@@ -50,7 +50,7 @@ const REQUIRED_RUNTIME_ASSETS = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')).re
 const DRIVER_REL = 'static/ergopti_plus/windows';
 const ENTRY_REL = `${DRIVER_REL}/ErgoptiPlus.ahk`;
 const VENDOR_REL = `${DRIVER_REL}/vendor`;
-const LAYOUT_DEFAULTS_REL = `${SHARED_REL}/modules/layouts/defaults.json`;
+const LAYOUT_DEFAULTS_REL = `${SHARED_REL}/layouts/data/defaults.json`;
 
 // python3 first (ubuntu CI), then the Windows launcher and python.
 const PY_CANDIDATES = [
@@ -73,7 +73,10 @@ const LICENSE_NOTICES = new Set([`${SHARED_REL}/ui/vendor/LICENSES.md`]);
 // Categories no Windows code can need at run time, judged by what the file is,
 // not by what the manifest says. A reference into one of them is itself a failure.
 const NEVER_RUNTIME = [
-	['behavior review metadata', (arc) => arc === `${SHARED_REL}/modules/features/behaviors.json`],
+	[
+		'behavior review metadata',
+		(arc) => arc === `${SHARED_REL}/settings/data/features/behaviors.json`
+	],
 	['shared test corpora', (arc) => arc.startsWith(`${SHARED_REL}/tests/`)],
 	// A Python source or anything under a python folder, wherever the layout
 	// puts it (_shared/python/ today, <feature>/adapters/python/ tomorrow).
@@ -83,18 +86,18 @@ const NEVER_RUNTIME = [
 			arc.startsWith(`${SHARED_REL}/`) &&
 			(/\.py[co]?$/.test(arc) || arc.split('/').includes('python'))
 	],
-	['native compile sources', (arc) => arc.startsWith(`${SHARED_REL}/native/`)],
-	['Go compile sources', (arc) => arc.startsWith(`${SHARED_REL}/go/`)],
+	['native compile sources', (arc) => arc.startsWith(`${SHARED_REL}/core/network/native/`)],
+	['Go compile sources', (arc) => arc.startsWith(`${SHARED_REL}/core/network/native/go/`)],
 	[
 		'macOS native Ollama catalogue',
 		(arc) =>
 			/^managed_ollama_(?:runtime|release)\.json$/.test(
-				arc.slice(`${SHARED_REL}/modules/llm/`.length)
-			) && arc.startsWith(`${SHARED_REL}/modules/llm/`)
+				arc.slice(`${SHARED_REL}/ai/data/`.length)
+			) && arc.startsWith(`${SHARED_REL}/ai/data/`)
 	],
 	[
 		'macOS Python bootstrap catalogue',
-		(arc) => arc === `${SHARED_REL}/modules/llm/managed_python_release.json`
+		(arc) => arc === `${SHARED_REL}/ai/data/managed_python_release.json`
 	],
 	['Lua sources', (arc) => arc.startsWith(`${SHARED_REL}/lua/`) || arc.endsWith('.lua')],
 	['documentation', (arc) => arc.endsWith('.md') && !LICENSE_NOTICES.has(arc)],
@@ -928,8 +931,12 @@ if (selection && refs) {
 	// add one forbidden file, and require the audit to name it.
 	const sharedTest = universeArcs.find((arc) => arc.startsWith(`${SHARED_REL}/tests/`));
 	const mutations = [
-		['add', `${SHARED_REL}/modules/features/behaviors.json`, 'the build-only behavior catalogue'],
-		['drop', `${SHARED_REL}/modules/llm/models.json`, 'a file name passed to a helper'],
+		[
+			'add',
+			`${SHARED_REL}/settings/data/features/behaviors.json`,
+			'the build-only behavior catalogue'
+		],
+		['drop', `${SHARED_REL}/ai/data/models.json`, 'a file name passed to a helper'],
 		['drop', 'vendor/sqlite3.dll', 'a root-anchored file'],
 		...[
 			'ollama_managed_files.ps1',
@@ -953,10 +960,14 @@ if (selection && refs) {
 			'static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml',
 			'the shipped MagicKey replacement metadata'
 		],
-		['drop', `${SHARED_REL}/data/locales/fr.json`, 'a dynamic locale path'],
+		['drop', `${SHARED_REL}/core/i18n/data/locales/fr.json`, 'a dynamic locale path'],
 		['drop', 'static/img/flags/de.png', 'a dynamic flag path'],
 		['drop', 'static/img/flags/de.bmp', 'a native language flag path'],
-		['drop', `${SHARED_REL}/modules/hotstrings/french/magickey.toml`, 'a language-pack TOML'],
+		[
+			'drop',
+			`${SHARED_REL}/hotstrings/data/catalogue/french/magickey.toml`,
+			'a language-pack TOML'
+		],
 		['drop', `${SHARED_REL}/ui/host_bridge.js`, 'a script a page loads'],
 		[
 			'drop',
@@ -965,29 +976,33 @@ if (selection && refs) {
 		],
 		['drop', `${registryFolder}/ergol/ergol.keylayout`, 'a file the registry index names'],
 		['add', sharedTest, 'a shared test corpus'],
-		['add', `${SHARED_REL}/python/network_proxy_policy.py`, 'a Python driver source'],
+		[
+			'add',
+			`${SHARED_REL}/core/network/adapters/python_network_proxy_policy.py`,
+			'a Python driver source'
+		],
 		[
 			'add',
 			`${SHARED_REL}/python/__pycache__/network_proxy_policy.cpython-313.pyc`,
 			'a generated Python driver runtime cache'
 		],
 		['add', `${SHARED_REL}/python/runtime.bin`, 'an arbitrary Python driver runtime asset'],
-		['add', `${SHARED_REL}/native/network/pac_runtime.c`, 'a native compile source'],
-		['add', `${SHARED_REL}/native/network/pac_runtime.h`, 'a native compile header'],
-		['add', `${SHARED_REL}/go/native_http/transport.go`, 'a Go compile source'],
+		['add', `${SHARED_REL}/core/network/native/pac_runtime.c`, 'a native compile source'],
+		['add', `${SHARED_REL}/core/network/native/pac_runtime.h`, 'a native compile header'],
+		['add', `${SHARED_REL}/core/network/native/go/native_http/transport.go`, 'a Go compile source'],
 		[
 			'add',
-			`${SHARED_REL}/modules/llm/managed_ollama_runtime.json`,
+			`${SHARED_REL}/ai/data/managed_ollama_runtime.json`,
 			'the macOS native Ollama source catalogue'
 		],
 		[
 			'add',
-			`${SHARED_REL}/modules/llm/managed_ollama_release.json`,
+			`${SHARED_REL}/ai/data/managed_ollama_release.json`,
 			'the macOS native Ollama produced catalogue'
 		],
 		[
 			'add',
-			`${SHARED_REL}/modules/llm/managed_python_release.json`,
+			`${SHARED_REL}/ai/data/managed_python_release.json`,
 			'the macOS Python bootstrap catalogue'
 		],
 		['add', 'vendor/UIA.ahk', 'a compile-time library'],

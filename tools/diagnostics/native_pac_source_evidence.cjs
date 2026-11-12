@@ -163,7 +163,7 @@ const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { sourceReceipt: trackedSourceReceipt } = require('./item36_xctest_evidence.cjs');
 const EXTRA_SOURCE_INPUTS = Object.freeze([
-	'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+	'static/ergopti_plus/_shared/core/network/data/proxy_policy.json',
 	'static/ergopti_plus/macos/tests/support/native_pac_source_fixture.py',
 	'tools/diagnostics/native_pac_source_evidence.cjs',
 	'tools/diagnostics/swift_xctest_evidence.cjs'

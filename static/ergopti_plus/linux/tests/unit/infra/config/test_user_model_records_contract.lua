@@ -10,4 +10,4 @@
 --- macOS and nothing here claims a Linux saved-model reader.
 --- ==============================================================================
 
-require("test.user_model_records_contract").register_pure(require("tests.helpers"))
+require("tests.lua.hotstrings.user_model_records_contract").register_pure(require("tests.helpers"))

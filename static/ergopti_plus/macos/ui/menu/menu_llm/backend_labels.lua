@@ -15,14 +15,14 @@
 ---    the dash comes from the locale.
 --- ==============================================================================
 
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 local Paths     = require("infra.paths")
 local JsonCodec = require("adapters.json_codec")
 local M = {}
 
 -- The brand and emoji come from the file the three drivers and the model page
 -- share; only the description key after the em dash is this menu's own.
-local BRANDS_PATH = "modules/llm/backends.json"
+local BRANDS_PATH = "ai/data/backends.json"
 local DESCRIPTION_KEYS = {
 	mlx    = "menu.llm.backend_mlx_suffix",
 	ollama = "menu.llm.backend_ollama_suffix",

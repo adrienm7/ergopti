@@ -31,13 +31,13 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Transaction = require("config_scope_transaction")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local Logger = require("logger.shim")
-local LayerPreset = require("keymap.layer_preset")
-local NativePath = require("native_path")
-local ConfigKeys = require("config_keys")
+local Transaction = require("settings.engine.scope.transaction")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local Logger = require("core.logger.engine.shim")
+local LayerPreset = require("layouts.engine.layers.preset")
+local NativePath = require("core.fs.engine.native_path")
+local ConfigKeys = require("settings.engine.keys")
 local LOG = "infra.tap_hold_scope"
 local _owner, _sequence = nil, 0
 require("infra.scope_registry").register("tap_hold_scope", function() return _owner ~= nil and _owner.pending() == true end)
@@ -271,7 +271,7 @@ end
 --- The tap-hold participant of a composed scope, bound to the retained owner.
 --- @return table participant See config_scope_composition.
 function M.participant()
-	return require("config_scope_participant").synchronous({
+	return require("settings.engine.scope.participant").synchronous({
 		apply = function(mode) return M.apply(mode) end,
 		owner = function() return _owner end,
 	})

@@ -36,21 +36,21 @@ local Logger = require("infra.logger")
 local Layout = require("modules.keymap.layout")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
-local KeyNames = require("keycodes.key_names")
-local StickyLabel = require("actions.sticky_label")
+local KeyNames = require("platform.input.keycodes.key_names")
+local StickyLabel = require("shortcuts.engine.actions.sticky_label")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
 
 local Defaults = require("platform.remap.defaults")
 local ActionCatalogue = require("platform.remap.action_catalogue")
 local Manifest = require("infra.manifest_reader")
-local OutdatedEntries = require("config_outdated")
+local OutdatedEntries = require("settings.engine.migration.outdated")
 local KePaths = require("platform.remap.ke_paths")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 local TapHoldFile = require("platform.remap.tap_hold_file")
 -- Resolved at use, as before: the shared writer binds its native admission when loaded.
-local function writer() return require("toml_codec.writer") end
+local function writer() return require("core.text.engine.toml_codec.writer") end
 -- Declared here, above the readers below: section 1 declares its own TomlCodec later.
 local ConfigCodec = require("infra.toml.codec")
 
@@ -172,7 +172,7 @@ end
 
 local TAP_HOLD_TIMEOUT_MS_DEFAULT       = Defaults.tap_hold_timeout_ms
 local TAP_HOLD_MAX_TIMEOUT_MS           = Defaults.tap_hold_max_timeout_ms
-local LoneTap = require("tap_hold.lone_tap")
+local LoneTap = require("tap_hold.engine.lone_tap")
 -- How long a modifier key pressed alone still taps: the manifest's
 -- tap_holds.lone_modifier_tap_max_ms (0 = the strict tap-hold).
 M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT = LoneTap.validate(
@@ -191,7 +191,7 @@ local function timing_leaf(section, key, default, path, section_name)
 	-- The global delay has SCHEMA.md's bound, read wherever this leaf is.
 	local maximum = section_name == ConfigKeys.KEY.TAP_HOLDS and key == "timeout_ms" and TAP_HOLD_MAX_TIMEOUT_MS or nil
 	local called, value = pcall(tonumber, section[key])
-	if called and require("number_policy").within_timer_ceiling(value)
+	if called and require("core.text.engine.number_policy").within_timer_ceiling(value)
 		and value > 0 and value % 1 == 0 and (maximum == nil or value <= maximum) then return value, false end
 	Outdated.report_in_file(path, { section_name, key }, maximum == nil
 		and "a timing is a finite positive whole number of milliseconds; the canonical default is used"
@@ -365,7 +365,7 @@ local _chord_catalogue = nil
 --- Replaces the hardcoded French label of any action that also exists in the one
 --- action registry with its translated one.
 ---
---- This catalogue's entries and the rows of _shared/modules/actions/actions.toml
+--- This catalogue's entries and the rows of _shared/shortcuts/data/actions/actions.toml
 --- are now ONE namespace: the 18 that always overlapped, plus the 32 merged on
 --- 2026-08-03, plus 4 that turned out to be Karabiner spellings of an action the
 --- registry already carried (`return`≡`enter`, `delete_fwd`≡`delete`, `cmd_tab`
@@ -432,7 +432,7 @@ local function name_modifier_holds(actions)
 end
 
 --- Names the layer holds (those declaring `hold_layer`) by the label the shared
---- hold picker gives that layer on every driver (_shared/lua/tap_hold/
+--- hold picker gives that layer on every driver (_shared/tap_hold/engine/
 --- hold_options.lua: tap_hold.hold.<layer>_layer). The navigation layer hold
 --- read « Layer nav. — Actif tant que maintenu » in French in every locale.
 --- @param actions table The decoded action list, mutated in place.
@@ -491,7 +491,7 @@ local function name_categories(actions)
 end
 
 local function append_shared_modifier_chords(actions)
-	local catalogue_path = Paths.shared("modules/actions/modifier_chords.json")
+	local catalogue_path = Paths.shared("shortcuts/data/actions/modifier_chords.json")
 	if not catalogue_path then return end
 	if _chord_catalogue == nil then
 		_chord_catalogue = load_json_file(catalogue_path) or false
@@ -1354,7 +1354,7 @@ function M.prepare_copy_taps_to_chords(entries, actions, path)
 	-- The shared file names a combination by its pair id.
 	local pairs_of = {}
 	for index, entry in ipairs(entries) do pairs_of[index] = { id = TapHoldFile.pair_of_combo(entry.id) } end
-	local plan = require("tap_hold.key_combinations").plan_chord_copy(status == "absent" and "" or source, {
+	local plan = require("tap_hold.engine.key_combinations").plan_chord_copy(status == "absent" and "" or source, {
 		entries = pairs_of, is_action = function(action) return known[action] == true end,
 		settings = { simultaneous_threshold_ms = SIMULTANEOUS_THRESHOLD_MS_DEFAULT, combo_symmetric = COMBO_SYMMETRIC_DEFAULT },
 	})

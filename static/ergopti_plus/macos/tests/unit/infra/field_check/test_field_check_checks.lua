@@ -259,7 +259,7 @@ helpers.describe("lease check", function()
 		local steps = run_on("owned", "lease", ports)
 		helpers.assert_eq(steps.config_present.value, "no", "the shared file says nothing of the owned runtime")
 		world.existing["/Users/jane/Library/Application Support/"
-			.. require("app_dirs").owned_runtime.macos_folder_name .. "/karabiner/karabiner.json"] = true
+			.. require("core.fs.engine.app_dirs").owned_runtime.macos_folder_name .. "/karabiner/karabiner.json"] = true
 		helpers.assert_eq(run_on("owned", "lease", ports).config_present.value, "yes")
 		helpers.assert_eq(run("lease", ports).config_present.value, "yes", "the shared runtime keeps its own file")
 	end)

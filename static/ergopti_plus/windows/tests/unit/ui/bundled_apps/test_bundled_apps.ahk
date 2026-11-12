@@ -49,7 +49,7 @@ _BAT_Format() {
 _BAT_Strings() {
 	global _SharedDir
 	if !BundledAppStrings.loaded
-		BundledAppStrings_Load(_SharedDir . "\data\locales", "en")
+		BundledAppStrings_Load(_SharedDir . "\core\i18n\data\locales", "en")
 }
 
 _BAT_WorkDir() {

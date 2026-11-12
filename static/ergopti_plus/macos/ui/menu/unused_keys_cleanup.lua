@@ -24,8 +24,8 @@
 --- ==============================================================================
 
 local M = {}
-local Engine = require("config_unused_keys")
-local ConfigOutdated = require("config_outdated")
+local Engine = require("settings.engine.migration.unused_keys")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 
 
 

@@ -4,7 +4,7 @@
 --- MODULE: copy_selected_path opens what the selection names (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/shortcuts/open_target_vectors.json, which the
---- macOS and Windows suites replay too, through _shared/lua/open_target with
+--- macOS and Windows suites replay too, through _shared/shortcuts/engine with
 --- the corpus's POSIX environment, then drives the real gesture dispatcher
 --- with a recorded primary selection and a recording desktop opener.
 ---
@@ -15,8 +15,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local OpenTarget = require("open_target")
+local json = require("core.text.engine.json")
+local OpenTarget = require("shortcuts.engine.open_target")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/shortcuts/open_target_vectors.json"
 
@@ -31,11 +31,11 @@ end
 helpers.describe("opening selected content privacy", function()
 	for _, failure in ipairs({ false, true }) do
 		helpers.it("does not log selected search text on " .. (failure and "failure" or "success"), function()
-			local old_logger, old_subject = package.loaded["logger.shim"], package.loaded["modules.shortcuts.open_selection"]
-			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local old_logger, old_subject = package.loaded["core.logger.engine.shim"], package.loaded["modules.shortcuts.open_selection"]
+			local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 			local logs, opened = {}, nil
 			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
-			package.loaded["logger.shim"] = logger
+			package.loaded["core.logger.engine.shim"] = logger
 			package.loaded["modules.shortcuts.open_selection"] = nil
 			local ok, err = xpcall(function()
 				local subject = require("modules.shortcuts.open_selection")
@@ -53,7 +53,7 @@ helpers.describe("opening selected content privacy", function()
 				helpers.assert_true(not table.concat(logs, "\n"):find("secretmarker", 1, true),
 					"the selected query and native error details must not enter logs")
 			end, debug.traceback)
-			package.loaded["logger.shim"], package.loaded["modules.shortcuts.open_selection"] = old_logger, old_subject
+			package.loaded["core.logger.engine.shim"], package.loaded["modules.shortcuts.open_selection"] = old_logger, old_subject
 			if not ok then error(err, 0) end
 		end)
 	end
@@ -62,12 +62,12 @@ end)
 helpers.describe("opening selected content notifier privacy", function()
 	for _, mode in ipairs({ "unavailable", "refused" }) do
 		helpers.it("keeps the selected path out of the real notifier fallback when " .. mode, function()
-			local names = { "logger.shim", "modules.shortcuts.open_selection", "adapters.notifier", "adapters.shell_runner" }
+			local names = { "core.logger.engine.shim", "modules.shortcuts.open_selection", "adapters.notifier", "adapters.shell_runner" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local logs = {}
-			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
-			package.loaded["logger.shim"] = logger
+			package.loaded["core.logger.engine.shim"] = logger
 			package.loaded["adapters.shell_runner"] = {
 				has_command = function() return mode ~= "unavailable" end,
 				quote = function(value) return "'" .. value .. "'" end,
@@ -94,12 +94,12 @@ end)
 helpers.describe("copied path notifier privacy", function()
 	for _, mode in ipairs({ "unavailable", "refused" }) do
 		helpers.it("keeps copied file paths out of the real notifier fallback when " .. mode, function()
-			local names = { "logger.shim", "modules.shortcuts.open_selection", "adapters.notifier", "adapters.shell_runner" }
+			local names = { "core.logger.engine.shim", "modules.shortcuts.open_selection", "adapters.notifier", "adapters.shell_runner" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local logs, written = {}, nil
-			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
-			package.loaded["logger.shim"] = logger
+			package.loaded["core.logger.engine.shim"] = logger
 			package.loaded["adapters.shell_runner"] = {
 				has_command = function() return mode ~= "unavailable" end,
 				quote = function(value) return "'" .. value .. "'" end,

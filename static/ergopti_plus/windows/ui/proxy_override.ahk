@@ -4,7 +4,7 @@
 ; MODULE: Proxy Override Row (Windows)
 ; DESCRIPTION:
 ; Debug > proxy for downloads: the twin of the shared edit flow
-; (_shared/lua/network/proxy_override.lua `edit`) over this driver's dialogs and
+; (_shared/core/network/engine/proxy_override.lua `edit`) over this driver's dialogs and
 ; config.toml. A value that is refused is never stored; a saved one applies to the
 ; next download. Logs name the mode only, never a relay.
 ; ==============================================================================

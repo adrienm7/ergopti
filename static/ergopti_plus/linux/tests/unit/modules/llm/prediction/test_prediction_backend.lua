@@ -418,7 +418,7 @@ end)
 helpers.describe("backend publication rechecks actual admission after dismissal", function()
 	for _, condition in ipairs({"pause", "foreign source", "admission withdrawn", "unchanged"}) do
 		helpers.it("retains canonical bytes after dismissal: " .. condition .. " (backend-second-admission)", function()
-			local Sandbox = require("test.config_unused_keys_contract").sandbox
+			local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 			local initial = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n[future]\nvalue = 42 # independently owned\n'
 			Sandbox.with_config(initial, function(path)
 				local engine, _, scheduler, restore = load("ollama", nil)
@@ -457,7 +457,7 @@ helpers.describe("backend publication rechecks actual admission after dismissal"
 					helpers.assert_eq(committed, condition == "unchanged")
 					local bytes = Sandbox.read_bytes(path)
 					if condition == "unchanged" then
-						local decoded = require("toml_codec").decode(bytes)
+						local decoded = require("core.text.engine.toml_codec").decode(bytes)
 						helpers.assert_eq(decoded.llm.models.selected, "api", "the real preference writer must acknowledge a new canonical backend")
 						helpers.assert_eq(decoded.future.value, 42)
 						package.loaded["infra.llm_preferences"] = nil
@@ -601,9 +601,9 @@ helpers.describe("prediction dispatch admission is explicit", function()
 	for _, completed in ipairs({ 0, 1 }) do
 		for _, starts_successor in ipairs({ false, true }) do
 			helpers.it("retains " .. (starts_successor and "successor" or "completed variants") .. " through a warning sink after " .. completed .. " variants (dispatch-refusal-logger)", function()
-				local previous_logger = package.loaded["logger.shim"]
-				local logger = dofile(helpers.driver_root() .. "/../_shared/lua/logger/init.lua")
-				package.loaded["logger.shim"] = logger
+				local previous_logger = package.loaded["core.logger.engine.shim"]
+				local logger = dofile(helpers.driver_root() .. "/../_shared/core/logger/engine/init.lua")
+				package.loaded["core.logger.engine.shim"] = logger
 				local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.display.streaming"] = true }, nil, true)
 				local ok, err = pcall(function()
 					local backend = package.loaded["modules.llm.api_remote"]
@@ -642,7 +642,7 @@ helpers.describe("prediction dispatch admission is explicit", function()
 				end)
 				logger.set_sink(nil)
 				restore()
-				package.loaded["logger.shim"] = previous_logger
+				package.loaded["core.logger.engine.shim"] = previous_logger
 				if not ok then error(err, 0) end
 			end)
 		end

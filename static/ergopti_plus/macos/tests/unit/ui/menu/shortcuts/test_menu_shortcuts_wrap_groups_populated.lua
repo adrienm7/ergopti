@@ -49,7 +49,7 @@ helpers.describe("Shortcuts wrap-symbol groups are populated", function()
 end)
 
 
-local WrapJson = require("json")
+local WrapJson = require("core.text.engine.json")
 local wrap_file = assert(io.open(helpers.shared("tests/corpus/menus/wrap_symbol_controls.json"), "rb"))
 local wrap_expectations = assert(WrapJson.decode(wrap_file:read("*a")))
 wrap_file:close()
@@ -58,7 +58,7 @@ wrap_file:close()
 local function with_wrap_controls(options, callback)
 	options = options or {}
 	return helpers.with_stub_scope({
-		"ui.menu.menu_shortcuts", "menu.wrap_mutation", "infra.manifest_menu", "infra.i18n", "infra.paths",
+		"ui.menu.menu_shortcuts", "menu.engine.wrap_mutation", "infra.manifest_menu", "infra.i18n", "infra.paths",
 		"infra.logger", "infra.dialog_util", "modules.shortcuts.actions.text",
 		"ui.menu.menu_utils", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
 		"ui.menu.menu_tap_keys", "infra.manifest_reader",
@@ -291,10 +291,10 @@ end
 helpers.describe("independent complete fixed wrap declaration coverage", function()
 	helpers.it("pins each published section field and hides every control on Linux (wrap-controls)", function()
 		with_wrap_controls({}, function(f)
-			local Renderer = require("menu.renderer")
+			local Renderer = require("menu.engine.renderer")
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
 				local renderer = assert(Renderer.new({ platform = platform,
-					manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end, json_decode = WrapJson.decode,
+					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end, json_decode = WrapJson.decode,
 					i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub() }))
 				for _, section in ipairs(wrap_expectations.sections) do
 					local definitions = renderer.get_array(section.section)
@@ -326,7 +326,7 @@ helpers.describe("independent complete fixed wrap declaration coverage", functio
 		with_wrap_controls({ custom = { { left = "a", right = "b" } } }, function(f)
 			local count = 0
 			for _, code in ipairs(wrap_expectations.locales) do
-				local file = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "rb"))
+				local file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. code .. ".json"), "rb"))
 				local translated = assert(WrapJson.decode(file:read("*a")))
 				file:close()
 				for _, section in ipairs(wrap_expectations.sections) do
@@ -579,8 +579,8 @@ local function with_shortcut_presentation(language, scenario)
 	local names = {
 		"ui.menu.menu_shortcuts", "infra.manifest_menu", "ui.menu.menu_utils",
 		"ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils", "ui.menu.menu_tap_keys",
-		"infra.i18n", "infra.locale", "locale.core", "menu.renderer", "infra.logger",
-		"infra.dialog_util", "infra.paths", "modules.shortcuts", "menu.row_dialect",
+		"infra.i18n", "infra.locale", "core.i18n.engine.core", "menu.engine.renderer", "infra.logger",
+		"infra.dialog_util", "infra.paths", "modules.shortcuts", "menu.engine.row_dialect",
 	}
 	return helpers.with_fresh_modules(names, function()
 		helpers.load_with_stubs("infra.manifest_menu")

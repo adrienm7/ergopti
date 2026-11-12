@@ -2,7 +2,7 @@
 
 --- Resolves the signed native runtime's read-only switcher helper, never PATH.
 local M = {}
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 --- Freezes the packaged digest and exact native file identity for admission.
 --- The normal authenticated launcher owns this executable path and signed digest.

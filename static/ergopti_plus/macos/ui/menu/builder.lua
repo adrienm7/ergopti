@@ -12,15 +12,15 @@
 --- ==============================================================================
 
 local M = {}
-local PersonalFiles = require("hotstrings.personal_files")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local hs         = hs
 local Logger     = require("infra.logger")
-local ParentSource = require("menu.frames.parent_source")
+local ParentSource = require("menu.engine.frames.parent_source")
 local PhaseStats = require("infra.phase_stats")
 local Paths      = require("infra.paths")
 local LOG        = "builder"
 local i18n       = require("infra.i18n")
-local COMMAND    = require("config_keys").COMMAND
+local COMMAND    = require("settings.engine.keys").COMMAND
 -- The single reader of menu_manifest.json. See load_manifest below for why this
 -- module no longer has one of its own.
 local ManifestMenu = require("infra.manifest_menu")
@@ -96,12 +96,12 @@ end
 local HotCounter  = require("ui.menu.hotstring_counter")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local CanvasBadge = require("ui.menu.canvas_badge")
-local Labels      = require("menu.labels")
+local Labels      = require("menu.engine.labels")
 
 
-local Languages   = require("hotstrings.languages")
-local Extensions  = require("hotstrings.extensions")
-local TomlCodec   = require("toml_codec.codec")
+local Languages   = require("hotstrings.engine.languages")
+local Extensions  = require("hotstrings.engine.extensions")
+local TomlCodec   = require("core.text.engine.toml_codec.codec")
 local LocaleTable = require("_generated.locale_table")
 
 local _top_level_cache = nil
@@ -196,7 +196,7 @@ end
 --- @return table Array of { id, locale, categories }.
 local function load_language_packs()
 	if _language_packs_cache then return _language_packs_cache end
-	local path = Paths.shared("modules/hotstrings/_index.toml")
+	local path = Paths.shared("hotstrings/data/catalogue/_index.toml")
 	local fh = io.open(path, "r")
 	if not fh then error("[builder] hotstring index is unreadable: " .. tostring(path)) end
 	local raw = fh:read("*a")
@@ -495,7 +495,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		-- parent row's `action`, which AppKit never sends for an item that
 		-- opens a submenu, so the Hotstrings master could not be switched from
 		-- the menu bar at all.
-		[require("config_keys").COMMAND.HOTSTRINGS_TOGGLE]      = function()
+		[require("settings.engine.keys").COMMAND.HOTSTRINGS_TOGGLE]      = function()
 			if ctx.paused then
 				Logger.warn(LOG, "Hotstrings switch refused: the script is paused.")
 				return false
@@ -713,13 +713,13 @@ function M.generate(ctx, menu_mods, actions)
 			local cfg_ctx = {}
 			for key, value in pairs(ctx or {}) do cfg_ctx[key] = value end
 			cfg_ctx.commands = {
-				[require("config_keys").COMMAND.SCOPE_RESTORE]       = restore,
-				[require("config_keys").COMMAND.SCOPE_CLEAR]         = clear,
-				[require("config_keys").COMMAND.CLEAN_UNUSED_KEYS]   = clean,
-				[require("config_keys").COMMAND.CONFIG_FOLDER]       = actions.open_paths,
-				[require("config_keys").COMMAND.SETUP_WIZARD]        = actions.show_setup_wizard,
+				[require("settings.engine.keys").COMMAND.SCOPE_RESTORE]       = restore,
+				[require("settings.engine.keys").COMMAND.SCOPE_CLEAR]         = clear,
+				[require("settings.engine.keys").COMMAND.CLEAN_UNUSED_KEYS]   = clean,
+				[require("settings.engine.keys").COMMAND.CONFIG_FOLDER]       = actions.open_paths,
+				[require("settings.engine.keys").COMMAND.SETUP_WIZARD]        = actions.show_setup_wizard,
 				-- Self-contained: the shared edit flow reads and writes its own setting.
-				[require("config_keys").COMMAND.PROXY_OVERRIDE]      = function() require("ui.proxy_override").run() end,
+				[require("settings.engine.keys").COMMAND.PROXY_OVERRIDE]      = function() require("ui.proxy_override").run() end,
 			}
 			cfg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
@@ -791,10 +791,10 @@ function M.generate(ctx, menu_mods, actions)
 			for key, value in pairs(ctx or {}) do dbg_ctx[key] = value end
 			dbg_ctx.commands = {
 				["console"]        = actions.open_console,
-				[require("config_keys").LEAF.LOG_LEVEL]      = actions.set_log_level,
-				[require("config_keys").COMMAND.OPEN_LOGS]      = actions.open_logs,
-				[require("config_keys").COMMAND.OPEN_TODAY_LOG] = actions.open_today_log,
-				[require("config_keys").COMMAND.OPEN_ERROR_LOG] = actions.open_error_log,
+				[require("settings.engine.keys").LEAF.LOG_LEVEL]      = actions.set_log_level,
+				[require("settings.engine.keys").COMMAND.OPEN_LOGS]      = actions.open_logs,
+				[require("settings.engine.keys").COMMAND.OPEN_TODAY_LOG] = actions.open_today_log,
+				[require("settings.engine.keys").COMMAND.OPEN_ERROR_LOG] = actions.open_error_log,
 				["healthcheck"]    = function() healthcheck.show_window({ state = ctx.state }) end,
 				[COMMAND.FIELD_CHECK_LEASE] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LEASE) end,
 				[COMMAND.FIELD_CHECK_OWNED_RUNTIME] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_OWNED_RUNTIME) end,
@@ -803,13 +803,13 @@ function M.generate(ctx, menu_mods, actions)
 				[COMMAND.FIELD_CHECK_LOGIN_ITEMS] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LOGIN_ITEMS) end,
 				[COMMAND.FIELD_CHECK_KEY_ACCOUNTING] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_KEY_ACCOUNTING) end,
 				[COMMAND.COMPOSER_CHECK] = function() require("ui.field_check").run(COMMAND.COMPOSER_CHECK) end,
-				[require("config_keys").COMMAND.REPORT_BUG]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
-				[require("config_keys").COMMAND.SUGGEST_FEATURE] = function() require("ui.healthcheck.report").suggest_feature() end,
-				[require("config_keys").LEAF.SHOW_ERROR_DIALOG] = actions.toggle_error_dialog,
+				[require("settings.engine.keys").COMMAND.REPORT_BUG]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
+				[require("settings.engine.keys").COMMAND.SUGGEST_FEATURE] = function() require("ui.healthcheck.report").suggest_feature() end,
+				[require("settings.engine.keys").LEAF.SHOW_ERROR_DIALOG] = actions.toggle_error_dialog,
 			}
 			dbg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do dbg_ctx.state_getters[key] = value end
-			dbg_ctx.state_getters[require("config_keys").KEY.SCRIPT_LOG_LEVEL] = function() return active_level_name end
+			dbg_ctx.state_getters[require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL] = function() return active_level_name end
 			dbg_ctx.state_getters["error_dialog_enabled"] = function()
 				return require("ui.error_dialog").is_enabled()
 			end

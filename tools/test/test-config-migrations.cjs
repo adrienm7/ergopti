@@ -5,7 +5,7 @@
  * MODULE: Config Migration Registry Gate
  * DESCRIPTION:
  * Pins the versioned config.toml contract shared by the three drivers: the
- * shipped registry (_shared/core/config_schema/migrations.toml) is contiguous
+ * shipped registry (_shared/settings/data/config_schema/migrations.toml) is contiguous
  * and uses only the closed op set, every corpus case is well formed and listed,
  * and an independent reference interpreter replays the corpus so an
  * expected.toml cannot silently describe behaviour no interpreter has.
@@ -22,7 +22,7 @@
  *    disjoint; a move into its own subtree is refused likewise.
  * 3. Replay. The reference interpreter below is a third implementation of the
  *    op semantics (after windows/infra/config_migrate.ahk and
- *    _shared/lua/config_migrate.lua). It decides every case's outcome, compares
+ *    _shared/settings/engine/migration/migrate.lua). It decides every case's outcome, compares
  *    the migrated model with expected.toml and replays the steps on their own
  *    output, which must change nothing.
  * 4. Coverage floors. Every op kind, every outcome and every driver appears in
@@ -43,7 +43,7 @@ const TOML = require('smol-toml');
 const { shared } = require('../lib/paths.cjs');
 const { parseOpFields } = require('../codegen/codegen-config-migration-ops.cjs');
 
-const REGISTRY_PATH = shared('core/config_schema/migrations.toml');
+const REGISTRY_PATH = shared('settings/data/config_schema/migrations.toml');
 const CORPUS_DIR = shared('tests/corpus/config_migrations');
 const DEFECTS_DIR = shared('tests/corpus/config_migration_registries');
 
@@ -793,11 +793,13 @@ function readToml(file) {
 // model and the actual shared modifier matrix; no fixture action allowlist.
 const actionGenerator = require('../codegen/codegen-action-catalogue.cjs');
 const actionModel = actionGenerator.buildModel(
-	actionGenerator.parseRegistry(fs.readFileSync(shared('modules/actions/actions.toml'), 'utf8')),
+	actionGenerator.parseRegistry(
+		fs.readFileSync(shared('shortcuts/data/actions/actions.toml'), 'utf8')
+	),
 	'hs'
 );
 const modifierChords = JSON.parse(
-	fs.readFileSync(shared('modules/actions/modifier_chords.json'), 'utf8')
+	fs.readFileSync(shared('shortcuts/data/actions/modifier_chords.json'), 'utf8')
 );
 const assignableActions = new Set(
 	actionModel.sgItems.filter((item) => item.kind === 'action').map((item) => item.id)
@@ -1191,9 +1193,12 @@ function readSource(file) {
 
 // The Lua engine names the registry the drivers load, and both Lua suites
 // replay the corpus through the shared contract with their own driver id.
-const luaEngine = readSource(shared('lua/config_migrate.lua'));
+const luaEngine = readSource(shared('settings/engine/migration/migrate.lua'));
 if (!luaEngine.includes(`M.REGISTRY_PATH = "${REGISTRY_RELATIVE}"`)) {
-	fail('wiring', `_shared/lua/config_migrate.lua must name the registry as "${REGISTRY_RELATIVE}"`);
+	fail(
+		'wiring',
+		`_shared/settings/engine/migration/migrate.lua must name the registry as "${REGISTRY_RELATIVE}"`
+	);
 }
 // The Lua engine still keeps its own table, so it is compared field by field
 // with the op set the registry declares.
@@ -1207,10 +1212,13 @@ for (const row of (luaOpsBlock ? luaOpsBlock[1] : '').split('\n')) {
 }
 for (const name of new Set([...Object.keys(OPS), ...Object.keys(luaOps)])) {
 	if (JSON.stringify(OPS[name]) !== JSON.stringify(luaOps[name])) {
-		fail('wiring', `_shared/lua/config_migrate.lua OPS.${name} differs from the registry's op set`);
+		fail(
+			'wiring',
+			`_shared/settings/engine/migration/migrate.lua OPS.${name} differs from the registry's op set`
+		);
 	}
 }
-const luaContract = readSource(shared('lua/test/config_migrate_contract.lua'));
+const luaContract = readSource(shared('tests/lua/settings/migrate_contract.lua'));
 for (const corpus of ['config_migrations', 'config_migration_registries']) {
 	if (!luaContract.includes(`/tests/corpus/${corpus}"`)) {
 		fail('wiring', `the shared Lua contract must replay tests/corpus/${corpus}`);
@@ -1289,7 +1297,7 @@ for (const [driver, id, runnerPath] of [
 	const runner = readSource(shared('..', driver, ...runnerPath.split('/')));
 	if (
 		!runner.includes(
-			`require("test.config_migrate_contract").register(helpers, { driver = "${id}" })`
+			`require("tests.lua.settings.migrate_contract").register(helpers, { driver = "${id}" })`
 		)
 	) {
 		fail('wiring', `${driver}/${runnerPath} must register the contract for driver "${id}"`);

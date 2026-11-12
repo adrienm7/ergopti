@@ -10,15 +10,15 @@
 --- ==============================================================================
 
 local M = {}
-local Errors = require("adapter_errors")
-local TextUtils = require("text_utils")
+local Errors = require("diagnostics.engine.adapter_errors")
+local TextUtils = require("core.text.engine.utils_core")
 local Shell = require("adapters.shell_runner")
 
 local Fs = require("adapters.file_system")
 local Paths = require("infra.paths")
-local Version = require("updater.version")
-local Snapshot = require("diagnostics.snapshot")
-local NativePath = require("native_path")
+local Version = require("updater.engine.version_core")
+local Snapshot = require("diagnostics.engine.snapshot")
+local NativePath = require("core.fs.engine.native_path")
 local NoReplaceMove = require("infra.no_replace_move")
 local Ownership = require("modules.updater.ownership_receipt")
 local ProgramRunner = require("adapters.program_runner")
@@ -145,7 +145,7 @@ function M.resolve(source_path, probe)
 	local wrapper = prefix .. "/bin/ergopti-hotstrings"
 	local shared_root = Paths.shared_root_from(driver_root,
 		function(path) return probe(path, "file") end)
-	if not shared_root or not probe(shared_root .. "/lua", "dir")
+	if not shared_root or not probe(shared_root .. "", "dir")
 		or not probe(wrapper, "file") then
 		return { kind = "unmanaged", reason = Errors.UPDATER_STANDALONE_FILES_ABSENT }
 	end
@@ -336,7 +336,7 @@ function DEFAULT_OPS.compile_bytecode(root)
 	local interpreter = running_interpreter()
 	if not interpreter then return false end
 	-- The compiler the activated release ships (infra/bytecode_package.lua).
-	local compiler = root .. "/" .. require("identifiers").bytecode_package.compiler
+	local compiler = root .. "/" .. require("core.text.engine.identifiers").bytecode_package.compiler
 	return run_command(shell_quote(interpreter) .. " " .. shell_quote(compiler)
 		.. " " .. shell_quote(root) .. " >/dev/null 2>&1")
 end
@@ -374,7 +374,7 @@ local function validate_candidate(work_dir, expected_version, ops)
 	for _, path in ipairs(required_files) do
 		if not ops.is_file(path) then return false, "staged archive is missing " .. path end
 	end
-	if not shared_root or not ops.is_dir(shared_root .. "/lua") then
+	if not shared_root or not ops.is_dir(shared_root .. "") then
 		return false, "staged archive is missing the shared Lua tree"
 	end
 

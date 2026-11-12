@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local PortFakes = require("tests.support.port_fakes")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local MODULES = {
 	"modules.llm.screen_answer", "modules.llm.prediction_engine", "modules.llm",
@@ -21,8 +21,8 @@ local MODULES = {
 	"modules.shortcuts.actions.screenshot_save", "adapters.file_system",
 	"adapters.json_codec", "adapters.storage", "adapters.timer_scheduler",
 	"adapters.mouse_control", "infra.logger", "infra.timings", "infra.keycodes",
-	"ui.tooltip", "llm.vision", "llm.rewrite", "llm.prompt_action", "llm.translate",
-	"text_utils", "compat.utf8",
+	"ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
+	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
 }
 
 local function with_capture(callback)

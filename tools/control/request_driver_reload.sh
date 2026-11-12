@@ -10,9 +10,9 @@
 # the request file itself wakes. The driver hands the request to its own reload
 # owner. This script never starts a driver, never ends one and never retries: a
 # reload that stays "requested" past the timeout has an unknown outcome. The
-# declaration is static/ergopti_plus/_shared/modules/control/driver_control.json;
+# declaration is static/ergopti_plus/_shared/diagnostics/data/control/driver_control.json;
 # the folders and file names below must match it, with {app} spelled as the
-# folder name of _shared/modules/paths/app_dirs.toml for that OS ("Ergopti" on
+# folder name of _shared/core/fs/data/paths/app_dirs.toml for that OS ("Ergopti" on
 # macOS, "ergopti" under XDG on Linux). POSIX sh reads neither JSON nor TOML,
 # so the Linux suite checks these spellings against both declarations.
 #

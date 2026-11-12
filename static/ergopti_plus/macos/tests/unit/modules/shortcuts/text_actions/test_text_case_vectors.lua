@@ -17,7 +17,7 @@
 local helpers = require("tests.helpers")
 local previous_destination = package.loaded["modules.keymap.utils"]
 local Destination = require("tests.support.text_destination_receipt")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local CORPUS = helpers.shared("tests/corpus/text_case/vectors.json")
 

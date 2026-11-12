@@ -132,12 +132,12 @@ end
 local function open_on_desktop(target)
 	local request, reason = require("adapters.desktop_opener").open(target, function(result)
 		if result.ok ~= true then
-			require("logger.shim").error(LOG, "Desktop open of %s failed (%s).",
+			require("core.logger.engine.shim").error(LOG, "Desktop open of %s failed (%s).",
 				target, tostring(result.error or result.code))
 		end
 	end)
 	if not request then
-		require("logger.shim").error(LOG, "Desktop open of %s refused: %s.", target, tostring(reason))
+		require("core.logger.engine.shim").error(LOG, "Desktop open of %s refused: %s.", target, tostring(reason))
 	end
 end
 
@@ -145,7 +145,7 @@ end
 --- @return string
 local function bug_form_url()
 	local documents = require("ui.healthcheck.bridge").config()
-	return require("diagnostics.issue_link").build_url(documents.templates, documents.repository, "bug", {})
+	return require("diagnostics.engine.reports.issue_link").build_url(documents.templates, documents.repository, "bug", {})
 end
 
 --- Default side effects of the degraded menu; tests replace each one.
@@ -197,7 +197,7 @@ end
 --- @param deps table tray (tray_menu adapter); i18n, sleep_ms, actions optional.
 --- @param texts table { label, title, body }: translated label, title, body.
 function M.hold_tray(deps, texts)
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local tray = deps.tray
 	tray.setIcon({ title = "Ergopti" })
 	if tray.getBackend() == nil then return end

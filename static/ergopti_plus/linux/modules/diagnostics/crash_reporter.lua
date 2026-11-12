@@ -22,9 +22,9 @@
 --- ==============================================================================
 
 local M = {}
-local CrashReport = require("crash_report")
+local CrashReport = require("diagnostics.engine.reports.crash_report")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "diagnostics.crash_reporter"
 
 -- =========================================
@@ -60,7 +60,7 @@ end
 
 --- Ensures the crash directory exists.
 local function _ensure_dir(directory)
-	return os.execute("mkdir -p " .. require("text_utils").shell_quote(directory) .. " 2>/dev/null")
+	return os.execute("mkdir -p " .. require("core.text.engine.utils_core").shell_quote(directory) .. " 2>/dev/null")
 end
 
 --- Deletes the reports beyond the shared cap, oldest first.

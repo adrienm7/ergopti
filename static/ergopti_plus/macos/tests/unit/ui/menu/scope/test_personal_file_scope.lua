@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local PersonalFiles = require("hotstrings.personal_files")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local TextUtils = require("infra.text_utils")
 
 --- Owns real source files, registry state and the conditional publication port.
@@ -20,7 +20,7 @@ local function with_fixture(collision, body)
 		"infra.notifications", "ui.menu.keymap_lifecycle", "modules.keymap.registry", "modules.keymap.registry_index",
 		"modules.keymap.registry_groups", "ui.menu.menu_hotstrings_custom", "infra.personal_file_scope",
 		"infra.personal_hotstrings",
-		"infra.i18n", "infra.manifest_menu", "infra.locale", "locale.core",
+		"infra.i18n", "infra.manifest_menu", "infra.locale", "core.i18n.engine.core",
 	}, function()
 		-- These fixtures own registered sources, not the boot scanner catalogue.
 		-- Keep only its empty diagnostics port scoped; the real registry and
@@ -203,7 +203,7 @@ helpers.describe("personal file callback admission", function()
 			helpers.assert_eq(f.R.is_group_enabled("personal_ext_unique"), true)
 			helpers.assert_eq(f.R.is_group_enabled("personal_ext_sibling"), false)
 			helpers.assert_eq(f.ctx.state.hotstrings, { personal_ext_unique = true, personal_ext_sibling = false })
-			local parsed = require("toml_codec").decode(f.content())
+			local parsed = require("core.text.engine.toml_codec").decode(f.content())
 			helpers.assert_eq(parsed.future.keep, "owned-unrelated-value")
 			helpers.assert_eq(parsed.hotstrings.groups.future_group, false)
 			helpers.assert_eq(parsed.hotstrings.modules.future_group.unknown_section, true)
@@ -224,7 +224,7 @@ helpers.describe("personal file callback admission", function()
 			helpers.assert_eq(f.mapping("personal_ext_sibling").repl, "Sibling")
 			helpers.assert_eq(f.R.is_group_enabled("personal_ext_sibling"), true)
 			helpers.assert_eq({ f.observations.writes, f.observations.refreshes, f.observations.starts }, { 2, 2, 0 })
-			local restored = require("toml_codec").decode(f.content())
+			local restored = require("core.text.engine.toml_codec").decode(f.content())
 			helpers.assert_eq(restored.hotstrings.groups.future_group, false)
 			helpers.assert_eq(restored.hotstrings.modules.future_group.unknown_section, true)
 		end)
@@ -391,7 +391,7 @@ helpers.describe("personal directory hand corpus drives the genuine native separ
 			local held = assert(f.commands()[1]).row.menu
 			local file=assert(io.open(require("infra.paths").shared("tests/corpus/menus/hotstring_personal_frames.json"),"rb"))
 			local bytes=file:read("*a");assert(file:close())
-			local hand=assert(require("json").decode(assert(bytes)))
+			local hand=assert(require("core.text.engine.json").decode(assert(bytes)))
 			local vectors, explicit_false = 0, 0
 			for _,vector in ipairs(hand.directory_cases)do
 				local node={folders={},files={}}

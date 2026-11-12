@@ -1036,7 +1036,7 @@ _LLM_RepeatChar(ch, count) {
 }
 
 ; The prefix of the selected line and the one of every other line — the Windows
-; port of prefixes() in _shared/lua/tooltip/llm_line.lua, pinned to it by
+; port of prefixes() in _shared/core/ui/engine/tooltip/llm_line.lua, pinned to it by
 ; _shared/tests/corpus/tooltip/llm_line_vectors.json. The indentation is a
 ; signed number of spaces:
 ;   above 0  the selected line is pushed right, mark included;
@@ -1077,7 +1077,7 @@ _LLM_GetInactivePrefix(slotCount) {
 }
 
 ; The pieces a slot's line reads, in reading order, each with its role — the
-; Windows port of segments() in _shared/lua/tooltip/llm_line.lua, pinned to it
+; Windows port of segments() in _shared/core/ui/engine/tooltip/llm_line.lua, pinned to it
 ; by the same corpus. The chunks are the end of what the user typed as the
 ; model corrected it: an "equal" chunk is text left as typed, an "insert" chunk
 ; a correction; the next words follow. The line's leading spacing is dropped,
@@ -1170,7 +1170,7 @@ _LLM_FormatValModifiers(valMods) {
 }
 
 /**
- * Port of shortcut_label in _shared/lua/tooltip/llm_line.lua: the chord that
+ * Port of shortcut_label in _shared/core/ui/engine/tooltip/llm_line.lua: the chord that
  * inserts prediction Idx, as the shortcut column of its row shows it. The
  * modifiers follow the shared order whatever order ValMods lists them in; the
  * digit is Idx, 0 for the tenth row, and later rows have none.
@@ -1393,7 +1393,7 @@ _LLM_TooltipJoinFooter(Footer, Info) {
 		H: Max(Footer.Hint.H, Footer.Sep.H, Info.H) }
 }
 
-; Port of shortcut_column in _shared/lua/tooltip/llm_line.lua: how wide the
+; Port of shortcut_column in _shared/core/ui/engine/tooltip/llm_line.lua: how wide the
 ; prediction block wants to be with its shortcut column, pinned on the three
 ; drivers by _shared/tests/corpus/tooltip/llm_column_vectors.json.
 ; @param {Number} WidestLine - Widest line, prefix included, over its renderings.
@@ -1727,7 +1727,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	InactivePrefixSize := _TooltipMeasureText(inactivePrefix)
 	; The shortcut column: every real row shows the chord that inserts it,
 	; right-aligned against the inner edge, label_gap past the widest line
-	; (_shared/modules/tooltip/constants.toml [llm_ui]).
+	; (_shared/core/ui/data/tooltip/constants.toml [llm_ui]).
 	ShortcutSizes := []
 	ShortcutColumnW := 0
 	for i, slot in slots {

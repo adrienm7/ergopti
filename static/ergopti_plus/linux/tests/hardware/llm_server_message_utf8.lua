@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Utf8 = require("compat.utf8")
+local Utf8 = require("core.lifecycle.engine.compat.utf8")
 local Remote = require("modules.llm.api_remote")
 local Http = require("adapters.http_client")
 local origin = assert(os.getenv("LLM_RESPONSE_ORIGIN"))

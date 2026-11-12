@@ -109,8 +109,8 @@ async function main() {
 		if (process.env.PERSONAL_INFO_LUAJIT) {
 			const driver = path.resolve(__dirname, '../../../static/ergopti_plus/linux');
 			const worker = String.raw`
-package.path='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;'..package.path
-package.loaded['logger.shim']={info=function()end,error=function()end,debug=function()end,warn=function()end}
+package.path='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;'..package.path
+package.loaded['core.logger.engine.shim']={info=function()end,error=function()end,debug=function()end,warn=function()end}
 local state={dyn_hotstrings={get_info=function()return {['__proto__']='before',address='first\r\nsecond\rthird\nfourth'}end,
  get_letters=function()return {}end,get_trigger_char=function()return '★'end},
  webview_manager={eval_js=function(_,js)io.write(js);return true end},i18n={get=function(key)return key end}}

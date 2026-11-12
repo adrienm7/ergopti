@@ -175,7 +175,7 @@ helpers.describe("declared Linux simultaneous publication through original owner
   end)
  end)
  helpers.it("requires an explicit Linux copy section and leaves original Mac policy distinct",function()
-  local Shared=require("tap_hold.key_combinations")
+  local Shared=require("tap_hold.engine.key_combinations")
   local text='[shortcuts.key_combination_taps]\ncaps_lock_then_tab="copy"\n[mod_combos.config.caps_lock_then_tab]\ntap="paste"\ncombo="none"\n'
   local options={entries={{id=pair}},settings={simultaneous_threshold_ms=100,combo_symmetric=false},is_action=function(a) return a=="copy" or a=="paste" end}
   helpers.assert_eq(Shared.plan_chord_copy(text,options).rows[1].value,"paste","original Mac source is unchanged")

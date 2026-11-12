@@ -69,7 +69,7 @@ end
 
 helpers.describe("healthcheck: macOS privacy permissions", function()
 	helpers.it("the collector's ids are the schema's, in its order", function()
-		local schema = require("healthcheck.snapshot").load_schema(helpers.shared("modules/diagnostics/schema.json"))
+		local schema = require("diagnostics.engine.healthcheck.snapshot").load_schema(helpers.shared("diagnostics/data/schema.json"))
 		local declared = {}
 		for id in pairs(schema.permissions.macos) do declared[#declared + 1] = id end
 		table.sort(declared)

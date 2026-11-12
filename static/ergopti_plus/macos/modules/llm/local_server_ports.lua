@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Local Server Port Scan (macOS)
 --- DESCRIPTION:
---- Reads the machine for the shared port policy (_shared/lua/llm/
+--- Reads the machine for the shared port policy (_shared/ai/engine/
 --- local_server_ports.lua): the catalogue's processes, the servers' settings
 --- files and their listening TCP ports.
 ---
@@ -36,9 +36,9 @@ local FileSystem     = require("adapters.file_system")
 local JsonCodec      = require("adapters.json_codec")
 local ShellRunner    = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
-local Policy         = require("llm.local_server_ports")
+local Policy         = require("ai.engine.local_servers.ports_core")
 
-local LOG = "llm.local_server_ports"
+local LOG = "ai.engine.local_servers.ports_core"
 
 local PGREP_BIN = "/usr/bin/pgrep"
 local PS_BIN    = "/bin/ps"

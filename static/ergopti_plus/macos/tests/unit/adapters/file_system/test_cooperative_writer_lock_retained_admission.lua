@@ -103,7 +103,7 @@ helpers.describe("conditional publication retained admission", function()
 				local source = "[custom]\nvalue = 0\n"
 				if source_present then seed(path, source) end
 				local runtime = 0
-				local owner = require("config_scope_transaction").new({ path = path, backup_path = path .. ".backup",
+				local owner = require("settings.engine.scope.transaction").new({ path = path, backup_path = path .. ".backup",
 					files = fs, manifest = { scope_plan = function() return { presets = {},
 						operations = { { section = "custom", key = "value", value = 1 } } } end },
 					capture = function() return { value = runtime } end,
@@ -131,7 +131,7 @@ helpers.describe("conditional publication retained admission", function()
 			seed(path, source)
 			control.target = path .. ".backup"
 			local runtime = 0
-			local owner = require("config_scope_transaction").new({ path = path, backup_path = path .. ".backup",
+			local owner = require("settings.engine.scope.transaction").new({ path = path, backup_path = path .. ".backup",
 				files = fs, manifest = { scope_plan = function() return { presets = {},
 					operations = { { section = "custom", key = "value", value = 1 } } } end },
 				capture = function() return {} end, apply = function() runtime = 1; return true end,
@@ -151,7 +151,7 @@ helpers.describe("conditional publication retained admission", function()
 		with_owned_publication(function(path, fs, control, seed)
 			local source = "[custom]\nvalue = 0\n"
 			seed(path, source); control.blocked = false
-			local owner = require("config_scope_transaction").new({ path = path, backup_path = path .. ".backup",
+			local owner = require("settings.engine.scope.transaction").new({ path = path, backup_path = path .. ".backup",
 				files = fs, manifest = { scope_plan = function() return { presets = {},
 					operations = { { section = "custom", key = "value", value = 1 } } } end },
 				capture = function() return {} end, apply = function() return true end, restore = function() return true end,
@@ -194,7 +194,7 @@ helpers.describe("conditional publication retained admission", function()
 			with_owned_publication(function(path, fs, control, seed)
 				local source = "[custom]\nvalue = 0\n"
 				seed(path, source)
-				local secondary = require("config_scope_file").new({ path = path, backup_path = path .. ".backup",
+				local secondary = require("settings.engine.scope.file").new({ path = path, backup_path = path .. ".backup",
 					files = fs, remove = fs.remove_exact })
 				helpers.assert_eq(secondary.prepare({ { section = "custom", key = "value", value = 1 } }), true)
 				if phase == "backup" then

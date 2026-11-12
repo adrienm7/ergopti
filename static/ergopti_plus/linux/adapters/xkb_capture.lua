@@ -31,14 +31,14 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
-local NumberRow = require("layout.number_row_native")
+local TableUtil = require("core.text.engine.table_util")
+local NumberRow = require("layouts.engine.layout.number_row_native")
 local number_row_receipts = setmetatable({}, { __mode = "k" })
 local receiving_rows = setmetatable({}, { __mode = "k" })
 local original_receiving_rows = nil
 local receiving_native_backends = setmetatable({}, { __mode = "k" })
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Keysym = require("infra.keysym")
 local EvdevCodes = require("infra.evdev_codes")
 

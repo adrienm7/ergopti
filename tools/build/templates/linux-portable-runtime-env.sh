@@ -9,7 +9,7 @@ if [ "$#" -ne 2 ] || [[ "$1" != /* ]] || [[ "$2" != /* ]]; then
 fi
 ERGOPTI_PACKAGE_PREFIX="$1"
 DRIVER_ROOT="$2"
-SHARED_LUA="$DRIVER_ROOT/_shared/lua"
+SHARED_LUA="$DRIVER_ROOT/_shared"
 unset ERGOPTI_LITERAL_DIRECT ERGOPTI_LITERAL_DAEMON ERGOPTI_LITERAL_NATIVE_MODULES
 # The private prefix's Lua packages (luaposix) after the driver's own modules.
 case "$DRIVER_ROOT$ERGOPTI_PACKAGE_PREFIX" in

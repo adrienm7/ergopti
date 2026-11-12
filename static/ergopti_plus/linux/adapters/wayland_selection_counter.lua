@@ -24,7 +24,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "adapters.wayland_selection_counter"
 local OUTPUT_TAIL_BYTES = 64

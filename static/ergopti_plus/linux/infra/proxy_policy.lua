@@ -6,16 +6,16 @@
 --- Resolves and initializes the canonical shared routing policy through the
 --- existing native path/file owners. No OS-specific routing fallback is stored.
 --- Every route decision receives the user's proxy override (Issue #101 point 2,
---- network/proxy_override.lua), read from storage at decision time, so managed
+--- core/network/engine/proxy_override.lua), read from storage at decision time, so managed
 --- downloads and the managed Ollama daemon honour it before the desktop proxy.
 --- ==============================================================================
 
 local M = {}
 local Paths = require("infra.paths")
 local Reader = require("infra.regular_file_reader")
-local Json = require("json")
-local SharedPolicy = require("network.proxy_policy")
-local Override = require("network.proxy_override")
+local Json = require("core.text.engine.json")
+local SharedPolicy = require("core.network.engine.proxy_policy_core")
+local Override = require("core.network.engine.proxy_override")
 local initialized, policy, refusal = false, nil, nil
 local override_initialized, override, override_refusal = false, nil, nil
 
@@ -43,7 +43,7 @@ function M.override_setting()
 	if override_initialized then return override, override_refusal end
 	override_initialized = true
 	local data
-	data, override_refusal = read_declaration("modules/network/proxy_override.json",
+	data, override_refusal = read_declaration("core/network/data/proxy_override.json",
 		"proxy-override-unavailable", Override.DECLARATION_INVALID)
 	if data then override, override_refusal = Override.new(data) end
 	return override, override_refusal
@@ -64,7 +64,7 @@ function M.load()
 	if initialized then return policy, refusal end
 	initialized = true
 	local data
-	data, refusal = read_declaration("modules/network/proxy_policy.json", "proxy-policy-unavailable", "proxy-policy-invalid")
+	data, refusal = read_declaration("core/network/data/proxy_policy.json", "proxy-policy-unavailable", "proxy-policy-invalid")
 	if not data then return nil, refusal end
 	local shared
 	shared, refusal = SharedPolicy.new(data)

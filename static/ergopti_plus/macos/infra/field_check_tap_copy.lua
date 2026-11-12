@@ -21,8 +21,8 @@
 ---    rest is information for the report.
 --- ==============================================================================
 
-local Report = require("field_check_report")
-local CopyCheck = require("tap_hold.copy_check")
+local Report = require("diagnostics.engine.field_check.report")
+local CopyCheck = require("tap_hold.engine.copy_check")
 
 local M = {}
 

@@ -7,9 +7,9 @@
 -- Requiring it inside a fixture and erasing it on teardown reopens libuv state.
 local NativeLoop = require("luv")
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 local Manifest = require("infra.manifest_reader")
 
 local SOURCE = '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\nchatgpt_url = "https://old.example"\nunknown = "keep"\n'
@@ -145,7 +145,7 @@ local function with_scope(body, source, chord_j_identity)
 				execute_action = function() error("no output during edit admission") end,
 				action_names = gestures.get_executable_action_names,
 				on_text_injected = function() error("no text during edit admission") end,
-				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
+				defaults_path = require("infra.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
 			local Pair = require("modules.shortcuts.key_combinations")
 			local pair_owner = tap_manager.configuration_snapshot().combinations
 			assert(Pair.set_instance(pair_owner))
@@ -404,9 +404,9 @@ end)
 helpers.describe('Actual shared physical editor to Linux native scope',function()
  helpers.it('(physical-editor-ui) Unicode Add publishes through exact actual source-return ACK',function()
   with_scope(function(scope,owners,controls,path)
-   local Json=require('json');local file=assert(io.open(helpers.driver_root() .. "/../_shared/data/keycodes/physical_keys.json"));local model=require('shortcuts.physical_slots').new(Json.decode(file:read('*a')));file:close()
+   local Json=require('core.text.engine.json');local file=assert(io.open(helpers.driver_root() .. "/../_shared/layouts/data/keycodes/physical_keys.json"));local model=require('shortcuts.engine.physical_slots').new(Json.decode(file:read('*a')));file:close()
    local callback,selected
-   local editor=require('shortcuts.physical_editor').new({model=model,catalogue=owners.gestures,parameter_section='gesture_parameters',positions={},capture=scope.capture_editor_inventory,current=scope.editor_source_current,commit=scope.edit,label=owners.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
+   local editor=require('shortcuts.engine.physical_editor').new({model=model,catalogue=owners.gestures,parameter_section='gesture_parameters',positions={},capture=scope.capture_editor_inventory,current=scope.editor_source_current,commit=scope.edit,label=owners.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
    helpers.assert_eq(#editor.open().entries,0)
    helpers.assert_eq(editor.choose({code='KeyJ',mods={ctrl=true},request_id=1}),true);helpers.assert_eq(callback('send_text','★'),true)
    helpers.assert_eq(#controls.backups,0,'Draft never publishes scalar/assignment')
@@ -417,9 +417,9 @@ helpers.describe('Actual shared physical editor to Linux native scope',function(
  end)
  helpers.it('(physical-editor-ui) foreign canonical source refuses retained draft without backup',function()
   with_scope(function(scope,owners,controls,path)
-   local Json=require('json');local file=assert(io.open(helpers.driver_root() .. "/../_shared/data/keycodes/physical_keys.json"));local model=require('shortcuts.physical_slots').new(Json.decode(file:read('*a')));file:close()
+   local Json=require('core.text.engine.json');local file=assert(io.open(helpers.driver_root() .. "/../_shared/layouts/data/keycodes/physical_keys.json"));local model=require('shortcuts.engine.physical_slots').new(Json.decode(file:read('*a')));file:close()
    local callback,selected
-   local editor=require('shortcuts.physical_editor').new({model=model,catalogue=owners.gestures,parameter_section='gesture_parameters',positions={},capture=scope.capture_editor_inventory,current=scope.editor_source_current,commit=scope.edit,label=owners.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
+   local editor=require('shortcuts.engine.physical_editor').new({model=model,catalogue=owners.gestures,parameter_section='gesture_parameters',positions={},capture=scope.capture_editor_inventory,current=scope.editor_source_current,commit=scope.edit,label=owners.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
    editor.open();editor.choose({code='KeyJ',mods={},request_id=1});helpers.assert_eq(callback('send_text','★'),true)
    local foreign=SOURCE..'# foreign editor\n';helpers.assert_true(Writer.publish_if_unchanged(path,foreign,nil,{status='ok',content=SOURCE}))
    helpers.assert_eq(editor.save(selected.token).committed,false);helpers.assert_eq(#controls.backups,0);helpers.assert_eq(Writer.read_classified(path),foreign)
@@ -432,7 +432,7 @@ helpers.describe('Retained Linux physical editor issuer factory',function()
   local created,opened,refused=0,0,0
   local paused,ready=false,true
   local host={physical_delivery_available=function()return true end,native_available=function()return ready end,available=function(owner)return owner~=nil end,open=function(options)helpers.assert_eq(options.scope.marker,'native');opened=opened+1;return true end}
-  local ports=require('shortcuts.physical_editor_menu').new({scope=function()created=created+1;return{marker='native'}end,host=function()return host end,refused=function()refused=refused+1 end})
+  local ports=require('shortcuts.engine.physical_editor_menu').new({scope=function()created=created+1;return{marker='native'}end,host=function()return host end,refused=function()refused=refused+1 end})
   helpers.assert_eq(ports.ready(),true);helpers.assert_eq(created,0);helpers.assert_eq(opened,0)
   ready=false;helpers.assert_eq(ports.ready(),false);helpers.assert_eq(ports.open(),false);helpers.assert_eq(created,0);helpers.assert_eq(refused,1)
   ready=true;helpers.assert_eq(ports.open(),true);helpers.assert_eq(created,1);helpers.assert_eq(opened,1)
@@ -504,8 +504,8 @@ local function assert_legacy(document)
 end
 local function planner_for(actions)
  local root=helpers.driver_root():gsub('/$','')..'/../_shared/'
- local file=assert(io.open(root..'data/keycodes/physical_keys.json','rb'));local registry=require('json').decode(file:read('*a'));assert(file:close())
- return require('shortcuts.physical_entries').new(require('shortcuts.physical_slots').new(registry),actions,{parameter_section='gesture_parameters'})
+ local file=assert(io.open(root..'layouts/data/keycodes/physical_keys.json','rb'));local registry=require('core.text.engine.json').decode(file:read('*a'));assert(file:close())
+ return require('shortcuts.engine.physical_entries').new(require('shortcuts.engine.physical_slots').new(registry),actions,{parameter_section='gesture_parameters'})
 end
 helpers.describe('Linux explicit physical entries preserve unrelated legacy semantics',function()
  helpers.it('does not invent a Unicode/J entry from accent letters or legacy magic defaults',function()
@@ -621,7 +621,7 @@ helpers.describe("Physical native host and menu capability admission", function(
 			local host=require("ui.physical_shortcuts.bridge")
 			helpers.assert_eq(host.physical_delivery_available(),false)
 			helpers.assert_eq(host.available(scope),false)
-			local menu=require("shortcuts.physical_editor_menu").new({host=function()return host end,
+			local menu=require("shortcuts.engine.physical_editor_menu").new({host=function()return host end,
 				scope=function()captures=captures+1;return scope end,
 				refused=function()opened=opened+1 end})
 			helpers.assert_eq(menu.ready(),false)

@@ -37,7 +37,7 @@ helpers.describe("preferences flatten_from_disk: table-valued scalar keys", func
 		-- setting silently reverts to its default at every boot.
 		local prefs = helpers.load_with_stubs("infra.preferences")
 		local flat
-		local reports = require("config_outdated").collect_reports(function()
+		local reports = require("settings.engine.migration.outdated").collect_reports(function()
 			flat = prefs.flatten_document({ hotstrings = { trigger_char = { mods = { "cmd" }, key = "x" } } })
 		end)
 		helpers.assert_eq(reports["hotstrings.trigger_char"], true,

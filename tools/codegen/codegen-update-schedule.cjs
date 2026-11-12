@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Update-Check Schedule Codegen
  * DESCRIPTION:
- * Emits the automatic update-check timing of _shared/modules/updater/
+ * Emits the automatic update-check timing of _shared/updater/data/
  * defaults.json (presets, boot delay, jitter, failure backoff, re-evaluation
  * period and the key of the persisted check record) as the data the Windows
  * schedule port (windows/modules/updater/schedule.ahk) interprets, and the
@@ -16,7 +16,7 @@
  * compiled AHK build has no JSON reader at include time, so it gets a generated
  * copy instead of a hand-maintained one; macOS and Linux decode the JSON at
  * runtime. The timing is validated by the canonical schedule module
- * (_shared/modules/updater/schedule.js) before anything is written.
+ * (_shared/updater/data/schedule.js) before anything is written.
  *
  * USAGE:  node tools/codegen/codegen-update-schedule.cjs
  * ==============================================================================
@@ -30,8 +30,8 @@ const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SOURCE = path.join(SP, '_shared', 'modules', 'updater', 'defaults.json');
-const SCHEDULE = path.join(SP, '_shared', 'modules', 'updater', 'schedule.js');
+const SOURCE = path.join(SP, '_shared', 'updater', 'data', 'defaults.json');
+const SCHEDULE = path.join(SP, '_shared', 'updater', 'data', 'schedule.js');
 const AHK_OUTPUT = path.join(SP, 'windows', '_generated', 'update_schedule.ahk');
 const RUN_HINT = 'npm run codegen:update-schedule';
 
@@ -67,7 +67,7 @@ function emitAhk(defaults) {
 		.join(', ');
 	return (
 		'﻿; _generated/update_schedule.ahk\n' +
-		'; AUTO-GENERATED from _shared/modules/updater/defaults.json.\n' +
+		'; AUTO-GENERATED from _shared/updater/data/defaults.json.\n' +
 		`; DO NOT EDIT BY HAND — run \`${RUN_HINT}\` to refresh.\n` +
 		'#Requires AutoHotkey v2.0\n' +
 		'\n' +

@@ -54,8 +54,8 @@ local function executable(source)
 				else last = stop; break end
 			end
 			local literal = source:sub(at + 1, last - 1)
-			mask(math.min(last, #source), literal == "menu.wrap_mutation" and "__WRAP_MUTATION_MODULE__"
-				or literal == "dynamic_hotstrings.menu_publication" and "__PROGRAMMABLE_PUBLICATION_MODULE__" or nil)
+			mask(math.min(last, #source), literal == "menu.engine.wrap_mutation" and "__WRAP_MUTATION_MODULE__"
+				or literal == "hotstrings.engine.dynamic.menu_publication" and "__PROGRAMMABLE_PUBLICATION_MODULE__" or nil)
 		else
 			output[#output + 1] = source:sub(at, at)
 			at = at + 1
@@ -104,7 +104,7 @@ local function block(source, prefix)
 	error("every menu preference writer: unterminated owner: " .. prefix)
 end
 
-local file = assert(io.open(helpers.shared("lua/menu/wrap_mutation.lua"), "rb"))
+local file = assert(io.open(helpers.shared("menu/engine/wrap_mutation.lua"), "rb"))
 local shared_wrap_source = file:read("*a")
 file:close()
 
@@ -139,7 +139,7 @@ local function delegated_guards(source, helper_source, native_source)
 	return callbacks, valid and callbacks or 0
 end
 
-local publication_file = assert(io.open(helpers.shared("lua/dynamic_hotstrings/menu_publication.lua"), "rb"))
+local publication_file = assert(io.open(helpers.shared("hotstrings/engine/dynamic/menu_publication.lua"), "rb"))
 local publication_source = assert(publication_file:read("*a")); assert(publication_file:close())
 
 -- The actual helper must consume the genuine publisher's protected status and
@@ -484,7 +484,7 @@ helpers.describe("shared Wrap preference delegation fails closed", function()
 			after = "return (function(candidate)", reason = "reviewed post-retirement census" },
 		{ name = "short-circuiting one delegated callback", before = "return mutate_wrap(function(candidate)",
 			after = "return true or mutate_wrap(function(candidate)", reason = "every menu preference writer" },
-		{ name = "changing the imported shared owner", before = 'require("menu.wrap_mutation")',
+		{ name = "changing the imported shared owner", before = 'require("menu.engine.wrap_mutation")',
 			after = 'require("menu.foreign_mutation")', reason = "every menu preference writer" },
 		{ name = "changing the real helper receiver", before = "WrapMutation.commit(state, mutate, ctx.save_prefs)",
 			after = "Foreign.commit(state, mutate, ctx.save_prefs)", reason = "every menu preference writer" },

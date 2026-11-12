@@ -14,7 +14,7 @@ global LLM_OPTION_MAX_API_ENTRIES := 64
 global LLM_OPTION_MAX_RECORD_FIELDS := 32
 global LLM_OPTION_MAX_STOP_SEQUENCES := 64
 global LLM_OPTION_MAX_AGGREGATE_CHARS := 1048576
-; Canonical built-in profile ids, those of _shared/modules/llm/profiles.json in
+; Canonical built-in profile ids, those of _shared/ai/data/profiles.json in
 ; menu order. Validation must reject custom records which would shadow
 ; resolution, while menu hotkeys preserve this exact order: "rewrite", the tone
 ; ladder and the live translations come last so the Ctrl+1…4 hotkeys of the
@@ -269,7 +269,7 @@ LLM_Option_NormalizeApiEntries(Value) {
 
 /**
  * The key an application is stored and looked up under, the twin of
- * _shared/lua/llm/app_identity.lua `normalize`.
+ * _shared/ai/engine/policy/app_identity.lua `normalize`.
  * @param {Any} App The identifier a driver reports, or a user typed.
  * @returns {String} Lower-cased, trimmed, without ".exe"; "" when unusable.
  */

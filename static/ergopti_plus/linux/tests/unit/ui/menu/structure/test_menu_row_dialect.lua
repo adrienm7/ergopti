@@ -24,7 +24,7 @@
 --- before wherever the data is right.
 ---
 --- WHY IT LIVES IN THE LINUX SUITE:
---- the renderer is `_shared/lua/menu/renderer.lua`, shared by macOS and Linux and
+--- the renderer is `_shared/menu/engine/renderer.lua`, shared by macOS and Linux and
 --- mirrored in windows/infra/manifest_menu.ahk. This suite is the one that loads
 --- the shared module directly and runs on plain LuaJIT in CI.
 --- ==============================================================================
@@ -37,7 +37,7 @@ local helpers = require("tests.helpers")
 --- caller already holds — so the fixture supplies only what `new()` demands.
 --- @return table R, table logs Renderer, and every line it logged.
 local function make_renderer()
-	local Renderer = helpers.load_module("menu.renderer")
+	local Renderer = helpers.load_module("menu.engine.renderer")
 	local logs = { warn = {}, error = {} }
 	local logger = helpers.make_logger_stub()
 	local function record(bucket)
@@ -52,7 +52,7 @@ local function make_renderer()
 	local R = Renderer.new({
 		platform      = "linux",
 		manifest_path = function() return "/nonexistent/menu_manifest.json" end,
-		json_decode   = require("json").decode,
+		json_decode   = require("core.text.engine.json").decode,
 		i18n          = { get = function(key) return key end, section = function(key) return key end },
 		logger        = logger,
 	})
@@ -281,7 +281,7 @@ helpers.describe("renderer: a category switch with no registered command", funct
 
 	helpers.it("is not drawn, and the renderer says so as an ERROR", function()
 		local path = write_toggle_manifest()
-		local Renderer = helpers.load_module("menu.renderer")
+		local Renderer = helpers.load_module("menu.engine.renderer")
 		local logs = { error = {} }
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...)
@@ -291,7 +291,7 @@ helpers.describe("renderer: a category switch with no registered command", funct
 		local R = Renderer.new({
 			platform      = "linux",
 			manifest_path = function() return path end,
-			json_decode   = require("json").decode,
+			json_decode   = require("core.text.engine.json").decode,
 			i18n          = { get = function(key) return key end, section = function(key) return key end },
 			logger        = logger,
 		})
@@ -306,4 +306,4 @@ helpers.describe("renderer: a category switch with no registered command", funct
 	end)
 end)
 
-require("test.menu_row_dialect_contract").register(helpers)
+require("tests.lua.menu.row_dialect_contract").register(helpers)

@@ -91,10 +91,10 @@ $nativeWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
 if (($Mode -eq 'entry') -ne $nativeWindows) { throw 'Entry mode must match the real operating system.' }
 $fixture = Join-Path $Scratch ('clone space ' + [char]0xe9)
 $developer = Join-Path $fixture 'tools\dev'
-$shared = Join-Path $fixture 'static\ergopti_plus\_shared\data'
+$shared = Join-Path $fixture 'static\ergopti_plus\_shared'
 [void][IO.Directory]::CreateDirectory($developer)
 [void][IO.Directory]::CreateDirectory($shared)
-$identifiersPath = Join-Path (Split-Path (Split-Path $Launcher)) '..\static\ergopti_plus\_shared\data\identifiers.json'
+$identifiersPath = Join-Path (Split-Path (Split-Path $Launcher)) '..\static\ergopti_plus\_shared\core\text\data\identifiers.json'
 $identifiersPath = [IO.Path]::GetFullPath($identifiersPath)
 [IO.File]::Copy($identifiersPath, (Join-Path $shared 'identifiers.json'), $false)
 $identifiers = [IO.File]::ReadAllText((Join-Path $shared 'identifiers.json')) | ConvertFrom-Json

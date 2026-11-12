@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 local Manifest = require("infra.manifest_reader")
-local Policy = require("layout.number_row_policy")
+local Policy = require("layouts.engine.layout.number_row_policy")
 
 local PATH = "layout.direct_access_digits"
 

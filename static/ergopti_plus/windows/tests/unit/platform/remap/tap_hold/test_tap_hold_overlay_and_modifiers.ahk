@@ -205,7 +205,7 @@ Test("ResolveHoldModifierKey: a token resolves to the key's own side only on tha
 ; on both a standard and a Kana AltGr (hold-alias-single-source).
 _TH_ResolveHoldModifierKeyReadsSharedAliases() {
 	global _ALTGR_KANA_FIXUP, _SharedDir
-	Picker := ParseTomlFile(_SharedDir . "\tap_hold\defaults.toml")["tap_hold.hold_picker"]
+	Picker := ParseTomlFile(_SharedDir . "\tap_hold\data\defaults.toml")["tap_hold.hold_picker"]
 	Aliases := Picker["modifier_aliases"]
 	LeftAliases := Picker["left_modifier_aliases"]
 	Assert(Aliases is Map && Aliases.Count >= 2, "the shared picker must declare modifier_aliases")
@@ -232,12 +232,12 @@ _TH_ResolveHoldModifierKeyReadsSharedAliases() {
 Test("ResolveHoldModifierKey: resolves the aliases of the shared hold picker (hold-alias-single-source)",
 	_TH_ResolveHoldModifierKeyReadsSharedAliases)
 
-; The one-shot Shift's results come from _shared/tap_hold/one_shot_shift.json,
+; The one-shot Shift's results come from _shared/tap_hold/data/one_shot_shift.json,
 ; which the Linux driver reads too; they were an if/else chain in
 ; one_shot_shift.ahk (one-shot-results-shared).
 _TH_OneShotResultsComeFromTheSharedTable() {
 	global _SharedDir
-	Root := JsonParse(FileRead(_SharedDir . "\tap_hold\one_shot_shift.json", "UTF-8"))
+	Root := JsonParse(FileRead(_SharedDir . "\tap_hold\data\one_shot_shift.json", "UTF-8"))
 	Assert(Root["results"].Length >= 7, "the shared table must declare the one-shot results")
 	EndKeys := TapHoldOneShotEndKeys("★")
 	for Entry in Root["results"] {
@@ -260,7 +260,7 @@ Test("tap-holds: the one-shot Shift results come from the shared table (one-shot
 ; instead of reading the file again at every tap (one-shot-table-once).
 _TH_OneShotMagicKeyFirstAndFailureKept() {
 	global _SharedDir, _TapHoldOneShotCache
-	Root := JsonParse(FileRead(_SharedDir . "\tap_hold\one_shot_shift.json", "UTF-8"))
+	Root := JsonParse(FileRead(_SharedDir . "\tap_hold\data\one_shot_shift.json", "UTF-8"))
 	for Entry in Root["results"]
 		AssertEqual(Root["magic_key_result"], TapHoldOneShotResult(Entry["char"], Entry["char"]),
 			"a magic '" . Entry["char"] . "' gives the magic key's result")
@@ -317,7 +317,7 @@ _TH_UnknownHoldModifierKeepsTheTap() {
 	Known :="[tap_hold.keys.alt_gr]`n" . 'hold_modifier = "AltGr"' . "`n"
 		. "[tap_hold.keys.space]`n" . 'hold_modifier = "Ctrl + lShift"' . "`n"
 	; Not "fn" or "cmd": those are the shared file's macOS modifiers, warned
-	; and held as nothing rather than refused (_shared/tap_hold/SCHEMA.md).
+	; and held as nothing rather than refused (_shared/tap_hold/data/SCHEMA.md).
 	for Source, Unknown in Map("user", "hyper", "defaults", "meta") {
 		DefaultsText := "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n"
 			. 'hold_modifier = "' . (Source == "defaults" ? Unknown : "ctrl") . '"' . "`n"

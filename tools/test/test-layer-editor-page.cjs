@@ -48,9 +48,14 @@ const UI = shared('ui');
 const APP = path.join(UI, 'layer_editor');
 const HTML = fs.readFileSync(path.join(APP, 'index.html'), 'utf8');
 const EN = JSON.parse(
-	fs.readFileSync(shared('data', 'locales', 'en.json'), 'utf8').replace(/^\uFEFF/, '')
+	fs
+		.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+		.replace(/^\uFEFF/, '')
 );
-const RECOMMENDED_TEXT = fs.readFileSync(shared('keymap', 'layers.recommended.toml'), 'utf8');
+const RECOMMENDED_TEXT = fs.readFileSync(
+	shared('layouts', 'data', 'layers.recommended.toml'),
+	'utf8'
+);
 const LEGENDS_CORPUS = JSON.parse(
 	fs.readFileSync(shared('tests', 'corpus', 'layer_editor', 'legends.json'), 'utf8')
 );

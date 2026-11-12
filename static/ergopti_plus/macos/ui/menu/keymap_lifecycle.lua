@@ -10,7 +10,7 @@
 
 local M = {}
 
-local SaveFailure = require("config_save_failure")
+local SaveFailure = require("settings.engine.publication.save_failure")
 local Logger        = require("infra.logger")
 local I18n          = require("infra.i18n")
 local Notifications = require("infra.notifications")

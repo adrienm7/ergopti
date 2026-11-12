@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Error Report Text
 ; DESCRIPTION:
-; AHK port of _shared/lua/diagnostics/error_report.lua: what the error window
+; AHK port of _shared/diagnostics/engine/reports/error_report.lua: what the error window
 ; (_shared/ui/error_dialog/) shows, copies and sends to GitHub for one logged
 ; error — the Markdown report and the prefilled fields of the bug form. Both
 ; ports replay

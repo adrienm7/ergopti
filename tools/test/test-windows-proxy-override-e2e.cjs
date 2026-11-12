@@ -78,7 +78,9 @@ const SHIPPED_RELAY_TLS = 'new SslStream(stream, false);';
 const RETIRED_PIN_VARIABLE = 'ERGOPTI_TEST_RELAY_PIN_SHA256';
 const COMMAND_SAMPLE_MS = 400;
 const WORKER_TIMEOUT_MS = 90000;
-const LOCALE = JSON.parse(fs.readFileSync(path.join(SHARED, 'data/locales/en.json'), 'utf8'));
+const LOCALE = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'core/i18n/data/locales/en.json'), 'utf8')
+);
 
 let total = 0;
 let failed = 0;
@@ -233,8 +235,8 @@ async function runStaging(work, override, extra = {}, url = TARGET, vendor = VEN
 		DOWNLOAD_MODULE: path.join(vendor, 'ergopti_updater_download.ps1'),
 		DEADLINE: '45000',
 		STARTED_TICK: String((os.uptime() * 1000) | 0),
-		PROXY_POLICY: path.join(SHARED, 'modules/network/proxy_policy.json'),
-		UPDATER_DEFAULTS: path.join(SHARED, 'modules/updater/defaults.json'),
+		PROXY_POLICY: path.join(SHARED, 'core/network/data/proxy_policy.json'),
+		UPDATER_DEFAULTS: path.join(SHARED, 'updater/data/defaults.json'),
 		AUTHENTICATED_SIZE: '0'
 	};
 	fs.mkdirSync(path.join(work, 'staged'), { recursive: true });
@@ -608,7 +610,7 @@ async function main() {
 				script,
 				[
 					`. '${path.join(VENDOR, 'ergopti_network_routes.ps1')}'`,
-					`$Policy = Get-ErgoptiNetworkPolicy '${path.join(SHARED, 'modules/network/proxy_policy.json')}'`,
+					`$Policy = Get-ErgoptiNetworkPolicy '${path.join(SHARED, 'core/network/data/proxy_policy.json')}'`,
 					`[Console]::Out.WriteLine((Resolve-ErgoptiRelayEndpoint '${`socks5h://${USERINFO}@${hostOf(socksLogin)}`}' $Policy))`,
 					'[Console]::Out.Flush()',
 					'[Console]::In.ReadLine() | Out-Null'
@@ -729,8 +731,8 @@ async function main() {
 				[
 					`. '${path.join(VENDOR, 'ergopti_route_plan.ps1')}'`,
 					`. '${path.join(VENDOR, 'ergopti_network_routes.ps1')}'`,
-					`$Policy = '${path.join(SHARED, 'modules/network/proxy_policy.json')}'`,
-					`$Defaults = '${path.join(SHARED, 'modules/updater/defaults.json')}'`,
+					`$Policy = '${path.join(SHARED, 'core/network/data/proxy_policy.json')}'`,
+					`$Defaults = '${path.join(SHARED, 'updater/data/defaults.json')}'`,
 					'$Resolve = { param($Origin) Resolve-ErgoptiNativeNetworkRoutes $Origin 30000 $null $null $Policy $Defaults }',
 					"$Read = { param($Name) [Environment]::GetEnvironmentVariable($Name, 'Process') }",
 					'$Probe = { param($Relay) Test-ErgoptiRelayReachable -Relay $Relay -TimeoutMs 1000 }',
@@ -779,8 +781,8 @@ async function main() {
 					[
 						`. '${path.join(VENDOR, 'ergopti_updater_download.ps1')}'`,
 						`. '${path.join(VENDOR, 'ergopti_network_routes.ps1')}'`,
-						`$PolicyFile = '${path.join(SHARED, 'modules/network/proxy_policy.json')}'`,
-						`$DefaultsFile = '${path.join(SHARED, 'modules/updater/defaults.json')}'`,
+						`$PolicyFile = '${path.join(SHARED, 'core/network/data/proxy_policy.json')}'`,
+						`$DefaultsFile = '${path.join(SHARED, 'updater/data/defaults.json')}'`,
 						"$State = @{ Stage = 'proxy_resolve'; Reason = 'download'; Receipt = @{}; CleanupDebt = @() }",
 						'$Resolver = { param($Destination, $Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $null $null $PolicyFile $DefaultsFile }',
 						'$Tick = [ErgoptiUpdaterMonotonicClock]::GetTickCount64()',
@@ -827,8 +829,8 @@ async function main() {
 					[
 						`. '${path.join(VENDOR, 'ergopti_updater_download.ps1')}'`,
 						`. '${path.join(VENDOR, 'ergopti_network_routes.ps1')}'`,
-						`$PolicyFile = '${path.join(SHARED, 'modules/network/proxy_policy.json')}'`,
-						`$DefaultsFile = '${path.join(SHARED, 'modules/updater/defaults.json')}'`,
+						`$PolicyFile = '${path.join(SHARED, 'core/network/data/proxy_policy.json')}'`,
+						`$DefaultsFile = '${path.join(SHARED, 'updater/data/defaults.json')}'`,
 						"$State = @{ Stage = 'proxy_resolve'; Reason = 'download'; Receipt = @{}; CleanupDebt = @() }",
 						'$Resolver = { param($Destination, $Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $null $null $PolicyFile $DefaultsFile }',
 						'$Tick = [ErgoptiUpdaterMonotonicClock]::GetTickCount64()',

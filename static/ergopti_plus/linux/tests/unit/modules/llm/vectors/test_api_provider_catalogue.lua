@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: API Provider Catalogue Coverage (Linux)
 --- DESCRIPTION:
---- Checks every concrete provider of _shared/modules/llm/api_providers.json
+--- Checks every concrete provider of _shared/ai/data/api_providers.json
 --- against the shared corpora: an https base_url, a default model, a thinking
 --- dialect its wire format can carry, a thinking-off vector for its default
 --- model (thinking_off_vectors.json) and a listing recorded from the provider
@@ -17,13 +17,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
 
-local ThinkingOff = require("llm.thinking_off")
-local UrlTemplate = require("llm.api_url_template")
-local TokenExchange = require("llm.api_token_exchange")
+local ThinkingOff = require("ai.engine.policy.thinking_off")
+local UrlTemplate = require("ai.engine.api.url_template")
+local TokenExchange = require("ai.engine.api.token_exchange")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -56,7 +56,7 @@ local function holds(list, value)
 end
 
 helpers.describe("api_providers.json: every concrete provider is usable and covered", function()
-	local catalogue = read_json("modules/llm/api_providers.json")
+	local catalogue = read_json("ai/data/api_providers.json")
 	local thinking = read_json("tests/corpus/llm/thinking_off_vectors.json")
 	local listing = read_json("tests/corpus/llm/api_model_listing_vectors.json")
 	local unlisted = listing.unlisted_providers or {}

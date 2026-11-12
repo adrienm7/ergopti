@@ -12,8 +12,8 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
-local Json = require("json")
-local SessionEvents = require("keystats.session_events")
+local Json = require("core.text.engine.json")
+local SessionEvents = require("metrics.engine.system.session_events")
 
 local function read(path)
 	local handle = assert(io.open(path, "rb"), "cannot open " .. path)

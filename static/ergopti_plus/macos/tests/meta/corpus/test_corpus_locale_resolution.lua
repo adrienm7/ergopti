@@ -80,8 +80,8 @@ end
 --- @param vec table Corpus vector.
 local function init_locale_with_vector(vec)
 	-- Reload the module fresh for each vector
-	package.loaded["locale.core"] = nil
-	local Core = require("locale.core")
+	package.loaded["core.i18n.engine.core"] = nil
+	local Core = require("core.i18n.engine.core")
 
 	-- Deep-copy the locales table so each vector gets a clean __last_resolved
 	local locales = {}
@@ -184,8 +184,8 @@ end)
 helpers.describe("locale resolution — additional regression edges", function()
 	helpers.it("set_locale switches active locale and clears cache", function()
 		-- Use a fresh init
-		package.loaded["locale.core"] = nil
-		local Core = require("locale.core")
+		package.loaded["core.i18n.engine.core"] = nil
+		local Core = require("core.i18n.engine.core")
 		local loc = { fr = { ["menu.a"] = "FR" }, en = { ["menu.a"] = "EN" } }
 		Core.init({
 			json_decode = make_json_decode(loc),
@@ -202,8 +202,8 @@ helpers.describe("locale resolution — additional regression edges", function()
 	end)
 
 	helpers.it("set_locale rejects empty code", function()
-		package.loaded["locale.core"] = nil
-		local Core = require("locale.core")
+		package.loaded["core.i18n.engine.core"] = nil
+		local Core = require("core.i18n.engine.core")
 		local loc = { fr = { ["menu.a"] = "FR" } }
 		Core.init({
 			json_decode = make_json_decode(loc),
@@ -217,14 +217,14 @@ helpers.describe("locale resolution — additional regression edges", function()
 	end)
 
 	helpers.it("get returns empty string before init", function()
-		package.loaded["locale.core"] = nil
-		local Core = require("locale.core")
+		package.loaded["core.i18n.engine.core"] = nil
+		local Core = require("core.i18n.engine.core")
 		helpers.assert_eq(Core.get("any.key"), "", "uninitialised get returns empty string")
 	end)
 
 	helpers.it("is_initialised returns false before init, true after", function()
-		package.loaded["locale.core"] = nil
-		local Core = require("locale.core")
+		package.loaded["core.i18n.engine.core"] = nil
+		local Core = require("core.i18n.engine.core")
 		helpers.assert_true(not Core.is_initialised(), "not initialised before init")
 		local loc = {}
 		Core.init({
@@ -236,8 +236,8 @@ helpers.describe("locale resolution — additional regression edges", function()
 	end)
 
 	helpers.it("duplicate init is a no-op (idempotent)", function()
-		package.loaded["locale.core"] = nil
-		local Core = require("locale.core")
+		package.loaded["core.i18n.engine.core"] = nil
+		local Core = require("core.i18n.engine.core")
 		local loc = { fr = { ["menu.a"] = "first" } }
 		Core.init({
 			json_decode = make_json_decode(loc),
@@ -259,8 +259,8 @@ helpers.describe("locale resolution — additional regression edges", function()
 	end)
 
 	helpers.it("trigger provider that returns non-string (nil) leaves ★ unchanged", function()
-		package.loaded["locale.core"] = nil
-		local Core = require("locale.core")
+		package.loaded["core.i18n.engine.core"] = nil
+		local Core = require("core.i18n.engine.core")
 		local loc = { fr = { ["star"] = "★ test" } }
 		Core.init({
 			json_decode = make_json_decode(loc),
@@ -273,8 +273,8 @@ helpers.describe("locale resolution — additional regression edges", function()
 	end)
 
 	helpers.it("trigger provider that returns empty string leaves ★ unchanged", function()
-		package.loaded["locale.core"] = nil
-		local Core = require("locale.core")
+		package.loaded["core.i18n.engine.core"] = nil
+		local Core = require("core.i18n.engine.core")
 		local loc = { fr = { ["star"] = "★ test" } }
 		Core.init({
 			json_decode = make_json_decode(loc),
@@ -287,8 +287,8 @@ helpers.describe("locale resolution — additional regression edges", function()
 	end)
 
 	helpers.it("key with non-string value in locale table is treated as missing", function()
-		package.loaded["locale.core"] = nil
-		local Core = require("locale.core")
+		package.loaded["core.i18n.engine.core"] = nil
+		local Core = require("core.i18n.engine.core")
 		local loc = {
 			fr = { ["menu.num"] = 42 },
 			en = { ["menu.num"] = "forty-two" },
@@ -305,8 +305,8 @@ helpers.describe("locale resolution — additional regression edges", function()
 	end)
 
 	helpers.it("retries an active locale after a transient read refusal", function()
-		package.loaded["locale.core"] = nil
-		local Core = require("locale.core")
+		package.loaded["core.i18n.engine.core"] = nil
+		local Core = require("core.i18n.engine.core")
 		local active_reads = 0
 		Core.init({
 			json_decode = function(raw)
@@ -333,8 +333,8 @@ helpers.describe("locale resolution — additional regression edges", function()
 	end)
 
 	helpers.it("strips a UTF-8 BOM before every injected decoder", function()
-		package.loaded["locale.core"] = nil
-		local Core = require("locale.core")
+		package.loaded["core.i18n.engine.core"] = nil
+		local Core = require("core.i18n.engine.core")
 		local bom = string.char(0xEF, 0xBB, 0xBF)
 		Core.init({
 			json_decode = function(raw)

@@ -1,7 +1,7 @@
 --- tests/unit/modules/gestures/programs/test_native_worker_service.lua
 
 local helpers = require("tests.helpers")
-local Worker = require("native_worker_owner")
+local Worker = require("core.lifecycle.engine.native_worker_owner")
 local function expect(value, reason) assert(value, reason) end
 local function test(name, body) helpers.it(name, body) end
 

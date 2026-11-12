@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 -- an earlier suite loaded under a substitute logger would report elsewhere.
 local Config = helpers.load_module("platform.remap.tap_hold_loader")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
 
 --- Loads the defaults with a user file holding `text`, its switch and timings
 --- in the config.toml beside it (tests/support/tap_hold_fixture.lua).
@@ -135,7 +135,7 @@ assert(result.enabled == false and next(result.keys) == nil)
 	end)
 
 	helpers.it("warns once about a key or field it does not have, and applies the rest (config-outdated-tap-hold)", function()
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_error, real_warn, errors, warnings = Logger.error, Logger.warn, {}, {}
 		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -171,7 +171,7 @@ assert(result.enabled == false and next(result.keys) == nil)
 		local broken, replaced = text:gsub('(%[tap_hold%.keys%.caps_lock%][^%[]-hold_modifier%s*=%s*)"ctrl"', '%1"hyper"', 1)
 		helpers.assert_eq(replaced, 1, "the fixture edits the shipped caps_lock hold")
 		local defaults_path, user_path = os.tmpname(), os.tmpname()
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_error, real_warn, errors, warnings = Logger.error, Logger.warn, {}, {}
 		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -215,7 +215,7 @@ end)
 helpers.describe("tap-hold config: the spellings of a hold", function()
 
 	local Engine = require("platform.remap.tap_hold_engine")
-	local HoldOptions = require("tap_hold.hold_options")
+	local HoldOptions = require("tap_hold.engine.hold_options")
 
 	--- The modifier codes the engine presses when `key_id` goes down.
 	local function held_codes(keys, key_id)
@@ -231,7 +231,7 @@ helpers.describe("tap-hold config: the spellings of a hold", function()
 	--- Loads `hold_modifier = value` on AltGr and captures the errors and
 	--- warnings logged.
 	local function load_hold(field, value)
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_error, real_warn, errors = Logger.error, Logger.warn, {}
 		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 		Logger.warn = Logger.error
@@ -302,7 +302,7 @@ helpers.describe("tap-hold config: the spellings of a hold", function()
 			{ "hold_modifier", "hyper" }, { "hold_modifier", "ctrl+alt gr" }, { "hold_modifier", "none" },
 			{ "hold_layer", "sym" },
 		}) do
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local real_error, real_warn, errors, warnings = Logger.error, Logger.warn, {}, {}
 			Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 			Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end

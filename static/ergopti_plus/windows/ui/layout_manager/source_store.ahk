@@ -6,7 +6,7 @@
 ; Keeps the files the unified layout editor saves from the layout manager
 ; window: the Ergopti layout source (TOML) and the exports the page produced
 ; from it (.keylayout, layers.toml), in one folder of the configuration folder.
-; The Windows twin of _shared/lua/layouts/source_store.lua (macOS and Linux):
+; The Windows twin of _shared/layouts/engine/composer/source_store.lua (macOS and Linux):
 ; the same bounds, codes and last-source pointer, replayed by the same cases.
 ;
 ; FEATURES & RATIONALE:
@@ -48,7 +48,7 @@ global SOURCE_STORE_EXTENSIONS := Map("toml", true, "keylayout", true)
 
 /**
  * Validates the [source] table of the shared layout defaults.
- * @param {Map} LayoutDefaults - Decoded _shared/modules/layouts/defaults.json.
+ * @param {Map} LayoutDefaults - Decoded _shared/layouts/data/defaults.json.
  * @returns {Map} folder, last_file, max_file_bytes, max_name_length, nav_file (the navigation export,
  *   never reopened as a source) and failures (the codes of source_store.lua: invalid, write).
  * @throws {Error} When the table is missing or one of its fields is not valid.
@@ -79,7 +79,7 @@ SourceStore_Settings(LayoutDefaults) {
 SourceStore_SharedSettings() {
 	static Settings := 0
 	if !(Settings is Map)
-		Settings := SourceStore_Settings(_LayoutRegistryReadJson("modules\layouts\defaults.json"))
+		Settings := SourceStore_Settings(_LayoutRegistryReadJson("layouts\data\defaults.json"))
 	return Settings
 }
 

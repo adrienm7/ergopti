@@ -338,7 +338,7 @@ helpers.describe("script settings cohorts", function()
 		local original_set, observed = settings.set, 0
 		settings.set = function(key, value)
 			if key == "ergopti.a" or key == "ergopti.b" then
-				local backup = assert(require("json").decode_lossless(backups.snapshot))
+				local backup = assert(require("core.text.engine.json").decode_lossless(backups.snapshot))
 				helpers.assert_eq(backup.cells.a.value, false); helpers.assert_eq(backup.cells.b.present, false); observed = observed + 1
 			end
 			return original_set(key, value)
@@ -478,7 +478,7 @@ helpers.describe("script settings numeric backup admission", function()
 			helpers.assert_eq(values["ergopti.a"], false); helpers.assert_nil(backups["cohort-integer-backup"])
 			helpers.assert_eq(storage.pending_owned(owner, receipt), false)
 		end
-		local json = require("json")
+		local json = require("core.text.engine.json")
 		local zero_readback = json.decode_lossless(assert(json.encode(-0.0)))
 		-- Unlike LuaJIT, Lua5.4 rereads the encoded -0 as positive integer zero.
 		if 1 / zero_readback ~= 1 / -0.0 then
@@ -493,12 +493,12 @@ end)
 
 helpers.describe("script settings producer load order", function()
 	helpers.it("script-storage-cohort loads actual i18n before acquiring the shared writer", function()
-		helpers.with_fresh_modules({ "adapters.storage", "infra.i18n", "toml_codec.writer" }, function()
+		helpers.with_fresh_modules({ "adapters.storage", "infra.i18n", "core.text.engine.toml_codec.writer" }, function()
 			local storage = settings_cohort_fixture({})
 			local i18n = require("infra.i18n")
 			helpers.assert_eq(package.loaded["infra.i18n"], i18n)
-			helpers.assert_nil(package.loaded["toml_codec.writer"], "Storage boot must not capture fallback i18n through an eager Writer cycle")
-			local writer = require("toml_codec.writer")
+			helpers.assert_nil(package.loaded["core.text.engine.toml_codec.writer"], "Storage boot must not capture fallback i18n through an eager Writer cycle")
+			local writer = require("core.text.engine.toml_codec.writer")
 			helpers.assert_true(type(writer) == "table"); helpers.assert_eq(package.loaded["infra.i18n"], i18n)
 			helpers.assert_eq(package.loaded["adapters.storage"], storage)
 		end)
@@ -566,7 +566,7 @@ helpers.describe("script settings actual void setter contract", function()
 		local receipt = assert(storage.capture_owned(owner))
 		helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = 0 }, b = { present = true, value = { 3, 4 } }, missing = { present = true, value = false } }, "void-native-backup", files))
 		helpers.assert_eq(writes, 3); helpers.assert_eq(values["ergopti.a"], 0); helpers.assert_eq(values["ergopti.b"], { 3, 4 }); helpers.assert_eq(values["ergopti.missing"], false)
-		local saved = require("json").decode_lossless(backups["void-native-backup"])
+		local saved = require("core.text.engine.json").decode_lossless(backups["void-native-backup"])
 		helpers.assert_eq(saved.cells.a.value, false); helpers.assert_eq(saved.cells.b.value, { 1, 2 }); helpers.assert_eq(saved.cells.missing.present, false)
 		helpers.assert_eq(storage.pending_owned(owner, receipt), false); helpers.assert_true(storage.set("foreign", 9))
 		helpers.assert_true(storage.release_owned(owner)); helpers.assert_true(storage.acquire_owned(owner, { "missing", "b", "a" }))
@@ -634,7 +634,7 @@ helpers.describe("script settings retired journal roots", function()
 		-- A native callback retained by LuaJIT may keep the old journal alive
 		-- after its receipt-map entry becomes a weak owner tombstone.
 		-- The map is the receipts upvalue of the shared owned-alias protocol
-		-- (storage_owned.lua), which forget_owned is.
+		-- (core/fs/engine/storage_owned.lua), which forget_owned is.
 		local records, slot = nil, 1
 		while true do
 			local name, value = debug.getupvalue(storage.forget_owned, slot)

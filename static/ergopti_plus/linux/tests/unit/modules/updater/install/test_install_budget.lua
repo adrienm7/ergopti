@@ -1,7 +1,7 @@
 --- tests/unit/modules/updater/install/test_install_budget.lua
 
 --- Independent fixed clock/cap/brand cases; no native or physical-ACK claim.
-local Budget = require("updater.install_budget")
+local Budget = require("updater.engine.install_budget")
 local tests = {}
 local function test(name, body) tests[#tests + 1] = { name, body } end
 local function defaults(cap)
@@ -52,9 +52,9 @@ test("forged equality token cannot borrow installation deadline", function()
  setmetatable(token, nil); if not ok then error(err, 0) end
 end)
 test("canonical install data declares literal three minute local cap", function()
- local path = assert(require("infra.paths").shared("modules/updater/defaults.json"))
+ local path = assert(require("infra.paths").shared("updater/data/defaults.json"))
  local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
- local d = assert(require("json").decode(raw))
+ local d = assert(require("core.text.engine.json").decode(raw))
  assert(d.release_install.install_timeout_ms == 180000)
  local token = assert(Budget.capture(d, 12.25)); assert(Budget.deadline(token) == 180012.25)
 end)
@@ -73,9 +73,9 @@ end)
 -- Additive listing-policy controls retain all original deadline assertions.
 local listing_tests = {
  { "canonical listing ceiling covers the independently measured release", function()
-  local path = assert(require("infra.paths").shared("modules/updater/defaults.json"))
+  local path = assert(require("infra.paths").shared("updater/data/defaults.json"))
   local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
-  local d = assert(require("json").decode(raw))
+  local d = assert(require("core.text.engine.json").decode(raw))
   local cap = assert(Budget.capture_listing(d))
   assert(cap == 8388608 and cap > 117004 and cap > 229756)
  end },

@@ -134,13 +134,13 @@ helpers.describe("keyboard shortcuts: unknown action ids", function()
 		-- walk_assignments asserted a table: an older build's `keyboard = "x"`
 		-- made start() fail with an ERROR, rolling back the whole shortcut
 		-- layer, and made the cleanup report the file as unreadable.
-		require("config_outdated").reset_for_tests()
+		require("settings.engine.migration.outdated").reset_for_tests()
 		local stale = "[shortcuts]\nkeyboard = \"x\"\n"
 		local observed = with_subject({}, function(subject)
 			package.loaded["adapters.file_system"].read_with_status = function() return stale, "ok" end
 			helpers.assert_eq(subject.start(), true, "an outdated value never stops the layer")
 			local marked = {}
-			subject.mark_config_reads(require("toml_codec").decode(stale),
+			subject.mark_config_reads(require("core.text.engine.toml_codec").decode(stale),
 				function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
 			helpers.assert_eq(marked, {}, "left unmarked, so the cleanup offers it")
 		end)

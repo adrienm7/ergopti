@@ -57,7 +57,7 @@ Test("tray bootstrap: cold publication stays non-empty, truthful, and root-owned
 _TBPI_CompiledAuthorityPrecedesPublication() {
 	global _SharedDir
 	Source := _DriverSourceNoComments()
-	Assert(InStr(Source, "#Include ../../_shared/modules/menu/startup_tray_projection.ahk") > 0,
+	Assert(InStr(Source, "#Include ../../_shared/menu/data/startup_tray_projection.ahk") > 0,
 		"the actual native helper must include the genuine generated shared owner")
 	ProjectionPath := _DriverProductionFileForSymbol("SharedStartupTrayProjection", _SharedDir)
 	Projection := _StripFullLineComments(FileRead(ProjectionPath, "UTF-8"))

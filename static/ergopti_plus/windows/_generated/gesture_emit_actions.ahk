@@ -1,5 +1,5 @@
 ﻿; _generated/gesture_emit_actions.ahk
-; AUTO-GENERATED from _shared/modules/actions/actions.toml.
+; AUTO-GENERATED from _shared/shortcuts/data/actions/actions.toml.
 ; DO NOT EDIT BY HAND — run `npm run codegen:gesture-emit-actions` to refresh.
 #Requires AutoHotkey v2.0
 

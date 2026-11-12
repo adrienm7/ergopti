@@ -19,13 +19,13 @@ daemon Ergopti starts cannot, and today the pull refuses with
 ## Shape
 
 One Go program, `ergopti-proxy-relay`, in the standard-library-only
-`native_http` module (`_shared/go/native_http/proxyrelay` and
+`native_http` module (`_shared/core/network/native/go/native_http/proxyrelay` and
 `cmd/ergopti-proxy-relay`). It is not spliced into the Ollama build (the
 splice lists files in `managed_ollama_runtime.json`), and the module keeps no
 `require`.
 
 Two subcommands, both given every bound and deadline on the command line by the
-caller, which reads them from `_shared/modules/timings/constants.toml`
+caller, which reads them from `_shared/core/timing/data/constants.toml`
 (`[adapters]` `proxy_relay_*`):
 
 - `probe --upstream URL --authority HOST:PORT`: sends one `CONNECT` through the
@@ -85,7 +85,7 @@ used, so there is no dependency to pin or licence to record.
 
 ## Refusals
 
-The closed set is `_shared/modules/network/proxy_auth_relay.json` `refusals`;
+The closed set is `_shared/core/network/data/proxy_auth_relay.json` `refusals`;
 each names its locale key under `network.relay.*`. The Go constants are pinned
 to it by `contract_test.go`, and the Lua policy (`network/proxy_auth_relay.lua`)
 reads the same file. A relay that ran but did not answer by contract (a crash,

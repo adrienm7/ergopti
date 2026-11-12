@@ -105,7 +105,7 @@ helpers.describe("custom model list transactions", function()
 	end
 
 	helpers.it("keeps the active Ollama model when removing the same MLX identifier", function()
-		local identifiers = require("llm.model_identifier")
+		local identifiers = require("ai.engine.local_servers.model_identifier")
 		helpers.assert_true(identifiers.valid("ollama", "owner/model"))
 		helpers.assert_true(identifiers.valid("mlx", "owner/model"))
 		local list = { { backend = "mlx", name = "owner/model" } }

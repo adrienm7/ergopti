@@ -22,18 +22,18 @@
 ---    predictions' one: it is listed with its own test and removal, and adding
 ---    it keeps the entry predictions already use.
 --- 5. Every entry reads <provider>/<model>, told apart by host then order when
----    two share it (_shared/lua/llm/api_entry_names.lua), on every driver. The
+---    two share it (_shared/ai/engine/api/entry_names.lua), on every driver. The
 ---    label an entry stores is written for older builds and never read.
 --- ==============================================================================
 
 local M = {}
-local SaveFailure = require("config_save_failure")
-local TextUtils = require("text_utils")
+local SaveFailure = require("settings.engine.publication.save_failure")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger = require("logger.shim")
-local EntryNames = require("llm.api_entry_names")
-local ApiModelListing = require("llm.api_model_listing")
-local UrlTemplate = require("llm.api_url_template")
+local Logger = require("core.logger.engine.shim")
+local EntryNames = require("ai.engine.api.entry_names")
+local ApiModelListing = require("ai.engine.api.model_listing")
+local UrlTemplate = require("ai.engine.api.url_template")
 local BackendBrands = require("modules.llm.backend_brands")
 
 local LOG = "ui.menu.llm_backend_rows"

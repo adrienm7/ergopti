@@ -313,7 +313,7 @@ final class OwnedLogDirectoryTests: XCTestCase {
 
 	private static let localesDirectory = URL(fileURLWithPath: #filePath)
 		.deletingLastPathComponent()
-		.appendingPathComponent("../../../../_shared/data/locales")
+		.appendingPathComponent("../../../../_shared/core/i18n/data/locales")
 		.standardizedFileURL.path
 
 	private func makeRoot() throws -> URL {

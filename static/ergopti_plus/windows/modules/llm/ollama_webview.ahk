@@ -398,13 +398,13 @@ OllamaWV_HtmlUrl() {
 }
 
 /**
- * Returns the file:// URL for the static/ergopti_plus/_shared/data/locales/ directory (trailing slash).
+ * Returns the file:// URL for the static/ergopti_plus/_shared/core/i18n/data/locales/ directory (trailing slash).
  * Injected as window.__i18n_base so i18n.js fetches the correct locale file.
  * @returns {string}
  */
 OllamaWV_LocalesUrl() {
 	global _SharedDir
-	base := _SharedDir . "\data\locales\"
+	base := _SharedDir . "\core\i18n\data\locales\"
 	return "file:///" . StrReplace(base, "\", "/")
 }
 
@@ -417,7 +417,7 @@ OllamaWV_LocalesUrl() {
  */
 OllamaWV_I18nApplyScript(locale_code) {
 	global _SharedDir
-	json_path := _SharedDir . "\data\locales\" . locale_code . ".json"
+	json_path := _SharedDir . "\core\i18n\data\locales\" . locale_code . ".json"
 	json_str  := ""
 	if FileExist(json_path)
 		try json_str := FileRead(json_path, "UTF-8")

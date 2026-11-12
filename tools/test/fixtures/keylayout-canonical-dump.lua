@@ -9,8 +9,8 @@
 --- and object keys are sorted so the output is stable.
 --- ==============================================================================
 
-package.path = arg[1] .. "/lua/?.lua;" .. arg[1] .. "/lua/?/init.lua;" .. package.path
-local Keylayout = require("layouts.keylayout")
+package.path = arg[1] .. "/?.lua;" .. arg[1] .. "/?/init.lua;" .. package.path
+local Keylayout = require("layouts.engine.composer.keylayout")
 
 local SHORT = { ['"'] = '\\"', ["\\"] = "\\\\", ["\n"] = "\\n", ["\r"] = "\\r", ["\t"] = "\\t", ["\b"] = "\\b", ["\f"] = "\\f" }
 

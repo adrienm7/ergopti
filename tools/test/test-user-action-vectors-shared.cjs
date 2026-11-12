@@ -12,7 +12,7 @@
  *
  * WHY:
  * The rule is implemented once for both Lua drivers
- * (_shared/lua/user_action_parameter.lua); Windows is pending
+ * (_shared/shortcuts/engine/user_action_parameter.lua); Windows is pending
  * (docs/tooling/windows-pc-agent-handoff.md). A corpus that disagrees with its
  * own rule, or that a suite stops replaying, pins nothing, and a platform
  * claimed before its replay exists is a binding the picker offers untested.
@@ -35,7 +35,7 @@ const CORPUS = path.join(
 	'action_parameters',
 	'user_action_vectors.json'
 );
-const ACTIONS = path.join(SP, '_shared', 'modules', 'actions', 'actions.toml');
+const ACTIONS = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'actions.toml');
 
 const errors = [];
 let checks = 0;

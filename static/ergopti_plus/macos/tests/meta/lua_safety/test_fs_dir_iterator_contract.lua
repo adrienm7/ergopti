@@ -44,7 +44,7 @@ local CommandLines = require("tests.support.command_lines")
 
 local DRIVER_ROOT = helpers.driver_root()  -- trailing slash, e.g. ".../macos/"
 
--- The driver entry point plus every production source root. _shared/lua is
+-- The driver entry point plus every production source root. _shared is
 -- resolved through helpers.shared so the folder name lives in one place.
 local ENTRY_POINT = DRIVER_ROOT .. "init.lua"
 local SOURCE_ROOTS = {
@@ -52,7 +52,7 @@ local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "modules",
 	DRIVER_ROOT .. "infra",
 	DRIVER_ROOT .. "adapters",
-	helpers.shared("lua"),
+	helpers.shared(""),
 }
 
 

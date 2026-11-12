@@ -19,7 +19,7 @@ local it          = helpers.it
 local assert_eq   = helpers.assert_eq
 local assert_true = helpers.assert_true
 
-local Snapshot = require("diagnostics.snapshot")
+local Snapshot = require("diagnostics.engine.snapshot")
 
 local SHA = "f58d15798aaaabbbbccccddddeeeeffff0000111"
 local SHORT = "f58d15798"
@@ -48,7 +48,7 @@ end
 --- @param body function
 --- @return table lines
 local function capture_logs(body)
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local lines = {}
 	local previous_level = Logger.get_level()
 	Logger.set_level(10)
@@ -239,7 +239,7 @@ describe("Build commit: the crash dump names the build and the config dir", func
 				assert_true(err == true, "metadata dump must acknowledge its retained redacted output")
 			end)
 			local body = table.concat(parts)
-			local report = require("json").decode(body)
+			local report = require("core.text.engine.json").decode(body)
 			assert_true(report ~= nil, "the dump is the shared JSON report: " .. body)
 			assert_true(report.git_hash == SHORT and report.commit_source == "build", body)
 			assert_true(report.config_dir == redact(ConfigPaths.get_config_dir()), body)
@@ -257,7 +257,7 @@ describe("Build commit: the crash dump names the build and the config dir", func
 				assert_true(err == true, "metadata dump must acknowledge its retained redacted output")
 			end)
 			local body = table.concat(parts)
-			local report = require("json").decode(body)
+			local report = require("core.text.engine.json").decode(body)
 			assert_true(report ~= nil, "the dump is the shared JSON report: " .. body)
 			assert_true(report.git_hash:find("unknown (resolution failed:", 1, true) == 1, body)
 			assert_true(report.git_hash:find("stamp read exploded", 1, true) ~= nil, body)

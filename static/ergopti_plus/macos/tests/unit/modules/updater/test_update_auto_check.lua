@@ -14,7 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local SEED = "7f3a9c21e5b04d68"
 local T0 = 1700000000
@@ -22,7 +22,7 @@ local URL = "https://api.github.com/repos/adrienm7/ergopti/releases?per_page=100
 local FEED_URL = "https://github.com/adrienm7/ergopti/releases.atom"
 
 local function read_defaults()
-	local handle = assert(io.open(helpers.shared("modules/updater/defaults.json"), "rb"))
+	local handle = assert(io.open(helpers.shared("updater/data/defaults.json"), "rb"))
 	local decoded = Json.decode(handle:read("*a"))
 	handle:close()
 	return decoded
@@ -866,7 +866,7 @@ local RATE_LIMITED = { ok = false, status = 403,
 
 helpers.describe("updater.auto_check (macOS): the Atom feed answers when the API gives no list (update-check-feed-99)", function()
 	helpers.it("reads the feed's repository tags in order, as the update check's list", function()
-		local ReleaseSources = require("updater.release_sources")
+		local ReleaseSources = require("updater.engine.release_sources")
 		local list = assert(ReleaseSources.feed_release_list(FEED, "adrienm7", "ergopti"))
 		helpers.assert_eq(Json.decode(list), {
 			{ tag_name = "v0.0.0-dev.150", published_at = "2026-09-02T00:00:00Z" },

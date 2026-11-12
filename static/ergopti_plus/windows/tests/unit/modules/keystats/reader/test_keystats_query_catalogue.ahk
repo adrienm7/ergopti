@@ -4,7 +4,7 @@
 ; MODULE: Keystats Named-Query Catalogue Tests (Windows)
 ; DESCRIPTION:
 ; The manifest reader renders eleven of its statements from the shared query
-; catalogue (_shared/data/db/queries.sql), compiled into
+; catalogue (_shared/metrics/data/db/queries.sql), compiled into
 ; _generated/keystats_queries.ahk: the statements macOS and Linux run too.
 ;
 ; FEATURES & RATIONALE:

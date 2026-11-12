@@ -40,8 +40,8 @@
 
 local M = {}
 
-local Json = require("json")
-local Queries = require("keystats.queries")
+local Json = require("core.text.engine.json")
+local Queries = require("metrics.engine.queries")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 local MetricsLedger = require("modules.keystats.metrics_ledger")
 
@@ -92,7 +92,7 @@ function M.is_foreign_device_id(name)
 end
 
 --- The columns of every raw events_* table of the shared schema.
---- @param schema string Text of _shared/data/db/schema.sql.
+--- @param schema string Text of _shared/metrics/data/db/schema.sql.
 --- @return table columns { [table] = { [column] = true } }
 function M.raw_columns(schema)
 	local out = {}
@@ -170,7 +170,7 @@ local function read_literal(chunk, pos)
 		local quoted, after = read_quoted(chunk, pos)
 		if not quoted then return nil end
 		-- Every driver writes a CR or a NUL as a char() concatenation
-		-- (sqlite/literal.lua, Windows SQLite_Q): only that form joins literals,
+		-- (core/fs/engine/sqlite/literal.lua, Windows SQLite_Q): only that form joins literals,
 		-- re-rendered as the exact bytes it stores.
 		if chunk:sub(after, after + 1) ~= "||" then return quoted, after end
 		local parts = { (quoted:sub(2, -2):gsub("''", "'")) }

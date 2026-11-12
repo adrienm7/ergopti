@@ -18,7 +18,7 @@ The macOS implementation of ErgoptiPlus.
 Releases are published as casks in the
 [`adrienm7/homebrew-ergopti`](https://github.com/adrienm7/homebrew-ergopti) tap,
 one cask per update channel of
-[`_shared/modules/updater/channels.json`](../_shared/modules/updater/channels.json):
+[`_shared/updater/data/channels.json`](../_shared/updater/data/channels.json):
 
 ```bash
 brew tap adrienm7/ergopti
@@ -103,7 +103,7 @@ commands for every layer live in [`../../../docs/TESTING.md`](../../../docs/TEST
 Repository-wide delivery rules live in [`AGENTS.md`](../../../AGENTS.md), macOS
 semantics in the
 [`hammerspoon-driver` skill](../../../.agents/skills/hammerspoon-driver/SKILL.md),
-and logging in the shared [`logger contract`](../_shared/modules/logger/SPEC.md).
+and logging in the shared [`logger contract`](../_shared/core/logger/data/SPEC.md).
 Hard-won gotchas live in
 [`../../../docs/memory/README.md`](../../../docs/memory/README.md). Work that is
 known but not done lives in the gate that measures it: each ratchet under

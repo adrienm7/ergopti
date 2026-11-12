@@ -129,7 +129,7 @@ local function ingest_errors(sync_foreign_data_sql)
 		"modules.keystats.aggregator",
 		"modules.keystats.rotation",
 		"modules.keystats.export",
-		"keystats.metrics",
+		"metrics.engine.metrics",
 		"adapters.ledger_append", "modules.keystats.log_manager",
 	}, function()
 		local errors = {}
@@ -154,7 +154,7 @@ local function ingest_errors(sync_foreign_data_sql)
 		package.loaded["modules.keystats.export"] = {
 			sync_foreign_data_sql = sync_foreign_data_sql,
 		}
-		package.loaded["keystats.metrics"] = {}
+		package.loaded["metrics.engine.metrics"] = {}
 
 		local manager = helpers.load_with_stubs("modules.keystats.log_manager")
 		local call_ok, call_err = pcall(manager.ingest_once)
@@ -211,7 +211,7 @@ helpers.describe("foreign sync writer quarantine", function()
 	helpers.it("does not touch the previously captured handle after foreign sync retires it", function()
 		helpers.with_fresh_modules({ "infra.logger", "modules.keystats.sqlite_writer",
 			"modules.keystats.aggregator", "modules.keystats.rotation", "modules.keystats.export",
-			"keystats.metrics", "adapters.ledger_append", "modules.keystats.log_manager" }, function()
+			"metrics.engine.metrics", "adapters.ledger_append", "modules.keystats.log_manager" }, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			local calls = 0
 			local db = { nrows = function() calls = calls + 1; error("retired handle read") end,
@@ -224,7 +224,7 @@ helpers.describe("foreign sync writer quarantine", function()
 				current = nil
 				return {}
 			end }
-			package.loaded["keystats.metrics"] = {}
+			package.loaded["metrics.engine.metrics"] = {}
 			local manager = helpers.load_with_stubs("modules.keystats.log_manager")
 			helpers.assert_eq(manager.ingest_once(), false)
 			helpers.assert_eq(calls, 0, "foreign sync may retire the original writer")

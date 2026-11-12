@@ -2,10 +2,10 @@
 --- Exact production metadata-hint and command composition over injected ports.
 local root = assert(arg[1])
 local production = assert(arg[2])
-package.path = root .. "/static/ergopti_plus/macos/?.lua;" .. root .. "/static/ergopti_plus/_shared/lua/?.lua;"
-	.. production .. "/static/ergopti_plus/macos/?.lua;" .. production .. "/static/ergopti_plus/_shared/lua/?.lua;"
-	.. production .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
-local Json = require("json")
+package.path = root .. "/static/ergopti_plus/macos/?.lua;" .. root .. "/static/ergopti_plus/_shared/?.lua;"
+	.. production .. "/static/ergopti_plus/macos/?.lua;" .. production .. "/static/ergopti_plus/_shared/?.lua;"
+	.. production .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
+local Json = require("core.text.engine.json")
 local Hint = assert(loadfile(root .. "/tools/test/fixtures/managed_ollama_runtime_hint.lua"))()
 local home = "/private/Owned O'Brien/$home"
 local native = home .. "/Library/Application Support/Ergopti/ollama-native-http/ollama"
@@ -42,9 +42,9 @@ local receipt_path = native:gsub("/ollama$", "/.ergopti-managed-runtime.json")
 local function seed()
 	files = {
 		[receipt_path] = Json.encode(receipt),
-		[driver .. "/../_shared/modules/llm/managed_ollama_runtime.json"] = raw_contract,
-		[driver .. "/../_shared/modules/llm/managed_ollama_release.json"] = raw_catalogue,
-		[driver .. "/../_shared/modules/llm/managed_ollama_bootstrap.json"] = '{"maximum_metadata_bytes":1048576}',
+		[driver .. "/../_shared/ai/data/managed_ollama_runtime.json"] = raw_contract,
+		[driver .. "/../_shared/ai/data/managed_ollama_release.json"] = raw_catalogue,
+		[driver .. "/../_shared/ai/data/managed_ollama_bootstrap.json"] = '{"maximum_metadata_bytes":1048576}',
 		[driver .. "/modules/llm/network-retry.sh"] = "CURL_CONNECT_TIMEOUT_SEC=30\nCURL_STALL_SEC=60\nCURL_MAX_TIME_SEC=600\n",
 		[driver .. "/modules/llm/managed_ollama_serve.py"] = "bundled source owner; port fixture only",
 	}
@@ -82,7 +82,7 @@ package.loaded["adapters.managed_ollama_hint"] = { get = function(directory)
 	local raw = files[receipt_path]
 	if not raw or #raw > 1048576 then return nil end
 	local ok, value = pcall(Json.decode, raw)
-	if not ok or not files[driver .. "/../_shared/modules/llm/managed_ollama_release.json"]
+	if not ok or not files[driver .. "/../_shared/ai/data/managed_ollama_release.json"]
 		or not Hint.matches(contract, catalogue, value, "macos-arm64", cd, rd) then return nil end
 	local budgets = { admission = 30, idle = 60, retirement = 600 }
 	local raw_retry = files[driver .. "/modules/llm/network-retry.sh"]
@@ -135,7 +135,7 @@ case(function()
 	check(command, nil); check(reason, "managed native budgets are unavailable"); seed()
 end)
 case(function()
-	files[driver .. "/../_shared/modules/llm/managed_ollama_release.json"] = nil
+	files[driver .. "/../_shared/ai/data/managed_ollama_release.json"] = nil
 	check(Binary.native_candidate(), nil)
 	local command, reason = Builder.build(native, "/private/logs/today.log", 11434)
 	check(command, nil); check(reason, "managed runtime selection is unavailable"); seed()

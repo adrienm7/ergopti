@@ -27,7 +27,7 @@ _CLP_WithPhysicalFrame(Body) {
 		for Language in ["en", "fr"] {
 			Root[Key] := Corpus["rows"]
 			Root[Legacy] := [Corpus["legacy"]]
-			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Language . ".json", "UTF-8"))
+			_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Language . ".json", "UTF-8"))
 			_I18nCacheLoaded := true
 			Body.Call(Key, Legacy, Root, Corpus, Language)
 		}
@@ -329,7 +329,7 @@ _MTF_CorpusImages() {
 	HadLoaded := IsSet(_I18nCacheLoaded), PreviousLoaded := HadLoaded ? _I18nCacheLoaded : false
 	try {
 		for Vector in Corpus["cases"] {
-			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Vector["language"] . ".json", "UTF-8"))
+			_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Vector["language"] . ".json", "UTF-8"))
 			_I18nCacheLoaded := true
 			ScriptInformation := HadInformation ? Prior.Clone() : Map()
 			ScriptInformation["MagicKey"] := Vector["value"]
@@ -369,7 +369,7 @@ _LVC_WithFixture(Body) {
 			Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\layout_caption_values.json", "UTF-8"))
 			Corpus["rows"][2]["platforms"] := ["ahk"]
 			Root[Key] := Corpus["rows"]
-			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Language . ".json", "UTF-8"))
+			_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Language . ".json", "UTF-8"))
 			_I18nCacheLoaded := true
 			Calls := Map("captions", 0, "commands", 0)
 			Getters := Map("ready", (*) => true, "selected", (*) => true)

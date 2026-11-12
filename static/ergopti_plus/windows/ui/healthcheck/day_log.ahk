@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Healthcheck / Day Log Attachment
 ; DESCRIPTION:
-; AHK port of _shared/lua/diagnostics/day_log.lua plus this driver's thin part:
+; AHK port of _shared/diagnostics/engine/day_log.lua plus this driver's thin part:
 ; reads today's complete log, redacts it line by line and keeps the result for
 ; the report actions. The attachment is opt-in: the page asks for it, shows the
 ; preview this module returns, and the Save and Report actions write the file

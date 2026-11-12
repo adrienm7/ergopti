@@ -3,7 +3,7 @@
 -- The companion Python fixture records actual wire headers independently.
 local uv = require("luv")
 local Http = require("adapters.http_client")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local origin = assert(os.getenv("HTTP_EMPTY_HEADER_ORIGIN"))
 local owner = "empty-header-native-fixture"
 local checks, failures, spawns = 0, 0, 0

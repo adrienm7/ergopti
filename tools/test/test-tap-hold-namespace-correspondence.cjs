@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Tap-Hold Namespace Correspondence
  * DESCRIPTION:
- * _shared/tap_hold/defaults.toml describes the same physical keys twice, under
+ * _shared/tap_hold/data/defaults.toml describes the same physical keys twice, under
  * two vocabularies that no code and no test has ever compared:
  *   [tap_hold.keys.*]  read by Windows and Linux, per-key threshold
  *   [hs_tap_hold]      read by macOS, one global threshold
@@ -48,7 +48,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const DEFAULTS = path.join(ROOT, 'static/ergopti_plus/_shared/tap_hold/defaults.toml');
+const DEFAULTS = path.join(ROOT, 'static/ergopti_plus/_shared/tap_hold/data/defaults.toml');
 
 // The physical-position correspondence. `pc` is the [tap_hold.keys.*] id read by
 // Windows and Linux; `mac` is the [hs_tap_hold] id read by macOS.

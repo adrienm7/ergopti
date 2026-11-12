@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 local PacFallback = require("infra.field_check_pac_fallback")
 local Checks = require("infra.field_check_checks")
 

@@ -234,7 +234,7 @@ if (totalFail === failBeforeCompleteness) {
 // Linux consumes the canonical list. Pin the existing macOS native owner's
 // inventory until it can adopt the shared binding without changing its gates.
 const redirectPolicy = JSON.parse(
-	fs.readFileSync(shared('data/http/redirect_policy.json'), 'utf8')
+	fs.readFileSync(shared('core/network/data/http/redirect_policy.json'), 'utf8')
 );
 const sensitiveHeaders = redirectPolicy.sensitive_headers;
 const validHeaderInventory =
@@ -271,7 +271,7 @@ if (macMaxRedirects && Number(macMaxRedirects[1]) === redirectPolicy.buffered_ge
 	pass('macOS native redirect hop limit matches the shared policy');
 } else {
 	fail('macOS native redirect hop limit matches the shared policy', [
-		'MAX_REDIRECTS must equal buffered_get.max_hops of data/http/redirect_policy.json'
+		'MAX_REDIRECTS must equal buffered_get.max_hops of core/network/data/http/redirect_policy.json'
 	]);
 }
 
@@ -283,7 +283,9 @@ if (macMaxRedirects && Number(macMaxRedirects[1]) === redirectPolicy.buffered_ge
 
 // The byte inventory belongs to the common HTTP contract. Header config
 // escaping alone cannot protect the wire boundary after native decoding.
-const headerPolicy = JSON.parse(fs.readFileSync(shared('data/http/header_policy.json'), 'utf8'));
+const headerPolicy = JSON.parse(
+	fs.readFileSync(shared('core/network/data/http/header_policy.json'), 'utf8')
+);
 const forbiddenHeaderBytes = headerPolicy.forbidden_bytes;
 if (
 	Array.isArray(forbiddenHeaderBytes) &&
@@ -303,7 +305,7 @@ if (
 // ==================================================
 
 const transportPolicy = JSON.parse(
-	fs.readFileSync(shared('data/http/transport_policy.json'), 'utf8')
+	fs.readFileSync(shared('core/network/data/http/transport_policy.json'), 'utf8')
 );
 const httpSchemes = transportPolicy.allowed_schemes;
 if (

@@ -160,8 +160,8 @@ helpers.describe("adapters.toml_cache: snapshot round-trip + invalidation", func
 	end)
 
 	helpers.it("(toml-hotstring-header-cache) rejects an unchanged partial source cached by version 5", function()
-		helpers.with_fresh_modules({ "toml_codec.reader" }, function()
-			local Reader = helpers.load_with_stubs("toml_codec.reader")
+		helpers.with_fresh_modules({ "core.text.engine.toml_codec.reader" }, function()
+			local Reader = helpers.load_with_stubs("core.text.engine.toml_codec.reader")
 			local file = assert(io.open(SRC, "rb"))
 			local original = assert(file:read("*a")); assert(file:close())
 			local before_mtime, before_size = cur_mtime, cur_size

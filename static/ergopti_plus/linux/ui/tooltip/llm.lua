@@ -10,12 +10,12 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Config = require("ui.tooltip.config")
 local DisplaySettings = require("modules.llm.display_settings")
-local LlmLine = require("tooltip.llm_line")
-local ConfigKeys = require("config_keys")
-local InfoBar = require("llm.request_plan.info_bar")
+local LlmLine = require("core.ui.engine.tooltip.llm_line")
+local ConfigKeys = require("settings.engine.keys")
+local InfoBar = require("ai.engine.request_plan.info_bar")
 
 local LOG = "ui.tooltip.llm"
 
@@ -64,7 +64,7 @@ end
 --- in front of the selected line, the typed text grey, the corrections green
 --- and the continuation orange on it, every other line grey, and the chord
 --- that inserts each line right-aligned in a muted column
---- (_shared/modules/tooltip/constants.toml [llm_ui]).
+--- (_shared/core/ui/data/tooltip/constants.toml [llm_ui]).
 --- @param candidates table Array of { to_type, chunks?, nw?, has_corrections? }.
 --- @param active_index integer
 --- @param meta table { model?, profile?, validation_modifiers?, loading? }

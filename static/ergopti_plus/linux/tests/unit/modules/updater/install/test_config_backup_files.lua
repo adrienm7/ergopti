@@ -117,7 +117,7 @@ helpers.describe("config_backup (Linux): real files", function()
 		local ok, err = pcall(function()
 			local owner = assert(Backup.owner())
 			local record = assert(owner.create("pre_install"))
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local manifest = assert(Json.decode_lossless(assert(read(record.path .. "/backup.json"))))
 			manifest.files = Json.decode_lossless("null")
 			write(record.path .. "/backup.json", assert(Json.encode(manifest)))
@@ -267,7 +267,7 @@ helpers.describe("config-backup-native-names", function()
 		local ok, err = pcall(function()
 			assert(require("luv").fs_symlink(dir .. "/not-here", dir .. "/cfg/dangling.toml"))
 			local owner = assert(Backup.owner())
-			local Writer = require("toml_codec.writer")
+			local Writer = require("core.text.engine.toml_codec.writer")
 			local native_read, attempts = Writer.read_classified, 0
 			Writer.read_classified = function(path, ...)
 				if path == dir .. "/cfg/dangling.toml" then attempts = attempts + 1 end
@@ -613,7 +613,7 @@ end)
 helpers.describe("config-backup-rule-source", function()
 	local uv = require("luv")
 	local Paths = require("infra.paths")
-	local rules = assert(read(Paths.shared("modules/updater/defaults.json")))
+	local rules = assert(read(Paths.shared("updater/data/defaults.json")))
 	for _, kind in ipairs({ "fifo", "fifo-link", "denied", "file", "file-link" }) do
 		helpers.it("(config-backup-rule-source) classifies " .. kind .. " before building a backup owner", function()
 			local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-backup-rules-XXXXXX"))
@@ -628,7 +628,7 @@ helpers.describe("config-backup-rule-source", function()
 			local code = string.format([[package.path = %q
 local original = require("infra.paths")
 package.loaded["infra.paths"] = setmetatable({ shared = function(relative)
- if relative == "modules/updater/defaults.json" then return %q end
+ if relative == "updater/data/defaults.json" then return %q end
  return original.shared(relative)
 end }, { __index = original })
 local backup = require("modules.updater.config_backup")
@@ -661,7 +661,7 @@ assert((owner ~= nil) == %s, "backup rules admission disagrees with actual sourc
 		local path = os.tmpname()
 		write(path, rules)
 		package.loaded["infra.paths"] = setmetatable({ shared = function(relative)
-			if relative == "modules/updater/defaults.json" then return path end
+			if relative == "updater/data/defaults.json" then return path end
 			return Paths.shared(relative)
 		end }, { __index = Paths })
 		local Backup = helpers.load_module("modules.updater.config_backup")

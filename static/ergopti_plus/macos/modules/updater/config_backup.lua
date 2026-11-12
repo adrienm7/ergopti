@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Configuration Backup (macOS)
 --- DESCRIPTION:
---- Binds the shared configuration backup owner (_shared/lua/updater/
+--- Binds the shared configuration backup owner (_shared/updater/engine/
 --- config_backup.lua, assembled by config_backup_binding.lua) to this driver: the configuration folder of
 --- infra/config_paths.lua and file ports over the FileSystem adapter's
 --- classified reads, create-only writes and compare-and-publish. The Versions
@@ -12,7 +12,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One rule set: the extensions, the excluded folders and the names come
----    from the config_backup block of _shared/modules/updater/defaults.json.
+---    from the config_backup block of _shared/updater/data/defaults.json.
 --- 2. A link to a folder is neither followed nor copied (it could loop); a link
 ---    to a file is copied through its target.
 --- 3. The remote API entries are configuration Windows backs up (its
@@ -33,11 +33,11 @@ local ConfigPaths = require("infra.config_paths")
 local FsDir       = require("infra.fs_dir")
 local FileSystem  = require("adapters.file_system")
 local JsonCodec   = require("adapters.json_codec")
-local Binding     = require("updater.config_backup_binding")
+local Binding     = require("updater.engine.config_backup_binding")
 local Storage     = require("adapters.storage")
-local Json        = require("json")
+local Json        = require("core.text.engine.json")
 
-local LOG = "updater.config_backup"
+local LOG = "updater.engine.config_backup_core"
 
 -- Test seam: replaces the owner options' ports (io, clock, roots).
 M._overrides = nil
@@ -162,7 +162,7 @@ end
 --- @return table|nil defaults
 --- @return string|nil error
 local function read_defaults()
-	local path = Paths.shared("modules/updater/defaults.json")
+	local path = Paths.shared("updater/data/defaults.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then return nil, "the shared updater defaults are unreadable" end
 	local decoded, decode_err = JsonCodec.decode(raw)

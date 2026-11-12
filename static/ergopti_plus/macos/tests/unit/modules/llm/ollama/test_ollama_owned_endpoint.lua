@@ -22,7 +22,7 @@ local function shared_defaults()
 	local Paths = require("infra.paths")
 	local file = assert(io.open(Paths.shared_llm_path("defaults.json"), "rb"))
 	local text = file:read("*a"); file:close()
-	return require("json").decode(text)
+	return require("core.text.engine.json").decode(text)
 end
 
 --- Loads the endpoint owner over an in-memory Storage.

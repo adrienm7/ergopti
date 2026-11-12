@@ -50,12 +50,12 @@ const SOURCES = [
 	'static/ergopti_plus/linux/infra/libuv_exit.lua',
 	'static/ergopti_plus/linux/modules/gestures/manager.lua',
 	'static/ergopti_plus/linux/ergopti_hotstrings.lua',
-	'static/ergopti_plus/_shared/lua/native_worker_owner.lua',
-	'static/ergopti_plus/_shared/lua/cursor_window_policy.lua',
-	'static/ergopti_plus/_shared/modules/actions/actions.toml',
+	'static/ergopti_plus/_shared/core/lifecycle/engine/native_worker_owner.lua',
+	'static/ergopti_plus/_shared/core/ui/engine/cursor_window_policy.lua',
+	'static/ergopti_plus/_shared/shortcuts/data/actions/actions.toml',
 	'static/ergopti_plus/linux/_generated/action_catalogue.lua',
-	'static/ergopti_plus/_shared/lua/actions/catalogue.lua',
-	'static/ergopti_plus/_shared/lua/actions/catalogue_data.lua',
+	'static/ergopti_plus/_shared/shortcuts/engine/actions/catalogue.lua',
+	'static/ergopti_plus/_shared/shortcuts/engine/actions/catalogue_data.lua',
 	'static/ergopti_plus/linux/_generated/action_emit.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_window_switch_receipts.py',
 	'static/ergopti_plus/linux/tests/hardware/run_window_switch_operation.lua',
@@ -550,7 +550,7 @@ async function main() {
 		!('timeout' in calls[1][2]),
 		'owner retains cancellation instead of blindly killing only its leader'
 	);
-	assert(calls[1][2].env.LUA_PATH.includes('../_shared/lua/?.lua'));
+	assert(calls[1][2].env.LUA_PATH.includes('../_shared/?.lua'));
 	if (process.env.ERGOPTI_NATIVE_LUA_CPATH)
 		assert.equal(calls[1][2].env.LUA_CPATH, process.env.ERGOPTI_NATIVE_LUA_CPATH);
 	// Exercise the real planner CLI with native subprocesses replaced at its

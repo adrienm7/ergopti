@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Manifest-Driven: Structure (order, separators, sections) is read from
----    ``_shared/modules/menu/menu_manifest.json`` via ``infra/manifest_menu``.
+---    ``_shared/menu/data/menu_manifest.json`` via ``infra/manifest_menu``.
 ---    Native getters and commands supply state and effects; only the app
 ---    exclusion count needs a computed provider label.
 --- 2. Orchestration: Bridges the isolated UI components (menubar, widget) and
@@ -32,7 +32,7 @@ local i18n          = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
 local Manifest      = require("infra.manifest_reader")
 local Logger        = require("infra.logger")
-local ParentSource = require("menu.frames.parent_source")
+local ParentSource = require("menu.engine.frames.parent_source")
 
 local LOG = "menu_metrics"
 local exclusion_transactions = setmetatable({}, { __mode = "k" })
@@ -678,26 +678,26 @@ function M.build(ctx)
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.state_getters = STATE_GETTERS
 	render_ctx.commands = {
-		[require("config_keys").COMMAND.METRICS_TOGGLE] = toggle_metrics,
-		[require("config_keys").COMMAND.WPM_WIDGET] = cmd_wpm_widget,
-		[require("config_keys").COMMAND.WIDGET_COLORS] = cmd_widget_colors,
-		[require("config_keys").COMMAND.INCLUDE_REALTIME] = cmd_include_realtime,
-		[require("config_keys").COMMAND.FILTER_PRIVATE] = cmd_filter_private,
-		[require("config_keys").COMMAND.FILTER_SECURE]  = cmd_filter_secure,
-		[require("config_keys").COMMAND.FILTER_SYSAUTH] = cmd_filter_sysauth,
+		[require("settings.engine.keys").COMMAND.METRICS_TOGGLE] = toggle_metrics,
+		[require("settings.engine.keys").COMMAND.WPM_WIDGET] = cmd_wpm_widget,
+		[require("settings.engine.keys").COMMAND.WIDGET_COLORS] = cmd_widget_colors,
+		[require("settings.engine.keys").COMMAND.INCLUDE_REALTIME] = cmd_include_realtime,
+		[require("settings.engine.keys").COMMAND.FILTER_PRIVATE] = cmd_filter_private,
+		[require("settings.engine.keys").COMMAND.FILTER_SECURE]  = cmd_filter_secure,
+		[require("settings.engine.keys").COMMAND.FILTER_SYSAUTH] = cmd_filter_sysauth,
 		["encryption"]     = cmd_encryption,
-		[require("config_keys").COMMAND.RESET_WPM_POSITION] = cmd_reset_wpm_position,
-		[require("config_keys").COMMAND.SHOW_TYPING]    = cmd_show_typing,
-		[require("config_keys").COMMAND.SHOW_APPS]      = cmd_show_apps,
-		[require("config_keys").COMMAND.METRICS_SUSPEND] = cmd_metrics_suspend,
-		[require("config_keys").COMMAND.METRICS_RESET_SESSION] = cmd_metrics_reset_session,
-		[require("config_keys").COMMAND.WPM_MENUBAR]    = cmd_wpm_menubar,
-		[require("config_keys").COMMAND.MENUBAR_COLORS] = cmd_menubar_colors,
+		[require("settings.engine.keys").COMMAND.RESET_WPM_POSITION] = cmd_reset_wpm_position,
+		[require("settings.engine.keys").COMMAND.SHOW_TYPING]    = cmd_show_typing,
+		[require("settings.engine.keys").COMMAND.SHOW_APPS]      = cmd_show_apps,
+		[require("settings.engine.keys").COMMAND.METRICS_SUSPEND] = cmd_metrics_suspend,
+		[require("settings.engine.keys").COMMAND.METRICS_RESET_SESSION] = cmd_metrics_reset_session,
+		[require("settings.engine.keys").COMMAND.WPM_MENUBAR]    = cmd_wpm_menubar,
+		[require("settings.engine.keys").COMMAND.MENUBAR_COLORS] = cmd_menubar_colors,
 	}
 	-- The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
 	-- The Configuration clear still composes the metrics scope owner.
 	-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
-	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function()
 		if type(ctx.apply_preference_scope) ~= "function" then return false end
 		return ctx.apply_preference_scope("metrics", "recommended")
 	end

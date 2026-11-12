@@ -178,7 +178,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          asset_name=$(node -p "require('./static/ergopti_plus/_shared/modules/updater/defaults.json').release_assets.linux_bundle")
+          asset_name=$(node -p "require('./static/ergopti_plus/_shared/updater/data/defaults.json').release_assets.linux_bundle")
           if [[ ! "$asset_name" =~ ^[A-Za-z0-9._+-]+\.tar\.gz$ ]]; then
               echo "::error::unsafe Linux bundle asset name: $asset_name"
               exit 1

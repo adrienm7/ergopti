@@ -21,7 +21,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 helpers.admit_logger_privacy(require("infra.logger"))
 package.loaded["adapters.boot_fatal"] = nil
@@ -129,7 +129,7 @@ helpers.describe("boot fatal reporter (silent-boot-abort)", function()
 	end)
 
 	helpers.it("(fatal-runtime-kind) every default message key exists in the canonical catalogue", function()
-		local catalogue = read_all(helpers.shared("data/locales/en.json"))
+		local catalogue = read_all(helpers.shared("core/i18n/data/locales/en.json"))
 		helpers.assert_true(type(catalogue) == "string" and #catalogue > 1000,
 			"en.json must be readable")
 		local keys = 0
@@ -237,7 +237,7 @@ helpers.describe("fatal report canonical privacy", function()
 	end)
 
 	helpers.it("mac-fatal-privacy: only the exact closed admission failure is writable before privacy initialization", function()
-		helpers.with_stub_scope({ "infra.logger", "logger", "adapters.boot_journal", "adapters.boot_fatal" }, function()
+		helpers.with_stub_scope({ "infra.logger", "core.logger.engine", "adapters.boot_journal", "adapters.boot_fatal" }, function()
 			local Fresh = require("adapters.boot_fatal")
 			local opens = 0
 			local deps = { fallback_path = "/owned/boot", getenv = function() return "/owned/report" end,

@@ -93,9 +93,9 @@ _EDOT_Assets(Root) {
 	for Subdir in ["config", "logs", "vendor", "vendor\64bit", "shared", "shared\modules",
 		"shared\modules\diagnostics", "shared\modules\updater", "shared\data", "shared\data\locales"]
 		FSCreateDirectoryExclusiveStrict(Root . "\" . Subdir)
-	for Relative in ["modules\diagnostics\schema.json", "modules\diagnostics\redaction.json", "modules\diagnostics\issue_templates.json",
-		"modules\diagnostics\error_policy.json", "modules\diagnostics\recent_issues.json", "modules\diagnostics\day_log.json",
-		"modules\updater\defaults.json", "data\locales\en.json", "data\locales\fr.json"] {
+	for Relative in ["diagnostics\data\schema.json", "diagnostics\data\redaction.json", "diagnostics\data\issue_templates.json",
+		"diagnostics\data\error_policy.json", "diagnostics\data\recent_issues.json", "diagnostics\data\day_log.json",
+		"updater\data\defaults.json", "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json"] {
 		Original := _SharedDir . "\" . Relative, Copy := Root . "\shared\" . Relative
 		FileCopy(Original, Copy, false)
 		AssertEqual(CryptoSha256Bytes(FSReadBytesStrict(Original)), CryptoSha256Bytes(FSReadBytesStrict(Copy)),

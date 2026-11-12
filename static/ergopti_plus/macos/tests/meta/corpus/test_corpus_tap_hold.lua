@@ -109,15 +109,15 @@ end)
 -- ==========================================
 -- ==========================================
 
--- Load the shared TOML codec (lives in _shared/lua/toml_codec/).
-local codec_ok, codec = pcall(require, "toml_codec.codec")
+-- Load the shared TOML codec (lives in _shared/core/text/engine/toml_codec/).
+local codec_ok, codec = pcall(require, "core.text.engine.toml_codec.codec")
 
 helpers.describe("tap_hold corpus — TOML codec round-trip", function()
 	helpers.it("toml_codec is available on the Lua path", function()
 		helpers.assert_eq(type(codec_ok and codec or nil), "table",
 			"the codec must load as a table — every vector below round-trips through it")
 		helpers.assert_true(codec_ok,
-			"toml_codec.codec not found — check package.path in tests/run.lua")
+			"core.text.engine.toml_codec.codec not found — check package.path in tests/run.lua")
 	end)
 
 	helpers.it("configured vectors round-trip through encode/decode", function()

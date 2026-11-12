@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 -- Distinct values: a stub that answers 0 for every level would hide the bug.
 local LEVELS = { normal = 0, floating = 3, modalPanel = 8, screenSaver = 1000 }
@@ -222,7 +222,7 @@ end)
 --- @return table healthcheck, table context
 local function load_healthcheck(view)
 	for _, name in ipairs({
-		"ui.healthcheck.core", "ui.healthcheck.helpers", "healthcheck.snapshot",
+		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
 		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
@@ -252,7 +252,7 @@ local function load_healthcheck(view)
 	package.loaded["adapters.timer_scheduler"] = { cancel = function() return true end }
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["ui.healthcheck.helpers"] = {}
-	package.loaded["healthcheck.snapshot"] = {}
+	package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
 	package.loaded["infra.paths"] = { shared = function() return "/shared" end }
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	local real = require("ui.ui_builder")

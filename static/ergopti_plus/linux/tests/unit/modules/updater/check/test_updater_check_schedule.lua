@@ -318,7 +318,7 @@ helpers.describe("updater (linux): the check schedule follows the persisted reco
 			helpers.assert_eq(ctx.M.get_check_interval(), 3600, "a retired 2 hours snaps to 1 hour")
 			helpers.assert_true(ctx.M.set_check_interval(21600))
 			local handle = assert(io.open(ctx.config_path, "r"))
-			local decoded = require("toml_codec").decode(handle:read("*a"))
+			local decoded = require("core.text.engine.toml_codec").decode(handle:read("*a"))
 			handle:close()
 			helpers.assert_eq(decoded.updater.check_interval_seconds, 21600, "the choice is written to config.toml")
 			local marked = {}

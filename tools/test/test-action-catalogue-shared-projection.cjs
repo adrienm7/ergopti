@@ -5,8 +5,8 @@
  * MODULE: Shared Lua Action Catalogue Loads Each Driver's Own Catalogue
  * DESCRIPTION:
  * The macOS and Linux drivers load one shared catalogue
- * (_shared/lua/actions/catalogue_data.lua) filtered at load by
- * _shared/lua/actions/catalogue.lua, instead of a full generated copy each.
+ * (_shared/shortcuts/engine/actions/catalogue_data.lua) filtered at load by
+ * _shared/shortcuts/engine/actions/catalogue.lua, instead of a full generated copy each.
  * This test loads every driver's _generated/action_catalogue.lua in a real Lua
  * interpreter and compares the table it returns with the generator's model of
  * that driver (buildModel, the one the per-driver copies used to print), so
@@ -66,7 +66,7 @@ end
  */
 function runLua(driverRoot, body) {
 	const source =
-		`package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path\n` +
+		`package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path\n` +
 		SERIALIZER +
 		body;
 	const result = spawnSync(LUA, ['-'], {
@@ -119,7 +119,7 @@ function expectedCatalogue(model) {
 }
 
 const registry = Generator.parseRegistry(
-	fs.readFileSync(path.join(SP, '_shared', 'modules', 'actions', 'actions.toml'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'actions.toml'), 'utf8')
 );
 let checks = 0;
 
@@ -144,7 +144,7 @@ for (const platform of Generator.LUA_PLATFORMS) {
 
 	const fresh = runLua(
 		driverRoot,
-		`local Catalogue = require("actions.catalogue")
+		`local Catalogue = require("shortcuts.engine.actions.catalogue")
 		local first = Catalogue.for_platform(${JSON.stringify(platform)})
 		first.sg_items[1].id = "edited"; first.actions.none = nil
 		local second = Catalogue.for_platform(${JSON.stringify(platform)})
@@ -164,7 +164,7 @@ for (const [label, call, message] of [
 ]) {
 	const refused = runLua(
 		'macos',
-		`local Catalogue = require("actions.catalogue")
+		`local Catalogue = require("shortcuts.engine.actions.catalogue")
 		local ok, err = pcall(function() return ${call} end)
 		io.write(tostring(not ok and tostring(err):find(${JSON.stringify(message)}, 1, true) ~= nil))`
 	);

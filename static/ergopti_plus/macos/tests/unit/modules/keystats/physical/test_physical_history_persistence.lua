@@ -8,8 +8,8 @@ local root, temporary, source_root = assert(arg[1]), assert(arg[2]), assert(arg[
 local driver = source_root .. "/static/ergopti_plus/macos"
 local shared = root .. "/static/ergopti_plus/_shared"
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. root .. "/static/ergopti_plus/macos/?.lua;" .. shared .. "/lua/?.lua;" .. shared .. "/lua/?/init.lua;" .. package.path
-local json = require("json")
+	.. root .. "/static/ergopti_plus/macos/?.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
+local json = require("core.text.engine.json")
 local function request(message)
 	message.kind = "request"
 	assert(io.stdout:write(json.encode(message) .. "\n")); assert(io.stdout:flush())
@@ -193,7 +193,7 @@ shell.run(function(capture, observed, native)
 	leaf.axuielement={applicationElementForPID=function() return app_element end,applicationElement=function() return app_element end,windowElement=function() return nil end,observer={new=function()
 		local o={}; function o:addWatcher() return self end; function o:removeWatcher() return self end; function o:callback(fn) observations.ax=fn;return self end;function o:start() return self end;function o:stop() return self end;return o end}}
 	-- The same declared native projection leaf model as existing managed-session controls.
-	local Accepted=require("keystats.physical_accepted_context")
+	local Accepted=require("metrics.engine.capture.physical_accepted_context")
 	package.loaded["adapters.physical_history_context"]={new=function(owner,history,borrowed)
 		local c,k=borrowed.capture,borrowed.clock
 		local ct,kt=c.identity(),k.identity(owner)
@@ -355,8 +355,8 @@ local root, temporary, source_root = assert(arg[1]), assert(arg[2]), assert(arg[
 local driver = source_root .. "/static/ergopti_plus/macos"
 local shared = root .. "/static/ergopti_plus/_shared"
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. root .. "/static/ergopti_plus/macos/?.lua;" .. shared .. "/lua/?.lua;" .. shared .. "/lua/?/init.lua;" .. package.path
-local json = require("json")
+	.. root .. "/static/ergopti_plus/macos/?.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
+local json = require("core.text.engine.json")
 local function request(message)
 	message.kind = "request"
 	assert(io.stdout:write(json.encode(message) .. "\n")); assert(io.stdout:flush())
@@ -540,7 +540,7 @@ shell.run(function(capture, observed, native)
 	leaf.axuielement={applicationElementForPID=function() return app_element end,applicationElement=function() return app_element end,windowElement=function() return nil end,observer={new=function()
 		local o={}; function o:addWatcher() return self end; function o:removeWatcher() return self end; function o:callback(fn) observations.ax=fn;return self end;function o:start() return self end;function o:stop() return self end;return o end}}
 	-- The same declared native projection leaf model as existing managed-session controls.
-	local Accepted=require("keystats.physical_accepted_context")
+	local Accepted=require("metrics.engine.capture.physical_accepted_context")
 	package.loaded["adapters.physical_history_context"]={new=function(owner,history,borrowed)
 		local c,k=borrowed.capture,borrowed.clock
 		local ct,kt=c.identity(),k.identity(owner)

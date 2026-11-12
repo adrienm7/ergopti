@@ -341,7 +341,7 @@ try:
         staged_manifest = installed / "macos/modules/llm/managed-pyobjc.json"
         staged_manifest.parent.mkdir(parents=True)
         shutil.copyfile(Path(launcher_path).parents[4] / "modules/llm/managed-pyobjc.json", staged_manifest)
-        staged_locales = installed / "_shared/data/locales"
+        staged_locales = installed / "_shared/core/i18n/data/locales"
         staged_locales.mkdir(parents=True)
         for name in ("en.json", "fr.json"):
             shutil.copyfile(locales / name, staged_locales / name)
@@ -367,7 +367,16 @@ finally:
     os.environ.clear()
     os.environ.update(original_env)
 `;
-const localesDirectory = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales');
+const localesDirectory = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'i18n',
+	'data',
+	'locales'
+);
 const localeRun = spawnSync(python, ['-c', localeHarness, LAUNCHER_PATH, localesDirectory], {
 	cwd: ROOT,
 	encoding: 'utf8',

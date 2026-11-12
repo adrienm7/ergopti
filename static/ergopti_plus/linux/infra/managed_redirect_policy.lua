@@ -10,8 +10,8 @@
 local M = {}
 local Paths = require("infra.paths")
 local Reader = require("infra.regular_file_reader")
-local Json = require("json")
-local Shared = require("network.http_redirect")
+local Json = require("core.text.engine.json")
+local Shared = require("core.network.engine.http_redirect")
 local initialized, policy, refusal = false, nil, nil
 -- Exceptional configuration-close debt remains owned by this one-time loader.
 -- No bare native close retry or policy reload follows an ambiguous close.
@@ -35,8 +35,8 @@ end
 function M.load()
 	if initialized then return policy, refusal end
 	initialized = true
-	local redirect = read("data/http/redirect_policy.json")
-	local transport = redirect and read("data/http/transport_policy.json")
+	local redirect = read("core/network/data/http/redirect_policy.json")
+	local transport = redirect and read("core/network/data/http/transport_policy.json")
 	if not redirect or not transport then refusal = "HTTP redirect policy unavailable"; return nil, refusal end
 	local constructed, value, error_code = pcall(Shared.new, redirect, transport)
 	if not constructed then refusal = "HTTP redirect policy unavailable"; return nil, refusal end

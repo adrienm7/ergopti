@@ -42,7 +42,7 @@ local MODULE_NAMES = {
 	"modules.gestures",
 	"modules.keymap",
 	"infra.manifest_reader",
-	"toml_codec.writer",
+	"core.text.engine.toml_codec.writer",
 	"modules.shortcuts",
 	"modules.dynamic_hotstrings",
 	"adapters.toml_cache",
@@ -356,7 +356,7 @@ local function run_isolated(options, assertions)
 				-- The real cold hotstring controller grants terminal admission before
 				-- its init phase. Its mandatory shipped defaults still need a real,
 				-- acknowledged parser; this fixture never opens a user override file.
-				parse = function(path) return require("toml_codec.reader").parse(path) end,
+				parse = function(path) return require("core.text.engine.toml_codec.reader").parse(path) end,
 			},
 			-- Keep these deadlines independent of the native timing loader; the root
 			-- coordinator reads no other timing in this early-boot fixture.

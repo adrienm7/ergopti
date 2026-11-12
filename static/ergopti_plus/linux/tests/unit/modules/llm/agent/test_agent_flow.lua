@@ -19,7 +19,7 @@
 
 local helpers = require("tests.helpers")
 local Scenario = require("tests.support.agent_scenario")
-local Agent = require("llm.agent")
+local Agent = require("ai.engine.agent.agent")
 
 local SELECTION = "On se voit jeudi 14h avec Paul pour le devis"
 local ANSWER = 'ACTIONS: [{"type":"calendar","title":"Devis avec Paul","start":"2026-10-01T14:00"},'
@@ -175,12 +175,12 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 	end)
 
 	helpers.it("does not log private text echoed by a failing provider", function()
-		local previous = package.loaded["logger.shim"]
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local previous = package.loaded["core.logger.engine.shim"]
+		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 		local lines = {}
 		logger.set_level("trace")
 		logger.set_sink(function(line) lines[#lines + 1] = line end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local ok, err = pcall(function()
 			Scenario.run({ selection = SELECTION }, function(world)
 				world.handlers.llm_agent_selection("tap_3")
@@ -191,17 +191,17 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 			helpers.assert_nil(log:find("private_server_echo_628", 1, true))
 			helpers.assert_true(log:find("HTTP 400", 1, true) ~= nil, "the status remains diagnosable")
 		end)
-		package.loaded["logger.shim"] = previous
+		package.loaded["core.logger.engine.shim"] = previous
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("does not log arbitrary model-provided action type or field text", function()
-		local previous = package.loaded["logger.shim"]
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local previous = package.loaded["core.logger.engine.shim"]
+		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 		local lines = {}
 		logger.set_level("trace")
 		logger.set_sink(function(line) lines[#lines + 1] = line end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local ok, err = pcall(function()
 			Scenario.run({ selection = SELECTION }, function(world)
 				world.handlers.llm_agent_selection("tap_3")
@@ -213,7 +213,7 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 			helpers.assert_nil(log:find("private_field_493", 1, true))
 			helpers.assert_true(log:find("Agent action refused", 1, true) ~= nil, "a generic refusal is still reported")
 		end)
-		package.loaded["logger.shim"] = previous
+		package.loaded["core.logger.engine.shim"] = previous
 		if not ok then error(err, 0) end
 	end)
 

@@ -4,7 +4,7 @@
 --- MODULE: LLM Prompt Builder (Hammerspoon shim)
 --- DESCRIPTION:
 --- Thin adapter over the shared pure-Lua implementation located at
---- ``_shared/lua/llm/prompt_builder.lua``. Delegates all deterministic
+--- ``_shared/ai/engine/prediction/prompt_builder_core.lua``. Delegates all deterministic
 --- computation (token budget, temperature, context truncation, tail extraction)
 --- to the shared module and adds only the Hammerspoon-specific concerns that
 --- cannot live in the shared layer:
@@ -23,11 +23,11 @@
 
 local M = {}
 
-local Shared = require("llm.prompt_builder")
-local Utf8   = require("compat.utf8")
+local Shared = require("ai.engine.prediction.prompt_builder_core")
+local Utf8   = require("core.lifecycle.engine.compat.utf8")
 local Logger = require("infra.logger")
 
-local LOG = "llm.prompt_builder"
+local LOG = "ai.engine.prediction.prompt_builder_core"
 
 
 

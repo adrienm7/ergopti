@@ -164,7 +164,7 @@ assert(Shell.run(prepare), "the live daemon configuration must be prepared befor
 -- The AI configured as a user would leave it after "Add an API": enabled, the
 -- API backend selected, one entry in the private keys file.
 if LLM_PORT then
-	local config_dir = home .. "/.config/" .. require("app_dirs").linux.folder_name
+	local config_dir = home .. "/.config/" .. require("core.fs.engine.app_dirs").linux.folder_name
 	os.execute("mkdir -p '" .. config_dir .. "'")
 	local keys = io.open(config_dir .. "/api_keys.json", "w")
 	keys:write(string.format('{"version":1,"active_id":"live","entries":[{"id":"live","provider":"openai_compat",'
@@ -587,7 +587,7 @@ end
 -- sentence, so the TAIL is "bonjour <prediction> ok pr jd", not only the last
 -- words typed after it.
 if LLM_PORT and LLM_REWRITE_REPLY then
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	--- The user turn of the first rewrite request after `from`, if one arrived.
 	--- A typing trigger may have asked for a continuation meanwhile.
 	local function rewrite_turn(from)

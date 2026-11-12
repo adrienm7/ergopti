@@ -26,9 +26,9 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Timings = require("infra.timings")
-local LocalModelPolicy = require("llm.local_model_policy")
+local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
 
 local LOG = "modules.llm.warmup"
 local INITIAL_DELAY_MS = Timings.ms("llm", "warmup_initial_delay_ms")

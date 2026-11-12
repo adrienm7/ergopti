@@ -320,7 +320,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/_shared/lua/phase_stats_core.lua",
+			"source": "static/ergopti_plus/_shared/metrics/engine/perf/phase_stats_core.lua",
 			"template": "Phase summary [%s] over %d s: %s.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [phase_stats] Phase summary [hotpath] over 300 s: keydown n=14 mean=2.60 max=3.69 total=36.4 ms | hotstring.match n=14 mean=0.02 max=0.05 total=0.3 ms | #timer_hold_over_250ms=3.",
 			"expect": {
@@ -421,7 +421,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/_shared/lua/field_check_report.lua",
+			"source": "static/ergopti_plus/_shared/diagnostics/engine/field_check/report.lua",
 			"template": "check=%s verdict=%s steps=%d %s",
 			"line": "2026-10-30 10:00:00:123 [INFO] [field_check] Field check 'network' result: check=network verdict=pass steps=6 proxy_settings=pass",
 			"expect": {
@@ -433,7 +433,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/_shared/lua/logger/init.lua",
+			"source": "static/ergopti_plus/_shared/core/logger/engine/init.lua",
 			"template": "\\u{2191} \\\"%s\\\" repeated %d more %s between %s and %s%s.",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [llm.streaming_handler] ↑ \"Watchdog triggered: stream produced no visible result for %ds.\" repeated 4 more times between 2026-10-30 09:50:59:228 and 2026-10-30 09:55:59:228.",
 			"expect": {
@@ -577,7 +577,7 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/_shared/lua/phase_stats_core.lua",
+			"source": "static/ergopti_plus/_shared/metrics/engine/perf/phase_stats_core.lua",
 			"template": "Phase summary [%s] over %d s: %s.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=16.26 max=81.19 total=2439.4 ms.",
 			"expect": {
@@ -594,7 +594,7 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/_shared/lua/logger/init.lua",
+			"source": "static/ergopti_plus/_shared/core/logger/engine/init.lua",
 			"template": "\\u{2191} \\\"%s\\\" repeated %d more %s between %s and %s%s.",
 			"line": "2026-10-30 10:00:00:123 [ERROR] [injector] ↑ \"Cannot deliver <text withheld> before erasing its trigger: %s.\" repeated 1 more time between 2026-10-30 09:00:00:000 and 2026-10-30 09:00:01:000.",
 			"expect": {
@@ -866,7 +866,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/_shared/lua/perf_budget.lua",
+			"source": "static/ergopti_plus/_shared/core/logger/engine/perf_budget.lua",
 			"template": "Over budget: %s took %d ms (budget %d ms).",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [menu] Over budget: menu.rebuild took 283 ms (budget 250 ms).",
 			"expect": {
@@ -876,7 +876,7 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/_shared/lua/perf_budget.lua",
+			"source": "static/ergopti_plus/_shared/core/logger/engine/perf_budget.lua",
 			"template": "Over budget: %s took %d ms (budget %d ms).",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [BootProfile] Over budget: boot took 2900 ms (budget 2500 ms).",
 			"expect": {
@@ -964,7 +964,7 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/_shared/lua/logger/init.lua",
+			"source": "static/ergopti_plus/_shared/core/logger/engine/init.lua",
 			"template": "\"%s [%s] [%s] %s\"",
 			"line": "  continued body line",
 			"expect": {

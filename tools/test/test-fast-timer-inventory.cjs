@@ -33,7 +33,7 @@
  *    `setTimeout(fn, 80)` are delays typed where they are used, so the same
  *    delay is typed again (the gesture poll `-100` six times, the safety flush
  *    `-2000` three times) and drifts. A delay is a key of the shared timing
- *    registry (_shared/modules/timings/constants.toml) read through Timings.
+ *    registry (_shared/core/timing/data/constants.toml) read through Timings.
  *    Zero is the "yield to the event loop" idiom and stays allowed, and so is
  *    an AutoHotkey `-1`: SetTimer(Fn, 0) deletes a timer, so -1 is how that
  *    language spells the same yield, and it is no duration to tune. The sites
@@ -337,7 +337,7 @@ if (literal.walked < MIN_LITERAL_SCAN_FILES) {
 	const verdict = compareLiteralBaseline(literal.counts, frozen);
 	for (const g of verdict.grown)
 		errors.push(
-			`${g}. A timer or sleep delay is a key of _shared/modules/timings/constants.toml, ` +
+			`${g}. A timer or sleep delay is a key of _shared/core/timing/data/constants.toml, ` +
 				'read through Timings; a number typed at the call is typed again elsewhere and drifts.'
 		);
 	for (const sh of verdict.shrunk)
@@ -384,7 +384,7 @@ const brightnessSources = Object.fromEntries(
 );
 const brightnessPolicy = JSON.parse(
 	fs.readFileSync(
-		path.join(DRIVER, '..', '_shared', 'modules', 'actions', 'brightness.json'),
+		path.join(DRIVER, '..', '_shared', 'shortcuts', 'data', 'actions', 'brightness.json'),
 		'utf8'
 	)
 );
@@ -412,7 +412,7 @@ function brightnessInventoryErrors(sources, policy) {
 		);
 	if (
 		!sources.adapter.includes(
-			'Data := JsonParse(FileRead(_SharedDir . "\\modules\\actions\\brightness.json", "UTF-8"))'
+			'Data := JsonParse(FileRead(_SharedDir . "\\shortcuts\\data\\actions\\brightness.json", "UTF-8"))'
 		)
 	)
 		faults.push('brightness period getter must load the actual canonical policy');
@@ -480,7 +480,7 @@ const brightnessMutations = [
 		{
 			...brightnessSources,
 			adapter: brightnessSources.adapter.replace(
-				'\\modules\\actions\\brightness.json',
+				'\\shortcuts\\data\\actions\\brightness.json',
 				'\\modules\\actions\\foreign.json'
 			)
 		},

@@ -4,7 +4,7 @@
 --- MODULE: Diversity Temperature Corpus Consumer (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/temperature_vectors.json through the shared
---- algorithm (_shared/lua/llm/temperature.lua), then proves the Linux engine's
+--- algorithm (_shared/ai/engine/policy/temperature.lua), then proves the Linux engine's
 --- entry point, Inference.variant_temperature, answers what the shared
 --- algorithm answers for the shipped inference.json policy.
 ---
@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
 local TOLERANCE = 1e-9
@@ -41,8 +41,8 @@ end
 
 helpers.describe("temperature corpus: the shared diversity temperature on Linux", function()
 	local corpus = read_json("tests/corpus/llm/temperature_vectors.json")
-	local shipped = read_json("modules/llm/inference.json").diversity_temperature
-	local Temperature = helpers.load_module("llm.temperature")
+	local shipped = read_json("ai/data/inference.json").diversity_temperature
+	local Temperature = helpers.load_module("ai.engine.policy.temperature")
 	local Inference = helpers.load_module("modules.llm.inference")
 
 	helpers.it("the corpus holds the base thresholds, the floor and the clamp", function()

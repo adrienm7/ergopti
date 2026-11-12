@@ -1,7 +1,7 @@
 --- tests/unit/modules/gestures/actions/test_window_switch_owner.lua
 
 local helpers = require("tests.helpers")
-local Policy = require("cursor_window_policy")
+local Policy = require("core.ui.engine.cursor_window_policy")
 local Switch = require("adapters.window_switch")
 local Display = require("infra.display_server")
 local PACKET = [[pointer

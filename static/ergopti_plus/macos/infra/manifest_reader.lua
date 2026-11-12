@@ -3,11 +3,11 @@
 --- ==============================================================================
 --- MODULE: Features Manifest Reader (Hammerspoon)
 --- DESCRIPTION:
---- Binds the shared manifest reader (_shared/lua/manifest_reader.lua) to this
+--- Binds the shared manifest reader (_shared/menu/engine/manifest_reader_core.lua) to this
 --- driver: its logger, the generated manifest next to it, and the resolution of
 --- the one default that depends on this machine, the model backend. This is the
 --- macOS counterpart of the AHK `infra/manifest_reader.ahk`: both read the
---- manifest at `_shared/modules/features/manifest.toml`, so the cross-driver
+--- manifest at `_shared/settings/data/features/manifest.toml`, so the cross-driver
 --- feature defaults are a genuine single source.
 ---
 --- FEATURES & RATIONALE:
@@ -21,8 +21,8 @@
 --- ==============================================================================
 
 local Logger = require("infra.logger")
-local NativePath = require("native_path")
-local ConfigKeys = require("config_keys")
+local NativePath = require("core.fs.engine.native_path")
+local ConfigKeys = require("settings.engine.keys")
 
 -- The backend default is hardware-derived: resolved on the first read that includes it.
 local BACKEND_PATH = ConfigKeys.KEY.LLM_MODELS_SELECTED
@@ -58,7 +58,7 @@ local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local infra_dir = NativePath.dirname(source) or source
 local driver_dir = NativePath.dirname(infra_dir) or infra_dir
 
-return require("manifest_reader").new({
+return require("menu.engine.manifest_reader_core").new({
 	logger = Logger,
 	log = "manifest_reader",
 	manifest_path = driver_dir .. "/_generated/features_manifest.lua",

@@ -10,12 +10,12 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Manifest = require("infra.manifest_reader")
-local AppIdentity = require("llm.app_identity")
-local NEVER_MS = require("llm.request_plan.debounce").NEVER_MS
-local ConfigKeys = require("config_keys")
+local AppIdentity = require("ai.engine.policy.app_identity")
+local NEVER_MS = require("ai.engine.request_plan.debounce").NEVER_MS
+local ConfigKeys = require("settings.engine.keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 -- Exported so the menu offers the same choice the file stores.

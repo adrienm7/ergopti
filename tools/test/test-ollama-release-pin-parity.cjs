@@ -30,10 +30,10 @@ const releaseGenerator = require('../codegen/codegen-ollama-release.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SELF = 'tools/test/test-ollama-release-pin-parity.cjs';
-const RELEASE = 'static/ergopti_plus/_shared/modules/llm/ollama_release.json';
-const RUNTIME = 'static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json';
+const RELEASE = 'static/ergopti_plus/_shared/ai/data/ollama_release.json';
+const RUNTIME = 'static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json';
 const PRODUCER = 'tools/build/build-macos-managed-ollama.py';
-const BRIDGE = 'static/ergopti_plus/_shared/go/native_http';
+const BRIDGE = 'static/ergopti_plus/_shared/core/network/native/go/native_http';
 
 // Independent transcription of the official v0.40.6 release (its sha256sum.txt,
 // cross-checked by streaming each asset through SHA-256) and of its tag commit.
@@ -124,11 +124,11 @@ check('the macOS shell projection is regenerated from the catalogue', () => {
 check('Windows and Linux read the catalogue at runtime instead of a copy', () => {
 	assert.match(
 		read('static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk'),
-		/\\modules\\llm\\ollama_release\.json"/
+		/\\ai\\data\\ollama_release\.json"/
 	);
 	assert.match(
 		read('static/ergopti_plus/linux/modules/llm/ollama_install_resolver.lua'),
-		/shared\("modules\/llm\/ollama_release\.json"\)/
+		/shared\("ai\/data\/ollama_release\.json"\)/
 	);
 });
 

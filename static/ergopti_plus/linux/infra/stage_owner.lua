@@ -24,13 +24,13 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Identifiers = require("identifiers")
+local Logger = require("core.logger.engine.shim")
+local Identifiers = require("core.text.engine.identifiers")
 
 local LOG = "infra.stage_owner"
 
 -- The word every stage name carries after the destination's own name
--- (_shared/data/identifiers.json linux_stage.infix).
+-- (_shared/core/text/data/identifiers.json linux_stage.infix).
 local INFIX = Identifiers.linux_stage.infix
 
 -- This process's identity; nil until first read.
@@ -174,7 +174,7 @@ end
 function M.reap_settings()
 	local folders, seen, removed = {}, {}, 0
 	for _, file in ipairs({ require("infra.config_paths").config("config.toml"), require("adapters.storage").path() }) do
-		local folder = type(file) == "string" and require("native_path").dirname(file) or nil
+		local folder = type(file) == "string" and require("core.fs.engine.native_path").dirname(file) or nil
 		if folder and folder ~= "" and not seen[folder] then
 			seen[folder] = true
 			folders[#folders + 1] = folder

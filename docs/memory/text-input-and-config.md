@@ -199,7 +199,7 @@ checked `sru`, so the bundled correction still applies to that typing.
 ### project-hotstring-output-tokens
 
 A TOML output is a small grammar (`{Left}`, `{Left 2}`, `{U+27C3}`, `{{}`), one
-shared rule read by `_shared/lua/send_input` `parse_output` and Windows
+shared rule read by `_shared/platform/input` `parse_output` and Windows
 `SendInputParseOutput`, pinned by `output_token_vectors.json`, over the keys of
 `send_keys.json`. It is not AutoHotkey Send syntax: `+ ^ ! #` and `{Ctrl down}` stay
 text on purpose, or one OS would run what another prints. Registration resolves
@@ -315,7 +315,7 @@ the master, and each submenu's « check all » is the row that switches them.
 
 ### project-hotstring-language-packs-and-opt-in
 
-Language-specific hotstrings live in `_shared/modules/hotstrings/<language>/`
+Language-specific hotstrings live in `_shared/hotstrings/data/catalogue/<language>/`
 and are declared in `_index.toml [languages]`; each file loads as the group
 `<language>_<stem>` (config, manifest and menu key). Resolve bundled TOML paths
 through the driver's single helper, never by concatenating `<cat>.toml`. Every
@@ -432,7 +432,7 @@ canonical values, not keep logging the same startup error forever.
 ### project-config-versioning
 
 `config.toml` carries `[_meta] schema_version`, read at boot by every driver
-against `_shared/core/config_schema/migrations.toml` (ADR-009). Renaming,
+against `_shared/settings/data/config_schema/migrations.toml` (ADR-009). Renaming,
 moving or retyping a config key ships a registry step in the same commit, with
 a corpus case each named driver replays. Retired keys reported by the explicit
 cleanup remain on disk until that cleanup; boot migrations and ordinary saves
@@ -490,7 +490,7 @@ ships a tap-hold delay (`[tap_hold.keys.*]` has no `time_activation_seconds`;
 every key follows the global delay, the registry's
 `tap_hold.default_activation_ms`) and why `[tap_hold.retired_delays]` exists:
 tap_hold.toml carries `[_meta] schema_version`, and step `v0_to_v1` of
-`_shared/tap_hold/migrations.toml` (its own registry: the config.toml one
+`_shared/tap_hold/data/migrations.toml` (its own registry: the config.toml one
 cannot express a delete-if-equal and Windows validates it at every boot)
 removes exactly the retired values, once, from a file that was never stamped
 and does not carry the old `explicit_delays = true` flag, then stamps it. The
@@ -508,7 +508,7 @@ An unknown, retired or outdated config.toml entry (a removed key, a value
 naming a gone hotkey, action, slot, section or mode, an old-shape value) is
 never an ERROR, a refusal, a crash or a rolled-back sync on any driver (the
 maintainer rule behind dev.146's `at_hash`). Lua readers route it through
-`_shared/lua/config_outdated.lua` (`report`, `partition`, `settings_table`,
+`_shared/settings/engine/migration/outdated.lua` (`report`, `partition`, `settings_table`,
 `manifest_value_fits` with the owner's own rule): one WARNING per entry and
 reason, read as absent, left unmarked. The cleanup offers every reported path
 even when another reader marks it, and cuts an outdated inline-table member
@@ -651,7 +651,7 @@ of an undeclared section and never loaded (issue #96).
 ### project-user-llm-profiles-one-envelope
 
 The user's prompt profiles live at `llm.user_profiles` on every OS: the "v1:" +
-base64(JSON array) envelope of `_shared/lua/llm/profile_registry_codec.lua`
+base64(JSON array) envelope of `_shared/ai/engine/settings/profile_registry_codec.lua`
 (Windows writes the same bytes). macOS keeps the list decoded in its state and
 crosses the disk boundary in `scalar_units` through the KEY_MAP `codec` field,
 so its menus never see the string. Its older `[llm.profiles] user_profiles`

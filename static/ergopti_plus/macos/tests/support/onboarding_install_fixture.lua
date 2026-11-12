@@ -16,9 +16,9 @@ local MODULE_NAMES = {
 	"adapters.task_lifecycle",
 	"adapters.timer_scheduler",
 	-- The onboarding names its download cache from the shared folder table.
-	"app_dirs",
+	"core.fs.engine.app_dirs",
 	-- The task lifecycle adapter formats raised errors through the shared owner.
-	"error_description",
+	"diagnostics.engine.reports.error_description",
 	"hs",
 	"infra.dialog_util",
 	"infra.i18n",
@@ -28,9 +28,9 @@ local MODULE_NAMES = {
 	"infra.text_utils",
 	-- The remap onboarding resolves its own folder, joins a label to its value
 	-- and the scheduler admits delays through these pure owners.
-	"locale.label_value",
-	"native_path",
-	"number_policy",
+	"core.i18n.engine.label_value",
+	"core.fs.engine.native_path",
+	"core.text.engine.number_policy",
 	"platform.remap.ke_paths",
 	"platform.remap.network_download",
 	"platform.remap.onboarding",

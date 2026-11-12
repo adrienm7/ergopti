@@ -14,9 +14,9 @@ local NativeFixture = require("tests.support.ui.usercontent_reference_fixture")
 local OWNED_MODULES = {
 	"ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils",
 	"infra.dialog_util", "infra.manifest_menu", "ui.menu.shortcut_utils",
-	"infra.deferred_work", "action_parameter_label", "ui.gesture_conflict_notice",
-	"ui.menu.preferences_transaction", "diagnostics.operation_reporter",
-	"menu.renderer", "logger.shim", "compat.utf8", "number_policy", "toml_codec.leaf_rows",
+	"infra.deferred_work", "shortcuts.engine.action_parameter_label", "ui.gesture_conflict_notice",
+	"ui.menu.preferences_transaction", "diagnostics.engine.operation_reporter",
+	"menu.engine.renderer", "core.logger.engine.shim", "core.lifecycle.engine.compat.utf8", "core.text.engine.number_policy", "core.text.engine.toml_codec.leaf_rows",
 }
 
 --- Opens the actual plain gesture picker over an acknowledged preference owner.
@@ -31,7 +31,7 @@ local function with_gesture(mode, conflict, scenario)
 					commits = 0, rollbacks = 0, updates = 0, conflicts = 0, notices = {}, queue = {}, name_reads = 0 }
 				local state = { gestures = true, action = "none" }
 				local logger = package.loaded["infra.logger"]
-				package.loaded["logger.shim"] = logger
+				package.loaded["core.logger.engine.shim"] = logger
 				package.loaded["infra.dialog_util"] = {}
 				package.loaded["ui.menu.menu_utils"] = {}
 				package.loaded["ui.menu.shortcut_utils"] = {
@@ -79,9 +79,9 @@ local function with_gesture(mode, conflict, scenario)
 						return true
 					end,
 				})
-				local renderer = assert(require("menu.renderer").new({
-					platform = "hs", manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-					json_decode = require("json").decode,
+				local renderer = assert(require("menu.engine.renderer").new({
+					platform = "hs", manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+					json_decode = require("core.text.engine.json").decode,
 					i18n = { get = package.loaded["infra.i18n"].get,
 						section = package.loaded["infra.i18n"].get }, logger = logger,
 				}))

@@ -4,11 +4,11 @@
  * ==============================================================================
  * MODULE: Feature Requirements Derivation
  * DESCRIPTION:
- * Reads what every feature of _shared/modules/features/manifest.toml declares
+ * Reads what every feature of _shared/settings/data/features/manifest.toml declares
  * it needs per OS (`requires = { macos = [...], linux = [...], windows = [...] }`)
  * and derives, from the drivers' real inputs, what each feature actually
  * reaches. The closed vocabulary and the per-OS detection rules live in
- * _shared/modules/features/requirements.toml; the macOS Karabiner mapping lives
+ * _shared/settings/data/features/requirements.toml; the macOS Karabiner mapping lives
  * in macos/platform/remap/generator.lua, beside the state fields it maps.
  *
  * FEATURES & RATIONALE:
@@ -37,8 +37,8 @@ const { parse: parseToml } = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PLUS = path.join(ROOT, 'static/ergopti_plus');
-const MANIFEST_PATH = path.join(PLUS, '_shared/modules/features/manifest.toml');
-const VOCABULARY_PATH = path.join(PLUS, '_shared/modules/features/requirements.toml');
+const MANIFEST_PATH = path.join(PLUS, '_shared/settings/data/features/manifest.toml');
+const VOCABULARY_PATH = path.join(PLUS, '_shared/settings/data/features/requirements.toml');
 const GENERATOR_PATH = path.join(PLUS, 'macos/platform/remap/generator.lua');
 const TABLE_PATH = path.join(ROOT, 'docs/design/feature-requirements.md');
 
@@ -720,7 +720,7 @@ function renderTable(sources) {
 		'',
 		'# Feature requirements per OS',
 		'',
-		'What each feature of `_shared/modules/features/manifest.toml` needs outside',
+		'What each feature of `_shared/settings/data/features/manifest.toml` needs outside',
 		'the driver itself, per OS. The declarations are the `requires` field of each',
 		'feature; `tools/test/test-feature-requirements.cjs` derives the same table from',
 		'the drivers (the macOS Karabiner generator state fields and remap facade',

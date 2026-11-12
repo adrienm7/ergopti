@@ -5,10 +5,10 @@ local M = {}
 local OWNED = {
 	"platform.remap.watchers", "adapters.shell_runner", "adapters.timer_scheduler",
 	"adapters.input_source_broker", "adapters.task_environment", "infra.launcher_environment",
-	"infra.deferred_work", "diagnostics.runtime_log", "infra.logger", "infra.timings", "infra.keycodes",
+	"infra.deferred_work", "diagnostics.engine.runtime_log", "infra.logger", "infra.timings", "infra.keycodes",
 	"adapters.key_state", "adapters.mouse_control", "adapters.hotkey_registrar",
 	"platform.remap.lease_contract", "platform.remap.ke_variables", "infra.capsword_auto_off",
-	"infra.capsword_output", "caps_word.auto_off",
+	"infra.capsword_output", "keyboard.engine.caps_word_auto_off",
 }
 
 --- Owns only this process's modeled native handles; no OS process is spawned.
@@ -22,7 +22,7 @@ function M.with_world(options, callback)
 		package.loaded["infra.keycodes"] = { F17_CYCLE_WINDOWS = 64, to_name = function() return "f17" end }
 		for _, name in ipairs({ "adapters.key_state", "adapters.mouse_control", "adapters.hotkey_registrar",
 			"platform.remap.lease_contract", "platform.remap.ke_variables", "infra.capsword_auto_off",
-			"infra.capsword_output", "caps_word.auto_off" }) do package.loaded[name] = {} end
+			"infra.capsword_output", "keyboard.engine.caps_word_auto_off" }) do package.loaded[name] = {} end
 		local w = { now = 0, timers = {}, tasks = {}, changes = {} }
 		local function timer(delay, action)
 			local native = { delay = delay, callback = action, live = false }

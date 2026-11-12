@@ -5,7 +5,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_file_digest_allocations%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
 local Digest, Timers = require("adapters.file_digest"), require("adapters.timer_scheduler")
 local directory = assert(uv.fs_mkdtemp("/tmp/ergopti-digest-allocation-XXXXXX"))

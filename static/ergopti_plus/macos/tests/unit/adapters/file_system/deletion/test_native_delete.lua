@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 
-local OWNED = { "adapters.file_system", "infra.logger", "diagnostics.operation_reporter",
-	"infra.fs_dir", "infra.text_utils", "text_utils", "compat.utf8", "lfs" }
+local OWNED = { "adapters.file_system", "infra.logger", "diagnostics.engine.operation_reporter",
+	"infra.fs_dir", "infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "lfs" }
 
 local function write(path, content)
 	local handle = assert(io.open(path, "wb"))
@@ -48,7 +48,7 @@ local function fixture(callback)
 			end
 			package.loaded["infra.logger"] = logger
 			package.loaded["infra.fs_dir"] = {}
-			package.loaded["diagnostics.operation_reporter"] = {}
+			package.loaded["diagnostics.engine.operation_reporter"] = {}
 			_G.hs = { fs = { attributes = fs.attributes, symlinkAttributes = fs.symlinkattributes } }
 			local adapter = require("adapters.file_system")
 			os.remove = function(path)

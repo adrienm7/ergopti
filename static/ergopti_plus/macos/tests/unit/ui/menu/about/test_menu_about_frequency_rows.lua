@@ -13,10 +13,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function presets()
-	local handle = assert(io.open(helpers.shared("modules/updater/defaults.json"), "rb"))
+	local handle = assert(io.open(helpers.shared("updater/data/defaults.json"), "rb"))
 	local decoded = Json.decode(handle:read("*a"))
 	handle:close()
 	return decoded.timing.check_interval_presets
@@ -70,7 +70,7 @@ end
 
 --- The row whose submenu is the frequency picker.
 local function picker(rows)
-	local prefix = require("locale.label_value").compose(require("infra.i18n").get, require("infra.i18n").get("menu.about.frequency_menu"), "")
+	local prefix = require("core.i18n.engine.label_value").compose(require("infra.i18n").get, require("infra.i18n").get("menu.about.frequency_menu"), "")
 	for _, row in ipairs(rows) do
 		if type(row.title) == "string" and row.title:find(prefix, 1, true) == 1 then return row end
 	end
@@ -149,7 +149,7 @@ helpers.describe("menu_about: the check frequency (macOS)", function()
 			local head = reason_head()
 			local expected = {
 				i18n.get("menu.about.check_for_updates"),
-				require("locale.label_value").compose(i18n.get, i18n.get("menu.about.frequency_menu"), i18n.get("menu.about.frequency." .. case.code)),
+				require("core.i18n.engine.label_value").compose(i18n.get, i18n.get("menu.about.frequency_menu"), i18n.get("menu.about.frequency." .. case.code)),
 			}
 			local found = {}
 			for index, row in ipairs(rows) do
@@ -244,7 +244,7 @@ helpers.describe("shared updater frequency choices (macOS)", function()
 			local row = assert(picker(build(obs.owner)))
 			helpers.assert_eq(#row.menu, #corpus.choices)
 			local i18n = require("infra.i18n")
-			helpers.assert_eq(row.title, require("locale.label_value").compose(i18n.get, i18n.get(corpus.i18n), i18n.get("menu.about.frequency." .. expected.code)))
+			helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(i18n.get, i18n.get(corpus.i18n), i18n.get("menu.about.frequency." .. expected.code)))
 			for index, choice in ipairs(corpus.choices) do
 				helpers.assert_eq(row.menu[index].title, i18n.get(choice.i18n))
 				helpers.assert_eq(row.menu[index].checked, choice.value == expected.value)

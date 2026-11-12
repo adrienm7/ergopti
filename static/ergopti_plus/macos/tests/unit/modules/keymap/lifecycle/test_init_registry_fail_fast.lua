@@ -61,7 +61,7 @@ local function load_keymap_with_results(results)
 			new = function() return {} end,
 		},
 		["modules.keymap.terminator_replay"] = {},
-		["keymap.terminators"] = {},
+		["layouts.engine.layers.terminators"] = {},
 		["infra.perf"] = {},
 		["infra.hotpath_profiler"] = {},
 		["modules.diagnostics.hid_diagnostic_mailbox"] = {},

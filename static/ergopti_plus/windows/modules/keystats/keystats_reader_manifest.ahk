@@ -223,7 +223,7 @@ KLR_NewAppEntry() {
 }
 
 ; Renders a named manifest query of the shared catalogue
-; (_shared/data/db/queries.sql), the statement macOS and Linux run too.
+; (_shared/metrics/data/db/queries.sql), the statement macOS and Linux run too.
 KLR_ManifestSql(Name, Where) {
 		return KeystatsQuery(Name, Map("where", Where))
 }
@@ -450,7 +450,7 @@ KLR__MediaProjectionRows(db, where, ExecFn := unset) {
 		Checks := SQLite_Query(db, "PRAGMA ignore_check_constraints;")
 		if Checks.Length != 1 || Checks[1]["ignore_check_constraints"] != 0
 				throw Error("Semantic media validation requires native CHECK enforcement.")
-		Schema := FSReadStrict(_SharedDir . "\data\db\media_schema.sql")
+		Schema := FSReadStrict(_SharedDir . "\metrics\data\db\media_schema.sql")
 		PressDeclarations := 0
 		HoldDeclarations := 0
 		Schema := StrReplace(Schema, "CREATE TABLE IF NOT EXISTS ngram_media_keys",

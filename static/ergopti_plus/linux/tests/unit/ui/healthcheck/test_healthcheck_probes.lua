@@ -18,7 +18,7 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 -- Two samples of the /proc files the processor probe reads, 1500 ticks apart:
 -- 700 of them idle, 75 spent by the daemon, whose command name holds a space
@@ -292,7 +292,7 @@ helpers.describe("diagnostics probes (linux)", function()
 			local schema = helpers.load_module("ui.healthcheck.bridge").config().schema
 			local declared = 0
 			for id, probe in pairs(schema.probes) do
-				if require("healthcheck.snapshot").applies(probe, "linux") then
+				if require("diagnostics.engine.healthcheck.snapshot").applies(probe, "linux") then
 					declared = declared + 1
 					helpers.assert_true(answers[id] ~= nil, "the " .. id .. " probe never answered")
 				end
@@ -431,7 +431,7 @@ helpers.describe("healthcheck native source admission", function()
 	helpers.it("(healthcheck-source-fifo) reads regular sources and rejects special files without blocking", function()
 		local shell = require("adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"))
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_healthcheck_sources.py"

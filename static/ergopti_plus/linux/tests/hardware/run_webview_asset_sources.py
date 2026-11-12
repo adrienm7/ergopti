@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 
 WORKER = r"""
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local role, root = os.getenv("UI_ASSET_ROLE"), os.getenv("UI_ASSET_ROOT")
 local regular = os.getenv("UI_ASSET_REGULAR") == "1"
 local host = require("ui.webkit_host")
@@ -77,7 +77,7 @@ def main():
                 assets = case / "assets" / "demo"
                 assets.mkdir(parents=True)
                 shared_ui = case / "_shared" / "ui"
-                locales = case / "_shared" / "data" / "locales"
+                locales = case / "_shared" / "core" / "i18n" / "data" / "locales"
                 shared_ui.mkdir(parents=True)
                 locales.mkdir(parents=True)
                 targets = {
@@ -135,7 +135,7 @@ def main():
                     UI_ASSET_ROOT=str(case),
                     UI_ASSET_REGULAR="1" if shape in ("regular", "file-link") else "0",
                     XDG_CONFIG_HOME=str(root / "config"),
-                    LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                    LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                 )
                 try:
                     result = subprocess.run(

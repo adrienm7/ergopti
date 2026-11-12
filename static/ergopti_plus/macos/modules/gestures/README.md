@@ -13,7 +13,7 @@ Captures raw multi-touch trackpad input via the undocumented macOS `touchdevice`
 
 The raw touch frame callback arrives via `vendor.hs_asm.undocumented.touchdevice` (loaded with `pcall`; gracefully absent when unavailable).
 
-## Domain module (`_shared/core/domain/`)
+## Domain module (`_shared/core/text/data/domain/`)
 
 - `GestureRecognizer.spec.js` — `engine.lua` implements the finger-count + direction classification contract
 

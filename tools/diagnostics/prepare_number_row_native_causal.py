@@ -25,7 +25,7 @@ if len(sys.argv) > 1 and sys.argv[1] in ("--composition", "--composition-control
     ) = sys.argv[2:12]
     if (
         receiver_path != "tools/diagnostics/number_row_native_causal.py"
-        or receiver_sha != "d913505e2d3522d5023227b947f3c7896ba3ef4aeadfbd0c1a7042fa9686c148"
+        or receiver_sha != "09fb51e8163a0a5dc46c570034e1caec892170f7703a56d0b93638b0ec0509c9"
     ):
         raise SystemExit("exact reviewed composition receiver required")
     if (
@@ -35,11 +35,11 @@ if len(sys.argv) > 1 and sys.argv[1] in ("--composition", "--composition-control
         raise SystemExit("original historical recipe path required")
     control_pins = {
         receiver_path: receiver_sha,
-        recipe_path: "77118a5238f504b1475988957843427f61aaaa798ab9f972e812205a2fb5b7ba",
+        recipe_path: "12ee6130462fdf662b976c2eb3dc66bad96159407078fd2c34b6be9bae321ddd",
         "tools/diagnostics/keyboard_geometry_xctest_receipt.py": "9cef4f9256f3604ac07d710d77c95424718012f23c6a8b472f9e5936253ac094",
         "tools/diagnostics/tis_evidence_transport.cjs": "f62344840267ab207370df974cc344fce83cbe3b758f2a25c986837a41d04269",
-        "tools/diagnostics/test_number_row_native_causal.py": "f058b0937e278229f2b348d07c65c8e73c575dbb12cbbde53713ab91d3df9ca2",
-        "tools/diagnostics/fixtures/number-row-native-causal/fixture-manifest.json.raw": "50fbec17bdd2f624bf65c6e16613deb2c0ddd2b9d6eff10a640520780770b8d1",
+        "tools/diagnostics/test_number_row_native_causal.py": "fa000ce8782fd0afb9a11c32b833004931fd51affc76c9bcebf64c7015f7004d",
+        "tools/diagnostics/fixtures/number-row-native-causal/fixture-manifest.json.raw": "be5406cda93591aa100cd5f59664b6f256d3d24012a33da45574a71259dd87a4",
     }
     if subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip() != head:
         raise SystemExit("actual source commit refused")
@@ -108,8 +108,8 @@ projection, evidence = Path(projection_path), Path(evidence_path)
 if subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip() != head:
     raise SystemExit("actual CI source commit refused")
 for path, expected in [
-    (recipe_path, "77118a5238f504b1475988957843427f61aaaa798ab9f972e812205a2fb5b7ba"),
-    (receiver_path, "d913505e2d3522d5023227b947f3c7896ba3ef4aeadfbd0c1a7042fa9686c148"),
+    (recipe_path, "12ee6130462fdf662b976c2eb3dc66bad96159407078fd2c34b6be9bae321ddd"),
+    (receiver_path, "09fb51e8163a0a5dc46c570034e1caec892170f7703a56d0b93638b0ec0509c9"),
     (
         "tools/diagnostics/keyboard_geometry_xctest_receipt.py",
         "9cef4f9256f3604ac07d710d77c95424718012f23c6a8b472f9e5936253ac094",
@@ -120,11 +120,11 @@ for path, expected in [
     ),
     (
         "tools/diagnostics/test_number_row_native_causal.py",
-        "f058b0937e278229f2b348d07c65c8e73c575dbb12cbbde53713ab91d3df9ca2",
+        "fa000ce8782fd0afb9a11c32b833004931fd51affc76c9bcebf64c7015f7004d",
     ),
     (
         "tools/diagnostics/fixtures/number-row-native-causal/fixture-manifest.json.raw",
-        "50fbec17bdd2f624bf65c6e16613deb2c0ddd2b9d6eff10a640520780770b8d1",
+        "be5406cda93591aa100cd5f59664b6f256d3d24012a33da45574a71259dd87a4",
     ),
 ]:
     data = Path(path).read_bytes()
@@ -136,7 +136,7 @@ for path, expected in [
 recipe_bytes = Path(recipe_path).read_bytes()
 if (
     hashlib.sha256(recipe_bytes).hexdigest()
-    != "77118a5238f504b1475988957843427f61aaaa798ab9f972e812205a2fb5b7ba"
+    != "12ee6130462fdf662b976c2eb3dc66bad96159407078fd2c34b6be9bae321ddd"
 ):
     raise SystemExit("reviewed source-image recipe refused")
 recipe = json.loads(recipe_bytes)

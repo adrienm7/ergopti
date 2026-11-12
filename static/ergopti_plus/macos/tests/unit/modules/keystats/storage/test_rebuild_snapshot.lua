@@ -4,8 +4,8 @@
 local function child()
  local root, temporary = assert(arg[3]), assert(arg[2])
  local driver = root .. '/static/ergopti_plus/macos'
- package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. root .. '/static/ergopti_plus/_shared/lua/?.lua;' .. root .. '/static/ergopti_plus/_shared/lua/?/init.lua;' .. package.path
- local json = require('json')
+ package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. root .. '/static/ergopti_plus/_shared/?.lua;' .. root .. '/static/ergopti_plus/_shared/?/init.lua;' .. package.path
+ local json = require('core.text.engine.json')
  local function request(message)
   message.kind = 'request'; assert(io.stdout:write(json.encode(message) .. '\n')); assert(io.stdout:flush())
   return assert(json.decode(assert(io.stdin:read('*l'))))
@@ -84,7 +84,7 @@ local function child()
 end
 if arg and arg[0] and arg[0]:match('test_rebuild_snapshot%.lua$') then child(); return end
 local helpers = require('tests.helpers')
-local quote = require('text_utils').shell_quote
+local quote = require('core.text.engine.utils_core').shell_quote
 local source = assert(debug.getinfo(1, 'S').source):gsub('^@', '')
 helpers.describe('SQLite rebuild snapshot', function()
  for _, case in ipairs({ 'normal', 'finish', 'cancel', 'same', 'external', 'switched', 'commit', 'targetfinish', 'budget', 'quarantinelease' }) do

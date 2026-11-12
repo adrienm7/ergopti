@@ -20,7 +20,7 @@
 
 local M = {}
 
-local ClipboardEvents = require("keystats.clipboard_events")
+local ClipboardEvents = require("metrics.engine.capture.clipboard_events")
 local Timings = require("infra.timings")
 
 local _tracker = nil

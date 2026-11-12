@@ -18,7 +18,9 @@ ROOT = Path(sys.argv.pop(1)).resolve()
 DRIVER = ROOT / "static/ergopti_plus/linux"
 # The application folder under XDG_CONFIG_HOME, read from the one declaration.
 FOLDER = tomllib.loads(
-    (ROOT / "static/ergopti_plus/_shared/modules/paths/app_dirs.toml").read_text(encoding="utf-8")
+    (ROOT / "static/ergopti_plus/_shared/core/fs/data/paths/app_dirs.toml").read_text(
+        encoding="utf-8"
+    )
 )["app"]["linux_folder_name"]
 FAULT_TOOLS = r"""#!/bin/bash
 set -eu
@@ -77,7 +79,7 @@ class UninstallTransactionTests(unittest.TestCase):
         self.prefix = self.home / "prefix"
         self.library = self.prefix / "lib/ergopti"
         self.runtime = self.library / "linux/ergopti_hotstrings.lua"
-        self.locale = self.library / "_shared/data/locales/en.json"
+        self.locale = self.library / "_shared/core/i18n/data/locales/en.json"
         self.wrapper = self.prefix / "bin/ergopti-hotstrings"
         self.manifest = self.library / ".ergopti-owned-files"
         self.installed = self.library / "linux/uninstall.sh"
@@ -97,9 +99,10 @@ class UninstallTransactionTests(unittest.TestCase):
         (source / "linux/ergopti_hotstrings.lua").write_bytes(b"-- shipped runtime\n")
         (source / "linux/ergopti_hotstrings.lua").chmod(0o751)
         (source / "linux/modified.lua").write_bytes(b"-- original shipped bytes\n")
-        (source / "_shared/data/locales").mkdir(parents=True)
+        (source / "_shared/core/i18n/data/locales").mkdir(parents=True)
         shutil.copy2(
-            DRIVER.parent / "_shared/data/locales/en.json", source / "_shared/data/locales/en.json"
+            DRIVER.parent / "_shared/core/i18n/data/locales/en.json",
+            source / "_shared/core/i18n/data/locales/en.json",
         )
         shutil.copytree(source / "linux", self.library / "linux")
         shutil.copytree(source / "_shared", self.library / "_shared")

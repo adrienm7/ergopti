@@ -1,7 +1,0 @@
-{
-	"_comment": "Single source of the proxy override setting (Issue 101, point 2): its storage key, its default (automatic: the system settings, PAC included) and the token that forces every download direct. Any other value is one relay URL, validated by network/route_plan.lua. Read by network/proxy_override.lua on macOS and Linux and by adapters/proxy_override.ahk on Windows, which holds the key in config.toml; vendor/ergopti_network_routes.ps1 hops through loopback for what WinHTTP cannot reach.",
-	"schema_version": 1,
-	"storage_key": "network.proxy_override",
-	"default": "",
-	"direct": "direct"
-}

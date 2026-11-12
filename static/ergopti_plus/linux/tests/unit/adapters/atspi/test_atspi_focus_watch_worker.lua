@@ -17,7 +17,7 @@ local Fixture = require("tests.support.focus_watch_worker_fixture")
 --- @return table worker
 --- @return function race Arms exactly one old query crossing a newer request.
 local function parent_fixture()
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local worker = Fixture.new()
 	local next_message, raced = 1, false
 	local epoch, secure = 0, true

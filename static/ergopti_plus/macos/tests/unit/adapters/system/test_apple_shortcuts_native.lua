@@ -2,7 +2,7 @@
 
 --- Controlled signed-role boundaries; actual SDK/C ownership is macOS CI-only.
 local H = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local ID = "11111111-1111-1111-1111-111111111111"
 -- The real registry reader, bound before the fixture's stubs: the adapter reads
 -- its reply cap from [limits] when it loads

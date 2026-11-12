@@ -84,8 +84,8 @@ _HNRT_Case(Mode) {
 	try {
 		_MBPT_StageAssets(Directory)
 		; The actual scope-owner class loads these shared picker tables at import.
-		FSCreateDirectoryExclusiveStrict(Directory . "\shared\tap_hold")
-		TapSource := _SharedDir . "\tap_hold\defaults.toml", TapTarget := Directory . "\shared\tap_hold\defaults.toml"
+		FSCreateDirectoryExclusiveStrict(Directory . "\shared\tap_hold\data")
+		TapSource := _SharedDir . "\tap_hold\data\defaults.toml", TapTarget := Directory . "\shared\tap_hold\data\defaults.toml"
 		TapBefore := FSReadBytesStrict(TapSource), TapHash := CryptoSha256Bytes(TapBefore)
 		FileCopy(TapSource, TapTarget, false)
 		TapAfter := FSReadBytesStrict(TapTarget)
@@ -93,7 +93,7 @@ _HNRT_Case(Mode) {
 		AssertEqual(TapHash, CryptoSha256Bytes(TapAfter), "Real include-time tap-hold data stays byte-exact")
 		for Relative in ["config", "vendor", "vendor\64bit", "personal", "extensions"]
 			FSCreateDirectoryExclusiveStrict(Directory . "\" . Relative)
-		Assets := _HNRT_CopyTree(_SharedDir . "\modules\hotstrings", Directory . "\shared\modules\hotstrings")
+		Assets := _HNRT_CopyTree(_SharedDir . "\hotstrings\data\catalogue", Directory . "\shared\hotstrings\data\catalogue")
 		AssertTrue(Assets > 5, "The complete actual hotstrings data pack must be staged")
 		Script := Directory . "\subject.ahk"
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _HNRT_Source()))

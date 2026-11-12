@@ -391,7 +391,7 @@ _HGBS_ColdFeaturesGuardControls() {
 	for Mutant in [StrReplace(Entry, Publication, ""),
 		Publication . "`n" . StrReplace(Entry, Publication, ""), Entry . "`n" . Publication,
 		StrReplace(Entry, "#Include infra/json.ahk", ""),
-		StrReplace(Entry, "#Include ../_shared/modules/features/layout_rows_policy.ahk", "")] {
+		StrReplace(Entry, "#Include ../_shared/settings/data/features/layout_rows_policy.ahk", "")] {
 		Assert(StrCompare(Entry, Mutant, true) != 0, "each owner mutant must alter the actual entry")
 		AssertFalse(_HGBS_FeaturesPublishAfterDependencies(Mutant, Mutant),
 			"missing, early, duplicate or dependency-free publication cannot justify cold pruning")

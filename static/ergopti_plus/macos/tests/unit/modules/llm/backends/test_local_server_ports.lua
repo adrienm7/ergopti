@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 
 --- Reads one shared JSON file.
@@ -24,6 +24,6 @@ local function read(relative)
 end
 
 helpers.describe("Local server port discovery (local-server-ports)", function()
-	require("test.local_server_ports_contract").run(read("tests/corpus/llm/local_server_ports.json"),
-		read("modules/llm/local_servers.json"), Json.decode, helpers)
+	require("tests.lua.core.local_server_ports_contract").run(read("tests/corpus/llm/local_server_ports.json"),
+		read("ai/data/local_servers.json"), Json.decode, helpers)
 end)

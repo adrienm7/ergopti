@@ -7,7 +7,7 @@ local function test(name, body) tests[#tests + 1] = { name, body } end
 local function scenario(options, body)
  options = options or {}
  local names = { "modules.updater.manager", "modules.updater.archive_transfer", "infra.archive_output",
-  "infra.monotonic", "infra.installation", "modules.updater.installer", "toml_codec.writer", "adapters.storage" }
+  "infra.monotonic", "infra.installation", "modules.updater.installer", "core.text.engine.toml_codec.writer", "adapters.storage" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local h = { paused = false, persistence = 0, dispatches = 0, callbacks = {}, flow_physical = false, observers = {},
   cancellation = 0, artifact_closed = false, artifact_listeners = {}, reads = 0, installs = 0, install_physical = false }
@@ -19,7 +19,7 @@ local function scenario(options, body)
  if not drivers_root or type(package.searchpath) ~= "function" then
   error("updater fixture repository source roots unavailable", 0)
  end
- local shared_root = drivers_root .. "/_shared/lua"
+ local shared_root = drivers_root .. "/_shared"
  local original_require, original_searchpath, original_path = require, package.searchpath, package.path
  _G.require = function(name, ...)
   if type(name) == "string" and saved[name] == nil and package.preload[name] == nil
@@ -110,7 +110,7 @@ local function scenario(options, body)
   if actual_installer then
    package.loaded["modules.updater.installer"].install_owned = actual_installer.install_owned
   end
-  package.loaded["toml_codec.writer"] = { batch_write = function() h.persistence = h.persistence + 1; return true end }
+  package.loaded["core.text.engine.toml_codec.writer"] = { batch_write = function() h.persistence = h.persistence + 1; return true end }
   package.loaded["modules.updater.manager"] = nil
   h.manager = require("modules.updater.manager")
   h.manager.init({ is_paused = function() return h.paused end })

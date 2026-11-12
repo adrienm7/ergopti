@@ -204,13 +204,13 @@ _MBPT_StageAssets(Directory) {
 	; Stage the complete shipped schema pack for the genuine boot owner, plus
 	; canonical presentation/privacy policies for diagnostics. The component
 	; does not claim every reserved policy is read on its successful cold path.
-	for Relative in ["modules\llm\defaults.json", "modules\llm\models.json", "modules\hotstrings\_index.toml", "data\locales\fr.json", "data\locales\en.json",
-		"modules\llm\backends.json", "modules\menu\menu_manifest.json", "modules\diagnostics\redaction.json", "data\keycodes\physical_keys.json",
-		"core\config_schema\migrations.toml", "core\config_schema\config.schema.json",
-		"core\config_schema\tap_hold.schema.json", "core\config_schema\SCHEMA.md",
-		"core\config_schema\examples\hs_tap_hold.example.toml", "core\config_schema\examples\personal_info.example.toml",
-		"core\config_schema\examples\hs_config.example.toml", "core\config_schema\examples\ahk_config.example.toml",
-		"core\config_schema\examples\hotstrings_config.example.toml", "core\config_schema\examples\ahk_tap_hold.example.toml"] {
+	for Relative in ["ai\data\defaults.json", "ai\data\models.json", "hotstrings\data\catalogue\_index.toml", "core\i18n\data\locales\fr.json", "core\i18n\data\locales\en.json",
+		"ai\data\backends.json", "menu\data\menu_manifest.json", "diagnostics\data\redaction.json", "layouts\data\keycodes\physical_keys.json",
+		"settings\data\config_schema\migrations.toml", "settings\data\config_schema\config.schema.json",
+		"settings\data\config_schema\tap_hold.schema.json", "settings\data\config_schema\SCHEMA.md",
+		"settings\data\config_schema\examples\hs_tap_hold.example.toml", "settings\data\config_schema\examples\personal_info.example.toml",
+		"settings\data\config_schema\examples\hs_config.example.toml", "settings\data\config_schema\examples\ahk_config.example.toml",
+		"settings\data\config_schema\examples\hotstrings_config.example.toml", "settings\data\config_schema\examples\ahk_tap_hold.example.toml"] {
 		Source := _SharedDir . "\" . Relative, Target := Directory . "\shared\" . Relative
 		Before := FSReadBytesStrict(Source), Expected := CryptoSha256Bytes(Before)
 		AssertTrue(Expected != "" && !FileExist(Target), "Only an exclusive private target may receive authentic data")

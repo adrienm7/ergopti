@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"
 local CHANNEL = require("modules.updater").installed_channel()
@@ -521,15 +521,15 @@ helpers.describe("layout manager (macOS): installing", function()
 		local candidate = "verified replacement layout"
 		entry.size, entry.sha256, entry.version = #candidate, string.rep("0", 64), "replacement"
 		local before = state.files[LOCAL_DIR .. "ergol.keylayout"]
-		local original = package.loaded["config_file_inverse"]
-		package.loaded["config_file_inverse"] = { for_current_writer = function() error("owner unavailable") end }
+		local original = package.loaded["settings.engine.migration.file_inverse"]
+		package.loaded["settings.engine.migration.file_inverse"] = { for_current_writer = function() error("owner unavailable") end }
 		local ok, err = xpcall(function()
 			local refused = run(function(done) registry.install_local(entry, candidate, done, deps) end)
 			helpers.assert_eq(refused.ok, false)
 			helpers.assert_eq(state.files[LOCAL_DIR .. "ergol.keylayout"], before)
 			helpers.assert_nil(registry.snapshot(deps).busy)
 		end, debug.traceback)
-		package.loaded["config_file_inverse"] = original
+		package.loaded["settings.engine.migration.file_inverse"] = original
 		if not ok then error(err, 0) end
 	end)
 	helpers.it("preserves a real edited layout during uninstall", function()
@@ -1120,7 +1120,7 @@ helpers.describe("layout manager: cold input-source conventions (iso-typing-conv
 end)
 
 
-require("test.layout_installed_manager_contract")(helpers, Json, {
+require("tests.lua.layouts.installed_manager_contract")(helpers, Json, {
 	manager = manager,
 	run = run,
 	entry = entry_of("ergol"),
@@ -1133,7 +1133,7 @@ require("test.layout_installed_manager_contract")(helpers, Json, {
 	end,
 })
 
-require("test.layout_installed_update_manager_contract")(helpers, Json, {
+require("tests.lua.layouts.installed_update_manager_contract")(helpers, Json, {
 	manager = manager,
 	run = run,
 	entry = entry_of("ergol"),
@@ -1146,7 +1146,7 @@ require("test.layout_installed_update_manager_contract")(helpers, Json, {
 	end,
 })
 
-require("test.layout_installed_extension_manager_contract")(helpers, Json, {
+require("tests.lua.layouts.installed_extension_manager_contract")(helpers, Json, {
 	manager = manager,
 	run = run,
 	entry = entry_of("ergol"),
@@ -1159,7 +1159,7 @@ require("test.layout_installed_extension_manager_contract")(helpers, Json, {
 	end,
 })
 
-require("test.layout_composer_contract")(helpers, Json, {
+require("tests.lua.layouts.composer_contract")(helpers, Json, {
 	name = "macOS",
 	platform = "macos",
 	shortcuts = "full",
@@ -1172,7 +1172,7 @@ require("test.layout_composer_contract")(helpers, Json, {
 	selections = function(state) return #state.selected end,
 })
 
-require("test.composer_check_contract")(helpers, Json, {
+require("tests.lua.layouts.composer_check_contract")(helpers, Json, {
 	name = "macOS",
 	manager = manager,
 	files = shipped_files,
@@ -1199,7 +1199,7 @@ require("test.composer_check_contract")(helpers, Json, {
 })
 
 helpers.describe("layout composer (macOS): a layout macOS turns on at the next login", function()
-	local fixture_dir = helpers.driver_root() .. "/../_shared/modules/layouts/composer_check/"
+	local fixture_dir = helpers.driver_root() .. "/../_shared/layouts/data/composer_check/"
 	local function shipped(name)
 		local handle = assert(io.open(fixture_dir .. name, "rb"))
 		local text = handle:read("*a")

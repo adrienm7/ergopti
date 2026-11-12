@@ -10,8 +10,8 @@
 local helpers = require("tests.helpers")
 
 local MANAGER = "modules.gestures.manager"
-local WRITER = "toml_codec.writer"
-local LOGGER = "logger.shim"
+local WRITER = "core.text.engine.toml_codec.writer"
+local LOGGER = "core.logger.engine.shim"
 
 --- Runs an isolated gesture manager against one deterministic writer.
 --- @param writer table
@@ -43,7 +43,7 @@ end
 local function rejecting_writer(detail)
 	local calls = {}
 	return {
-		read_classified = require("toml_codec.writer").read_classified,
+		read_classified = require("core.text.engine.toml_codec.writer").read_classified,
 		batch_write = function(path, updates)
 			calls[#calls + 1] = { path = path, updates = updates }
 			return false, detail

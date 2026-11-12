@@ -24,9 +24,9 @@ end
 
 helpers.describe("rules_engine.stop clears shared rule ownership", function()
 	helpers.it("a stop/start cycle registers one date-rule set, never two", function()
-		package.loaded["dynamic_hotstrings"] = nil
+		package.loaded["hotstrings.engine.dynamic.core"] = nil
 		package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
-		local SharedEngine = helpers.load_with_stubs("dynamic_hotstrings")
+		local SharedEngine = helpers.load_with_stubs("hotstrings.engine.dynamic.core")
 		local RulesEngine = require("modules.dynamic_hotstrings.rules_engine")
 
 		SharedEngine.reset_rules()
@@ -44,9 +44,9 @@ helpers.describe("rules_engine.stop clears shared rule ownership", function()
 	end)
 
 	helpers.it("fails closed when preview revocation refuses teardown", function()
-		package.loaded["dynamic_hotstrings"] = nil
+		package.loaded["hotstrings.engine.dynamic.core"] = nil
 		package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
-		local SharedEngine = helpers.load_with_stubs("dynamic_hotstrings")
+		local SharedEngine = helpers.load_with_stubs("hotstrings.engine.dynamic.core")
 		local RulesEngine = require("modules.dynamic_hotstrings.rules_engine")
 
 		SharedEngine.reset_rules()

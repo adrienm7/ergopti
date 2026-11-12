@@ -5,8 +5,8 @@
  * MODULE: Automatic Update-Check Schedule Contract Test
  * DESCRIPTION:
  * When an automatic update check is due is decided once, by
- * _shared/modules/updater/schedule.js over the timing of
- * _shared/modules/updater/defaults.json, and replayed by a Lua port (macOS and
+ * _shared/updater/data/schedule.js over the timing of
+ * _shared/updater/data/defaults.json, and replayed by a Lua port (macOS and
  * Linux) and an AHK port (Windows).
  *
  * ROOT CAUSE ENCODED:
@@ -41,11 +41,11 @@ const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const UPDATER = path.join(SP, '_shared', 'modules', 'updater');
+const UPDATER = path.join(SP, '_shared', 'updater', 'data');
 const DEFAULTS_PATH = path.join(UPDATER, 'defaults.json');
 const VECTORS_PATH = path.join(UPDATER, 'schedule_vectors.json');
 const SCHEDULE_PATH = path.join(UPDATER, 'schedule.js');
-const LOCALES_DIR = path.join(SP, '_shared', 'data', 'locales');
+const LOCALES_DIR = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 const GENERATOR_PATH = path.join(ROOT, 'tools', 'codegen', 'codegen-update-schedule.cjs');
 const LOCALE_COUNT = 21;
 const MIN_VECTORS = { due: 15, jitter: 8, snap: 10, sanitize: 6, record: 4, delay: 4 };
@@ -53,12 +53,12 @@ const MIN_VECTORS = { due: 15, jitter: 8, snap: 10, sanitize: 6, record: 4, dela
 // Each port and the suite entry that runs its vector test.
 const PORTS = [
 	{
-		port: '_shared/lua/updater/schedule.lua',
+		port: '_shared/updater/engine/schedule.lua',
 		test: 'macos/tests/unit/modules/updater/test_update_schedule_vectors.lua',
 		wiring: null
 	},
 	{
-		port: '_shared/lua/updater/schedule.lua',
+		port: '_shared/updater/engine/schedule.lua',
 		test: 'linux/tests/unit/modules/updater/vectors/test_update_schedule_vectors.lua',
 		wiring: {
 			file: 'linux/tests/test_manifest.lua',
@@ -374,7 +374,7 @@ function checkPorts() {
 	try {
 		schedule = await import(pathToFileURL(SCHEDULE_PATH).href);
 	} catch (error) {
-		expect(false, `_shared/modules/updater/schedule.js must load: ${error.message}`);
+		expect(false, `_shared/updater/data/schedule.js must load: ${error.message}`);
 	}
 	if (schedule) {
 		checkVectors(schedule, timing, vectors);

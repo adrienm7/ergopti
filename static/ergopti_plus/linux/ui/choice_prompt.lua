@@ -21,12 +21,12 @@
 
 local M = {}
 
-local Errors = require("adapter_errors")
-local Logger = require("logger.shim")
+local Errors = require("diagnostics.engine.adapter_errors")
+local Logger = require("core.logger.engine.shim")
 local Modal = require("ui.modal")
 local NativeDialog = require("ui.native_dialog")
 local Shell = require("adapters.shell_runner")
-local WindowTitles = require("window_titles")
+local WindowTitles = require("core.ui.engine.window_titles")
 
 local LOG = "ui.choice_prompt"
 

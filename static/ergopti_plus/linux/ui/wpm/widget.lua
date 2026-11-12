@@ -10,8 +10,8 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Everything it decides is shared. What to draw, in which colour, when to
----    show and where by default comes from _shared/lua/wpm_widget/model.lua
----    and _shared/modules/wpm_widget/constants.toml, the same code and file
+---    show and where by default comes from _shared/metrics/engine/wpm_widget_model.lua
+---    and _shared/metrics/data/wpm_widget/constants.toml, the same code and file
 ---    macOS uses; this module holds only the user's choices and the timing.
 --- 2. It really draws. It used to call a renderer function that did not exist,
 ---    read a stats table that carried no speed and no source, and so drew
@@ -21,15 +21,15 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger    = require("logger.shim")
+local Logger    = require("core.logger.engine.shim")
 local Constants = require("infra.wpm_constants")
 local Timings   = require("infra.timings")
 local Manifest  = require("infra.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
-local Model     = require("wpm_widget.model")
-local ConfigKeys = require("config_keys")
+local Model     = require("metrics.engine.wpm_widget_model")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "ui.wpm.widget"
 

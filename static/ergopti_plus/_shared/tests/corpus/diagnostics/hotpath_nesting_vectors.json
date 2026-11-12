@@ -1,5 +1,5 @@
 {
-	"_comment": "Nesting attribution of the slow-segment WARNING (_shared/lua/hotpath_segments.lua new_nesting), replayed by the macOS and Linux suites. Steps: [\"open\", at_ms] or [\"close\", name, started_ms, at_ms]. A name absent from thresholds is a span that is not a declared segment. reports lists every slow segment in emission order; slow lists the verdict of each close.",
+	"_comment": "Nesting attribution of the slow-segment WARNING (_shared/metrics/engine/perf/hotpath_segments.lua new_nesting), replayed by the macOS and Linux suites. Steps: [\"open\", at_ms] or [\"close\", name, started_ms, at_ms]. A name absent from thresholds is a span that is not a declared segment. reports lists every slow segment in emission order; slow lists the verdict of each close.",
 	"thresholds": {
 		"input.dispatch": 5,
 		"input.char": 5,

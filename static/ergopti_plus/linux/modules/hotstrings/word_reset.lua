@@ -43,18 +43,18 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Manifest = require("infra.manifest_reader")
 local Paths = require("infra.config_paths")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 local Preferences = require("infra.hotstring_preferences")
-local ConfigOutdated = require("config_outdated")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Engine = require("modules.hotstrings.engine")
 local Monotonic = require("infra.monotonic")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 local LOG = "hotstrings.word_reset"

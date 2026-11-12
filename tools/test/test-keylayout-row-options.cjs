@@ -5,7 +5,7 @@
  * MODULE: Keylayout Number-Row Options Gate
  * DESCRIPTION:
  * macOS installs a .keylayout that already types the number-row options: the
- * shared Lua editor (_shared/lua/layouts/keylayout_rows.lua) rewrites the cells
+ * shared Lua editor (_shared/layouts/engine/composer/keylayout_rows.lua) rewrites the cells
  * of the layout's file. Linux applies the same options while converting
  * (xkb_converter.lua) and the web composer while compiling. All three must
  * type the same layout.
@@ -39,7 +39,7 @@ const CONVERT = path.join(__dirname, 'fixtures', 'keylayout-xkb-convert.lua');
 const APPLY = path.join(__dirname, 'fixtures', 'keylayout-rows-apply.lua');
 const DATA = path.join(ROOT, 'static', 'ergopti', 'linux', 'xkb_generation', 'data');
 const REGISTRY = path.join(ROOT, 'static', 'layouts', 'registry');
-const TABLE_PATH = shared('modules', 'layouts', 'mac_keycodes.json');
+const TABLE_PATH = shared('layouts', 'data', 'mac_keycodes.json');
 const CASES = JSON.parse(
 	fs.readFileSync(shared('tests', 'corpus', 'layouts', 'row_options_vectors.json'), 'utf8')
 ).cases;

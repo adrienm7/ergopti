@@ -4,7 +4,7 @@
 --- MODULE: Web-View Window Toggle (macOS)
 --- DESCRIPTION:
 --- The one three-state rule behind the shared `open_*` window actions
---- (_shared/modules/actions/actions.toml, group "UI"), so a single shortcut
+--- (_shared/shortcuts/data/actions/actions.toml, group "UI"), so a single shortcut
 --- both shows and dismisses an Ergopti page.
 ---
 --- FEATURES & RATIONALE:

@@ -10,7 +10,7 @@
 ; text must load without an error on every OS
 ; (platform/remap/layers_loader.ahk), is published atomically, and the driver
 ; reloads so NavLayer_Init registers the edited layer. The macOS and Linux
-; hosts implement the same contract through _shared/lua/keymap/layer_editor.lua.
+; hosts implement the same contract through _shared/layouts/engine/layers/editor.lua.
 ;
 ; FEATURES & RATIONALE:
 ; 1. The page offers only what exists on Windows; the host still refuses any

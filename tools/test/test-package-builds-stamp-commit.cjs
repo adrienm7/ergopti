@@ -15,7 +15,7 @@
  * this long before with the BUNDLE_COMMIT stamp; the macOS and Linux packages
  * (.deb, .rpm, AppImage, Flatpak, tarball) had nothing. They now share one
  * mechanism — tools/build/write_build_stamp.sh writes `build_stamp.txt` at the
- * root of the shared tree they ship, and _shared/lua/diagnostics/snapshot.lua
+ * root of the shared tree they ship, and _shared/diagnostics/engine/snapshot.lua
  * reads it — and this guard fails as soon as a build path stops stamping.
  *
  * FEATURES & RATIONALE:
@@ -56,7 +56,7 @@ const pipeline = require('./ci-pipeline.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS_WORKFLOW_REL = '.github/workflows/ci-windows.yml';
 const WRITER_REL = 'tools/build/write_build_stamp.sh';
-const READER_REL = 'static/ergopti_plus/_shared/lua/diagnostics/snapshot.lua';
+const READER_REL = 'static/ergopti_plus/_shared/diagnostics/engine/snapshot.lua';
 const WINDOWS_BUNDLE_REL = 'static/ergopti_plus/windows/infra/bundle.ahk';
 
 // The scripts that assemble a shipped tree and therefore write the stamp.

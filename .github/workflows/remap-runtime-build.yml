@@ -144,7 +144,7 @@ jobs:
       # The scaffold bundles the proxy sign-in relay, built with Go.
       - uses: actions/setup-go@v5
         with:
-          go-version-file: ergopti/static/ergopti_plus/_shared/go/native_http/go.mod
+          go-version-file: ergopti/static/ergopti_plus/_shared/core/network/native/go/native_http/go.mod
           check-latest: false
           cache: false
 

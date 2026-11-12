@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local corpus_stream = assert(io.open(helpers.shared("tests/corpus/native_presentations/original_captions.json"), "rb"))
 local read_ok, corpus_bytes = pcall(function() return corpus_stream:read("*a") end)
 local close_ok, close_result = pcall(function() return corpus_stream:close() end)
@@ -26,10 +26,10 @@ local function fixture(body, secondary)
 	local primary_failed, primary = false, nil
 	local restored, scope_failure = pcall(function()
 		helpers.with_stub_scope({
-			"infra.native_presentation", "native_presentation", "window_titles", "infra.i18n",
-			"infra.locale", "locale.core", "infra.paths", "infra.logger", "adapters.json_codec",
+			"infra.native_presentation", "menu.engine.native_presentation_core", "core.ui.engine.window_titles", "infra.i18n",
+			"infra.locale", "core.i18n.engine.core", "infra.paths", "infra.logger", "adapters.json_codec",
 			"adapters.storage", "adapters.timer_scheduler", "adapters.shell_runner", "infra.dialog_util",
-			"ui.menu.shortcut_utils", "infra.text_utils", "send_input", "hs", "tests.stubs.hs",
+			"ui.menu.shortcut_utils", "infra.text_utils", "platform.input.send_input", "hs", "tests.stubs.hs",
 		}, function()
 			local policy, lookup, dialog, prompt, scheduler
 			local state = { calls = {}, applies = {}, raw = "ctrl+k", focus_calls = 0 }
@@ -45,7 +45,7 @@ local function fixture(body, secondary)
 				package.loaded["infra.i18n"] = nil
 				local i18n = require("infra.i18n")
 				local locale = require("infra.locale")
-				policy = require("window_titles")
+				policy = require("core.ui.engine.window_titles")
 				lookup = policy.native_presentation
 				local factory = require("infra.native_presentation")
 				dialog = require("infra.dialog_util")

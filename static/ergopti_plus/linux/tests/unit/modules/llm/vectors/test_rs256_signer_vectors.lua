@@ -4,7 +4,7 @@
 --- MODULE: RS256 Signer Corpus (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/crypto/rs256_vectors.json through
---- _shared/lua/crypto/sha256.lua and _shared/lua/crypto/rsa_pkcs1.lua: SHA-256
+--- _shared/core/crypto/engine/sha256.lua and _shared/core/crypto/engine/rsa_pkcs1.lua: SHA-256
 --- digests, RSASSA-PKCS1-v1_5 signatures made by an independent
 --- implementation under PKCS#8 and PKCS#1 test keys of 2048 and 3072 bits,
 --- the sliced signature, and the keys refused with their reasons.
@@ -15,11 +15,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-local Rsa = require("crypto.rsa_pkcs1")
-local Sha256 = require("crypto.sha256")
+local Rsa = require("core.crypto.engine.rsa_pkcs1")
+local Sha256 = require("core.crypto.engine.sha256")
 
 --- @param path string Shared-relative path.
 --- @return string

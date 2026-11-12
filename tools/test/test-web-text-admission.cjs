@@ -98,7 +98,7 @@ async function checkLayoutDataRoutes() {
 
 async function checkHotstringSources() {
 	const urlOwner = fs.readFileSync(path.join(root, 'src/lib/js/hotstringDataUrls.js'), 'utf8');
-	const catalogue = '/ergopti_plus/_shared/modules/hotstrings';
+	const catalogue = '/ergopti_plus/_shared/hotstrings/data/catalogue';
 	const page = fs.readFileSync(
 		path.join(root, 'src/routes/utilisation/introduction_telechargements.svelte'),
 		'utf8'
@@ -492,8 +492,8 @@ async function checkEmulationLoading() {
 	assert.deepEqual(
 		first.requests.map((request) => request.url),
 		[
-			'/dev/ergopti_plus/_shared/modules/hotstrings/magickey.toml',
-			'/dev/ergopti_plus/_shared/modules/hotstrings/french/magickey.toml'
+			'/dev/ergopti_plus/_shared/hotstrings/data/catalogue/magickey.toml',
+			'/dev/ergopti_plus/_shared/hotstrings/data/catalogue/french/magickey.toml'
 		]
 	);
 	assert.equal(first.requests[0].options.signal, first.requests[1].options.signal);

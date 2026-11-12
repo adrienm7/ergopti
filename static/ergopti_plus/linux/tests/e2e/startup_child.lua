@@ -27,7 +27,7 @@
 local DEVICE, ACTION, DRIVER, SEED = arg[1], arg[2], arg[3], arg[4]
 assert(DEVICE and ACTION and DRIVER, "usage: startup_child.lua <device> <action> <driver folder>")
 arg = { "--device", DEVICE, "--tray" }
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 
 require("tests.win_compat").install()
 
@@ -127,7 +127,7 @@ local real_execute, real_popen = os.execute, io.popen
 os.execute = function(command, ...) watch_command(command); return real_execute(command, ...) end
 io.popen = function(command, ...) watch_command(command); return real_popen(command, ...) end
 -- A feature switched off is announced at the error level on purpose
--- (_shared/lua/feature_notice.lua); the delimiter steps name the one they cause.
+-- (_shared/menu/engine/feature_notice.lua); the delimiter steps name the one they cause.
 local expected_off_notice = nil
 package.preload["adapters.notifier"] = function()
 	local notifier = dofile("adapters/notifier.lua")
@@ -188,7 +188,7 @@ if SEED and SEED ~= "" then
 	source:close()
 	-- Stamped at the oldest version, so the boot climbs the chain as a release file does.
 	if not content:find("schema_version%s*=") then
-		local registry = assert(real_open(DRIVER .. "/../_shared/core/config_schema/migrations.toml", "rb"))
+		local registry = assert(real_open(DRIVER .. "/../_shared/settings/data/config_schema/migrations.toml", "rb"))
 		local text = registry:read("*a")
 		registry:close()
 		content = "[_meta]\nschema_version = " .. assert(text:match("\noldest_version = (%d+)")) .. "\n\n" .. content
@@ -387,7 +387,7 @@ package.preload["adapters.event_loop"] = function()
 				end
 			end
 		elseif ACTION == "delimiters_add" or ACTION == "delimiters_verify" then
-			local Terminators = require("keymap.terminators")
+			local Terminators = require("layouts.engine.layers.terminators")
 			local Settings = require("modules.hotstrings.terminator_settings")
 			if ACTION == "delimiters_add" then
 				record("FACT", "delimiter_added=" .. tostring(Terminators.add_custom_terminator("custom_µ", "µ", "µ", false)))
@@ -397,7 +397,7 @@ package.preload["adapters.event_loop"] = function()
 			local source = io.open(path, "rb")
 			local bytes = source and source:read("*a") or ""
 			if source then source:close() end
-			local document = require("toml_codec").decode(bytes)
+			local document = require("core.text.engine.toml_codec").decode(bytes)
 			local hotstrings = type(document) == "table" and document.hotstrings or nil
 			local list = type(hotstrings) == "table" and hotstrings.terminators or nil
 			local first = type(list) == "table" and list[1] or nil
@@ -411,8 +411,8 @@ package.preload["adapters.event_loop"] = function()
 				and Terminators.terminator_is_consumed("¤") and not Terminators.terminator_is_consumed("µ")
 			record("FACT", "custom_list_verified=" .. tostring(verified == true))
 		elseif ACTION == "delimiters_edit" or ACTION == "delimiters_verify_edit" then
-			local Terminators = require("keymap.terminators")
-			local Codec = require("toml_codec")
+			local Terminators = require("layouts.engine.layers.terminators")
+			local Codec = require("core.text.engine.toml_codec")
 			local path = require("infra.config_paths").config("config.toml")
 			local function bytes()
 				local source = real_open(path, "rb")

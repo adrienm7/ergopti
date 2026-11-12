@@ -56,7 +56,7 @@ end
 local function with_foreground(port, callback)
 	helpers.with_stub_scope({
 		"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "adapters.shell_runner",
-		"core.llm.managed_ollama_daemon_receipt", "core.llm.managed_ollama_daemon_lifecycle",
+		"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 		"modules.llm.ollama_binary", "modules.llm.ollama_server_command", "modules.llm.managed_native_python",
 		"modules.llm.ollama_endpoint", "adapters.file_system", "adapters.task_lifecycle",
 		"adapters.http_client", "adapters.timer_scheduler", "adapters.json_codec",

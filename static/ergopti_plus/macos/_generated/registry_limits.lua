@@ -1,5 +1,5 @@
 --- _generated/registry_limits.lua
---- AUTO-GENERATED from _shared/modules/timings/constants.toml.
+--- AUTO-GENERATED from _shared/core/timing/data/constants.toml.
 --- DO NOT EDIT BY HAND — run `npm run codegen:registry-constants` to refresh.
 
 --- ==============================================================================

@@ -31,7 +31,7 @@ const INPUTS = [
 ];
 const DEFAULT_OUTPUT = 'OUTPUT_DIR="${REPO_ROOT}/build/linux/linux/bin"';
 const RELAY_BUILDER = 'tools/build/build-proxy-relay.sh';
-const RELAY_SOURCE = 'static/ergopti_plus/_shared/go/native_http/';
+const RELAY_SOURCE = 'static/ergopti_plus/_shared/core/network/native/go/native_http/';
 const RELAY_OUTPUT = 'linux/bin/ergopti-proxy-relay';
 const RELAY_GENERATE =
 	'bash "${SCRIPT_DIR}/build-proxy-relay.sh" --output "${BUILD_DIR}/linux/bin/ergopti-proxy-relay"';
@@ -114,14 +114,14 @@ function classifyGeneratedNativeArtifacts(sources) {
 		check <= relayGenerate ||
 		!required[1].includes('"' + RELAY_OUTPUT + '"') ||
 		!sources[RELAY_INPUTS[1]].includes(
-			'module github.com/adrienm7/ergopti/static/ergopti_plus/_shared/go/native_http'
+			'module github.com/adrienm7/ergopti/static/ergopti_plus/_shared/core/network/native/go/native_http'
 		) ||
 		!sources[RELAY_INPUTS[2]].includes('package main')
 	)
 		refused();
 	for (const fragment of [
 		'set -euo pipefail',
-		'SOURCE_DIR="${REPO_ROOT}/static/ergopti_plus/_shared/go/native_http"',
+		'SOURCE_DIR="${REPO_ROOT}/static/ergopti_plus/_shared/core/network/native/go/native_http"',
 		'[[ ! -e "$OUTPUT" && ! -L "$OUTPUT" ]]',
 		'export GOTOOLCHAIN=local GOPROXY=off GOFLAGS=-mod=readonly GOWORK=off CGO_ENABLED=1',
 		'go build -trimpath -buildvcs=false -ldflags=\'-s -w\' -o "$STAGE" ./cmd/ergopti-proxy-relay',

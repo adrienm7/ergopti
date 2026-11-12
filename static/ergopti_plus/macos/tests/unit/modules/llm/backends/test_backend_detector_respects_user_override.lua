@@ -108,7 +108,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 		shared = function(rel) return helpers.shared(rel) end,
 		shared_root = function() return helpers.shared() end,
 		shared_llm_path = function(name)
-			return helpers.shared("modules/llm/" .. name)
+			return helpers.shared("ai/data/" .. name)
 		end,
 		find_from_configdir = function(relative_target)
 			return helpers.driver_root() .. "../../" .. relative_target
@@ -144,7 +144,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 	end
 
 	-- Load the real modules.llm.init — load_shared_defaults() runs now, reading
-	-- _shared/modules/llm/defaults.json via lib.paths stub (requires lib.paths to be set
+	-- _shared/ai/data/defaults.json via lib.paths stub (requires lib.paths to be set
 	-- before this line)
 	local LLM = require("modules.llm")
 
@@ -199,7 +199,7 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 	package.loaded["infra.paths"] = {
 		shared = function(rel) return helpers.shared(rel) end,
 		shared_root = function() return helpers.shared() end,
-		shared_llm_path = function(name) return helpers.shared("modules/llm/" .. name) end,
+		shared_llm_path = function(name) return helpers.shared("ai/data/" .. name) end,
 		find_from_configdir = function(relative_target)
 			return helpers.driver_root() .. "../../" .. relative_target
 		end,

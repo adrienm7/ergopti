@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local Destination = require("tests.support.text_destination_receipt")
 local with_sender = require("tests.support.text_sender_fixture")
-require("logger")
+require("core.logger.engine")
 
 local function with_plain(callback)
 	helpers.with_stub_scope({

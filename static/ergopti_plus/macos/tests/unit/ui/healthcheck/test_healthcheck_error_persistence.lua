@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 ---   tallies every warn/error line the logger actually emitted.
 local function with_real_logger(callback)
 	helpers.with_stub_scope({
-		"infra.logger", "logger", "ui.healthcheck.core", "ui.healthcheck.helpers",
+		"infra.logger", "core.logger.engine", "ui.healthcheck.core", "ui.healthcheck.helpers",
 	}, function()
 		local Logger = helpers.load_with_stubs("infra.logger")
 		Logger.set_level("DEBUG")

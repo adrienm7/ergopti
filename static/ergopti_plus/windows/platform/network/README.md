@@ -23,7 +23,7 @@ keeps private request configuration out of the command line.
 
 Linux needs a GIO runtime and compiled proxy schemas; Windows uses its own
 native APIs and does not load GIO. Shared policy belongs in
-`_shared/lua/network/` and `_shared/modules/network/`. Saved Windows candidate
+`_shared/core/network/engine/` and `_shared/core/network/data/`. Saved Windows candidate
 patches are inactive preparation; they and their twelve native, E2E, package
 and install checks left the tree with the old handovers and stay in Git at
 `49c62d77a1` (`docs/handovers/2026-10-04-group6-windows/`).

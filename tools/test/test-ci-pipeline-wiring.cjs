@@ -845,7 +845,7 @@ const STEP_CONDITIONS = [
 		'Keep the ErgoptiPlus.exe antivirus surface record',
 		"${{ always() && hashFiles('ergoptiplus-av-surface.json') != '' }}"
 	],
-	// The detached update-asset signatures (_shared/modules/updater/asset_signing.json)
+	// The detached update-asset signatures (_shared/updater/data/asset_signing.json)
 	// are made on release runs only, like the Authenticode signature above.
 	[
 		WINDOWS_BOX,
@@ -8213,7 +8213,7 @@ function checkNativePacSourceReceipts() {
 			write(relative, fs.readFileSync(path.join(root, relative)));
 		}
 		for (const relative of [
-			'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+			'static/ergopti_plus/_shared/core/network/data/proxy_policy.json',
 			'static/ergopti_plus/macos/tests/support/native_pac_source_fixture.py',
 			'tools/diagnostics/native_pac_source_evidence.cjs',
 			'tools/diagnostics/swift_xctest_evidence.cjs'
@@ -8297,7 +8297,7 @@ function checkNativePacSourceReceipts() {
 			count++;
 		}
 		write('capture.log', transcript);
-		const policy = 'static/ergopti_plus/_shared/modules/network/proxy_policy.json';
+		const policy = 'static/ergopti_plus/_shared/core/network/data/proxy_policy.json';
 		const original = fs.readFileSync(path.join(repository, policy));
 		write(policy, Buffer.concat([original, Buffer.from('\n')]));
 		assert.notEqual(judge(), 0);

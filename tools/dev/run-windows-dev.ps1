@@ -41,7 +41,7 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).ProviderPath.TrimEnd('\')
 $DriverDir = Join-Path $RepoRoot 'static\ergopti_plus\windows'
 $Identifiers = Get-Content -Raw -Encoding UTF8 -LiteralPath (
-	Join-Path $RepoRoot 'static\ergopti_plus\_shared\data\identifiers.json') | ConvertFrom-Json
+	Join-Path $RepoRoot 'static\ergopti_plus\_shared\core\text\data\identifiers.json') | ConvertFrom-Json
 $Variable = $Identifiers.dev_source.environment
 if (-not $Variable) { Fail 'identifiers.json names no dev_source.environment.' }
 $Entry = Join-Path $DriverDir $Identifiers.app.ahk

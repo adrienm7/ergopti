@@ -10,9 +10,9 @@
 
 local M = {}
 local hs     = hs
-local Identifiers = require("identifiers")
+local Identifiers = require("core.text.engine.identifiers")
 local Logger = require("infra.logger")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local TimerScheduler = require("adapters.timer_scheduler")
 local RunningApplication = require("adapters.running_application")
 

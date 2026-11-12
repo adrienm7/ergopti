@@ -295,7 +295,7 @@ _LSP_Exercise(State) {
     State.Replayed := false, State.ReplayCalls := 0
     State.BRoles := "", State.ReplayRoles := "", State.ReplayText := "", State.ReplayId := 0
     State.ReplayNetworkDelta := -1, State.ReplayRecord := 0
-    Limits := JsonParse(FSReadUtf8Exact(_SharedDir . "\modules\llm\parser_limits.json"))
+    Limits := JsonParse(FSReadUtf8Exact(_SharedDir . "\ai\data\parser_limits.json"))
     Huge := ""
     Loop Limits["max_operand_bytes"] + 1
         Huge .= "x"
