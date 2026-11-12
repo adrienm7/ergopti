@@ -47,6 +47,20 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		empties: '_shared/lua',
 		from: '{ module = "program_providers", field = "MAX_CATALOGUE_BYTES"',
 		to: '{ module = "apps.engine.program_providers", field = "MAX_CATALOGUE_BYTES"'
+	},
+	{
+		// The site loader check matches the folder by a regular expression.
+		file: 'tools/test/test-action-catalogue-codegen.cjs',
+		empties: '_shared/modules/actions',
+		from: '/ACTIONS_ROOT[\\s\\S]*?modules[/\\\\]actions/.test(SITE_LOADER)',
+		to: '/ACTIONS_ROOT[\\s\\S]*?shortcuts[/\\\\]data[/\\\\]actions/.test(SITE_LOADER)'
+	},
+	{
+		// Paths.shared_llm_path(name) resolves under the AI data folder.
+		file: 'tools/test/test-shared-root-resolvers.cjs',
+		empties: '_shared/modules/llm',
+		from: "m[1] === 'shared_llm_path' ? `modules/llm/${arg}` : arg",
+		to: "m[1] === 'shared_llm_path' ? `ai/data/${arg}` : arg"
 	}
 ];
 

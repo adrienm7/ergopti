@@ -18,6 +18,9 @@
  * - a path rewritten twice: the folder row _shared/core → _shared rewrote
  *   inside the …/_shared/core/network/data/x.json a file row had just written;
  * - a corpus captured byte for byte, whose header was rewritten under its pin;
+ * - what a rewrite leaves inconsistent beside a path: sub(1, 12) == "_shared/",
+ *   and a fixture's mkdir list holding _shared twice and no parent of a deeper
+ *   new folder;
  * - driver_root() .. "/../_shared/modules/x" written in a _shared file, whose
  *   "../_shared" was dropped, so it named a folder of the driver.
  * ==============================================================================
@@ -182,6 +185,19 @@ function run() {
 			rewrite('tools/test/z.cjs', "const fake = '/tmp/x/shared/zz_probe_mod/hotstrings/a.toml';"),
 			"const fake = '/tmp/x/shared/zz_probe_hs/data/a.toml';",
 			'a fake file system root named for _shared'
+		);
+		assert.equal(
+			rewrite(
+				'tools/test/z.cjs',
+				"const t = fs.readFileSync(shared('zz_probe_data', vector.file), 'utf8');"
+			),
+			"const t = fs.readFileSync(shared('core', 'zz_probe_i18n', 'data', vector.file), 'utf8');",
+			'a folder handed to shared() with a name to join'
+		);
+		assert.equal(
+			rewrite(`${P}linux/tests/z.lua`, 'mkdir_chain(shared_dir, "zz_probe_data", "locales")'),
+			'mkdir_chain(shared_dir, "core", "zz_probe_i18n", "data", "locales")',
+			'a Lua call that spells a shared path in pieces'
 		);
 		const constants = (mod, last) =>
 			[
@@ -351,6 +367,31 @@ function run() {
 	assert.ok(
 		![...pinned].some((f) => /\.(lua|ahk)$/.test(f)),
 		'no source file is exempt: a digest manifest follows its sources'
+	);
+	// What a rewrite leaves inconsistent beside the path it changed.
+	assert.equal(
+		Apply.repairCoupled(
+			'if r:sub(1, 12) == "_shared/lua/" then end',
+			'if r:sub(1, 12) == "_shared/" then end'
+		),
+		'if r:sub(1, 8) == "_shared/" then end',
+		'a prefix check keeps measuring its literal'
+	);
+	assert.equal(
+		Apply.repairCoupled(
+			'for _, dir in ipairs({ d, d .. "/a", d .. "/a/b" }) do uv.fs_mkdir(dir, 448) end',
+			'for _, dir in ipairs({ d, d .. "/x", d .. "/x", d .. "/x/y/z" }) do uv.fs_mkdir(dir, 448) end'
+		),
+		'for _, dir in ipairs({ d, d .. "/x", d .. "/x/y", d .. "/x/y/z" }) do uv.fs_mkdir(dir, 448) end',
+		'a fixture tree built one mkdir at a time creates each folder once, parents first'
+	);
+	assert.equal(
+		Apply.repairCoupled(
+			'for _, r in ipairs({ "a", "a/b" }) do mkdir(w .. "/" .. r) end',
+			'for _, r in ipairs({ "x", "x", "x/y/z" }) do mkdir(w .. "/" .. r) end'
+		),
+		'for _, r in ipairs({ "x", "x/y", "x/y/z" }) do mkdir(w .. "/" .. r) end',
+		'the same with bare relative entries joined onto a base by the loop'
 	);
 	console.log('[OK] every path form the structure plan rewrites follows the moved file.');
 }
