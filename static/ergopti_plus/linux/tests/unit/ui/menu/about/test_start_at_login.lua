@@ -228,7 +228,7 @@ local function with_source_startup(body)
 		assert(uv.fs_chmod(root .. "/commands/systemctl", 493))
 		for key, value in pairs(environment) do assert(uv.os_setenv(key, value)) end
 		Paths.driver_root = function() return driver end
-		body(menu, driver .. "/bin/ergopti-hotstrings", root .. "/config/autostart/ergopti-hotstrings.desktop", write)
+		body(menu, driver .. "/bin/ergopti-hotstrings", root .. "/config/autostart/ergopti-source.desktop", write)
 	end, debug.traceback)
 	Paths.driver_root = original_root
 	for key in pairs(environment) do
@@ -251,6 +251,9 @@ helpers.describe("login startup on a source run (SAD-1)", function()
 			helpers.assert_eq(menu.enabled(), false)
 			helpers.assert_eq(menu.toggle(), true)
 			helpers.assert_eq(menu.enabled(), true)
+			-- The standalone installer's entry name stays free (install.sh refuses an
+			-- ergopti-hotstrings entry it does not own).
+			helpers.assert_nil(io.open(desktop:gsub("ergopti%-source", "ergopti-hotstrings"), "rb"))
 			local bytes = read_file(desktop)
 			helpers.assert_true(bytes:find('Exec=/bin/bash "' .. launcher .. '" --tray\n', 1, true) ~= nil, bytes)
 			helpers.assert_true(bytes:find("Hidden=false", 1, true) ~= nil)
