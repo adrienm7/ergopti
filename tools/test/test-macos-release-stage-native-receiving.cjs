@@ -292,7 +292,7 @@ function main() {
 	const held = fs.readFileSync(
 		path.join(root, 'tools/diagnostics/macos_release_stage_route_test.py')
 	);
-	assert.equal(sha(held), '0b739b76604a464d86d8e94eb7e5fc37df1834633250f7aac6dd7a6a04e38fc9');
+	assert.equal(sha(held), '8ba6b599edab6946eaab4fced0289a6aac08571b126fff9da26525ab2682888f');
 	const directory = fs.mkdtempSync(
 		path.join(process.env.TMPDIR || require('node:os').tmpdir(), 'darwin50-controlled-refusals-')
 	);
