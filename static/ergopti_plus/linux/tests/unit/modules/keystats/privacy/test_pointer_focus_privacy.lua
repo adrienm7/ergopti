@@ -48,7 +48,7 @@ local function fixture(initial_role)
 		type_text = function(text) output[#output + 1] = text; return true end,
 	})
 	local source = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
-	local body = assert(source:read("*a"):match("local function on_click%(%)(.-)\n\tend"), "native pointer callback missing")
+	local body = assert(source:read("*a"):match("local function on_click%(code%)(.-)\n\tend"), "native pointer callback missing")
 	source:close()
 	local factory = assert((loadstring or load)("return function(secure_focus_guard,wrap_on_type,prediction_engine,WordReset,engine,Logger,LOG,TapHold,keystats) "
 		.. "return function() " .. body .. " end end"))()

@@ -414,7 +414,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
       helpers.assert_true(fh ~= nil, "daemon file is readable")
       local src = fh:read("*a"); fh:close()
-      local click_start = assert(src:find("local function on_click()", 1, true))
+      local click_start = assert(src:find("local function on_click(code)", 1, true))
       local click_end = assert(src:find("\n\tend\n", click_start, true))
       helpers.assert_true(src:sub(click_start, click_end):find("secure_focus_guard.invalidate()", 1, true) ~= nil,
         "a pointer press must invalidate the privacy verdict")
