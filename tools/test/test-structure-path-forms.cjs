@@ -89,6 +89,14 @@ function rewrite(file, text) {
 
 function run() {
 	withFakes(() => {
+		// os.path.join pieces in a Python script with no extension.
+		assert.equal(
+			rewrite(
+				`${P}macos/apps/X.app/Contents/MacOS/X`,
+				'#!/usr/bin/env python3\nd = os.path.join(root,\n    "_shared", "zz_probe_data", "locales",\n)\n'
+			),
+			'#!/usr/bin/env python3\nd = os.path.join(root,\n    "_shared", "core", "zz_probe_i18n", "data", "locales",\n)\n'
+		);
 		// A shell exclusion of a bare _shared path, unquoted.
 		assert.equal(
 			rewrite(

@@ -1661,9 +1661,11 @@ function scanFile(file, text, ctx) {
 		}
 	}
 	// ROOT / "static" / "ergopti_plus" / "_shared" / "data" / "x.sql": a Python
-	// path joined with the / operator, read from the tree it passes through.
-	if (file.endsWith('.py'))
-		for (const m of text.matchAll(/(?:\s*\/\s*(["'])[\w.?-]+\1)+/g)) {
+	// path joined with the / operator, read from the tree it passes through;
+	// os.path.join(root, "_shared", "data", "locales") the same with commas.
+	// A script with a Python shebang and no extension is Python too.
+	if (file.endsWith('.py') || /^#![^\n]*\bpython/.test(text))
+		for (const m of text.matchAll(/\s*([/,])\s*(["'])[\w.?-]+\2(?:\s*\1\s*(["'])[\w.?-]+\3)*/g)) {
 			const pieces = [...m[0].matchAll(/(["'])([\w.?-]+)\1/g)].map((x) => x[2]);
 			const at = pieces.findIndex((p) => Census.TREES.includes(p));
 			if (at < 0 || at === pieces.length - 1) continue;
@@ -1691,10 +1693,15 @@ function scanFile(file, text, ctx) {
 			const fresh = (target ? target.slice(PREFIX.length).split('/') : tail).map(
 				(p) => `${quote}${p}${quote}`
 			);
-			add('join', m[0].trim().replace(/^\/\s*/, ''), [...kept, ...fresh].join(' / '), {
-				oldRepo: repo,
-				newRepo: target || repo
-			});
+			add(
+				'join',
+				m[0].trim().replace(/^[/,]\s*/, ''),
+				[...kept, ...fresh].join(m[1] === '/' ? ' / ' : ', '),
+				{
+					oldRepo: repo,
+					newRepo: target || repo
+				}
+			);
 		}
 	// /\\modules\\llm\\x\.json"/ in a tool: an AutoHotkey path, joined onto
 	// _SharedDir (or the driver's own folder), checked with a regular expression.
