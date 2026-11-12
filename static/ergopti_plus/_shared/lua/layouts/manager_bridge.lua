@@ -280,6 +280,8 @@ end
 ---   layout is the emulated one and refreshes its menu (LMH-001, LMH-002). A
 ---   stored emulated layout stays chosen when it is uninstalled (maintainer
 ---   decision, 2026-11-12): the reload stops it, a reinstall resumes it.
+--- deps.is_paused() answers true while the driver is paused: only the page's
+---   ready signal is then admitted, as Windows' suspended driver does (LMH-003).
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
 --- deps.strings() returns the translated strings the page shows.
 --- deps.open_url(url) opens an https URL; deps.close() closes the window.
@@ -324,6 +326,10 @@ function M.new(deps)
 			return false
 		end
 		local action, id = payload.action, payload.id
+		if action ~= "ready" and type(deps.is_paused) == "function" and deps.is_paused() == true then
+			deps.log("info", "Refused a layout manager '%s' while the driver is paused.", action)
+			return false
+		end
 		if action == "ready" then
 			controller.result = nil
 			page_ready = true
