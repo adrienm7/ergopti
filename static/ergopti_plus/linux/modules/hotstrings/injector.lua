@@ -205,11 +205,17 @@ end
 --- @param count integer Number of Backspace strokes to send.
 local require_publication
 
-local function send_backspaces(tx, count)
+--- @param paced boolean|nil True paces each stroke for a terminal (erase_paced).
+local function send_backspaces(tx, count, paced)
 	if count < 1 then return end
+	-- A terminal or TUI prompt may judge every Backspace against one stale
+	-- render: Windows (IsTerminalApp) and macOS (prepare_collected_paced) wait
+	-- [debounce] terminal_hotstring_key_delay_ms after each one (HSE-001).
+	local delay_ms = paced == true and require("infra.timings").ms("debounce", "terminal_hotstring_key_delay_ms") or nil
 	for _ = 1, count do
 		must_emit(tx, EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_DOWN, "backspace down")
 		must_emit(tx, EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_UP, "backspace up")
+		if delay_ms then sleep_ms(delay_ms) end
 	end
 end
 
@@ -218,14 +224,24 @@ end
 --- arrives, which is the one case the Windows and macOS drivers pace
 --- ([debounce] terminal_hotstring_key_delay_ms); any other application reads
 --- the virtual keyboard's events in order, so the pause only delayed the text.
---- Without a pacing port (tests, tools) every erase pauses, as before.
-local function erase_pause()
-	if _erase_pacing then
-		local asked, wanted = pcall(_erase_pacing)
-		if asked and wanted == false then return end
-		if not asked then Logger.error(LOG, "The erase pacing port failed: %s; pausing.", tostring(wanted)) end
+--- Without a pacing port (tests, tools) every erase pauses once, as before.
+--- @return boolean|nil paced True for a target the erase must be paced for
+---   (a failing port included), false for one it need not be, nil without a port.
+local function erase_paced()
+	if not _erase_pacing then return nil end
+	local asked, wanted = pcall(_erase_pacing)
+	if not asked then
+		Logger.error(LOG, "The erase pacing port failed: %s; pacing.", tostring(wanted))
+		return true
 	end
-	sleep_ms(INTER_PHASE_DELAY_MS)
+	return wanted ~= false
+end
+
+--- The pause after an erase without a pacing port: a paced erase already
+--- waited after its last stroke, an unpaced one needs none.
+--- @param paced boolean|nil From erase_paced.
+local function erase_pause(paced)
+	if paced == nil then sleep_ms(INTER_PHASE_DELAY_MS) end
 end
 
 --- Types a string as keystrokes, under the layout the session actually has.
@@ -981,9 +997,10 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	local ran, result = pcall(run_transaction, "inject()", function(tx)
 		-- Phase 1: erase the trigger (and terminator if consumed).
 		if backspace_count > 0 then
-			send_backspaces(tx, backspace_count)
+			local paced = erase_paced()
+			send_backspaces(tx, backspace_count, paced)
 			-- A terminal processes the deletions before the text arrives.
-			erase_pause()
+			erase_pause(paced)
 		end
 
 		require_publication(publication, false)
@@ -1120,8 +1137,9 @@ function M.inject_fields(backspace_count, values, is_private, publication)
 		-- trigger was typed in; later fields are reached through the Tabs below.
 		require_publication(publication, false)
 		if backspace_count > 0 then
-			send_backspaces(tx, backspace_count)
-			erase_pause()
+			local paced = erase_paced()
+			send_backspaces(tx, backspace_count, paced)
+			erase_pause(paced)
 		end
 		require_publication(publication, false)
 
@@ -1182,8 +1200,9 @@ function M.inject_tokens(backspace_count, tokens, is_private, replay_terminator,
 
 	local result = run_transaction("inject_tokens()", function(tx)
 		if backspace_count > 0 then
-			send_backspaces(tx, backspace_count)
-			erase_pause()
+			local paced = erase_paced()
+			send_backspaces(tx, backspace_count, paced)
+			erase_pause(paced)
 		end
 		require_publication(publication, false)
 		local field = 0
