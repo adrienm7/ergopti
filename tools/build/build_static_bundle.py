@@ -38,16 +38,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # The executable name is declared once in _shared/data/identifiers.json.
-sys.path.insert(
-    0,
-    str(
-        Path(__file__).resolve().parent.parent.parent
-        / "static"
-        / "ergopti_plus"
-        / "_shared"
-        / "data"
-    ),
+_IDENTIFIERS = (
+    Path(__file__).resolve().parent.parent.parent
+    / "static/ergopti_plus/_shared/data/identifiers.py"
 )
+sys.path.insert(0, str(_IDENTIFIERS.parent))
 _bytecode_default = sys.dont_write_bytecode
 sys.dont_write_bytecode = True  # a cache beside the shared data would ship in the bundles
 from identifiers import APP  # noqa: E402
