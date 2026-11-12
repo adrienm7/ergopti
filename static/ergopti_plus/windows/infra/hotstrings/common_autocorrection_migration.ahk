@@ -125,7 +125,7 @@ HotstringsCommonOverrideMigrate(Path, PublishFn := 0) {
 			return true
 		}
 		Policy := _ConfigMigrateParse(FSReadStrict(_SharedDir
-			. "\data\hotstrings\common_autocorrection_migration.toml"), "common override policy")
+			. "\hotstrings\data\autocorrection\common_autocorrection_migration.toml"), "common override policy")
 		if !Policy.Has("migration") || !Policy["migration"].Has("ops")
 			throw Error("Common hotstring override migration policy is invalid.")
 		Plan := HotstringsCommonOverridePlan(Source, Policy["migration"]["ops"])

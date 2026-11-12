@@ -19,7 +19,7 @@ local function typed_at(offset_ms)
 end
 
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-sqlite-wpm-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", root .. "/" .. name:lower()))
@@ -31,8 +31,8 @@ assert(config:write("[metrics]\nenabled = true\n") and config:close())
 
 local Keystats = require("modules.keystats.keystats")
 local Writer = require("modules.keystats.sqlite_writer")
-local Metrics = require("keystats.metrics")
-local Json = require("json")
+local Metrics = require("metrics.engine.metrics")
+local Json = require("core.text.engine.json")
 local path = root .. "/metrics.sqlite"
 local checks, failures = 0, 0
 

@@ -1,6 +1,6 @@
 # _shared/tests/corpus/tap_hold_shared_file/macos_legacy.toml
 # A macOS config_karabiner.toml from before the shared tap_hold.toml: the
-# import of _shared/tap_hold/migrations.toml [legacy_imports.hs] turns it into
+# import of _shared/tap_hold/data/migrations.toml [legacy_imports.hs] turns it into
 # exactly the content of macos_written.toml.
 
 [karabiner]

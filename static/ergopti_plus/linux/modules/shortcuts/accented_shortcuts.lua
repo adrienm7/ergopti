@@ -28,12 +28,12 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Manifest = require("infra.manifest_reader")
 local EvdevCodes = require("infra.evdev_codes")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local ConfigOutdated = require("config_outdated")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 
 local LOG = "modules.shortcuts.accented_shortcuts"
 

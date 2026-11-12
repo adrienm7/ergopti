@@ -27,7 +27,7 @@ One slot, one action, one neutral id, on every driver:
 - Slot id: `<modifiers>_<key>` in a fixed modifier order, with the primary
   modifier named by role, not by OS (`primary_g` is Ctrl on Windows and Linux,
   Cmd on macOS). Roles: `primary`, `secondary`, `alt`, `meta`.
-- Value: a catalogue action id from `_shared/modules/actions/actions.toml`
+- Value: a catalogue action id from `_shared/shortcuts/data/actions/actions.toml`
   (`none` clears the slot). A feature that was a boolean becomes the action
   that toggles it.
 - One section, `shortcuts.keyboard`, declared once in the manifest with
@@ -43,7 +43,7 @@ would be neither read nor converted. That is superseded (maintainer's
 decision, 2026-10-27): a setting a user chose is kept. The retired slot ids and
 the redundant booleans of macOS and Linux are converted into the neutral slot
 ids by one step of the shared config migration registry
-(`_shared/core/config_schema/migrations.toml`, the same closed op set the
+(`_shared/settings/data/config_schema/migrations.toml`, the same closed op set the
 Windows engine already runs: `rename`, `copy_if_absent`, `map_value`,
 `delete`, `set_if_absent`, plus `rename_prefix`, which carries the per-slot
 action parameters `keyboard__<slot>__<action>` to the new slot ids). No runtime
@@ -88,16 +88,16 @@ through `ConfigOutdated` and offered by the cleanup, on macOS and Linux.
   legacy boolean, keyboard slot, personal toggle and slot prefix family;
   `tools/test/test-shortcut-inventory-matches-sources.cjs` re-derives it from the
   manifest and the driver sources.
-- Step 2 done: `_shared/modules/actions/slot_roles.json` holds the roles
+- Step 2 done: `_shared/shortcuts/data/actions/slot_roles.json` holds the roles
   (`primary`, `secondary`, `alt`, `meta`, `shift`), generated to
-  `_shared/lua/shortcuts/slot_roles_data.lua` and resolved by
-  `_shared/lua/shortcuts/slot_roles.lua`. `secondary` is the Mac's Ctrl next to
+  `_shared/shortcuts/engine/slot_roles_data.lua` and resolved by
+  `_shared/shortcuts/engine/slot_roles.lua`. `secondary` is the Mac's Ctrl next to
   Cmd; `meta` is the Win/Super key and has no Mac equivalent.
   `tools/test/test-slot-roles-single-source.cjs` holds the table to
   `modifier_chords.json` and to the slot prefix families.
 - Step 7, shared part done: `_shared/tests/corpus/shortcuts/neutral_slots.json`
   is replayed by the macOS and Linux unit gates through
-  `_shared/lua/test/slot_roles_contract.lua`. Windows replays it when it adopts.
+  `_shared/tests/lua/keyboard/slot_roles_contract.lua`. Windows replays it when it adopts.
 - Key catalogue gap: Win+', Win+CapsLock, Ctrl+CapsLock, Ctrl+' and Cmd+\* use keys
   (`quote`, `capslock`, `star`, `sc029`) that `modifier_chords.json` lacks; add
   them in step 3 before those chords become slots.

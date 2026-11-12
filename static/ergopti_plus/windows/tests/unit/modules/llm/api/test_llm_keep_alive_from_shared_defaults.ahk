@@ -5,7 +5,7 @@
 ;         (llm-keep-alive-not-loaded-on-windows)
 ; DESCRIPTION:
 ; LLM_Defaults_Load enumerates the keys it sources from
-; _shared/modules/llm/defaults.json group by group: booleans, numbers, strings,
+; _shared/ai/data/defaults.json group by group: booleans, numbers, strings,
 ; temperature, arrays. llm_ollama_keep_alive is a string and appeared in none of
 ; them, so LLM_Defaults never held the key at all.
 ;

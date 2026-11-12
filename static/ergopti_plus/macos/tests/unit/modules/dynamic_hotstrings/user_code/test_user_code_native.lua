@@ -483,11 +483,11 @@ helpers.describe("programmable native macOS hotstrings", function()
 			local Logger = require("infra.logger")
 			local warn, err, warned, errors = Logger.warn, Logger.error, {}, {}
 			Logger.warn = function(module, message, ...)
-				if module == "dynamic_hotstrings.user_code" then warned[#warned + 1] = message end
+				if module == "hotstrings.engine.dynamic.user_code_core" then warned[#warned + 1] = message end
 				return warn(module, message, ...)
 			end
 			Logger.error = function(module, message, ...)
-				if module == "dynamic_hotstrings.user_code" then errors[#errors + 1] = message end
+				if module == "hotstrings.engine.dynamic.user_code_core" then errors[#errors + 1] = message end
 				return err(module, message, ...)
 			end
 			local ok, failure = pcall(function()
@@ -911,7 +911,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 				helpers.assert_eq(select(2, Preferences.load(path)), "ok")
 				helpers.assert_true(Preferences.save(path, { dynamichotstrings_user_code_enabled = true,
 					dynamichotstrings_user_code_time_activation_seconds = 0.125 }, {}, {}))
-				local decoded = require("toml_codec").decode(read_disk())
+				local decoded = require("core.text.engine.toml_codec").decode(read_disk())
 				helpers.assert_eq(decoded.other.untouched, "foreign")
 				helpers.assert_eq(decoded.hotstrings.dynamic.user_code.neighbor, "kept")
 				package.loaded["infra.preferences"] = nil

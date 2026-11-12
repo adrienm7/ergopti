@@ -84,9 +84,9 @@ _HESO_Case(Mode) {
 	try {
 		for Relative in ["64bit", "shared", "shared\modules", "shared\modules\hotstrings", "extensions", "personal"]
 			FSCreateDirectoryExclusiveStrict(Directory . "\" . Relative)
-		SourceIndex := _SharedDir . "\modules\hotstrings\_index.toml"
+		SourceIndex := _SharedDir . "\hotstrings\data\catalogue\_index.toml"
 		IndexHash := CryptoSha256Bytes(FSReadBytesStrict(SourceIndex))
-		PrivateIndex := Directory . "\shared\modules\hotstrings\_index.toml"
+		PrivateIndex := Directory . "\shared\hotstrings\data\catalogue\_index.toml"
 		AssertTrue(FSWriteCreateDurable(PrivateIndex, FSReadStrict(SourceIndex)) != 0)
 		AssertEqual(IndexHash, CryptoSha256Bytes(FSReadBytesStrict(PrivateIndex)), "The private index copy must be exact")
 		Owners["language_index"] := Map("path", SourceIndex, "sha256", IndexHash)

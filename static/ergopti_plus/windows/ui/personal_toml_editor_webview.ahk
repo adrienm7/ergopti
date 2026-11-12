@@ -32,7 +32,7 @@
 ; are unique security origins and the chrome.webview JS->AHK channel does not
 ; reliably deliver from them (see docs/memory project-webview2-bridge-gotchas).
 ; One host covers the frontend (ui/hotstring_editor/), the shared i18n.js
-; (ui/i18n.js) and the locale JSON (data/locales/).
+; (ui/i18n.js) and the locale JSON (core/i18n/data/locales/).
 global HSED_VHOST := "ergopti.hotstrings"   ; -> _SharedDir
 ; COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW.
 global HSED_HOST_ACCESS_ALLOW := 1
@@ -602,7 +602,7 @@ _HsEdWeb_TriggerChar() {
 _HsEdWeb_I18nSeed() {
 	global HSED_VHOST, _I18nLocale
 	loc := IsSet(_I18nLocale) ? _I18nLocale : "en"
-	return "window.__i18n_base='https://" . HSED_VHOST . "/data/locales/';"
+	return "window.__i18n_base='https://" . HSED_VHOST . "/core/i18n/data/locales/';"
 		. "window._i18n_locale='" . loc . "';"
 }
 

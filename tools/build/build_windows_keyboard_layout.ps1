@@ -6,7 +6,7 @@ DESCRIPTION:
 Compiles the Ergopti keyboard layout DLL from the generated sources
 (static/ergopti_plus/windows/native/keyboard_layout/_generated, written by
 tools/codegen/codegen-windows-keyboard-layout.cjs) for every architecture
-_shared/modules/layouts/windows_system_layout.json names, into
+_shared/layouts/data/windows_system_layout.json names, into
 static/ergopti_plus/windows/vendor/keyboard_layout/<build>/, where the driver's
 installer and the release package take them. No MSKLC: kbd.h comes from the
 Windows SDK and MSVC compiles and links.
@@ -42,7 +42,7 @@ $ErrorActionPreference = "Stop"
 Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1') -ErrorAction Stop
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$SpecPath = Join-Path $RepoRoot "static\ergopti_plus\_shared\modules\layouts\windows_system_layout.json"
+$SpecPath = Join-Path $RepoRoot "static\ergopti_plus\_shared\layouts\data\windows_system_layout.json"
 $SourceDirectory = Join-Path $RepoRoot "static\ergopti_plus\windows\native\keyboard_layout\_generated"
 if (-not $OutputDirectory) {
 	$OutputDirectory = Join-Path $RepoRoot "static\ergopti_plus\windows\vendor\keyboard_layout"

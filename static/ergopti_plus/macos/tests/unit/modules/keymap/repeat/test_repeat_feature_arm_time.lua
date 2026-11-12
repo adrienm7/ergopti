@@ -174,7 +174,7 @@ helpers.describe("keymap expander: the shared repeat_key_vectors.json corpus", f
 end)
 
 helpers.describe("keymap expander: the shared idle_reset_vectors.json corpus", function()
-	local Core = require("hotstring_engine")
+	local Core = require("hotstrings.engine.matcher")
 	for _, vector in ipairs(corpus_vectors("idle_reset_vectors.json")) do
 		helpers.it(vector.id .. " (idle-reset-corpus)", function()
 			-- A JSON null decodes to nil or a sentinel: only a number is a keystroke time.

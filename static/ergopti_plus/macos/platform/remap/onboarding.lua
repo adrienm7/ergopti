@@ -39,9 +39,9 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local i18n   = require("infra.i18n")
-local LabelValue = require("locale.label_value")
+local LabelValue = require("core.i18n.engine.label_value")
 local text_utils = require("infra.text_utils")
 local KePaths = require("platform.remap.ke_paths")
 local TaskLifecycle = require("adapters.task_lifecycle")
@@ -79,7 +79,7 @@ local MANIFEST_PATH = _SELF_DIR .. "../../vendor/karabiner-elements/manifest.lua
 
 -- Where the downloaded DMG is cached. Standard macOS cache location for
 -- regenerable, app-specific data.
-local CACHE_DIR = (os.getenv("HOME") or "") .. "/" .. require("app_dirs").macos.cache_relative
+local CACHE_DIR = (os.getenv("HOME") or "") .. "/" .. require("core.fs.engine.app_dirs").macos.cache_relative
 	.. "/karabiner-elements/"
 
 -- Filesystem signposts revealing the install state of KE.

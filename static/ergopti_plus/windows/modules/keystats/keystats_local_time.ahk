@@ -6,7 +6,7 @@
 ; A raw metrics row stores its instant in UTC (`ts`) and the local UTC offset in
 ; force when it was recorded (`utc_offset_min`), on every OS (maintainer
 ; decision KMD-1 of 11 November 2026). This is the Windows port of
-; _shared/lua/keystats/local_time.lua: the writer converts the journal's local
+; _shared/metrics/engine/local_time.lua: the writer converts the journal's local
 ; stamp into that pair, and the walker reads a row in the local time the user
 ; lived, ts plus its offset.
 ;

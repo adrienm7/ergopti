@@ -23,7 +23,7 @@ local STAMP = "2026-01-15 10:00:00:000"
 function M.delivered(calls)
 	assert(type(calls) == "table" and #calls > 0,
 		"repeat replay needs at least one captured call, or it proves nothing")
-	local path = assert(package.searchpath("logger", package.path),
+	local path = assert(package.searchpath("core.logger.engine", package.path),
 		"the shared logger core is not on package.path")
 	-- dofile rather than require: a private instance, so neither the process
 	-- singleton nor another test's streaks can influence the outcome.

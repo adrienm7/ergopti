@@ -54,7 +54,7 @@ helpers.describe("injector: output observer", function()
 	helpers.it("injector output, mutation barriers retire empty and partial synthetic edits without inventing typed text", function()
 		for _, scenario in ipairs({ "empty", "partial", "preflight" }) do
 			with_injector(function(injector, channel)
-				local Roi = require("keystats.trigger_roi")
+				local Roi = require("metrics.engine.privacy.trigger_roi")
 				local state = Roi.new(0, true)
 				local context = { app = "Editor", window = 1, title = "Document", timestamp = "stamp" }
 				local barriers, outputs = 0, 0

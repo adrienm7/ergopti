@@ -269,10 +269,12 @@ try:
             original["window_title"] = policy
             manifest.write_text(json.dumps(original))
             # The generator checks every presented caption against the locales.
-            data = policy_root / "static/ergopti_plus/_shared/data"
+            data = policy_root / "static/ergopti_plus/_shared"
             data.mkdir(parents=True)
-            shutil.copy(root / "static/ergopti_plus/_shared/data/locale_order.json", data)
-            shutil.copytree(root / "static/ergopti_plus/_shared/data/locales", data / "locales")
+            shutil.copy(root / "static/ergopti_plus/_shared/core/i18n/data/locale_order.json", data)
+            shutil.copytree(
+                root / "static/ergopti_plus/_shared/core/i18n/data/locales", data / "locales"
+            )
             subprocess.run(
                 [
                     "node",
@@ -284,11 +286,11 @@ try:
                 check=True,
                 timeout=10,
             )
-            shared = root / "static/ergopti_plus/_shared/lua"
+            shared = root / "static/ergopti_plus/_shared"
             driver = root / "static/ergopti_plus/linux"
             package_path = ";".join(
                 [
-                    str(policy_root / "static/ergopti_plus/_shared/lua/?.lua"),
+                    str(policy_root / "static/ergopti_plus/_shared/?.lua"),
                     str(driver / "?.lua"),
                     str(driver / "?/init.lua"),
                     str(shared / "?.lua"),
@@ -311,7 +313,7 @@ try:
                         + json.dumps(package_path)
                         + ' .. ";" .. package.path\n'
                         + "local logger=require('tests.helpers').make_logger_stub();local errors=0\n"
-                        + "logger.error=function() errors=errors+1 end;package.loaded['logger.shim']=logger\n"
+                        + "logger.error=function() errors=errors+1 end;package.loaded['core.logger.engine.shim']=logger\n"
                         + "local releases, restores = 0, 0\n"
                         + "package.loaded['adapters.keyboard_hook'] = {while_released=function(fn) releases=releases+1; local result={fn()}; restores=restores+1; return unpack(result) end}\n"
                         + "local shell=require('adapters.shell_runner')\n"

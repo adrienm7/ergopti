@@ -23,8 +23,8 @@
 --- ==============================================================================
 
 local M = {}
-local Json = require("json")
-local NativePath = require("native_path")
+local Json = require("core.text.engine.json")
+local NativePath = require("core.fs.engine.native_path")
 local WebviewResult = require("adapters.webview_result")
 local hs     = hs
 local Logger = require("infra.logger")

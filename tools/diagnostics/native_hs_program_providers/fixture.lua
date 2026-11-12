@@ -4,7 +4,7 @@ local input = hs.json.decode(__INPUT_JSON__)
 local native_fs, native_open = hs.fs, io.open
 local source = input.source_root
 package.path = source .. "/static/ergopti_plus/macos/?.lua;" .. source .. "/static/ergopti_plus/macos/?/init.lua;"
-    .. source .. "/static/ergopti_plus/_shared/lua/?.lua;" .. source .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
+    .. source .. "/static/ergopti_plus/_shared/?.lua;" .. source .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
 local configured = input.config
 local logs = 0
 local logger = setmetatable({}, { __index = function() return function() logs = logs + 1 end end })

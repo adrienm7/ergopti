@@ -7,16 +7,16 @@ local readers_root = assert(arg[3])
 -- (as Hammerspoon embeds) for macOS.
 local drivers = { (assert(arg[4], 'the driver whose reader runs')) }
 package.path = root .. '/static/ergopti_plus/linux/?.lua;'
-	.. root .. '/static/ergopti_plus/_shared/lua/?.lua;'
-	.. root .. '/static/ergopti_plus/_shared/lua/?/init.lua;' .. package.path
-local json = require('json')
+	.. root .. '/static/ergopti_plus/_shared/?.lua;'
+	.. root .. '/static/ergopti_plus/_shared/?/init.lua;' .. package.path
+local json = require('core.text.engine.json')
 local logger = {}
 for _, name in ipairs({ 'debug', 'info', 'trace', 'done', 'start', 'success' }) do
 	logger[name] = function() end
 end
 logger.warn = function(_, message, ...) error(select('#', ...) > 0 and string.format(message, ...) or message) end
 logger.error = logger.warn
-package.loaded['logger.shim'] = logger
+package.loaded['core.logger.engine.shim'] = logger
 package.loaded['infra.logger'] = logger
 package.loaded['hs.json'] = json
 local command = require('modules.keystats.sqlite_command')

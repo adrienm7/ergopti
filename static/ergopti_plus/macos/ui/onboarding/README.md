@@ -22,4 +22,4 @@ catalogue, and they reach `config.toml` in one versioned `batch_write` before
 - `_shared/ui/onboarding/` — HTML/CSS/JS shared with the Windows and Linux hosts.
 - `_shared/ui/_generated/onboarding_catalogue.{js,json}` — the pages, generated
   from the manifest's `[onboarding]` block by `npm run codegen:onboarding-catalogue`.
-- `_shared/lua/onboarding_answers.lua` — the validation contract every Lua host uses.
+- `_shared/onboarding/engine/answers.lua` — the validation contract every Lua host uses.

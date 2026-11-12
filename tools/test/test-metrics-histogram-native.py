@@ -33,11 +33,11 @@ with tempfile.TemporaryDirectory(prefix="ergopti-histogram-regression-") as temp
     database = pathlib.Path(temporary) / "fixture.sqlite"
     with closing(sqlite3.connect(database)) as connection:
         connection.executescript(
-            (root / "static/ergopti_plus/_shared/data/db/schema.sql").read_text()
+            (root / "static/ergopti_plus/_shared/metrics/data/db/schema.sql").read_text()
         )
         # Both readers project media aggregates alongside the histogram queries.
         connection.executescript(
-            (root / "static/ergopti_plus/_shared/data/db/media_schema.sql").read_text(
+            (root / "static/ergopti_plus/_shared/metrics/data/db/media_schema.sql").read_text(
                 encoding="utf-8"
             )
         )

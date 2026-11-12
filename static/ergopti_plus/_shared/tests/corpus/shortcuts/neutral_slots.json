@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"description": "Independent vectors for the neutral keyboard-slot grammar (_shared/lua/shortcuts/slot_roles.lua). 'valid' holds slots with the exact native chord each driver resolves them to ({\"absent\": true} where the keyboard lacks a role). 'invalid' holds ids the parser must refuse, including every OS-named id the model retires. 'crosswalk' maps each chord the three drivers register today (docs/audits/2026-10-27-shortcut-inventory.json) to its neutral slot; tools/test/test-slot-roles-single-source.cjs keeps it equal to the inventory. 'pending_keys' lists keys of the crosswalk that modifier_chords.json does not yet carry. 'families' and 'extra_keys' pin the prefixes (in menu order) and the slot-only keys each driver accepts.",
+	"description": "Independent vectors for the neutral keyboard-slot grammar (_shared/shortcuts/engine/slot_roles.lua). 'valid' holds slots with the exact native chord each driver resolves them to ({\"absent\": true} where the keyboard lacks a role). 'invalid' holds ids the parser must refuse, including every OS-named id the model retires. 'crosswalk' maps each chord the three drivers register today (docs/audits/2026-10-27-shortcut-inventory.json) to its neutral slot; tools/test/test-slot-roles-single-source.cjs keeps it equal to the inventory. 'pending_keys' lists keys of the crosswalk that modifier_chords.json does not yet carry. 'families' and 'extra_keys' pin the prefixes (in menu order) and the slot-only keys each driver accepts.",
 	"valid": [
 		{
 			"slot": "primary_g",

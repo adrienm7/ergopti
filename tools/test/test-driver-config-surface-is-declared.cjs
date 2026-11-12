@@ -5,7 +5,7 @@
  * MODULE: Driver Config Surface — Declared in the Manifest
  * DESCRIPTION:
  * Every config.toml section/key a driver reads or writes must be declared in
- * _shared/modules/features/manifest.toml FOR THAT PLATFORM. The manifest is the
+ * _shared/settings/data/features/manifest.toml FOR THAT PLATFORM. The manifest is the
  * single source of truth for what a config file contains; a key the driver
  * persists but the manifest has never heard of is a setting with no default, no
  * type, no schema entry and no menu row — invisible to every gate that exists.
@@ -53,7 +53,7 @@ const { stripComments, scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS_DIR = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(DRIVERS_DIR, '_shared', 'modules', 'features', 'manifest.toml');
+const MANIFEST = path.join(DRIVERS_DIR, '_shared', 'settings', 'data', 'features', 'manifest.toml');
 
 // Frozen baseline — config surfaces a driver touches that the manifest does not
 // declare for it. Drive to zero; NEVER raise.
@@ -429,7 +429,10 @@ function isCanonicalParameterWrite(
 		return false;
 	if (
 		selected &&
-		(!executableMatch(/local PhysicalSlots = require\("shortcuts\.physical_slots"\)/, source) ||
+		(!executableMatch(
+			/local PhysicalSlots = require\("shortcuts\.engine\.physical_slots"\)/,
+			source
+		) ||
 			!executableMatch(/function M\.apply\(binding, scalar, is_paused, action\)/, source) ||
 			!executableMatch(
 				/binding = binding, scalar = scalar, is_paused = is_paused, action = action/,
@@ -503,7 +506,7 @@ assert.equal(
  * @returns {boolean} Whether exact path and snapshot arguments reach the writer.
  */
 function hasSecondaryRecoveryTransport(sourceRoot) {
-	const helperPath = path.join(sourceRoot, '_shared/lua/hotstrings/publication_recovery.lua');
+	const helperPath = path.join(sourceRoot, '_shared/hotstrings/engine/publication_recovery.lua');
 	if (!fs.existsSync(helperPath)) return false;
 	const helper = fs.readFileSync(helperPath, 'utf8');
 	const constructor = /^function M\.new\(options\)\r?\n[\s\S]*?^end\b/m.exec(helper);
@@ -520,7 +523,9 @@ function hasSecondaryRecoveryTransport(sourceRoot) {
 			helper
 		) &&
 		/^\tlocal files = options\.files\s*$/m.test(body) &&
-		/^\tlocal writer = options\.writer or require\("toml_codec\.writer"\)\s*$/m.test(body) &&
+		/^\tlocal writer = options\.writer or require\("core\.text\.engine\.toml_codec\.writer"\)\s*$/m.test(
+			body
+		) &&
 		/adapter ~= files/.test(publish[0]) &&
 		/local record = \{ path = path, candidate = candidate, expected = copy_source\(expected\),\s+on_error = on_error, attempt = attempt, publisher = publisher or writer\.publish_if_unchanged \}/.test(
 			publish[0]
@@ -559,7 +564,7 @@ function hasSecondaryPublicationOwner(source, sourceRoot = DRIVERS_DIR) {
 		/local prepared, prepare_error = prepare_override_content\(overrides\)/.test(save[0]) &&
 		/content = prepared/.test(save[0]) &&
 		/^local FileSystem\s*= require\("adapters\.file_system"\)\s*$/m.test(source) &&
-		/^local PublicationRecovery = require\("hotstrings\.publication_recovery"\)\s*$/m.test(
+		/^local PublicationRecovery = require\("hotstrings\.engine\.publication_recovery"\)\s*$/m.test(
 			source
 		) &&
 		/^local function publish_native_override\(path, content, files, expected, on_error\)\r?\n\s*return files\.write_if_unchanged\(path, content, expected, on_error\)\s*\r?\nend\b/m.test(
@@ -598,7 +603,7 @@ function literalWriteSurfaces(source) {
 // Redirecting that owner to config.toml must fail the gate too.
 const secondaryBootstrap = fs.readFileSync(path.join(DRIVERS_DIR, 'macos', 'init.lua'), 'utf8');
 const secondaryDestination =
-	/override_path = require\("native_path"\)\.with_trailing_separator\(override_path\) \.\. "hotstrings_config\.toml"\s+local hotstring_config_ready = hotstrings_config\.init\(\{\s+override_path = override_path,/;
+	/override_path = require\("core.fs.engine.native_path"\)\.with_trailing_separator\(override_path\) \.\. "hotstrings_config\.toml"\s+local hotstring_config_ready = hotstrings_config\.init\(\{\s+override_path = override_path,/;
 assert.equal(
 	secondaryDestination.test(secondaryBootstrap),
 	true,
@@ -653,7 +658,7 @@ try {
 		false,
 		'an absent recovery helper grants no transport'
 	);
-	const helperPath = '_shared/lua/hotstrings/publication_recovery.lua';
+	const helperPath = '_shared/hotstrings/engine/publication_recovery.lua';
 	const target = path.join(recoveryFixture, helperPath);
 	fs.mkdirSync(path.dirname(target), { recursive: true });
 	const helperSource = fs.readFileSync(path.join(DRIVERS_DIR, helperPath), 'utf8');
@@ -764,7 +769,7 @@ const scopes = normalizeScopes(parseToml(fs.readFileSync(MANIFEST, 'utf8')).scop
 const dynamic = Object.values(scopes).flatMap((scope) => scope.dynamic_defaults || []);
 assert.ok(dynamic.length > 0, 'the scope registry must declare dynamic defaults');
 const actions = parseToml(
-	fs.readFileSync(path.join(DRIVERS_DIR, '_shared/modules/actions/actions.toml'), 'utf8')
+	fs.readFileSync(path.join(DRIVERS_DIR, '_shared/shortcuts/data/actions/actions.toml'), 'utf8')
 ).sg_actions;
 const parameterStorageOwner = fs.readFileSync(
 	path.join(DRIVERS_DIR, 'linux/modules/gestures/manager.lua'),
@@ -777,9 +782,9 @@ const parameterWriter = String.raw`--- infra/program_binding_transaction.lua
 
 --- Publishes an executable parameter and its binding under exact runtime ownership.
 local M = {}
-local Transaction = require("config_scope_transaction")
-local Writer = require("toml_codec.writer")
-local Logger = require("logger.shim")
+local Transaction = require("settings.engine.scope.transaction")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Logger = require("core.logger.engine.shim")
 local LOG = "infra.program_binding_transaction"
 local _current, _sequence = nil, 0
 local _constructing = false

@@ -1,7 +1,7 @@
 #!/usr/bin/env lua
 --- tools/test/test-utf8-compat.lua
 ---
---- Regression test for _shared/lua/compat/utf8.lua (SLP-1 + SLP-2).
+--- Regression test for _shared/core/lifecycle/engine/compat/utf8.lua (SLP-1 + SLP-2).
 --- Validates:
 ---   1. The compat shim installs correctly when utf8 is absent.
 ---   2. The shim does NOT overwrite a native utf8 library (Lua 5.3+).
@@ -43,11 +43,11 @@ end
 
 -- Always set the path first — this script lives in tools/test/, two levels
 -- below the repo root, and the shared lua modules are under
--- static/ergopti_plus/_shared/lua/.
-package.path = "static/ergopti_plus/_shared/lua/?.lua" .. ";" .. package.path
+-- static/ergopti_plus/_shared/.
+package.path = "static/ergopti_plus/_shared/?.lua" .. ";" .. package.path
 
-local ok, compat = pcall(require, "compat.utf8")
-assert_true(ok, "require compat.utf8")
+local ok, compat = pcall(require, "core.lifecycle.engine.compat.utf8")
+assert_true(ok, "require core.lifecycle.engine.compat.utf8")
 assert_true(type(compat) == "table", "compat is a table")
 
 -- =========================================================================

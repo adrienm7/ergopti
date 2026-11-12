@@ -36,7 +36,7 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const CORPUS = path.join(SHARED, 'tests', 'corpus');
-const CONTRACTS = path.join(SHARED, 'lua', 'test');
+const CONTRACTS = path.join(SHARED, 'tests', 'lua');
 const EXPECT_KEYS = new Set([
 	'ok',
 	'content',
@@ -230,7 +230,7 @@ const LUA_COUNTS = {
 	},
 	menu_numbered_caption(corpus) {
 		const match = fs
-			.readFileSync(path.join(CONTRACTS, 'menu_numbered_caption_contract.lua'), 'utf8')
+			.readFileSync(path.join(CONTRACTS, 'menu/numbered_caption_contract.lua'), 'utf8')
 			.match(
 				/#corpus\.positive == (\d+) and #corpus\.grammar_refusals == (\d+) and #corpus\.ownership_refusals == (\d+)/
 			);
@@ -243,7 +243,7 @@ const LUA_COUNTS = {
 	},
 	config_scope_plan(corpus) {
 		const match = fs
-			.readFileSync(path.join(CONTRACTS, 'config_scope_plan_contract.lua'), 'utf8')
+			.readFileSync(path.join(CONTRACTS, 'settings/scope_plan_contract.lua'), 'utf8')
 			.match(
 				/#corpus\.stored_paths == (\d+) and #corpus\.inventories == (\d+) and #corpus\.refusals == (\d+)\s+and #corpus\.declaration_plans == (\d+) and #corpus\.declaration_refusals == (\d+) and #corpus\.declaration_cycles == (\d+)\s+and #corpus\.inventory_collections == (\d+) and #corpus\.inventory_refusals == (\d+)/
 			);

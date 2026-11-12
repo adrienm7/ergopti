@@ -8,7 +8,7 @@
 --- and a refused privacy admission. Windows keeps the same file for the same
 --- purpose (a yielding second instance, a refused configuration transition) and
 --- macOS keeps launcher.log and a fatal report in the native launcher; the name is
---- declared once in _shared/modules/paths/app_dirs.toml.
+--- declared once in _shared/core/fs/data/paths/app_dirs.toml.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Closed vocabulary. The privacy policy is not loaded yet, so a free-text
@@ -43,8 +43,8 @@ M.CODES = {
 	second_instance_yielded = "Another daemon owns the session lock; this start yielded.",
 }
 
-local AppDirs = require("app_dirs")
-local NativePath = require("native_path")
+local AppDirs = require("core.fs.engine.app_dirs")
+local NativePath = require("core.fs.engine.native_path")
 
 
 
@@ -78,7 +78,7 @@ function M.append(code, opts)
 	-- Required here, not at load: Main loads this module before the session
 	-- lock retains the launcher's lock, and text_utils pulls compat.utf8 and the
 	-- rest of the shared tree that must load after it.
-	os.execute("mkdir -p " .. require("text_utils").shell_quote(dir) .. " 2>/dev/null")
+	os.execute("mkdir -p " .. require("core.text.engine.utils_core").shell_quote(dir) .. " 2>/dev/null")
 	local handle = require("infra.regular_file_writer").open(path, "a")
 	if not handle then return false, "bootstrap log not writable" end
 	local wrote = handle:write(os.date("%Y-%m-%d %H:%M:%S"), " [ERROR] [bootstrap] ", message, "\n")

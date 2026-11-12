@@ -121,8 +121,8 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 #Include ../../infra/manifest_reader.ahk
 #Include ../../modules/keymap/layout/layout_ergopti.ahk
 #Include ../../modules/keymap/layout/accented_shortcuts.ahk
-#Include ../../../_shared/modules/features/number_row_policy.ahk
-#Include ../../../_shared/modules/features/layout_rows_policy.ahk
+#Include ../../../_shared/settings/data/features/number_row_policy.ahk
+#Include ../../../_shared/settings/data/features/layout_rows_policy.ahk
 #Include ../../modules/keymap/layout/layout_shift_caps.ahk
 #Include ../../modules/keymap/layout/number_row_send.ahk
 #Include ../../modules/keymap/layout/digit_row_bindings.ahk

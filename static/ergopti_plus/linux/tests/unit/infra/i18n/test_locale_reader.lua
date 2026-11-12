@@ -10,13 +10,13 @@ helpers.describe("linux/infra/locale.lua", function()
 	end)
 
 	helpers.it("locale refuses a missing JSON decoder before reading data", function()
-		local saved_json, saved_preload = package.loaded.json, package.preload.json
-		local saved_locale, saved_core = package.loaded["infra.locale"], package.loaded["locale.core"]
-		package.loaded.json, package.loaded["infra.locale"] = nil, nil
-		package.preload.json = function() error("controlled missing decoder") end
+		local saved_json, saved_preload = package.loaded["core.text.engine.json"], package.preload["core.text.engine.json"]
+		local saved_locale, saved_core = package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"]
+		package.loaded["core.text.engine.json"], package.loaded["infra.locale"] = nil, nil
+		package.preload["core.text.engine.json"] = function() error("controlled missing decoder") end
 		local ok, detail = pcall(require, "infra.locale")
-		package.loaded.json, package.preload.json = saved_json, saved_preload
-		package.loaded["infra.locale"], package.loaded["locale.core"] = saved_locale, saved_core
+		package.loaded["core.text.engine.json"], package.preload["core.text.engine.json"] = saved_json, saved_preload
+		package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"] = saved_locale, saved_core
 		helpers.assert_eq(ok, false, "a missing JSON decoder must not become an executable data fallback")
 		helpers.assert_true(tostring(detail):find("JSON decoder", 1, true) ~= nil)
 	end)
@@ -54,15 +54,15 @@ end)
 
 helpers.describe("Linux keycode JSON admission", function()
 	helpers.it("input reader refuses a missing JSON decoder before loading keycodes", function()
-		local saved_json, saved_preload = package.loaded.json, package.preload.json
-		local saved_reader, saved_evdev = package.loaded["modules.hotstrings.input_reader"], package.loaded["keycodes.evdev"]
+		local saved_json, saved_preload = package.loaded["core.text.engine.json"], package.preload["core.text.engine.json"]
+		local saved_reader, saved_evdev = package.loaded["modules.hotstrings.input_reader"], package.loaded["platform.input.keycodes.evdev"]
 		local calls = 0
-		package.loaded.json, package.loaded["modules.hotstrings.input_reader"] = nil, nil
-		package.preload.json = function() error("controlled missing decoder") end
-		package.loaded["keycodes.evdev"] = { load = function() calls = calls + 1; return {} end }
+		package.loaded["core.text.engine.json"], package.loaded["modules.hotstrings.input_reader"] = nil, nil
+		package.preload["core.text.engine.json"] = function() error("controlled missing decoder") end
+		package.loaded["platform.input.keycodes.evdev"] = { load = function() calls = calls + 1; return {} end }
 		local ok = pcall(require, "modules.hotstrings.input_reader")
-		package.loaded.json, package.preload.json = saved_json, saved_preload
-		package.loaded["modules.hotstrings.input_reader"], package.loaded["keycodes.evdev"] = saved_reader, saved_evdev
+		package.loaded["core.text.engine.json"], package.preload["core.text.engine.json"] = saved_json, saved_preload
+		package.loaded["modules.hotstrings.input_reader"], package.loaded["platform.input.keycodes.evdev"] = saved_reader, saved_evdev
 		helpers.assert_eq(ok, false, "missing JSON must refuse keycode admission")
 		helpers.assert_eq(calls, 0, "no keycode data is read with an executable fallback")
 	end)
@@ -93,10 +93,10 @@ helpers.describe("linux/infra/i18n.lua", function()
 	-- catalogue uses: one duplicated inventory key in all 21 files once failed
 	-- every such reader on Linux.
 	helpers.it("every locale catalogue decodes losslessly, with no key written twice", function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local Paths = require("infra.paths")
-		local directory = Paths.shared("data/locales")
-		local listing = assert(io.popen("ls " .. require("text_utils").shell_quote(directory)))
+		local directory = Paths.shared("core/i18n/data/locales")
+		local listing = assert(io.popen("ls " .. require("core.text.engine.utils_core").shell_quote(directory)))
 		local names = {}
 		for name in listing:lines() do
 			if name:match("^%a%a%.json$") then names[#names + 1] = name end
@@ -119,13 +119,13 @@ helpers.describe("linux/infra/i18n.lua", function()
 		helpers.assert_eq(i18n.get_locale(), "fr", "default locale is fr")
 	end)
 	helpers.it("i18n warns once per raw key shown, never for a probe (i18n-miss-warned)", function()
-		local names = { "logger.shim", "infra.i18n", "infra.locale", "locale.core" }
+		local names = { "core.logger.engine.shim", "infra.i18n", "infra.locale", "core.i18n.engine.core" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local logs = {}
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		package.loaded["infra.locale"] = nil
 		local ok, detail = pcall(function()
 			local i18n = helpers.load_module("infra.i18n")

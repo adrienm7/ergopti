@@ -33,10 +33,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Preferences = require("infra.hotstring_preferences")
 local ManifestReader = require("infra.manifest_reader")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "hotstrings.preview_settings"
 

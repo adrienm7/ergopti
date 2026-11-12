@@ -72,7 +72,7 @@ helpers.describe("first-use startup", function()
 		if package.config:sub(1, 1) == "\\" then return end
 		local path = os.tmpname()
 		os.remove(path)
-		local created = os.execute("mkdir " .. require("text_utils").shell_quote(path))
+		local created = os.execute("mkdir " .. require("core.text.engine.utils_core").shell_quote(path))
 		assert(created == true or created == 0)
 		local absent, detail = Startup.config_absent(path)
 		assert(os.remove(path))
@@ -84,11 +84,11 @@ helpers.describe("first-use startup", function()
 		if package.config:sub(1, 1) == "\\" then return end
 		local path = os.tmpname()
 		os.remove(path)
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local created = os.execute("mkfifo " .. quote(path))
 		assert(created == true or created == 0)
 		local root = helpers.driver_root()
-		local script = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/../_shared/lua/?.lua;")
+		local script = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/../_shared/?.lua;")
 			.. "..package.path; local absent = require('ui.onboarding.startup').config_absent("
 			.. string.format("%q", path) .. "); assert(absent == nil)"
 		local interpreter = assert(require("luv").exepath())

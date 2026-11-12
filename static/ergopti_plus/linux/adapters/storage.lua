@@ -21,14 +21,14 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Shell  = require("adapters.shell_runner")
 local NoReplaceMove = require("infra.no_replace_move")
 
 -- Shared pure-Lua JSON codec (single source of truth for all Lua drivers). The
 -- bespoke encoder/decoder this replaces silently flattened nested tables and
 -- dropped arrays on the decode path, corrupting any non-flat stored value
-local json = require("json")
+local json = require("core.text.engine.json")
 local JSON_METHODS = {}
 for _, name in ipairs({ "decode", "decode_lossless", "encode", "quote", "is_array", "is_null",
 	"decode_root_object_source", "splice_root_object_source" }) do JSON_METHODS[name] = json[name] end
@@ -36,7 +36,7 @@ for _, name in ipairs({ "decode", "decode_lossless", "encode", "quote", "is_arra
 --- Admits the actual canonical codec instance and its original capabilities.
 --- @return boolean current
 local function owned_json_live()
-	if not rawequal(package.loaded["json"], json) then return false end
+	if not rawequal(package.loaded["core.text.engine.json"], json) then return false end
 	for name, callback in pairs(JSON_METHODS) do
 		if type(callback) ~= "function" or not rawequal(json[name], callback) then return false end
 	end
@@ -49,7 +49,7 @@ local _owned_writer = nil
 --- Eager Writer resolution softly loads i18n, whose native owner needs Storage.
 --- @return table writer
 local function owned_writer()
-	if _owned_writer == nil then _owned_writer = require("toml_codec.writer") end
+	if _owned_writer == nil then _owned_writer = require("core.text.engine.toml_codec.writer") end
 	return _owned_writer
 end
 
@@ -58,7 +58,7 @@ local _owned_inverse = nil
 --- Resolves the existing exact inverse without reintroducing the boot cycle.
 --- @return table inverse
 local function owned_inverse()
-	if _owned_inverse == nil then _owned_inverse = require("config_file_inverse") end
+	if _owned_inverse == nil then _owned_inverse = require("settings.engine.migration.file_inverse") end
 	return _owned_inverse
 end
 
@@ -114,9 +114,9 @@ local function owned_logical_key(key) return type(key) == "string" and key ~= ""
 
 -- The owned-alias gates, receipt authority and finalization shared with the
 -- other Lua driver; capture, publish and restore below stay native.
-local Owned = require("storage_owned")
-local NativePath = require("native_path")
-local TableUtil = require("table_util")
+local Owned = require("core.fs.engine.storage_owned")
+local NativePath = require("core.fs.engine.native_path")
+local TableUtil = require("core.text.engine.table_util")
 local _owned = Owned.new({
 	name = "adapters.storage", module = M, logical_key = owned_logical_key, logger = Logger, log = LOG,
 	-- An ordinary commit in flight, or its unsettled debt, refuses owned work;
@@ -774,7 +774,7 @@ end
 --- @return boolean current
 local function ordinary_live(record)
 	if not owned_live(record) or not rawequal(package.loaded["adapters.file_system"], record.file_owner)
-		or not rawequal(package.loaded["toml_codec.writer"], record.writer_owner) then return false end
+		or not rawequal(package.loaded["core.text.engine.toml_codec.writer"], record.writer_owner) then return false end
 	if not rawequal(record.readback, owned_store_readback) and not rawequal(record.readback, released_store_readback) then return false end
 	for name, callback in pairs(record.writer_methods) do
 		if not rawequal(record.writer_owner[name], callback) then return false end

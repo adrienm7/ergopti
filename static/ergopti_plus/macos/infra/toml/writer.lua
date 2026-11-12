@@ -5,16 +5,16 @@
 --- DESCRIPTION:
 --- Re-exports the canonical TOML writer from the shared Lua library.
 --- Callers: require("infra.toml.writer"). The real implementation lives at:
----   static/ergopti_plus/_shared/lua/toml_codec/writer.lua
+---   static/ergopti_plus/_shared/core/text/engine/toml_codec/writer.lua
 ---
 --- RATIONALE:
 --- The writer was extracted to _shared/ so all Lua-based drivers (Hammerspoon,
 --- future Linux driver) share one implementation. The test runner (tests/run.lua)
---- and the Hammerspoon runtime both inject _shared/lua into package.path before
+--- and the Hammerspoon runtime both inject _shared into package.path before
 --- any module is required, so this shim can delegate with a plain require().
 --- ==============================================================================
 
-local SharedWriter = require("toml_codec.writer")
+local SharedWriter = require("core.text.engine.toml_codec.writer")
 local FileSystem   = require("adapters.file_system")
 
 local M = {}

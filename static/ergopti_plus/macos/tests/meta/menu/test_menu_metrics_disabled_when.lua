@@ -73,7 +73,7 @@ end
 
 helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree with the canonical graph", function()
 	helpers.it("menu_manifest.json declares the canonical disabled_when for every item", function()
-		local fh = io.open(helpers.shared("modules/menu/menu_manifest.json"), "r")
+		local fh = io.open(helpers.shared("menu/data/menu_manifest.json"), "r")
 		helpers.assert_true(fh ~= nil, "menu_manifest.json must be readable")
 		local raw = fh:read("*a")
 		fh:close()
@@ -108,7 +108,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 	-- their providers are gone, and the two rows that open a window follow
 	-- each other with no separator between them.
 	helpers.it("(metrics-no-shortcut-rows) the menu sets no shortcut and its two opening rows form one group", function()
-		local fh = io.open(helpers.shared("modules/menu/menu_manifest.json"), "r")
+		local fh = io.open(helpers.shared("menu/data/menu_manifest.json"), "r")
 		helpers.assert_true(fh ~= nil, "menu_manifest.json must be readable")
 		local data = hs.json.decode(fh:read("*a"))
 		fh:close()
@@ -137,7 +137,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 	end)
 
 	helpers.it("menubar_colors depends_on is now load-bearing disabled_when (MG-2)", function()
-		local fh = io.open(helpers.shared("modules/menu/menu_manifest.json"), "r")
+		local fh = io.open(helpers.shared("menu/data/menu_manifest.json"), "r")
 		local raw = fh:read("*a")
 		fh:close()
 		local data = hs.json.decode(raw)
@@ -252,7 +252,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 	helpers.it("every flat metrics state name the manifest reads is declared once and owned by a preference", function()
 		local declared = {}
 		for _, value in pairs(MetricsState) do declared[value] = true end
-		local file = assert(io.open(helpers.shared("modules/menu/menu_manifest.json"), "rb"))
+		local file = assert(io.open(helpers.shared("menu/data/menu_manifest.json"), "rb"))
 		local manifest_text = file:read("*a"); file:close()
 		local used, named = {}, 0
 		for name in manifest_text:gmatch('"(keystats_[%w_]+)"') do
@@ -266,7 +266,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 		end
 		local Preferences = require("infra.preferences")
 		local owned = {}
-		for _, path in pairs(require("config_keys").KEY) do
+		for _, path in pairs(require("settings.engine.keys").KEY) do
 			if path:sub(1, 8) == "metrics." then
 				local flat = Preferences.flat_key_for(path)
 				if flat then owned[flat] = true end

@@ -365,7 +365,7 @@ helpers.describe("model browser inventory document", function()
 							if mode == "inline" then callback({ state = "listed", ids = {} }) end
 							return false
 						end } })
-				local logger, messages = require("logger.shim"), {}
+				local logger, messages = require("core.logger.engine.shim"), {}
 				local previous_error = logger.error
 				logger.error = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end
 				local called, result = pcall(f.handshake)
@@ -393,7 +393,7 @@ helpers.describe("model browser inventory document", function()
 				ollama_state = function() return true end, ollama_install_phase = function() return "idle" end,
 				install_ollama = function() return true end })
 			f.handshake()
-			local logger, messages = require("logger.shim"), {}
+			local logger, messages = require("core.logger.engine.shim"), {}
 			local previous_error = logger.error
 			logger.error = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end
 			local called, result = pcall(f.send, { action = "add_provider", backend = "api", provider = "test" })
@@ -458,7 +458,7 @@ helpers.describe("model browser inventory document", function()
 			with_browser(function(f, _, seen)
 				f.handshake()
 				seen.refuse_download = refused
-				local logger, messages = require("logger.shim"), {}
+				local logger, messages = require("core.logger.engine.shim"), {}
 				local info, warn = logger.info, logger.warn
 				logger.info = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end
 				logger.warn = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end

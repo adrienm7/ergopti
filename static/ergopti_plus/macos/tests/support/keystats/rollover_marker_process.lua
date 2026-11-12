@@ -12,9 +12,9 @@ return function()
 	local root, temporary = assert(arg[3]), assert(arg[2])
 	local driver = root .. "/static/ergopti_plus/macos"
 	package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-		.. root .. "/static/ergopti_plus/_shared/lua/?.lua;"
-		.. root .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
-	local Json = require("json")
+		.. root .. "/static/ergopti_plus/_shared/?.lua;"
+		.. root .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
+	local Json = require("core.text.engine.json")
 	local Helpers = require("tests.helpers")
 	local Lfs = require("lfs")
 	local case = assert(os.getenv("ERGOPTI_ROLLOVER_CASE"))

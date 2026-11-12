@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Roi = require("keystats.trigger_roi")
+local Roi = require("metrics.engine.privacy.trigger_roi")
 local Native = require("tests.support.modules.keystats.context_tracker.ax_native_callback_fixture")
 
 --- Runs the window writer against already available native window observations.

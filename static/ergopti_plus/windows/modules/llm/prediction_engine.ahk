@@ -17,7 +17,7 @@
 #Requires AutoHotkey v2.0
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
-#Include ../../../_shared/modules/llm/display_policy.ahk
+#Include ../../../_shared/ai/data/display_policy.ahk
 #Include prediction_ports.ahk
 
 
@@ -35,7 +35,7 @@
 ; defaults.json rather than being hardcoded here.
 ; Timer/cache keys are always initialised to their zero values regardless.
 ; String/numeric placeholder values — always overwritten by LLM_Engine_ApplySharedDefaults()
-; which reads from LLM_Defaults (infra/llm_defaults.ahk → _shared/modules/llm/defaults.json).
+; which reads from LLM_Defaults (infra/llm_defaults.ahk → _shared/ai/data/defaults.json).
 global _LLM_Engine := Map(
 	"enabled",                    false,
 	"model",                      "",

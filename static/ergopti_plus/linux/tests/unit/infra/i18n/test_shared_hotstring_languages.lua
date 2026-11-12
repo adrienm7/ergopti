@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Hotstring Language Packs (shared)
 --- DESCRIPTION:
---- Covers _shared/lua/hotstrings/languages.lua, which both Lua drivers use to
+--- Covers _shared/hotstrings/engine/languages.lua, which both Lua drivers use to
 --- turn _index.toml [languages] into language packs and to answer the shipped
 --- default of a bundled section.
 ---
@@ -18,7 +18,7 @@
 
 local helpers = require("tests.helpers")
 
-local Languages = helpers.load_module("hotstrings.languages")
+local Languages = helpers.load_module("hotstrings.engine.languages")
 
 
 helpers.describe("hotstring languages: the index declares the packs", function()
@@ -57,10 +57,10 @@ helpers.describe("hotstring languages: the index declares the packs", function()
 	end)
 
 	helpers.it("(language-packs) the shipped index declares French", function()
-		local fh = assert(io.open(require("infra.paths").shared("modules/hotstrings/_index.toml"), "r"))
+		local fh = assert(io.open(require("infra.paths").shared("hotstrings/data/catalogue/_index.toml"), "r"))
 		local raw = fh:read("*a")
 		fh:close()
-		local packs = Languages.packs(require("toml_codec.codec").decode(raw))
+		local packs = Languages.packs(require("core.text.engine.toml_codec.codec").decode(raw))
 		helpers.assert_eq(packs[1].id, "french")
 		helpers.assert_eq(packs[1].locale, "fr")
 	end)

@@ -13,8 +13,8 @@ helpers.describe("TOML reader text snapshots", function()
 	for _, newline in ipairs({ "\n", "\r\n" }) do
 		helpers.it("(hs-271-text) matches file parsing with newline width " .. #newline, function()
 			with_virtual_file(function(state)
-				helpers.with_fresh_modules({ "toml_codec.reader" }, function()
-					local reader = require("toml_codec.reader")
+				helpers.with_fresh_modules({ "core.text.engine.toml_codec.reader" }, function()
+					local reader = require("core.text.engine.toml_codec.reader")
 					state.content = table.concat({ '[_meta]', 'sections_order = ["arrows"]',
 						'[[arrows]]', '"a\\\"b" = { output = "A" }', 'description = "Arrows"' }, newline)
 					local file, file_ok = reader.parse("/virtual/extensions/demo/hotstrings/demo.toml")
@@ -34,8 +34,8 @@ helpers.describe("TOML reader text snapshots", function()
 	end
 
 	helpers.it("(hs-271-text) bypasses disk cache and rejects non-text input", function()
-		helpers.with_fresh_modules({ "toml_codec.reader" }, function()
-			local reader = require("toml_codec.reader")
+		helpers.with_fresh_modules({ "core.text.engine.toml_codec.reader" }, function()
+			local reader = require("core.text.engine.toml_codec.reader")
 			local calls = 0
 			local function touched() calls = calls + 1 end
 			reader.set_cache_provider({ load = touched, capture_source = touched, store = touched })

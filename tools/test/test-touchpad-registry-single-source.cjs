@@ -39,8 +39,8 @@ const MENU_MANIFEST = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
 	'menu',
+	'data',
 	'menu_manifest.json'
 );
 const OWNER = path.join(WIN, 'modules', 'gestures', 'touchpad_registry.ahk');

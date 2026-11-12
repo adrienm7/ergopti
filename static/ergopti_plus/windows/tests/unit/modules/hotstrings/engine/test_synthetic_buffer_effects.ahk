@@ -118,7 +118,7 @@ _SBE_MixedPayloadIsTreatedAsAMove() {
 _SBE_LayerPayloads() {
 	SharedDir := A_ScriptDir . "\..\..\_shared"
 	Ctx := KeymapLayers_LoadContext(SharedDir)
-	Result := KeymapLayers_Load("windows", Ctx, FileRead(SharedDir . "\keymap\layers.recommended.toml", "UTF-8"))
+	Result := KeymapLayers_Load("windows", Ctx, FileRead(SharedDir . "\layouts\data\layers.recommended.toml", "UTF-8"))
 	Assert(Result["ok"] && Result["layers"].Has(NAV_LAYER_ID),
 		"the recommended layer must resolve for Windows before its payloads can be classified")
 	Payloads := []

@@ -4,7 +4,7 @@
 --- MODULE: Healthcheck Collectors (macOS)
 --- DESCRIPTION:
 --- The synchronous half of the diagnostics snapshot (version 2 of
---- _shared/modules/diagnostics/schema.json): one collector per section, each
+--- _shared/diagnostics/data/schema.json): one collector per section, each
 --- returning that section's fields. The asynchronous probes (network, AI
 --- backend, sysctl, df) live in ui.healthcheck.probes.
 ---
@@ -350,7 +350,7 @@ function H.configuration_context(schema, overrides)
 		driver   = "macos",
 		features = overrides.features or function() return require("infra.manifest_reader").features() end,
 		path_of  = overrides.path_of or path_of,
-		decode   = require("toml_codec").decode,
+		decode   = require("core.text.engine.toml_codec").decode,
 		open_fn  = overrides.open_fn,
 		clock    = overrides.clock or function() return hs.timer.absoluteTime() / 1e6 end,
 	}
@@ -372,7 +372,7 @@ end
 --- translates each reason key.
 --- @return table { items = { { feature, platforms, reason } } }
 function H.collect_unavailable()
-	return require("healthcheck.unavailable").collect(require("infra.manifest_reader"))
+	return require("diagnostics.engine.healthcheck.unavailable").collect(require("infra.manifest_reader"))
 end
 
 --- The AI section: the switch, the backend, the model and the profile.

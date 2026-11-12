@@ -60,8 +60,8 @@ helpers.describe("final response rate-limit observation", function()
 	end)
 end)
 
-helpers.describe("updater.rate_limit: exhausted GitHub limit detail", function()
-	local RateLimit = require("updater.rate_limit")
+helpers.describe("updater.engine.rate_limit: exhausted GitHub limit detail", function()
+	local RateLimit = require("updater.engine.rate_limit")
 	helpers.it("names the limit and its UTC reset for a 403 or 429 with nothing left", function()
 		helpers.assert_eq(RateLimit.exhausted_detail(403, "0", "86400"),
 			"HTTP 403: the GitHub API rate limit is exhausted, it resets at 1970-01-02 00:00:00 UTC")

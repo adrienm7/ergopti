@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 
 -- Independent expected inventory; never derive this oracle from the planner.
 local FAMILIES = { "date", "date_fr", "date_long_fr", "phone_prefixes", "ssn_prefixes",
@@ -56,7 +56,7 @@ local function with_scope(body, initial)
 	local ok, err = pcall(function()
 		for _, name in ipairs({ "infra.hotstring_preferences", "infra.dynamic_hotstrings_scope",
 			"modules.hotstrings.hotstrings_config", "modules.dynamic_hotstrings.manager",
-			"modules.dynamic_hotstrings.prefix_rules", "dynamic_hotstrings" }) do package.loaded[name] = nil end
+			"modules.dynamic_hotstrings.prefix_rules", "hotstrings.engine.dynamic.core" }) do package.loaded[name] = nil end
 		local paths = {}
 		for key, value in pairs(require("infra.config_paths")) do paths[key] = value end
 		paths.config = function(rel) return rel and (directory .. "/" .. rel) or directory end
@@ -83,7 +83,7 @@ local function with_scope(body, initial)
 		c.Dynamic = require("modules.dynamic_hotstrings.manager")
 		assert(c.Dynamic.init({ trigger_char = "\\", personal_info_path = c.personal }))
 		c.Config = require("modules.hotstrings.hotstrings_config")
-		c.engine = require("hotstring_engine").new()
+		c.engine = require("hotstrings.engine.matcher").new()
 		assert(c.Config.init(c.engine, "virtual.toml"))
 		c.Config.set_extra_mappings_provider(function() return c.Dynamic.prefix_mappings() end)
 		local _, committed = c.Config.load_all()

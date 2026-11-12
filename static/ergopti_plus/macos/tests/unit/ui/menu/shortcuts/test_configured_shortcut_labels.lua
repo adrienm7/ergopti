@@ -16,7 +16,7 @@ local names = {
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
 	"modules.shortcuts.actions.text", "infra.i18n", "infra.logger", "infra.manifest_menu",
 	"infra.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
-	"infra.paths", "menu.renderer",
+	"infra.paths", "menu.engine.renderer",
 }
 
 helpers.describe("configured shortcut row labels", function()
@@ -117,7 +117,7 @@ helpers.describe("real script-action catalogue projection", function()
 	for _, language in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
 		helpers.it("preserves every genuine script action and heading in " .. language, catalogue_scope(function()
 			-- Establish the existing controlled native environment before publishing translation.
-			helpers.load_with_stubs("action_parameter_label")
+			helpers.load_with_stubs("shortcuts.engine.action_parameter_label")
 			local Json = require("adapters.json_codec")
 			local function read(relative)
 				local file = assert(io.open(helpers.shared(relative), "rb"))
@@ -125,7 +125,7 @@ helpers.describe("real script-action catalogue projection", function()
 				return assert(Json.decode(bytes))
 			end
 			local expected = read("tests/corpus/menus/script_action_original_catalogue_projection.json").locales[language].rows
-			local dictionary = read("data/locales/" .. language .. ".json")
+			local dictionary = read("core/i18n/data/locales/" .. language .. ".json")
 			local translator = package.loaded["infra.i18n"]
 			translator.get = function(key) return dictionary[key] or key end
 			translator.format = function(key, ...)

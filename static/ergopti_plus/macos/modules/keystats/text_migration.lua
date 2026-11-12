@@ -11,12 +11,12 @@
 ---
 --- WHAT IS HERE AND WHAT IS SHARED:
 --- The state machine — cursor discipline, the fail-closed rule, idempotence —
---- lives in _shared/lua/keystats/text_migration_runner.lua, because Linux runs
+--- lives in _shared/metrics/engine/privacy/text_migration_runner.lua, because Linux runs
 --- the identical algorithm and a second copy would be a second place for the
 --- rule that protects the user's data to rot. What is here is the macOS half:
 --- rows read and written through the SQLite handle sqlite_writer owns, and the
 --- scheduler port that keeps the pass off the typing path (the public surface
---- and the slicing live in _shared/lua/keystats/text_migration_driver.lua).
+--- and the slicing live in _shared/metrics/engine/privacy/text_migration_driver.lua).
 ---
 --- WHY IT RUNS IN SLICES:
 --- Hammerspoon is single-threaded and every value costs one openssl spawn, so a
@@ -40,10 +40,10 @@ local Logger       = require("infra.logger")
 local Scheduler    = require("adapters.timer_scheduler")
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local TextCipher   = require("modules.keystats.text_cipher")
-local Driver       = require("keystats.text_migration_driver")
-local Runner       = require("keystats.text_migration_runner")
+local Driver       = require("metrics.engine.privacy.text_migration_driver")
+local Runner       = require("metrics.engine.privacy.text_migration_runner")
 
-local LOG = "keystats.text_migration"
+local LOG = "metrics.engine.privacy.text_migration_core"
 
 
 

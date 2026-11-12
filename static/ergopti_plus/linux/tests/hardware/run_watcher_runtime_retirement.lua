@@ -8,8 +8,8 @@
 
 local root, mode = assert(arg[1]), assert(arg[2])
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local Guard = require("infra.runtime_guard")
 local file = assert(io.open(root .. "/ergopti_hotstrings.lua", "rb"))
 local source = assert(file:read("*a")); assert(file:close())
@@ -38,7 +38,7 @@ if mode ~= "native" then
 	local pump, shutdown_stop, current = bind(owner, Guard)
 	pump()
 	local called, result = pcall(shutdown_stop)
-	print("MAIN_WATCHER_RECEIPT " .. require("json").encode({ mode=mode,retained=current()==owner,shutdown_called=called,shutdown_ack=called and result==true,pumps=pumps,stops=stops }))
+	print("MAIN_WATCHER_RECEIPT " .. require("core.text.engine.json").encode({ mode=mode,retained=current()==owner,shutdown_called=called,shutdown_ack=called and result==true,pumps=pumps,stops=stops }))
 	assert(current() == owner and (not called or result == false), "Main must retain every owner without literal cleanup acknowledgement")
 	pump(); pump()
 	assert(pumps == 1 and stops >= 4, "retirement must retry only stop, never the failed pump")
@@ -71,7 +71,7 @@ local ok, failure = xpcall(function()
 	local pump, shutdown_stop, current = bind(watcher, Guard)
 	pump()
 	local acknowledged, retired = shutdown_stop(), original_stop()
-	print("MAIN_WATCHER_NATIVE " .. require("json").encode({retained=current()==watcher,shutdown_ack=acknowledged,real_retired=retired,native_handles=native_count(),pumps=pumps,stops=stops}))
+	print("MAIN_WATCHER_NATIVE " .. require("core.text.engine.json").encode({retained=current()==watcher,shutdown_ack=acknowledged,real_retired=retired,native_handles=native_count(),pumps=pumps,stops=stops}))
 	assert(current() == watcher and acknowledged == false and retired == false,
 		"Main must not acknowledge discarded native watcher retirement debt")
 	pump(); pump()

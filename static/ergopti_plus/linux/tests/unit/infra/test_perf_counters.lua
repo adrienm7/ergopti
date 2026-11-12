@@ -8,15 +8,15 @@
 --- above DEBUG, and report one never-collapsed evidence line per interval.
 --- ==============================================================================
 
-local helpers = require("tests.support.logger_fixture").helpers({ "infra.perf_counters", "infra.paths", "toml_codec.reader" })
+local helpers = require("tests.support.logger_fixture").helpers({ "infra.perf_counters", "infra.paths", "core.text.engine.toml_codec.reader" })
 
 --- Loads fresh counters and a logger capturing every delivered line.
 --- @param level number Logger minimum level.
 --- @return table perf, table lines, table logger
 local function fixture(level)
-	package.loaded["logger"] = nil
-	package.loaded["logger.shim"] = nil
-	local logger = require("logger")
+	package.loaded["core.logger.engine"] = nil
+	package.loaded["core.logger.engine.shim"] = nil
+	local logger = require("core.logger.engine")
 	local lines = {}
 	logger.set_sink(function(line) lines[#lines + 1] = line end)
 	logger.set_level(level)
@@ -159,7 +159,7 @@ helpers.describe("perf counters: spans are always timed", function()
 end)
 
 helpers.describe("perf counters: slow segments", function()
-	local Segments = require("hotpath_segments")
+	local Segments = require("metrics.engine.perf.hotpath_segments")
 	local SLOW_MS = require("infra.timings").ms("logger", "hotpath_slow_ms")
 
 	helpers.it("warns once with the name and duration when a segment exceeds its threshold", function()
@@ -261,9 +261,9 @@ helpers.describe("perf counters: nesting attribution", function()
 	--- Loads fresh counters on a clock the case moves by hand.
 	local function clocked()
 		local clock = { now = 1000 }
-		package.loaded["logger"] = nil
-		package.loaded["logger.shim"] = nil
-		local logger = require("logger")
+		package.loaded["core.logger.engine"] = nil
+		package.loaded["core.logger.engine.shim"] = nil
+		local logger = require("core.logger.engine")
 		local lines = {}
 		logger.set_sink(function(line) lines[#lines + 1] = line end)
 		logger.set_level(30)

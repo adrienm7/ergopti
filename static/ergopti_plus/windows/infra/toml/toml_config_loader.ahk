@@ -4,7 +4,7 @@
 ; MODULE: TOML Config Loader
 ; DESCRIPTION:
 ; Reads the user ``config.toml`` produced by the first-boot generator from
-; ``_shared/modules/features/manifest.toml``. Distinct from the legacy ``toml_loader.ahk``
+; ``_shared/settings/data/features/manifest.toml``. Distinct from the legacy ``toml_loader.ahk``
 ; which only handles flat ``[script]``/``[features]`` overrides — this loader
 ; supports arbitrarily nested sections (``[hotstrings.autocorrection.accents]``)
 ; and simple array values (``val_modifiers = ["alt"]``).
@@ -41,7 +41,7 @@
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include ../../_generated/action_catalogue.ahk
-#Include ../../../_shared/ahk/config_binding_identity.ahk
+#Include ../../../_shared/settings/engine/publication/binding_identity.ahk
 
 
 
@@ -132,7 +132,7 @@ TomlConfigForeignOwnershipRegistry() {
 }
 
 ; The keys of a key combination, as a regex alternation: the Windows column of
-; [tap_hold.catalog] in _shared/tap_hold/defaults.toml. Spelled here because
+; [tap_hold.catalog] in _shared/tap_hold/data/defaults.toml. Spelled here because
 ; this loader runs before that catalogue is read, and in a function because a
 ; key can be asked about before this file's include position has run;
 ; tests/unit/platform/remap/key_combinations/test_key_combinations.ahk holds the two together.

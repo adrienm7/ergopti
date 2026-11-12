@@ -277,7 +277,7 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 			let probe = Self.repositoryURL.appendingPathComponent("tools/test/lib/app-cloner-log-cleanup-probe.py")
 			fixtureCanRetire = false
 			let result = try run(["-c", #"exec /usr/bin/env python3 "$1" --resources "$2" --shell /bin/zsh --fixture "$3" --palette "$4""#,
-				"native-cli-log-cleanup", probe.path, Self.resourcesURL.path, root.appendingPathComponent("physical-cases").path, Self.repositoryURL.appendingPathComponent("static/ergopti_plus/_shared/data/native_theme.toml").path], root: root)
+				"native-cli-log-cleanup", probe.path, Self.resourcesURL.path, root.appendingPathComponent("physical-cases").path, Self.repositoryURL.appendingPathComponent("static/ergopti_plus/_shared/core/ui/data/native_theme.toml").path], root: root)
 			let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.output.utf8)) as? [String: Any])
 			fixtureCanRetire = report["ownership_closed"] as? Bool == true
 			XCTAssertTrue(fixtureCanRetire, "Retain the exact native CLI fixture if any child retirement is unknown")
@@ -362,7 +362,7 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 
 	func testActualShortcutRollsBackFailuresAndStillRunsWithoutPythonCommands() throws {
 		try fixture { root in
-			let paletteURL = Self.resourcesURL.appendingPathComponent("../../../../../_shared/data/native_theme.toml").standardizedFileURL
+			let paletteURL = Self.resourcesURL.appendingPathComponent("../../../../../_shared/core/ui/data/native_theme.toml").standardizedFileURL
 			let palette = try String(contentsOf: paletteURL, encoding: .utf8)
 			let expression = try NSRegularExpression(pattern: #"(?m)^hex = "(#[0-9a-fA-F]{6})"$"#)
 			let match = try XCTUnwrap(expression.firstMatch(in: palette, range: NSRange(palette.startIndex..<palette.endIndex, in: palette)),
@@ -558,7 +558,7 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 	func testActualNativeUUIDsKeepSameSecondBundlesAndCloneConsumersDistinct() throws {
 		try fixture { root in
 			let probe = Self.repositoryURL.appendingPathComponent("tools/test/lib/app-cloner-identity-probe.py")
-			let palette = Self.repositoryURL.appendingPathComponent("static/ergopti_plus/_shared/data/native_theme.toml")
+			let palette = Self.repositoryURL.appendingPathComponent("static/ergopti_plus/_shared/core/ui/data/native_theme.toml")
 			fixtureCanRetire = false
 			let result = try run(["-c", #"exec /usr/bin/env python3 "$1" --resources "$2" --shell /bin/zsh --fixture "$3" --palette "$4""#,
 				"native-bundle-identity", probe.path, Self.resourcesURL.path,

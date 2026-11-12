@@ -1,6 +1,6 @@
 // Receiving-only module for a private copy of the canonical native HTTP Go package.
 // x/sys matches the SHA256-admitted Ollama 0.40.6 upstream module; never injected.
-module github.com/adrienm7/ergopti/static/ergopti_plus/_shared/go/native_http
+module github.com/adrienm7/ergopti/static/ergopti_plus/_shared/core/network/native/go/native_http
 
 go 1.24.0
 

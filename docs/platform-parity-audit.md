@@ -269,13 +269,13 @@ behaviors cannot be discovered reliably from a manifest alone.
 
 ## Sources and checks
 
-- Configuration and settings: `_shared/modules/features/manifest.toml`, resolved
+- Configuration and settings: `_shared/settings/data/features/manifest.toml`, resolved
   with the same platform inheritance as the driver generator. The existing
   Linux evidence gate checks registration, calls, application and proof tiers.
-- Bindable actions and gesture axes: `_shared/modules/actions/actions.toml`.
+- Bindable actions and gesture axes: `_shared/shortcuts/data/actions/actions.toml`.
   Its generator requires a reason for each missing platform and validates named
   equivalents; driver suites compare generated catalogues to executable actions.
-- User-visible unavailable controls: `_shared/modules/menu/menu.toml` and its
+- User-visible unavailable controls: `_shared/menu/data/menu.toml` and its
   generated `menu_manifest.json`. Restricted interactive rows and rows with `unavailable = "grey"` supply the
   platform-specific reason where declared. The menu's own drift and dispatch gates remain the
   authority for its projection and handlers.
@@ -284,7 +284,7 @@ behaviors cannot be discovered reliably from a manifest alone.
   app descriptions. Files with matching names are leads, not proof of parity.
 
 The layer editor has an additional canonical vocabulary:
-`_shared/keymap/layer_actions.toml`. Its actions, modifier restrictions, input
+`_shared/layouts/data/layer_actions.toml`. Its actions, modifier restrictions, input
 source kinds and parameters are included in the generated action inventory as
 `layers.*`. Mouse-button sources exclude Linux, repeat counts are Windows-only,
 and Fn and Spotlight belong to macOS. The source explains each restriction.

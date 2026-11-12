@@ -48,7 +48,7 @@ const aboutSource = fs.readFileSync(
 );
 const menuManifest = JSON.parse(
 	fs.readFileSync(
-		path.join(root, 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'),
+		path.join(root, 'static/ergopti_plus/_shared/menu/data/menu_manifest.json'),
 		'utf8'
 	)
 );
@@ -649,7 +649,7 @@ try {
 			verifyArchiveFilesystemModel
 		} = require('./fixtures/archive-contract-filesystem.cjs');
 		const defaults = JSON.parse(
-			fs.readFileSync(require('../lib/paths.cjs').shared('modules/updater/defaults.json'), 'utf8')
+			fs.readFileSync(require('../lib/paths.cjs').shared('updater/data/defaults.json'), 'utf8')
 		);
 		verifyArchiveFilesystemModel(os.tmpdir());
 		const model = new ArchiveContractFilesystem(os.tmpdir());
@@ -1218,7 +1218,7 @@ try {
 		'utf8'
 	);
 	assert.match(fixture, /"OUTPUT_PATH=" \+ generated.path/);
-	assert.match(fixture, /static\/ergopti_plus\/_shared\/modules\/updater\/defaults\.json/);
+	assert.match(fixture, /static\/ergopti_plus\/_shared\/updater\/data\/defaults\.json/);
 	assert.match(fixture, /let github = defaults\["github"\]/);
 	assert.match(fixture, /"GH_OWNER=" \+ identity.owner, "GH_REPO=" \+ identity.name/);
 	assert.match(fixture, /"FixtureArchiveOrigin": identity.archiveOrigin/);
@@ -2276,15 +2276,15 @@ try {
 		);
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-build-feed-'));
 	const repository = path.join(temporary, 'repository');
-	const defaultsRelative = 'static/ergopti_plus/_shared/modules/updater/defaults.json';
+	const defaultsRelative = 'static/ergopti_plus/_shared/updater/data/defaults.json';
 	const canonical = JSON.parse(fs.readFileSync(path.join(root, defaultsRelative), 'utf8')).github;
 	try {
 		for (const relative of [
 			'tools/build/launcher_localizations.py',
-			'static/ergopti_plus/_shared/data/identifiers.sh',
+			'static/ergopti_plus/_shared/core/text/data/identifiers.sh',
 			'static/ergopti_plus/macos/modules/llm/network-retry.sh',
-			'static/ergopti_plus/_shared/modules/network/route_origins.json',
-			'static/ergopti_plus/_shared/data/locale_order.json'
+			'static/ergopti_plus/_shared/core/network/data/route_origins.json',
+			'static/ergopti_plus/_shared/core/i18n/data/locale_order.json'
 		]) {
 			const destination = path.join(repository, relative);
 			fs.mkdirSync(path.dirname(destination), { recursive: true });

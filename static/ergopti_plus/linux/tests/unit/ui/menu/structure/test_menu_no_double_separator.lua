@@ -16,20 +16,20 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local check   = require("test.menu_separators")
+local check   = require("tests.lua.menu.separators")
 
 local PLATFORM      = "linux"
-local MANIFEST_PATH = "../_shared/modules/menu/menu_manifest.json"
+local MANIFEST_PATH = "../_shared/menu/data/menu_manifest.json"
 
 
 helpers.describe("menu: no separator doubles up on linux", function()
 
 	helpers.it("renders every manifest menu without a misplaced separator", function()
-		package.loaded["menu.renderer"] = nil
-		local defects, rendered = check.render_every_menu(require("menu.renderer"), {
+		package.loaded["menu.engine.renderer"] = nil
+		local defects, rendered = check.render_every_menu(require("menu.engine.renderer"), {
 			platform      = PLATFORM,
 			manifest_path = MANIFEST_PATH,
-			json_decode   = require("json").decode,
+			json_decode   = require("core.text.engine.json").decode,
 			logger        = helpers.make_logger_stub(),
 		})
 		helpers.assert_true(rendered > 10, "every menu of the shared manifest must render, got " .. rendered)
@@ -39,12 +39,12 @@ helpers.describe("menu: no separator doubles up on linux", function()
 	-- A section header titles the rows under it: never a separator, another
 	-- header or the end of its menu right after it (test.menu_section_headers).
 	helpers.it("renders every manifest menu with each section header over real rows", function()
-		package.loaded["menu.renderer"] = nil
-		local defects, rendered, headers = require("test.menu_section_headers").render_every_menu(
-			require("menu.renderer"), {
+		package.loaded["menu.engine.renderer"] = nil
+		local defects, rendered, headers = require("tests.lua.menu.section_headers").render_every_menu(
+			require("menu.engine.renderer"), {
 				platform      = PLATFORM,
 				manifest_path = MANIFEST_PATH,
-				json_decode   = require("json").decode,
+				json_decode   = require("core.text.engine.json").decode,
 				logger        = helpers.make_logger_stub(),
 			})
 		helpers.assert_true(rendered > 10, "every menu of the shared manifest must render, got " .. rendered)
@@ -54,7 +54,7 @@ helpers.describe("menu: no separator doubles up on linux", function()
 
 	helpers.it("declares the first level of the tray without a misplaced separator", function()
 		local fh = assert(io.open(MANIFEST_PATH, "r"))
-		local root = require("json").decode(fh:read("*a"))
+		local root = require("core.text.engine.json").decode(fh:read("*a"))
 		fh:close()
 		helpers.assert_eq(check.top_level_defects(root, PLATFORM), {},
 			"top_level must not put two separators in a row once other platforms' rows are dropped")

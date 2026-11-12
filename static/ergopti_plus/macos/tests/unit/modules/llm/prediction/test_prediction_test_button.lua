@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-require("test.test_prediction_contract")(helpers)
+require("tests.lua.ai.test_prediction_contract")(helpers)
 
 helpers.describe("macOS test prediction wiring", function()
 	helpers.it("goes to the backend, never to a prediction surface", function()
@@ -28,7 +28,7 @@ helpers.describe("macOS test prediction wiring", function()
 	end)
 
 	helpers.it("reads the test's temperature from the shared defaults", function()
-		local raw = assert(io.open(helpers.shared("modules/llm/defaults.json"), "rb"))
+		local raw = assert(io.open(helpers.shared("ai/data/defaults.json"), "rb"))
 		local defaults = hs.json.decode(raw:read("*a")); raw:close()
 		helpers.assert_true(defaults.llm_test_prediction_temperature > defaults.llm_temperature, "above the setting")
 		helpers.assert_eq(require("modules.llm.api_common").test_prediction_temperature(),

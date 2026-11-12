@@ -7,15 +7,15 @@
 --- `require("infra.logger")` — a module this driver does not have. Every such
 --- require raised "module 'infra.logger' not found" the moment the adapter loaded,
 --- silently crashing whichever feature pulled it in. The canonical entry point is
---- `require("logger.shim")`, used by the other 11 adapters.
+--- `require("core.logger.engine.shim")`, used by the other 11 adapters.
 ---
 --- Two facts this docstring previously got wrong, corrected here because a stale
 --- rationale is how the sink bug survived:
 --- 1. `linux/infra/` DOES exist (file_watchers, i18n, locale, logger_sink,
 ---    monotonic, timings, version). The forbidden module is `lib.logger`
 ---    specifically, not the whole namespace.
---- 2. `logger.shim` is NOT the print-fallback in production. Because _shared/lua
----    is on package.path, its `pcall(require, "logger")` succeeds and it returns
+--- 2. `logger.shim` is NOT the print-fallback in production. Because _shared
+---    is on package.path, its `pcall(require, "core.logger.engine")` succeeds and it returns
 ---    the shared CORE, whose print fallback is never reached. The core writes only
 ---    to an injected sink — which is why `infra/logger_sink.lua` exists and is
 ---    installed by the entry point. See tests/unit/infra/logger/test_logger_sink.lua.
@@ -114,7 +114,7 @@ end
 -- ==================================================
 -- ==================================================
 
-helpers.describe("linux: production code uses logger.shim only", function()
+helpers.describe("linux: production code uses core.logger.engine.shim only", function()
 	local offenders = {}
 
 	for _, dir in ipairs(SCAN_DIRS) do
@@ -138,7 +138,7 @@ helpers.describe("linux: production code uses logger.shim only", function()
 			helpers.assert_true(
 				#offenders == 0,
 				string.format(
-					"%d file(s) require lib.logger instead of logger.shim: %s",
+					"%d file(s) require lib.logger instead of core.logger.engine.shim: %s",
 					#offenders,
 					table.concat(offenders, ", ")
 				)

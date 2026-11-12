@@ -70,8 +70,8 @@ function prepareLintFixture() {
 		}
 	}
 	const shared = path.join(FIXTURE_ROOT, 'static/ergopti_plus/_shared');
-	fs.mkdirSync(path.join(shared, 'lua'), { recursive: true });
-	fs.writeFileSync(path.join(shared, 'lua/fixture.lua'), '-- lua/fixture.lua\nreturn {}\n');
+	fs.mkdirSync(path.join(shared, '.'), { recursive: true });
+	fs.writeFileSync(path.join(shared, 'fixture.lua'), '-- lua/fixture.lua\nreturn {}\n');
 	fs.writeFileSync(path.join(shared, 'fixture.toml'), 'enabled = true\n');
 	for (const args of [
 		['init', '-q'],

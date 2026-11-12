@@ -12,7 +12,7 @@ import stat
 
 SPEC = importlib.util.spec_from_file_location(
     "ergopti_source_alias_policy",
-    Path(__file__).resolve().parents[2] / "_shared/python/managed_source_alias.py",
+    Path(__file__).resolve().parents[2] / "_shared/ai/adapters/python/managed_source_alias.py",
 )
 POLICY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(POLICY)

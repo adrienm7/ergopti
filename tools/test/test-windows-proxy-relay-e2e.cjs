@@ -151,7 +151,7 @@ function forbiddenPortRows(pids) {
 /** Each prerequisite's reason when it is missing, by its case group. */
 function findGo() {
 	const pin = JSON.parse(
-		fs.readFileSync(path.join(runtime.SHARED, 'modules/llm/managed_ollama_runtime.json'), 'utf8')
+		fs.readFileSync(path.join(runtime.SHARED, 'ai/data/managed_ollama_runtime.json'), 'utf8')
 	).go_version;
 	const local = process.env.LOCALAPPDATA
 		? path.join(process.env.LOCALAPPDATA, 'Programs', `go-${pin.slice(2)}`, 'bin', 'go.exe')

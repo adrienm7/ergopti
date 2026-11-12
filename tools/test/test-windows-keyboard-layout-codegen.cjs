@@ -40,14 +40,14 @@ const { GENERATORS } = require('../build/generators.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const KEYCODES = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/_shared/modules/layouts/mac_keycodes.json'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/layouts/data/mac_keycodes.json'),
 		'utf8'
 	)
 );
 const SPEC = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8'));
 const PHYSICAL_KEYS = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/_shared/data/keycodes/physical_keys.json'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/layouts/data/keycodes/physical_keys.json'),
 		'utf8'
 	)
 );

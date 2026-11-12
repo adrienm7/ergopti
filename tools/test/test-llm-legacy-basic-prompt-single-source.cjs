@@ -26,8 +26,8 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 
-const LEGACY_IDS_JSON = path.join(ROOT, 'static/ergopti_plus/_shared/modules/llm/legacy_ids.json');
-const PROFILES_JSON = path.join(ROOT, 'static/ergopti_plus/_shared/modules/llm/profiles.json');
+const LEGACY_IDS_JSON = path.join(ROOT, 'static/ergopti_plus/_shared/ai/data/legacy_ids.json');
+const PROFILES_JSON = path.join(ROOT, 'static/ergopti_plus/_shared/ai/data/profiles.json');
 const GENERATED_AHK = path.join(
 	ROOT,
 	'static/ergopti_plus/windows/_generated/llm_profiles_data.ahk'

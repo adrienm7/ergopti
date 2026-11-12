@@ -2,10 +2,10 @@
 
 --- Exercises the actual picker callback, state owners and conditional file writer.
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local Json = require("json")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local Json = require("core.text.engine.json")
 
 local PRIOR = Json.encode({ version = 1, executable = "/private/prior-program", arguments = { "private-prior" } })
 local NEXT = Json.encode({ version = 1, executable = "/private/next-program", arguments = { "private-next" } })
@@ -84,7 +84,7 @@ local function with_case(spec, body)
 					controls.logs[#controls.logs + 1] = string.format(message, ...)
 				end
 			end
-			package.loaded["logger.shim"] = logger
+			package.loaded["core.logger.engine.shim"] = logger
 			package.loaded["infra.config_paths"] = { config = function() return path end }
 			package.loaded["adapters.storage"] = { get = function(_, default) return default end }
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
@@ -177,7 +177,7 @@ local function with_configuration_picker(body)
 		for _, level in ipairs({ "error", "warn", "info", "debug", "trace", "start", "success", "done" }) do
 			logger[level] = function(_, message, ...) seen.logs[#seen.logs + 1] = string.format(message, ...) end
 		end
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
 		package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad" }
 		package.loaded["adapters.program_providers"] = {}

@@ -21,7 +21,7 @@
 
 local helpers = require("tests.helpers")
 local Double = require("tests.support.keystats.cipher_shell_double")
-local TextCrypto = require("keystats.text_crypto")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
 local MODULES = { "adapters.crypto", "adapters.shell_runner", "modules.keystats.text_cipher", "infra.logger" }
 
@@ -58,7 +58,7 @@ local function healthy_envelope(plaintext)
 end
 
 
-helpers.describe("keystats.text_cipher: arbitrary bytes survive the shell (cipher-nul-transport-2026-10-21)", function()
+helpers.describe("metrics.engine.privacy.text_cipher_core: arbitrary bytes survive the shell (cipher-nul-transport-2026-10-21)", function()
 	local all_bytes = {}
 	for byte = 0, 255 do all_bytes[#all_bytes + 1] = string.char(byte) end
 	local cases = {
@@ -89,7 +89,7 @@ helpers.describe("keystats.text_cipher: arbitrary bytes survive the shell (ciphe
 end)
 
 
-helpers.describe("keystats.text_cipher: openssl success requires its exit status (cipher-exit-receipt-2026-10-21)", function()
+helpers.describe("metrics.engine.privacy.text_cipher_core: openssl success requires its exit status (cipher-exit-receipt-2026-10-21)", function()
 	helpers.it("returns no plaintext from a failed decryption that printed partial bytes", function()
 		local envelope = healthy_envelope("secret words")
 		with_cipher({ decrypt = { "secret wo", 1 } }, function(cipher, _, logs)
@@ -116,7 +116,7 @@ helpers.describe("keystats.text_cipher: openssl success requires its exit status
 end)
 
 
-helpers.describe("keystats.text_cipher: every pipeline stage is supervised (cipher-pipeline-receipt-2026-10-21)", function()
+helpers.describe("metrics.engine.privacy.text_cipher_core: every pipeline stage is supervised (cipher-pipeline-receipt-2026-10-21)", function()
 	helpers.it("refuses an envelope when the stdin producer failed after a partial delivery", function()
 		with_cipher({ producer = 1 }, function(cipher)
 			helpers.assert_eq(cipher.encrypt("mac", 7, "twenty-seven typed bytes!!"), nil,
@@ -126,7 +126,7 @@ helpers.describe("keystats.text_cipher: every pipeline stage is supervised (ciph
 end)
 
 
-helpers.describe("keystats.text_cipher: secrets never reach a command line (cipher-plaintext-argv-2026-10-22)", function()
+helpers.describe("metrics.engine.privacy.text_cipher_core: secrets never reach a command line (cipher-plaintext-argv-2026-10-22)", function()
 	local SECRET = "my bank PIN is 4711"
 	helpers.it("keeps the typed text and the hardware UUID out of every shell command", function()
 		with_cipher(nil, function(cipher, seen, _, native)
@@ -154,7 +154,7 @@ helpers.describe("keystats.text_cipher: secrets never reach a command line (ciph
 end)
 
 
-helpers.describe("keystats.text_cipher refuses private cleanup debt (cipher-private-output-cleanup)", function()
+helpers.describe("metrics.engine.privacy.text_cipher_core refuses private cleanup debt (cipher-private-output-cleanup)", function()
 	helpers.it("does not publish a derived key whose private output file remains", function()
 		with_cipher({ cleanup_refused = true }, function(cipher, _, logs, native)
 			helpers.assert_eq(cipher.is_available(), false,

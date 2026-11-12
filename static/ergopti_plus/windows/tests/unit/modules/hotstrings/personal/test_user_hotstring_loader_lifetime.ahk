@@ -70,8 +70,8 @@ _UHLT_Assets(Root) {
 	for Subdir in ["config", "logs", "vendor", "shared", "shared\modules", "shared\modules\hotstrings",
 		"shared\modules\diagnostics", "localappdata"]
 		FSCreateDirectoryExclusiveStrict(Root . "\" . Subdir)
-	for Pair in [[_SharedDir . "\modules\hotstrings\user_code.ahk", Root . "\shared\modules\hotstrings\user_code.ahk"],
-		[_SharedDir . "\modules\diagnostics\redaction.json", Root . "\shared\modules\diagnostics\redaction.json"],
+	for Pair in [[_SharedDir . "\hotstrings\data\catalogue\user_code.ahk", Root . "\shared\hotstrings\data\catalogue\user_code.ahk"],
+		[_SharedDir . "\diagnostics\data\redaction.json", Root . "\shared\diagnostics\data\redaction.json"],
 		[_VendorDir . "\ergopti_user_hotstrings.ahk", Root . "\vendor\ergopti_user_hotstrings.ahk"]] {
 		FileCopy(Pair[1], Pair[2], false)
 		AssertEqual(CryptoSha256Bytes(FSReadBytesStrict(Pair[1])), CryptoSha256Bytes(FSReadBytesStrict(Pair[2])),

@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 
-require("test.network_transitions_contract").register(helpers)
+require("tests.lua.core.network_transitions_contract").register(helpers)
 
 --- Starts a fresh watcher over scripted ports.
 --- @return table watcher, table entries, table control

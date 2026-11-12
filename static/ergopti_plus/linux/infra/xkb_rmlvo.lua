@@ -27,7 +27,7 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 
 

@@ -48,10 +48,10 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
-local TextUtils = require("text_utils")
+local TableUtil = require("core.text.engine.table_util")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "infra.xkb_keymap"
 

@@ -50,7 +50,7 @@ const FAILURE_KEYS = Object.freeze({
 	python_missing: 'layouts.linux_needs_python'
 });
 
-// Catalogue error codes (_shared/lua/layouts/catalogue.lua and its AHK twin).
+// Catalogue error codes (_shared/layouts/engine/composer/catalogue.lua and its AHK twin).
 const CATALOGUE_ERROR_KEYS = Object.freeze({
 	offline: 'layout_manager.error_offline',
 	http: 'layout_manager.error_http'
@@ -494,7 +494,7 @@ function hostSave(filename, text) {
 
 /**
  * Installs the editor's source through the composer host (composer_save with
- * `source`, _shared/lua/layouts/composer.lua) and switches to it; settles on
+ * `source`, _shared/layouts/engine/composer/composer.lua) and switches to it; settles on
  * the composerResult that answers it.
  */
 function hostInstall(payload) {

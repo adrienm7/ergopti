@@ -169,7 +169,7 @@ local function native_dialog_receipt(status, output)
 		write(executable, "#!/bin/sh\nprintf '%s' " .. Shell.quote(output) .. "\nexit " .. status .. "\n")
 		assert(Shell.run("chmod u+x " .. Shell.quote(executable)))
 		write(worker, "package.path = " .. string.format("%q", package.path) .. "\n"
-			.. "package.loaded['logger.shim']={error=function()end,warn=function()end,debug=function()end}\n"
+			.. "package.loaded['core.logger.engine.shim']={error=function()end,warn=function()end,debug=function()end}\n"
 			.. "local calls=0;package.loaded['ui.modal']={run=function(fn)calls=calls+1;return fn()end}\n"
 			.. "local S=require('adapters.shell_runner')\n"
 			.. "local shell={quote=S.quote,exec_line=S.exec_line,exec_checked=S.exec_checked}\n"

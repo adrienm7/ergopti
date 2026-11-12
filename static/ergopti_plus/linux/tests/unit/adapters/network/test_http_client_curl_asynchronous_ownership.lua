@@ -105,7 +105,7 @@ end)
 helpers.describe("http_client: asynchronous curl ownership", function()
 	for _, literal in ipairs({ "nan", "inf", "-1", "1.5", "1e999" }) do
 		helpers.it("linux-http-body-limit-admission: refuses registry value " .. literal, function()
-			local reader, Factory = require("toml_codec.reader"), require("timings")
+			local reader, Factory = require("core.text.engine.toml_codec.reader"), require("core.timing.engine.timings_core")
 			local timing = Factory.new({ logger = { info = function() end }, log = "test", loaded_level = "info",
 				shared_path = function() return "/fixture/constants.toml" end,
 				parse = function() return reader.parse_text("[limits]\nrelease_list_body_bytes = " .. literal .. "\n") end })
@@ -529,9 +529,9 @@ end)
 helpers.describe("http_client: asynchronous curl ownership", function()
 	for _, method in ipairs({ "get", "post", "download", "postStream" }) do
 		helpers.it("incomplete-error-body: " .. method .. " publishes only complete HTTP rejection bytes", function()
-			local policy = require("llm.local_model_policy")
+			local policy = require("ai.engine.ollama.local_model_policy")
 			local url = "http://127.0.0.1:11434/api/chat"
-			local body = require("json").encode({ error = 'model "fixture:latest" not found' })
+			local body = require("core.text.engine.json").encode({ error = 'model "fixture:latest" not found' })
 			for _, status in ipairs({ 401, 404, 503 }) do
 				for _, exit in ipairs({ { code = 0 }, { code = 22 }, { code = 18 },
 					{ code = 23 }, { code = 56 }, { code = 0, signal = 15 } }) do

@@ -12,7 +12,7 @@
 ; run was most likely to abort exactly when it was most needed. Field evidence:
 ; "Running healthcheck..." was the last line two crashed processes ever wrote,
 ; and neither produced a crash report. The collectors now build the version 2
-; sections (_shared/modules/diagnostics/schema.json), one per section.
+; sections (_shared/diagnostics/data/schema.json), one per section.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Encodes the ROOT CAUSE — an unguarded collector between START and SUCCESS —

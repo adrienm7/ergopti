@@ -12,7 +12,7 @@
 --- « Français — Ergopti » files.
 --- ==============================================================================
 
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 
 local handle = assert(io.popen("xkbcomp -xkb \"$DISPLAY\" - 2>/dev/null", "r"))
 local printed = handle:read("*a")

@@ -39,8 +39,8 @@ const TOML = require('smol-toml');
 
 const ROOT = path.resolve(process.argv[2] || path.join(__dirname, '..', '..'));
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
-const MIGRATIONS = path.join(SP, '_shared', 'core', 'config_schema', 'migrations.toml');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
+const MIGRATIONS = path.join(SP, '_shared', 'settings', 'data', 'config_schema', 'migrations.toml');
 
 // Identifiers that existed only for the toggle. "space_wrap" also matches the
 // state key gesture_space_wrap and the getter/setter get_/set_space_wrap.
@@ -49,15 +49,23 @@ const RETIRED_KEY = 'menu.gestures.circular_spaces';
 
 // Every tree a driver or a generated copy of the manifests lives in. The
 // migration registry, its corpora and the shared migration contract
-// (_shared/lua/test) are the deliberate exception: they must name the old key
+// (_shared/tests/lua) are the deliberate exception: they must name the old key
 // to prove its preservation until explicit cleanup.
 const SCANNED = [
 	{ dir: path.join(SP, 'macos'), exts: ['.lua', '.toml', '.json'] },
 	{ dir: path.join(SP, 'windows'), exts: ['.ahk', '.toml', '.json'] },
 	{ dir: path.join(SP, 'linux'), exts: ['.lua', '.toml', '.json'] },
-	{ dir: path.join(SP, '_shared', 'modules'), exts: ['.toml', '.json', '.lua'] },
-	{ dir: path.join(SP, '_shared', 'lua'), exts: ['.lua'], skip: ['test'] },
-	{ dir: path.join(SP, '_shared', 'core', 'config_schema', 'examples'), exts: ['.toml'] }
+	{ dir: path.join(SP, '_shared'), exts: ['.toml', '.json', '.lua'], skip: ['tests', 'settings'] },
+	{ dir: path.join(SP, '_shared', 'settings'), exts: ['.toml', '.json', '.lua'], skip: ['data'] },
+	{
+		dir: path.join(SP, '_shared', 'settings', 'data'),
+		exts: ['.toml', '.json', '.lua'],
+		skip: ['config_schema']
+	},
+	{
+		dir: path.join(SP, '_shared', 'settings', 'data', 'config_schema', 'examples'),
+		exts: ['.toml']
+	}
 ];
 const SKIPPED_DIRS = new Set(['node_modules', 'vendor']);
 

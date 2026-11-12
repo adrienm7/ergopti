@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 
 
@@ -593,7 +593,7 @@ helpers.describe("model manager generation fences", function()
 			end}
 			helpers.provide_timings()
 			package.loaded["infra.paths"] = {
-				shared_llm_path = function() return helpers.shared("modules/llm/models.json") end,
+				shared_llm_path = function() return helpers.shared("ai/data/models.json") end,
 			}
 			package.loaded["modules.llm"] = {get_backend = function() return "ollama" end}
 			package.loaded["ui.menu.menu_llm.models_manager_ollama"] = {

@@ -4,7 +4,7 @@
 --- MODULE: PromptBuilder Corpus Consumer (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/prompt_builder/vectors.json through the shared
---- PromptBuilder (_shared/lua/llm/prompt_builder.lua), which the Linux
+--- PromptBuilder (_shared/ai/engine/prediction/prompt_builder_core.lua), which the Linux
 --- prediction engine and api_remote load to size every request: token budget,
 --- temperature, context tail and truncation, and the passthrough fields.
 ---
@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/prompt_builder/vectors.json"
 
@@ -53,7 +53,7 @@ end
 
 helpers.describe("prompt builder corpus: the shared PromptBuilder on Linux", function()
 	local corpus = read_corpus()
-	local PromptBuilder = helpers.load_module("llm.prompt_builder")
+	local PromptBuilder = helpers.load_module("ai.engine.prediction.prompt_builder_core")
 
 	helpers.it("corpus constants match the module constants", function()
 		local constants = corpus.constants

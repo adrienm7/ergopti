@@ -4,7 +4,7 @@
 ; MODULE: Hotstring Language Pack Tests
 ; DESCRIPTION:
 ; French hotstrings moved out of the neutral packs into
-; _shared/modules/hotstrings/french/<stem>.toml and load as the group
+; _shared/hotstrings/data/catalogue/french/<stem>.toml and load as the group
 ; "french_<stem>". Every consumer builds that file path, and every one of them
 ; used to concatenate "<category>.toml" at the root — so a helper that missed the
 ; language folder would make the cache, the counters and the menu read a file

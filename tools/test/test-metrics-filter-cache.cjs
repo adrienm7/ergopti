@@ -3459,7 +3459,7 @@ function typingAppFilterLocalePorts(page) {
 	};
 	return button;
 }
-const typingCaptionLocaleRoot = path.resolve(root, '../data/locales');
+const typingCaptionLocaleRoot = path.resolve(root, '../core/i18n/data/locales');
 const typingCaptionCatalogues = fs
 	.readdirSync(typingCaptionLocaleRoot)
 	.filter((name) => name.endsWith('.json'))
@@ -5157,7 +5157,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 
 			publishTypingPage(page, host, { '2026-10-01': { Editor: { chars: 2 } } });
 			page.context.window._i18n_strings = JSON.parse(
-				fs.readFileSync(path.join(root, `../data/locales/${vector.locale}.json`), 'utf8')
+				fs.readFileSync(path.join(root, `../core/i18n/data/locales/${vector.locale}.json`), 'utf8')
 			);
 			if (vector.counterpart)
 				page.context.window._i18n_strings['ui_typing.finger.l_pinky'] = vector.counterpart;
@@ -5181,7 +5181,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 					for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
 				};
 				const japanese = JSON.parse(
-					fs.readFileSync(path.join(root, '../data/locales/ja.json'), 'utf8')
+					fs.readFileSync(path.join(root, '../core/i18n/data/locales/ja.json'), 'utf8')
 				);
 				page.context.window.i18n_apply(japanese);
 				const updated = JSON.parse(vm.runInContext('JSON.stringify(_sfb_data)', page.context));

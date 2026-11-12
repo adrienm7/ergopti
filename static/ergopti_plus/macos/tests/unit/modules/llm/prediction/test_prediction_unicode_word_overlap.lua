@@ -16,7 +16,7 @@ helpers.describe("prediction Unicode word overlap", function()
 		helpers.it("retains distinct word " .. pair[2] .. " after " .. pair[1] .. " (unicode-word-overlap)", function()
 			helpers.load_with_stubs("infra.logger")
 			local buffer = "hello " .. pair[1]
-			local prediction = require("llm.parser").process_prediction(buffer, buffer,
+			local prediction = require("ai.engine.api.parser_core").process_prediction(buffer, buffer,
 				"TAIL_CORRECTED: " .. buffer .. "\nNEXT_WORDS: " .. pair[2] .. " tomorrow",
 				{ min_words = 1, max_words = 0 })
 			helpers.assert_not_nil(prediction)
@@ -33,7 +33,7 @@ helpers.describe("prediction Unicode word overlap", function()
 		helpers.it("still removes the complete repeated word " .. word .. " (unicode-word-overlap)", function()
 			helpers.load_with_stubs("infra.logger")
 			local buffer = "hello " .. word
-			local prediction = require("llm.parser").process_prediction(buffer, buffer,
+			local prediction = require("ai.engine.api.parser_core").process_prediction(buffer, buffer,
 				"TAIL_CORRECTED: " .. buffer .. "\nNEXT_WORDS: " .. word .. " tomorrow",
 				{ min_words = 1, max_words = 0 })
 			helpers.assert_not_nil(prediction)

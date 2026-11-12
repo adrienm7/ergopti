@@ -22,7 +22,7 @@ local helpers = require("tests.helpers")
 -- so it does not leak into later test files that require the REAL menu.labels
 -- (test_log_level_emojis.lua and ui/menu/builder.lua both call log_level_emoji).
 local _labels_called = {}
-package.loaded["menu.labels"] = {
+package.loaded["menu.engine.labels"] = {
 	decorate_section = function(text)
 		_labels_called[#_labels_called + 1] = text
 		return "— " .. text .. " —"
@@ -285,7 +285,7 @@ helpers.describe("i18n: detect_system_locale()", function()
 	end)
 
 	helpers.it("takes its fallback from the shared identifiers (i18n-system-fallback)", function()
-		local identifiers = require("identifiers")
+		local identifiers = require("core.text.engine.identifiers")
 		local saved = identifiers.locales.system_fallback
 		identifiers.locales.system_fallback = "de"
 		local ok, detail = pcall(function()
@@ -414,7 +414,7 @@ helpers.describe("i18n: get()", function()
 	end)
 
 	helpers.it("warns once per raw key shown, never for a probe (i18n-miss-warned)", function()
-		local stub_locale, stub_core = package.loaded["infra.locale"], package.loaded["locale.core"]
+		local stub_locale, stub_core = package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"]
 		local logger = package.loaded["infra.logger"]
 		local warn, warnings = logger.warn, {}
 		logger.warn = function(_, message, key) warnings[#warnings + 1] = message:gsub("%%s", key or "") end
@@ -428,7 +428,7 @@ helpers.describe("i18n: get()", function()
 			locale.missing("__other_missing__")
 		end)
 		logger.warn = warn
-		package.loaded["infra.locale"], package.loaded["locale.core"] = stub_locale, stub_core
+		package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"] = stub_locale, stub_core
 		assert(ok, detail)
 		helpers.assert_eq(#warnings, 2, "each missing key is warned once")
 		helpers.assert_true(warnings[1]:find("'__missing_key__'", 1, true) ~= nil)
@@ -974,7 +974,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr"\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths, Writer = require("infra.config_paths"), require("toml_codec.writer")
+		local Paths, Writer = require("infra.config_paths"), require("core.text.engine.toml_codec.writer")
 		local prior_get, prior_publish = Paths.get, Writer.publish_if_unchanged
 		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
@@ -997,7 +997,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr"\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths, Writer = require("infra.config_paths"), require("toml_codec.writer")
+		local Paths, Writer = require("infra.config_paths"), require("core.text.engine.toml_codec.writer")
 		local prior_get, prior_batch = Paths.get, Writer.batch_write
 		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
@@ -1261,6 +1261,6 @@ end)
 -- file installed forces the NEXT file to load the genuine modules: menu.labels
 -- (needed real by test_log_level_emojis.lua and ui/menu/builder.lua) and the
 -- stub-wired lib.i18n / lib.locale pair must not leak either.
-package.loaded["menu.labels"] = nil
+package.loaded["menu.engine.labels"] = nil
 package.loaded["infra.locale"]  = nil
 package.loaded["infra.i18n"]    = nil

@@ -11,15 +11,15 @@ import subprocess
 import tempfile
 
 WORKER = r"""
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local function shared(path)
  local file = assert(io.open("../_shared/"..path, "rb"))
  local value = Json.decode(file:read("*a")); assert(file:close()); return value
 end
-local config = require("healthcheck.snapshot").load_config(function(path) return "../_shared/"..path end)
+local config = require("diagnostics.engine.healthcheck.snapshot").load_config(function(path) return "../_shared/"..path end)
 local schema = config.schema
 local rules = config.redaction
-local catalogue = shared("data/locales/en.json")
+local catalogue = shared("core/i18n/data/locales/en.json")
 local notice = assert(catalogue[schema.share_policy.notice_key])
 package.loaded["infra.i18n"] = {get=function(key)
  local value = catalogue[key]
@@ -40,7 +40,7 @@ if #raw>=8192 then
   snapshot.retired_probes[i]={probes={github_api={state="cancelled",cleanup="unknown",ms=i}}}
  end
 end
-local document = require("healthcheck.share").document(snapshot,schema,notice)
+local document = require("diagnostics.engine.healthcheck.share").document(snapshot,schema,notice)
 assert(not document.text:find("/private-owner",1,true) and not document.text:find("privateowner",1,true))
 if #raw>=8192 then assert(#document.text>=8192,"immediate-write corpus lost its large native write") end
 local name=document.name
@@ -83,9 +83,7 @@ def main():
         ("readonly-existing-file", "readonly", "x" * 128, None, "file"),
         ("unwritable-directory", "unwritable", "x" * 128, None, "directory"),
     )
-    schema = json.loads(
-        Path("../_shared/modules/diagnostics/schema.json").read_text(encoding="utf-8")
-    )
+    schema = json.loads(Path("../_shared/diagnostics/data/schema.json").read_text(encoding="utf-8"))
     name = (
         schema["report"]["name_prefix"]
         + "linux-2026-10-04T00_00_00Z"

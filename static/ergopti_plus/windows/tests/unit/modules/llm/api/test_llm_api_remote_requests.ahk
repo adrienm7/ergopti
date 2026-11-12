@@ -18,8 +18,8 @@ _RemoteCatalog_LoadedFromShared() {
 	AssertTrue(LLM_API_PROVIDERS.Has("openai"))
 	AssertTrue(LLM_API_PROVIDERS.Has("openai_compat"))
 	; Preserve the complete cloud prefix and independently name the new local suffix.
-	Shipped := JsonParse(FileRead(_SharedDir . "\modules\llm\api_providers.json", "UTF-8"))
-	ShippedLocal := JsonParse(FileRead(_SharedDir . "\modules\llm\local_servers.json", "UTF-8"))
+	Shipped := JsonParse(FileRead(_SharedDir . "\ai\data\api_providers.json", "UTF-8"))
+	ShippedLocal := JsonParse(FileRead(_SharedDir . "\ai\data\local_servers.json", "UTF-8"))
 	LocalIds := ShippedLocal["server_order"]
 	; The first four stay independently named: the catalogue only grows behind them.
 	for Index, ProviderId in ["omlx", "lmstudio", "llamacpp", "jan"]
@@ -132,8 +132,8 @@ _RemoteCatalog_InvalidScalarsNeverPublish() {
 	testRoot := A_Temp . "\ergopti-ahk013-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount
 	fixture := FileRead(A_ScriptDir . "\..\..\_shared\tests\corpus\api_provider_catalog_validation.json", "UTF-8")
 	try {
-		DirCreate(testRoot . "\modules\llm")
-		FileAppend(fixture, testRoot . "\modules\llm\api_providers.json", "UTF-8")
+		DirCreate(testRoot . "\ai\data")
+		FileAppend(fixture, testRoot . "\ai\data\api_providers.json", "UTF-8")
 		_SharedDir := testRoot
 		_LLMRemote_LoadCatalog()
 

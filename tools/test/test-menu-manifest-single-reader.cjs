@@ -91,7 +91,7 @@ const DRIVERS = {
 // where the manifest is and how to decode it.
 //
 // WHAT THIS COUNTS, AFTER THE EXTRACTION. The io.open now lives in
-// _shared/lua/menu/renderer.lua, which is not a driver tree and is not scanned.
+// _shared/menu/engine/renderer.lua, which is not a driver tree and is not scanned.
 // What each driver keeps is the BINDING — the file naming the path and supplying
 // the decoder — and one per driver is exactly the invariant worth holding. Three
 // bindings would be three answers to "where is the manifest", which is the
@@ -153,7 +153,7 @@ function verifyReaderDetection() {
 	const binding = [
 		'local JsonCodec = require("adapters.json_codec")',
 		'return {',
-		'  manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,',
+		'  manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,',
 		'  json_decode = JsonCodec.decode,',
 		'}'
 	].join('\n');

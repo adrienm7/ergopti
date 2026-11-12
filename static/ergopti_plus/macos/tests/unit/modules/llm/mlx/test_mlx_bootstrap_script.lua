@@ -149,9 +149,9 @@ local function new_fixture()
 		.. sh_quote(project .. "/")
 		-- network-retry.sh reads the shared origin inventory three folders up,
 		-- where the bundle and the checkout keep _shared beside the driver.
-		.. " && mkdir -p " .. sh_quote(root .. "/_shared/modules/network") .. " && cp "
-		.. sh_quote(driver .. "../_shared/modules/network/route_origins.json") .. " "
-		.. sh_quote(root .. "/_shared/modules/network/"))
+		.. " && mkdir -p " .. sh_quote(root .. "/_shared/core/network/data") .. " && cp "
+		.. sh_quote(driver .. "../_shared/core/network/data/route_origins.json") .. " "
+		.. sh_quote(root .. "/_shared/core/network/data/"))
 	helpers.assert_eq(made, 0, "the fixture project must be created")
 	write(home .. "/.local/bin/uv", FAKE_UV)
 	run("chmod +x " .. sh_quote(home .. "/.local/bin/uv"))

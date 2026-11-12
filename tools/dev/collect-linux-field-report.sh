@@ -78,8 +78,8 @@ REPO_ROOT="${REPO_ROOT%.}"
 # The collector keeps going after a failed step, but never without the shared
 # identifiers: a missing file stops it here.
 set -e
-# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
-. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# shellcheck source=../../static/ergopti_plus/_shared/core/text/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 # shellcheck source=field-report-git.sh
 . "$REPO_ROOT/tools/dev/field-report-git.sh"
 # shellcheck source=linux-field-shell-checks.sh
@@ -88,8 +88,8 @@ set -e
 . "$REPO_ROOT/tools/dev/linux-field-run.sh"
 set +e
 DRIVER_ROOT="$REPO_ROOT/static/ergopti_plus/linux"
-SHARED_LUA="$REPO_ROOT/static/ergopti_plus/_shared/lua"
-BUNDLED_HOTSTRINGS="$REPO_ROOT/static/ergopti_plus/_shared/modules/hotstrings"
+SHARED_LUA="$REPO_ROOT/static/ergopti_plus/_shared"
+BUNDLED_HOTSTRINGS="$REPO_ROOT/static/ergopti_plus/_shared/hotstrings/data/catalogue"
 
 fail() { printf '[field-report] ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '[field-report] %s\n' "$*"; }
@@ -179,13 +179,13 @@ report_field_checks() {
 }
 
 # Prints the logs folder the driver resolves and the log file names of
-# _shared/lua/app_dirs.lua, one per line: folder, unified prefix, errors prefix,
+# _shared/core/fs/engine/app_dirs.lua, one per line: folder, unified prefix, errors prefix,
 # extension, bootstrap log, crash reports folder, personal hotstrings file and
 # the Metrics database the guided steps count rows in.
 driver_log_layout() {
 	LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;" \
 		luajit -e '
-			local dirs, files = require("app_dirs"), require("app_dirs").files
+			local dirs, files = require("core.fs.engine.app_dirs"), require("core.fs.engine.app_dirs").files
 			print(require("infra.config_paths").get_logs_dir())
 			print(files.unified_prefix); print(files.errors_prefix); print(files.extension)
 			print(files.bootstrap_log); print(dirs.crash_reports_dir)

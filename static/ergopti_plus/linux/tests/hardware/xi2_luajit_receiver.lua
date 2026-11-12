@@ -23,7 +23,7 @@ print = function(...)
     for _, value in ipairs(parts) do log_bytes = log_bytes + #tostring(value) end
     assert(log_bytes <= 32768, "diagnostic logger bound")
 end
-package.loaded["logger.shim"] = assert(loadfile(logger_source))()
+package.loaded["core.logger.engine.shim"] = assert(loadfile(logger_source))()
 local Probe = assert(loadfile(candidate))()
 ffi.cdef([[
     struct _XDisplay; struct xcb_connection_t; struct xkb_context; struct xkb_keymap;

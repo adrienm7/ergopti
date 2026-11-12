@@ -258,7 +258,7 @@ it("isolates throwing callbacks and delivers all settlement listeners", function
 end)
 
 it("retires real sockets when both a callback and its diagnostic throw", function()
-	local logger = require("logger.shim")
+	local logger = require("core.logger.engine.shim")
 	local old_error = logger.error
 	local server, port = listener()
 	local child = assert(Probe.probe("127.0.0.1", port, 1000, function()
@@ -277,7 +277,7 @@ it("retires real sockets when both a callback and its diagnostic throw", functio
 end)
 
 it("continues socket retirement when a refused timer close and its diagnostic throw", function()
-	local logger = require("logger.shim")
+	local logger = require("core.logger.engine.shim")
 	local old_error = logger.error
 	local resolve, connect, allow_close, socket_closed = nil, nil, false, false
 	local function handle(is_timer)

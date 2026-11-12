@@ -2,25 +2,25 @@
 
 ## Purpose
 
-Coordinates communication with local (Ollama, MLX) and remote LLM backends, and with the local OpenAI-compatible servers the user runs (oMLX, LM Studio, llama.cpp / LocalAI, Jan: `local_servers.lua` detects them from `_shared/modules/llm/local_servers.json`, and `api_remote.lua` sends their requests without a key). Manages backend detection, profile selection, streaming response parsing, warmup scheduling, and exposes a unified prediction API to `keymap/llm_bridge.lua`. Loads cross-platform defaults from `_shared/modules/llm/defaults.json` so the same tuning applies on every driver.
+Coordinates communication with local (Ollama, MLX) and remote LLM backends, and with the local OpenAI-compatible servers the user runs (oMLX, LM Studio, llama.cpp / LocalAI, Jan: `local_servers.lua` detects them from `_shared/ai/data/local_servers.json`, and `api_remote.lua` sends their requests without a key). Manages backend detection, profile selection, streaming response parsing, warmup scheduling, and exposes a unified prediction API to `keymap/llm_bridge.lua`. Loads cross-platform defaults from `_shared/ai/data/defaults.json` so the same tuning applies on every driver.
 
 ## Ports used (`_shared/core/ports/`)
 
-| Port               | Usage                                                                              |
-| ------------------ | ---------------------------------------------------------------------------------- |
-| `HttpClient`       | REST calls to Ollama/MLX APIs and remote endpoints                                 |
-| `FileSystem`       | Reading `_shared/modules/llm/defaults.json` and shell-script dependency installers |
-| `TimerScheduler`   | Debounce timer between keystrokes and the actual LLM request                       |
-| `TooltipRenderer`  | Streaming token display during prediction                                          |
-| `ProcessLifecycle` | Launching and watching the Ollama/MLX background process                           |
+| Port               | Usage                                                                          |
+| ------------------ | ------------------------------------------------------------------------------ |
+| `HttpClient`       | REST calls to Ollama/MLX APIs and remote endpoints                             |
+| `FileSystem`       | Reading `_shared/ai/data/defaults.json` and shell-script dependency installers |
+| `TimerScheduler`   | Debounce timer between keystrokes and the actual LLM request                   |
+| `TooltipRenderer`  | Streaming token display during prediction                                      |
+| `ProcessLifecycle` | Launching and watching the Ollama/MLX background process                       |
 
-## Domain module (`_shared/core/domain/`)
+## Domain module (`_shared/core/text/data/domain/`)
 
 - `PromptBuilder.js` — `prompt_builder.lua` implements this contract
 - `ProfileSelector.js` — `profiles.lua` implements profile management
 
 LLM output diff-coloring (`process_prediction`) lives in the shared Lua canon
-`_shared/lua/llm/parser.lua`; `modules/llm/parser.lua` is a thin shim over it
+`_shared/ai/engine/api/parser_core.lua`; `modules/llm/parser.lua` is a thin shim over it
 (AHK port: `windows/modules/llm/parser.ahk`), pinned by
 `_shared/tests/corpus/llm/process_prediction_vectors.json`.
 
@@ -42,4 +42,4 @@ LLM.init(shared_state)
 -- keymap/llm_bridge.lua calls LLM.request() on every keystroke debounce
 ```
 
-Cross-platform defaults are loaded from `_shared/modules/llm/defaults.json` at init time and merged into `M.DEFAULT_STATE`. HS-specific keys (model names, `llm_debounce` in seconds) are not in the JSON and keep their hardcoded base values.
+Cross-platform defaults are loaded from `_shared/ai/data/defaults.json` at init time and merged into `M.DEFAULT_STATE`. HS-specific keys (model names, `llm_debounce` in seconds) are not in the JSON and keep their hardcoded base values.

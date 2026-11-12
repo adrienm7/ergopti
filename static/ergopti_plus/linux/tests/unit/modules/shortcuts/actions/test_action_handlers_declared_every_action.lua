@@ -5,7 +5,7 @@
 --- MODULE: Regression — actions the shared catalogue declares for Linux must
 ---         actually do something (linux-declared-actions-unhandled)
 --- DESCRIPTION:
---- `_shared/modules/actions/actions.toml` declared 79 actions for Linux and the
+--- `_shared/shortcuts/data/actions/actions.toml` declared 79 actions for Linux and the
 --- driver implemented 40 of them. The other 39 were not broken in a way anyone
 --- could see: the picker offers every DECLARED action as bindable, so the user
 --- bound one, the assignment was stored, the chord fired — and `_execute_action`
@@ -65,7 +65,7 @@ helpers.describe("linux actions: every action this driver declares runs", functi
 
 	helpers.it("warns, not in DEBUG, when an action has nothing to run", function()
 		local Gestures = helpers.load_module("modules.gestures.manager")
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_warn, warned = Logger.warn, {}
 		Logger.warn = function(_, fmt, ...) warned[#warned + 1] = string.format(fmt, ...) end
 		local ok, err = pcall(Gestures.execute_action, "microsoft_bold", "tap_hold")
@@ -360,9 +360,9 @@ helpers.describe("linux actions: modifier chords", function()
 	--- Every chord the shared catalogue declares for Linux, read from the
 	--- catalogue itself: { id, mods = {combo names}, key = key id }.
 	local function declared_chords()
-		local path = require("infra.paths").shared("modules/actions/modifier_chords.json")
+		local path = require("infra.paths").shared("shortcuts/data/actions/modifier_chords.json")
 		local fh = assert(io.open(path, "r"), "the shared modifier chords must be readable")
-		local catalogue = require("json").decode(fh:read("*a"))
+		local catalogue = require("core.text.engine.json").decode(fh:read("*a"))
 		fh:close()
 		local modifiers = catalogue.platforms.linux.modifiers
 		local chords = {}
@@ -440,7 +440,7 @@ helpers.describe("linux actions: modifier chords", function()
 	helpers.it("falls back to xdotool with keysym names it accepts (modifier-chord-uinput)", function()
 		-- Only when the uinput device cannot be written. `xdotool key ctrl+.`
 		-- fails: xdotool takes X keysym names, and "." is `period`.
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_error = Logger.error
 		Logger.error = function() end
 		-- One unopened device and one manager serve the whole sweep.

@@ -313,6 +313,7 @@ const physical = JSON.parse(
 			'static',
 			'ergopti_plus',
 			'_shared',
+			'layouts',
 			'data',
 			'keycodes',
 			'physical_keys.json'

@@ -1,5 +1,5 @@
 {
-	"description": "Cross-driver tooltip layout vectors — position resolution and clamping from _shared/modules/tooltip/layout.js layoutTestVectors(). Consumed by macOS and AHK layout tests.",
+	"description": "Cross-driver tooltip layout vectors — position resolution and clamping from _shared/core/ui/data/tooltip/layout.js layoutTestVectors(). Consumed by macOS and AHK layout tests.",
 	"vectors": [
 		{
 			"id": "caret_normal",

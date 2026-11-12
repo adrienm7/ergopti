@@ -20,9 +20,9 @@
 
 local root, mode = assert(arg[1], "driver root"), assert(arg[2], "session mode")
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
-local Logger = require("logger.shim")
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
+local Logger = require("core.logger.engine.shim")
 local Display = require("infra.display_server")
 local Shell = require("adapters.shell_runner")
 

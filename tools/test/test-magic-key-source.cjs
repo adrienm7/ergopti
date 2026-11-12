@@ -38,7 +38,9 @@ const PATH = 'hotstrings.magic_key_source';
 const RETIRED_KEY = 'magic_key_source_scan';
 const FORMER_WINDOWS_DEFAULT = 'SC02E';
 
-const manifest = TOML.parse(fs.readFileSync(shared('modules/features/manifest.toml'), 'utf8'));
+const manifest = TOML.parse(
+	fs.readFileSync(shared('settings/data/features/manifest.toml'), 'utf8')
+);
 const entry = (manifest.features.hotstrings || []).find(
 	(feature) => feature.id === 'magic_key_source'
 );
@@ -55,7 +57,7 @@ assert.strictEqual(entry.enum_values[0], 'auto');
 
 // 1. Candidates.
 const layoutKeys = JSON.parse(
-	fs.readFileSync(shared('modules/layouts/mac_keycodes.json'), 'utf8')
+	fs.readFileSync(shared('layouts/data/mac_keycodes.json'), 'utf8')
 ).keys;
 const expected = layoutKeys.map((key) => key.code).filter((code) => code !== 'Space');
 assert.deepStrictEqual(
@@ -66,7 +68,7 @@ assert.deepStrictEqual(
 
 // 2. Resolution.
 const physical = JSON.parse(
-	fs.readFileSync(shared('data/keycodes/physical_keys.json'), 'utf8')
+	fs.readFileSync(shared('layouts/data/keycodes/physical_keys.json'), 'utf8')
 ).keys;
 const scanOf = new Map(layoutKeys.map((key) => [key.code, key.ahk]));
 for (const code of expected) {
@@ -107,7 +109,9 @@ console.log(
 const claims = JSON.parse(
 	fs.readFileSync(shared('tests/corpus/keymap/magic_source_tap_claims.json'), 'utf8')
 );
-const taps = JSON.parse(fs.readFileSync(shared('modules/actions/tap_keys.json'), 'utf8')).keys;
+const taps = JSON.parse(
+	fs.readFileSync(shared('shortcuts/data/actions/tap_keys.json'), 'utf8')
+).keys;
 assert.strictEqual(claims.cases.length, 9, 'the independent admission cases remain complete');
 for (const test of claims.cases) {
 	assert.ok(entry.enum_values.includes(test.source), test.name);
@@ -125,7 +129,7 @@ for (const test of claims.cases) {
 		assert.strictEqual(key?.id || '', test.expected[platform], `${test.name}: ${platform}`);
 	}
 }
-const luaPolicy = fs.readFileSync(shared('lua/keymap/magic_key_source.lua'), 'utf8');
+const luaPolicy = fs.readFileSync(shared('layouts/engine/layers/magic_key_source.lua'), 'utf8');
 const windowsChoice = fs.readFileSync(
 	path.join(REPO_ROOT, 'static/ergopti_plus/windows/ui/editors.ahk'),
 	'utf8'

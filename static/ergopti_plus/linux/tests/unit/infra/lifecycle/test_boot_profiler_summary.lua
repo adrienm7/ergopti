@@ -12,9 +12,9 @@ local helpers = require("tests.support.logger_fixture").helpers({ "infra.boot_pr
 --- Loads a fresh profiler with the real logger capturing delivered lines.
 --- @return table profiler, table lines
 local function fixture()
-	package.loaded["logger"] = nil
-	package.loaded["logger.shim"] = nil
-	local logger = require("logger")
+	package.loaded["core.logger.engine"] = nil
+	package.loaded["core.logger.engine.shim"] = nil
+	local logger = require("core.logger.engine")
 	local lines = {}
 	logger.set_sink(function(line) lines[#lines + 1] = line end)
 	logger.set_level(20)

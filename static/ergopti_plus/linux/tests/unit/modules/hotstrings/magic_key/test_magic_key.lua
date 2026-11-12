@@ -152,11 +152,11 @@ helpers.describe("magic key: the user's choice outranks the shipped default", fu
 	helpers.it("warns once, never an ERROR, about that key and offers it (config-outdated-magic-key)", function()
 		local _, restore_storage = stub_storage({ stored = "e" })
 		local restore_manifest = stub_manifest("★")
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_warn, real_error, warnings, errors = Logger.warn, Logger.error, {}, {}
 		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		require("config_outdated").reset_for_tests()
+		require("settings.engine.migration.outdated").reset_for_tests()
 		local ok, err = pcall(function()
 			local magic = load_magic_key()
 			for _ = 1, 3 do helpers.assert_eq(magic.get(), "★") end
@@ -168,7 +168,7 @@ helpers.describe("magic key: the user's choice outranks the shipped default", fu
 		restore_manifest(); restore_storage()
 		if not ok then error(err, 0) end
 		local source = '[hotstrings]\ntrigger_char = "e"\n'
-		local scan = require("config_unused_keys").find_in_source(source, require("ui.menu.unused_keys_cleanup").collect)
+		local scan = require("settings.engine.migration.unused_keys").find_in_source(source, require("ui.menu.unused_keys_cleanup").collect)
 		helpers.assert_eq(#scan.keys, 1, "the cleanup offers the key the reader ignores")
 		helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "hotstrings", "trigger_char" })
 	end)
@@ -408,7 +408,7 @@ end)
 
 -- Uses the actual native builder closure and genuine shared factory; no provider stand-in.
 local function with_magic_frame(language, stored, mode, body)
-	local names = { "infra.manifest_menu", "ui.menu.builder", "modules.hotstrings.magic_key", "infra.i18n", "infra.locale", "locale.core", "ui.text_prompt" }
+	local names = { "infra.manifest_menu", "ui.menu.builder", "modules.hotstrings.magic_key", "infra.i18n", "infra.locale", "core.i18n.engine.core", "ui.text_prompt" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local storage, restore_storage, restore_manifest
@@ -417,17 +417,17 @@ local function with_magic_frame(language, stored, mode, body)
 	local ok, detail = xpcall(function()
 		storage, restore_storage = stub_storage({ stored = stored })
 		restore_manifest = stub_manifest("★")
-		local json = require("json")
+		local json = require("core.text.engine.json")
 		local Paths = require("infra.paths")
-		package.loaded["infra.i18n"], package.loaded["infra.locale"], package.loaded["locale.core"] = nil, nil, nil
+		package.loaded["infra.i18n"], package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"] = nil, nil, nil
 		local native_locale = require("infra.locale")
 		native_locale.set_locale(language)
 		local native_i18n = require("infra.i18n")
 		prompt_owner = require("ui.text_prompt")
 		prior_ask = prompt_owner.ask
 		prompt_owner.ask = function() effects.prompts = effects.prompts + 1; return "§" end
-		local renderer = assert(require("menu.renderer").new({ platform = "linux", json_decode = json.decode,
-			manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+		local renderer = assert(require("menu.engine.renderer").new({ platform = "linux", json_decode = json.decode,
+			manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 			i18n = native_i18n, logger = { error = function() end, warn = function() end } }))
 		root = renderer.get_root(); frame = root.hotstrings_magic_trigger_frame; first_i18n = frame and frame[1].i18n
 		local template = renderer.template_rows

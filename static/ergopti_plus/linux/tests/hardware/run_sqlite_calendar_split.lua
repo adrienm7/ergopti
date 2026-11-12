@@ -3,7 +3,7 @@
 --- wall-clock input seam. No SQLite/process/database/provider mocks or hardware claims.
 local uv = require("luv")
 local ffi = require("ffi")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 ffi.cdef("void tzset(void);")
 -- POSIX rules require no installed timezone database. libc does all calendar
 -- normalization; only the instant supplied to Lua's no-argument clock is owned.

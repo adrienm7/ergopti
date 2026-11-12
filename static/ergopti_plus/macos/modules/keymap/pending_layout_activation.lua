@@ -21,7 +21,7 @@
 --- ==============================================================================
 
 local Logger = require("infra.logger")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local M = {}
 
@@ -271,7 +271,7 @@ end
 --- The production collaborators.
 --- @return table deps
 function M.production_deps()
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local Storage = require("adapters.storage")
 	return {
 		storage = { read_exact = Storage.read_exact, set = Storage.set, delete = Storage.delete },

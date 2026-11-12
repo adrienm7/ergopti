@@ -66,7 +66,7 @@ function M.install(world)
 		return op
 	end
 	function world:inventory_answer(models)
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local rows = {}
 		for _, model in ipairs(models) do rows[#rows + 1] = { name = model } end
 		local body = #rows == 0 and '{"models":[]}' or Json.encode({ models = rows })

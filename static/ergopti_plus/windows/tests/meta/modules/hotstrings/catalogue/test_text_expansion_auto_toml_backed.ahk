@@ -54,7 +54,7 @@ _TEA_ReadSharedSource(RelPath) {
 ; ==================================================
 
 _TEA_SectionTableExists() {
-	Toml := _TEA_ReadSharedSource("modules/hotstrings/french/magickey.toml")
+	Toml := _TEA_ReadSharedSource("hotstrings/data/catalogue/french/magickey.toml")
 	Assert(InStr(Toml, "[[text_expansion_auto]]") > 0,
 		"magickey.toml must declare a [[text_expansion_auto]] table - F49: the category was enabled by default with zero TOML-backed entries")
 
@@ -74,7 +74,7 @@ _TEA_SectionTableExists() {
 Test("magickey toml: text_expansion_auto table exists with real entries (F49)", _TEA_SectionTableExists)
 
 _TEA_MetaSectionsDescribesIt() {
-	Toml := _TEA_ReadSharedSource("modules/hotstrings/french/magickey.toml")
+	Toml := _TEA_ReadSharedSource("hotstrings/data/catalogue/french/magickey.toml")
 	MetaPos := InStr(Toml, "[_meta.sections]")
 	Assert(MetaPos > 0, "magickey.toml must declare a [_meta.sections] block")
 	NextTablePos := InStr(Toml, "[[", , MetaPos)
@@ -85,7 +85,7 @@ _TEA_MetaSectionsDescribesIt() {
 Test("magickey toml: [_meta.sections] describes text_expansion_auto (F49)", _TEA_MetaSectionsDescribesIt)
 
 _TEA_ManifestStillDeclaresFeature() {
-	Toml := _TEA_ReadSharedSource("modules/features/manifest.toml")
+	Toml := _TEA_ReadSharedSource("settings/data/features/manifest.toml")
 	Assert(InStr(Toml, 'id = "text_expansion_auto"') > 0,
 		"manifest.toml must still declare the text_expansion_auto feature - F49 was fixed by authoring the missing TOML content, not by deleting the toggle")
 }

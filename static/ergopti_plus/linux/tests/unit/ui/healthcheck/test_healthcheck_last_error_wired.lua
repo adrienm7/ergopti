@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 --- every warn/error line the core actually emitted.
 --- @param callback function Receives (Logger, Bridge, counts).
 local function with_real_logger(callback)
-	local Logger = require("logger")
+	local Logger = require("core.logger.engine")
 	local previous_level = Logger.get_level()
 	Logger.set_level("debug")
 	Logger.reset_dedup()

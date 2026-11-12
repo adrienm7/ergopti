@@ -31,7 +31,7 @@ for name in (
 ):
     parser.add_argument("--" + name, type=Path, required=True)
 args, unittest_args = parser.parse_known_args()
-FIXTURE_MANIFEST_SHA = "50fbec17bdd2f624bf65c6e16613deb2c0ddd2b9d6eff10a640520780770b8d1"
+FIXTURE_MANIFEST_SHA = "be5406cda93591aa100cd5f59664b6f256d3d24012a33da45574a71259dd87a4"
 fixture_data = args.fixture_manifest.read_bytes()
 if hashlib.sha256(fixture_data).hexdigest() != FIXTURE_MANIFEST_SHA:
     raise ValueError("immutable portable fixture manifest refused")

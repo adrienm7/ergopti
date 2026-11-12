@@ -46,9 +46,9 @@ const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/collect-linux-field-report.sh';
 const FIELD_GIT = 'tools/dev/field-report-git.sh';
 const MAC_SCRIPT = 'tools/dev/collect-macos-field-report.sh';
-const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.sh';
-const IDENTIFIERS_JSON = 'static/ergopti_plus/_shared/data/identifiers.json';
-const APP_DIRS = 'static/ergopti_plus/_shared/lua/app_dirs.lua';
+const IDENTIFIERS = 'static/ergopti_plus/_shared/core/text/data/identifiers.sh';
+const IDENTIFIERS_JSON = 'static/ergopti_plus/_shared/core/text/data/identifiers.json';
+const APP_DIRS = 'static/ergopti_plus/_shared/core/fs/engine/app_dirs.lua';
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
 const REPORT_REDACT = 'tools/dev/field-report-redact.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
@@ -68,7 +68,8 @@ const ANALYSER_SOURCES = JSON.parse(
 		encoding: 'utf8'
 	}).stdout
 ).sources;
-const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml';
+const BUNDLED_SAMPLE =
+	'static/ergopti_plus/_shared/hotstrings/data/catalogue/french/autocorrection.toml';
 
 const names = JSON.parse(fs.readFileSync(path.join(ROOT, IDENTIFIERS_JSON), 'utf8')).field_report;
 const collector = fs.readFileSync(path.join(ROOT, SCRIPT), 'utf8');
@@ -297,7 +298,7 @@ function read(folder, name) {
 
 		await check("the logs folder and file names are the driver's own", () => {
 			assert.match(collector, /require\("infra\.config_paths"\)\.get_logs_dir\(\)/);
-			assert.match(collector, /require\("app_dirs"\)/);
+			assert.match(collector, /require\("core.fs.engine.app_dirs"\)/);
 			assert.doesNotMatch(
 				collector.replace(/^\s*#.*$/gm, ''),
 				new RegExp(`${LOG_FILES.main}|\\.local/state|${LOG_FILES.bootstrap.replace('.', '\\.')}`),

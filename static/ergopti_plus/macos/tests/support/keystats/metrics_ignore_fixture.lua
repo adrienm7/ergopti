@@ -3,8 +3,8 @@
 --- Physical public-init fixture; SQLite unavailability explicitly selects JSONL-only mode.
 local Helpers = require("tests.helpers")
 local Lfs = require("lfs")
-local Json = require("json")
-local Quote = require("text_utils").shell_quote
+local Json = require("core.text.engine.json")
+local Quote = require("core.text.engine.utils_core").shell_quote
 local M = {}
 local OWNERS = {
 	"tests.stubs.hs", "infra.logger", "infra.fs_dir", "adapters.file_system", "adapters.ledger_append",

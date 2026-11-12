@@ -36,7 +36,7 @@ _FreshSameSec_TieIsStale() {
 	; Only magickey.toml exists here; the genuine builder captures every other
 	; declared source as absent in the same canonical inventory.
 	Base := A_Temp . "\ergopti_freshness_samesecond_test"
-	HsDir := Base . "\modules\hotstrings"
+	HsDir := Base . "\hotstrings\data\catalogue"
 	try DirCreate(HsDir)
 
 	; Save the real shared root: this global is process-wide, and every later
@@ -47,7 +47,7 @@ _FreshSameSec_TieIsStale() {
 	_SharedDir := Base
 	; The cache paths resolve through the language index, so it must exist first.
 	IndexPath := HsDir . "\_index.toml"
-	FileCopy(_FreshSameSec_PrevShared . "\modules\hotstrings\_index.toml", IndexPath, true)
+	FileCopy(_FreshSameSec_PrevShared . "\hotstrings\data\catalogue\_index.toml", IndexPath, true)
 	FileSetTime("20240101115900", IndexPath, "M")
 	TsvPath := _HotstringsCacheTsvPath()
 	TomlPath := _HotstringsCacheTomlPath("magickey")
@@ -93,7 +93,7 @@ _FreshSameSec_NewerTsvStillFresh() {
 	; The fix must only catch the equal-second tie, not regress the normal case:
 	; a .tsv strictly newer than every TOML is still fresh (no needless rebuild).
 	Base := A_Temp . "\ergopti_freshness_newer_test"
-	HsDir := Base . "\modules\hotstrings"
+	HsDir := Base . "\hotstrings\data\catalogue"
 	try DirCreate(HsDir)
 
 	; Save the real shared root: this global is process-wide, and every later
@@ -104,7 +104,7 @@ _FreshSameSec_NewerTsvStillFresh() {
 	_SharedDir := Base
 	; The cache paths resolve through the language index, so it must exist first.
 	IndexPath := HsDir . "\_index.toml"
-	FileCopy(_FreshSameSec_PrevShared . "\modules\hotstrings\_index.toml", IndexPath, true)
+	FileCopy(_FreshSameSec_PrevShared . "\hotstrings\data\catalogue\_index.toml", IndexPath, true)
 	FileSetTime("20240101115900", IndexPath, "M")
 	TsvPath := _HotstringsCacheTsvPath()
 	TomlPath := _HotstringsCacheTomlPath("magickey")

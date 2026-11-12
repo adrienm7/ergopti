@@ -5,7 +5,7 @@
  * MODULE: Ergopti Layout Source XKB Export
  * DESCRIPTION:
  * Compiles a source through the shared Lua export adapter
- * (_shared/lua/layouts/source_export.lua) and the shared target export
+ * (_shared/layouts/engine/composer/source_export.lua) and the shared target export
  * (_shared/ui/layout_composer/target_export.js), the same two steps the layout
  * editor page runs. Assets and source travel as explicit input; the API returns
  * artifacts without writing files or installing anything.
@@ -49,9 +49,7 @@ function runLua(step, input, label) {
 function xkbAssets() {
 	const data = path.join(REPO_ROOT, 'static', 'ergopti', 'linux', 'xkb_generation', 'data');
 	return {
-		keycodes: JSON.parse(
-			fs.readFileSync(shared('modules', 'layouts', 'mac_keycodes.json'), 'utf8')
-		),
+		keycodes: JSON.parse(fs.readFileSync(shared('layouts', 'data', 'mac_keycodes.json'), 'utf8')),
 		keysyms: JSON.parse(fs.readFileSync(path.join(data, 'key_sym.json'), 'utf8')),
 		template: fs.readFileSync(path.join(data, 'xkb_symbols.txt'), 'utf8'),
 		types: fs.readFileSync(path.join(data, 'xkb_types.txt'), 'utf8')

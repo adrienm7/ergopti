@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 --- Creates a throwaway XDG config root under the system temp directory and
 --- ensures its application subdirectory exists so the storage adapter can

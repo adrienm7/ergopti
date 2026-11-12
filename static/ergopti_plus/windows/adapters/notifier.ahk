@@ -107,7 +107,7 @@ _NotifierDeliver(Text, Level, What, SendFn) {
 }
 
 ; Announces that a menu feature was switched, with the contract of
-; _shared/lua/feature_notice.lua: one log line first, enabled is "success" and
+; _shared/menu/engine/feature_notice.lua: one log line first, enabled is "success" and
 ; disabled "error", and a failing notifier is never fatal.
 ; @param Label {String} Display name of the feature.
 ; @param Enabled {Boolean} The new state; anything but a true value is disabled.

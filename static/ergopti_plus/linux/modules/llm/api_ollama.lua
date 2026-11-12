@@ -25,15 +25,15 @@ local ResponseCapture, ResponseCurrent = ResponseEngine.capture_runtime_response
 assert(type(ResponseCapture) == "function" and type(ResponseCurrent) == "function",
 	"original runtime response owner unavailable")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "modules.llm.api_ollama"
 
 -- HTTP request hard timeout comes from the shared timings registry so every
 -- driver's LLM call times out identically (no magic seconds literal here).
 local Timings = require("infra.timings")
 local HttpClient = require("adapters.http_client")
-local LocalModelPolicy = require("llm.local_model_policy")
-local Json = require("json")
+local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
+local Json = require("core.text.engine.json")
 
 -- The warmup's HTTP owner: a prediction's own request never waits for it.
 local WARMUP_OWNER = "ollama_model_warmup"
@@ -77,7 +77,7 @@ local function read_shared_json(relative)
 	if not ok_paths or not Paths then return nil end
 	local root = Paths.shared_root()
 	if not root then return nil end
-	local body, status = require("toml_codec.writer").read_classified(root .. "/" .. relative)
+	local body, status = require("core.text.engine.toml_codec.writer").read_classified(root .. "/" .. relative)
 	if status ~= "ok" then return nil end
 	local ok_bridge, Bridge = pcall(require, "infra.llm_bridge")
 	if not ok_bridge or not Bridge or not Bridge.json_decode then return nil end
@@ -93,7 +93,7 @@ end
 -- sent it; this one did not, and the difference was invisible except as "the
 -- Linux predictions are sometimes very slow".
 local OLLAMA_KEEP_ALIVE = (function()
-	local defaults = read_shared_json("modules/llm/defaults.json")
+	local defaults = read_shared_json("ai/data/defaults.json")
 	local value = defaults and defaults.llm_ollama_keep_alive
 	if type(value) == "string" and value ~= "" then return value end
 	Logger.warn(LOG, "defaults.json llm_ollama_keep_alive unreadable — Ollama will apply its own default.")
@@ -106,7 +106,7 @@ end)()
 -- the prompt template, and the user sees the scaffolding of their own prompt
 -- offered back as a prediction.
 local STOP_SEQUENCES = (function()
-	local inference = read_shared_json("modules/llm/inference.json")
+	local inference = read_shared_json("ai/data/inference.json")
 	local sequences = inference and inference.stop_sequences
 	if type(sequences) ~= "table" then
 		Logger.warn(LOG, "inference.json stop_sequences unreadable — completions will not be cut short.")

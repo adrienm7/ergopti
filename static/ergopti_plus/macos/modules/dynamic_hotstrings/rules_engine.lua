@@ -6,7 +6,7 @@
 --- Hammerspoon-specific shim that wires the shared pure-Lua dynamic hotstrings
 --- rules engine into the HS keymap module. Handles hs.eventtap injection and
 --- hs.timer scheduling — the matching logic itself lives in the shared module at
---- _shared/lua/dynamic_hotstrings/init.lua.
+--- _shared/hotstrings/engine/dynamic/core.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Thin shim: all suffix-matching and rule-registration logic is delegated to
@@ -23,8 +23,8 @@ if not ok_utils then km_utils = nil end
 local ok_kl, keystats = pcall(require, "modules.keystats")
 if not ok_kl then keystats = nil end
 
-local SharedEngine = require("dynamic_hotstrings")
-local Terminators = require("keymap.terminators")
+local SharedEngine = require("hotstrings.engine.dynamic.core")
+local Terminators = require("layouts.engine.layers.terminators")
 local SyntheticInput = require("adapters.synthetic_input")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 

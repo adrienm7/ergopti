@@ -19,11 +19,11 @@
 --- ==============================================================================
 
 local M = {}
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local hs     = hs
 local Logger = require("infra.logger")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local _owned_writer = nil
 
@@ -31,7 +31,7 @@ local _owned_writer = nil
 --- Eager Writer resolution softly loads i18n, whose native owner needs Storage.
 --- @return table writer
 local function owned_writer()
-	if _owned_writer == nil then _owned_writer = require("toml_codec.writer") end
+	if _owned_writer == nil then _owned_writer = require("core.text.engine.toml_codec.writer") end
 	return _owned_writer
 end
 
@@ -103,8 +103,8 @@ local function owned_logical_key(key) return physical_key(key) ~= nil end
 
 -- The owned-alias gates, receipt authority and finalization shared with the
 -- other Lua driver; capture, publish and restore below stay native.
-local Owned = require("storage_owned")
-local TableUtil = require("table_util")
+local Owned = require("core.fs.engine.storage_owned")
+local TableUtil = require("core.text.engine.table_util")
 local _owned = Owned.new({
 	name = "adapters.storage", module = M, logical_key = owned_logical_key, logger = Logger, log = LOG,
 })

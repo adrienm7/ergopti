@@ -1,13 +1,13 @@
 --- tests/unit/modules/dynamic_hotstrings/rules_engine/test_date_snapshot.lua
 
 local helpers = require("tests.helpers")
-local Engine = require("dynamic_hotstrings")
+local Engine = require("hotstrings.engine.dynamic.core")
 
 -- The first clock read occurs immediately before midnight; later reads see
 -- New Year's Day. This drives the same date formatter used by the rule/UI.
 local function across_midnight(callback)
 	local old_date, reads = os.date, 0
-	local logger = require("logger.shim")
+	local logger = require("core.logger.engine.shim")
 	local old_debug = logger.debug
 	-- The clock double belongs to the date resolver, not the shared logger.
 	logger.debug = function() end

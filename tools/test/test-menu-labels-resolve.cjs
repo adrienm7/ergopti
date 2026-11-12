@@ -49,7 +49,17 @@ const GEN = path.join(
 	'_generated',
 	'features_manifest.ahk'
 );
-const EN = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json');
+const EN = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'i18n',
+	'data',
+	'locales',
+	'en.json'
+);
 
 // Frozen baseline — manifest entries whose label falls through to the raw path
 // tail. Lower it as translations land; NEVER raise it.

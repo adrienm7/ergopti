@@ -30,8 +30,8 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const json = (...parts) => JSON.parse(fs.readFileSync(path.join(...parts), 'utf8'));
 
-const roles = json(SHARED, 'modules', 'actions', 'slot_roles.json');
-const chords = json(SHARED, 'modules', 'actions', 'modifier_chords.json');
+const roles = json(SHARED, 'shortcuts', 'data', 'actions', 'slot_roles.json');
+const chords = json(SHARED, 'shortcuts', 'data', 'actions', 'modifier_chords.json');
 const inventory = json(ROOT, 'docs', 'audits', '2026-10-27-shortcut-inventory.json');
 const corpus = json(SHARED, 'tests', 'corpus', 'shortcuts', 'neutral_slots.json');
 const DRIVERS = ['windows', 'macos', 'linux'];

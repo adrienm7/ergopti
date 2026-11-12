@@ -42,11 +42,11 @@ local function render(commands, getters)
 	local errors = {}
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
-	package.loaded["menu.renderer"] = nil
-	local R = require("menu.renderer").new({
+	package.loaded["menu.engine.renderer"] = nil
+	local R = require("menu.engine.renderer").new({
 		platform      = "linux",
 		manifest_path = function() return path end,
-		json_decode   = require("json").decode,
+		json_decode   = require("core.text.engine.json").decode,
 		i18n          = { get = function(k) return k end, section = function(k) return k end },
 		logger        = logger,
 	})

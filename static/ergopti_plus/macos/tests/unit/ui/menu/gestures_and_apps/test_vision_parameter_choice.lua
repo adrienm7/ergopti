@@ -71,7 +71,7 @@ helpers.describe("macOS screen action vision parameter (macos-vision-choice-list
 		fixture(3, "", function(utils)
 			local value = utils.ask_parameter_value(gestures, "screen_read", "llm_vision", "T", "")
 			helpers.assert_eq(value, "custom|")
-			helpers.assert_eq(require("llm.vision").is_valid(value), false)
+			helpers.assert_eq(require("ai.engine.prediction.vision").is_valid(value), false)
 		end)
 	end)
 

@@ -169,7 +169,7 @@ KLWV_AssetUrl(which) {
 ; Resolve the https:// URL of the shared locales directory, same virtual host.
 KLWV_LocalesUrl() {
 		global KLWV_VHOST
-		return "https://" . KLWV_VHOST . "/data/locales/"
+		return "https://" . KLWV_VHOST . "/core/i18n/data/locales/"
 }
 
 
@@ -1137,7 +1137,7 @@ KLWV_InjectI18n(which, ExpectedEpoch := 0) {
 		if !KLWV_IsCurrent(which, ExpectedEpoch)
 				return false
 		locale_code := I18nGetLocale()
-		json_path := _SharedDir . "\data\locales\" . locale_code . ".json"
+		json_path := _SharedDir . "\core\i18n\data\locales\" . locale_code . ".json"
 		json_str := "{}"
 		if FileExist(json_path)
 				try json_str := FileRead(json_path, "UTF-8")

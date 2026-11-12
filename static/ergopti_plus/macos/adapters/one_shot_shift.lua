@@ -10,7 +10,7 @@
 
 local M = {}
 local State = require("modules.keymap.one_shot_shift")
-local Keycodes = require("keycodes")
+local Keycodes = require("platform.input.keycodes.core")
 local Timer = require("adapters.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
 local KeystrokeIntegrity = require("infra.keystroke_integrity")
@@ -27,7 +27,7 @@ local CONTROL = {
 function M.new(deps)
 	local data = deps.data
 	if data == nil then
-		local path = require("infra.paths").shared("tap_hold/one_shot_shift.json")
+		local path = require("infra.paths").shared("tap_hold/data/one_shot_shift.json")
 		local raw = assert(require("adapters.file_system").read(path), "one-shot Shift results are unreadable")
 		data = assert(require("adapters.json_codec").decode(raw), "one-shot Shift results are malformed")
 	end

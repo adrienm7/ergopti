@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: About Version Row Vectors (macOS)
 --- DESCRIPTION:
---- Replays _shared/modules/updater/version_label_vectors.json through the
+--- Replays _shared/updater/data/version_label_vectors.json through the
 --- shared Lua formatter (updater.version_label). The Linux suite replays it
 --- through the same module and the AHK suite through Updater_VersionRowLabel,
 --- so the three drivers cannot word the version row differently, and every
@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function read_json(path)
 	local handle = assert(io.open(path, "rb"))
@@ -20,7 +20,7 @@ local function read_json(path)
 	return assert(Json.decode(raw), path .. " must decode")
 end
 
-local VECTORS = read_json(helpers.shared("modules/updater/version_label_vectors.json"))
+local VECTORS = read_json(helpers.shared("updater/data/version_label_vectors.json"))
 
 --- The vectors' fake templates, so the replay pins the formatter, not a wording.
 local function translate(key)
@@ -35,9 +35,9 @@ local function placeholders(text)
 	return found
 end
 
-helpers.describe("updater.version_label — shared vectors (macOS)", function()
-	package.loaded["updater.version_label"] = nil
-	local VersionLabel = require("updater.version_label")
+helpers.describe("updater.engine.version_label — shared vectors (macOS)", function()
+	package.loaded["updater.engine.version_label"] = nil
+	local VersionLabel = require("updater.engine.version_label")
 
 	helpers.it("uses the locale keys the contract names", function()
 		for kind, key in pairs(VersionLabel.KEYS) do
@@ -66,10 +66,10 @@ helpers.describe("updater.version_label — shared vectors (macOS)", function()
 
 	helpers.it("every locale carries exactly the placeholders each key is filled with", function()
 		-- The shared order lists every shipped locale (its own gate holds that).
-		local order = read_json(helpers.shared("data/locale_order.json")).order
+		local order = read_json(helpers.shared("core/i18n/data/locale_order.json")).order
 		helpers.assert_eq(#order, 21, "all 21 locales must be checked")
 		for _, code in ipairs(order) do
-			local catalogue = read_json(helpers.shared("data/locales/" .. code .. ".json"))
+			local catalogue = read_json(helpers.shared("core/i18n/data/locales/" .. code .. ".json"))
 			for key, expected in pairs(VECTORS.placeholders) do
 				local value = catalogue[key]
 				helpers.assert_true(type(value) == "string" and value ~= "", code .. " must translate " .. key)

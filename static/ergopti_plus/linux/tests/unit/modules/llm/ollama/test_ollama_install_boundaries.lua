@@ -10,13 +10,13 @@
 local helpers = require("tests.helpers")
 local function expect(value, message) assert(value, message) end
 local function test(key, name, body) helpers.it(name .. " (ollama-install-boundary)", body) end
-helpers.load_module("llm.ollama_archive_installer")
-local Phase = helpers.load_module("llm.ollama_install_phase")
+helpers.load_module("ai.engine.ollama.archive_installer")
+local Phase = helpers.load_module("ai.engine.ollama.install_phase")
 local Admission = helpers.load_module("modules.llm.ollama_install_admission")
 local Resolver = helpers.load_module_with_dependency("modules.llm.ollama_install_resolver", "luv", false)
 local fixture = helpers.load_module("tests.support.ollama_archive_fixture")
-local Json, AppDirs = require("json"), require("app_dirs")
-local source = assert(io.open(assert(require("infra.paths").shared("modules/llm/ollama_release.json")), "rb"))
+local Json, AppDirs = require("core.text.engine.json"), require("core.fs.engine.app_dirs")
+local source = assert(io.open(assert(require("infra.paths").shared("ai/data/ollama_release.json")), "rb"))
 local release_text = assert(source:read("*a")); assert(source:close())
 local function release() return assert(Json.decode_lossless(release_text)) end
 local catalogue = release()

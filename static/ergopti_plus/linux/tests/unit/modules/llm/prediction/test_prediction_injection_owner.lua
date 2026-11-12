@@ -26,11 +26,11 @@ local function scenario(action, phase, body)
 		local state = { logs = {}, bus = ":1.23", path = "/field/original", role = 61, now = 1000,
 			rows = {}, held = {}, writes = {}, requests = {}, errors = {}, stopped = 0, resets = 0, output = 0, paused = false,
 			owner_captures = 0, apply_admissions = 0, clipboard_reads = 0 }
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("trace")
 		logger.set_sink(function(line) state.logs[#state.logs + 1] = line end)
 		logger.set_error_observer(function(_, template) state.errors[#state.errors + 1] = template end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local policy = require("modules.keystats.keystats")
 		local configuration = assert(policy.configuration_snapshot()); configuration.private_filter_enabled = false
 		assert(policy.apply_configuration(configuration))

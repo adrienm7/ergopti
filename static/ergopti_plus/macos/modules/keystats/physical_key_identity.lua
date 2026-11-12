@@ -36,7 +36,7 @@
 
 local M = {}
 
-local Keycodes = require("keycodes")
+local Keycodes = require("platform.input.keycodes.core")
 local Wire     = require("modules.keystats.physical_wire")
 local Table    = require("_generated.hid_key_identity")
 
@@ -104,7 +104,7 @@ end
 ---@param catalogue table Reviewed shared metrics media identity document.
 ---@return table policy Media-only identity and aggregation interface.
 function M.media_policy(catalogue)
-	return require("keystats.media_identity").new(catalogue)
+	return require("metrics.engine.media.identity").new(catalogue)
 end
 
 return M

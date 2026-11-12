@@ -230,10 +230,10 @@ _HCWS_Main() {
 	Primary := 0, Observed := false
 	OnError(_HCWS_OnError)
 	try {
-		for Directory in [_SharedDir . "\modules\hotstrings", _ExtensionsDir, ScriptInformation["PersonalHotstringsDir"]]
+		for Directory in [_SharedDir . "\hotstrings\data\catalogue", _ExtensionsDir, ScriptInformation["PersonalHotstringsDir"]]
 			DirCreate(Directory)
-		IndexSource := _HCWS_SourceShared . "\modules\hotstrings\_index.toml"
-		IndexTarget := _SharedDir . "\modules\hotstrings\_index.toml"
+		IndexSource := _HCWS_SourceShared . "\hotstrings\data\catalogue\_index.toml"
+		IndexTarget := _SharedDir . "\hotstrings\data\catalogue\_index.toml"
 		FileCopy(IndexSource, IndexTarget, false)
 		IndexHash := CryptoSha256Bytes(FSReadBytesStrict(IndexSource))
 		_HCWS_Require(RegExMatch(IndexHash, "^[0-9a-f]{64}$")

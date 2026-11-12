@@ -13,11 +13,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
 local MODULES = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_loader",
-	"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "config_scope_transaction" }
+	"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "settings.engine.scope.transaction" }
 
 local function read(path)
 	local fh = io.open(path, "r")
@@ -156,7 +156,7 @@ helpers.describe("Linux tap-hold scope: restore recommended", function()
 			helpers.assert_nil(stored.tap_hold.inherit_defaults, "no inheritance stands in for the preset")
 			helpers.assert_nil(stored.tap_hold.enabled, "the switch is a config.toml row")
 			helpers.assert_eq(stored_switch(s),
-				require("infra.manifest_reader").recommended_for(require("config_keys").KEY.TAP_HOLDS_ENABLED))
+				require("infra.manifest_reader").recommended_for(require("settings.engine.keys").KEY.TAP_HOLDS_ENABLED))
 			local preset = require("platform.remap.tap_hold_loader").preset_keys(DEFAULTS)
 			helpers.assert_true(next(preset) ~= nil, "the shipped preset has keys")
 			helpers.assert_eq(stored.tap_hold.keys, preset)
@@ -199,7 +199,7 @@ helpers.describe("Linux tap-hold scope: the one-shot timeout", function()
 			local ok, detail = s.owner().apply("recommended")
 			helpers.assert_eq(ok, true, detail)
 			local stored = Codec.decode(read(s.config_path))
-			local recommended = require("infra.manifest_reader").recommended_for(require("config_keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
+			local recommended = require("infra.manifest_reader").recommended_for(require("settings.engine.keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
 			local timeout = stored.tap_holds and stored.tap_holds.sticky_timeout_ms
 			helpers.assert_true(timeout == nil or timeout == recommended, "the stored timeout is reset: " .. tostring(timeout))
 			helpers.assert_true(timeout ~= 4000)
@@ -313,7 +313,7 @@ end)
 -- restored left_alt entered an empty navigation layer. The restore now brings
 -- Ergopti's recommended layer along, never over a file the user has.
 helpers.describe("Linux tap-hold scope: the recommended navigation layer", function()
-	local PRESET = read(require("infra.paths").shared("keymap/layers.recommended.toml"))
+	local PRESET = read(require("infra.paths").shared("layouts/data/layers.recommended.toml"))
 
 	helpers.it("(nav-layer-fresh-install-default) a restore creates layers.toml and the engine runs its layer", function()
 		with_scope(nil, nil, function(s)
@@ -511,7 +511,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 			with_scope(nil, nil, function(s)
 				local calls = removal(s, function() return false end)
 				local owner = s.owner()
-				local participant = require("config_scope_participant").synchronous({
+				local participant = require("settings.engine.scope.participant").synchronous({
 					apply = function(selected) return owner.apply(selected) end,
 					owner = function() return owner end,
 				})
@@ -522,7 +522,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 					pending = function() return false end,
 					retry_restore = function(done) return done(true) end,
 				}
-				local composition = require("config_scope_composition").new({
+				local composition = require("settings.engine.scope.composition").new({
 					manifest = require("infra.manifest_reader"), scope = "global",
 					logger = helpers.make_logger_stub(),
 					participants = function() return { tap_holds = participant, llm = failed } end,
@@ -627,7 +627,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 					if path == layer_path then return refusal.run() end
 					return native(path)
 				end
-				local Preset = require("keymap.layer_preset")
+				local Preset = require("layouts.engine.layers.preset")
 				local imported = { status = Preset.IMPORTED, path = layer_path, content = bytes }
 				local undone, detail = Preset.undo(imported, s.files)
 				helpers.assert_eq(undone, false)
@@ -706,7 +706,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 				if releases == 1 then return false end
 				return native(retained)
 			end
-			local participant = require("config_scope_participant").synchronous({
+			local participant = require("settings.engine.scope.participant").synchronous({
 				apply = function(mode) return owner.apply(mode) end,
 				owner = function() return owner end,
 			})
@@ -718,7 +718,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 				pending = function() return false end,
 				retry_restore = function(done) return done(true) end,
 			}
-			local composition = require("config_scope_composition").new({
+			local composition = require("settings.engine.scope.composition").new({
 				manifest = require("infra.manifest_reader"), scope = "global",
 				logger = helpers.make_logger_stub(),
 				participants = function() return { tap_holds = participant, llm = next_category } end,

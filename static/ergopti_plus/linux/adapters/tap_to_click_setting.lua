@@ -37,7 +37,7 @@ local M = {}
 local Shell = require("adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
 local TapDetector = require("modules.gestures.tap_detector")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 -- Seconds each tool call may take (see FEATURES 1).
 local TOOL_TIMEOUT_S = 1

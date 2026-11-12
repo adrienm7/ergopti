@@ -328,7 +328,7 @@ global GESTURE_ACTIONS := Map(
 ; thing, where a wrong copy is invisible: a `copy` action that sends Ctrl+X is
 ; not a crash and not a failing test.
 ;
-; They now come from _shared/modules/actions/actions.toml through
+; They now come from _shared/shortcuts/data/actions/actions.toml through
 ; _generated/gesture_emit_actions.ahk. Registered HERE, at static-init: a
 ; handler built by anything deferred off the boot path would open a window in
 ; which a gesture fires and finds nothing registered.
@@ -350,7 +350,7 @@ for _EmitId, _Emit in GestureEmitActionsData() {
 ;
 ; llm_predict_<id> is llm_prompt_prediction with that built-in profile and the
 ; AI menu's count. Registered from LLM_PROFILE_BUILTIN_ORDER, the driver's list
-; of the built-ins in _shared/modules/llm/profiles.json, so a new built-in gets
+; of the built-ins in _shared/ai/data/profiles.json, so a new built-in gets
 ; its action with no second list to update; the catalogue parity test fails if
 ; the generated catalogue and this registry ever disagree.
 for _PresetProfileId in LLM_PROFILE_BUILTIN_ORDER {
@@ -449,7 +449,7 @@ _GestureActionLabel(Name) {
 	; A sticky label is a template its modifiers fill from the key name table
 	; (« 📌 {1} rémanents »), Cmd being Win and Option Alt. It used to spell
 	; macOS's English names and swap two of them. sticky_hyper is named by its
-	; own word. Port of _shared/lua/actions/sticky_label.lua.
+	; own word. Port of _shared/shortcuts/engine/actions/sticky_label.lua.
 	if (InStr(Name, "sticky_") == 1) && (Name != "sticky_hyper")
 		return KeyNameFill(Key, KeyNameModifiersLabel(StickyModifierNames(Name)))
 	return Translated
@@ -789,7 +789,7 @@ for _CaseActionId, _CaseTransform in GestureCaseTransforms()
 		GESTURE_ACTIONS[_CaseActionId] := { Fn: _GestureMakeCaseAction(_CaseTransform) }
 
 ; The pair a wrap_selection parameter names, resolved against the built-in
-; catalogue (_WS_BUILTIN_PAIRS, loaded from _shared/modules/wrap_symbols/wrap_symbols.json).
+; catalogue (_WS_BUILTIN_PAIRS, loaded from _shared/keyboard/data/wrap_symbols/wrap_symbols.json).
 ; @param {String} Value The stored parameter.
 ; @returns {Map|String} Map("left", ..., "right", ...), or "" when it names none.
 GestureWrapPairFor(Value) {
@@ -959,7 +959,7 @@ _GestureJoin(Values, Separator) {
 _GestureRegisterModifierChords() {
 		global GESTURE_ACTIONS, GESTURE_MODIFIER_ACTION_PARTS, GESTURE_MODIFIER_ACTION_GROUPS, _SharedDir
 
-		Path := _SharedDir . "\modules\actions\modifier_chords.json"
+		Path := _SharedDir . "\shortcuts\data\actions\modifier_chords.json"
 		Raw := FSRead(Path)
 		if (Raw = false) {
 				try LoggerWarn("gestures", "Cannot load shared modifier chords from '{1}'.", Path)
@@ -1201,7 +1201,7 @@ GestureEditPersonalShortcuts() {
 		}
 }
 
-; The Windows action catalogue, generated from _shared/modules/actions/actions.toml
+; The Windows action catalogue, generated from _shared/shortcuts/data/actions/actions.toml
 ; by tools/codegen/codegen-action-catalogue.cjs and already filtered to this
 ; platform. It used to be built by parsing the TOML with ParseTomlFile inside a
 ; loader deferred off the boot path (a SetTimer worth ~100 ms); the generated

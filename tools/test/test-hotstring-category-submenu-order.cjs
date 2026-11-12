@@ -27,7 +27,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 
 const manifest = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared/menu/data/menu_manifest.json'), 'utf8')
 );
 const {
 	hotstringScopePublication,

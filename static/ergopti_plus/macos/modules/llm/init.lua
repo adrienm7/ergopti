@@ -14,18 +14,18 @@ local Profiles  = require("modules.llm.profiles")
 local ApiOllama = require("modules.llm.api_ollama")
 local ApiMlx    = require("modules.llm.api_mlx")
 local ApiRemote = require("modules.llm.api_remote")
-local LocalAuth = require("llm.local_server_auth")
+local LocalAuth = require("ai.engine.local_servers.auth")
 local LocalServers = require("modules.llm.local_servers")
-local RuntimeChoice = require("core.llm.ollama_runtime_choice")
-local EnableAdmission = require("llm.enable_admission")
+local RuntimeChoice = require("core.lifecycle.engine.core.ollama_runtime_choice")
+local EnableAdmission = require("ai.engine.settings.enable_admission_core")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local Logger    = require("infra.logger")
 local Paths     = require("infra.paths")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Storage = require("adapters.storage")
 local JsonCodec = require("adapters.json_codec")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "llm.core"
 
@@ -41,7 +41,7 @@ M.BUILTIN_PROFILES = Profiles.BUILTIN_PROFILES
 -- =======================================
 -- =======================================
 
---- Shared scalar/boolean defaults: keys that live in _shared/modules/llm/defaults.json
+--- Shared scalar/boolean defaults: keys that live in _shared/ai/data/defaults.json
 --- under the same name on every driver. Sourced EXCLUSIVELY from the JSON — the
 --- values are never re-declared here (rule 5.2 single source of truth).
 local _SHARED_SCALAR_KEYS = {
@@ -83,21 +83,21 @@ local function load_shared_defaults()
 	-- performs the dual-root upward walk so it is deterministic in production
 	-- and in headless tests alike — independent of hs.configdir layout.
 	local raw, used = nil, nil
-	local p = Paths.shared("modules/llm/defaults.json")
+	local p = Paths.shared("ai/data/defaults.json")
 	if type(p) == "string" and p ~= "" then
 		local fh = io.open(p, "r")
 		if fh then raw = fh:read("*a"); fh:close(); used = p end
 	end
 
 	if not raw or raw == "" then
-		Logger.error(LOG, "_shared/modules/llm/defaults.json not found on any candidate path — LLM defaults cannot be initialised.")
-		error("ergopti_plus: _shared/modules/llm/defaults.json is required but was not found")
+		Logger.error(LOG, "_shared/ai/data/defaults.json not found on any candidate path — LLM defaults cannot be initialised.")
+		error("ergopti_plus: _shared/ai/data/defaults.json is required but was not found")
 	end
 
 	local parsed, decode_err = JsonCodec.decode(raw)
 	if decode_err ~= nil or type(parsed) ~= "table" then
-		Logger.error(LOG, "_shared/modules/llm/defaults.json (%s) could not be parsed — LLM defaults cannot be initialised.", tostring(used))
-		error("ergopti_plus: _shared/modules/llm/defaults.json failed to parse")
+		Logger.error(LOG, "_shared/ai/data/defaults.json (%s) could not be parsed — LLM defaults cannot be initialised.", tostring(used))
+		error("ergopti_plus: _shared/ai/data/defaults.json failed to parse")
 	end
 
 	-- Start from the HS-only defaults, then layer every shared value on top.
@@ -137,8 +137,8 @@ local function load_shared_defaults()
 	end
 
 	if #missing > 0 then
-		Logger.error(LOG, "_shared/modules/llm/defaults.json is missing required key(s): %s — LLM defaults incomplete.", table.concat(missing, ", "))
-		error("ergopti_plus: _shared/modules/llm/defaults.json is missing required key(s): " .. table.concat(missing, ", "))
+		Logger.error(LOG, "_shared/ai/data/defaults.json is missing required key(s): %s — LLM defaults incomplete.", table.concat(missing, ", "))
+		error("ergopti_plus: _shared/ai/data/defaults.json is missing required key(s): " .. table.concat(missing, ", "))
 	end
 
 	-- Whether the prompt profile follows the selected model: the manifest's
@@ -2025,7 +2025,7 @@ end
 -- Flat index: { [label] = { ollama = "...", mlx = "..." } } — built once from JSON
 local _model_index = nil
 
---- Builds and caches a flat O(1) lookup index from _shared/modules/llm/models.json.
+--- Builds and caches a flat O(1) lookup index from _shared/ai/data/models.json.
 --- @return table The index keyed by model label.
 local function get_model_index()
 	if _model_index then return _model_index end
@@ -2063,7 +2063,7 @@ end
 
 --- Translates a JSON model label to the backend-specific identifier in O(1).
 --- e.g., "gemma-4-E2B-it" -> "gemma4:e2b" (Ollama) or "gemma-4-e2b-it-mxfp4" (MLX)
---- @param label string The model label ("name" field from _shared/modules/llm/models.json).
+--- @param label string The model label ("name" field from _shared/ai/data/models.json).
 --- @param backend string The target backend identifier.
 --- @return string The backend-specific identifier, or label unchanged if not found.
 local function resolve_model_for_backend(label, backend)
@@ -2099,7 +2099,7 @@ end
 --- 11 November 2026).
 --- @return table snapshot
 function M.request_settings()
-	local RequestSettings = require("llm.request_settings")
+	local RequestSettings = require("ai.engine.settings.request_settings")
 	local backend = CoreState.backend
 	if backend == "api" then
 		local entry = ApiRemote.get_active_entry()
@@ -2242,7 +2242,7 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 	-- A batch profile asks once for every variant, but only above one prediction:
 	-- the rule of the shared plan and of the prompt selector, as on Windows and
 	-- Linux. A single prediction of a batch profile used to take the batch path.
-	local batching = require("llm.request_plan.batching").plan(
+	local batching = require("ai.engine.request_plan.batching").plan(
 		type(profile) == "table" and (profile.batch and true or false), num_predictions)
 	if type(profile) == "table" and batching.mode == "sequential" then
 		if num_predictions > 1 and not sequential_mode then

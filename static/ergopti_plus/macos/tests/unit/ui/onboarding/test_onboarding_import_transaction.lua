@@ -18,7 +18,7 @@ helpers.describe("onboarding configuration import transaction", function()
 				state.native_encode = function(value, encode)
 					local function native_shape(item)
 						if type(item) ~= "table" then return item end
-						if next(item) == nil then return require("json").array({}) end
+						if next(item) == nil then return require("core.text.engine.json").array({}) end
 						local result = {}
 						for key, child in pairs(item) do result[key] = native_shape(child) end
 						return result
@@ -156,7 +156,7 @@ helpers.describe("onboarding empty configuration folder", function()
 					if attributes and attributes.mode == "file" then attributes.size = #content_for(path) end
 					return attributes
 				end
-				package.loaded["infra.toml.codec"].decode = require("toml_codec").decode
+				package.loaded["infra.toml.codec"].decode = require("core.text.engine.toml_codec").decode
 				package.loaded["platform.remap"].recommended_key_report = function(path)
 					remap_paths[#remap_paths + 1] = path
 					return { enabled = false, keys = {} }
@@ -202,7 +202,7 @@ helpers.describe("onboarding empty configuration folder", function()
 				if attributes and attributes.mode == "file" then attributes.size = #content end
 				return attributes
 			end
-			package.loaded["infra.toml.codec"].decode = require("toml_codec").decode
+			package.loaded["infra.toml.codec"].decode = require("core.text.engine.toml_codec").decode
 			io.open = function(path, access)
 				helpers.assert_eq(access, "r")
 				reads[#reads + 1] = path
@@ -255,7 +255,7 @@ helpers.describe("onboarding retained configuration source", function()
 					return { enabled = false, keys = {} }
 				end
 				if phase == "encode" then
-					local encode = require("json").encode
+					local encode = require("core.text.engine.json").encode
 					state.encode = function(value)
 						state.encode = nil
 						replace_source()

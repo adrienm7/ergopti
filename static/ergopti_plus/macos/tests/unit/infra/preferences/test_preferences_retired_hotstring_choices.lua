@@ -37,18 +37,18 @@ local SOURCE = table.concat({
 --- Loads a private config.toml through the real preferences owner.
 --- @param body function Receives (preferences, path, warnings, catalogue).
 local function with_source(body)
-	helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim",
-		"config_outdated", "infra.hotstring_choice_catalogue" }, function()
+	helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim",
+		"settings.engine.migration.outdated", "infra.hotstring_choice_catalogue" }, function()
 		local warnings = {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...)
 			warnings[#warnings + 1] = select("#", ...) > 0 and string.format(fmt, ...) or fmt
 		end
 		logger.error = logger.warn
-		package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+		package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		package.loaded["adapters.file_system"] = nil
 		package.loaded["infra.hotstring_choice_catalogue"] = nil
-		local config_outdated = require("config_outdated")
+		local config_outdated = require("settings.engine.migration.outdated")
 		if type(config_outdated.reset_for_tests) == "function" then config_outdated.reset_for_tests() end
 		local preferences = helpers.load_with_stubs("infra.preferences")
 		local catalogue = require("infra.hotstring_choice_catalogue")
@@ -134,9 +134,9 @@ helpers.describe("retired hotstring choices (hotstring-choice-retired-2026-10-23
 
 	helpers.it("keeps a retired choice in the file across a save", function()
 		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.hotstring_choice_catalogue",
-			"config_outdated" }, function()
+			"settings.engine.migration.outdated" }, function()
 			package.loaded["infra.hotstring_choice_catalogue"] = nil
-			require("config_outdated").reset_for_tests()
+			require("settings.engine.migration.outdated").reset_for_tests()
 			local path = "/virtual/retired_choices/config.toml"
 			local disk = { [path] = SOURCE }
 			local preferences = load_fixture_preferences(disk)
@@ -156,9 +156,9 @@ helpers.describe("retired hotstring choices (hotstring-choice-retired-2026-10-23
 
 	helpers.it("keeps every retired choice when the state holds no category at all", function()
 		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.hotstring_choice_catalogue",
-			"config_outdated" }, function()
+			"settings.engine.migration.outdated" }, function()
 			package.loaded["infra.hotstring_choice_catalogue"] = nil
-			require("config_outdated").reset_for_tests()
+			require("settings.engine.migration.outdated").reset_for_tests()
 			local path = "/virtual/retired_choices/empty.toml"
 			local disk = { [path] = "[hotstrings.groups]\nremoved = true\n" }
 			local preferences = load_fixture_preferences(disk)

@@ -1,7 +1,7 @@
 # .github/ISSUE_TEMPLATE/bug_report.yml
 #
 # The form ErgoptiPlus opens from Debug > Report a bug. The app prefills the
-# fields listed in static/ergopti_plus/_shared/modules/diagnostics/issue_templates.json
+# fields listed in static/ergopti_plus/_shared/diagnostics/data/issue_templates.json
 # by their `id`; tools/test/test-issue-templates.cjs keeps both in step.
 # Labels live here because the URL's `labels=` parameter only applies to users
 # with triage permission. GitHub drops a label the repository does not have, so

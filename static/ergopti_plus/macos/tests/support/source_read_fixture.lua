@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local Discovery = require("test.runner_discovery")
+local Discovery = require("tests.lua.core.runner_discovery")
 
 --- Runs a source collector against controlled file failures and a repair.
 --- @param root string Driver root with its trailing separator.

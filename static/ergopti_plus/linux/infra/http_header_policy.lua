@@ -10,7 +10,7 @@
 
 local M = {}
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local Reader = require("infra.regular_file_reader")
 
@@ -27,7 +27,7 @@ local _bytes = nil
 --- @return table|nil bytes, string|nil error
 local function load_bytes()
 	if _bytes then return _bytes end
-	local path = Paths.shared("data/http/header_policy.json")
+	local path = Paths.shared("core/network/data/http/header_policy.json")
 	local file = path and Reader.open_source(path)
 	if not file then return nil, "HTTP header policy is unavailable" end
 	local content = file:read("*a")

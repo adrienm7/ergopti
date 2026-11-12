@@ -33,17 +33,17 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[2]
 STAGER = ROOT / "tools/dev/stage-macos-dev-ollama-catalogue.py"
 SHARED = "static/ergopti_plus/_shared"
-CONTRACT = SHARED + "/modules/llm/managed_ollama_runtime.json"
-OFFICIAL_RELEASE = SHARED + "/modules/llm/ollama_release.json"
+CONTRACT = SHARED + "/ai/data/managed_ollama_runtime.json"
+OFFICIAL_RELEASE = SHARED + "/ai/data/ollama_release.json"
 RUNTIME = "static/ergopti_plus/macos/modules/llm/managed_ollama_runtime.py"
 INPUTS = (
     CONTRACT,
     OFFICIAL_RELEASE,
-    SHARED + "/modules/updater/channels.json",
-    SHARED + "/data/identifiers.json",
-    SHARED + "/python/managed_ollama_runtime.py",
-    SHARED + "/python/network_proxy_policy.py",
-    SHARED + "/python/managed_source_alias.py",
+    SHARED + "/updater/data/channels.json",
+    SHARED + "/core/text/data/identifiers.json",
+    SHARED + "/ai/adapters/python/managed_ollama_runtime.py",
+    SHARED + "/core/network/adapters/python_network_proxy_policy.py",
+    SHARED + "/ai/adapters/python/managed_source_alias.py",
     RUNTIME,
     "static/ergopti_plus/macos/modules/llm/managed_bootstrap_http.py",
 )

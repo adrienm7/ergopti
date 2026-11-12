@@ -9,12 +9,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.path
+package.path = SHARED .. "?.lua;" .. SHARED .. "?/init.lua;" .. package.path
 
-local FailureClass = require("llm.failure_class")
+local FailureClass = require("ai.engine.policy.failure_class")
 
 local function read_vectors()
 	local path = SHARED .. "tests/corpus/llm/auth_failure_vectors.json"

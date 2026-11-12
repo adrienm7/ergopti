@@ -18,13 +18,13 @@ local helpers = require("tests.helpers")
 --- @param source string TOML source.
 --- @param body function Receives { config, path, load, read, errors }.
 local function with_file(source, body)
-	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger", "logger.shim",
-		"toml_codec", "infra.toml.codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger", "core.logger.engine.shim",
+		"core.text.engine.toml_codec", "infra.toml.codec" }, function()
 		local errors = {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
-		require("config_outdated").reset_for_tests()
+		package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+		require("settings.engine.migration.outdated").reset_for_tests()
 		local config = helpers.load_with_stubs("platform.remap.config")
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb")); assert(file:write(source)); assert(file:close())

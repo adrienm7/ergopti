@@ -201,7 +201,7 @@ if (!assemblyFunction) {
 					`
 set -euo pipefail
 # The builder names the guardian plist through the shared identifiers.
-. "$2/static/ergopti_plus/_shared/data/identifiers.sh"
+. "$2/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 REPO_ROOT="$1"
 LAUNCHER_DIR="$1/launcher"
 BUILD_DIR="$1/build"

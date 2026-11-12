@@ -5,7 +5,7 @@
  * MODULE: Config-Key and Menu-Command Constants Codegen
  * DESCRIPTION:
  * Emits one constant per configuration key and per menu command id, for the
- * Lua drivers (macOS and Linux share `_shared/lua/config_keys.lua`), the shared
+ * Lua drivers (macOS and Linux share `_shared/settings/engine/keys.lua`), the shared
  * web UI (`_shared/ui/_generated/config_keys.js`) and the AutoHotkey driver
  * (`windows/_generated/config_keys.ahk`).
  *
@@ -20,13 +20,13 @@
  * class whose missing static property throws).
  *
  * SOURCES, BOTH READ AS DATA:
- * 1. `_shared/core/config_schema/config.schema.json`: every property path,
+ * 1. `_shared/settings/data/config_schema/config.schema.json`: every property path,
  *    sections included, with `$ref` resolved.
- * 2. `_shared/modules/menu/menu_manifest.json`: the `path` of every row that
+ * 2. `_shared/menu/data/menu_manifest.json`: the `path` of every row that
  *    names a configuration leaf (some are not yet declared in the schema), and
  *    the `id` of every dispatchable row (command, check, toggle, choice).
  *
- * 3. `_shared/core/config_schema/config_key_extras.json`: the few paths code
+ * 3. `_shared/settings/data/config_schema/config_key_extras.json`: the few paths code
  *    spells that neither source declares (dynamic tables, tap-hold timing).
  *
  * Every ancestor of a key is a key too (`shortcuts.caps_word` for
@@ -47,10 +47,10 @@ const fs = require('fs');
 const path = require('path');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
-const SCHEMA = 'static/ergopti_plus/_shared/core/config_schema/config.schema.json';
-const MENU_MANIFEST = 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json';
-const EXTRAS = 'static/ergopti_plus/_shared/core/config_schema/config_key_extras.json';
-const LUA_OUTPUT = 'static/ergopti_plus/_shared/lua/config_keys.lua';
+const SCHEMA = 'static/ergopti_plus/_shared/settings/data/config_schema/config.schema.json';
+const MENU_MANIFEST = 'static/ergopti_plus/_shared/menu/data/menu_manifest.json';
+const EXTRAS = 'static/ergopti_plus/_shared/settings/data/config_schema/config_key_extras.json';
+const LUA_OUTPUT = 'static/ergopti_plus/_shared/settings/engine/keys.lua';
 const JS_OUTPUT = 'static/ergopti_plus/_shared/ui/_generated/config_keys.js';
 const CJS_OUTPUT = 'tools/lib/_generated/config_keys.cjs';
 const AHK_OUTPUT = 'static/ergopti_plus/windows/_generated/config_keys.ahk';
@@ -211,9 +211,9 @@ function emitLua(tables) {
 			'\n})'
 	).join('\n\n');
 	return (
-		'--- _shared/lua/config_keys.lua\n' +
-		'--- AUTO-GENERATED from _shared/core/config_schema/config.schema.json and\n' +
-		'--- _shared/modules/menu/menu_manifest.json.\n' +
+		'--- _shared/settings/engine/keys.lua\n' +
+		'--- AUTO-GENERATED from _shared/settings/data/config_schema/config.schema.json and\n' +
+		'--- _shared/menu/data/menu_manifest.json.\n' +
 		'--- DO NOT EDIT BY HAND — run `npm run codegen:config-keys` to refresh.\n' +
 		'\n' +
 		'--- ==============================================================================\n' +
@@ -351,8 +351,8 @@ function emitAhk(tables) {
 	).join('\n\n');
 	return (
 		'﻿; _generated/config_keys.ahk\n' +
-		'; AUTO-GENERATED from _shared/core/config_schema/config.schema.json and\n' +
-		'; _shared/modules/menu/menu_manifest.json.\n' +
+		'; AUTO-GENERATED from _shared/settings/data/config_schema/config.schema.json and\n' +
+		'; _shared/menu/data/menu_manifest.json.\n' +
 		'; DO NOT EDIT BY HAND — run `npm run codegen:config-keys` to refresh.\n' +
 		'#Requires AutoHotkey v2.0\n' +
 		'\n' +

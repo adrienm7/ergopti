@@ -731,7 +731,7 @@ helpers.describe("managed source cohort provider and logger reentry", function()
 		helpers.it("blocks actual " .. callback_kind .. " reentry before final cohort publication", function()
 			local Fixture = require("tests.support.input_owner_fixture")
 			Fixture.with_session({ on_capture_reacquired = function() return true end }, function(s)
-				local finder, logger = package.loaded["modules.hotstrings.device_finder"], require("logger.shim")
+				local finder, logger = package.loaded["modules.hotstrings.device_finder"], require("core.logger.engine.shim")
 				local find, success = finder.find_devices, logger.success
 				local observed = false
 				local function attempt()

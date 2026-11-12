@@ -38,9 +38,9 @@ local function expect(ok, label)
 end
 
 local Updater = require("modules.updater.manager")
-local Json = require("json")
-local Redact = require("diagnostics.redact")
-local rules = assert(Json.decode(read(DRIVER .. "/../_shared/modules/diagnostics/redaction.json")))
+local Json = require("core.text.engine.json")
+local Redact = require("diagnostics.engine.reports.redact")
+local rules = assert(Json.decode(read(DRIVER .. "/../_shared/diagnostics/data/redaction.json")))
 local http_evidence = { schema_version = 1, responses = {} }
 local evidence_dir = os.getenv("ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR")
 local transport_get = Updater._http_client.get

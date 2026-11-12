@@ -5,8 +5,8 @@
 ; DESCRIPTION:
 ; Builds the one-line environment summary the driver logs once boot completes.
 ; The field list and rendering rules are the cross-driver contract in
-; _shared/modules/logger/diagnostic_snapshot.json; macOS and Linux render the
-; same fields through _shared/lua/diagnostics/snapshot.lua.
+; _shared/core/logger/data/diagnostic_snapshot.json; macOS and Linux render the
+; same fields through _shared/diagnostics/engine/snapshot.lua.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One line, identical field names on every driver: a user log answers "which
@@ -60,7 +60,7 @@ DiagSnapshot_CollectionIdentity() {
 	Identity := Map("compiled", A_IsCompiled ? 1 : 0, "evidence_origin", "resident_driver", "version", Updater_CurrentVersion(),
 		"source_sha", SourceSha, "architecture", A_PtrSize == 8 ? "x64" : "x86",
 		"runtime", A_AhkVersion, "receiver_title", t("healthcheck.collection.start"))
-	Rules := JsonParse(FSReadStrict(_SharedDir . "\modules\diagnostics\redaction.json"))
+	Rules := JsonParse(FSReadStrict(_SharedDir . "\diagnostics\data\redaction.json"))
 	Context := HealthCheck_RedactionContext()
 	for Key in ["version", "source_sha", "architecture", "runtime", "receiver_title"] {
 		if Redact_Apply(Identity[Key], Rules, Context) != Identity[Key]
@@ -85,7 +85,7 @@ DiagSnapshot_ResidentObservations(Contract := 0) {
 	global _PrefixContentGeneration, _PrefixWatcherSuppressed, _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL
 	global _OllamaIdentityPendingHandles
 	if !(Contract is Map)
-		Contract := JsonParse(FSReadStrict(_SharedDir . "\modules\diagnostics\collection.json"))
+		Contract := JsonParse(FSReadStrict(_SharedDir . "\diagnostics\data\collection.json"))
 	Fields := Contract["resident_observation_fields"]
 	Rows := []
 	for Id in ["hotstrings", "ai", "capture_replay", "fifo"]

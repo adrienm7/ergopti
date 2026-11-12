@@ -223,7 +223,7 @@ helpers.describe("modules.updater.manager", function()
 			release("v0.0.0-dev.134", true), release("v1.2.0", false),
 			release("v1.3.0-beta.1", true), release("v0.0.0-dev.133", true), release("v1.1.0", false),
 		}, ",") .. "]"
-		local Parser = require("updater.release_parser")
+		local Parser = require("updater.engine.release_parser")
 		helpers.assert_eq(Parser.parse_tag(M._select_channel_release(list, "main")), "v1.2.0",
 			"the stable channel keeps its latest stable release, not the newest publication")
 		helpers.assert_eq(Parser.parse_tag(M._select_channel_release(list, "dev")), "v0.0.0-dev.134")

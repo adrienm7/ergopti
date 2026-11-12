@@ -106,7 +106,7 @@ async function parseToml(source) {
  * @returns {Promise<object>} The parsed manifest.
  */
 async function loadManifest() {
-	const source = fs.readFileSync(paths.shared('modules/features/manifest.toml'), 'utf8');
+	const source = fs.readFileSync(paths.shared('settings/data/features/manifest.toml'), 'utf8');
 	return parseToml(
 		source.replace(
 			/^\[\[features\.([^\]]+)\]\]$/gm,
@@ -203,7 +203,7 @@ async function checkPlatform(manifest, platform, spec) {
  */
 async function exampleTable(table) {
 	const source = fs.readFileSync(
-		paths.shared('core/config_schema/examples/ahk_config.example.toml'),
+		paths.shared('settings/data/config_schema/examples/ahk_config.example.toml'),
 		'utf8'
 	);
 	const values = {};

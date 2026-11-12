@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Publication = require("tests.support.ui.metrics.typing.publication")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local FakeSqlite = require("tests.support.fake_ngram_sqlite")
 local with_delivery = require("tests.support.typing_delivery_fixture")
 local M = {}

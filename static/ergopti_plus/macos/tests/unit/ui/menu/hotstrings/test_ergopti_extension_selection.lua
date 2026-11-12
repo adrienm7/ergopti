@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
-require("test.ergopti_extension_selection_contract").run(helpers, require("infra.manifest_reader").features())
+require("tests.lua.ergopti_extension_selection_contract").run(helpers, require("infra.manifest_reader").features())
 
 --- Provides the real files beneath a shipped scanner root.
 --- @return table Scanner filesystem collaborators.
@@ -83,7 +83,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 			Packs._reset()
 			local found = Packs.discover({ { pack = helpers.driver_root() .. "../../layouts/registry/ergopti" } }, scanner_io())
 			helpers.assert_eq(#found, 1, "the shipped pack needs no installed-layout record")
-			local common = helpers.shared("modules/hotstrings/magickey.toml")
+			local common = helpers.shared("hotstrings/data/catalogue/magickey.toml")
 			local path, sources = Packs.route("magickey", common)
 			helpers.assert_true(Keymap.load_toml("magickey", path, sources))
 			local suffix_path = Packs.route("french_distancesreduction", nil)

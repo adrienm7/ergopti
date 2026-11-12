@@ -5,7 +5,7 @@
  * MODULE: Shell Identifiers Are Sourced Fail-Fast
  * DESCRIPTION:
  * The build scripts, installers and bootstrap scripts read the application
- * names, bundle ids and hosts from _shared/data/identifiers.sh. This gate keeps
+ * names, bundle ids and hosts from _shared/core/text/data/identifiers.sh. This gate keeps
  * that dependency honest:
  * 1. every script sources the file in one of two recognised forms:
  *    - BUILD: from the checkout root ($REPO_ROOT or $PROJECT_ROOT), for the
@@ -42,12 +42,12 @@ const { bashExecutable } = require('../lib/git-bash.cjs');
 const payload = require('../build/macos-bundle-payload.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const IDENTIFIERS_REL = 'static/ergopti_plus/_shared/data/identifiers.sh';
+const IDENTIFIERS_REL = 'static/ergopti_plus/_shared/core/text/data/identifiers.sh';
 const DRIVERS_ROOT_REL = 'static/ergopti_plus';
 const BUILD_LINE =
-	/^\. "\$(?:REPO_ROOT|PROJECT_ROOT)\/static\/ergopti_plus\/_shared\/data\/identifiers\.sh"$/m;
+	/^\. "\$(?:REPO_ROOT|PROJECT_ROOT)\/static\/ergopti_plus\/_shared\/core\/text\/data\/identifiers\.sh"$/m;
 const ANCHOR = String.raw`(\$\{?(?:SCRIPT_DIR|DRIVERS_ROOT)\}?|\$\(dirname "\$\{BASH_SOURCE\[0\]\}"\))`;
-const RELATIVE = String.raw`((?:\/\.\.)*(?:\/_shared)?\/data\/identifiers\.sh)`;
+const RELATIVE = String.raw`((?:\/\.\.)*(?:\/_shared)?\/core\/text\/data\/identifiers\.sh)`;
 const PROPAGATE = String.raw`( \|\| return [1-9][0-9]*)?`;
 const RUNTIME_LINE = new RegExp(String.raw`^\. "${ANCHOR}${RELATIVE}"${PROPAGATE}$`, 'm');
 const RUNTIME_ASSIGNMENT = new RegExp(String.raw`^IDENTIFIERS_FILE="${ANCHOR}${RELATIVE}"$`, 'm');
@@ -83,30 +83,30 @@ function classify(file, text) {
 for (const [file, line, expected] of [
 	[
 		'static/ergopti_plus/macos/modules/llm/x.sh',
-		'. "$SCRIPT_DIR/../../../_shared/data/identifiers.sh"',
+		'. "$SCRIPT_DIR/../../../_shared/core/text/data/identifiers.sh"',
 		IDENTIFIERS_REL
 	],
 	[
 		'static/ergopti_plus/macos/modules/llm/x.sh',
-		'. "$SCRIPT_DIR/../../_shared/data/identifiers.sh"',
-		'static/ergopti_plus/macos/_shared/data/identifiers.sh'
+		'. "$SCRIPT_DIR/../../_shared/core/text/data/identifiers.sh"',
+		'static/ergopti_plus/macos/_shared/core/text/data/identifiers.sh'
 	],
 	[
 		'static/ergopti_plus/_shared/modules/llm/install/x.sh',
-		'. "$SCRIPT_DIR/../../../data/identifiers.sh"',
+		'. "$SCRIPT_DIR/../../../core/text/data/identifiers.sh"',
 		IDENTIFIERS_REL
 	],
 	[
 		'static/ergopti_plus/linux/x.sh',
-		'. "${DRIVERS_ROOT}/_shared/data/identifiers.sh"',
+		'. "${DRIVERS_ROOT}/_shared/core/text/data/identifiers.sh"',
 		IDENTIFIERS_REL
 	]
 ]) {
 	assert.equal(classify(file, `set -e\n${line}\n`).resolved, expected, `${file}: ${line}`);
 }
-assert.equal(classify('x.sh', '. "$HOME/_shared/data/identifiers.sh"\n'), null);
+assert.equal(classify('x.sh', '. "$HOME/_shared/core/text/data/identifiers.sh"\n'), null);
 assert.equal(
-	classify('x.sh', '. "$SCRIPT_DIR/../_shared/data/identifiers.sh" || true\n'),
+	classify('x.sh', '. "$SCRIPT_DIR/../_shared/core/text/data/identifiers.sh" || true\n'),
 	null,
 	'a tolerated failure is not a recognised form'
 );
@@ -127,7 +127,9 @@ const scripts = execFileSync('git', ['ls-files', '-z', '--', 'tools', 'static'],
 			.split('\n')
 			.some(
 				(line) =>
-					!/^\s*#/.test(line) && !/^\s*"[^"$]*"$/.test(line) && line.includes('data/identifiers.sh')
+					!/^\s*#/.test(line) &&
+					!/^\s*"[^"$]*"$/.test(line) &&
+					line.includes('core/text/data/identifiers.sh')
 			)
 	);
 
@@ -175,8 +177,8 @@ for (const file of scripts) {
 		if (LINUX_BUNDLED.test(file))
 			assert.match(
 				linuxRequired[1],
-				/^\t"_shared\/data\/identifiers\.sh"$/m,
-				`${file}: build-linux-driver.sh must require _shared/data/identifiers.sh`
+				/^\t"_shared\/core\/text\/data\/identifiers\.sh"$/m,
+				`${file}: build-linux-driver.sh must require _shared/core/text/data/identifiers.sh`
 			);
 	}
 

@@ -27,7 +27,7 @@ local function with_native(body, catalogue)
 	end
 	native.file(CONFIG, "directory", "rwx------")
 	native.file(ROOT, "directory", "rwx------")
-	native.file("/shared/modules/actions/program_providers.json")
+	native.file("/shared/shortcuts/data/actions/program_providers.json")
 	native.directories[CONFIG] = { "scripts" }
 	native.directories[ROOT] = {}
 	native.file("/bin", "directory", "rwxr-xr-x")
@@ -78,7 +78,7 @@ local function with_native(body, catalogue)
 		io.open = function(path, mode)
 			helpers.assert_eq(mode, "rb")
 			native.opened[#native.opened + 1] = path
-			if path == "/shared/modules/actions/program_providers.json" then
+			if path == "/shared/shortcuts/data/actions/program_providers.json" then
 				local handle = { read = function() return catalogue or RAW end }
 				function handle:close()
 					native.close_handles[#native.close_handles + 1] = self
@@ -142,7 +142,7 @@ helpers.describe("native provider inventory through shared policy", function()
 			local owner = assert(adapter.create()); local result = assert(owner.discover())
 			helpers.assert_eq(#result.choices, 1)
 			local scalar = assert(owner.resolve(result.choices[1].key, { "", "$(touch PRIVATE)", "'`\"\n", "e\204\129" }))
-			local descriptor = require("json").decode_lossless(scalar)
+			local descriptor = require("core.text.engine.json").decode_lossless(scalar)
 			helpers.assert_eq(descriptor.executable, "/bin/sh")
 			helpers.assert_eq(descriptor.arguments, { ROOT .. "/" .. name, "", "$(touch PRIVATE)", "'`\"\n", "e\204\129" })
 		end)
@@ -199,7 +199,7 @@ helpers.describe("native provider inventory through shared policy", function()
 			native.links["/usr/local/bin/python3"] = "/opt/Python/bin/python3"
 			native.file("/opt/Python/bin/python3", "file", "rwxr-xr-x")
 			local owner = assert(adapter.create()); local result = assert(owner.discover())
-			local descriptor = require("json").decode_lossless(assert(owner.resolve(result.choices[1].key, {})))
+			local descriptor = require("core.text.engine.json").decode_lossless(assert(owner.resolve(result.choices[1].key, {})))
 			helpers.assert_eq(descriptor.executable, "/opt/Python/bin/python3")
 			native.files[descriptor.executable].ino = native.files[descriptor.executable].ino + 1
 			helpers.assert_nil(owner.resolve(result.choices[1].key, {}))
@@ -271,7 +271,7 @@ helpers.describe("native provider inventory through shared policy", function()
 				if observed == path then native.files[path].mode = "named pipe" end
 			end
 			helpers.assert_nil(owner.discover())
-			helpers.assert_eq(native.opened, { "/shared/modules/actions/program_providers.json" })
+			helpers.assert_eq(native.opened, { "/shared/shortcuts/data/actions/program_providers.json" })
 		end)
 	end)
 
@@ -344,7 +344,7 @@ helpers.describe("native provider fixture scalar boundary", function()
 		local body = assert(source:match('case%("real_interpreter_symlink", function%(%)\n(.-)\nend%)\ncase%("interpreter_link_retarget_is_stale"'))
 		local observer = assert(source:match("local function observe_scalar%(%.%.%.%)\n.-\nend"))
 		with_native(function()
-			local shared, json = require("program_providers"), require("json")
+			local shared, json = require("apps.engine.program_providers"), require("core.text.engine.json")
 			local input = { config = "/fixture", expected_python = "/fixture/python3" }
 			local owner = assert(shared.new("hs", RAW, {
 				route = function() return "/fixture/scripts" end,
@@ -401,7 +401,7 @@ end)
 
 --- Actual bundled provider data, with explicitly controlled Hammerspoon metadata.
 helpers.describe("macOS PowerShell provider metadata boundary", function()
-	local file = assert(io.open(helpers.shared("modules/actions/program_providers.json"), "rb"))
+	local file = assert(io.open(helpers.shared("shortcuts/data/actions/program_providers.json"), "rb"))
 	local catalogue = file:read("*a"); assert(file:close())
 	for _, available in ipairs({ true, false }) do
 		helpers.it("uses the bundled PowerShell contract with pwsh availability " .. tostring(available), function()
@@ -422,7 +422,7 @@ helpers.describe("macOS PowerShell provider metadata boundary", function()
 				helpers.assert_eq(#packet.choices, 1)
 				helpers.assert_eq(packet.choices[1].provider, "powershell")
 				local scalar = assert(owner.resolve(packet.choices[1].key, { "", "two words", "$(literal)`quote`", "日本" }))
-				local parsed = assert(require("program_parameter").parse(scalar, "posix"))
+				local parsed = assert(require("settings.engine.program_parameter").parse(scalar, "posix"))
 				helpers.assert_eq(parsed.executable, "/bin/pwsh")
 				helpers.assert_eq(parsed.arguments, {
 					"-NoProfile", "-NonInteractive", "-File", ROOT .. "/" .. name,

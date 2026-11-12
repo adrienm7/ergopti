@@ -86,7 +86,7 @@ async function main() {
 	const { parse } = await import('smol-toml');
 	const manifest = parse(
 		fs
-			.readFileSync(paths.shared('modules/features/manifest.toml'), 'utf8')
+			.readFileSync(paths.shared('settings/data/features/manifest.toml'), 'utf8')
 			.replace(
 				/^\[\[features\.([^\]]+)\]\]$/gm,
 				(_match, section) => `[[entries]]\nsection = "${section}"`

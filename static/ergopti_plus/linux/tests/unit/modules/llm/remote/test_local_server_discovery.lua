@@ -2,10 +2,10 @@
 
 --- Catalogue discovery uses actual private source ownership and retained native GETs.
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 -- The shipped catalogue. These cases drive four of its servers; the others
 -- are stopped by the scan fake below, so a longer catalogue changes no case.
-local CATALOGUE = Json.decode(assert(io.open(require("infra.paths").shared("modules/llm/local_servers.json"), "rb")):read("*a"))
+local CATALOGUE = Json.decode(assert(io.open(require("infra.paths").shared("ai/data/local_servers.json"), "rb")):read("*a"))
 local DRIVEN = { omlx = true, lmstudio = true, llamacpp = true, jan = true }
 --- The probed sources of one sweep: the driven servers and configured rows.
 --- @param servers table modules.llm.local_servers
@@ -640,7 +640,7 @@ helpers.describe("Linux local server discovery ownership", function()
 
 	helpers.it("a waiter failure diagnostic cannot acknowledge the active delivery", function()
 		isolated(function(servers)
-			local ports, logger = require("modules.llm.local_server_ports"), require("logger.shim")
+			local ports, logger = require("modules.llm.local_server_ports"), require("core.logger.engine.shim")
 			local prior, previous_error, closed, during = ports.scan_owned, logger.error, false, nil
 			ports.scan_owned = function()
 				return { cancel = function() return false end, is_settled = function() return closed end }
@@ -899,7 +899,7 @@ helpers.describe("Linux local server discovery ownership", function()
 				for _, id in ipairs({ "omlx", "lmstudio", "llamacpp", "jan" }) do
 					scan[id] = { running = false, pids = {} }
 				end
-				local ports, logger = require("modules.llm.local_server_ports"), require("logger.shim")
+				local ports, logger = require("modules.llm.local_server_ports"), require("core.logger.engine.shim")
 				local original_scan, original_error, messages = ports.scan, logger.error, {}
 				if source == "port scan" then ports.scan = function() error("synthetic-private-token") end end
 				logger.error = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end
@@ -1246,7 +1246,7 @@ helpers.describe("Native discovery infrastructure receipts (local-probe-unavaila
 				local failed=find(rows,require("infra.i18n").get("healthcheck.status.failed"))
 				helpers.assert_true(failed and failed.disabled,"actual menu exposes infrastructure failure")
 				helpers.assert_eq(#rows,5,"one failure row replaces the no-server summary")
-				local catalogue=require("json").decode(assert(io.open(require("infra.paths").shared("modules/llm/local_servers.json"),"rb")):read("*a"))
+				local catalogue=require("core.text.engine.json").decode(assert(io.open(require("infra.paths").shared("ai/data/local_servers.json"),"rb")):read("*a"))
 				local labels={}
 				for _,id in ipairs(catalogue.server_order) do labels[#labels+1]=catalogue.servers[id].label end
 				local none=require("infra.i18n").get("menu.llm.local_servers.none_detected")
@@ -1449,7 +1449,7 @@ helpers.describe("Scripted startup discovery transport custody (startup-local-ht
 		isolated(function(servers,_,calls)
 			local port=package.loaded["adapters.http_client"]
 			local _,probes=require("tests.support.owned_http_fixture").local_discovery(port)
-			local logger=require("logger.shim")
+			local logger=require("core.logger.engine.shim")
 			local previous,errors=logger.error,{}
 			logger.error=function(_,message) errors[#errors+1]=message end
 			local ok,err=pcall(function()

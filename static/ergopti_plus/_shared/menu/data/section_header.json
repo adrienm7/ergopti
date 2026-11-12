@@ -1,0 +1,4 @@
+{
+	"_comment": "The one drawing of a disabled section header in every tray menu of the three drivers. A locale value holds the title only, in the case its locale writes it; the frame comes from this format, where {label} stands for the translated title. tools/codegen/codegen-menu-section-header.cjs projects it into _shared/menu/engine/section_header_data.lua (read by menu.labels on macOS and Linux) and windows/_generated/menu_section_header.ahk (read by MenuSectionTitle). Changing the style of every header is an edit of this value, then npm run gen. tools/test/test-section-decoration-parity.cjs refuses a header framed anywhere else.",
+	"format": "— {label} —"
+}

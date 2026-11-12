@@ -31,8 +31,8 @@
 
 local M = {}
 
--- The package's file names and wire markers (_shared/data/identifiers.json).
-local Names = require("identifiers").bytecode_package
+-- The package's file names and wire markers (_shared/core/text/data/identifiers.json).
+local Names = require("core.text.engine.identifiers").bytecode_package
 M.MANIFEST = Names.manifest
 M.BUNDLE = Names.bundle
 local FORMAT = Names.format
@@ -64,21 +64,21 @@ end
 --- one in the order the bootstrap writes package.path, and keeps the spelling,
 --- so searchpath's names and the chunk names match it.
 --- @param driver_dir string The driver directory as the daemon spells it.
---- @return string|nil prefix "<shared root>/lua/", nil when no shared tree is there.
+--- @return string|nil prefix "<shared root>/", nil when no shared tree is there.
 function M.shared_lua_prefix(driver_dir)
 	local shared = require("infra.paths").shared_root_from(driver_dir)
-	return shared and shared .. "/lua/" or nil
+	return shared and shared .. "/" or nil
 end
 
 --- The spelling the daemon gives a module file at runtime, which LuaJIT keeps
 --- inside the dumped chunk as its source name.
 --- @param root string Physical installation root.
---- @param relative string Root-relative path, linux/... or _shared/lua/...
+--- @param relative string Root-relative path, linux/... or _shared/...
 --- @return string|nil filename
 function M.runtime_filename(root, relative)
 	local driver = relative:match("^linux/(.+%.lua)$")
 	if driver then return root .. "/linux/" .. driver end
-	local shared = relative:match("^_shared/lua/(.+%.lua)$")
+	local shared = relative:match("^_shared/(.+%.lua)$")
 	local prefix = shared and M.shared_lua_prefix(root .. "/linux")
 	if prefix then return prefix .. shared end
 	return nil
@@ -100,7 +100,7 @@ function M.schema_names(root)
 end
 
 --- Whether a root-relative path may name a chunk: a .lua file below linux/ or
---- _shared/lua/, without blanks, backslashes or dot segments. Runs once per
+--- _shared/, without blanks, backslashes or dot segments. Runs once per
 --- manifest line at every boot, so it is a few plain searches.
 local function valid_relative(relative)
 	if type(relative) ~= "string" or relative:find(" ", 1, true) or relative:find("\t", 1, true)
@@ -109,7 +109,7 @@ local function valid_relative(relative)
 	end
 	if relative:find("/./", 1, true) or relative:find("/../", 1, true) or relative:find("//", 1, true) then return false end
 	if relative:sub(-4) ~= ".lua" then return false end
-	return (#relative > 10 and relative:sub(1, 6) == "linux/") or (#relative > 16 and relative:sub(1, 12) == "_shared/lua/")
+	return (#relative > 10 and relative:sub(1, 6) == "linux/") or (#relative > 16 and relative:sub(1, 8) == "_shared/")
 end
 
 
@@ -260,7 +260,7 @@ function M.install(script_dir, options)
 		-- The shared spelling starts with the driver's, so it is tested first.
 		local relative
 		if filename:sub(1, #shared_prefix) == shared_prefix then
-			relative = "_shared/lua/" .. filename:sub(#shared_prefix + 1)
+			relative = "_shared/" .. filename:sub(#shared_prefix + 1)
 		elseif filename:sub(1, #driver_prefix) == driver_prefix then
 			relative = "linux/" .. filename:sub(#driver_prefix + 1)
 		else
@@ -317,7 +317,7 @@ end
 --- Compiles an installed tree's application modules into <root>/.bytecode,
 --- replacing any previous package only once the new one is complete.
 --- @param root string Physical installation root.
---- @param sources table Dense { relative, digest } rows, every .lua file under linux/ and _shared/lua/.
+--- @param sources table Dense { relative, digest } rows, every .lua file under linux/ and _shared/.
 --- @return boolean ok
 --- @return string|nil failure
 function M.compile(root, sources)

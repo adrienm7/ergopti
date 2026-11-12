@@ -313,7 +313,7 @@ def main():
                         "XDG_CONFIG_HOME": str(case_root / "config"),
                         "ERGOPTI_NATIVE_UPDATER_ORIGIN": f"https://127.0.0.1:{server.server_port}",
                         "ERGOPTI_NATIVE_UPDATER_MODE": mode,
-                        "LUA_PATH": "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                        "LUA_PATH": "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                     }
                 )
                 child = None

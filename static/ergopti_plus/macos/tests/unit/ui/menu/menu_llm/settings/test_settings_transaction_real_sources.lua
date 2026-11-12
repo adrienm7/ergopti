@@ -454,7 +454,7 @@ end)
 
 helpers.describe("Shared privacy intent policy", function()
 	helpers.it("replays independent strict snapshot types and exact identities (shared-privacy-triggers)", function()
-		local corpus, policy = privacy_corpus(), require("llm.trigger_policy")
+		local corpus, policy = privacy_corpus(), require("ai.engine.policy.trigger_policy")
 		for _, vector in ipairs(corpus.vectors) do
 			local expected = clone_value(corpus.snapshot)
 			expected.owner = {}
@@ -497,12 +497,12 @@ helpers.describe("LLM navigation: shared native child declarations", function()
 	end)
 
 	helpers.it("(llm-nav-shared) preserves all twenty-one actual captions and native ranges", function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local root = helpers.driver_root() .. "../_shared/"
-		local file = assert(io.open(root .. "data/locale_order.json", "r"))
+		local file = assert(io.open(root .. "core/i18n/data/locale_order.json", "r"))
 		local locales = assert(Json.decode(file:read("*a"))).order; file:close()
 		helpers.assert_eq(#locales, 21)
-		local manifest_file = assert(io.open(helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json", "r"))
+		local manifest_file = assert(io.open(helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json", "r"))
 		local definitions = assert(Json.decode(manifest_file:read("*a"))).llm_navigation_rows; manifest_file:close()
 		local corpus_file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/llm_navigation_rows.json", "r"))
 		local expected = assert(Json.decode(corpus_file:read("*a"))).rows; corpus_file:close()
@@ -513,7 +513,7 @@ helpers.describe("LLM navigation: shared native child declarations", function()
 				{ expected[index].id, expected[index].type, expected[index].i18n })
 		end
 		for _, locale in ipairs(locales) do
-			local input = assert(io.open(root .. "data/locales/" .. locale .. ".json", "r"))
+			local input = assert(io.open(root .. "core/i18n/data/locales/" .. locale .. ".json", "r"))
 			local catalogue = assert(Json.decode(input:read("*a"))); input:close()
 			local matched_paths = {}
 			local function translated(key)
@@ -616,7 +616,7 @@ end)
 helpers.describe("LLM fixed parents: independent original full physical hierarchy", function()
 	helpers.it("retains every original native child, flag and callback through the real outer renderer", function()
 		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/llm_parent_groups.json"), "rb"))
-		local corpus = assert(require("json").decode(file:read("*a"))); assert(file:close())
+		local corpus = assert(require("core.text.engine.json").decode(file:read("*a"))); assert(file:close())
 		with_fixture({parent_only = true}, function(fixture)
 			local rows = fixture.top_level_callbacks().rebuild()
 			local parents = {}
@@ -624,7 +624,7 @@ helpers.describe("LLM fixed parents: independent original full physical hierarch
 				parents[#parents + 1] = assert(find_item(rows, expected.i18n))
 			end
 			helpers.assert_eq(#parents, 3, "the independent complete parent set is nonempty")
-			helpers.assert_eq(require("test.menu_native_child_rows").hierarchy(parents), corpus.macos)
+			helpers.assert_eq(require("tests.lua.menu.native_child_rows").hierarchy(parents), corpus.macos)
 			helpers.assert_eq(fixture.calls.runtime, 0)
 			helpers.assert_eq(fixture.calls.save, 0)
 			helpers.assert_eq(fixture.calls.settings, 0)

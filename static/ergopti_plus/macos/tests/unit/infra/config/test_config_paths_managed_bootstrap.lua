@@ -21,7 +21,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local MANAGED_FILE = "/Users/test/" .. AppDirs.config.macos_paths_file
 local BUNDLE_DIR = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/"

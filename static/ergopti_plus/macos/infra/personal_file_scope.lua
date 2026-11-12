@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local M = {}
-local Policy = require("hotstrings.personal_scope")
-local Files = require("hotstrings.personal_files")
+local Policy = require("hotstrings.engine.catalogue.personal_scope")
+local Files = require("hotstrings.engine.catalogue.personal_files")
 local FileSystem = require("adapters.file_system")
 local MenuPaths = require("infra.config_paths")
 

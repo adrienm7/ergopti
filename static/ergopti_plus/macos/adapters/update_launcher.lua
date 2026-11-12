@@ -25,7 +25,7 @@ local Logger = require("infra.logger")
 local dialog = require("infra.dialog_util")
 local i18n   = require("infra.i18n")
 local Notifier = require("adapters.application_notifier")
-local ErrorDescription = require("error_description")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 local LOG = "update_launcher"
 local COMMAND_ROOT = "ergoptiplus://updater/"

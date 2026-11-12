@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Layout Composer Check Codegen
  * DESCRIPTION:
- * Compiles _shared/modules/layouts/composer_check/composition.json into
+ * Compiles _shared/layouts/data/composer_check/composition.json into
  * composed.keylayout, the small composition the Debug menu's « Test the
  * composed layout » check installs on each driver. Unlike the test corpus it
  * ships with the app, so it is built from the built-in reference layouts only
@@ -25,7 +25,7 @@ const { shared } = require('../lib/paths.cjs');
 const { loadComposer } = require('../lib/layout-composer.cjs');
 
 // config-key-literal-ok: a folder name that happens to spell a leaf
-const CHECK_DIR = shared('modules', 'layouts', 'composer_check');
+const CHECK_DIR = shared('layouts', 'data', 'composer_check');
 const DECLARATION_PATH = path.join(CHECK_DIR, 'composition.json');
 const OUT_PATH = path.join(CHECK_DIR, 'composed.keylayout');
 

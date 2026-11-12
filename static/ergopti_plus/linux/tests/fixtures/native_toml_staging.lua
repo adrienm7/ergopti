@@ -9,8 +9,8 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_toml_staging%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local folder, kind, entry = assert(arg[1]), assert(arg[2]), assert(arg[3])
 local path, target = folder .. "/source.toml", folder .. "/target"
 -- The native writer stages under this process's name (CFD-1); stdio keeps `.tmp`.
@@ -25,7 +25,7 @@ if entry == "portable" then
 		return searchpath(name, ...)
 	end
 end
-local Shell, Writer = require("adapters.shell_runner"), require("toml_codec.writer")
+local Shell, Writer = require("adapters.shell_runner"), require("core.text.engine.toml_codec.writer")
 package.searchpath = searchpath
 local adapter = entry == "adapter" and require("adapters.file_system") or nil
 local function run(command) assert(Shell.run(command)) end
@@ -57,7 +57,7 @@ else
 	assert(os.remove(stage), "only this fixture removes its pre-existing endpoint")
 	assert(Writer.batch_write(path, updates, adapter), "repair permits a later publication")
 end
-assert(require("toml_codec").decode(read(path)).shortcuts.enabled == true)
+assert(require("core.text.engine.toml_codec").decode(read(path)).shortcuts.enabled == true)
 assert(read(target) == foreign)
 run("test ! -e " .. Shell.quote(stage))
 write(folder .. "/complete", "complete")

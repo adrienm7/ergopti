@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local M = {}
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 --- The OS-default logs folder of a home folder.
 --- @param home string|nil Absolute home folder.

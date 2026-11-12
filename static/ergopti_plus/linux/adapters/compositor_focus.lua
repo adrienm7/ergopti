@@ -110,16 +110,16 @@ end
 --- @return table source
 function M.new(options)
 	assert(type(options) == "table" and M.REPORTERS[options.family], "compositor focus needs a GNOME, KDE or COSMIC family")
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local family = options.family
 	local reporter = M.REPORTERS[family]
 	local start_process = options.start_process or function(...) return require("adapters.owned_process").start(...) end
-	local decode = options.decode or function(line) return require("json").decode(line) end
+	local decode = options.decode or function(line) return require("core.text.engine.json").decode(line) end
 	local command = options.command or function()
 		local uv = require("luv")
 		local Paths = require("infra.paths")
 		local executable = assert(uv.exepath(), "native interpreter identity unavailable")
-		local shared_lua = assert(Paths.shared("lua"), "shared Lua library unavailable")
+		local shared_lua = assert(Paths.shared_root(), "shared Lua library unavailable")
 		if family == "cosmic" then
 			local soname = assert(require("_generated.native_runtime").optional.wayland_client, "libwayland-client unnamed")
 			return executable, { Paths.driver_root() .. "/adapters/cosmic_toplevel_worker.lua",
@@ -181,7 +181,7 @@ function M.new(options)
 		local commanded, executable, arguments, cwd = pcall(command)
 		if not commanded then fail("worker command unavailable: " .. tostring(executable)); return false end
 		local spawned, child = pcall(start_process, executable, arguments, {
-			owner = OWNER, capture_tail = true, max_output_bytes = require("llm.process_limits").defaults().max_output_bytes, cwd = cwd,
+			owner = OWNER, capture_tail = true, max_output_bytes = require("ai.engine.policy.process_limits").defaults().max_output_bytes, cwd = cwd,
 			on_output = on_output,
 		}, function(result)
 			if status == "stopped" then return end

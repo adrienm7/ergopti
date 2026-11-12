@@ -30,7 +30,7 @@ local FEED = read_shared("tests/corpus/updater/releases_feed.atom")
 --- Returns the decoded shared updater defaults.
 --- @return table
 local function defaults()
-	return require("json").decode(read_shared("modules/updater/defaults.json"))
+	return require("core.text.engine.json").decode(read_shared("updater/data/defaults.json"))
 end
 
 --- Builds a transport double whose responses are released by the test.
@@ -68,7 +68,7 @@ local function logged(lines, needle)
 end
 
 helpers.describe("release_sources: shared defaults", function()
-	local Sources = helpers.load_module("updater.release_sources")
+	local Sources = helpers.load_module("updater.engine.release_sources")
 
 	helpers.it("expands the canonical API, feed and page URLs", function()
 		local sources = assert(Sources.resolve(defaults()))
@@ -112,7 +112,7 @@ helpers.describe("release_sources: shared defaults", function()
 end)
 
 helpers.describe("release_sources: ordered fetch", function()
-	local Sources = helpers.load_module("updater.release_sources")
+	local Sources = helpers.load_module("updater.engine.release_sources")
 	local sources = assert(Sources.resolve(defaults()))
 
 	helpers.it("serves the API result without touching the feed", function()
@@ -296,7 +296,7 @@ helpers.describe("changelog_bridge: native fetch push", function()
 	helpers.it("changelog refuses a FIFO release configuration without blocking", function()
 		local uv, Paths = require("luv"), require("infra.paths")
 		local original = Paths.shared
-		local source = assert(original("modules/updater/defaults.json"))
+		local source = assert(original("updater/data/defaults.json"))
 		local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-changelog-fifo-XXXXXX"))
 		local path = dir .. "/defaults.json"
 		local made = os.execute("mkfifo '" .. path .. "'"); assert(made == 0 or made == true)
@@ -305,7 +305,7 @@ helpers.describe("changelog_bridge: native fetch push", function()
 			code, exited = result, true; process:close()
 		end))
 		Paths.shared = function(relative)
-			if relative == "modules/updater/defaults.json" then return path end
+			if relative == "updater/data/defaults.json" then return path end
 			return original(relative)
 		end
 		local called, result = pcall(function() install(); return Bridge.on_message("ready", {}) end)
@@ -431,7 +431,7 @@ helpers.describe("changelog_bridge: native fetch push", function()
 		helpers.assert_eq(evaluated[1].app, "changelog")
 		local encoded = evaluated[1].code:match("__hostBridgeResponse%('changelog_bridge',true,'([^']+)'%)")
 		helpers.assert_not_nil(encoded, "the push must use the base64 response hook")
-		local decoded = require("json").decode(base64_decode(encoded))
+		local decoded = require("core.text.engine.json").decode(base64_decode(encoded))
 		helpers.assert_eq(decoded.action, "releases_error")
 		Bridge._reset()
 	end)

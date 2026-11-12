@@ -259,7 +259,7 @@ LLM_OllamaPullRefusalKey(Text, ContractPath := "") {
 	if !(Text is String) || !RegExMatch(Text, "Managed model pull refused: proxy_relay ([a-z_]+)", &Found)
 		return "network.failure.proxy_windows_login"
 	if ContractPath == ""
-		ContractPath := _SharedDir . "\modules\network\proxy_auth_relay.json"
+		ContractPath := _SharedDir . "\core\network\data\proxy_auth_relay.json"
 	Refusals := JsonParse(FSReadUtf8ExactBounded(ContractPath, 8192))["refusals"]
 	return Refusals.Has(Found[1]) ? Refusals[Found[1]] : Refusals["relay_unavailable"]
 }
@@ -337,12 +337,12 @@ class OllamaManagedBootstrap {
 		Asset := NativeArchitecture == "arm64" ? "windows-arm64" : "windows-amd64"
 		Root := AppFoldersManagedOllamaRoot()
 		Directory := _StaticDir . "\ergopti_plus\windows\modules\llm"
-		Catalogue := _SharedDir . "\modules\llm\ollama_release.json"
-		Updater := _SharedDir . "\modules\updater\defaults.json"
-		Policy := _SharedDir . "\modules\network\proxy_policy.json"
-		ServeEnvironment := _SharedDir . "\modules\llm\managed_ollama_environment.json"
-		RouteOrigins := _SharedDir . "\modules\network\route_origins.json"
-		RelayContract := _SharedDir . "\modules\network\proxy_auth_relay.json"
+		Catalogue := _SharedDir . "\ai\data\ollama_release.json"
+		Updater := _SharedDir . "\updater\data\defaults.json"
+		Policy := _SharedDir . "\core\network\data\proxy_policy.json"
+		ServeEnvironment := _SharedDir . "\ai\data\managed_ollama_environment.json"
+		RouteOrigins := _SharedDir . "\core\network\data\route_origins.json"
+		RelayContract := _SharedDir . "\core\network\data\proxy_auth_relay.json"
 		Helper := Directory . "\ollama_managed_files.ps1"
 		Acquisition := Directory . "\ollama_managed_acquisition.ps1"
 		Vendor := _VendorDir

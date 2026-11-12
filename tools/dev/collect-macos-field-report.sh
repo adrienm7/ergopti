@@ -76,8 +76,8 @@ REPO_ROOT="${REPO_ROOT%.}"
 # The collector keeps going after a failed step, but never without the shared
 # identifiers: a missing file stops it here.
 set -e
-# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
-. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# shellcheck source=../../static/ergopti_plus/_shared/core/text/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 # shellcheck source=macos-field-shell-checks.sh
 . "$REPO_ROOT/tools/dev/macos-field-shell-checks.sh"
 # shellcheck source=field-report-git.sh
@@ -91,7 +91,7 @@ FIELD_TOPICAL_LOGS="llm ollama mlx boot karabiner menu"
 field_paths="$(python3 "${REPO_ROOT}/tools/dev/field-report-paths.py" "${REPO_ROOT}/static/ergopti_plus/_shared" ${FIELD_TOPICAL_LOGS})" \
 	|| { printf '[field-report] ERROR: cannot resolve the driver folders.\n' >&2; exit 1; }
 eval "${field_paths}"
-BUNDLED_HOTSTRINGS="static/ergopti_plus/_shared/modules/hotstrings"
+BUNDLED_HOTSTRINGS="static/ergopti_plus/_shared/hotstrings/data/catalogue"
 FIELD_RUN_SPEC="static/ergopti_plus/macos/data/field_run.json"
 # How long the collector keeps waiting for done after the request's own
 # deadline (the declared default, which covers every step at its bound): the
@@ -326,7 +326,7 @@ if ! git -C "${REPO_ROOT}" diff --quiet -- '*.scpt'; then
 		&& log "Recompiled AppleScript committed on ${branch}; cherry-pick that commit to ${base}." \
 		|| log "WARNING: the recompiled AppleScript could not be committed; see ${out}/scpt_recompile.txt."
 fi
-# The process names of _shared/modules/llm/local_servers.json (discovery) too,
+# The process names of _shared/ai/data/local_servers.json (discovery) too,
 # so a report shows which local API server runs
 step processes sh -c 'pgrep -ilf "ErgoptiPlus|Hammerspoon|karabiner|ollama|omlx|llama-server|local-ai|LM Studio|llmster|Jan" || true'
 step launchd sh -c 'launchctl list | grep -iE "ergopti|pqrs" || true'

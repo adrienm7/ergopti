@@ -178,7 +178,7 @@ try {
 		assert.equal(icons.length, 1, 'the package must supply exactly one desktop icon');
 		const actual = fs.readFileSync(icons[0]);
 		assert.ok(actual.length > 0, 'the desktop icon must not be an empty placeholder');
-		const expected = fs.readFileSync(path.join(library, '_shared/assets/ergopti_tray.png'));
+		const expected = fs.readFileSync(path.join(library, '_shared/tray/data/ergopti_tray.png'));
 		assert.deepEqual(actual, expected, 'desktop and tray must use the canonical logo bytes');
 		const width = expected.readUInt32BE(16),
 			height = expected.readUInt32BE(20);
@@ -336,16 +336,16 @@ try {
 		const probe = [
 			'local Paths = require("infra.paths")',
 			'local Fs = require("adapters.file_system")',
-			'local Snapshot = require("diagnostics.snapshot")',
+			'local Snapshot = require("diagnostics.engine.snapshot")',
 			'assert(Paths.driver_root() == os.getenv("ARCH_LIBRARY_ROOT"), "staged driver root")',
 			'assert(Paths.shared_root() == os.getenv("ARCH_SHARED_ROOT"), "staged shared root")',
 			'local commit, origin = Snapshot.resolve_commit(Fs, Paths.shared_root(), Paths.driver_root())',
 			'assert(origin == Snapshot.COMMIT_SOURCE_BUILD and #commit > 0, "staged build identity")',
 			'assert(os.getenv("ARCH_EXPECTED_COMMIT"):sub(1, #commit) == commit, "actual source commit")',
-			'for _, rel in ipairs({ "data/locales/en.json", "data/db/schema.sql", "assets/ergopti_tray.png", "core/config_schema/migrations.toml", "ui/apps.manifest.json" }) do',
+			'for _, rel in ipairs({ "core/i18n/data/locales/en.json", "metrics/data/db/schema.sql", "tray/data/ergopti_tray.png", "settings/data/config_schema/migrations.toml", "ui/apps.manifest.json" }) do',
 			' local bytes = Fs.read(Paths.shared(rel)); assert(type(bytes) == "string" and #bytes > 0, "staged resource: " .. rel)',
 			'end',
-			'local defaults = assert(require("json").decode(Fs.read(Paths.shared("modules/updater/defaults.json"))))',
+			'local defaults = assert(require("core.text.engine.json").decode(Fs.read(Paths.shared("updater/data/defaults.json"))))',
 			'local factory, refusal = require("infra.archive_output").native_artifact(defaults.release_assets.linux_bundle)',
 			'assert(type(factory) == "table", "staged native backend: " .. tostring(refusal and refusal.capability_reason))',
 			'print("ARCH_STAGED_ROOTS_OK")'
@@ -366,7 +366,7 @@ try {
 		const resolved = readData();
 		assert.equal(resolved.status, 0, resolved.stderr);
 		assert.match(resolved.stdout, /^ARCH_STAGED_ROOTS_OK$/m);
-		const sentinel = path.join(shared, 'data/locales/en.json');
+		const sentinel = path.join(shared, 'core/i18n/data/locales/en.json');
 		const hidden = `${sentinel}.private-test`;
 		fs.renameSync(sentinel, hidden);
 		try {

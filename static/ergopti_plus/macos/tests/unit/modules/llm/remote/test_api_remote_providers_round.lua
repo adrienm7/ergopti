@@ -21,12 +21,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.path
+package.path = SHARED .. "?.lua;" .. SHARED .. "?/init.lua;" .. package.path
 
-local Formats = require("llm.remote_formats")
+local Formats = require("ai.engine.api.remote_formats")
 
 local function read_json(path)
 	local fh = assert(io.open(helpers.shared(path), "r"), "cannot open " .. path)
@@ -35,7 +35,7 @@ local function read_json(path)
 	return assert(json.decode(raw), path .. " is not valid JSON")
 end
 
-local CATALOGUE = read_json("modules/llm/api_providers.json")
+local CATALOGUE = read_json("ai/data/api_providers.json")
 
 --- Finds one upvalue, searching nested closures.
 --- @param fn function
@@ -62,7 +62,7 @@ end
 --- @return table api, table posts
 local function load_api()
 	package.loaded["modules.llm.api_remote"] = nil
-	package.loaded["llm.remote_response_classifier"] = nil
+	package.loaded["ai.engine.policy.remote_response_classifier"] = nil
 	package.loaded["modules.llm.provider_uses"] = nil
 	package.loaded["modules.shortcuts.script_control"] = nil
 	local api = helpers.load_with_stubs("modules.llm.api_remote", {})

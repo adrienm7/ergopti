@@ -135,7 +135,7 @@ mkfifo -m 600 "${FIFO}"
 NODE_FILE="$(mktemp /tmp/ergopti-phys-node.XXXXXX)"
 PROBES="$(mktemp -d /tmp/ergopti-phys-probes.XXXXXX)"
 DRIVER="${SRC}/static/ergopti_plus/linux"
-(cd "${DRIVER}" && LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' \
+(cd "${DRIVER}" && LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;' \
 	exec luajit tests/hardware/phys_keyboard.lua "${NODE_FILE}" "${FIFO}" "${PROBES}") \
 	> "${RECEIPTS}/keyboard.log" 2>&1 &
 KEYBOARD_PID=$!
@@ -201,7 +201,7 @@ say "  ..   after the systemd restart: $(probe_wait after_systemd)"
 check "keys flow through the successor" probe_holds after_systemd
 
 section "Owned smoke deadline"
-INSTALLED_LUA_PATH="${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_ROOT}/_shared/lua/?.lua;${LIB_ROOT}/_shared/lua/?/init.lua;;"
+INSTALLED_LUA_PATH="${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_ROOT}/_shared/?.lua;${LIB_ROOT}/_shared/?/init.lua;;"
 INSTALLED_LUA_CPATH="${LIB_ROOT}/linux/native_modules/?.so;;"
 cp "${DRIVER}/tests/hardware/phys_smoke_deadline.lua" /tmp/ergopti-phys-smoke.lua
 chmod 644 /tmp/ergopti-phys-smoke.lua
