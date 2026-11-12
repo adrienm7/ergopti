@@ -226,6 +226,22 @@ function run() {
 			'paths.shared = function(path)\n\tif path == "zz_probe_hs/data" then return nil end\nend',
 			'the argument a stand-in of the shared resolver is compared with'
 		);
+		// A whole shared folder handed to the resolver: respelled when it moves
+		// whole, a refusal when the plan scatters it.
+		assert.equal(
+			rewrite(`${P}linux/z.lua`, 'local d = Paths.shared("zz_probe_lua")'),
+			'local d = Paths.shared("zz_probe_text")'
+		);
+		const scattered = Plan.scanFile(
+			`${P}linux/z.lua`,
+			'local d = Paths.shared("zz_probe_mod")',
+			Plan.referenceContext(MAP)
+		);
+		assert.deepEqual(
+			scattered.map((r) => r.kind),
+			['dir-split'],
+			'a scattered shared folder named whole refuses the step'
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
