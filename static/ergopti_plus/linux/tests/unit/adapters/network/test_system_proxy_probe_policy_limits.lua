@@ -34,14 +34,33 @@ local function run(root)
 	return Json.decode(output)
 end
 
+-- The policy the helper reads, relative to the shared root.
+local POLICY = "modules/network/proxy_policy.json"
+
+--- Mirrors the real shared tree into `fake`: every entry is linked, except the
+--- folders on the way to `relative`, which are made, and `relative` itself, so
+--- the helper finds its own modules wherever the layout puts them.
+local function shadow(real, fake, relative)
+	local uv = require("luv")
+	assert(uv.fs_mkdir(fake, 448))
+	local head, rest = relative:match("^([^/]+)/(.+)$")
+	local scanner = assert(uv.fs_scandir(real))
+	while true do
+		local name = uv.fs_scandir_next(scanner)
+		if not name then break end
+		if name == head then shadow(real .. "/" .. name, fake .. "/" .. name, rest)
+		elseif head or name ~= relative then assert(uv.fs_symlink(real .. "/" .. name, fake .. "/" .. name)) end
+	end
+end
+
 --- A scratch shared root holding the given policy text.
 --- @param policy string
 --- @return string root
 local function root_with(policy)
 	local root = os.tmpname()
 	os.remove(root)
-	assert(os.execute("mkdir -p '" .. root .. "/modules/network'"))
-	local file = assert(io.open(root .. "/modules/network/proxy_policy.json", "wb"))
+	shadow(assert(Paths.shared_root()), root, POLICY)
+	local file = assert(io.open(root .. "/" .. POLICY, "wb"))
 	file:write(policy)
 	file:close()
 	return root
@@ -77,11 +96,10 @@ helpers.describe("system proxy probe: selection limits come from the shared poli
 	end)
 	helpers.it("proxy-policy-single-source: a FIFO policy produces an immediate refusal", function()
 		local root = root_with("{}")
-		local path = root .. "/modules/network/proxy_policy.json"
+		local path = root .. "/" .. POLICY
 		os.remove(path)
 		local Shell = require("adapters.shell_runner")
 		local quote = Shell.quote
-		assert(os.execute("ln -s " .. quote(assert(Paths.shared_root()) .. "/lua") .. " " .. quote(root .. "/lua")))
 		assert(os.execute("mkfifo " .. quote(path)))
 		local executable = assert(require("luv").exepath())
 		local command = "printf '%s' " .. quote(Json.encode({ url = "https://corporate.invalid/private" }))
