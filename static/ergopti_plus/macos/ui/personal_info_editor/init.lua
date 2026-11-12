@@ -177,6 +177,20 @@ end
 
 --- Handles an incoming message from the JavaScript frontend.
 --- @param body table The decoded message body ({action, …}).
+--- Tells the user a save was refused, as Windows and Linux do: the editor stays
+--- open with the values. The alert runs as deferred work, never inside the
+--- page's message callback.
+local function report_save_failure()
+	local scheduled = DeferredWork.after(0, function()
+		local shown, err = pcall(function()
+			require("infra.dialog_util").block_alert(i18n.get("dialog.personal_info.save_failed_title"),
+				i18n.get("dialog.personal_info.save_failed"), i18n.get("button.ok"), nil, "critical")
+		end)
+		if not shown then Logger.error(LOG, "The save failure could not be shown: %s.", tostring(err)) end
+	end, "personal_info_editor.save_failed")
+	if scheduled ~= true then Logger.error(LOG, "The save failure notice could not be scheduled.") end
+end
+
 local function handle_message(body, owner)
 	if not owner_is_current(owner) then return end
 	if type(body) ~= "table" then return end
@@ -191,6 +205,7 @@ local function handle_message(body, owner)
 		local values = type(body.values) == "table" and body.values or {}
 		if type(_save_cb) ~= "function" then
 			Logger.error(LOG, "Personal info save refused because no save callback is registered.")
+			report_save_failure()
 			return
 		end
 		local ok, committed = xpcall(function() return _save_cb(values) end, debug.traceback)
@@ -198,6 +213,7 @@ local function handle_message(body, owner)
 		if not ok or committed ~= true then
 			Logger.error(LOG, "Personal info save callback %s (session=%d; result type=%s; content withheld).",
 				ok and "refused" or "raised", owner.serial, type(committed))
+			report_save_failure()
 			return
 		end
 		close_webview()
@@ -263,7 +279,7 @@ function M.open(current_info, save_callback)
 		if not ok_ui or not ui_builder then return nil end
 
 		local masks       = hs.webview.windowMasks
-		local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
+		local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)
 		local screen = hs.screen.mainScreen()
 		local sf = screen and type(screen.frame) == "function" and screen:frame() or { w = 1440, h = 900 }
 		-- Clamp the shared manifest dimensions to the active screen

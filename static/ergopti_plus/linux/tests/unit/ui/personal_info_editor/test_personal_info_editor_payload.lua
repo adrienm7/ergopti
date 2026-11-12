@@ -95,6 +95,15 @@ helpers.describe("personal info editor save outcomes (linux-personal-save)", fun
 		helpers.assert_eq(f.seen.closes, 1)
 	end)
 
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+	helpers.it("saves while the daemon is paused (edd1-paused-writes)", function()
+		local f = fixture()
+		f.state.is_paused = function() return true end
+		local answer = f.handler.on_message({ action = "save", values = { first_name = "Grace" } }, f.state)
+		helpers.assert_eq(answer, { saved = true, reloaded = true, closed = true })
+		helpers.assert_eq(f.seen.saves, { { first_name = "Grace" } })
+	end)
+
 	helpers.it("a refused save keeps the editor open and notifies once", function()
 		local f = fixture({ save_result = false })
 		local answer = f.handler.on_message({ action = "save", values = { first_name = "Grace" } }, f.state)

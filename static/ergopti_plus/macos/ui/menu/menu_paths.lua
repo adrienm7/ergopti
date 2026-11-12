@@ -532,7 +532,7 @@ local function open_editor_impl()
 	end
 
 	local masks       = hs.webview.windowMasks
-	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
+	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)
 
 	local screen  = hs.screen.mainScreen()
 	local sf      = screen and type(screen.frame) == "function" and screen:frame() or { h = 800 }

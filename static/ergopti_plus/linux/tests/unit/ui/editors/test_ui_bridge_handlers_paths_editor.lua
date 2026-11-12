@@ -190,6 +190,14 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_contains(captured.pushes[1].code, "window.applyBrowseResult")
 			helpers.assert_contains(captured.pushes[1].code, "/tmp/ergopti-picked")
 		end)
+		-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+		helpers.it("persists configDir while the daemon is paused (edd1-paused-writes)", function()
+			local state, values = paths_state()
+			state.is_paused = function() return true end
+			local result = handler.on_message({ action = "save", configDir = "/tmp/ergopti-paused/" }, state)
+			helpers.assert_true(result.saved, "the paused daemon still writes the folder")
+			helpers.assert_eq(values.config_dir, "/tmp/ergopti-paused")
+		end)
 		helpers.it("persists configDir, closes, and reloads on save", function()
 			local state, values, captured = paths_state()
 			local result = handler.on_message({

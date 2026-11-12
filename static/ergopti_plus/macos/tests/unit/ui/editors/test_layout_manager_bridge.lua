@@ -211,17 +211,16 @@ helpers.describe("layout manager bridge: the emulation follows a changed layout"
 			"a select changes no layout; every other success reaches the emulation")
 	end)
 
-	helpers.it("(lmh-003-paused) refuses every page command but ready while the driver is paused", function()
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+	helpers.it("(edd1-paused-writes) runs page commands while the driver is paused", function()
 		local paused = { value = true }
 		local instance, changed = host_bridge(paused)
-		helpers.assert_true(instance.on_message({ action = "ready" }), "the page still loads")
-		for _, payload in ipairs({ { action = "install", id = "ergol" }, { action = "uninstall", id = "ergol" },
-			{ action = "select", id = "ergol" }, { action = "refresh" }, { action = "composer_remove" } }) do
-			helpers.assert_eq(instance.on_message(payload), false, "admitted while paused: " .. payload.action)
-		end
-		helpers.assert_eq(#changed, 0)
-		paused.value = false
-		helpers.assert_true(instance.on_message({ action = "install", id = "ergol" }))
+		helpers.assert_true(instance.on_message({ action = "ready" }))
+		helpers.assert_true(instance.on_message({ action = "install", id = "ergol" }), "an install runs while paused")
+		helpers.assert_true(instance.on_message({ action = "uninstall", id = "ergol" }))
+		helpers.assert_eq(changed, { "ergol", "ergol" })
+		local host = assert(helpers.read_module_source("ui.layout_manager"))
+		helpers.assert_nil(host:find("is_paused", 1, true), "the macOS host reads no pause")
 	end)
 
 	helpers.it("(lmh-004-extension-reload) a layout shipping an extension reloads the driver", function()
@@ -257,8 +256,6 @@ helpers.describe("layout manager bridge: the emulation follows a changed layout"
 		helpers.assert_contains(menu, 'require("ui.layout_manager").set_layout_change_handler(function(id)')
 		helpers.assert_contains(menu, "if Emulation.status().id ~= id then return end")
 		local host = assert(helpers.read_module_source("ui.layout_manager"))
-		helpers.assert_contains(host, "is_paused = function() return _pause_query ~= nil and _pause_query() == true end")
-		helpers.assert_contains(menu, 'require("ui.layout_manager").set_pause_query(function()')
 		helpers.assert_contains(menu, 'require("ui.layout_manager").set_extension_reloader(function()')
 		helpers.assert_contains(host, "reload_extensions = function(id) return _extension_reloader ~= nil and _extension_reloader(id) == true end")
 		helpers.assert_contains(host, "if _layout_change_handler then _layout_change_handler(id) end")

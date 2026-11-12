@@ -138,12 +138,13 @@ helpers.describe("layout manager bridge (Linux)", function()
 		helpers.assert_eq(state.reloads, 2, "a reinstall resumes it")
 	end)
 
-	helpers.it("(lmh-003-paused) refuses page commands while the daemon is paused", function()
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+	helpers.it("(edd1-paused-writes) runs page commands while the daemon is paused", function()
 		local Bridge, state, daemon_state = bridge()
 		daemon_state.is_paused = function() return true end
 		Bridge.on_message({ action = "ready" }, daemon_state)
-		helpers.assert_true(Bridge.on_message({ action = "install", id = "ergol" }, daemon_state).handled == false)
-		helpers.assert_eq(#state.calls, 1, "only the ready refresh ran: " .. table.concat(state.calls, ","))
+		helpers.assert_true(Bridge.on_message({ action = "install", id = "ergol" }, daemon_state).handled ~= false)
+		helpers.assert_true(#state.calls > 1, "the install ran: " .. table.concat(state.calls, ","))
 	end)
 
 	helpers.it("(lmh-004-extension-reload) a layout shipping an extension reloads the daemon", function()
