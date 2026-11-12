@@ -112,7 +112,7 @@ scenario(
 			/electron\|chromium\)\n\s*ARGS=\(--user-data-dir "\$USER_DATA_DIR"\) ;;/
 		);
 		assert.match(cloneApp, /firefox\)\n\s*ARGS=\(--no-remote --profile "\$USER_DATA_DIR"\) ;;/);
-		assert.match(cloneApp, /chromium\) ARGS\+=\("--app=\$OPEN_ARG"\); OPEN_ARG="" ;;/);
+		assert.match(cloneApp, /chromium\|firefox\) ARGS\+=\("\$OPEN_ARG"\); OPEN_ARG="" ;;/);
 		assert.ok(
 			catalogue.families.chromium.web_app.startsWith('--app='),
 			'the web-app argument is --app'
