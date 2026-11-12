@@ -120,6 +120,46 @@ scenario(
 	}
 );
 
+scenario(
+	'(bap-004-vscode-variants) clone_app.sh uses the catalogue folders of each VS Code variant',
+	() => {
+		const folders = catalogue.families.vscode.user_folders;
+		assert.ok(folders && folders.code, 'the vscode family names its user folders');
+		for (const name of Object.keys(folders)) {
+			assert.ok(
+				catalogue.families.vscode.executables.includes(name),
+				`${name} is a vscode executable`
+			);
+		}
+		assert.ok(
+			catalogue.families.vscode.arguments.some(
+				(argument) =>
+					argument.user_folder === 'extensions' && argument.value.startsWith('--extensions-dir=')
+			),
+			'the extensions argument is marked'
+		);
+		const block = cloneApp.match(/case "\$\{VSCODE_CLI:-\$\{SRC_EXE_NAME:l\}\}" in\n([^]*?)\nesac/);
+		assert.ok(block, 'the VS Code variant case of clone_app.sh moved');
+		const arms = [
+			...block[1].matchAll(
+				/\t(.+)\)\n\t\tVSCODE_SETTINGS="([^"]+)"; VSCODE_EXTENSIONS="([^"]+)" ;;/g
+			)
+		];
+		assert.equal(arms.length, 3, 'three variant arms');
+		for (const [, patterns, settings, extensions] of arms) {
+			const names =
+				patterns === '*' ? ['code'] : patterns.split('|').map((n) => n.replace(/"/g, ''));
+			for (const name of names) {
+				assert.deepEqual(folders[name], { settings, extensions }, `${name} folders`);
+			}
+		}
+		assert.ok(cloneApp.includes('SHARED_EXT_DIR="$HOME/$VSCODE_EXTENSIONS/extensions"'));
+		assert.ok(
+			cloneApp.includes('MAIN_VSCODE_DATA="$HOME/Library/Application Support/$VSCODE_SETTINGS"')
+		);
+	}
+);
+
 if (failed > 0) {
 	console.error(`${failed} App Cloner family check(s) failed.`);
 	process.exit(1);

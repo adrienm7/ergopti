@@ -171,7 +171,13 @@ case "${SRC_EXE_NAME:l}" in
 		APP_FAMILY=firefox ;;
 esac
 # VSCode is Electron too but with extra CLI flags worth passing
-if [[ -f "$SOURCE_APP/Contents/Resources/app/bin/code" ]] \
+# The bundled CLI names the variant: VSCodium and the Insiders build keep their
+# own settings and extensions (families.json `user_folders`, BAP-004).
+VSCODE_CLI=""
+for cli in code code-insiders codium; do
+	[[ -f "$SOURCE_APP/Contents/Resources/app/bin/$cli" ]] && VSCODE_CLI=$cli
+done
+if [[ -n "$VSCODE_CLI" ]] \
    || [[ "$SRC_EXE_NAME" == "Code" ]] \
    || [[ "$SRC_EXE_NAME" == "Code - Insiders" ]]; then
 	APP_FAMILY=vscode
@@ -191,9 +197,19 @@ mkdir -p "$USER_DATA_DIR"
 # VSCode-specific extras: shared extensions dir + symlinked User/ subdir,
 # so the clone inherits settings/keybindings/snippets/themes/globalStorage
 # from the main VSCode instance and doesn't re-install extensions.
-SHARED_EXT_DIR="$HOME/.vscode/extensions"
+# The folders are families.json's vscode `user_folders`, held to it by
+# tools/test/test-app-cloner-families.cjs.
+case "${VSCODE_CLI:-${SRC_EXE_NAME:l}}" in
+	"code-insiders"|"code - insiders")
+		VSCODE_SETTINGS="Code - Insiders"; VSCODE_EXTENSIONS=".vscode-insiders" ;;
+	"codium"|"vscodium")
+		VSCODE_SETTINGS="VSCodium"; VSCODE_EXTENSIONS=".vscode-oss" ;;
+	*)
+		VSCODE_SETTINGS="Code"; VSCODE_EXTENSIONS=".vscode" ;;
+esac
+SHARED_EXT_DIR="$HOME/$VSCODE_EXTENSIONS/extensions"
 if [[ "$APP_FAMILY" == "vscode" ]]; then
-	MAIN_VSCODE_DATA="$HOME/Library/Application Support/Code"
+	MAIN_VSCODE_DATA="$HOME/Library/Application Support/$VSCODE_SETTINGS"
 	if [[ -d "$MAIN_VSCODE_DATA/User" && ! -e "$USER_DATA_DIR/User" ]]; then
 		ln -s "$MAIN_VSCODE_DATA/User" "$USER_DATA_DIR/User"
 		log "Symlinked User/ → main VSCode user data"
