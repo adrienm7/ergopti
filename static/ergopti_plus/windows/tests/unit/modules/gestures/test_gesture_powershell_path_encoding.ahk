@@ -26,10 +26,13 @@ _GPSE_Source() {
 	Owner := _DriverProductionFileForSymbol("FSWrite", _DriverDir)
 	AssertTrue(Owner != "")
 	Source .= "#Include " . Owner . "`n"
+	; Both callers first ask the real isolation owner whether this profile may
+	; restart the device; the child has no isolated profile, as a real one.
 	for Name in ["_Onboarding_StartGestureAuto", "_Onboarding_ReserveGestureAuto", "_Onboarding_AbortGestureAutoReservation",
 		"_Onboarding_PollGestureAuto", "_Onboarding_ReadGestureAutoResult",
 		"GestureRestartTouchpadDevice", "_GestureRestartReserve", "_GestureRestartAbortReservation",
-		"_GestureRestartPoll", "_GestureRestartReadResult", "_GestureRestartBuildPsScript"] {
+		"_GestureRestartPoll", "_GestureRestartReadResult", "_GestureRestartBuildPsScript",
+		"TouchpadRegistrySkipsDeviceRestart", "TouchpadRegistryPrivatePath", "TouchpadRegistryLogTag"] {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "the child needs the entire actual function: " . Name)
 		if Name == "_Onboarding_StartGestureAuto" || Name == "GestureRestartTouchpadDevice"
