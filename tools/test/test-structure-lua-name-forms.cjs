@@ -195,6 +195,34 @@ function run() {
 		Edits.MODULE_NAME_FILES.pop();
 	}
 
+	// A listed tool's record names, '<module>.<method>', follow the module; an
+	// unlisted tool's string of the same shape is not a record name.
+	const memberTool = 'tools/test/test-zz-probe-delegation.cjs';
+	const members = "assert.deepEqual(names, ['keymap.terminators.build', 'keymap.other.build']);";
+	Edits.MODULE_MEMBER_FILES.push({ file: memberTool, why: 'probe' });
+	try {
+		assert.equal(
+			Apply.rewriteText(
+				members,
+				Plan.scanFile(memberTool, members, Plan.referenceContext(MAP)),
+				new Map(),
+				memberTool
+			),
+			"assert.deepEqual(names, ['layouts.engine.terminators.build', 'keymap.other.build']);"
+		);
+	} finally {
+		Edits.MODULE_MEMBER_FILES.pop();
+	}
+	assert.equal(
+		Apply.rewriteText(
+			members,
+			Plan.scanFile(tool, members, Plan.referenceContext(MAP)),
+			new Map(),
+			tool
+		),
+		members
+	);
+
 	const rx = 'if (!/keymap\\.terminators/.test(src)) fail();';
 	assert.equal(
 		Apply.rewriteText(rx, Plan.scanFile(tool, rx, Plan.referenceContext(MAP)), new Map(), tool),

@@ -191,4 +191,17 @@ const MODULE_NAME_FILES = [
 	}
 ];
 
-module.exports = { FOLDER_EDITS, SYNTHETIC_PATHS, MODULE_NAME_FILES };
+// Tools that name a shared module's method by the record name the menu
+// delegation builds, '<module>.<method>': the module part follows the module.
+const MODULE_MEMBER_FILES = [
+	{
+		file: 'tools/test/test-menu-shared-delegation.cjs',
+		why: 'it asserts the record names delegatedMenuSources builds from MODULES'
+	},
+	{
+		file: 'tools/test/test-menu-manifest.cjs',
+		why: 'it finds the magic key source rows by their delegated record name'
+	}
+];
+
+module.exports = { FOLDER_EDITS, SYNTHETIC_PATHS, MODULE_NAME_FILES, MODULE_MEMBER_FILES };
