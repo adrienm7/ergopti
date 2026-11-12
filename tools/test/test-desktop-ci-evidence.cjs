@@ -2961,7 +2961,7 @@ console.log(
 			fs.rmSync(calls, { force: true });
 			fs.writeFileSync(calls, '');
 			const result = require('node:child_process').spawnSync(
-				'bash',
+				require('../lib/git-bash.cjs').bashExecutable(),
 				[script, owned, path.join(owned, 'scratch')],
 				{
 					encoding: 'utf8',
