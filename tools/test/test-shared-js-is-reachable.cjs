@@ -41,7 +41,14 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SHARED = path.join(ROOT, 'static/ergopti_plus/_shared/modules');
+const SHARED_ROOT = path.join(ROOT, 'static/ergopti_plus/_shared');
+// The folders of the canonical shared JS algorithms, each named on its own so
+// the list follows them wherever the layout puts them.
+const MODULE_DIRS = [
+	path.join(ROOT, 'static/ergopti_plus/_shared/modules/network'),
+	path.join(ROOT, 'static/ergopti_plus/_shared/modules/tooltip'),
+	path.join(ROOT, 'static/ergopti_plus/_shared/modules/updater')
+];
 const DRIVERS = ['windows', 'macos', 'linux'];
 
 // Shared JS that is currently neither runtime-mirrored nor an oracle, with why.
@@ -69,7 +76,7 @@ function corpusFiles() {
 	return out.filter((f) => /\.(js|cjs|mjs|lua|ahk|c|h)$/.test(f));
 }
 
-const modules = walk(SHARED).filter((f) => f.endsWith('.js'));
+const modules = MODULE_DIRS.flatMap((dir) => walk(dir)).filter((f) => f.endsWith('.js'));
 if (modules.length < 3) {
 	errors.push(
 		`found ${modules.length} shared JS module(s) — expected at least 3; the scan is broken`
@@ -92,7 +99,8 @@ const blobs = files.map((f) => {
 
 const unreachable = [];
 for (const mod of modules) {
-	const rel = path.relative(SHARED, mod).replace(/\\/g, '/');
+	// The module's path under _shared, as a driver names it.
+	const rel = path.relative(SHARED_ROOT, mod).replace(/\\/g, '/');
 	const src = fs.readFileSync(mod, 'utf8');
 	const base = path.basename(mod, '.js');
 
@@ -107,7 +115,7 @@ for (const mod of modules) {
 			b.rel.startsWith('static/ergopti_plus/') &&
 			!b.rel.startsWith('static/ergopti_plus/_shared/') &&
 			!/\/tests?\//.test(b.rel) &&
-			(b.src.includes(`tooltip/${base}`) || b.src.includes(`modules/${rel}`))
+			(b.src.includes(`tooltip/${base}`) || b.src.includes(rel))
 	);
 
 	if (isOracle || isMirrored) {
@@ -131,7 +139,7 @@ for (const mod of modules) {
 }
 
 for (const rel of Object.keys(DECLARED_UNREACHABLE)) {
-	if (!modules.some((m) => path.relative(SHARED, m).replace(/\\/g, '/') === rel)) {
+	if (!modules.some((m) => path.relative(SHARED_ROOT, m).replace(/\\/g, '/') === rel)) {
 		errors.push(`"${rel}" is declared unreachable but no longer exists — the note is stale`);
 	}
 }
