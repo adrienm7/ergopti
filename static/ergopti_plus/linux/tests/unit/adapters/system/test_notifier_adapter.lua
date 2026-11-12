@@ -101,8 +101,7 @@ helpers.describe("notifier: sending", function()
 			helpers.assert_true(commands[1]:find("--expire-time=" .. string.format("%d", ttl), 1, true) ~= nil,
 				"one declaration in _shared/modules/timings/constants.toml, shared with macOS")
 		end)
-		local file = assert(io.open(helpers.driver_root() .. "/adapters/notifier.lua", "rb"))
-		local source = assert(file:read("*a")); assert(file:close())
+		local source = assert(helpers.read_module_source("adapters.notifier"))
 		helpers.assert_true(source:find("TIMEOUT_MS = 5000", 1, true) == nil, "no typed copy of the duration")
 	end)
 
