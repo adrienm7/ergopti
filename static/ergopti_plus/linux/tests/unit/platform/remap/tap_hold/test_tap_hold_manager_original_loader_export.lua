@@ -96,7 +96,7 @@ helpers.describe("complete original-issuer combination binding publication", fun
 		local owned_paths, cleanup = {}, {}
 		local function defer(callback) undo[#undo + 1] = callback end
 		local source = [[[_meta]
-schema_version = 21
+schema_version = 22
 [category_enabled]
 key_combinations = false
 [gesture_parameters]
