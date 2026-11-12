@@ -200,6 +200,39 @@ try {
 		}
 	);
 
+	scenario('(bap-003-overwrite-cancel) cancelling one overwrite skips that file only', () => {
+		const lines = fs
+			.readFileSync(applescript, 'utf8')
+			.split('\n')
+			.map((line) => line.trim())
+			.filter((line) => line !== '' && !line.startsWith('--'));
+		// An alert with a cancel button raises -128, which would end the whole
+		// « on open » batch unless the enclosing try catches it.
+		// ask_password's display dialog throws -128 by contract; its callers catch it.
+		const cancelling = lines.flatMap((line, index) =>
+			line.includes('cancel button') &&
+			lines.slice(Math.max(0, index - 4), index + 1).some((l) => l.includes('display alert'))
+				? [index]
+				: []
+		);
+		assert.ok(cancelling.length > 0, 'the overwrite alert is found');
+		for (const index of cancelling) {
+			const opener = lines
+				.slice(0, index)
+				.reverse()
+				.find((line) => line === 'try' || line === 'end try');
+			const handler = lines
+				.slice(index)
+				.find((line) => line.startsWith('on error') || line === 'end try');
+			assert.equal(opener, 'try', `the alert at line ${index} sits in a try`);
+			assert.equal(
+				handler,
+				'on error number -128',
+				`the alert at line ${index} catches its cancel`
+			);
+		}
+	});
+
 	scenario('(bap-001-folder-destination) a folder destination is refused, not filled', () => {
 		const folder = fs.mkdtempSync(path.join(work, 'folder-'));
 		const clear = path.join(folder, 'notes.txt');
