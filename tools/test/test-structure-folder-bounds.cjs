@@ -22,7 +22,8 @@
  *
  * The measurement is tools/audit/structure/census.cjs, which reads the Git
  * index only. `--update-baseline` rewrites the baseline and refuses while any
- * count is above it.
+ * count is above it; with `--allow-rise`, under ERGOPTI_STRUCTURE_PHASE=2 only,
+ * it records the rises of a structure step instead, one `[RISE]` line each.
  * ==============================================================================
  */
 
@@ -145,7 +146,18 @@ function main() {
 
 	if (process.argv.includes('--update-baseline')) {
 		const rising = failures.filter((f) => / rose to |has no baseline/.test(f));
-		if (rising.length > 0) {
+		// A structure step may pass through a tree with more single-entry
+		// folders than the last (the first core/ feature has one child until
+		// the next fills it). Only the phase 2 runner may raise a count, and
+		// only by naming each rise, which it writes into the step's commit.
+		const allowRise =
+			process.argv.includes('--allow-rise') && process.env.ERGOPTI_STRUCTURE_PHASE === '2';
+		if (process.argv.includes('--allow-rise') && !allowRise) {
+			console.error('[ERROR] --allow-rise is for the structure phase 2 runner only.');
+			process.exit(1);
+		}
+		if (allowRise) for (const r of rising) console.log(`[RISE] ${r}`);
+		if (rising.length > 0 && !allowRise) {
 			console.error(
 				'[ERROR] refusing to raise the structure baseline:\n    - ' + rising.join('\n    - ')
 			);
@@ -153,7 +165,11 @@ function main() {
 		}
 		const out = { _comment: baseline._comment, ...measured };
 		fs.writeFileSync(BASELINE_FILE, JSON.stringify(out, null, '\t') + '\n', 'utf8');
-		console.log('[OK] structure folder bounds baseline lowered to the measurement.');
+		console.log(
+			`[OK] structure folder bounds baseline ${
+				rising.length > 0 ? 'moved' : 'lowered'
+			} to the measurement.`
+		);
 		return;
 	}
 	if (failures.length > 0) {

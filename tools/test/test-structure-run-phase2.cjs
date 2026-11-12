@@ -43,6 +43,15 @@ function run() {
 	assert.notEqual(refused.status, 0, 'the runner refuses without ERGOPTI_STRUCTURE_PHASE=2');
 	assert.match(refused.stderr, /ERGOPTI_STRUCTURE_PHASE=2/);
 
+	// Only the runner may raise a folder bound, and only by naming the rise.
+	const bounds = spawnSync(
+		process.execPath,
+		[path.join(__dirname, 'test-structure-folder-bounds.cjs'), '--update-baseline', '--allow-rise'],
+		{ encoding: 'utf8', env }
+	);
+	assert.notEqual(bounds.status, 0, 'a bound rises only under ERGOPTI_STRUCTURE_PHASE=2');
+	assert.match(bounds.stderr, /for the structure phase 2 runner only/);
+
 	// The follow-ups a step needs and no path rewrite can do, in order.
 	// The derived pins are recorded by the tree before the step applies.
 	const order = [
@@ -52,7 +61,7 @@ function run() {
 		"'--write'",
 		"'--derived-before'",
 		'settleCodegen(key',
-		'--update-baseline',
+		"'--allow-rise'",
 		"'--fail-on-violations'"
 	];
 	const source = require('node:fs').readFileSync(RUNNER, 'utf8');

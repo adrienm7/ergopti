@@ -233,10 +233,18 @@ function runStep(key, opts) {
 		settleCodegen(key, receipt);
 	}
 	// The bounds only fall as the plan lands; a step lowers the ratchet.
-	action('folder bounds', process.execPath, [
-		'tools/test/test-structure-folder-bounds.cjs',
-		'--update-baseline'
-	]);
+	// A step may raise a bound on its way to the target tree; each rise is
+	// named in the step's commit, never taken silently.
+	const bounds = action(
+		'folder bounds',
+		process.execPath,
+		['tools/test/test-structure-folder-bounds.cjs', '--update-baseline', '--allow-rise'],
+		{ env: { ERGOPTI_STRUCTURE_PHASE: '2' } }
+	);
+	receipt.boundsRaised = bounds.tail
+		.split('\n')
+		.filter((l) => l.startsWith('[RISE] '))
+		.map((l) => l.slice('[RISE] '.length));
 	const after = unstagedPaths();
 	if (after.changed.length > 0) git('add', '--', ...after.changed);
 	for (const [label, cmd, args] of [
@@ -264,8 +272,14 @@ function runStep(key, opts) {
 			: [];
 		receipt.requalified = records;
 		const section = Repin.requalificationSection(records);
+		const raised = receipt.boundsRaised.length
+			? 'Bounds raised by this step (Rule B, falling again as later steps\n' +
+				'fill the new feature folders):\n' +
+				receipt.boundsRaised.map((r) => `- ${r}`).join('\n')
+			: '';
 		const message =
 			`refactor(structure): move ${key} into its feature folder\n\n${receipt.summary}` +
+			(raised ? `\n\n${raised}` : '') +
 			(section ? `\n\n${section}` : '');
 		action('commit', 'git', ['commit', '-q', '-m', message]);
 		receipt.commit = git('rev-parse', 'HEAD').trim();
