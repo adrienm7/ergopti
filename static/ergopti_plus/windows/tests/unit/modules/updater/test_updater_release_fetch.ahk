@@ -454,14 +454,12 @@ _UpdaterTest_JsonStringZeroHasTypedTransportSemantics() {
 	SavedCache := _UpdaterFetchCache
 	try {
 		_UpdaterFetchCache := Map()
-		AssertEqual("0", _Updater_InterpretResponse(
+		; A release list is a JSON array (UPD-1): the String "0" is no list, so it
+		; answers none and never enters the cache.
+		AssertEqual("", _Updater_InterpretResponse(
 			200, "0", "typed-etag", "typed-zero", "test://typed-zero"),
-			'the fresh JSON String "0" must survive response interpretation')
-		AssertEqual("0", _UpdaterFetchCache["typed-zero"].Json,
-			'the fresh JSON String "0" must remain cacheable')
-		AssertEqual("0", _Updater_InterpretResponse(
-			304, "", "", "typed-zero", "test://typed-zero"),
-			'the cached JSON String "0" must survive a 304 response')
+			'a 200 whose body is "0" opens no JSON array and answers no list')
+		AssertFalse(_UpdaterFetchCache.Has("typed-zero"), "a body that is no list is never cached")
 	} finally {
 		_UpdaterFetchCache := SavedCache
 	}
@@ -607,6 +605,24 @@ _UpdaterTest_RateLimitDetail() {
 	}
 }
 Test("Updater: an exhausted GitHub rate limit names its reset time (#95)", _UpdaterTest_RateLimitDetail)
+
+; UPD-1 (decided by the maintainer on 2026-11-11): a 200 whose body opens no JSON
+; array, a captive portal's page, is no release list. It answers none, so the
+; check reads the Atom feed and, when that fails too, says « no connection »
+; rather than « parse failed ».
+_UpdaterTest_HtmlOkIsNoList() {
+	global _UpdaterFetchCache
+	SavedCache := _UpdaterFetchCache
+	try {
+		_UpdaterFetchCache := Map()
+		AssertEqual("", _Updater_InterpretResponse(200, "<!doctype html><html><body>Portal</body></html>",
+			'"portal-etag"', "main", "test://portal"), "an HTML 200 answers no release list")
+		AssertFalse(_UpdaterFetchCache.Has("main"), "the portal page never enters the response cache")
+	} finally {
+		_UpdaterFetchCache := SavedCache
+	}
+}
+Test("Updater: an HTML 200 is no release list, so the feed is read (UPD-1)", _UpdaterTest_HtmlOkIsNoList)
 
 
 ; Simulates a driver restart: the in-memory cache and the load memo are fresh.
