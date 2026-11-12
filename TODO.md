@@ -367,6 +367,22 @@ and the next module candidates. The audit is paused at the maintainer's request.
       names the cause. The cohort passed 41/41 (Intel) and 40/40 (Apple silicon) over 2026-11-07..10 and again in
       [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137); the cause stays unproven until a
       refusal carries that snapshot.
+      2026-11-12: scan of ci.yml runs 2026-11-07..12 (282 of 353 runs on dev, claude/_ and tmp/_): the cohort steps ran
+      61 times on Intel and 62 on Apple silicon; 2 Intel refusals, [43013053161](https://github.com/adrienm7/ergopti/actions/runs/43013053161)
+      (job 130500102196) and [43172671159](https://github.com/adrienm7/ergopti/actions/runs/43172671159) (tmp/ci-snapshot, job 131034291324),
+      both after `CFMessagePortSendRequest FAILED(-1)` lines, as in 42014901978; none on Apple silicon. One macOS 26
+      `KeyboardSourceProbeTests` refusal in the full launcher suite ([43108782369](https://github.com/adrienm7/ergopti/actions/runs/43108782369),
+      job 130833096151) has no such line. Probes on hosted runners (temporary `probe-macos-tsm.yml`, removed in 3363b94e):
+      `TextInputMenuAgent` owns `com.apple.tsm.uiserver`; stopping it prints the line (20 on macos-15, 31 on Intel), so
+      does stopping `TextInputSwitcher` on Intel (12), not stopping SystemUIServer. But every perturbed cohort still passed
+      12/12: agent stopped ([43189848716](https://github.com/adrienm7/ergopti/actions/runs/43189848716), job 131086084762), both stopped, either
+      stopped or killed while the cohort selected ([43194666371](https://github.com/adrienm7/ergopti/actions/runs/43194666371), job 131102413569),
+      and that fresh runner's unperturbed baseline printed four such lines and passed. So the unanswered server is a
+      state the refusals share, not their cause; the cause is still unproven and no retry was added. 71a16621 (wording
+      corrected in 4d2e7e55, 533e2762) writes `tsm-refusal.json` beside the number-row receipt and annotates the state
+      (`tsm_uiserver_unanswered`, `fixture_refusal_unclassified` or `no_fixture_refusal`) with the agent snapshot; the
+      verdict and the exact cohorts are unchanged (`tools/test/test-macos-tsm-refusal.cjs`). Next refusal: read its
+      receipt and snapshot (did the agent's pid or run count change?) before trying another perturbation.
 
 - [x] **[CODE] Personal-info documentation:** replace obsolete Windows-preview-not-wired claims in shared README; audit the metadata-only missing localization key separately from the working translated menu caption. Done: the obsolete Windows-not-wired section of the shared README now describes the AutoHotkey mask twin; the metadata-only missing localization key is noted as a separate audit (not fixed here).
 - [x] **[PARITY] Personal aliases and preparation (alphabets documented in the shared personal_info README; Windows eager pre-generation cost moved to « To confirm on the Windows PC », macOS Unicode aliases tracked below):** document allowed alias alphabets per OS; qualify or bound Windows eager pre-generation at accepted high pattern settings without claiming a measured hang. Preserve actual dynamic-resolution alternatives on Lua.
@@ -1645,6 +1661,17 @@ Each closes on a named green hosted or native run, recorded here.
       not end both processes within 10 s (the Quit AppleEvent was never answered)" while the same build quit in
       0.3–0.4 s in every other row. Its re-run (attempt 2, job 130295289361) passed and the macOS Verdict of
       42929436137 is green (job 130295941982); keep it listed until it stays green.
+      Scan 2026-11-12 of ci.yml runs 2026-11-07..12 on dev, claude/_ and tmp/_ (282 of 353 runs listed, 71 runs of
+      2026-11-07..10 and the second job pages of ten large runs not read; logs read for the A/B buckets and one sample
+      per other failure group): `symlink_logs_dir` Quit timeout only once (job 130257482167 above); its failed-launch
+      artifact (launch-gate-failed-ci-macos-15-symlink_logs_dir\_\_tilde_paths-attempt-1, with the launcher and
+      Hammerspoon samples) could not be read from this session (artifact storage host refused by its network policy),
+      so it stays unexplained. No failure of the window switch, cffi-lua clone, desktop-webview AI focus,
+      `TestIdleDeadlinePhysicallyRetiresPeer` or `testBridgeHardDeath...` in the logs read; the sampled Linux install
+      and webview failures were an APT mirror timeout (1200 s) and WIP tests. `NativeAppClonerBundleOwnershipTests`
+      EPERM appears twice more, in [42940650392](https://github.com/adrienm7/ergopti/actions/runs/42940650392) and [42927169227](https://github.com/adrienm7/ergopti/actions/runs/42927169227), (2026-11-11, macOS 26); whether
+      their sources hold its fix bce01f27 is not checked (that commit is not reachable from this clone). Nothing reproduced, so nothing was changed here; the keyboard-source refusals are under « [CI] Native
+      keyboard-source fixture ».
 
 ## Maintainer decisions pending
 
