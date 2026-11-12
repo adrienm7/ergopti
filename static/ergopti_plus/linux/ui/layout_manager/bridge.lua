@@ -170,6 +170,15 @@ local function controller(state, context)
 			return false
 		end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+		-- A layout that changed while it is the emulated one reloads the
+		-- emulation: an uninstalled one stays chosen and stops, a reinstalled one
+		-- resumes (maintainer decision, 2026-11-12), and the tray shows its state
+		-- (LMH-001, LMH-002).
+		layout_changed = function(id)
+			if not emulation or type(emulation.status) ~= "function" or emulation.status().id ~= id then return end
+			emulation.reload_if_started()
+			if type(state.on_config_changed) == "function" then state.on_config_changed() end
+		end,
 		-- The layout editor applies a source's navigation layer through the
 		-- navigation layer editor's own save (ui/layer_editor/bridge.lua).
 		apply_nav = layer_editor and function(text, done)

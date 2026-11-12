@@ -116,6 +116,28 @@ helpers.describe("layout manager bridge (Linux)", function()
 		return Bridge, state, daemon_state
 	end
 
+	helpers.it("(lmh-001-002-emulation-reload) a changed emulated layout reloads the emulation and the tray", function()
+		local Bridge, state, daemon_state = emulating_bridge()
+		state.reloads, state.rebuilds = 0, 0
+		daemon_state.layout_emulation = {
+			status = function() return { active = true, id = "ergol" } end,
+			reload_if_started = function() state.reloads = state.reloads + 1; return true end,
+		}
+		daemon_state.on_config_changed = function() state.rebuilds = state.rebuilds + 1 end
+		daemon_state.layout_registry.snapshot = function()
+			return { platform = "linux", index = INDEX, installed = { ergol = { id = "ergol" }, other = { id = "other" } }, source = "cache" }
+		end
+		daemon_state.layout_registry.uninstall = function(_, on_done) on_done(true, {}) end
+		Bridge.on_message({ action = "ready" }, daemon_state)
+		helpers.assert_true(Bridge.on_message({ action = "uninstall", id = "other" }, daemon_state).handled)
+		helpers.assert_eq(state.reloads, 0, "a layout that is not emulated leaves the emulation alone")
+		helpers.assert_true(Bridge.on_message({ action = "uninstall", id = "ergol" }, daemon_state).handled)
+		helpers.assert_eq(state.reloads, 1, "the uninstalled emulated layout stops (it stays chosen)")
+		helpers.assert_eq(state.rebuilds, 1, "the tray shows the stopped emulation")
+		helpers.assert_true(Bridge.on_message({ action = "install", id = "ergol" }, daemon_state).handled)
+		helpers.assert_eq(state.reloads, 2, "a reinstall resumes it")
+	end)
+
 	helpers.it("emulates a source without installing it (layout-editor-emulate)", function()
 		local Bridge, state, daemon_state = emulating_bridge()
 		Bridge.on_message({ action = "ready" }, daemon_state)

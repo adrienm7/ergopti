@@ -116,6 +116,15 @@ end
 -- =============================
 -- =============================
 
+--- Tells the host that a layout changed, so a changed emulated layout reloads.
+--- @param deps table
+--- @param id string The changed layout's id.
+local function layout_changed(deps, id)
+	if type(deps.layout_changed) ~= "function" then return end
+	local ok, err = pcall(deps.layout_changed, id)
+	if not ok then deps.log("error", "The layout change of '%s' could not reach the emulation: %s.", id, tostring(err)) end
+end
+
 --- Handles the three composer messages of the page.
 --- @param deps table The controller's collaborators.
 --- @param controller table
@@ -131,6 +140,10 @@ function M.handle_composer(deps, controller, action, payload, push_state)
 		return false
 	end
 	local function report(ok, code, detail, used, installed)
+		-- A saved or removed composition changes the reserved `composed` layout.
+		if ok == true and (action == "composer_save" or action == "composer_remove") then
+			layout_changed(deps, "composed")
+		end
 		deps.push("composerResult", { action = action, ok = ok == true, code = code, detail = detail and tostring(detail),
 			used = used == true,
 			pending = type(installed) == "table" and installed.pending_activation == true,
@@ -262,6 +275,11 @@ end
 ---   layout and reloads the layout emulation; on_done(ok, code, detail). With
 ---   registry.composer_emulate it offers composer_emulate (« Emulate without
 ---   installing »); without them composer_emulate is refused.
+--- deps.layout_changed(id) is told after a layout was installed, updated,
+---   uninstalled, saved or removed, so the host reloads the emulation when that
+---   layout is the emulated one and refreshes its menu (LMH-001, LMH-002). A
+---   stored emulated layout stays chosen when it is uninstalled (maintainer
+---   decision, 2026-11-12): the reload stops it, a reinstall resumes it.
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
 --- deps.strings() returns the translated strings the page shows.
 --- deps.open_url(url) opens an https URL; deps.close() closes the window.
@@ -288,6 +306,7 @@ function M.new(deps)
 					warning = detail_or_code.pending_activation == true and "pending_logout" or "not_enabled"
 				end
 				controller.result = { id = id, action = action, ok = true, warning = warning }
+				if action ~= "select" then layout_changed(deps, id) end
 			else
 				controller.result = { id = id, action = action, ok = false, code = tostring(detail_or_code),
 					detail = detail ~= nil and tostring(detail) or nil }
