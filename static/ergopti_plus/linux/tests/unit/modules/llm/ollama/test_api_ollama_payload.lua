@@ -36,6 +36,7 @@ for _, name in ipairs({ "defaults.json", "inference.json" }) do
 		for part in POLICY:gmatch("[^/]+") do
 			at = at .. "/" .. part; assert(uv.fs_mkdir(at, 448)); folders[#folders + 1] = at
 		end
+		helpers.assert_true(#folders > 0, "the policy folders were made")
 		for _, file in ipairs({ "defaults.json", "inference.json" }) do
 			local path = base .. POLICY .. "/" .. file
 			if file == name then
