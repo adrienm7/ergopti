@@ -374,6 +374,14 @@ function run() {
 				Plan.referenceContext(MAP)
 			).some((r) => Plan.REFUSED_KINDS.has(r.kind))
 		);
+		// A tool's bare path of a file only _shared holds.
+		assert.equal(
+			rewrite(
+				'tools/test/z.cjs',
+				"const SPEC_ONLY = { 'zz_probe_mod/hotstrings/a.toml': 'read by humans' };"
+			),
+			"const SPEC_ONLY = { 'zz_probe_hs/data/a.toml': 'read by humans' };"
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
