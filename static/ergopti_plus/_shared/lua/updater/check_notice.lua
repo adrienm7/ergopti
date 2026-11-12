@@ -1,10 +1,11 @@
---- modules/updater/check_notice.lua
+--- _shared/lua/updater/check_notice.lua
 
 --- ==============================================================================
---- MODULE: Update Check Notice (Linux)
+--- MODULE: Update Check Notice (Shared)
 --- DESCRIPTION:
 --- Words the notification a manual check sends when the update-check window
---- cannot open (no WebKitGTK, no display). It reads the same structured answer
+--- cannot open (Linux without WebKitGTK or a display, a macOS webview that
+--- refuses to open). It reads the same structured answer
 --- the window shows (updater.check_result), so each outcome keeps its own
 --- sentence, as Windows' Updater_ShowAvailableUpdateCallback words them.
 ---
