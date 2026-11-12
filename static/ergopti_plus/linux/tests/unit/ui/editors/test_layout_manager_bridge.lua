@@ -138,6 +138,15 @@ helpers.describe("layout manager bridge (Linux)", function()
 		helpers.assert_eq(state.reloads, 2, "a reinstall resumes it")
 	end)
 
+	helpers.it("(lmh-005-emulate-tray) emulating without installing rebuilds the tray", function()
+		local Bridge, state, daemon_state = emulating_bridge()
+		state.rebuilds = 0
+		daemon_state.on_config_changed = function() state.rebuilds = state.rebuilds + 1 end
+		Bridge.on_message({ action = "ready" }, daemon_state)
+		helpers.assert_true(Bridge.on_message({ action = "composer_emulate", source = "src", keylayout = "<k/>" }, daemon_state).handled)
+		helpers.assert_eq(state.rebuilds, 1, "the tray ticks the newly emulated layout")
+	end)
+
 	helpers.it("emulates a source without installing it (layout-editor-emulate)", function()
 		local Bridge, state, daemon_state = emulating_bridge()
 		Bridge.on_message({ action = "ready" }, daemon_state)
