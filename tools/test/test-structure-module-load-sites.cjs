@@ -7,7 +7,7 @@
  * The structure plan renames Lua modules (`json` becomes
  * `core.text.engine.json`). A one-word module name is also an ordinary word:
  * a file type ("json"), a slot kind ("chord"), an action ("wrap_pair") or a
- * timings section ("logger"). Phase 2 once rewrote all 404 such strings in
+ * timings section ("logger"). Applying the plan once rewrote all 404 such strings in
  * S01, turning `Timings.count("logger", "retention_days")` into a read of a
  * section that does not exist. A one-word name now moves only where it is
  * loaded: a require argument or a package.loaded / package.preload key.
