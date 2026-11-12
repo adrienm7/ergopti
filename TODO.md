@@ -22,7 +22,7 @@ the field-run step or the hand action that proves it and the commits it confirms
       the 11th callback entering at 10 units and completing last: a later callback overtook it. A real Windows
       bug on the dispatcher path, which left Critical before its append and dropped the overtaken character,
       and a test-side race in the probe's own callback; both now serialize from admission (0aae34e00c).
-- [ ] **[TEST] Windows compiled upgrade (Install and launch):** run 42480459552 (39b55d78ff) failed at the
+- [x] **[TEST] Windows compiled upgrade (Install and launch):** run 42480459552 (39b55d78ff) failed at the
       `upgrade` step: the current exe, booted on the profile v1.0.0 installed, did not exit successfully. It last
       passed on fb2059e00e; the exe changes since are the dev channel core (5427b56b49) and the LLM dispatcher
       serialization (0aae34e00c). 36805b170a keeps the exit code, the launch streams and the startup logs in
@@ -32,6 +32,16 @@ the field-run step or the hand action that proves it and the commits it confirms
       0.5 s later, then exited non-zero with empty stdout and stderr. Lead: a curl
       child still running when the smoke quits makes the exit fail; check how the quit path settles an in-flight
       HttpClient request and why its termination is refused.
+      2026-11-12: the lead does not hold. The smoke quits through ExitProcess(0), nothing on that path reads the
+      abort debts, and only the smoke error handler exits 1 with empty streams: an uncaught error (13cfcd3070 now
+      prints « startup-smoke: uncaught <Type> during phase … »). The warning 0.5 s after ready matches the 500 ms
+      tree-terminate budget. ed11665a (an Abort interrupted between the two reads of ManagedAdmissionFn hands
+      SetTimer an Integer) fits that order, and 351beaa1 fixes its three siblings (DeadlineFn stop, re-arm and
+      both first arms). d092255a replays the order deterministically, with a control that makes the pre-fix stop
+      raise; all four cases passed on the Windows lane ([43275759107](https://github.com/adrienm7/ergopti/actions/runs/43275759107), job 131384994469, ok 910-913).
+      Upgrade exit 1: ed11665a is the credible cause, unproven (the logs never named the aborted request, and
+      that run stopped at the startup-smoke ceiling neutral-defaults toml.flat_values=2250 > 2248, not mine);
+      watch for a startup-smoke: uncaught line on the next failure.
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
       Mac too):** rules stay fail-closed. The misleading « lease auto-recovery exhausted » error is gone (the
       recovery stops while the runtime waits for admission), and the installer helper refusal now names its cause
