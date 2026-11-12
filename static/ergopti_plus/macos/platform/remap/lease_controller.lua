@@ -2331,9 +2331,16 @@ function M.stop_exact(token, reason, on_done)
 end
 
 --- Returns the current public phase and a diagnostic snapshot.
+--- @param options table|nil `{ before_init = "uninitialized" }` answers a
+---   caller that expects a controller that never started (a quit during the
+---   first-run wizard) without reporting that call as an error.
 --- @return string phase Current lifecycle phase.
 --- @return table snapshot Token-scoped state safe for status UIs.
-function M.status()
+function M.status(options)
+	if options ~= nil and (type(options) ~= "table" or options.before_init ~= "uninitialized") then
+		error("lease_controller.status: options must be nil or { before_init = \"uninitialized\" }", 2)
+	end
+	if not _state and options ~= nil then return "uninitialized", { phase = "uninitialized" } end
 	if not require_state("status") then return "uninitialized", { phase = "uninitialized" } end
 	retry_timer_cleanup()
 	local generation = _state.current
