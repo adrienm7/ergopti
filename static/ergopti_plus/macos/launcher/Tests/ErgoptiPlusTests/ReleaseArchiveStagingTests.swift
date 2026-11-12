@@ -163,9 +163,10 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 	private static func archiveBounds() throws -> (absoluteMs: Int, idleMs: Int) {
 		let defaults = repositoryURL.appendingPathComponent("static/ergopti_plus/_shared/modules/updater/defaults.json")
 		let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: defaults)) as? [String: Any])
-		let phases = try XCTUnwrap(object["phase_timeout_ms"] as? [String: Any])
+		let transfer = try XCTUnwrap(object["archive_transfer"] as? [String: Any])
+		let phases = try XCTUnwrap(transfer["phase_timeout_ms"] as? [String: Any])
 		let absolute = try XCTUnwrap(phases["archive"] as? Int)
-		let idle = try XCTUnwrap(object["archive_idle_timeout_ms"] as? Int)
+		let idle = try XCTUnwrap(transfer["archive_idle_timeout_ms"] as? Int)
 		XCTAssertTrue(absolute % 1000 == 0 && idle % 1000 == 0 && idle >= 1000 && absolute >= idle)
 		return (absolute, idle)
 	}
