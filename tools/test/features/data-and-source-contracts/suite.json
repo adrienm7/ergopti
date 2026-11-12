@@ -721,6 +721,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-pinned-reads-shared-helpers.cjs"],
 			"repro": "npm run test:pinned-reads-shared-helpers"
+		},
+		{
+			"id": "js-0517",
+			"ordinal": 634,
+			"name": "a structure step re-pins every hash of a file it changed, follows chains, refuses ambiguity and keeps history",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-repin.cjs"],
+			"repro": "npm run test:structure-repin"
 		}
 	]
 }
