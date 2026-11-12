@@ -376,12 +376,38 @@ HSE_RegisterFromTomlFlags(IsCaseSensitive, Flags, Trigger, Output, Options) {
 		}
 		if IsCaseSensitive {
 				CreateHotstring(Flags, Trigger, Output, Options)
+				; The literal family gets the same no-break space variants as the cased
+				; one (HSE-003, see CreateCaseSensitiveHotstrings).
+				for SpaceVariant in HSE_NoBreakSpaceVariants(Trigger)
+						CreateHotstring(Flags, SpaceVariant, Output, Options)
 				return
 		}
 		CreateCaseSensitiveHotstrings(Flags, Trigger, Output, Options)
 }
 
+; Returns the no-break (U+00A0) and narrow no-break (U+202F) forms of a trigger
+; with an inner space, or none for a trigger without one or starting with a space
+; (a word-boundary guard keeps its own), as macOS add_with_space_variants.
+; @param Trigger {String} The trigger as written.
+; @returns {Array} Zero or two variant triggers.
+HSE_NoBreakSpaceVariants(Trigger) {
+		FirstUnit := SubStr(Trigger, 1, 1)
+		if !InStr(Trigger, " ") || FirstUnit == " " || FirstUnit == Chr(0xA0) || FirstUnit == Chr(0x202F)
+				return []
+		return [StrReplace(Trigger, " ", Chr(0xA0)), StrReplace(Trigger, " ", Chr(0x202F))]
+}
+
 CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset) {
+		; A no-break space typed inside a trigger counts as a space (maintainer
+		; decision HSE-003, 2026-11-12, as macOS add_with_space_variants and the
+		; shared engine): « la » + U+00A0 + « notre » fires « la nôtre ». A trigger
+		; starting with a space is a word-boundary guard and keeps its own.
+		for SpaceVariant in HSE_NoBreakSpaceVariants(Abbreviation) {
+				if IsSet(options)
+						CreateCaseSensitiveHotstrings(Flags, SpaceVariant, Replacement, options)
+				else
+						CreateCaseSensitiveHotstrings(Flags, SpaceVariant, Replacement)
+		}
 		OnlyText := (IsSet(options) and options.Has("OnlyText")) ? options["OnlyText"] : True
 		FinalResult := (IsSet(options) and options.Has("FinalResult")) ? options["FinalResult"] : False
 		TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options[
