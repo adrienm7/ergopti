@@ -1463,7 +1463,7 @@ _LLMRemoteResolveEntry(Entry) {
     Token := _LLMRemoteStoredKey(Entry)
     if !LocalServerAuthEntryTokenAllowed(ProviderId, Token, BaseUrl, LLM_LOCAL_API_SERVERS)
         return ""
-    Model := _LLMRemoteEntryGet(Entry, "Model", Provider["DefaultModel"])
+    Model := LLM_RemoteEntryModel(Entry)
     if (Model == "")
         return ""
     for Scalar in [ProviderId, ProvFmt, BaseUrl, Token, Model] {
@@ -1482,6 +1482,19 @@ _LLMRemoteResolveEntry(Entry) {
         Resolved["Token"] := ""
     }
     return Resolved
+}
+
+/**
+ * The model an entry is answered by: its own, else its provider's default.
+ * @param {Map|Object} Entry An API entry record.
+ * @returns {String} The model, "" for an unknown provider.
+ */
+LLM_RemoteEntryModel(Entry) {
+    global LLM_API_PROVIDERS
+    ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
+    if !LLM_API_PROVIDERS.Has(ProviderId)
+        return ""
+    return _LLMRemoteEntryGet(Entry, "Model", LLM_API_PROVIDERS[ProviderId]["DefaultModel"])
 }
 
 ; The key an entry record stores: a resolved record of a token-exchange provider

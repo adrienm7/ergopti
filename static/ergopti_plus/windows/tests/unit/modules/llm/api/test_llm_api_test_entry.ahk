@@ -334,7 +334,7 @@ _LAT_SurvivesTypingCancels() {
 	for FnName in ["LLM_Engine_StopGeneration", "LLM_Engine_CancelInflight"] {
 		Code := _StripFullLineComments(_DriverFuncBody(FnName))
 		Assert(Code != "", FnName . " must remain source-visible")
-		Assert(InStr(Code, "LLM_RemoteCancelAllAsync(LLM_REMOTE_KIND_API_TEST)") > 0,
+		Assert(InStr(Code, '_LLM_Engine_Port("http").Cancel(LLM_REMOTE_KIND_API_TEST)') > 0,
 			FnName . " must spare the owned probe when cancelling prediction work")
 	}
 }

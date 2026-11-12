@@ -12,16 +12,20 @@ and generated data. Bypassing the shared source creates silent drift.
 
 ### project-structure-plan-owns-the-tree-shape
 
-The target tree of every driver and of `_shared` is computed, not typed:
-`tools/audit/structure/rules.cjs` maps each tracked file to its place (one
-domain vocabulary for `infra`, `adapters` and `_shared/lua`, the `ui/` groups,
-the sub-module splits), and `docs/design/structure-plan.md` explains the
-choices. Until its phase 2 lands, a new driver folder or file takes the name
-those rules give it, and `test-structure-folder-bounds.cjs` (2..20 entries per
-folder, 40 in tests, layer folders on every driver) and
-`test-shared-literal-inventory.cjs` (hand-typed values per driver and kind)
-may only go down. Move files with `tools/audit/structure/apply-step.cjs`, never
-by hand: it rewrites the Lua names, `#Include` lines and repository paths.
+The target tree of every driver and of `_shared` is feature-first, decided by
+the maintainer on 2026-11-11, and computed, not typed:
+`tools/audit/structure/rules.cjs` maps each tracked file to
+`<feature>/{engine,adapters,ui,data,native}/` or to `core/<domain>/` and
+`platform/<domain>/`, strips the file-name prefixes the folder repeats, and
+names the layers-and-chords feature `keyboard`; tests mirror the tree under
+`tests/<kind>/`. Until phase 2 runs (on the maintainer's go), a new driver file
+takes the place those rules give it, and `test-structure-folder-bounds.cjs`
+and `test-shared-literal-inventory.cjs` may only go down. A Lua module name
+built at runtime (`"prefix." .. name`) must be listed in `RUNTIME_PREFIXES`, or
+`apply-step.cjs --check-all` refuses. Move files with `apply-step.cjs`, never by
+hand: it rewrites Lua names, `#Include` lines, paths and folder references, and
+refuses a step that would let a driver module and a `_shared` module answer
+the same Lua name.
 
 ### project-the-tap-hold-file-is-one-layout-translated-at-the-boundary
 

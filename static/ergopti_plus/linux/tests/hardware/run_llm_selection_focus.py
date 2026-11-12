@@ -18,6 +18,38 @@ TITLE = "ergopti-owned-identical-ai-title"
 # Re-runs allowed for a positive case whose focus verdict relapsed to "unknown"
 # after the reply (accessibility stack churn at the fixture boundary).
 CASE_RETRIES = 2
+# How long a reader waits for the GTK child's first complete state document.
+STATE_READ_SECONDS = 10
+
+
+def publish(path, data):
+    """Writes a JSON document whole: a reader sees the old one or the new one.
+
+    write_text() truncates, then writes; a reader between the two read an empty
+    file (JSONDecodeError at char 0, run 43105583384). The temporary sibling is
+    renamed over the document, which POSIX makes atomic.
+    """
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(json.dumps(data))
+    os.replace(temporary, path)
+
+
+def read_complete(path, seconds=STATE_READ_SECONDS):
+    """Reads a document publish() wrote, waiting for its first version.
+
+    A missing or incomplete file is retried until the deadline, then named in
+    the failure; a document is never parsed from a partial write.
+    """
+    deadline = time.monotonic() + seconds
+    while True:
+        try:
+            return json.loads(path.read_text())
+        except (FileNotFoundError, json.JSONDecodeError) as error:
+            if time.monotonic() >= deadline:
+                raise AssertionError(
+                    f"{path.name} held no complete document within {seconds} s: {error}"
+                ) from error
+            time.sleep(0.02)
 
 
 def stop(process):
@@ -51,10 +83,10 @@ def gtk(root):
 
     def state(*_):
         data = {"focused": current[0], "texts": [entry.get_text() for entry in fields]}
-        (root / "state.json").write_text(json.dumps(data))
+        publish(root / "state.json", data)
 
     def control():
-        request = json.loads((root / "control.json").read_text())
+        request = read_complete(root / "control.json")
         if request.get("reset"):
             for entry, text in zip(fields, ("ORIGIN SECOND ORIGIN", "SECOND", "SECRET", "OTHER")):
                 entry.set_text(text)
@@ -84,7 +116,7 @@ def session(root):
     with (root / "wm.log").open("w") as wm_log, (root / "gtk.log").open("w") as gtk_log:
         wm = subprocess.Popen(["openbox"], stdout=wm_log, stderr=wm_log)
         processes.append(wm)
-        (root / "control.json").write_text(json.dumps({"target": 0, "reset": True}))
+        publish(root / "control.json", {"target": 0, "reset": True})
         app = subprocess.Popen(
             [
                 os.environ.get("ERGOPTI_ATSPI_GTK_PYTHON", "/usr/bin/python3"),
@@ -147,18 +179,19 @@ def session(root):
                     return json.loads(line.removeprefix("RECEIPT:"))
 
                 def focus(target, reset=False, start=0, end=-1):
-                    (root / "control.json").write_text(
-                        json.dumps({"target": target, "reset": reset, "start": start, "end": end})
+                    publish(
+                        root / "control.json",
+                        {"target": target, "reset": reset, "start": start, "end": end},
                     )
                     app.send_signal(signal.SIGUSR1)
                     time.sleep(0.2)
-                    state = json.loads((root / "state.json").read_text())
+                    state = read_complete(root / "state.json")
                     assert state["focused"] == target
                     return state["texts"]
 
                 def unchanged(expected):
                     time.sleep(0.1)
-                    actual = json.loads((root / "state.json").read_text())["texts"]
+                    actual = read_complete(root / "state.json")["texts"]
                     assert actual == expected, (
                         "AI typed into an unowned native field",
                         expected,
@@ -243,7 +276,7 @@ def session(root):
                             unchanged(before)
                         else:
                             time.sleep(0.1)
-                            texts = json.loads((root / "state.json").read_text())["texts"]
+                            texts = read_complete(root / "state.json")["texts"]
                             assert texts[0] != before[0] and texts[1:] == before[1:], (
                                 "positive native output must reach only its own field"
                             )
@@ -319,7 +352,7 @@ def session(root):
                                 assert not result["accepted"]
                         else:
                             time.sleep(0.1)
-                            after = json.loads((root / "state.json").read_text())["texts"]
+                            after = read_complete(root / "state.json")["texts"]
                             assert (
                                 after[0] != before[0]
                                 and after[0].endswith(" SECOND ORIGIN")

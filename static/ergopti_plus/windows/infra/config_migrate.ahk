@@ -1661,11 +1661,11 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			; logged here, as the macOS and Linux boots log theirs.
 			try {
 				Native.classify.Call(Native.decode.Call(Row.image.source), Row.registry_shadow, &RefusedVersion)
-				Reason := ConfigMigrateVersionRefusalDetail(Row.classification, RefusedVersion, Row.registry_shadow)
+				RefusalDetail := ConfigMigrateVersionRefusalDetail(Row.classification, RefusedVersion, Row.registry_shadow)
 			} catch as Err
-				Reason := "the prepared classification could not be read again: " . Err.Message
+				RefusalDetail := "the prepared classification could not be read again: " . Err.Message
 			try LoggerError("ConfigMigrate", "Config migration of '{1}' refused ({2}): {3}. The file is "
-				. "left untouched and this session will not write it.", FilePath, Row.classification, Reason)
+				. "left untouched and this session will not write it.", FilePath, Row.classification, RefusalDetail)
 			return PreserveVariantRefusal(Map("status", Row.classification, "read_only", 1, "from", "", "to", Row.registry_shadow["current"],
 				"backup", "", "detail", Detail))
 		}

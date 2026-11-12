@@ -2151,16 +2151,10 @@ i18n = "menu.layout.manage"
 # Opens the layout manager window straight on the unified layout editor: create
 # a layout from scratch or from another, export it for every OS, install it on
 # the system or emulate it without installing it (docs/design/layout-editor.md).
-# Windows: the WebView2 host does not offer the editor's file operations yet, so
-# the row stays greyed with its reason (decided by the coordinator on
-# 2026-11-11, to review by the maintainer).
 [[menu.layout_menu]]
 type = "command"
 id = "open_layout_editor"
 i18n = "menu.layout.edit"
-platforms = ["hs", "linux"]
-unavailable = "grey"
-reason_key = "platform_reason.layout_editor_is_on_the_website_on_windows"
 
 # The two blocks macOS alone has. It installs a .bundle keyboard layout through
 # TIS — the OS's own input-source mechanism, with a user scope and a system scope

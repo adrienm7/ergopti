@@ -766,11 +766,11 @@ HSE_DeferredRegistrationSlice(BudgetMs := "") {
 						while (Job.StepIndex <= Job.Steps.Length) {
 								Step := Job.Steps[Job.StepIndex]
 								Last := Min(Job.RowIndex + RUN_ROWS - 1, Step.Rows.Length)
-								Run := []
+								RowBatch := []
 								loop (Last - Job.RowIndex + 1)
-										Run.Push(Step.Rows[Job.RowIndex + A_Index - 1])
-								if Run.Length
-										Step.Register.Call(Run)
+										RowBatch.Push(Step.Rows[Job.RowIndex + A_Index - 1])
+								if RowBatch.Length
+										Step.Register.Call(RowBatch)
 								Job.RowIndex := Last + 1
 								if (Job.RowIndex > Step.Rows.Length) {
 										Job.StepIndex += 1

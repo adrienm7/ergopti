@@ -8,35 +8,32 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 
 | folder                        | windows |  macos |   linux |
 | ----------------------------- | ------: | -----: | ------: |
-| `adapters`                    |  **58** | **92** |  **58** |
+| `adapters`                    |  **59** | **92** |  **58** |
 | `apps`                        |       5 |      2 |       6 |
 | `bin`                         |       — |      — |   **1** |
 | `data`                        |   **1** |      5 |       3 |
 | `desktop_focus`               |       — |      — |       2 |
-| `desktop_focus/gnome`         |       — |      — |       2 |
-| `desktop_focus/kwin`          |       — |      — |       2 |
-| `desktop_focus/kwin/contents` |       — |      — |   **1** |
-| `infra`                       | **109** | **89** | **112** |
+| `infra`                       | **109** | **89** | **113** |
 | `infra/hotstrings`            |  **26** |      — |       — |
 | `infra/metrics`               |       2 |      — |       — |
 | `infra/timings`               |   **1** |      — |       — |
 | `infra/toml`                  |       7 |      4 |   **1** |
-| `install`                     |       — |      — |      18 |
+| `install`                     |       — |      — |      19 |
 | `modules`                     |      13 |      9 |      12 |
 | `modules/diagnostics`         |   **1** |      2 |   **1** |
 | `modules/dynamic_hotstrings`  |       2 |      6 |       3 |
-| `modules/gestures`            |      12 |     17 |      15 |
+| `modules/gestures`            |      17 |     17 |      15 |
 | `modules/hotstrings`          |       5 |      3 |      16 |
-| `modules/keymap`              |      10 | **27** |       7 |
+| `modules/keymap`              |      11 | **27** |       7 |
 | `modules/keymap/keylayout`    |       8 |      — |       — |
 | `modules/keymap/layout`       |       6 |      — |       — |
-| `modules/keystats`            |  **66** | **35** |      20 |
+| `modules/keystats`            |  **67** | **35** |      20 |
 | `modules/keystats/aggregator` |       — |      5 |       — |
 | `modules/llm`                 |  **45** | **68** |  **43** |
 | `modules/llm/api_ollama`      |       7 |      — |       — |
 | `modules/shortcuts`           |       6 |     11 |      15 |
 | `modules/shortcuts/actions`   |       — |     10 |       — |
-| `modules/updater`             |       8 |      6 |       7 |
+| `modules/updater`             |       8 |      6 |       8 |
 | `native`                      |       6 |  **1** |   **1** |
 | `native/archive_output`       |       — |      — |       2 |
 | `native/keyboard_layout`      |   **1** |      — |       — |
@@ -68,7 +65,7 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 | `ui/paths_editor`             |       2 |      — |   **1** |
 | `ui/permission_dialog`        |       — |      2 |       — |
 | `ui/personal_info_editor`     |       2 |      2 |   **1** |
-| `ui/physical_shortcuts`       |   **1** |  **1** |   **1** |
+| `ui/physical_shortcuts`       |       5 |  **1** |   **1** |
 | `ui/prompt_editor`            |       2 |      2 |   **1** |
 | `ui/spotlight`                |       3 |      — |       — |
 | `ui/token_prompt`             |       — |      — |   **1** |
@@ -79,7 +76,6 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 ## Folders outside the bounds (code)
 
 - singleton (1) `_shared/ahk/tap_hold`
-- oversized (23) `_shared/core/ports`
 - oversized (22) `_shared/data`
 - singleton (1) `_shared/data/app_cloner`
 - singleton (1) `_shared/data/crypto`
@@ -90,15 +86,15 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - singleton (1) `_shared/lua/caps_word`
 - singleton (1) `_shared/lua/color`
 - singleton (1) `_shared/lua/control`
-- singleton (1) `_shared/lua/core`
+- singleton_parity (1) `_shared/lua/core`
 - singleton (1) `_shared/lua/desktop_navigation`
 - singleton (1) `_shared/lua/error_dialog`
 - singleton (1) `_shared/lua/file_selection`
 - singleton (1) `_shared/lua/file_system`
 - singleton (1) `_shared/lua/hotstring_priority`
 - singleton (1) `_shared/lua/input`
-- oversized (42) `_shared/lua/keystats`
-- oversized (49) `_shared/lua/llm`
+- oversized (44) `_shared/lua/keystats`
+- oversized (50) `_shared/lua/llm`
 - singleton (1) `_shared/lua/open_target`
 - singleton (1) `_shared/lua/process`
 - singleton (1) `_shared/lua/send_input`
@@ -111,14 +107,11 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - singleton (1) `_shared/modules/control`
 - oversized (37) `_shared/modules/llm`
 - singleton (1) `_shared/modules/paths`
-- singleton (1) `_shared/modules/shortcuts`
-- singleton (1) `_shared/native`
+- singleton_parity (1) `_shared/native`
 - oversized (44) `_shared/ui`
 - oversized (58) `linux/adapters`
 - singleton (1) `linux/bin`
-- singleton (1) `linux/desktop_focus/kwin/contents`
-- singleton (1) `linux/desktop_focus/kwin/contents/code`
-- oversized (112) `linux/infra`
+- oversized (113) `linux/infra`
 - singleton_parity (1) `linux/infra/toml`
 - singleton_parity (1) `linux/modules/diagnostics`
 - oversized (43) `linux/modules/llm`
@@ -127,24 +120,24 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - oversized (45) `linux/ui`
 - singleton_parity (1) `linux/ui/action_picker`
 - singleton_parity (1) `linux/ui/changelog`
-- singleton (1) `linux/ui/config_cleanup`
+- singleton_parity (1) `linux/ui/config_cleanup`
 - singleton_parity (1) `linux/ui/download_window`
-- singleton (1) `linux/ui/error_dialog`
+- singleton_parity (1) `linux/ui/error_dialog`
 - singleton_parity (1) `linux/ui/hotstring_editor`
 - singleton_parity (1) `linux/ui/hotstrings_config_window`
-- singleton (1) `linux/ui/layer_editor`
+- singleton_parity (1) `linux/ui/layer_editor`
 - singleton_parity (1) `linux/ui/layout_manager`
 - oversized (34) `linux/ui/menu`
 - singleton_parity (1) `linux/ui/metrics_apps`
 - singleton_parity (1) `linux/ui/metrics_typing`
 - singleton_parity (1) `linux/ui/model_browser`
-- singleton (1) `linux/ui/numeric_prompt`
+- singleton_parity (1) `linux/ui/numeric_prompt`
 - singleton_parity (1) `linux/ui/paths_editor`
 - singleton_parity (1) `linux/ui/personal_info_editor`
-- singleton (1) `linux/ui/physical_shortcuts`
+- singleton_parity (1) `linux/ui/physical_shortcuts`
 - singleton_parity (1) `linux/ui/prompt_editor`
-- singleton (1) `linux/ui/token_prompt`
-- singleton (1) `linux/ui/update_check`
+- singleton_parity (1) `linux/ui/token_prompt`
+- singleton_parity (1) `linux/ui/update_check`
 - oversized (92) `macos/adapters`
 - oversized (89) `macos/infra`
 - oversized (27) `macos/modules/keymap`
@@ -154,41 +147,40 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - oversized (33) `macos/platform/remap`
 - singleton (1) `macos/platform/tray`
 - oversized (36) `macos/ui`
-- singleton (1) `macos/ui/config_cleanup`
-- singleton (1) `macos/ui/error_dialog`
+- singleton_parity (1) `macos/ui/config_cleanup`
+- singleton_parity (1) `macos/ui/error_dialog`
 - singleton_parity (1) `macos/ui/field_check`
-- singleton (1) `macos/ui/layer_editor`
+- singleton_parity (1) `macos/ui/layer_editor`
 - singleton_parity (1) `macos/ui/layout_manager`
 - oversized (51) `macos/ui/menu`
 - oversized (35) `macos/ui/menu/menu_llm`
-- singleton (1) `macos/ui/physical_shortcuts`
-- singleton (1) `macos/ui/update_check`
-- oversized (58) `windows/adapters`
+- singleton_parity (1) `macos/ui/physical_shortcuts`
+- singleton_parity (1) `macos/ui/update_check`
+- oversized (59) `windows/adapters`
 - singleton_parity (1) `windows/data`
 - oversized (109) `windows/infra`
 - oversized (26) `windows/infra/hotstrings`
 - singleton (1) `windows/infra/timings`
 - singleton_parity (1) `windows/modules/diagnostics`
-- oversized (66) `windows/modules/keystats`
+- oversized (67) `windows/modules/keystats`
 - oversized (45) `windows/modules/llm`
 - singleton (1) `windows/native/keyboard_layout`
 - singleton_parity (1) `windows/platform/network`
 - oversized (26) `windows/platform/remap`
 - singleton (1) `windows/platform/tray`
 - oversized (30) `windows/ui`
-- singleton (1) `windows/ui/config_cleanup`
-- singleton (1) `windows/ui/error_dialog`
+- singleton_parity (1) `windows/ui/config_cleanup`
+- singleton_parity (1) `windows/ui/error_dialog`
 - singleton_parity (1) `windows/ui/field_check`
-- singleton (1) `windows/ui/layer_editor`
-- singleton (1) `windows/ui/physical_shortcuts`
-- singleton (1) `windows/ui/update_check`
+- singleton_parity (1) `windows/ui/layer_editor`
+- singleton_parity (1) `windows/ui/update_check`
 
 ## Folders outside the bounds (tests)
 
 - oversized (202) `_shared/lua/test`
 - singleton (1) `_shared/tests/fixtures/keystats`
 - oversized (42) `linux/tests/fixtures`
-- oversized (322) `linux/tests/hardware`
+- oversized (324) `linux/tests/hardware`
 - singleton (1) `linux/tests/hardware/fixtures/wayland`
 - oversized (52) `linux/tests/support`
 - singleton (1) `linux/tests/support/adapters/network`
@@ -228,7 +220,7 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - singleton (1) `macos/tests/fixtures/llm_responses`
 - singleton (1) `macos/tests/fixtures/toml_samples`
 - singleton (1) `macos/tests/stubs`
-- oversized (137) `macos/tests/support`
+- oversized (138) `macos/tests/support`
 - singleton (1) `macos/tests/support/adapters/contracts`
 - singleton (1) `macos/tests/support/adapters/file_system`
 - singleton (1) `macos/tests/support/adapters/network`
@@ -270,7 +262,7 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - singleton_parity (1) `macos/tests/unit/infra/control`
 - singleton (1) `macos/tests/unit/infra/toml/cache`
 - singleton (1) `macos/tests/unit/modules/gestures/actions/clipboard/fifo`
-- oversized (72) `macos/tests/unit/modules/keystats/storage`
+- oversized (73) `macos/tests/unit/modules/keystats/storage`
 - singleton (1) `macos/tests/unit/modules/llm/agent/consent`
 - singleton (1) `macos/tests/unit/modules/llm/features/selection`
 - singleton (1) `macos/tests/unit/modules/llm/mlx/inference`
@@ -301,25 +293,23 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - singleton_parity (1) `windows/tests/unit/adapters/network`
 - oversized (41) `windows/tests/unit/infra/config/persistence`
 - singleton_parity (1) `windows/tests/unit/modules/dynamic_hotstrings`
+- oversized (43) `windows/tests/unit/modules/gestures`
 - oversized (43) `windows/tests/unit/modules/hotstrings/engine`
 - oversized (76) `windows/tests/unit/modules/keystats`
 - oversized (50) `windows/tests/unit/modules/keystats/metrics`
-- oversized (47) `windows/tests/unit/modules/keystats/reader`
+- oversized (49) `windows/tests/unit/modules/keystats/reader`
 - oversized (51) `windows/tests/unit/modules/llm/api`
 - oversized (53) `windows/tests/unit/modules/llm/servers`
 - oversized (51) `windows/tests/unit/modules/updater`
 - singleton_parity (1) `windows/tests/unit/ui/bundled_apps`
 - singleton_parity (1) `windows/tests/unit/ui/field_check`
+- singleton (1) `windows/tests/unit/ui/physical_shortcuts`
 - singleton (1) `windows/tests/unit/updater`
 
 ## Architecture folders on one or two drivers only
 
 - `bin` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
 - `desktop_focus` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `desktop_focus/gnome` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `desktop_focus/kwin` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `desktop_focus/kwin/contents` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `desktop_focus/kwin/contents/code` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
 - `infra/hotstrings` on windows — code exists on these drivers only; the counterpart gains the folder with its first file
 - `infra/metrics` on windows — code exists on these drivers only; the counterpart gains the folder with its first file
 - `install` on linux — declared OS-specific
@@ -334,15 +324,15 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - `modules/keymap/layout` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `modules/keystats/aggregator` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `modules/shortcuts/actions` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
-- `native/archive_output` on linux — declared OS-specific
-- `native/keyboard_layout` on windows — declared OS-specific
-- `native/nav_event_owner` on windows — declared OS-specific
-- `platform/remap/data` on macos — declared OS-specific
-- `ui/hotstring_editor` on macos + linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `ui/metrics_apps` on macos + linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `ui/metrics_typing` on macos + linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `ui/numeric_prompt` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `ui/paths_editor` on windows + linux — code exists on these drivers only; the counterpart gains the folder with its first file
+- `native/archive_output` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
+- `native/keyboard_layout` on windows — code exists on these drivers only; the counterpart gains the folder with its first file
+- `native/nav_event_owner` on windows — code exists on these drivers only; the counterpart gains the folder with its first file
+- `platform/remap/data` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
+- `ui/hotstring_editor` on macos + linux — the Lua drivers share it from `_shared/lua/ui/hotstring_editor/`
+- `ui/metrics_apps` on macos + linux — the Lua drivers share it from `_shared/lua/ui/metrics_apps/`
+- `ui/metrics_typing` on macos + linux — the Lua drivers share it from `_shared/lua/ui/metrics_typing/`
+- `ui/numeric_prompt` on linux — the Lua drivers share it from `_shared/lua/ui/numeric_prompt/`
+- `ui/paths_editor` on windows + linux — the Lua drivers share it from `_shared/lua/ui/paths_editor/`
 - `ui/permission_dialog` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `ui/spotlight` on windows — code exists on these drivers only; the counterpart gains the folder with its first file
-- `ui/token_prompt` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
+- `ui/token_prompt` on linux — the Lua drivers share it from `_shared/lua/ui/token_prompt/`

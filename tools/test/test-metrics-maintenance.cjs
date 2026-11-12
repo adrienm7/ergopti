@@ -198,9 +198,17 @@ check('windows-vectors: the Windows module renders the shared names and tombston
 	assert.ok(source.includes(`EXPORT_PREFIX := "${VECTORS.export.prefix}"`));
 	assert.ok(source.includes(`EXPORT_EXTENSION := "${VECTORS.export.extension}"`));
 	assert.ok(source.includes('"yyyy-MM-dd_HH-mm-ss"'), 'the export name format');
-	assert.ok(
-		source.includes('"utc", FormatTime(UtcStamp, "yyyy-MM-dd HH:mm:ss")'),
-		'the UTC instant'
+	// KMD-1: the tombstone's utc is the very ts its events_system row stores,
+	// milliseconds kept, so both must come from the one local-to-UTC converter.
+	assert.match(
+		source,
+		/KL_MetricsTombstone\(LocalTs\) \{[\s\S]{0,300}"utc", KL_TimestampFromLocal\(LocalTs\)\["ts"\]\)/,
+		'the tombstone carries the UTC instant of its journal stamp'
+	);
+	assert.match(
+		read('windows/modules/keystats/keystats_sql.ahk'),
+		/KL_EventTime\(e\) \{[\s\S]{0,200}Instant := KL_TimestampFromLocal\(LocalTs\)[\s\S]{0,100}"ts", Instant\["ts"\]/,
+		'the events_system row stores the same UTC instant'
 	);
 	assert.ok(source.includes(`KeystatsQuery("${VECTORS.export.query}"`));
 	assert.ok(read('windows/_generated/keystats_queries.ahk').includes(`"${VECTORS.export.query}"`));

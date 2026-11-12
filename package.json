@@ -250,6 +250,7 @@
 		"test:llm-nav-chord-contract": "node ./tools/test/test-llm-nav-chord-contract.cjs",
 		"test:windows-script-chords-follow-their-slot": "node ./tools/test/test-windows-script-chords-follow-their-slot.cjs",
 		"test:windows-child-handle-inheritance": "node ./tools/test/test-windows-child-handle-inheritance.cjs",
+		"test:windows-diagnostic-progress-reader": "node ./tools/test/test-windows-diagnostic-progress-reader.cjs",
 		"test:script-chords-three-os": "node ./tools/test/test-script-chords-three-os.cjs",
 		"test:windows-hotstring-preview-shows": "node ./tools/test/test-windows-hotstring-preview-shows.cjs",
 		"test:send-input-vectors-shared": "node ./tools/test/test-send-input-vectors-shared.cjs",
