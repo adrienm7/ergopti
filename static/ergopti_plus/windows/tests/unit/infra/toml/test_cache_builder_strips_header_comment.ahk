@@ -71,9 +71,8 @@ _CBHC_CommentedHeaderKeepsItsEntries() {
 		_SharedDir := PrevShared
 		try FileDelete(TomlPath)
 		try FileDelete(IndexPath)
-		try DirDelete(HsDir)
-		try DirDelete(Base . "\modules")
-		try DirDelete(Base)
+		; The fixture owns the whole isolated tree, whatever depth HsDir has.
+		try DirDelete(Base, true)
 	}
 }
 Test("hotstrings cache: a commented section header keeps its entries (cache-builder-header-comment-not-stripped)",
