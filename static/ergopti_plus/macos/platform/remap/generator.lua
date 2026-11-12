@@ -1198,6 +1198,112 @@ local function apply_tap_minimum(rule, tap_min_ms)
 	return rule
 end
 
+--- The first key of a held pair, and its second key, of one key-combination
+--- manipulator: the key whose ke_held_<k1> it requires, and its from key.
+--- @param manipulator table
+--- @return string|nil k1, string|nil k2
+local function pair_keys(manipulator)
+	local from = manipulator.from
+	if type(from) ~= "table" or type(from.key_code) ~= "string" then return nil end
+	for _, condition in ipairs(manipulator.conditions or {}) do
+		if condition.type == "variable_if" and condition.value == 1 and type(condition.name) == "string" then
+			local k1 = condition.name:match("^ke_held_(.+)$")
+			if k1 then return k1, from.key_code end
+		end
+	end
+	return nil
+end
+
+--- The variable set while `first` was already held when `later` went down.
+--- @param first string
+--- @param later string
+--- @return string name
+local function held_before_var(first, later)
+	return "ke_before_" .. first .. "_" .. later
+end
+
+--- Makes the first key held earliest win a pair, as Windows
+--- (KeyCombinationHeldFirstKey) and Linux (the shared press_sequence) choose
+--- it: Karabiner takes the first matching rule, so with two first keys held
+--- before one second key, the rule written first won whatever the press order.
+--- Each key-down of a rival first key records, through a to-event's own
+--- condition (Karabiner v16 evaluates it when it posts the event, as
+--- apply_tap_minimum relies on), which rivals were already held; its key-up
+--- clears them; a pair is gated on no rival held before its first key.
+--- @param rules table Every rule of the build.
+--- @param pair_rules table Set of the key-combination rules.
+local function apply_pair_press_order(rules, pair_rules)
+	local firsts = {}
+	for rule in pairs(pair_rules) do
+		for _, manipulator in ipairs(rule.manipulators or {}) do
+			local k1, k2 = pair_keys(manipulator)
+			if k1 then firsts[k2] = firsts[k2] or {}; firsts[k2][k1] = true end
+		end
+	end
+	local rivals = {}
+	for _, set in pairs(firsts) do
+		for a in pairs(set) do
+			for b in pairs(set) do
+				if a ~= b then rivals[a] = rivals[a] or {}; rivals[a][b] = true end
+			end
+		end
+	end
+	if next(rivals) == nil then return end
+	local function sorted(set)
+		local list = {}
+		for key in pairs(set) do list[#list + 1] = key end
+		table.sort(list)
+		return list
+	end
+	for rule in pairs(pair_rules) do
+		for _, manipulator in ipairs(rule.manipulators or {}) do
+			local k1, k2 = pair_keys(manipulator)
+			if k1 and rivals[k1] then
+				for _, other in ipairs(sorted(firsts[k2])) do
+					if other ~= k1 then
+						manipulator.conditions[#manipulator.conditions + 1] = {
+							type = "variable_unless", name = held_before_var(other, k1), value = 1,
+						}
+					end
+				end
+			end
+		end
+	end
+	--- Inserts `extra` right after the event setting ke_held_<key> to `value`.
+	local function after_held(events, value, extra_of)
+		if type(events) ~= "table" then return end
+		for index = #events, 1, -1 do
+			local set = events[index].set_variable
+			local key = set and set.value == value and type(set.name) == "string" and set.name:match("^ke_held_(.+)$")
+			if key and rivals[key] then
+				for offset, event in ipairs(extra_of(key)) do table.insert(events, index + offset, event) end
+			end
+		end
+	end
+	for _, rule in ipairs(rules) do
+		for _, manipulator in ipairs(rule.manipulators or {}) do
+			after_held(manipulator.to, 1, function(key)
+				local events = {}
+				for _, other in ipairs(sorted(rivals[key])) do
+					events[#events + 1] = set_var_event(held_before_var(other, key), 0)
+					local set = set_var_event(held_before_var(other, key), 1)
+					set.conditions = { { type = "variable_if", name = held_var_name(other), value = 1 } }
+					events[#events + 1] = set
+				end
+				return events
+			end)
+			after_held(manipulator.to_after_key_up, 0, function(key)
+				local events = {}
+				for _, other in ipairs(sorted(rivals[key])) do
+					events[#events + 1] = set_var_event(held_before_var(other, key), 0)
+					events[#events + 1] = set_var_event(held_before_var(key, other), 0)
+				end
+				return events
+			end)
+		end
+	end
+end
+
 --- Builds a Karabiner rule table for a single tap / hold key.
 ---
 --- The manipulator ALWAYS tracks physical state via ke_held_<key_code>:
@@ -2358,6 +2464,7 @@ function M.build_karabiner_json(
 	-- deployed these rules without it (the tap-hold rules' historical graph is
 	-- built apart, by build_tap_hold_rule's historical reconstruction).
 	for rule in pairs(key_combination_rules) do apply_tap_minimum(rule, Defaults.tap_min_duration_ms) end
+	apply_pair_press_order(all_rules, key_combination_rules)
 
 	-- Only a script chord that runs an action keeps its sentinel rule: an
 	-- unassigned slot, or every slot while the chords' switch is off, leaves

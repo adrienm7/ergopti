@@ -501,6 +501,26 @@
 			"proves": "Karabiner's owned minimum tap (to_delayed_action, apply_tap_minimum) drops a bounce, keeps a real tap and delays no ordinary key; the keyboard is read below the event system, so only the person sees it."
 		},
 		{
+			"id": "guided_lalt_one_shot",
+			"kind": "guided",
+			"mode": "attest",
+			"check": "tap_hold_thresholds",
+			"gesture_seconds": 120,
+			"deadline_seconds": 180,
+			"gesture": "With Left Command set to the one-shot Shift on tap and no hold, in TextEdit: tap Left Command then a: « A »; hold Left Command and type b: « B »; hold Right Option (or Caps Lock, Left Shift, Fn) and press Left Command, then release both and type c: « c », no one-shot. Pass if all three hold.",
+			"proves": "The generator's held left_shift ends the one-shot's key-down and its tracking-only manipulators stand it down under a held modifier key, as Windows' lalt.ahk 4.1."
+		},
+		{
+			"id": "guided_pair_press_order",
+			"kind": "guided",
+			"mode": "attest",
+			"check": "tap_hold_thresholds",
+			"gesture_seconds": 120,
+			"deadline_seconds": 180,
+			"gesture": "With two pairs sharing Tab as second key (CapsLock then Tab and Left Shift then Tab, each on a distinct tap action), in TextEdit: hold Left Shift, then CapsLock, then tap Tab: Left Shift's action runs; hold CapsLock, then Left Shift, then tap Tab: CapsLock's runs. Pass if both hold.",
+			"proves": "The ke_before_* variables Karabiner sets through a to-event's own condition give a pair to the first key held earliest, as Windows and Linux choose it."
+		},
+		{
 			"id": "guided_taphold_word_reset",
 			"kind": "guided",
 			"mode": "observe",

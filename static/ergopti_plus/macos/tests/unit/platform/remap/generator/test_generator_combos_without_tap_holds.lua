@@ -60,8 +60,11 @@ local TAP_HOLDS_ON_PINS = {
 	-- of its own is led by the untagged context-menu key (the digest is the old
 	-- one with the marker left out). Then for the tap minimum
 	-- (tap_hold.tap_min_duration_ms): every release-judged tap is gated on a
-	-- variable a delayed action raises once the minimum has elapsed.
-	recommended = { rules = 27, digest = "d1098d0cef2f7cf4" },
+	-- variable a delayed action raises once the minimum has elapsed. Then for
+	-- the pairs' press order (2026-11-12): a key-down of a first key shared by
+	-- several pairs records the rivals already held, and each such pair waits
+	-- for no rival held before its own first key.
+	recommended = { rules = 27, digest = "124d7525760bcbf7" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the

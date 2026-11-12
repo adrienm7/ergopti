@@ -1097,4 +1097,49 @@ helpers.with_fresh_modules({
 			end)
 		end
 	end)
+
+	helpers.describe("a pair takes the first key held earliest (pair-first-key-press-order)", function()
+		-- caps_tab comes before lshift_tab in mod_combos.json: rule order alone
+		-- would give CapsLock the Tab whichever key was held first.
+		local rules = build(nil, {
+			caps_tab = { combo = "none", tap = "arrow_left", hold = "none" },
+			lshift_tab = { combo = "none", tap = "arrow_right", hold = "none" },
+		})
+		--- The arrow a Tab press typed after the given keys were held in order.
+		local function arrow_after(order)
+			local engine = engine_for(rules)
+			for _, key in ipairs(order) do engine:down(key); engine:advance(400) end
+			engine:clear()
+			engine:down("tab")
+			local typed = {}
+			for _, emission in ipairs(engine:emissions()) do
+				if emission.key_code == "left_arrow" or emission.key_code == "right_arrow" then
+					typed[#typed + 1] = emission.key_code
+				end
+			end
+			engine:up("tab")
+			for index = #order, 1, -1 do engine:up(order[index]) end
+			return table.concat(typed, ",")
+		end
+
+		helpers.it("Shift held before CapsLock gives Shift's pair, as Windows and Linux choose", function()
+			helpers.assert_eq(arrow_after({ "left_shift", "caps_lock" }), "right_arrow")
+		end)
+		helpers.it("CapsLock held before Shift gives CapsLock's pair", function()
+			helpers.assert_eq(arrow_after({ "caps_lock", "left_shift" }), "left_arrow")
+		end)
+		helpers.it("a released earlier key leaves the pair to the key still held", function()
+			local engine = engine_for(rules)
+			engine:down("left_shift"); engine:advance(400)
+			engine:down("caps_lock"); engine:advance(400)
+			engine:up("left_shift")
+			engine:clear()
+			engine:down("tab")
+			local typed = nil
+			for _, emission in ipairs(engine:emissions()) do
+				if emission.key_code == "left_arrow" or emission.key_code == "right_arrow" then typed = emission.key_code end
+			end
+			helpers.assert_eq(typed, "left_arrow")
+		end)
+	end)
 end)
