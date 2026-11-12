@@ -82,6 +82,10 @@ printf 'left=%s\n' "$(ls -A "$FX/tmp")"
 --- @param mode string "uv", "python" or "refuse".
 --- @param extra string|nil Extra environment assignments for the caller.
 --- @return table The parsed fields plus the fixture root.
+-- The shared identifiers the release pins source, relative to the shared
+-- root: the fixture copies them to the same place under its own root.
+local IDENTIFIERS = "data/identifiers.sh"
+
 local function run(mode, extra)
 	-- A private root: a parallel suite run must not share the fixture.
 	local root = os.tmpname()
@@ -90,13 +94,13 @@ local function run(mode, extra)
 	local llm = helpers.driver_root() .. "modules/llm/"
 	local _, prepared = command("rm -rf " .. quote(root) .. " && mkdir -p " .. quote(root .. "/home")
 		.. " " .. quote(root .. "/tmp") .. " " .. quote(root .. "/macos/modules/llm")
-		.. " " .. quote(root .. "/_shared/data")
+		.. " " .. quote(root .. "/_shared/" .. IDENTIFIERS:match("^(.*)/[^/]+$"))
 		.. " && cp " .. quote(llm .. "native_python_bootstrap.sh") .. " " .. quote(llm .. "uv-release.sh")
 		.. " " .. quote(llm .. "network-retry.sh")
 		.. " " .. quote(llm .. "managed-python-release.sh") .. " " .. quote(root .. "/macos/modules/llm/")
 		-- The release pins name their host through the shared identifiers, three
 		-- folders above modules/llm as in the bundle.
-		.. " && cp " .. quote(helpers.shared("data/identifiers.sh")) .. " " .. quote(root .. "/_shared/data/"))
+		.. " && cp " .. quote(helpers.shared(IDENTIFIERS)) .. " " .. quote(root .. "/_shared/" .. IDENTIFIERS))
 	helpers.assert_eq(prepared, 0, "fixture copies the real bootstrap sources")
 	write(root .. "/run.sh", CALLER)
 	write(root .. "/driver.sh", DRIVER)
