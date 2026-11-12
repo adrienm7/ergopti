@@ -98,6 +98,10 @@ local _webview      = nil
 local _usercontent  = nil
 local _closing_webview = nil
 local _focus_owner = nil
+-- The language chosen on the wizard's first step. The running script keeps its
+-- own until Finish commits it, as on Windows (_ob_locale) and Linux: a wizard
+-- closed before Finish leaves the menus in the saved language.
+local _selected_locale = nil
 
 -- Absolute path to the assets folder. The onboarding frontend (index.html,
 -- script.js, style.css) lives in the cross-driver _shared/ui/ tree so the
@@ -236,6 +240,26 @@ local function locale_strings(code)
 		return nil
 	end
 	return strings
+end
+
+--- The language the wizard speaks: the one chosen on its first step, else the
+--- running script's.
+--- @return string
+local function wizard_locale()
+	return _selected_locale or i18n.get_locale()
+end
+
+--- A host string in the wizard's language, read from that locale file without
+--- switching the running script; the running lookup answers when it fails.
+--- @param key string Locale key.
+--- @return string
+local function wizard_text(key)
+	if _selected_locale ~= nil and _selected_locale ~= i18n.get_locale() then
+		local strings = locale_strings(_selected_locale)
+		local text = strings and strings[key]
+		if type(text) == "string" and text ~= "" then return text end
+	end
+	return i18n.get(key)
 end
 
 --- Whether a locale code is one this build ships.
@@ -426,7 +450,7 @@ end
 local function inject_init_data(owner, view, config_path)
 	if not publication_is_current(owner, view) then return end
 
-	local current_locale = i18n.get_locale()
+	local current_locale = wizard_locale()
 	local strings = locale_strings(current_locale)
 	if not strings then return end
 
@@ -650,7 +674,7 @@ end
 --- @param body string Localised alert body.
 local function fail_commit(title_key, body)
 	close_webview()
-	require("infra.dialog_util").block_alert(i18n.get(title_key), body, i18n.get("onboarding.btn.ok"))
+	require("infra.dialog_util").block_alert(wizard_text(title_key), body, wizard_text("onboarding.btn.ok"))
 end
 
 --- Versions a config.toml the wizard is about to write: the boot migration
@@ -732,8 +756,8 @@ end
 --- @param after function|nil Work to run once the user dismissed it.
 local function deferred_notice(key, after)
 	local scheduled = DeferredWork.after(0, function()
-		require("infra.dialog_util").block_alert(i18n.get("onboarding.error.title"), i18n.get(key),
-			i18n.get("onboarding.btn.ok"))
+		require("infra.dialog_util").block_alert(wizard_text("onboarding.error.title"), wizard_text(key),
+			wizard_text("onboarding.btn.ok"))
 		if after then after() end
 	end, "onboarding.notice")
 	if scheduled ~= true then
@@ -789,7 +813,7 @@ local function commit_owned(answers, publication)
 	if not rows or not known_locale(answers.locale) or type(answers.config_dir) ~= "string" then
 		Logger.error(LOG, "Onboarding answers refused: %s.",
 			tostring(refusal or "the language or the folder is invalid"))
-		fail_commit("onboarding.error.title", i18n.get("onboarding.error.invalid_answers"))
+		fail_commit("onboarding.error.title", wizard_text("onboarding.error.invalid_answers"))
 		return
 	end
 
@@ -850,7 +874,7 @@ local function commit_owned(answers, publication)
 		local persisted, persist_err = M._persist_config_dir(menu_paths, answers.config_dir)
 		if not persisted then
 			Logger.error(LOG, "Failed to persist config dir override: %s.", tostring(persist_err))
-			fail_commit("paths_editor.save_failed_title", i18n.get("paths_editor.save_failed"))
+			fail_commit("paths_editor.save_failed_title", wizard_text("paths_editor.save_failed"))
 			return
 		end
 		published_dir = require("infra.config_paths").get_config_dir()
@@ -861,14 +885,14 @@ local function commit_owned(answers, publication)
 		local resolved_path = M._resolve_commit_path(menu_paths, _config_path)
 		if not resolved_path then
 			Logger.error(LOG, "The selected configuration path could not be resolved; onboarding answers were not written.")
-			fail_published("paths_editor.save_failed_title", i18n.get("paths_editor.save_failed"))
+			fail_published("paths_editor.save_failed_title", wizard_text("paths_editor.save_failed"))
 			return
 		end
 		_config_path = resolved_path
 		_config_path_unresolved = false
 	elseif _config_path_unresolved then
 		Logger.error(LOG, "The selected configuration folder must be confirmed again; onboarding answers were not written.")
-		fail_commit("paths_editor.save_failed_title", i18n.get("onboarding.error.commit_redirect_render"))
+		fail_commit("paths_editor.save_failed_title", wizard_text("onboarding.error.commit_redirect_render"))
 		return
 	end
 
@@ -987,14 +1011,14 @@ local function commit(answers)
 	local claim = publication.begin()
 	if claim == nil then
 		Logger.error(LOG, "Onboarding finish refused while publication compensation remains pending.")
-		fail_commit("onboarding.error.title", i18n.get("onboarding.error.write_failed"))
+		fail_commit("onboarding.error.title", wizard_text("onboarding.error.write_failed"))
 		return
 	end
 	local called, detail = xpcall(function() return commit_owned(answers, publication) end, debug.traceback)
 	publication.finish(claim)
 	if not called then
 		Logger.error(LOG, "Onboarding commit refused after a native callback failure: %s.", tostring(detail))
-		fail_commit("onboarding.error.title", i18n.get("onboarding.error.write_failed"))
+		fail_commit("onboarding.error.title", wizard_text("onboarding.error.write_failed"))
 	end
 end
 
@@ -1010,14 +1034,21 @@ local function handle_message(body)
 
 	elseif action == "previewLocale" then
 		-- User hovered/clicked a language row — inject its strings live
-		local code = type(body.locale) == "string" and body.locale or "en"
-		inject_strings(code, owner, view)
+		if not known_locale(body.locale) then
+			Logger.warn(LOG, "previewLocale refused — '%s' is not a shipped locale.", tostring(body.locale))
+			return
+		end
+		inject_strings(body.locale, owner, view)
 
 	elseif action == "localeSelected" then
 		-- User confirmed language and moved to step 2 — switch locale in memory
-		local code = type(body.locale) == "string" and body.locale or "en"
-		i18n.set_locale_no_reload(code)
-		Logger.info(LOG, "Onboarding locale set to '%s'.", code)
+		-- Recorded only: Finish switches and persists it (onboarding report OBM-001).
+		if not known_locale(body.locale) then
+			Logger.warn(LOG, "localeSelected refused — '%s' is not a shipped locale.", tostring(body.locale))
+			return
+		end
+		_selected_locale = body.locale
+		Logger.info(LOG, "Onboarding locale chosen: '%s'.", body.locale)
 
 	elseif action == "pickConfigDir" then
 		-- The path editor's picker is the single native folder dialog: the
@@ -1030,7 +1061,7 @@ local function handle_message(body)
 		end
 		local seed = type(body.current) == "string" and body.current or ""
 		local picked, chosen = pcall(menu_paths.pick_config_dir, seed,
-			i18n.get("dialog.config_folder.select_title"))
+			wizard_text("dialog.config_folder.select_title"))
 		if not picked then
 			Logger.error(LOG, "pickConfigDir: the native folder picker failed: %s.", tostring(chosen))
 			return
@@ -1180,6 +1211,7 @@ function M.run(config_path)
 	end
 	_config_path = config_path
 	_config_path_unresolved = false
+	_selected_locale = nil
 	if _usercontent and close_webview() ~= true then
 		Logger.error(LOG, "Cannot open onboarding while bridge cleanup remains pending.")
 		return false
