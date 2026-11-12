@@ -88,7 +88,14 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; _ProxyOverrideDeclaration is a lazy cache of a shipped file and _ProxyOverrideStored
 	; is written with the published value; a reader before boot sees "automatic", the
 	; declared empty value, by design. There is no injected state for a guard to wait on.
-	"adapters/proxy_override.ahk", true
+	"adapters/proxy_override.ahk", true,
+	; _LLM_Engine_Ports — a test seam, not injected state. Production never
+	; writes it: every port read falls back to LLM_ENGINE_DEFAULT_PORTS, which
+	; exist from load. Only LLM_Engine_SetPort writes it, after checking the
+	; owner against the port contract, and its callers nest by design (a harness
+	; owner, then a scenario owner, each restoring what SetPort handed back), so
+	; there is neither an init to wait on nor a duplicate install to refuse.
+	"modules/llm/prediction_ports.ahk", true
 )
 
 ; Captured 2026-07-21 after excluding UPPER_SNAKE constants from the state
