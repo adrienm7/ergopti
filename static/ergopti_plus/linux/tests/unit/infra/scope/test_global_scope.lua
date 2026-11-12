@@ -65,8 +65,9 @@ helpers.describe("Linux global scope: registry and composition", function()
 		with_modules(function()
 			local trace = {}
 			for _, name in ipairs(OWNER_MODULES) do
-				package.loaded[name] = { participant = function(is_paused)
-					helpers.assert_eq(is_paused(), false)
+				package.loaded[name] = { participant = function(...)
+					-- A pause no longer reaches a scope owner (EDD-1, edd1-paused-writes).
+					helpers.assert_eq(select("#", ...), 0)
 					return stub(trace, name)
 				end }
 			end
@@ -160,8 +161,8 @@ helpers.describe("Linux global scope: hotstrings", function()
 		with_modules(function()
 			local seen, participant = nil, stub({}, "hotstrings")
 			package.loaded["infra.hotstrings_scope"] = {
-				participant = function(is_paused, ports)
-					seen = { paused = is_paused(), ports = ports }
+				participant = function(ports, ...)
+					seen = { extra = select("#", ...), ports = ports }
 					return participant
 				end,
 			}
@@ -170,7 +171,7 @@ helpers.describe("Linux global scope: hotstrings", function()
 				tooltip_preview = preview, is_paused = function() return false end })
 			helpers.assert_true(registry.hotstrings == participant, "hotstrings take part through their scope owner")
 			helpers.assert_not_nil(seen, "the owner's participant was asked for")
-			helpers.assert_eq(seen.paused, false)
+			helpers.assert_eq(seen.extra, 0, "a pause no longer reaches the owner (edd1-paused-writes)")
 			helpers.assert_true(seen.ports.dynamic == dynamic, "the dynamic runtime reaches the owner")
 			helpers.assert_true(seen.ports.preview == preview, "the preview runtime reaches the owner")
 		end)
@@ -232,12 +233,12 @@ helpers.describe("Linux global scope: the Configuration row", function()
 		helpers.assert_eq(calls, { "participants", "recommended" })
 	end)
 
-	helpers.it("refuses while paused without asking", function()
+	helpers.it("composes while paused and asks nothing (edd1-paused-writes)", function()
 		local saved_builder, saved_global = package.loaded["ui.menu.builder"], package.loaded["infra.global_scope"]
 		local execute, calls, asked = os.execute, {}, 0
 		local ok, err = pcall(function()
 			local row = restore_row({ _version = "test", on_quit = function() end,
-				is_paused = function() return true end }, calls)
+				paused = true, is_paused = function() return true end }, calls)
 			os.execute = function(command)
 				if command:find("dialog_host.lua", 1, true) then asked = asked + 1; return 0 end
 				return execute(command)
@@ -248,7 +249,7 @@ helpers.describe("Linux global scope: the Configuration row", function()
 		package.loaded["ui.menu.builder"], package.loaded["infra.global_scope"] = saved_builder, saved_global
 		if not ok then error(err, 0) end
 		helpers.assert_eq(asked, 0)
-		helpers.assert_eq(calls, {})
+		helpers.assert_eq(calls, { "participants", "recommended" })
 	end)
 end)
 
@@ -352,7 +353,7 @@ helpers.describe("Linux global scope: the Configuration clear", function()
 			local trace = {}
 			local GlobalScope = require("infra.global_scope")
 			local committed, report = apply_now(GlobalScope, "clear", {
-				tap_holds = require("infra.tap_hold_scope").participant(function() return false end),
+				tap_holds = require("infra.tap_hold_scope").participant(),
 				llm = stub(trace, "llm", true),
 			})
 			helpers.assert_eq(committed, false)
@@ -393,7 +394,7 @@ helpers.describe("Linux global scope: a real owner is reverted", function()
 			local trace = {}
 			local GlobalScope = require("infra.global_scope")
 			local committed, report = apply_now(GlobalScope, "recommended", {
-				tap_holds = require("infra.tap_hold_scope").participant(function() return false end),
+				tap_holds = require("infra.tap_hold_scope").participant(),
 				llm = stub(trace, "llm", true),
 			})
 			helpers.assert_eq(committed, false)
