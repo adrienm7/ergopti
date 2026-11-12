@@ -176,8 +176,15 @@ global LLM_ENGINE_DEFAULT_PORTS := Map(
 ; ====================================
 ; ====================================
 
-; The owners installed over the defaults, by port name. Empty in production.
-global _LLM_Engine_Ports := Map()
+/**
+ * The owners installed over the defaults, by port name. Empty in production:
+ * only LLM_Engine_SetPort writes it, and the default owners exist from load.
+ * @returns {Map}
+ */
+_LLM_Engine_Installed() {
+	static Installed := Map()
+	return Installed
+}
 
 /**
  * Installs an owner for one port, or puts the default back with 0. The caller
@@ -188,17 +195,18 @@ global _LLM_Engine_Ports := Map()
  * @returns {Object|Integer} The owner installed before, 0 for the default.
  */
 LLM_Engine_SetPort(PortName, Owner) {
-	global _LLM_Engine_Ports, LLM_ENGINE_PORT_CONTRACTS
+	global LLM_ENGINE_PORT_CONTRACTS
+	Installed := _LLM_Engine_Installed()
 	if !(PortName is String) || !LLM_ENGINE_PORT_CONTRACTS.Has(PortName)
 		throw ValueError("Unknown prediction engine port.", -1, String(PortName))
 	if !(Owner is Integer && Owner == 0)
 		LLM_Engine_CheckPort(PortName, Owner)
-	Previous := _LLM_Engine_Ports.Get(PortName, 0)
+	Previous := Installed.Get(PortName, 0)
 	if (Owner is Integer) {
-		if _LLM_Engine_Ports.Has(PortName)
-			_LLM_Engine_Ports.Delete(PortName)
+		if Installed.Has(PortName)
+			Installed.Delete(PortName)
 	} else
-		_LLM_Engine_Ports[PortName] := Owner
+		Installed[PortName] := Owner
 	return Previous
 }
 
@@ -208,8 +216,9 @@ LLM_Engine_SetPort(PortName, Owner) {
  * @returns {Object}
  */
 _LLM_Engine_Port(PortName) {
-	global _LLM_Engine_Ports, LLM_ENGINE_DEFAULT_PORTS
-	if _LLM_Engine_Ports.Has(PortName)
-		return _LLM_Engine_Ports[PortName]
+	global LLM_ENGINE_DEFAULT_PORTS
+	Installed := _LLM_Engine_Installed()
+	if Installed.Has(PortName)
+		return Installed[PortName]
 	return LLM_ENGINE_DEFAULT_PORTS[PortName]
 }

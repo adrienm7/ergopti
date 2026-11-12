@@ -105,9 +105,11 @@ _TLRE_LlmRequestIdentityOwnsReservationAndCommit() {
 			and Commit != "" and CommitLoading != ""
 			and Show != "" and Present != "",
 		"the engine, both publication fences, and typed drop path must be readable")
+	; The engine paints through its TooltipRenderer port; the default owner's
+	; forwarding of the same tuple is the behaviour test below.
 	EngineGuard := InStr(Engine, 'PresentationMeta["render_guard"]')
 	EngineShow := InStr(Engine,
-		"LLM_Tooltip_Show(display_slots, active, is_final, PresentationMeta)")
+		'_LLM_Engine_Port("tooltip").Show(display_slots, active, is_final, PresentationMeta)')
 	Assert(EngineGuard > 0 and EngineShow > EngineGuard,
 		"an identified engine render must carry its immutable guard into the tooltip")
 	Assert(InStr(LoadingEngine, '"render_guard"') > 0,
@@ -143,6 +145,36 @@ _TLRE_LlmRequestIdentityOwnsReservationAndCommit() {
 
 Test("tooltip: request identity is revalidated at reservation and pixel commit (ahk026-render-identity-boundary)",
 	_TLRE_LlmRequestIdentityOwnsReservationAndCommit)
+
+; The engine's render reaches the tooltip through the default TooltipRenderer
+; owner. A guard the engine builds is decoration unless that owner hands the
+; tooltip the very same tuple, with the same slots, index and finality.
+_TLRE_DefaultRendererForwardsThePresentationTuple() {
+	global _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
+	global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord, LLM_ENGINE_DEFAULT_PORTS
+	Saved := [_Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading,
+		_Stub_LlmTooltipText, _Stub_LlmPresentedRecord]
+	Meta := Map("offer_id", 7, "render_guard", () => true)
+	Slots := ["first", "second"]
+	_Stub_LlmTooltipCalls := []
+	try {
+		LLM_ENGINE_DEFAULT_PORTS["tooltip"].Show(Slots, 2, true, Meta)
+		AssertEqual(1, _Stub_LlmTooltipCalls.Length, "the default owner paints once")
+		Call := _Stub_LlmTooltipCalls[1]
+		AssertEqual(ObjPtr(Meta), ObjPtr(Call.meta),
+			"the default owner must hand the tooltip the engine's own presentation tuple")
+		AssertEqual(ObjPtr(Slots), ObjPtr(Call.slots), "the same slots reach the tooltip")
+		AssertEqual(2, Call.active, "the same active index reaches the tooltip")
+		AssertTrue(Call.is_final, "the same finality reaches the tooltip")
+	} finally {
+		_Stub_LlmTooltipCalls := Saved[1], _Stub_LlmTooltipVisible := Saved[2]
+		_Stub_LlmTooltipLoading := Saved[3], _Stub_LlmTooltipText := Saved[4]
+		_Stub_LlmPresentedRecord := Saved[5]
+	}
+}
+
+Test("tooltip: the default renderer port forwards the engine's presentation tuple (ahk026-render-identity-boundary)",
+	_TLRE_DefaultRendererForwardsThePresentationTuple)
 
 _TLRE_LoadingPauseDropNeverRetiresVisiblePrediction() {
 	Show := _StripFullLineComments(_DriverFuncBody("TooltipShow"))

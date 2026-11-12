@@ -569,12 +569,12 @@ _LayoutComposer_Deps(Deps) {
 		"emulate_settled", LayoutManager_EmulateSettled,
 		"base_enabled", _LayoutComposer_BaseEnabled,
 		"staging_root", AppFoldersRoot() . LayoutRegistry_Composer()["folder"] . "\" . LayoutRegistry_Composer()["dll_folder"] . "\",
-		"write_bytes", _LayoutComposer_WriteBytes,
+		"write_bytes", LayoutInstallWriteStagedBytes,
 		"read_text", (Path) => FSReadUtf8ExactBounded(Path, 65536),
-		"registry", Map("reg_read", _LayoutComposer_RegRead, "reg_subkeys", _LayoutComposer_RegSubkeys),
+		"registry", Map("reg_read", LayoutInstallRegRead64, "reg_subkeys", LayoutInstallRegSubkeys64),
 		"self_env", KbdRegister_SelfEnv(),
-		"elevate", _LayoutComposer_Elevate,
-		"activate", _LayoutComposer_Activate
+		"elevate", LayoutInstallElevate,
+		"activate", LayoutInstallActivate
 	)
 	if (Deps is Map)
 		for Key, Value in Deps
@@ -735,53 +735,6 @@ _LayoutComposer_BaseEnabled() {
 	if !IsSet(Features) || !Features.Has("layout")
 		return false
 	return Features["layout"].Get(ConfigLeaf.ERGOPTI_BASE, false) = true
-}
-
-_LayoutComposer_WriteBytes(Path, Bytes) {
-	SplitPath(Path, , &Parent)
-	DirCreate(Parent)
-	Handle := FileOpen(Path, "w")
-	try Handle.RawWrite(Bytes, Bytes.Size)
-	finally Handle.Close()
-}
-
-; The 64-bit registry view, whatever the bitness of AutoHotkey: the uninstall
-; entries of a 64-bit Windows live there.
-_LayoutComposer_RegRead(Key, Name) {
-	Previous := A_RegView
-	SetRegView(64)
-	try return RegRead(Key, Name, "")
-	finally SetRegView(Previous)
-}
-
-_LayoutComposer_RegSubkeys(Key) {
-	Previous := A_RegView
-	SetRegView(64)
-	try {
-		Names := []
-		loop reg Key, "K"
-			Names.Push(A_LoopRegName)
-		return Names
-	} finally SetRegView(Previous)
-}
-
-; The one UAC prompt: a refused prompt throws, like a cancelled ShellExecute.
-_LayoutComposer_Elevate(Command) {
-	return RunWait('*RunAs "' . Command["executable"] . '" ' . Command["arguments"], , "Hide")
-}
-
-; Loads the installed layout and asks the foreground window to switch to it.
-_LayoutComposer_Activate(Klid) {
-	static KLF_ACTIVATE := 0x1, WM_INPUTLANGCHANGEREQUEST := 0x50
-	Hkl := DllCall("User32\LoadKeyboardLayoutW", "WStr", Klid, "UInt", KLF_ACTIVATE, "Ptr")
-	if !Hkl {
-		LoggerError("LayoutComposer", "Windows did not load the keyboard layout {1}.", Klid)
-		return false
-	}
-	Foreground := WinExist("A")
-	if Foreground
-		PostMessage(WM_INPUTLANGCHANGEREQUEST, 0, Hkl, , "ahk_id " . Foreground)
-	return true
 }
 
 ; The result of the editor's source forms, with the JSON booleans the page reads.

@@ -198,7 +198,7 @@ _TLTSH_RequestSourceIsBoundAndPublished() {
 	Assert(InStr(NormalizedRender,
 		'"accept_source", RenderAcceptSource') > 0
 		and InStr(NormalizedRender,
-		"LLM_Tooltip_Show(display_slots, active, is_final, PresentationMeta)") > 0,
+		'_LLM_Engine_Port("tooltip").Show(display_slots, active, is_final, PresentationMeta)') > 0,
 		"the render must carry its immutable source inside the candidate presentation tuple")
 	Assert(InStr(SurfaceCommitBody,
 		"SurfaceToken.LlmPresented := Record") > 0,
