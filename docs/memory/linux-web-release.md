@@ -417,21 +417,6 @@ in some tab. Action: keep `adapters/file_manager_folder.lua` refusing every
 other owner, and prove a new file manager with
 `tests/hardware/run_file_manager_folder.sh`.
 
-### project-linux-key-combinations-two-files
-
-The Linux combinations owner (`modules/shortcuts/key_combinations.lua`) reads
-its pair taps, holds and switch from `config.toml` and `[mod_combos]` from the
-`tap_hold.toml` beside it, the shared file (`_shared/tap_hold/SCHEMA.md`).
-Every source receipt, guard and lease check carries a nested `chord` frame for
-the second file; compare frames with `same_source_frame`, never by path and
-content alone. The scopes publish `mod_combos.*` rows through the transaction's
-`companions` port (`_shared/lua/config_scope_transaction.lua`), prepared by
-`tap_hold_writer.prepare_combo_rows`: a companion is always read, published and
-backed up only when its candidate changes it. A test fixture that stubs
-`ConfigPaths.config` or a file port must keep `tap_hold.toml` beside
-`config.toml` and give the port a conditional remover, or the inverse of a
-publication that created the file cannot run.
-
 ### project-linux-field-report-answers-its-todo-section
 
 `tools/dev/collect-linux-field-report.sh` runs, after the daemon's field run,
@@ -621,9 +606,10 @@ depends on.
 
 ### project-linux-json-store-publication
 
-The Linux JSON store requires an object root, creates `storage.json.tmp`
-exclusively (a foreign staging file blocks the mutation and is never removed
-automatically) and publishes backups by no-replace rename on LuaJIT or checked
+The Linux JSON store requires an object root, creates its per-process stage
+`storage.json.ergopti-<pid>-<start>.tmp` exclusively (a foreign file under that
+name blocks the mutation and is never removed; a dead Ergopti process's stage
+is reaped at start, CFD-1, `infra/stage_owner.lua`) and publishes backups by no-replace rename on LuaJIT or checked
 link and unlink on stock Lua. The updater downloads into the inode reserved by
 `os.tmpname`, publishes with no-replace, and reuses its cache on a 304 only
 after a completed-response receipt.

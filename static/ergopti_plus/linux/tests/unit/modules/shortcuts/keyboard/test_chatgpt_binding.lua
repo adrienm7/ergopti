@@ -53,7 +53,7 @@ local function with_binding(body, options)
 					local Loader = require("platform.remap.tap_hold_loader")
 					local defaults = require("infra.paths").shared("tap_hold/defaults.toml")
 					local catalogue = Loader.load_document(defaults,
-						{ tap_hold = { enabled = false, inherit_defaults = true } }, nil, path .. ".tap_hold.toml")
+						{ tap_hold = { inherit_defaults = true } }, nil, path .. ".tap_hold.toml", nil, { tap_holds = { enabled = false } })
 					helpers.assert_true(combinations.install({ keys = catalogue.catalog, hold_picker = catalogue.hold_picker,
 						files = require("adapters.file_system"), route = function() return path end,
 						is_paused = function() return false end,
@@ -80,7 +80,7 @@ local function with_binding(body, options)
 			body(owners, seen, path, reload)
 		end)
 	end)
-	for _, path in ipairs(backups) do os.remove(path); os.remove(path .. ".tmp") end
+	for _, path in ipairs(backups) do os.remove(path); os.remove(path .. ".tmp"); os.remove(helpers.stage_path(path)) end
 	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(loaded) do package.loaded[name] = value end
 	if not ok then error(err, 0) end

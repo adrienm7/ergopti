@@ -530,7 +530,7 @@ helpers.describe("keyboard shortcuts: live deferred admission", function()
 	end
 
 	for _, gate in ipairs({ "master", "paused" }) do
-		helpers.it("(ordinary-live-admission) keeps script control available through " .. gate, function()
+		helpers.it("(ordinary-live-admission) retires a script-action slot through " .. gate .. " (scd1-slot-paused)", function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "script_pause_toggle" })
 			local gestures = require("modules.gestures.manager")
 			local execute, pending, fired = gestures.execute_action, nil, 0
@@ -543,7 +543,9 @@ helpers.describe("keyboard shortcuts: live deferred admission", function()
 				}))
 				admission[gate] = gate == "paused"
 				pending()
-				helpers.assert_eq(fired, 1, "script control remains the user's way back from pause")
+				-- SCD-1: a slot is suspended like on Windows and macOS; the AltGr
+				-- script chords are the way back from a pause.
+				helpers.assert_eq(fired, 0, "a keyboard slot must not run a script action through " .. gate)
 			end)
 			gestures.execute_action = execute
 			drop_config()

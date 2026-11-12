@@ -5,6 +5,182 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## One configuration layout on every OS for tap-holds (2026-11-11)
+
+## The Linux decoder judges millimetres (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (GSD-2): the Linux contact decoder
+(`modules/gestures/mt_decoder.lua`) judges its finished-swipe minimum and the
+pair-scroll travel (after which a landed pair is a scroll and a joining finger
+a resting thumb) in millimetres through the touchpad's resolution, as the
+incremental tracker already did, instead of 120 device units (10 mm at 12
+units per mm, 4 mm at 30). The values are the shared timings registry's
+`[gestures]` `decoder_swipe_minimum_mm` and `pair_scroll_travel_mm`, both
+10.0 (the 12-units-per-mm figure kept: decided by the coordinator on
+2026-11-11, to review by the maintainer), and `touchpad_fallback_units_per_mm`
+= 12 for a pad that reports neither its resolution nor its axes (the
+third-contact rule still needs the pad's own). `test-gesture-defaults-single-source.cjs`
+pins the three values and fails on a gesture source declaring a
+`*SWIPE_THRESHOLD`, `*UNITS_PER_MM` or `PAIR_SCROLL_TRAVEL*` literal. macOS
+measures millimetres already; Windows receives finished swipes. Regressions
+`gsd2-decoder-mm`.
+
+## An answer that is not the release list is no connection (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (UPD-1): a GitHub API answer with
+HTTP 200 whose body does not open a JSON array (a proxy or captive-portal
+page) is « no connection » on every driver, so the update check reads the
+public Atom feed, as macOS did; a body that opens one but is malformed or cut
+stays « parse failed » with no feed (the Linux hardware array vectors pin
+that). The one rule is `updater.release_sources.opens_release_array` (BOM
+stripped, then `[`), read by Linux `manager.lua` `accept_page` and macOS
+`auto_check.lua` `read_response`, which now also admits a BOM.
+A Linux 304 the check cannot answer from its cached page (none, or an ETag
+association that does not match) is « no connection » with the feed too, and
+the cached page is dropped so the next request is unconditional; macOS and
+Windows already fell back there. Windows counterpart (maintainer): TODO
+« Windows (the PC agent's) ». Regressions `upd1-captive-portal`.
+
+## Linux stages are named per process and reaped at start (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (CFD-1): the Linux TOML writer
+(`_shared/lua/toml_codec/writer.lua`, native writer only) and `storage.json`
+stage as `<file>.ergopti-<pid>-<start>.tmp`, `<start>` being the kernel start
+tick of `/proc/<pid>/stat` (field 22) so a reused pid is never the owner
+(`infra/stage_owner.lua`). A stage a kill or a power cut left therefore never
+blocks a later write, and at start the daemon removes, in the folders of
+`config.toml` and `storage.json` (`reap_settings`), every stage of this pattern whose owner is
+gone (no process, a zombie, another start tick) and older than
+`[adapters] stale_temp_age_ms`, as Windows `_TOML_ReapStaleTemps` does. A
+file outside the pattern (an older build's `.tmp`, another program's) is
+never touched and still refuses the exclusive creation of its own name. The
+identity is read at load, before a test or caller can replace `io.open`;
+`tests/helpers.lua` `stage_path` gives tests the same name. macOS needs no
+change: it stages through stdio `"w"`, which overwrites a leftover `.tmp`.
+Other Linux writers that stage `<file>.tmp` themselves (API entries, agent
+learning, tap-hold, app categories) are outside the decision and unchanged.
+Regressions `cfd1-stage-owner`.
+
+## The Linux application identity is the WM class or app_id (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (ADD-3): Linux names an application
+by its WM class under X11 (the class string of `WM_CLASS`,
+`x11_focus.window_class`, also in `clients()`) and by its app_id or class
+under Wayland, so one exclusion list matches under both session types.
+`/proc/<pid>/comm` is only the fallback (a window without `WM_CLASS`, or the
+xdotool route without the native transport); the kernel cuts it to 15 bytes
+(`TASK_COMM_LEN` 16 with its NUL), so `gnome-terminal-server` reads
+`gnome-terminal-`. Saved lists (`metrics.disabled_apps`,
+`llm.trigger.disabled_apps`, `llm.agent_disabled_apps`) are converted once at
+boot by `infra/app_identity_migration.lua` through
+`_shared/data/linux_app_identities.json` (`aliases` comm to class, `same`
+for names that do not change); an unknown entry is kept and logged at INFO,
+never dropped, and the `migrations.linux_app_identity` marker in
+storage.json is written only after every list is persisted. The conversion
+runs outside the shared config migration registry, whose closed op set the
+Windows interpreter validates at boot and whose identity (the process name)
+does not change (decided by the coordinator on 2026-11-11, to review by the
+maintainer). macOS keeps bundle ids unchanged; Windows keeps process names.
+Regressions `add3-app-identity`.
+
+## A password manager is a secure field as a whole, from one list (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (ADD-1): every application of
+`_shared/data/secure_apps.json` (1Password, Bitwarden, KeePassXC, KeePass,
+LastPass, Dashlane, RoboForm, Authy, the system keychains and authenticators)
+is a secure field as a whole on the three drivers, so hotstrings, keymap
+output, AI requests, clipboard borrowers and metrics stay inert there. The
+file holds one row per application with its `windows` process names (no case),
+`macos` display names (exact) and `linux` lowercase fragments of the WM class
+or Wayland app_id (substring, so `org.keepassxc.KeePassXC` matches); the rule
+is `_shared/lua/secure_apps.lua`. macOS `adapters/secure_field_detector.lua`
+`isSecureApp` reads it; Linux reads it once in `infra/secure_apps.lua`, used by
+`secure_field_detector.isSecureApp` and the metrics' `_SECURE_APPS` (still
+behind the metrics secure filter for recording), and
+`keystats.is_context_protected` returns true for a listed application
+whatever the metrics filters say: that verdict is what the focus guard
+publishes to the detector every text consumer reads. A missing or malformed
+list raises (fail closed). `test-secure-apps-single-source.cjs` fails on a
+driver-local list and on a Windows `SFD_SECURE_APPS` name missing from the
+file. Windows (maintainer): read the file in `secure_field_detector.ahk` and
+call `SFD_IsSecureApp` from `SFD_IsSecureField`; see TODO « Windows (the PC
+agent's) ». Regressions `add1-secure-app`.
+
+## A borrowed unowned Linux clipboard goes back unowned (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (ADD-2): when a Linux borrower
+(paste, selection read or transform, paste stage) finds a clipboard nobody
+owns, it restores it unowned, as macOS clears its pasteboard, instead of
+writing an owned empty string that clipboard managers record. The snapshot
+carries `unowned = true` and `restore_snapshot` calls the backend's `clear`:
+X11 `x11_selection_stamp.disown` (`XSetSelectionOwner(CLIPBOARD, None)`,
+checked by reading the owner back), Wayland `wl-copy --clear`; a backend
+with no `clear` refuses the borrow. Regressions `clipboard-unowned-empty`.
+Windows needs no change: assigning an empty `ClipboardAll` runs
+`EmptyClipboard`, which offers no format.
+
+## Ctrl+AltGr is Ctrl and the logical key, AltGr suspended (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (ILD-2): under the layout emulation,
+Ctrl+AltGr+key sends Ctrl and the key's logical character (its Ctrl level),
+with AltGr suspended, on every driver, as Linux already did (the shared
+`layouts.keylayout_emulation.decide` resolves any Ctrl chord at the Ctrl level,
+and `production_deps().emit_shortcut` leaves AltGr out of the chord). macOS,
+where the right Option key is AltGr, now clears Option from a Ctrl+Option
+shortcut (`modules/keymap/layout_emulation.lua` `key_down`); Cmd+Option keeps
+Option, being macOS's own chord family (decided by the coordinator on
+2026-11-11, to review by the maintainer). The shared vector
+`ctrl_altgr_sends_ctrl_and_the_logical_key` (`emulation_vectors.json`) pins
+the decision for the three drivers; regressions `ctrl-altgr-logical`. Settled
+with it (SCD-2, SCD-3): Ctrl+Alt+é sends Ctrl+Alt and the logical key, as
+ILD-1 sends every two-modifier chord, and a `ctrl_x` keyboard slot fires for
+Ctrl+AltGr+x, AltGr being suspended there; Linux already does both. Windows
+counterparts (maintainer): TODO « Windows (the PC agent's) ».
+
+## No Linux keyboard slot runs through a pause (2026-11-11)
+
+Decided by the maintainer on 2026-11-11, settling the 2026-11-10 entry below
+and the overnight Linux `[mod_combos]` move: one home per manifest path on
+every OS. `config.toml` holds every `[[features.*]]` row and the settings of
+the same sections: `[tap_holds]` `enabled`, `lone_modifier_tap_max_ms` and
+`sticky_timeout_ms`, and the whole `[mod_combos]` section (switch, timing,
+symmetry and `[mod_combos.config.<first>_then_<second>]`), beside
+`[category_enabled]` and `[shortcuts.key_combination_*]`. The shared
+`tap_hold.toml` holds the keys and what only they read: `[tap_hold]`
+`inherit_defaults`, the global delay `time_activation_seconds`,
+`[tap_hold.keys.<id>]`, its `[_meta]` stamp, and the macOS-only `[karabiner]`
+section (`_shared/tap_hold/SCHEMA.md`).
+
+- One migration step moves the old homes: `v21_to_v22` of
+  `_shared/core/config_schema/migrations.toml`, op `import_companion`, for
+  macOS and Linux (Windows already kept these rows in `config.toml`). The
+  boot names the driver's `tap_hold.toml` (macOS first carries an old
+  `config_karabiner.toml` over into it); the engine copies the values into
+  `config.toml` where it holds none, after its byte-exact backup, and the
+  driver then deletes the moved values from `tap_hold.toml`, after a backup
+  of that file. The config stamp makes it run once; a value left in
+  `tap_hold.toml` by a crash between the two writes is never read and is
+  warned as outdated.
+- A cross-driver corpus (`_shared/tests/corpus/tap_hold_shared_file/`) holds
+  the two files each driver writes; each suite pins its own and reads the
+  others'. Do not move a manifest row back into `tap_hold.toml`.
+
+## No Linux keyboard slot runs through a pause (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (SCD-1): on Linux a keyboard slot
+(`[shortcuts.keyboard]`) bound to a `script_*` action is held back while the
+driver is paused, in dry-run, or with Shortcuts off, like every other slot, as
+Windows (slot hotkeys suspended) and macOS (every slot paused) already do; the
+way back is the AltGr script chords and the menu. `keyboard_shortcuts.match`
+holds every slot back under `only_script` and `consume` no longer exempts a
+script action from the pause epoch or the live admission. What does run
+through a pause (script chords, gestures, tap keys in dry-run,
+`ScriptActions.allows`) is the shared `paused_actions` list of
+`_shared/modules/actions/script_chords.json`, read by
+`ScriptActions.runs_while_paused`, not the `script_` prefix:
+`script_save_reload` waits, `open_personal_shortcuts` runs. Regressions
+`scd1-slot-paused`, `scd1-paused-actions`. Windows needs no change.
+
 ## Windows swipes step with the fingers through raw HID reports (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: Windows gets the incremental touchpad
@@ -43,7 +219,7 @@ Decided by the maintainer on 2026-11-11: the old steps of
 `_shared/core/config_schema/migrations.toml` are squashed, which cuts most of
 the registry every driver parses at boot and most of the config test time.
 `oldest_version` is v20, what 1.0.9 (the latest public release) and every
-1.0.10 pre-release wrote; only `v20_to_v21` remains. A file stamped below it,
+1.0.10 pre-release wrote; only `v20_to_v21` remained at the squash. A file stamped below it,
 including the v12 of 1.0.0 to 1.0.6 and the v16 of 1.0.7 and 1.0.8, is refused
 cleanly on every driver: never written, the session read-only, one ERROR at
 boot and the `config.read_only.older_schema` notice naming 1.0.9 as the bridge
@@ -176,7 +352,7 @@ minimum locally. « Still user-adjustable » is read as the slot's own step
 the direction (reading decided by the coordinator on 2026-11-11, to review by
 the maintainer). Windows receives finished swipes, has no live minimum and no
 literal to remove. The Linux decoder's own threshold and pair-scroll travel
-(120 device units) are GSD-2, still pending: not moved.
+moved to millimetres too (GSD-2, below).
 
 ## An unbound diagonal falls back to its dominant straight slot (2026-11-11)
 
@@ -356,14 +532,11 @@ Decided by the coordinator on 2026-11-11, to review by the maintainer.
 
 ## Tap-hold settings, minimum tap, tap-to-click and Linux proof (2026-11-10)
 
-- One home for the tap-hold settings on every OS: a shared `tap_hold.toml`
-  holds the keys, the global and sticky delays, the lone-tap window and the
-  modifier combinations (`mod_combos`); `config.toml` keeps the
-  `[[features.*]]` rows; the macOS-only Karabiner integration is its own
-  section of that file. Each driver migrates its old files once
-  (macOS `config_karabiner.toml`, Linux `config.toml` `mod_combos`, Windows
-  `config.toml` tap-hold keys), and a cross-driver test writes the file on one
-  driver and reads it on the other two.
+- One home for the tap-hold settings on every OS. Settled on 2026-11-11 (the
+  entry at the top of this page): the shared `tap_hold.toml` holds the keys,
+  the global delay and the macOS-only Karabiner section; `config.toml` keeps
+  every `[[features.*]]` row, the sticky delay, the lone-tap window and the
+  modifier combinations (`mod_combos`).
 - The minimum tap duration applies to every tap that waits for its release,
   the Linux rule, on the three drivers; Windows stops limiting it to LShift,
   LCtrl, RShift, CapsLock holding the layer and LAlt with a non-Backspace tap.
@@ -950,9 +1123,10 @@ shared clipboard owner is busy. Output is neither dropped nor delayed
 ## The one-shot Shift timeout is a user setting on every OS (6 November 2026)
 
 Aligned on macOS: `sticky_timeout_ms` (2000 ms registry default) is editable on
-Windows (`config.toml` `[tap_holds]`, `_TH_CommitOneShotTimeoutMs`) and Linux
-(`tap_hold.toml` `[tap_hold]`, `set_one_shot_timeout_ms`), each with a tray row;
-only a positive whole number of milliseconds is admitted, no zero or unlimited.
+Windows (`_TH_CommitOneShotTimeoutMs`) and Linux (`set_one_shot_timeout_ms`),
+each with a tray row, in `config.toml` `[tap_holds]` on every OS since config
+schema v22; only a positive whole number of milliseconds is admitted, no zero
+or unlimited.
 
 ## CapsWord setting changes reach the running session (6 November 2026)
 

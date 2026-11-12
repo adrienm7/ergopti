@@ -6,15 +6,16 @@
 --- Linux implementation of the SecureFieldDetector port contract defined in
 --- static/ergopti_plus/_shared/core/ports/SecureFieldDetector.spec.js. Uses
 --- libatspi to detect whether the currently focused element is a password field,
---- and a hardcoded known-app list
---- for apps that render secure views in WebKit or Electron without exposing the
---- AT-SPI role.
+--- and the shared known-app list (_shared/data/secure_apps.json) for apps that
+--- render secure views in WebKit or Electron without exposing the AT-SPI role.
 ---
 --- FEATURES & RATIONALE:
 --- 1. AT-SPI2 role detection: Linux GTK/Qt apps expose PASSWORD_TEXT via
 ---    libatspi. Focus is an accessible state, not a Registry.GetFocused method.
 --- 2. Known-app guard: some security apps (Bitwarden Electron, KeePassXC WebKit)
----    never set the AT-SPI role; the hardcoded list covers these cases.
+---    never set the AT-SPI role; the shared list, the one macOS and Windows
+---    read, makes the whole application secure (ADD-1). keystats publishes it
+---    through the focus guard, so hotstrings, AI and clipboard borrowers obey it.
 --- 3. Tri-state verdict: probe failures remain "unknown" and every privacy
 ---    consumer treats unknown exactly like secure. Failure can therefore remove
 ---    automation, never privacy.
@@ -29,6 +30,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local AtspiFocus = require("adapters.atspi_focus")
+local SecureApps = require("secure_apps")
 
 local LOG = "adapters.secure_field_detector"
 
@@ -41,21 +43,6 @@ local LOG = "adapters.secure_field_detector"
 -- ======= 1/ Constants =======
 -- ============================
 -- ============================
-
--- Apps whose entire surface is considered sensitive regardless of AT-SPI role.
--- Keys are lowercase application class names (WM_CLASS second field).
-local SECURE_APP_IDS = {
-	["1password"]           = true,
-	["bitwarden"]           = true,
-	["keepassxc"]           = true,
-	["lastpass"]            = true,
-	["dashlane"]            = true,
-	["gnome-keyring-3"]     = true,
-	["seahorse"]            = true,   -- GNOME Passwords app
-	["gnome-authenticator"] = true,
-	["authenticator"]       = true,
-	["yubikey-manager"]     = true,
-}
 
 -- URL bars are meaningful only inside browsers. Limiting the identity heuristic
 -- to these application IDs prevents an ordinary editor field named "location"
@@ -215,12 +202,14 @@ function M.currentEpoch()
 	return _focus_epoch
 end
 
---- Returns true if the given app ID belongs to a known security-sensitive app.
---- @param appId string|nil The application class name to check (case-insensitive).
+--- Returns true if the given app identity belongs to a known security-sensitive
+--- app of the shared list: the WM class or Wayland app_id, matched by its
+--- lowercase fragments.
+--- @param appId string|nil The application identity to check (case-insensitive).
 --- @return boolean
 function M.isSecureApp(appId)
 	if appId == nil or appId == "" then return false end
-	return SECURE_APP_IDS[tostring(appId):lower()] == true
+	return SecureApps.is_secure_app("linux", tostring(appId))
 end
 
 --- Returns true only when the focused accessible is a browser address control.

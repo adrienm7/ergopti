@@ -542,6 +542,7 @@ InstallSendNoOps()
 #Include unit/modules/hotstrings/engine/test_domain_expander.ahk
 #Include unit/infra/toml/test_toml_loader.ahk
 #Include unit/infra/toml/test_toml_helpers_roundtrip.ahk
+#Include support/hotstring_registry_scope.ahk
 #Include unit/modules/hotstrings/catalogue/test_hotstrings_cache.ahk
 #Include unit/modules/hotstrings/catalogue/test_hotstring_language_packs.ahk
 #Include unit/ui/menu/test_menu_languages_and_global_separator.ahk
@@ -1394,6 +1395,7 @@ global _AhkSubDir := ""
 #Include unit/platform/remap/tap_hold/test_tap_copy_check.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_lone_tap.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_one_shot_timeout.ahk
+#Include unit/platform/remap/tap_hold/test_tap_hold_shared_file.ahk
 #Include unit/platform/remap/keys/test_timings_config.ahk
 _LogBootProgress("keystats modules + tests included")
 
@@ -2303,7 +2305,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/ergonomics/test_marker_and_heatmap_completeness.ahk
 #Include meta/adapters/input/test_text_send_direct_mode_guarded.ahk
 #Include meta/platform/network/test_http_post_reentrancy_guard.ahk
-#Include meta/modules/hotstrings/personal/test_personal_editor_autoexpand_i18n.ahk
 #Include meta/infra/toml/test_jsstr_cr_escaped.ahk
 #Include meta/infra/toml/test_json_string_literal_single_source.ahk
 #Include meta/infra/toml/test_json_string_decoder_single_source.ahk

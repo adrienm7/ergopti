@@ -31,16 +31,21 @@ background check (UPL-001 does not apply), and its feed-only announcement
 hands off to Sparkle, which installs from the appcast (UPL-003 does not
 apply).
 
-## Decisions pending (behaviour left unchanged)
+## Decided
 
-- **UPD-1, a proxy or captive-portal answer.** A 200 whose body is not a JSON
-  array is « no connection » with the feed fallback on macOS
-  (`auto_check.lua`), « parse failed » with no fallback on Windows
-  (`core.ahk`) and Linux (`manager.lua` `accept_page`). Separately, a 304
-  with no cached page reads as « unexpected » on Linux, with no fallback,
-  where Windows falls back to the feed; Linux sends a conditional request
-  only once its ETag association matches a cached page, so this needs a
-  corrupted cache.
+- **UPD-1, a proxy or captive-portal answer** (decided by the maintainer on
+  2026-11-11): a 200 whose body does not open a JSON array is « no
+  connection » with the feed fallback on every driver, through the shared
+  `updater.release_sources.opens_release_array` (Linux `accept_page`, macOS
+  `read_response`); a malformed or cut array stays « parse failed ». A Linux 304
+  with no usable cached page is « no connection » with the feed too, the
+  cached page dropped. Regressions `upd1-captive-portal` (Linux and macOS).
+  Windows counterpart, for the maintainer (`modules/updater/core.ahk`
+  `_Updater_InterpretResponse`): for a 200 whose body does not open a JSON
+  array (`^\x{FEFF}?\s*\[`, the opening half of `ui/changelog/init.ahk:747`), log a warning
+  and return "" (no list, so the caller reads the feed) instead of handing the
+  page to the release parser; test with an HTML 200 that the feed is
+  requested and the answer is `updater.no_connection`.
 
 ## Windows, report only
 

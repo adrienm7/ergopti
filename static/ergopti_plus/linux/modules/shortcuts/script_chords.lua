@@ -404,7 +404,7 @@ function M.on_key(detail)
 	end
 	local generation, paused, runs, epoch_reader = _dispatch_generation, _is_paused, M.slot_runs, _pause_epoch
 	local action = _assignments[slot_id]
-	local script_action = require("modules.shortcuts.script_actions").is_script_action(action)
+	local script_action = require("modules.shortcuts.script_actions").runs_while_paused(action)
 	local epoch
 	if epoch_reader and not script_action then
 		local called, value = pcall(epoch_reader)

@@ -163,7 +163,7 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 			with_real_gate_owner(not enabled, function(c)
 				local rename, attempts, redraws = os.rename, 0, 0
 				os.rename = function(from, to)
-					if from == c.path .. ".tmp" and to == c.path then
+					if from == helpers.stage_path(c.path) and to == c.path then
 						attempts = attempts + 1
 						if attempts == 2 then return false, "inert second publication refusal" end
 					end
@@ -197,7 +197,7 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 				with_real_gate_owner(not enabled, function(c)
 					local rename, attempts, redraws = os.rename, 0, 0
 					os.rename = function(from, to)
-						if from == c.path .. ".tmp" and to == c.path then
+						if from == helpers.stage_path(c.path) and to == c.path then
 							attempts = attempts + 1
 							if outcome == "throw" then error("inert batch publication refusal") end
 							if outcome == "nil" then return nil, "inert batch publication refusal" end
@@ -439,7 +439,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 					local before = kind == "global" and c.config_original or c.original
 					local rename, writes = os.rename, 0
 					os.rename = function(from, to)
-						if from == target .. ".tmp" and to == target then
+						if from == helpers.stage_path(target) and to == target then
 							writes = writes + 1
 							if outcome == "throw" then error("inert owned delay publication refusal") end
 							if outcome == "nil" then return nil, "inert refusal" end

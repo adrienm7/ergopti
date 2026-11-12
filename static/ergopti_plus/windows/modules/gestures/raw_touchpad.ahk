@@ -391,7 +391,7 @@ RawTouchpadStart(Hwnd := A_ScriptHwnd) {
 		"handoff_ms", TimingsGet("gestures", "incremental_handoff_ms"),
 		"mode_of", _RawTouchpadModeOf, "step_of", GestureSlotSensitivity,
 		"dispatch", GestureRunSlotAction,
-		"schedule", (Callback) => SetTimer(Callback, -1)))
+		"schedule", (Callback) => TimerArmOneShotMs(Callback, 1)))
 	try {
 		RawInput_Register(TOUCHPAD_HID.page_digitizer, TOUCHPAD_HID.touch_pad,
 			RAW_INPUT_RIDEV_INPUTSINK | RAW_INPUT_RIDEV_DEVNOTIFY, Hwnd)
@@ -418,7 +418,7 @@ RawTouchpadStop() {
 	LoggerStart("gestures.incremental", "Removing the touchpad's raw HID reports…")
 	OnMessage(RAW_INPUT_WM_INPUT, _RawTouchpadOnInput, 0)
 	OnMessage(RAW_INPUT_WM_INPUT_DEVICE_CHANGE, _RawTouchpadOnDeviceChange, 0)
-	SetTimer(_RawTouchpadWatchdog, 0)
+	TimerSetCallback(_RawTouchpadWatchdog, 0)
 	_RawTouchpadOwner := ""
 	_RawTouchpadReceiver := ""
 	try {
@@ -453,7 +453,7 @@ RawTouchpadClaimsShortcut(Slot) {
 	LoggerDebug("gestures.incremental", "{1}: shortcut {2} by the moving touch.", Slot,
 		Verdict = "swallow" ? "swallowed" : "deferred")
 	if (Verdict = "defer")
-		SetTimer(_RawTouchpadWatchdog, TimingsGet("gestures", "incremental_handoff_ms"))
+		TimerSetCallback(_RawTouchpadWatchdog, TimingsGet("gestures", "incremental_handoff_ms"))
 	return true
 }
 
@@ -461,12 +461,12 @@ RawTouchpadClaimsShortcut(Slot) {
 _RawTouchpadWatchdog() {
 	global _RawTouchpadOwner
 	if !IsObject(_RawTouchpadOwner) {
-		SetTimer(_RawTouchpadWatchdog, 0)
+		TimerSetCallback(_RawTouchpadWatchdog, 0)
 		return
 	}
 	_RawTouchpadOwner.Expire(A_TickCount, TimingsGet("gestures", "incremental_handoff_ms"))
 	if (_RawTouchpadOwner.Handoff().Pending() = "")
-		SetTimer(_RawTouchpadWatchdog, 0)
+		TimerSetCallback(_RawTouchpadWatchdog, 0)
 }
 
 ; WM_INPUT: parses each report of the payload. Raw input keeps arriving while

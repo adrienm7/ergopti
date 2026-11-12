@@ -23,6 +23,11 @@ _TNDO_Source() {
 		AssertTrue(Body != "", "The native activation graph must include " . Symbol)
 		Source .= Body . "`n"
 	}
+	; The tab settle comes from the timing registry; the child binds that one
+	; key to the registry's own value, so a tabbed Notepad reaches it too.
+	Settle := TimingsGet("ui", "take_note_tab_settle_ms")
+	Source .= 'TimingsGet(Section, Key) {`n`tif (Section != "ui" || Key != "take_note_tab_settle_ms")`n'
+		. '`t`tthrow ValueError("Only the tab settle timing is bound: " . Section . "." . Key)`n`treturn ' . Settle . '`n}`n'
 	return Source . "#Include " . _DriverDir . "\tests\fixtures\takenote_native_document_owner_body.ahk`n"
 }
 _TNDO_Done(State, Code, Output, ErrorText) {
@@ -52,6 +57,9 @@ _TNDO_Case(Mode) {
 		_TestPrint("# takenote-document mode=" . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
 		PhysicalClean := InStr(State.Output, "CLEANUP takenote-document retired=1") > 0
 		AssertEqual(1, State.Calls)
+		; A load warning names a symbol the child lacks; only a tabbed Notepad
+		; reaches some of them, so the warning itself is the host-free witness.
+		AssertFalse(InStr(State.Output, "==> Warning:"), State.Output)
 		AssertEqual(0, State.Code, State.Output . State.ErrorText)
 		AssertEqual("", State.ErrorText)
 		AssertContains(State.Output, "PASS takenote-document " . Mode)

@@ -441,7 +441,7 @@ helpers.describe("hotstring editor classified source admission", function()
 				return native_open(target, access)
 			end
 			NativeWriter.open = function(target, access)
-				if target ~= path .. ".tmp" or access ~= "wx" then return native_stage(target, access) end
+				if target ~= helpers.stage_path(path) or access ~= "wx" then return native_stage(target, access) end
 				-- Observe the admitted stream without discarding any native receipt.
 				local function opened(stream, ...)
 					if stream then
@@ -493,7 +493,7 @@ helpers.describe("hotstring editor classified source admission", function()
 		package.loaded["ui.webview_manager"] = old_manager
 		package.loaded["toml_codec.writer"], package.loaded["toml_codec.reader"] = old_writer, old_reader
 		local fh = native_open(path, "r"); obs.bytes = fh and fh:read("*a") or nil; if fh then fh:close() end
-		local stage = native_open(path .. ".tmp", "r"); obs.stage_left = stage ~= nil; if stage then stage:close() end
+		local stage = native_open(helpers.stage_path(path), "r"); obs.stage_left = stage ~= nil; if stage then stage:close() end
 		os.remove(path); os.remove(path .. ".tmp"); os.remove(root)
 		obs.ok, obs.problem = ok, problem
 		obs.restored = io.open == native_open and os.rename == native_rename and NativeWriter.open == native_stage

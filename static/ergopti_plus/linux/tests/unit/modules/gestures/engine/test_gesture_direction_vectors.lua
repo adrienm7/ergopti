@@ -37,7 +37,10 @@ end
 --- @param dy integer
 --- @return table|nil
 local function decode(fingers, dx, dy, threshold)
-	local decoder, last = Decoder.new({ swipe_threshold = threshold }), nil
+	-- The decoder judges millimetres (GSD-2): a threshold in device units is a
+	-- swipe minimum at the fallback resolution of a pad that reports none.
+	local decoder, last = Decoder.new({
+		swipe_minimum_mm = threshold and threshold / Decoder.FALLBACK_UNITS_PER_MM or nil }), nil
 	local function push(t, c, v)
 		local out = decoder:feed({ type = t, code = c, value = v })
 		if out then last = out end
@@ -75,7 +78,7 @@ end
 helpers.describe("gesture direction vectors (Linux)", function()
 	local corpus = assert(Json.decode_lossless(read("tests/corpus/gestures/direction_vectors.json")))
 	local actions = read("modules/actions/actions.toml")
-	local threshold = Decoder.DEFAULT_SWIPE_THRESHOLD
+	local threshold = Decoder.SWIPE_MINIMUM_MM * Decoder.FALLBACK_UNITS_PER_MM
 	local scale = { swipe = 4 * threshold, short = threshold / 4 }
 
 	for _, fingers in ipairs(corpus.fingers) do
