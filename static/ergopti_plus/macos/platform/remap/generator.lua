@@ -1023,6 +1023,13 @@ end
 -- press armed the one-shot and nothing held Shift.
 local HOLD_PAST_THRESHOLD_TAPS = { right_option = "sticky_shift" }
 
+-- The one-shot taps with no hold that hold Shift while the key is down and
+-- stand down while another of the keys Windows names is held (lalt.ahk 4.1:
+-- RCtrl, CapsLock, LShift, LCtrl, here right_option, caps_lock, left_shift and
+-- fn, the Windows left-Control position). Left Command is the Windows LAlt.
+local HELD_SHIFT_ONE_SHOT_TAPS = { left_command = "sticky_shift" }
+local HELD_SHIFT_ONE_SHOT_BLOCKERS = { "right_option", "caps_lock", "left_shift", "fn" }
+
 -- The tap timeout of each key in the last build (M.last_tap_timeouts).
 local _last_tap_timeouts = nil
 
@@ -1261,6 +1268,7 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	local marked = typing_priority ~= false
 	local key_down_action = hold_action
 	local rollover_hold_var
+	local held_shift_one_shot = false
 	if #hold_to == 0 and typing_priority ~= false and HOLD_PAST_THRESHOLD_TAPS[key_def.id] == tap_action.id then
 		-- rctrl.ahk 7.3: the one-shot waits for a quick release, and a long press
 		-- holds Shift from the threshold on (apply_managed_timing_parameters
@@ -1270,6 +1278,13 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	elseif #hold_to == 0 then
 		key_down_action = tap_action
 		for _, ev in ipairs(marked_tap(tap_to, marked)) do to_events[#to_events + 1] = ev end
+		if typing_priority ~= false and HELD_SHIFT_ONE_SHOT_TAPS[key_def.id] == tap_action.id then
+			-- lalt.ahk 4.1: the one-shot also holds LShift until the key comes
+			-- up, so a key struck under it is shifted at once. The last entry
+			-- of `to` is the one Karabiner keeps down (basic.hpp).
+			to_events[#to_events + 1] = { key_code = "left_shift" }
+			held_shift_one_shot = true
+		end
 	elseif typing_priority ~= false and Defaults.rollover_keys[key_def.id] and
 		same_output((#tap_to > 0) and tap_to or { { key_code = key_code } }, { { key_code = key_code } })
 		and not same_output(tap_to, hold_to) then
@@ -1365,6 +1380,21 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 				}
 				blocked[#blocked + 1] = copy
 			end
+		end
+		for _, variant in ipairs(manipulators) do blocked[#blocked + 1] = variant end
+		manipulators = blocked
+	end
+	if held_shift_one_shot then
+		-- Under another held modifier key the one-shot stands down, as Windows'
+		-- lalt.ahk 4.1 returns without firing: the key is only tracked.
+		local blocked = {}
+		for _, blocker in ipairs(HELD_SHIFT_ONE_SHOT_BLOCKERS) do
+			blocked[#blocked + 1] = {
+				type = "basic", from = deep_copy(key_def.from),
+				conditions = { { type = "variable_if", name = held_var_name(blocker), value = 1 } },
+				to = { set_var_event(var_name, 1), physical_kc_ledger_event(key_code, false) },
+				to_after_key_up = { set_var_event(var_name, 0), physical_kc_ledger_event(key_code, true) },
+			}
 		end
 		for _, variant in ipairs(manipulators) do blocked[#blocked + 1] = variant end
 		manipulators = blocked
