@@ -2656,6 +2656,15 @@ local function main()
 	-- action included (SCD-1); the AltGr script chords are their own consumer.
 	local function consume_bound_chord(detail)
 		local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
+		-- Under an emulated layout a slot follows the emulated letter, as on
+		-- Windows: Ctrl on the key typing « a » is the ctrl+a slot (ILX-001).
+		local emulated_key = require("modules.keymap.layout_emulation").chord_key(detail)
+		if emulated_key then
+			local offered = {}
+			for field, value in pairs(detail) do offered[field] = value end
+			offered.key = emulated_key
+			detail = offered
+		end
 		local consumed = keyboard_shortcuts.consume(detail, {
 			pause_epoch = script_actions.pause_epoch,
 			only_script = opts.dry_run or script_actions.is_paused() or not shortcuts_on,
