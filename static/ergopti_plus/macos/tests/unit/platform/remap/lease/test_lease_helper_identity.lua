@@ -27,7 +27,10 @@ local EXPECTED_INODE = "987654321"
 local function resolve_candidate(override, options)
 	options = options or {}
 	package.loaded["platform.remap.lease_helper"] = nil
+	local previous_dev_source = package.loaded["infra.dev_source"]
+	if options.dev_source then package.loaded["infra.dev_source"] = options.dev_source end
 	local helper = helpers.load_with_stubs("platform.remap.lease_helper", {
+		processInfo = options.process_info,
 		fs = {
 			symlinkAttributes = function(path)
 				if path ~= EXPECTED_HELPER then return nil end
@@ -67,8 +70,10 @@ local function resolve_candidate(override, options)
 		end
 		return original_getenv(name)
 	end
-	local call_ok, resolved, resolve_err, environment = pcall(helper.resolve, DRIVER_ROOT)
+	local call_ok, resolved, resolve_err, environment = pcall(helper.resolve, options.no_override_root ~= true
+		and DRIVER_ROOT or nil)
 	os.getenv = original_getenv
+	package.loaded["infra.dev_source"] = previous_dev_source
 	if not call_ok then error(resolved) end
 	return resolved, resolve_err, environment
 end
@@ -97,6 +102,27 @@ helpers.describe("karabiner lease helper: bundle-owned identity", function()
 		helpers.assert_eq(environment[HELPER_ENV], EXPECTED_HELPER)
 		helpers.assert_eq(environment[HELPER_DEVICE_ENV], EXPECTED_DEVICE)
 		helpers.assert_eq(environment[HELPER_INODE_ENV], EXPECTED_INODE)
+	end)
+
+	-- The developer app runs a clone, not its bundled Lua: start at login asks
+	-- this resolver for its launcher, so a source run on macOS reaches the
+	-- login-item worker of the developer app's own bundle (SAD-1).
+	helpers.it("resolves the developer app's own launcher for a clone (login-source-run)", function()
+		local asked = nil
+		local dev_source = {
+			root = function() return "/Users/dev/ergopti" end,
+			launcher_executable = function(bundle)
+				asked = bundle
+				return bundle == "/Users/dev/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app"
+					and EXPECTED_HELPER or nil
+			end,
+		}
+		local ok, resolved, detail = pcall(resolve_candidate, EXPECTED_HELPER, { dev_source = dev_source,
+			no_override_root = true,
+			process_info = { bundlePath = "/Users/dev/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app" } })
+		assert(ok, resolved)
+		helpers.assert_eq(asked, "/Users/dev/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app")
+		helpers.assert_eq(resolved, EXPECTED_HELPER, detail)
 	end)
 
 	helpers.it("preserves a 64-bit integer inode without floating-point rounding", function()
