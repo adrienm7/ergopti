@@ -2,7 +2,7 @@
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://ergopti.com/schema/tap_hold.schema.json",
 	"title": "Ergopti+ tap-hold configuration (shared)",
-	"description": "JSON Schema for _shared/tap_hold/defaults.toml AND for the user's tap_hold.toml, one layout on every OS (_shared/tap_hold/SCHEMA.md). The shared defaults are read at runtime on every boot; the user file is laid over them key by key on Windows, and on Linux when it sets [tap_hold] inherit_defaults = true.",
+	"description": "JSON Schema for _shared/tap_hold/defaults.toml AND for the user's tap_hold.toml, one layout on every OS (_shared/tap_hold/SCHEMA.md): the keys and the global delay. The Tap-Holds switch, the one-shot and lone-tap timings and the key combinations are config.toml rows (config.schema.json [tap_holds], [mod_combos]) since schema v22. The shared defaults are read at runtime on every boot; the user file is laid over them key by key on Windows, and on Linux when it sets [tap_hold] inherit_defaults = true.",
 	"type": "object",
 	"additionalProperties": false,
 
@@ -22,10 +22,6 @@
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
-				"enabled": {
-					"type": "boolean",
-					"description": "Switches the feature on or off (Linux file switch)."
-				},
 				"inherit_defaults": {
 					"type": "boolean",
 					"description": "Lays the file over the shipped recommendation key by key."
@@ -40,54 +36,7 @@
 					"type": "boolean",
 					"description": "Retired. No driver reads or writes it; the v0_to_v1 migration (_shared/tap_hold/migrations.toml) uses it once, to leave the delays of a flagged file alone, and removes it."
 				},
-				"sticky_timeout_ms": {
-					"type": "integer",
-					"exclusiveMinimum": 0,
-					"description": "How long a one-shot Shift waits for its key, in milliseconds. Absent: the timing registry's tap_hold.one_shot_shift_timeout_ms."
-				},
-				"lone_modifier_tap_max_ms": {
-					"type": "integer",
-					"minimum": 0,
-					"description": "How long a modifier key pressed alone still taps, in milliseconds; 0 is the strict tap-hold. Absent: the manifest default."
-				},
 				"keys": { "$ref": "#/$defs/keys_map" }
-			}
-		},
-		"mod_combos": {
-			"type": "object",
-			"additionalProperties": false,
-			"description": "The key combinations. macOS writes them here; Linux still keeps them in config.toml.",
-			"properties": {
-				"enabled": { "type": "boolean", "description": "The key combinations switch. Absent: on." },
-				"simultaneous_threshold_ms": {
-					"type": "integer",
-					"exclusiveMinimum": 0,
-					"description": "The longest gap between the two keys of a combination, in milliseconds."
-				},
-				"symmetric": {
-					"type": "boolean",
-					"description": "A then B also fires the combination of B then A."
-				},
-				"config": {
-					"type": "object",
-					"description": "Pair id (<first>_then_<second> over catalogue key ids) to its slots.",
-					"propertyNames": { "pattern": "^[a-z][a-z0-9_]*_then_[a-z][a-z0-9_]*$" },
-					"additionalProperties": {
-						"type": "object",
-						"additionalProperties": false,
-						"properties": {
-							"combo": { "type": "string", "description": "The action of the combination." },
-							"tap": {
-								"type": "string",
-								"description": "macOS only: the action of the pair's tap slot."
-							},
-							"hold": {
-								"type": "string",
-								"description": "macOS only: the action of the pair's hold slot."
-							}
-						}
-					}
-				}
 			}
 		},
 		"karabiner": {

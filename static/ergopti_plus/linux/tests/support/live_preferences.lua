@@ -21,7 +21,8 @@ function M.daemon()
 	local _, status = Files.read_with_status(Paths.config("config.toml"))
 	assert(status == "absent", "the live daemon fixture requires a fresh configuration")
 	-- Any config.toml is a configured driver, so the setup wizard stays closed.
-	local config = ""
+	-- The tap-hold switch is a config.toml row (tests/support/tap_hold_fixture.lua).
+	local config = require("tests.support.tap_hold_fixture").config()
 	-- The AI probe's rewrite runs from a chord, as a user would bind it. Chords
 	-- only fire while the shortcuts feature is on, which it is not by default:
 	-- without it the daemon holds the chord back as it does during a pause.

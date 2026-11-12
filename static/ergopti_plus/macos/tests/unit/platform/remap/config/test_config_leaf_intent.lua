@@ -37,8 +37,10 @@ local function with_file(original, body)
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
 		local Text = require("tests.support.tap_hold_file_text")
-		original = Text.file(original)
+		local original_config
+		original, original_config = Text.file(original)
 		write(original)
+		Text.write_config(path, original_config)
 		local files = require("adapters.file_system")
 		local native_write = files.write_if_unchanged
 		local controls = { writes = 0 }
@@ -55,9 +57,9 @@ local function with_file(original, body)
 			return config.load_user_config({ { id = "escape" } }, { { id = "esc_tab" } }, path)
 		end
 		local ok, err = pcall(body, { config = config, path = path, warnings = warnings, errors = errors,
-			controls = controls, load = load, read = read, decode = Text.model, file = Text.file, original = original })
+			controls = controls, load = load, read = read, decode = function(text) return Text.model(text, Text.read_config(path)) end, file = function(text) local tap, rows = Text.file(text); Text.write_config(path, rows); return tap end, original = original })
 		files.write_if_unchanged = native_write
-		os.remove(path); os.remove(path .. ".tmp")
+		os.remove(path); os.remove(path .. ".tmp"); Text.remove_config(path)
 		if not ok then error(err, 0) end
 	end)
 end

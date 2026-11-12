@@ -1395,6 +1395,7 @@ global _AhkSubDir := ""
 #Include unit/platform/remap/tap_hold/test_tap_copy_check.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_lone_tap.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_one_shot_timeout.ahk
+#Include unit/platform/remap/tap_hold/test_tap_hold_shared_file.ahk
 #Include unit/platform/remap/keys/test_timings_config.ahk
 _LogBootProgress("keystats modules + tests included")
 

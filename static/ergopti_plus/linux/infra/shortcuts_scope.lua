@@ -96,25 +96,6 @@ function M.new(options)
 			assert(type(combinations[name]) == "function", "shortcut scope requires its actual combination owner")
 		end
 	end
-	-- `[mod_combos]` lives in the shared tap_hold.toml: its rows publish there,
-	-- through the transaction's backed-up companion and its own inverse.
-	local chord_path, chord_backup
-	if combinations then
-		chord_path = options.chord_path or require("modules.shortcuts.key_combinations").chord_path_for(options.path)
-		assert(type(chord_path) == "string" and chord_path ~= options.path, "shortcut scope requires its tap_hold.toml companion")
-		-- The companion's backup carries the same suffix as config.toml's.
-		local suffix = options.backup_path:sub(1, #options.path) == options.path and options.backup_path:sub(#options.path + 1)
-		chord_backup = options.chord_backup_path or chord_path .. (suffix and suffix ~= "" and suffix or ".shortcuts.bak")
-	end
-	local prepare_chords = options.prepare_chord_rows
-	local same_frame = options.same_source_frame or require("modules.shortcuts.key_combinations").same_source_frame
-	local function companions(backup)
-		if not combinations then return nil end
-		return { tap_hold = { path = chord_path, backup_path = backup, prefixes = { ConfigKeys.KEY.MOD_COMBOS },
-			prepare = function(rows, adapter)
-				return (prepare_chords or require("platform.remap.tap_hold_writer").prepare_combo_rows)(chord_path, rows, adapter)
-			end } }
-	end
 	local owner, held, source, document, legacy = {}, {}, nil, nil, nil
 	local editing, busy, retiring, uncertain_pair = false, false, false, false
 	local pair_source, published_source, publication_acked, delivery_held
@@ -194,7 +175,8 @@ function M.new(options)
 					if combinations.configuration_source_matches(owner, expected) ~= true then return refuse() end
 				else
 					local receipt = combinations.capture_edit_source(owner)
-					if type(receipt) ~= "table" or not same_frame(receipt, expected) or receipt.guard() ~= true then return refuse() end
+					if type(receipt) ~= "table" or receipt.path ~= expected.path or receipt.status ~= expected.status
+						or receipt.content ~= expected.content or receipt.guard() ~= true then return refuse() end
 				end
 			end
 			local called, accepted = pcall(held[index].release, owner)
@@ -248,35 +230,30 @@ function M.new(options)
 	--- @param config table Decoded document.
 	--- @param written boolean|nil True for the post-write candidate.
 	--- @return table state
-	--- @param chord_config table|nil Decoded tap_hold.toml, the combinations' third slots.
-	local function resolve(config, written, chord_config)
+	local function resolve(config, written)
 		local others = options.only == nil and written or nil
 		url.configuration_candidate(config, others)
 		return { manager = manager.configuration_candidate(config),
 			keyboard = keyboard.configuration_candidate(config, others),
 			taps = taps.configuration_candidate(config, others),
 			chords = chords.configuration_candidate(config, group_prefix == nil and written or nil),
-			combinations = combinations and combinations.configuration_candidate(config, others, chord_config) or nil }
+			combinations = combinations and combinations.configuration_candidate(config, others) or nil }
 	end
 	local function inventory()
 		local bytes, status, detail = Writer.read_classified(options.path, files)
 		assert(status == "ok" or status == "absent", "shortcut source is unreadable: " .. tostring(detail))
 		source = { status = status, content = bytes }
-		local chord_document = {}
 		if combinations then
 			pair_source = combinations.configuration_source(owner)
 			assert(type(pair_source) == "table" and pair_source.path == options.path
-				and pair_source.status == status and pair_source.content == bytes
-				and type(pair_source.chord) == "table" and pair_source.chord.path == chord_path,
+				and pair_source.status == status and pair_source.content == bytes,
 				"shortcut pair runtime disagrees with its acknowledged source")
-			chord_document = Codec.decode(pair_source.chord.content or "")
-			assert(type(chord_document) == "table", "shortcut combination source is malformed")
 		end
 		document = Codec.decode(bytes or "")
 		assert(type(document) == "table", "shortcut source is malformed")
 		assert(parameters.parameter_configuration_matches(owner, document, domain) == true,
 			"shortcut runtime parameters disagree with their acknowledged source")
-		resolve(document, nil, chord_document)
+		resolve(document)
 		local paths
 		paths, legacy = parameters.parameter_configuration_inventory(document, domain)
 		return manifest.scope_inventory("shortcuts", {
@@ -298,8 +275,7 @@ function M.new(options)
 				end
 				-- Only catalogue-issued third leaves join bulk clear/restore. Future
 				-- records and sibling fields stay outside this transaction's scope.
-				local stored = chord_document[ConfigKeys.KEY.MOD_COMBOS]
-				local configured = type(stored) == "table" and stored.config or nil
+				local configured = type(document.mod_combos) == "table" and document.mod_combos.config or nil
 				local seen = {}
 				for pair, value in pairs(desired.chords or {}) do if value ~= "none" then seen[pair] = true end end
 				for pair, row in pairs(type(configured) == "table" and configured or {}) do
@@ -334,7 +310,6 @@ function M.new(options)
 	local select_row = options.only == "script_chords" and script_chord_rows(parameter_domain)
 		or group_prefix and keyboard_group_rows(keyboard, group_prefix) or nil
 	local transaction_options = { path = options.path, backup_path = options.backup_path, files = files,
-		companions = companions(chord_backup),
 		manifest = manifest, owned_paths = inventory, owners = validators, capture = capture, restore = apply_state,
 		select = select_row,
 		after_publish = function() publication_acked = true; return release(published_source) end,
@@ -376,10 +351,9 @@ function M.new(options)
 			or edit_source.content ~= source.content) then return false, "source_changed" end
 			return Writer.prepare_batch(path, operations, adapter, source)
 		end,
-		apply = function(config, updates, _, candidate_bytes, rendered)
+		apply = function(config, updates, _, candidate_bytes)
 			if combinations and combinations.configuration_source_matches(owner, pair_source) ~= true then return false end
-			local chord = combinations and rendered.tap_hold or nil
-			local candidate = resolve(config, true, chord and chord.decoded)
+			local candidate = resolve(config, true)
 			candidate.parameters = parameters.parameter_configuration_snapshot(owner)
 			if type(candidate.parameters) ~= "table" then return false end
 			if editing then
@@ -400,9 +374,7 @@ function M.new(options)
 			if apply_state(candidate) ~= true then return false end
 			if combinations then
 				if combinations.configuration_source_matches(owner, pair_source) ~= true then return false end
-				published_source = { path = options.path, status = "ok", content = candidate_bytes,
-					chord = chord.published and { path = chord_path, status = "ok", content = chord.candidate }
-						or { path = chord_path, status = chord.source.status, content = chord.source.content } }
+				published_source = { path = options.path, status = "ok", content = candidate_bytes }
 			end
 			return true
 		end,
@@ -415,7 +387,6 @@ function M.new(options)
 			local fresh = {}
 			for key, value in pairs(transaction_options) do fresh[key] = value end
 			fresh.backup_path = options.backup_path .. ".edit-" .. publication_sequence
-			fresh.companions = companions(chord_backup and chord_backup .. ".edit-" .. publication_sequence)
 			transaction = Transaction.new(fresh)
 		end
 		publication_sequence = publication_sequence + 1

@@ -298,21 +298,13 @@ function M.with_manager_session(options, body)
 		local function write(path, text)
 			local file = assert(io.open(path, "w")); assert(file:write(text)); assert(file:close())
 		end
-		-- `s.chord_bytes` is the `[mod_combos]` part of tap_hold.toml, where the
-		-- combinations' third slots live; `s.bytes` stays config.toml.
-		local function tap_text()
-			local text = require("tests.support.tap_hold_fixture").with_preset(options.tap_hold_text or "")
-			return s.chord_bytes and text .. "\n" .. s.chord_bytes or text
-		end
 		write(source_path, s.bytes)
-		write(tap_path, tap_text())
+		require("tests.support.tap_hold_fixture").write(tap_path, options.tap_hold_text or "")
 		ConfigPaths.config = function(name) return name == "config.toml" and source_path or original_route(name) end
 		Files.read_with_status = function(path)
 			if path == source_path then
 				if options.on_guard then options.on_guard(s) end
 				write(source_path, s.bytes)
-			elseif path == tap_path and s.chord_bytes ~= nil then
-				write(tap_path, tap_text())
 			end
 			return original_read(path)
 		end
@@ -330,7 +322,7 @@ function M.with_manager_session(options, body)
 					if options.on_generic_action then return options.on_generic_action(s, action, binding) end
 					return true
 				end, action_names = function() return options.action_names or { "copy" } end, on_text_injected = function() end,
-				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path }) == true)
+				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }) == true)
 			s.manager, s.engine, s.owner = manager, manager.configuration_snapshot().engine, manager.configuration_snapshot().combinations
 			s.arm_deadline = function() return s.engine.one_shot_until end
 			body(s)
@@ -339,6 +331,7 @@ function M.with_manager_session(options, body)
 		ConfigPaths.config, Files.read_with_status = original_route, original_read
 		for _, name in ipairs(names) do package.loaded[name] = saved[name][1] end
 		os.remove(source_path); os.remove(tap_path); os.remove(folder .. "/layers.toml")
+		os.remove(require("tests.support.tap_hold_fixture").config_path(tap_path))
 		os.execute("rmdir '" .. folder:gsub("'", "'\\''") .. "'")
 		if not called then error(failure, 0) end
 	end)

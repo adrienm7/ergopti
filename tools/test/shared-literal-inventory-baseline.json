@@ -2,7 +2,7 @@
 	"_comment": "Counts of tools/test/test-shared-literal-inventory.cjs (Rule A of docs/design/structure-plan.md), measured 2026-11-11. They can only go down: lower them with --update-baseline in the change that moves a copy to its shared home; never raise one.",
 	"linux.limit": 78,
 	"linux.duration": 60,
-	"linux.path_name": 56,
+	"linux.path_name": 55,
 	"linux.enum_name": 178,
 	"macos.duration": 217,
 	"macos.enum_name": 351,
@@ -15,7 +15,7 @@
 	"windows.limit": 189,
 	"windows.enum_name": 127,
 	"windows.color": 3,
-	"macos+linux.lua_function": 104,
+	"macos+linux.lua_function": 102,
 	"macos+linux.lua_table": 18,
 	"cross_driver_names": 54,
 	"cross_driver_divergent": 13

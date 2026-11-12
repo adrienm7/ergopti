@@ -69,7 +69,8 @@ end
 --- Builds the Tap-Holds submenu: the feature switch, reset and disable-all,
 --- then one row per key with its tap picker, hold picker and delay — the
 --- Windows menu, on the engine this daemon runs. Every change writes the
---- user's tap_hold.toml and reloads the engine, so it is in force at once.
+--- user's tap_hold.toml (keys and delays) or config.toml (the switch and the
+--- timings) and reloads the engine, so it is in force at once.
 --- @param ctx table Menu context (ctx.tap_holds is the tap-hold manager).
 --- @return table One menu entry with its submenu.
 local function _build_tap_holds(ctx)
@@ -395,9 +396,8 @@ local function _build_tap_holds(ctx)
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do render_ctx.commands[key] = value end
-	-- The feature switch is persisted in the file ([tap_hold] enabled), as the
-	-- Windows toggle is in its config; turning it on also lifts a runtime
-	-- « Disable all ».
+	-- The feature switch is persisted in config.toml ([tap_holds] enabled), as
+	-- the Windows toggle is; turning it on also lifts a runtime « Disable all ».
 	render_ctx.commands[require("config_keys").COMMAND.TAPHOLDS_TOGGLE] = function()
 		local want = not feature_on
 		local ok = Writer.set_enabled(want)

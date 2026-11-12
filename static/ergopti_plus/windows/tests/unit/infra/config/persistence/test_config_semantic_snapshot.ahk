@@ -400,7 +400,7 @@ _FMS_FullSavePreservesOutdatedAndUnknown(Path) {
 	}
 }
 _FMS_FullSaveUsesSemanticReadWithoutCleanup() {
-	_FMS_WithSource("fullsave", '_meta.schema_version = 21`nhotstrings.trigger_char = "@"`n[layout]`nnumber_row_reorder_edges = 2 # outdated, retained`n[future]`nold = "retain" # user data`n',
+	_FMS_WithSource("fullsave", '_meta.schema_version = 22`nhotstrings.trigger_char = "@"`n[layout]`nnumber_row_reorder_edges = 2 # outdated, retained`n[future]`nold = "retain" # user data`n',
 		_FMS_FullSavePreservesOutdatedAndUnknown)
 }
 Test("configuration snapshot: actual full save retains outdated and unknown scalar records (config-semantic-snapshot)",

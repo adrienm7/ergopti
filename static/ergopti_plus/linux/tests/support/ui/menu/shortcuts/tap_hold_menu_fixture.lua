@@ -41,15 +41,11 @@ end
 --- Builds the menu with a real tap-hold manager on the shared defaults, a fake
 --- writer and a fake picker, and returns the Tap-Holds section.
 local function build(calls, picked, user_text)
-	user_text = require("tests.support.tap_hold_fixture").with_preset(user_text)
 	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 	local user_path = os.tmpname()
 	os.remove(user_path)
-	if user_text then
-		local fh = assert(io.open(user_path, "w"))
-		fh:write(user_text)
-		fh:close()
-	end
+	-- The keys in tap_hold.toml, the switch and the timings in the config.toml beside it.
+	local config_path = require("tests.support.tap_hold_fixture").write(user_path, user_text)
 	Manager.init({
 		keyboard_hook = { set_remapper = function() end, key_text = function() return nil end,
 			held_modifiers = function() return {} end,
@@ -60,6 +56,7 @@ local function build(calls, picked, user_text)
 		action_names = function() return { "open_url" } end,
 		defaults_path = DEFAULTS,
 		user_path = user_path,
+		config_path = config_path,
 	})
 	package.loaded[WRITER] = fake_writer(calls)
 	package.loaded[SCOPE] = {

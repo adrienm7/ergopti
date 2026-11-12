@@ -8,6 +8,8 @@
 --- A restore must write the shipped preset explicitly and make the engine run
 --- exactly what inheriting it would; a clear must leave the keyboard neutral;
 --- both keep unknown data, back up both files and compensate every refusal.
+--- The switch is a config.toml row (maintainer decision of 2026-11-11): a
+--- restore publishes it there, beside the keys of tap_hold.toml.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -137,6 +139,13 @@ local function effective(document)
 	return require("platform.remap.tap_hold_loader").load_document(DEFAULTS, document)
 end
 
+--- The [tap_holds] switch of the config.toml a scenario reads, nil when unset.
+local function stored_switch(s)
+	local text = read(s.config_path)
+	local section = text and Codec.decode(text).tap_holds
+	return section and section.enabled
+end
+
 helpers.describe("Linux tap-hold scope: restore recommended", function()
 	helpers.it("writes the shipped preset explicitly and runs exactly what inheriting it would", function()
 		with_scope(nil, nil, function(s)
@@ -145,15 +154,16 @@ helpers.describe("Linux tap-hold scope: restore recommended", function()
 			helpers.assert_eq(ok, true, detail)
 			local stored = Codec.decode(read(s.tap_path))
 			helpers.assert_nil(stored.tap_hold.inherit_defaults, "no inheritance stands in for the preset")
-			helpers.assert_eq(stored.tap_hold.enabled, require("infra.manifest_reader").recommended_for("tap_holds.enabled"))
+			helpers.assert_nil(stored.tap_hold.enabled, "the switch is a config.toml row")
+			helpers.assert_eq(stored_switch(s),
+				require("infra.manifest_reader").recommended_for(require("config_keys").KEY.TAP_HOLDS_ENABLED))
 			local preset = require("platform.remap.tap_hold_loader").preset_keys(DEFAULTS)
 			helpers.assert_true(next(preset) ~= nil, "the shipped preset has keys")
 			helpers.assert_eq(stored.tap_hold.keys, preset)
-			local inherited = effective({ tap_hold = { inherit_defaults = true, enabled = true } })
+			local inherited = effective({ tap_hold = { inherit_defaults = true } })
 			helpers.assert_eq(effective(stored).keys, inherited.keys)
 			helpers.assert_eq(s.manager.keys(), inherited.keys, "the engine acknowledged the candidate")
 			helpers.assert_eq(s.manager.is_active(), true)
-			helpers.assert_nil(read(s.config_path), "no tap-hold row lives in config.toml, so none is created")
 			helpers.assert_nil(read(s.tap_path .. ".bak"), "an absent source has nothing to back up")
 		end)
 	end)
@@ -173,6 +183,7 @@ helpers.describe("Linux tap-hold scope: restore recommended", function()
 			helpers.assert_eq(stored.tap_hold.keys.left_shift.tap_action, "copy")
 			helpers.assert_nil(stored.tap_hold.keys.left_shift.enabled)
 			helpers.assert_eq(stored.tap_hold.keys.future_key.tap_action, "future")
+			helpers.assert_nil(stored.tap_hold.enabled, "a switch left in tap_hold.toml by an unfinished move goes")
 			helpers.assert_eq(read(s.tap_path .. ".bak"), source)
 			helpers.assert_eq(s.manager.keys().left_shift.tap_action, "copy")
 		end)
@@ -184,16 +195,17 @@ helpers.describe("Linux tap-hold scope: clear to system", function()
 	-- the user set did nothing until the switch was found again.
 	helpers.it("(tap-hold-clear-keeps-switch) removes every owned field and leaves the switch as it is", function()
 		for _, switch in ipairs({ true, false }) do
-			local source = '[tap_hold]\nenabled = ' .. tostring(switch) .. '\ninherit_defaults = true\nfuture = "keep"\n'
+			local source = '[tap_hold]\ninherit_defaults = true\nfuture = "keep"\n'
 				.. '[tap_hold.keys.left_shift]\ntap_action = "paste"\nhold_modifier = "shift"\n'
 				.. 'time_activation_seconds = 0.3\n[tap_hold.keys.left_shift.custom]\nnote = "keep"\n'
 				.. '[tap_hold.keys.left_ctrl]\ntap_action = "copy"\n'
-			with_scope(source, nil, function(s)
+			with_scope(source, '[tap_holds]\nenabled = ' .. tostring(switch) .. '\n', function(s)
 				helpers.assert_eq(s.manager.is_active(), switch)
 				helpers.assert_eq(s.owner().apply("clear"), true)
 				local stored = Codec.decode(read(s.tap_path))
-				helpers.assert_eq(stored.tap_hold, { enabled = switch, future = "keep",
+				helpers.assert_eq(stored.tap_hold, { future = "keep",
 					keys = { left_shift = { custom = { note = "keep" } } } })
+				helpers.assert_eq(stored_switch(s), switch, "config.toml keeps the switch")
 				helpers.assert_eq(s.manager.file_enabled(), switch, "the clear owns the keys, not the switch")
 				for key_id, key in pairs(s.manager.keys()) do
 					helpers.assert_true(key.tap_action == nil and key.hold_modifier == nil and key.hold_layer == nil,
@@ -224,19 +236,19 @@ end)
 helpers.describe("Linux tap-hold scope: refusals and revert", function()
 	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
 	helpers.it("clears with no pause owner (edd1-paused-writes)", function()
-		local source = '[tap_hold]\nenabled = true\ninherit_defaults = true\n'
-		with_scope(source, nil, function(s)
+		local source = '[tap_hold]\ninherit_defaults = true\n'
+		with_scope(source, '[tap_holds]\nenabled = true\n', function(s)
 			helpers.assert_eq(s.owner().apply("clear"), true)
 			helpers.assert_true(read(s.tap_path) ~= source, "the paused driver still writes tap_hold.toml")
 		end)
 	end)
 
 	helpers.it("keeps an external edit and restores the engine and parameters", function()
-		local source = '[tap_hold]\nenabled = true\ninherit_defaults = true\n'
-		local config = '[gesture_parameters]\ntap_hold__open_url = "https://tap.example"\n'
+		local source = '[tap_hold]\ninherit_defaults = true\n'
+		local config = '[gesture_parameters]\ntap_hold__open_url = "https://tap.example"\n[tap_holds]\nenabled = true\n'
 		with_scope(source, config, function(s)
 			local before = s.manager.keys()
-			local external = '[tap_hold]\nenabled = false\n# edited by hand\n'
+			local external = '[tap_hold]\ninherit_defaults = false\n# edited by hand\n'
 			s.controls.before_publish = function(path)
 				if path == s.tap_path then write(s.tap_path, external) end
 			end
@@ -251,8 +263,8 @@ helpers.describe("Linux tap-hold scope: refusals and revert", function()
 	end)
 
 	helpers.it("puts the preset file back when config.toml publication is refused", function()
-		local source = '[tap_hold]\nenabled = true\ninherit_defaults = true\n'
-		local config = '[gesture_parameters]\ntap_hold__open_url = "https://tap.example"\n'
+		local source = '[tap_hold]\ninherit_defaults = true\n'
+		local config = '[gesture_parameters]\ntap_hold__open_url = "https://tap.example"\n[tap_holds]\nenabled = true\n'
 		with_scope(source, config, function(s)
 			s.controls.refuse = s.config_path
 			helpers.assert_eq(s.owner().apply("clear"), false)
