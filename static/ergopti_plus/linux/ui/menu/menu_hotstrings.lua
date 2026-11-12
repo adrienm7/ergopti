@@ -88,8 +88,8 @@ end
 --- @param mode string "recommended" or "clear".
 --- @return boolean committed
 local function _apply_hotstrings_scope(ctx, mode)
-	if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-	local committed = require("infra.hotstrings_scope").apply(mode, ctx.is_paused,
+	-- Runs while paused: a pause stops typing, not configuration (EDD-1).
+	local committed = require("infra.hotstrings_scope").apply(mode,
 		{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
 	if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	return committed

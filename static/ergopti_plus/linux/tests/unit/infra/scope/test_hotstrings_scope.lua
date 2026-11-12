@@ -174,7 +174,6 @@ local function with_scope(body, source)
 		context.suffix = ".hotstrings-test.bak"
 		context.scope = require("infra.hotstrings_scope").new({
 			path = config_path, backup_suffix = context.suffix, files = context.files,
-			is_paused = function() return context.paused end,
 			config = Config, preferences = context.Preferences, repeat_key = context.RepeatKey,
 			word_reset = context.WordReset,
 			magic_key = context.MagicKey, preview_settings = require("modules.hotstrings.preview_settings"),
@@ -482,12 +481,11 @@ helpers.describe("hotstrings scope: refusals", function()
 		end)
 	end)
 
-	helpers.it("refuses to start while paused", function()
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+	helpers.it("clears with no pause owner (edd1-paused-writes)", function()
 		with_scope(function(c)
-			c.paused = true
-			helpers.assert_eq(c.scope.apply("clear"), false)
-			helpers.assert_eq(read(c.config_path), CONFIG)
-			helpers.assert_eq(#c.published, 0)
+			helpers.assert_eq(c.scope.apply("clear"), true)
+			helpers.assert_true(read(c.config_path) ~= CONFIG, "the paused driver still writes config.toml")
 		end)
 	end)
 end)
@@ -654,7 +652,7 @@ helpers.describe("hotstrings retained native release debt", function()
 			end
 		end
 		local scope = require("infra.hotstrings_scope").new({ path = c.config_path, backup_suffix = c.suffix,
-			files = c.files, is_paused = function() return c.paused end,
+			files = c.files,
 			config = c.Config, preferences = c.Preferences, repeat_key = c.RepeatKey, magic_key = c.MagicKey,
 			word_reset = c.WordReset,
 			preview_settings = require("modules.hotstrings.preview_settings"), terminators = c.Terminators,
