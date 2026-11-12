@@ -2364,6 +2364,17 @@ sg("script_quit",                         function()
 		if not request_ok or accepted_or_err ~= true then
 			Logger.error(LOG, "script_quit controlled exit was rejected: %s",
 				tostring(accepted_or_err))
+			-- The same notice as the menubar Quit and Windows' quit admission: a
+			-- refused shortcut or gesture Quit must not look like nothing (NUI-001).
+			local told, notice_err = pcall(function()
+				local notifications = require("infra.notifications")
+				require("feature_notice").quit_refused({
+					send = function(text, level) return notifications.notify(text, nil, level) end,
+					info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+					warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
+				}, require("infra.i18n").get)
+			end)
+			if not told then Logger.error(LOG, "The refused Quit notice failed: %s.", tostring(notice_err)) end
 		end
 	end
 	local scheduled, schedule_result = pcall(function()

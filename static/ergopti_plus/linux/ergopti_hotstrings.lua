@@ -888,6 +888,13 @@ privacy_owners.tray_quit = require("infra.quit_request").new({
 	notify_refused = function() require("ui.menu.feature_notice").quit_refused(require("infra.i18n").get) end,
 })
 
+--- A Quit from a shortcut, a gesture or the degraded tray row: the owner tells
+--- the user of a refusal that comes after the call returned, this of one that
+--- comes at once, as the tray row (ui/menu/menu_quit.lua) and Windows' quit
+--- admission do (NUI-001).
+privacy_owners.user_quit = require("infra.quit_request").notifying(privacy_owners.tray_quit,
+	function() require("ui.menu.feature_notice").quit_refused(require("infra.i18n").get) end)
+
 
 -- =========================================
 -- =========================================
@@ -1316,7 +1323,7 @@ local function main()
 		-- A shortcut or gesture Quit is the same user Quit as the tray row: it
 		-- cancels a reload in flight, waits for writes and tells a waiting update
 		-- watcher, so the update is not rolled back (LCY-003).
-		quit = function(reason) return privacy_owners.tray_quit(reason) end,
+		quit = function(reason) return privacy_owners.user_quit(reason) end,
 		hide_preview = tooltip_preview and function() tooltip_preview.hide() end or nil,
 		hide_prediction = llm_overlay and function() llm_overlay.hide() end or nil,
 		cancel_prediction = prediction_engine and type(prediction_engine.cancel) == "function"
@@ -3015,7 +3022,7 @@ local function main()
 					-- The same user Quit owner as every other Quit (LCY-003). This
 					-- row is the last way out of a daemon whose tray failed, so an
 					-- owner that raises still ends the daemon, after saying so.
-					local called, err = pcall(privacy_owners.tray_quit, "degraded tray quit")
+					local called, err = pcall(privacy_owners.user_quit, "degraded tray quit")
 					if not called then
 						Logger.error(LOG, "The user Quit owner raised (%s); quitting through the shutdown alone.", tostring(err))
 						shutdown.request("degraded tray quit")

@@ -146,7 +146,7 @@ helpers.describe("pause layout switch", function()
 		local _, quits = source:gsub('require%("modules%.keymap%.pause_layout_switch"%)%.quit_safely%(%)', "")
 		-- The tray row, the shortcut and the gesture Quit share one owner (LCY-003).
 		helpers.assert_eq(quits, 1, "the user Quit owner switches first")
-		helpers.assert_true(source:find("quit = function(reason) return privacy_owners.tray_quit(reason) end", 1, true) ~= nil,
+		helpers.assert_true(source:find("quit = function(reason) return privacy_owners.user_quit(reason) end", 1, true) ~= nil,
 			"the shortcut quit reaches the user Quit owner")
 		-- The tray quit runs through infra/quit_request.lua, which applies the pause
 		-- layout only once the shared admission accepted the quit.
@@ -168,7 +168,7 @@ helpers.describe("pause layout switch", function()
 		local actions = source:match("local script_actions = ScriptActions%.new%(%{(.-)\n\t%}%)")
 		helpers.assert_true(actions ~= nil, "the script actions are found")
 		helpers.assert_true(actions:find("\n\t\treload = perform_reload,\n", 1, true) ~= nil, "a reload does not switch")
-		helpers.assert_true(actions:find("\n\t\tquit = function(reason) return privacy_owners.tray_quit(reason) end,\n", 1, true) ~= nil,
+		helpers.assert_true(actions:find("\n\t\tquit = function(reason) return privacy_owners.user_quit(reason) end,\n", 1, true) ~= nil,
 			"the shortcut quit switches through the user Quit owner")
 	end)
 end)

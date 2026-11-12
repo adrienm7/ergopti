@@ -78,17 +78,34 @@ helpers.describe("Linux tray Quit follows the shared admission (quit-admission)"
 		helpers.assert_true(not pcall(build({}), ""), "a user Quit names its source")
 	end)
 
+	helpers.it("(nui-001-quit-refused) a shortcut Quit refused at once tells the user", function()
+		local on_quit, calls = build({ requested = true })
+		local notices = 0
+		local quit = QuitRequest.notifying(on_quit, function() notices = notices + 1 end)
+		helpers.assert_eq(quit("gesture or shortcut quit"), false)
+		helpers.assert_eq(notices, 1, "an exit that already owns the process is told, as on Windows")
+		helpers.assert_eq(#calls.notices, 0, "the later-refusal port stays silent for a refusal at once")
+		local admitted = QuitRequest.notifying(build({}), function() notices = notices + 1 end)
+		helpers.assert_eq(admitted("gesture or shortcut quit"), true)
+		helpers.assert_eq(notices, 1, "an admitted Quit gives no notice")
+		local waiting = QuitRequest.notifying(build({ writer = true }), function() notices = notices + 1 end)
+		helpers.assert_eq(waiting("gesture or shortcut quit"), true)
+		helpers.assert_eq(notices, 1, "a waiting Quit is told by its owner only if it is refused later")
+	end)
+
 	helpers.it("(lcy-003-shortcut-quit) Main routes the shortcut and gesture Quit through that owner", function()
 		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
 		local source = assert(file:read("*a")); assert(file:close())
 		helpers.assert_true(
-			source:find("quit = function(reason) return privacy_owners.tray_quit(reason) end", 1, true) ~= nil,
+			source:find("quit = function(reason) return privacy_owners.user_quit(reason) end", 1, true) ~= nil,
 			"the script_quit port must reach the user Quit owner")
+		helpers.assert_true(source:find('privacy_owners.user_quit = require("infra.quit_request").notifying(privacy_owners.tray_quit,', 1, true) ~= nil,
+			"a shortcut, gesture or degraded Quit refused at once is told (NUI-001)")
 		helpers.assert_true(source:find('report_quit("the tray Quit")', 1, true) == nil,
 			"the watcher report names the Quit source it was given")
 		local degraded = source:match('tray_menu%.setFallbackMenu%((.-)\n\t\t\t\tend%)')
 		helpers.assert_true(degraded ~= nil, "the degraded tray Quit is found")
-		local owner = degraded:find('pcall(privacy_owners.tray_quit, "degraded tray quit")', 1, true)
+		local owner = degraded:find('pcall(privacy_owners.user_quit, "degraded tray quit")', 1, true)
 		local safety = degraded:find('shutdown.request("degraded tray quit")', 1, true)
 		helpers.assert_true(owner ~= nil and safety ~= nil and owner < safety,
 			"the degraded tray Quit takes the user Quit owner and ends the daemon only when that owner raises")
