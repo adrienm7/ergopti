@@ -27,8 +27,11 @@ const missing = [];
 function collect(relative) {
 	for (const entry of fs.readdirSync(path.join(ROOT, relative), { withFileTypes: true })) {
 		const child = relative + entry.name;
-		if (entry.isDirectory()) collect(child + '/');
-		else if (entry.isFile() && child.endsWith('.lua')) files.push(child);
+		// The shared test tree holds cross-driver contracts, which every suite
+		// verifies on purpose: not a Lua implementation.
+		if (entry.isDirectory()) {
+			if (child !== 'static/ergopti_plus/_shared/tests') collect(child + '/');
+		} else if (entry.isFile() && child.endsWith('.lua')) files.push(child);
 	}
 }
 
