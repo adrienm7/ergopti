@@ -675,8 +675,10 @@ function run() {
 	const fullCtx = Plan.referenceContext(full);
 	const repo = path.resolve(__dirname, '..', '..');
 	for (const e of Edits.FOLDER_EDITS) {
+		// Once applied (the proof branch), the folder is gone and so is the
+		// text, or the file itself moved with it.
+		if (!fs.existsSync(path.join(repo, e.file))) continue;
 		const text = fs.readFileSync(path.join(repo, e.file), 'utf8');
-		// Once applied (the proof branch), the folder is gone and so is the text.
 		if (!fs.existsSync(path.join(repo, P, e.empties)) && !text.includes(e.from)) continue;
 		const kinds = Plan.scanFile(e.file, text, fullCtx)
 			.filter((r) => r.old === e.from)
