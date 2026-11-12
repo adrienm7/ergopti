@@ -291,6 +291,18 @@ function run() {
 			fromParam('', 'zz_probe_hs', 'data', 'a.toml'),
 			'joins onto a base derived from a defaulted parameter follow its folder'
 		);
+		// A Python path joined with the / operator, read from the tree it passes.
+		assert.equal(
+			rewrite(
+				'tools/test/z.py',
+				'S = ROOT / "static" / "ergopti_plus" / "_shared" / "zz_probe_mod" / "hotstrings" / "a.toml"'
+			),
+			'S = ROOT / "static" / "ergopti_plus" / "_shared" / "zz_probe_hs" / "data" / "a.toml"'
+		);
+		assert.equal(
+			rewrite(`${P}linux/tests/z.py`, 'locales = case / "_shared" / "zz_probe_data" / "locales"'),
+			'locales = case / "_shared" / "core" / "zz_probe_i18n" / "data" / "locales"'
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(

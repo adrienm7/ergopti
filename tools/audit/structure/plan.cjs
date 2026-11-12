@@ -1526,6 +1526,42 @@ function scanFile(file, text, ctx) {
 			add('lua-concat', m[0], m[0].replace(j.text, `${m[1]}${lead}${piece}${trail}${m[1]}`), hit);
 		}
 	}
+	// ROOT / "static" / "ergopti_plus" / "_shared" / "data" / "x.sql": a Python
+	// path joined with the / operator, read from the tree it passes through.
+	if (file.endsWith('.py'))
+		for (const m of text.matchAll(/(?:[ \t]*\/[ \t]*(["'])[\w.?-]+\1)+/g)) {
+			const pieces = [...m[0].matchAll(/(["'])([\w.?-]+)\1/g)].map((x) => x[2]);
+			const at = pieces.findIndex((p) => Census.TREES.includes(p));
+			if (at < 0 || at === pieces.length - 1) continue;
+			let tail = pieces.slice(at);
+			let lua = false;
+			if (rootSwitch && tail[0] === '_shared' && tail[1] === 'lua') {
+				tail = ['_shared', ...tail.slice(2)];
+				lua = true;
+			}
+			const wild = tail.some((p) => p.includes('?'));
+			const repo = PREFIX + tail.join('/');
+			let target = null;
+			if (!wild) {
+				// A whole move only: a scattered folder has no one new spelling here.
+				const moved = byRepoPath.get(repo) || byRepoDir.get(repo);
+				if (moved === SPLIT && !isProse(file, text, code, m.index)) {
+					add('dir-split', m[0].trim(), '(split)', { oldRepo: repo });
+					continue;
+				}
+				if (moved && moved !== SPLIT && moved !== repo && EXISTING.has(repo)) target = moved;
+			}
+			if (!target && !lua) continue;
+			const quote = m[0].match(/["']/)[0];
+			const kept = pieces.slice(0, at).map((p) => `${quote}${p}${quote}`);
+			const fresh = (target ? target.slice(PREFIX.length).split('/') : tail).map(
+				(p) => `${quote}${p}${quote}`
+			);
+			add('join', m[0].trim().replace(/^\/\s*/, ''), [...kept, ...fresh].join(' / '), {
+				oldRepo: repo,
+				newRepo: target || repo
+			});
+		}
 	// A Lua module name in a tool's regular expression: /tap_hold\.hold_options/.test(src).
 	// Tools only: a page's /^network\.failure\./ matches a locale key.
 	if (/^tools\/.*\.(c?js|mjs)$/.test(file))
