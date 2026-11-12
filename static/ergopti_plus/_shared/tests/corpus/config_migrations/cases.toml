@@ -10,7 +10,9 @@
 #   input.toml       the config.toml a driver finds at boot;
 #   expected.toml    the migrated file, for outcome "migrated" only;
 #   migrations.toml  optional: a registry replacing the shipped one, so every
-#                    op of the closed set is exercised on its own.
+#                    op of the closed set is exercised on its own;
+#   companion_<file> optional: the companion file an import_companion op
+#                    names, as the driver hands it (absent: no such file).
 # The JS gate fails when this list and the case directories differ.
 
 [corpus]
@@ -100,5 +102,6 @@ cases = [
 	"shipped_release_settings_kept_on_linux",
 	"shipped_language_section_order_kept_on_linux",
 	"shipped_release_ai_enabled_kept_on_macos",
-	"shipped_language_section_order_kept_on_macos"
+	"shipped_language_section_order_kept_on_macos",
+	"op_import_companion"
 ]
