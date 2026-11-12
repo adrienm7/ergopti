@@ -2730,6 +2730,10 @@ local function load_slot_settings(config)
 	local section = type(config.gestures) == "table" and config.gestures or {}
 	local Sensitivity = require("gestures.sensitivity")
 	for slot, mode in pairs(type(section.modes) == "table" and section.modes or {}) do
+		-- A case variant reads in its manifest spelling, as Windows' loader admits it.
+		if type(slot) == "string" then
+			mode = ConfigOutdated.canonical_enum_value(Manifest.find_entry_by_path(MODES_SECTION .. "." .. slot), mode)
+		end
 		if M.DEFAULT_MODES[slot] ~= nil and (mode == M.MODE_SINGLE or mode == M.MODE_INCREMENTAL) then
 			_modes[slot] = mode
 		else

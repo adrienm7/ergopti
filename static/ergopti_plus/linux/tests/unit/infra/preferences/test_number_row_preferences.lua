@@ -82,6 +82,21 @@ helpers.describe("number row preferences", function()
 				helpers.assert_eq(scan.keys[1].key, "future")
 			end)
 	end)
+	helpers.it("reads an ordering written in another case in its manifest spelling (config-enum-case)", function()
+		with_config('[layout]\ndirect_access_digits = "Symbols"\n', function(Preferences)
+			helpers.assert_eq(Preferences.settings().order, "symbols")
+		end)
+	end)
+
+	helpers.it("reads the emulation's enum leaves in their manifest spelling (config-enum-case)", function()
+		local Settings = require("layouts.emulation_settings")
+		local reported = {}
+		local settings = Settings.resolve({ layout = { ergopti_variant = "Ergopti_Plus", direct_access_digits = "DIGITS" } },
+			require("infra.manifest_reader").default_for, function(segments) reported[#reported + 1] = table.concat(segments, ".") end)
+		helpers.assert_eq(reported, {}, "a case variant is not outdated")
+		helpers.assert_eq(settings.id, "ergopti_plus")
+		helpers.assert_eq(settings.number_row, "digits")
+	end)
 end)
 
 return true

@@ -67,7 +67,10 @@ function M.resolve(config, mark)
 		local section, key = leaf(role)
 		local node = config[section]
 		local value
-		if type(node) == "table" then value = node[key] end
+		-- A case variant reads in its manifest spelling, as Windows' loader admits it.
+		if type(node) == "table" then
+			value = ConfigOutdated.canonical_enum_value(Manifest.find_entry_by_path(spec.path), node[key])
+		end
 		if value ~= nil then
 			local valid, detail = spec.valid(value)
 			if not valid then

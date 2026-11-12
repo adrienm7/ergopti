@@ -138,6 +138,8 @@ local function inspect(document, path)
 	-- longer lists is outdated on its own, never read as another choice.
 	local entry = value ~= nil and Manifest.find_entry_by_path(path) or nil
 	if type(entry) == "table" and entry.type == "enum" then
+		-- A case variant reads in its manifest spelling, as Windows' loader admits it.
+		value = ConfigOutdated.canonical_enum_value(entry, value)
 		local fits, detail = ConfigOutdated.manifest_value_fits(entry, value, "linux")
 		if not fits then return nil, path, detail end
 	end
