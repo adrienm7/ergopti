@@ -317,6 +317,7 @@ static/ergopti_plus/_shared/lua/layouts/source_export.lua	static/ergopti_plus/_s
 static/ergopti_plus/_shared/lua/layouts/source_store.lua	static/ergopti_plus/_shared/layouts/engine/composer/source_store.lua	S01
 static/ergopti_plus/_shared/lua/layouts/xkb_converter.lua	static/ergopti_plus/_shared/layouts/engine/composer/xkb_converter.lua	S01
 static/ergopti_plus/_shared/lua/legacy_folder_migration.lua	static/ergopti_plus/_shared/settings/engine/migration/legacy_folder_migration_core.lua	S01
+static/ergopti_plus/_shared/lua/linux_app_identities_data.lua	static/ergopti_plus/_shared/apps/engine/linux_app_identities_data.lua	S01
 static/ergopti_plus/_shared/lua/llm/agent.lua	static/ergopti_plus/_shared/ai/engine/agent/agent.lua	S01
 static/ergopti_plus/_shared/lua/llm/agent_learning_store.lua	static/ergopti_plus/_shared/ai/engine/agent/learning_store.lua	S01
 static/ergopti_plus/_shared/lua/llm/api_entry_identity.lua	static/ergopti_plus/_shared/ai/engine/api/entry_identity.lua	S01
@@ -429,6 +430,8 @@ static/ergopti_plus/_shared/lua/script_chords.lua	static/ergopti_plus/_shared/ke
 static/ergopti_plus/_shared/lua/script_config_authority.lua	static/ergopti_plus/_shared/settings/engine/scope/script_config_authority.lua	S01
 static/ergopti_plus/_shared/lua/script_override_projection.lua	static/ergopti_plus/_shared/settings/engine/scope/script_override_projection.lua	S01
 static/ergopti_plus/_shared/lua/script_scope_runtime.lua	static/ergopti_plus/_shared/settings/engine/scope/script_scope_runtime.lua	S01
+static/ergopti_plus/_shared/lua/secure_apps.lua	static/ergopti_plus/_shared/apps/engine/secure_apps.lua	S01
+static/ergopti_plus/_shared/lua/secure_apps_data.lua	static/ergopti_plus/_shared/apps/engine/secure_apps_data.lua	S01
 static/ergopti_plus/_shared/lua/send_input/init.lua	static/ergopti_plus/_shared/platform/input/send_input.lua	S01
 static/ergopti_plus/_shared/lua/shell/heredoc.lua	static/ergopti_plus/_shared/core/process/shell_heredoc.lua	S01
 static/ergopti_plus/_shared/lua/shortcuts/assignment.lua	static/ergopti_plus/_shared/shortcuts/engine/assignment.lua	S01
@@ -681,6 +684,7 @@ static/ergopti_plus/_shared/lua/tray/protocol.lua	static/ergopti_plus/_shared/tr
 static/ergopti_plus/_shared/lua/unicode_case/data.lua	static/ergopti_plus/_shared/core/text/engine/unicode_case/data.lua	S01
 static/ergopti_plus/_shared/lua/unicode_case/init.lua	static/ergopti_plus/_shared/core/text/engine/unicode_case/init.lua	S01
 static/ergopti_plus/_shared/lua/updater/channels.lua	static/ergopti_plus/_shared/updater/engine/channels.lua	S01
+static/ergopti_plus/_shared/lua/updater/check_notice.lua	static/ergopti_plus/_shared/updater/engine/check_notice.lua	S01
 static/ergopti_plus/_shared/lua/updater/check_result.lua	static/ergopti_plus/_shared/updater/engine/check_result.lua	S01
 static/ergopti_plus/_shared/lua/updater/check_session.lua	static/ergopti_plus/_shared/updater/engine/check_session.lua	S01
 static/ergopti_plus/_shared/lua/updater/config_backup.lua	static/ergopti_plus/_shared/updater/engine/config_backup_core.lua	S01
@@ -737,19 +741,19 @@ static/ergopti_plus/_shared/modules/features/number_row_policy.ahk	static/ergopt
 static/ergopti_plus/_shared/modules/features/pause_switch_policy.ahk	static/ergopti_plus/_shared/settings/data/features/pause_switch_policy.ahk	S01
 static/ergopti_plus/_shared/modules/features/requirements.toml	static/ergopti_plus/_shared/settings/data/features/requirements.toml	S01
 static/ergopti_plus/_shared/modules/features/shortcuts.toml	static/ergopti_plus/_shared/settings/data/features/shortcuts.toml	S01
-static/ergopti_plus/_shared/modules/hotstrings/README.md	static/ergopti_plus/_shared/hotstrings/data/README.md	S01
-static/ergopti_plus/_shared/modules/hotstrings/_index.toml	static/ergopti_plus/_shared/hotstrings/data/_index.toml	S01
-static/ergopti_plus/_shared/modules/hotstrings/autocorrection.toml	static/ergopti_plus/_shared/hotstrings/data/autocorrection.toml	S01
-static/ergopti_plus/_shared/modules/hotstrings/defaults.toml	static/ergopti_plus/_shared/hotstrings/data/defaults.toml	S01
-static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml	static/ergopti_plus/_shared/hotstrings/data/french/autocorrection.toml	S01
-static/ergopti_plus/_shared/modules/hotstrings/french/magickey.toml	static/ergopti_plus/_shared/hotstrings/data/french/magickey.toml	S01
-static/ergopti_plus/_shared/modules/hotstrings/magickey.toml	static/ergopti_plus/_shared/hotstrings/data/magickey.toml	S01
-static/ergopti_plus/_shared/modules/hotstrings/personal_files.json	static/ergopti_plus/_shared/hotstrings/data/personal_files.json	S01
-static/ergopti_plus/_shared/modules/hotstrings/personal_scope.ahk	static/ergopti_plus/_shared/hotstrings/data/personal_scope.ahk	S01
-static/ergopti_plus/_shared/modules/hotstrings/priority.json	static/ergopti_plus/_shared/hotstrings/data/priority.json	S01
-static/ergopti_plus/_shared/modules/hotstrings/schema.md	static/ergopti_plus/_shared/hotstrings/data/schema.md	S01
-static/ergopti_plus/_shared/modules/hotstrings/scope_overrides.ahk	static/ergopti_plus/_shared/hotstrings/data/scope_overrides.ahk	S01
-static/ergopti_plus/_shared/modules/hotstrings/user_code.ahk	static/ergopti_plus/_shared/hotstrings/data/user_code.ahk	S01
+static/ergopti_plus/_shared/modules/hotstrings/README.md	static/ergopti_plus/_shared/hotstrings/data/catalogue/README.md	S01
+static/ergopti_plus/_shared/modules/hotstrings/_index.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/_index.toml	S01
+static/ergopti_plus/_shared/modules/hotstrings/autocorrection.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/autocorrection.toml	S01
+static/ergopti_plus/_shared/modules/hotstrings/defaults.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/defaults.toml	S01
+static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/french/autocorrection.toml	S01
+static/ergopti_plus/_shared/modules/hotstrings/french/magickey.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/french/magickey.toml	S01
+static/ergopti_plus/_shared/modules/hotstrings/magickey.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/magickey.toml	S01
+static/ergopti_plus/_shared/modules/hotstrings/personal_files.json	static/ergopti_plus/_shared/hotstrings/data/catalogue/personal_files.json	S01
+static/ergopti_plus/_shared/modules/hotstrings/personal_scope.ahk	static/ergopti_plus/_shared/hotstrings/data/catalogue/personal_scope.ahk	S01
+static/ergopti_plus/_shared/modules/hotstrings/priority.json	static/ergopti_plus/_shared/hotstrings/data/catalogue/priority.json	S01
+static/ergopti_plus/_shared/modules/hotstrings/schema.md	static/ergopti_plus/_shared/hotstrings/data/catalogue/schema.md	S01
+static/ergopti_plus/_shared/modules/hotstrings/scope_overrides.ahk	static/ergopti_plus/_shared/hotstrings/data/catalogue/scope_overrides.ahk	S01
+static/ergopti_plus/_shared/modules/hotstrings/user_code.ahk	static/ergopti_plus/_shared/hotstrings/data/catalogue/user_code.ahk	S01
 static/ergopti_plus/_shared/modules/layouts/composer_check/composed.keylayout	static/ergopti_plus/_shared/layouts/data/composer_check/composed.keylayout	S01
 static/ergopti_plus/_shared/modules/layouts/composer_check/composition.json	static/ergopti_plus/_shared/layouts/data/composer_check/composition.json	S01
 static/ergopti_plus/_shared/modules/layouts/defaults.json	static/ergopti_plus/_shared/layouts/data/defaults.json	S01
@@ -911,7 +915,7 @@ static/ergopti_plus/linux/adapters/tcp_probe.lua	static/ergopti_plus/linux/core/
 static/ergopti_plus/linux/adapters/timer_scheduler.lua	static/ergopti_plus/linux/core/events/timer_scheduler.lua	S03
 static/ergopti_plus/linux/adapters/tray_menu.lua	static/ergopti_plus/linux/tray/adapters/menu.lua	S20
 static/ergopti_plus/linux/adapters/uinput_writer.lua	static/ergopti_plus/linux/platform/input/uinput_writer.lua	S15
-static/ergopti_plus/linux/adapters/user_hotstring_destination.lua	static/ergopti_plus/linux/hotstrings/user_hotstring_destination.lua	S26
+static/ergopti_plus/linux/adapters/user_hotstring_destination.lua	static/ergopti_plus/linux/hotstrings/adapters/user_hotstring_destination.lua	S26
 static/ergopti_plus/linux/adapters/wayland_selection_counter.lua	static/ergopti_plus/linux/clipboard/adapters/wayland_selection_counter.lua	S23
 static/ergopti_plus/linux/adapters/window_info.lua	static/ergopti_plus/linux/platform/focus/window_info.lua	S14
 static/ergopti_plus/linux/adapters/window_switch.lua	static/ergopti_plus/linux/shortcuts/adapters/window_switch.lua	S33
@@ -934,6 +938,7 @@ static/ergopti_plus/linux/desktop_focus/kwin/contents/code/main.js	static/ergopt
 static/ergopti_plus/linux/desktop_focus/kwin/metadata.json	static/ergopti_plus/linux/platform/desktop_focus/kwin/metadata.json	S13
 static/ergopti_plus/linux/infra/absolute_motion.lua	static/ergopti_plus/linux/gestures/engine/absolute_motion.lua	S25
 static/ergopti_plus/linux/infra/account_name.lua	static/ergopti_plus/linux/core/lifecycle/engine/account_name.lua	S06
+static/ergopti_plus/linux/infra/app_identity_migration.lua	static/ergopti_plus/linux/core/lifecycle/engine/app_identity_migration.lua	S06
 static/ergopti_plus/linux/infra/archive_output.lua	static/ergopti_plus/linux/updater/engine/archive_output.lua	S35
 static/ergopti_plus/linux/infra/archive_tar_feeder.lua	static/ergopti_plus/linux/updater/engine/archive_tar_feeder.lua	S35
 static/ergopti_plus/linux/infra/asset_signature.lua	static/ergopti_plus/linux/updater/engine/asset_signature.lua	S35
@@ -1034,6 +1039,7 @@ static/ergopti_plus/linux/infra/shutdown_coordinator.lua	static/ergopti_plus/lin
 static/ergopti_plus/linux/infra/signal_handlers.lua	static/ergopti_plus/linux/core/lifecycle/engine/shutdown/signal_handlers.lua	S06
 static/ergopti_plus/linux/infra/sqlite_batch_process.lua	static/ergopti_plus/linux/core/fs/engine/sqlite_batch_process.lua	S04
 static/ergopti_plus/linux/infra/sqlite_privacy_policy.lua	static/ergopti_plus/linux/core/fs/engine/sqlite_privacy_policy.lua	S04
+static/ergopti_plus/linux/infra/stage_owner.lua	static/ergopti_plus/linux/core/lifecycle/engine/stage_owner.lua	S06
 static/ergopti_plus/linux/infra/tap_hold_scope.lua	static/ergopti_plus/linux/tap_hold/engine/scope.lua	S34
 static/ergopti_plus/linux/infra/timings.lua	static/ergopti_plus/linux/core/timing/engine/timings.lua	S11
 static/ergopti_plus/linux/infra/toml/reader.lua	static/ergopti_plus/linux/core/text/engine/toml/reader.lua	S10
@@ -1169,7 +1175,6 @@ static/ergopti_plus/linux/modules/shortcuts/wrap_on_type.lua	static/ergopti_plus
 static/ergopti_plus/linux/modules/shortcuts/wrap_symbol_settings.lua	static/ergopti_plus/linux/shortcuts/engine/wrap_symbol_settings.lua	S33
 static/ergopti_plus/linux/modules/take_note.lua	static/ergopti_plus/linux/shortcuts/engine/take_note.lua	S33
 static/ergopti_plus/linux/modules/updater/archive_transfer.lua	static/ergopti_plus/linux/updater/engine/archive_transfer.lua	S35
-static/ergopti_plus/linux/modules/updater/check_notice.lua	static/ergopti_plus/linux/updater/engine/check_notice.lua	S35
 static/ergopti_plus/linux/modules/updater/config_backup.lua	static/ergopti_plus/linux/updater/engine/config_backup.lua	S35
 static/ergopti_plus/linux/modules/updater/installer.lua	static/ergopti_plus/linux/updater/engine/installer.lua	S35
 static/ergopti_plus/linux/modules/updater/manager.lua	static/ergopti_plus/linux/updater/engine/manager.lua	S35
@@ -1509,6 +1514,7 @@ static/ergopti_plus/linux/tests/support/ollama_retained_fixture.lua	static/ergop
 static/ergopti_plus/linux/tests/support/platform/remap/tap_hold/tap_hold_engine_fixture.lua	static/ergopti_plus/linux/tests/support/keyboard/engine/tap_hold_engine_fixture.lua	S38
 static/ergopti_plus/linux/tests/support/platform/remap/tap_hold/tap_hold_manager_fixture.lua	static/ergopti_plus/linux/tests/support/keyboard/engine/tap_hold_manager_fixture.lua	S38
 static/ergopti_plus/linux/tests/support/release_http_fixture.lua	static/ergopti_plus/linux/tests/support/updater/release_http_fixture.lua	S38
+static/ergopti_plus/linux/tests/support/session_language.lua	static/ergopti_plus/linux/tests/support/core/session_language.lua	S38
 static/ergopti_plus/linux/tests/support/sqlite_flush_fake.lua	static/ergopti_plus/linux/tests/support/core/sqlite_flush_fake.lua	S38
 static/ergopti_plus/linux/tests/support/sqlite_flush_native.lua	static/ergopti_plus/linux/tests/support/core/sqlite_flush_native.lua	S38
 static/ergopti_plus/linux/tests/support/tap_hold_fixture.lua	static/ergopti_plus/linux/tests/support/keyboard/tap_hold_fixture.lua	S38
@@ -1691,6 +1697,7 @@ static/ergopti_plus/linux/tests/unit/infra/config/test_script_config_authority.l
 static/ergopti_plus/linux/tests/unit/infra/config/test_shared_manifest_reader.lua	static/ergopti_plus/linux/tests/unit/settings/test_shared_manifest_reader.lua	S18
 static/ergopti_plus/linux/tests/unit/infra/config/test_shared_probe_native.lua	static/ergopti_plus/linux/tests/unit/settings/test_shared_probe_native.lua	S18
 static/ergopti_plus/linux/tests/unit/infra/config/test_shared_timings.lua	static/ergopti_plus/linux/tests/unit/settings/test_shared_timings.lua	S18
+static/ergopti_plus/linux/tests/unit/infra/config/test_stage_owner.lua	static/ergopti_plus/linux/tests/unit/settings/test_stage_owner.lua	S18
 static/ergopti_plus/linux/tests/unit/infra/config/test_toml_codec_scan_cost.lua	static/ergopti_plus/linux/tests/unit/settings/test_toml_codec_scan_cost.lua	S18
 static/ergopti_plus/linux/tests/unit/infra/config/test_toml_codec_shapes.lua	static/ergopti_plus/linux/tests/unit/settings/test_toml_codec_shapes.lua	S18
 static/ergopti_plus/linux/tests/unit/infra/config/test_toml_codec_shared_decode.lua	static/ergopti_plus/linux/tests/unit/settings/test_toml_codec_shared_decode.lua	S18
@@ -1768,6 +1775,7 @@ static/ergopti_plus/linux/tests/unit/infra/network/test_network_proxy_policy_con
 static/ergopti_plus/linux/tests/unit/infra/network/test_network_route_plan_contract.lua	static/ergopti_plus/linux/tests/unit/core/network/engine/test_route_plan_contract.lua	S08
 static/ergopti_plus/linux/tests/unit/infra/network/test_proxy_auth_relay.lua	static/ergopti_plus/linux/tests/unit/core/network/engine/test_proxy_auth_relay.lua	S08
 static/ergopti_plus/linux/tests/unit/infra/network/test_release_check_physical_join.lua	static/ergopti_plus/linux/tests/unit/core/network/engine/test_release_check_physical_join.lua	S08
+static/ergopti_plus/linux/tests/unit/infra/preferences/test_app_identity_migration.lua	static/ergopti_plus/linux/tests/unit/settings/preferences/test_app_identity_migration.lua	S18
 static/ergopti_plus/linux/tests/unit/infra/preferences/test_hotstring_preferences.lua	static/ergopti_plus/linux/tests/unit/settings/preferences/test_hotstring_preferences.lua	S18
 static/ergopti_plus/linux/tests/unit/infra/preferences/test_legacy_hotstring_storage.lua	static/ergopti_plus/linux/tests/unit/settings/preferences/test_legacy_hotstring_storage.lua	S18
 static/ergopti_plus/linux/tests/unit/infra/preferences/test_llm_preference_snapshot.lua	static/ergopti_plus/linux/tests/unit/settings/preferences/test_llm_preference_snapshot.lua	S18
@@ -1851,6 +1859,7 @@ static/ergopti_plus/linux/tests/unit/modules/gestures/config/test_gestures_manag
 static/ergopti_plus/linux/tests/unit/modules/gestures/config/test_gestures_manager_gesture_parameter_binding.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/config/test_manager_gesture_parameter_binding.lua	S25
 static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_combo_emitter.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/engine/test_combo_emitter.lua	S25
 static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_combo_press_order.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/engine/test_combo_press_order.lua	S25
+static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_decoder_millimetres.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/engine/test_decoder_millimetres.lua	S25
 static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_axis_slots.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/engine/test_axis_slots.lua	S25
 static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_click_retirement.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/engine/test_click_retirement.lua	S25
 static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_close_ack.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/engine/test_close_ack.lua	S25
@@ -2902,6 +2911,7 @@ static/ergopti_plus/macos/platform/remap/lease_memory_snapshot.lua	static/ergopt
 static/ergopti_plus/macos/platform/remap/legacy_release_fixtures.lua	static/ergopti_plus/macos/keyboard/engine/runtime/legacy_release_fixtures.lua	S28
 static/ergopti_plus/macos/platform/remap/managed_rule_removal.lua	static/ergopti_plus/macos/keyboard/adapters/runtime/managed_rule_removal.lua	S28
 static/ergopti_plus/macos/platform/remap/nav_layer.lua	static/ergopti_plus/macos/keyboard/engine/layers/nav_layer.lua	S28
+static/ergopti_plus/macos/platform/remap/network_download.lua	static/ergopti_plus/macos/keyboard/engine/network_download.lua	S28
 static/ergopti_plus/macos/platform/remap/onboarding.lua	static/ergopti_plus/macos/keyboard/engine/runtime/onboarding.lua	S28
 static/ergopti_plus/macos/platform/remap/runtime_activation.lua	static/ergopti_plus/macos/keyboard/adapters/runtime/activation.lua	S28
 static/ergopti_plus/macos/platform/remap/runtime_approval_watch.lua	static/ergopti_plus/macos/keyboard/adapters/runtime/approval_watch.lua	S28
@@ -3461,6 +3471,7 @@ static/ergopti_plus/macos/tests/unit/infra/preferences/test_layout_emulation_pre
 static/ergopti_plus/macos/tests/unit/infra/preferences/test_preferences_constructor_source.lua	static/ergopti_plus/macos/tests/unit/settings/preferences/test_constructor_source.lua	S18
 static/ergopti_plus/macos/tests/unit/infra/preferences/test_preferences_current_view_reason.lua	static/ergopti_plus/macos/tests/unit/settings/preferences/test_current_view_reason.lua	S18
 static/ergopti_plus/macos/tests/unit/infra/preferences/test_preferences_dynamic_family_rows.lua	static/ergopti_plus/macos/tests/unit/settings/preferences/test_dynamic_family_rows.lua	S18
+static/ergopti_plus/macos/tests/unit/infra/preferences/test_preferences_enum_case.lua	static/ergopti_plus/macos/tests/unit/settings/preferences/test_enum_case.lua	S18
 static/ergopti_plus/macos/tests/unit/infra/preferences/test_preferences_existing_key_spellings.lua	static/ergopti_plus/macos/tests/unit/settings/preferences/test_existing_key_spellings.lua	S18
 static/ergopti_plus/macos/tests/unit/infra/preferences/test_preferences_keeps_unowned_sections_actual_file.lua	static/ergopti_plus/macos/tests/unit/settings/preferences/test_keeps_unowned_sections_actual_file.lua	S18
 static/ergopti_plus/macos/tests/unit/infra/preferences/test_preferences_keeps_unowned_sections_gesture_parameters.lua	static/ergopti_plus/macos/tests/unit/settings/preferences/test_keeps_unowned_sections_gesture_parameters.lua	S18
@@ -4258,7 +4269,6 @@ static/ergopti_plus/macos/tests/unit/modules/llm/remote/test_llm_api_providers.l
 static/ergopti_plus/macos/tests/unit/modules/llm/remote/test_load_api_entries_deferred.lua	static/ergopti_plus/macos/tests/unit/ai/engine/remote/test_load_api_entries_deferred.lua	S21
 static/ergopti_plus/macos/tests/unit/modules/llm/remote/test_remote_response_error_contract.lua	static/ergopti_plus/macos/tests/unit/ai/engine/remote/test_response_error_contract.lua	S21
 static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_callbacks_never_swallowed.lua	static/ergopti_plus/macos/tests/unit/ai/engine/streaming/test_callbacks_never_swallowed.lua	S21
-static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_on_fail_cancels_watchdog.lua	static/ergopti_plus/macos/tests/unit/ai/engine/streaming/test_on_fail_cancels_watchdog.lua	S21
 static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_payload_file_admission.lua	static/ergopti_plus/macos/tests/unit/ai/engine/streaming/test_payload_file_admission.lua	S21
 static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_progressive_reveal_transaction.lua	static/ergopti_plus/macos/tests/unit/ai/engine/streaming/test_progressive_reveal_transaction.lua	S21
 static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_retry_policy_shared_across_backends.lua	static/ergopti_plus/macos/tests/unit/ai/engine/streaming/test_retry_policy_shared_across_backends.lua	S21
@@ -4271,7 +4281,6 @@ static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_stream_payload_r
 static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_stream_retry_withdraws_partial.lua	static/ergopti_plus/macos/tests/unit/ai/engine/streaming/test_stream_retry_withdraws_partial.lua	S21
 static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_stream_tmpfile_cleanup_after_maxtime.lua	static/ergopti_plus/macos/tests/unit/ai/engine/streaming/test_stream_tmpfile_cleanup_after_maxtime.lua	S21
 static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_stream_tmpfile_no_orphan.lua	static/ergopti_plus/macos/tests/unit/ai/engine/streaming/test_stream_tmpfile_no_orphan.lua	S21
-static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_stream_watchdog_timer_ownership.lua	static/ergopti_plus/macos/tests/unit/ai/engine/streaming/test_stream_watchdog_timer_ownership.lua	S21
 static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_streaming_handler_stale.lua	static/ergopti_plus/macos/tests/unit/ai/engine/streaming/test_handler_stale.lua	S21
 static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_streaming_handler_ui_commit_gate.lua	static/ergopti_plus/macos/tests/unit/ai/engine/streaming/test_handler_ui_commit_gate.lua	S21
 static/ergopti_plus/macos/tests/unit/modules/llm/streaming/test_streaming_ui_scope.lua	static/ergopti_plus/macos/tests/unit/ai/engine/streaming/test_ui_scope.lua	S21
@@ -4575,10 +4584,12 @@ static/ergopti_plus/macos/tests/unit/platform/remap/lifecycle/test_legacy_rules_
 static/ergopti_plus/macos/tests/unit/platform/remap/lifecycle/test_managed_rule_removal.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/lifecycle/test_managed_rule_removal.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/lifecycle/test_native_karabiner_config_fixture.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/lifecycle/test_native_karabiner_config_fixture.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/lifecycle/test_package_manifest.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/lifecycle/test_package_manifest.lua	S28
+static/ergopti_plus/macos/tests/unit/platform/remap/lifecycle/test_teardown_before_lease_init.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/lifecycle/test_teardown_before_lease_init.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/onboarding_install/test_artifact_cleanup.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/onboarding_install/test_artifact_cleanup.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/onboarding_install/test_cache_publication.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/onboarding_install/test_cache_publication.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/onboarding_install/test_cleanup_timer_acquisition.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/onboarding_install/test_cleanup_timer_acquisition.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/onboarding_install/test_cleanup_timer_cancellation.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/onboarding_install/test_cleanup_timer_cancellation.lua	S28
+static/ergopti_plus/macos/tests/unit/platform/remap/onboarding_install/test_download_network_route.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/onboarding_install/test_download_network_route.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/onboarding_install/test_native_termination.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/onboarding_install/test_native_termination.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/onboarding_install/test_no_fd_leak_in_first_launch.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/onboarding_install/test_no_fd_leak_in_first_launch.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/onboarding_install/test_onboarding_continuation_timer_transaction.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/onboarding_install/test_onboarding_continuation_timer_transaction.lua	S28
@@ -4608,7 +4619,8 @@ static/ergopti_plus/macos/tests/unit/platform/remap/rules/test_tap_hold_key_thre
 static/ergopti_plus/macos/tests/unit/platform/remap/rules/test_typing_rollover_catalog.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/rules/test_typing_rollover_catalog.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/runtime_activation/test_runtime_activation.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/test_runtime_activation.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/runtime_approval_watch/test_runtime_approval_watch.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/test_runtime_approval_watch.lua	S28
-static/ergopti_plus/macos/tests/unit/platform/remap/runtime_artifact_fetch/test_runtime_artifact_fetch.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/test_runtime_artifact_fetch.lua	S28
+static/ergopti_plus/macos/tests/unit/platform/remap/runtime_artifact_fetch/test_network_download.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/runtime_artifact_fetch/test_network_download.lua	S28
+static/ergopti_plus/macos/tests/unit/platform/remap/runtime_artifact_fetch/test_runtime_artifact_fetch.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/runtime_artifact_fetch/test_runtime_artifact_fetch.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/runtime_install/test_runtime_install.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/runtime_install/test_runtime_install.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/runtime_install/test_runtime_service_repair.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/runtime_install/test_runtime_service_repair.lua	S28
 static/ergopti_plus/macos/tests/unit/platform/remap/runtime_manifest/test_runtime_manifest.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/test_runtime_manifest.lua	S28
@@ -5019,6 +5031,7 @@ static/ergopti_plus/macos/tests/unit/ui/menu/tap_holds/test_menu_tap_holds_karab
 static/ergopti_plus/macos/tests/unit/ui/menu/tap_holds/test_menu_tap_holds_lone_tap.lua	static/ergopti_plus/macos/tests/unit/menu/ui/tap_holds/test_lone_tap.lua	S19
 static/ergopti_plus/macos/tests/unit/ui/menu/tap_holds/test_menu_tap_holds_owned_runtime.lua	static/ergopti_plus/macos/tests/unit/menu/ui/tap_holds/test_owned_runtime.lua	S19
 static/ergopti_plus/macos/tests/unit/ui/menu/test_feature_notice.lua	static/ergopti_plus/macos/tests/unit/menu/ui/builder/test_feature_notice.lua	S19
+static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_reload_refusal.lua	static/ergopti_plus/macos/tests/unit/menu/ui/builder/test_reload_refusal.lua	S19
 static/ergopti_plus/macos/tests/unit/ui/menu/test_quit_admission.lua	static/ergopti_plus/macos/tests/unit/menu/ui/builder/test_quit_admission.lua	S19
 static/ergopti_plus/macos/tests/unit/ui/menu/tray/test_builder_tail_isolation.lua	static/ergopti_plus/macos/tests/unit/menu/ui/tray/test_builder_tail_isolation.lua	S19
 static/ergopti_plus/macos/tests/unit/ui/menu/tray/test_canvas_badge_no_leak.lua	static/ergopti_plus/macos/tests/unit/menu/ui/tray/test_canvas_badge_no_leak.lua	S19
@@ -5148,6 +5161,7 @@ static/ergopti_plus/macos/tests/unit/ui/ui_builder/lifecycle/test_webview_child_
 static/ergopti_plus/macos/tests/unit/ui/ui_builder/lifecycle/test_webview_close_recursion.lua	static/ergopti_plus/macos/tests/unit/core/ui/ui_builder/lifecycle/test_webview_close_recursion.lua	S12
 static/ergopti_plus/macos/tests/unit/ui/ui_builder/test_asset_inlining_is_loud.lua	static/ergopti_plus/macos/tests/unit/core/ui/ui_builder/test_asset_inlining_is_loud.lua	S12
 static/ergopti_plus/macos/tests/unit/ui/ui_builder/test_console_window.lua	static/ergopti_plus/macos/tests/unit/core/ui/ui_builder/test_console_window.lua	S12
+static/ergopti_plus/macos/tests/unit/ui/ui_builder/test_editor_windows_resizable.lua	static/ergopti_plus/macos/tests/unit/core/ui/ui_builder/test_editor_windows_resizable.lua	S12
 static/ergopti_plus/macos/tests/unit/ui/ui_builder/test_every_app_window_title.lua	static/ergopti_plus/macos/tests/unit/core/ui/ui_builder/test_every_app_window_title.lua	S12
 static/ergopti_plus/macos/tests/unit/ui/ui_builder/test_hot_path_costs_are_cached.lua	static/ergopti_plus/macos/tests/unit/core/ui/ui_builder/test_hot_path_costs_are_cached.lua	S12
 static/ergopti_plus/macos/tests/unit/ui/ui_builder/test_shared_window_ownership.lua	static/ergopti_plus/macos/tests/unit/core/ui/ui_builder/test_shared_window_ownership.lua	S12
@@ -5350,6 +5364,7 @@ static/ergopti_plus/windows/adapters/http_client.ahk	static/ergopti_plus/windows
 static/ergopti_plus/windows/adapters/input_probe_native.ahk	static/ergopti_plus/windows/platform/input/probe_native.ahk	S15
 static/ergopti_plus/windows/adapters/key_state.ahk	static/ergopti_plus/windows/platform/input/key_state.ahk	S15
 static/ergopti_plus/windows/adapters/keyboard_hook.ahk	static/ergopti_plus/windows/platform/input/keyboard_hook.ahk	S15
+static/ergopti_plus/windows/adapters/keyboard_layout_install.ahk	static/ergopti_plus/windows/layouts/adapters/keyboard_layout_install.ahk	S29
 static/ergopti_plus/windows/adapters/keyboard_layout_switch.ahk	static/ergopti_plus/windows/layouts/adapters/keyboard_layout_switch.ahk	S29
 static/ergopti_plus/windows/adapters/llm_automation.ahk	static/ergopti_plus/windows/ai/adapters/automation.ahk	S21
 static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk	static/ergopti_plus/windows/ai/adapters/nav_event_owner.ahk	S21
@@ -5366,6 +5381,7 @@ static/ergopti_plus/windows/adapters/process_lifecycle.ahk	static/ergopti_plus/w
 static/ergopti_plus/windows/adapters/program_providers.ahk	static/ergopti_plus/windows/core/process/program_providers.ahk	S09
 static/ergopti_plus/windows/adapters/proxy_override.ahk	static/ergopti_plus/windows/core/network/adapters/proxy_override.ahk	S08
 static/ergopti_plus/windows/adapters/raw_input.ahk	static/ergopti_plus/windows/platform/system/raw_input.ahk	S17
+static/ergopti_plus/windows/adapters/registry_notify.ahk	static/ergopti_plus/windows/hotstrings/adapters/registry_notify.ahk	S26
 static/ergopti_plus/windows/adapters/screen_brightness.ahk	static/ergopti_plus/windows/shortcuts/adapters/screen_brightness.ahk	S33
 static/ergopti_plus/windows/adapters/screen_capture.ahk	static/ergopti_plus/windows/platform/system/screen_capture.ahk	S17
 static/ergopti_plus/windows/adapters/secure_field_detector.ahk	static/ergopti_plus/windows/platform/focus/secure_field_detector.ahk	S14
@@ -5386,7 +5402,7 @@ static/ergopti_plus/windows/adapters/tray_startup_click.ahk	static/ergopti_plus/
 static/ergopti_plus/windows/adapters/tray_startup_commands.ahk	static/ergopti_plus/windows/tray/adapters/startup_commands.ahk	S20
 static/ergopti_plus/windows/adapters/uia_worker.ahk	static/ergopti_plus/windows/core/process/uia_worker.ahk	S09
 static/ergopti_plus/windows/adapters/updater_curl_capture.ahk	static/ergopti_plus/windows/updater/adapters/curl_capture.ahk	S35
-static/ergopti_plus/windows/adapters/user_hotstrings_native.ahk	static/ergopti_plus/windows/hotstrings/user_hotstrings_native.ahk	S26
+static/ergopti_plus/windows/adapters/user_hotstrings_native.ahk	static/ergopti_plus/windows/hotstrings/adapters/user_hotstrings_native.ahk	S26
 static/ergopti_plus/windows/adapters/webview_profiles.ahk	static/ergopti_plus/windows/core/ui/adapters/webview_profiles.ahk	S12
 static/ergopti_plus/windows/adapters/window_info.ahk	static/ergopti_plus/windows/platform/focus/window_info.ahk	S14
 static/ergopti_plus/windows/adapters/window_manager.ahk	static/ergopti_plus/windows/platform/focus/window_manager.ahk	S14
@@ -5569,6 +5585,7 @@ static/ergopti_plus/windows/modules/keymap/keylayout/layout_catalogue_refresh.ah
 static/ergopti_plus/windows/modules/keymap/keylayout/layout_extension.ahk	static/ergopti_plus/windows/layouts/engine/keylayout/extension.ahk	S29
 static/ergopti_plus/windows/modules/keymap/keylayout/layout_registry.ahk	static/ergopti_plus/windows/layouts/engine/keylayout/registry.ahk	S29
 static/ergopti_plus/windows/modules/keymap/keylayout/layout_registry_download.ahk	static/ergopti_plus/windows/layouts/engine/keylayout/registry_download.ahk	S29
+static/ergopti_plus/windows/modules/keymap/keylayout/source_emulation.ahk	static/ergopti_plus/windows/layouts/engine/keylayout/source_emulation.ahk	S29
 static/ergopti_plus/windows/modules/keymap/layout.ahk	static/ergopti_plus/windows/layouts/engine/layout.ahk	S29
 static/ergopti_plus/windows/modules/keymap/layout/accented_shortcuts.ahk	static/ergopti_plus/windows/layouts/engine/accented_shortcuts.ahk	S29
 static/ergopti_plus/windows/modules/keymap/layout/digit_row_bindings.ahk	static/ergopti_plus/windows/layouts/engine/digit_row_bindings.ahk	S29
@@ -5689,6 +5706,7 @@ static/ergopti_plus/windows/modules/llm/prediction_engine.ahk	static/ergopti_plu
 static/ergopti_plus/windows/modules/llm/prediction_exec.ahk	static/ergopti_plus/windows/ai/engine/prediction/exec.ahk	S21
 static/ergopti_plus/windows/modules/llm/prediction_keystats.ahk	static/ergopti_plus/windows/ai/engine/prediction/keystats.ahk	S21
 static/ergopti_plus/windows/modules/llm/prediction_live.ahk	static/ergopti_plus/windows/ai/engine/prediction/live.ahk	S21
+static/ergopti_plus/windows/modules/llm/prediction_ports.ahk	static/ergopti_plus/windows/ai/engine/prediction/ports.ahk	S21
 static/ergopti_plus/windows/modules/llm/profiles.ahk	static/ergopti_plus/windows/ai/engine/settings/profiles.ahk	S21
 static/ergopti_plus/windows/modules/llm/prompt_action.ahk	static/ergopti_plus/windows/ai/engine/prediction/prompt_action.ahk	S21
 static/ergopti_plus/windows/modules/llm/remote_formats.ahk	static/ergopti_plus/windows/ai/engine/api/remote_formats.ahk	S21
@@ -6211,7 +6229,6 @@ static/ergopti_plus/windows/tests/meta/modules/hotstrings/magic_key/test_magic_k
 static/ergopti_plus/windows/tests/meta/modules/hotstrings/magic_key/test_magic_key_no_regex_inject.ahk	static/ergopti_plus/windows/tests/meta/hotstrings/engine/magic_key/test_no_regex_inject.ahk	S26
 static/ergopti_plus/windows/tests/meta/modules/hotstrings/magic_key/test_magic_key_probe_deadkey_safe.ahk	static/ergopti_plus/windows/tests/meta/hotstrings/engine/magic_key/test_probe_deadkey_safe.ahk	S26
 static/ergopti_plus/windows/tests/meta/modules/hotstrings/personal/test_personal_combo_letters_guard.ahk	static/ergopti_plus/windows/tests/meta/hotstrings/engine/personal/test_combo_letters_guard.ahk	S26
-static/ergopti_plus/windows/tests/meta/modules/hotstrings/personal/test_personal_editor_autoexpand_i18n.ahk	static/ergopti_plus/windows/tests/meta/hotstrings/engine/personal/test_editor_autoexpand_i18n.ahk	S26
 static/ergopti_plus/windows/tests/meta/modules/hotstrings/personal/test_personal_ext_scan_unbounded_recursion.ahk	static/ergopti_plus/windows/tests/meta/hotstrings/engine/personal/test_ext_scan_unbounded_recursion.ahk	S26
 static/ergopti_plus/windows/tests/meta/modules/hotstrings/personal/test_personal_hotstring_cache_invalidation.ahk	static/ergopti_plus/windows/tests/meta/hotstrings/engine/personal/test_cache_invalidation.ahk	S26
 static/ergopti_plus/windows/tests/meta/modules/hotstrings/personal/test_personal_hotstring_new_section_seed.ahk	static/ergopti_plus/windows/tests/meta/hotstrings/engine/personal/test_new_section_seed.ahk	S26
@@ -6660,6 +6677,7 @@ static/ergopti_plus/windows/tests/meta/ui/wpm/test_wpm_widget_consistency.ahk	st
 static/ergopti_plus/windows/tests/meta/ui/wpm/test_wpm_widget_hidden_until_typed.ahk	static/ergopti_plus/windows/tests/meta/metrics/ui/test_wpm_widget_hidden_until_typed.ahk	S30
 static/ergopti_plus/windows/tests/meta/ui/wpm/test_wpm_widget_native_render.ahk	static/ergopti_plus/windows/tests/meta/metrics/ui/test_wpm_widget_native_render.ahk	S30
 static/ergopti_plus/windows/tests/support/config_journal_fixtures.ahk	static/ergopti_plus/windows/tests/support/settings/journal_fixtures.ahk	S38
+static/ergopti_plus/windows/tests/support/hotstring_registry_scope.ahk	static/ergopti_plus/windows/tests/support/hotstrings/registry_scope.ahk	S38
 static/ergopti_plus/windows/tests/support/layout_schema_kind_fixtures.ahk	static/ergopti_plus/windows/tests/support/layouts/schema_kind_fixtures.ahk	S38
 static/ergopti_plus/windows/tests/support/llm_menu_fixture_state.ahk	static/ergopti_plus/windows/tests/support/ai/menu_fixture_state.ahk	S38
 static/ergopti_plus/windows/tests/support/llm_persistence_runner_contract.ahk	static/ergopti_plus/windows/tests/support/ai/persistence_runner_contract.ahk	S38
@@ -6700,6 +6718,7 @@ static/ergopti_plus/windows/tests/unit/adapters/input/test_one_shot_rearm_admiss
 static/ergopti_plus/windows/tests/unit/adapters/input/test_own_injection_is_not_activity.ahk	static/ergopti_plus/windows/tests/unit/platform/input/test_own_injection_is_not_activity.ahk	S15
 static/ergopti_plus/windows/tests/unit/adapters/input/test_plain_native_cas_owner.ahk	static/ergopti_plus/windows/tests/unit/platform/input/test_plain_native_cas_owner.ahk	S15
 static/ergopti_plus/windows/tests/unit/adapters/input/test_plain_paste_snapshot_owner.ahk	static/ergopti_plus/windows/tests/unit/platform/input/test_plain_paste_snapshot_owner.ahk	S15
+static/ergopti_plus/windows/tests/unit/adapters/input/test_selection_capture_receiving.ahk	static/ergopti_plus/windows/tests/unit/platform/input/test_selection_capture_receiving.ahk	S15
 static/ergopti_plus/windows/tests/unit/adapters/input/test_suppress_refcount.ahk	static/ergopti_plus/windows/tests/unit/platform/input/test_suppress_refcount.ahk	S15
 static/ergopti_plus/windows/tests/unit/adapters/input/test_suppressive_capture_settlement.ahk	static/ergopti_plus/windows/tests/unit/platform/input/test_suppressive_capture_settlement.ahk	S15
 static/ergopti_plus/windows/tests/unit/adapters/input/test_suppressive_inputhook_ownership.ahk	static/ergopti_plus/windows/tests/unit/platform/input/test_suppressive_inputhook_ownership.ahk	S15
@@ -6774,6 +6793,7 @@ static/ergopti_plus/windows/tests/unit/infra/config/migration/test_config_migrat
 static/ergopti_plus/windows/tests/unit/infra/config/migration/test_config_migrate_variant_metadata.ahk	static/ergopti_plus/windows/tests/unit/settings/engine/migration/test_migrate_variant_metadata.ahk	S18
 static/ergopti_plus/windows/tests/unit/infra/config/migration/test_keystats_migration_read_refusal.ahk	static/ergopti_plus/windows/tests/unit/settings/engine/migration/test_keystats_migration_read_refusal.ahk	S18
 static/ergopti_plus/windows/tests/unit/infra/config/migration/test_legacy_folder_migration.ahk	static/ergopti_plus/windows/tests/unit/settings/engine/migration/test_legacy_folder_migration.ahk	S18
+static/ergopti_plus/windows/tests/unit/infra/config/migration/test_legacy_folder_migration_receiving.ahk	static/ergopti_plus/windows/tests/unit/settings/engine/migration/test_legacy_folder_migration_receiving.ahk	S18
 static/ergopti_plus/windows/tests/unit/infra/config/migration/test_migration_native_write.ahk	static/ergopti_plus/windows/tests/unit/settings/engine/migration/test_native_write.ahk	S18
 static/ergopti_plus/windows/tests/unit/infra/config/migration/test_migration_open_refusal.ahk	static/ergopti_plus/windows/tests/unit/settings/engine/migration/test_open_refusal.ahk	S18
 static/ergopti_plus/windows/tests/unit/infra/config/persistence/test_apply_config_toml.ahk	static/ergopti_plus/windows/tests/unit/settings/engine/persistence/test_apply_config_toml.ahk	S18
@@ -6963,6 +6983,7 @@ static/ergopti_plus/windows/tests/unit/modules/gestures/test_system_actions.ahk	
 static/ergopti_plus/windows/tests/unit/modules/gestures/test_system_actions_confirmed_targets.ahk	static/ergopti_plus/windows/tests/unit/gestures/engine/test_system_actions_confirmed_targets.ahk	S25
 static/ergopti_plus/windows/tests/unit/modules/gestures/test_system_actions_process_lease.ahk	static/ergopti_plus/windows/tests/unit/gestures/engine/test_system_actions_process_lease.ahk	S25
 static/ergopti_plus/windows/tests/unit/modules/gestures/test_system_actions_query_pause.ahk	static/ergopti_plus/windows/tests/unit/gestures/engine/test_system_actions_query_pause.ahk	S25
+static/ergopti_plus/windows/tests/unit/modules/gestures/test_system_actions_receiving.ahk	static/ergopti_plus/windows/tests/unit/gestures/engine/test_system_actions_receiving.ahk	S25
 static/ergopti_plus/windows/tests/unit/modules/gestures/test_take_note_async_job.ahk	static/ergopti_plus/windows/tests/unit/gestures/engine/test_take_note_async_job.ahk	S25
 static/ergopti_plus/windows/tests/unit/modules/gestures/test_take_note_counted_nul.ahk	static/ergopti_plus/windows/tests/unit/gestures/engine/test_take_note_counted_nul.ahk	S25
 static/ergopti_plus/windows/tests/unit/modules/gestures/test_take_note_native64_deadline.ahk	static/ergopti_plus/windows/tests/unit/gestures/engine/test_take_note_native64_deadline.ahk	S25
@@ -7106,6 +7127,7 @@ static/ergopti_plus/windows/tests/unit/modules/hotstrings/preview/test_preview_s
 static/ergopti_plus/windows/tests/unit/modules/hotstrings/preview/test_preview_uses_by_trigger_index.ahk	static/ergopti_plus/windows/tests/unit/hotstrings/engine/preview/test_uses_by_trigger_index.ahk	S26
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_ergopti_keylayout_tables.ahk	static/ergopti_plus/windows/tests/unit/hotstrings/engine/expander/test_ergopti_keylayout_tables.ahk	S26
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_foreground_keyboard_layout.ahk	static/ergopti_plus/windows/tests/unit/hotstrings/engine/expander/test_foreground_keyboard_layout.ahk	S26
+static/ergopti_plus/windows/tests/unit/modules/keymap/test_kbd_register.ahk	static/ergopti_plus/windows/tests/unit/hotstrings/engine/expander/test_kbd_register.ahk	S26
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_keylayout_altgr_characterization.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/composer/test_keylayout_altgr_characterization.ahk	S29
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_keylayout_canonical_form.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/composer/test_keylayout_canonical_form.ahk	S29
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_keylayout_canonical_source.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/composer/test_keylayout_canonical_source.ahk	S29
@@ -7116,6 +7138,7 @@ static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_catalogue.ahk	
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_catalogue_refresh_owner.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_catalogue_refresh_owner.ahk	S29
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_composer_check.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_composer_check.ahk	S29
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_composer_host.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_composer_host.ahk	S29
+static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_composer_source.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_composer_source.ahk	S29
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_composer_stage_ownership.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_composer_stage_ownership.ahk	S29
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_digit_row_probe.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_digit_row_probe.ahk	S29
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_extension_menu.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_extension_menu.ahk	S29
@@ -7131,6 +7154,8 @@ static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_registry_inlin
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_registry_late_poll.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_late_poll.ahk	S29
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_registry_watch.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_watch.ahk	S29
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_rows_policy.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_rows_policy.ahk	S29
+static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_source_emulation.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_source_emulation.ahk	S29
+static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_source_store.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_source_store.ahk	S29
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_supersession.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_supersession.ahk	S29
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_tables.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/registry/test_tables.ahk	S29
 static/ergopti_plus/windows/tests/unit/modules/keymap/test_number_row_native_hkl.ahk	static/ergopti_plus/windows/tests/unit/layouts/engine/emulation/test_number_row_native_hkl.ahk	S29
@@ -7442,6 +7467,7 @@ static/ergopti_plus/windows/tests/unit/modules/llm/prediction/test_llm_bridge_ap
 static/ergopti_plus/windows/tests/unit/modules/llm/prediction/test_llm_bridge_buffer_cap.ahk	static/ergopti_plus/windows/tests/unit/ai/prediction/test_bridge_buffer_cap.ahk	S21
 static/ergopti_plus/windows/tests/unit/modules/llm/prediction/test_llm_cache_hit_logs_suggested.ahk	static/ergopti_plus/windows/tests/unit/ai/prediction/test_cache_hit_logs_suggested.ahk	S21
 static/ergopti_plus/windows/tests/unit/modules/llm/prediction/test_llm_engine_read_guarded_in_timer.ahk	static/ergopti_plus/windows/tests/unit/ai/prediction/test_engine_read_guarded_in_timer.ahk	S21
+static/ergopti_plus/windows/tests/unit/modules/llm/prediction/test_llm_engine_transcripts.ahk	static/ergopti_plus/windows/tests/unit/ai/prediction/test_engine_transcripts.ahk	S21
 static/ergopti_plus/windows/tests/unit/modules/llm/prediction/test_llm_failed_prediction_owner.ahk	static/ergopti_plus/windows/tests/unit/ai/prediction/test_failed_prediction_owner.ahk	S21
 static/ergopti_plus/windows/tests/unit/modules/llm/prediction/test_llm_generate_prediction_feedback.ahk	static/ergopti_plus/windows/tests/unit/ai/prediction/test_generate_prediction_feedback.ahk	S21
 static/ergopti_plus/windows/tests/unit/modules/llm/prediction/test_llm_hotstring_tooltip_hold.ahk	static/ergopti_plus/windows/tests/unit/ai/prediction/test_hotstring_tooltip_hold.ahk	S21
@@ -7512,6 +7538,7 @@ static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_ollama_webview_p
 static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_orphan_cleanup_pid.ahk	static/ergopti_plus/windows/tests/unit/ai/servers/test_orphan_cleanup_pid.ahk	S21
 static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_remote_curl_terminal_classification.ahk	static/ergopti_plus/windows/tests/unit/ai/servers/test_remote_curl_terminal_classification.ahk	S21
 static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_remote_parse_first_content_match.ahk	static/ergopti_plus/windows/tests/unit/ai/servers/test_remote_parse_first_content_match.ahk	S21
+static/ergopti_plus/windows/tests/unit/modules/llm/test_api_token_crypto_receiving.ahk	static/ergopti_plus/windows/tests/unit/ai/api/test_token_crypto_receiving.ahk	S21
 static/ergopti_plus/windows/tests/unit/modules/llm/tooltip/test_llm_line_style.ahk	static/ergopti_plus/windows/tests/unit/ai/tooltip/test_line_style.ahk	S21
 static/ergopti_plus/windows/tests/unit/modules/llm/tooltip/test_llm_tooltip_grace.ahk	static/ergopti_plus/windows/tests/unit/ai/tooltip/test_grace.ahk	S21
 static/ergopti_plus/windows/tests/unit/modules/llm/tooltip/test_llm_tooltip_layout.ahk	static/ergopti_plus/windows/tests/unit/ai/tooltip/test_layout.ahk	S21
@@ -7591,6 +7618,7 @@ static/ergopti_plus/windows/tests/unit/modules/updater/test_updater_schedule_vec
 static/ergopti_plus/windows/tests/unit/modules/updater/test_updater_staging_transport.ahk	static/ergopti_plus/windows/tests/unit/updater/engine/test_staging_transport.ahk	S35
 static/ergopti_plus/windows/tests/unit/modules/updater/test_updater_swap_cancellation.ahk	static/ergopti_plus/windows/tests/unit/updater/engine/test_swap_cancellation.ahk	S35
 static/ergopti_plus/windows/tests/unit/modules/updater/test_updater_swap_cleanup.ahk	static/ergopti_plus/windows/tests/unit/updater/engine/test_swap_cleanup.ahk	S35
+static/ergopti_plus/windows/tests/unit/modules/updater/test_updater_swap_receiving.ahk	static/ergopti_plus/windows/tests/unit/updater/engine/test_swap_receiving.ahk	S35
 static/ergopti_plus/windows/tests/unit/modules/updater/test_updater_swap_recovery.ahk	static/ergopti_plus/windows/tests/unit/updater/engine/test_swap_recovery.ahk	S35
 static/ergopti_plus/windows/tests/unit/modules/updater/test_updater_swap_shutdown.ahk	static/ergopti_plus/windows/tests/unit/updater/engine/test_swap_shutdown.ahk	S35
 static/ergopti_plus/windows/tests/unit/modules/updater/test_updater_swap_transaction.ahk	static/ergopti_plus/windows/tests/unit/updater/engine/test_swap_transaction.ahk	S35
@@ -7813,6 +7841,7 @@ static/ergopti_plus/windows/tests/unit/ui/wpm/test_wpm_drag_admission.ahk	static
 static/ergopti_plus/windows/tests/unit/ui/wpm/test_wpm_empty_source_hold_owner.ahk	static/ergopti_plus/windows/tests/unit/metrics/ui/test_wpm_empty_source_hold_owner.ahk	S30
 static/ergopti_plus/windows/tests/unit/ui/wpm/test_wpm_gdiplus_ownership.ahk	static/ergopti_plus/windows/tests/unit/metrics/ui/test_wpm_gdiplus_ownership.ahk	S30
 static/ergopti_plus/windows/tests/unit/ui/wpm/test_wpm_graph_native_reentry.ahk	static/ergopti_plus/windows/tests/unit/metrics/ui/test_wpm_graph_native_reentry.ahk	S30
+static/ergopti_plus/windows/tests/unit/ui/wpm/test_wpm_position_receiving.ahk	static/ergopti_plus/windows/tests/unit/metrics/ui/test_wpm_position_receiving.ahk	S30
 static/ergopti_plus/windows/tests/unit/ui/wpm/test_wpm_region_target.ahk	static/ergopti_plus/windows/tests/unit/metrics/ui/test_wpm_region_target.ahk	S30
 static/ergopti_plus/windows/tests/unit/ui/wpm/test_wpm_tick_rollover_owner.ahk	static/ergopti_plus/windows/tests/unit/metrics/ui/test_wpm_tick_rollover_owner.ahk	S30
 static/ergopti_plus/windows/ui/action_picker/README.md	static/ergopti_plus/windows/shortcuts/ui/action_picker/README.md	S33
@@ -7847,6 +7876,9 @@ static/ergopti_plus/windows/ui/layer_editor/init.ahk	static/ergopti_plus/windows
 static/ergopti_plus/windows/ui/layout_manager/composer.ahk	static/ergopti_plus/windows/layouts/ui/layout_manager/composer.ahk	S29
 static/ergopti_plus/windows/ui/layout_manager/composer_check.ahk	static/ergopti_plus/windows/layouts/ui/layout_manager/composer_check.ahk	S29
 static/ergopti_plus/windows/ui/layout_manager/init.ahk	static/ergopti_plus/windows/layouts/ui/layout_manager/init.ahk	S29
+static/ergopti_plus/windows/ui/layout_manager/kbd_register.ahk	static/ergopti_plus/windows/layouts/ui/layout_manager/kbd_register.ahk	S29
+static/ergopti_plus/windows/ui/layout_manager/kbd_register_core.ahk	static/ergopti_plus/windows/layouts/ui/layout_manager/kbd_register_core.ahk	S29
+static/ergopti_plus/windows/ui/layout_manager/source_store.ahk	static/ergopti_plus/windows/layouts/ui/layout_manager/source_store.ahk	S29
 static/ergopti_plus/windows/ui/log_openers.ahk	static/ergopti_plus/windows/diagnostics/ui/log_openers.ahk	S24
 static/ergopti_plus/windows/ui/menu/README.md	static/ergopti_plus/windows/menu/ui/README.md	S19
 static/ergopti_plus/windows/ui/menu/menu_actions.ahk	static/ergopti_plus/windows/menu/ui/builder/actions.ahk	S19

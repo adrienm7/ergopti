@@ -8,12 +8,12 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 
 | folder                        | windows |  macos |   linux |
 | ----------------------------- | ------: | -----: | ------: |
-| `adapters`                    |  **59** | **92** |  **58** |
+| `adapters`                    |  **61** | **92** |  **58** |
 | `apps`                        |       5 |      2 |       6 |
 | `bin`                         |       — |      — |   **1** |
 | `data`                        |   **1** |      5 |       3 |
 | `desktop_focus`               |       — |      — |       2 |
-| `infra`                       | **109** | **89** | **113** |
+| `infra`                       | **109** | **89** | **115** |
 | `infra/hotstrings`            |  **26** |      — |       — |
 | `infra/metrics`               |       2 |      — |       — |
 | `infra/timings`               |   **1** |      — |       — |
@@ -25,22 +25,22 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 | `modules/gestures`            |      17 |     17 |      15 |
 | `modules/hotstrings`          |       5 |      3 |      16 |
 | `modules/keymap`              |      11 | **27** |       7 |
-| `modules/keymap/keylayout`    |       8 |      — |       — |
+| `modules/keymap/keylayout`    |       9 |      — |       — |
 | `modules/keymap/layout`       |       6 |      — |       — |
 | `modules/keystats`            |  **67** | **35** |      20 |
 | `modules/keystats/aggregator` |       — |      5 |       — |
-| `modules/llm`                 |  **45** | **68** |  **43** |
+| `modules/llm`                 |  **46** | **68** |  **43** |
 | `modules/llm/api_ollama`      |       7 |      — |       — |
 | `modules/shortcuts`           |       6 |     11 |      15 |
 | `modules/shortcuts/actions`   |       — |     10 |       — |
-| `modules/updater`             |       8 |      6 |       8 |
+| `modules/updater`             |       8 |      6 |       7 |
 | `native`                      |       6 |  **1** |   **1** |
 | `native/archive_output`       |       — |      — |       2 |
 | `native/keyboard_layout`      |   **1** |      — |       — |
 | `native/nav_event_owner`      |      19 |      — |       — |
 | `platform`                    |       4 |      9 |       4 |
 | `platform/network`            |   **1** |      4 |       5 |
-| `platform/remap`              |  **26** | **33** |       9 |
+| `platform/remap`              |  **26** | **34** |       9 |
 | `platform/remap/data`         |       — |      6 |       — |
 | `platform/tray`               |   **1** |  **1** |   **1** |
 | `ui`                          |  **30** | **36** |  **45** |
@@ -54,7 +54,7 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 | `ui/hotstring_editor`         |       — |      3 |   **1** |
 | `ui/hotstrings_config_window` |       5 |      2 |   **1** |
 | `ui/layer_editor`             |   **1** |  **1** |   **1** |
-| `ui/layout_manager`           |       3 |  **1** |   **1** |
+| `ui/layout_manager`           |       6 |  **1** |   **1** |
 | `ui/menu`                     |      17 | **51** |  **34** |
 | `ui/menu/menu_llm`            |      18 | **35** |       — |
 | `ui/metrics_apps`             |       — |      2 |   **1** |
@@ -76,12 +76,12 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 ## Folders outside the bounds (code)
 
 - singleton (1) `_shared/ahk/tap_hold`
-- oversized (22) `_shared/data`
+- oversized (24) `_shared/data`
 - singleton (1) `_shared/data/app_cloner`
 - singleton (1) `_shared/data/crypto`
 - singleton (1) `_shared/data/db/migrations`
 - singleton (1) `_shared/data/encryptor`
-- oversized (113) `_shared/lua`
+- oversized (116) `_shared/lua`
 - singleton (1) `_shared/lua/app_parameter`
 - singleton (1) `_shared/lua/caps_word`
 - singleton (1) `_shared/lua/color`
@@ -111,7 +111,7 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - oversized (44) `_shared/ui`
 - oversized (58) `linux/adapters`
 - singleton (1) `linux/bin`
-- oversized (113) `linux/infra`
+- oversized (115) `linux/infra`
 - singleton_parity (1) `linux/infra/toml`
 - singleton_parity (1) `linux/modules/diagnostics`
 - oversized (43) `linux/modules/llm`
@@ -144,7 +144,7 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - oversized (35) `macos/modules/keystats`
 - oversized (68) `macos/modules/llm`
 - singleton_parity (1) `macos/native`
-- oversized (33) `macos/platform/remap`
+- oversized (34) `macos/platform/remap`
 - singleton (1) `macos/platform/tray`
 - oversized (36) `macos/ui`
 - singleton_parity (1) `macos/ui/config_cleanup`
@@ -156,14 +156,14 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - oversized (35) `macos/ui/menu/menu_llm`
 - singleton_parity (1) `macos/ui/physical_shortcuts`
 - singleton_parity (1) `macos/ui/update_check`
-- oversized (59) `windows/adapters`
+- oversized (61) `windows/adapters`
 - singleton_parity (1) `windows/data`
 - oversized (109) `windows/infra`
 - oversized (26) `windows/infra/hotstrings`
 - singleton (1) `windows/infra/timings`
 - singleton_parity (1) `windows/modules/diagnostics`
 - oversized (67) `windows/modules/keystats`
-- oversized (45) `windows/modules/llm`
+- oversized (46) `windows/modules/llm`
 - singleton (1) `windows/native/keyboard_layout`
 - singleton_parity (1) `windows/platform/network`
 - oversized (26) `windows/platform/remap`
@@ -182,7 +182,7 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - oversized (42) `linux/tests/fixtures`
 - oversized (324) `linux/tests/hardware`
 - singleton (1) `linux/tests/hardware/fixtures/wayland`
-- oversized (52) `linux/tests/support`
+- oversized (55) `linux/tests/support`
 - singleton (1) `linux/tests/support/adapters/network`
 - singleton (1) `linux/tests/support/adapters/storage`
 - singleton (1) `linux/tests/support/e2e`
@@ -271,7 +271,6 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - singleton (1) `macos/tests/unit/platform/remap/layout/retirement`
 - singleton (1) `macos/tests/unit/platform/remap/runtime_activation`
 - singleton (1) `macos/tests/unit/platform/remap/runtime_approval_watch`
-- singleton (1) `macos/tests/unit/platform/remap/runtime_artifact_fetch`
 - singleton (1) `macos/tests/unit/platform/remap/runtime_manifest`
 - singleton (1) `macos/tests/unit/platform/remap/runtime_vhid_update`
 - singleton (1) `macos/tests/unit/ui/action_picker`
@@ -293,14 +292,14 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - singleton_parity (1) `windows/tests/unit/adapters/network`
 - oversized (41) `windows/tests/unit/infra/config/persistence`
 - singleton_parity (1) `windows/tests/unit/modules/dynamic_hotstrings`
-- oversized (43) `windows/tests/unit/modules/gestures`
+- oversized (44) `windows/tests/unit/modules/gestures`
 - oversized (43) `windows/tests/unit/modules/hotstrings/engine`
 - oversized (76) `windows/tests/unit/modules/keystats`
 - oversized (50) `windows/tests/unit/modules/keystats/metrics`
 - oversized (49) `windows/tests/unit/modules/keystats/reader`
 - oversized (51) `windows/tests/unit/modules/llm/api`
 - oversized (53) `windows/tests/unit/modules/llm/servers`
-- oversized (51) `windows/tests/unit/modules/updater`
+- oversized (52) `windows/tests/unit/modules/updater`
 - singleton_parity (1) `windows/tests/unit/ui/bundled_apps`
 - singleton_parity (1) `windows/tests/unit/ui/field_check`
 - singleton (1) `windows/tests/unit/ui/physical_shortcuts`
