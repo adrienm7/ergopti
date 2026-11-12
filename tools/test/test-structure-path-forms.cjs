@@ -335,6 +335,14 @@ function run() {
 		);
 		assert.equal(
 			rewrite(
+				`${P}linux/tests/z.lua`,
+				'local root = helpers.driver_root() .. "/../_shared/zz_probe_mod/"\nlocal f = io.open(root .. "hotstrings/" .. name)'
+			),
+			'local root = helpers.driver_root() .. "/../_shared/"\nlocal f = io.open(root .. "zz_probe_hs/data/" .. name)',
+			'a folder piece joined onto a Lua local keeps its trailing slash'
+		);
+		assert.equal(
+			rewrite(
 				`${P}linux/z.lua`,
 				'local ORDER = "zz_probe_mod/hotstrings/a.toml"\nreturn read_shared(ORDER)'
 			),
