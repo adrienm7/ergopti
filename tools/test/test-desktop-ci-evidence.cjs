@@ -2917,6 +2917,104 @@ console.log(
 		assert.ok(body.indexOf(upload) < body.indexOf(producer));
 	}
 }
+// The Apple-silicon managed native lot once failed cloning Sparkle while Intel
+// resolved it. The launcher build resolves first through a bounded retry: three
+// attempts at most, each failure reported, and the lot red after the third.
+{
+	const body = Mac.body(pipeline.file('.github/workflows/ci-macos.yml'), 'managed-ollama-native');
+	const compile = pipeline.step(body, 'Build the actual launcher native transport roles');
+	const resolve =
+		'bash tools/ci/swiftpm-resolve.sh static/ergopti_plus/macos/launcher "$ERGOPTI_OLLAMA_BUILD_ROOT/swift"';
+	assert.ok(compile.includes(resolve), 'the launcher build resolves through the bounded retry');
+	assert.ok(
+		compile.indexOf(resolve) < compile.indexOf('swift build -c release'),
+		'the dependencies are resolved before the build reads them'
+	);
+	assert.doesNotMatch(
+		compile,
+		/swiftpm-resolve\.sh[^\n]*\|\|/,
+		'a failed resolve is never swallowed'
+	);
+	const script = path.join(pipeline.ROOT, 'tools/ci/swiftpm-resolve.sh');
+	const source = fs.readFileSync(script, 'utf8');
+	assert.match(source, /^MAX_ATTEMPTS=3$/m, 'the retry is bounded to three attempts');
+	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-swiftpm-resolve-'));
+	try {
+		const bin = path.join(owned, 'bin');
+		fs.mkdirSync(bin);
+		const calls = path.join(owned, 'calls.txt');
+		// A fake swift that fails a given number of times, and a sleep that only records.
+		fs.writeFileSync(
+			path.join(bin, 'swift'),
+			'#!/usr/bin/env bash\necho "swift $*" >> "$CALLS"\n' +
+				'n=$(grep -c "^swift " "$CALLS")\n[ "$n" -gt "$FAILURES" ] || exit 7\n',
+			{ mode: 0o755 }
+		);
+		fs.writeFileSync(
+			path.join(bin, 'sleep'),
+			'#!/usr/bin/env bash\necho "sleep $*" >> "$CALLS"\n',
+			{
+				mode: 0o755
+			}
+		);
+		const run = (failures) => {
+			fs.rmSync(calls, { force: true });
+			fs.writeFileSync(calls, '');
+			const result = require('node:child_process').spawnSync(
+				'bash',
+				[script, owned, path.join(owned, 'scratch')],
+				{
+					encoding: 'utf8',
+					env: {
+						...process.env,
+						PATH: bin + path.delimiter + process.env.PATH,
+						CALLS: calls,
+						FAILURES: String(failures)
+					}
+				}
+			);
+			const log = fs.readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean);
+			return { status: result.status, out: result.stdout, log };
+		};
+		const first = run(0);
+		assert.equal(first.status, 0);
+		assert.deepEqual(first.log, [
+			'swift package resolve --package-path ' +
+				owned +
+				' --scratch-path ' +
+				path.join(owned, 'scratch')
+		]);
+		const second = run(1);
+		assert.equal(second.status, 0, 'one transient refusal is retried');
+		assert.equal(second.log.filter((line) => line.startsWith('swift ')).length, 2);
+		assert.match(second.out, /::warning::SwiftPM resolve attempt 1\/3 failed with status 7/);
+		const exhausted = run(3);
+		assert.equal(exhausted.status, 7, 'the third failure turns the lot red with its status');
+		assert.equal(
+			exhausted.log.filter((line) => line.startsWith('swift ')).length,
+			3,
+			'never a fourth attempt'
+		);
+		assert.equal(
+			exhausted.log.filter((line) => line.startsWith('sleep ')).length,
+			2,
+			'a delay between attempts'
+		);
+		assert.match(exhausted.out, /::warning::SwiftPM resolve attempt 2\/3 failed/);
+		assert.match(exhausted.out, /::error::SwiftPM resolve attempt 3\/3 failed with status 7/);
+		const lasting = run(100);
+		assert.equal(
+			lasting.log.filter((line) => line.startsWith('swift ')).length,
+			3,
+			'a lasting refusal stops at three'
+		);
+	} finally {
+		fs.rmSync(owned, { recursive: true, force: true });
+	}
+	console.log(
+		'[OK] The managed native launcher resolve retries at most three times and fails red after the third.'
+	);
+}
 // The new producer reads actual package/evidence files and appends only its own
 // admitted observation. Every failed attempt must preserve the fresh record.
 {
