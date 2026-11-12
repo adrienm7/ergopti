@@ -156,7 +156,17 @@ helpers.describe("terminal macOS shortcut scopes", function()
 		end)
 	end)
 
-	for _, field in ipairs({ "paused", "idle", "stale_source", "native_mismatch" }) do
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("clears while paused (edd1-paused-writes)", function()
+		Fixture.run(function(f)
+			f.controls.paused = true
+			local before = f.files.config
+			helpers.assert_eq(f.owner.apply("clear"), true)
+			helpers.assert_true(f.files.config ~= before, "the paused clear writes its category")
+		end)
+	end)
+
+	for _, field in ipairs({ "idle", "stale_source", "native_mismatch" }) do
 		helpers.it("refuses " .. field .. " before backup or native publication", function()
 			Fixture.run(function(f)
 				if field == "idle" then f.controls[field] = false

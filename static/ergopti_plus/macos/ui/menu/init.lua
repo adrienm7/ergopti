@@ -1254,11 +1254,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				demotions = session_demotions,
 				capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 				admission = run_global_exclusive,
-				paused = function()
-					if type(core_mods.shortcuts_mod) ~= "table"
-						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-					return core_mods.shortcuts_mod.is_paused()
-				end,
 				backup_path = function()
 					scope_generation = scope_generation + 1
 					return MenuPaths.get("ConfigTomlPath") .. ".gestures-"
@@ -1291,9 +1286,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	--- @param scope string Manifest scope id.
 	--- @return table|nil owner
 	local function preference_scope_owner(scope)
+		-- A pause refuses no scope owner: a pause stops typing, not configuration
+		-- (EDD-1, maintainer decision 2026-11-12).
 		if scope == "global" then
-			if read_only_reason ~= nil or type(core_mods.shortcuts_mod) ~= "table"
-				or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+			if read_only_reason ~= nil then return nil end
 			if not script_scope then
 				local script_backup
 				script_scope = require("infra.script_scope").new({
@@ -1301,7 +1297,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 					admission = run_global_exclusive,
-					paused = function() return core_mods.shortcuts_mod.is_paused() end,
 					backup_path = function()
 						scope_generation = scope_generation + 1
 						script_backup = MenuPaths.get("ConfigTomlPath") .. ".script-"
@@ -1335,10 +1330,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					end,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 					admission = run_global_exclusive,
-					paused = function()
-						if type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-						return core_mods.shortcuts_mod.is_paused()
-					end,
 					backup_path = function()
 						scope_generation = scope_generation + 1
 						return MenuPaths.get("ConfigTomlPath") .. ".shortcuts-"
@@ -1357,10 +1348,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					demotions = session_demotions, runtime = llm_handler.scope_runtime, profiles = llm_handler.scope_profiles,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 					admission = run_global_exclusive,
-					paused = function()
-						if type(core_mods.shortcuts_mod) ~= "table" or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-						return core_mods.shortcuts_mod.is_paused()
-					end,
 					backup_path = function()
 						scope_generation = scope_generation + 1
 						return MenuPaths.get("ConfigTomlPath") .. ".llm-" .. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
@@ -1381,11 +1368,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					activation_pending = MenuState.metrics_start_pending,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 					admission = run_global_exclusive,
-					paused = function()
-						if type(core_mods.shortcuts_mod) ~= "table"
-							or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-						return core_mods.shortcuts_mod.is_paused()
-					end,
 					backup_path = function()
 						scope_generation = scope_generation + 1
 						return MenuPaths.get("ConfigTomlPath") .. ".metrics-"
@@ -1420,11 +1402,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					remove = function(target) return FileSystem.remove_exact(target) == true end,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 					admission = run_global_exclusive,
-					paused = function()
-						if type(core_mods.shortcuts_mod) ~= "table"
-							or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-						return core_mods.shortcuts_mod.is_paused()
-					end,
 					backup_path = function()
 						scope_generation = scope_generation + 1
 						return MenuPaths.get("ConfigTomlPath") .. ".hotstrings-"
@@ -1452,11 +1429,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				},
 				capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 				admission = run_global_exclusive,
-				paused = function()
-					if type(core_mods.shortcuts_mod) ~= "table"
-						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-					return core_mods.shortcuts_mod.is_paused()
-				end,
 				backup_path = function()
 					scope_generation = scope_generation + 1
 					return MenuPaths.get("ConfigTomlPath") .. ".layout-"
@@ -1583,11 +1555,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				defer = function(continuation)
 					return DeferredWork.after(0, continuation, "menu.global_scope") == true
 				end,
-				paused = function()
-					if type(core_mods.shortcuts_mod) ~= "table"
-						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-					return core_mods.shortcuts_mod.is_paused()
-				end,
 				refresh = function(committed, report)
 					Builder.invalidate_cache()
 					updateMenu()
@@ -1637,7 +1604,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local ctx = {
 		is_paused = live_pause,
 		physical_shortcuts_scope = function() return preference_scope_owner("shortcuts") end,
-		physical_shortcuts_paused = live_pause,
 		commit_program_parameter = program_parameter_owner.apply,
 		apply_gesture_scope = apply_gesture_scope,
 		apply_preference_scope = apply_preference_scope,

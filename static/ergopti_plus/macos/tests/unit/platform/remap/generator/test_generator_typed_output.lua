@@ -1063,4 +1063,83 @@ helpers.with_fresh_modules({
 				"Shift+F17 is alt_tab_windows: the held Shift must not reach the trigger")
 		end)
 	end)
+
+	helpers.describe("Left Command's one-shot Shift with no hold (lalt-one-shot-held-shift)", function()
+		local rules = build({ left_command = { tap = "sticky_shift", hold = "none" } })
+		--- Whether the one-shot Shift was armed (its control sentinel was sent).
+		local function armed(engine)
+			for _, emission in ipairs(engine:emissions()) do
+				if emission.key_code == "key_90" and emission.flags.left_control == true
+					and emission.flags.left_option == true then return true end
+			end
+			return false
+		end
+
+		helpers.it("arms the one-shot and holds Shift while the key is down, as lalt.ahk 4.1", function()
+			local engine = engine_for(rules)
+			engine:down("left_command")
+			helpers.assert_true(armed(engine), "the one-shot is armed at key-down")
+			helpers.assert_true(engine:pressed().left_shift == true, "Shift is held while the key is down")
+			engine:up("left_command")
+			helpers.assert_true(engine:pressed().left_shift ~= true, "Shift is let go with the key")
+		end)
+
+		for _, blocker in ipairs({ "right_option", "caps_lock", "left_shift", "fn" }) do
+			helpers.it("stands down under a held " .. blocker .. ", as Windows under RCtrl, CapsLock, LShift or LCtrl", function()
+				local engine = engine_for(rules)
+				engine:down(blocker)
+				engine:clear()
+				local before = engine:pressed().left_shift == true
+				engine:down("left_command")
+				helpers.assert_true(not armed(engine), "no one-shot under " .. blocker)
+				helpers.assert_eq(engine:pressed().left_shift == true, before, "no Shift of its own under " .. blocker)
+				engine:up("left_command")
+			end)
+		end
+	end)
+
+	helpers.describe("a pair takes the first key held earliest (pair-first-key-press-order)", function()
+		-- caps_tab comes before lshift_tab in mod_combos.json: rule order alone
+		-- would give CapsLock the Tab whichever key was held first.
+		local rules = build(nil, {
+			caps_tab = { combo = "none", tap = "arrow_left", hold = "none" },
+			lshift_tab = { combo = "none", tap = "arrow_right", hold = "none" },
+		})
+		--- The arrow a Tab press typed after the given keys were held in order.
+		local function arrow_after(order)
+			local engine = engine_for(rules)
+			for _, key in ipairs(order) do engine:down(key); engine:advance(400) end
+			engine:clear()
+			engine:down("tab")
+			local typed = {}
+			for _, emission in ipairs(engine:emissions()) do
+				if emission.key_code == "left_arrow" or emission.key_code == "right_arrow" then
+					typed[#typed + 1] = emission.key_code
+				end
+			end
+			engine:up("tab")
+			for index = #order, 1, -1 do engine:up(order[index]) end
+			return table.concat(typed, ",")
+		end
+
+		helpers.it("Shift held before CapsLock gives Shift's pair, as Windows and Linux choose", function()
+			helpers.assert_eq(arrow_after({ "left_shift", "caps_lock" }), "right_arrow")
+		end)
+		helpers.it("CapsLock held before Shift gives CapsLock's pair", function()
+			helpers.assert_eq(arrow_after({ "caps_lock", "left_shift" }), "left_arrow")
+		end)
+		helpers.it("a released earlier key leaves the pair to the key still held", function()
+			local engine = engine_for(rules)
+			engine:down("left_shift"); engine:advance(400)
+			engine:down("caps_lock"); engine:advance(400)
+			engine:up("left_shift")
+			engine:clear()
+			engine:down("tab")
+			local typed = nil
+			for _, emission in ipairs(engine:emissions()) do
+				if emission.key_code == "left_arrow" or emission.key_code == "right_arrow" then typed = emission.key_code end
+			end
+			helpers.assert_eq(typed, "left_arrow")
+		end)
+	end)
 end)

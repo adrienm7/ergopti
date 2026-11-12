@@ -696,8 +696,9 @@ function M.build(ctx)
 	}
 	-- The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
 	-- The Configuration clear still composes the metrics scope owner.
+	-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
 	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
-		if paused_now() or type(ctx.apply_preference_scope) ~= "function" then return false end
+		if type(ctx.apply_preference_scope) ~= "function" then return false end
 		return ctx.apply_preference_scope("metrics", "recommended")
 	end
 

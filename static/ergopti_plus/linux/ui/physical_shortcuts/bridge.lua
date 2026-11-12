@@ -38,11 +38,10 @@ function M.available(scope)
 end
 
 --- Opens one shared form over the existing acknowledged native scope.
---- @param options table Scope owner and live pause getter.
+--- @param options table Scope owner.
 --- @return boolean opened
 function M.open(options)
-	if type(options) ~= "table" or type(options.is_paused) ~= "function" or options.is_paused() ~= false
-		or not M.available(options.scope) then return false end
+	if type(options) ~= "table" or not M.available(options.scope) then return false end
 	if session ~= nil and M.close() ~= true then return false end
 	local Manager = require("ui.webview_manager")
 	local Gestures = require("modules.gestures.manager")

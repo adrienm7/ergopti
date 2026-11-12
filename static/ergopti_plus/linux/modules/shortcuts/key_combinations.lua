@@ -118,12 +118,6 @@ function M.new(options)
 	local catalogue = options.actions or require("modules.gestures.manager")
 	local owner, state, lease, generation, busy = {}, nil, nil, 0, false
 	local delivery_fence
-	-- A paused inverse may settle only the exact retained delivery fence. This
-	-- authorizes source inspection, never ordinary edit or runtime delivery.
-	local function pause_allowed(value, token, restoring)
-		return value == false or restoring == true and value == true
-			and type(token) == "table" and rawequal(delivery_fence, token)
-	end
 	local function candidate(document, strict, shapes, chord_document, chord_shapes)
 		assert(type(document) == "table", "decoded canonical config required")
 		assert(chord_document == nil or type(chord_document) == "table", "decoded tap_hold.toml required")
@@ -275,28 +269,27 @@ function M.new(options)
 	function owner.get_hold(pair) return known[pair] and state.holds[pair] or Shared.NONE end
 	function owner.is_enabled() return state.enabled == true end
 	--- A private menu receipt; canonical bytes are never sent to the page.
-	function owner.capture_edit_source(token, restoring)
-		-- Paused compensation still owes exact source and private state ACKs.
-		-- Only its retained delivery token can inspect the settled native frame;
-		-- ordinary editors and runtime admission continue to require pause=false.
+	--- A pause does not refuse it: a pause stops typing, not configuration
+	--- (EDD-1, maintainer decision 2026-11-12). Runtime capture keeps the pause.
+	function owner.capture_edit_source(token)
+		-- Only a retained delivery token can inspect the settled native frame.
 		local function permitted() return delivery_fence == nil or type(token) == "table" and delivery_fence == token end
-		if busy or lease or not permitted() or not pause_allowed(options.is_paused(), token, restoring) then return nil end
+		if busy or lease or not permitted() then return nil end
 		local prior, path, bytes, status, chord = safe_read()
 		if not prior then return nil end
 		if prior.enabled ~= state.enabled or not equal(prior.taps,state.taps) or not equal(prior.holds,state.holds) or not chords_equal(prior,state) then return nil end
 		local captured, revision = state, generation
 		local receipt = { path = path, status = status, content = status == "ok" and bytes or nil, chord = chord }
 		receipt.guard = function()
-			if busy or lease or not permitted() or state ~= captured or generation ~= revision or not pause_allowed(options.is_paused(), token, restoring) then return false end
+			if busy or lease or not permitted() or state ~= captured or generation ~= revision then return false end
 			local routed, current_path = pcall(route)
 			if not routed or current_path ~= path then return false end
 			local called, current, current_status = pcall(files.read_with_status,path)
 			local chord_ok = chord_current(chord)
-			local observed, paused = pcall(options.is_paused)
 			local final_route, final_path = pcall(route)
 			return called and current_status == status and (status ~= "ok" or current == bytes) and chord_ok
 				and final_route and final_path == path and not busy and not lease and permitted()
-				and state == captured and generation == revision and observed and pause_allowed(paused, token, restoring)
+				and state == captured and generation == revision
 		end
 		if receipt.guard() ~= true then return nil end
 		return receipt
@@ -458,14 +451,12 @@ function M.new(options)
 	end
 	--- Reads a coherent source frame while the exact native lease is held.
 	--- @param token table Exact configuration owner.
-	--- @param restoring boolean|nil True permits a paused inverse under its retained delivery fence.
-	function owner.configuration_source(token, restoring)
-		if token ~= lease or busy or not pause_allowed(options.is_paused(), token, restoring) then return nil end
+	function owner.configuration_source(token)
+		if token ~= lease or busy then return nil end
 		local captured, revision = state, generation
 		local prior, path, bytes, status, chord = safe_read()
-		local observed, paused = pcall(options.is_paused)
 		local routed, current_path = pcall(route)
-		if not prior or not routed or current_path ~= path or not observed or not pause_allowed(paused, token, restoring)
+		if not prior or not routed or current_path ~= path
 			or token ~= lease or busy or state ~= captured or generation ~= revision
 			or prior.enabled ~= state.enabled or not equal(prior.taps,state.taps) or not equal(prior.holds,state.holds) or not chords_equal(prior,state) then return nil end
 		return {path=path,status=status,content=status == "ok" and bytes or nil,chord=chord}
@@ -474,14 +465,12 @@ function M.new(options)
 	--- the candidate state to equal the previous unpublished runtime snapshot.
 	--- @param token table Exact configuration owner.
 	--- @param source table Exact canonical source frame.
-	--- @param restoring boolean|nil True permits a paused inverse under its retained delivery fence.
-	function owner.configuration_source_matches(token, source, restoring)
-		if token ~= lease or busy or type(source) ~= "table" or not pause_allowed(options.is_paused(), token, restoring) then return false end
+	function owner.configuration_source_matches(token, source)
+		if token ~= lease or busy or type(source) ~= "table" then return false end
 		local captured, revision = state, generation
 		local prior, path, bytes, status, chord = safe_read()
-		local observed, paused = pcall(options.is_paused)
 		local routed, current_path = pcall(route)
-		return prior ~= nil and routed and current_path == path and observed and pause_allowed(paused, token, restoring)
+		return prior ~= nil and routed and current_path == path
 			and path == source.path and status == source.status and (status ~= "ok" or bytes == source.content)
 			and same_chord_frame(chord, source.chord)
 			and token == lease and not busy and state == captured and generation == revision

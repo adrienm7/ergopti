@@ -451,8 +451,9 @@ function M.build(ctx)
 
 	-- `command` since 2026-08-07: the renderer builds the row and its label from
 	-- the declaration, so this supplies only what the click does.
+	--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
 	local function apply_scope(mode)
-		if ctx.paused or type(ctx.apply_gesture_scope) ~= "function" then return false end
+		if type(ctx.apply_gesture_scope) ~= "function" then return false end
 		if gesture_toggle_debt ~= nil then
 			Logger.warn(LOG, "Gesture scope refused while the previous toggle rollback remains pending.")
 			return false

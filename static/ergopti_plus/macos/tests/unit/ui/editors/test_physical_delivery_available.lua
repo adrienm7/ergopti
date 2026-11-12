@@ -6,9 +6,9 @@
 --- LIN-004, turned on by the maintainer on 2026-11-11 on macOS as on Linux:
 --- the production delivery getter answers true, so the real host and the
 --- shared menu port open the editor once the window constructor is ready. The
---- safety refusals stay: a window that is not ready, a paused script or a
---- getter that answers false keeps the editor closed with no scope captured
---- (physical-delivery-available).
+--- safety refusals stay: a window that is not ready or a getter that answers
+--- false keeps the editor closed with no scope captured
+--- (physical-delivery-available). A pause does not (EDD-1).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -35,14 +35,12 @@ end
 
 --- The shared menu port over a host, counting captures and refusals.
 --- @param host table
---- @param paused boolean
 --- @return table menu, table counts
-local function menu_over(host, paused)
+local function menu_over(host)
 	local counts = { captured = 0, refused = 0 }
 	local menu = require("shortcuts.physical_editor_menu").new({
 		host = function() return host end,
 		scope = function() counts.captured = counts.captured + 1 return {} end,
-		paused = function() return paused end,
 		refused = function() counts.refused = counts.refused + 1 end,
 	})
 	return menu, counts
@@ -53,13 +51,13 @@ helpers.describe("macos physical delivery is available (physical-delivery-availa
 		with_host(true, function(keyboard, host)
 			helpers.assert_eq(keyboard.physical_delivery_available(), true, "the production getter")
 			helpers.assert_eq(host.physical_delivery_available(), true, "the host reads the getter")
-			helpers.assert_eq(menu_over(host, false).ready(), true, "the editor row is enabled")
+			helpers.assert_eq(menu_over(host).ready(), true, "the editor row is enabled")
 		end)
 	end)
 
 	helpers.it("physical-delivery: a window that is not ready keeps the editor closed", function()
 		with_host(false, function(_, host)
-			local menu, counts = menu_over(host, false)
+			local menu, counts = menu_over(host)
 			helpers.assert_eq(menu.ready(), false)
 			helpers.assert_eq(menu.open(), false)
 			helpers.assert_eq(counts.captured, 0, "no scope is captured")
@@ -67,12 +65,12 @@ helpers.describe("macos physical delivery is available (physical-delivery-availa
 		end)
 	end)
 
-	helpers.it("physical-delivery: a paused script keeps the editor closed", function()
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration;
+	-- the shared menu port reads no pause at all.
+	helpers.it("physical-delivery: the editor opens without a pause owner (edd1-paused-writes)", function()
 		with_host(true, function(_, host)
-			local menu, counts = menu_over(host, true)
-			helpers.assert_eq(menu.ready(), false)
-			helpers.assert_eq(menu.open(), false)
-			helpers.assert_eq(counts.captured, 0, "no scope is captured")
+			local menu = menu_over(host)
+			helpers.assert_eq(menu.ready(), true)
 		end)
 	end)
 
@@ -80,7 +78,7 @@ helpers.describe("macos physical delivery is available (physical-delivery-availa
 		with_host(true, function(keyboard, host)
 			keyboard.physical_delivery_available = function() return false end
 			helpers.assert_eq(host.physical_delivery_available(), false, "the refusal is read live")
-			local menu, counts = menu_over(host, false)
+			local menu, counts = menu_over(host)
 			helpers.assert_eq(menu.ready(), false)
 			helpers.assert_eq(menu.open(), false)
 			helpers.assert_eq(counts.captured, 0, "no scope is captured")
