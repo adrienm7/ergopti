@@ -65,8 +65,13 @@ AGENT_FIELDS = re.compile(r"^\s*(state|pid|runs|last exit code|last terminating 
 
 
 def method(identity):
-    """The bare test method of an XCTest case identity."""
-    match = re.search(r"(test\w+)\]?$", identity)
+    """The bare test method of an XCTest case identity.
+
+    NumberRowSourceProbeTests names each selection's record after the case and
+    the source it selects ("-[Class testName]:com.apple.keylayout.French"), so
+    the method is the one the bracketed identity closes, wherever it ends.
+    """
+    match = re.search(r"\b(test\w+)\]", identity) or re.search(r"\b(test\w+)$", identity)
     return match.group(1) if match else identity
 
 
@@ -118,27 +123,33 @@ def source_state(state):
 
 
 def selection_timeline(receipts, case):
-    """The selection calls of the receipt for test method `case`, relative to its first event."""
-    for receipt in receipts:
-        test = receipt["test"]
-        if test["state"] != "present" or method(test["value"]) != case:
-            continue
-        events = receipt["events"]
-        if not events:
-            return []
-        start = events[0]["uptime"]
-        return [
-            {
-                "phase": event["phase"],
-                "offset_ms": round((event["uptime"] - start) * 1000),
-                "status": event.get("status"),
-                "target": source_state(event.get("target")),
-                "current": source_state(event.get("current")),
-            }
-            for event in events
-            if not TIMELINE_SKIPPED.match(event["phase"])
-        ]
-    return None
+    """The selection calls of every receipt for test method `case`, in record order.
+
+    A case that selects several sources publishes one receipt per selection;
+    offsets count from the first event of the first such receipt.
+    """
+    matching = [
+        receipt
+        for receipt in receipts
+        if receipt["test"]["state"] == "present" and method(receipt["test"]["value"]) == case
+    ]
+    if not matching:
+        return None
+    events = [event for receipt in matching for event in receipt["events"]]
+    if not events:
+        return []
+    start = events[0]["uptime"]
+    return [
+        {
+            "phase": event["phase"],
+            "offset_ms": round((event["uptime"] - start) * 1000),
+            "status": event.get("status"),
+            "target": source_state(event.get("target")),
+            "current": source_state(event.get("current")),
+        }
+        for event in events
+        if not TIMELINE_SKIPPED.match(event["phase"])
+    ]
 
 
 def timeline_text(timeline):
@@ -189,6 +200,7 @@ def evaluate(transcript, snapshot="", receipts=None):
         "first_refusal": refusals[0] if refusals else None,
         "agent": agent_phases(snapshot),
         "tis_session": "absent" if receipts is None else "read",
+        "tis_record_count": None if receipts is None else len(receipts),
         "selection_timeline": timeline,
     }
 
@@ -201,7 +213,10 @@ def annotation(receipt):
     timeline = receipt["selection_timeline"]
     if receipt["tis_session"] == "read":
         if timeline is None:
-            line += f" The TIS session holds no receipt for {receipt['first_refusal']['case']}."
+            line += (
+                f" The TIS session's {receipt['tis_record_count']} records hold none for "
+                f"{receipt['first_refusal']['case']}."
+            )
         else:
             line += " Selection timeline: " + timeline_text(timeline)
     return line
