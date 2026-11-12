@@ -5,6 +5,21 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## A pause stops typing, not configuration (2026-11-12)
+
+Decided by the maintainer on 2026-11-12 (EDD-1): pausing the driver stops its
+typing features (hotstrings, shortcuts, tap-holds, predictions), never a
+configuration write. An editor window already open when the driver is paused
+keeps saving: the prompt, personal information, paths, layer, hotstrings and
+physical shortcuts editors and the layout manager write their files while
+paused, on every OS. macOS and Linux follow it (the LMH-003 layout manager
+gate, the prompt editor's create and clone saves, the Linux physical
+shortcuts capture and rows: `edd1-paused-writes` regressions); the Windows
+`A_IsSuspended` page-message gates are to remove (TODO « Windows (the PC
+agent's) »). Pages that are not configuration (changelog, download, update
+check) keep their own rules, and the tray's feature rows still grey while
+paused (`greyed_when_paused`). Do not add a pause gate to a configuration page.
+
 ## One configuration layout on every OS for tap-holds (2026-11-11)
 
 ## The Linux decoder judges millimetres (2026-11-11)
