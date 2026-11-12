@@ -183,6 +183,14 @@ function runStep(key, opts) {
 		ROOT,
 		git('rev-parse', '--git-path', 'ergopti-structure-moves.json').trim()
 	);
+	// The derived pins, computed by the tree before the step with its own tools.
+	const derivedFile = path.resolve(
+		ROOT,
+		git('rev-parse', '--git-path', 'ergopti-structure-derived.json').trim()
+	);
+	const derived = run(process.execPath, [REPIN, '--derive-out', derivedFile]);
+	if (derived.status !== 0)
+		throw Object.assign(new Error(`${key}: derived pins:\n${derived.tail}`), { receipt });
 	action('apply', process.execPath, [APPLY, key, '--apply', `--moves-out=${movesFile}`], {
 		env: { ERGOPTI_STRUCTURE_PHASE: '2' }
 	});
@@ -199,7 +207,13 @@ function runStep(key, opts) {
 	// generator, then the domain build with its drift check; again until the
 	// pins hold, since a generator may copy a pin and a pin may name an output.
 	for (let round = 1; ; round++) {
-		const pinned = action('repin', process.execPath, [REPIN, '--moves', movesFile]);
+		const pinned = action('repin', process.execPath, [
+			REPIN,
+			'--moves',
+			movesFile,
+			'--derived-before',
+			derivedFile
+		]);
 		const repinned = Number((pinned.tail.match(/\[repin\] (\d+) file/) || [])[1]);
 		if (round > 1 && repinned === 0) break;
 		if (round > MAX_SETTLE_ROUNDS)
