@@ -218,6 +218,17 @@ function run() {
 			'local root = helpers.driver_root() .. "/../_shared/"\nlocal f = io.open(root .. "zz_probe_hs/data/a.toml")',
 			'a folder held in a Lua local, joined later'
 		);
+		// One folder name joined onto an unknown base is no reference; onto a
+		// base named for _shared it is.
+		assert.equal(
+			rewrite(`${P}linux/tests/z.lua`, 'local root = parent .. "/zz_probe_data"'),
+			'local root = parent .. "/zz_probe_data"',
+			'a temporary folder that shares a name with a shared folder'
+		);
+		assert.equal(
+			rewrite(`${P}linux/tests/z.lua`, 'local root = shared_dir .. "/zz_probe_data"'),
+			'local root = shared_dir .. "/core/zz_probe_i18n/data"'
+		);
 		assert.equal(
 			rewrite(`${P}linux/z.lua`, 'local k = shared_json("zz_probe_mod/hotstrings/a.toml", true)'),
 			'local k = shared_json("zz_probe_hs/data/a.toml", true)',
