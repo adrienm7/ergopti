@@ -116,9 +116,10 @@ helpers.describe("menu_gestures: master toggle is pause-gated (F-MED-5)", functi
 		end)
 	end
 
-	helpers.it("greys the parent row while paused", function()
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("keeps the parent row reachable while paused (edd1-paused-writes)", function()
 		with_toggle_fixture(true, { paused = true }, function(switch)
-			helpers.assert_eq(switch.parent.disabled, true, "the gestures row must be greyed while paused")
+			helpers.assert_true(switch.parent.disabled ~= true, "the gestures row stays reachable while paused")
 			helpers.assert_eq(switch.parent.checked, true, "and keep reporting the stored preference")
 		end)
 	end)

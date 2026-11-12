@@ -440,7 +440,8 @@ helpers.describe("layout switching consumes its complete shared presentation fra
 				local rows = build()
 				local parent = switch_row(rows, "  ↳ menu.layout.layout_on_pause : ")
 				helpers.assert_not_nil(parent)
-				helpers.assert_eq(parent.disabled == true, shape ~= "ready")
+				-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+				helpers.assert_eq(parent.disabled == true, shape == "off")
 			end)
 		end)
 	end
