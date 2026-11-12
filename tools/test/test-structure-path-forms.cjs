@@ -47,7 +47,9 @@ const FAKE = [
 	'macos/zz_probe_llm/binary.lua',
 	'_shared/zz_probe_mod/other.json',
 	'_shared/lua/zz_probe_hot/p.lua',
-	'_shared/lua/zz_probe_hot/q.lua'
+	'_shared/lua/zz_probe_hot/q.lua',
+	'_shared/zz_inward/x.lua',
+	'_shared/zz_inward/y.lua'
 ];
 const MAP = new Map([
 	['_shared/zz_probe_data/locales/en.json', '_shared/core/zz_probe_i18n/data/locales/en.json'],
@@ -59,7 +61,9 @@ const MAP = new Map([
 	['macos/zz_probe_llm/binary.lua', 'macos/zz_ai/adapters/binary.lua'],
 	['_shared/zz_probe_mod/other.json', '_shared/zz_other/data/other.json'],
 	['_shared/lua/zz_probe_hot/p.lua', '_shared/zz_hot/engine/p.lua'],
-	['_shared/lua/zz_probe_hot/q.lua', '_shared/zz_hot/engine/q.lua']
+	['_shared/lua/zz_probe_hot/q.lua', '_shared/zz_hot/engine/q.lua'],
+	['_shared/zz_inward/x.lua', '_shared/zz_inward/b/x.lua'],
+	['_shared/zz_inward/y.lua', '_shared/zz_inward/c/y.lua']
 ]);
 
 function withFakes(fn) {
@@ -97,6 +101,10 @@ function run() {
 			),
 			'#!/usr/bin/env python3\nd = os.path.join(root,\n    "_shared", "core", "zz_probe_i18n", "data", "locales",\n)\n'
 		);
+		// A folder whose files only move into its own subfolders keeps its name,
+		// escapes and all: S02 rewrote such a regex into invalid JavaScript.
+		const inward = 'const m = f.match(/^static\\/ergopti_plus\\/_shared\\/zz_inward\\/(.+)$/);';
+		assert.equal(rewrite('tools/x.cjs', inward), inward);
 		// A shell exclusion of a bare _shared path, unquoted.
 		assert.equal(
 			rewrite(
