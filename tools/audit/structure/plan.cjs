@@ -1920,12 +1920,21 @@ function jsConstants(text, file) {
 		if (lit) return norm(lit[2]);
 		return null;
 	};
-	for (const m of text.matchAll(
-		/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+?)\s*;?\s*$/gm
-	)) {
-		const v = evaluate(m[2].trim());
-		if (v !== null && v !== undefined) env.set(m[1], v);
-	}
+	const constants = () => {
+		for (const m of text.matchAll(
+			/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+?)\s*;?\s*$/gm
+		)) {
+			const v = evaluate(m[2].trim());
+			if (v !== null && v !== undefined && !env.has(m[1])) env.set(m[1], v);
+		}
+	};
+	constants();
+	// function main(root = ROOT): a parameter that defaults to a known
+	// constant holds it, and the constants derived from it inside follow.
+	for (const m of text.matchAll(/\bfunction\s*[\w$]*\s*\(([^)]*)\)/g))
+		for (const p of m[1].matchAll(/([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)/g))
+			if (env.has(p[2]) && !env.has(p[1])) env.set(p[1], env.get(p[2]));
+	constants();
 	return env;
 }
 
