@@ -217,6 +217,101 @@ _ManagedCurlControlStopReentry() {
 Test("managed curl owner: an interrupted admission stop never hands SetTimer an Integer (managed-admission-stop-reentry)",
 	_ManagedCurlControlStopReentry)
 
+; The compiled upgrade smoke (42480459552; 42619305563 attempt 1) logged
+; « Curl child termination was refused » 0.5 s after ready, then exited 1 with
+; empty streams, which before 13cfcd3070 meant an uncaught error. This plays a
+; sequence that yields that order: an Abort enters the admission stop, the
+; admission poll interrupts it and aborts the request itself, the nested
+; Abort's Job close is refused and logs that warning, and the outer stop then
+; read the cleared field and handed SetTimer an Integer. The poll and deadline
+; timers call Abort outside any try, so the error was uncaught. The CI logs do
+; not show which request was aborted (managed-abort-interrupted-by-refused-abort).
+
+; Arms the interruption: the next read of the admission callback runs the
+; interrupting poll's own Abort, whose Job close is refused, then hands out the
+; callback the interrupted reader had already seen.
+_ManagedCurlControlInterruptNextAdmissionRead(Request, Armed, Slot) {
+	InterruptOnce(Self) {
+		Slot.Interruptions += 1
+		Request.DeleteProp("ManagedAdmissionFn")
+		Request.ManagedAdmissionFn := Armed
+		AssertFalse(Request.Abort(), "the nested Abort's refused Job close cannot claim completion")
+		AssertFalse(IsObject(Request.ManagedAdmissionFn), "the nested Abort released the admission callback")
+		return Armed
+	}
+	Request.DefineProp("ManagedAdmissionFn", {get: InterruptOnce})
+}
+
+; A failure before the interruption leaves the getter in place; restore a plain
+; field, then let the Job close and release the retained debt.
+_ManagedCurlControlReleaseInterrupted(State, Slot) {
+	Request := State["request"]
+	if Slot.Interruptions == 0 {
+		Request.DeleteProp("ManagedAdmissionFn")
+		Request.ManagedAdmissionFn := 0
+	}
+	State["retire"] := true
+	_ManagedCurlControlRelease(State)
+}
+
+_ManagedCurlControlAbortInterruptedByRefusedAbort() {
+	global _HTTP_CURL_ABORT_DEBTS
+	State := _ManagedCurlControlState()
+	State["retire"] := false
+	Request := _ManagedCurlControlNew(State)
+	Slot := {Interruptions: 0}
+	try {
+		AssertTrue(Request.Send("private-user-payload"))
+		Armed := Request.ManagedAdmissionFn
+		AssertTrue(IsObject(Armed), "the request arms its admission callback")
+		_ManagedCurlControlInterruptNextAdmissionRead(Request, Armed, Slot)
+		try Outer := Request.Abort()
+		catch as Failure
+			throw Error("the interrupted outer Abort raised « " . Failure.Message
+				. " », which ends a startup smoke with exit code 1")
+		AssertEqual(1, Slot.Interruptions, "the admission poll interrupts the outer stop exactly once")
+		AssertFalse(Outer, "the refused Job close keeps the outer Abort nonterminal")
+		AssertFalse(Request.Completed, "refused retirement leaves the request nonterminal")
+		AssertTrue(Request.Aborted, "the request is aborted once, by whichever Abort ran first")
+		AssertTrue(_HTTP_CURL_ABORT_DEBTS.Has(Request.CleanupDebtId), "the exact request stays retained for retry")
+		AssertFalse(IsObject(Request.ManagedAdmissionFn), "no admission callback survives either Abort")
+		AssertFalse(Request.ManagedPayloadPublished, "an aborted request never publishes its payload")
+	} finally _ManagedCurlControlReleaseInterrupted(State, Slot)
+}
+Test("managed curl owner: an Abort interrupted by a refused nested Abort raises nothing (managed-abort-interrupted-by-refused-abort)",
+	_ManagedCurlControlAbortInterruptedByRefusedAbort)
+
+; The control proves the interleaving above can fail: the stop as it was before
+; ed11665a, replayed under the same interruption, reads the cleared field again
+; and raises, which is what made the outer Abort escape its timer.
+_ManagedCurlControlPreFixStop(Request) {
+	if IsObject(Request.ManagedAdmissionFn)
+		SetTimer(Request.ManagedAdmissionFn, 0)
+	Request.ManagedAdmissionFn := 0
+	Request.ManagedTransportImage := ""
+}
+
+_ManagedCurlControlPreFixStopRaises() {
+	State := _ManagedCurlControlState()
+	State["retire"] := false
+	Request := _ManagedCurlControlNew(State)
+	Slot := {Interruptions: 0}
+	try {
+		AssertTrue(Request.Send("private-user-payload"))
+		Armed := Request.ManagedAdmissionFn
+		AssertTrue(IsObject(Armed), "the request arms its admission callback")
+		_ManagedCurlControlInterruptNextAdmissionRead(Request, Armed, Slot)
+		Raised := false
+		try _ManagedCurlControlPreFixStop(Request)
+		catch
+			Raised := true
+		AssertEqual(1, Slot.Interruptions, "the control replays the same single interruption")
+		AssertTrue(Raised, "the pre-ed11665a stop hands SetTimer the cleared Integer and raises")
+	} finally _ManagedCurlControlReleaseInterrupted(State, Slot)
+}
+Test("managed curl owner: control, the pre-fix admission stop raises under that interruption (managed-abort-interrupted-by-refused-abort)",
+	_ManagedCurlControlPreFixStopRaises)
+
 _ManagedCurlControlExpiredAck() {
 	State := _ManagedCurlControlState()
 	Request := _ManagedCurlControlNew(State)
