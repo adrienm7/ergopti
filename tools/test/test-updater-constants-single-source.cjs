@@ -569,6 +569,32 @@ if (/\bDOWNLOAD_TIMEOUT_MS\b/.test(fs.readFileSync(LINUX_UPDATER, 'utf8'))) {
 	} else {
 		pass('the macOS release download reads the shared archive limits');
 	}
+	// Windows has no JSON reader at include time: core.ahk reads the bounds from
+	// the generated UpdateArchiveTransferData() (codegen:update-schedule), never
+	// from a literal.
+	const generated = fs.readFileSync(AHK_SCHEDULE_DATA, 'utf8');
+	const genIdle = generated.match(/"archive_idle_timeout_ms",\s*(\d+)/);
+	const genArchive = generated.match(/"archive_phase_timeout_ms",\s*(\d+)/);
+	const ahkReads =
+		/UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS\s*:=\s*UpdateArchiveTransferData\(\)\["archive_idle_timeout_ms"\]/.test(
+			ahkSrc
+		) &&
+		/UPDATER_HTTP_DOWNLOAD_DEADLINE_MS\s*:=\s*UpdateArchiveTransferData\(\)\["archive_phase_timeout_ms"\]/.test(
+			ahkSrc
+		);
+	if (
+		!ahkReads ||
+		!genIdle ||
+		!genArchive ||
+		Number(genIdle[1]) !== policy.archive_idle_timeout_ms ||
+		Number(genArchive[1]) !== policy.phase_timeout_ms?.archive
+	) {
+		fail(
+			'the Windows release download keeps a typed budget instead of the generated shared archive limits'
+		);
+	} else {
+		pass('the Windows release download reads the generated shared archive limits');
+	}
 }
 
 // ─── Summary ─────────────────────────────────────────────────────────────────

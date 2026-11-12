@@ -52,12 +52,16 @@ _UDTO_FindPollBlock() {
 ; ===========================================================
 
 _UDTO_600SecCeiling() {
-	SplitPath(A_ScriptDir, , &Root)
-	Core := FileRead(StrReplace(Root, "\", "/") . "/modules/updater/core.ahk")
-	Assert(InStr(Core, "UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS := 600000") > 0,
-		"core.ahk must retain the 600000 ms download timeout budget passed to the staging worker")
+	global _SharedDir, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
+	Transfer := JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["archive_transfer"]
+	AssertEqual(600000, Transfer["archive_idle_timeout_ms"],
+		"the shared archive idle budget stays 600000 ms")
+	AssertEqual(Transfer["archive_idle_timeout_ms"], UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS,
+		"the download receive timeout passed to the staging worker is the shared archive idle budget")
+	AssertEqual(Transfer["phase_timeout_ms"]["archive"], UPDATER_HTTP_DOWNLOAD_DEADLINE_MS,
+		"the absolute download deadline is the shared archive phase budget")
 }
-Test("Updater: download poll ceiling raised to 600000 ms (updater-download-timeout)", _UDTO_600SecCeiling)
+Test("Updater: download bounds come from the shared archive_transfer budget (updater-download-timeout)", _UDTO_600SecCeiling)
 
 
 _UDTO_No120SecCeiling() {
