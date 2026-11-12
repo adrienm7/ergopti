@@ -191,21 +191,6 @@ local function _build_header(ctx)
 	return row, current
 end
 
---- Greys one feature row for a pause, and strips what would let it act.
----
---- Stripped, not merely greyed: a disabled row whose submenu or handler survives
---- still acts the moment a tray backend renders the greying differently.
---- @param row table Row data from a section builder.
---- @return table The same row, greyed.
-local function _grey_for_pause(row)
-	if type(row) ~= "table" or row.separator then return row end
-	row.disabled = true
-	row.submenu = nil
-	row.items = nil
-	row.action = nil
-	return row
-end
-
 --- Whether a manifest row is visible on this driver. A row with no ``platforms``
 --- restriction is visible everywhere.
 --- @param row table Manifest row.
@@ -401,13 +386,11 @@ function M.build(ctx)
 						disabled_reason_key = row.reason_key }
 				elseif id == "quit" then
 					quit_row = build(ctx)
-				elseif ctx.paused == true and row.greyed_when_paused == true then
-					-- The rows the manifest marks as features, the same ones on the
-					-- three trays. The tail (updates, configuration, language, about,
-					-- reload, quit, debug) stays live: it is how the user inspects,
-					-- resumes or leaves a paused script.
-					rows[#rows + 1] = _grey_for_pause(build(ctx))
 				else
+					-- A pause stops typing, not configuration (EDD-1, maintainer
+					-- decision 2026-11-12): the feature rows stay live while paused.
+					-- The manifest's `greyed_when_paused` is read by the AHK tray
+					-- alone until its Suspend gates go.
 					rows[#rows + 1] = build(ctx)
 				end
 			end

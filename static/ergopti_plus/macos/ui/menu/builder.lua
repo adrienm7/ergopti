@@ -222,8 +222,8 @@ end
 --- tray in its old order — and a missing anchor emptied the tail, taking
 --- Reload, Quit and Debug with it.
 ---
---- Each entry keeps the manifest's `greyed_when_paused` mark: the feature rows a
---- pause greys, declared once for the three trays.
+--- Each entry keeps the manifest's `greyed_when_paused` mark, which only the
+--- AHK tray still honours (EDD-1).
 --- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
 --- @return table Array of projected entries retaining their exact canonical source records.
 local function load_top_level()
@@ -871,19 +871,10 @@ function M.generate(ctx, menu_mods, actions)
 			item_timings[#item_timings + 1] = { id = id, ms = item_ms }
 			if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 			for _, row in ipairs(children) do
-				-- « Pause = tout éteint »: every row the manifest marks as a feature
-				-- is greyed and stripped of its handler in one place. Each builder
-				-- used to decide this for itself, so Shortcuts and Gestures greyed
-				-- while Hotstrings, AI, Metrics and Tap-Holds stayed live (Metrics
-				-- could even be toggled mid-pause). The unmarked rows (configuration,
-				-- language, about, reload, quit, debug) and the title row that
-				-- resumes the script stay live: they are how the user inspects,
-				-- resumes or leaves a paused script.
-				if ctx.paused == true and entry.greyed_when_paused and type(row) == "table" and row.separator ~= true then
-					row.disabled = true
-					row.action = nil
-					row.fn = nil
-				end
+				-- A pause stops typing, not configuration (EDD-1, maintainer
+				-- decision 2026-11-12): the feature rows stay live while paused.
+				-- The manifest's `greyed_when_paused` is read by the AHK tray alone
+				-- until its Suspend gates go.
 				table.insert(items, row)
 			end
 		end

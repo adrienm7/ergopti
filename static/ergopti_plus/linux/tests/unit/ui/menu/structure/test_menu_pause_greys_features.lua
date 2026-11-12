@@ -1,14 +1,12 @@
 --- tests/unit/ui/menu/structure/test_menu_pause_greys_features.lua
 
 --- ==============================================================================
---- MODULE: A Paused Script Greys The Feature Rows (Linux tray)
+--- MODULE: A Paused Script Keeps Its Feature Rows (Linux tray)
 --- DESCRIPTION:
---- The menu builder never read the pause state: while paused every feature row
---- stayed live, and the title row was a disabled label with no action, so the
---- tray offered no way back. It now greys and strips every row the manifest
---- marks `greyed_when_paused` (the features), keeps the tail (configuration,
---- language, about, reload, quit, debug) live, and the title row resumes the
---- script, as on macOS.
+--- A pause stops typing, not configuration (EDD-1, maintainer decision
+--- 2026-11-12): every feature row stays live while paused, whatever the
+--- manifest's `greyed_when_paused` mark (now read by the AHK tray alone), and
+--- the title row resumes the script, as on macOS.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -62,7 +60,7 @@ local function build(paused, resumed)
 	})
 end
 
--- The features a pause switches off, by their title key.
+-- The feature rows, by their title key.
 local FEATURE_KEYS = {
 	"menu.hotstrings.title",
 	"menu.llm.title",
@@ -77,15 +75,14 @@ local LIVE_KEYS = {
 	"menu.debug.title",
 }
 
-helpers.describe("tray (linux): a pause greys every feature row", function()
-	helpers.it("greys and strips every feature row while paused", function()
+helpers.describe("tray (linux): a pause keeps every feature row live", function()
+	helpers.it("keeps every feature row and its submenu while paused (edd1-paused-writes)", function()
 		local items = build(true)
 		for _, key in ipairs(FEATURE_KEYS) do
 			local row = row_for(items, key)
 			helpers.assert_true(row ~= nil, "row " .. key .. " must still be drawn while paused")
-			helpers.assert_eq(row.disabled, true, key .. " must be greyed while paused")
-			helpers.assert_nil(row.menu, key .. " must not open a submenu while paused")
-			helpers.assert_nil(row.fn, key .. " must not act while paused")
+			helpers.assert_true(row.disabled ~= true, key .. " must stay enabled while paused")
+			helpers.assert_true(type(row.menu) == "table" and #row.menu > 0, key .. " keeps its submenu while paused")
 		end
 	end)
 
@@ -121,10 +118,9 @@ helpers.describe("tray (linux): a pause greys every feature row", function()
 		end
 	end)
 
-	helpers.it("greys exactly the rows the manifest marks, wherever they sit", function()
-		-- The mark moves from Metrics to Language. A driver that keeps its own
-		-- list of the feature ids keeps greying Metrics and leaves Language live,
-		-- so it fails even while that list matches the shipped manifest.
+	helpers.it("greys no row the manifest marks (edd1-paused-writes)", function()
+		-- The mark is the AHK tray's alone: moving it onto Language must grey
+		-- nothing here either.
 		local ManifestMenu = require("infra.manifest_menu")
 		local shipped = ManifestMenu.get_array("top_level")
 		local marked = 0
@@ -133,10 +129,8 @@ helpers.describe("tray (linux): a pause greys every feature row", function()
 			moved[index] = { row = row, greyed_when_paused = row.greyed_when_paused }
 			if row.greyed_when_paused == true then marked = marked + 1 end
 		end
-		helpers.assert_true(marked >= 7,
-			"the manifest must mark the feature rows a pause greys, got " .. marked)
+		helpers.assert_true(marked >= 7, "the manifest still carries the AHK tray's mark, got " .. marked)
 		for _, entry in ipairs(moved) do
-			if entry.row.id == "metrics" then entry.row.greyed_when_paused = nil end
 			if entry.row.id == "language" then entry.row.greyed_when_paused = true end
 		end
 		local ok, items = pcall(build, true)
@@ -145,8 +139,8 @@ helpers.describe("tray (linux): a pause greys every feature row", function()
 		local metrics = row_for(items, "menu.metrics.title")
 		local language = row_for(items, "menu.global.language")
 		helpers.assert_true(metrics ~= nil and language ~= nil, "both rows must be drawn")
-		helpers.assert_true(metrics.disabled ~= true, "a row the manifest does not mark stays live while paused")
-		helpers.assert_eq(language.disabled, true, "a row the manifest marks is greyed while paused")
+		helpers.assert_true(metrics.disabled ~= true, "a marked feature row stays live while paused")
+		helpers.assert_true(language.disabled ~= true, "a newly marked row stays live while paused")
 	end)
 
 	helpers.it("shows a source run's version without a stray v", function()
