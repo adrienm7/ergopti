@@ -126,6 +126,16 @@ NotifyQuitRefused(SendFn := 0) {
 	_NotifierDeliver(t("notify.quit_refused"), "error", "Quit refusal", SendFn)
 }
 
+; Tells a committed pause or resume, as macOS publish_pause_state and Linux
+; script_actions PAUSE_NOTICES do: the pause at the warning level, the resume at
+; the success level. Windows' balloon keeps the system's own display time.
+; @param Paused {Boolean} The committed state.
+; @param SendFn {Func|Integer} Replaces NotifierSend (tests only).
+NotifyPauseState(Paused, SendFn := 0) {
+	_NotifierDeliver(t(Paused ? "script_control.paused" : "script_control.resumed"),
+		Paused ? "warning" : "success", Paused ? "Pause" : "Resume", SendFn)
+}
+
 ; Machine-readable contract map - consumed by the generic adapter compliance test
 ; (tests/unit/adapters/test_adapter_compliance.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
