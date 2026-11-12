@@ -15,10 +15,11 @@
 ---    boundary and owned admission behave exactly as in production, so a test
 ---    that asserts on a recorded notice asserts on what would be shown.
 --- 2. Built once, before any fixture can replace infra.timings or the logger,
----    and without leaving its dependencies in package.loaded, so the cache a
+---    and without leaving its Lua dependencies in package.loaded, so the cache a
 ---    test module sees is the one it saw before the recorder existed.
 --- 3. Installed per case and put back after it only while it is still in
----    place: a fixture that installs its own notifier keeps ownership of it.
+---    place: a fixture that installs its own notifier keeps ownership of it,
+---    across cases too, and may restore the recorder it found.
 --- ==============================================================================
 
 local M = {}
@@ -32,8 +33,9 @@ local _notifier = nil
 -- What the current case sent, in order.
 local _notices = {}
 
--- What package.loaded held for the notifier before the current case.
-local _previous = nil
+-- What package.loaded holds for the notifier outside the cases: the last value
+-- a case found that was neither the recorder nor a fixture's double.
+local _baseline = nil
 
 --- The shell double the recording notifier is bound to: notify-send is always
 --- present, and each run is recorded and reported as a success.
@@ -65,8 +67,10 @@ function M.install()
 	package.loaded[SHELL] = recording_shell()
 	package.loaded[NOTIFIER] = nil
 	local ok, result = pcall(require, NOTIFIER)
+	-- Only Lua sources are forgotten: a native module such as luv owns process
+	-- state (its event loop), and opening it a second time crashes the process.
 	for name in pairs(package.loaded) do
-		if before[name] == nil then package.loaded[name] = nil end
+		if before[name] == nil and package.searchpath(name, package.path) then package.loaded[name] = nil end
 	end
 	package.loaded[SHELL], package.loaded[NOTIFIER] = before[SHELL], before[NOTIFIER]
 	if not ok then error("the recording notifier could not load: " .. tostring(result), 0) end
@@ -104,18 +108,21 @@ function M.bind_child()
 end
 
 --- Puts the recording notifier in place for one test case and forgets what
---- the previous case sent.
-function M.begin_case()
+--- the previous case sent. A double a fixture installed in an earlier case
+--- and still owns stays in place: it already keeps the case's notices.
+--- @param is_fixture_double function Whether a package.loaded value is a test double.
+function M.begin_case(is_fixture_double)
 	assert(_notifier, "the recording notifier is not installed")
 	_notices = {}
-	_previous = package.loaded[NOTIFIER]
+	local current = package.loaded[NOTIFIER]
+	if current ~= nil and current ~= _notifier and is_fixture_double(current) then return end
+	if current ~= _notifier then _baseline = current end
 	package.loaded[NOTIFIER] = _notifier
 end
 
---- Puts back the notifier the case found, unless the case installed its own.
+--- Puts back the notifier found outside the cases, unless the case left its own.
 function M.end_case()
-	if package.loaded[NOTIFIER] == _notifier then package.loaded[NOTIFIER] = _previous end
-	_previous = nil
+	if package.loaded[NOTIFIER] == _notifier then package.loaded[NOTIFIER] = _baseline end
 end
 
 --- The recording notifier, so a fixture can bind a module to it explicitly.
