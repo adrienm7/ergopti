@@ -1257,6 +1257,10 @@ between workers) green alone. All live checks pass, typed by the harness.
       (`shared_file.lua` `positional_key`) and Linux (`tap_hold_loader.lua`) now do. Then read
       `_shared/tests/corpus/tap_hold_spellings/mac_thumb.toml` in `test_tap_hold_shared_file.ahk` against the
       `[reads.mac_thumb.linux]` expectations of its `expected.toml`.
+- [ ] **Tap-hold delay bound from the timing registry (TCL-005, 2026-11-12).** `platform/remap/tap_hold_loader.ahk`
+      keeps the 10 s bound of `time_activation_seconds` as a literal; read `_shared/modules/timings/constants.toml`
+      `[tap_hold] max_activation_ms`, which macOS (`platform/remap/defaults.lua`) and Linux (`tap_hold_loader.lua`,
+      `tap_hold_writer.lua`) now read.
 - [ ] **Release archive budget from the shared defaults (maintainer decision, 2026-11-12).** `modules/updater/core.ahk`
       keeps the WinHTTP release download bounds as literals (600 s receive, 1,200 s absolute); read them from
       `_shared/modules/updater/defaults.json` `archive_transfer` (`archive_idle_timeout_ms`, `phase_timeout_ms.archive`),
