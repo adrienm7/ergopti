@@ -170,6 +170,26 @@ function run() {
 		"const crypto = require('crypto');\nconst lua = `local json=require('core.text.engine.json')`;"
 	);
 
+	// The tail of a require call the tool spells in full elsewhere moves with it;
+	// one the tool never loads is not a module name.
+	const tails =
+		"const use = 'require(\"json\").decode(text)';\nassert(m.includes('json\").decode'));";
+	assert.equal(
+		Apply.rewriteText(
+			tails,
+			Plan.scanFile(tool, tails, Plan.referenceContext(MAP)),
+			new Map(),
+			tool
+		),
+		'const use = \'require("core.text.engine.json").decode(text)\';\n' +
+			"assert(m.includes('core.text.engine.json\").decode'));"
+	);
+	const lone = "assert(m.includes('json\").decode'));";
+	assert.equal(
+		Apply.rewriteText(lone, Plan.scanFile(tool, lone, Plan.referenceContext(MAP)), new Map(), tool),
+		lone
+	);
+
 	// The module key of an embedded chunk spelled as a field moves too.
 	const field = 'const lua = `assert(package.loaded.json.decode)`;';
 	assert.equal(
