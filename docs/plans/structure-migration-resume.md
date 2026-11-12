@@ -25,10 +25,12 @@ same commit as each step or checkpoint. Times are Paris time.
   is green locally. Windows is then proven on CI.
 - Decision C for the Windows cohort pins is implemented as C1 (`9e01a8e0`).
   The (c) frames are the owner's input, not its output, so they are
-  requalified, not regenerated. The coordinator was asked to confirm C1:
+  requalified, not regenerated. C1 was decided by the coordinator on
+  2026-11-12, to review by the maintainer:
   - `edits.cjs` `REQUALIFIED_PINS` lists the five receipts;
   - `repin.cjs` records each old→new pin there, with the move that justifies
-    it, and refuses a derived pin there;
+    it, and fails fast on a pin there it cannot attribute (a file the step
+    removed, a hash shared by files the step made different, a derived pin);
   - the runner writes a "Requalification" section into the step commit.
 
 ## Next commands
