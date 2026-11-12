@@ -4153,6 +4153,7 @@
 	"dialog.uninstall.missing_program": "Ergopti se nepodařilo odinstalovat, protože program „{1}“ není nainstalován. Nainstalujte jej a zkuste to znovu. Vaše osobní údaje byly zachovány.",
 	"menu.global.start_at_login": "Spustit při přihlášení",
 	"dialog.start_at_login.failed": "Automatické spouštění se nepodařilo změnit. Zkontrolujte nastavení spouštění systému.",
+	"dialog.start_at_login.approval": "Povolte Ergopti v právě otevřeném nastavení spouštění systému. Volba se zaškrtne, jakmile ji systém potvrdí.",
 	"onboarding.error.open_failed": "Průvodce nastavením se nepodařilo otevřít. Zkontrolujte protokoly a zkuste to znovu z nabídky.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Zatím ne ve Windows: zobrazování po jednotlivých tokenech nebylo ve Windows ověřeno, proto tato možnost zůstává neaktivní.",
 	"menu.layout.number_row": "Číselná řada",

@@ -4153,6 +4153,7 @@
 	"dialog.uninstall.missing_program": "No se pudo desinstalar Ergopti porque el programa «{1}» no está instalado. Instálelo e inténtelo de nuevo. Se conservaron sus datos personales.",
 	"menu.global.start_at_login": "Iniciar al abrir sesión",
 	"dialog.start_at_login.failed": "No se pudo cambiar el inicio automático. Revise los ajustes de inicio del sistema.",
+	"dialog.start_at_login.approval": "Autoriza Ergopti en los ajustes de inicio del sistema, que se acaban de abrir. La opción se marcará en cuanto el sistema la confirme.",
 	"onboarding.error.open_failed": "No se pudo abrir el asistente de configuración. Revise los registros e inténtelo de nuevo desde el menú.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Aún no en Windows: la visualización token por token no se ha validado en Windows, por lo que esta opción permanece inactiva.",
 	"menu.layout.number_row": "Fila de números",

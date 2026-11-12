@@ -4153,6 +4153,7 @@
 	"dialog.uninstall.missing_program": "تعذّرت إزالة Ergopti لأن البرنامج «{1}» غير مثبّت. ثبّته ثم حاول مرة أخرى. تم الاحتفاظ ببياناتك الشخصية.",
 	"menu.global.start_at_login": "التشغيل عند تسجيل الدخول",
 	"dialog.start_at_login.failed": "تعذر تغيير التشغيل التلقائي. تحقق من إعدادات بدء التشغيل في النظام.",
+	"dialog.start_at_login.approval": "اسمح لـ Ergopti في إعدادات بدء تشغيل النظام التي فُتحت للتو. سيتم تحديد الخيار بمجرد أن يؤكده النظام.",
 	"onboarding.error.open_failed": "تعذر فتح معالج الإعداد. تحقق من السجلات ثم حاول مجددًا من القائمة.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "ليس بعد على Windows: لم يتم التحقق من العرض رمزًا برمز على Windows، لذلك يظل هذا الخيار غير نشط.",
 	"menu.layout.number_row": "صف الأرقام",

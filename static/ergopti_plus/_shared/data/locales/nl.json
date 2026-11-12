@@ -4153,6 +4153,7 @@
 	"dialog.uninstall.missing_program": "Ergopti kon niet worden gedeïnstalleerd omdat het programma “{1}” niet is geïnstalleerd. Installeer het en probeer het opnieuw. Uw persoonlijke gegevens zijn bewaard.",
 	"menu.global.start_at_login": "Starten bij aanmelden",
 	"dialog.start_at_login.failed": "Automatisch starten kon niet worden gewijzigd. Controleer de opstartinstellingen van het systeem.",
+	"dialog.start_at_login.approval": "Sta Ergopti toe in de zojuist geopende opstartinstellingen van het systeem. De optie wordt aangevinkt zodra het systeem dit bevestigt.",
 	"onboarding.error.open_failed": "De configuratiewizard kon niet worden geopend. Controleer de logboeken en probeer het opnieuw via het menu.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Nog niet op Windows: de token-voor-token-weergave is op Windows nog niet gevalideerd, dus deze optie blijft inactief.",
 	"menu.layout.number_row": "Cijferrij",

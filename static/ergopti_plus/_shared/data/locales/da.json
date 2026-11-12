@@ -4153,6 +4153,7 @@
 	"dialog.uninstall.missing_program": "Ergopti kunne ikke afinstalleres, fordi programmet “{1}” ikke er installeret. Installer det, og prøv igen. Dine personlige data er bevaret.",
 	"menu.global.start_at_login": "Start ved login",
 	"dialog.start_at_login.failed": "Automatisk start kunne ikke ændres. Kontrollér systemets startindstillinger.",
+	"dialog.start_at_login.approval": "Tillad Ergopti i systemets opstartsindstillinger, som lige er blevet åbnet. Indstillingen markeres, så snart systemet bekræfter den.",
 	"onboarding.error.open_failed": "Opsætningsguiden kunne ikke åbnes. Se logfilerne, og prøv igen fra menuen.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Endnu ikke på Windows: visning token for token er ikke valideret på Windows, så denne indstilling forbliver inaktiv.",
 	"menu.layout.number_row": "Talrække",

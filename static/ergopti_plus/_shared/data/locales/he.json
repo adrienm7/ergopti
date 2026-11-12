@@ -4153,6 +4153,7 @@
 	"dialog.uninstall.missing_program": "לא ניתן היה להסיר את Ergopti מפני שהתוכנה \"{1}\" אינה מותקנת. התקינו אותה ונסו שוב. הנתונים האישיים שלכם נשמרו.",
 	"menu.global.start_at_login": "הפעלה בעת הכניסה למערכת",
 	"dialog.start_at_login.failed": "לא ניתן לשנות את ההפעלה האוטומטית. יש לבדוק את הגדרות ההפעלה של המערכת.",
+	"dialog.start_at_login.approval": "אשרו את Ergopti בהגדרות ההפעלה של המערכת, שנפתחו זה עתה. האפשרות תסומן ברגע שהמערכת תאשר אותה.",
 	"onboarding.error.open_failed": "לא ניתן לפתוח את אשף ההגדרה. יש לבדוק את היומנים ולנסות שוב מהתפריט.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "עדיין לא ב-Windows: התצוגה טוקן אחר טוקן לא אומתה ב-Windows, ולכן אפשרות זו נשארת לא פעילה.",
 	"menu.layout.number_row": "שורת הספרות",

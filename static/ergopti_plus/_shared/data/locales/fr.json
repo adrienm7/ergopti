@@ -4153,6 +4153,7 @@
 	"dialog.uninstall.missing_program": "Ergopti n’a pas pu être désinstallé, car le programme « {1} » n’est pas installé. Installez-le, puis réessayez. Vos données personnelles ont été conservées.",
 	"menu.global.start_at_login": "Démarrer à l’ouverture de session",
 	"dialog.start_at_login.failed": "Impossible de modifier le démarrage automatique. Vérifiez les réglages de démarrage du système.",
+	"dialog.start_at_login.approval": "Autorisez Ergopti dans les réglages de démarrage du système, qui viennent de s’ouvrir. L’option sera cochée dès que le système l’aura confirmée.",
 	"onboarding.error.open_failed": "L’assistant de configuration n’a pas pu s’ouvrir. Consultez les journaux, puis réessayez depuis le menu.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Pas encore sous Windows : l'affichage jeton par jeton n'a pas été validé sous Windows, donc cette option reste inactive.",
 	"menu.layout.number_row": "Rangée des chiffres",
