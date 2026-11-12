@@ -56,6 +56,23 @@ local ConfigCodec = require("infra.toml.codec")
 
 local LOG = "karabiner"
 
+--- Hands a published config.toml to the preferences owner. The menus' scopes
+--- check that config.toml still holds the bytes the preferences loaded, so a
+--- remap save that rewrote its rows (the tap-hold switch, timings and
+--- `[mod_combos]`) must move that acknowledged source along, or the next scope
+--- of a global restore refuses. A path the preferences never loaded is not
+--- theirs to follow.
+--- @param path string The config.toml path.
+--- @param previous table Exact classified bytes the publication replaced.
+--- @param content string Published bytes.
+local function adopt_config_publication(path, previous, content)
+	local Preferences = require("infra.preferences")
+	if Preferences.source_snapshot(path) == nil then return end
+	if Preferences.replace_source(path, previous, { status = "ok", content = content }) ~= true then
+		Logger.warn(LOG, "The preferences did not adopt the tap-hold rows written to '%s'.", path)
+	end
+end
+
 --- The config.toml that holds the manifest's tap-hold rows, beside tap_hold.toml
 --- (platform/remap/tap_hold_file.lua owns the rule).
 --- @param user_config_path string The tap_hold.toml path.
@@ -1304,6 +1321,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			return false, tostring(called and publish_detail or published),
 				type(config_cleanup) == "function" and companion or nil
 		end
+		adopt_config_publication(config_source.path, config_expected, config_candidate)
 	end
 	local publication_source = { status = source_status, content = source }
 	local write_ok, written, detail, retry_cleanup = pcall(FileSystem.write_if_unchanged,
