@@ -59,6 +59,52 @@ helpers.describe("notifications.notify", function()
 		helpers.assert_eq(captured.informativeText, "My body")
 	end)
 
+	helpers.it("(nui-004-notice-privacy) logs a dispatched notice by shape, never its text", function()
+		local lines = {}
+		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line) lines[#lines + 1] = line end)
+		_G.hs.notify.new = function()
+			local native = {}
+			native.send = function() return native end
+			return native
+		end
+		local dispatched = notifications.notify("Command failed", "stderr: token=SECRET-42", "error")
+		Logger.set_sink(nil)
+		helpers.assert_true(dispatched)
+		local rendered = table.concat(lines, "\n")
+		helpers.assert_contains(rendered, "Notification dispatched")
+		helpers.assert_true(rendered:find("SECRET-42", 1, true) == nil,
+			"a notification body can quote stderr meant for the user alone")
+		helpers.assert_true(rendered:find("Command failed", 1, true) == nil)
+	end)
+
+	helpers.it("(nui-004-notice-privacy) the hs.notify bridge logs English metadata only", function()
+		local source = assert(helpers.read_driver_unit("-- Global user-notification logging bridge."))
+		local bridge = source:match("%-%- Global user%-notification logging bridge%.(.-)\nend\n")
+		helpers.assert_true(bridge ~= nil, "the bridge is found")
+		helpers.assert_true(bridge:find("sans titre", 1, true) == nil and bridge:find("utilisateur", 1, true) == nil,
+			"driver logs are English")
+		helpers.assert_true(bridge:find('Logger.info("notify", "User notification created: title %d byte(s), body %d byte(s).", #t, #b)', 1, true) ~= nil,
+			"only the notice's shape is logged")
+	end)
+
+	helpers.it("(nui-006-notification-ttl) withdraws a notice after the registry's duration", function()
+		local captured = nil
+		_G.hs.notify.new = function(arg1, arg2)
+			captured = type(arg1) == "function" and arg2 or arg1
+			local native = {}
+			native.send = function() return native end
+			return native
+		end
+		helpers.assert_true(notifications.notify("hello"))
+		helpers.assert_eq(captured.withdrawAfter, require("infra.timings").sec("ui", "notification_ttl_ms"),
+			"one declaration in _shared/modules/timings/constants.toml, shared with Linux")
+		local source = assert(helpers.read_module_source("infra.notifications"))
+		helpers.assert_true(source:find("RETENTION_SEC = 5", 1, true) == nil and source:find("withdrawAfter   = 5", 1, true) == nil, "no typed copy of the duration")
+	end)
+
 	helpers.it("returns false and never claims dispatch if hs.notify.new throws", function()
 		local lines = {}
 		local Logger = require("infra.logger")

@@ -114,4 +114,21 @@ function M.new(ports)
 	end
 end
 
+--- Wraps a Quit handler for a caller with no row of its own to answer (a
+--- shortcut, a gesture, the degraded tray row): a refusal at once is told with
+--- the same notice the handler gives a refusal that comes later, as the tray
+--- row and Windows' quit admission do (NUI-001).
+--- @param on_quit function The handler M.new returned.
+--- @param notify_refused function Tells the user of the refusal.
+--- @return function quit (reason) -> accepted
+function M.notifying(on_quit, notify_refused)
+	assert(type(on_quit) == "function" and type(notify_refused) == "function",
+		"a notifying Quit needs its handler and its notice")
+	return function(reason)
+		local accepted = on_quit(reason)
+		if accepted == false then notify_refused() end
+		return accepted
+	end
+end
+
 return M

@@ -257,10 +257,12 @@ local function binaries(candidates)
 	return table.concat(names, ", ")
 end
 
---- Shows a short notice for an action that had nothing to act on.
+--- Shows a short notice for an action that had nothing to act on, or that failed.
 --- @param key string Locale key.
 --- @param value string|nil Replaces {1} in the message.
-local function notify(key, value)
+--- @param level string|nil "error" for a failure, as Windows' Iconx notices and
+---   user_actions show the same keys (NUI-007); "info" otherwise.
+local function notify(key, value, level)
 	local ok, Notifier = pcall(require, "adapters.application_notifier")
 	if not ok or type(Notifier.send) ~= "function" then
 		Logger.warn(LOG, "No notifier to show '%s'.", key)
@@ -268,7 +270,7 @@ local function notify(key, value)
 	end
 	local message = i18n.get(key)
 	if value ~= nil then message = message:gsub("{1}", function() return value end) end
-	Notifier.send(message, { level = "info" })
+	Notifier.send(message, { level = level or "info" })
 end
 
 --- How many free names new_text_file_here tries before it gives up.
@@ -440,7 +442,7 @@ M.HANDLERS = {
 			local terminal = UserActions.resolve_terminal(ShellRunner.has_command, os.getenv("TERMINAL"))
 			if not terminal then
 				Logger.error(LOG, "open_terminal_here: no known terminal is installed.")
-				notify("user_actions.terminal_unavailable")
+				notify("user_actions.terminal_unavailable", nil, "error")
 				return
 			end
 			local command = "cd -- " .. quote(folder.path) .. " && " .. UserActions.detached_command({ terminal.binary })
@@ -448,7 +450,7 @@ M.HANDLERS = {
 				Logger.info(LOG, "Opened %s in the file manager folder.", terminal.binary)
 			else
 				Logger.error(LOG, "open_terminal_here: %s could not start in the folder.", terminal.binary)
-				notify("user_actions.terminal_unavailable")
+				notify("user_actions.terminal_unavailable", nil, "error")
 			end
 		end)
 	end,
@@ -456,7 +458,7 @@ M.HANDLERS = {
 		with_file_manager_folder("new_text_file_here", function(folder, Folder)
 			local path = M.create_new_text_file(folder.path)
 			if not path then
-				notify("system_actions.new_text_file_failed")
+				notify("system_actions.new_text_file_failed", nil, "error")
 				return
 			end
 			Logger.info(LOG, "Created a text file in the file manager folder.")
