@@ -8,6 +8,25 @@ the field-run step or the hand action that proves it and the commits it confirms
 [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
 (`git show 2a0083cb11:TODO.md` is the long form before this shrink).
 
+## Resume here (2026-11-12 evening, read first)
+
+If the coordinating session stopped (weekly quota), any agent can continue from this section alone. Follow
+[AGENTS.md](AGENTS.md); never push `dev` or `main` without the maintainer's go in the current conversation.
+
+- **Folder migration by OS (structure plan, the priority).** Plan: [docs/design/structure-plan.md](docs/design/structure-plan.md)
+  (item « Structure plan » under « Remaining code work »). The work runs overnight on branch
+  `claude/ergopti-todo-structure-phase2`, not on `dev`; if it had to be rebased it continues on
+  `claude/ergopti-todo-structure-phase2-night` (never force-pushed). Read the branch's
+  `docs/plans/structure-migration-resume.md` first: base `dev` commit, steps done with their proof, the step in
+  progress, the next command, known traps, how to regenerate `move-map.tsv`. One step per commit with
+  `tools/audit/structure/apply-step.cjs` (`--check-all` clean first); a step is done when local gates and CI on the
+  three OS show only the reds `dev` already has. Land on `dev` only with the maintainer's go.
+- **TODO cleanup (maintainer request 2026-11-12).** This file keeps only features and fixes: drop the `[x]` items
+  (they stay in Git history), keeping as a new short open line any leftover a done item still names. The three
+  hardware sections move verbatim, headings unchanged, to `TODO-tests-macos.md`, `TODO-tests-windows.md` and
+  `TODO-tests-linux.md`; then point `todo.file` in `static/ergopti_plus/{linux,macos}/data/field_todo_coverage.json`
+  at the new files and rerun the two `test_field_todo_coverage.lua` tests. Remove this bullet once done.
+
 ## Windows CI reliability (2026-11-07)
 
 - [x] **[CODE] Boot counts 2 more TOML parses than on 2026-11-05:** the boot log's "Document parses by owner"
@@ -1482,6 +1501,7 @@ between workers) green alone. All live checks pass, typed by the harness.
 ### All drivers
 
 - [ ] **Structure plan (maintainer request 2026-11-11):** [docs/design/structure-plan.md](docs/design/structure-plan.md).
+      In progress: see « Resume here » at the top (branch `claude/ergopti-todo-structure-phase2`).
       Rule A: every common value, text and logic in `_shared`. Rule B, decided by the maintainer on 2026-11-11:
       feature-first trees (`<feature>/{engine,adapters,ui,data,native}`, `core/`, `platform/`), the same on every
       driver and in `_shared`; file prefixes the folder repeats are renamed away (`keystats_walker.ahk` →
