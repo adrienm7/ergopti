@@ -246,7 +246,7 @@ _TapHold_ParseFileInto(FilePath, Result, MigrateWith := "", CapturedSource := un
 	if (MigrateWith != "") {
 		for Field in TapHoldConfigOwnedFields()
 			if Root.Has(Field)
-				_TapHoldReportConfigOwned(FilePath, "tap_hold." . Field)
+				_TapHoldReportConfigOwned(FilePath, Format("{1}.{2}", "tap_hold", Field))
 	}
 	if Root.Has("inherit_defaults") {
 		if Root["inherit_defaults"] is TOML_Bool
@@ -333,7 +333,7 @@ _TapHold_ParseFileInto(FilePath, Result, MigrateWith := "", CapturedSource := un
 			; to hold and swallowed the key, tap included. Refuse it here, as the
 			; Linux loader does: the entry holds the picker's "none" and keeps its
 			; tap, and the user's choice still replaces a default hold.
-			if (Key == "hold_modifier" and Value != "" and _TapHoldHoldModifierIsMacOnly(Value)) {
+			if (Key == "hold_modifier" and Value != "" and MigrateWith != "" and _TapHoldHoldModifierIsMacOnly(Value)) {
 				; A Cmd or Fn hold written on macOS: the shared file is right, this
 				; keyboard has no such modifier. Warned once; the tap stays.
 				ConfigOutdatedReportInFile(FilePath, CurrentPath . "." . Key,
