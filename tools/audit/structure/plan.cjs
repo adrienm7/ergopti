@@ -1027,6 +1027,7 @@ function joinedPaths(text) {
 		if (parts.length < 2 && !(parts.length === 1 && (m[2].trim() || more))) continue;
 		out.push({
 			more,
+			index: start,
 			text: text.slice(start, at),
 			parts,
 			quote,
@@ -1302,7 +1303,17 @@ function scanFile(file, text, ctx) {
 	if (/\.(c?js|mjs|lua)$/.test(file))
 		for (const j of joinedPaths(text)) {
 			const hit = resolveJoinedPath(j, byRepoPath, byRepoDir, successors, jsEnv);
-			if (hit) add(hit.kind, j.text, hit.rendered, hit);
+			if (!hit) continue;
+			// shared('lua', name): the root switch drops the 'lua' piece, so a
+			// join onto the old root is respelled by the switch, not refused.
+			if (
+				rootSwitch &&
+				hit.kind === 'join-split' &&
+				`${hit.oldRepo}/` === PREFIX + SHARED_LUA_ROOT &&
+				sharedRootRewrite(lineAt(text, j.index)) !== lineAt(text, j.index)
+			)
+				continue;
+			add(hit.kind, j.text, hit.rendered, hit);
 		}
 	// A scan scope over a folder the plan scatters (edits.cjs FOLDER_EDITS):
 	// the step that empties the folder rewrites it as listed, and a listed
@@ -1513,6 +1524,13 @@ function scanFile(file, text, ctx) {
 		}
 	}
 	return rows;
+}
+
+/** The whole line of `text` that holds offset `index`. */
+function lineAt(text, index) {
+	const start = text.lastIndexOf('\n', index - 1) + 1;
+	const end = text.indexOf('\n', index);
+	return text.slice(start, end < 0 ? text.length : end);
 }
 
 /** The new place of a repository folder: itself, its target, or a split folder's successor. */
