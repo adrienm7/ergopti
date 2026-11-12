@@ -43,7 +43,9 @@ helpers.describe("installed source role: one spelling in three languages", funct
 		helpers.assert_true(main:find("InstalledPhysicalSourceBridge.handles(arguments: CommandLine.arguments)", 1, true) ~= nil,
 			"the launcher must dispatch the bridge before it boots the GUI")
 		helpers.assert_true(main:find("Darwin.exit(InstalledPhysicalSourceBridge.run())", 1, true) ~= nil)
-		local gui = assert(main:find("Write MJConfigFile via CFPreferences", 1, true), "the GUI boot marker moved")
+		-- The GUI boot starts at the shared application; MJConfigFile is seeded by
+		-- the sole launcher only, no longer before it (MLC-001).
+		local gui = assert(main:find("let app      = NSApplication.shared", 1, true), "the GUI boot marker moved")
 		local dispatch = main:find("InstalledPhysicalSourceBridge.handles", 1, true)
 		helpers.assert_true(dispatch < gui, "the dispatch must precede the GUI boot")
 	end)

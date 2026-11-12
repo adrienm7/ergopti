@@ -994,7 +994,14 @@ elif [ "$TEST_CASE" = cancel ] || [[ "$TEST_CASE" = help-no-groups-* ]]; then ec
 elif [ "$TEST_CASE" = stale ] && [ "$#" = 1 ]; then echo "users \${ACQUIRED_GROUPS:-}"
 else echo "users input uinput"; fi`
 	);
-	stub('systemctl', logCall + '\n[[ "$TEST_CASE" = help-no-bus-* ]] && exit 1\nexit 0');
+	// The unit is inactive unless the case is a relaunch of a running unit (MLC-003).
+	stub(
+		'systemctl',
+		logCall +
+			'\n[[ "$TEST_CASE" = help-no-bus-* ]] && exit 1\n' +
+			'if [ "$1 $2" = "--user is-active" ]; then [ "$TEST_CASE" = desktop-restart ] && exit 0; exit 3; fi\n' +
+			'exit 0'
+	);
 	stub('luajit', logCall + '\nexit 0');
 	stub('pkexec', logCall + '\nexit 126');
 	stub(
@@ -1032,11 +1039,18 @@ else echo "users input uinput"; fi`
 			/luajit|pkexec|enable/
 		],
 		[
+			'desktop-restart',
+			['--tray'],
+			0,
+			/systemctl --user restart ergopti-hotstrings.service/,
+			/luajit|pkexec|enable|--user start/
+		],
+		[
 			'autostart',
 			['--session-start', '--tray'],
 			0,
 			/systemctl --user start ergopti-hotstrings.service/,
-			/luajit|pkexec|enable/
+			/luajit|pkexec|enable|restart/
 		],
 		...[
 			[

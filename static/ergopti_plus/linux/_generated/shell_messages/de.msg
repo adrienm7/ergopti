@@ -85,6 +85,7 @@ install.xdg_autostart=XDG-Autostart: {1}
 launch.already_running=Ergopti+ läuft bereits in dieser Sitzung ({1} ist belegt); dieser Start wurde abgelehnt.
 launch.authorization_failed=Die Freigabe des Eingabezugriffs wurde abgebrochen oder ist fehlgeschlagen.
 launch.groups_unavailable=Die Sitzung konnte ihre konfigurierten Eingabegruppen nicht erhalten.
+launch.restarting=Ergopti+ läuft bereits in dieser Sitzung; es wird zum Beenden aufgefordert und dann neu gestartet.
 launch.session_lock_invalid=Das Verzeichnis der Sitzungssperre muss ein absoluter Pfad sein.
 launcher.dependencies_installed=Abhängigkeiten installiert.
 launcher.driver_missing=Fehler: Verzeichnis des Linux-Treibers nicht gefunden: {1}
