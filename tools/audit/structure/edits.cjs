@@ -101,6 +101,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '"globs": ["**/*.lua", "static/ergopti_plus/_shared/keyboard/engine/chord/vectors.json"],'
 	},
 	{
+		// The standalone layout editor fetches its Lua sources from the shared
+		// Lua root, spelled as a URL relative to the page: now _shared itself.
+		file: 'static/ergopti_plus/_shared/ui/layout_editor/standalone.js',
+		empties: '_shared/lua',
+		from: "const LUA_ROOT = new URL('../../lua/', location.href);",
+		to: "const LUA_ROOT = new URL('../../', location.href);"
+	},
+	{
 		// The shared test contracts join the shared test tree, which the
 		// pattern above already excludes.
 		file: 'tools/build/macos-bundle-manifest.json',
@@ -147,6 +155,10 @@ const MODULE_NAME_FILES = [
 	{
 		file: 'tools/lib/menu-hotstring-language-binding.cjs',
 		why: 'its imports table names the modules the hotstring language menu requires'
+	},
+	{
+		file: 'static/ergopti_plus/_shared/ui/layout_editor/lua_runner.js',
+		why: 'MODULES lists the shared Lua modules the page loads into fengari, in load order'
 	},
 	{
 		file: 'tools/lib/config-key-tokens.cjs',
