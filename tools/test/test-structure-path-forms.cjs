@@ -319,6 +319,22 @@ function run() {
 			'S = (\n    ROOT\n    / "static" / "ergopti_plus" / "_shared" / "zz_probe_hs" / "data" / "a.toml"\n)',
 			'a Python / chain the formatter wrapped over lines'
 		);
+		// A tool's regular expressions of a shared path: AutoHotkey backslashes
+		// and a bare relative path a driver hands to its shared resolver.
+		assert.equal(
+			rewrite(
+				'tools/test/z.cjs',
+				'assert.match(ahk, /\\\\zz_probe_mod\\\\hotstrings\\\\a\\.toml"/);'
+			),
+			'assert.match(ahk, /\\\\zz_probe_hs\\\\data\\\\a\\.toml"/);'
+		);
+		assert.equal(
+			rewrite(
+				'tools/test/z.cjs',
+				'assert.match(lua, /shared\\("zz_probe_mod\\/hotstrings\\/a\\.toml"\\)/);'
+			),
+			'assert.match(lua, /shared\\("zz_probe_hs\\/data\\/a\\.toml"\\)/);'
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
