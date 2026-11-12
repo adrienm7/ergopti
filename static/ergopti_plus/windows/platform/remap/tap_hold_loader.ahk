@@ -56,6 +56,10 @@ global TAPHOLD_MAX_ACTIVATION_SECONDS := 10
 ; picker does not offer. A file carrying them keeps them; this driver warns once
 ; and holds nothing. Read at this include position, like the aliases below.
 global TAPHOLD_MACOS_MODIFIERS := _TapHoldReadMacOnlyModifiers()
+; The PC key at the place of each Mac thumb key (maintainer decision TCL-004,
+; « follow the position »): _shared/tap_hold/shared_file.toml [thumb_positions],
+; read at this include position like the tables around it.
+global TAPHOLD_THUMB_POSITIONS := _TapHoldReadThumbPositions()
 ; The other spellings of a hold modifier (altgr, lctrl...), read here, at this
 ; file's include position, and never from a #HotIf: those are live before the
 ; auto-execute section runs, during Bundle_Init's message-pumping RunWait, and
@@ -273,10 +277,15 @@ _TapHold_ParseFileInto(FilePath, Result, MigrateWith := "", CapturedSource := un
 		return
 	}
 	InvalidKeys := Map()
-	for KeyId, Entry in Root["keys"] {
-		if !(KeyId is String) || !RegExMatch(KeyId, "^[A-Za-z0-9_]+$")
+	for FileKeyId, Entry in Root["keys"] {
+		if !(FileKeyId is String) || !RegExMatch(FileKeyId, "^[A-Za-z0-9_]+$")
 			continue
-		CurrentPath := "tap_hold.keys." . KeyId
+		CurrentPath := "tap_hold.keys." . FileKeyId
+		; A Mac thumb key is the PC key at its place (TCL-004); "" when the file
+		; names that key too, which wins.
+		KeyId := _TapHoldPositionalKey(FileKeyId, Root["keys"])
+		if (KeyId == "")
+			continue
 		if !(Entry is Map) {
 			try LoggerError("TapHoldLoader", "Field '[{1}]' must be a key table; key disabled.", CurrentPath)
 			InvalidKeys[KeyId] := true
@@ -284,7 +293,7 @@ _TapHold_ParseFileInto(FilePath, Result, MigrateWith := "", CapturedSource := un
 		}
 		for Key, Typed in Entry {
 			LiteralKind := _TOML_ValueKind(Typed)
-			if LiteralKind == "string" && !_TapHold_FieldStringIsQuoted(Records, KeyId, Key)
+			if LiteralKind == "string" && !_TapHold_FieldStringIsQuoted(Records, FileKeyId, Key)
 				LiteralKind := "unknown"
 			Value := _ConfigTomlNativeValue(Typed)
 			ExpectedKind := TapHoldFieldKinds().Get(Key, "")
@@ -821,6 +830,35 @@ _TapHoldReportConfigOwned(FilePath, EntryPath) {
 	ConfigOutdatedReportInFile(FilePath, EntryPath,
 		"kept in config.toml since schema v22; this copy is not read",
 		(Message, Args*) => LoggerWarn("TapHoldLoader", Message, Args*))
+}
+
+; The Mac thumb keys of the shared file and the PC key at the place of each.
+; @returns {Map} Mac catalogue id -> PC catalogue id.
+_TapHoldReadThumbPositions() {
+	global _SharedDir
+	Spec := ParseTomlFile(_SharedDir . "\tap_hold\shared_file.toml")
+	Positions := Spec.Get("thumb_positions", "")
+	Out := Map()
+	if !(Positions is Map) {
+		try LoggerError("TapHoldLoader", "'shared_file.toml' declares no [thumb_positions] — a Mac thumb key is not read.")
+		return Out
+	}
+	for MacId, PcId in Positions
+		Out[MacId] := PcId
+	return Out
+}
+
+; The key a shared-file entry configures here: a Mac thumb id is the PC key at
+; its place unless the file names that key too, which wins ("" then).
+; @param FileKeyId {String} The entry's id in the file.
+; @param Keys {Map} Every entry of [tap_hold.keys].
+; @returns {String} The key id, or "" when the entry is superseded.
+_TapHoldPositionalKey(FileKeyId, Keys) {
+	global TAPHOLD_THUMB_POSITIONS
+	if !TAPHOLD_THUMB_POSITIONS.Has(FileKeyId)
+		return FileKeyId
+	Positional := TAPHOLD_THUMB_POSITIONS[FileKeyId]
+	return Keys.Has(Positional) ? "" : Positional
 }
 
 ; The shared modifier names the hold picker does not offer, lower case.
