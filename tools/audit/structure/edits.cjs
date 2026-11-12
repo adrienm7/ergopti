@@ -109,6 +109,19 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "const LUA_ROOT = new URL('../../', location.href);"
 	},
 	{
+		// verify-change's cross-driver contracts were the specifications under
+		// _shared/core; their nearest new folder (_shared) would make every
+		// shared file one, selecting every suite. The new homes of exactly them.
+		file: 'tools/test/verify-change.cjs',
+		empties: '_shared/core/config_schema',
+		from: "\t\tf.startsWith('static/ergopti_plus/_shared/core/') ||\n",
+		to:
+			"\t\tf === 'static/ergopti_plus/_shared/core/features.json' ||\n" +
+			"\t\tf.startsWith('static/ergopti_plus/_shared/core/ports/') ||\n" +
+			"\t\tf.startsWith('static/ergopti_plus/_shared/core/text/data/domain/') ||\n" +
+			"\t\tf.startsWith('static/ergopti_plus/_shared/settings/data/config_schema/') ||\n"
+	},
+	{
 		// The shared test contracts join the shared test tree, which the
 		// pattern above already excludes.
 		file: 'tools/build/macos-bundle-manifest.json',
