@@ -1818,13 +1818,16 @@ function scanFile(file, text, ctx) {
 	// A scan scope over a folder the plan scatters (edits.cjs FOLDER_EDITS):
 	// the step that empties the folder rewrites it as listed, and a listed
 	// text that no longer matches refuses the step instead of passing silently.
+	// An edit keyed on a file (`moves`) belongs to the step that moves it.
 	for (const e of Edits.FOLDER_EDITS) {
-		if (e.file !== file || !emptiesFolder(map, e.empties)) continue;
-		if (text.includes(e.from)) add('folder-edit', e.from, e.to, { oldRepo: PREFIX + e.empties });
+		const due = e.moves
+			? !!map.get(e.moves) && map.get(e.moves) !== e.moves
+			: emptiesFolder(map, e.empties);
+		if (e.file !== file || !due) continue;
+		const oldRepo = PREFIX + (e.moves || e.empties);
+		if (text.includes(e.from)) add('folder-edit', e.from, e.to, { oldRepo });
 		else
-			add('folder-edit-stale', e.from, `(${e.file} no longer holds the listed text)`, {
-				oldRepo: PREFIX + e.empties
-			});
+			add('folder-edit-stale', e.from, `(${e.file} no longer holds the listed text)`, { oldRepo });
 	}
 	for (const e of Rules.RUNTIME_EDITS) {
 		if (PREFIX + e.file !== file || !text.includes(e.from)) continue;

@@ -7,9 +7,10 @@
  * The few sites whose new text is a decision rather than a rewrite: a scan
  * over a folder the plan scatters, whose new scope (what it must now include
  * or skip) no path rule can know. Each edit names the file as it stands when
- * the edit runs, the folder whose emptying triggers it (tree-relative), and
- * its exact text before and after. A `from` the file no longer holds refuses
- * the step instead of passing silently.
+ * the edit runs, the folder whose emptying triggers it (tree-relative), or
+ * with `moves` the file whose move does, and its exact text before and after.
+ * A `from` the file no longer holds refuses the step instead of passing
+ * silently.
  *
  * This file is never rewritten by the steps (plan.cjs NEVER_REWRITTEN): its
  * texts are what the files hold before their step.
@@ -86,6 +87,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		empties: '_shared/python',
 		from: `'Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_daemon_authority.py"'`,
 		to: `'Path(__file__).absolute().parents[2]\\n    / "_shared/ai/adapters/python/managed_ollama_daemon_authority.py"'`
+	},
+	{
+		// The sourcing gate's self-test sources the identifiers from a synthetic
+		// script three folders below _shared, which no move carries along.
+		file: 'tools/test/test-shell-identifiers-sourcing.cjs',
+		moves: '_shared/data/identifiers.sh',
+		from: `'. "$SCRIPT_DIR/../../../data/identifiers.sh"',`,
+		to: `'. "$SCRIPT_DIR/../../../core/text/data/identifiers.sh"',`
 	},
 	{
 		// The locale is found relative to the page under test, a variable
