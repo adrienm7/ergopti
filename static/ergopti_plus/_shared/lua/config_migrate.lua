@@ -1480,8 +1480,9 @@ end
 --- @param context table|nil The driver's migration context.
 --- @param companions table|nil `{ [file] = path }`.
 --- @param read function The reader of M.run.
---- @return table|nil context A copy holding `companions[file] = { status, content, path }`.
---- @return string|nil detail Why a companion could not be read.
+--- @return table|nil context A copy holding `companions[file] = { status, content, path }`;
+---   the driver's own context (nil included) when it named no companion.
+--- @return string|nil detail Why a companion could not be read; nil on success.
 local function with_companions(context, companions, read)
 	if companions == nil then return context end
 	if type(companions) ~= "table" then return nil, "companions must map bare file names to paths" end
@@ -1741,7 +1742,8 @@ function M.run(opts)
 	else
 		local companion_err
 		plan_context, companion_err = with_companions(opts.context, opts.companions, read)
-		if not plan_context then return refuse("failed", companion_err) end
+		-- A nil context is a run without one; only a detail is a refusal.
+		if companion_err ~= nil then return refuse("failed", companion_err) end
 		plan = M.plan(source, registry, opts.driver, plan_context)
 		if version ~= nil and version ~= registry.current and plan.version ~= version then
 			return refuse("unsupported", "legacy metadata is not addressable by this migration owner")
