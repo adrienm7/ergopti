@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_language_section_order_kept_on_linux/case.toml
+
+[case]
+description = "A configuration a 1.0.10 pre-release wrote on Linux (v20) keeps the section orders it already stores under each language group id; the Windows-only v21 copy never runs on it, so only the stamp moves."
+drivers = ["linux"]
+outcome = "migrated"
+from_version = 20
+to_version = 21

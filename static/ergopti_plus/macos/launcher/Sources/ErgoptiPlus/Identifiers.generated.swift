@@ -43,4 +43,7 @@ enum Identifiers {
 		static let baseConfigKey = "ergoptiFieldBase"
 		static let environment = "ERGOPTI_FIELD_RUN_ROOT"
 	}
+	enum MacosNotifications {
+		static let launcherQuitRequest = "com.ergoptiplus.app.quit-request"
+	}
 }

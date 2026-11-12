@@ -291,11 +291,33 @@ terminal_hotstring_key_delay_ms = 20
 # value for every driver (maintainer decision GSD-3 of 2026-11-11); the swipe
 # step itself is each slot's own [gestures.sensitivities] setting.
 # HS: modules/gestures/geometry.lua. LX: modules/gestures/incremental_tracker.lua.
-# Windows receives each swipe finished by the Precision Touchpad settings and
-# measures no travel, so it reads none of them.
+# AHK: modules/gestures/raw_touchpad.ahk, from the raw HID digitizer reports.
 swipe_minimum_mm = 1.5
 pair_swipe_minimum_mm = 3.0
 pair_diagonal_minimum_mm = 5.0
+
+# The incremental swipe step rule and the live direction lock, for a driver
+# that cannot require the shared Lua modules: travel before the first action
+# (FIRST_STEP), the most actions one frame may earn before a sensor jump is
+# refused (MAX_ACTIONS_PER_FRAME), the smallest reversal (macOS LIVE_AXIS_MIN,
+# Linux REVERSE_FLOOR_MM), the straight-axis sector (AXIS_MAX_DEGREES) and a
+# diagonal's minimum as a factor of the swipe's (DIAGONAL_MINIMUM_FACTOR). The
+# shared corpora (_shared/tests/corpus/gestures/incremental_steps.json and
+# direction_vectors.json) pin these to the Lua constants on every driver.
+# HS, LX: _shared/lua/gestures/incremental.lua, direction.lua.
+# AHK: modules/gestures/incremental.ahk, direction.ahk.
+incremental_first_step_mm = 4.0
+incremental_max_actions_per_frame = 100
+incremental_reverse_floor_mm = 1.0
+swipe_axis_max_degrees = 25
+swipe_diagonal_minimum_factor = 1.5
+
+# Windows: how long after a raw touch ends the Precision Touchpad settings'
+# shortcut for that swipe still belongs to it. A touch that stepped while
+# moving swallows the shortcut within this window; a touch whose frames stop
+# for this long without a lift frame is over, so a deferred shortcut fires.
+# AHK: modules/gestures/raw_touchpad.ahk.
+incremental_handoff_ms = 300
 
 # Windows: how long a gesture's synthetic keys stay marked, the settle after an
 # action's own window change, and the wait before the first auto-configuration.
@@ -926,8 +948,16 @@ ollama_deps_poll_ms = 3000
 # drain, local teardown, logger drain) must finish within this bound; otherwise
 # the process force-exits and native stdin EOF revokes the exact lease. It
 # exceeds the 7 s lease STOPPED timeout so the exact fence gets its full chance.
-# HS: infra/termination_coordinator.lua request_user_exit deadline.
+# HS: infra/termination_coordinator.lua request_user_exit deadline. Swift: the
+# grace main.swift gives a leftover embedded runtime (LauncherTimings).
 user_quit_deadline_ms = 12000
+
+# Margin past user_quit_deadline_ms a launcher waits for the running instance's
+# controlled exit before it gives up: the macOS launcher answering a quit from
+# outside (Sparkle relaunch, logout, osascript; MLC-002), and a second launch
+# restarting the running instance on macOS and Linux (MLC-003). Swift: main.swift
+# (LauncherTimings); Linux: install/launch.sh (_generated/launch_timings.sh).
+quit_handshake_margin_ms = 2000
 
 # Deadline for a controlled reload (menu, source watcher, field run). An
 # in-process reload takes about 1 s. Past this bound, a reload whose stages never
@@ -1357,6 +1387,12 @@ file_lock_retry_ms = 1
 # Pause between tries of the sole-launcher lock while an update relaunch hands
 # it over (50 tries). Swift: main.swift, LauncherInstanceOwnership.swift.
 instance_lock_retry_ms = 100
+
+# Poll of a leftover embedded runtime asked to terminate. Its grace before it
+# is force-terminated is [ui] user_quit_deadline_ms, the bound of its own
+# controlled exit, so a runtime still inside its quit fence is never killed
+# (MLC-004). Swift: main.swift waitForStaleRuntimes.
+stale_runtime_poll_ms = 100
 
 # Poll of the remap lease guardian while it arms, and of its singleton lock.
 # Swift: RemapLeaseGuardian.swift.

@@ -550,6 +550,54 @@ enum LauncherLog {
 // =====================================
 // =====================================
 
+// Write Hammerspoon preference overrides directly via CFPreferencesSetValue.
+// This writes into ~/Library/Preferences/<bundleId>.plist synchronously,
+// bypassing the cfprefsd async pipeline that `defaults write` goes through.
+// Hammerspoon reads its prefs via [NSUserDefaults standardUserDefaults] under
+// its own bundle ID (rewritten to kEmbeddedHammerspoonBundleId at build time);
+// the outer bundle prohibits duplicate instances, so the GUI child must keep
+// a distinct Launch Services identity. The plist is flushed before each
+// runtime launch so HS sees the correct path on the very first read, even on
+// first-ever launch, and a user who moved the .app sees the new path.
+/// - Parameter initLuaPath: The init.lua this launcher's runtime must load.
+func seedEmbeddedHammerspoonConfig(initLuaPath: String) {
+	let appId = kEmbeddedHammerspoonBundleId as CFString
+	let user  = kCFPreferencesCurrentUser
+	let host  = kCFPreferencesAnyHost
+
+	// Point HS at our bundled init.lua — MJConfigFile takes the full file path.
+	CFPreferencesSetValue(
+		kHammerspoonConfigKey as CFString,
+		initLuaPath as CFString,
+		appId, user, host)
+
+	// Suppress the native Hammerspoon hammer menubar icon and Dock icon.
+	// Ergopti provides its own menubar item via hs.menubar; the HS default
+	// icons are redundant and reveal the underlying dependency.
+	for key in ["MJShowMenuIconOnLaunch", "MJShowDockIconOnLaunch"] {
+		CFPreferencesSetValue(
+			key as CFString,
+			false as CFBoolean,
+			appId, user, host)
+	}
+
+	// Flush synchronously so the plist is on disk before we exec Hammerspoon.
+	CFPreferencesSynchronize(appId, user, host)
+}
+
+/// Asks the embedded runtime with this process id for its controlled exit
+/// (infra/launcher_guard.lua listens for it); the object names the runtime so
+/// another copy's runtime ignores it.
+/// - Parameter runtimePid: Process id of this launcher's embedded runtime.
+func postEmbeddedRuntimeQuitRequest(_ runtimePid: pid_t) {
+	DistributedNotificationCenter.default().postNotificationName(
+		NSNotification.Name(Identifiers.MacosNotifications.launcherQuitRequest),
+		object: String(runtimePid),
+		userInfo: nil,
+		deliverImmediately: true
+	)
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private var hsApplication: NSRunningApplication?
@@ -587,7 +635,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let childActivity: EmbeddedChildActivity
 	private let instanceLock: LauncherInstanceLock
 	private let runningApplicationsReader: (String) -> [NSRunningApplication]
+	/// Seeds MJConfigFile; only the sole launcher calls it, before each runtime launch.
+	private let hammerspoonConfigSeeder: (String) -> Void
+	/// Asks every other running launcher to quit; returns how many were asked.
+	private let launcherQuitRequester: () -> Int
 	private var applicationIsTerminating = false
+	/// True while a quit from outside waits for the runtime's controlled exit.
+	private var quitHandshakePending = false
+	/// Asks the embedded runtime, by its process id, for its controlled exit.
+	private let quitRequestPoster: (pid_t) -> Void
+	/// Answers a deferred `applicationShouldTerminate`.
+	private let terminationReplier: (Bool) -> Void
 	// Monotonic origin of this launcher's startup trail.
 	private let launcherStartUptime = ProcessInfo.processInfo.systemUptime
 
@@ -608,6 +666,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	///   - childActivity: Keeps App Nap off the launcher while its child runs.
 	///   - instanceLock: Per-user lock that makes this process the sole launcher.
 	///   - runningApplicationsReader: Lists running applications by bundle identifier.
+	///   - hammerspoonConfigSeeder: Points the embedded runtime at this launcher's init.lua.
+	///   - quitRequestPoster: Asks the embedded runtime for its controlled exit.
+	///   - terminationReplier: Answers a quit deferred for that exit.
+	///   - launcherQuitRequester: Asks the running launcher to quit for a restart;
+	///     nil terminates every other running launcher found by bundle identifier.
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
@@ -635,7 +698,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		instanceLock: LauncherInstanceLock = LauncherInstanceLock(path: launcherInstanceLockPath()),
 		runningApplicationsReader: @escaping (String) -> [NSRunningApplication] = {
 			NSRunningApplication.runningApplications(withBundleIdentifier: $0)
-		}
+		},
+		hammerspoonConfigSeeder: @escaping (String) -> Void = { seedEmbeddedHammerspoonConfig(initLuaPath: $0) },
+		quitRequestPoster: @escaping (pid_t) -> Void = postEmbeddedRuntimeQuitRequest,
+		terminationReplier: @escaping (Bool) -> Void = { NSApp.reply(toApplicationShouldTerminate: $0) },
+		launcherQuitRequester: (() -> Int)? = nil
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
 		self.applicationLauncher = applicationLauncher
@@ -647,6 +714,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		self.childActivity = childActivity
 		self.instanceLock = instanceLock
 		self.runningApplicationsReader = runningApplicationsReader
+		self.hammerspoonConfigSeeder = hammerspoonConfigSeeder
+		self.quitRequestPoster = quitRequestPoster
+		self.terminationReplier = terminationReplier
+		self.launcherQuitRequester = launcherQuitRequester ?? {
+			let ownPid = ProcessInfo.processInfo.processIdentifier
+			let others = runningApplicationsReader(kErgoptiBundleId).filter { $0.processIdentifier != ownPid }
+			for other in others { _ = other.terminate() }
+			return others.count
+		}
 		super.init()
 	}
 
@@ -669,16 +745,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	/// - Parameters:
 	///   - attempt: Retries already spent on a held lock.
 	///   - proceed: Continues startup once the lock is held.
+	///   - takingOver: Whether the running launcher was asked to quit for this one.
 	@MainActor
-	private func acquireSoleLauncherOwnership(attempt: Int, then proceed: @escaping @MainActor () -> Void) {
+	func acquireSoleLauncherOwnership(
+		attempt: Int,
+		takingOver: Bool = false,
+		then proceed: @escaping @MainActor () -> Void
+	) {
 		switch instanceLock.acquire() {
 		case .acquired:
 			LauncherLog.write("launcher stage: sole-launcher lock held at \(instanceLock.path)")
 			proceed()
-		case .heldByAnotherLauncher where attempt < kLauncherLockRetryAttempts:
+		case .heldByAnotherLauncher
+			where attempt < (takingOver ? kLauncherTakeoverRetryAttempts : kLauncherLockRetryAttempts):
+			// A second launch restarts the running app, as Windows'
+			// #SingleInstance Force does (MLC-003, decided by the maintainer on
+			// 2026-11-11): the running launcher is asked to quit, which runs its
+			// runtime's controlled exit, and this one takes the lock it releases.
+			var takeover = takingOver
+			if attempt == 0 && !takingOver {
+				let asked = launcherQuitRequester()
+				if asked > 0 {
+					LauncherLog.write("another ErgoptiPlus launcher runs; asked it to quit so this launch restarts the app")
+					takeover = true
+				}
+			}
 			Task { @MainActor [weak self] in
 				try? await Task.sleep(nanoseconds: LauncherTimings.instanceLockRetry.nanoseconds)
-				self?.acquireSoleLauncherOwnership(attempt: attempt + 1, then: proceed)
+				self?.acquireSoleLauncherOwnership(attempt: attempt + 1, takingOver: takeover, then: proceed)
 			}
 		case .heldByAnotherLauncher:
 			// A second launcher would start a second embedded runtime beside the first
@@ -713,6 +807,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		case .packaged:
 			break
 		}
+		// Tell the embedded Hammerspoon where to read its Lua config from, before
+		// anything (Sparkle included) can fail: only the lock holder writes it.
+		seedHammerspoonConfig()
 		// A developer app is never updated in place: Sparkle would replace it.
 		if luaSource.developerRoot == nil {
 			startSparkleUpdater()
@@ -720,9 +817,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			LauncherLog.write("launcher stage: Sparkle updater not started: a developer source build is never updated")
 		}
 
-		// Tell the embedded Hammerspoon where to read its Lua config from.
-		seedConfigDirDefault()
-		LauncherLog.write("launcher stage: \(kHammerspoonConfigKey) seeded to \(bundledInitLuaPath())")
 
 		// Spawn the embedded Hammerspoon binary; if it cannot be located we
 		// surface a hard error rather than silently degrading.
@@ -824,7 +918,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 		waitForStaleRuntimes(
 			stale,
-			deadline: Date().addingTimeInterval(kStaleRuntimeTerminateGraceSeconds),
+			deadline: Date().addingTimeInterval(kStaleRuntimeTerminateGrace.seconds),
 			then: proceed
 		)
 	}
@@ -855,9 +949,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			proceed()
 			return
 		}
-		DispatchQueue.main.asyncAfter(deadline: .now() + kStaleRuntimePollIntervalSeconds) { [weak self] in
+		DispatchQueue.main.asyncAfter(deadline: .now() + kStaleRuntimePoll.seconds) { [weak self] in
 			self?.waitForStaleRuntimes(stale, deadline: deadline, then: proceed)
 		}
+	}
+
+	/// Defers a quit from outside (Sparkle's relaunch, a logout, osascript) until
+	/// the booted runtime has run its controlled exit: a plain terminate ran only
+	/// its inert shutdown callback, left the LLM helpers and the detached MLX
+	/// server running and lost its shutdown log (MLC-002). Its own deadline
+	/// ([ui] user_quit_deadline_ms) plus a margin bounds the wait.
+	func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+		if quitHandshakePending { return .terminateLater }
+		guard hsBootstrapReady, let application = hsApplication, !application.isTerminated else {
+			return .terminateNow
+		}
+		return beginQuitHandshake(runtimePid: application.processIdentifier)
+	}
+
+	/// Asks the booted runtime for its controlled exit and defers the quit until
+	/// it exits or its bound passes.
+	/// - Parameter runtimePid: Process id of the booted embedded runtime.
+	/// - Returns: `.terminateLater`, answered through the termination replier.
+	func beginQuitHandshake(runtimePid: pid_t) -> NSApplication.TerminateReply {
+		if quitHandshakePending { return .terminateLater }
+		quitHandshakePending = true
+		applicationIsTerminating = true
+		LauncherLog.write(
+			"quit requested from outside; asking embedded Hammerspoon pid \(runtimePid) for its controlled exit"
+		)
+		quitRequestPoster(runtimePid)
+		let bound = LauncherTimings.userQuitDeadline.seconds + LauncherTimings.quitHandshakeMargin.seconds
+		DispatchQueue.main.asyncAfter(deadline: .now() + bound) { [weak self] in
+			guard let self, self.quitHandshakePending else { return }
+			LauncherLog.write("embedded Hammerspoon did not finish its controlled exit in time; quitting anyway")
+			self.finishQuitHandshake()
+		}
+		return .terminateLater
+	}
+
+	/// Answers the deferred quit once, after the runtime exited or its bound passed.
+	private func finishQuitHandshake() {
+		guard quitHandshakePending else { return }
+		quitHandshakePending = false
+		terminationReplier(true)
 	}
 
 	func applicationWillTerminate(_ notification: Notification) {
@@ -910,47 +1045,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		return bundledConfigDir() + "/init.lua"
 	}
 
+	/// Seeds MJConfigFile with this launcher's init.lua and logs it.
+	private func seedHammerspoonConfig() {
+		hammerspoonConfigSeeder(bundledInitLuaPath())
+		LauncherLog.write("launcher stage: \(kHammerspoonConfigKey) seeded to \(bundledInitLuaPath())")
+	}
+
 
 
 
 	// =====================================
 	// ===== 2.3) Hammerspoon Lifecycle ====
 	// =====================================
-
-	// Write Hammerspoon preference overrides directly via CFPreferencesSetValue.
-	// This writes into ~/Library/Preferences/<bundleId>.plist synchronously,
-	// bypassing the cfprefsd async pipeline that `defaults write` goes through.
-	// Hammerspoon reads its prefs via [NSUserDefaults standardUserDefaults] under
-	// its own bundle ID (rewritten to kEmbeddedHammerspoonBundleId at build time);
-	// the outer bundle prohibits duplicate instances, so the GUI child must keep
-	// a distinct Launch Services identity. The plist
-	// is flushed before launchHammerspoon() so HS sees the correct path on the
-	// very first read, even on first-ever launch.
-	// Done at every startup so a user who moved the .app sees the new path.
-	private func seedConfigDirDefault() {
-		let appId = kEmbeddedHammerspoonBundleId as CFString
-		let user  = kCFPreferencesCurrentUser
-		let host  = kCFPreferencesAnyHost
-
-		// Point HS at our bundled init.lua — MJConfigFile takes the full file path.
-		CFPreferencesSetValue(
-			kHammerspoonConfigKey as CFString,
-			bundledInitLuaPath() as CFString,
-			appId, user, host)
-
-		// Suppress the native Hammerspoon hammer menubar icon and Dock icon.
-		// Ergopti provides its own menubar item via hs.menubar; the HS default
-		// icons are redundant and reveal the underlying dependency.
-		for key in ["MJShowMenuIconOnLaunch", "MJShowDockIconOnLaunch"] {
-			CFPreferencesSetValue(
-				key as CFString,
-				false as CFBoolean,
-				appId, user, host)
-		}
-
-		// Flush synchronously so the plist is on disk before we exec Hammerspoon.
-		CFPreferencesSynchronize(appId, user, host)
-	}
 
 	// Launch the embedded Hammerspoon through Launch Services. A nested AppKit
 	// bundle cannot be bootstrapped reliably by executing its inner Mach-O: on
@@ -1172,6 +1278,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// The child is gone; a bootstrap retry below holds the activity again.
 		childActivity.release()
 		guard !applicationIsTerminating else {
+			// A quit from outside waited for this exit: answer it now.
+			if quitHandshakePending {
+				LauncherLog.write("embedded Hammerspoon finished its controlled exit; quitting")
+				finishQuitHandshake()
+				return
+			}
 			applicationTerminator(self)
 			return
 		}
@@ -1214,6 +1326,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			LauncherLog.write(
 				"embedded Hammerspoon exited before bootstrap readiness; retrying once"
 			)
+			// Another launcher may have rewritten the preference meanwhile.
+			seedHammerspoonConfig()
 			launchHammerspoon(
 				at: launchContext.binaryPath,
 				remapGuardianStatus: launchContext.guardianStatus
@@ -1421,21 +1535,10 @@ if InstalledPhysicalSourceBridge.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(InstalledPhysicalSourceBridge.run())
 }
 
-// Write MJConfigFile via CFPreferences before NSApplication.run() so Hammerspoon
-// always sees the correct config path, even if applicationDidFinishLaunching is
-// never reached (Gatekeeper first-run kill, Sparkle init exception, etc.).
-// CFPreferencesSynchronize flushes synchronously to disk before app.run().
-let _earlyInitLua = Bundle.main.bundlePath + "/Contents/Resources/static/ergopti_plus/macos/init.lua"
-CFPreferencesSetValue(
-    kHammerspoonConfigKey as CFString,
-    _earlyInitLua as CFString,
-    kEmbeddedHammerspoonBundleId as CFString,
-    kCFPreferencesCurrentUser,
-    kCFPreferencesAnyHost)
-CFPreferencesSynchronize(
-    kEmbeddedHammerspoonBundleId as CFString,
-    kCFPreferencesCurrentUser,
-    kCFPreferencesAnyHost)
+// MJConfigFile is seeded only once this process holds the sole-launcher lock
+// (finishLaunchingAsSoleLauncher) and again before each runtime launch: an
+// early write here let a second launcher repoint the running copy's runtime at
+// its own bundle before finding the lock held (MLC-001).
 
 let app      = NSApplication.shared
 let delegate = AppDelegate()

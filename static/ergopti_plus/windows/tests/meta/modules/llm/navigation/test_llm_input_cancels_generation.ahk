@@ -57,8 +57,8 @@ _MetaCheckInputCancelsGeneration() {
 		"LLM_Engine_CancelInflight must cancel Ollama streaming work")
 	Assert(InStr(CiBody, "LLM_OllamaCancelAllAsync("),
 		"LLM_Engine_CancelInflight must cancel Ollama async work")
-	Assert(InStr(CiBody, "LLM_RemoteCancelAllAsync("),
-		"LLM_Engine_CancelInflight must cancel remote (API) async work")
+	Assert(InStr(CiBody, '_LLM_Engine_Port("http").Cancel('),
+		"LLM_Engine_CancelInflight must cancel remote (API) async work through the engine's HttpClient port")
 
 	; (3) Pointer click + move dismissal acts on ANY active prediction work — the
 	; loading spinner and in-flight generation, not only a shown prediction.

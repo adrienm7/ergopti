@@ -6,8 +6,11 @@
  * DESCRIPTION:
  * Holds the shape of the driver trees to the counts measured when the
  * structure plan was written (docs/design/structure-plan.md): folders outside
- * the 2..20 entry bounds (40 in tests), per tree, and the layer and domain
- * folders (depth two) present on one or two drivers only. No count may rise; a count that falls
+ * the 2..20 entry bounds (40 in tests), per tree, and the top-level folders
+ * (features, core, platform, today's layers) present on one or two drivers
+ * only. A
+ * one-entry folder that mirrors a real folder on another driver is kept for
+ * parity and not counted. No count may rise; a count that falls
  * fails too until the baseline is lowered in the same change, so the ratchet
  * never carries slack a regression could hide in.
  *
@@ -38,15 +41,17 @@ function numbers(census) {
 	const out = {};
 	for (const [tree, s] of Object.entries(census.summary)) {
 		for (const k of KEYS) out[`${tree}.${k}`] = s[k];
-		// A singleton kept for parity is still a singleton: the plan turns plain
-		// ones into parity ones, so the two are ratcheted together.
-		out[`${tree}.code_singleton`] += s.code_singleton_parity;
-		out[`${tree}.tests_singleton`] += s.tests_singleton_parity;
+		// A one-entry folder whose counterpart on another driver is a real
+		// folder is not counted: the feature-first tree gives every feature the
+		// same sub-folders (engine/, adapters/, ui/, data/) on every driver, and
+		// Rule B's "same tree" wins over "no singleton" (docs/design/
+		// structure-plan.md, decisions). The census still reports them.
 	}
-	// Layer and domain level only: below it a sub-module exists where its code
-	// exists, and the plan creates such asymmetric sub-folders on purpose.
-	out['drivers.mismatched_folders_depth2'] = census.mismatches.filter(
-		(m) => m.folder.split('/').length <= 2
+	// The top level only: a feature holds the sub-folders its code needs
+	// (decided by the maintainer on 2026-11-11), so gestures/adapters/ exists
+	// where gestures bind the OS; the census reports those asymmetries.
+	out['drivers.mismatched_top_level'] = census.mismatches.filter(
+		(m) => !m.folder.includes('/')
 	).length;
 	return out;
 }
@@ -89,10 +94,16 @@ function selfTest() {
 	assert.equal(crowded.summary.linux.code_oversized, 1, 'a 28-entry folder is oversized');
 	const lonely = Census.measure([...files, 'macos/modules/only/one.lua']);
 	assert.equal(lonely.summary.macos.code_singleton, 1, 'a one-entry folder is a singleton');
+	const alone = Census.measure([...files, 'macos/launcher/a.swift', 'macos/launcher/b.swift']);
 	assert.equal(
-		numbers(lonely)['drivers.mismatched_folders_depth2'],
+		numbers(lonely)['drivers.mismatched_top_level'],
+		0,
+		'a sub-folder asymmetry is reported, not ratcheted'
+	);
+	assert.equal(
+		numbers(alone)['drivers.mismatched_top_level'],
 		1,
-		'a folder on one driver is a mismatch'
+		'a top-level folder on one driver is a mismatch'
 	);
 	const parity = Census.measure([
 		...files,

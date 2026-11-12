@@ -29,6 +29,7 @@ done
 [ -n "${BUS_LAUNCHER}" ] || { echo "ENVIRONMENT: at-spi-bus-launcher is missing" >&2; exit 2; }
 luajit -e 'require("lgi")' >/dev/null 2>&1 || { echo "ENVIRONMENT: lgi is unreachable from LuaJIT (lua-lgi)" >&2; exit 2; }
 python3 tests/hardware/test_atspi_fixture_lifetime.py || exit 1
+python3 tests/hardware/test_llm_selection_focus_state.py || exit 1
 # Keep the new race regressions on the native lane, beyond recorder-based units.
 for probe in run_window_focus_identity.py run_llm_prediction_acceptance.py run_llm_selection_focus.py run_user_hotstring_destination.py run_secure_focus_watch.py; do
 	python3 "tests/hardware/${probe}" || exit 1

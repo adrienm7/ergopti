@@ -8,7 +8,9 @@
  * parse it at runtime: macos/_generated/registry_limits.lua, the [limits] byte
  * caps for the macOS modules loaded before infra.timings exists, and
  * LauncherTimings.generated.swift, the [launcher] durations of the Swift
- * launcher's sleeps and polls plus its shared LLM route-probe budget.
+ * launcher's sleeps and polls plus its shared LLM route-probe budget and the
+ * quit deadline, and linux/_generated/launch_timings.sh, the bound a second
+ * Linux launch waits for the running daemon's controlled exit.
  *
  * WHY THIS EXISTS:
  * infra.timings parses the registry through the TOML reader, whose cache
@@ -40,6 +42,7 @@ const OUTPUT_SWIFT = path.join(
 	SP,
 	'macos/launcher/Sources/ErgoptiPlus/LauncherTimings.generated.swift'
 );
+const OUTPUT_SHELL = path.join(SP, 'linux/_generated/launch_timings.sh');
 // usleep takes a 32-bit microsecond count: the longest duration it can carry.
 const MAX_LAUNCHER_MS = Math.floor(0xffffffff / 1000);
 
@@ -126,6 +129,18 @@ const probeMs = registry.llm?.[probeKey];
 if (!Number.isSafeInteger(probeMs) || probeMs < 1 || probeMs > MAX_LAUNCHER_MS)
 	fail(`[llm].${probeKey} must be an integer from 1 to ${MAX_LAUNCHER_MS} milliseconds.`);
 
+// A leftover runtime gets the bound of its own controlled exit before it is
+// force-terminated: the launcher reads the Lua quit deadline, not a copy.
+const quitKey = 'user_quit_deadline_ms';
+const quitMs = registry.ui?.[quitKey];
+if (!Number.isSafeInteger(quitMs) || quitMs < 1 || quitMs > MAX_LAUNCHER_MS)
+	fail(`[ui].${quitKey} must be an integer from 1 to ${MAX_LAUNCHER_MS} milliseconds.`);
+// A launcher waits this much longer for the running instance's controlled exit.
+const marginKey = 'quit_handshake_margin_ms';
+const marginMs = registry.ui?.[marginKey];
+if (!Number.isSafeInteger(marginMs) || marginMs < 1 || marginMs > MAX_LAUNCHER_MS)
+	fail(`[ui].${marginKey} must be an integer from 1 to ${MAX_LAUNCHER_MS} milliseconds.`);
+
 const swiftRows = Object.entries(launcher)
 	.map(
 		([key, value]) =>
@@ -142,7 +157,7 @@ const swift = `// Sources/ErgoptiPlus/LauncherTimings.generated.swift
 // DESCRIPTION:
 // The [launcher] section of the timing registry: every sleep and poll interval
 // of the launcher, its fixtures and its tests, plus the shared LLM route-probe
-// budget, in the units the sleep APIs take.
+// budget and the Lua quit deadline, in the units the sleep APIs take.
 // ==============================================================================
 
 import Foundation
@@ -164,12 +179,26 @@ struct RegistryDuration: Sendable {
 enum LauncherTimings {
 ${swiftRows}
 	static let managedProxyProbeTimeout = RegistryDuration(section: "llm", key: "${probeKey}", milliseconds: ${probeMs})
+	static let userQuitDeadline = RegistryDuration(section: "ui", key: "${quitKey}", milliseconds: ${quitMs})
+	static let quitHandshakeMargin = RegistryDuration(section: "ui", key: "${marginKey}", milliseconds: ${marginMs})
 }
 `;
 
+// install/launch.sh cannot read TOML before the daemon's module loader exists;
+// a second launch restarting the running daemon waits this bound (MLC-003).
+const shell = `# linux/_generated/launch_timings.sh
+# AUTO-GENERATED from ${SOURCE_REL}.
+# DO NOT EDIT BY HAND — run \`npm run codegen:registry-constants\` to refresh.
+# Sourced by install/launch.sh: the running daemon's controlled-exit bound.
+ERGOPTI_USER_QUIT_DEADLINE_MS=${quitMs}
+ERGOPTI_QUIT_HANDSHAKE_MARGIN_MS=${marginMs}
+`;
+
+fs.writeFileSync(OUTPUT_SHELL, shell);
 fs.writeFileSync(OUTPUT_LUA, lua);
 fs.writeFileSync(OUTPUT_SWIFT, swift);
 console.log(`[OK] ${path.relative(ROOT, OUTPUT_LUA)} (${Object.keys(limits).length} limit(s))`);
+console.log(`[OK] ${path.relative(ROOT, OUTPUT_SHELL)} (the Linux relaunch bound)`);
 console.log(
-	`[OK] ${path.relative(ROOT, OUTPUT_SWIFT)} (${Object.keys(launcher).length + 1} duration(s))`
+	`[OK] ${path.relative(ROOT, OUTPUT_SWIFT)} (${Object.keys(launcher).length + 3} duration(s))`
 );

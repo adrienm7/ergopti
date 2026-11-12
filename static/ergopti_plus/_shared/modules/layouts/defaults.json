@@ -1,5 +1,5 @@
 {
-	"_comment": "Keyboard-layout registry location, the single source for every driver and tool. The registry is a folder of this repository: one <id>/<id>.keylayout (the only source of a layout) plus <id>/meta.toml per layout, and index.json generated from them by tools/build/build-layouts-index.cjs. Drivers download index.json and the chosen .keylayout straight from that folder through raw_url_template; owner and repo come from ../updater/defaults.json. branch is the standalone default; each packaged driver resolves its installed build channel through the updater owner. A source run (a clone) reads the published registry like a release, except while its registry folder differs from HEAD (git status, untracked included): it then reads the clone's folder without HTTP (docs/design/developer-mode.md). max_file_bytes bounds every download (index or layout). local_folder is the folder, inside the configuration folder, where a driver keeps the layouts it downloaded (<id>.keylayout) with installed_file, the record of each installed layout and the index entry its copy was verified against, and the last catalogue index.json with the ETag the registry served it with (etag_file). ergopti_family identifies the Ergopti layouts in catalogue metadata. composer describes the layout the per-layer composer builds (docs/design/layout-composer.md): id is the reserved registry-shaped id its compiled .keylayout is installed under (no registry layout may use it), folder the folder of the configuration folder that keeps the user’s composition (declaration_file, at most max_declaration_bytes) or, in its place, the user’s Ergopti layout source (source_file, at most max_source_bytes; docs/design/layout-source-format.md) with the emulation table compiled from it for that driver (emulation_file, at most max_emulation_bytes) and, when the source is stored for the layout emulation alone (« Emulate without installing »), its compiled .keylayout (keylayout_file), which the emulation reads while the composed layout is not installed; family the family its installed record carries. source describes where the unified layout editor keeps what it saves from inside ErgoptiPlus (_shared/lua/layouts/source_store.lua): folder of the configuration folder, last_file naming the last saved source, max_file_bytes per file and max_name_length per file name. Geometry hotstrings remain opt-in on every layout; the active layout never changes their enabled state.",
+	"_comment": "Keyboard-layout registry location, the single source for every driver and tool. The registry is a folder of this repository: one <id>/<id>.keylayout (the only source of a layout) plus <id>/meta.toml per layout, and index.json generated from them by tools/build/build-layouts-index.cjs. Drivers download index.json and the chosen .keylayout straight from that folder through raw_url_template; owner and repo come from ../updater/defaults.json. branch is the standalone default; each packaged driver resolves its installed build channel through the updater owner. A source run (a clone) reads the published registry like a release, except while its registry folder differs from HEAD (git status, untracked included): it then reads the clone's folder without HTTP (docs/design/developer-mode.md). max_file_bytes bounds every download (index or layout). local_folder is the folder, inside the configuration folder, where a driver keeps the layouts it downloaded (<id>.keylayout) with installed_file, the record of each installed layout and the index entry its copy was verified against, and the last catalogue index.json with the ETag the registry served it with (etag_file). ergopti_family identifies the Ergopti layouts in catalogue metadata. composer describes the layout the per-layer composer builds (docs/design/layout-composer.md): id is the reserved registry-shaped id its compiled .keylayout is installed under (no registry layout may use it), folder the folder of the configuration folder that keeps the user’s composition (declaration_file, at most max_declaration_bytes) or, in its place, the user’s Ergopti layout source (source_file, at most max_source_bytes; docs/design/layout-source-format.md) with the emulation table compiled from it for that driver (emulation_file, at most max_emulation_bytes) and, when the source is stored for the layout emulation alone (« Emulate without installing »), its compiled .keylayout (keylayout_file), which the emulation reads while the composed layout is not installed; family the family its installed record carries; source_format and source_version the layout source a host accepts, failures the codes a host answers the page with (layout_composer.failure_* and layout_editor.error.*), dll_folder the folder of the Ergopti root where the Windows host stages the layout DLL images it registers. source describes where the unified layout editor keeps what it saves from inside ErgoptiPlus (_shared/lua/layouts/source_store.lua): folder of the configuration folder, last_file naming the last saved source, max_file_bytes per file, max_name_length per file name, nav_file the navigation layer export that is never reopened as a source, and failures its refusal codes. Geometry hotstrings remain opt-in on every layout; the active layout never changes their enabled state.",
 	"registry": {
 		"folder": "static/layouts/registry",
 		"index_file": "index.json",
@@ -22,12 +22,29 @@
 		"emulation_file": "layout_source_emulation.json",
 		"max_emulation_bytes": 262144,
 		"keylayout_file": "layout_source.keylayout",
-		"family": "composed"
+		"family": "composed",
+		"source_format": "ergopti-layout",
+		"source_version": 1,
+		"dll_folder": "dll",
+		"failures": {
+			"install": "install_failed",
+			"elevation": "elevation_refused",
+			"foreign": "foreign_layout",
+			"profile": "profile_not_added",
+			"uninstall": "uninstall_failed",
+			"emulate_not_saved": "emulate_not_saved",
+			"emulate": "emulate_failed"
+		}
 	},
 	"source": {
 		"folder": "layout_sources",
 		"last_file": "last_source",
 		"max_file_bytes": 4194304,
-		"max_name_length": 80
+		"max_name_length": 80,
+		"nav_file": "layers.toml",
+		"failures": {
+			"invalid": "source_invalid_file",
+			"write": "write_failed"
+		}
 	}
 }

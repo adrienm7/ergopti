@@ -213,6 +213,66 @@ class SessionLockTests(unittest.TestCase):
                         if node_socket is not None:
                             node_socket.close()
 
+    def test_second_launch_restarts_the_running_daemon(self):
+        """A second direct launch asks the running daemon for its controlled exit
+        (SIGTERM) and takes the lock, as Windows' #SingleInstance Force restarts;
+        the login autostart leaves it alone (MLC-003, second-launch-restarts)."""
+        driver = pathlib.Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            stubs = root / "bin"
+            stubs.mkdir()
+            marks = root / "marks"
+            # The daemon stand-in holds the inherited lock descriptor and leaves
+            # on SIGTERM, as the daemon's controlled exit does.
+            (stubs / "luajit").write_text(
+                "#!/bin/bash\n"
+                'trap \'echo "exit $$" >> "$MARKS"; exit 0\' TERM\n'
+                'echo "start $$" >> "$MARKS"\n'
+                "while :; do sleep 0.05; done\n",
+                encoding="utf-8",
+            )
+            (stubs / "luajit").chmod(0o755)
+            environment = dict(os.environ)
+            environment.pop("ERGOPTI_SESSION_LOCK_FD", None)
+            environment["XDG_RUNTIME_DIR"] = str(root / "runtime")
+            environment["HOME"] = str(root / "home")
+            environment["MARKS"] = str(marks)
+            environment["PATH"] = str(stubs) + os.pathsep + environment["PATH"]
+            launch = ["bash", str(driver / "install/launch.sh")]
+            first = subprocess.Popen(launch, env=environment, stderr=subprocess.DEVNULL)
+            second = None
+            try:
+                deadline = time.monotonic() + 10
+                while not (marks.exists() and "start" in marks.read_text()):
+                    self.assertLess(time.monotonic(), deadline, "the first daemon never started")
+                    time.sleep(0.05)
+                autostart = subprocess.run(
+                    launch + ["--session-start"], env=environment, capture_output=True, timeout=10
+                )
+                self.assertEqual(autostart.returncode, 0, autostart.stderr)
+                self.assertNotIn(
+                    "exit", marks.read_text(), "the login autostart leaves the daemon alone"
+                )
+                second = subprocess.Popen(launch, env=environment, stderr=subprocess.DEVNULL)
+                first.wait(timeout=20)
+                deadline = time.monotonic() + 20
+                while marks.read_text().count("start") < 2:
+                    self.assertLess(time.monotonic(), deadline, "the second launch never took over")
+                    time.sleep(0.05)
+                lines = marks.read_text().split()
+                self.assertEqual(
+                    lines[0::2],
+                    ["start", "exit", "start"],
+                    "the running daemon left before the second one started",
+                )
+                self.assertIsNone(second.poll(), "the second launch now runs the daemon")
+            finally:
+                for process in (first, second):
+                    if process is not None and process.poll() is None:
+                        process.kill()
+                        process.wait(timeout=5)
+
     def test_child_outlives_daemon_without_retaining_lock(self):
         driver = pathlib.Path(__file__).resolve().parents[2]
         runtime = shutil.which("luajit")

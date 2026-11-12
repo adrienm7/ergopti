@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_release_ai_enabled_kept_on_macos/case.toml
+
+[case]
+description = "A configuration ErgoptiPlus 1.0.9 wrote on macOS (v20, the oldest version) with the AI turned on climbs to the current version with every setting kept: the v21 step is Windows-only, so only the stamp moves."
+drivers = ["hs"]
+outcome = "migrated"
+from_version = 20
+to_version = 21

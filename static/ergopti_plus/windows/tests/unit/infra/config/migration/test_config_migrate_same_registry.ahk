@@ -225,13 +225,14 @@ _CMSR_CollectHolders(Value, Holders) {
 }
 
 _CMSR_ShippedRegistry() {
-	static Probes := 6
 	Registry := ManifestCloneValue(ConfigMigrateShippedRegistry())
 	Twin := ManifestCloneValue(Registry)
 	_CMSR_Expect("the shipped registry and its copy", 1, Registry, Twin)
 	Holders := []
 	_CMSR_CollectHolders(Registry, Holders)
-	Assert(Holders.Length > Probes, "the shipped registry must be large enough to probe")
+	; A squashed registry may hold a single step: probe every node up to six.
+	Probes := Min(6, Holders.Length)
+	Assert(Probes >= 3, "the shipped registry must be large enough to probe")
 	Stride := Holders.Length // Probes
 	Probed := 0
 	loop Probes {

@@ -125,6 +125,7 @@ _TestResultsBeginRun()
 ; AppState fields directly, and before any infra/ file that reads AppState.
 #Include ../infra/app_state.ahk
 #Include support/native_cli_diagnostics.ahk
+#Include support/receiving_profile.ahk
 
 ; Stubs second — they define ScriptInformation, Features, SendNewResult,
 ; WrapTextIfSelected, DeadKey, ToggleCapsLock, etc., which infra/ files
@@ -311,6 +312,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../modules/keymap/keylayout/keylayout_parser.ahk
 #Include ../modules/keymap/keylayout/keylayout_tables.ahk
 #Include ../modules/keymap/keylayout/keylayout_emulation.ahk
+#Include ../modules/keymap/keylayout/source_emulation.ahk
 #Include ../modules/keymap/keylayout/layout_registry.ahk
 #Include ../modules/keymap/keylayout/layout_catalogue.ahk
 #Include ../modules/keymap/keylayout/layout_extension.ahk
@@ -426,6 +428,7 @@ InstallSendNoOps()
 #Include unit/adapters/test_adapter_contract_vectors.ahk
 #Include unit/adapters/test_adapter_contract_vectors_system.ahk
 #Include unit/adapters/input/test_clipboard_paste_transaction_ownership.ahk
+#Include unit/adapters/input/test_selection_capture_receiving.ahk
 #Include unit/adapters/input/test_suppressive_inputhook_ownership.ahk
 ; Runs startup/siho_boot_window_smoke.ahk as a child process. That harness is
 ; deliberately NOT included here: it must observe the state before the module's
@@ -577,6 +580,7 @@ InstallSendNoOps()
 #Include unit/infra/config/persistence/test_config.ahk
 #Include unit/infra/config/persistence/test_feature_state_boot.ahk
 #Include unit/ui/wpm/test_wpm_config_types.ahk
+#Include unit/ui/wpm/test_wpm_position_receiving.ahk
 #Include ../ui/wpm/wpm_gdiplus_ownership.ahk
 #Include ../ui/wpm/wpm_widget.ahk
 #Include ../ui/wpm/wpm_category_color.ahk
@@ -673,11 +677,16 @@ InstallSendNoOps()
 #Include unit/modules/updater/test_updater_release_notes.ahk
 #Include unit/modules/updater/test_updater_staging_transport.ahk
 #Include unit/modules/updater/test_updater_swap_transaction.ahk
+#Include unit/modules/updater/test_updater_swap_receiving.ahk
 #Include unit/modules/updater/test_updater_swap_cancellation.ahk
 #Include unit/modules/updater/test_updater_swap_shutdown.ahk
 #Include unit/modules/updater/test_updater_swap_recovery.ahk
 #Include unit/modules/updater/test_updater_swap_cleanup.ahk
 #Include unit/modules/gestures/test_gesture_emit_actions.ahk
+#Include unit/modules/gestures/test_gesture_incremental_rule.ahk
+#Include unit/modules/gestures/test_touchpad_hid.ahk
+#Include unit/modules/gestures/test_raw_touchpad_owner.ahk
+#Include unit/modules/gestures/test_gesture_swipe_slot_menu.ahk
 #Include unit/modules/updater/test_updater_constants_single_source.ahk
 #Include unit/infra/lifecycle/test_runtime_contract_version.ahk
 #Include meta/modules/updater/test_updater_load_interval_guard.ahk
@@ -855,6 +864,8 @@ _LLM_Deps_State := "ready"
 #Include ../ui/layout_manager/init.ahk
 #Include ../ui/layout_manager/composer.ahk
 #Include ../ui/layout_manager/composer_check.ahk
+#Include ../ui/layout_manager/source_store.ahk
+#Include ../ui/layout_manager/kbd_register_core.ahk
 #Include ../ui/field_check/network_check.ahk
 #Include ../ui/proxy_override.ahk
 #Include ../ui/menu/menu_layout.ahk
@@ -862,6 +873,10 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/keymap/test_layout_composer_host.ahk
 #Include unit/modules/keymap/test_layout_composer_stage_ownership.ahk
 #Include unit/modules/keymap/test_layout_composer_check.ahk
+#Include unit/modules/keymap/test_layout_source_store.ahk
+#Include unit/modules/keymap/test_layout_composer_source.ahk
+#Include unit/modules/keymap/test_kbd_register.ahk
+#Include unit/modules/keymap/test_layout_source_emulation.ahk
 #Include unit/ui/field_check/test_network_check.ahk
 #Include unit/modules/keymap/test_ergopti_keylayout_tables.ahk
 #Include unit/modules/keymap/test_layout_supersession.ahk
@@ -935,6 +950,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/modules/llm/api/test_llm_sync_target.ahk
 #Include unit/modules/llm/menu/test_llm_menu_transactions.ahk
 #Include unit/modules/llm/menu/test_llm_api_entries_transactions.ahk
+#Include unit/modules/llm/test_api_token_crypto_receiving.ahk
 #Include unit/modules/llm/menu/test_llm_menu_display.ahk
 #Include unit/modules/llm/menu/test_llm_menu_generation.ahk
 #Include unit/modules/llm/menu/test_llm_menu_indentation.ahk
@@ -1018,6 +1034,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/gestures/test_system_actions_confirmed_targets.ahk
 #Include unit/modules/gestures/test_system_actions_query_pause.ahk
 #Include unit/modules/gestures/test_system_actions_process_lease.ahk
+#Include unit/modules/gestures/test_system_actions_receiving.ahk
 #Include unit/adapters/test_screen_brightness.ahk
 #Include unit/modules/llm/actions/test_llm_rewrite.ahk
 #Include unit/modules/llm/actions/test_llm_prompt_action.ahk
@@ -1035,6 +1052,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/llm/actions/test_llm_agent_requester.ahk
 #Include unit/modules/llm/api/test_llm_remote_formats.ahk
 #Include unit/modules/llm/prediction/test_llm_live_mode.ahk
+#Include unit/modules/llm/prediction/test_llm_engine_transcripts.ahk
 #Include unit/modules/llm/prediction/test_llm_hotstring_tooltip_hold.ahk
 #Include unit/modules/shortcuts/test_send_input_actions.ahk
 #Include unit/platform/remap/keys/test_tap_keys.ahk
@@ -1070,6 +1088,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/infra/config/migration/test_config_migrate_variant_metadata.ahk
 #Include unit/infra/config/migration/test_config_migrate_same_registry.ahk
 #Include unit/infra/config/migration/test_legacy_folder_migration.ahk
+#Include unit/infra/config/migration/test_legacy_folder_migration_receiving.ahk
 #Include unit/infra/config/migration/test_config_journal_boot.ahk
 #Include unit/infra/config/migration/test_config_journal_ai_admission.ahk
 #Include unit/infra/config/migration/test_config_journal_settlement.ahk

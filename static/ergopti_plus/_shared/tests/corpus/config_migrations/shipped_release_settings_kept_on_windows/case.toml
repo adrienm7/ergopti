@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_release_settings_kept_on_windows/case.toml
+
+[case]
+description = "A configuration ErgoptiPlus 1.0.9 wrote on Windows (v20, the oldest version) climbs to the current version with every setting kept: only the stamp moves when it holds no language section order."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 20
+to_version = 21

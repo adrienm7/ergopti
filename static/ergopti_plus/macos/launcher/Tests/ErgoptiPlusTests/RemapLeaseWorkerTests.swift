@@ -3548,9 +3548,6 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let headless = try XCTUnwrap(
 			source.range(of: "KarabinerLeaseWorker.handles")?.lowerBound
 		)
-		let preferences = try XCTUnwrap(
-			source.range(of: "let _earlyInitLua")?.lowerBound
-		)
 		let application = try XCTUnwrap(
 			source.range(of: "NSApplication.shared")?.lowerBound
 		)
@@ -3567,8 +3564,10 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			source.range(of: "applicationLauncher(applicationURL, configuration)")?.lowerBound
 		)
 
-		XCTAssertLessThan(headless, preferences)
 		XCTAssertLessThan(headless, application)
+		// MJConfigFile is seeded by the sole launcher only, never by the
+		// top-level code a headless worker or a second launcher runs (MLC-001).
+		XCTAssertNil(source[headless..<application].range(of: "kHammerspoonConfigKey"))
 		XCTAssertLessThan(helperExport, childStart)
 		XCTAssertLessThan(deviceExport, childStart)
 		XCTAssertLessThan(inodeExport, childStart)

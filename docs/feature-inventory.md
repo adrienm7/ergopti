@@ -6,7 +6,7 @@ These are complete projections of the shared configuration and action catalogues
 
 Each unchecked row is a triage item, not a confirmed missing feature. To update this queue and the website data, edit the manifest and run `node tools/codegen/codegen-feature-inventory.cjs`; the Linux parity gate checks for stale outputs.
 
-## windows — 130 paths not declared
+## windows — 114 paths not declared
 
 - [ ] `hotstrings.enabled` (feature; declared: macos; reason: `platform_reason.hotstrings_master_is_macos_engine`)
 - [ ] `llm.models.user_models` (setting; declared: macos; reason: `platform_reason.llm_saved_user_models_are_macos`)
@@ -63,76 +63,60 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `gestures.swipe_5_horiz` (feature; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
 - [ ] `gestures.tap_2` (feature; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
 - [ ] `gestures.tap_5` (feature; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
-- [ ] `gestures.modes.swipe_2_left` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_2_right` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_2_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_2_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_2_left_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_2_left_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_2_right_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_2_right_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_3_left` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_3_right` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_3_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_3_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_3_left_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_3_left_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_3_right_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_3_right_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_4_left` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_4_right` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_4_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_4_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_4_left_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_4_left_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_4_right_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_4_right_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_5_left` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_5_right` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_5_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_5_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_5_left_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_5_left_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_5_right_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_5_right_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_2_left` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_2_right` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_2_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_2_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_2_left_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_2_left_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_2_right_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_2_right_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_3_left` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_3_right` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_3_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_3_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_3_left_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_3_left_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_3_right_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_3_right_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_4_left` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_4_right` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_4_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_4_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_4_left_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_4_left_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_4_right_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_4_right_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_5_left` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_5_right` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_5_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_5_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_5_left_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_5_left_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_5_right_down` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_5_right_up` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_3_horiz` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_4_horiz` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.modes.swipe_5_horiz` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_3_horiz` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_4_horiz` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
-- [ ] `gestures.sensitivities.swipe_5_horiz` (setting; declared: macos, linux; reason: `platform_reason.gesture_modes_and_steps_need_finger_travel`)
+- [ ] `gestures.modes.swipe_2_left` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_2_right` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_2_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_2_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_2_left_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_2_left_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_2_right_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_2_right_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_3_left_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_3_left_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_3_right_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_3_right_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_4_left_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_4_left_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_4_right_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_4_right_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_5_left` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_5_right` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_5_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_5_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_5_left_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_5_left_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_5_right_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_5_right_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_2_left` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_2_right` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_2_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_2_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_2_left_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_2_left_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_2_right_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_2_right_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_3_left_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_3_left_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_3_right_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_3_right_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_4_left_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_4_left_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_4_right_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_4_right_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_5_left` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_5_right` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_5_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_5_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_5_left_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_5_left_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_5_right_down` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_5_right_up` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_3_horiz` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_4_horiz` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.modes.swipe_5_horiz` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_3_horiz` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_4_horiz` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
+- [ ] `gestures.sensitivities.swipe_5_horiz` (setting; declared: macos, linux; reason: `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`)
 - [ ] `layout.virtual_keyboard` (setting; declared: macos; reason: `platform_reason.virtual_keyboard_is_karabiner`)
 - [ ] `ui.menubar_icon` (setting; declared: macos; reason: `platform_reason.layout_bundle_and_menubar_are_macos`)
 - [ ] `tap_holds.enabled` (feature; declared: macos, linux; reason: `platform_reason.category_master_is_a_gate_on_windows`)
@@ -447,7 +431,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `tap_hold_owned_repair_rows.tap_hold_owned_repair` (hide): Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.
 - [ ] `metrics_menu.metrics_availability` (hide): Linux only: under Wayland an application gets no cursor position, and the current desktop only from sway, Hyprland or KDE Plasma, so this list names the metrics that session cannot measure, each with its reason. Windows and macOS measure both on every session and have nothing to list.
 - [ ] `metrics_menu.metrics_migration` (hide): Linux only: this driver converts the stored metrics to encrypted form in the background and shows the progress here, with a way to stop. Windows and macOS convert on the next launch, so they have no progress to show.
-- [ ] `layout_menu.open_layout_editor` (grey): Editor on the website on Windows: the Windows layout manager window has no layout editor; create, edit and export layouts on the Ergopti website.
 - [ ] `layout_menu.layout_bundle` (hide): macOS only: this row installs the .bundle layout. Windows installs Ergopti from « Download the Ergopti system layout installer » below; on Linux, install it from « Manage layouts… » (Wayland) or with install.sh (X11).
 - [ ] `layout_menu.virtual_keyboard` (hide): macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.
 - [ ] `layout_menu.menubar_icon` (hide): macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.
@@ -461,9 +444,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `gestures_menu.gesture_slots_5` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
 - [ ] `gestures_menu.gesture_slots_linux` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
 - [ ] `gestures_menu.gesture_reading_linux` (hide): Linux only: this driver reads the touchpad itself through libinput, and this row starts and stops that reader. macOS receives gestures from the system and Windows from its touchpad settings, so neither has a reader to run.
-- [ ] `gesture_slot_mode_commands.gesture_mode_single` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
-- [ ] `gesture_slot_mode_commands.gesture_mode_incremental` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
-- [ ] `gesture_change_action.gesture_slot_change_action` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
 - [ ] `tap_holds_menu.tap_hold_timings` (hide): Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.
 - [ ] `llm_api_add_provider_group.api_add_entry` (hide): The other drivers carry this control as a row of their own: each driver lays out the value, reset or variants of a setting through its own row, because the native menu toolkits differ. This is a presentation difference, not a missing control.
 - [ ] `llm_api_active_commands.api_test_active` (hide): The other drivers carry this control as a row of their own: each driver lays out the value, reset or variants of a setting through its own row, because the native menu toolkits differ. This is a presentation difference, not a missing control.
@@ -476,8 +456,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `selection_helper_commands.selection_paste_plain` (hide): Linux only: this driver groups its selection operations — CapsWord, the case transforms, select word or line, paste without formatting — into one block. macOS reaches the same operations through its Ctrl shortcuts and Windows through its own key combinations, so a shared row would list them twice there.
 - [ ] `tap_hold_key_native_commands.tap_hold_key_no_action` (hide): Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.
 - [ ] `gesture_system_status_controls.gesture_system_refresh` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
-- [ ] `gesture_swipe_slot_menu.gesture_mode_options` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
-- [ ] `gesture_swipe_slot_menu.gesture_sensitivity_options` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
 - [ ] `llm_custom_profile_controls.llm_profile_use` (hide): The other drivers carry this control as a row of their own: each driver lays out the value, reset or variants of a setting through its own row, because the native menu toolkits differ. This is a presentation difference, not a missing control.
 - [ ] `llm_custom_profile_controls.llm_profile_shortcut` (hide): On Windows and Linux, assign “AI prediction with a chosen prompt” to a keyboard shortcut and choose your custom profile in the action picker. The profile applies to that request only; the action is refused if the profile was deleted or AI is disabled.
 - [ ] `llm_custom_profile_controls.llm_profile_edit` (hide): The other drivers carry this control as a row of their own: each driver lays out the value, reset or variants of a setting through its own row, because the native menu toolkits differ. This is a presentation difference, not a missing control.

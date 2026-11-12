@@ -86,8 +86,11 @@ if (!embeddedId || swiftEmbeddedId !== embeddedId) {
 		'Swift CFPreferences and the build script must share the embedded runtime bundle ID.'
 	);
 }
-if ((launcher.match(/kEmbeddedHammerspoonBundleId as CFString/g) || []).length !== 3) {
-	errors.push('all three Hammerspoon preference-domain uses must target the embedded runtime ID.');
+// The seeder is the one preference-domain use since the top-level write went (MLC-001).
+if ((launcher.match(/kEmbeddedHammerspoonBundleId as CFString/g) || []).length !== 1) {
+	errors.push(
+		'the one Hammerspoon preference-domain use (the seeder) must target the embedded runtime ID.'
+	);
 }
 for (const inheritedKey of ['__CFBundleIdentifier', 'XPC_SERVICE_NAME']) {
 	const escapedKey = inheritedKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -113,13 +116,52 @@ if (/proc\.executableURL\s*=/.test(launcher)) {
 const finishAt = launcher.indexOf('func applicationDidFinishLaunching(');
 const lockAt = launcher.indexOf('acquireSoleLauncherOwnership(attempt: 0)', finishAt);
 const soleAt = launcher.indexOf('private func finishLaunchingAsSoleLauncher()');
-const seedAt = launcher.indexOf('seedConfigDirDefault()', soleAt);
+const seedAt = launcher.indexOf('seedHammerspoonConfig()', soleAt);
 const startAt = launcher.indexOf('startManagedHammerspoon(at: hsBinary)', soleAt);
 if (finishAt < 0 || lockAt < 0 || soleAt < lockAt || seedAt < soleAt || startAt < seedAt) {
 	errors.push(
 		'main.swift: applicationDidFinishLaunching must take the sole-launcher lock before it seeds ' +
 			'MJConfigFile or starts embedded Hammerspoon (hs-second-instance-2026-10-22).'
 	);
+}
+// Every MJConfigFile write is the seeder's, and only the sole launcher calls it:
+// a top-level write before the lock let a second launcher repoint the running
+// copy's runtime at its own bundle (MLC-001).
+{
+	const writes = [...launcher.matchAll(/CFPreferencesSetValue\(\s*kHammerspoonConfigKey/g)].map(
+		(m) => m.index
+	);
+	const seederAt = launcher.indexOf('func seedEmbeddedHammerspoonConfig(initLuaPath: String) {');
+	const seederEnd = seederAt < 0 ? -1 : launcher.indexOf('\n}\n', seederAt);
+	if (writes.length === 0 || seederAt < 0 || writes.some((at) => at < seederAt || at > seederEnd)) {
+		errors.push(
+			'main.swift: MJConfigFile (kHammerspoonConfigKey) may be written only inside ' +
+				'seedEmbeddedHammerspoonConfig (MLC-001).'
+		);
+	}
+	const calls = [...launcher.matchAll(/seedHammerspoonConfig\(\)/g)].map((m) => m.index);
+	const helperAt = launcher.indexOf('private func seedHammerspoonConfig()');
+	const retryAt = launcher.indexOf('exited before bootstrap readiness; retrying once');
+	const callers = calls.filter((at) => at !== helperAt + 'private func '.length);
+	if (
+		callers.length !== 2 ||
+		!(callers[0] > soleAt && callers[0] < startAt) ||
+		!(retryAt > 0 && callers[1] > retryAt)
+	) {
+		errors.push(
+			'main.swift: MJConfigFile is seeded once the sole-launcher lock is held and again before the ' +
+				'bootstrap retry, nowhere else (MLC-001).'
+		);
+	}
+	const topLevelAt = launcher.indexOf('let app      = NSApplication.shared');
+	if (
+		topLevelAt > 0 &&
+		/kHammerspoonConfigKey/.test(
+			launcher.slice(launcher.lastIndexOf('\n}\n', topLevelAt), topLevelAt)
+		)
+	) {
+		errors.push('main.swift: the top-level code writes no MJConfigFile before the lock (MLC-001).');
+	}
 }
 const ownership = read(
 	'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherInstanceOwnership.swift'
@@ -134,6 +176,17 @@ if (!/candidate\.bundleIdentifier == embeddedBundleId/.test(ownership)) {
 	errors.push(
 		'LauncherInstanceOwnership.swift: stale-runtime replacement must select the embedded bundle ' +
 			'identity only, so a Hammerspoon the user installed is never terminated.'
+	);
+}
+// A leftover runtime gets its own controlled-exit bound before it is killed;
+// a 3 s literal killed it inside its quit fence (MLC-004).
+if (
+	!/^let kStaleRuntimeTerminateGrace = LauncherTimings\.userQuitDeadline$/m.test(ownership) ||
+	!/^let kStaleRuntimePoll = LauncherTimings\.staleRuntimePoll$/m.test(ownership)
+) {
+	errors.push(
+		'LauncherInstanceOwnership.swift: the leftover-runtime grace must be [ui] user_quit_deadline_ms ' +
+			'and its poll [launcher] stale_runtime_poll_ms, both from LauncherTimings (MLC-004).'
 	);
 }
 const admission = read('static/ergopti_plus/macos/infra/instance_admission.lua');

@@ -47,12 +47,19 @@ const GROUPS = [
 	'hosts',
 	'dev_source',
 	'field_report',
-	'bytecode_package'
+	'bytecode_package',
+	'macos_notifications'
 ];
 // Groups only the Lua drivers read stay out of the shell, Python, JS, Swift and
 // AutoHotkey projections: the bytecode package is the LuaJIT daemon's alone.
 const LUA_ONLY_GROUPS = new Set(['bytecode_package']);
-const PROJECTED_GROUPS = GROUPS.filter((group) => !LUA_ONLY_GROUPS.has(group));
+// Groups the macOS launcher and its Lua runtime share reach Lua and Swift only:
+// the launcher's quit request to its embedded runtime (MLC-002).
+const MACOS_ONLY_GROUPS = new Set(['macos_notifications']);
+const PROJECTED_GROUPS = GROUPS.filter(
+	(group) => !LUA_ONLY_GROUPS.has(group) && !MACOS_ONLY_GROUPS.has(group)
+);
+const SWIFT_GROUPS = GROUPS.filter((group) => !LUA_ONLY_GROUPS.has(group));
 const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 // The field report names are repository paths and a branch prefix: slash-
 // separated plain segments, with an optional final slash for a prefix.
@@ -170,15 +177,18 @@ const SWIFT_ENUM = {
 	service_labels: 'ServiceLabels',
 	hosts: 'Hosts',
 	dev_source: 'DevSource',
-	field_report: 'FieldReport'
+	field_report: 'FieldReport',
+	macos_notifications: 'MacosNotifications'
 };
+for (const group of SWIFT_GROUPS)
+	if (!SWIFT_ENUM[group]) fail(`group "${group}" has no Swift enum name.`);
 const camel = (key) => key.replace(/_([a-z0-9])/g, (_m, c) => c.toUpperCase());
 const swift = `${BANNER('//')}
 
 /// Application names, bundle ids, service labels and external hosts. Hosts are
 /// bare names: build a URL as "https://\\(Identifiers.Hosts.github)/...".
 enum Identifiers {
-${PROJECTED_GROUPS.map((group) => {
+${SWIFT_GROUPS.map((group) => {
 	const rows = Object.entries(source[group]).map(
 		([key, value]) => `\t\tstatic let ${camel(key)} = "${value}"`
 	);

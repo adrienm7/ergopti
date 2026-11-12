@@ -23,9 +23,13 @@ GROUPS_REFRESHED=false
 if [ "${1:-}" = --groups-refreshed ]; then GROUPS_REFRESHED=true; shift; fi
 SESSION_START=false
 SERVICE_MODE=false
+# The login autostart alone (--session-start) leaves a running instance alone;
+# any other launch restarts it, as Windows' #SingleInstance Force does (MLC-003).
+AUTOSTART=false
 if [ "${1:-}" = --service ]; then SERVICE_MODE=true; shift; fi
 if [ "${1:-}" = --session-start ]; then
 	SESSION_START=true
+	AUTOSTART=true
 	shift
 	# The native autostart entry already carries --tray. Avoid duplicating it
 	# while keeping every supplied daemon argument in its original order.
@@ -50,6 +54,13 @@ if "$DAEMON_LAUNCH" && "$SESSION_START" && ! "$SERVICE_MODE" \
 	# The packaged unit remains the sole startup owner when systemd is present.
 	# XDG only starts the daemon directly on non-systemd desktops.
 	systemctl --user daemon-reload
+	# A relaunch from the application menu restarts a running unit; systemd stops
+	# it with SIGTERM, the daemon's controlled exit (MLC-003).
+	if ! "$AUTOSTART" && systemctl --user is-active --quiet ergopti-hotstrings.service; then
+		ergopti_msg launch.restarting >&2
+		systemctl --user restart ergopti-hotstrings.service
+		exit 0
+	fi
 	systemctl --user start ergopti-hotstrings.service
 	exit 0
 fi
@@ -104,6 +115,31 @@ for arg in "$@"; do
 	fi
 done
 
+# Asks the processes holding the instance lock (descriptor 9 here) for their
+# controlled exit and waits for the lock, within the daemon's own quit deadline
+# plus a margin (_generated/launch_timings.sh).
+# @param $1 The instance lock's path.
+# @return 0 once this launch holds the lock, 1 when it did not get it.
+ergopti_restart_lock_holders() {
+	local lock_path="$1" fd target pid holders=()
+	for fd in /proc/[0-9]*/fd/*; do
+		target="$(readlink -- "$fd" 2>/dev/null)" || continue
+		[ "$target" = "$lock_path" ] || continue
+		pid="${fd#/proc/}"
+		pid="${pid%%/*}"
+		if [ "$pid" != "$$" ] && [ "$pid" != "${BASHPID:-$$}" ]; then holders+=("$pid"); fi
+	done
+	if [ "${#holders[@]}" -eq 0 ]; then return 1; fi
+	ergopti_msg launch.restarting >&2
+	kill -TERM "${holders[@]}" 2>/dev/null || true
+	# shellcheck source=../_generated/launch_timings.sh
+	source "$DRIVER_ROOT/_generated/launch_timings.sh"
+	local wait_ms=$((ERGOPTI_USER_QUIT_DEADLINE_MS + ERGOPTI_QUIT_HANDSHAKE_MARGIN_MS))
+	# BusyBox flock has no -w: a blocking flock under timeout bounds the wait on
+	# util-linux and BusyBox alike.
+	timeout "$((wait_ms / 1000))" flock 9
+}
+
 # Every daemon launch, including a terminal launch, takes the instance lock.
 if "$DAEMON_LAUNCH"; then
 	lock_base="${XDG_RUNTIME_DIR:-}"
@@ -140,14 +176,27 @@ if "$DAEMON_LAUNCH"; then
 	else
 		status=$?
 		if [ "$status" -eq 1 ] && [ -z "$lock_diagnostic" ]; then
-			ergopti_msg launch.already_running "$lock_root/ergopti.lock" >&2
-			# A second session start (autostart racing the unit, a tray relaunch)
-			# is expected and succeeds; a direct launch reports the refusal.
-			if "$SESSION_START"; then exit 0; fi
-			exit 75
+			# The login autostart racing the unit is expected and leaves the
+			# running daemon alone.
+			if "$AUTOSTART"; then
+				ergopti_msg launch.already_running "$lock_root/ergopti.lock" >&2
+				exit 0
+			fi
+			# A direct launch restarts the running daemon, as Windows'
+			# #SingleInstance Force does (MLC-003, decided by the maintainer on
+			# 2026-11-11): the lock holders are asked for their controlled exit
+			# (SIGTERM), and the launch takes the lock once they released it.
+			# A tray launch that cannot restart the holder keeps its session
+			# start contract (status 0); a direct launch reports EX_TEMPFAIL.
+			if ! ergopti_restart_lock_holders "$lock_root/ergopti.lock"; then
+				ergopti_msg launch.already_running "$lock_root/ergopti.lock" >&2
+				if "$SESSION_START"; then exit 0; fi
+				exit 75
+			fi
+		else
+			if [ -n "$lock_diagnostic" ]; then printf '%s\n' "$lock_diagnostic" >&2; fi
+			exit "$status"
 		fi
-		if [ -n "$lock_diagnostic" ]; then printf '%s\n' "$lock_diagnostic" >&2; fi
-		exit "$status"
 	fi
 	# LuaJIT restricts inheritance before loading modules that launch children.
 	export ERGOPTI_SESSION_LOCK_FD=9

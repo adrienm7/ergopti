@@ -5,6 +5,53 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Windows swipes step with the fingers through raw HID reports (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: Windows gets the incremental touchpad
+gesture modes and step sizes of macOS and Linux (`gestures.modes`,
+`gestures.sensitivities`, the `[gestures.modes]` / `[gestures.sensitivities]`
+sections and the shared swipe-slot template), through a raw HID digitizer
+reader the driver owns: `RegisterRawInputDevices` for usage page 0x0D, usage
+0x05 (`modules/gestures/raw_touchpad.ahk`, natives in
+`adapters/raw_input.ahk`), contact X/Y and contact count read with `HidP_*`
+from the preparsed descriptor, travel turned into millimetres with the
+descriptor's logical-to-physical scale, and the shared step and reversal rule
+ported to AutoHotkey and pinned by `_shared/tests/corpus/gestures/incremental_steps.json`.
+`platform_reason.gesture_modes_and_steps_need_finger_travel` is retired; the
+two- and five-finger, diagonal and axis entries keep
+`platform_reason.windows_touchpad_slots_are_three_and_four_fingers`.
+
+- Ownership of a swipe: the Precision Touchpad settings keep sending each
+  finished swipe's shortcut (`^#+F2`..`^#+F10`). A raw touch that stepped
+  owns its swipe: its shortcut is swallowed whether it arrives before or after
+  the last raw frame (within `[gestures] incremental_handoff_ms` of the lift).
+  A touch that did not step lets the shortcut fire once; an incremental slot's
+  shortcut waits for the touch's end, an x1 slot's fires at once. This is the
+  Linux rule (`if not _incremental:finish() then dispatch`) made independent
+  of the order Windows delivers the two.
+- Only a slot the system routes to Ergopti's shortcut steps: an unmapped slot
+  also runs Windows' own gesture. A descriptor without a physical size fires
+  incremental slots once, as Linux does for a pad with no resolution.
+- Do not write the PrecisionTouchPad registry to silence the shortcut of an
+  incremental slot: the handoff owns the double-fire risk, and the registry
+  mapping stays the discrete path for x1 slots and for pads the reader cannot
+  measure.
+
+## The config migration registry starts at v20, the schema of 1.0.9 (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: the old steps of
+`_shared/core/config_schema/migrations.toml` are squashed, which cuts most of
+the registry every driver parses at boot and most of the config test time.
+`oldest_version` is v20, what 1.0.9 (the latest public release) and every
+1.0.10 pre-release wrote; only `v20_to_v21` remains. A file stamped below it,
+including the v12 of 1.0.0 to 1.0.6 and the v16 of 1.0.7 and 1.0.8, is refused
+cleanly on every driver: never written, the session read-only, one ERROR at
+boot and the `config.read_only.older_schema` notice naming 1.0.9 as the bridge
+(it still climbs v12 and v16). There is no silent partial upgrade. Do not bring
+the squashed steps back; the next squash raises the floor only to the schema
+of a public release that climbs every older public schema, and moves the
+bridge and the compiled-upgrade pin with it.
+
 ## The Windows physical shortcut host is built, delivery refused (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: Windows gets the host and the editor
@@ -761,9 +808,10 @@ desktop (`space_next` / `space_prev` on macOS), up / down = next / previous
 window of the active app; `tap_3` = `left_click_toggle`, `tap_4` =
 `alt_tab_monitor`; on macOS five fingers up / down = `mission_control` /
 `app_expose` (the macOS order), so both overviews survive turning the system's
-four-finger gestures off. On macOS the three-finger horizontal swipes scale with
-the distance (mode "incremental"); Windows gets one shortcut per swipe and
-cannot, and the four-finger swipes stay one step per swipe everywhere. Linux
+four-finger gestures off. The three-finger horizontal swipes scale with the
+distance (mode "incremental"; on Windows through the raw touchpad reader since
+2026-11-11, see the first entry), and the four-finger swipes stay one step per
+swipe everywhere. Linux
 keeps the 2026-10-24 rule for its swipes, which stay "none": the touchpad is
 read without a grab, so the desktop acts on the same swipes (a double action);
 its five-finger swipe stays "none" too (no Mission Control equivalent). macOS
@@ -1106,3 +1154,18 @@ daemon serves raw keystrokes only to that signed app), so the steps
 runs every step, those included, on the newest signed dev prerelease. Action:
 keep the root daemon's signature check; mark any new step that needs the owned
 runtime installed `signed_app`, never weaken the check for test runs.
+
+## A second launch restarts the running app on every OS (2026-11-11)
+
+Opening ErgoptiPlus while it runs restarts it, as Windows' `#SingleInstance
+Force` does (MLC-003). macOS: the second launcher asks the running one to quit,
+which defers that quit until its runtime ran the menu Quit's controlled exit
+(MLC-002), waits for the sole-launcher lock within `[ui]
+user_quit_deadline_ms` plus `quit_handshake_margin_ms`, then takes it and boots
+(`main.swift` `acquireSoleLauncherOwnership`). Linux: `install/launch.sh` sends
+SIGTERM, the daemon's controlled exit, to the instance lock's holders and waits
+for the lock within the same bound (`_generated/launch_timings.sh`); under
+systemd a relaunch from the application menu restarts the unit. Only the login
+autostart (`--session-start`) leaves a running instance alone. Action: keep the
+restart pinned by `testASecondLauncherAsksTheRunningOneToQuitAndTakesOver` and
+`test_second_launch_restarts_the_running_daemon`.

@@ -85,6 +85,7 @@ install.xdg_autostart=XDG autostart: {1}
 launch.already_running=Ergopti+ is already running in this session ({1} is held); this launch was refused.
 launch.authorization_failed=Input permission authorization was cancelled or failed.
 launch.groups_unavailable=The session could not acquire its configured input groups.
+launch.restarting=Ergopti+ is already running in this session; asking it to quit, then restarting.
 launch.session_lock_invalid=The session lock root must be an absolute path.
 launcher.dependencies_installed=Dependencies installed.
 launcher.driver_missing=Error: Linux driver directory not found: {1}

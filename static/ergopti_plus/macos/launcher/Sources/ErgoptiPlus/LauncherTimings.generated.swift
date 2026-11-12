@@ -7,7 +7,7 @@
 // DESCRIPTION:
 // The [launcher] section of the timing registry: every sleep and poll interval
 // of the launcher, its fixtures and its tests, plus the shared LLM route-probe
-// budget, in the units the sleep APIs take.
+// budget and the Lua quit deadline, in the units the sleep APIs take.
 // ==============================================================================
 
 import Foundation
@@ -29,6 +29,7 @@ struct RegistryDuration: Sendable {
 enum LauncherTimings {
 	static let fileLockRetry = RegistryDuration(section: "launcher", key: "file_lock_retry_ms", milliseconds: 1)
 	static let instanceLockRetry = RegistryDuration(section: "launcher", key: "instance_lock_retry_ms", milliseconds: 100)
+	static let staleRuntimePoll = RegistryDuration(section: "launcher", key: "stale_runtime_poll_ms", milliseconds: 100)
 	static let guardianArmPoll = RegistryDuration(section: "launcher", key: "guardian_arm_poll_ms", milliseconds: 10)
 	static let guardianSingletonRetry = RegistryDuration(section: "launcher", key: "guardian_singleton_retry_ms", milliseconds: 10)
 	static let leaseChildPoll = RegistryDuration(section: "launcher", key: "lease_child_poll_ms", milliseconds: 50)
@@ -61,4 +62,6 @@ enum LauncherTimings {
 	static let testLateRelaunchSettle = RegistryDuration(section: "launcher", key: "test_late_relaunch_settle_ms", milliseconds: 250)
 	static let testSlowSettingsRead = RegistryDuration(section: "launcher", key: "test_slow_settings_read_ms", milliseconds: 20)
 	static let managedProxyProbeTimeout = RegistryDuration(section: "llm", key: "managed_proxy_probe_timeout_ms", milliseconds: 1000)
+	static let userQuitDeadline = RegistryDuration(section: "ui", key: "user_quit_deadline_ms", milliseconds: 12000)
+	static let quitHandshakeMargin = RegistryDuration(section: "ui", key: "quit_handshake_margin_ms", milliseconds: 2000)
 }
