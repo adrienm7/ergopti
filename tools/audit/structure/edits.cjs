@@ -273,7 +273,37 @@ const DERIVED_PINS = [
 	}
 ];
 
+// Receipts designed to be immutable: the Windows cohort input frames and the
+// pins of those frames. A step re-pins them only as an explicit
+// requalification: repin.cjs reports every old→new pin with the file it
+// follows, the runner writes them into the step's commit body, and a pin in
+// them that no file of the step accounts for stops the step. The cohorts are
+// then requalified on the real Windows PC.
+const REQUALIFIED_PINS = [
+	{
+		file: 'tools/ci/windows-key-combination-cohort-original-inputs.json',
+		why: 'the original key-combination cohort frame, read by its owner as --legacy-inputs'
+	},
+	{
+		file: 'tools/ci/windows-updater-original-diagnostic-cohort-inputs.json',
+		why: 'the original updater diagnostic cohort frame'
+	},
+	{
+		file: 'tools/test/portable-control-inputs.json',
+		why: 'the portable control inputs of the key-combination cohort'
+	},
+	{
+		file: 'tools/ci/prepare_windows_key_combination_cohort_inputs.py',
+		why: 'LEGACY_SHA pins the original key-combination frame'
+	},
+	{
+		file: 'tools/test/test_windows_key_combination_source_roster.py',
+		why: 'OLD and HELPER pin the original frame and the cohort runner'
+	}
+];
+
 module.exports = {
+	REQUALIFIED_PINS,
 	FOLDER_EDITS,
 	SYNTHETIC_PATHS,
 	MODULE_NAME_FILES,
