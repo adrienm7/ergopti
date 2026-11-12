@@ -1281,34 +1281,40 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 State on 2026-11-01. Whole AHK suite at d85a24eb53: 17277/17288 in parallel, the other 11 (clipboard and focus contention
 between workers) green alone. All live checks pass, typed by the harness.
 
-- [ ] **Release archive budget from the shared defaults (maintainer decision, 2026-11-12).** `modules/updater/core.ahk`
+- [x] **Release archive budget from the shared defaults (maintainer decision, 2026-11-12).** `modules/updater/core.ahk`
       keeps the WinHTTP release download bounds as literals (600 s receive, 1,200 s absolute); read them from
       `_shared/modules/updater/defaults.json` `archive_transfer` (`archive_idle_timeout_ms`, `phase_timeout_ms.archive`),
       which macOS and Linux now read, and extend `tools/test/test-updater-constants-single-source.cjs` to the AHK side.
-- [ ] **No-break space inside a trigger (maintainer decision HSE-003, 2026-11-12).** macOS (`add_with_space_variants`) and
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 3b88056e, seal b15901b4): `codegen:update-schedule` emits `UpdateArchiveTransferData()`, core.ahk reads both bounds from it, and the single-source gate covers Windows.
+- [x] **No-break space inside a trigger (maintainer decision HSE-003, 2026-11-12).** macOS (`add_with_space_variants`) and
       now the shared engine register, for a trigger with an inner space that does not start with one, its U+00A0 and
       U+202F variants, so `la` + no-break space + `notre` fires `la nôtre`. `CreateCaseSensitiveHotstrings` registers no
       such variant: add both (skipping triggers that start with a space), and extend the AHK hotstring registration test.
-- [ ] **Hotstring short entry forms (maintainer decision HSE-002, 2026-11-12).** macOS and Linux now load the bare-key
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 4fc9a85c): `HSE_NoBreakSpaceVariants`, for the cased and the literal families; tests `hse-003-nbsp-trigger` in `test_hotstring_engine_match.ahk`.
+- [x] **Hotstring short entry forms (maintainer decision HSE-002, 2026-11-12).** macOS and Linux now load the bare-key
       and the simple `"bbq" = "text"` entries, as `infra/toml/toml_loader.ahk` does. Its `_HOTSTRING_ENTRY_PATTERN` still
       drops an inline-table entry whose keys come in another order than output, is_word, auto_expand, is_case_sensitive,
       final_result, or that carries only `output` (the Lua reader defaults each missing flag to false); accept any key
       order and missing flags, and extend `test_toml_loader.ahk` with both cases.
-- [ ] **App Cloner item to open (maintainer decision, 2026-11-12).** `apps/bundled_apps.ahk`
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 5ee6c6e4): `HS_EntryPattern` builds the engine and preview patterns (output required, flags and priority optional in any order, read member by member); tests `hse-002-short-entry-forms`.
+- [x] **App Cloner item to open (maintainer decision, 2026-11-12).** `apps/bundled_apps.ahk`
       `_AppCloner_InvalidOpenItem` accepts « https:/x » and « localhost:3000 » and refuses a « ~ » path. Align it with
       macOS `validateOpenArg` and the Linux validator (`linux/apps/app_cloner.lua` `invalid_open_item`): expand « ~ »
       to the profile folder and check the path exists; otherwise require « :// » or the `msteams:/l/` and
       `msteams:/calendar` forms. Then extend the AHK App Cloner test with those cases.
-- [ ] **App Cloner VS Code variants (maintainer decision BAP-004, 2026-11-12).** `apps/app_cloner_core.ahk`
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 0129cbc7): « ~ » expanded and checked, otherwise « :// » or the Teams forms; test `bundled-apps-cloner-open-item`.
+- [x] **App Cloner VS Code variants (maintainer decision BAP-004, 2026-11-12).** `apps/app_cloner_core.ahk`
       links `%APPDATA%\Code\User` and passes the catalogue's `--extensions-dir={home}/.vscode/extensions` for every
       vscode-family program; VSCodium and the Insiders build keep their own. Read `_shared/data/app_cloner/families.json`
       vscode `user_folders` (per executable: `settings` under `%APPDATA%`, `extensions` under `{home}`) and replace the
       argument marked `user_folder: "extensions"`, as macOS and Linux now do; then extend the AHK App Cloner test.
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 8c28b52f): `AppCloner_UserFolders` reads `user_folders` per executable; test `bap-004-vscode-variants`.
 - [ ] **Keep the emulated layout on uninstall or remove (maintainer decision, 2026-11-12).** `_LayMgrWeb_After`
       (`ui/layout_manager/init.ahk`) writes `[layout] emulated_layout = ""` when the emulated layout is uninstalled, and
       `_LayoutComposer_Remove` (`composer.ahk`) does the same for « composed ». Keep the stored choice instead, as macOS and
       Linux now do: the menu row stays named, ticked and greyed (« — non appliqué »), the emulation stops and reloads, and
       resumes by itself when the layout is installed again. Then update the AHK tests that expect the cleared selection.
+      Blocked on 2026-11-12, question to the coordinator: `KeylayoutEmulation_Boot` downloads a selected layout whose local copy is missing (`read_local` throws, then `LayoutCatalogue_Install`), and the « Disposition à émuler » menu relies on it for a catalogue layout not yet installed. Keeping the choice and reloading would reinstall the layout at once. Either move the download to the menu choice (install, then select) and let the boot only report « — non appliqué » for an id the installed record lacks (it keeps repairing an installed but damaged copy), or keep the boot download and skip it for an id the user uninstalled (a persisted marker).
 - [x] **Layout editor host on Windows (maintainer request, 2026-11-11).** One pass, as planned in
       [layout-editor.md « Windows host »](docs/design/layout-editor.md#windows-host): `init.ahk` accepts `source_open`,
       `source_save`, `nav_save`, `composer_emulate` and sends `source_editor`, `emulate`, `nav_apply`; a new
@@ -1332,23 +1338,26 @@ between workers) green alone. All live checks pass, typed by the harness.
       milliseconds and offset; `keystats_walker_events.ahk` reads `ts` plus the offset (an old Linux row with the current
       offset) in `KLW_IsNightWake`, the hour slot and the days of `KLW_WalkAppSwitch`, `KLW_WalkWindowSwitch` and
       `KLW_WalkSystemEvent`. Full list: `docs/memory/maintainer-decisions.md`.
-- [ ] **AID-2 on AHK (Windows suites red until done).** `LLM_TokenExchange_Read` appends the service's message
+- [x] **AID-2 on AHK (Windows suites red until done).** `LLM_TokenExchange_Read` appends the service's message
       (`error_description`, `errorMessage`, `error.message`, `message`, then `error`; one line, at most 200 bytes) and the
       `api_common.ahk` phrase list takes « the token exchange answered http 400 »; `test_llm_shared_vectors.ahk` and
       `test_llm_api_token_exchange.ahk` replay the updated shared corpora.
+      Already in the code on 2026-11-12 (`_LLM_TokenExchange_ServiceMessage`, the api_common phrase); the llm shard passed on Windows CI run 43261921277.
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
-- [ ] **ADD-1 on AHK (decided by the maintainer on 2026-11-11).** `adapters/secure_field_detector.ahk`: build
+- [x] **ADD-1 on AHK (decided by the maintainer on 2026-11-11).** `adapters/secure_field_detector.ahk`: build
       `SFD_SECURE_APPS` from the `windows` names of `_shared/data/secure_apps.json` (a `Map` with `CaseSense := "Off"`;
       a read or parse failure makes every application secure) instead of its literal, and return true at the top of
       `SFD_IsSecureField` when `SFD_IsSecureApp(WinGetProcessName("ahk_id " Hwnd))`, so hotstrings, the LLM bridge,
       predictions, agent actions and metrics follow. Test in `test_secure_field_detector.ahk`: a `RoboForm.exe` window is
       secure; `test-secure-apps-single-source.cjs` then drops its Windows subset check for a no-literal check.
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 9c3cf49c): `SFD_SecureApps` reads the shared file once (an unreadable file makes every application secure), `SFD_IsSecureAppWindow` answers per top-level window and process id; `test-secure-apps-single-source.cjs` requires no typed list.
 
-- [ ] **UPD-1 on AHK (decided by the maintainer on 2026-11-11).** `modules/updater/core.ahk` `_Updater_InterpretResponse`:
+- [x] **UPD-1 on AHK (decided by the maintainer on 2026-11-11).** `modules/updater/core.ahk` `_Updater_InterpretResponse`:
       a 200 whose body does not open a JSON array (`^\x{FEFF}?\s*\[`, the opening half of `ui/changelog/init.ahk:747`) logs a
       warning and returns "" (no list: the caller reads the Atom feed, « no connection ») instead of reaching the release
       parser (« parse failed »); a malformed array stays a parse failure. Test in the updater suite: an HTML 200 requests
       the feed and answers `updater.no_connection`.
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 957aef5a): tests in `test_updater_release_fetch.ahk` and `test_updater_check_only_fallback.ahk` (UPD-1).
 - [ ] **ILD-2, SCD-2 and SCD-3 on AHK (decided by the maintainer on 2026-11-11).** Ctrl+AltGr+key sends Ctrl and the
       logical key, AltGr suspended. `modules/keymap/keylayout/keylayout_emulation.ahk` `_KLE_OnAltGr`: with a Ctrl other
       than AltGr's own physically held, `_KLE_OnShortcut(Sc, "^")` (`"^+"` with Shift) instead of `_KLE_Emit`;
@@ -1357,13 +1366,16 @@ between workers) green alone. All live checks pass, typed by the harness.
       `AccentedShortcuts_Register`: add the `<^<!` and `<^<!+` prefixes (SCD-2, Ctrl+Alt+é sends Ctrl+Alt+C).
       `modules/shortcuts/utils.ahk` `AddShortcut` for a `^` slot: also `<^>!^` + scan code to the same callback, guarded by
       the physical Ctrl (SCD-3, a `ctrl_x` slot fires for Ctrl+AltGr+x). Tests beside each.
-- [ ] **Pause and resume notices on AHK (decided by the maintainer on 2026-11-12).** After a committed pause show
+      ILD-2 and SCD-2 done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 7163ba50 and ee18e2d9: `_KLE_AltGrShortcutMods` with `_KLE_RealCtrlHeld`, the `<^<!` and `<^<!+` chords). Left: SCD-3. `AddShortcut` in `modules/shortcuts/utils.ahk` has no production caller, so the `<^>!^` registration belongs where the `ctrl_x` slots are really registered; find that registrar first, then add the hotkey guarded by `_KLE_RealCtrlHeld()` and test Ctrl+AltGr+x running the `ctrl_x` action.
+- [x] **Pause and resume notices on AHK (decided by the maintainer on 2026-11-12).** After a committed pause show
       `script_control.paused` at the warning level, after a committed resume `script_control.resumed` at the success level,
       for `[ui] notification_ttl_ms`, as macOS `publish_pause_state` and Linux `script_actions` (`PAUSE_NOTICES`) do.
-- [ ] **SAW-001 on AHK (start-at-login report, 2026-11-12).** `infra/start_at_login.ahk` `StartAtLoginToggle`: when
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, c9f84592): `NotifyPauseState` once each transition committed. TrayTip takes no duration, so `[ui] notification_ttl_ms` cannot hold the Windows balloon; the system keeps its own display time.
+- [x] **SAW-001 on AHK (start-at-login report, 2026-11-12).** `infra/start_at_login.ahk` `StartAtLoginToggle`: when
       Startup Apps keeps the new shortcut disabled, it opens `ms-settings:startupapps` and then shows « Could not change
       automatic startup ». Show `dialog.start_at_login.approval` (informational, already in the 21 locales) on that branch,
       the failure dialog on the others, as macOS does. Test in the startup suite through `NoticeFn`.
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 3088850d): `StartupApprovalPending` and `_StartAtLoginReportFailure`; the test drives the report through `NoticeFn` and pins the branch in the toggle, which a test cannot reach for real (an isolated profile has no approval reader).
 - [ ] **EDD-1 on AHK (decided by the maintainer on 2026-11-12: a pause stops typing, not configuration).** Remove the
       `A_IsSuspended` page-message gates that drop or refuse a configuration write while suspended, in
       `ui/prompt_editor/init.ahk` (`_PromptEdWeb_OnWebMessage` and `_PromptEdWeb_Save`), `ui/paths_editor`,
@@ -1378,9 +1390,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       chords, shortcuts, gestures, AI predictions and their warmups and local server), with a regression for any
       that still acts, and that a setting changed while suspended applies on resume. See
       `docs/memory/maintainer-decisions.md`.
-- [ ] **I18W-001 on AHK (i18n run-time report, 2026-11-12, low priority).** `infra/i18n.ahk` `_I18nDetectSystemLocale`
+      Not started on 2026-11-12: about thirty `A_IsSuspended` gates across the ten editors (counts: model_browser 9, layer_editor 7, paths_editor 6, personal_toml_editor_webview 5, prompt_editor 3, layout_manager 2, hotstrings_config_window 2, personal_info_editor 1, action_picker 1, physical_shortcuts 1) and 25 Windows test files that read them; do one editor per commit, each with its « save while suspended writes the file » test.
+- [x] **I18W-001 on AHK (i18n run-time report, 2026-11-12, low priority).** `infra/i18n.ahk` `_I18nDetectSystemLocale`
       returns an `"en"` literal; emit `locales.system_fallback` in `_generated/identifiers.ahk` through its codegen and read
       it, as the Lua drivers do.
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, cd671fd1): the identifiers codegen projects `locales` to AutoHotkey; `Identifiers.Locales.SYSTEM_FALLBACK`.
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
   keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
   `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
