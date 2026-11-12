@@ -175,6 +175,17 @@ helpers.describe("gestures.actions: get_label", function()
 		helpers.assert_eq(Actions.get_label("totally_not_a_real_id"), "totally_not_a_real_id")
 	end)
 
+	-- An id from another OS has no conventional key: a probe, not a raw key shown.
+	helpers.it("probes the conventional keys of an undeclared id (i18n-miss-warned)", function()
+		local i18n = require("infra.i18n")
+		local saved, asked = i18n.get, {}
+		i18n.get = function(key) asked[#asked + 1] = key; return saved(key) end
+		local ok, err = pcall(Actions.get_label, "totally_not_a_real_id")
+		i18n.get = saved
+		assert(ok, err)
+		helpers.assert_eq(asked, {}, "a missing conventional key is never fetched for display")
+	end)
+
 	-- 2026-11-03: the chords read the catalogue's English names (« Shift »,
 	-- « Enter ») in every locale; each key is now named in the user's language.
 	helpers.it("names shared modifier chords in the user's language", function()

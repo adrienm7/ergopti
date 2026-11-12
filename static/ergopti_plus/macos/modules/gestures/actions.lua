@@ -3054,7 +3054,9 @@ function M.get_label(name)
 	local meta = Catalogue.actions[name]
 	local keys = meta and { meta.label_key } or { "sg_actions." .. name, "ax_actions." .. name }
 	for _, key in ipairs(keys) do
-		local s = i18n.get(key)
+		-- The declared key must exist (a miss is logged); the conventional ones
+		-- are probed, since an id from another OS may have neither.
+		local s = (meta or i18n.has(key)) and i18n.get(key) or key
 		if s ~= key then
 			-- A sticky label is a template its modifiers fill (« 📌 {1} rémanents »).
 			if StickyLabel.is_sticky(name) then return StickyLabel.label(name, key, "macos", i18n.get) end

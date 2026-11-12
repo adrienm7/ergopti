@@ -378,6 +378,25 @@ helpers.describe("i18n: get()", function()
 		helpers.assert_eq(i18n.get("empty.key"), "empty.key",
 			"empty translation must return the key itself")
 	end)
+
+	helpers.it("warns once per raw key shown, never for a probe (i18n-miss-warned)", function()
+		local logger = package.loaded["infra.logger"]
+		local warn, warnings = logger.warn, {}
+		logger.warn = function(_, message, key) warnings[#warnings + 1] = message:gsub("%%s", key or "") end
+		local i18n = load_i18n()
+		local ok, detail = pcall(function()
+			i18n.get("__missing_key__")
+			i18n.get("__missing_key__")
+			i18n.get("__other_missing__")
+			_locale_store["menu.global.reload"] = "Recharger"
+			i18n.get("menu.global.reload")
+		end)
+		logger.warn = warn
+		assert(ok, detail)
+		helpers.assert_eq(#warnings, 2, "each missing key is warned once")
+		helpers.assert_true(warnings[1]:find("'__missing_key__'", 1, true) ~= nil)
+		helpers.assert_true(warnings[2]:find("'__other_missing__'", 1, true) ~= nil)
+	end)
 end)
 
 
