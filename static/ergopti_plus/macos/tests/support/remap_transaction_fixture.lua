@@ -633,6 +633,7 @@ return function(run, dependencies)
 				"platform.remap.ke_paths",
 				"adapters.timer_scheduler",
 				"adapters.task_lifecycle",
+				"platform.remap.network_download",
 				"platform.remap.onboarding",
 			}
 			local saved_modules = {}
@@ -706,6 +707,15 @@ return function(run, dependencies)
 					return true
 				end,
 				every = function() return nil, false end,
+			}
+			-- The DMG download's network route, in its production shell shape
+			-- (platform/remap/network_download.lua, NET-001).
+			package.loaded["platform.remap.network_download"] = {
+				command = function(tag, curl_args)
+					local args = { "-c", 'exec /usr/bin/curl "$@"', tag }
+					for _, value in ipairs(curl_args) do args[#args + 1] = value end
+					return "/bin/sh", args, function() return nil end
+				end,
 			}
 			package.loaded["adapters.task_lifecycle"] = nil
 			package.loaded["platform.remap.onboarding"] = nil

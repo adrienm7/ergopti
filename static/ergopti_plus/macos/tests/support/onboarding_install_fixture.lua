@@ -32,6 +32,7 @@ local MODULE_NAMES = {
 	"native_path",
 	"number_policy",
 	"platform.remap.ke_paths",
+	"platform.remap.network_download",
 	"platform.remap.onboarding",
 	"tests.stubs.hs",
 }
@@ -39,8 +40,11 @@ local MODULE_NAMES = {
 --- Returns the installer stage represented by an executable path.
 --- @param executable string Native executable path.
 --- @return string stage Stable lifecycle stage.
-local function stage_for_executable(executable)
-	if executable == "/usr/bin/curl" then return "download" end
+--- @param args table|nil Native argv: the download is curl behind the network
+---   route's shell (platform/remap/network_download.lua, NET-001).
+local function stage_for_executable(executable, args)
+	if executable == "/bin/sh" and type(args) == "table" and type(args[2]) == "string"
+		and args[2]:find('exec /usr/bin/curl "$@"', 1, true) then return "download" end
 	if executable == "/usr/bin/shasum" then return "checksum" end
 	if executable == "/usr/bin/hdiutil" then return "mount" end
 	if executable == "/usr/bin/osascript" then return "install" end
@@ -142,7 +146,7 @@ local function run_fixture(options, scenario)
 	local start_indexes = {}
 	local terminate_indexes = {}
 	hs_stub.task.new = function(executable, callback, args)
-		local stage = stage_for_executable(executable)
+		local stage = stage_for_executable(executable, args)
 		local task = {
 			args = args or {},
 			callback = callback,
@@ -314,6 +318,15 @@ local function run_fixture(options, scenario)
 		GRABBER = "/test/karabiner_grabber",
 	}
 
+	-- The download's network route: the shell shape of the production command,
+	-- without the prelude this fixture cannot read (test_network_download.lua).
+	package.loaded["platform.remap.network_download"] = {
+		command = function(tag, curl_args)
+			local args = { "-c", 'exec /usr/bin/curl "$@"', tag }
+			for _, value in ipairs(curl_args) do args[#args + 1] = value end
+			return "/bin/sh", args, function() return nil end
+		end,
+	}
 	package.loaded["adapters.task_lifecycle"] = nil
 	package.loaded["platform.remap.onboarding"] = nil
 	onboarding = require("platform.remap.onboarding")

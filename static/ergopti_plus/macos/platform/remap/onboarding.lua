@@ -852,6 +852,14 @@ local function download_async(owner, url, dest, callback)
 			return
 		end
 	end
+	-- Behind the system network route and over https only, as every remap
+	-- download (platform/remap/network_download.lua, NET-001).
+	local download, download_args, describe = require("platform.remap.network_download").command("KARABINER-DMG",
+		{ "-L", "--fail", "--silent", "--show-error", "--proto", "=https", "--output", dest, url })
+	if not download then
+		callback(false, "the network route is unavailable: " .. tostring(download_args))
+		return
+	end
 	local task
 	local start_gate, on_completion = latch_install_task_completion(owner, "download",
 		function(rc, _, stderr)
@@ -863,13 +871,13 @@ local function download_async(owner, url, dest, callback)
 				return
 			end
 			if rc ~= 0 then
-				callback(false, "curl rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
+				local named = describe(rc, stderr)
+				callback(false, named or ("curl rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr)))
 				return
 			end
 			callback(true, nil)
 		end)
-	task = TaskLifecycle.native("Karabiner installer download", "/usr/bin/curl",
-		on_completion, { "-L", "--fail", "--silent", "--show-error", "--output", dest, url })
+	task = TaskLifecycle.native("Karabiner installer download", download, on_completion, download_args)
 	start_owned_task(owner, task, "download", "Karabiner installer download", callback, start_gate)
 end
 

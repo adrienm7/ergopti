@@ -122,13 +122,15 @@ end
 --- Creates a fetcher bound to its ports.
 --- Port contracts:
 ---   exec(executable, args, timeout, fn(code|nil, stdout, stderr)) runs one command;
+---   network_command(curl_args) -> executable, args, describe(code, stderr) | nil, err
+---     wraps the download behind the system network route (NET-001);
 ---   exists(path) -> boolean; read(path) -> string|nil; write(path, content) -> boolean;
 ---   expand(path) -> absolute path.
 --- @param ports table exec, exists, read, write, expand.
 --- @return table fetcher { ensure, payload_for }.
 function M.new(ports)
 	assert(type(ports) == "table", "Missing artifact fetch ports")
-	for _, name in ipairs({ "exec", "exists", "read", "write", "expand" }) do
+	for _, name in ipairs({ "exec", "network_command", "exists", "read", "write", "expand" }) do
 		assert(type(ports[name]) == "function", "Missing artifact fetch port: " .. name)
 	end
 	local fetcher = {}
@@ -154,10 +156,16 @@ function M.new(ports)
 		end
 	end
 
+	-- The failure describer of a wrapped command, keyed by its exact argv table.
+	local describers = setmetatable({}, { __mode = "k" })
+
 	--- Runs one step and continues only on exit 0.
 	local function step(executable, args, timeout, reason, detail, continue)
+		local describe = describers[args]
 		ports.exec(executable, args, timeout, function(code, stdout, stderr)
 			if code ~= 0 then
+				local named = describe and describe(code, stderr)
+				if named then return settle(false, reason, detail .. " (" .. named .. ")") end
 				return settle(false, reason, detail .. " (" .. NativePath.basename(executable) .. " status "
 					.. tostring(code) .. (stderr and stderr ~= "" and (": " .. stderr:gsub("%s+$", "")) or "") .. ")")
 			end
@@ -228,8 +236,13 @@ function M.new(ports)
 			REASON.STORE, "the artifact folder could not be cleared", function()
 		step("/bin/mkdir", { "-p", staging }, M.STEP_TIMEOUT_SEC, REASON.STORE,
 			"the artifact folder could not be created", function()
-		step("/usr/bin/curl", { "-L", "--fail", "--silent", "--show-error", "--proto", "=https",
-			"--max-filesize", tostring(pin.size), "--output", partial, pin.source_url },
+		local download, download_args, describe = ports.network_command({ "-L", "--fail", "--silent", "--show-error",
+			"--proto", "=https", "--max-filesize", tostring(pin.size), "--output", partial, pin.source_url })
+		if not download then
+			return settle(false, REASON.DOWNLOAD, "the network route is unavailable: " .. tostring(download_args))
+		end
+		describers[download_args] = describe
+		step(download, download_args,
 			M.DOWNLOAD_TIMEOUT_SEC, REASON.DOWNLOAD, "the artifact could not be downloaded from " .. pin.source_url,
 			function()
 		step("/usr/bin/stat", { "-f", "%z", partial }, M.STEP_TIMEOUT_SEC, REASON.SIZE,
