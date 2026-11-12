@@ -29,13 +29,15 @@ bound its URL, as Windows does; UPX-002 gives the Linux bundle, checksum and
 signature the same binding. The Linux test fixtures that served assets from
 `example.invalid` now use the repository path a real release carries.
 
-## To decide
+## Decided
 
-- **UPD-2, a manual check during a pause:** Windows refuses it with a notice
-  (`_Updater_RefuseManualWhileSuspended`); macOS (`auto_check.check_now`,
-  « whatever the schedule or the pause ») and Linux (`check_for_updates`) run
-  it. EDD-1 leaves the update check to its own rules. Either Windows drops
-  the refusal, or macOS and Linux refuse with the same notice.
+- **UPD-2, a manual check during a pause** (decided by the coordinator on
+  2026-11-12, from the maintainer's rule that installs stay allowed during a
+  pause): the check runs, as on macOS (`auto_check.check_now`) and Linux
+  (`check_for_updates`). Windows counterpart, for its worker: drop
+  `_Updater_RefuseManualWhileSuspended` from the manual check
+  (`modules/updater/self_update.ahk`) and update the AHK test that expects
+  the refusal.
 
 ## Open
 
