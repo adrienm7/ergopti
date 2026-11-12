@@ -171,9 +171,10 @@ helpers.describe("layout manager bridge: the layout editor's navigation layer", 
 	end)
 end)
 
---- A bridge whose host records layout changes.
+--- A bridge whose host records layout changes and answers its pause state.
+--- @param paused table { value = boolean }
 --- @return table instance, table changed
-local function host_bridge()
+local function host_bridge(paused)
 	local changed = {}
 	local snapshot = { platform = "macos", index = INDEX, source = "network", installed = { ergol = { id = "ergol" } }, active = "" }
 	local instance = ManagerBridge.new({
@@ -192,13 +193,14 @@ local function host_bridge()
 		close = function() end,
 		log = function() end,
 		layout_changed = function(id) changed[#changed + 1] = id end,
+		is_paused = function() return paused.value end,
 	})
 	return instance, changed
 end
 
 helpers.describe("layout manager bridge: the emulation follows a changed layout", function()
 	helpers.it("(lmh-001-002-emulation-reload) tells the host of every install, update, uninstall and composition", function()
-		local instance, changed = host_bridge()
+		local instance, changed = host_bridge({ value = false })
 		helpers.assert_true(instance.on_message({ action = "install", id = "ergol" }))
 		helpers.assert_true(instance.on_message({ action = "update", id = "ergol" }))
 		helpers.assert_true(instance.on_message({ action = "uninstall", id = "ergol" }))
@@ -209,11 +211,26 @@ helpers.describe("layout manager bridge: the emulation follows a changed layout"
 			"a select changes no layout; every other success reaches the emulation")
 	end)
 
+	helpers.it("(lmh-003-paused) refuses every page command but ready while the driver is paused", function()
+		local paused = { value = true }
+		local instance, changed = host_bridge(paused)
+		helpers.assert_true(instance.on_message({ action = "ready" }), "the page still loads")
+		for _, payload in ipairs({ { action = "install", id = "ergol" }, { action = "uninstall", id = "ergol" },
+			{ action = "select", id = "ergol" }, { action = "refresh" }, { action = "composer_remove" } }) do
+			helpers.assert_eq(instance.on_message(payload), false, "admitted while paused: " .. payload.action)
+		end
+		helpers.assert_eq(#changed, 0)
+		paused.value = false
+		helpers.assert_true(instance.on_message({ action = "install", id = "ergol" }))
+	end)
+
 	helpers.it("(lmh-001-002-emulation-reload) the macOS host reloads the emulated layout and the menu", function()
 		local menu = assert(helpers.read_module_source("ui.menu"))
 		helpers.assert_contains(menu, 'require("ui.layout_manager").set_layout_change_handler(function(id)')
 		helpers.assert_contains(menu, "if Emulation.status().id ~= id then return end")
 		local host = assert(helpers.read_module_source("ui.layout_manager"))
+		helpers.assert_contains(host, "is_paused = function() return _pause_query ~= nil and _pause_query() == true end")
+		helpers.assert_contains(menu, 'require("ui.layout_manager").set_pause_query(function()')
 		helpers.assert_contains(host, "if _layout_change_handler then _layout_change_handler(id) end")
 	end)
 end)

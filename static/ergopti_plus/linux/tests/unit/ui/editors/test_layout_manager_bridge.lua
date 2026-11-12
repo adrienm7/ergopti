@@ -138,6 +138,14 @@ helpers.describe("layout manager bridge (Linux)", function()
 		helpers.assert_eq(state.reloads, 2, "a reinstall resumes it")
 	end)
 
+	helpers.it("(lmh-003-paused) refuses page commands while the daemon is paused", function()
+		local Bridge, state, daemon_state = bridge()
+		daemon_state.is_paused = function() return true end
+		Bridge.on_message({ action = "ready" }, daemon_state)
+		helpers.assert_true(Bridge.on_message({ action = "install", id = "ergol" }, daemon_state).handled == false)
+		helpers.assert_eq(#state.calls, 1, "only the ready refresh ran: " .. table.concat(state.calls, ","))
+	end)
+
 	helpers.it("(lmh-005-emulate-tray) emulating without installing rebuilds the tray", function()
 		local Bridge, state, daemon_state = emulating_bridge()
 		state.rebuilds = 0

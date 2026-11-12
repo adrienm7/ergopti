@@ -1707,6 +1707,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		Emulation.reload_if_started()
 		if type(updateMenu) == "function" then updateMenu() end
 	end)
+	require("ui.layout_manager").set_pause_query(function()
+		local shortcuts_mod = core_mods.shortcuts_mod
+		return type(shortcuts_mod) == "table" and type(shortcuts_mod.is_paused) == "function"
+			and shortcuts_mod.is_paused() == true
+	end)
 	WindowToggle.set_opener("changelog", function()
 		return require("ui.changelog").open({ channel_owner = channel_owner })
 	end)
