@@ -47,7 +47,7 @@ function run() {
 	const order = [
 		'--fix-banners',
 		"'--write'",
-		"'codegen'",
+		'settleCodegen(key',
 		'--update-baseline',
 		"'--fail-on-violations'"
 	];
@@ -58,6 +58,29 @@ function run() {
 		assert.ok(next > at, `the runner runs ${marker} after the previous follow-up`);
 		at = next;
 	}
+	// A generator the step broke fails on the staged tree too, and stops the
+	// step: the first S01 apply committed with the Linux bundle unbuildable.
+	const settle = (statuses, changes = [[], []]) => {
+		const receipt = { actions: [] };
+		const runs = [...statuses];
+		const lists = [...changes];
+		const staged = [];
+		Runner.settleCodegen('S', receipt, {
+			codegen: () => ({ status: runs.shift(), tail: 'build:linux failed' }),
+			unstaged: () => ({ changed: lists.shift() || [], added: [] }),
+			stage: (paths) => staged.push(...paths)
+		});
+		return { receipt, staged };
+	};
+	assert.throws(() => settle([1, 1]), /S: codegen does not settle:\nbuild:linux failed/);
+	// Drift against HEAD alone settles once the regenerated files are staged.
+	const settled = settle([1, 0], [['a/_generated/x.lua'], []]);
+	assert.deepEqual(settled.staged, ['a/_generated/x.lua']);
+	assert.deepEqual(
+		settled.receipt.actions.map((a) => a.label),
+		['codegen', 'codegen (after staging)']
+	);
+	assert.equal(settle([0]).receipt.actions.length, 1, 'a clean run is not repeated');
 	console.log(
 		'[OK] the phase 2 runner refuses without its go and owns the follow-ups of each step.'
 	);
