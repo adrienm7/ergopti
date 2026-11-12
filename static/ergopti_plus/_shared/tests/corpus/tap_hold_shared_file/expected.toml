@@ -1,25 +1,32 @@
 # _shared/tests/corpus/tap_hold_shared_file/expected.toml
-# What each driver reads from each file of this corpus (_shared/tap_hold/SCHEMA.md).
+# What each driver reads from each pair of files of this corpus: <name>.toml is
+# the shared tap_hold.toml (_shared/tap_hold/SCHEMA.md), <name>.config.toml the
+# config.toml rows written beside it (the maintainer decision of 2026-11-11:
+# every manifest row lives in config.toml).
 #
-# linux_written.toml is what the Linux writer writes for the changes listed in
+# linux_written is what the Linux writers write for the changes listed in
 # linux/tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.lua;
-# macos_written.toml is what the macOS writer writes for the state in
-# macos/tests/unit/platform/remap/config/test_tap_hold_shared_file.lua, and
-# what the import of macos_legacy.toml publishes. Each suite pins its own file
-# byte for byte and reads both with its own reader:
-#   - [reads.<file>.linux]: platform/remap/tap_hold_loader.lua load(), the
-#     effective keys (a key without a delay of its own takes the global one),
-#     and under `mod_combos` what modules/shortcuts/key_combinations.lua reads
-#     of the key combinations (its third slots; an absent section is the
-#     manifest's defaults, no combination);
-#   - [reads.<file>.hs]: platform/remap/config.lua load_user_config(), the
-#     state fields and bindings under the macOS ids.
-# The Windows reader adds [reads.<file>.ahk] when it reads this layout.
+# macos_written what the macOS writer writes for the state in
+# macos/tests/unit/platform/remap/config/test_tap_hold_shared_file.lua;
+# windows_written what the Windows writers write for the changes in
+# windows/tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.ahk.
+# Each suite pins its own tap_hold.toml byte for byte, its own config.toml rows
+# as values, and reads every pair with its own readers:
+#   - [reads.<name>.linux]: platform/remap/tap_hold_loader.lua, the effective
+#     keys (a key without a delay of its own takes the global one), and under
+#     `mod_combos` what modules/shortcuts/key_combinations.lua reads of the key
+#     combinations (its third slots; an absent section is the manifest's
+#     defaults, no combination);
+#   - [reads.<name>.hs]: platform/remap/config.lua load_user_config(), the
+#     state fields and bindings under the macOS ids;
+#   - [reads.<name>.ahk]: platform/remap/tap_hold_loader.ahk, the keys under the
+#     shared ids, the global delay, and the config.toml rows the Windows
+#     driver reads.
 #
-# The two files differ where the drivers do: macOS writes the key
-# combinations and the Karabiner integration, and a Cmd hold Linux cannot run
-# (left_ctrl: warned once, the key keeps its tap and holds nothing); Linux
-# writes a key macOS does not have (win).
+# The files differ where the drivers do: macOS writes the key combinations and
+# the Karabiner integration, and a Cmd hold Linux and Windows cannot run
+# (left_ctrl: warned once, the key keeps its tap and holds nothing); Linux and
+# Windows write a key macOS does not have (win).
 
 [reads.linux_written.linux]
 enabled = true
@@ -108,3 +115,133 @@ left_control = { tap = "none", hold = "cmd_shift" }
 
 [reads.macos_written.hs.mod_combos_config]
 esc_tab = { combo = "copy", tap = "none", hold = "none" }
+
+[reads.linux_written.ahk]
+global_seconds = 0.25
+lone_tap_max_ms = 0
+one_shot_timeout_ms = 1500
+
+[reads.linux_written.ahk.mod_combos]
+simultaneous_threshold_ms = 100
+symmetric = false
+
+[reads.linux_written.ahk.keys.caps_lock]
+tap_action = "backspace"
+hold_modifier = "ctrl"
+time_activation_seconds = 0.25
+
+[reads.linux_written.ahk.keys.left_shift]
+tap_action = "copy"
+hold_modifier = "shift"
+time_activation_seconds = 0.3
+
+[reads.linux_written.ahk.keys.tab]
+hold_layer = "nav"
+time_activation_seconds = 0.25
+
+[reads.linux_written.ahk.keys.win]
+hold_modifier = "ctrl+alt"
+time_activation_seconds = 0.25
+
+[reads.macos_written.ahk]
+global_seconds = 0.25
+lone_tap_max_ms = 0
+one_shot_timeout_ms = 1500
+
+[reads.macos_written.ahk.mod_combos]
+simultaneous_threshold_ms = 80
+symmetric = true
+
+[reads.macos_written.ahk.mod_combos.chords]
+escape_then_tab = "copy"
+
+[reads.macos_written.ahk.keys.caps_lock]
+tap_action = "backspace"
+hold_modifier = "ctrl"
+time_activation_seconds = 0.25
+
+[reads.macos_written.ahk.keys.left_ctrl]
+time_activation_seconds = 0.25
+
+[reads.macos_written.ahk.keys.left_shift]
+tap_action = "copy"
+hold_modifier = "shift"
+time_activation_seconds = 0.3
+
+[reads.macos_written.ahk.keys.tab]
+hold_layer = "nav"
+time_activation_seconds = 0.25
+
+[reads.windows_written.ahk]
+global_seconds = 0.25
+lone_tap_max_ms = 0
+one_shot_timeout_ms = 1500
+
+[reads.windows_written.ahk.mod_combos]
+simultaneous_threshold_ms = 80
+symmetric = true
+
+[reads.windows_written.ahk.keys.caps_lock]
+tap_action = "backspace"
+hold_modifier = "ctrl"
+time_activation_seconds = 0.25
+
+[reads.windows_written.ahk.keys.left_shift]
+tap_action = "copy"
+hold_modifier = "shift"
+time_activation_seconds = 0.3
+
+[reads.windows_written.ahk.keys.tab]
+hold_layer = "nav"
+time_activation_seconds = 0.25
+
+[reads.windows_written.ahk.keys.win]
+hold_modifier = "ctrl+alt"
+time_activation_seconds = 0.25
+
+# Windows keeps its Tap-Holds switch as [category_enabled] tap_holds (the
+# manifest's platform_reason.category_master_is_a_gate_on_windows), so macOS
+# and Linux read the switch of a Windows pair as the manifest default, off.
+
+[reads.windows_written.linux]
+enabled = false
+global_seconds = 0.25
+lone_tap_max_ms = 0
+one_shot_timeout_ms = 1500
+
+[reads.windows_written.linux.mod_combos]
+enabled = true
+simultaneous_threshold_ms = 80
+symmetric = true
+chords = {}
+
+[reads.windows_written.linux.keys.caps_lock]
+tap_action = "backspace"
+hold_modifier = "ctrl"
+time_activation_seconds = 0.25
+
+[reads.windows_written.linux.keys.left_shift]
+tap_action = "copy"
+hold_modifier = "shift"
+time_activation_seconds = 0.3
+
+[reads.windows_written.linux.keys.tab]
+hold_layer = "nav"
+time_activation_seconds = 0.25
+
+[reads.windows_written.linux.keys.win]
+hold_modifier = "ctrl+alt"
+time_activation_seconds = 0.25
+
+[reads.windows_written.hs]
+tap_holds_enabled = false
+tap_hold_timeout_ms = 250
+sticky_timeout_ms = 1500
+lone_modifier_tap_max_ms = 0
+simultaneous_threshold_ms = 80
+combo_symmetric = true
+
+[reads.windows_written.hs.tap_hold_config]
+caps_lock = { tap = "backspace", hold = "ctrl" }
+left_shift = { tap = "copy", hold = "shift", timeout_ms = 300 }
+tab = { tap = "none", hold = "layer" }
