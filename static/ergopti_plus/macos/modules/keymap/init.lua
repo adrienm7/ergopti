@@ -1457,6 +1457,23 @@ local function run_trigger_checks()
 	-- matches) and the engine disagree, and the disagreement is what reaches the
 	-- screen.
 	local star_validated = Terminators.matches_magic_event(chars, CoreState.magic_key)
+	-- A letter magic key pressed with Shift completes an uppercase trigger, as on
+	-- Windows (HSE-004); it never repeats a letter, and when no mapping fires it
+	-- stays an ordinary typed capital.
+	local cased_magic = not star_validated and chars == Expander.cased_magic(CoreState.magic_key)
+	if cased_magic then
+		local before_magic = CoreState.buffer:sub(1, #CoreState.buffer - #chars)
+		local resolution = Expander.resolve_magic_action(before_magic, function(mapping)
+			if LLMBridge.owns_visible_magic_action(mapping, before_magic) then return true end
+			return mapping_fires(mapping)
+		end, chars)
+		for _, action in ipairs(resolution and resolution.attempts or {}) do
+			if action.kind ~= "autocorrect" and Expander.try_auto_expand(
+				action.mapping, text_utils.utf8_len(chars), false, before_magic .. chars) then
+				return true
+			end
+		end
+	end
 	if star_validated then
 		-- Ask the same prospective resolver the tooltip uses. It owns candidate
 		-- eligibility and cross-kind ordering, so pressing the advertised key cannot
