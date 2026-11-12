@@ -421,6 +421,12 @@ and the next module candidates. The audit is paused at the maintainer's request.
       `testFreshKeyboardEventsFollowLayoutAndShiftFlags` passed, 13 TIS records closed, receipt
       `no_fixture_refusal`. So 2 of the 3 full-suite runs refused. Still unproven: whether a refusal follows a select
       issued before the enable is observed; the next refusal's annotation answers it.
+      Evening: the macOS 26 full suite passed again in [43276494558](https://github.com/adrienm7/ergopti/actions/runs/43276494558) (2 of 4 refused), but the
+      number-row cohort refused on macOS 15 Apple silicon in the same run (job 131404916213, « Managed Ollama »
+      cell): `testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI` (French) hit the deadline and an
+      unresolved cleanup, then six cases "unavailable"; `fixture_refusal_unclassified`, no `tsm.uiserver` line.
+      Its annotation found no timeline because the number-row records are named "<case>:<source id>";
+      84e97e47 matches them by case, so the next refusal prints the selection timeline.
 
 - [x] **[CODE] Personal-info documentation:** replace obsolete Windows-preview-not-wired claims in shared README; audit the metadata-only missing localization key separately from the working translated menu caption. Done: the obsolete Windows-not-wired section of the shared README now describes the AutoHotkey mask twin; the metadata-only missing localization key is noted as a separate audit (not fixed here).
 - [x] **[PARITY] Personal aliases and preparation (alphabets documented in the shared personal_info README; Windows eager pre-generation cost moved to « To confirm on the Windows PC », macOS Unicode aliases tracked below):** document allowed alias alphabets per OS; qualify or bound Windows eager pre-generation at accepted high pattern settings without claiming a measured hang. Preserve actual dynamic-resolution alternatives on Lua.
