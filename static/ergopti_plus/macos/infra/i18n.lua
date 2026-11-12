@@ -28,6 +28,7 @@ local hs     = hs
 local Logger = require("infra.logger")
 local Storage = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
+local _miss_warned = {}
 local LOG    = "i18n"
 
 local locale_mod = require("infra.locale")
@@ -157,8 +158,15 @@ end
 --- @return string
 function M.get(key)
 	local s = locale_mod.get(key)
-	if s == nil or s == "" then return key end
-	return s
+	if s ~= nil and s ~= "" then return s end
+	-- A total miss (active locale, en and fr) shows the raw key: warned once
+	-- per key, as on Windows, since every menu rebuild asks again.
+	if not _miss_warned[key] then
+		_miss_warned[key] = true
+		Logger.warn(LOG, "No translation for '%s' in the active locale, en or fr — the raw key is displayed.",
+			tostring(key))
+	end
+	return key
 end
 
 --- Whether a key has a translation, for a caller probing optional keys: unlike
