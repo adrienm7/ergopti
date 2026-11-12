@@ -1940,12 +1940,16 @@ _Updater_RetireManagedFailure(ExpectedOwner := unset) {
 _Updater_ManagedFailureOwnerIsCurrent(Owner) {
 	global _UpdaterManagedFailureOwner, _UpdaterSelfUpdateEpoch
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker, _UpdaterSwapOwner
-	global _UpdaterRecoveryPublishTarget, UPDATER_REQUEST_POLICY_ALLOW
+	global _UpdaterRecoveryPublishTarget, UPDATER_REQUEST_POLICY_ALLOW, _UpdaterPauseGeneration
 	if !(Owner is Map) || !(_UpdaterManagedFailureOwner is Map)
 		|| Owner != _UpdaterManagedFailureOwner || !Owner.Get("terminal", false)
 		|| Owner.Get("retired", true) || Owner.Get("staging_epoch", 0) != _UpdaterSelfUpdateEpoch
 		|| _UpdaterDownloadInProgress || IsObject(_UpdaterDownloadWorker)
 		|| (_UpdaterSwapOwner is Map) || _UpdaterRecoveryPublishTarget != ""
+		return false
+	; An install still stops at a pause (UPD-2 leaves installs pause-sensitive), so
+	; a pause retires its retry consent even though the manual request runs on.
+	if !_Updater_RequestContextValid(Owner["request"]) || Owner["request"].Generation != _UpdaterPauseGeneration
 		return false
 	return _Updater_RequestPolicy(Owner["request"]) == UPDATER_REQUEST_POLICY_ALLOW
 }
