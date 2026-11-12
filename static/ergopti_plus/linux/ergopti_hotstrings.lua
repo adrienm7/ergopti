@@ -3409,7 +3409,7 @@ local function main()
 	-- file_watchers.pump() (deadline check + mtime polling) and one batch of the
 	-- at-rest migration.
 	local function stop_input_loop()
-		shutdown.request("runtime callback failure", "runtime callback failure")
+		shutdown.request_failure("runtime callback failure", "runtime callback failure")
 	end
 
 	-- Summarises the repeat streaks that are due, so a source that fell silent
@@ -3669,7 +3669,8 @@ local function main()
 		onIdle = function()
 			if shutdown.is_requested() then shutdown.poll(); return end
 			if not keyboard_hook.isRunning() and not keyboard_hook.isRecovering() then
-				shutdown.request("keyboard hook stopped")
+				-- Only an emergency stops the hook before a shutdown was requested.
+				shutdown.request_failure("keyboard hook stopped")
 				return
 			end
 			if tray_menu then
@@ -3768,4 +3769,10 @@ if not ok_main then
 	-- Non-zero, so systemd sees a failure and its Restart= policy applies. A daemon
 	-- that crashes and exits 0 is a daemon the supervisor believes finished its work.
 	os.exit(1)
+end
+-- Input that stopped at run time is a failure for the supervisor too (LCY-001);
+-- the teardown above already ran, so only the status remains to report.
+if shutdown.failure() then
+	pcall(Logger.error, LOG, "Daemon exiting after a run-time failure: %s.", shutdown.failure())
+	os.exit(ShutdownCoordinator.RUNTIME_FAILURE_EXIT_CODE)
 end

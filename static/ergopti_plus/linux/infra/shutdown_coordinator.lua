@@ -14,6 +14,10 @@ local Logger = require("logger.shim")
 
 local LOG = "infra.shutdown_coordinator"
 
+-- EX_SOFTWARE, as the macOS runtime failure exit: systemd's Restart=on-failure
+-- restarts a daemon whose input stopped at run time instead of reading it as done.
+M.RUNTIME_FAILURE_EXIT_CODE = 70
+
 --- Builds one shutdown owner.
 --- @param opts table { pre_wait, final_wait (optional strict-ACK registry), keyboard_hook, event_loop }
 --- @return table
@@ -47,6 +51,7 @@ function M.new(opts)
 	end
 
 	local requested, complete, polling = false, false, false
+	local failure = nil
 	local registering, input_stopped = false, false
 	local pending, native_claims, final_claims = {}, {}, {}
 	local final_started = false
@@ -150,6 +155,22 @@ function M.new(opts)
 		if not preparation then dispatch() end
 		return true
 	end
+
+	--- Starts the shutdown for a run-time failure, so the process exits non-zero.
+	--- A failure seen once an exit already owns the process changes nothing.
+	--- @param reason string Human-readable failure.
+	--- @param emergency_reason string|nil Passed to the hook's emergency stop.
+	--- @return boolean started True only for the first request.
+	function coordinator.request_failure(reason, emergency_reason)
+		if type(reason) ~= "string" or reason == "" then error("a run-time failure names its cause", 2) end
+		if requested then return false end
+		failure = reason
+		return coordinator.request(reason, emergency_reason)
+	end
+
+	--- Reports the run-time failure that started the shutdown, if any.
+	--- @return string|nil reason
+	function coordinator.failure() return failure end
 
 	--- Retains startup acquisitions until their native constructor frames return.
 	--- @return table|nil token Exact opaque ownership, or nil when admission is closed.
