@@ -153,6 +153,21 @@ helpers.describe("personal editor exact callback owners", function()
 		end)
 	end)
 
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+	helpers.it("commits a save while the driver is paused (edd1-paused-writes)", function()
+	local paused_control = package.loaded["modules.shortcuts.script_control"]
+	package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return true end }
+		local ok, failure = pcall(with_editor, function(editor, records)
+			local saves = 0
+			editor.open({}, function() saves = saves + 1; return true end)
+			records.bridges[1]({ body = { action = "save", values = {} } })
+			helpers.assert_eq(saves, 1)
+			helpers.assert_eq(records.windows[1].deletes, 1, "the committed save closes the editor")
+		end)
+	package.loaded["modules.shortcuts.script_control"] = paused_control
+		assert(ok, failure)
+	end)
+
 	helpers.it("retains deletion retry without replaying committed saves (personal-editor-owner)", function()
 		with_editor(function(editor, records)
 			local saves = 0
