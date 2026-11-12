@@ -329,7 +329,7 @@ local LayoutScope = require("infra.keyboard_layout_scope")
 local settled_at_once = nil
 local cleared = await("the global clear", function(done)
 	local answered = false
-	GlobalScope.apply("clear", { keyboard_layout = LayoutScope.participant(function() return false end) },
+	GlobalScope.apply("clear", { keyboard_layout = LayoutScope.participant() },
 		function(...)
 			answered = true
 			return done(...)
