@@ -50,9 +50,14 @@ local function observe(family, target, mode)
 	local ok, err = xpcall(function()
 		local driver = base .. "/driver"
 		for _, dir in ipairs({ driver, driver .. "/infra", driver .. "/_shared", driver .. "/_shared/data",
-			driver .. "/_shared/data/locales", driver .. "/_shared/modules", driver .. "/_shared/modules/llm",
-			driver .. "/_shared/" .. require("native_path").dirname(TIMINGS_SOURCE) }) do
+			driver .. "/_shared/data/locales", driver .. "/_shared/modules", driver .. "/_shared/modules/llm" }) do
 			assert(uv.fs_mkdir(dir, 448))
+		end
+		-- The timings owner names its own place; each missing folder of it is made.
+		local timings_dir = driver .. "/_shared"
+		for part in require("native_path").dirname(TIMINGS_SOURCE):gmatch("[^/]+") do
+			timings_dir = timings_dir .. "/" .. part
+			if not uv.fs_stat(timings_dir) then assert(uv.fs_mkdir(timings_dir, 448)) end
 		end
 		write(driver .. "/infra/paths.lua", assert(helpers.read_module_source("infra.paths")))
 		write(driver .. "/_shared/data/locales/en.json", read(root .. "/../_shared/data/locales/en.json"))
