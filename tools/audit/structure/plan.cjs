@@ -865,6 +865,20 @@ function filesEndingWith(tail) {
 	return (tailIndex.get(name) || []).filter((p) => p.endsWith(`/${tail}`));
 }
 
+/**
+ * A quoted module name at `index` of a tool listed in edits.cjs
+ * MODULE_NAME_FILES: one of the tool's own JavaScript values (a property, an
+ * element or a comparison operand, in single quotes), never a log tag of a
+ * Lua template the tool embeds.
+ */
+function isListedModuleSite(file, text, index) {
+	return (
+		Edits.MODULE_NAME_FILES.some((e) => e.file === file) &&
+		text[index] === "'" &&
+		/(?:[\w$]+\s*:|[[,(]|[!=]==?)\s*$/.test(text.slice(Math.max(0, index - 40), index))
+	);
+}
+
 let listText = null;
 let listRanges = [];
 /**
@@ -1754,13 +1768,24 @@ function scanFile(file, text, ctx) {
 				) &&
 				!configKeys().has(m[1]) &&
 				!localeKeys().has(m[1]);
-			if ((!dotted && !isModuleLoadSite(text, m.index)) || NODE_MODULES.has(m[1])) continue;
+			// A tool listed in edits.cjs MODULE_NAME_FILES names Lua modules in
+			// its own tables (new Set(['menu.personal_files', …])): every quoted
+			// name of a moved module there is one.
+			// Only the tool's own JavaScript values: a property, an element or a
+			// comparison operand in single quotes, never a Lua template's log tag.
+			const listed = isListedModuleSite(file, text, m.index);
+			if ((!dotted && !listed && !isModuleLoadSite(text, m.index)) || NODE_MODULES.has(m[1]))
+				continue;
 			const shared = byLuaName.get(`_shared|${m[1]}`);
 			const own = drivers.map((d) => byLuaName.get(`${d}|${m[1]}`)).filter(Boolean);
 			const targets = new Set(own.map((h) => h[2]));
 			const hit = shared || (targets.size === 1 ? own[0] : null);
 			if (hit && hit[2])
-				add('lua-module', m[1], hit[2], { oldRepo: PREFIX + hit[0], loadOnly: !dotted });
+				add('lua-module', m[1], hit[2], {
+					oldRepo: PREFIX + hit[0],
+					loadOnly: !dotted && !listed,
+					listed: listed && !dotted
+				});
 		}
 	}
 	// A file whose path literals are synthetic coordinates (edits.cjs
@@ -2356,6 +2381,7 @@ if (require.main === module) main();
 module.exports = {
 	SPLIT,
 	neverRewritten,
+	isListedModuleSite,
 	EXISTING,
 	referenceContext,
 	scanFile,

@@ -202,10 +202,16 @@ function rewriteText(text, rows, movedRepo, file) {
 		}
 		if (row.kind === 'lua-module-escaped') {
 			text = text.replace(new RegExp(`(?<![\\w%.])${esc}(?![\\w])`, 'g'), () => hold(row.new));
-		} else if (row.kind === 'lua-module' && (!row.old.includes('.') || row.resolution?.loadOnly)) {
-			// A one-word name moves only where it is loaded (Plan.isModuleLoadSite).
+		} else if (
+			row.kind === 'lua-module' &&
+			(!row.old.includes('.') || row.resolution?.loadOnly || row.resolution?.listed)
+		) {
+			// A one-word name moves only where it is loaded (Plan.isModuleLoadSite)
+			// or where a listed tool names it (Plan.isListedModuleSite).
 			text = text.replace(new RegExp(`(["'])${esc}\\1`, 'g'), (whole, quote, offset, all) =>
-				Plan.isModuleLoadSite(all, offset) ? `${quote}${hold(row.new)}${quote}` : whole
+				Plan.isModuleLoadSite(all, offset) || Plan.isListedModuleSite(file, all, offset)
+					? `${quote}${hold(row.new)}${quote}`
+					: whole
 			);
 		} else if (row.kind === 'lua-module' || row.kind === 'lua-prefix') {
 			text = text.replace(
