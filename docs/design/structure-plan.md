@@ -383,14 +383,23 @@ is required as `gestures.engine.direction`, exactly like a driver module in
   module. `plan.cjs` fails if any collision is left, and `apply-step.cjs`
   refuses a step that would create one.
 
-There is no period with two shared roots: step S00 moves all of `_shared` at
-once and, in the same commit, turns every reference to the shared Lua root
-into one to `_shared` (the `package.path` strings `…/_shared/lua/?.lua`,
-`SHARED_LUA_DIR`, the literal module loader's shared root, the bytecode
-compiler's `find`, the bundle globs). Those are ordinary folder and path
-rewrites, listed in rewrites.tsv under S00; a path written relative to the
+There is no period with two shared roots: the first step (`_shared`) moves all
+of `_shared` at once and, in the same commit, turns every reference to the
+shared Lua root into one to `_shared` (`plan.cjs` `SHARED_ROOT_REWRITES`): the
+`package.path` and `LUA_PATH` strings `…/_shared/lua/?.lua`, `SHARED_LUA_DIR`,
+`shared .. "/lua/"` and `Paths.shared("lua")`, the literal module loader's
+shared root, the bytecode compiler's `find`, the installers' `SHARED_LUA`, the
+bundle globs. Paths to files and folders that move are rewritten first, as
+ordinary tokens; the switch takes what is left. A path written relative to the
 shared Lua root (`SHARED_LUA_DIR .. "/toml_codec/source_open.lua"`) is rewritten
-relative to `_shared`.
+relative to `_shared`. `plan.cjs` refuses a map that leaves any file under
+`_shared/lua/`.
+
+The shared test modules move from `_shared/lua/test/` to
+`_shared/tests/lua/<feature>/` and are named from `_shared` like any shared
+module: `test.assertions` becomes `tests.lua.assertions`, with no extra
+`package.path` entry. What is left naming the old test folder as a whole (an
+exclusion glob, a prune, a test-double root) becomes `_shared/tests`.
 
 ## Move map, rewrites and steps
 
@@ -447,13 +456,34 @@ ERGOPTI_STRUCTURE_PHASE=2 node tools/audit/structure/apply-step.cjs gestures --a
 ```
 
 `--apply` refuses without `ERGOPTI_STRUCTURE_PHASE=2` (the coordinator's go),
-when a touched file has local changes, and when the step creates a Lua module
-collision. It rewrites references first, then `git mv`s the files,
-re-relativises the relative `#Include` lines of moved AHK files, `git rm`s a
-retired file and stages exactly what it touched. It commits nothing: the
-step's gates run first, then `test-structure-folder-bounds --update-baseline`
-lowers the ratchet, then one commit per step
-(`refactor(structure): move <feature> into its feature folder`).
+when a touched file has local changes, when the step creates a Lua module
+collision, and when any reference is refused, before its first write. It
+rewrites references first (each replacement final, so a short folder token
+never rewrites inside a path a longer one just wrote), then `git mv`s the
+files, re-relativises the relative `#Include` lines of moved AHK files,
+`git rm`s a retired file, removes the folders it left empty and stages exactly
+what it touched. It commits nothing.
+
+`run-phase2.cjs` runs the steps in order, one commit per step:
+
+```bash
+ERGOPTI_STRUCTURE_PHASE=2 node tools/audit/structure/run-phase2.cjs \
+  [--from <step>] [--to <step>] [--gate "<command>"]... [--receipt <file>]
+```
+
+Each step is applied in a fresh process (the tools name moved paths too), then
+the follow-ups no rewrite can do: banner widths (`lint-conventions
+--fix-banners`), the formatter (`format.cjs --write`), the generated outputs
+(`npm run codegen`; a generator that still writes an old path leaves an
+untracked file and stops the run), and `test-structure-folder-bounds
+--update-baseline`. The strict format and convention lint and every `--gate`
+command run next; a red gate stops the run with the step staged. Then one
+commit per step (`refactor(structure): move <feature> into its feature folder`).
+
+The few sites whose new text is a decision rather than a rewrite (a scan over
+a folder the plan scatters, whose new scope no rule can know) are listed in
+`edits.cjs` with their exact text before and after and the folder whose
+emptying triggers them; a text that no longer matches refuses the step.
 
 ### The dry run of the whole sequence
 
@@ -657,6 +687,8 @@ mechanical edit; they head Rule A's order of work.
 | `tools/audit/structure/rules.cjs`                  | the feature-first target tree as rules        |
 | `tools/audit/structure/plan.cjs --write`           | appendices 1 to 4                             |
 | `tools/audit/structure/apply-step.cjs`             | one step, dry run by default                  |
+| `tools/audit/structure/run-phase2.cjs`             | every step in order, one commit per step      |
+| `tools/audit/structure/edits.cjs`                  | the explicit edits of scattered scan scopes   |
 | `tools/audit/shared-literal-inventory.cjs --write` | appendices 5 and 6                            |
 | `tools/test/test-structure-folder-bounds.cjs`      | Rule B ratchet (`js-0507`)                    |
 | `tools/test/test-shared-literal-inventory.cjs`     | Rule A ratchet (`js-0508`)                    |
