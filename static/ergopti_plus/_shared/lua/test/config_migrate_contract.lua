@@ -79,12 +79,15 @@ local function with_config(content, body)
 	local path = new_config_path()
 	if content then write_bytes(path, content) end
 	local ok, err = pcall(body, path)
-	for _, version in ipairs({ 2, 3 }) do
-		os.remove(Engine.backup_path(path, version, STAMP))
-		os.remove(Engine.backup_path(path, version, STAMP) .. ".tmp")
+	-- Linux stages under this process's name (CFD-1), macOS under `.tmp`.
+	local has_owner, StageOwner = pcall(require, "infra.stage_owner")
+	local files = { path }
+	for _, version in ipairs({ 2, 3 }) do files[#files + 1] = Engine.backup_path(path, version, STAMP) end
+	for _, file in ipairs(files) do
+		os.remove(file)
+		os.remove(file .. ".tmp")
+		if has_owner then os.remove(StageOwner.stage_path(file)) end
 	end
-	os.remove(path)
-	os.remove(path .. ".tmp")
 	if not ok then error(err, 0) end
 end
 
