@@ -201,8 +201,6 @@ helpers.describe("hold durations: tap or hold", function()
 			action_names = function() return {} end,
 			defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 			user_path = user_path,
-			-- No switch row: the config.toml beside the file is absent.
-			config_path = user_path .. ".config.toml",
 		})
 		local ok, err = pcall(body, TapHold.threshold_ms())
 		TapHold._reset_for_test()

@@ -141,25 +141,6 @@ local function migration_context()
 	return context
 end
 
---- The companion files a case registry's import_companion ops name, as a
---- driver hands them: companion_<file> beside the case input, absent when the
---- case has none.
---- @param dir string Case directory.
---- @param registry table Validated case registry.
---- @return table companions `{ [file] = { status, content? } }`.
-local function corpus_companions(dir, registry)
-	local companions = {}
-	for _, step in ipairs(registry.steps) do
-		for _, op in ipairs(step.ops) do
-			if op.op == "import_companion" and companions[op.file] == nil then
-				local content = read_bytes(dir .. "/companion_" .. op.file)
-				companions[op.file] = content and { status = "ok", content = content } or { status = "absent" }
-			end
-		end
-	end
-	return companions
-end
-
 --- A validated registry from TOML text, for scenarios independent of the
 --- shipped one.
 local function registry_from(text)
@@ -255,7 +236,6 @@ local function register_corpus(h, driver)
 
 					local _, input = read_corpus_file(dir .. "/input.toml")
 					local context = migration_context()
-					context.companions = corpus_companions(dir, registry)
 					local plan = Engine.plan(input, registry, driver, context)
 					h.assert_eq(plan.outcome, spec.outcome, "outcome (" .. tostring(plan.detail) .. ")")
 					if spec.outcome ~= "migrated" then
@@ -1343,71 +1323,6 @@ local function register_version_refused_reads(h, driver)
 	end)
 end
 
---- Registers the boot of a migration that moves values out of a companion file.
---- @param h table Driver test helpers.
---- @param driver string
-local function register_companion_import(h, driver)
-	local dir = shared_root() .. "/tests/corpus/config_migrations/op_import_companion"
-	h.describe("config migration companion import (" .. driver .. ")", function()
-		h.it("publishes config.toml first, then deletes the moved values from the backed-up companion", function()
-			local _, source = read_corpus_file(dir .. "/input.toml")
-			local _, companion = read_corpus_file(dir .. "/companion_tap_hold.toml")
-			local _, wanted = read_corpus_file(dir .. "/expected.toml")
-			local registry = assert(Engine.load_registry(dir .. "/migrations.toml"))
-			with_config(source, function(path)
-				local companion_path = path .. ".tap_hold.toml"
-				local companion_backup = Engine.backup_path(companion_path, registry.current, STAMP)
-				write_bytes(companion_path, companion)
-				local ok, detail = pcall(function()
-					local result = Engine.run({ path = path, driver = driver, registry = registry, stamp = STAMP,
-						companions = { ["tap_hold.toml"] = companion_path } })
-					h.assert_eq(result.status, "migrated", tostring(result.detail))
-					h.assert_eq(Engine.plain(assert(Engine.model_from_source(read_bytes(path)))),
-						Engine.plain(assert(Engine.model_from_source(wanted))), "config.toml holds the moved values")
-					h.assert_eq(result.companions["tap_hold.toml"].retired, true, tostring(result.companions["tap_hold.toml"].detail))
-					h.assert_eq(read_bytes(companion_backup), companion, "the companion is backed up byte for byte")
-					local left = Engine.plain(assert(Engine.model_from_source(read_bytes(companion_path))))
-					h.assert_eq(left, { tap_hold = { time_activation_seconds = 0.25 },
-						["tap_hold.keys.caps_lock"] = { tap_action = "backspace" } },
-						"every addressed value leaves the companion, the keys and the global delay stay")
-					local again = Engine.run({ path = path, driver = driver, registry = registry, stamp = STAMP,
-						companions = { ["tap_hold.toml"] = companion_path } })
-					h.assert_eq(again.status, "current", "the stamp makes the move run once")
-				end)
-				os.remove(companion_path)
-				os.remove(companion_backup)
-				if not ok then error(detail, 0) end
-			end)
-		end)
-
-		h.it("refuses a migration whose companion the driver did not name, leaving config.toml untouched", function()
-			local _, source = read_corpus_file(dir .. "/input.toml")
-			local registry = assert(Engine.load_registry(dir .. "/migrations.toml"))
-			with_config(source, function(path)
-				local result = Engine.boot({ path = path, driver = driver, registry = registry, stamp = STAMP,
-					logger = (recording_logger()) })
-				h.assert_eq(result.status, "failed")
-				h.assert_eq(result.read_only, true)
-				h.assert_eq(read_bytes(path), source, "an import without its companion never publishes")
-				h.assert_nil(read_bytes(Engine.backup_path(path, registry.current, STAMP)))
-			end)
-		end)
-
-		h.it("reads an absent companion as holding nothing", function()
-			local _, source = read_corpus_file(dir .. "/input.toml")
-			local registry = assert(Engine.load_registry(dir .. "/migrations.toml"))
-			with_config(source, function(path)
-				local result = Engine.run({ path = path, driver = driver, registry = registry, stamp = STAMP,
-					companions = { ["tap_hold.toml"] = path .. ".absent_tap_hold.toml" } })
-				h.assert_eq(result.status, "migrated", tostring(result.detail))
-				h.assert_eq(Engine.plain(assert(Engine.model_from_source(read_bytes(path)))).mod_combos,
-					{ symmetric = false }, "nothing is imported from an absent companion")
-				h.assert_eq(next(result.companions), nil, "an absent companion is not rewritten")
-			end)
-		end)
-	end)
-end
-
 --- Registers the whole contract for one driver.
 --- @param h table Driver test helpers (describe, it, assert_*).
 --- @param opts table `{ driver = "hs" | "linux" }`.
@@ -1419,7 +1334,6 @@ function M.register(h, opts)
 	register_registry(h, opts.driver)
 	register_copy_ownership(h, opts.driver)
 	register_chord_handoff(h, opts.driver)
-	register_companion_import(h, opts.driver)
 	register_boot(h, opts.driver)
 	register_schema_admission(h, opts.driver)
 	register_version_refused_reads(h, opts.driver)

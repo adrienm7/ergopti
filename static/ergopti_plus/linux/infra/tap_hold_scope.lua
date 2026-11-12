@@ -5,10 +5,9 @@
 --- DESCRIPTION:
 --- Restores Ergopti's recommended tap-holds or clears them to the keyboard's own
 --- behaviour through the shared scope transaction: the user's tap_hold.toml is
---- the manifest preset's file (the keys); the switch, the timings and the
---- tap-hold action parameters stay in config.toml. Both get verified backups,
---- the engine acknowledges the exact pair of candidates before anything is
---- published, and a refusal restores both.
+--- the manifest preset's file, and the tap-hold action parameters stay in
+--- config.toml. Both get verified backups, the engine acknowledges the exact
+--- candidate before anything is published, and a refusal restores both.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Explicit Preset: a restore writes every shipped key field instead of
@@ -146,23 +145,13 @@ function M.new(options)
 		path = options.path, backup_path = options.backup_path, files = files, manifest = Manifest,
 		owned_paths = inventory, owners = validators,
 		presets = { tap_hold = {
-			-- No row is routed here: every manifest row under tap_holds is a
-			-- config.toml row (maintainer decision of 2026-11-11).
-			path = options.tap_hold_path, backup_path = options.tap_hold_backup_path,
+			path = options.tap_hold_path, backup_path = options.tap_hold_backup_path, prefixes = { ConfigKeys.KEY.TAP_HOLDS },
 			render = function(mode, document, rows, shapes) return writer.render_scope(mode, document, rows, preset, shapes) end,
 		} },
 		prepare_batch = function(path, updates, adapter)
 			local operations = {}
 			for _, row in ipairs(updates) do operations[#operations + 1] = row end
 			for _, row in ipairs(legacy) do operations[#operations + 1] = row end
-			-- The one-shot timeout has no manifest row; the scope resets it with the
-			-- keys, as the recommendation sets none. Only a stored one is deleted:
-			-- a scope never creates config.toml for a row it removes.
-			local stored = source and source.status == "ok" and Codec.decode(source.content) or nil
-			local settings = type(stored) == "table" and stored[ConfigKeys.KEY.TAP_HOLDS] or nil
-			if type(settings) == "table" and settings[ConfigKeys.LEAF.STICKY_TIMEOUT_MS] ~= nil then
-				operations[#operations + 1] = { section = ConfigKeys.KEY.TAP_HOLDS, key = ConfigKeys.LEAF.STICKY_TIMEOUT_MS, delete = true }
-			end
 			return Writer.prepare_batch(path, operations, adapter, source)
 		end,
 		capture = function()
@@ -171,7 +160,7 @@ function M.new(options)
 			if type(snapshot.tap_hold) ~= "table" or type(snapshot.parameters) ~= "table" then return nil end
 			return snapshot
 		end,
-		apply = function(config, _, _, _, presets)
+		apply = function(_, _, _, _, presets)
 			if options.is_paused() then return false end
 			local candidate = parameters.parameter_configuration_snapshot(owner)
 			if type(candidate) ~= "table" then return false end
@@ -179,7 +168,7 @@ function M.new(options)
 				if parameter_domain("gesture_parameters." .. key) then candidate[key] = nil end
 			end
 			if parameters.apply_parameter_configuration(owner, candidate) ~= true then return false end
-			return manager.apply_configuration(presets.tap_hold.decoded, presets.tap_hold.shapes, config) == true
+			return manager.apply_configuration(presets.tap_hold.decoded, presets.tap_hold.shapes) == true
 		end,
 		restore = apply_state,
 	})

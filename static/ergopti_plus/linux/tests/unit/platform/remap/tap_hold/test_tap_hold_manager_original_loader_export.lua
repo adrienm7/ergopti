@@ -62,8 +62,7 @@ helpers.describe("loader currency after the last construction callback",function
    action_names=function()
     if change then change=false;Loader.load_document=function(...)return original(...)end end
     return original_names()
-   end,defaults_path=DEFAULTS,user_path=user_path,
-   config_path=require("tests.support.tap_hold_fixture").config_path(user_path)})
+   end,defaults_path=DEFAULTS,user_path=user_path})
   local running,calls=hook.engine,hook.calls
   change=true
   local ok,failure=pcall(function()
@@ -96,7 +95,7 @@ helpers.describe("complete original-issuer combination binding publication", fun
 		local owned_paths, cleanup = {}, {}
 		local function defer(callback) undo[#undo + 1] = callback end
 		local source = [[[_meta]
-schema_version = 22
+schema_version = 21
 [category_enabled]
 key_combinations = false
 [gesture_parameters]
@@ -127,7 +126,6 @@ keep = true
 		local okay, primary = xpcall(function()
 			user_path = os.tmpname(); owned_paths[#owned_paths + 1] = user_path
 			config_path = os.tmpname(); owned_paths[#owned_paths + 1] = config_path
-			-- The combinations' config.toml holds no [tap_holds]: the switch is off.
 			stream(user_path, "wb", require("tests.support.tap_hold_fixture").with_preset("[tap_hold]\nenabled = false\n"))
 			stream(config_path, "wb", source)
 			paths.config = function() return config_path end
@@ -139,7 +137,7 @@ keep = true
 			local function start()
 				return Manager.init({ keyboard_hook = hook, execute_action = Gestures.execute_action,
 					action_names = Gestures.get_executable_action_names, on_text_injected = function() end,
-					defaults_path = DEFAULTS, user_path = user_path, config_path = config_path })
+					defaults_path = DEFAULTS, user_path = user_path })
 			end
 			if not delayed then helpers.assert_eq(start(), true) end
 			body(Manager, Combinations, Gestures, hook, config_path, source, read, defer, start)

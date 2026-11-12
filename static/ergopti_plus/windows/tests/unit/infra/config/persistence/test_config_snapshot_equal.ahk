@@ -80,7 +80,7 @@ _CSE_PlainEqual(Left, Right) {
 }
 
 _CSE_Source() {
-	return '[_meta]`nschema_version = 22`n`n[script]`nlog_level = "INFO"`n'
+	return '[_meta]`nschema_version = 21`n`n[script]`nlog_level = "INFO"`n'
 		. '[hotstrings]`nmagic_key = "★"`nexpansion_delay = 0.25`n'
 		. '[llm]`nenabled = true`nuser_profiles = "v1:W10="`n'
 		. '[llm.navigation]`nnav_modifiers = ["alt", "ctrl"]`n'

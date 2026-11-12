@@ -5,4 +5,4 @@ description = "A configuration a 1.0.10 pre-release wrote on macOS (v20) keeps t
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 20
-to_version = 22
+to_version = 21

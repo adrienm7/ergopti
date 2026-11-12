@@ -126,11 +126,7 @@ local function manager()
 	-- Tap-holds on over the shared defaults: with no file the category reads
 	-- off, and an off category greys every row of its submenu (category-off rule).
 	local file = assert(io.open(user_path, "wb"))
-	assert(file:write("[tap_hold]\ninherit_defaults = true\n"))
-	assert(file:close())
-	-- The switch is a config.toml row beside the file.
-	file = assert(io.open(user_path .. ".config.toml", "wb"))
-	assert(file:write("[tap_holds]\nenabled = true\n"))
+	assert(file:write("[tap_hold]\nenabled = true\ninherit_defaults = true\n"))
 	assert(file:close())
 	Manager.init({
 		keyboard_hook = { set_remapper = function() end, key_text = function() return nil end,
@@ -142,7 +138,6 @@ local function manager()
 		action_names = function() return {} end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = user_path,
-		config_path = user_path .. ".config.toml",
 	})
 	return Manager
 end
@@ -168,7 +163,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 				"Cancel is not an empty answer — it must change nothing")
 		end)
 		th._reset_for_test()
-		os.remove(last_user_path); os.remove(last_user_path .. ".config.toml")
+		os.remove(last_user_path)
 		package.loaded["platform.remap.tap_hold_writer"] = previous
 		if not ok then error(err, 0) end
 	end)
@@ -189,7 +184,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 			helpers.assert_eq(writer_calls[1][2], 0.3, "300 ms is 0.3 s in the file")
 		end)
 		th._reset_for_test()
-		os.remove(last_user_path); os.remove(last_user_path .. ".config.toml")
+		os.remove(last_user_path)
 		package.loaded["platform.remap.tap_hold_writer"] = previous
 		if not ok then error(err, 0) end
 	end)

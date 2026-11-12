@@ -7,10 +7,8 @@
 --- model platform/remap/config.lua merges: a read decodes the file, migrates
 --- it in memory (_shared/tap_hold/migrations.toml) and translates it with
 --- _shared/lua/tap_hold/shared_file.lua; a save writes back only the leaves the
---- model changed, stamped with the current version. The switch, the timings and
---- the key combinations are config.toml rows (read_config, config_rows). It also
---- carries an old config_karabiner.toml over once (import_legacy), before the
---- boot versions config.toml, whose v22 step moves those rows out of it.
+--- model changed, stamped with the current version. It also carries an old
+--- config_karabiner.toml over once (import_legacy).
 ---
 --- FEATURES & RATIONALE:
 --- 1. One home on every OS: macOS reads and writes the file Linux and Windows
@@ -200,41 +198,6 @@ function M.read(document, shapes, path)
 		before = snapshot(model, is_table), writable = writable, detail = outcome }
 end
 
---- The config.toml that holds the manifest's tap-hold rows: the file beside
---- tap_hold.toml (infra/config_paths.lua places ConfigTomlPath and
---- TapHoldConfigPath in the same driver folder; the macOS boot checks it).
---- @param tap_hold_path string The tap_hold.toml path.
---- @return string
-function M.config_toml_path_for(tap_hold_path)
-	return (require("native_path").directory_prefix(tap_hold_path) or "") .. "config.toml"
-end
-
---- The config-owned part of the Karabiner model from a decoded config.toml
---- (see shared_file.config_to_karabiner); each leaf macOS cannot run is warned
---- once, naming config.toml.
---- @param document table Decoded config.toml; {} for an absent file.
---- @param shapes table|nil Its shape receipt.
---- @param path string The config.toml, named by warnings.
---- @return table part `{ tap_holds?, mod_combos? }`.
-function M.read_config(document, shapes, path)
-	local part, notes = SharedFile.config_to_karabiner(document, M.context(), table_test(shapes))
-	for _, note in ipairs(notes) do
-		local segments = {}
-		for segment in note.path:gmatch("[^%.]+") do segments[#segments + 1] = segment end
-		Outdated.report_in_file(path, segments, note.detail, Logger)
-	end
-	return part
-end
-
---- The config.toml rows a save writes (see shared_file.config_rows).
---- @param before table What M.read_config() returned for the config.toml the save read.
---- @param model table The model the save produced.
---- @param shapes table|nil The shape receipt of the model's arrays.
---- @return table rows
-function M.config_rows(before, model, shapes)
-	return SharedFile.config_rows(before, model, M.context(), table_test(shapes))
-end
-
 --- Stamps a document with the current version.
 local function stamp(document)
 	if type(document[Migrate.META_SECTION]) ~= "table" then document[Migrate.META_SECTION] = {} end
@@ -248,7 +211,7 @@ end
 --- @return string text
 function M.encode(file, model)
 	if file == nil then
-		local document = SharedFile.new_file(model, M.context(), table_test(nil))
+		local document = SharedFile.from_karabiner(model, M.context(), table_test(nil))
 		stamp(document)
 		return TomlCodec.encode(document)
 	end

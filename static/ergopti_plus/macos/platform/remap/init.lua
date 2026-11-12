@@ -4530,10 +4530,8 @@ local function reject_bulk_settings_candidate(transaction, reason, refused_befor
 	end
 end
 
---- Reads the remap file and the config.toml beside it and writes one verified
---- backup of the exact bytes of each (the config.toml one at
---- `<backup_path>.config`), so a scope's candidate can only replace the bytes
---- those backups hold.
+--- Reads the remap file and writes one verified backup of its exact bytes, so a
+--- scope's candidate can only replace the bytes that backup holds.
 --- @param backup_path string Unique backup destination that must not exist.
 --- @param source_path string|nil The settings file, the running one by default.
 --- @param admitted_source table|nil Optional exact Config read-generation receipt.
@@ -4554,36 +4552,16 @@ local function back_up_settings_source(backup_path, source_path, admitted_source
 			return nil, "remap source changed after recommendation admission"
 		end
 	end
-	-- The tap-hold rows of the manifest live in the config.toml beside it: the
-	-- save checks and rewrites both, so both are backed up first.
-	local config_path = require("platform.remap.tap_hold_file").config_toml_path_for(path)
-	local config_content, config_status = FileSystem.read_with_status(config_path)
-	if admitted_source ~= nil and type(admitted_source.config) == "table"
-		and (config_status ~= admitted_source.config.status
-			or (config_status == "ok" and config_content ~= admitted_source.config.content)) then
-		return nil, "remap rows changed after recommendation admission"
-	end
-	if config_status ~= "ok" and config_status ~= "absent" then return nil, "config.toml is unreadable" end
-	local config_source = { status = config_status, content = config_status == "ok" and config_content or nil }
-	local function back_up(destination, bytes)
-		local backed, detail, retry_cleanup = TomlWriter.publish_if_unchanged(destination, bytes, FileSystem, { status = "absent" })
-		if backed ~= true then
-			local cleanup = type(retry_cleanup) == "function" and { publication_cleanup = retry_cleanup } or nil
-			return nil, "backup refused: " .. tostring(detail), cleanup
-		end
-		local observed, observed_status = FileSystem.read_with_status(destination)
-		if observed_status ~= "ok" or observed ~= bytes then return nil, "backup verification failed" end
-		return true
-	end
-	if config_status == "ok" then
-		local backed, detail, cleanup = back_up(backup_path .. ".config", config_content)
-		if not backed then return nil, detail, cleanup end
-	end
-	if status == "absent" then return { status = "absent", config = config_source } end
+	if status == "absent" then return { status = "absent" } end
 	if status ~= "ok" or type(content) ~= "string" then return nil, "remap source is unreadable" end
-	local backed, detail, cleanup = back_up(backup_path, content)
-	if not backed then return nil, detail, cleanup end
-	return { status = "ok", content = content, config = config_source }
+	local backed, detail, retry_cleanup = TomlWriter.publish_if_unchanged(backup_path, content, FileSystem, { status = "absent" })
+	if backed ~= true then
+		local cleanup = type(retry_cleanup) == "function" and { publication_cleanup = retry_cleanup } or nil
+		return nil, "backup refused: " .. tostring(detail), cleanup
+	end
+	local observed, observed_status = FileSystem.read_with_status(backup_path)
+	if observed_status ~= "ok" or observed ~= content then return nil, "backup verification failed" end
+	return { status = "ok", content = content }
 end
 
 --- Applies one multi-setting candidate, deploys it, and compensates exactly on

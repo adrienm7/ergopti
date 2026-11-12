@@ -1,8 +1,0 @@
-# _shared/tests/corpus/config_migrations/op_import_companion/case.toml
-
-[case]
-description = "One key and a whole section tree move from the driver's companion file into config.toml; a value config.toml already holds wins, and a key the companion lacks is a no-op."
-drivers = ["ahk", "hs", "linux"]
-outcome = "migrated"
-from_version = 1
-to_version = 2

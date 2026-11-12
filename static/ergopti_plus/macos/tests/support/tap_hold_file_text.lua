@@ -6,14 +6,10 @@
 --- Lets a remap test keep stating its source in the Karabiner model (the
 --- `[tap_holds]` / `[mod_combos.config.esc_tab]` layout config_karabiner.toml had)
 --- while the driver reads and writes the shared tap_hold.toml
---- (_shared/tap_hold/SCHEMA.md) and the config.toml beside it, which holds the
---- manifest's tap-hold rows (`[tap_holds]` enabled, sticky_timeout_ms,
---- lone_modifier_tap_max_ms and `[mod_combos]`). `file(text)` is the pair a
---- model text becomes (tap_hold.toml stamped with the current version, then the
---- config.toml rows or nil); `model(text, config_text)` is the model a pair
---- reads as, without the stamp. Both go through the driver's own translation
---- (platform/remap/tap_hold_file.lua), never a second one; `write_config`,
---- `read_config` and `remove_config` reach the config.toml beside a path.
+--- (_shared/tap_hold/SCHEMA.md). `file(text)` is the shared file a model text
+--- becomes, stamped with the current version; `model(text)` is the model a
+--- shared file reads as, without the stamp. Both go through the driver's own
+--- translation (platform/remap/tap_hold_file.lua), never a second one.
 ---
 --- An entry under an id no driver has (a retired key or combination, the
 --- outdated-entry cases) has no translation: `file` writes it under the same
@@ -36,8 +32,11 @@ local function table_test(shapes)
 	return function(value) return type(value) == "table" and not (shapes and shapes.arrays[value]) end
 end
 
--- The [tap_holds] leaves config.toml keeps.
-local CONFIG_TAP_HOLD_LEAVES = { "enabled", "sticky_timeout_ms", "lone_modifier_tap_max_ms" }
+-- Model section -> file section of the entries keyed by id.
+local ENTRY_SECTIONS = {
+	{ model = { "tap_holds", "config" }, file = { "tap_hold", "keys" } },
+	{ model = { "mod_combos", "config" }, file = { "mod_combos", "config" } },
+}
 
 --- The table at a path, nil when a segment is not a table.
 local function at(document, path, is_table)
@@ -59,138 +58,69 @@ local function ensure(document, path)
 	return node
 end
 
---- Whether a key id names nothing the context can translate.
-local function untranslatable_key(ctx, id)
-	return ctx.key_of_hs[id] == nil and not ctx.catalogue_ids[id]
+--- Whether an id names nothing the context can translate.
+local function untranslatable(ctx, section, id)
+	if section.file[1] == "tap_hold" then return ctx.key_of_hs[id] == nil and not ctx.catalogue_ids[id] end
+	return ctx.pair_of_combo[id] == nil and ctx.combo_of_pair[id] == nil
+		and not (type(id) == "string" and id:find("_then_", 1, true) and (function()
+			local first, second = id:match("^(.-)_then_(.+)$")
+			return ctx.catalogue_ids[first] and ctx.catalogue_ids[second]
+		end)())
 end
 
---- The config.toml beside a tap_hold.toml path, as the driver resolves it.
---- @param path string
---- @return string
-function M.config_path(path)
-	return require("platform.remap.config").config_toml_path_for(path)
-end
-
---- Writes, or with nil removes, the config.toml beside a tap_hold.toml path.
---- @param path string The tap_hold.toml path.
---- @param text string|nil
-function M.write_config(path, text)
-	local target = M.config_path(path)
-	if text == nil then os.remove(target) return end
-	local fh = assert(io.open(target, "wb")); assert(fh:write(text)); assert(fh:close())
-end
-
---- The config.toml beside a tap_hold.toml path, nil when absent.
---- @param path string
---- @return string|nil
-function M.read_config(path)
-	local fh = io.open(M.config_path(path), "rb")
-	if not fh then return nil end
-	local text = fh:read("*a")
-	fh:close()
-	return text
-end
-
---- Removes the config.toml beside a path and the backups a scope wrote of it.
---- @param path string
-function M.remove_config(path)
-	os.remove(M.config_path(path))
-end
-
---- The pair of texts a Karabiner model text becomes.
+--- The shared tap_hold.toml text a Karabiner model text becomes.
 --- @param text string Model text (config_karabiner.toml layout).
---- @return string text Shared tap_hold.toml text, stamped; unparseable text unchanged.
---- @return string|nil config_text The config.toml rows, nil when the model holds none.
+--- @return string text Shared file text, stamped; unparseable text unchanged.
 function M.file(text)
 	local model, shapes = TomlCodec.decode_with_shapes(text)
 	-- Bytes that do not parse are a corrupt file in any layout: written as they are.
 	if type(model) ~= "table" then return text end
 	local file = binding()
 	local ctx, is_table = file.context(), table_test(shapes)
-	-- The config.toml rows: the owned [tap_holds] leaves and the whole
-	-- [mod_combos], each pair under its shared id (an untranslatable id as is).
-	local config = {}
-	local tap_holds = is_table(model.tap_holds) and model.tap_holds or nil
-	if tap_holds then
-		for _, leaf in ipairs(CONFIG_TAP_HOLD_LEAVES) do
-			if tap_holds[leaf] ~= nil then ensure(config, { "tap_holds" })[leaf] = tap_holds[leaf] end
-			tap_holds[leaf] = nil
-		end
-	end
-	if model.mod_combos ~= nil then
-		local combos = model.mod_combos
-		if is_table(combos) then
-			local out = {}
-			for field, value in pairs(combos) do out[field] = value end
-			if is_table(combos.config) then
-				out.config = {}
-				for id, entry in pairs(combos.config) do out.config[ctx.pair_of_combo[id] or id] = entry end
-			end
-			combos = out
-		end
-		config.mod_combos = combos
-		model.mod_combos = nil
-	end
 	local held = {}
-	for id, value in pairs(at(model, { "tap_holds", "config" }, is_table) or {}) do
-		if untranslatable_key(ctx, id) then held[id], model.tap_holds.config[id] = value, nil end
+	for index, section in ipairs(ENTRY_SECTIONS) do
+		local entries = at(model, section.model, is_table)
+		held[index] = {}
+		for id, value in pairs(entries or {}) do
+			if untranslatable(ctx, section, id) then held[index][id], entries[id] = value, nil end
+		end
 	end
-	local document = SharedFile.new_file(model, ctx, is_table)
-	for id, value in pairs(held) do ensure(document, { "tap_hold", "keys" })[id] = value end
+	local document = SharedFile.from_karabiner(model, ctx, is_table)
+	for index, section in ipairs(ENTRY_SECTIONS) do
+		for id, value in pairs(held[index]) do ensure(document, section.file)[id] = value end
+	end
 	document._meta = document._meta or {}
 	document._meta.schema_version = file.registry().current
-	local function encode(doc)
-		if shapes then
-			-- The receipts are keyed by table: the sections carried by reference keep their spelling.
-			return TomlCodec.encode_with_shapes(doc, { arrays = shapes.arrays, numbers = shapes.numbers,
-				strings = shapes.strings, document = doc })
-		end
-		return TomlCodec.encode(doc)
+	if shapes then
+		-- The receipts are keyed by table: the sections carried by reference keep their spelling.
+		return TomlCodec.encode_with_shapes(document, { arrays = shapes.arrays, numbers = shapes.numbers,
+			strings = shapes.strings, document = document })
 	end
-	return encode(document), next(config) ~= nil and encode(config) or nil
+	return TomlCodec.encode(document)
 end
 
---- The Karabiner model a pair of texts reads as.
+--- The Karabiner model a shared tap_hold.toml text reads as.
 --- @param text string Shared file text.
---- @param config_text string|nil The config.toml beside it.
 --- @return table model Without the version stamp.
-function M.model(text, config_text)
+function M.model(text)
 	local document, shapes = TomlCodec.decode_with_shapes(text)
 	assert(type(document) == "table", "tap_hold.toml text does not parse")
-	local config, config_shapes
-	if config_text ~= nil then
-		config, config_shapes = TomlCodec.decode_with_shapes(config_text)
-		assert(type(config) == "table", "config.toml text does not parse")
-	end
-	return M.model_of(document, shapes, config, config_shapes)
+	return M.model_of(document, shapes)
 end
 
---- The Karabiner model of a decoded pair: arrays and the sections carried by
---- reference stay the decoded tables, so a test can ask the shape receipt
---- about them.
+--- The Karabiner model of a decoded shared tap_hold.toml: arrays and the
+--- sections carried by reference stay the decoded tables, so a test can ask
+--- the shape receipt about them.
 --- @param document table Decoded shared file.
 --- @param shapes table|nil Its shape receipt.
---- @param config table|nil Decoded config.toml.
---- @param config_shapes table|nil Its shape receipt.
 --- @return table model Without the version stamp.
-function M.model_of(document, shapes, config, config_shapes)
+function M.model_of(document, shapes)
 	local ctx, is_table = binding().context(), table_test(shapes)
 	local model = SharedFile.to_karabiner(document, ctx, is_table)
 	model._meta = nil
-	for id, value in pairs(at(document, { "tap_hold", "keys" }, is_table) or {}) do
-		if untranslatable_key(ctx, id) then ensure(model, { "tap_holds", "config" })[id] = value end
-	end
-	if config ~= nil then
-		local config_is_table = table_test(config_shapes)
-		local part = SharedFile.config_to_karabiner(config, ctx, config_is_table)
-		if part.tap_holds ~= nil then
-			for leaf, value in pairs(part.tap_holds) do ensure(model, { "tap_holds" })[leaf] = value end
-		end
-		model.mod_combos = part.mod_combos
-		for id, value in pairs(at(config, { "mod_combos", "config" }, config_is_table) or {}) do
-			if ctx.combo_of_pair[id] == nil and not (type(id) == "string" and id:find("_then_", 1, true)) then
-				ensure(model, { "mod_combos", "config" })[id] = value
-			end
+	for _, section in ipairs(ENTRY_SECTIONS) do
+		for id, value in pairs(at(document, section.file, is_table) or {}) do
+			if untranslatable(ctx, section, id) then ensure(model, section.model)[id] = value end
 		end
 	end
 	return model

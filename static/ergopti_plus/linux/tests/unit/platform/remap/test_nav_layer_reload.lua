@@ -28,14 +28,13 @@ helpers.describe("native navigation reload transactions", function()
 			held_shortcut_modifier_codes = function() return {} end }
 		function hook.set_remapper(engine) hook.engine = engine end
 		local ok, err = pcall(function()
-			write(dir .. "/tap_hold.toml", '')
-			write(dir .. "/config.toml", '[tap_holds]\nenabled = true\n')
+			write(dir .. "/tap_hold.toml", '[tap_hold]\nenabled = true\n')
 			Manager.init({ keyboard_hook = hook, execute_action = function() end,
 				action_names = function() return {} end, on_text_injected = function() end,
 				defaults_path = helpers.driver_root() .. "/../_shared/tap_hold/defaults.toml",
 				user_path = dir .. "/tap_hold.toml" })
 			local original = assert(hook.engine)
-			write(dir .. "/config.toml", '[tap_holds]\nenabled = false\n')
+			write(dir .. "/tap_hold.toml", '[tap_hold]\nenabled = false\n')
 			write(dir .. "/layers.toml", '[broken')
 			helpers.assert_eq(Manager.reload(), false, "invalid layer refuses the entire reload")
 			helpers.assert_true(hook.engine == original, "no partial engine publication")
@@ -45,7 +44,6 @@ helpers.describe("native navigation reload transactions", function()
 		Manager._reset_for_test()
 		os.remove(dir .. "/layers.toml")
 		os.remove(dir .. "/tap_hold.toml")
-		os.remove(dir .. "/config.toml")
 		os.execute('rmdir "' .. dir .. '"')
 		if not ok then error(err, 0) end
 	end)
@@ -102,7 +100,7 @@ end)
 
 helpers.describe("boot navigation file isolation (nav-layer-boot-refusal)", function()
 	local valid = '[_meta]\nschema_version = 1\n[layers.nav.all]\nKeyJ = "keystroke:Home"\n'
-	local tap_text = '[tap_hold]\ninherit_defaults = false\n'
+	local tap_text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
 		.. '[tap_hold.keys.caps_lock]\ntap_action = "enter"\nhold_modifier = "ctrl"\ntime_activation_seconds = 0.35\n'
 
 	-- Inject only the original native read/close boundary; never supply a
@@ -188,7 +186,6 @@ helpers.describe("boot navigation file isolation (nav-layer-boot-refusal)", func
 			NavLayer = require("platform.remap.nav_layer")
 			compile = NavLayer.compile
 			write(dir .. "/tap_hold.toml", tap_text)
-			write(dir .. "/config.toml", "[tap_holds]\nenabled = true\n")
 			if layer_text then write(dir .. "/layers.toml", layer_text) end
 			local function initialize()
 				local initialized, detail = pcall(Manager.init, {
@@ -222,7 +219,6 @@ helpers.describe("boot navigation file isolation (nav-layer-boot-refusal)", func
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 		os.remove(dir .. "/layers.toml")
 		os.remove(dir .. "/tap_hold.toml")
-		os.remove(dir .. "/config.toml")
 		os.execute('rmdir "' .. dir .. '"')
 		if not ok then error(err, 0) end
 		if not reset_ok or reset_result == false then error("fixture Manager cleanup refused: " .. tostring(reset_result), 0) end
@@ -367,9 +363,9 @@ end)
 helpers.describe("original configured Navigation source reservations", function()
 	local NAV_NONE = '[_meta]\nschema_version = 1\n[layers.nav.all]\nKeyJ = "none"\n'
 	local NAV_HOME = '[_meta]\nschema_version = 1\n[layers.nav.all]\nKeyJ = "keystroke:Home"\n'
-	local TAP_NAV = '[tap_hold]\ninherit_defaults = false\n[tap_hold.keys.left_alt]\n'
+	local TAP_NAV = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.left_alt]\n'
 		.. 'tap_action = "enter"\nhold_modifier = ""\nhold_layer = "nav"\ntime_activation_seconds = 0.2\n'
-	local TAP_EMPTY = '[tap_hold]\ninherit_defaults = false\n'
+	local TAP_EMPTY = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
 	local function write_source(path, bytes_expected)
 		local handle = assert(io.open(path, "wb"))
 		local wrote, result = pcall(handle.write, handle, bytes_expected)
@@ -401,8 +397,7 @@ helpers.describe("original configured Navigation source reservations", function(
 			local made = os.execute("mkdir " .. quote(dir))
 			assert(made == true or made == 0)
 			made_directory = true
-			-- The switch is a config.toml row: every scenario runs with it on.
-			write_source(dir .. "/config.toml", "[tap_holds]\nenabled = true\n" .. (config_text or ""))
+			write_source(dir .. "/config.toml", config_text or "")
 			package.loaded["infra.config_paths"] = { config = function(name) return dir .. "/" .. name end }
 			package.loaded["platform.remap.nav_layer"] = nil
 			package.loaded["platform.remap.tap_hold_manager"] = nil

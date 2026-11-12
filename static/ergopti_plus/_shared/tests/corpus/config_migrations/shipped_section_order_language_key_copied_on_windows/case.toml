@@ -5,4 +5,4 @@ description = "The Windows order a neutral category shared with the French categ
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 20
-to_version = 22
+to_version = 21

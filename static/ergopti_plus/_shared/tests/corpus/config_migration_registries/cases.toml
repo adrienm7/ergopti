@@ -13,8 +13,6 @@
 [corpus]
 control = "control"
 rejected = [
-	"import_companion_file_path",
-	"import_companion_missing_target",
 	"encode_value_unknown_encoding",
 	"chord_missing_action",
 	"chord_missing_platform",

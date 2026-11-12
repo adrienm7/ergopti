@@ -87,18 +87,6 @@
 #   { op = "set_if_absent", section, key, value }
 #       Writes a value only where the key is absent (freezes an old default
 #       before the default changes).
-#   { op = "import_companion", file, section, to_section, key? }
-#       Copies into config.toml what the driver kept in another file of its
-#       configuration folder, named bare (``file``: tap_hold.toml): the value
-#       of ``key``, or without ``key`` every key of ``section`` and of every
-#       section below it, each to the same place under ``to_section``. A
-#       target config.toml already holds keeps its value (the copy_if_absent
-#       rule). The driver names the file's path at boot (an absent file holds
-#       nothing, an unreadable one refuses the migration). Once the migrated
-#       config.toml is published, every value the op addressed is deleted
-#       from that file line by line, after a byte-exact backup
-#       ``<name>.pre-v<N>-<stamp>.toml`` beside it; a failure there is logged
-#       and leaves the values unread.
 # A section left without keys by an op disappears. Every op is idempotent, so
 # replaying a step on its own output changes nothing.
 #
@@ -111,7 +99,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 22
+current_version = 21
 unstamped_version = 2
 oldest_version = 20
 
@@ -138,20 +126,4 @@ reason = "The Windows tray stored the section order of a language category under
 ops = [
 	{ op = "copy_if_absent", section = "hotstrings.order_overrides", key = "autocorrection", to_key = "french_autocorrection" },
 	{ op = "copy_if_absent", section = "hotstrings.order_overrides", key = "magickey", to_key = "french_magickey" },
-]
-
-[steps.v21_to_v22]
-from = 21
-to = 22
-drivers = ["hs", "linux"]
-reason = "The tap-hold switch, the one-shot and lone-tap timings and the key combinations are rows of the feature manifest, kept in config.toml on every OS; macOS and Linux kept them in tap_hold.toml, which now holds the keys only (maintainer decision of 2026-11-11)."
-# Windows always kept these rows in config.toml. macOS carries an old
-# config_karabiner.toml over into tap_hold.toml before this step reads it, so
-# a 1.0.9 configuration moves in one boot. A value config.toml already holds
-# wins; the moved values leave tap_hold.toml once config.toml is published.
-ops = [
-	{ op = "import_companion", file = "tap_hold.toml", section = "tap_hold", key = "enabled", to_section = "tap_holds" },
-	{ op = "import_companion", file = "tap_hold.toml", section = "tap_hold", key = "lone_modifier_tap_max_ms", to_section = "tap_holds" },
-	{ op = "import_companion", file = "tap_hold.toml", section = "tap_hold", key = "sticky_timeout_ms", to_section = "tap_holds" },
-	{ op = "import_companion", file = "tap_hold.toml", section = "mod_combos", to_section = "mod_combos" },
 ]

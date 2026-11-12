@@ -1,8 +1,0 @@
-# _shared/tests/corpus/tap_hold_shared_file/linux_written.config.toml
-# The config.toml rows the Linux writers publish beside linux_written.toml for
-# the same changes: the switch and the two timings are manifest rows.
-
-[tap_holds]
-enabled = true
-lone_modifier_tap_max_ms = 0
-sticky_timeout_ms = 1500

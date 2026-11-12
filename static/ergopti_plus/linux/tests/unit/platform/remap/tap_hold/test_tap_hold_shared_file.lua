@@ -3,14 +3,13 @@
 --- ==============================================================================
 --- MODULE: The Shared Tap-Hold File On Linux
 --- DESCRIPTION:
---- Every driver keeps its tap-hold keys in one tap_hold.toml
---- (_shared/tap_hold/SCHEMA.md) and the manifest rows (the switch, the timings,
---- the key combinations) in config.toml. The cross-driver corpus
---- (_shared/tests/corpus/tap_hold_shared_file) holds, per driver, the pair its
---- writers produce: <name>.toml pinned here byte for byte for Linux, and
---- <name>.config.toml pinned as values. The Linux readers read every pair as
+--- Every driver keeps its tap-hold settings in one tap_hold.toml
+--- (_shared/tap_hold/SCHEMA.md). The cross-driver corpus
+--- (_shared/tests/corpus/tap_hold_shared_file) holds one file written by the
+--- Linux writer, pinned here byte for byte, and one written by the macOS
+--- writer, pinned by the macOS suite. The Linux loader reads both as
 --- expected.toml says, and a Linux change over the macOS file keeps every leaf
---- Linux does not own (the Karabiner integration, a macOS hold).
+--- Linux does not own (the key combinations, the Karabiner integration).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -20,13 +19,6 @@ local Codec = require("toml_codec")
 
 local DEFAULTS = Paths.shared("tap_hold/defaults.toml")
 local CORPUS = Paths.shared("tests/corpus/tap_hold_shared_file") .. "/"
--- Every pair of the corpus the Linux readers read; windows_written once the
--- Windows writer pins its own.
-local PAIRS = { "linux_written", "macos_written" }
-for _, name in ipairs({ "windows_written" }) do
-	local probe = io.open(CORPUS .. name .. ".toml", "rb")
-	if probe then probe:close(); PAIRS[#PAIRS + 1] = name end
-end
 
 require("test.tap_hold_shared_file_contract").register(helpers, { driver = "linux", shared_root = Paths.shared_root() })
 
@@ -59,10 +51,8 @@ local function with_writer(body)
 			return require("tap_hold.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
 		end,
 	})
-	local ok, err = pcall(body, writer, dir .. "/tap_hold.toml", dir .. "/config.toml")
-	for _, name in ipairs({ "tap_hold.toml", "tap_hold.toml.tmp", "config.toml", "config.toml.tmp" }) do
-		os.remove(dir .. "/" .. name)
-	end
+	local ok, err = pcall(body, writer, dir .. "/tap_hold.toml")
+	for _, name in ipairs({ "tap_hold.toml", "tap_hold.toml.tmp" }) do os.remove(dir .. "/" .. name) end
 	os.execute('rmdir "' .. dir .. '"')
 	if not ok then error(err, 0) end
 end
@@ -70,8 +60,8 @@ end
 helpers.describe("The shared tap_hold.toml on Linux (tap-hold-shared-file)", function()
 	local expected = Codec.decode(assert(read(CORPUS .. "expected.toml"), "the corpus expectations are missing"))
 
-	helpers.it("the Linux writers write the corpus pair: tap_hold.toml byte for byte, config.toml as values (tap-hold-shared-file)", function()
-		with_writer(function(writer, path, config_path)
+	helpers.it("the Linux writer writes the corpus file byte for byte (tap-hold-shared-file)", function()
+		with_writer(function(writer, path)
 			for _, change in ipairs({
 				function() return writer.set_enabled(true) end,
 				function() return writer.set_global_threshold(0.25) end,
@@ -88,15 +78,13 @@ helpers.describe("The shared tap_hold.toml on Linux (tap-hold-shared-file)", fun
 				helpers.assert_true(change(), "each corpus change is saved")
 			end
 			helpers.assert_eq(read(path), read(CORPUS .. "linux_written.toml"))
-			helpers.assert_eq(Codec.decode(assert(read(config_path), "the switch and timings reach config.toml")),
-				Codec.decode(read(CORPUS .. "linux_written.config.toml")))
 		end)
 	end)
 
-	for _, name in ipairs(PAIRS) do
-		helpers.it("the Linux loader reads the " .. name .. " pair as expected.toml says (tap-hold-shared-file)", function()
+	for _, name in ipairs({ "linux_written", "macos_written" }) do
+		helpers.it("the Linux loader reads " .. name .. ".toml as expected.toml says (tap-hold-shared-file)", function()
 			local want = expected.reads[name].linux
-			local loaded = Loader.load(DEFAULTS, CORPUS .. name .. ".toml", CORPUS .. name .. ".config.toml")
+			local loaded = Loader.load(DEFAULTS, CORPUS .. name .. ".toml")
 			helpers.assert_eq(loaded.user_error, nil)
 			for _, field in ipairs({ "enabled", "global_seconds", "lone_tap_max_ms", "one_shot_timeout_ms" }) do
 				helpers.assert_eq(loaded[field], want[field], field)
@@ -108,13 +96,16 @@ helpers.describe("The shared tap_hold.toml on Linux (tap-hold-shared-file)", fun
 			end
 			helpers.assert_eq(keys, want.keys)
 		end)
+	end
 
-		helpers.it("the Linux key combinations read the " .. name .. " pair as expected.toml says (tap-hold-shared-file)", function()
+	for _, name in ipairs({ "linux_written", "macos_written" }) do
+		helpers.it("the Linux key combinations read " .. name .. ".toml as expected.toml says (tap-hold-shared-file)", function()
 			local want = expected.reads[name].linux.mod_combos
-			local defaults = Loader.load(DEFAULTS, nil)
-			local owner = require("modules.shortcuts.key_combinations").new({ keys = defaults.catalog,
-				hold_picker = defaults.hold_picker, files = require("adapters.file_system"),
-				route = function() return CORPUS .. name .. ".config.toml" end,
+			local catalog = Loader.load(DEFAULTS, nil).catalog
+			local owner = require("modules.shortcuts.key_combinations").new({ keys = catalog,
+				hold_picker = Loader.load(DEFAULTS, nil).hold_picker,
+				files = require("adapters.file_system"), route = function() return "/nonexistent-ergopti-corpus/config.toml" end,
+				chord_route = function() return CORPUS .. name .. ".toml" end,
 				is_paused = function() return false end, changed = function() return true end,
 				actions = { is_assignable = function(action) return action == "copy" end } })
 			local token = {}
@@ -129,25 +120,6 @@ helpers.describe("The shared tap_hold.toml on Linux (tap-hold-shared-file)", fun
 			helpers.assert_eq(chords, want.chords)
 		end)
 	end
-
-	helpers.it("a [tap_hold] leaf config.toml owns is warned once and never read (tap-hold-shared-file)", function()
-		local Logger = require("logger.shim")
-		local real_warn, warnings = Logger.warn, {}
-		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-		local path = os.tmpname()
-		local ok, err = pcall(function()
-			write(path, '[_meta]\nschema_version = 1\n[tap_hold]\nenabled = true\nlone_modifier_tap_max_ms = 0\n')
-			local loaded = Loader.load(DEFAULTS, path)
-			helpers.assert_eq(loaded.enabled, require("infra.manifest_reader").default_for(require("config_keys").KEY.TAP_HOLDS_ENABLED),
-				"the switch comes from config.toml only")
-			helpers.assert_eq(loaded.lone_tap_max_ms, Loader.LONE_TAP_DEFAULT_MS, "the window comes from config.toml only")
-			helpers.assert_eq(#warnings, 2, table.concat(warnings, "\n"))
-			helpers.assert_contains(warnings[1] .. warnings[2], "since config schema v22")
-		end)
-		Logger.warn = real_warn
-		os.remove(path)
-		if not ok then error(err, 0) end
-	end)
 
 	helpers.it("another driver's key is left alone, a macOS hold is named once (tap-hold-shared-file)", function()
 		local Logger = require("logger.shim")

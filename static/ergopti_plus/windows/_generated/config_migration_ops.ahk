@@ -17,8 +17,7 @@ ConfigMigrateOpFieldsData() {
 		"encode_value", [["section", "key", "to_section", "to_key", "encoding"], []],
 		"wrap_value", [["section", "key", "to_key"], []],
 		"delete", [["section"], ["key"]],
-		"set_if_absent", [["section", "key", "value"], []],
-		"import_companion", [["file", "section", "to_section"], ["key"]]
+		"set_if_absent", [["section", "key", "value"], []]
 	)
 	return Fields
 }
