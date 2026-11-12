@@ -122,6 +122,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 			"\t\tf.startsWith('static/ergopti_plus/_shared/settings/data/config_schema/') ||\n"
 	},
 	{
+		// The Go sources join the native folder, which the pattern above
+		// already excludes (the edit holds the new spelling of both).
+		file: 'tools/build/macos-bundle-manifest.json',
+		empties: '_shared/go',
+		from: '"ergopti_plus/_shared/native/**",\n\t\t\t\t"ergopti_plus/_shared/go/**"',
+		to: '"ergopti_plus/_shared/core/network/native/**"'
+	},
+	{
 		// The shared test contracts join the shared test tree, which the
 		// pattern above already excludes.
 		file: 'tools/build/macos-bundle-manifest.json',
