@@ -252,15 +252,13 @@ function M.get(key)
 	return s
 end
 
---- Returns the translation shown for a label, or the key itself on a total
---- miss (active locale, en and fr). The miss is warned once per key, as on
---- Windows: every menu rebuild asks again. A caller probing an optional key
---- uses has() instead, since its miss is not a defect.
+--- Answers a label lookup that found nothing in the active locale, en or fr:
+--- the key itself, the miss warned once per key as on Windows, since every
+--- menu rebuild asks again. A caller probing an optional key uses has()
+--- instead, since its miss is not a defect.
 --- @param key string Dot-notation key.
---- @return string
-function M.display(key)
-	local s = M.get(key)
-	if s ~= "" then return s end
+--- @return string The key.
+function M.missing(key)
 	if _state and not _state.miss_warned[key] then
 		_state.miss_warned[key] = true
 		if _state.log_warn then

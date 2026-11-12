@@ -163,7 +163,9 @@ end
 --- @param key string Dot-notation key, e.g. ``"menu.global.reload"``.
 --- @return string
 function M.get(key)
-	return locale_mod.display(key)
+	local s = locale_mod.get(key)
+	if s == nil or s == "" then return locale_mod.missing(key) end
+	return s
 end
 
 --- Whether a key has a translation, for a caller probing optional keys: unlike
