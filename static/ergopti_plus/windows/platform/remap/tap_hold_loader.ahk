@@ -48,11 +48,6 @@
 ; straight into a KeyWait timeout — so anything past it is rejected at the
 ; loader boundary instead of stalling a hotkey thread for minutes.
 global TAPHOLD_MAX_ACTIVATION_SECONDS := 10
-; The modifiers of the shared file that no Windows key holds (cmd, fn): the
-; names of _shared/tap_hold/shared_file.toml [modifiers] order that the hold
-; picker does not offer. A file carrying them keeps them; this driver warns once
-; and holds nothing. Read at this include position, like the aliases below.
-global TAPHOLD_MACOS_MODIFIERS := _TapHoldReadMacOnlyModifiers()
 ; The other spellings of a hold modifier (altgr, lctrl...), read here, at this
 ; file's include position, and never from a #HotIf: those are live before the
 ; auto-execute section runs, during Bundle_Init's message-pumping RunWait, and
@@ -844,12 +839,16 @@ _TapHoldReadMacOnlyModifiers() {
 ; Whether a hold_modifier names only modifiers macOS has and this keyboard has
 ; not, and at least one of them.
 _TapHoldHoldModifierIsMacOnly(ModifierValue) {
-	global TAPHOLD_MACOS_MODIFIERS
+	; The modifiers of the shared file that no Windows key holds (cmd, fn), read
+	; at the first user-file load that asks: at this file's include position the
+	; hold picker's reader is not yet usable in every process that includes it
+	; (the layer editor and the layout manager children).
+	static MacOnly := _TapHoldReadMacOnlyModifiers()
 	Parts := _TapHoldHoldModifierParts(ModifierValue, &Invalid)
 	if (Invalid.Length == 0)
 		return false
 	for _, Token in Invalid {
-		if !TAPHOLD_MACOS_MODIFIERS.Has(StrLower(Trim(Token)))
+		if !MacOnly.Has(StrLower(Trim(Token)))
 			return false
 	}
 	return true
