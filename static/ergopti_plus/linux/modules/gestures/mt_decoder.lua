@@ -108,11 +108,6 @@ M.ABS_MT_TOUCH_MAJOR = ABS_MT_TOUCH_MAJOR
 M.BTN_TOUCH = BTN_TOUCH
 M.FINGER_COUNT_CODES = FINGER_COUNT_CODES
 
--- A gesture must travel at least this far, in device units, before it counts as a
--- swipe rather than a tap or a tremor. Device units are not millimetres and vary
--- per touchpad, so the adapter scales this by the device's reported resolution
--- when it has one; this value is the fallback for a device that reports none.
-M.DEFAULT_SWIPE_THRESHOLD = 120
 
 -- How long a touch may last and still be a tap, from the shared timings registry
 -- so the three drivers cannot drift on it.
@@ -136,6 +131,15 @@ M.STABLE_FRAMES = ok_timings and Timings.count("gestures", "finger_join_frames")
 M.LANDING_SEC = ok_timings and Timings.sec("gestures", "multi_finger_landing_ms") or nil
 M.SCROLL_GUARD_SEC = ok_timings and Timings.sec("gestures", "scroll_momentum_guard_ms") or nil
 
+-- The decoder's distances, in millimetres through the pad's resolution, from
+-- the shared timings registry (GSD-2): the travel a finished gesture needs to
+-- be a swipe rather than a tap or a tremor, and the travel after which a pair
+-- that landed is a scroll. A pad that reports no resolution is read at the
+-- registry's fallback resolution.
+M.SWIPE_MINIMUM_MM = ok_timings and Timings.count("gestures", "decoder_swipe_minimum_mm") or nil
+M.PAIR_SCROLL_TRAVEL_MM = ok_timings and Timings.count("gestures", "pair_scroll_travel_mm") or nil
+M.FALLBACK_UNITS_PER_MM = ok_timings and Timings.count("gestures", "touchpad_fallback_units_per_mm") or nil
+
 
 
 
@@ -146,14 +150,21 @@ M.SCROLL_GUARD_SEC = ok_timings and Timings.sec("gestures", "scroll_momentum_gua
 -- =============================================
 
 --- Creates a decoder.
---- @param opts table|nil { swipe_threshold = number, units_per_mm = { x, y } }
----   units_per_mm converts positions for the third-contact rule (rule 4); a
----   decoder without it cannot judge distances and admits any third contact.
+--- @param opts table|nil { units_per_mm = { x, y }, swipe_minimum_mm = number,
+---   pair_scroll_travel_mm = number }
+---   units_per_mm converts device units to millimetres: the swipe minimum, the
+---   pair-scroll travel and the third-contact rule (rule 4) are judged in
+---   millimetres. Without it the distances use the registry's fallback
+---   resolution and the third-contact rule admits any contact.
 --- @return table
 function M.new(opts)
 	opts = opts or {}
-	local threshold = tonumber(opts.swipe_threshold) or M.DEFAULT_SWIPE_THRESHOLD
-	assert(threshold > 0, "the swipe threshold must be a positive number of device units")
+	local swipe_mm = tonumber(opts.swipe_minimum_mm) or M.SWIPE_MINIMUM_MM
+	local scroll_mm = tonumber(opts.pair_scroll_travel_mm) or M.PAIR_SCROLL_TRAVEL_MM
+	assert(type(swipe_mm) == "number" and swipe_mm > 0,
+		"[gestures].decoder_swipe_minimum_mm must be a positive number of millimetres")
+	assert(type(scroll_mm) == "number" and scroll_mm > 0,
+		"[gestures].pair_scroll_travel_mm must be a positive number of millimetres")
 
 	-- Wall clock, injectable. Deliberately NOT os.clock(): its CPU time barely
 	-- advances in an I/O-bound daemon, so a gesture held for seconds would report
@@ -186,13 +197,26 @@ function M.new(opts)
 		"[gestures].multi_finger_landing_ms must be a duration")
 	assert(type(scroll_guard_sec) == "number" and scroll_guard_sec >= 0,
 		"[gestures].scroll_momentum_guard_ms must be a duration")
-	-- A pair that travelled a swipe's worth has scrolled.
-	local landing_travel = threshold
 	local units_per_mm = opts.units_per_mm
 	if units_per_mm ~= nil then
 		assert(type(units_per_mm) == "table" and tonumber(units_per_mm.x) and tonumber(units_per_mm.x) > 0
 			and tonumber(units_per_mm.y) and tonumber(units_per_mm.y) > 0,
 			"units_per_mm must give positive x and y device units per millimetre")
+	end
+	-- Device units per millimetre of each axis for the distances: the pad's,
+	-- else the registry's fallback (rule 4 still needs the pad's own).
+	local fallback = M.FALLBACK_UNITS_PER_MM
+	local scale_x = units_per_mm and tonumber(units_per_mm.x) or fallback
+	local scale_y = units_per_mm and tonumber(units_per_mm.y) or fallback
+	assert(type(scale_x) == "number" and scale_x > 0 and type(scale_y) == "number" and scale_y > 0,
+		"[gestures].touchpad_fallback_units_per_mm must be a positive resolution")
+
+	--- Manhattan travel of a device-unit displacement, in millimetres.
+	--- @param dx number
+	--- @param dy number
+	--- @return number
+	local function travel_mm(dx, dy)
+		return math.abs(dx) / scale_x + math.abs(dy) / scale_y
 	end
 
 	local decoder = {}
@@ -294,10 +318,11 @@ function M.new(opts)
 	end
 
 	--- Names the direction of a displacement through the classifier the macOS
-	--- geometry uses too (_shared/lua/gestures/direction.lua), measured in this
-	--- decoder's device units. The swipe threshold is the swipe minimum, and a
-	--- diagonal needs the shared factor of it; this project's slot space has
-	--- explicit diagonal directions, so a diagonal is a real answer.
+	--- geometry uses too (_shared/lua/gestures/direction.lua), measured in
+	--- millimetres through the pad's resolution (GSD-2). The swipe minimum is
+	--- the registry's decoder_swipe_minimum_mm, and a diagonal needs the shared
+	--- factor of it; this project's slot space has explicit diagonal
+	--- directions, so a diagonal is a real answer.
 	---
 	--- Y grows DOWNWARD in evdev, so a negative dy is "up". Getting that backwards
 	--- inverts every vertical gesture and reads as the binding being wrong rather
@@ -308,7 +333,7 @@ function M.new(opts)
 	--- @param dy number
 	--- @return string|nil
 	local function direction_of(dx, dy)
-		return Direction.classify(dx, dy, threshold, threshold * Direction.DIAGONAL_MINIMUM_FACTOR)
+		return Direction.classify(dx / scale_x, dy / scale_y, swipe_mm, swipe_mm * Direction.DIAGONAL_MINIMUM_FACTOR)
 	end
 
 	--- Feeds one decoded event.
@@ -404,16 +429,16 @@ function M.new(opts)
 					-- Rule 1: a pair that moved or outlived its landing is a scroll,
 					-- and a finger joining it is a resting thumb or a palm.
 					local since_landing = now - (_peak_since or now)
-					local pair_travel = math.abs(_travel_x) + math.abs(_travel_y)
+					local pair_travel = travel_mm(_travel_x, _travel_y)
 					local late = _peak_fingers >= 2
-						and (since_landing > landing_sec or pair_travel >= landing_travel)
+						and (since_landing > landing_sec or pair_travel >= scroll_mm)
 					if late then
 						if not _late_join_refused then
 							Logger.debug(LOG,
-								"Three-finger candidate rejected by %s: %d -> %d, %.0f ms since landing (max %.0f), travel %.0f (max %.0f).",
-								pair_travel >= landing_travel and "pair scroll" or "landing window",
+								"Three-finger candidate rejected by %s: %d -> %d, %.0f ms since landing (max %.0f), travel %.1f mm (max %.1f).",
+								pair_travel >= scroll_mm and "pair scroll" or "landing window",
 								_peak_fingers, _count, since_landing * 1000, landing_sec * 1000,
-								pair_travel, landing_travel)
+								pair_travel, scroll_mm)
 							_late_join_refused = true
 						end
 					else
@@ -453,7 +478,7 @@ function M.new(opts)
 				-- travels on after the peak dropped is scrolling.
 				if _peak_fingers >= 3 and _count == 2 then
 					if not _drop_x then _drop_x, _drop_y = cx, cy end
-					if math.abs(cx - _drop_x) + math.abs(cy - _drop_y) >= landing_travel then
+					if travel_mm(cx - _drop_x, cy - _drop_y) >= scroll_mm then
 						_aborted = true
 					end
 				else

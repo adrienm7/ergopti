@@ -842,6 +842,7 @@ return {
 	"tests.unit.modules.gestures.engine.test_gesture_under_load",
 	"tests.unit.modules.gestures.engine.test_mt_decoder",
 	"tests.unit.modules.gestures.engine.test_resting_thumb_join",
+	"tests.unit.modules.gestures.engine.test_decoder_millimetres",
 	"tests.unit.modules.gestures.engine.test_gesture_roundtrip_input_core",
 	"tests.unit.modules.gestures.engine.test_gesture_direction_vectors",
 	"tests.unit.modules.gestures.engine.test_gesture_incremental_vectors",

@@ -296,6 +296,19 @@ swipe_minimum_mm = 1.5
 pair_swipe_minimum_mm = 3.0
 pair_diagonal_minimum_mm = 5.0
 
+# The Linux contact decoder's own distances, in millimetres through the
+# touchpad's resolution (maintainer decision GSD-2 of 2026-11-11): the travel a
+# finished swipe needs before it has a direction, and the travel after which a
+# pair that landed is a scroll, so a finger joining it is a resting thumb. Both
+# were 120 device units, which is this 10 mm on a pad of 12 units per mm and
+# 4 mm on one of 30 (the value kept: decided by the coordinator on 2026-11-11,
+# to review by the maintainer). A pad that reports neither its resolution nor
+# its axes is read at the fallback resolution.
+# LX: modules/gestures/mt_decoder.lua.
+decoder_swipe_minimum_mm = 10.0
+pair_scroll_travel_mm = 10.0
+touchpad_fallback_units_per_mm = 12
+
 # The incremental swipe step rule and the live direction lock, for a driver
 # that cannot require the shared Lua modules: travel before the first action
 # (FIRST_STEP), the most actions one frame may earn before a sensor jump is

@@ -5,6 +5,24 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The Linux decoder judges millimetres (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (GSD-2): the Linux contact decoder
+(`modules/gestures/mt_decoder.lua`) judges its finished-swipe minimum and the
+pair-scroll travel (after which a landed pair is a scroll and a joining finger
+a resting thumb) in millimetres through the touchpad's resolution, as the
+incremental tracker already did, instead of 120 device units (10 mm at 12
+units per mm, 4 mm at 30). The values are the shared timings registry's
+`[gestures]` `decoder_swipe_minimum_mm` and `pair_scroll_travel_mm`, both
+10.0 (the 12-units-per-mm figure kept: decided by the coordinator on
+2026-11-11, to review by the maintainer), and `touchpad_fallback_units_per_mm`
+= 12 for a pad that reports neither its resolution nor its axes (the
+third-contact rule still needs the pad's own). `test-gesture-defaults-single-source.cjs`
+pins the three values and fails on a gesture source declaring a
+`*SWIPE_THRESHOLD`, `*UNITS_PER_MM` or `PAIR_SCROLL_TRAVEL*` literal. macOS
+measures millimetres already; Windows receives finished swipes. Regressions
+`gsd2-decoder-mm`.
+
 ## An answer that is not the release list is no connection (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (UPD-1): a GitHub API answer with
@@ -286,7 +304,7 @@ minimum locally. « Still user-adjustable » is read as the slot's own step
 the direction (reading decided by the coordinator on 2026-11-11, to review by
 the maintainer). Windows receives finished swipes, has no live minimum and no
 literal to remove. The Linux decoder's own threshold and pair-scroll travel
-(120 device units) are GSD-2, still pending: not moved.
+moved to millimetres too (GSD-2, below).
 
 ## An unbound diagonal falls back to its dominant straight slot (2026-11-11)
 
