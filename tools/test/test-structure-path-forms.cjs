@@ -229,6 +229,22 @@ function run() {
 			'a Go build directive (//go:build in _shared/go) is not a folder'
 		);
 		assert.equal(
+			rewrite(
+				'tools/codegen/x.cjs',
+				"const SOURCES = ['zz_probe_mod/hotstrings/a.toml'];\nconst h = SOURCES.map((s) => `// Source: ${sharedRel(s)}`);"
+			),
+			"const SOURCES = ['zz_probe_hs/data/a.toml'];\nconst h = SOURCES.map((s) => `// Source: ${sharedRel(s)}`);",
+			'a list whose elements the file hands to a shared helper'
+		);
+		assert.equal(
+			rewrite(
+				'tools/codegen/x.cjs',
+				"const TABLES = [['a', 'zz_probe_mod/hotstrings/a.toml']];\nfor (const [name, file] of TABLES) read(shared(file));"
+			),
+			"const TABLES = [['a', 'zz_probe_hs/data/a.toml']];\nfor (const [name, file] of TABLES) read(shared(file));",
+			'the same through a for…of loop'
+		);
+		assert.equal(
 			rewrite('tools/x.cjs', "const T = read('zz_probe_mod/hotstrings/a.toml', SHARED);"),
 			"const T = read('zz_probe_hs/data/a.toml', SHARED);",
 			'a reader that takes the shared base after the path'
