@@ -165,6 +165,20 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		helpers.assert_eq(world.titles[1], "layer_editor=layer_editor.window_title")
 	end)
 
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+	helpers.it("saves the page's file while the daemon is paused (edd1-paused-writes)", function()
+		local dir = make_config_dir()
+		local world = make_state(dir)
+		world.state.is_paused = function() return true end
+		helpers.assert_eq(Bridge.on_message("ready", world.state).pushed, true)
+		local text = read_file(FIXTURE)
+		local outcome = Bridge.on_message({ action = "save", text = text }, world.state)
+		local written = read_file(dir .. "/layers.toml")
+		remove_config_dir(dir)
+		helpers.assert_eq(outcome.saved, true)
+		helpers.assert_eq(written:gsub("\r\n", "\n"), text, "the paused daemon still writes the file")
+	end)
+
 	helpers.it("refuses, writes nothing and restarts nothing for an invalid save", function()
 		local dir = make_config_dir()
 		local world = make_state(dir)
