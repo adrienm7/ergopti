@@ -56,7 +56,7 @@ for ERGOPTI_PACKAGE_COMPONENT in \
 done
 
 # BEGIN GENERATED LINUX PORTABLE TRUST
-ERGOPTI_SYSTEM_CA_FILES=("/etc/ssl/certs/ca-certificates.crt" "/etc/pki/tls/certs/ca-bundle.crt" "/usr/share/ssl/certs/ca-bundle.crt" "/usr/local/share/certs/ca-root-nss.crt" "/etc/ssl/cert.pem")
+ERGOPTI_SYSTEM_CA_FILES=("/etc/ssl/certs/ca-certificates.crt" "/etc/pki/tls/certs/ca-bundle.crt" "/usr/share/ssl/certs/ca-bundle.crt" "/usr/local/share/certs/ca-root-nss.crt" "/etc/ssl/cert.pem" "/etc/ssl/ca-bundle.pem")
 # END GENERATED LINUX PORTABLE TRUST
 
 # Respect explicit trust configuration. Otherwise select a recipient system

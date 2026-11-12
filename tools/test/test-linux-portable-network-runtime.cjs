@@ -101,7 +101,10 @@ assert.deepEqual(catalogue.network_runtime.portable.system_ca_files, [
 	'/etc/pki/tls/certs/ca-bundle.crt',
 	'/usr/share/ssl/certs/ca-bundle.crt',
 	'/usr/local/share/certs/ca-root-nss.crt',
-	'/etc/ssl/cert.pem'
+	'/etc/ssl/cert.pem',
+	// openSUSE's ca-certificates (p11-kit) writes this bundle and no
+	// ca-certificates.crt; without it the AppImage had no trust (NET-006).
+	'/etc/ssl/ca-bundle.pem'
 ]);
 assert.equal(Object.keys(catalogue.libraries).join(','), 'xkbcommon,xkbcommon_x11,x11,x11_xcb');
 passed++;
