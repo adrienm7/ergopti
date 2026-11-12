@@ -60,7 +60,7 @@ return function(helpers, driver)
 			if driver == "linux" then assert(logger.apply()) else logger.set_level("DEBUG") end
 			local dialog = require(driver == "linux" and "ui.error_dialog.bridge" or "ui.error_dialog")
 			local function create(overrides)
-				local options = { path = path, files = files, is_paused = function() return false end,
+				local options = { path = path, files = files,
 					backup_path = path .. ".bak", storage_backup_path = path .. ".settings.bak" }
 				if driver == "macos" then
 					local preferences = require("infra.preferences")
@@ -70,7 +70,7 @@ return function(helpers, driver)
 						{ state = state, initial_state = {}, initial_preferences = {} })
 					options = { path = path, files = files, state = state, preferences = preferences, checkpoint = checkpoint,
 						capture_preferences = function() return preferences.snapshot(state, {}, {}) end,
-						admission = function(_, work) return work() == true end, paused = function() return false end,
+						admission = function(_, work) return work() == true end,
 						backup_path = function() return path .. ".bak" end,
 						storage_backup_path = function() return path .. ".settings.bak" end }
 				end
@@ -160,11 +160,19 @@ return function(helpers, driver)
 				restored(ctx)
 			end)
 		end)
-		helpers.it("refuses paused and invalid requests before source or alias mutation", function()
+		-- A pause stops typing, not configuration (EDD-1, maintainer decision
+		-- 2026-11-12): neither owner reads it any more.
+		helpers.it("applies while paused (edd1-paused-writes)", function()
 			fixture(function(ctx)
-				local owner = ctx.create(driver == "linux" and { is_paused = function() return nil end }
-					or { paused = function() return nil end })
-				helpers.assert_eq(owner.apply("recommended"), false)
+				local owner = ctx.create(driver == "linux" and { is_paused = function() return true end }
+					or { paused = function() return true end })
+				local committed, detail = owner.apply("recommended")
+				helpers.assert_eq(committed, true, detail)
+			end)
+		end)
+		helpers.it("refuses invalid requests before source or alias mutation", function()
+			fixture(function(ctx)
+				local owner = ctx.create()
 				helpers.assert_eq(owner.apply("invalid"), false)
 				helpers.assert_eq(ctx.read(ctx.path .. ".bak"), nil)
 				helpers.assert_eq(ctx.read(ctx.path .. ".settings.bak"), nil)
