@@ -227,6 +227,26 @@ _BAT_VsCodeAndFirefoxPlans() {
 }
 Test("(bundled-apps-cloner-plan) shares VS Code settings and gives Firefox its own profile", _BAT_VsCodeAndFirefoxPlans)
 
+; BAP-004 (maintainer decision, 2026-11-12): VSCodium and the Insiders build keep
+; their own settings and extensions, read from the catalogue's user_folders per
+; executable, as macOS and Linux do.
+_BAT_VsCodeVariantFolders() {
+	for Row in [
+			["C:\Codium\VSCodium.exe", "VSCodium", ".vscode-oss"],
+			["C:\Codium\codium.exe", "VSCodium", ".vscode-oss"],
+			["C:\Insiders\Code - Insiders.exe", "Code - Insiders", ".vscode-insiders"],
+			["C:\Code\Code.exe", "Code", ".vscode"]] {
+		Plan := AppCloner_Plan(_BAT_Request(Row[1]))
+		AssertEqual("vscode", Plan["family"], Row[1] . " is a VS Code family program")
+		AssertContains(Plan["arguments"], "--extensions-dir=C:\Users\u\" . Row[3] . "\extensions")
+		AssertEqual("C:\Users\u\AppData\Roaming\" . Row[2] . "\User", Plan["links"][1]["target"],
+			Row[1] . " links its own settings")
+	}
+	Oss := AppCloner_Plan(_BAT_Request("C:\Codium\VSCodium.exe"))
+	AssertFalse(InStr(Oss["arguments"], "\.vscode\extensions") > 0, "VSCodium never reads VS Code's extensions")
+}
+Test("(bundled-apps-cloner-plan) gives VSCodium and Insiders their own folders (bap-004-vscode-variants)", _BAT_VsCodeVariantFolders)
+
 _BAT_NativeAndTaken() {
 	Native := AppCloner_Plan(_BAT_Request("C:\Windows\notepad.exe", Map("has_marker", (P, M) => false)))
 	AssertEqual("native", Native["family"])
