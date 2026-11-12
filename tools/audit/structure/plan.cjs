@@ -1027,9 +1027,11 @@ function joinedPaths(text) {
 		// path too, when the base is a constant the file defines.
 		// shared('keymap', vector.file): a folder handed on with a name to join.
 		const more = /^\s*,\s*[^\s'"`)]/.test(text.slice(at));
+		const after = (text.slice(at).match(/^\s*,\s*([^\s,)]+)/) || [])[1] || null;
 		if (parts.length < 2 && !(parts.length === 1 && (m[2].trim() || more))) continue;
 		out.push({
 			more,
+			after,
 			index: start,
 			text: text.slice(start, at),
 			parts,
@@ -1040,6 +1042,21 @@ function joinedPaths(text) {
 		});
 	}
 	return out;
+}
+
+/**
+ * Spells a path relative to a join's base in the join's own pieces: one
+ * literal per segment, except where the run was one path argument
+ * (shared_json("data/x.json", true) keeps a single argument before `true`).
+ */
+function renderJoin(j, rel) {
+	// A lone literal that already holds a separator, or one followed by a
+	// flag rather than a further piece, is one path argument.
+	const single =
+		j.parts.length === 1 &&
+		(j.parts[0].includes('/') || /^(?:true|false|nil|null|undefined|\d+)$/.test(j.after || ''));
+	const pieces = single ? [rel] : rel.split('/');
+	return pieces.map((p) => `${j.quote}${p}${j.quote}`).join(j.separator || ', ');
 }
 
 /**
@@ -1077,11 +1094,7 @@ function resolveJoinedPath(j, byRepoPath, byRepoDir, successors, env = new Map()
 				if (!to || to === SPLIT) break;
 				const newRepo = to + oldRepo.slice(d.length);
 				if (!newRepo.startsWith(base)) break;
-				const rendered = newRepo
-					.slice(base.length)
-					.split('/')
-					.map((p) => `${j.quote}${p}${j.quote}`)
-					.join(j.separator || ', ');
+				const rendered = renderJoin(j, newRepo.slice(base.length));
 				return { kind: 'join', rendered, oldRepo: d, newRepo };
 			}
 			continue;
@@ -1095,11 +1108,7 @@ function resolveJoinedPath(j, byRepoPath, byRepoDir, successors, env = new Map()
 		}
 		if (!newRepo || newRepo === PREFIX || !newRepo.startsWith(base))
 			return { kind: 'join-split', rendered: '(split)', oldRepo, newRepo: null };
-		const rel = newRepo.slice(base.length);
-		const rendered = rel
-			.split('/')
-			.map((p) => `${j.quote}${p}${j.quote}`)
-			.join(j.separator || ', ');
+		const rendered = renderJoin(j, newRepo.slice(base.length));
 		return { kind, rendered, oldRepo, newRepo };
 	}
 	return null;

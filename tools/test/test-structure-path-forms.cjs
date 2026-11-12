@@ -211,6 +211,11 @@ function run() {
 			'a folder held in a Lua local, joined later'
 		);
 		assert.equal(
+			rewrite(`${P}linux/z.lua`, 'local k = shared_json("zz_probe_mod/hotstrings/a.toml", true)'),
+			'local k = shared_json("zz_probe_hs/data/a.toml", true)',
+			'one path argument before a flag stays one argument'
+		);
+		assert.equal(
 			rewrite(`${P}_shared/zz_probe_mod/x.go`, '//hotstrings:build !windows\n\npackage x\n'),
 			'//hotstrings:build !windows\n\npackage x\n',
 			'a Go build directive (//go:build in _shared/go) is not a folder'
