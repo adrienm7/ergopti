@@ -191,6 +191,14 @@ function run() {
 		);
 		assert.equal(
 			rewrite(
+				`${P}linux/tests/z.lua`,
+				'assert_eq(path, "/owned-shared/zz_probe_mod/hotstrings/a.toml")'
+			),
+			'assert_eq(path, "/owned-shared/zz_probe_hs/data/a.toml")',
+			'a fake root named for _shared with a qualifier'
+		);
+		assert.equal(
+			rewrite(
 				'tools/test/z.cjs',
 				"const t = fs.readFileSync(shared('zz_probe_data', vector.file), 'utf8');"
 			),
