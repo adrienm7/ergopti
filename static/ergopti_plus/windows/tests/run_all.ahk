@@ -311,6 +311,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../modules/keymap/keylayout/keylayout_parser.ahk
 #Include ../modules/keymap/keylayout/keylayout_tables.ahk
 #Include ../modules/keymap/keylayout/keylayout_emulation.ahk
+#Include ../modules/keymap/keylayout/source_emulation.ahk
 #Include ../modules/keymap/keylayout/layout_registry.ahk
 #Include ../modules/keymap/keylayout/layout_catalogue.ahk
 #Include ../modules/keymap/keylayout/layout_extension.ahk
@@ -859,6 +860,8 @@ _LLM_Deps_State := "ready"
 #Include ../ui/layout_manager/init.ahk
 #Include ../ui/layout_manager/composer.ahk
 #Include ../ui/layout_manager/composer_check.ahk
+#Include ../ui/layout_manager/source_store.ahk
+#Include ../ui/layout_manager/kbd_register_core.ahk
 #Include ../ui/field_check/network_check.ahk
 #Include ../ui/proxy_override.ahk
 #Include ../ui/menu/menu_layout.ahk
@@ -866,6 +869,10 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/keymap/test_layout_composer_host.ahk
 #Include unit/modules/keymap/test_layout_composer_stage_ownership.ahk
 #Include unit/modules/keymap/test_layout_composer_check.ahk
+#Include unit/modules/keymap/test_layout_source_store.ahk
+#Include unit/modules/keymap/test_layout_composer_source.ahk
+#Include unit/modules/keymap/test_kbd_register.ahk
+#Include unit/modules/keymap/test_layout_source_emulation.ahk
 #Include unit/ui/field_check/test_network_check.ahk
 #Include unit/modules/keymap/test_ergopti_keylayout_tables.ahk
 #Include unit/modules/keymap/test_layout_supersession.ahk

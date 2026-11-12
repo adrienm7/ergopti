@@ -698,6 +698,7 @@ _LAY_ScopeCommands(Options := unset) {
 	Commands := ConfigScopeMenuCommands("keyboard_layout", Map(), IsSet(Options) ? Options : Map())
 	Commands[MenuCommand.LAYOUT_TOGGLE] := MenuRenderer_CategoryGateCommand("Layout")
 	Commands[MenuCommand.LAYOUT_MANAGER] := LayoutManager_Open
+	Commands[MenuCommand.OPEN_LAYOUT_EDITOR] := LayoutManager_OpenEditor
 	return Commands
 }
 

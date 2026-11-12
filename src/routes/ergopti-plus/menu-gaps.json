@@ -623,18 +623,6 @@
 		}
 	},
 	{
-		"path": "layout_menu.open_layout_editor",
-		"visibility": "grey",
-		"labels": { "fr": "Créer ou modifier une disposition…", "en": "Create or edit a layout…" },
-		"platforms": { "windows": false, "macos": true, "linux": true },
-		"reasons": {
-			"windows": {
-				"en": "Editor on the website on Windows: the Windows layout manager window has no layout editor; create, edit and export layouts on the Ergopti website.",
-				"fr": "Éditeur sur le site sous Windows : la fenêtre du gestionnaire de dispositions de Windows n'a pas d'éditeur ; créez, modifiez et exportez vos dispositions sur le site Ergopti."
-			}
-		}
-	},
-	{
 		"path": "layout_menu.layout_bundle",
 		"visibility": "hide",
 		"labels": { "fr": "layout_bundle", "en": "layout_bundle" },
