@@ -190,8 +190,8 @@ helpers.describe("Linux tap-hold scope: restore recommended", function()
 	end)
 end)
 
--- The recommendation sets no one-shot timeout: a scope resets a stored one with
--- the keys (one-shot-timeout-setting), in config.toml where it lives.
+-- The one-shot timeout is a manifest row of the tap_holds scope: a restore puts
+-- it back to the recommendation (one-shot-timeout-setting), in config.toml.
 helpers.describe("Linux tap-hold scope: the one-shot timeout", function()
 	helpers.it("(one-shot-timeout-setting) a restore deletes the stored config.toml timeout and keeps the rest", function()
 		with_scope(nil, '[tap_holds]\nsticky_timeout_ms = 4000\n[other]\nvalue = 17\n', function(s)
@@ -199,7 +199,10 @@ helpers.describe("Linux tap-hold scope: the one-shot timeout", function()
 			local ok, detail = s.owner().apply("recommended")
 			helpers.assert_eq(ok, true, detail)
 			local stored = Codec.decode(read(s.config_path))
-			helpers.assert_nil(stored.tap_holds and stored.tap_holds.sticky_timeout_ms, "the stored timeout is reset")
+			local recommended = require("infra.manifest_reader").recommended_for(require("config_keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
+			local timeout = stored.tap_holds and stored.tap_holds.sticky_timeout_ms
+			helpers.assert_true(timeout == nil or timeout == recommended, "the stored timeout is reset: " .. tostring(timeout))
+			helpers.assert_true(timeout ~= 4000)
 			helpers.assert_eq(stored.other.value, 17)
 		end)
 	end)

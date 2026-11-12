@@ -6111,6 +6111,8 @@ function M.apply_scope(request, on_done)
 			[require("config_keys").KEY.TAP_HOLDS_ENABLED] = "tap_holds_enabled",
 			-- config-key-literal-ok: the value is the remap state field, named like its leaf
 			[require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS] = "lone_modifier_tap_max_ms",
+			-- config-key-literal-ok: the value is the remap state field, named like its leaf
+			[require("config_keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS] = "sticky_timeout_ms",
 		}
 		for _, row in ipairs(Manifest.scope_plan(request.scope, request.mode).operations) do
 			local path = row.section .. "." .. row.key
@@ -6123,7 +6125,6 @@ function M.apply_scope(request, on_done)
 		end
 		candidate.tap_hold_config = target.tap_hold_config
 		candidate.tap_hold_timeout_ms = target.tap_hold_timeout_ms
-		candidate.sticky_timeout_ms = target.sticky_timeout_ms
 		return #M.TAP_HOLD_KEYS
 	end, on_done, nil, request.backup_path, sibling)
 end
