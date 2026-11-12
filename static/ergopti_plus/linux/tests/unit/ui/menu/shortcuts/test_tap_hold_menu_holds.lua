@@ -65,8 +65,8 @@ helpers.describe("Linux Tap-Holds menu", function()
 			-- Both apply at once, after the scope's backups: the restore since
 			-- restore-recommended-no-confirm, the clear since 2026-09-30.
 			helpers.assert_eq(#asked, 0, "no scope row asks")
-			helpers.assert_eq(calls[1], { "scope", "recommended", false })
-			helpers.assert_eq(calls[2], { "scope", "clear", false })
+			helpers.assert_eq(calls[1], { "scope", "recommended", 0 })
+			helpers.assert_eq(calls[2], { "scope", "clear", 0 })
 			helpers.assert_eq(calls[3][1], "set_enabled")
 			helpers.assert_eq(calls[3][2], false, "the switch was on, a click turns it off")
 		end)

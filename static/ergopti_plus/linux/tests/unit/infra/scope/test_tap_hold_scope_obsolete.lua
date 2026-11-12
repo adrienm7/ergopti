@@ -116,7 +116,7 @@ local function with_scope(tap_text, config_text, body)
 		return require("infra.tap_hold_scope").new({
 			path = config_path, backup_path = config_path .. ".bak",
 			tap_hold_path = tap_path, tap_hold_backup_path = tap_path .. ".bak",
-			is_paused = function() return s.paused end, parameters = s.parameters, files = s.files,
+			parameters = s.parameters, files = s.files,
 		})
 	end
 	local ok, err = pcall(body, s)
