@@ -268,11 +268,18 @@ on process_file(file_path, is_encrypt, s)
 		set dest_exists to true
 	end try
 	if dest_exists then
-		set overwrite_answer to button returned of ¬
-			(display alert (warn_overwrite of s) ¬
-				buttons {btn_cancel of s, btn_overwrite of s} ¬
-				default button btn_overwrite of s ¬
-				cancel button btn_cancel of s)
+		-- A cancel button raises error -128 instead of returning it: caught
+		-- here, it skips this file only, and the next dropped file is still
+		-- processed, as on Windows and Linux (BAP-003).
+		try
+			set overwrite_answer to button returned of ¬
+				(display alert (warn_overwrite of s) ¬
+					buttons {btn_cancel of s, btn_overwrite of s} ¬
+					default button btn_overwrite of s ¬
+					cancel button btn_cancel of s)
+		on error number -128
+			return
+		end try
 		if overwrite_answer is (btn_cancel of s) then return
 	end if
 
