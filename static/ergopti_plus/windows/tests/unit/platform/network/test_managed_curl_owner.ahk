@@ -183,6 +183,40 @@ _ManagedCurlControlBadAck(Mode) {
 Test("managed curl owner: foreign request acknowledgement refuses payload publication", _ManagedCurlControlBadAck.Bind("foreign"))
 Test("managed curl owner: string-valued native closing acknowledgement refuses publication", _ManagedCurlControlBadAck.Bind("forged"))
 
+; The admission timer can interrupt _StopManagedAdmission between two lines and
+; retire the request itself. The property below plays that interleaving: its
+; first read hands out the armed callback and clears the field as the
+; interrupting poll would. Reading the field a second time then gave SetTimer an
+; Integer (managed-admission-stop-reentry, red on Windows CI 2026-11-12).
+_ManagedCurlControlStopReentry() {
+	State := _ManagedCurlControlState()
+	Request := _ManagedCurlControlNew(State)
+	try {
+		AssertTrue(Request.Send("private-user-payload"))
+		Armed := Request.ManagedAdmissionFn
+		AssertTrue(IsObject(Armed), "the request arms its admission callback")
+		Slot := {Value: Armed, Reads: 0}
+		ReadOnce(Self) {
+			Slot.Reads += 1
+			Current := Slot.Value
+			Slot.Value := 0
+			return Current
+		}
+		Request.DefineProp("ManagedAdmissionFn", {
+			get: ReadOnce,
+			set: (Self, Value) => Slot.Value := Value
+		})
+		Request._StopManagedAdmission()
+		AssertEqual(1, Slot.Reads, "the callback is read once, so an interruption cannot change it")
+		AssertEqual(0, Slot.Value, "the stop releases the admission callback")
+		AssertEqual("", Request.ManagedTransportImage, "the stop releases the staging image")
+		Request.DeleteProp("ManagedAdmissionFn")
+		Request.ManagedAdmissionFn := 0
+	} finally _ManagedCurlControlRelease(State)
+}
+Test("managed curl owner: an interrupted admission stop never hands SetTimer an Integer (managed-admission-stop-reentry)",
+	_ManagedCurlControlStopReentry)
+
 _ManagedCurlControlExpiredAck() {
 	State := _ManagedCurlControlState()
 	Request := _ManagedCurlControlNew(State)

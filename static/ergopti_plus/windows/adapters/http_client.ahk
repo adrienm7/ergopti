@@ -543,7 +543,10 @@ class CurlAsyncRequest {
 			Directory := this.ManagedCapture["CaptureDir"]
 			AckPath := Directory . "admission.json"
 			if !FileExist(AckPath) {
-				SetTimer(this.ManagedAdmissionFn, -Min(HTTP_CURL_CLEANUP_RETRY_MS, Max(1, this._Remaining())))
+				; A stop that interrupted this poll released the callback: nothing to re-arm.
+				AdmissionFn := this.ManagedAdmissionFn
+				if IsObject(AdmissionFn)
+					SetTimer(AdmissionFn, -Min(HTTP_CURL_CLEANUP_RETRY_MS, Max(1, this._Remaining())))
 				return
 			}
 			if FileGetSize(AckPath) > 8192
@@ -584,10 +587,17 @@ class CurlAsyncRequest {
 	}
 
 	_StopManagedAdmission() {
-		if IsObject(this.ManagedAdmissionFn)
-			SetTimer(this.ManagedAdmissionFn, 0)
-		this.ManagedAdmissionFn := 0
-		this.ManagedTransportImage := ""
+		; One read, cleared at once: the admission timer can interrupt between two
+		; lines and retire the request itself, so a second read of the field could
+		; find 0 and hand SetTimer an Integer (managed-admission-stop-reentry).
+		PreviousCritical := Critical("On")
+		try {
+			AdmissionFn := this.ManagedAdmissionFn
+			this.ManagedAdmissionFn := 0
+			this.ManagedTransportImage := ""
+		} finally Critical(PreviousCritical)
+		if IsObject(AdmissionFn)
+			SetTimer(AdmissionFn, 0)
 	}
 
 	_OnManagedDone(ExitCode, Stdout, Stderr) {
