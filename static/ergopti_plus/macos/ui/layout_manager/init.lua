@@ -64,6 +64,11 @@ local _emulation_applier = nil
 -- (M.set_layout_change_handler); nil until then.
 local _layout_change_handler = nil
 
+-- Reports whether the driver is paused, bound by the menu (M.set_pause_query):
+-- a paused driver admits only the page's ready signal, as on Windows (LMH-003).
+-- nil until then, and every command is admitted.
+local _pause_query = nil
+
 --- Settles exact window and callback owners before admitting another window.
 --- @return boolean settled Native cleanup committed or already consumed the window.
 local function settle_retired_window()
@@ -195,6 +200,7 @@ local function controller_for(view)
 		layout_changed = function(id)
 			if _layout_change_handler then _layout_change_handler(id) end
 		end,
+		is_paused = function() return _pause_query ~= nil and _pause_query() == true end,
 		apply_nav = _nav_applier and function(text, on_done)
 			local applier = _nav_applier
 			if not applier then
@@ -371,6 +377,15 @@ function M.set_layout_change_handler(handler)
 		error("layout_manager.set_layout_change_handler: a function or nil is required", 2)
 	end
 	_layout_change_handler = handler
+end
+
+--- Binds the pause state the bridge reads before admitting a page command.
+--- @param query function|nil query() returns true while the driver is paused.
+function M.set_pause_query(query)
+	if query ~= nil and type(query) ~= "function" then
+		error("layout_manager.set_pause_query: a function or nil is required", 2)
+	end
+	_pause_query = query
 end
 
 --- Opens the layout manager straight on the layout editor (the menu's « Create

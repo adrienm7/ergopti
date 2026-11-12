@@ -179,6 +179,8 @@ local function controller(state, context)
 			emulation.reload_if_started()
 			if type(state.on_config_changed) == "function" then state.on_config_changed() end
 		end,
+		-- A paused driver admits only the page's ready signal, as on Windows (LMH-003).
+		is_paused = function() return type(state.is_paused) == "function" and state.is_paused() == true end,
 		-- The layout editor applies a source's navigation layer through the
 		-- navigation layer editor's own save (ui/layer_editor/bridge.lua).
 		apply_nav = layer_editor and function(text, done)
