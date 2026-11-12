@@ -96,5 +96,9 @@ cases = [
 	"shipped_section_order_language_key_copied_on_windows",
 	"shipped_section_order_language_key_kept_on_windows",
 	"shipped_section_order_language_key_untouched_on_lua",
-	"shipped_release_settings_kept_on_windows"
+	"shipped_release_settings_kept_on_windows",
+	"shipped_release_settings_kept_on_linux",
+	"shipped_language_section_order_kept_on_linux",
+	"shipped_release_ai_enabled_kept_on_macos",
+	"shipped_language_section_order_kept_on_macos"
 ]

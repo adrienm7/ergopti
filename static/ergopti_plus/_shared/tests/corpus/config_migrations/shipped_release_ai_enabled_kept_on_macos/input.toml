@@ -1,0 +1,13 @@
+# _shared/tests/corpus/config_migrations/shipped_release_ai_enabled_kept_on_macos/input.toml
+
+[_meta]
+schema_version = 20
+
+[llm]
+enabled = true
+
+[llm.trigger]
+debounce_ms = 200
+
+[shortcuts.keyboard]
+hs_ctrl_space = "llm_generate_prediction"
