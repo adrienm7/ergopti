@@ -71,9 +71,11 @@ helpers.describe("Linux App Cloner", function()
 		helpers.assert_eq(plan.desktop_path, "/home/u/.local/share/applications/ergopti-clone-work-browser.desktop")
 	end)
 
-	helpers.it("app cloner: suffixes a name already taken instead of sharing its profile", function()
+	helpers.it("(bap-006-duplicate-name) app cloner: suffixes a taken name on its profile and its menu name", function()
 		local plan = plan_for("chromium", { taken = function(id) return id == "work-browser" end })
 		helpers.assert_eq(plan.id, "work-browser-2")
+		-- The menu tells the two clones apart.
+		helpers.assert_contains(plan.desktop_text, "Name=Work Browser (2)\n")
 	end)
 
 	helpers.it("app cloner: runs a native clone with its own XDG folders and the source's own words", function()
