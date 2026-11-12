@@ -168,6 +168,7 @@ local function load_remap(options)
 			end
 			return calls.lease_token
 		end,
+		is_initialized = function() return calls.phase_listener ~= nil end,
 		status = function()
 			return calls.lease_phase, {
 				phase = calls.lease_phase,
