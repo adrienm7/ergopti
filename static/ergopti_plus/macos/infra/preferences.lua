@@ -931,6 +931,9 @@ local function flatten_from_disk(grouped, mark, shapes)
 			flat[flat_key] = UserModels.partition(value, shapes, mark)
 			return
 		end
+		-- A case variant reads in its manifest spelling, as Windows' loader
+		-- admits it (`agent_mode = "Auto"`); every rule below sees that spelling.
+		value = ConfigOutdated.canonical_enum_value(Manifest.find_entry_by_path(table.concat({ ... }, ".")), value)
 		local fits, detail = persisted_units_fit(KEY_MAP[flat_key], value)
 		local spec = KEY_MAP[flat_key]
 		if fits and spec and spec.enum then
@@ -1013,6 +1016,12 @@ local function flatten_from_disk(grouped, mark, shapes)
 						end
 						if MANIFEST_CHILD_TABLES[nested_fk] then
 							local prefix = sec_name .. "." .. disk_key .. "."
+							for inner_key, inner_val in pairs(owned) do
+								if type(inner_key) == "string" then
+									owned[inner_key] = ConfigOutdated.canonical_enum_value(
+										Manifest.find_entry_by_path(prefix .. inner_key), inner_val)
+								end
+							end
 							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
 								function(id, value) return manifest_child_fits(nested_fk, prefix .. id, value) end, mark)
 						elseif nested_fk == "terminator_states" then
