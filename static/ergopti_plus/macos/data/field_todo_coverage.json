@@ -750,6 +750,12 @@
 					"step": "guided_input_policies"
 				}
 			]
+		},
+		{
+			"id": "developer_app_login_item",
+			"title": "Start at login from the developer app (ad hoc signed)",
+			"checks": [],
+			"not_testable": "Changes the user's own Login Items and needs a logout: in the developer app, tick About > Start at login, approve it in System Settings > General > Login Items if asked, log out and in, then untick it."
 		}
 	]
 }
