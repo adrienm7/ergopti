@@ -159,6 +159,17 @@ case "$SRC_EXE_NAME" in
 	"Slack"|"Discord"|"Notion"|"Spotify"|"Figma"|"Postman")
 		APP_FAMILY=electron ;;
 esac
+# Browsers get their own profile, as the catalogue's chromium and firefox
+# families do on Windows and Linux (BAP-002): matched by their macOS
+# executable names, lower-cased, which test-app-cloner-families.cjs holds to
+# _shared/data/app_cloner/families.json. Google Chrome ships a « Google Chrome
+# Framework », which the Chromium framework test above does not see.
+case "${SRC_EXE_NAME:l}" in
+	"google chrome"|"chromium"|"microsoft edge"|"brave browser"|"vivaldi"|"opera")
+		APP_FAMILY=chromium ;;
+	"firefox"|"librewolf"|"waterfox"|"thunderbird")
+		APP_FAMILY=firefox ;;
+esac
 # VSCode is Electron too but with extra CLI flags worth passing
 if [[ -f "$SOURCE_APP/Contents/Resources/app/bin/code" ]] \
    || [[ "$SRC_EXE_NAME" == "Code" ]] \
@@ -1036,8 +1047,10 @@ case "$APP_FAMILY" in
 			--extensions-dir "$SHARED_EXT_DIR"
 			--new-window
 		) ;;
-	electron)
+	electron|chromium)
 		ARGS=(--user-data-dir "$USER_DATA_DIR") ;;
+	firefox)
+		ARGS=(--no-remote --profile "$USER_DATA_DIR") ;;
 	native|*)
 		ARGS=() ;;
 esac
@@ -1053,6 +1066,16 @@ esac
 #                            no-ops because the app isn't yet a registered
 #                            URL handler in this process tree.
 URL_SCHEME_RE='^[a-zA-Z][a-zA-Z0-9+.-]*:'
+# A browser clone opens a web URL itself: `open -a` would hand it to the
+# browser's main instance, not the clone's profile. A Chromium clone opens it
+# as its own application window, the catalogue's web_app argument.
+WEB_URL_RE='^https?://'
+if [[ -n "$OPEN_ARG" && "$OPEN_ARG" =~ $WEB_URL_RE ]]; then
+	case "$APP_FAMILY" in
+		chromium) ARGS+=("--app=$OPEN_ARG"); OPEN_ARG="" ;;
+		firefox) ARGS+=("$OPEN_ARG"); OPEN_ARG="" ;;
+	esac
+fi
 if [[ -n "$OPEN_ARG" && ! "$OPEN_ARG" =~ $URL_SCHEME_RE ]]; then
 	ARGS+=("$OPEN_ARG")
 fi
