@@ -16,7 +16,9 @@
 --- 1. No path from the page: a file name is one plain name of an allowed
 ---    extension, so the page cannot write outside the store's folder.
 --- 2. Fail fast: a refused or failed write reports a stable code and detail;
----    nothing is truncated or rewritten silently.
+---    nothing is truncated or rewritten silently. The codes, the folder, the
+---    navigation export's name and the bounds come from the shared layout
+---    defaults, which Windows' source_store.ahk reads too.
 --- 3. Saving never installs or activates anything: the editor's files are the
 ---    user's; installing a generated layout stays the layout manager's job.
 --- ==============================================================================
@@ -25,14 +27,11 @@ local M = {}
 
 local NativePath = require("native_path")
 
-M.FAILURE_INVALID = "source_invalid_file"
-M.FAILURE_WRITE   = "write_failed"
-
 -- A plain lowercase name ending in one of the editor's file types.
 local FILE_NAME = "^[a-z][a-z0-9_]*%.[a-z]+$"
 local EXTENSIONS = { toml = true, keylayout = true }
--- The page names a source after its identifier; layers.toml is the navigation export.
-local NAV_FILE = "layers.toml"
+-- A failure code the page receives.
+local CODE = "^[a-z_]+$"
 
 
 
@@ -46,12 +45,13 @@ local NAV_FILE = "layers.toml"
 
 --- Validates the [source] table of the shared layout defaults.
 --- @param layout_defaults table Decoded _shared/modules/layouts/defaults.json.
---- @return table|nil settings { folder, last_file, max_file_bytes, max_name_length }
+--- @return table|nil settings { folder, last_file, nav_file, max_file_bytes,
+---   max_name_length, failures = { invalid, write } }
 --- @return string|nil error
 function M.settings(layout_defaults)
 	local source = type(layout_defaults) == "table" and layout_defaults.source or nil
 	if type(source) ~= "table" then return nil, "the layout defaults have no source table" end
-	for _, field in ipairs({ "folder", "last_file" }) do
+	for _, field in ipairs({ "folder", "last_file", "nav_file" }) do
 		if type(source[field]) ~= "string" or not source[field]:match("^[A-Za-z0-9._-]+$") then
 			return nil, "the source " .. field .. " is not a plain name"
 		end
@@ -62,11 +62,20 @@ function M.settings(layout_defaults)
 			return nil, "the source " .. field .. " is not a positive integer"
 		end
 	end
+	local failures = source.failures
+	for _, code in ipairs({ "invalid", "write" }) do
+		if type(failures) ~= "table" or type(failures[code]) ~= "string" or not failures[code]:match(CODE) then
+			return nil, "the source failures name no " .. code .. " code"
+		end
+	end
 	return {
 		folder = source.folder,
 		last_file = source.last_file,
+		-- The page names a source after its identifier; nav_file is the navigation export.
+		nav_file = source.nav_file,
 		max_file_bytes = source.max_file_bytes,
 		max_name_length = source.max_name_length,
+		failures = { invalid = failures.invalid, write = failures.write },
 	}, nil
 end
 
@@ -139,22 +148,23 @@ function M.read_picked(settings, path, read)
 	local name = type(path) == "string" and NativePath.basename(path) or nil
 	local extension = name and name:match("%.([A-Za-z]+)$")
 	if not extension or not EXTENSIONS[extension:lower()] then
-		return { code = M.FAILURE_INVALID, detail = "the file type is not one the editor opens" }
+		return { code = settings.failures.invalid, detail = "the file type is not one the editor opens" }
 	end
 	local text = read(path)
-	if type(text) ~= "string" then return { code = M.FAILURE_INVALID, detail = "the file is unreadable" } end
+	if type(text) ~= "string" then return { code = settings.failures.invalid, detail = "the file is unreadable" } end
 	if #text > settings.max_file_bytes then
-		return { code = M.FAILURE_INVALID, detail = "the file is larger than its bound" }
+		return { code = settings.failures.invalid, detail = "the file is larger than its bound" }
 	end
-	if not M.is_utf8(text) then return { code = M.FAILURE_INVALID, detail = "the file is not UTF-8 text" } end
+	if not M.is_utf8(text) then return { code = settings.failures.invalid, detail = "the file is not UTF-8 text" } end
 	return { filename = name, text = text }
 end
 
 --- Whether a saved file is a layout source the editor reopens.
+--- @param settings table From M.settings.
 --- @param name string
 --- @return boolean
-function M.is_source(name)
-	return name ~= NAV_FILE and name:match("%.toml$") ~= nil
+function M.is_source(settings, name)
+	return name ~= settings.nav_file and name:match("%.toml$") ~= nil
 end
 
 
@@ -190,7 +200,7 @@ function M.new(env)
 		if env.exists(pointer) then
 			local name = env.read(pointer)
 			name = type(name) == "string" and name:gsub("%s+$", "") or nil
-			local ok = name and M.check(settings, { filename = name, text = "x" }) and M.is_source(name)
+			local ok = name and M.check(settings, { filename = name, text = "x" }) and M.is_source(settings, name)
 			local text = ok and env.exists(folder() .. name) and env.read(folder() .. name) or nil
 			if type(text) == "string" and #text <= settings.max_file_bytes then
 				data.text, data.filename = text, name
@@ -208,21 +218,21 @@ function M.new(env)
 		local ok, detail = M.check(settings, payload)
 		if not ok then
 			env.log("warn", "Refused a layout editor file: %s.", detail)
-			on_done(false, M.FAILURE_INVALID, detail, nil)
+			on_done(false, settings.failures.invalid, detail, nil)
 			return
 		end
 		local path = folder() .. payload.filename
 		local written, write_err = env.write(path, payload.text)
 		if not written then
 			env.log("error", "The layout editor file %s could not be written: %s.", path, tostring(write_err))
-			on_done(false, M.FAILURE_WRITE, tostring(write_err), payload.filename)
+			on_done(false, settings.failures.write, tostring(write_err), payload.filename)
 			return
 		end
-		if M.is_source(payload.filename) then
+		if M.is_source(settings, payload.filename) then
 			local pointed, pointer_err = env.write(folder() .. settings.last_file, payload.filename .. "\n")
 			if not pointed then
 				env.log("error", "The last layout source could not be recorded: %s.", tostring(pointer_err))
-				on_done(false, M.FAILURE_WRITE, tostring(pointer_err), payload.filename)
+				on_done(false, settings.failures.write, tostring(pointer_err), payload.filename)
 				return
 			end
 		end
