@@ -31,7 +31,8 @@ LMH-001, decided by the maintainer on 2026-11-12: the stored
 `[layout] emulated_layout` is kept on uninstall or remove. The menu row stays
 named, ticked and greyed (« — non appliqué »), the emulation stops and
 reloads, and it resumes by itself when the layout is installed again. Windows
-still clears the choice; its TODO line is under « Windows (the PC agent's) ».
+keeps it too (2026-11-12): its boot no longer downloads a missing layout, and
+the menu choice installs one before selecting it.
 
 LMH-004 asks the host for a full driver reload, because the extension
 catalogue is read once per boot; that reload also restarts the emulation, so
