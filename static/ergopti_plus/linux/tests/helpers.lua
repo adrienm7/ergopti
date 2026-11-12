@@ -26,6 +26,9 @@ local M = {}
 -- first: isolating here keeps its logs and config away from the account's own
 -- home. Idempotent, the runner already isolated.
 require("test.runner_home").isolate()
+-- The fixtures read the French catalogue whatever the session language says
+-- (tests/support/session_language.lua); helpers load once per test process.
+require("tests.support.session_language").install()
 
 -- Value formatting and stack-trace helpers shared with macOS (single source of truth).
 local fmt = require("test.format")

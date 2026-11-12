@@ -48,16 +48,43 @@ local function _get_storage()
 	return _storage
 end
 
---- Loads the persisted locale preference, or returns the default.
---- @return string
+--- Loads the persisted locale preference.
+--- @return string|nil saved The saved code, nil when none is saved.
 local function _load_persisted_locale()
 	local s = _get_storage()
-	if not s then return "fr" end
+	if not s then return nil end
 	local saved = s.get("locale")
 	if type(saved) == "string" and saved ~= "" then
 		return saved
 	end
-	return "fr"
+	return nil
+end
+
+-- The catalogue of a system language without one, as on Windows and macOS and
+-- in the Linux shell messages (install/messages.sh).
+local SYSTEM_FALLBACK_LOCALE = "en"
+
+--- Picks the catalogue of the session language, as the Windows and macOS
+--- drivers do for a first run: LC_ALL, then LC_MESSAGES, then LANG, as the
+--- shell messages read them; Norwegian bokmål and nynorsk share "no".
+--- @param available string[] Discovered catalogue codes.
+--- @param getenv function|nil Environment reader (os.getenv by default).
+--- @return string code A code from available, or the fallback.
+function M.detect_system_locale(available, getenv)
+	assert(type(available) == "table", "the system locale is matched against the discovered catalogues")
+	getenv = getenv or os.getenv
+	local value = nil
+	for _, name in ipairs({ "LC_ALL", "LC_MESSAGES", "LANG" }) do
+		local candidate = getenv(name)
+		if type(candidate) == "string" and candidate ~= "" then value = candidate; break end
+	end
+	local language = value and value:match("^(%a+)") or nil
+	language = language and language:lower() or nil
+	if language == "nb" or language == "nn" then language = "no" end
+	for _, code in ipairs(available) do
+		if code == language then return code end
+	end
+	return SYSTEM_FALLBACK_LOCALE
 end
 
 -- =========================================
@@ -173,9 +200,15 @@ function M.init()
 		_locale = saved
 		locale_mod.set_locale(saved)
 	else
-		Logger.warn(LOG, "Persisted locale '%s' is unavailable — using 'fr'.", tostring(saved))
-		_locale = "fr"
-		locale_mod.set_locale("fr")
+		-- A first run or an unknown saved code follows the session language,
+		-- as on Windows and macOS (LCY-002).
+		local detected = M.detect_system_locale(_available)
+		if saved ~= nil then
+			Logger.warn(LOG, "Persisted locale '%s' is unavailable — using the system locale '%s'.",
+				tostring(saved), detected)
+		end
+		_locale = detected
+		locale_mod.set_locale(detected)
 	end
 
 	Logger.info(LOG, "i18n initialised (locale=%s, %d available).", _locale, #_available)
