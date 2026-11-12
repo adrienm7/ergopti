@@ -704,6 +704,20 @@ function run() {
 			.map((r) => r.kind);
 		assert.deepEqual(kinds, ['folder-edit'], `${e.file}: the listed edit applies`);
 	}
+	// The resolver walk test prefixes the llm wrapper's argument and expects
+	// the prefixed request: both edits of its folder land, or the walk fails.
+	const resolverTest = 'tools/test/test-shared-root-resolvers.cjs';
+	if (fs.existsSync(path.join(repo, resolverTest))) {
+		const before = fs.readFileSync(path.join(repo, resolverTest), 'utf8');
+		const after = Apply.rewriteText(
+			before,
+			Plan.scanFile(resolverTest, before, fullCtx),
+			new Map(),
+			resolverTest
+		);
+		const prefix = after.match(/'shared_llm_path' \? `([^`$]*)\$\{arg\}`/)[1];
+		assert.ok(after.includes(`'${prefix}fixture.json'`), `${resolverTest}: ${prefix} expected`);
+	}
 	// A file of synthetic coordinates keeps them all: rewriting the arguments of
 	// sibling() and not its fake source made the loader contract fail.
 	const moved = new Map([...full].filter(([o, t]) => t && o !== t).map(([o, t]) => [P + o, P + t]));
