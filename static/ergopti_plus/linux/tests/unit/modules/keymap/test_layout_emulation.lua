@@ -115,6 +115,24 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_true(not press(M, KEY_F1, { ctrl = true }), "a key outside the layout passes")
 	end)
 
+	-- Windows registers a keyboard slot on the key that types its letter in the
+	-- emulated layout; Linux matched the system layout's key (ILX-001).
+	helpers.it("names the emulated letter of a chord for the shortcut slots, typing nothing (ilx-001-slot-emulated-letter)", function()
+		local M, record = fixture({ emulated_layout = "ergopti", ergopti_base = true })
+		M.reload()
+		helpers.assert_eq(M.chord_key({ code = KEY_Q, mods = { ctrl = true } }), "z", "Ctrl on Q is Ergopti's z")
+		helpers.assert_eq(M.chord_key({ code = KEY_Q, mods = { alt = true } }), "z")
+		helpers.assert_nil(M.chord_key({ code = KEY_Q, mods = {} }), "no chord, no slot letter")
+		helpers.assert_nil(M.chord_key({ code = KEY_F1, mods = { ctrl = true } }), "a key outside the layout")
+		helpers.assert_eq(record.shortcuts, {}, "the query sends nothing")
+		helpers.assert_eq(record.typed, {}, "and types nothing")
+		record.paused = true
+		helpers.assert_nil(M.chord_key({ code = KEY_Q, mods = { ctrl = true } }), "a paused emulation names nothing")
+		local off = fixture({ emulated_layout = "" })
+		off.reload()
+		helpers.assert_nil(off.chord_key({ code = KEY_Q, mods = { ctrl = true } }), "no emulated layout")
+	end)
+
 	-- A chord of two modifiers sends the key of the layout's character, as a
 	-- single-modifier chord does, the held modifiers kept (ILD-1, decided by the
 	-- maintainer on 2026-11-11: the logical key everywhere; two-modifier-chord).
