@@ -1282,6 +1282,9 @@ between workers) green alone. All live checks pass, typed by the harness.
       `AccentedShortcuts_Register`: add the `<^<!` and `<^<!+` prefixes (SCD-2, Ctrl+Alt+é sends Ctrl+Alt+C).
       `modules/shortcuts/utils.ahk` `AddShortcut` for a `^` slot: also `<^>!^` + scan code to the same callback, guarded by
       the physical Ctrl (SCD-3, a `ctrl_x` slot fires for Ctrl+AltGr+x). Tests beside each.
+- [ ] **Pause and resume notices on AHK (decided by the maintainer on 2026-11-12).** After a committed pause show
+      `script_control.paused` at the warning level, after a committed resume `script_control.resumed` at the success level,
+      for `[ui] notification_ttl_ms`, as macOS `publish_pause_state` and Linux `script_actions` (`PAUSE_NOTICES`) do.
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
   keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
   `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
