@@ -870,6 +870,8 @@ jobs:
           number_row_statuses=("${PIPESTATUS[@]}")
           set -e
           bash tools/diagnostics/macos_text_input_agents.sh "$evidence/text-input-agents.txt" after
+          # Names a refusal the unanswered text-input UI server caused; never the verdict.
+          python3 tools/diagnostics/macos_tsm_refusal.py --log "$transcript" --agents "$evidence/text-input-agents.txt" --receipt "$evidence/tsm-refusal.json"
           test "${#number_row_statuses[@]}" -eq 2
           set +e
           python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py \
@@ -935,6 +937,7 @@ jobs:
             ${{ runner.temp }}/number-row-source-evidence/number-row-verdict.json
             ${{ runner.temp }}/number-row-source-evidence/tested-sha.txt
             ${{ runner.temp }}/number-row-source-evidence/text-input-agents.txt
+            ${{ runner.temp }}/number-row-source-evidence/tsm-refusal.json
             ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbe.swift
             ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbeTests.swift
             ${{ runner.temp }}/number-row-source-evidence/tis-session.*/start.json
