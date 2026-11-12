@@ -85,8 +85,11 @@ local function run_window(module_name, scenario)
 			local original = files.read
 			files.read = function(path, ...)
 				for _, name in ipairs({ "channels", "defaults" }) do
-					if path:match("/modules/updater/" .. name .. "%.json$") then
-						local file = assert(io.open(helpers.shared("modules/updater/" .. name .. ".json"), "r"))
+					-- The read is recognized by the file's path under the shared root.
+					local real = helpers.shared("modules/updater/" .. name .. ".json")
+					local relative = real:sub(#helpers.shared() + 1)
+					if path:sub(-#relative) == relative then
+						local file = assert(io.open(real, "r"))
 						local data = file:read("*a")
 						file:close()
 						return data
