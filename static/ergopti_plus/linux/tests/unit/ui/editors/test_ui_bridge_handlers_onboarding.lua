@@ -262,8 +262,9 @@ helpers.describe("ui.bridge_handlers", function()
 			local folder = scratch_dir()
 			helpers.assert_true(os.execute("mkdir -p '" .. folder .. "'"))
 			values.config_dir = folder
-			write_file(folder .. "/tap_hold.toml", '[tap_hold]\nenabled = true\n'
-				.. '[tap_hold.keys.caps_lock]\ntime_activation_seconds = 0.35\ntap_action = "enter"\n'
+			-- The switch is a config.toml row; the keys are the folder's tap_hold.toml.
+			write_file(folder .. "/config.toml", '[tap_holds]\nenabled = true\n')
+			write_file(folder .. "/tap_hold.toml", '[tap_hold.keys.caps_lock]\ntime_activation_seconds = 0.35\ntap_action = "enter"\n'
 				.. 'hold_modifier = "ctrl"\n'
 				.. '[tap_hold.keys.left_alt]\ntap_action = "escape"\n')
 			local ready = handler.on_message({ action = "ready" }, state)
@@ -271,6 +272,7 @@ helpers.describe("ui.bridge_handlers", function()
 			write_file(folder .. "/tap_hold.toml", '[tap_hold.keys.left_alt\n')
 			local broken = handler.on_message({ action = "ready" }, state)
 			os.remove(folder .. "/tap_hold.toml")
+			os.remove(folder .. "/config.toml")
 			os.remove(folder)
 			local expected = {
 				["tap_holds.enabled"] = true,
@@ -513,15 +515,17 @@ helpers.describe("ui.bridge_handlers", function()
 				{ path = "tap_holds.keys.tab", value = true },
 			} })
 			local loaded = require("platform.remap.tap_hold_loader").load(
-				require("infra.paths").shared("tap_hold/defaults.toml"), target .. "/tap_hold.toml")
+				require("infra.paths").shared("tap_hold/defaults.toml"), target .. "/tap_hold.toml",
+				target .. "/config.toml")
 			os.remove(target .. "/tap_hold.toml")
+			os.remove(target .. "/config.toml")
 			os.remove(target)
 			helpers.assert_eq(result, { done = true, restarted = true })
 			helpers.assert_eq(imports, { { path = target .. "/tap_hold.toml", keys = { "caps_lock", "tab" },
 				config_writes = 1 } }, "one import of the checked keys, into the chosen folder, after the answers")
 			helpers.assert_eq(captured.writes[1].updates, { { section = "gestures", key = "enabled", value = true } },
 				"no tap-hold key reaches config.toml")
-			helpers.assert_eq(loaded.enabled, true, "the import switches the Tap-Holds on in their own file")
+			helpers.assert_eq(loaded.enabled, true, "the import switches the Tap-Holds on in the folder's config.toml")
 			helpers.assert_eq(loaded.keys.caps_lock.tap_action, "enter")
 			helpers.assert_true(loaded.keys.tab ~= nil)
 			helpers.assert_nil(loaded.keys.left_alt, "an unchecked key is not written")
