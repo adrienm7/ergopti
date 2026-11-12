@@ -484,6 +484,21 @@ function isProse(file, text, code, index) {
 	return /(\/\/|^\s*\*|^\s*\/\*|#)/.test(before);
 }
 
+/** Code just before a quoted name that loads it as a Lua module. */
+const MODULE_LOAD_BEFORE =
+	/(?:\brequire\s*\(?|\bpackage\.(?:loaded|preload)\s*\[|\bpcall\s*\(\s*require\s*,|\brequire_\w*\s*\(|\b\w*_require\s*\()\s*$/;
+
+/**
+ * Tells whether the quoted token at `index` is a Lua module load: a require
+ * argument or a package.loaded / package.preload key.
+ * @param {string} text Source text.
+ * @param {number} index Offset of the opening quote.
+ * @returns {boolean}
+ */
+function isModuleLoadSite(text, index) {
+	return MODULE_LOAD_BEFORE.test(text.slice(Math.max(0, index - 80), index));
+}
+
 /**
  * Classifies one module a runtime edit expects.
  * @param {Map<string, Array>} byLuaName Moved modules by "<root>|<old name>".
@@ -638,6 +653,10 @@ function references(map) {
 			}
 			const roots = inTree === '_shared' ? ['_shared', 'macos', 'linux'] : [inTree, '_shared'];
 			for (const m of text.matchAll(luaToken)) {
+				// A one-word string ("json", "chord", "logger") is a module name
+				// only where it is loaded: elsewhere it is a file type, a slot kind
+				// or a settings section that happens to share the name.
+				if (!m[1].includes('.') && !isModuleLoadSite(text, m.index)) continue;
 				for (const r of roots) {
 					const hit = byLuaName.get(`${r}|${m[1]}`);
 					if (hit) {
@@ -1018,6 +1037,7 @@ module.exports = {
 	attributeSteps,
 	REFUSED_KINDS,
 	runtimeEditState,
+	isModuleLoadSite,
 	REVIEWED_KINDS,
 	directoryMap,
 	moveMap,

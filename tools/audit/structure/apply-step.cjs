@@ -300,7 +300,12 @@ function main() {
 				text = text.split(row.old).join(row.new);
 				continue;
 			}
-			if (row.kind === 'lua-module' || row.kind === 'lua-prefix') {
+			if (row.kind === 'lua-module' && !row.old.includes('.')) {
+				// A one-word name moves only where it is loaded (Plan.isModuleLoadSite).
+				text = text.replace(new RegExp(`(["'])${esc}\\1`, 'g'), (whole, quote, offset, all) =>
+					Plan.isModuleLoadSite(all, offset) ? `${quote}${row.new}${quote}` : whole
+				);
+			} else if (row.kind === 'lua-module' || row.kind === 'lua-prefix') {
 				text = text.replace(new RegExp(`(["'])${esc}\\1`, 'g'), `$1${row.new}$1`);
 			} else {
 				// Whole tokens only: tests/unit/modules/llm must not rewrite
