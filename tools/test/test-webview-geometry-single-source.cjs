@@ -291,12 +291,36 @@ const MACOS_EXCLUSIONS = {
 const WINDOWS_APPS = {
 	physical_shortcuts: {
 		file: 'ui/physical_shortcuts/host.ahk',
-		// The WebViewHost base sizes the window from the manifest entry.
-		checks: () => [
-			/class PhysicalShortcutsWindow extends WebViewHost/,
-			/static APP_ID\s*:=\s*"physical_shortcuts"/,
-			/Host\.AppId\s*:=\s*PhysicalShortcutsHost\.APP_ID/
-		]
+		// The WebViewHost base sizes the window from the manifest entry. The page
+		// id is read from the shared identifier file every driver names, so that
+		// file, and the reader the host calls, must name this manifest entry.
+		checks: () => {
+			const shared = JSON.parse(
+				fs.readFileSync(
+					path.join(ROOT, SP, '_shared/modules/shortcuts/physical_shortcuts.json'),
+					'utf8'
+				)
+			);
+			assert.equal(
+				shared.app_id,
+				'physical_shortcuts',
+				'the shared physical shortcut page id names its apps.manifest.json entry'
+			);
+			const reader = fs.readFileSync(
+				path.join(ROOT, SP, 'windows/ui/physical_shortcuts/slots.ahk'),
+				'utf8'
+			);
+			assert.match(
+				reader,
+				/PhysicalShortcutsShared\(\) \{[\s\S]*?"\\modules\\shortcuts\\physical_shortcuts\.json"/,
+				'the Windows reader loads the shared physical shortcut identifiers'
+			);
+			return [
+				/class PhysicalShortcutsWindow extends WebViewHost/,
+				/static APP_ID\s*=>\s*PhysicalShortcutsShared\(\)\["app_id"\]/,
+				/Host\.AppId\s*:=\s*PhysicalShortcutsHost\.APP_ID/
+			];
+		}
 	},
 	config_cleanup: {
 		file: 'ui/config_cleanup/init.ahk',
