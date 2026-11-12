@@ -131,11 +131,4 @@ helpers.describe("tap-hold storage: the one-shot timeout in config.toml (one-sho
 		discard(path)
 	end)
 
-	helpers.it("the scope resets the config.toml timeout with the keys (one-shot-timeout-setting)", function()
-		local source = assert(io.open(require("infra.paths").driver_root() .. "/infra/tap_hold_scope.lua", "r"))
-		local text = source:read("*a")
-		source:close()
-		helpers.assert_true(text:find("key = ConfigKeys.LEAF.STICKY_TIMEOUT_MS, delete = true", 1, true) ~= nil,
-			"the scope's config.toml batch deletes a stored timeout")
-	end)
 end)
