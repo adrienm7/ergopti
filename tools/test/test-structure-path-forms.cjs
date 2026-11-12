@@ -303,6 +303,14 @@ function run() {
 			rewrite(`${P}linux/tests/z.py`, 'locales = case / "_shared" / "zz_probe_data" / "locales"'),
 			'locales = case / "_shared" / "core" / "zz_probe_i18n" / "data" / "locales"'
 		);
+		assert.equal(
+			rewrite(
+				'tools/build/z.cjs',
+				"const F = path.join(__dirname, '..', '..', 'static', 'ergopti_plus', '_shared', 'zz_probe_mod', 'hotstrings', 'a.toml');"
+			),
+			"const F = path.join(__dirname, '..', '..', 'static', 'ergopti_plus', '_shared', 'zz_probe_hs', 'data', 'a.toml');",
+			"a join from the file's own folder"
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
