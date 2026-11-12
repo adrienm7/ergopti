@@ -121,7 +121,7 @@ local function with_owner(body, managed, public_chords)
 			prepare_chord_rows=prepare_chord_rows,files=files,combinations=state.pairs,parameters=gestures,
 			manifest=public_chords==true and require("infra.manifest_reader") or {scope_plan=function(scope, mode)
 				helpers.assert_eq(scope,"shortcuts");helpers.assert_eq(mode,"clear");return {presets={},operations={}}
-			end},is_paused=function() return state.paused end})
+			end}})
 		body(state)
 	end)
 	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
@@ -134,7 +134,7 @@ local function failed(value) helpers.assert_eq(value,false) end
 local function next_scope(s,expected,manifest,tag)
 	return Scope.new({path=path,backup_path=backup..(tag or ".next"),chord_path=chord_path,
 		chord_backup_path=chord_backup..(tag or ".next"),prepare_chord_rows=prepare_chord_rows,files=s.files,combinations=s.pairs,parameters=s.gestures,
-		manifest=manifest or require("infra.manifest_reader"),is_paused=function() return s.paused end,expected_source=expected})
+		manifest=manifest or require("infra.manifest_reader"),expected_source=expected})
 end
 
 local function with_menu(body, public_chords)

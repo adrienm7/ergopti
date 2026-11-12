@@ -259,13 +259,20 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
    helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
   end,true)
  end)
- for _,kind in ipairs({'cancel','invalid','paused','source'}) do
+ -- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+ helpers.it('sets the delay while paused (edd1-paused-writes)',function()
+  with_menu(function(s)
+   s.delay_selection='75';s.on_delay=function() s.paused=true end
+   local row=find_menu(s.build(),s.translate('menu.tapholds.simultaneous_title'):gsub('%%s',''))
+   helpers.assert_true(row.fn());helpers.assert_eq(s.publications,1)
+  end,true)
+ end)
+ for _,kind in ipairs({'cancel','invalid','source'}) do
   helpers.it('refuses '..kind..' delay without publication',function()
    with_menu(function(s)
     s.delay_selection=kind=='invalid' and '0' or '75'
     if kind=='cancel' then s.delay_selection=nil end
     s.on_delay=function()
-     if kind=='paused' then s.paused=true end
      if kind=='source' then s.bytes[path]=source..'[outside]\nchanged=true\n' end
     end
     local row=find_menu(s.build(),s.translate('menu.tapholds.simultaneous_title'):gsub('%%s',''))
