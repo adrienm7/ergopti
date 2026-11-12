@@ -165,9 +165,14 @@ function rewriteText(text, rows, movedRepo, file) {
 			continue;
 		}
 		if (
-			['lua-tail', 'lua-climb', 'folder-edit', 'lua-module-quoted', 'shared-prefix'].includes(
-				row.kind
-			)
+			[
+				'lua-tail',
+				'lua-climb',
+				'folder-edit',
+				'lua-module-quoted',
+				'shared-prefix',
+				'lua-concat'
+			].includes(row.kind)
 		) {
 			swap(row.old, row.new);
 			continue;
