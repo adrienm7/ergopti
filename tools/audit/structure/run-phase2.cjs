@@ -93,6 +93,38 @@ function parseArgs(argv) {
 }
 
 /**
+ * Runs the generators on the step's tree and stages what they wrote.
+ * Generators whose inputs or outputs moved write their new bytes; a generator
+ * that still writes an old path leaves an untracked file. The drift check of
+ * a first run compares against HEAD, so a failed first run is repeated on the
+ * staged tree, and a run that still fails stops the step.
+ * @param {object} [io] The commands, replaced in the runner's test.
+ */
+function settleCodegen(key, receipt, io = {}) {
+	const codegen = io.codegen || (() => run('npm', ['run', '--silent', 'codegen']));
+	const unstaged = io.unstaged || unstagedPaths;
+	const stage = io.stage || ((paths) => git('add', '--', ...paths));
+	const fail = (message) => Object.assign(new Error(`${key}: ${message}`), { receipt });
+	const first = codegen();
+	receipt.actions.push({ label: 'codegen', ...first });
+	const { changed, added } = unstaged();
+	if (added.length > 0)
+		throw fail(
+			`the step left ${added.length} new untracked file(s), e.g. ${added.slice(0, 5).join(', ')}: ` +
+				'a generator or a fixture still writes an old path'
+		);
+	if (changed.length > 0) stage(changed);
+	receipt.followUps = changed;
+	if (first.status === 0) return;
+	const again = codegen();
+	receipt.actions.push({ label: 'codegen (after staging)', ...again });
+	const left = unstaged();
+	if (left.changed.length > 0) stage(left.changed);
+	if (again.status !== 0 || left.changed.length > 0 || left.added.length > 0)
+		throw fail(`codegen does not settle:\n${again.tail}`);
+}
+
+/**
  * Applies one step and its follow-ups, runs its gates and commits it.
  * @returns {object} The step's receipt.
  */
@@ -117,34 +149,7 @@ function runStep(key, opts) {
 		'--warn-only'
 	]);
 	action('format', process.execPath, ['tools/lint/format.cjs', '--write']);
-	// Generators whose inputs or outputs moved write their new bytes; a
-	// generator that still writes an old path leaves an untracked file.
-	const codegen = run('npm', ['run', '--silent', 'codegen']);
-	receipt.actions.push({ label: 'codegen', ...codegen });
-	const { changed, added } = unstagedPaths();
-	if (added.length > 0)
-		throw Object.assign(
-			new Error(
-				`${key}: the step left ${added.length} new untracked file(s), e.g. ${added.slice(0, 5).join(', ')}: ` +
-					'a generator or a fixture still writes an old path'
-			),
-			{ receipt }
-		);
-	if (changed.length > 0) git('add', '--', ...changed);
-	receipt.followUps = changed;
-	// The generated files now match their generators; the drift check of a
-	// codegen run that preceded the staging compares against HEAD and is
-	// repeated here against the index.
-	if (codegen.status !== 0) {
-		const again = run('npm', ['run', '--silent', 'codegen']);
-		receipt.actions.push({ label: 'codegen (after staging)', ...again });
-		const left = unstagedPaths();
-		if (left.changed.length > 0) git('add', '--', ...left.changed);
-		if (left.changed.length > 0 || left.added.length > 0)
-			throw Object.assign(new Error(`${key}: codegen does not settle:\n${again.tail}`), {
-				receipt
-			});
-	}
+	settleCodegen(key, receipt);
 	// The bounds only fall as the plan lands; a step lowers the ratchet.
 	action('folder bounds', process.execPath, [
 		'tools/test/test-structure-folder-bounds.cjs',
@@ -223,4 +228,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { parseArgs };
+module.exports = { parseArgs, settleCodegen };
