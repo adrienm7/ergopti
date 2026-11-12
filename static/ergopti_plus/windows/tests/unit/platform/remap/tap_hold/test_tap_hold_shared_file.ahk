@@ -271,3 +271,21 @@ _THSF_LoaderWarnsOtherDriversLeaves() {
 }
 Test("tap-hold shared file: the loader warns once about another driver's leaves (tap-hold-shared-file)",
 	_THSF_LoaderWarnsOtherDriversLeaves)
+
+; TCL-004, « follow the position »: a Mac thumb key a Mac wrote under its own id
+; is the PC key at its place, unless the file names that key too, which wins.
+; The expectations are the ones Linux reads ([reads.mac_thumb.linux]).
+_THSF_MacThumbKeysFollowThePosition() {
+	global _SharedDir
+	Dir := _SharedDir . "\tests\corpus\tap_hold_spellings"
+	Expected := TOML_ParseDocument(FSReadUtf8Exact(Dir . "\expected.toml"))
+	TH := LoadTapHoldToml(Dir . "\mac_thumb.toml", _SharedDir . "\tap_hold\defaults.toml")
+	Keys := Expected["reads"]["mac_thumb"]["linux"]["keys"]
+	for KeyId, Fields in Keys {
+		AssertTrue(TH["keys"].Has(KeyId), KeyId . " is read from its Mac thumb id")
+		for Field, Value in Fields
+			AssertEqual(_THSF_Native(Value), TH["keys"][KeyId].Get(Field, ""), KeyId . "." . Field)
+	}
+}
+Test("tap-hold shared file: a Mac thumb key is the PC key at its place (tap-hold-spellings)",
+	_THSF_MacThumbKeysFollowThePosition)
