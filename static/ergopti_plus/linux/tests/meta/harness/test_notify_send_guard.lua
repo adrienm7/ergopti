@@ -6,11 +6,13 @@
 --- Proves the sentinel that keeps the suite from showing real notifications is
 --- first on PATH, so no test can reach the real program, and answers a spawn
 --- with a record and a failure. It fails when children would resolve the real
---- notify-send.
+--- notify-send, or when a case's require("adapters.notifier") is not the
+--- recording seam.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local Guard = require("tests.support.notify_send_guard")
+local NoticeRecorder = require("tests.support.notice_recorder")
 
 helpers.describe("notify-send spawn guard (nui-003-spawn-guard)", function()
 	helpers.it("resolves notify-send to the sentinel and records a spawn", function()
@@ -35,5 +37,17 @@ helpers.describe("notify-send spawn guard (nui-003-spawn-guard)", function()
 		os.remove(log)
 		helpers.assert_contains(recorded, "probe body", "the sentinel records what it was asked to show")
 		helpers.assert_eq(Guard.spawned(), nil, "the probe wrote to its own file, not the run's record")
+	end)
+
+	helpers.it("resolves every case's notifier to the recording seam", function()
+		local notifier = require("adapters.notifier")
+		helpers.assert_true(notifier == NoticeRecorder.notifier(), "a case's notifier is the recorder")
+		helpers.assert_eq(notifier.send("probe body", { title = "probe", level = "warning" }), true,
+			"the recorder admits the notice as the real adapter would")
+		local notices = helpers.recorded_notices()
+		helpers.assert_eq(#notices, 1, "the notice was recorded instead of spawned")
+		helpers.assert_eq(notices[1].title, "⚠ probe", "the real adapter composed the title")
+		helpers.assert_eq(notices[1].message, "probe body", "the body is recorded verbatim")
+		helpers.assert_eq(notices[1].urgency, "normal", "the level maps to its urgency")
 	end)
 end)

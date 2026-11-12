@@ -29,8 +29,13 @@ require("test.runner_home").isolate()
 -- The fixtures read the French catalogue whatever the session language says
 -- (tests/support/session_language.lua); helpers load once per test process.
 require("tests.support.session_language").install()
--- No fixture may show a real desktop notification (tests/support/notify_send_guard.lua).
+-- No fixture may show a real desktop notification: each case resolves the
+-- notifier to a recorder (tests/support/notice_recorder.lua), and a notice that
+-- still reaches notify-send hits a sentinel that fails the run
+-- (tests/support/notify_send_guard.lua).
 require("tests.support.notify_send_guard").install()
+local NoticeRecorder = require("tests.support.notice_recorder")
+NoticeRecorder.install()
 
 -- Value formatting and stack-trace helpers shared with macOS (single source of truth).
 local fmt = require("test.format")
@@ -375,17 +380,18 @@ end
 function M.it(name, fn)
 	-- --only <substr>: run only tests whose name contains the filter (plain
 	-- substring) so one behaviour can be re-run in isolation.
+	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 	local ok, err
+	NoticeRecorder.begin_case()
 	if _timing then
 		ok, err = _timing.case(name, fn, _before_each_fn, _only_filter, _current_module)
-		if ok == nil then return end
 	else
-		if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 		ok, err = pcall(function()
 			if _before_each_fn then _before_each_fn() end
 			fn()
 		end)
 	end
+	NoticeRecorder.end_case()
 	if ok then
 		_suite_results.passed = _suite_results.passed + 1
 		print("  ok   " .. name)
@@ -409,6 +415,11 @@ function M.make_logger_stub()
 		ring_buffer_snapshot = function() return {} end,
 	}
 end
+
+--- What the current case sent through the recording notifier
+--- (tests/support/notice_recorder.lua), in order.
+--- @return table notices { { title, message, urgency, args }, ... }
+function M.recorded_notices() return NoticeRecorder.notices() end
 
 --- Returns the global test result tally.
 --- @return table { passed, failed, failures }
