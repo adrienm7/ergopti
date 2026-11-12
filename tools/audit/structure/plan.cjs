@@ -1534,7 +1534,13 @@ function resolveOnBase(j, base, joined, byRepoPath, byRepoDir, successors) {
 	if (EXISTING.has(full)) newFull = byRepoPath.get(full) || newFolder(full, byRepoDir, successors);
 	else {
 		// A fixture or a generated file in a folder that moves whole follows it.
-		for (let d = path.posix.dirname(full); d.length > base.length; d = path.posix.dirname(d)) {
+		// Up to the base, and never past the top: dirname('.') is '.', and a
+		// join that climbs out of the repository has no folder to follow.
+		for (
+			let d = path.posix.dirname(full);
+			d.length > base.length && d !== '.' && d !== '/';
+			d = path.posix.dirname(d)
+		) {
 			if (!EXISTING.has(d)) continue;
 			const to = byRepoDir.get(d);
 			if (to && to !== SPLIT) newFull = to + full.slice(d.length);
