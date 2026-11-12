@@ -740,10 +740,12 @@ local function assert_fully_restored(observations)
 	helpers.assert_eq(observations.persisted, observations.initial_state)
 	helpers.assert_eq(observations.named_shortcut, true)
 	helpers.assert_eq(observations.named_bound, true)
-	-- A refused Quit tells the user so; the reset itself notifies nothing.
+	-- A refused Quit or manual Reload tells the user so (NUI-002); the reset
+	-- itself notifies nothing.
 	for _, notification in ipairs(observations.notifications) do
-		helpers.assert_eq(notification.label, "notify.quit_refused",
-			"a rolled-back reset notifies nothing of its own")
+		helpers.assert_true(notification.label == "notify.quit_refused"
+			or notification.label == "init.reload_refused_title",
+			"a rolled-back reset notifies nothing of its own: " .. tostring(notification.label))
 	end
 end
 

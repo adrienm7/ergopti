@@ -217,7 +217,9 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			helpers.assert_eq(observations.calls.manual_reload or 0, 0)
 			helpers.assert_eq(observations.calls.exit or 0, 0)
 			-- Waiting tells nothing; only a wait that outlasts the quit deadline does.
-			helpers.assert_eq(#observations.notifications, 0)
+			-- The refused manual Reload is told, as on Windows and Linux (NUI-002).
+			helpers.assert_eq(#observations.notifications, 1, "only the refused manual Reload is told")
+			helpers.assert_eq(observations.notifications[1].level, "error")
 
 			local abort = observations.reload_abort
 			observations.reload_abort = nil
