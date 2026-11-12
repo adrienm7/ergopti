@@ -1962,6 +1962,8 @@ function luaConstants(text, file, inTree) {
 function jsConstants(text, file) {
 	const env = new Map();
 	const dir = path.posix.dirname(file);
+	// path.join(__dirname, '..', '..', 'static', …): the file's own folder.
+	env.set('__dirname', dir);
 	const norm = (p) => {
 		const n = path.posix.normalize(p);
 		if (n === '.') return '';
