@@ -408,6 +408,10 @@ function M.start(ctx)
 	local burst_count     = 0
 	local last_change_sec = 0
 	local reload_refusal_logged = false
+	-- One « Reloading » notice per burst: a refused reload is retried every
+	-- 0.5 s and used to notify on every attempt (NUI-005, measured: four
+	-- refusals then an admission gave five notices).
+	local reload_notice_sent = false
 
 	-- ``fire_reload`` is forward-declared so the debounce timer closure can call it
 	-- while ``fire_reload`` itself re-arms through ``arm_timer``. The Lua
@@ -550,12 +554,15 @@ function M.start(ctx)
 					-- snapshot() is a safety net for any UI still open at reload time;
 					-- under normal deferral they are already closed so it saves nothing.
 					ui_restore.snapshot()
-					local notified, notify_err = pcall(function()
-						notifications.notify(i18n.get("init.reload_title"),
-							msg or i18n.get("init.reload_files"), "info")
-					end)
-					if not notified then
-						Logger.warn(LOG, "Reload notification failed: %s.", tostring(notify_err))
+					if not reload_notice_sent then
+						reload_notice_sent = true
+						local notified, notify_err = pcall(function()
+							notifications.notify(i18n.get("init.reload_title"),
+								msg or i18n.get("init.reload_files"), "info")
+						end)
+						if not notified then
+							Logger.warn(LOG, "Reload notification failed: %s.", tostring(notify_err))
+						end
 					end
 					return hs.reload()
 				end, debug.traceback)
@@ -577,6 +584,7 @@ function M.start(ctx)
 				end
 				burst_paths, burst_count, defer_count = {}, 0, 0
 				reload_refusal_logged = false
+				reload_notice_sent = false
 				return true
 			end)
 		end, debug.traceback)
