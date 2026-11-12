@@ -746,7 +746,16 @@ function run() {
 			resolverTest
 		);
 		const prefix = after.match(/'shared_llm_path' \? `([^`$]*)\$\{arg\}`/)[1];
-		assert.ok(after.includes(`'${prefix}fixture.json'`), `${resolverTest}: ${prefix} expected`);
+		const expected = after
+			.match(/\[\.\.\.requested\.keys\(\)\]\.sort\(\), \[([^\]]*)\]/)[1]
+			.match(/'[^']*'/g)
+			.map((t) => t.slice(1, -1));
+		assert.ok(expected.includes(`${prefix}fixture.json`), `${resolverTest}: ${prefix} expected`);
+		assert.deepEqual(
+			expected,
+			[...expected].sort(),
+			`${resolverTest}: the expected list stays sorted`
+		);
 	}
 	// The gate coverage test probes a contract under each tree verify-change
 	// holds binding on every driver: both edits of _shared/core land together.
