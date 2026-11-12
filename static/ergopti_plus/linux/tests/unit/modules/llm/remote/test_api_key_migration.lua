@@ -334,7 +334,7 @@ helpers.describe("api_key_migration: a locked keyring never delays input readine
 end)
 
 -- The migration's own outcomes over faked ports: a save that moved every key
--- first (AIX-002).
+-- first (AIX-002) and a shutdown in the middle of an attempt (AIX-003).
 helpers.describe("api_key_migration: an attempt overtaken by a save or a shutdown", function()
 	--- Loads a fresh migration over scripted entries and store ports.
 	local function faked()
@@ -394,4 +394,12 @@ helpers.describe("api_key_migration: an attempt overtaken by a save or a shutdow
 		world.restore()
 	end)
 
+	helpers.it("(aix-003-migration-shutdown-orphans) a shutdown discards the keys the attempt already stored", function()
+		local migration, world = faked()
+		migration.start(); table.remove(world.timers, 1)()
+		world.pending[1].callback("secret-service:a#2")
+		helpers.assert_eq(migration.shutdown(), true)
+		helpers.assert_eq(world.cleared, { "secret-service:a#2" }, "no stored key is left named by no file")
+		world.restore()
+	end)
 end)
