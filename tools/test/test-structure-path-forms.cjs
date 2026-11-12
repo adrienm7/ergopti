@@ -390,9 +390,9 @@ function run() {
 		assert.equal(
 			rewrite(
 				'tools/build/z.json',
-				'{ "patterns": ["ergopti_plus/_shared/zz_probe_lua/codec/*.lua"] }'
+				'{ "patterns": ["ergopti_plus/_shared/zz_probe_lua/codec/x_*.lua"] }'
 			),
-			'{ "patterns": ["ergopti_plus/_shared/zz_probe_text/codec/*.lua"] }',
+			'{ "patterns": ["ergopti_plus/_shared/zz_probe_text/codec/x_*.lua"] }',
 			'a glob whose folder moves whole'
 		);
 		// One folder name joined onto an unknown base is no reference; onto a
