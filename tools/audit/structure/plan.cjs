@@ -772,6 +772,8 @@ function isSharedArgument(text, index) {
 	// constant the file hands to a shared reader.
 	const named = before.match(/\b(?:local|const|let)\s+([A-Za-z_]\w*)\s*=\s*["'`]$/);
 	if (named && new RegExp(`\\b\\w*[sS]hared\\w*\\(\\s*${named[1]}\\s*[,)]`).test(text)) return true;
+	// read('lua/test/format.lua', SHARED): the base comes after the path.
+	if (/^[^"'`\n]*["'`]\s*,\s*\w*SHARED\w*\s*\)/.test(text.slice(index, index + 200))) return true;
 	return (
 		/\b\w*[sS]hared(?!_llm)\w*\(\s*["'`]$/.test(before) &&
 		!/shared_llm_path\(\s*["'`]$/.test(before)
