@@ -2091,6 +2091,16 @@ function scanFile(file, text, ctx) {
 				});
 		}
 	}
+	// require [[layouts.registry]]: the long-bracket spelling of a load site.
+	for (const m of text.matchAll(/\brequire\s*\[(=*)\[([A-Za-z_][\w.]*)\]\1\]/g)) {
+		const shared = byLuaName.get(`_shared|${m[2]}`);
+		const own = Census.DRIVERS.map((d) => byLuaName.get(`${d}|${m[2]}`)).filter(Boolean);
+		const hit = shared || (new Set(own.map((h) => h[2])).size === 1 ? own[0] : null);
+		if (hit && hit[2])
+			add('lua-module-quoted', m[0], m[0].replace(`[${m[1]}[${m[2]}]`, `[${m[1]}[${hit[2]}]`), {
+				oldRepo: PREFIX + hit[0]
+			});
+	}
 	// A tool listed in edits.cjs MODULE_MEMBER_FILES names a shared module's
 	// method by the record name the menu delegation builds from the module
 	// ('menu.personal_files.build'): its module part follows the module.
