@@ -199,6 +199,9 @@ local function controller(state, context)
 				done(false, "emulate_failed", "the layout emulation did not reload the composed layout")
 				return
 			end
+			-- The tray ticks the newly emulated layout, as the menu row and macOS
+			-- do (LMH-005).
+			if type(state.on_config_changed) == "function" then state.on_config_changed() end
 			if current() then done(true) end
 		end or nil,
 	})
