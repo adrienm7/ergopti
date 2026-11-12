@@ -8,7 +8,7 @@
  * builds at run time, such as the macOS startup test's `"modules." .. name`
  * over gestures, keymap, shortcuts and dynamic hotstrings. Those modules move
  * in different steps (S25, S26, S33), so a step that leaves one of them for
- * later has nothing to rewrite yet. Phase 2 once refused S01 on that edit,
+ * later has nothing to rewrite yet. The first real step once refused S01 on that edit,
  * after writing 2,603 files, because a step judged the edit against modules
  * it does not move: the whole-sequence dry run passed and the first real
  * step stopped half applied.
