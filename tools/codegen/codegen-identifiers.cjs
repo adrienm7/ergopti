@@ -49,12 +49,14 @@ const GROUPS = [
 	'field_report',
 	'bytecode_package',
 	'macos_notifications',
-	'linux_stage'
+	'linux_stage',
+	'locales'
 ];
 // Groups only the Lua drivers read stay out of the shell, Python, JS, Swift and
 // AutoHotkey projections: the bytecode package is the LuaJIT daemon's alone, and
-// so is the name its atomic-write stages carry (linux/infra/stage_owner.lua).
-const LUA_ONLY_GROUPS = new Set(['bytecode_package', 'linux_stage']);
+// so is the name its atomic-write stages carry (linux/infra/stage_owner.lua), and
+// the catalogue the Lua drivers show for a system language without one.
+const LUA_ONLY_GROUPS = new Set(['bytecode_package', 'linux_stage', 'locales']);
 // Groups the macOS launcher and its Lua runtime share reach Lua and Swift only:
 // the launcher's quit request to its embedded runtime (MLC-002).
 const MACOS_ONLY_GROUPS = new Set(['macos_notifications']);
