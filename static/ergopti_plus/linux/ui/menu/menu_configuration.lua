@@ -71,8 +71,9 @@ local function _build_configuration(ctx)
 	-- The global restore and clear compose every category's own scope owner,
 	-- all of them or none of them, at once: each owner backs up first, so
 	-- neither asks (the maintainer retired the clear's question on 2026-09-30).
+	-- A pause does not refuse them: a pause stops typing, not configuration
+	-- (EDD-1, maintainer decision 2026-11-12).
 	local function apply_global_scope(mode)
-		if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
 		local GlobalScope = require("infra.global_scope")
 		-- The layout category settles once the session holds its layout, after a
 		-- child answers: the outcome is shown from the continuation.
