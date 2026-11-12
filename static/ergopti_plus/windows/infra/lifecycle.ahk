@@ -710,6 +710,8 @@ Ergopti_OnSuspendEnter() {
 		return false
 	}
 	LoggerSuccess("Lifecycle", "Suspend entered — all suspend-bypassing subsystems torn down.")
+	if IsSet(NotifyPauseState)
+		NotifyPauseState(true)
 	return true
 }
 Ergopti_OnSuspendResume() {
@@ -807,6 +809,8 @@ Ergopti_OnSuspendResume() {
 				try LoggerError("Lifecycle", "Local AI server post-transition repair remains owned.")
 		}
 		LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
+		if IsSet(NotifyPauseState)
+			NotifyPauseState(false)
 		return true
 }
 
