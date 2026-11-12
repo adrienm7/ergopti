@@ -167,15 +167,14 @@ helpers.describe("macOS complete gesture scope", function()
 		if not ok then error(err, 0) end
 	end)
 
-	helpers.it("a pause leaves every store untouched", function()
-		for _, mode in ipairs({ "clear", "recommended" }) do
-			local owner, gestures, files, _, controls, _, _, writes, original = fixture()
-			controls.paused = true
-			helpers.assert_eq(owner.apply(mode), false)
-			helpers.assert_eq(writes(), 0)
-			helpers.assert_eq(files.config, original)
-			helpers.assert_eq(gestures.get_action("tap_4"), "open_url")
-		end
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("clears while paused (edd1-paused-writes)", function()
+		local owner, gestures, files, _, controls, _, _, writes, original = fixture()
+		controls.paused = true
+		helpers.assert_eq(owner.apply("clear"), true)
+		helpers.assert_true(writes() > 0, "the paused clear writes its category")
+		helpers.assert_true(files.config ~= original)
+		helpers.assert_true(gestures.get_action("tap_4") ~= "open_url")
 	end)
 	helpers.it("refused publication restores native state and both preference baselines", function()
 		local owner, gestures, files, state, controls, prefs, save, _, original = fixture()

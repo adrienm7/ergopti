@@ -31,7 +31,7 @@ function M.new(options)
 	for _, name in ipairs({ "capture", "apply", "restore" }) do
 		assert(type(runtime[name]) == "function", "scope runtime port missing: " .. name)
 	end
-	for _, name in ipairs({ "admission", "paused", "backup_path", "capture_preferences" }) do
+	for _, name in ipairs({ "admission", "backup_path", "capture_preferences" }) do
 		assert(type(options[name]) == "function", "scope port missing: " .. name)
 	end
 	-- Retired with the clear's question on 2026-09-30: a caller still wiring
@@ -62,7 +62,6 @@ function M.new(options)
 	function owner.revert()
 		if transaction == nil then return false end
 		return options.admission("Preference scope revert: " .. options.scope, function()
-			if options.paused() ~= false then return false end
 			local reverted, detail = transaction.revert()
 			if reverted ~= true then
 				Logger.warn(LOG, "Scope %s revert did not settle: %s.", options.scope, tostring(detail))
@@ -94,7 +93,6 @@ function M.new(options)
 		if edit_rows == nil and mode ~= "clear" and mode ~= "recommended" then return false end
 		if select ~= nil and type(select) ~= "function" then return false end
 		return options.admission("Preference scope: " .. options.scope, function()
-			if options.paused() ~= false then return false end
 			if claim.pending() and claim.retry_restore() ~= true then return false end
 			transaction = (options.transaction_factory or Scope.new)({
 				manifest = Manifest, select = select, editing = edit_rows ~= nil,

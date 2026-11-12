@@ -834,7 +834,8 @@ function M.build(ctx)
 	render_ctx.commands[require("config_keys").COMMAND.OPEN_LAYOUT_EDITOR] = LayoutManagerWindow.editor_menu_command()
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		render_ctx.commands[command] = function()
-			if ctx.paused == true or type(ctx.apply_preference_scope) ~= "function" then return false end
+			-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+			if type(ctx.apply_preference_scope) ~= "function" then return false end
 			local applied = ctx.apply_preference_scope("keyboard_layout", mode)
 			-- The scope holds the emulation's rows too: it types what was restored.
 			require("modules.keymap.layout_emulation").reload_if_started()

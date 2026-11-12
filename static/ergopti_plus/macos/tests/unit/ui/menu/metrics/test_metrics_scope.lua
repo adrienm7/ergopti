@@ -189,9 +189,10 @@ helpers.describe("Metrics scope provider", function()
 			helpers.assert_eq(captured.commands.scope_restore(), true)
 			helpers.assert_eq(selected, "metrics")
 			helpers.assert_eq(mode, "recommended")
+			-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
 			paused, mode = true, nil
-			helpers.assert_eq(captured.commands.scope_restore(), false)
-			helpers.assert_nil(mode, "a paused session runs no scope")
+			helpers.assert_eq(captured.commands.scope_restore(), true)
+			helpers.assert_eq(mode, "recommended", "a paused session still restores")
 		end, debug.traceback)
 		renderer.build = old
 		if not ok then error(err, 0) end

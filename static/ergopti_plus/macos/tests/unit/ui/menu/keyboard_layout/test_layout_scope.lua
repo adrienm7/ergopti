@@ -181,8 +181,10 @@ helpers.describe("layout scope provider", LayoutFixture.scoped(function()
 			helpers.assert_eq(mode, "clear")
 			helpers.assert_eq(captured.commands.scope_restore(), true)
 			helpers.assert_eq(mode, "recommended")
-			ctx.paused = true
-			helpers.assert_eq(captured.commands.scope_clear(), false)
+			-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+			ctx.paused, mode = true, nil
+			helpers.assert_eq(captured.commands.scope_clear(), true)
+			helpers.assert_eq(mode, "clear", "a paused session still clears")
 			ctx.paused, ctx.apply_preference_scope = false, nil
 			helpers.assert_eq(captured.commands.scope_restore(), false)
 		end, debug.traceback)
