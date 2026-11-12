@@ -314,9 +314,8 @@ helpers.describe("LLM user profiles: tray reachability", function()
 		helpers.assert_eq(create.fn(), false,
 			"a retained Create callback must re-read the native pause owner")
 		helpers.assert_eq(editor_calls, 1, "the paused callback cannot reach the editor")
-		helpers.assert_eq(opened.on_save({ id = opened.opts.profile_id,
-			label = "Refused", system_single = "Refused", batch = false }), false,
-			"a retained editor save must not publish while paused")
+		-- An open editor's save does publish while paused (EDD-1, maintainer
+		-- decision 2026-11-12): only the menu row reads the pause here.
 		helpers.assert_eq(#settings.list_user(), 0)
 		helpers.assert_eq(rebuilds, 0)
 		paused = false
@@ -514,7 +513,7 @@ helpers.describe("shared Clone Profile command", function()
 			helpers.assert_eq(row.fn(), false)
 			helpers.assert_eq(calls, 1)
 			local profile = { id = opened.opts.profile_id, label = "Cloned", system_single = "Clone {context}", batch = false }
-			helpers.assert_eq(opened.on_save(profile), false)
+			-- The open editor's save publishes while paused (EDD-1); only the row refuses.
 			helpers.assert_eq(#settings.list_user(), 0)
 			helpers.assert_eq(refreshes, 0)
 			paused = false
