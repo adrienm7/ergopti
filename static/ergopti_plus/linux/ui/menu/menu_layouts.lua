@@ -288,7 +288,6 @@ local function _build_layouts(ctx)
 			return {}
 		end
 		return require("ui.menu.pause_layout_rows").rows({
-			paused = ctx.paused == true,
 			t = i18n_safe,
 			show_error = show_error,
 			on_changed = function()
