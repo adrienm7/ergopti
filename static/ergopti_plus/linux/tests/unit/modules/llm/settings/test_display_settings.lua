@@ -168,7 +168,7 @@ local function with_info_menu(options, callback)
 	profiles._reset()
 	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "linux",
-		manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+		manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 		json_decode = function(raw)
 			local root = assert(require("core.text.engine.json").decode(raw))
 			if options.label then root.llm_display_menu[2].i18n = options.label end
@@ -238,7 +238,7 @@ end
 --- Loads a historical expectation independently of the generated menu declaration.
 --- @return table corpus
 local function info_bar_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/info_bar_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/info_bar_control.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
 	return assert(require("core.text.engine.json").decode(raw))
@@ -314,7 +314,7 @@ end)
 --- Reads fixed progressive and show-all semantics independently of native code.
 --- @return table
 local function show_all_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/show_all_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/show_all_control.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
 	return assert(require("core.text.engine.json").decode(raw))
@@ -434,7 +434,7 @@ end)
 --- Reads independent native capability and stale-command expectations.
 --- @return table corpus
 local function token_streaming_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
 	return assert(require("core.text.engine.json").decode(text))
@@ -534,7 +534,7 @@ end)
 --- Reads independent signed values and retained-command expectations.
 --- @return table corpus
 local function indentation_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/indentation_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/indentation_control.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
 	return assert(require("core.text.engine.json").decode(text))

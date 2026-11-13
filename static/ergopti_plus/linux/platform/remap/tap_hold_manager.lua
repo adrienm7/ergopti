@@ -46,7 +46,7 @@ local HoldOptions = require("tap_hold.engine.hold_options")
 local EmitActions = require("_generated.gesture_emit_actions")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local NavLayer = require("platform.remap.nav_layer")
 local Outdated = require("settings.engine.migration.outdated")
 local Codec = require("core.text.engine.toml_codec")
@@ -78,7 +78,7 @@ local function nav_ports_current()
 	if not rawequal(package.loaded["platform.remap.nav_layer"], NavLayer) or getmetatable(NavLayer) ~= nil
 		or rawget(NavLayer, "load") ~= original_nav_load
 		or type(original_nav_capture) ~= "function" or rawget(NavLayer, "capture_source_observation") ~= original_nav_capture
-		or not rawequal(package.loaded["infra.paths"], Paths) or rawget(Paths, "shared_root") ~= original_shared_root
+		or not rawequal(package.loaded["core.fs.engine.paths"], Paths) or rawget(Paths, "shared_root") ~= original_shared_root
 		or not rawequal(package.loaded["core.text.engine.toml_codec"], Codec) or rawget(Codec, "decode") ~= original_codec_decode
 		or not rawequal(package.loaded["platform.remap.tap_hold_engine"], Engine) or getmetatable(Engine) ~= nil
 		or not rawequal(package.loaded["platform.remap.key_combination_engine"], PairModule)
@@ -280,7 +280,7 @@ end
 --- @return table { results = { [char] = result }, magic_key_result = string }
 local function _read_one_shot()
 	local path = Paths.shared("tap_hold/data/one_shot_shift.json")
-	local fh = require("infra.regular_file_reader").open_source(path)
+	local fh = require("core.fs.engine.regular_file_reader").open_source(path)
 	if not fh then error("the one-shot Shift results are unreadable: " .. tostring(path), 0) end
 	local read_ok, raw = pcall(fh.read, fh, "*a")
 	local close_ok, closed = pcall(fh.close, fh)
@@ -1022,7 +1022,7 @@ end
 --- @return function|nil current Strict true only while the original scope survives.
 function M.capture_configuration_edit()
 	if not _initialized or not _loaded or _paused or not config_exports_current() then return nil end
-	local Files = require("adapters.file_system")
+	local Files = require("core.fs.adapters.file_system")
 	local read, factory = Files.read_with_status, M.capture_configuration_edit
 	local path, defaults, loaded, config_path = _user_path, _defaults_path, _loaded, _config_path
 	local engine, installed, generation = _engine, _installed_engine, _generation
@@ -1041,7 +1041,7 @@ function M.capture_configuration_edit()
 			and loaded.one_shot_timeout_ms == one_shot_ms
 			and fields_equal(loaded.keys, keys) and fields_equal(loaded.roll_keys, rolls)
 			and fields_equal(loaded.catalog, catalog) and fields_equal(loaded.hold_picker, holds) and config_exports_current()
-			and rawequal(package.loaded["adapters.file_system"], Files) and Files.read_with_status == read
+			and rawequal(package.loaded["core.fs.adapters.file_system"], Files) and Files.read_with_status == read
 	end
 	local bytes, status = read(path)
 	local shipped, shipped_status = read(defaults)
@@ -1075,7 +1075,7 @@ end
 function M.capture_tap_action(binding, action)
 	local key_id = type(binding) == "string" and binding:match("^tap_hold__(.+)$") or nil
 	if key_id == nil or type(action) ~= "string" or action == "" or M.get_tap_action(key_id) ~= action then return nil end
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	local path, defaults, config_path = _user_path, _defaults_path, _config_path
 	local text, status = files.read_with_status(path)
 	local shipped, shipped_status = files.read_with_status(defaults)
@@ -1236,7 +1236,7 @@ BindingPublication.register("combination", "platform.remap.tap_hold_manager", M,
 function M.capture_collision_inventory()
 	if not _initialized or not _loaded or _paused or not config_exports_current()
 		or original_logical_catalogue_current(_combinations) ~= true then return nil end
-	local Files = require("adapters.file_system")
+	local Files = require("core.fs.adapters.file_system")
 	local read, factory = Files.read_with_status, M.capture_collision_inventory
 	local path, defaults, loaded, engine, installed, epoch = _user_path, _defaults_path, _loaded, _engine, _installed_engine, _generation
 	local config_path = _config_path
@@ -1279,7 +1279,7 @@ function M.capture_collision_inventory()
 			and loaded.enabled == decoded.enabled and rawequal(_combinations, combinations)
 			and original_logical_catalogue_current(combinations) == true
 			and fields_equal(loaded.keys, keys) and fields_equal(Engine.KEY_CODES, codes)
-			and rawequal(package.loaded["adapters.file_system"], Files) and Files.read_with_status == read
+			and rawequal(package.loaded["core.fs.adapters.file_system"], Files) and Files.read_with_status == read
 			and M.capture_collision_inventory == factory
 	end
 	local function current()

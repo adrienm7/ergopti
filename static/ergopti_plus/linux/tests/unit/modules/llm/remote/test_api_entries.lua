@@ -148,7 +148,7 @@ helpers.describe("api_entries: a private, durable store", function()
 			.. " && printf 'older set-aside' > '" .. PATH .. ".corrupt'")
 		-- A second process sets its own malformed copy aside at .corrupt.1 between
 		-- this process's choice of that name and its move.
-		local Mover = require("infra.no_replace_move")
+		local Mover = require("core.fs.engine.no_replace_move")
 		local move = Mover.move
 		Mover.move = function(from, to)
 			if to == PATH .. ".corrupt.1" and not io.open(to, "rb") then
@@ -606,7 +606,7 @@ helpers.describe("malformed API source quarantine acknowledgement", function()
 		local malformed = '{"future": [ incomplete private source'
 		external_api_source(malformed)
 		local entries = fresh(true)
-		local Mover = require("infra.no_replace_move")
+		local Mover = require("core.fs.engine.no_replace_move")
 		local rename, rename_calls, stages = Mover.move, 0, 0
 		Mover.move = function(from, to)
 			if from == PATH and to == PATH .. ".corrupt" then

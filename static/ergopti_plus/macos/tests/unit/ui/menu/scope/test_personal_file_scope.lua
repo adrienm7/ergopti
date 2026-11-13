@@ -16,7 +16,7 @@ local TextUtils = require("infra.text_utils")
 --- @param body function Receives the actual native-owner fixture.
 local function with_fixture(collision, body)
 	return helpers.with_stub_scope({
-		"infra.preferences", "adapters.file_system", "adapters.storage", "infra.config_paths",
+		"infra.preferences", "core.fs.adapters.file_system", "core.fs.adapters.storage", "infra.config_paths",
 		"infra.notifications", "ui.menu.keymap_lifecycle", "modules.keymap.registry", "modules.keymap.registry_index",
 		"modules.keymap.registry_groups", "ui.menu.menu_hotstrings_custom", "infra.personal_file_scope",
 		"infra.personal_hotstrings",
@@ -83,7 +83,7 @@ local function with_fixture(collision, body)
 				disk = content; return true
 			end,
 		}
-		package.loaded["adapters.file_system"] = native_files
+		package.loaded["core.fs.adapters.file_system"] = native_files
 		package.loaded["infra.config_paths"] = { get = function(key)
 			if key == "PersonalHotstringsDir" then return controls.root or root end
 			if key == "ConfigTomlPath" then return config end
@@ -389,7 +389,7 @@ helpers.describe("personal directory hand corpus drives the genuine native separ
 			helpers.assert_type(actual,"table");helpers.assert_true(ok)
 			helpers.assert_type(native_tree,"function","actual physical-file provider invokes its native tree renderer")
 			local held = assert(f.commands()[1]).row.menu
-			local file=assert(io.open(require("infra.paths").shared("tests/corpus/menus/hotstring_personal_frames.json"),"rb"))
+			local file=assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/hotstring_personal_frames.json"),"rb"))
 			local bytes=file:read("*a");assert(file:close())
 			local hand=assert(require("core.text.engine.json").decode(assert(bytes)))
 			local vectors, explicit_false = 0, 0

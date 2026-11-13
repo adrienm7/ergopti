@@ -10,7 +10,7 @@
 
 local uv = require("luv")
 local Shell = require("adapters.shell_runner")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Command = require("modules.keystats.sqlite_command")
 local Writer = require("modules.keystats.sqlite_writer")
 local Reader = require("modules.keystats.sqlite_reader")

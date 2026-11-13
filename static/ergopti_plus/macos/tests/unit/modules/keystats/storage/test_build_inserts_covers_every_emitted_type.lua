@@ -141,8 +141,8 @@ local function load_real_keystats()
 	}
 	package.loaded["modules.keystats.watchers"]    = nil
 
-	local saved_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = {
+	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+	package.loaded["core.fs.adapters.file_system"] = {
 		-- This non-IO scenario begins with an existing user metrics ignore.
 		path_status = function(path)
 			assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
@@ -154,7 +154,7 @@ local function load_real_keystats()
 		read_with_status = function() return nil, "absent" end,
 	}
 	require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
-		package.loaded["adapters.file_system"], false)
+		package.loaded["core.fs.adapters.file_system"], false)
 	local KL = helpers.load_with_stubs("modules.keystats.init", {
 		processInfo = { processID = 7001 },
 		application = {
@@ -213,7 +213,7 @@ local function load_real_keystats()
 		keycodes = { currentLayout = function() return "ABC" end },
 		execute = function() return "" end,
 	})
-	package.loaded["adapters.file_system"] = saved_file_system
+	package.loaded["core.fs.adapters.file_system"] = saved_file_system
 
 	helpers.assert_eq(KL.start({ is_paused = function() return false end }), true,
 		"the coverage fixture must start the real producer before reflecting on it")

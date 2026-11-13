@@ -34,7 +34,7 @@ local function with_preferences(body, source, fresh_writer)
 end
 
 local function menu_controls(paused, relabel, magic_relabel, presence_options)
-	local paths = require("infra.paths")
+	local paths = require("core.fs.engine.paths")
 	local i18n = require("infra.i18n")
 	local original = package.loaded["infra.manifest_menu"]
 	local observations = { writes = 0, redraws = 0 }
@@ -249,7 +249,7 @@ helpers.describe("coloured provider locale contract", function()
 			local observed = {}
 			local ok, err = pcall(function()
 				for _, code in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
-					local path = require("infra.paths").shared("core/i18n/data/locales/" .. code .. ".json")
+					local path = require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. code .. ".json")
 					local file = assert(io.open(path, "rb")); local raw = file:read("*a"); file:close()
 					local catalog = assert(require("core.text.engine.json").decode(raw))
 					local translated = {}; for key, value in pairs(i18n) do translated[key] = value end
@@ -338,13 +338,13 @@ helpers.describe("magic provider locale contract", function()
 	helpers.it("uses all twenty-one real catalogues for the magic checkbox", function()
 		with_preferences(function()
 			local i18n = require("infra.i18n")
-			local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/preview_magic_control.json"), "rb"))
+			local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/preview_magic_control.json"), "rb"))
 			local raw = file:read("*a"); file:close()
 			local corpus = assert(require("core.text.engine.json").decode(raw))
 			local observations = {}
 			local passed, err = pcall(function()
 				for _, code in ipairs(corpus.locales) do
-					local locale = assert(io.open(require("infra.paths").shared("core/i18n/data/locales/" .. code .. ".json"), "rb"))
+					local locale = assert(io.open(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. code .. ".json"), "rb"))
 					local text = locale:read("*a"); locale:close()
 					local catalog = assert(require("core.text.engine.json").decode(text))
 					local translated = {}; for key, value in pairs(i18n) do translated[key] = value end
@@ -486,7 +486,7 @@ helpers.describe("ordered presence provider locale contract", function()
 				local file = assert(io.open(path, "rb")); local text = file:read("*a"); file:close()
 				return assert(require("core.text.engine.json").decode(text))
 			end
-			local Paths = require("infra.paths")
+			local Paths = require("core.fs.engine.paths")
 			local corpus = read_json(Paths.shared("tests/corpus/menus/preview_presence_controls.json"))
 			local observations = {}
 			local passed, err = pcall(function()

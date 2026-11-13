@@ -13,7 +13,7 @@ local function with_menu(body)
 	local saved = {}; for name,value in pairs(package.loaded) do saved[name]=value end
 	local ok,err=pcall(function()
 		require("tests.support.key_combination_declaration_fixture").install_unavailable()
-		local Paths=require("infra.paths")
+		local Paths=require("core.fs.engine.paths")
 		local file=assert(io.open(Paths.shared("tap_hold/data/defaults.toml"),"rb"));local defaults=assert(Codec.decode(file:read("*a")));assert(file:close())
 		file=assert(io.open(Paths.shared("core/i18n/data/locales/en.json"),"rb"));local locale=require("core.text.engine.json").decode(file:read("*a"));assert(file:close())
 		local function t(key) return locale[key] or key end
@@ -141,7 +141,7 @@ local EXPECTED_LINUX_KEYS = {
 --- @param relative string Shared data file.
 --- @return table
 local function read_locale_data(relative)
-	local file = assert(io.open(require("infra.paths").shared(relative), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared(relative), "rb"))
 	local bytes = assert(file:read("*a"))
 	assert(file:close())
 	return assert(require("core.text.engine.json").decode(bytes))
@@ -176,7 +176,7 @@ end
 local function with_canonical_locale_menu(callback)
 	with_menu(function(state)
 		local preference = "en"
-		package.loaded["adapters.storage"] = {
+		package.loaded["core.fs.adapters.storage"] = {
 			get = function(key) return key == "locale" and preference or nil end,
 			set = function(key, value)
 				assert(key == "locale" and type(value) == "string")
@@ -189,7 +189,7 @@ local function with_canonical_locale_menu(callback)
 		package.loaded["infra.script_scope"] = {
 			retry_locale = function() return true end,
 			edit_locale = function(value)
-				if package.loaded["adapters.storage"].set("locale", value) ~= true then return false end
+				if package.loaded["core.fs.adapters.storage"].set("locale", value) ~= true then return false end
 				local native = require("infra.i18n")
 				local token = { pending = function() return false end }
 				assert(native.scope_acquire(token))

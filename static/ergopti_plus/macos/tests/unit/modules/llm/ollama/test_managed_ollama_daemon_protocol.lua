@@ -24,11 +24,11 @@ end
 
 local function with_builder(callback)
 	helpers.with_stub_scope({ "modules.llm.ollama_server_command", "modules.llm.ollama_binary",
-		"modules.llm.managed_native_python", "adapters.file_system" }, function()
+		"modules.llm.managed_native_python", "core.fs.adapters.file_system" }, function()
 		local builder = helpers.load_with_stubs("modules.llm.ollama_server_command")
 		local binary = require("modules.llm.ollama_binary")
 		local python = require("modules.llm.managed_native_python")
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		local old_candidate, old_python, old_exists = binary.native_candidate, python.resolve, files.exists
 		local path = "/fixture/managed/ollama"
 		binary.native_candidate = function() return path, { admission = 17, idle = 23, retirement = 11 } end

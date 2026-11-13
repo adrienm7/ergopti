@@ -87,7 +87,7 @@ helpers.describe("locale.locale_path", function()
 
 	helpers.it("logs ERROR when locale file cannot be found", function()
 		log_calls = {}
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local orig_find = Paths.find_from_configdir
 		Paths.find_from_configdir = function() return nil end
 

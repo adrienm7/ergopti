@@ -20,7 +20,7 @@ local function with_focus(boundary, scenario)
 			debug = function() end, info = function() end, warn = function() end,
 			error = function() end,
 		}
-		package.loaded["infra.paths"] = { shared = function() return "/virtual/shared" end }
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/shared" end }
 		package.loaded["infra.deferred_work"] = { after = function()
 			error("A ready window must not schedule a retry")
 		end }

@@ -34,7 +34,7 @@ local Queries = require("metrics.engine.queries")
 -- apostrophes alone let one cut a literal (sql-literal-nul-2026-10-21).
 local Literal = require("core.fs.engine.sqlite.literal")
 local i18n   = require("infra.i18n")
-local FsDir  = require("infra.fs_dir")
+local FsDir  = require("core.fs.engine.dir")
 local RunningApplication = require("adapters.running_application")
 local ForeignLedgerSnapshot = require("adapters.foreign_ledger_snapshot")
 local LOG    = "keystats.export"
@@ -569,7 +569,7 @@ function M.sync_foreign_data_sql(on_applied)
 	local function unavailable_directory(path)
 		if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
 		if type(path) ~= "string" or path == "" then return nil, "foreign metrics directory is unavailable" end
-		local called, _, status = pcall(require("adapters.file_system").classify_no_follow, path)
+		local called, _, status = pcall(require("core.fs.adapters.file_system").classify_no_follow, path)
 		if called and status == "absent" then return synced_devices end
 		return nil, "foreign metrics directory cannot be inspected"
 	end

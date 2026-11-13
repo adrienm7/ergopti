@@ -18,7 +18,7 @@ local PICKER_OWNERS = {
 	"ui.ui_builder",
 	"infra.logger",
 	"infra.dialog_util",
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"infra.config_paths",
 	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
@@ -39,7 +39,7 @@ local PICKER_OWNERS = {
 	"core.fs.engine.app_dirs",
 	"infra.log_folders",
 	"diagnostics.engine.operation_reporter",
-	"infra.fs_dir",
+	"core.fs.engine.dir",
 }
 
 --- Scopes only this leaf's dashboard transitive imports; the shared fixture stays unchanged.

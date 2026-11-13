@@ -30,7 +30,7 @@ local BindingPublication = require("settings.engine.publication.binding_publicat
 
 local Logger = require("core.logger.engine.shim")
 local ConfigOutdated = require("settings.engine.migration.outdated")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local AiActions = require("modules.shortcuts.ai_actions")
 local Manifest = require("infra.manifest_reader")
 local TomlCodec = require("core.text.engine.toml_codec")

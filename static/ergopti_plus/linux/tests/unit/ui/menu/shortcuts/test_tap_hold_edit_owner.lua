@@ -17,7 +17,7 @@ local function with_editor(body, options)
 	local saved = {}
 	for _, name in ipairs(MODULES) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local path, defaults = os.tmpname(), os.tmpname(); os.remove(path)
-	write(defaults, assert(read(require("infra.paths").shared("tap_hold/data/defaults.toml"))))
+	write(defaults, assert(read(require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"))))
 	-- The switch is a config.toml row beside the file.
 	local config_path = path .. ".config.toml"
 	if not options.absent then
@@ -26,7 +26,7 @@ local function with_editor(body, options)
 	end
 	local Prompt = require("ui.text_prompt")
 	local ask, execute, open = Prompt.ask, os.execute, io.open
-	local FileWriter = require("infra.regular_file_writer")
+	local FileWriter = require("core.fs.engine.regular_file_writer")
 	local writer_open = FileWriter.open
 	local manager
 	local ok, err = xpcall(function()

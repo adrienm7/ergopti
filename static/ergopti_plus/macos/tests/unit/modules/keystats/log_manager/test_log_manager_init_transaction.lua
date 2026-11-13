@@ -28,13 +28,13 @@ helpers.describe("log_manager — initialization transaction", function()
 	helpers.it("rolls back a post-publication throw and retries the full init (keystats-log-init-transaction)", function()
 		local slots = {
 			"infra.logger",
-			"adapters.file_system",
+			"core.fs.adapters.file_system",
 			"modules.keystats.sqlite_writer",
 			"modules.keystats.aggregator",
 			"modules.keystats.rotation",
 			"modules.keystats.export",
 			"metrics.engine.metrics",
-			"adapters.ledger_append", "modules.keystats.log_manager",
+			"core.fs.adapters.ledger_append", "modules.keystats.log_manager",
 		}
 		local saved = {}
 		for _, slot in ipairs(slots) do saved[slot] = package.loaded[slot] end
@@ -60,7 +60,7 @@ helpers.describe("log_manager — initialization transaction", function()
 				success_messages[#success_messages + 1] = string.format(message, ...)
 			end
 			package.loaded["infra.logger"] = logger
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function()
 					return [[{"device_id":"device-stable","name":"Test Mac","os":"darwin","host_signature":"fallback:unknown","created_at":"2026-08-13 00:00:00.000"}]], "ok"
 				end,

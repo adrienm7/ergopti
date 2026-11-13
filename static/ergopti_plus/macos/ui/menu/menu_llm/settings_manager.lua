@@ -12,7 +12,7 @@ local M = {}
 
 local llm_mod = require("modules.llm")
 local Logger  = require("infra.logger")
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 local i18n    = require("infra.i18n")
 local KeyNames = require("platform.input.keycodes.key_names")
 local dialog  = require("infra.dialog_util")

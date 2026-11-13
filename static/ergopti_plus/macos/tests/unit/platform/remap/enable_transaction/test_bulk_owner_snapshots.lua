@@ -190,7 +190,7 @@ helpers.describe("configured navigation reservations share actual remap settings
 			end)
 		end, debug.traceback)
 		if real_writes then
-			local guard = assert(require("adapters.write_lock_path").for_canonical(config, os.getenv("HOME")))
+			local guard = assert(require("core.fs.adapters.write_lock_path").for_canonical(config, os.getenv("HOME")))
 			local attributes = lfs.attributes(guard)
 			if attributes ~= nil then
 				assert(attributes.mode == "file" and attributes.size == 0, "only the actual owned empty cooperative guard may be removed")

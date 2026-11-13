@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 --- Decodes the shared brand file independently of the module under test.
 local function shared_brands()
-	local JsonCodec = require("adapters.json_codec")
+	local JsonCodec = require("core.fs.adapters.json_codec")
 	local fh = assert(io.open(helpers.shared("ai/data/backends.json"), "r"))
 	local decoded = JsonCodec.decode(fh:read("*a"))
 	fh:close()

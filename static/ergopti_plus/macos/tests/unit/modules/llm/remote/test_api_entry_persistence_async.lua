@@ -31,7 +31,7 @@ local function with_persistence_fixture(options, body)
 		"modules.llm", "modules.llm.profiles", "modules.llm.api_ollama",
 		"modules.llm.api_mlx", "modules.llm.api_remote",
 		"modules.llm.api_token_crypto", "modules.llm.api_common",
-		"infra.logger", "infra.paths", "core.events.timer_scheduler", "adapters.storage",
+		"infra.logger", "core.fs.engine.paths", "core.events.timer_scheduler", "core.fs.adapters.storage",
 	}
 	local saved = {}
 	for _, name in ipairs(module_names) do saved[name] = package.loaded[name] end
@@ -113,7 +113,7 @@ local function with_persistence_fixture(options, body)
 		pcall = function(_, fn, ...) return pcall(fn, ...) end,
 		callback = function(_, _, fn, ...) return xpcall(fn, debug.traceback, ...) end,
 	}
-	package.loaded["infra.paths"] = {
+	package.loaded["core.fs.engine.paths"] = {
 		shared = function(relative)
 			return "static/ergopti_plus/_shared/" .. relative
 		end,
@@ -137,7 +137,7 @@ local function with_persistence_fixture(options, body)
 		end,
 		clear = function(key) store[key] = nil end,
 	}
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		set = function(key, value)
 			local ok = pcall(settings.set, key, value)
 			return ok
@@ -244,7 +244,7 @@ helpers.describe("LLM API persistence transaction", function()
 				local remote = fixture.api_remote
 				local file = assert(io.open(helpers.driver_root() .. "../_shared/ai/data/api_providers.json", "rb"))
 				local raw = file:read("*a"); assert(file:close())
-				local catalogue = assert(require("adapters.json_codec").decode(raw))
+				local catalogue = assert(require("core.fs.adapters.json_codec").decode(raw))
 				remote.PROVIDER_ORDER = { provider_id }
 				remote.PROVIDERS = { [provider_id] = assert(catalogue.providers[provider_id]) }
 				remote.get_active_entry = function()
@@ -272,7 +272,7 @@ helpers.describe("LLM API persistence transaction", function()
 					local renderer = assert(require("menu.engine.renderer").new({
 						platform = "hs",
 						manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
-						json_decode = require("adapters.json_codec").decode,
+						json_decode = require("core.fs.adapters.json_codec").decode,
 						i18n = { get = package.loaded["infra.i18n"].get, section = function() return {} end },
 						logger = helpers.make_logger_stub(),
 					}))

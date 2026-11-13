@@ -13,7 +13,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 local Groups = require("modules.keymap.registry_groups")
 local i18n   = require("infra.i18n")
 local ManifestReader = require("infra.manifest_reader")
@@ -283,7 +283,7 @@ local section_setting_key = M.section_setting_key
 --- The backup stays on disk because its pathname does not prove inode ownership.
 --- A committed transaction keeps its publication even if cleanup must retry.
 local function settle_section_owner(owner)
-	if not rawequal(package.loaded["adapters.storage"], Storage) then return false end
+	if not rawequal(package.loaded["core.fs.adapters.storage"], Storage) then return false end
 	for name, method in pairs(owner.storage_methods) do
 		if not rawequal(Storage[name], method) then return false end
 	end
@@ -359,7 +359,7 @@ local function publish_section_cells(keys, expected, updates)
 			_section_serial = _section_serial + 1
 			local backup = config .. ".section-settings-" .. tostring(hs.timer.absoluteTime())
 				.. "-" .. tostring(_section_serial)
-			local adapter = require("adapters.file_system")
+			local adapter = require("core.fs.adapters.file_system")
 			return backup, adapter
 		end)
 		if ok then

@@ -31,14 +31,14 @@ local function with_changelog(callback)
 		helpers.with_fresh_modules({
 			"ui.changelog",
 			"ui.ui_builder",
-			"adapters.file_system",
-			"adapters.json_codec",
+			"core.fs.adapters.file_system",
+			"core.fs.adapters.json_codec",
 			"adapters.http_client",
 			"core.events.timer_scheduler",
 			"infra.deferred_work",
 			"infra.i18n",
 			"infra.logger",
-			"infra.paths",
+			"core.fs.engine.paths",
 			"modules.shortcuts.script_control",
 			"hs",
 			"tests.stubs.hs",
@@ -139,7 +139,7 @@ local function with_changelog(callback)
 				handle:close()
 				return text
 			end
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read = read_file,
 				-- The native header policy reads its shared law through this bound.
 				read_bounded = function(path, max_bytes)
@@ -149,7 +149,7 @@ local function with_changelog(callback)
 					return text, "ok"
 				end,
 			}
-			package.loaded["infra.paths"] = {
+			package.loaded["core.fs.engine.paths"] = {
 				shared = function(relative)
 					if relative == "updater/data/defaults.json" then return SHARED_DEFAULTS end
 					if relative == "updater/data/channels.json" then return SHARED_CHANNELS end

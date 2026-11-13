@@ -280,7 +280,7 @@ local function admit_client_source(path)
   'the simulated backend admits only declared checked-in client sources: ' .. tostring(path))
  return io.open(path, 'r')
 end
-package.preload['infra.regular_file_reader'] = function() return {
+package.preload['core.fs.engine.regular_file_reader'] = function() return {
  open = admit_client_source,
  open_source = admit_client_source,
 } end

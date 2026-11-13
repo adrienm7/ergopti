@@ -28,13 +28,13 @@ local function network_env_under(root)
 	local source = file:read("*a")
 	file:close()
 	local probed = {}
-	local real_fs = require("adapters.file_system")
+	local real_fs = require("core.fs.adapters.file_system")
 	local fs = setmetatable({ exists = function(candidate)
 		probed[#probed + 1] = candidate
 		return true
 	end }, { __index = real_fs })
-	return helpers.with_fresh_modules({ "adapters.file_system" }, function()
-		package.loaded["adapters.file_system"] = fs
+	return helpers.with_fresh_modules({ "core.fs.adapters.file_system" }, function()
+		package.loaded["core.fs.adapters.file_system"] = fs
 		-- Same relative layout as the real file, under the fixture root.
 		local real_root = assert(path:match("^(.*)/modules/llm/[^/]+$"))
 		local chunk = assert(load(source, "@" .. root .. path:sub(#real_root + 1)))
@@ -56,10 +56,10 @@ describe("macOS source-located paths keep their backslashes (posix-backslash-pat
 		local page = assert(io.open(dir .. "index.html", "wb"))
 		page:write("<html><head></head><body></body></html>")
 		page:close()
-		local html = helpers.with_fresh_modules({ "ui.ui_builder", "infra.paths", "infra.locale", "infra.i18n" }, function()
-			package.loaded["infra.paths"] = setmetatable({
+		local html = helpers.with_fresh_modules({ "ui.ui_builder", "core.fs.engine.paths", "infra.locale", "infra.i18n" }, function()
+			package.loaded["core.fs.engine.paths"] = setmetatable({
 				shared = function(rel) return '/x\\y "z"/_shared/' .. rel end,
-			}, { __index = require("infra.paths") })
+			}, { __index = require("core.fs.engine.paths") })
 			package.loaded["infra.locale"] = { catalogue = function() return { probe = "P" } end }
 			package.loaded["infra.i18n"] = { get_locale = function() return "fr" end }
 			return require("ui.ui_builder").build_injected_html(dir, "index.html")

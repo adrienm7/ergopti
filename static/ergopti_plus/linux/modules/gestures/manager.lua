@@ -42,7 +42,7 @@ local ConfigOutdated = require("settings.engine.migration.outdated")
 local BindingIdentity = require("settings.engine.publication.binding_identity")
 local KeyboardPublication = require("settings.engine.publication.keyboard_publication")
 local BindingPublication = require("settings.engine.publication.binding_publication")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
 local Manifest = require("infra.manifest_reader")
@@ -502,7 +502,7 @@ local OPEN_WINDOW_OPENER = {
 --- freezing them at load would open the wrong directory under a changed
 --- environment.
 local OPEN_PATH = {
-	["open_script_source"]      = function() return require("infra.paths").driver_root() .. "/ergopti_hotstrings.lua" end,
+	["open_script_source"]      = function() return require("core.fs.engine.paths").driver_root() .. "/ergopti_hotstrings.lua" end,
 	["open_config"]             = function(Paths) return Paths.config("config.toml") end,
 	["open_personal_info"]      = function(Paths) return Paths.config("personal_info.toml") end,
 	["open_personal_hotstrings"] = function(Paths) return Paths.config("personal_hotstrings.toml") end,
@@ -819,7 +819,7 @@ local function _execute_action(action_name, go_next, binding)
 		-- xdg-open on a file that does not exist fails silently, so say so here
 		-- instead: a personal_*.toml the user has never created is the common case
 		-- and "nothing happened" is not a usable answer.
-		local kind, detail, code = require("infra.native_directory").target_kind(target)
+		local kind, detail, code = require("core.fs.engine.native_directory").target_kind(target)
 		if kind == nil and code == "ENOENT" and not target:match("/$") then
 			Logger.warn(LOG, "'%s' points at '%s', which does not exist yet.", name, target)
 		elseif kind == nil and code ~= "ENOENT" then
@@ -1107,8 +1107,8 @@ local function requirement_holds(token)
 	if token == "file_manager:folder" then
 		-- A file manager that publishes its windows' folders (Nautilus): with
 		-- only Thunar, Dolphin or another one installed, the row stays greyed
-		-- with the reason (adapters/file_manager_folder.lua).
-		if require("adapters.file_manager_folder").supported_installed() then return true, nil end
+		-- with the reason (core/fs/adapters/file_manager_folder.lua).
+		if require("core.fs.adapters.file_manager_folder").supported_installed() then return true, nil end
 		return false, i18n.get("platform_reason.action_file_manager_folder_is_unreadable_on_linux")
 	end
 	if token == "ai:on" then
@@ -1642,7 +1642,7 @@ end
 --- Captures the actual binding and exact canonical source before native acquisition.
 local function capture_program(binding)
 	if _persist ~= true or type(binding) ~= "string" or not admit_mutation() then return nil end
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 
 	local runtime, section, id = binding_action(binding)
 	if runtime ~= "run_program" then return nil end
@@ -1726,7 +1726,7 @@ local function capture_window(binding)
 		pair_guard = require("modules.shortcuts.key_combinations").capture_action(binding, action)
 		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
 	end
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local Keyboard = require("adapters.keyboard_hook")
 	local physical = Keyboard.physical_source_receipt()
 	if type(physical) ~= "table" or physical.ready ~= true then return nil end

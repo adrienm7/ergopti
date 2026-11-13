@@ -124,7 +124,7 @@ local function fake_luv(config)
 end
 
 
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local driver_root = helpers.driver_root()
 local Json = require("core.text.engine.json")
 
@@ -171,7 +171,7 @@ end
 local function fresh_client(config)
  config = config or {}
  local fake, state = fake_luv(config)
- local names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "infra.monotonic", "infra.managed_http_deadline", "infra.paths" }
+ local names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "infra.monotonic", "infra.managed_http_deadline", "core.fs.engine.paths" }
  local saved = {}
  for _, name in ipairs(names) do saved[name] = package.loaded[name] end
  local ok, client = pcall(function()
@@ -183,7 +183,7 @@ local function fresh_client(config)
  local data = Json.decode(file:read("*a")); file:close()
  local policy = assert(policy_module.new(data))
  package.loaded["infra.proxy_policy"] = { load = function() return policy end, environment = function() return {} end }
- package.loaded["infra.paths"] = { driver_root = function() return driver_root end,
+ package.loaded["core.fs.engine.paths"] = { driver_root = function() return driver_root end,
   shared_root = function() return assert(Paths.shared_root()) end,
   shared = function(path) return assert(Paths.shared(path)) end }
  package.loaded["infra.managed_http_deadline"] = { start = deadline_port(state, config) }

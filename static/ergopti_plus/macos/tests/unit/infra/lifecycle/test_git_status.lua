@@ -24,7 +24,7 @@ local helpers = require("tests.helpers")
 -- injected BEFORE the module is required.
 local existing = {}
 local contents = {}
-package.loaded["adapters.file_system"] = {
+package.loaded["core.fs.adapters.file_system"] = {
 	exists = function(p) return existing[p] == true end,
 	read   = function(p) return contents[p] end,
 }

@@ -6,10 +6,10 @@ local OutputFixture = require("tests.support.toml_output_fixture")
 helpers.describe("explicit confirmation of a demoted context length", function()
 	for _, outcome in ipairs({ "success", "save_refused", "menu_refused" }) do
 		helpers.it("preserves the original setting until the transaction commits: " .. outcome, function()
-			helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "adapters.storage",
+			helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.fs.adapters.storage",
 				"infra.dialog_util", "infra.i18n", "modules.llm", "ui.menu.menu_llm.settings_manager" }, function()
 				local Preferences = helpers.load_with_stubs("infra.preferences")
-				local FileSystem = require("adapters.file_system")
+				local FileSystem = require("core.fs.adapters.file_system")
 				local Session = require("ui.menu.session_demotions")
 				local Transaction = require("ui.menu.preferences_transaction")
 				local session = Session.new()
@@ -17,7 +17,7 @@ helpers.describe("explicit confirmation of a demoted context length", function()
 				session.record({ feature = "ai", key = "llm_max_words", persisted = 20, demoted = 10 })
 				local state = { hotstrings = {}, llm_context_length = 1500, llm_max_words = 10 }
 				local runtime, native = 1500, 1500
-				package.loaded["adapters.storage"] = {
+				package.loaded["core.fs.adapters.storage"] = {
 					read_exact = function() return true, native end,
 					set = function(_, value) native = value; return true end,
 					delete_exact = function() native = nil; return true end,

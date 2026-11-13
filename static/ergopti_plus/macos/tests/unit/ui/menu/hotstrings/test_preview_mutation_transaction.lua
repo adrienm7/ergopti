@@ -40,22 +40,22 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 		or (selected_key and "menu.hotstrings.tooltip_magic" or "menu.hotstrings.tooltip_colored")
 	local section = presence and "preview_presence_controls" or (selected_key and "preview_magic_control" or "preview_colored_control")
 	return helpers.with_stub_scope({
-		"infra.preferences", "adapters.file_system", "infra.logger", "infra.dialog_util",
+		"infra.preferences", "core.fs.adapters.file_system", "infra.logger", "infra.dialog_util",
 		"infra.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
 		"modules.hotstrings.hotstrings_config",
 		"ui.menu.preview_transaction", "ui.menu.preferences_transaction", "ui.menu.global_actions_transaction",
 	}, function()
 		local Preferences = helpers.load_with_stubs("infra.preferences")
-		local FileSystem = require("adapters.file_system")
+		local FileSystem = require("core.fs.adapters.file_system")
 		local Transaction = require("ui.menu.preferences_transaction")
 		local Global = require("ui.menu.global_actions_transaction")
 		local Preview = require("ui.menu.preview_transaction")
 		translate = translate or function(key) return key end
 		package.loaded["infra.i18n"] = { get = translate }
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = function(raw)
-				local decoded = require("adapters.json_codec").decode(raw)
+				local decoded = require("core.fs.adapters.json_codec").decode(raw)
 				if declaration_label and decoded[section] then
 					for _, item in ipairs(decoded[section]) do
 						if item.id == owned_key then item.i18n = declaration_label end
@@ -266,8 +266,8 @@ helpers.describe("declared coloured preview checkbox", function()
 		end, nil, "button.ok")
 	end)
 	helpers.it("keeps every existing locale, presence switch and separator in the real provider", function()
-		local Paths = require("infra.paths")
-		local Codec = require("adapters.json_codec")
+		local Paths = require("core.fs.engine.paths")
+		local Codec = require("core.fs.adapters.json_codec")
 		local function read_json(path)
 			local file = assert(io.open(path, "rb")); local raw = file:read("*a"); file:close()
 			return assert(Codec.decode(raw))
@@ -361,8 +361,8 @@ helpers.describe("magic preview shared label contract", function()
 		end, nil, "button.ok", "preview_star_enabled")
 	end)
 	helpers.it("uses every actual locale without changing the two other presence flags", function()
-		local Codec = require("adapters.json_codec")
-		local Paths = require("infra.paths")
+		local Codec = require("core.fs.adapters.json_codec")
+		local Paths = require("core.fs.engine.paths")
 		local function read_json(path)
 			local file = assert(io.open(path, "rb")); local raw = file:read("*a"); file:close()
 			return assert(Codec.decode(raw))
@@ -452,10 +452,10 @@ end)
 helpers.describe("ordered presence checkbox locale contract", function()
 	local function read_json(path)
 		local file = assert(io.open(path, "rb")); local text = file:read("*a"); file:close()
-		return assert(require("adapters.json_codec").decode(text))
+		return assert(require("core.fs.adapters.json_codec").decode(text))
 	end
 	helpers.it("uses both real labels and the actual declaration order in all twenty-one locales", function()
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local corpus = read_json(Paths.shared("tests/corpus/menus/preview_presence_controls.json"))
 		local observed = 0
 		for _, locale in ipairs(corpus.locales) do

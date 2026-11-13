@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Watchers = require("infra.file_watchers")
+local Watchers = require("core.fs.engine.file_watchers")
 assert(uv.getuid() ~= 0, "permission receipts require an ordinary user")
 local root = assert(uv.fs_mkdtemp("/var/tmp/ergopti-watch-receipts-XXXXXX"))
 local checks, failures = 0, 0

@@ -25,7 +25,7 @@ if not ok_editor then ui_editor = nil end
 
 local ok_kl, keystats = pcall(require, "modules.keystats")
 if not ok_kl then keystats = nil end
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local BasicString = require("core.text.engine.toml_codec.basic_string")
 local TomlCodec = require("core.text.engine.toml_codec.codec")
 local UnicodeCase = require("core.text.engine.unicode_case")

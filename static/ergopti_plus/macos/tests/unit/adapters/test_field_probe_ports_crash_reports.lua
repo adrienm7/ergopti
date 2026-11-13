@@ -6,7 +6,7 @@
 --- The real crash report port over temporary folders:
 --- 1. a driver crash_reports folder that does not exist holds no report and
 ---    logs no error (the 2026-10-30 20:51 run logged "Cannot iterate
----    directory" from infra/fs_dir.lua for it);
+---    directory" from core/fs/engine/dir.lua for it);
 --- 2. macOS reports are split into this app's processes, each with its kind
 ---    read as closed tokens from the report, and other apps' ones, counted;
 --- 3. a report older than a day is not counted.
@@ -14,7 +14,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.fs_dir", "adapters.field_probe_ports" }
+local MODULES = { "infra.logger", "core.fs.engine.dir", "adapters.field_probe_ports" }
 
 --- Writes one file.
 local function write(path, text)
@@ -56,7 +56,7 @@ helpers.describe("field run crash report port", function()
 			logger.error = function() errors = errors + 1 end
 			logger.crash_reports_dir = function() return home .. "/missing/crash_reports/" end
 			package.loaded["infra.logger"] = logger
-			package.loaded["infra.fs_dir"] = nil
+			package.loaded["core.fs.engine.dir"] = nil
 			package.loaded["adapters.field_probe_ports"] = nil
 			hs.fs.__set_entries(reports, entries)
 			local saved = os.getenv

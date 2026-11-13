@@ -24,15 +24,15 @@ end
 --- `in_system` says the same bundle is there too.
 local function with_fake_bundle_listing(initial_name, callback, in_system)
 	local original_popen = io.popen
-	local original_dir = package.loaded["infra.fs_dir"]
-	local original_fs = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = setmetatable({
+	local original_dir = package.loaded["core.fs.engine.dir"]
+	local original_fs = package.loaded["core.fs.adapters.file_system"]
+	package.loaded["core.fs.adapters.file_system"] = setmetatable({
 		classify_no_follow = function() return { mode = "directory" }, "ok" end,
 	}, { __index = original_fs or {} })
 	local listing = initial_name
 	local system_present = in_system == true
 	local scans = 0
-	package.loaded["infra.fs_dir"] = { try_entries = function(dir)
+	package.loaded["core.fs.engine.dir"] = { try_entries = function(dir)
 		local system_scan = dir:sub(1, 1) == "/" and dir:find("/Library/Keyboard Layouts", 1, true) == 1
 		if system_scan and not system_present then return {}, true end
 		if not system_scan then scans = scans + 1 end
@@ -62,8 +62,8 @@ local function with_fake_bundle_listing(initial_name, callback, in_system)
 		})
 	end, debug.traceback)
 	io.popen = original_popen
-	package.loaded["infra.fs_dir"] = original_dir
-	package.loaded["adapters.file_system"] = original_fs
+	package.loaded["core.fs.engine.dir"] = original_dir
+	package.loaded["core.fs.adapters.file_system"] = original_fs
 	if not ok then error(err, 0) end
 end
 
@@ -170,9 +170,9 @@ helpers.describe("layout_install: transactional replacement", function()
 	end)
 
 	helpers.it("refuses an unreadable other scope before mutation (layout-other-scope-unverified)", function()
-		local old_dir, old_fs = package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"]
-		package.loaded["infra.fs_dir"] = { try_entries = function() return {}, false end }
-		package.loaded["adapters.file_system"] = { classify_no_follow = function() return nil, "error" end }
+		local old_dir, old_fs = package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"]
+		package.loaded["core.fs.engine.dir"] = { try_entries = function() return {}, false end }
+		package.loaded["core.fs.adapters.file_system"] = { classify_no_follow = function() return nil, "error" end }
 		local ok, err = xpcall(function()
 			local calls = 0
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
@@ -183,18 +183,18 @@ helpers.describe("layout_install: transactional replacement", function()
 			helpers.assert_eq(committed, false); helpers.assert_eq(reason, "other_scope_unverified")
 			helpers.assert_eq(calls, 0, "unverified scope cannot authorize mutation")
 		end, debug.traceback)
-		package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"] = old_dir, old_fs
+		package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"] = old_dir, old_fs
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("warns when the post-install other-scope check becomes unreadable", function()
-		local old_dir, old_fs, old_notify = package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"],
+		local old_dir, old_fs, old_notify = package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"],
 			package.loaded["infra.notifications"]
 		local reads, notices = 0, {}
-		package.loaded["infra.fs_dir"] = { try_entries = function()
+		package.loaded["core.fs.engine.dir"] = { try_entries = function()
 			reads = reads + 1; return {}, reads <= 2
 		end }
-		package.loaded["adapters.file_system"] = { classify_no_follow = function() return nil, "error" end }
+		package.loaded["core.fs.adapters.file_system"] = { classify_no_follow = function() return nil, "error" end }
 		package.loaded["infra.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
 		local ok, err = xpcall(function()
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
@@ -205,7 +205,7 @@ helpers.describe("layout_install: transactional replacement", function()
 			helpers.assert_eq(reason, "other_scope_unverified")
 			helpers.assert_eq(notices, {}, "a partial publication must not claim success")
 		end, debug.traceback)
-		package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"], package.loaded["infra.notifications"] =
+		package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"], package.loaded["infra.notifications"] =
 			old_dir, old_fs, old_notify
 		if not ok then error(err, 0) end
 	end)
@@ -364,10 +364,10 @@ helpers.describe("layout_install: transactional replacement", function()
 	end)
 
 	helpers.it("checks the user scope before accepting an existing system copy", function()
-		local old_dir, old_fs, old_popen = package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"], io.popen
+		local old_dir, old_fs, old_popen = package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"], io.popen
 		local readable = true
-		package.loaded["adapters.file_system"] = { classify_no_follow = function() return { mode = "directory" }, "ok" end }
-		package.loaded["infra.fs_dir"] = { try_entries = function(dir)
+		package.loaded["core.fs.adapters.file_system"] = { classify_no_follow = function() return { mode = "directory" }, "ok" end }
+		package.loaded["core.fs.engine.dir"] = { try_entries = function(dir)
 			if dir:find("/Library/Keyboard Layouts", 1, true) == 1 then return { "Ergopti_v1.0.0.bundle" }, true end
 			return {}, readable
 		end }
@@ -382,7 +382,7 @@ helpers.describe("layout_install: transactional replacement", function()
 			helpers.assert_eq(installed, false)
 			helpers.assert_eq(reason, "other_scope_unverified")
 		end, debug.traceback)
-		package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"], io.popen = old_dir, old_fs, old_popen
+		package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"], io.popen = old_dir, old_fs, old_popen
 		if not ok then error(err, 0) end
 	end)
 
@@ -412,8 +412,8 @@ helpers.describe("layout_install: fresh bundle resources", function()
 	helpers.it("sees added and removed layouts without launching a directory scan", function()
 		local layouts = { "first.keylayout" }
 		local original_popen = io.popen
-		local original_fs, original_dir = package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"]
-		package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"] = nil, nil
+		local original_fs, original_dir = package.loaded["core.fs.adapters.file_system"], package.loaded["core.fs.engine.dir"]
+		package.loaded["core.fs.adapters.file_system"], package.loaded["core.fs.engine.dir"] = nil, nil
 		local ok, err = xpcall(function()
 			io.popen = function() error("native enumeration must not spawn find") end
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
@@ -439,14 +439,14 @@ helpers.describe("layout_install: fresh bundle resources", function()
 			helpers.assert_true(names.second)
 		end, debug.traceback)
 		io.popen = original_popen
-		package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"] = original_fs, original_dir
+		package.loaded["core.fs.adapters.file_system"], package.loaded["core.fs.engine.dir"] = original_fs, original_dir
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("does not publish a partial native resource enumeration", function()
 		local original_popen = io.popen
-		local original_fs, original_dir = package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"]
-		package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"] = nil, nil
+		local original_fs, original_dir = package.loaded["core.fs.adapters.file_system"], package.loaded["core.fs.engine.dir"]
+		package.loaded["core.fs.adapters.file_system"], package.loaded["core.fs.engine.dir"] = nil, nil
 		local ok, err = xpcall(function()
 			local scans, fail_stat, fail_find = 0, false, false
 			io.popen = function()
@@ -484,7 +484,7 @@ helpers.describe("layout_install: fresh bundle resources", function()
 			helpers.assert_nil(install.bundle_keylayout_names(), "a failed fallback cannot publish a partial index")
 		end, debug.traceback)
 		io.popen = original_popen
-		package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"] = original_fs, original_dir
+		package.loaded["core.fs.adapters.file_system"], package.loaded["core.fs.engine.dir"] = original_fs, original_dir
 		if not ok then error(err, 0) end
 	end)
 end)
@@ -492,9 +492,9 @@ end)
 helpers.describe("layout_install: failed listings are not cached", function()
 	helpers.it("retries an incomplete listing without reusing its partial result", function()
 		local original_popen = io.popen
-		local original_dir, original_fs = package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"]
-		package.loaded["infra.fs_dir"] = { try_entries = function() return {}, false end }
-		package.loaded["adapters.file_system"] = { classify_no_follow = function() return nil, "error" end }
+		local original_dir, original_fs = package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"]
+		package.loaded["core.fs.engine.dir"] = { try_entries = function() return {}, false end }
+		package.loaded["core.fs.adapters.file_system"] = { classify_no_follow = function() return nil, "error" end }
 		local scans = 0
 		local ok, err = xpcall(function()
 			io.popen = function()
@@ -522,17 +522,17 @@ helpers.describe("layout_install: failed listings are not cached", function()
 			helpers.assert_eq(scans, 2)
 		end, debug.traceback)
 		io.popen = original_popen
-		package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"] = original_dir, original_fs
+		package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"] = original_dir, original_fs
 		if not ok then error(err, 0) end
 	end)
 end)
 
 helpers.describe("layout_install: missing optional directories", function()
 	helpers.it("proves absence before requesting a directory listing", function()
-		local old_dir, old_fs = package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"]
+		local old_dir, old_fs = package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"]
 		local listings = 0
-		package.loaded["infra.fs_dir"] = { try_entries = function() listings = listings + 1; return {}, false end }
-		package.loaded["adapters.file_system"] = { classify_no_follow = function() return nil, "absent" end }
+		package.loaded["core.fs.engine.dir"] = { try_entries = function() listings = listings + 1; return {}, false end }
+		package.loaded["core.fs.adapters.file_system"] = { classify_no_follow = function() return nil, "absent" end }
 		local ok, err = xpcall(function()
 			local install = helpers.load_with_stubs("modules.keymap.layout_install")
 			local result, listed = install.highest_installed("/missing")
@@ -541,7 +541,7 @@ helpers.describe("layout_install: missing optional directories", function()
 			helpers.assert_eq(install.bundle_keylayout_names(), {})
 			helpers.assert_eq(listings, 0, "a proven missing scope needs no error-producing listing")
 		end, debug.traceback)
-		package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"] = old_dir, old_fs
+		package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"] = old_dir, old_fs
 		if not ok then error(err, 0) end
 	end)
 end)

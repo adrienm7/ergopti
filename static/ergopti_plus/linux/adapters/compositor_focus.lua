@@ -117,7 +117,7 @@ function M.new(options)
 	local decode = options.decode or function(line) return require("core.text.engine.json").decode(line) end
 	local command = options.command or function()
 		local uv = require("luv")
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local executable = assert(uv.exepath(), "native interpreter identity unavailable")
 		local shared_lua = assert(Paths.shared_root(), "shared Lua library unavailable")
 		if family == "cosmic" then

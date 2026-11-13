@@ -174,7 +174,7 @@ end)
 --- Runs an actual current-schema native file inside a fresh constructor cohort.
 --- @param body function Callback receiving Writer, source image, path and byte reader.
 local function with_current_native_source(body)
-	helpers.with_fresh_modules({ "core.text.engine.toml_codec.writer", "settings.engine.migration.migrate", "adapters.file_system", "infra.logger" }, function()
+	helpers.with_fresh_modules({ "core.text.engine.toml_codec.writer", "settings.engine.migration.migrate", "core.fs.adapters.file_system", "infra.logger" }, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		local writer, engine = require("core.text.engine.toml_codec.writer"), require("settings.engine.migration.migrate")
 		local registry = assert(engine.load_registry(helpers.shared("settings/data/config_schema/migrations.toml")))
@@ -221,7 +221,7 @@ helpers.describe("genuine configuration keeps detached publication admission", f
 
 	helpers.it("refuses a replaced genuine registered reader before any callback or publication", function()
 		with_current_native_source(function(writer, expected, path, read)
-			local native = require("adapters.file_system")
+			local native = require("core.fs.adapters.file_system")
 			local original, calls = native.read_with_status, 0
 			native.read_with_status = function() calls = calls + 1; return expected.content, "ok" end
 			local called, committed = pcall(writer.publish_if_unchanged, path, expected.content, native, expected)

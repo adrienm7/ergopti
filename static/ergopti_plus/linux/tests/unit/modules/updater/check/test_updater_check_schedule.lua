@@ -31,7 +31,7 @@ local function with_manager(opts, body)
 	local real_is_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return opts.source_run == true end
 	local previous = {}
-	for _, name in ipairs({ "core.events.timer_scheduler", "adapters.storage", "modules.updater.manager" }) do
+	for _, name in ipairs({ "core.events.timer_scheduler", "core.fs.adapters.storage", "modules.updater.manager" }) do
 		previous[name] = package.loaded[name]
 	end
 	local ctx = { timers = {}, dispatches = {}, clock = { now = opts.now }, available = {} }
@@ -49,7 +49,7 @@ local function with_manager(opts, body)
 	package.loaded["core.events.timer_scheduler"] = timer
 	local initial = {}
 	ctx.state_key = nil
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["modules.updater.manager"] = nil
 	local probe = require("modules.updater.manager")
 	ctx.state_key = probe.CHECK_STATE_KEY
@@ -65,7 +65,7 @@ local function with_manager(opts, body)
 		if key == ctx.state_key and ctx.record_read_error then return false, nil end
 		return true, ctx.storage.get(key, nil)
 	end
-	package.loaded["adapters.storage"] = ctx.storage
+	package.loaded["core.fs.adapters.storage"] = ctx.storage
 	package.loaded["modules.updater.manager"] = nil
 	ctx.M = require("modules.updater.manager")
 	for name, value in pairs(previous) do package.loaded[name] = value end

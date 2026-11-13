@@ -2,7 +2,7 @@
 
 local helpers = require("tests.helpers")
 local Loader = require("platform.remap.tap_hold_loader")
-local defaults = require("infra.paths").shared("tap_hold/data/defaults.toml")
+local defaults = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 helpers.describe("empty tap-hold configuration is neutral", function()
 	helpers.it("neutral-config: dynamic rule availability never grants activation", function()

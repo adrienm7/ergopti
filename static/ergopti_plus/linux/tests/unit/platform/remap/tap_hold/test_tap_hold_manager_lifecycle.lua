@@ -51,7 +51,7 @@ require("core.lifecycle.engine.compat.utf8").install()
 local fixture = require("tests.support.platform.remap.tap_hold.tap_hold_manager_fixture")
 local manager, hook, _, user_path = fixture.manager()
 local original = hook.engine
-local paths = require("infra.paths")
+local paths = require("core.fs.engine.paths")
 local shared = paths.shared
 paths.shared = function(name)
   if name == "tap_hold/data/one_shot_shift.json" then return %q end
@@ -211,7 +211,7 @@ os.remove(user_path)
 
 	helpers.it("admits a monitor tap only from its active canonical tap-hold source", function()
 		local names = { "modules.gestures.manager", "platform.remap.tap_hold_manager", "adapters.window_switch",
-			"adapters.keyboard_hook", "adapters.file_system", "infra.config_paths", "adapters.storage", "ui.gesture_conflicts" }
+			"adapters.keyboard_hook", "core.fs.adapters.file_system", "infra.config_paths", "core.fs.adapters.storage", "ui.gesture_conflicts" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local user_path, config_path = os.tmpname(), os.tmpname()
@@ -222,14 +222,14 @@ os.remove(user_path)
 			package.loaded["adapters.keyboard_hook"] = { physical_source_receipt = function()
 				return { ready = true, generation = generation }
 			end }
-			package.loaded["adapters.file_system"] = { read_with_status = function(path)
+			package.loaded["core.fs.adapters.file_system"] = { read_with_status = function(path)
 				if on_read and path == user_path then local callback = on_read; on_read = nil; callback() end
 				local stream = io.open(path, "rb")
 				if not stream then return nil, "absent" end
 				local text = stream:read("*a"); stream:close(); return text, "ok"
 			end }
 			package.loaded["infra.config_paths"] = { config = function() return config_path end }
-			package.loaded["adapters.storage"] = { get = function(_, default) return default end }
+			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
 			package.loaded["adapters.window_switch"] = { new = function(owner_capture)
 				capture = owner_capture

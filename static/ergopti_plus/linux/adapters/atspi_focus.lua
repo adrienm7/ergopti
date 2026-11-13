@@ -17,7 +17,7 @@ local Timings = require("infra.timings")
 local Interpreter = require("core.process.interpreter")
 local NativeIdentity = require("adapters.atspi_native_identity")
 local OwnedProcess = require("adapters.owned_process")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local ProcessLimits = require("ai.engine.policy.process_limits")
 
 local LOG = "adapters.atspi_focus"

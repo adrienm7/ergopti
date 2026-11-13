@@ -152,7 +152,7 @@ local function fresh_pixel_owner()
 			}
 		end,
 	}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		create_secure_temp_file = function()
 			local mode = table.remove(fixture.next_temp_modes, 1)
 			if mode == "false" then return false, "allocation refused" end

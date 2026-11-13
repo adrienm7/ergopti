@@ -10,4 +10,4 @@
 
 local helpers = require("tests.helpers")
 
-require("tests.lua.source_emulation_contract").register(helpers, require("infra.paths").shared)
+require("tests.lua.source_emulation_contract").register(helpers, require("core.fs.engine.paths").shared)

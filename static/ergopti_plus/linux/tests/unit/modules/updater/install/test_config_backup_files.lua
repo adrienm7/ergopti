@@ -95,7 +95,7 @@ end)
 helpers.describe("config_backup (Linux): real files", function()
 	helpers.it("compares actual directory identities and refuses symlinks", function()
 		local dir = scratch()
-		local uv, NativeDirectory = require("luv"), require("infra.native_directory")
+		local uv, NativeDirectory = require("luv"), require("core.fs.engine.native_directory")
 		local ok, err = pcall(function()
 			assert(uv.fs_mkdir(dir .. "/cfg/Backups", 448))
 			assert(uv.fs_mkdir(dir .. "/cfg/backups", 448))
@@ -343,7 +343,7 @@ helpers.describe("config-backup-native-metadata", function()
 			local target = root .. "/config.toml"
 			write(target, "[native]\nvalue = 1\n")
 			write(root .. "/kept.toml", "[kept]\nvalue = 2\n")
-			local previous_directory = package.loaded["infra.native_directory"]
+			local previous_directory = package.loaded["core.fs.engine.native_directory"]
 			local previous_backup = package.loaded["modules.updater.config_backup"]
 			local closed, probed, native_code = 0, 0, nil
 			-- Only the configuration root's descriptor is under test; the backup
@@ -385,8 +385,8 @@ helpers.describe("config-backup-native-metadata", function()
 				fs_stat = uv.fs_stat,
 			}
 			local ok, err = pcall(function()
-				local Directory = helpers.load_module_with_dependency("infra.native_directory", "luv", backend)
-				package.loaded["infra.native_directory"] = Directory
+				local Directory = helpers.load_module_with_dependency("core.fs.engine.native_directory", "luv", backend)
+				package.loaded["core.fs.engine.native_directory"] = Directory
 				local Backup = helpers.load_module("modules.updater.config_backup")
 				Backup._overrides = { roots = { { id = "config", dir = root } } }
 				local owner = assert(Backup.owner())
@@ -409,7 +409,7 @@ helpers.describe("config-backup-native-metadata", function()
 					helpers.assert_eq(read(record.path .. "/config/config.toml"), "[native]\nvalue = 1\n")
 				end
 			end)
-			package.loaded["infra.native_directory"] = previous_directory
+			package.loaded["core.fs.engine.native_directory"] = previous_directory
 			package.loaded["modules.updater.config_backup"] = previous_backup
 			uv.fs_chmod(root, 448)
 			os.execute("rm -rf " .. quote(root))
@@ -578,10 +578,10 @@ helpers.describe("installer-native-publication", function()
 		Fixture.write(source .. "/owned.marker", "owned source\n")
 		local original = assert(uv.fs_stat(source))
 		local previous = package.loaded["modules.updater.installer"]
-		local native_owner = require("infra.no_replace_move")
+		local native_owner = require("core.fs.engine.no_replace_move")
 		helpers.assert_eq(type(native_owner.move), "function", "the double must mirror the real canonical port")
 		local probes, forks = 0, 0
-		local Installer = helpers.load_module_with_dependency("modules.updater.installer", "infra.no_replace_move", {
+		local Installer = helpers.load_module_with_dependency("modules.updater.installer", "core.fs.engine.no_replace_move", {
 			move = function(from, to)
 				probes = probes + 1
 				helpers.assert_eq(from, source)
@@ -612,7 +612,7 @@ end)
 
 helpers.describe("config-backup-rule-source", function()
 	local uv = require("luv")
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local rules = assert(read(Paths.shared("updater/data/defaults.json")))
 	for _, kind in ipairs({ "fifo", "fifo-link", "denied", "file", "file-link" }) do
 		helpers.it("(config-backup-rule-source) classifies " .. kind .. " before building a backup owner", function()
@@ -626,8 +626,8 @@ helpers.describe("config-backup-rule-source", function()
 			if kind == "denied" then assert(uv.fs_chmod(source, 0)) end
 			local admitted = kind == "file" or kind == "file-link"
 			local code = string.format([[package.path = %q
-local original = require("infra.paths")
-package.loaded["infra.paths"] = setmetatable({ shared = function(relative)
+local original = require("core.fs.engine.paths")
+package.loaded["core.fs.engine.paths"] = setmetatable({ shared = function(relative)
  if relative == "updater/data/defaults.json" then return %q end
  return original.shared(relative)
 end }, { __index = original })
@@ -656,11 +656,11 @@ assert((owner ~= nil) == %s, "backup rules admission disagrees with actual sourc
 	end
 
 	helpers.it("(config-backup-rule-source) refuses valid bytes when the stream close is unacknowledged", function()
-		local previous_paths = package.loaded["infra.paths"]
+		local previous_paths = package.loaded["core.fs.engine.paths"]
 		local previous_backup = package.loaded["modules.updater.config_backup"]
 		local path = os.tmpname()
 		write(path, rules)
-		package.loaded["infra.paths"] = setmetatable({ shared = function(relative)
+		package.loaded["core.fs.engine.paths"] = setmetatable({ shared = function(relative)
 			if relative == "updater/data/defaults.json" then return path end
 			return Paths.shared(relative)
 		end }, { __index = Paths })
@@ -679,7 +679,7 @@ assert((owner ~= nil) == %s, "backup rules admission disagrees with actual sourc
 		end
 		local called, owner, detail = pcall(Backup.owner)
 		io.open = open
-		package.loaded["infra.paths"] = previous_paths
+		package.loaded["core.fs.engine.paths"] = previous_paths
 		package.loaded["modules.updater.config_backup"] = previous_backup
 		os.remove(path)
 		helpers.assert_eq(called, true, "the public owner must report a refusal without throwing")

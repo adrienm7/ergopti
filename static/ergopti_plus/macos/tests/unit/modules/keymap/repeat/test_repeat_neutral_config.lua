@@ -5,9 +5,9 @@ local codec = require("core.text.engine.toml_codec")
 
 helpers.describe("neutral repeat configuration", function()
 	helpers.it("requires explicit repeat intent and saves it through the canonical sparse preferences", function()
-		helpers.with_fresh_modules({ "modules.keymap.registry_index", "infra.preferences", "adapters.file_system" }, function()
+		helpers.with_fresh_modules({ "modules.keymap.registry_index", "infra.preferences", "core.fs.adapters.file_system" }, function()
 			local source, writes = "", 0
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return source, "ok" end,
 				write = function() error("unguarded write") end,
 				write_if_unchanged = function(_, content, expected)

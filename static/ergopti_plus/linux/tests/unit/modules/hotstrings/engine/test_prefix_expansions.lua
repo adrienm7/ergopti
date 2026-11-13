@@ -259,8 +259,8 @@ helpers.describe("prefix expansions: the switches", function()
 	helpers.it("takes a switched-off family out of the category's count", function()
 		local Fakes = helpers.load_module("tests.fakes")
 		local storage = Fakes.storage({})
-		local previous_storage = package.loaded["adapters.storage"]
-		package.loaded["adapters.storage"] = storage
+		local previous_storage = package.loaded["core.fs.adapters.storage"]
+		package.loaded["core.fs.adapters.storage"] = storage
 
 		local path = os.tmpname()
 		local fh = assert(io.open(path, "w"))
@@ -277,7 +277,7 @@ helpers.describe("prefix expansions: the switches", function()
 		dh.set_rule_enabled("phoneprefixes", false)
 		local after = dh.active_count()
 
-		package.loaded["adapters.storage"] = previous_storage
+		package.loaded["core.fs.adapters.storage"] = previous_storage
 		os.remove(path)
 
 		helpers.assert_true(before > after,
@@ -289,8 +289,8 @@ helpers.describe("prefix expansions: the switches", function()
 	end)
 
 	helpers.it("passes the configured magic key through the real prefix provider", function()
-		local previous_storage = package.loaded["adapters.storage"]
-		package.loaded["adapters.storage"] = helpers.load_module("tests.fakes").storage({})
+		local previous_storage = package.loaded["core.fs.adapters.storage"]
+		package.loaded["core.fs.adapters.storage"] = helpers.load_module("tests.fakes").storage({})
 		local path = os.tmpname()
 		local file = assert(io.open(path, "w"))
 		file:write('[info]\nphone_number = "0750399576"\n')
@@ -308,7 +308,7 @@ helpers.describe("prefix expansions: the switches", function()
 			helpers.assert_not_nil(result)
 			helpers.assert_eq(result.replacement, INFO.phone_number)
 		end)
-		package.loaded["adapters.storage"] = previous_storage
+		package.loaded["core.fs.adapters.storage"] = previous_storage
 		os.remove(path)
 		if not ok then error(err, 0) end
 	end)

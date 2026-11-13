@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local lfs = require("lfs")
 local shell_quote = require("core.text.engine.utils_core").shell_quote
 local OWNERS = { "ui.log_openers", "infra.logger", "infra.config_paths",
-	"infra.notifications", "adapters.file_system", "infra.fs_dir" }
+	"infra.notifications", "core.fs.adapters.file_system", "core.fs.engine.dir" }
 
 --- Uses real filesystem outcomes and always reopens its private fixture for cleanup.
 --- @param kind string Physical entry to exercise.
@@ -61,7 +61,7 @@ local function with_entry(kind, check)
 				symlinkAttributes = lfs.symlinkattributes,
 				dir = lfs.dir,
 			} })
-			local FileSystem = require("adapters.file_system")
+			local FileSystem = require("core.fs.adapters.file_system")
 			observed.status = FileSystem.path_status(path)
 			observed.open = function(opened)
 				observed.opened[#observed.opened + 1] = opened

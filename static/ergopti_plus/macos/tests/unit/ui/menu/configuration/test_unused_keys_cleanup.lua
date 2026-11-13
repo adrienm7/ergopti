@@ -108,19 +108,19 @@ local IoAdapter = {
 }
 
 local MODULES = {
-	"adapters.storage", "adapters.file_system", "infra.config_overrides",
+	"core.fs.adapters.storage", "core.fs.adapters.file_system", "infra.config_overrides",
 	"infra.preferences", "ui.onboarding", "ui.menu.unused_keys_cleanup", "ui.menu.builder",
 }
 
 helpers.with_stub_scope(MODULES, function()
 	local stored = {}
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		set = function(key, value) stored[key] = value; return true end,
 		get = function(key) return stored[key] end,
 		delete = function(key) stored[key] = nil; return true end,
 		keys = function() return {} end,
 	}
-	package.loaded["adapters.file_system"] = IoAdapter
+	package.loaded["core.fs.adapters.file_system"] = IoAdapter
 	local Overrides   = helpers.load_with_stubs("infra.config_overrides")
 	local Preferences = helpers.load_with_stubs("infra.preferences")
 	local Onboarding  = helpers.load_with_stubs("ui.onboarding")
@@ -763,11 +763,11 @@ helpers.with_stub_scope(MODULES, function()
 end)
 
 helpers.with_stub_scope(MODULES, function()
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function() end, set = function() return true end,
 		delete = function() return true end, keys = function() return {} end,
 	}
-	package.loaded["adapters.file_system"] = IoAdapter
+	package.loaded["core.fs.adapters.file_system"] = IoAdapter
 	local cleanup = helpers.load_with_stubs("ui.menu.unused_keys_cleanup")
 	require("tests.lua.settings.cleanup_roots_contract").register(helpers, {
 		driver = "macos", collect = cleanup.collect, file_adapter = IoAdapter,

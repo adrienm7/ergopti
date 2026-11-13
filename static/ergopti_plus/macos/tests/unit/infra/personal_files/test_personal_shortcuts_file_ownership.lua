@@ -28,7 +28,7 @@ local function load_module(file_system, observations)
 		return "", true, "exit", 0
 	end
 	_G.hs = hs_stub
-	package.loaded["adapters.file_system"] = file_system
+	package.loaded["core.fs.adapters.file_system"] = file_system
 	package.loaded["infra.config_paths"] = {
 		get = function(key)
 			helpers.assert_eq(key, "PersonalShortcutsLuaPath")
@@ -54,7 +54,7 @@ local function with_runtime(file_system, body)
 	local original_open = io.open
 	local original_dofile = dofile
 	local original_hs = _G.hs
-	local original_file_system = package.loaded["adapters.file_system"]
+	local original_file_system = package.loaded["core.fs.adapters.file_system"]
 	local original_config_paths = package.loaded["infra.config_paths"]
 	local original_deferred_work = package.loaded["infra.deferred_work"]
 	local original_logger = package.loaded["infra.logger"]
@@ -82,7 +82,7 @@ local function with_runtime(file_system, body)
 	io.open = original_open
 	_G.dofile = original_dofile
 	_G.hs = original_hs
-	package.loaded["adapters.file_system"] = original_file_system
+	package.loaded["core.fs.adapters.file_system"] = original_file_system
 	package.loaded["infra.config_paths"] = original_config_paths
 	package.loaded["infra.deferred_work"] = original_deferred_work
 	package.loaded["infra.logger"] = original_logger

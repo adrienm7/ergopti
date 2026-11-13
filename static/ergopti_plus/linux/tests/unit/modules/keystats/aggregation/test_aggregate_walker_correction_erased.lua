@@ -10,7 +10,7 @@
 package.loaded["tests.support.modules.keystats.aggregation.aggregate_walker_fixture"] = nil
 local Fixture = require("tests.support.modules.keystats.aggregation.aggregate_walker_fixture")
 
-local file = assert(io.open(assert(require("infra.paths").shared(
+local file = assert(io.open(assert(require("core.fs.engine.paths").shared(
 	"tests/corpus/keystats/correction_erased_vectors.json")), "rb"))
 local data = require("core.text.engine.json").decode(assert(file:read("*a")))
 assert(file:close())

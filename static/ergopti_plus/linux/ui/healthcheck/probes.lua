@@ -109,7 +109,7 @@ end
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	return require("infra.regular_file_reader").read_source(path)
+	return require("core.fs.engine.regular_file_reader").read_source(path)
 end
 
 --- The answer of a failed HTTP request.

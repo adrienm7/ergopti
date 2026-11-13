@@ -16,7 +16,7 @@ WORKER = r"""
 local source = assert(os.getenv("ERGOPTI_READ_SOURCE"))
 local read = os.getenv("ERGOPTI_READ_PORT") == "updater"
 	and require("modules.updater.installer").DEFAULT_OPS.read
-	or require("adapters.file_system").read
+	or require("core.fs.adapters.file_system").read
 local bytes = read(source)
 if os.getenv("ERGOPTI_READ_FAULT") then
 	assert(bytes == nil, "a failed stream receipt published successful file contents")

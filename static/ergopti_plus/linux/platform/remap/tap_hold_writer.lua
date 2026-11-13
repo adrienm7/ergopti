@@ -48,7 +48,7 @@ local LayerPreset = require("layouts.engine.layers.preset")
 local Shapes = require("platform.remap.tap_hold_shapes")
 local KeyCatalog = require("tap_hold.engine.key_catalog")
 local Migration = require("platform.remap.tap_hold_migration")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local ConfigKeys = require("settings.engine.keys")
 local LoneTap = require("tap_hold.engine.lone_tap")
 
@@ -126,7 +126,7 @@ end
 local function back_up(path, text)
 	_backup_sequence = _backup_sequence + 1
 	local backup = string.format("%s.tap_holds-%s-%d.bak", path, os.date("%Y%m%d-%H%M%S"), _backup_sequence)
-	local opened, fh, _, _, remove_owned, current_image = pcall(require("infra.regular_file_writer").open, backup, "wx")
+	local opened, fh, _, _, remove_owned, current_image = pcall(require("core.fs.engine.regular_file_writer").open, backup, "wx")
 	if not opened or not fh then return nil end
 	if type(remove_owned) ~= "function" or type(current_image) ~= "function" then
 		pcall(fh.close, fh)
@@ -230,7 +230,7 @@ local function write_document(path, document, shapes, expected_source, guard)
 		return false
 	end
 	local tmp = path .. ".tmp"
-	local opened, fh, err, _, remove_owned, current_image = pcall(require("infra.regular_file_writer").open, tmp, "wx")
+	local opened, fh, err, _, remove_owned, current_image = pcall(require("core.fs.engine.regular_file_writer").open, tmp, "wx")
 	if not opened or not fh or type(remove_owned) ~= "function" or type(current_image) ~= "function" then
 		if opened and fh then
 			pcall(fh.close, fh)

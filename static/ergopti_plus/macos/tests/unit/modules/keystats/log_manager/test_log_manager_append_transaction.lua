@@ -20,11 +20,11 @@ local helpers = require("tests.helpers")
 local ByteCursor = require("tests.support.keystats.byte_stream_cursor")
 
 local MUTATED_PACKAGE_SLOTS = {
-	"adapters.file_system", "core.events.timer_scheduler",
+	"core.fs.adapters.file_system", "core.events.timer_scheduler",
 	"hs", "hs.fs", "hs.json", "hs.sqlite3", "hs.timer",
 	"infra.logger", "infra.timings", "metrics.engine.metrics",
 	"modules.keystats.aggregator", "modules.keystats.export",
-	"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
+	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode",
 	"tests.stubs.hs",
@@ -148,7 +148,7 @@ end
 local function load_log_manager_fixture(sink_failures, initialize)
 	local restore_runtime = capture_runtime()
 	for _, name in ipairs({
-		"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
+		"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 		"modules.keystats.sqlite_writer", "modules.keystats.aggregator",
 		"modules.keystats.export", "metrics.engine.metrics", "infra.logger",
 		"infra.timings", "core.events.timer_scheduler",
@@ -261,8 +261,8 @@ local function load_log_manager_fixture(sink_failures, initialize)
 		count = function() return 65536 end,
 	}
 
-	local saved_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = {
+	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+	package.loaded["core.fs.adapters.file_system"] = {
 		-- This non-IO scenario begins with an existing user metrics ignore.
 		path_status = function(path)
 			assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
@@ -273,9 +273,9 @@ local function load_log_manager_fixture(sink_failures, initialize)
 		read = function() return nil end,
 	}
 	require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
-		package.loaded["adapters.file_system"], false)
+		package.loaded["core.fs.adapters.file_system"], false)
 	local manager = require("modules.keystats.log_manager")
-	package.loaded["adapters.file_system"] = saved_file_system
+	package.loaded["core.fs.adapters.file_system"] = saved_file_system
 
 	local state = {
 		is_enabled = true,

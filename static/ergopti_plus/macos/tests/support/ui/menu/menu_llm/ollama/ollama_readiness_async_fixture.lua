@@ -63,9 +63,9 @@ local MODULES = {
 	"modules.llm.ollama_server_command",
 	"modules.llm.network_env",
 	-- The prelude reads the proxy override through storage: none is stored.
-	"adapters.storage",
+	"core.fs.adapters.storage",
 	-- FileSystem captures hs when it loads; each fixture binds its own copy.
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"adapters.task_lifecycle",
 	"adapters.shell_runner",
 	"core.events.timer_scheduler",
@@ -410,7 +410,7 @@ local function with_fixture(spec, body)
 		-- not readiness work; once the body runs every execute is forbidden.
 		local setup_probe = helpers.existence_probe_execute()
 		local in_setup = true
-		package.loaded["adapters.file_system"] = nil
+		package.loaded["core.fs.adapters.file_system"] = nil
 		_G.hs = {
 			execute = function(...)
 				if in_setup then return setup_probe(...) end
@@ -455,7 +455,7 @@ local function with_fixture(spec, body)
 		-- Own the genuine methods with an independently read native policy path.
 		-- The fixture's other cached adapter doubles cannot select a fake policy.
 		local native_root = helpers.driver_root():gsub("\\", "/")
-		package.loaded["adapters.storage"] = { get = function(_, default) return default end }
+		package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
 		package.loaded["modules.llm.network_env"] = nil
 		local network = require("modules.llm.network_env")
 		local native_policy_path = native_root .. "modules/llm/network-retry.sh"

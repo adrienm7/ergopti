@@ -24,11 +24,11 @@ end
 
 --- Loads a fresh manager over a Storage fake, as the installed build of channel main.
 local function boot(current)
-	local previous_storage, previous_manager = package.loaded["adapters.storage"], package.loaded["modules.updater.manager"]
-	package.loaded["adapters.storage"] = Fakes.storage({ initial = {} })
+	local previous_storage, previous_manager = package.loaded["core.fs.adapters.storage"], package.loaded["modules.updater.manager"]
+	package.loaded["core.fs.adapters.storage"] = Fakes.storage({ initial = {} })
 	package.loaded["modules.updater.manager"] = nil
 	local ok, manager = pcall(require, "modules.updater.manager")
-	package.loaded["adapters.storage"], package.loaded["modules.updater.manager"] = previous_storage, previous_manager
+	package.loaded["core.fs.adapters.storage"], package.loaded["modules.updater.manager"] = previous_storage, previous_manager
 	helpers.assert_true(ok and type(manager) == "table", tostring(manager))
 	manager.current_version = function() return current end
 	manager.installed_channel = function() return "main" end

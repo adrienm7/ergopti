@@ -71,7 +71,7 @@ if endpoint == "bootstrap" then
  return
 end
 if endpoint == "privacy" then
- require("infra.paths").shared_root_from = function() return root .. "/shared" end
+ require("core.fs.engine.paths").shared_root_from = function() return root .. "/shared" end
  local ok = pcall(Sink.install, logger, { log_dir = root .. "/logs", redaction_context = { home = "/native-private", user = "native-private" } })
  assert(ok == false, "unreadable privacy rules must refuse startup")
  assert(installed == 0, "no sink may publish before privacy admission")

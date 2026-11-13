@@ -57,7 +57,7 @@ local function with_scope(body, source, options)
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0, pair_changes = 0 }
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return default end,
 				set = function() error("shortcut scope must not write legacy storage") end,
 			}
@@ -94,14 +94,14 @@ local function with_scope(body, source, options)
 					return Writer.publish_if_unchanged(target, content, nil, expected)
 				end,
 			}
-			package.loaded["adapters.file_system"] = files
+			package.loaded["core.fs.adapters.file_system"] = files
 			-- The global shortcut scope now includes the daemon's canonical pair
 			-- owner. Build its actual policy from the physical catalogue; only
 			-- native retirement/installation acknowledgements are controlled here.
 			local combinations = require("modules.shortcuts.key_combinations")
 			if not options or options.initialize_pairs ~= false then
 				local Loader = require("platform.remap.tap_hold_loader")
-				local defaults = require("infra.paths").shared("tap_hold/data/defaults.toml")
+				local defaults = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 				local loaded_pairs = Loader.load_document(defaults,
 					{ tap_hold = { inherit_defaults = true } }, nil, path .. ".tap_hold.toml", nil, { tap_holds = { enabled = false } })
 				helpers.assert_true(combinations.install({ keys = loaded_pairs.catalog, hold_picker = loaded_pairs.hold_picker,
@@ -190,7 +190,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 			Manager = require("platform.remap.tap_hold_manager")
 			helpers.assert_true(Manager.init({ keyboard_hook = hook, execute_action = function() error("no action during collision validation") end,
 				action_names = owners.gestures.get_executable_action_names, on_text_injected = function() error("no output during validation") end,
-				defaults_path = require("infra.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
+				defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
 			controls.source_reads, controls.intentional_hook_changes = 0, 0
 			-- This fixture acknowledges initial readiness solely to reach preflight.
 			-- The genuine getter answers true since 2026-11-11 (LIN-004); outside an
@@ -256,7 +256,7 @@ local COLLISION_BASE = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nmagic
 
 local NO_TAP_HOLDS = '[tap_hold]\nenabled = false\ninherit_defaults = false\n'
 
-local magic_collision_file_read = require("adapters.file_system").read
+local magic_collision_file_read = require("core.fs.adapters.file_system").read
 
 --- Uses the real replacement owner and its actual cached preference document.
 local function with_magic_source(scope, owners, controls, path, state, body)

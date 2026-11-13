@@ -25,7 +25,7 @@ local EV_SYN, EV_KEY, EV_ABS = Decoder.EV_SYN, Decoder.EV_KEY, Decoder.EV_ABS
 local BTN_TOOL = { [1] = 0x145, [2] = 0x14d, [3] = 0x14e, [4] = 0x14f, [5] = 0x148 }
 
 local function read(relative)
-	local handle = assert(io.open(require("infra.paths").shared(relative), "rb"))
+	local handle = assert(io.open(require("core.fs.engine.paths").shared(relative), "rb"))
 	local text = handle:read("*a")
 	handle:close()
 	return text

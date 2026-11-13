@@ -37,7 +37,7 @@ local SOURCE = table.concat({
 --- Loads a private config.toml through the real preferences owner.
 --- @param body function Receives (preferences, path, warnings, catalogue).
 local function with_source(body)
-	helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim",
+	helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim",
 		"settings.engine.migration.outdated", "infra.hotstring_choice_catalogue" }, function()
 		local warnings = {}
 		local logger = helpers.make_logger_stub()
@@ -46,7 +46,7 @@ local function with_source(body)
 		end
 		logger.error = logger.warn
 		package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
-		package.loaded["adapters.file_system"] = nil
+		package.loaded["core.fs.adapters.file_system"] = nil
 		package.loaded["infra.hotstring_choice_catalogue"] = nil
 		local config_outdated = require("settings.engine.migration.outdated")
 		if type(config_outdated.reset_for_tests) == "function" then config_outdated.reset_for_tests() end
@@ -133,7 +133,7 @@ helpers.describe("retired hotstring choices (hotstring-choice-retired-2026-10-23
 	end)
 
 	helpers.it("keeps a retired choice in the file across a save", function()
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.hotstring_choice_catalogue",
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.hotstring_choice_catalogue",
 			"settings.engine.migration.outdated" }, function()
 			package.loaded["infra.hotstring_choice_catalogue"] = nil
 			require("settings.engine.migration.outdated").reset_for_tests()
@@ -155,7 +155,7 @@ helpers.describe("retired hotstring choices (hotstring-choice-retired-2026-10-23
 	end)
 
 	helpers.it("keeps every retired choice when the state holds no category at all", function()
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.hotstring_choice_catalogue",
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.hotstring_choice_catalogue",
 			"settings.engine.migration.outdated" }, function()
 			package.loaded["infra.hotstring_choice_catalogue"] = nil
 			require("settings.engine.migration.outdated").reset_for_tests()

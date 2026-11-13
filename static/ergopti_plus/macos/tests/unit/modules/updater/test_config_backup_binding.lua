@@ -24,12 +24,12 @@ local DEFAULTS = helpers.shared("updater/data/defaults.json")
 local function with_binding(tree, body)
 	helpers.with_fresh_modules({
 		"modules.updater.config_backup",
-		"adapters.file_system",
-		"infra.fs_dir",
+		"core.fs.adapters.file_system",
+		"core.fs.engine.dir",
 		"infra.config_paths",
-		"infra.paths",
+		"core.fs.engine.paths",
 	}, function()
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			path_status = function(path)
 				local kind = tree[path]
 				if not kind then return "absent" end
@@ -61,7 +61,7 @@ local function with_binding(tree, body)
 				return text
 			end,
 		}
-		package.loaded["infra.fs_dir"] = {
+		package.loaded["core.fs.engine.dir"] = {
 			try_entries = function(dir)
 				local names = {}
 				for path in pairs(tree) do
@@ -77,7 +77,7 @@ local function with_binding(tree, body)
 			get_config_dir = function() return "/Users/me/" .. AppDirs.config.macos_relative .. "/" end,
 			ensure_dir = function() return true end,
 		}
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared = function(relative)
 				if relative == "updater/data/defaults.json" then return DEFAULTS end
 				return nil

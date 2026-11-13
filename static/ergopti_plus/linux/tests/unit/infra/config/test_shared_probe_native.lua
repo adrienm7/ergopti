@@ -32,7 +32,7 @@ helpers.describe("shared-probe-native", function()
 			end
 			local expected = root .. ((kind == "file" or kind == "symlink") and "/../_shared" or "/_shared")
 			local code = string.format([[package.path = %q
-local resolved = require("infra.paths").shared_root_from(%q)
+local resolved = require("core.fs.engine.paths").shared_root_from(%q)
 assert(resolved == %q, "a nonregular candidate must not shadow the packaged child tree")
 ]], package.path, root, expected)
 			local expired, exited, exit_code, exit_signal = false, false, nil, nil
@@ -56,18 +56,18 @@ assert(resolved == %q, "a nonregular candidate must not shadow the packaged chil
 
 	helpers.it("(shared-probe-native) refuses an unacknowledged probe close", function()
 		local previous_io = io.open
-		local previous_reader = package.loaded["infra.regular_file_reader"]
-		local paths = require("infra.paths")
+		local previous_reader = package.loaded["core.fs.engine.regular_file_reader"]
+		local paths = require("core.fs.engine.paths")
 		local closes = 0
 		local function open(path)
 			helpers.assert_contains(path, "/probe-owner/")
 			return { close = function() closes = closes + 1; return nil, "EIO" end }
 		end
 		io.open = open
-		package.loaded["infra.regular_file_reader"] = { open_source = open }
+		package.loaded["core.fs.engine.regular_file_reader"] = { open_source = open }
 		local ok, result = pcall(paths.shared_root_from, "/probe-owner/driver")
 		io.open = previous_io
-		package.loaded["infra.regular_file_reader"] = previous_reader
+		package.loaded["core.fs.engine.regular_file_reader"] = previous_reader
 		helpers.assert_eq(ok, true)
 		helpers.assert_nil(result, "a candidate whose stream did not close cannot certify the tree")
 		helpers.assert_eq(closes, 2, "each candidate releases exactly its own probe stream")

@@ -128,7 +128,7 @@ echo "Package: $PACKAGE_NAME $VERSION ($ARCH)"
 REQUIRED_PAYLOAD=(
   "ergopti_hotstrings.lua"
   "modules/hotstrings/engine.lua"
-  "infra/paths.lua"
+  "core/fs/engine/paths.lua"
   "adapters/tray_menu.lua"
   "ui/webkit_host.lua"
   "_shared/hotstrings/engine/matcher/init.lua"

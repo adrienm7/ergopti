@@ -139,7 +139,7 @@ helpers.describe("ShellRunner: argv typing", function()
 	helpers.it("every luv.spawn site validates its argv before spawning", function()
 		local sites = {
 			{ file = "adapters.curl_http_client", binary = "curl" },
-			{ file = "adapters.file_digest", binary = "sha256sum" },
+			{ file = "core.fs.adapters.file_digest", binary = "sha256sum" },
 			{ file = "adapters.process_runner", binary = "any program (python3 for layouts)", boundary = "pcall(OwnedProcess.start," },
 			{ file = "adapters.owned_process", binary = "the retained native process", boundary = "pcall(native.spawn," },
 			{ file = "adapters.system_proxy", binary = "the native proxy lookup helper" },

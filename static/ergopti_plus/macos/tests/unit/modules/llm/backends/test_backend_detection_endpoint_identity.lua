@@ -11,9 +11,9 @@ local helpers = require("tests.helpers")
 
 local function with_world(body)
 	return helpers.with_stub_scope({ "modules.llm", "modules.llm.api_ollama", "modules.llm.api_mlx",
-		"modules.llm.ollama_endpoint", "adapters.storage", "infra.logger" }, function()
+		"modules.llm.ollama_endpoint", "core.fs.adapters.storage", "infra.logger" }, function()
 		local Core = helpers.load_with_stubs("modules.llm")
-		local Storage = require("adapters.storage")
+		local Storage = require("core.fs.adapters.storage")
 		local world = { core = Core, probes = {}, completions = {} }
 		hs.timer.secondsSinceEpoch = function() return 100 end
 		hs.http.asyncGet = function(url, _, callback)

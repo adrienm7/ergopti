@@ -58,7 +58,7 @@ local function with_focus(callback)
 			local utils = require("modules.keymap.utils")
 			utils.start_ignored_win_tracking({}, {})
 			helpers.assert_true(utils.prewarm_ignored_win_watchers({}, {}))
-			package.loaded["infra.paths"] = { shared = function() return nil end }
+			package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
 			package.loaded["infra.timings"] = { sec = function() return 0.01 end }
 			local text = require("modules.shortcuts.actions.text")
 			local ok, err = xpcall(function() callback(f, focus, text) end, debug.traceback)

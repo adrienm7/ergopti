@@ -94,7 +94,7 @@ guarded(function()
 	-- SyntheticInput reserves a global tag block at require-time. This probe never
 	-- emits input; preserve the real user's high-water rather than rolling it back.
 	local reservation
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key)
 			assert(key == "synthetic_input.next_tag_sequence_v2", "unexpected configuration read")
 			probe.storage_reads = probe.storage_reads + 1

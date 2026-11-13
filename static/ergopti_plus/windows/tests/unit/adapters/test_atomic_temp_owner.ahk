@@ -49,7 +49,7 @@ _ATO_KeystatsReap(Path, MaxAgeMs) {
 	AssertTrue(Body != "")
 	Script := _KLRDC_Root() . "isolated_reaper.ahk"
 	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . "#Requires AutoHotkey v2.0`n"
-		. '#Include ' . A_ScriptDir . '\..\adapters\file_system.ahk' . "`n"
+		. '#Include ' . A_ScriptDir . '\..\core\fs\adapters\file_system.ahk' . "`n"
 		. Body . "`n_KL_ReapStaleTemps(A_Args[1], Integer(A_Args[2]))`nExitApp(0)`n") != 0)
 	ExitCode := -1
 	Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script, Path, String(MaxAgeMs)],

@@ -21,12 +21,12 @@
 
 local M = {}
 local Logger    = require("infra.logger")
-local Storage   = require("adapters.storage")
+local Storage   = require("core.fs.adapters.storage")
 local TomlCodec = require("infra.toml.codec")
 local Projection = require("settings.engine.scope.script_override_projection")
 local Manifest = require("infra.manifest_reader")
 local ConfigOutdated = require("settings.engine.migration.outdated")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local TextUtils = require("core.text.engine.utils_core")
 local ConfigKeys = require("settings.engine.keys")
 local LOG       = "config_overrides"
