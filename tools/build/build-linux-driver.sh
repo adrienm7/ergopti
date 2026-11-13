@@ -151,7 +151,7 @@ copy_tree "${LINUX_SRC}/" "${BUILD_DIR}/linux/" --exclude vendor
 # Generate the private native backend from the canonical C/header after the
 # tracked copy. Ignored local .so files and prior private fixture outputs never
 # enter this bundle. The helper refuses an already occupied destination.
-bash "${SCRIPT_DIR}/build-linux-native-output.sh" --output-directory "${BUILD_DIR}/linux/bin"
+bash "${SCRIPT_DIR}/build-linux-native-output.sh" --output-directory "${BUILD_DIR}/linux/install"
 
 # The local NTLM/Negotiate relay (docs/design/proxy-auth-relay.md) lives beside
 # the archive backend, where infra/proxy_auth_relay.lua resolves it. Every
@@ -221,7 +221,7 @@ echo ""
 echo "--- Integrity check ---"
 
 REQUIRED_FILES=(
-	"linux/bin/libergopti_archive_publication.so"
+	"linux/install/libergopti_archive_publication.so"
 	"linux/bin/ergopti-proxy-relay"
 	"linux/ergopti_hotstrings.lua"
 	"linux/apps/encryptor.lua"

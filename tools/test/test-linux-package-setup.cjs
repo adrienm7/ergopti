@@ -352,8 +352,8 @@ try {
 			'_shared',
 			'_shared',
 			'linux/static/layouts/registry',
-			'linux/bin',
-			'linux/bin/libergopti_archive_publication.so',
+			'linux/install',
+			'linux/install/libergopti_archive_publication.so',
 			'bin',
 			'bin/ergopti-hotstrings'
 		];
@@ -521,7 +521,7 @@ try {
 		assert.ok(planStart >= 0 && planEnd > planStart);
 		const emptySource = path.join(sandbox, 'empty-payload-source');
 		const planLibrary = path.join(sandbox, 'generated-plan-library');
-		const nativeParent = path.join(planLibrary, 'linux/bin');
+		const nativeParent = path.join(planLibrary, 'linux/install');
 		const nativeTarget = path.join(sandbox, 'generated-plan-foreign');
 		fs.mkdirSync(emptySource);
 		fs.mkdirSync(path.dirname(nativeParent), { recursive: true });

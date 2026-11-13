@@ -28,7 +28,7 @@ for name in ("_native_output_ordinary_directory", "_native_output_bin_parents"):
     functions.append(observed.group())
 assert source.index("_native_output_bin_parents || exit 1") < source.index('NATIVE_OUTPUT_STAGE=""')
 PAYLOAD_START = 'NATIVE_LUV_RETAINED_DIGEST=""'
-BIN_MKDIR = 'install -d "${LIB_DIR}/linux/bin"'
+BIN_MKDIR = 'install -d "${LIB_DIR}/linux/install"'
 BIN_INSTALL = 'install -m 755 "$NATIVE_OUTPUT_SOURCE"'
 GUARD = re.compile(r"^_native_output_bin_parents \|\| exit 1[ \t]*$", re.M)
 
@@ -82,7 +82,7 @@ def payload_copied(text):
             observed.returncode == 0
             and copied.is_file()
             and copied.read_bytes() == original
-            and not (lib / "linux/bin/libergopti_archive_publication.so").exists()
+            and not (lib / "linux/install/libergopti_archive_publication.so").exists()
         )
 
 
@@ -151,9 +151,9 @@ with tempfile.TemporaryDirectory(prefix="native-bin-parent-") as directory:
         else:
             (src / "bin").mkdir()
         if shape == "installed":
-            (lib / "linux/bin").symlink_to(outside, target_is_directory=True)
+            (lib / "linux/install").symlink_to(outside, target_is_directory=True)
         else:
-            (lib / "linux/bin").mkdir()
+            (lib / "linux/install").mkdir()
         script = (
             "set -eu\n"
             + "\n".join(functions)

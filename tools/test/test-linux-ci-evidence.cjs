@@ -1136,7 +1136,7 @@ end
 	fs.mkdirSync(path.join(runnerFixture, 'tools/build'), { recursive: true });
 	fs.mkdirSync(path.join(runnerFixture, 'build/linux/linux'), { recursive: true });
 	fs.mkdirSync(path.join(runnerFixture, 'build/linux/_shared'), { recursive: true });
-	fs.mkdirSync(path.join(runnerFixture, 'build/linux/bin'), { recursive: true });
+	fs.mkdirSync(path.join(runnerFixture, 'build/linux/install'), { recursive: true });
 	fs.writeFileSync(
 		path.join(runnerFixture, 'tools/build/build-linux-driver.sh'),
 		'#!/usr/bin/env bash\nexit "${UPDATER_TEST_BUILD_STATUS:-0}"\n'

@@ -103,12 +103,14 @@ const ALLOWED = [
 		text: 'Hidden=%s\\nX-Ergopti-Startup=true\\n',
 		reason: 'desktop entry keys emitted by the startup file serializer'
 	},
-	...['linux/bin/libergopti_archive_publication.so', 'linux/native_modules/luv.so'].map((file) => ({
-		file: 'linux/install.sh',
-		sink: 'printf',
-		text: '%s\\t' + file + '\\n',
-		reason: 'digest and installed path emitted by the ownership manifest serializer'
-	})),
+	...['linux/install/libergopti_archive_publication.so', 'linux/native_modules/luv.so'].map(
+		(file) => ({
+			file: 'linux/install.sh',
+			sink: 'printf',
+			text: '%s\\t' + file + '\\n',
+			reason: 'digest and installed path emitted by the ownership manifest serializer'
+		})
+	),
 	{
 		file: 'linux/install.sh',
 		sink: 'echo',

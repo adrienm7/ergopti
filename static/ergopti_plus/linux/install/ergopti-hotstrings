@@ -19,7 +19,7 @@
 set -euo pipefail
 
 # The sentences this script prints, in the user's language (install/messages.sh).
-# shellcheck source=../install/messages.sh
+# shellcheck source=messages.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/../install/messages.sh"
 
 

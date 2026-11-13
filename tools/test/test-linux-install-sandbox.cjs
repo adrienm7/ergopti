@@ -295,7 +295,7 @@ function verifyOwnership(run, contents, prefix = path.join(run.home, '.local'), 
 	const requiredOwners = [
 		'linux/ergopti_hotstrings.lua',
 		'_shared/core/i18n/data/locales/en.json',
-		'linux/bin/libergopti_archive_publication.so',
+		'linux/install/libergopti_archive_publication.so',
 		'bin/ergopti-hotstrings',
 		'@wrapper'
 	];

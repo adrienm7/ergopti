@@ -164,7 +164,7 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
 	}
-	fs.mkdirSync(path.join(clone, 'static/ergopti_plus/linux/bin'), { recursive: true });
+	fs.mkdirSync(path.join(clone, 'static/ergopti_plus/linux/install'), { recursive: true });
 	fs.writeFileSync(path.join(clone, 'static/ergopti_plus/linux/bin/.keep'), '');
 	// The logs are ignored in the real clone too: the collector adds them with -f
 	fs.writeFileSync(path.join(clone, '.gitignore'), '*.log\n');

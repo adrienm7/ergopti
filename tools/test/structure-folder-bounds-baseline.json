@@ -9,12 +9,12 @@
 	"macos.tests_oversized": 2,
 	"macos.tests_singleton": 43,
 	"linux.code_oversized": 0,
-	"linux.code_singleton": 1,
+	"linux.code_singleton": 0,
 	"linux.tests_oversized": 3,
 	"linux.tests_singleton": 23,
 	"_shared.code_oversized": 2,
 	"_shared.code_singleton": 15,
 	"_shared.tests_oversized": 1,
 	"_shared.tests_singleton": 1,
-	"drivers.mismatched_top_level": 4
+	"drivers.mismatched_top_level": 3
 }

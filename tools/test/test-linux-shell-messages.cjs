@@ -173,7 +173,7 @@ function shellFiles() {
 		const stat = fs.statSync(abs);
 		if (stat.isDirectory()) {
 			for (const entry of fs.readdirSync(abs)) visit(path.join(abs, entry));
-		} else if (abs.endsWith('.sh') || path.dirname(abs).endsWith(path.join('linux', 'bin'))) {
+		} else if (abs.endsWith('.sh') || path.dirname(abs).endsWith(path.join('linux', 'install'))) {
 			if (!fs.readFileSync(abs).includes(0)) out.push(abs);
 		}
 	};

@@ -196,7 +196,7 @@ assert.ok(
 );
 assert.equal(
 	isGeneratedLinuxAsset(
-		'ergopti_plus/linux/bin/libergopti_archive_publication.so',
+		'ergopti_plus/linux/install/libergopti_archive_publication.so',
 		generated.artifacts
 	),
 	true,
@@ -204,7 +204,7 @@ assert.equal(
 );
 for (const target of [
 	'ergopti_plus/macos/bin/libergopti_archive_publication.so',
-	'ergopti_plus/linux/bin/foreign.so',
+	'ergopti_plus/linux/install/foreign.so',
 	'ergopti_plus/linux/cache/libergopti_archive_publication.so'
 ])
 	assert.equal(
@@ -217,12 +217,12 @@ for (const [file, before, after] of [
 	[DRIVER, 'bash "${SCRIPT_DIR}/build-linux-native-output.sh"', 'true'],
 	[
 		DRIVER,
-		'--output-directory "${BUILD_DIR}/linux/bin"',
+		'--output-directory "${BUILD_DIR}/linux/install"',
 		'--output-directory "${REPO_ROOT}/elsewhere"'
 	],
-	[DRIVER, '"' + OUTPUT + '"', '"linux/bin/missing-native.so"'],
+	[DRIVER, '"' + OUTPUT + '"', '"linux/install/missing-native.so"'],
 	[DRIVER, 'if [ ! -f "${BUILD_DIR}/${f}" ]; then', 'if false; then'],
-	[BUILDER, DEFAULT_OUTPUT, 'OUTPUT_DIR="${REPO_ROOT}/build/linux/bin"'],
+	[BUILDER, DEFAULT_OUTPUT, 'OUTPUT_DIR="${REPO_ROOT}/build/linux/install"'],
 	[BUILDER, 'archive_publication.c"', 'missing_source.c"'],
 	[BUILDER, 'ln -T --', 'cp --'],
 	[BUILDER, '-Wl,-soname,libergopti_archive_publication.so', '-Wl,-soname,foreign.so']

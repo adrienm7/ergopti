@@ -179,7 +179,7 @@ const DRIVER_SRC = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
 // Not runtime: tests are dead weight in a system package, __pycache__ is a
 // build artefact, bin/ is superseded by the generated /usr/bin wrapper, and
 // vendor/ is excluded from the bundle before a packager ever sees it.
-const NON_RUNTIME_DIRS = new Set(['tests', '__pycache__', 'bin', 'vendor']);
+const NON_RUNTIME_DIRS = new Set(['tests', '__pycache__', 'bin', 'vendor', 'install']);
 
 const runtimeDirs = fs
 	.readdirSync(DRIVER_SRC, { withFileTypes: true })

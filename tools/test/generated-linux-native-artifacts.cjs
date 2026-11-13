@@ -22,7 +22,7 @@ const { execFileSync } = require('node:child_process');
 const DRIVER = 'tools/build/build-linux-driver.sh';
 const BUILDER = 'tools/build/build-linux-native-output.sh';
 const NATIVE_SOURCE = 'static/ergopti_plus/linux/native/archive_output/';
-const OUTPUT = 'linux/bin/libergopti_archive_publication.so';
+const OUTPUT = 'linux/install/libergopti_archive_publication.so';
 const INPUTS = [
 	DRIVER,
 	BUILDER,
@@ -61,7 +61,7 @@ function classifyGeneratedNativeArtifacts(sources) {
 	// The driver hands the backend build its own bundle's bin directory, so the
 	// generated library lands where the mandatory bundle check looks for it.
 	const generate = driver.indexOf(
-		'bash "${SCRIPT_DIR}/build-linux-native-output.sh" --output-directory "${BUILD_DIR}/linux/bin"'
+		'bash "${SCRIPT_DIR}/build-linux-native-output.sh" --output-directory "${BUILD_DIR}/linux/install"'
 	);
 	const check = driver.indexOf('for f in "${REQUIRED_FILES[@]}"; do');
 	const requiredLoop = /for f in "\$\{REQUIRED_FILES\[@\]\}"; do\n([\s\S]*?)\ndone/.exec(driver);

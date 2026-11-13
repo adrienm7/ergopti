@@ -69,7 +69,7 @@ const IDENTIFIERS_READER = `. ${JSON.stringify(
 		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'core', 'text', 'data', 'identifiers.sh')
 	)
 )}\n`;
-const LAUNCHER = path.join(DRIVER, 'bin', 'ergopti-hotstrings');
+const LAUNCHER = path.join(DRIVER, 'install', 'ergopti-hotstrings');
 const INSTALLER = path.join(DRIVER, 'install.sh');
 const DEB_BUILDER = path.join(ROOT, 'tools', 'build', 'build-linux-deb.sh');
 const RPM_BUILDER = path.join(ROOT, 'tools', 'build', 'build-linux-rpm.sh');

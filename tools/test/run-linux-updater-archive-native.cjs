@@ -402,7 +402,7 @@ async function run({
 			refused();
 		versionCurrent();
 		const inventory = payloadInventory(payload, current);
-		const backend = path.join(payload, 'linux/bin/libergopti_archive_publication.so');
+		const backend = path.join(payload, 'linux/install/libergopti_archive_publication.so');
 		ordinary(backend);
 		if (
 			!fs

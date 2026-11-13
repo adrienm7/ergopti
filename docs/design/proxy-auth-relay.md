@@ -163,7 +163,7 @@ no-replace output, a smoke run of the host slice. CI installs the repository's
 one Go pin (`managed_ollama_runtime.json` `go_version`) or the module's
 `go.mod` floor through `actions/setup-go`.
 
-- Linux: `build-linux-driver.sh` builds it into `linux/bin/`, beside the archive
+- Linux: `build-linux-driver.sh` builds it into `linux/install/`, beside the archive
   backend, so the .deb, .rpm, tarball and AppImage carry it at
   `<driver>/bin/ergopti-proxy-relay`. It needs at most `GLIBC_2.34` and only
   `libc.so.6` (`check-elf-glibc-ceiling.cjs`). The Flatpak never takes a

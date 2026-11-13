@@ -193,7 +193,7 @@ const TREES = [
 	'linux/core/lifecycle/engine',
 	'linux/core/i18n/engine',
 	'linux/core/fs/engine',
-	'linux/bin',
+	'linux/install',
 	'linux/ui',
 	'linux/hotstrings/ui/hotstring_editor',
 	'linux/hotstrings/ui/hotstrings_config_window',

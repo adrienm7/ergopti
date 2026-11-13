@@ -93,7 +93,7 @@ container_build() {
 	# The bundle's backend was compiled on the runner: replace it with one built
 	# here, which every package made from the bundle then carries.
 	local backend="libergopti_archive_publication.so"
-	rm -f "$BUILD_ROOT/linux/bin/$backend"
+	rm -f "$BUILD_ROOT/linux/install/$backend"
 	bash tools/build/build-linux-native-output.sh
 
 	local tools

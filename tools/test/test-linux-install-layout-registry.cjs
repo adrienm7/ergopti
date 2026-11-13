@@ -271,7 +271,7 @@ function observePayloadCopy(block, prefix) {
 				result.status === 0 &&
 				fs.existsSync(copied) &&
 				fs.readFileSync(copied).equals(bytes) &&
-				!fs.existsSync(path.join(library, 'linux/bin/libergopti_archive_publication.so')),
+				!fs.existsSync(path.join(library, 'linux/install/libergopti_archive_publication.so')),
 			status: result.status,
 			stderr: result.stderr
 		};

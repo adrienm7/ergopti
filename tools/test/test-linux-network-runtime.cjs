@@ -258,8 +258,11 @@ function portable() {
 			assert.ok(start >= 0 && end > start, 'actual receipt publication block');
 			const block = installer.slice(start, end);
 			const library = path.join(scratch, 'lib');
-			fs.mkdirSync(path.join(library, 'linux/bin'), { recursive: true });
-			fs.writeFileSync(path.join(library, 'linux/bin/libergopti_archive_publication.so'), 'binary');
+			fs.mkdirSync(path.join(library, 'linux/install'), { recursive: true });
+			fs.writeFileSync(
+				path.join(library, 'linux/install/libergopti_archive_publication.so'),
+				'binary'
+			);
 			const receipt = path.join(library, '.ergopti-owned-files');
 			fs.writeFileSync(receipt, 'abc\tlinux/sentinel\n');
 			for (const failure of ['write', 'mv']) {

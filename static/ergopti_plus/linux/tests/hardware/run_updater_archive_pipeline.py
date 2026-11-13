@@ -442,7 +442,7 @@ def main() -> int:
     raw_guardian = ordinary(args.guardian)
     if hashlib.sha256(raw_guardian).hexdigest() != args.expected_guardian_sha256:
         raise RuntimeError("Original native guardian source identity refused")
-    native = ordinary(args.payload / "linux/bin/libergopti_archive_publication.so")
+    native = ordinary(args.payload / "linux/install/libergopti_archive_publication.so")
     if native[:4] != b"\x7fELF":
         raise RuntimeError("Canonical backend was not built for actual target")
     if ordinary(args.payload / "bin/ergopti-hotstrings") != ordinary(

@@ -356,7 +356,7 @@ if ! $SETUP_PERMS_ONLY; then
 	fi
 	# These files and parents are always generated, even when absent from the
 	# source tree; conditional luv publication is admitted at its actual branch.
-	for owned_launcher in "${LIB_DIR}/linux/bin" "${LIB_DIR}/linux/bin/libergopti_archive_publication.so" \
+	for owned_launcher in "${LIB_DIR}/linux/install" "${LIB_DIR}/linux/install/libergopti_archive_publication.so" \
 		"${LIB_DIR}/bin" "${LIB_DIR}/bin/ergopti-hotstrings"; do
 		if [ -L "$owned_launcher" ]; then
 			printf '[install] code=linked-payload path=%q\n' "$owned_launcher" >&2
@@ -721,7 +721,7 @@ _native_output_bin_parents() {
 	fi
 	_native_output_ordinary_directory "${SRC_DRIVER}/bin" \
 		&& _native_output_ordinary_directory "${LIB_DIR}/linux" \
-		&& _native_output_ordinary_directory "${LIB_DIR}/linux/bin" \
+		&& _native_output_ordinary_directory "${LIB_DIR}/linux/install" \
 		&& _native_output_ordinary_directory "${SRC_DRIVER}/native_modules" \
 		&& _native_output_ordinary_directory "${LIB_DIR}/linux/native_modules"
 }
@@ -1246,10 +1246,10 @@ fi
 # Re-read after the payload/native directory operations; a payload bin alias
 # must not become write authority for the target helper.
 _native_output_bin_parents || exit 1
-install -d "${LIB_DIR}/linux/bin"
+install -d "${LIB_DIR}/linux/install"
 _native_output_bin_parents || exit 1
-[ -d "${LIB_DIR}/linux/bin" ] || exit 1
-install -m 755 "$NATIVE_OUTPUT_SOURCE" "${LIB_DIR}/linux/bin/libergopti_archive_publication.so"
+[ -d "${LIB_DIR}/linux/install" ] || exit 1
+install -m 755 "$NATIVE_OUTPUT_SOURCE" "${LIB_DIR}/linux/install/libergopti_archive_publication.so"
 if [ -n "$NATIVE_LUV_STAGE" ]; then
 	_native_output_bin_parents || exit 1
 	install -d "${LIB_DIR}/linux/native_modules"
@@ -1280,11 +1280,11 @@ done
 if [ -n "$NATIVE_OUTPUT_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
 	# This generated checkout artifact is outside the input source tree, so its
 	# actual installed bytes need their own canonical ownership entry.
-	NATIVE_OUTPUT_DIGEST="$(sha256sum < "${LIB_DIR}/linux/bin/libergopti_archive_publication.so")"
+	NATIVE_OUTPUT_DIGEST="$(sha256sum < "${LIB_DIR}/linux/install/libergopti_archive_publication.so")"
 	NATIVE_OUTPUT_MANIFEST="$(mktemp "${LIB_DIR}/.ergopti-owned-native.XXXXXX")"
 	write_native_output_manifest() {
 		while IFS=$'\t' read -r native_digest native_relative || [ -n "$native_digest$native_relative" ]; do
-			[ "$native_relative" = "linux/bin/libergopti_archive_publication.so" ] && continue
+			[ "$native_relative" = "linux/install/libergopti_archive_publication.so" ] && continue
 			[ "$native_relative" = "linux/native_modules/luv.so" ] && continue
 			printf '%s\t%s\n' "$native_digest" "$native_relative" || return 1
 		done < "${LIB_DIR}/.ergopti-owned-files" || return 1

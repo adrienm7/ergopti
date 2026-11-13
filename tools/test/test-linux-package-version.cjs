@@ -153,7 +153,7 @@ try {
 				);
 				assert.deepEqual(
 					fs.readFileSync(path.join(extracted, 'bin/libergopti_archive_publication.so')),
-					fs.readFileSync(path.join(BUILD, 'linux/bin/libergopti_archive_publication.so'))
+					fs.readFileSync(path.join(BUILD, 'linux/install/libergopti_archive_publication.so'))
 				);
 				assert.deepEqual(
 					fs.readFileSync(path.join(extracted, '_shared/build_stamp.txt')),
