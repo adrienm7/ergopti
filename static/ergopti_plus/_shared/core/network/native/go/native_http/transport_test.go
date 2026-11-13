@@ -249,6 +249,32 @@ func recordedPeer(t *testing.T, path string, cancel context.CancelFunc) {
 	}()
 }
 
+// recordedDeadline is a context whose deadline passes once the peer has
+// recorded itself: the privacy test needs a real DeadlineExceeded, and a fixed
+// 100 ms deadline raced the peer's start the same way.
+type recordedDeadline struct {
+	context.Context
+	done chan struct{}
+}
+
+func (c *recordedDeadline) Done() <-chan struct{} { return c.done }
+
+func (c *recordedDeadline) Err() error {
+	select {
+	case <-c.done:
+		return context.DeadlineExceeded
+	default:
+		return nil
+	}
+}
+
+func deadlineAfterRecord(t *testing.T, path string) context.Context {
+	t.Helper()
+	ctx := &recordedDeadline{Context: context.Background(), done: make(chan struct{})}
+	recordedPeer(t, path, func() { close(ctx.done) })
+	return ctx
+}
+
 func TestCancellationAndConcurrentClosePhysicallyRetirePeer(t *testing.T) {
 	for _, name := range []string{"stall-header", "cancel-body", "stall-body", "slow-start"} {
 		t.Run(name, func(t *testing.T) {
@@ -349,8 +375,7 @@ func TestUnknownLengthRequiresTerminalAndExactEOF(t *testing.T) {
 func TestClientErrorPrivacyRetainsContextCause(t *testing.T) {
 	t.Setenv("ERGOPTI_OLLAMA_NATIVE_HTTP", "1")
 	transport, record := peerTransport(t, "stall-header")
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
+	ctx := deadlineAfterRecord(t, record)
 	request, _ := http.NewRequestWithContext(ctx, "GET", "https://example.test/private?token=receiving-test-secret", nil)
 	_, err := Do(&http.Client{Transport: transport}, request)
 	if err == nil || strings.Contains(err.Error(), "example.test") || strings.Contains(err.Error(), "receiving-test-secret") || !errors.Is(err, context.DeadlineExceeded) {
