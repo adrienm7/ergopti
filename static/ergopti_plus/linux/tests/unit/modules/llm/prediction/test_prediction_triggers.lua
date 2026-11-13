@@ -285,7 +285,10 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 		helpers.assert_true(preview.show({
 			{ trigger = "btw", replacement = "by the way", group = "rolls", fires = true },
 		}, "autocorrect"))
-		helpers.assert_eq(scheduler.test.advance(0.249), 0)
+		-- The bubble's own delay less the shared decrement (preview-expiry-decrement).
+		local lifetime = require("ui.tooltip.config").effective_delay(0.25)
+		helpers.assert_true(lifetime < 0.25)
+		helpers.assert_eq(scheduler.test.advance(lifetime - 0.001), 0)
 		helpers.assert_eq(expired, 0)
 		helpers.assert_eq(scheduler.test.advance(0.001), 1)
 		helpers.assert_eq(expired, 1)
