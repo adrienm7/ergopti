@@ -116,16 +116,15 @@ function run() {
 	);
 	// An entry names its files as the tree had them before the migration: in a
 	// later step, a source an earlier step moved is read at its new place.
-	const Plan = require('../audit/structure/plan.cjs');
-	const [movedBase, movedFinal] = [...Plan.moveMap().map].find(([o, t]) => t && t !== o);
 	const laterRepo = scratch({
-		[Plan.PREFIX + movedFinal]: 'beta\n',
+		'docs/design/structure-plan/move-map.tsv': 'old\tnew\tstep\nw/src.txt\tx/src.txt\tS01\n',
+		'x/src.txt': 'beta\n',
 		'holder.txt': `${upper('beta\n')}\n`
 	});
 	assert.deepEqual(
 		deriveAll({
 			root: laterRepo.root,
-			entries: [{ ...entry, source: Plan.PREFIX + movedBase }],
+			entries: [{ ...entry, source: 'w/src.txt' }],
 			pinned: true
 		}),
 		{ 'holder.txt': upper('beta\n') }
