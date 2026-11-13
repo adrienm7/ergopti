@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 13:55)
+## Where things stand (2026-11-13, 15:45)
 
 - Branch: `claude/ergopti-todo-structure-phase2`, fast-forward only. Base:
   dev `520bb24c`, merged in `ee1aa96f`. Tip: `677fc455`.
@@ -47,10 +47,18 @@ same commit as each step or checkpoint. Times are Paris time.
   serve-command receiving test copies `_shared/python`, which S01 splits into
   the ai and network features; now a listed edit names both homes
   (`677fc455`). Every other red matched the baseline.
-- Proof 10 (S01+S02 from the tip `677fc455`): rebuilding in
-  `/home/user/wt-seq` (log `scratchpad/proof10-run.log`), then `…-proof-10`
-  and `ci.yml os_lanes=all`. Only baseline reds → send the coordinator the
-  range.
+- Proof 10 (S01+S02 = `319d5efe..a1063539` on `677fc455`, run
+  43430776650): Ai and network green; only extra reds were the macOS Intel
+  managed Ollama build (Go test
+  `TestCancellationAndConcurrentClosePhysicallyRetirePeer`, passed on proof 9
+  with the same sources) and its runtime job. Failed jobs re-run (attempt 2).
+- Full chain locally (proof 8, S01–S38 from `267cc01a` in `wt-proof`), Lua
+  suites against an unstepped tree (`scratchpad/{base,p8}-{macos,linux}-lua.log`):
+  1,152 new failing macOS cases in 145 modules, 911 Linux cases in 92
+  modules. Main classes: module-prefix sweeps and dissolved scan roots (see
+  « Decisions to review »), a few unfollowed `require` names
+  (`modules.shortcuts`), then a long tail to triage per module
+  (`scratchpad/triage-{macos,linux}.txt`).
 - Later steps, found on proof 6 locally (macOS and Linux Lua suites): init
   modules named with their stem (`3ef3fc4a`), the macOS keyboard data readers
   and the Linux tray source reader (`1b0998e0`), a climbing `Paths.shared`
@@ -132,6 +140,16 @@ A red outside this list is the step's (the coordinator, 2026-11-12 22:00).
   pinned toolset (no MSVC here): the comments-only changes and `/Brepro`
   without debug records argue it holds; a run of the builder with
   `-UpdateTracked` on the pinned toolset would prove it.
+- Open, proposed (2026-11-13): Lua module-name prefix patterns
+  (`name:match("^modules%.")`, 178 sites in 71 files, almost all test
+  cache sweeps) and dissolved folders used as scan roots (`"adapters"`,
+  `"infra"`, `"ui"` under a driver's tests, about 131 candidate sites). The
+  tooling leaves both untouched today, so after the moves a sweep matches
+  nothing and a scan opens a missing folder. An exact rewrite is not viable
+  (`^modules%.` on macOS alone becomes 20 prefixes and 48 names). Proposed:
+  the tooling refuses both (fail fast, like `lua-prefix-split`); each site
+  then gets a listed edit, and the many identical sweeps of "every driver
+  module" become one shared predicate over the driver's production roots.
 
 ## Next commands
 
