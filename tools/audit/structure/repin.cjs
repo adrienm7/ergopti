@@ -128,7 +128,7 @@ function deriveAll({
 		if (!fs.existsSync(at(e.file)) || !fs.existsSync(at(e.source)))
 			throw new Error(`repin: derived pin ${e.file} names a missing file`);
 		const holder = fs.readFileSync(at(e.file), 'utf8');
-		const value = e.derive(fs.readFileSync(at(e.source), 'utf8'), holder, lib);
+		const value = e.derive(fs.readFileSync(at(e.source), 'utf8'), holder, lib, at(e.source));
 		if (!value) throw new Error(`repin: ${e.file} cannot be derived from ${e.source}`);
 		if (pinned && !holder.includes(value))
 			throw new Error(`repin: the derivation of ${e.file} no longer reproduces its pin`);
