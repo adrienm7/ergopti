@@ -60,16 +60,26 @@ def main():
         origin = "https://127.0.0.1:" + str(listener.getsockname()[1])
         responses = []
         for index in range(1, 11):
-            assets = [
-                {
-                    "name": "ergopti-plus-linux.tar.gz",
-                    "browser_download_url": origin + "/never-requested-bundle",
-                },
-                {
-                    "name": "ergopti-plus-linux.tar.gz.sha256",
-                    "browser_download_url": origin + "/never-requested-checksum",
-                },
-            ]
+
+            def assets_for(tag):
+                # The updater admits an asset only under the release page's own /download/<tag>/ path (UPX-002).
+                return [
+                    {
+                        "name": "ergopti-plus-linux.tar.gz",
+                        "browser_download_url": origin
+                        + "/releases/download/"
+                        + tag
+                        + "/ergopti-plus-linux.tar.gz",
+                    },
+                    {
+                        "name": "ergopti-plus-linux.tar.gz.sha256",
+                        "browser_download_url": origin
+                        + "/releases/download/"
+                        + tag
+                        + "/ergopti-plus-linux.tar.gz.sha256",
+                    },
+                ]
+
             release = {}
             if index in (4, 9, 10):
                 release["author"] = {"login": "fixture-author", "tag_name": "v9.9.9"}
@@ -80,7 +90,7 @@ def main():
                     "draft": False,
                     "prerelease": False,
                     "body": "Ordinary notes",
-                    "assets": assets,
+                    "assets": assets_for("v1.2.0"),
                     "published_at": "2026-10-01T00:00:00Z",
                 }
             )
@@ -99,6 +109,7 @@ def main():
                 later = dict(release)
                 later["tag_name"] = "v1.3.0" if index == 7 else "v9.9.0-beta.1"
                 later["prerelease"] = index == 8
+                later["assets"] = assets_for(later["tag_name"])
                 releases.append(later)
                 if index == 7:
                     expected_tag = "v1.3.0"
