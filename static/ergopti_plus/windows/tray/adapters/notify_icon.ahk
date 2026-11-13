@@ -1,4 +1,4 @@
-﻿; adapters/notify_icon.ahk
+﻿; tray/adapters/notify_icon.ahk
 
 ; ==============================================================================
 ; MODULE: Notification Icon Adapter (AutoHotkey)

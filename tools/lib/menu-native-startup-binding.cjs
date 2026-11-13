@@ -7,8 +7,8 @@ const { scriptTokens, stripComments } = require('./script-source.cjs');
 const projection = require('./codegen-startup-tray.cjs');
 const keys = Object.freeze({
 	entry: 'windows/ErgoptiPlus.ahk',
-	bootstrap: 'windows/infra/tray_bootstrap.ahk',
-	adapter: 'windows/adapters/tray_menu.ahk',
+	bootstrap: 'windows/tray/bootstrap.ahk',
+	adapter: 'windows/tray/adapters/menu.ahk',
 	dispatcher: 'windows/menu/engine/dispatcher.ahk',
 	safe: 'windows/menu/engine/startup_commands.ahk'
 });

@@ -1,4 +1,4 @@
-﻿; adapters/tray_startup_commands.ahk
+﻿; tray/adapters/startup_commands.ahk
 
 ; ==============================================================================
 ; MODULE: Native Tray Startup Commands

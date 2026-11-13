@@ -52,7 +52,7 @@ const UPDATE = process.argv.includes('--update-baseline');
 const WINDOWS_RENDERER = new Set([
 	'windows/menu/engine/manifest_menu.ahk',
 	'windows/menu/engine/dispatcher.ahk',
-	'windows/adapters/tray_menu.ahk',
+	'windows/tray/adapters/menu.ahk',
 	'windows/menu/ui/builder/engine.ahk',
 	'windows/menu/ui/builder/rebuild.ahk'
 ]);
@@ -413,7 +413,7 @@ const DRIVERS = ['windows', 'macos', 'linux'];
 // minimum against the immutable pre-migration oracle, not the migration debt.
 const FLOORS = { windows: 20, macos: 20, linux: 20 };
 const LEGACY_PATH = path.join(__dirname, 'fixtures', 'native-menu-census-legacy.json');
-const LEGACY_SHA256 = 'c7879d723c8de9351fe51aab39057e5fff94a0a9b64ddf60b94c2b3b7a038dc2';
+const LEGACY_SHA256 = '813dc79feeeef7e04cbb4b604d7fb9938383b4ea06627b20f9167d73f997a8b9';
 const legacyBytes = fs.readFileSync(LEGACY_PATH);
 assert.equal(
 	crypto.createHash('sha256').update(legacyBytes).digest('hex'),

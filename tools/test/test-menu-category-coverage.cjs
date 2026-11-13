@@ -1510,8 +1510,8 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 			sources: { ...startup.sources, [key]: startup.sources[key].replace(before, after) }
 		};
 	}
-	const helper = 'windows/infra/tray_bootstrap.ahk';
-	const adapter = 'windows/adapters/tray_menu.ahk';
+	const helper = 'windows/tray/bootstrap.ahk';
+	const adapter = 'windows/tray/adapters/menu.ahk';
 	const entry = 'windows/ErgoptiPlus.ahk';
 	const dispatcher = 'windows/menu/engine/dispatcher.ahk';
 	const controls = [

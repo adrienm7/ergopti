@@ -1,4 +1,4 @@
---- platform/tray/appindicator.lua
+--- tray/adapters/appindicator.lua
 
 --- ==============================================================================
 --- MODULE: Tray Indicator (Linux, LuaJIT FFI)
@@ -47,7 +47,7 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 local Perf = require("core.logger.engine.perf_counters")
 
-local LOG = "platform.tray.appindicator"
+local LOG = "tray.adapters.appindicator"
 
 
 

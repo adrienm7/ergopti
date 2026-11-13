@@ -605,7 +605,7 @@ _required_dependency_package() {
 		pacman:secret-tool) echo "libsecret" ;;
 		xbps:secret-tool) echo "libsecret" ;;
 		apk:secret-tool) echo "libsecret" ;;
-		# The tray icon. platform/tray/appindicator.lua binds this library
+		# The tray icon. tray/adapters/appindicator.lua binds this library
 		# through FFI; without it --tray has nothing to host the icon in.
 		apt:tray) echo "libayatana-appindicator3-1" ;;
 		dnf:tray) echo "libayatana-appindicator-gtk3" ;;

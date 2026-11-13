@@ -138,7 +138,7 @@ package.loaded["modules.updater"] = {
 	get_check_interval = function() return 3600 end,
 	start_background_checks = function() end,
 }
-package.loaded["adapters.tray_menu"] = {
+package.loaded["tray.adapters.menu"] = {
 	adopt = function() end,
 	setMenu = function() return true end,
 }

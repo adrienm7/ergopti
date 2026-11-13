@@ -716,7 +716,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.tray_menu",
+		id       = "tray.adapters.menu",
 		contract = { "setIcon", "setMenu", "setTooltip", "destroy" },
 		wired    = true,
 	},

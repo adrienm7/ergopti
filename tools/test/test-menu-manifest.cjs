@@ -5788,7 +5788,7 @@ console.log(
 	const entry = menu.shortcuts_menu.find((row) => row.id === 'personal_shortcuts');
 	// Native port mutations preserve every original personal corpus assertion.
 	{
-		const nativeFile = 'windows/adapters/tray_menu.ahk';
+		const nativeFile = 'windows/tray/adapters/menu.ahk';
 		const original = physicalPersonalSources[nativeFile];
 		const nativeDeclaration = 'TrayMenuFrameNative(Operation, Target := false, Handle := 0) {';
 		const nativeNextDeclaration = '\n_TrayBootstrapNoOp(*) {';

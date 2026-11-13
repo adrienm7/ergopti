@@ -1077,7 +1077,7 @@ function personalFrameDataPublication(sources, definition, owningEntry) {
 			'windows/ui/menu/menu_shortcuts.ahk',
 			'windows/menu/ui/builder/menu_init.ahk',
 			'windows/menu/engine/manifest_menu.ahk',
-			'windows/adapters/tray_menu.ahk'
+			'windows/tray/adapters/menu.ahk'
 		];
 		if (
 			!sources ||
@@ -1120,7 +1120,7 @@ function personalFrameDataPublication(sources, definition, owningEntry) {
 		personalCentral(unit);
 		personalConstructorAuthority(lexical(physical['windows/menu/engine/manifest_menu.ahk']));
 		personalNativeAdapter(
-			lexical(physical['windows/adapters/tray_menu.ahk']),
+			lexical(physical['windows/tray/adapters/menu.ahk']),
 			lexical(physical['windows/menu/engine/manifest_menu.ahk'])
 		);
 		personalAuthority(unit);

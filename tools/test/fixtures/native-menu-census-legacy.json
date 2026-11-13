@@ -7,7 +7,7 @@
 		"windows": {
 			"count": 27,
 			"sites": [
-				"windows/infra/tray_bootstrap.ahk:54 add",
+				"windows/tray/bootstrap.ahk:54 add",
 				"windows/ui/menu/menu_hotstrings.ahk:913 append",
 				"windows/ui/menu/menu_hotstrings.ahk:1074 append",
 				"windows/ui/menu/menu_hotstrings.ahk:1251 append",
@@ -133,8 +133,8 @@
 				"windows/platform/input/text_sender.ahk",
 				"windows/core/events/timer_scheduler.ahk",
 				"windows/core/ui/adapters/tooltip_renderer.ahk",
-				"windows/adapters/tray_startup_click.ahk",
-				"windows/adapters/tray_startup_commands.ahk",
+				"windows/tray/adapters/startup_click.ahk",
+				"windows/tray/adapters/startup_commands.ahk",
 				"windows/core/process/adapters/uia_worker.ahk",
 				"windows/adapters/user_hotstrings_native.ahk",
 				"windows/core/ui/adapters/webview_profiles.ahk",
@@ -244,7 +244,7 @@
 				"windows/core/text/engine/toml/helpers.ahk",
 				"windows/core/text/engine/toml/inline_tables.ahk",
 				"windows/core/text/engine/toml/loader.ahk",
-				"windows/infra/tray_bootstrap.ahk",
+				"windows/tray/bootstrap.ahk",
 				"windows/core/ui/engine/style.ahk",
 				"windows/core/lifecycle/engine/shutdown/uninstall.ahk",
 				"windows/core/logger/engine/wall_clock.ahk",
@@ -502,13 +502,13 @@
 			],
 			"excerpts": [
 				{
-					"path": "windows/infra/tray_bootstrap.ahk",
+					"path": "windows/tray/bootstrap.ahk",
 					"sourceSha256": "646af344664856b8b453f67577f5947f7784705f8742054b2c8e29df36b7b9c1",
 					"lines": [
 						{
 							"line": 54,
 							"source": "\t\tMenuObj.Add(Label, _TrayBootstrapNoOp)",
-							"expectedSite": "windows/infra/tray_bootstrap.ahk:54 add"
+							"expectedSite": "windows/tray/bootstrap.ahk:54 add"
 						}
 					]
 				},

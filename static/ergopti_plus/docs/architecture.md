@@ -45,7 +45,6 @@ graph TD
         LINUX_input_source_switch["InputSourceSwitch.lua"]
         LINUX_keyboard_layout["KeyboardLayout.lua"]
         LINUX_selection_transaction["SelectionTransaction.lua"]
-        LINUX_tray_menu["TrayMenu.lua"]
         LINUX_user_hotstring_destination["UserHotstringDestination.lua"]
         LINUX_wayland_selection_counter["WaylandSelectionCounter.lua"]
         LINUX_window_switch["WindowSwitch.lua"]
@@ -100,7 +99,6 @@ graph TD
         MACOS_system_switcher_runtime["SystemSwitcherRuntime.lua"]
         MACOS_system_switcher_sampler["SystemSwitcherSampler.lua"]
         MACOS_tcc_grant["TccGrant.lua"]
-        MACOS_tray_menu["TrayMenu.lua"]
         MACOS_unicode_carrier["UnicodeCarrier.lua"]
         MACOS_update_launcher["UpdateLauncher.lua"]
     end
@@ -118,13 +116,9 @@ graph TD
         WINDOWS_llm_automation["LlmAutomation.ahk"]
         WINDOWS_llm_nav_event_owner["LlmNavEventOwner.ahk"]
         WINDOWS_mouse_control["MouseControl.ahk"]
-        WINDOWS_notify_icon["NotifyIcon.ahk"]
         WINDOWS_ollama_identity["OllamaIdentity.ahk"]
         WINDOWS_registry_notify["RegistryNotify.ahk"]
         WINDOWS_screen_brightness["ScreenBrightness.ahk"]
-        WINDOWS_tray_menu["TrayMenu.ahk"]
-        WINDOWS_tray_startup_click["TrayStartupClick.ahk"]
-        WINDOWS_tray_startup_commands["TrayStartupCommands.ahk"]
         WINDOWS_updater_curl_capture["UpdaterCurlCapture.ahk"]
         WINDOWS_user_hotstrings_native["UserHotstringsNative.ahk"]
     end
@@ -139,19 +133,16 @@ graph TD
 
     %% Port implementations: Linux (Lua)
     P_Clipboard -->|implements| LINUX_clipboard
-    P_TrayMenu -->|implements| LINUX_tray_menu
 
     %% Port implementations: macOS (Hammerspoon)
     P_AppLauncher -->|implements| MACOS_app_launcher
     P_Clipboard -->|implements| MACOS_clipboard
     P_MouseControl -->|implements| MACOS_mouse_control
-    P_TrayMenu -->|implements| MACOS_tray_menu
 
     %% Port implementations: Windows (AutoHotkey)
     P_AppLauncher -->|implements| WINDOWS_app_launcher
     P_Clipboard -->|implements| WINDOWS_clipboard
     P_MouseControl -->|implements| WINDOWS_mouse_control
-    P_TrayMenu -->|implements| WINDOWS_tray_menu
 
     %% Key domain relationships
     D_Expander -->|uses| D_Registry

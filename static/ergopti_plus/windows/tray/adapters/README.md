@@ -25,4 +25,4 @@ one is to bind `libayatana-appindicator` and build a `GtkMenu`. That is a
 genuine OS mechanism with a genuine choice behind it, which is what `platform/`
 is for.
 
-See `linux/platform/tray/appindicator.lua`.
+See `linux/tray/adapters/appindicator.lua`.

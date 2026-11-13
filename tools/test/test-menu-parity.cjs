@@ -3406,8 +3406,8 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 			sources: { ...startup.sources, [key]: startup.sources[key].replace(before, after) }
 		};
 	}
-	const helper = 'windows/infra/tray_bootstrap.ahk';
-	const adapter = 'windows/adapters/tray_menu.ahk';
+	const helper = 'windows/tray/bootstrap.ahk';
+	const adapter = 'windows/tray/adapters/menu.ahk';
 	const entry = 'windows/ErgoptiPlus.ahk';
 	const dispatcher = 'windows/menu/engine/dispatcher.ahk';
 	const controls = [
@@ -5177,7 +5177,7 @@ function personalFrameSources() {
 			'windows/ui/menu/menu_shortcuts.ahk',
 			'windows/menu/ui/builder/menu_init.ahk',
 			'windows/menu/engine/manifest_menu.ahk',
-			'windows/adapters/tray_menu.ahk'
+			'windows/tray/adapters/menu.ahk'
 		].map((file) => [file, readSourceFile(path.join(SP, file))])
 	);
 }
@@ -5187,7 +5187,7 @@ function personalFrameEdgePublication(edge, sources, definition, row, platform) 
 		'windows/ui/menu/menu_shortcuts.ahk',
 		'windows/menu/ui/builder/menu_init.ahk',
 		'windows/menu/engine/manifest_menu.ahk',
-		'windows/adapters/tray_menu.ahk'
+		'windows/tray/adapters/menu.ahk'
 	];
 	if (
 		platform !== 'ahk' ||

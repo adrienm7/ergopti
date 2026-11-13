@@ -248,7 +248,7 @@ end
 
 if MENU_ROWS_FILE then
 	arg[#arg + 1] = "--tray"
-	package.preload["platform.tray.appindicator"] = function()
+	package.preload["tray.adapters.appindicator"] = function()
 		local function count(items)
 			local n = 0
 			for _, item in ipairs(items or {}) do
@@ -282,7 +282,7 @@ end
 -- engine, which the demo configuration loads: its cancel path runs on every
 -- Backspace and once wiped the hotstring buffer.
 local WITH_LLM = os.getenv("ERGOPTI_E2E_LLM") == "1"
-for _, name in ipairs(MENU_ROWS_FILE and {} or { "core.ui.ui.tooltip.preview", "core.ui.ui.tooltip.llm", "adapters.tray_menu",
+for _, name in ipairs(MENU_ROWS_FILE and {} or { "core.ui.ui.tooltip.preview", "core.ui.ui.tooltip.llm", "tray.adapters.menu",
 	"menu.ui.builder.builder", "modules.updater.manager",
 	"modules.gestures.manager", "platform.focus.window_info", "core.process.adapters.lifecycle",
 	"core.ui.ui.webview_manager",

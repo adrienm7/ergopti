@@ -1,4 +1,4 @@
-﻿; adapters/tray_startup_click.ahk
+﻿; tray/adapters/startup_click.ahk
 
 ; ==============================================================================
 ; MODULE: Tray Startup Click Admission

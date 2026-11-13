@@ -28,7 +28,7 @@
 --- installed, which is a property of the machine and not of the binding.
 --- ==============================================================================
 
--- Mirrored from platform/tray/appindicator.lua. Written out rather than imported
+-- Mirrored from tray/adapters/appindicator.lua. Written out rather than imported
 -- because importing would make the harness agree with the binding by
 -- construction: if the binding renamed a symbol to something absent, a shared
 -- list would rename it here too and the check would pass.

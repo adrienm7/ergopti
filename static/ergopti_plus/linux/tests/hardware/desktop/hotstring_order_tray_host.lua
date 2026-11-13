@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The daemon's tray without its keyboard: the real hotstring catalogue
 --- (modules/hotstrings/hotstrings_config.lua over the bundled packs), the real
---- menu builder (menu/ui/builder/builder.lua) and the real tray (adapters/tray_menu.lua
+--- menu builder (menu/ui/builder/builder.lua) and the real tray (tray/adapters/menu.lua
 --- over libayatana-appindicator), rebuilt through the daemon's own rebuild owner
 --- after every committed click. tray_panel.py clicks it over D-Bus.
 ---
@@ -24,8 +24,8 @@ local Logger = require("core.logger.engine.shim")
 Logger.set_level("info")
 -- The driver routes its lines to a file sink; this host prints them for the proof.
 Logger.set_sink(function(line) io.stdout:write(line, "\n"); io.stdout:flush() end)
-local Indicator = require("platform.tray.appindicator")
-local TrayMenu = require("adapters.tray_menu")
+local Indicator = require("tray.adapters.appindicator")
+local TrayMenu = require("tray.adapters.menu")
 
 if not Indicator.is_available() then
 	io.stderr:write("ENVIRONMENT: the tray backend cannot bind (library or display missing)\n")

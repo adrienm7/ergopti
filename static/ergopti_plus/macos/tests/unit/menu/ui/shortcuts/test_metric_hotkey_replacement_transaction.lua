@@ -121,7 +121,7 @@ local function load_fixture(legacy)
 		get_check_interval = function() return 3600 end,
 		start_background_checks = noop,
 	}
-	package.loaded["adapters.tray_menu"] = {
+	package.loaded["tray.adapters.menu"] = {
 		adopt = function() return true end,
 		setMenu = function(items)
 			if type(items) == "function" then dynamic_menu_callback = items end

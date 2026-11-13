@@ -39,6 +39,7 @@ const FIX = process.argv.includes('--fix');
 // Source trees to validate, and the file extensions that carry a path header.
 const TREES = [
 	'windows/infra',
+	'windows/tray',
 	'windows/menu/engine',
 	'windows/settings/engine',
 	'windows/platform/input',
@@ -58,6 +59,7 @@ const TREES = [
 	'windows/core/ui/ui',
 	'windows/core/network',
 	'windows/adapters',
+	'windows/tray/adapters',
 	'windows/platform/system',
 	'windows/platform/input',
 	'windows/platform/focus',
@@ -90,6 +92,7 @@ const TREES = [
 	'macos/core/ui/ui',
 	'macos/core/network',
 	'macos/adapters',
+	'macos/tray/adapters',
 	'macos/platform/system',
 	'macos/platform/input',
 	'macos/platform/focus',
@@ -102,6 +105,7 @@ const TREES = [
 	'macos/core/crypto',
 	'linux/modules',
 	'linux/adapters',
+	'linux/tray/adapters',
 	'linux/platform/system',
 	'linux/platform/input',
 	'linux/platform/focus',

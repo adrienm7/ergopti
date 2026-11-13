@@ -287,7 +287,7 @@ local BootProfiler      = require("core.logger.engine.boot_profiler")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
-local tray_menu = RuntimeGuard.optional_require("adapters.tray_menu")
+local tray_menu = RuntimeGuard.optional_require("tray.adapters.menu")
 
 -- Event loop adapter (luv when available, pump fallback otherwise).
 local event_loop = require("core.events.loop")

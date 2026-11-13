@@ -1,4 +1,4 @@
---- adapters/tray_menu.lua
+--- tray/adapters/menu.lua
 
 --- ==============================================================================
 --- MODULE: TrayMenu Adapter (Hammerspoon)
@@ -25,7 +25,7 @@ local M = {}
 local hs     = hs
 local Logger = require("core.logger.engine.logger")
 
-local LOG = "adapters.tray_menu"
+local LOG = "tray.adapters.menu"
 
 
 -- =========================================

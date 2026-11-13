@@ -209,7 +209,7 @@ hook.pump = function() return 0 end
 -- The tray: rows kept, not drawn. The delimiter steps click the latest tree it
 -- was handed, as GTK would.
 local published_menu = nil
-package.preload["platform.tray.appindicator"] = function()
+package.preload["tray.adapters.appindicator"] = function()
 	local live = false
 	return {
 		is_available = function() return true end,

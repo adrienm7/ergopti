@@ -97,7 +97,7 @@ helpers.describe("gui_stack: the desktop toolkit is checked at start", function(
 	end)
 
 	helpers.it("the tray binding names the library it could not load (owned-runtimes-gui-stack)", function()
-		local Indicator = helpers.load_module("platform.tray.appindicator")
+		local Indicator = helpers.load_module("tray.adapters.appindicator")
 		helpers.assert_eq(Indicator.GTK_COMPONENT, "GTK 3")
 		helpers.assert_eq(Indicator.INDICATOR_COMPONENT, "libayatana-appindicator3")
 		helpers.assert_eq(type(Indicator.missing_component), "function")

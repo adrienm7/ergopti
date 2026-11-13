@@ -235,7 +235,7 @@ REQUIRED_FILES=(
 	"linux/modules/hotstrings/device_finder.lua"
 	"linux/modules/keystats/metrics_collector.lua"
 	"linux/core/network/adapters/http_client.lua"
-	"linux/adapters/tray_menu.lua"
+	"linux/tray/adapters/menu.lua"
 	"linux/core/i18n/engine/locale.lua"
 	"linux/install/config_home.sh"
 	"linux/install/ownership_schema.sh"

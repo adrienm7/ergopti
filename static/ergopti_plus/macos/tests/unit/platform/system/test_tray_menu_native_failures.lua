@@ -38,7 +38,7 @@ local function load_fixture()
 	local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 	Logger.set_level("DEBUG")
 	Logger.set_sink(function(line) lines[#lines + 1] = line end)
-	local adapter = helpers.load_with_stubs("adapters.tray_menu", {
+	local adapter = helpers.load_with_stubs("tray.adapters.menu", {
 		image = { imageFromPath = function(path) return { path = path } end },
 	})
 	helpers.assert_eq(adapter.adopt(menubar), true)

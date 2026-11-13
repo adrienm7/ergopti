@@ -170,9 +170,9 @@ OnError(_FatalErrorHandler)
 ; anyway) — only its pure helpers (_Bundle_ResolveDir, ResolveLocalAppDataDir)
 ; are invoked directly by the regression test.
 #Include ../core/lifecycle/engine/bundle.ahk
-#Include ../infra/tray_bootstrap.ahk
-#Include ../adapters/tray_startup_click.ahk
-#Include ../adapters/tray_startup_commands.ahk
+#Include ../tray/bootstrap.ahk
+#Include ../tray/adapters/startup_click.ahk
+#Include ../tray/adapters/startup_commands.ahk
 #Include ../core/lifecycle/engine/reload/single_instance_gate.ahk
 #Include ../ui/menu/menu_llm/menu_build_coordinator.ahk
 #Include ../_generated/window_titles.ahk
@@ -366,7 +366,7 @@ InstallHotstringHooks()
 #Include ../core/fs/adapters/file_system.ahk
 #Include ../platform/focus/window_info.ahk
 #Include ../core/process/adapters/uia_worker.ahk
-#Include ../adapters/tray_menu.ahk
+#Include ../tray/adapters/menu.ahk
 #Include ../platform/input/text_sender.ahk
 #Include ../core/network/adapters/http_client.ahk
 #Include ../platform/focus/secure_field_detector.ahk
@@ -389,7 +389,7 @@ InstallHotstringHooks()
 #Include ../platform/system/control.ahk
 #Include ../adapters/mouse_control.ahk
 #Include ../core/ui/adapters/graphics_renderer.ahk
-#Include ../adapters/notify_icon.ahk
+#Include ../tray/adapters/notify_icon.ahk
 #Include ../core/ui/ui/spotlight/ownership.ahk
 #Include ../core/process/adapters/shell_runner.ahk
 #Include ../../_shared/shortcuts/data/actions/brightness.ahk
@@ -1374,7 +1374,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/test_keystats_password_fail_closed.ahk
 #Include unit/core/lifecycle/test_single_instance_gate.ahk
 #Include unit/platform/system/test_worker_tray_icon_hidden.ahk
-#Include unit/adapters/test_notify_icon.ahk
+#Include unit/tray/test_notify_icon.ahk
 #Include unit/modules/keystats/test_keystats_network_transitions.ahk
 #Include ../menu/engine/command_origin.ahk
 #Include unit/menu/test_command_origin.ahk
