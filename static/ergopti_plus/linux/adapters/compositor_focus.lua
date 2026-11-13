@@ -113,7 +113,7 @@ function M.new(options)
 	local Logger = require("core.logger.engine.shim")
 	local family = options.family
 	local reporter = M.REPORTERS[family]
-	local start_process = options.start_process or function(...) return require("adapters.owned_process").start(...) end
+	local start_process = options.start_process or function(...) return require("core.process.adapters.owned_process").start(...) end
 	local decode = options.decode or function(line) return require("core.text.engine.json").decode(line) end
 	local command = options.command or function()
 		local uv = require("luv")

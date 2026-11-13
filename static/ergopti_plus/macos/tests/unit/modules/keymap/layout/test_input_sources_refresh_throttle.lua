@@ -13,8 +13,8 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"modules.keymap.input_sources", "modules.keymap.layout_install",
 	"core.logger.engine.logger", "infra.timings", "adapters.python_interpreter",
-	"adapters.input_source_selector", "core.fs.engine.native_path", "adapters.shell_runner",
-	"infra.deferred_work", "adapters.task_environment", "core.lifecycle.engine.launcher_environment",
+	"adapters.input_source_selector", "core.fs.engine.native_path", "core.process.adapters.shell_runner",
+	"infra.deferred_work", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
 	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy", "core.fs.engine.openstep_plist",
 }
@@ -86,7 +86,7 @@ local function with_sources(scenario)
 			end },
 		}
 		local sources = require("modules.keymap.input_sources")
-		local runner = require("adapters.shell_runner")
+		local runner = require("core.process.adapters.shell_runner")
 		local scheduler = require("core.events.timer_scheduler")
 		function w.sample(awake, step)
 			helpers.assert_true(awake >= w.awake, "the independent awake clock never regresses")

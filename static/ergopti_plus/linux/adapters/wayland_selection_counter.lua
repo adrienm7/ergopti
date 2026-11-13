@@ -40,12 +40,12 @@ local _running = false
 function M.start(ports)
 	if _operation ~= nil then error("wayland selection counter already started") end
 	ports = ports or {}
-	local has_command = ports.has_command or require("adapters.shell_runner").has_command
+	local has_command = ports.has_command or require("core.process.adapters.shell_runner").has_command
 	if not has_command("wl-paste") then
 		Logger.info(LOG, "wl-paste is not installed: Wayland copies cannot be confirmed.")
 		return false
 	end
-	local start_process = ports.start_process or require("adapters.owned_process").start
+	local start_process = ports.start_process or require("core.process.adapters.owned_process").start
 	_count, _running = 0, true
 	local operation = start_process("wl-paste", { "--watch", "sh", "-c", WATCH_COMMAND }, {
 		owner = "wayland-selection-counter", capture_tail = true, max_output_bytes = OUTPUT_TAIL_BYTES,

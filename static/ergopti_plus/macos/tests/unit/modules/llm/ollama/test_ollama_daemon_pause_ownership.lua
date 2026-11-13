@@ -163,7 +163,7 @@ local function load_fixture()
 		end,
 	}
 	package.loaded["core.events.timer_scheduler"] = scheduler
-	package.loaded["adapters.shell_runner"] = shell
+	package.loaded["core.process.adapters.shell_runner"] = shell
 	package.loaded["core.fs.adapters.storage"] = {
 			-- The real adapter's read and write pair (api_remote's refused thinking fields)
 			get = function() return nil end,

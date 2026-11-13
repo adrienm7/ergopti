@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local names = { "modules.hotstrings.injector", "adapters.clipboard", "modules.hotstrings.output_transaction",
-	"adapters.keyboard_layout", "adapters.xkb_capture", "adapters.shell_runner", "infra.display_server",
+	"adapters.keyboard_layout", "adapters.xkb_capture", "core.process.adapters.shell_runner", "infra.display_server",
 	"core.logger.engine.shim", "adapters.keyboard_hook", "adapters.modifier_broker", "platform.input.modifier_custody", "adapters.uinput_writer" }
 
 local function fixture(options, callback)
@@ -61,7 +61,7 @@ local function fixture(options, callback)
 		end
 		return true
 	end
-	package.loaded["adapters.shell_runner"] = Shell
+	package.loaded["core.process.adapters.shell_runner"] = Shell
 	local Output = require("modules.hotstrings.output_transaction")
 	local new_transaction = Output.new
 	Output.new = function(...)

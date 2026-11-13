@@ -45,10 +45,10 @@ end
 --- @return table owner
 function M.new(ports)
 	ports = ports or {}
-	local start = ports.start or require("adapters.owned_process").start
+	local start = ports.start or require("core.process.adapters.owned_process").start
 	local scheduler = ports.scheduler or require("core.events.timer_scheduler")
 	local pipe = ports.pipe or hold_pipe
-	local has_command = ports.has_command or require("adapters.shell_runner").has_command
+	local has_command = ports.has_command or require("core.process.adapters.shell_runner").has_command
 	local notify = ports.notify or function(key)
 		require("adapters.application_notifier").send(i18n.get(key))
 	end

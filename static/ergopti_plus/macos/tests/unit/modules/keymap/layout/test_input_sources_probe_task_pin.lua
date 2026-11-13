@@ -16,9 +16,9 @@ local helpers = require("tests.helpers")
 --- Clears every stateful module owned by this fixture.
 local function reset_fixture_modules()
 	package.loaded["modules.keymap.input_sources"] = nil
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 end
 
 

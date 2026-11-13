@@ -28,7 +28,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 
 local LOG = "modules.updater.restarter"
 

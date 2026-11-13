@@ -17,7 +17,7 @@ end }
 package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return function() end end })
 require("infra.timings").count("limits", "program_catalogue_bytes")
 package.loaded["core.logger.engine.logger"] = logger
-local Adapter = require("adapters.program_providers")
+local Adapter = require("core.process.adapters.program_providers")
 local Directories = require("core.fs.engine.dir")
 local cases, case_facts = {}, {}
 local active_case, check_ordinal, check_failure

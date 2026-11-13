@@ -24,7 +24,7 @@ local TextUtils = require("core.text.engine.utils_core")
 local Logger = require("core.logger.engine.shim")
 local Modal = require("ui.modal")
 local NativeDialog = require("ui.native_dialog")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local WindowTitles = require("core.ui.engine.window_titles")
 
 local LOG = "ui.text_prompt"

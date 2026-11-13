@@ -64,7 +64,7 @@ local OWNED = {
 	"modules.gestures.user_actions", "modules.gestures.apple_shortcut_action",
 	"adapters.apple_shortcuts_cli", "adapters.apple_shortcuts", "core.logger.engine.logger", "core.i18n.engine.i18n",
 	"infra.notifications", "modules.gestures.actions_aux_owner", "core.fs.adapters.file_system", "adapters.clipboard",
-	"adapters.synthetic_input", "adapters.shell_runner", "core.events.timer_scheduler",
+	"adapters.synthetic_input", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
 	"adapters.apple_shortcuts_native", "modules.shortcuts.actions.text",
 }
 
@@ -167,7 +167,7 @@ local function with_world(body)
 		}
 		--- The process layer of /usr/bin/shortcuts: a listing of world.library,
 		--- a run answered with world.run_code unless world.hold_run keeps it.
-		package.loaded["adapters.shell_runner"] = { spawn = function(executable, args, on_done, _, _, private)
+		package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, args, on_done, _, _, private)
 			local handle = { executable = executable, args = args, private = private, observers = {} }
 			world.spawned[#world.spawned + 1] = handle
 			local function settle(code, out, err)

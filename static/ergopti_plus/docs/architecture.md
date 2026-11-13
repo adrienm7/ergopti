@@ -58,17 +58,10 @@ graph TD
         LINUX_keyboard_layout["KeyboardLayout.lua"]
         LINUX_modifier_broker["ModifierBroker.lua"]
         LINUX_notifier["Notifier.lua"]
-        LINUX_owned_process["OwnedProcess.lua"]
-        LINUX_process_lifecycle["ProcessLifecycle.lua"]
-        LINUX_process_runner["ProcessRunner.lua"]
-        LINUX_program_providers["ProgramProviders.lua"]
-        LINUX_program_runner["ProgramRunner.lua"]
         LINUX_screen_capture["ScreenCapture.lua"]
         LINUX_secure_field_detector["SecureFieldDetector.lua"]
         LINUX_selection_transaction["SelectionTransaction.lua"]
-        LINUX_shell_runner["ShellRunner.lua"]
         LINUX_spotlight_overlay["SpotlightOverlay.lua"]
-        LINUX_sqlite_process_worker["SqliteProcessWorker.lua"]
         LINUX_tap_to_click_setting["TapToClickSetting.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
@@ -122,7 +115,6 @@ graph TD
         MACOS_notifier["Notifier.lua"]
         MACOS_one_shot_shift["OneShotShift.lua"]
         MACOS_own_window["OwnWindow.lua"]
-        MACOS_owned_program_runner["OwnedProgramRunner.lua"]
         MACOS_physical_context_probe["PhysicalContextProbe.lua"]
         MACOS_physical_history_context["PhysicalHistoryContext.lua"]
         MACOS_physical_lifecycle_event["PhysicalLifecycleEvent.lua"]
@@ -131,8 +123,6 @@ graph TD
         MACOS_power_source["PowerSource.lua"]
         MACOS_prediction_tooltip_port["PredictionTooltipPort.lua"]
         MACOS_privacy_settings["PrivacySettings.lua"]
-        MACOS_process_lifecycle["ProcessLifecycle.lua"]
-        MACOS_program_providers["ProgramProviders.lua"]
         MACOS_python_interpreter["PythonInterpreter.lua"]
         MACOS_reload_breadcrumb["ReloadBreadcrumb.lua"]
         MACOS_running_application["RunningApplication.lua"]
@@ -140,16 +130,12 @@ graph TD
         MACOS_runtime_owner_ports["RuntimeOwnerPorts.lua"]
         MACOS_screen_capture["ScreenCapture.lua"]
         MACOS_secure_field_detector["SecureFieldDetector.lua"]
-        MACOS_shell_runner["ShellRunner.lua"]
         MACOS_synthetic_input["SyntheticInput.lua"]
         MACOS_synthetic_input_loopback_owner["SyntheticInputLoopbackOwner.lua"]
         MACOS_system_info["SystemInfo.lua"]
         MACOS_system_switcher_input["SystemSwitcherInput.lua"]
         MACOS_system_switcher_runtime["SystemSwitcherRuntime.lua"]
         MACOS_system_switcher_sampler["SystemSwitcherSampler.lua"]
-        MACOS_task_environment["TaskEnvironment.lua"]
-        MACOS_task_lifecycle["TaskLifecycle.lua"]
-        MACOS_task_output_turn["TaskOutputTurn.lua"]
         MACOS_tcc_grant["TccGrant.lua"]
         MACOS_text_sender["TextSender.lua"]
         MACOS_tooltip_renderer["TooltipRenderer.lua"]
@@ -185,14 +171,11 @@ graph TD
         WINDOWS_notifier["Notifier.ahk"]
         WINDOWS_notify_icon["NotifyIcon.ahk"]
         WINDOWS_ollama_identity["OllamaIdentity.ahk"]
-        WINDOWS_process_lifecycle["ProcessLifecycle.ahk"]
-        WINDOWS_program_providers["ProgramProviders.ahk"]
         WINDOWS_raw_input["RawInput.ahk"]
         WINDOWS_registry_notify["RegistryNotify.ahk"]
         WINDOWS_screen_brightness["ScreenBrightness.ahk"]
         WINDOWS_screen_capture["ScreenCapture.ahk"]
         WINDOWS_secure_field_detector["SecureFieldDetector.ahk"]
-        WINDOWS_shell_runner["ShellRunner.ahk"]
         WINDOWS_system_control["SystemControl.ahk"]
         WINDOWS_system_locale["SystemLocale.ahk"]
         WINDOWS_system_time_zone["SystemTimeZone.ahk"]
@@ -204,7 +187,6 @@ graph TD
         WINDOWS_tray_menu["TrayMenu.ahk"]
         WINDOWS_tray_startup_click["TrayStartupClick.ahk"]
         WINDOWS_tray_startup_commands["TrayStartupCommands.ahk"]
-        WINDOWS_uia_worker["UiaWorker.ahk"]
         WINDOWS_updater_curl_capture["UpdaterCurlCapture.ahk"]
         WINDOWS_user_hotstrings_native["UserHotstringsNative.ahk"]
         WINDOWS_webview_profiles["WebviewProfiles.ahk"]
@@ -225,7 +207,6 @@ graph TD
     P_GraphicsRenderer -->|implements| LINUX_graphics_renderer
     P_KeyboardHook -->|implements| LINUX_keyboard_hook
     P_Notifier -->|implements| LINUX_notifier
-    P_ProcessLifecycle -->|implements| LINUX_process_lifecycle
     P_SecureFieldDetector -->|implements| LINUX_secure_field_detector
     P_TrayMenu -->|implements| LINUX_tray_menu
     P_WindowInfo -->|implements| LINUX_window_info
@@ -239,7 +220,6 @@ graph TD
     P_KeyboardHook -->|implements| MACOS_keyboard_hook
     P_MouseControl -->|implements| MACOS_mouse_control
     P_Notifier -->|implements| MACOS_notifier
-    P_ProcessLifecycle -->|implements| MACOS_process_lifecycle
     P_SecureFieldDetector -->|implements| MACOS_secure_field_detector
     P_TextSender -->|implements| MACOS_text_sender
     P_TooltipRenderer -->|implements| MACOS_tooltip_renderer
@@ -256,7 +236,6 @@ graph TD
     P_KeyboardHook -->|implements| WINDOWS_keyboard_hook
     P_MouseControl -->|implements| WINDOWS_mouse_control
     P_Notifier -->|implements| WINDOWS_notifier
-    P_ProcessLifecycle -->|implements| WINDOWS_process_lifecycle
     P_SecureFieldDetector -->|implements| WINDOWS_secure_field_detector
     P_TextSender -->|implements| WINDOWS_text_sender
     P_TooltipRenderer -->|implements| WINDOWS_tooltip_renderer

@@ -6,7 +6,7 @@ local helpers = require("tests.helpers")
 local DF_OUTPUT = "Filesystem 512-blocks Used Available Capacity Mounted\n/dev/disk3s1 976 300 100 75% /\n"
 
 local MODULES = {
-	"adapters.shell_runner",
+	"core.process.adapters.shell_runner",
 	"core.events.timer_scheduler",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
@@ -102,7 +102,7 @@ local function with_fixture(callback)
 		})
 
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			run = function(executable, args, on_done)
 				local run = { executable = executable, args = args, on_done = on_done, terminated = 0 }
 				run.handle = { terminate = function()

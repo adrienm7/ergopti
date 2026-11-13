@@ -13,9 +13,9 @@ local function with_program(callback, program_admission)
 	local path = os.tmpname()
 	os.remove(path)
 	local tasks, actions, auxiliary = {}, nil, nil
-	local owned = { "modules.gestures.actions", "modules.gestures.actions_aux_owner", "adapters.shell_runner",
-		"adapters.owned_program_runner", "platform.remap.lease_helper", "core.crypto.crypto",
-		"adapters.task_environment", "core.fs.adapters.file_system", "core.events.timer_scheduler", "infra.preferences",
+	local owned = { "modules.gestures.actions", "modules.gestures.actions_aux_owner", "core.process.adapters.shell_runner",
+		"core.process.adapters.owned_program_runner", "platform.remap.lease_helper", "core.crypto.crypto",
+		"core.process.adapters.task_environment", "core.fs.adapters.file_system", "core.events.timer_scheduler", "infra.preferences",
 		"infra.config_paths", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.timings",
 		"modules.shortcuts.keyboard_shortcuts", "tests.stubs.hs", "hs" }
 	for _, name in ipairs(owned) do package.loaded[name] = nil end
@@ -272,7 +272,7 @@ helpers.describe("private run_program owned source admission", function()
 	helpers.it("fails closed when the exact supervised handle has no Boolean cleanup-debt receipt", function()
 		for _, receipt in ipairs({ "missing", "throw", "nil", "string", "number" }) do
 			with_program(function(actions, _, _, _, tasks)
-				local runner = require("adapters.shell_runner")
+				local runner = require("core.process.adapters.shell_runner")
 				local spawn = runner.spawn_private
 				runner.spawn_private = function(...)
 					local handle = spawn(...)
@@ -294,7 +294,7 @@ helpers.describe("private run_program owned source admission", function()
 
 	helpers.it("contains dispatch reentry from an owned cleanup-debt query", function()
 		with_program(function(actions, _, _, _, tasks)
-			local runner = require("adapters.shell_runner")
+			local runner = require("core.process.adapters.shell_runner")
 			local spawn, nested, attempted = runner.spawn_private, nil, false
 			runner.spawn_private = function(...)
 				local handle = spawn(...)
@@ -314,7 +314,7 @@ helpers.describe("private run_program owned source admission", function()
 
 	helpers.it("rechecks native cancellation invoked inside a cleanup query before successor admission", function()
 		with_program(function(actions, auxiliary, _, _, tasks)
-			local runner = require("adapters.shell_runner")
+			local runner = require("core.process.adapters.shell_runner")
 			local spawn = runner.spawn_private
 			runner.spawn_private = function(...)
 				local handle = spawn(...)

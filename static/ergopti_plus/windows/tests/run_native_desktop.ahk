@@ -56,8 +56,8 @@ global _LogsDir := A_Temp . "\ergopti_test_logs\" . AppDirsFolderName() . "\"
 global _DefaultLogsDir := _LogsDir
 #Include ../core/logger/engine/logger.ahk
 #Include ../core/fs/adapters/file_system.ahk
-#Include ../adapters/process_lifecycle.ahk
-#Include ../adapters/shell_runner.ahk
+#Include ../core/process/adapters/lifecycle.ahk
+#Include ../core/process/adapters/shell_runner.ahk
 #Include ../adapters/key_state.ahk
 #Include ../adapters/text_sender.ahk
 #Include ../ui/console_window.ahk

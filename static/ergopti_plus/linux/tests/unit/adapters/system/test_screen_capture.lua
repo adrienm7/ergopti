@@ -18,7 +18,7 @@
 
 local helpers = require("tests.helpers")
 local ScreenCapture = require("adapters.screen_capture")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 
 local EDGE = 1568
 

@@ -62,13 +62,13 @@ end)
 helpers.describe("opening selected content notifier privacy", function()
 	for _, mode in ipairs({ "unavailable", "refused" }) do
 		helpers.it("keeps the selected path out of the real notifier fallback when " .. mode, function()
-			local names = { "core.logger.engine.shim", "modules.shortcuts.open_selection", "adapters.notifier", "adapters.shell_runner" }
+			local names = { "core.logger.engine.shim", "modules.shortcuts.open_selection", "adapters.notifier", "core.process.adapters.shell_runner" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local logs = {}
 			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
 			package.loaded["core.logger.engine.shim"] = logger
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return mode ~= "unavailable" end,
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function() return false end,
@@ -94,13 +94,13 @@ end)
 helpers.describe("copied path notifier privacy", function()
 	for _, mode in ipairs({ "unavailable", "refused" }) do
 		helpers.it("keeps copied file paths out of the real notifier fallback when " .. mode, function()
-			local names = { "core.logger.engine.shim", "modules.shortcuts.open_selection", "adapters.notifier", "adapters.shell_runner" }
+			local names = { "core.logger.engine.shim", "modules.shortcuts.open_selection", "adapters.notifier", "core.process.adapters.shell_runner" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local logs, written = {}, nil
 			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
 			package.loaded["core.logger.engine.shim"] = logger
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return mode ~= "unavailable" end,
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function() return false end,

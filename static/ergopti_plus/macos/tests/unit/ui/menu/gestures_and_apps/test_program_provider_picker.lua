@@ -20,7 +20,7 @@ local function fixture(body)
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/controlled/shared" end }
 		package.loaded["infra.timings"] = Timings
-		package.loaded["adapters.program_providers"] = { create = function()
+		package.loaded["core.process.adapters.program_providers"] = { create = function()
 			local owner = { resolutions = 0, invalidations = 0, retired = false }
 			owner.discover = function() return { choices = { { key = "opaque-choice", label = "Reviewed provider" } } } end
 			owner.resolve = function(key)
@@ -57,7 +57,7 @@ local function fixture(body)
 		package.loaded["ui.menu.shortcut_utils"] = nil
 		package.loaded["adapters.apple_shortcuts_native"] = nil
 		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil end }
-		package.loaded["adapters.shell_runner"] = { run_async = function() error("native query forbidden") end }
+		package.loaded["core.process.adapters.shell_runner"] = { run_async = function() error("native query forbidden") end }
 		package.loaded["infra.dialog_util"] = {
 			text_prompt = function(_, _, _, save) return save, f.typed end,
 			block_alert = function(_, reason) f.warning = reason end,
@@ -85,7 +85,7 @@ local function fixture(body)
 	_G.hs = old_hs
 	for key in pairs(package.loaded) do if saved[key] == nil then package.loaded[key] = nil end end
 	for key, value in pairs(saved) do package.loaded[key] = value end
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(failure, 0) end
 end
 

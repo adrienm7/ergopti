@@ -163,7 +163,7 @@ end
 --- Opens today's log in the default application.
 --- @return boolean opened
 local function open_today_log()
-	local ShellRunner = require("adapters.shell_runner")
+	local ShellRunner = require("core.process.adapters.shell_runner")
 	return require("ui.log_openers").open_today_log(function(target) return (ShellRunner.open(target)) end)
 end
 

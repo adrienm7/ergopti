@@ -8,7 +8,7 @@ package.path = driver_root .. "/?.lua;" .. shared_root .. "/?.lua;" .. package.p
 local Errors = require("diagnostics.engine.adapter_errors")
 
 local uv = require("luv")
-local Owner = require("adapters.owned_process")
+local Owner = require("core.process.adapters.owned_process")
 local passed = 0
 local WAIT_MS = 5000
 

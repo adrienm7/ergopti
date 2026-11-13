@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local function snapshot_modules()
 	return {
 		http_client = package.loaded["core.network.adapters.http_client"],
-		shell_runner = package.loaded["adapters.shell_runner"],
+		shell_runner = package.loaded["core.process.adapters.shell_runner"],
 		timer_scheduler = package.loaded["core.events.timer_scheduler"],
 		discovery = package.loaded["modules.llm.api_mlx_discovery"],
 		hs_module = package.loaded["hs"],
@@ -81,7 +81,7 @@ local function make_env(options)
 		end,
 	}
 
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(_executable, _args, on_done)
 			local task = { on_done = on_done }
 			task.start = function()
@@ -151,7 +151,7 @@ end
 --- @param saved table Snapshot returned by snapshot_modules().
 local function restore_modules(saved)
 	package.loaded["core.network.adapters.http_client"] = saved.http_client
-	package.loaded["adapters.shell_runner"] = saved.shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved.shell_runner
 	package.loaded["core.events.timer_scheduler"] = saved.timer_scheduler
 	package.loaded["modules.llm.api_mlx_discovery"] = saved.discovery
 	package.loaded["hs"] = saved.hs_module

@@ -23,7 +23,7 @@ helpers.describe("AT-SPI focus query", function()
 	local previous_logger = package.loaded["core.logger.engine.shim"]
 	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 	local AtspiFocus = helpers.load_module("adapters.atspi_focus")
-	local ShellRunner = helpers.load_module("adapters.shell_runner")
+	local ShellRunner = helpers.load_module("core.process.adapters.shell_runner")
 
 	local function backend(root)
 		local released = {}

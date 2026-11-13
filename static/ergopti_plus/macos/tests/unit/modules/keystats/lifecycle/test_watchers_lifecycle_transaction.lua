@@ -30,7 +30,7 @@ local helpers = require("tests.helpers")
 -- ===========================================
 
 local MODULE_NAMES = {
-	"adapters.task_lifecycle",
+	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.logger.engine.logger",
 	"infra.timings",
@@ -193,7 +193,7 @@ local function with_fixture(options, scenario)
 			return options.timings and options.timings[key] or 1
 		end,
 	}
-	package.loaded["adapters.task_lifecycle"] = {
+	package.loaded["core.process.adapters.task_lifecycle"] = {
 		native = function() return nil end,
 		start = function() return false end,
 	}

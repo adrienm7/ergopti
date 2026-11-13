@@ -116,7 +116,7 @@ end
 --- @return boolean opened True when `open` was started.
 --- @return string|nil detail Exact failure otherwise.
 function M.open_permission_settings(on_done)
-	local started = require("adapters.shell_runner").open(M.settings_url(), on_done)
+	local started = require("core.process.adapters.shell_runner").open(M.settings_url(), on_done)
 	if started ~= true then return false, "open could not be started" end
 	return true
 end

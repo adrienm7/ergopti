@@ -443,7 +443,7 @@ helpers.describe("GC retention: EVERY native task site in the driver is pinned",
 				local code = src:gsub("%-%-[^\n]*", "")
 				-- TaskLifecycle owns construction only; its callers own the handle and
 				-- pin before start. Judge each caller launch, not the adapter's return.
-				local sites = helpers.module_name_of(rel) == "adapters.task_lifecycle" and {}
+				local sites = helpers.module_name_of(rel) == "core.process.adapters.task_lifecycle" and {}
 					or scan_unpinned_sites(src)
 				if code:find("hs%.task%.new%s*%(")
 						or code:find("pcall%s*%(%s*hs%.task%.new")
@@ -533,7 +533,7 @@ helpers.describe("GC retention: hs.task pinning", function()
 	end)
 
 	helpers.it("shell_runner: canonical GC-root table is present", function()
-		local src = read_source("local function invoke_guarded") -- adapters/shell_runner.lua
+		local src = read_source("local function invoke_guarded") -- core/process/adapters/shell_runner.lua
 		assert(src, "shell_runner.lua must exist")
 		assert(src:find("_active_tasks", 1, false),
 			"shell_runner: must maintain M._active_tasks as GC root for all spawned tasks")

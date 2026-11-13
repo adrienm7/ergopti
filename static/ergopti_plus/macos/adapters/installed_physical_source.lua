@@ -369,7 +369,7 @@ end
 function M.new(dependencies)
 	dependencies = dependencies or {}
 	local timer = dependencies.timer or require("core.events.timer_scheduler")
-	local shell = dependencies.shell or require("adapters.shell_runner")
+	local shell = dependencies.shell or require("core.process.adapters.shell_runner")
 	local codec = dependencies.codec or require("core.fs.adapters.json_codec")
 	local resolve = dependencies.resolve or resolve_real
 	local resolved, owner, acquired

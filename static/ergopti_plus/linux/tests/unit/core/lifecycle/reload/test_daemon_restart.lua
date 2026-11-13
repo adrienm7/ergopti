@@ -137,7 +137,7 @@ end)
 --- Runs each handoff with its own bootstrap file and restores all adapter ports.
 local function pause_handoff_fixture(body)
 	local Storage, Files = require("core.fs.adapters.storage"), require("core.fs.adapters.file_system")
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local folder = os.tmpname()
 	os.remove(folder)
 	assert(Shell.run("mkdir -p -- " .. Shell.quote(folder)) == true)

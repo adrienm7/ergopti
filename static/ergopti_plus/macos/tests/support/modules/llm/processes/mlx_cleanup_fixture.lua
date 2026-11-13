@@ -12,8 +12,8 @@ local M = {}
 local OWNED = {
 	"core.logger.engine.logger", "infra.notifications", "core.i18n.engine.i18n", "infra.config_paths",
 	"infra.text_utils", "infra.timings", "core.fs.engine.paths", "core.fs.adapters.storage",
-	"core.network.adapters.http_client", "core.fs.adapters.json_codec", "adapters.shell_runner",
-	"core.events.timer_scheduler", "adapters.task_lifecycle", "modules.llm.profiles",
+	"core.network.adapters.http_client", "core.fs.adapters.json_codec", "core.process.adapters.shell_runner",
+	"core.events.timer_scheduler", "core.process.adapters.task_lifecycle", "modules.llm.profiles",
 	"modules.llm.api_common", "modules.llm.api_mlx_inference", "modules.llm.api_mlx_fetch",
 	"modules.llm.api_mlx_discovery", "modules.llm.mlx_stream_retirement",
 	"modules.llm.api_mlx", "modules.llm.boot_cleanup",
@@ -57,12 +57,12 @@ function M.with_commands(callback)
 			package.loaded["core.fs.adapters.storage"] = { get = function() return nil end }
 			package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }
 			package.loaded["core.fs.adapters.json_codec"] = { decode = function() return nil end }
-			package.loaded["adapters.shell_runner"] = { spawn = capture }
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = capture }
 			package.loaded["core.events.timer_scheduler"] = {
 				awake_time = function() return 100 end,
 				after = function() return { timer = {} }, true end,
 			}
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(_, executable, _, third, fourth)
 					return capture(executable, fourth or third)
 				end,

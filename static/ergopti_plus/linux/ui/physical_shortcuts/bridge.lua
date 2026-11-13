@@ -162,7 +162,7 @@ function M.open(options)
 					local spec = Gestures.get_action_parameter_spec(id)
 					if spec and parameter == nil then
 						if spec == "app" then
-							parameter = require("ui.app_chooser").pick(require("adapters.shell_runner"),Gestures.get_action_parameter_prompt(id))
+							parameter = require("ui.app_chooser").pick(require("core.process.adapters.shell_runner"),Gestures.get_action_parameter_prompt(id))
 						elseif require("ui.user_action_editor").KINDS[spec] then
 							parameter = require("ui.user_action_editor").ask(spec,I18n.get("physical_shortcuts.window_title"),
 								Gestures.get_action_parameter_prompt(id),Gestures.get_action_parameter(binding,id))

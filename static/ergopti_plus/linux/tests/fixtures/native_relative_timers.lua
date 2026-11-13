@@ -7,7 +7,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
 local Scheduler = require("core.events.timer_scheduler")
-local Process = require("adapters.process_runner")
+local Process = require("core.process.adapters.runner")
 local checks, failures = 0, 0
 
 local function await(predicate)

@@ -36,7 +36,7 @@ local Paths       = require("core.fs.engine.paths")
 local NativePath  = require("core.fs.engine.native_path")
 local FileSystem  = require("core.fs.adapters.file_system")
 local JsonCodec   = require("core.fs.adapters.json_codec")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 local Archives    = require("updater.engine.release_assets")
 local ProxyPolicy = require("core.network.engine.proxy_policy_core")
 

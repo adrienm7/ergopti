@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.support.logger_fixture").helpers({
-	"infra.phase_stats", "adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "core.logger.engine.boot_profiler",
+	"infra.phase_stats", "core.process.adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "core.logger.engine.boot_profiler",
 	"core.logger.engine.perf_counters", "core.text.engine.toml_codec.reader",
 })
 
@@ -89,7 +89,7 @@ end)
 helpers.describe("phase stats: child processes", function()
 	helpers.it("times a synchronous child as process.<program> through the shell runner", function()
 		local stats = fixture(20)
-		local runner = helpers.load_module("adapters.shell_runner")
+		local runner = helpers.load_module("core.process.adapters.shell_runner")
 		helpers.assert_true(runner.run("true"))
 		local figures = stats.figures("process.true")
 		helpers.assert_not_nil(figures, "the runner must record the child's duration")
@@ -98,7 +98,7 @@ helpers.describe("phase stats: child processes", function()
 
 	helpers.it("names the program, never the command line", function()
 		local stats, lines = fixture(20)
-		local runner = helpers.load_module("adapters.shell_runner")
+		local runner = helpers.load_module("core.process.adapters.shell_runner")
 		-- A marker without digits: the flushed lines carry durations and
 		-- timestamps, and "4711" once matched one of them on a CI runner.
 		runner.run("true --secret-argument-qzxwv")

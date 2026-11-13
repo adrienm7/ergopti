@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local h = require("tests.helpers")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 -- The owned dialog host's command words every native site starts with.
 local DIALOG = require("ui.native_dialog").command()
 
@@ -17,7 +17,7 @@ local DIALOG = require("ui.native_dialog").command()
 --- @param body function Receives effect observations and a shell authority.
 local function scenario(body)
 	local names = { "ui.text_prompt", "ui.app_chooser", "ui.config_dir_picker", "ui.gesture_conflicts",
-		"modules.gestures.system_actions", "core.i18n.engine.i18n", "adapters.shell_runner", "ui.modal",
+		"modules.gestures.system_actions", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "ui.modal",
 		"core.fs.adapters.storage", "core.events.loop", "adapters.keyboard_hook",
 		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "infra.manifest_menu" }
 	local saved, observed = {}, { commands = {}, modals = 0, queued = {}, writes = {} }
@@ -52,7 +52,7 @@ local function scenario(body)
 			return accepted, observed.answer or "", accepted and nil or "command exited with status 1", accepted and nil or require("diagnostics.engine.adapter_errors").COMMAND_EXITED_NONZERO, accepted and nil or 1
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = shell
+	package.loaded["core.process.adapters.shell_runner"] = shell
 	io.popen = function(command)
 		observed.commands[#observed.commands + 1] = command
 		return { read = function() return observed.answer end, close = function() return observed.status end }
@@ -397,7 +397,7 @@ local function picker_exit_receipt(status, output, application_root)
 		write(executable, "#!/bin/sh\nprintf '%s' " .. Shell.quote(output) .. "\nexit " .. status .. "\n")
 		assert(Shell.run("chmod u+x " .. Shell.quote(executable)))
 		write(worker, "package.path = " .. string.format("%q", package.path) .. "\n"
-			.. "local shell = require('adapters.shell_runner')\n"
+			.. "local shell = require('core.process.adapters.shell_runner')\n"
 			-- The private executable stands in for the owned dialog host.
 			.. "package.loaded['ui.native_dialog'] = { command = function() return shell.quote(" .. string.format("%q", executable) .. ") end }\n"
 			.. "local modals = 0\n"

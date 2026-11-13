@@ -16,7 +16,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local OpenSSL = require("core.network.engine.openssl_command")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Base64 = require("core.lifecycle.engine.compat.base64")
 local NativeDigest = require("core.network.engine.openssl_digest")
 

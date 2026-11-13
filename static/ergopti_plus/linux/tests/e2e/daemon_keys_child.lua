@@ -284,7 +284,7 @@ end
 local WITH_LLM = os.getenv("ERGOPTI_E2E_LLM") == "1"
 for _, name in ipairs(MENU_ROWS_FILE and {} or { "ui.tooltip.preview", "ui.tooltip.llm", "adapters.tray_menu",
 	"ui.menu.builder", "modules.updater.manager",
-	"modules.gestures.manager", "adapters.window_info", "adapters.process_lifecycle",
+	"modules.gestures.manager", "adapters.window_info", "core.process.adapters.lifecycle",
 	"ui.webview_manager",
 	"core.fs.engine.file_watchers", "ui.wpm.widget", "modules.keystats.system_metrics", "adapters.notifier" }) do
 	package.preload[name] = function() error("disabled for the daemon key scenarios") end

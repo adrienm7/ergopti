@@ -55,10 +55,10 @@ end
 -- is a separate production debt. The stock builder's daily loop remains below.
 local function with_foreground(port, callback)
 	helpers.with_stub_scope({
-		"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "adapters.shell_runner",
+		"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "core.process.adapters.shell_runner",
 		"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 		"modules.llm.ollama_binary", "modules.llm.ollama_server_command", "modules.llm.managed_native_python",
-		"modules.llm.ollama_endpoint", "core.fs.adapters.file_system", "adapters.task_lifecycle",
+		"modules.llm.ollama_endpoint", "core.fs.adapters.file_system", "core.process.adapters.task_lifecycle",
 		"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 		"modules.llm.progressive_reveal", "core.logger.engine.logger", "infra.notifications", "core.i18n.engine.i18n",
@@ -127,7 +127,7 @@ local function with_foreground(port, callback)
 			fixture.builds[#fixture.builds + 1] = table.pack(...)
 			return build(...)
 		end
-		fixture.api, fixture.overrides, fixture.shell = api, overrides, require("adapters.shell_runner")
+		fixture.api, fixture.overrides, fixture.shell = api, overrides, require("core.process.adapters.shell_runner")
 		fixture.owner_script, fixture.nonce = owner_script, nonce
 		local ok, err = xpcall(function() callback(fixture) end, debug.traceback)
 		for _, task in ipairs(fixture.tasks) do
@@ -264,7 +264,7 @@ helpers.describe("Ollama daemon log rollover", function()
 				return true
 			end,
 		}
-		package.loaded["adapters.task_lifecycle"] = nil
+		package.loaded["core.process.adapters.task_lifecycle"] = nil
 		Logger.today_log_path = function() return SENTINEL_LOG end
 
 		local Checker = helpers.load_with_stubs("modules.llm.ollama_deps_checker", {

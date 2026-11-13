@@ -51,7 +51,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
 local X11Focus = require("adapters.x11_focus")
 

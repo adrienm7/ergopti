@@ -23,7 +23,7 @@ local OWNED_MODULES = {
 	"adapters.synthetic_input",
 	"core.events.timer_scheduler",
 	"adapters.key_state",
-	"adapters.task_lifecycle",
+	"core.process.adapters.task_lifecycle",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
 	"modules.keystats",
@@ -320,7 +320,7 @@ end
 --- @return table manager Exact requirements manager.
 --- @return table module Manager module exposing the canonical GC root.
 local function build_manager(script_control, shared_system_check)
-	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	local manager_module = require("ui.menu.menu_llm.models_manager_mlx")
 	local presets = {
 		{

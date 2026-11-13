@@ -12,7 +12,7 @@ helpers.describe("hotstring priority overrides", function()
 		local Engine = helpers.load_module("modules.hotstrings.engine")
 		local previous_config = package.loaded["modules.hotstrings.hotstrings_config"]
 		local previous_paths = package.loaded["infra.config_paths"]
-		local previous_shell = package.loaded["adapters.shell_runner"]
+		local previous_shell = package.loaded["core.process.adapters.shell_runner"]
 		local previous_storage = package.loaded["core.fs.adapters.storage"]
 		local previous_load_catalogue = Loader.load_catalogue
 		local previous_open = io.open
@@ -100,7 +100,7 @@ helpers.describe("hotstring priority overrides", function()
 			package.loaded["infra.config_paths"] = {
 				config = function() return "/virtual-home/.config/ergopti" end,
 			}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function(command)
 					created_config_dir = command
@@ -283,7 +283,7 @@ helpers.describe("hotstring priority overrides", function()
 		os.remove(choice_path .. ".tmp"); os.remove(helpers.stage_path(choice_path))
 		Loader.load_catalogue = previous_load_catalogue
 		package.loaded["core.fs.adapters.storage"] = previous_storage
-		package.loaded["adapters.shell_runner"] = previous_shell
+		package.loaded["core.process.adapters.shell_runner"] = previous_shell
 		package.loaded["infra.config_paths"] = previous_paths
 		package.loaded["modules.hotstrings.hotstrings_config"] = previous_config
 		if not ok then error(failure, 0) end
@@ -316,9 +316,9 @@ helpers.describe("hotstring override leaf ownership", function()
 		local old_open, old_rename, old_remove = io.open, os.rename, os.remove
 		local NativeWriter = require("core.fs.engine.regular_file_writer")
 		local old_stage = NativeWriter.open
-		local old_shell = package.loaded["adapters.shell_runner"]
+		local old_shell = package.loaded["core.process.adapters.shell_runner"]
 		local ok, failure = xpcall(function()
-			package.loaded["adapters.shell_runner"] = nil
+			package.loaded["core.process.adapters.shell_runner"] = nil
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			local config = require("modules.hotstrings.hotstrings_config")
 			assert(config._set_override_config_dir_for_test(root))
@@ -330,7 +330,7 @@ helpers.describe("hotstring override leaf ownership", function()
 		end, debug.traceback)
 		io.open, os.rename, os.remove, NativeWriter.open = old_open, old_rename, old_remove, old_stage
 		package.loaded["modules.hotstrings.hotstrings_config"] = old_config
-		package.loaded["adapters.shell_runner"] = old_shell
+		package.loaded["core.process.adapters.shell_runner"] = old_shell
 		os.remove(path .. ".tmp"); os.remove(helpers.stage_path(path))
 		os.remove(path)
 		os.remove(choices)

@@ -49,7 +49,7 @@ local CONTRACT = {
 	{ mod = "adapters.accessibility_permission", fns = { "is_trusted" } },
 	{ mod = "adapters.screen_capture",          fns = { "permission_state" } },
 	{ mod = "core.network.adapters.http_client",             fns = { "new" } },
-	{ mod = "adapters.shell_runner",            fns = { "spawn" } },
+	{ mod = "core.process.adapters.shell_runner",            fns = { "spawn" } },
 	{ mod = "core.fs.adapters.json_codec",              fns = { "decode" } },
 	{ mod = "adapters.clipboard",               fns = { "write" } },
 	{ mod = "adapters.notifier",                fns = { "send" } },

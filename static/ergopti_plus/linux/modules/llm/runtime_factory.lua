@@ -43,7 +43,7 @@ function M.new(engine, profiles)
 		path = require("infra.config_paths").config("config.toml"),
 	})
 	local process = require("ai.engine.policy.process_port").new(require("core.lifecycle.engine.native_worker_owner"),
-		require("adapters.owned_process"), native, Timings.ms("llm", "poll_interval_ms"))
+		require("core.process.adapters.owned_process"), native, Timings.ms("llm", "poll_interval_ms"))
 	local timer = require("modules.llm.owned_timer").new(native, require("infra.native_timer"))
 	local installed = require("modules.llm.ollama_installed_runtime")
 	local controller = require("modules.llm.runtime_composition").new({

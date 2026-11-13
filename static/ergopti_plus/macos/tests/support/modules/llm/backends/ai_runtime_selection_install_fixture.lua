@@ -164,7 +164,7 @@ local function load_api(state, daemon)
 		state.http_clients[#state.http_clients + 1] = client
 		return client
 	end }
-	package.loaded["adapters.shell_runner"] = { spawn = function(program, args, done, chunk, environment, private, owned)
+	package.loaded["core.process.adapters.shell_runner"] = { spawn = function(program, args, done, chunk, environment, private, owned)
 		helpers.assert_eq(program, "/bin/sh")
 		helpers.assert_eq(private, true)
 		helpers.assert_eq(owned, true)
@@ -234,7 +234,7 @@ local function load_ollama_checker(state, daemon)
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,
 	}
-	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	local checker = helpers.load_with_stubs("modules.llm.ollama_deps_checker", {
 		fs = fake_fs(state),
@@ -257,7 +257,7 @@ local function load_mlx_checker(state)
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,
 	}
-	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	return helpers.load_with_stubs("modules.llm.mlx_deps_checker", {
 		fs = fake_fs(state),
@@ -281,17 +281,17 @@ end
 
 local STUBBED_MODULES = {
 	"ui.download_window", "modules.llm.ollama_binary", "modules.llm.api_ollama",
-	"modules.llm.pty_process_group", "adapters.task_lifecycle",
+	"modules.llm.pty_process_group", "core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler", "modules.llm.ollama_deps_checker",
 	"modules.llm.mlx_deps_checker", "infra.dialog_util", "infra.notifications",
 	"ui.menu.menu_llm.runtime_install_offer",
 	"modules.llm.network_env", "core.fs.adapters.file_system",
 	"adapters.managed_ollama_hint", "adapters.managed_ollama_daemon",
-	"core.network.adapters.http_client", "adapters.shell_runner", "core.fs.adapters.json_codec",
+	"core.network.adapters.http_client", "core.process.adapters.shell_runner", "core.fs.adapters.json_codec",
 	"modules.llm.ollama_server_command", "modules.llm.parser", "modules.llm.profiles",
 	"modules.llm.progressive_reveal", "modules.llm.prediction_engine",
 	"ui.menu.menu_llm.models_manager_ollama", "modules.llm.api_common",
-	"modules.llm.ollama_endpoint", "core.fs.adapters.storage", "adapters.owned_program_runner",
+	"modules.llm.ollama_endpoint", "core.fs.adapters.storage", "core.process.adapters.owned_program_runner",
 	"platform.remap.lease_helper", "modules.shortcuts.script_control", "modules.keystats",
 	"core.lifecycle.engine.core.ollama_runtime_choice", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "ai.engine.ollama.local_model_policy",

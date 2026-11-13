@@ -23,7 +23,10 @@
 		"divergent": false
 	},
 	"DEFAULT_MAX_OUTPUT_BYTES": {
-		"files": ["linux/adapters/owned_process.lua", "linux/adapters/process_runner.lua"],
+		"files": [
+			"linux/core/process/adapters/owned_process.lua",
+			"linux/core/process/adapters/runner.lua"
+		],
 		"divergent": false
 	},
 	"HEADER_BYTES": {
@@ -125,7 +128,7 @@
 		"divergent": false
 	},
 	"WINDOW_MS": {
-		"files": ["windows/adapters/shell_runner.ahk", "windows/ui/wpm/wpm_display.ahk"],
+		"files": ["windows/core/process/adapters/shell_runner.ahk", "windows/ui/wpm/wpm_display.ahk"],
 		"divergent": false
 	}
 }

@@ -12,7 +12,7 @@ local fs      = helpers.load_module("core.fs.adapters.file_system")
 --- Owns source, staging and all faulted native streams for one codec attempt.
 --- @param body function Receives codec, source path and controlled receipts.
 local function with_toml_staging(body)
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local Writer, Native = require("core.text.engine.toml_codec.writer"), require("core.fs.engine.regular_file_writer")
 	local open, native_open, rename = io.open, Native.open, os.rename
 	local folder = os.tmpname()
@@ -438,7 +438,7 @@ helpers.describe("Linux TOML staging admission", function()
 		for _, kind in ipairs(entry == "portable" and { "missing" } or { "fifo", "symlink", "hardlink", "regular", "directory", "missing" }) do
 			helpers.it("(toml-staging-admission) bounds " .. entry .. " " .. kind, function()
 				with_toml_staging(function(_, _, state)
-					local Shell = require("adapters.shell_runner")
+					local Shell = require("core.process.adapters.shell_runner")
 					local fixture = helpers.driver_root() .. "/tests/fixtures/native_toml_staging.lua"
 					helpers.assert_true(Shell.run("timeout --kill-after=2 5 " .. Shell.quote(assert(arg[-1]))
 						.. " " .. Shell.quote(fixture) .. " " .. Shell.quote(state.folder) .. " " .. Shell.quote(kind) .. " " .. Shell.quote(entry)),
@@ -503,7 +503,7 @@ helpers.describe("Linux TOML staging image", function()
 		for _, mutation in ipairs({ "replace", "rewrite", "symlink", "directory", "fifo", "same-image", "healthy" }) do
 			helpers.it("(toml-staging-image) checks " .. entry .. " after " .. mutation .. " admission", function()
 				with_toml_staging(function(Writer, path, state)
-					local Shell, uv = require("adapters.shell_runner"), require("luv")
+					local Shell, uv = require("core.process.adapters.shell_runner"), require("luv")
 					local before, wanted, borrowed = "[demo]\nvalue = 1\n", "[demo]\nvalue = 2\n", "[demo]\nvalue = 9\n"
 					state.write(path, before)
 					local stage, retained, target = helpers.stage_path(path), state.folder .. "/retained", state.folder .. "/target"
@@ -1020,7 +1020,7 @@ end)
 local function with_exists_backend(backend, result, test)
 	local previous_require, previous_open = require, io.open
 	local previous_files = package.loaded["core.fs.adapters.file_system"]
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local previous_run = Shell.run
 	local state = { stats = 0, opens = 0, commands = {} }
 	local function stat(path)

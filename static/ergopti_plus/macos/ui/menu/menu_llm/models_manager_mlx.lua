@@ -18,7 +18,7 @@ local Logger = require("core.logger.engine.logger")
 local fs_dir       = require("core.fs.engine.dir")
 local i18n = require("core.i18n.engine.i18n")
 local ApiCommon = require("modules.llm.api_common")
-local TaskLifecycle = require("adapters.task_lifecycle")
+local TaskLifecycle = require("core.process.adapters.task_lifecycle")
 local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
 local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 

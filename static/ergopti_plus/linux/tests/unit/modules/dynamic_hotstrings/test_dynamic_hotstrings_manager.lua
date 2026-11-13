@@ -56,7 +56,7 @@ helpers.describe("dynamic hotstrings manager", function()
 
     helpers.it("personal info FIFO is refused without blocking dynamic initialization", function()
       local uv = require("luv")
-      local shell = require("adapters.shell_runner")
+      local shell = require("core.process.adapters.shell_runner")
       local path = os.tmpname()
       os.remove(path)
       assert(shell.run("mkfifo -- " .. shell.quote(path)))

@@ -15,7 +15,7 @@ local fixture = require("tests.support.text_owner_fixture")
 --- @param body function Receives result, wire, writes, state and stopped count.
 local function injection(boundary, body)
 	fixture.with(function(guard, state)
-		local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server",
+		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server",
 			"adapters.keyboard_layout", "modules.hotstrings.injector", "adapters.keyboard_hook", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -39,7 +39,7 @@ local function injection(boundary, body)
 			end
 		end
 		local clipboard = "SAVED"
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function() return true end,
 			-- A completed write is what the next read sees, as on a real clipboard.
 			exec_checked = function(command)

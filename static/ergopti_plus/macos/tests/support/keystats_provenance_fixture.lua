@@ -124,7 +124,7 @@ function M.load_keystats()
 		perform_maintenance = function() end,
 		caffeinate_cb = function() end,
 	}
-	package.loaded["adapters.process_lifecycle"] = {
+	package.loaded["core.process.adapters.lifecycle"] = {
 		onAppActivate = function(callback) return type(callback) == "function" end,
 		start = function() return true end,
 		stop = function() return true end,

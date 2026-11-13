@@ -348,7 +348,7 @@ local function with_native_session(callback)
 	local names = { "modules.keystats.physical_history_session", "adapters.physical_history_context",
 		"adapters.physical_observation_clock", "modules.keystats.physical_capture", "modules.keystats",
 		"modules.keystats.context_tracker", "modules.keystats.watchers", "modules.shortcuts.script_control",
-		"adapters.shell_runner", "modules.keystats.physical_key_identity", "modules.keystats.log_manager" }
+		"core.process.adapters.shell_runner", "modules.keystats.physical_key_identity", "modules.keystats.log_manager" }
 	helpers.with_fresh_modules(names, function()
 		local c, time, subscriber = { calls = {}, stops = 0, releases = 0, refusals = 0 }, 0, nil
 		local capture_token, clock_token = {}, {}
@@ -424,7 +424,7 @@ local function with_native_session(callback)
 		package.loaded["modules.keystats.context_tracker"] = { bind_physical_correlated_context_observer = binder("context", true) }
 		package.loaded["modules.keystats.watchers"] = { bind_physical_lifecycle_observer = binder("system") }
 		package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = binder("pause") }
-		package.loaded["adapters.shell_runner"] = { spawn = spawn }
+		package.loaded["core.process.adapters.shell_runner"] = { spawn = spawn }
 		package.loaded["modules.keystats.physical_key_identity"] = { resolve = keycode }
 		package.loaded["modules.keystats.log_manager"] = { log_physical_press = emit, log_physical_release = emit_release }
 		local adapter = require("modules.keystats.physical_history_session")
@@ -550,7 +550,7 @@ helpers.describe("physical history consumption by the actual capture owner", fun
 		Fixture.run(function(capture, observed, controls)
 			local names = { "modules.keystats.physical_history_session", "adapters.physical_history_context",
 				"adapters.physical_observation_clock", "modules.keystats", "modules.keystats.context_tracker",
-				"modules.keystats.watchers", "modules.shortcuts.script_control", "adapters.shell_runner",
+				"modules.keystats.watchers", "modules.shortcuts.script_control", "core.process.adapters.shell_runner",
 				"modules.keystats.physical_key_identity", "modules.keystats.log_manager" }
 			helpers.with_fresh_modules(names, function()
 				local native, sample, ns = hs, nil, 0
@@ -585,7 +585,7 @@ helpers.describe("physical history consumption by the actual capture owner", fun
 					package.loaded["modules.keystats.context_tracker"] = { bind_physical_correlated_context_observer = binder("context", true) }
 					package.loaded["modules.keystats.watchers"] = { bind_physical_lifecycle_observer = binder("system") }
 					package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = binder("pause") }
-					package.loaded["adapters.shell_runner"] = { spawn = controls.dependencies.spawn }
+					package.loaded["core.process.adapters.shell_runner"] = { spawn = controls.dependencies.spawn }
 					package.loaded["modules.keystats.physical_key_identity"] = { resolve = controls.dependencies.keycode }
 					package.loaded["modules.keystats.log_manager"] = {
 						log_physical_press = controls.dependencies.emit, log_physical_release = controls.dependencies.emit_release }
@@ -1210,7 +1210,7 @@ local function with_native_session(callback)
 	local names = { "modules.keystats.physical_history_session", "adapters.physical_history_context",
 		"adapters.physical_observation_clock", "modules.keystats.physical_capture", "modules.keystats",
 		"modules.keystats.context_tracker", "modules.keystats.watchers", "modules.shortcuts.script_control",
-		"adapters.shell_runner", "modules.keystats.physical_key_identity", "modules.keystats.log_manager" }
+		"core.process.adapters.shell_runner", "modules.keystats.physical_key_identity", "modules.keystats.log_manager" }
 	helpers.with_fresh_modules(names, function()
 		local c, time, subscriber = { calls = {}, stops = 0, releases = 0, refusals = 0, counts = {}, fifth = {} }, 0, nil
 		local capture_token, clock_token = {}, {}
@@ -1288,7 +1288,7 @@ local function with_native_session(callback)
 		package.loaded["modules.keystats.context_tracker"] = { bind_physical_correlated_context_observer = binder("context", true) }
 		package.loaded["modules.keystats.watchers"] = { bind_physical_lifecycle_observer = binder("system") }
 		package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = binder("pause") }
-		package.loaded["adapters.shell_runner"] = { spawn = spawn }
+		package.loaded["core.process.adapters.shell_runner"] = { spawn = spawn }
 		package.loaded["modules.keystats.physical_key_identity"] = { resolve = keycode }
 		package.loaded["modules.keystats.log_manager"] = { log_physical_press = emit, log_physical_release = emit_release }
 		local adapter = require("modules.keystats.physical_history_session")
@@ -1462,7 +1462,7 @@ local function with_managed_session(options, callback)
 	local names = { "modules.keystats.physical_history_session", "adapters.physical_history_context",
 		"adapters.physical_observation_clock", "core.events.timer_scheduler", "metrics.engine.capture.physical_lease_policy",
 		"modules.keystats", "modules.keystats.context_tracker", "modules.keystats.watchers",
-		"modules.shortcuts.script_control", "adapters.shell_runner", "modules.keystats.physical_key_identity",
+		"modules.shortcuts.script_control", "core.process.adapters.shell_runner", "modules.keystats.physical_key_identity",
 		"modules.keystats.log_manager", "modules.keystats.physical_protocol", "modules.keystats.physical_transport",
 		"modules.keystats.physical_delivery" }
 	helpers.with_fresh_modules(names, function()
@@ -1546,7 +1546,7 @@ local function with_managed_session(options, callback)
 				end }
 			package.loaded["modules.keystats.watchers"] = { bind_physical_lifecycle_observer = actor_source("system") }
 			package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = actor_source("pause") }
-			package.loaded["adapters.shell_runner"] = { spawn = native.dependencies.spawn }
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = native.dependencies.spawn }
 			package.loaded["modules.keystats.physical_key_identity"] = { resolve = native.dependencies.keycode }
 			package.loaded["modules.keystats.log_manager"] = { log_physical_press = native.dependencies.emit,
 				log_physical_release = native.dependencies.emit_release }
@@ -1951,7 +1951,7 @@ local function with_native_session(callback)
 	local names = { "modules.keystats.physical_history_session", "adapters.physical_history_context",
 		"adapters.physical_observation_clock", "modules.keystats.physical_capture", "modules.keystats",
 		"modules.keystats.context_tracker", "modules.keystats.watchers", "modules.shortcuts.script_control",
-		"adapters.shell_runner", "modules.keystats.physical_key_identity", "modules.keystats.log_manager" }
+		"core.process.adapters.shell_runner", "modules.keystats.physical_key_identity", "modules.keystats.log_manager" }
 	helpers.with_fresh_modules(names, function()
 		local c, time, subscriber = { calls = {}, stops = 0, releases = 0, refusals = 0, counts = {}, fifth = {} }, 0, nil
 		local capture_token, clock_token = {}, {}
@@ -2029,7 +2029,7 @@ local function with_native_session(callback)
 		package.loaded["modules.keystats.context_tracker"] = { bind_physical_correlated_context_observer = binder("context", true) }
 		package.loaded["modules.keystats.watchers"] = { bind_physical_lifecycle_observer = binder("system") }
 		package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = binder("pause") }
-		package.loaded["adapters.shell_runner"] = { spawn = spawn }
+		package.loaded["core.process.adapters.shell_runner"] = { spawn = spawn }
 		package.loaded["modules.keystats.physical_key_identity"] = { resolve = keycode }
 		package.loaded["modules.keystats.log_manager"] = { log_physical_press = emit, log_physical_release = emit_release }
 		local adapter = require("modules.keystats.physical_history_session")
@@ -2082,7 +2082,7 @@ local function with_managed_session(options, callback)
 	local names = { "modules.keystats.physical_history_session", "adapters.physical_history_context",
 		"adapters.physical_observation_clock", "core.events.timer_scheduler", "metrics.engine.capture.physical_lease_policy",
 		"modules.keystats", "modules.keystats.context_tracker", "modules.keystats.watchers",
-		"modules.shortcuts.script_control", "adapters.shell_runner", "modules.keystats.physical_key_identity",
+		"modules.shortcuts.script_control", "core.process.adapters.shell_runner", "modules.keystats.physical_key_identity",
 		"modules.keystats.log_manager", "modules.keystats.physical_protocol", "modules.keystats.physical_transport",
 		"modules.keystats.physical_delivery" }
 	helpers.with_fresh_modules(names, function()
@@ -2166,7 +2166,7 @@ local function with_managed_session(options, callback)
 				end }
 			package.loaded["modules.keystats.watchers"] = { bind_physical_lifecycle_observer = actor_source("system") }
 			package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = actor_source("pause") }
-			package.loaded["adapters.shell_runner"] = { spawn = native.dependencies.spawn }
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = native.dependencies.spawn }
 			package.loaded["modules.keystats.physical_key_identity"] = { resolve = native.dependencies.keycode }
 			package.loaded["modules.keystats.log_manager"] = { log_physical_press = native.dependencies.emit,
 				log_physical_release = native.dependencies.emit_release }

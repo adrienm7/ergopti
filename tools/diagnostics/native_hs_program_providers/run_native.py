@@ -33,7 +33,7 @@ CONTRACT = "macos-native-hs-program-providers"
 BYTE_LIMIT = 32768
 TIMEOUT = 45
 PINS = (
-    "static/ergopti_plus/macos/adapters/program_providers.lua",
+    "static/ergopti_plus/macos/core/process/adapters/program_providers.lua",
     "static/ergopti_plus/macos/core/fs/engine/dir.lua",
     "static/ergopti_plus/_shared/apps/engine/program_providers.lua",
     "static/ergopti_plus/_shared/shortcuts/data/actions/program_providers.json",

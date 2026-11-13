@@ -42,7 +42,7 @@ end
 --- @param text string
 --- @return boolean|nil nil when no native question could be shown.
 local function confirm(title, text, opts)
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	title = require("core.ui.engine.window_titles").compose(title)
 	local command = require("ui.native_dialog").command() .. " --question --no-markup --default-cancel --title="
 		.. Shell.quote(title) .. " --text=" .. Shell.quote(text)

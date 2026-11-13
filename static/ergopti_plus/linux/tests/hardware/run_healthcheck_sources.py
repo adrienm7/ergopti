@@ -35,7 +35,7 @@ elseif kind == "cpu" then
     package.loaded["core.events.timer_scheduler"] = { HAS_ASYNC = true,
         after = function() return { armed = true } end, cancel = function() return true end }
     package.loaded["core.network.adapters.http_client"] = { HAS_ASYNC = false }
-    package.loaded["adapters.shell_runner"] = { HAS_ASYNC = false, has_command = function() return false end }
+    package.loaded["core.process.adapters.shell_runner"] = { HAS_ASYNC = false, has_command = function() return false end }
     local results = {}
     local run = require("ui.healthcheck.probes").start(schema, {}, {}, function(id, result) results[id] = result end)
     if regular then assert(results.cpu_load == nil, "valid first sample must wait for the timer")

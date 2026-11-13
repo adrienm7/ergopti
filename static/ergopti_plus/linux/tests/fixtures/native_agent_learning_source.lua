@@ -14,7 +14,7 @@ require("core.lifecycle.engine.compat.utf8").install()
 
 local folder, kind, mode = assert(arg[1]), assert(arg[2]), assert(arg[3])
 local path, target = folder .. "/source", folder .. "/target"
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Json = require("core.text.engine.json")
 local Learning = require("modules.llm.agent_learning")
 local function run(command) assert(Shell.run(command), "fixture command failed: " .. command) end

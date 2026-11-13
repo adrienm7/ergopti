@@ -37,7 +37,7 @@ local Monotonic = require("core.logger.engine.monotonic")
 local reload_gate = require("core.lifecycle.engine.reload.gate")
 local FileSystem = require("core.fs.adapters.file_system")
 local RuntimeLog = require("diagnostics.engine.runtime_log")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local NativePath = require("core.fs.engine.native_path")
 local LOG = "file_watchers"
 

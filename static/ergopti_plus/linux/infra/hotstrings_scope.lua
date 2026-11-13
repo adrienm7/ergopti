@@ -42,7 +42,7 @@ local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 -- The category personal.toml loads as (ui/hotstring_editor/bridge.lua).
 local PERSONAL_CATEGORY = "personal"
 local ScopeFile = require("settings.engine.scope.file")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Logger = require("core.logger.engine.shim")
 local ConfigKeys = require("settings.engine.keys")
 

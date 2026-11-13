@@ -522,7 +522,7 @@ function M.timezone()
 	end
 	local line = first_line("/etc/timezone")
 	if line and line:match("^[%w_%+%-]+/[%w_%+%-/]+$") then return line end
-	local target = require("adapters.shell_runner").exec_line("readlink -f /etc/localtime 2>/dev/null")
+	local target = require("core.process.adapters.shell_runner").exec_line("readlink -f /etc/localtime 2>/dev/null")
 	local zone = type(target) == "string" and target:match(ZONEINFO_MARKER .. "(.+)$") or nil
 	if zone and zone ~= "" then return zone end
 	return nil

@@ -708,7 +708,7 @@ helpers.describe("Linux local server discovery ownership", function()
 		scanner._list_proc = function() return { "1" } end
 		scanner._read_cmdline = function() return "/usr/bin/omlx-server\0" end
 		scanner._owned_process = function(_, _, options, callback)
-			return require("adapters.owned_process").start("/bin/sleep", { "10" }, options, callback)
+			return require("core.process.adapters.owned_process").start("/bin/sleep", { "10" }, options, callback)
 		end
 		local ok, failure = pcall(isolated, function(servers)
 			local ports = require("modules.llm.local_server_ports")

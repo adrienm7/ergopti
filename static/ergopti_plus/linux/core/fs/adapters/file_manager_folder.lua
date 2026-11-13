@@ -46,7 +46,7 @@ local LOG = "core.fs.adapters.file_manager_folder"
 --- loads this adapter for its file manager names, possibly while a caller has
 --- the runner replaced.
 --- @return table
-local function shell() return require("adapters.shell_runner") end
+local function shell() return require("core.process.adapters.shell_runner") end
 
 --- @param value string
 --- @return string

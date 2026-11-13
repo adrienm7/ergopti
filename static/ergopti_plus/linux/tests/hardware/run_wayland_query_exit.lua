@@ -11,7 +11,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Display = require("infra.display_server")
 local FAILURE_STATUS = 73
 local cases = {

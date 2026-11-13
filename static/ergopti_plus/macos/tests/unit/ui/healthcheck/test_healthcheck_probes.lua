@@ -19,13 +19,13 @@ local AppDirs = require("core.fs.engine.app_dirs")
 -- The modules each case replaces, restored after it
 local FIXTURE_MODULES = {
 	"core.logger.engine.logger", "ui.healthcheck.probes", "core.events.timer_scheduler", "core.network.adapters.http_client",
-	"adapters.shell_runner", "core.fs.adapters.json_codec", "modules.llm", "ui.healthcheck.appleevents",
+	"core.process.adapters.shell_runner", "core.fs.adapters.json_codec", "modules.llm", "ui.healthcheck.appleevents",
 }
 
 --- Runs body with the real probes over recorded adapters.
 --- @param body function(Probes, world)
 local function with_probes(body)
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	helpers.with_stub_scope(FIXTURE_MODULES, function()
 		helpers.load_with_stubs("core.logger.engine.logger")
 		local world = { timers = {}, requests = {}, tasks = {}, cancelled_requests = 0, terminated = 0, llm_on = false,
@@ -101,7 +101,7 @@ local function with_probes(body)
 				return client
 			end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, on_done)
 				local task = { executable = executable, args = args, on_done = on_done }
 				world.tasks[#world.tasks + 1] = task
@@ -123,7 +123,7 @@ local function with_probes(body)
 	end)
 	-- The scope already restored it; written out so the suite-wide stub hygiene
 	-- scan (tests/meta/harness/test_shell_runner_stub_restore.lua) sees the restore
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 end
 
 --- The probes of the real schema, started on a phase A snapshot with a recorder.

@@ -19,7 +19,7 @@ for name, value in pairs({ XDG_CONFIG_HOME = scratch .. "/.config", XDG_DATA_HOM
 	XDG_STATE_HOME = scratch .. "/.local/state", ERGOPTI_AGENT_SHUTDOWN_PROBE_DIR = scratch }) do
 	assert(uv.os_setenv(name, value))
 end
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Connectors = require("modules.llm.agent_connectors")
 local Loop, Coordinator = require("core.events.loop"), require("core.lifecycle.engine.shutdown.coordinator")
 local function read(path)
@@ -71,10 +71,10 @@ end
 local watchdog, timed_out
 local ok, why = xpcall(function()
 	if arg[1] == "cold" then
-		assert(not package.loaded["adapters.owned_process"], "cold load initialized a native process owner")
+		assert(not package.loaded["core.process.adapters.owned_process"], "cold load initialized a native process owner")
 		assert(Connectors.shutdown())
 		assert(not Connectors.run({ max_tools = 4 }, { type = "shortcut", name = "absent" }, function() error("late callback") end))
-		assert(not package.loaded["adapters.owned_process"] and #children == 0)
+		assert(not package.loaded["core.process.adapters.owned_process"] and #children == 0)
 		print("PASS native cold agent shutdown: no process backend acquisition")
 		return
 	end

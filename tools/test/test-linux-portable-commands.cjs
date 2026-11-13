@@ -2301,12 +2301,12 @@ function selfTest() {
 	expectFound(
 		'Lua ShellRunner.exec_line',
 		'fixture.lua',
-		'local Shell = require("adapters.shell_runner")\nShell.exec_line("hostname")\n'
+		'local Shell = require("core.process.adapters.shell_runner")\nShell.exec_line("hostname")\n'
 	);
 	expectFound(
 		'Lua loop over a literal table, the form of the first regression',
 		'fixture.lua',
-		'local Shell = require("adapters.shell_runner")\nfor _, program in ipairs({ "mkdir", "hostname" }) do\n\tShell.exec_checked("command -v " .. program)\nend\n'
+		'local Shell = require("core.process.adapters.shell_runner")\nfor _, program in ipairs({ "mkdir", "hostname" }) do\n\tShell.exec_checked("command -v " .. program)\nend\n'
 	);
 	expectFound(
 		'Python loop over a literal list',

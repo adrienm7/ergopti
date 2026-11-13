@@ -56,7 +56,7 @@ end
 --- @return table
 local function production()
 	local Timings = require("infra.timings")
-	local OwnedProcess = require("adapters.owned_process")
+	local OwnedProcess = require("core.process.adapters.owned_process")
 	return {
 		settle_ms = Timings.ms("ui", "x11_layout_reapply_settle_ms"),
 		window_ms = Timings.ms("ui", "x11_layout_reapply_window_ms"),

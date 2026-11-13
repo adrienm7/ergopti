@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local Rmlvo = require("infra.xkb_rmlvo")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Layout = require("adapters.keyboard_layout")
 local Capture = require("adapters.xkb_capture")
 local FileSystem = require("core.fs.adapters.file_system")

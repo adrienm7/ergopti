@@ -82,7 +82,7 @@ helpers.describe("owned_programs: the private runtime's programs only", function
 		}
 		local saved, saved_path = {}, package.path
 		for name, double in pairs(doubles) do saved[name], package.loaded[name] = package.loaded[name], double end
-		local Worker = helpers.fresh_module("adapters.sqlite_process_worker")
+		local Worker = helpers.fresh_module("core.process.adapters.sqlite_process_worker")
 		local ok, err = pcall(Worker.run, "4242", "/tmp/metrics.sqlite")
 		for name in pairs(doubles) do package.loaded[name] = saved[name] end
 		package.path = saved_path

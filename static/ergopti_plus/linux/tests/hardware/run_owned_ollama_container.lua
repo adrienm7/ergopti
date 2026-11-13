@@ -30,7 +30,7 @@ for _, level in ipairs({ "error", "warn", "info" }) do
 end
 
 -- Observe the owned daemon start without changing its arguments or answers.
-local Native = require("adapters.owned_process")
+local Native = require("core.process.adapters.owned_process")
 local served = {}
 local original_start = Native.start
 Native.start = function(executable, arguments, options, callback)

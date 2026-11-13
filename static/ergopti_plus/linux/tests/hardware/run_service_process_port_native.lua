@@ -8,7 +8,7 @@ package.path = driver_root .. "/?.lua;" .. shared_root .. "/?.lua;" .. package.p
 local Errors = require("diagnostics.engine.adapter_errors")
 
 local uv = require("luv")
-local NativeProcess = require("adapters.owned_process")
+local NativeProcess = require("core.process.adapters.owned_process")
 local Worker = require("core.lifecycle.engine.native_worker_owner")
 local Port = require("ai.engine.policy.finite_process_port")
 local timers, timer_port = {}, {}

@@ -363,8 +363,8 @@ helpers.describe("Cursor-window source and asynchronous ownership", function()
 end)
 
 helpers.describe("GNU timeout capability admission", function()
-	local Runner = require("adapters.program_runner")
-	local Shell = require("adapters.shell_runner")
+	local Runner = require("core.process.adapters.program_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	for _, receipt in ipairs({ "supported", "refused", "unknown", "numeric", "text", "throw" }) do
 		helpers.it("requires exact GNU timeout capability receipt: " .. receipt, function()
 			local previous = Display.kind()

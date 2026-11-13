@@ -315,7 +315,7 @@ local shortcuts = RuntimeGuard.optional_require("modules.shortcuts.manager")
 local window_info = RuntimeGuard.optional_require("adapters.window_info")
 
 -- Process lifecycle tracker (optional — drives focus-change events on Linux).
-local process_lifecycle = RuntimeGuard.optional_require("adapters.process_lifecycle")
+local process_lifecycle = RuntimeGuard.optional_require("core.process.adapters.lifecycle")
 
 -- Optional probe, mandatory posture: when AT-SPI cannot load, FocusGuard keeps
 -- metrics and text automation closed instead of treating absence as permission.

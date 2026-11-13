@@ -475,7 +475,7 @@ helpers.describe("sqlite_command — native filesystem database paths", function
 				"file:owned.sqlite", "file:encoded%20name.sqlite", "file:query.sqlite?mode=ro",
 				"file:fragment.sqlite#tail", ":memory:", "-metrics.sqlite", "-", "été ' .sqlite" }) do
 				local command = assert(Cmd.build(path, "SELECT 42;", { flags = flags, capture_exit = true }))
-				local quoted = require("adapters.shell_runner").quote("./" .. path)
+				local quoted = require("core.process.adapters.shell_runner").quote("./" .. path)
 				helpers.assert_contains(command, quoted, "the CLI must open the filesystem path, not its URI or option interpretation")
 				helpers.assert_contains(command, "SELECT 42;")
 				helpers.assert_contains(command, "ERGOPTI_SQL_EXIT_STATUS=")
@@ -486,7 +486,7 @@ helpers.describe("sqlite_command — native filesystem database paths", function
 	helpers.it("linux-sqlite-filesystem-path: leaves absolute database bytes unchanged", function()
 		for _, path in ipairs({ "/db/metrics.sqlite", "/db/file:owned.sqlite", "/db/:memory:", "/db/été ' .sqlite" }) do
 			local command = assert(Cmd.build(path, "SELECT 42;"))
-			helpers.assert_contains(command, require("adapters.shell_runner").quote(path))
+			helpers.assert_contains(command, require("core.process.adapters.shell_runner").quote(path))
 			assert_absent(command, "./" .. path, "absolute filesystem identities must not change")
 		end
 	end)

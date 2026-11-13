@@ -37,7 +37,7 @@ local function with_wrap(options, body)
 	require("core.text.engine.toml_codec.writer")
 	require("settings.engine.migration.file_inverse")
 	Fixture.with(function(guard, focus, _, _, watch)
-		local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
+		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
 			"modules.hotstrings.injector", "adapters.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type",
 			"modules.gestures.user_actions", "core.logger.engine.shim" }
 		local saved = {}
@@ -68,7 +68,7 @@ local function with_wrap(options, body)
 			else error("unknown controlled transition") end
 		end
 		local commands = {}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function() return true end,
 			exec_checked = function(command)
 				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
@@ -312,7 +312,7 @@ end)
 if os.getenv("ERGOPTI_WRAP_STORAGE_CHILD") ~= "1" then
 	helpers.describe("wrap fixture constructor isolation", function()
 		helpers.it("keeps a cold real store writable after the actual wrap scenarios", function()
-			local uv, Shell = require("luv"), require("adapters.shell_runner")
+			local uv, Shell = require("luv"), require("core.process.adapters.shell_runner")
 			local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-wrap-storage-XXXXXX"))
 			local okay, detail = pcall(function()
 				for _, name in ipairs({ "config", "data", "cache" }) do assert(uv.fs_mkdir(directory .. "/" .. name, 448)) end

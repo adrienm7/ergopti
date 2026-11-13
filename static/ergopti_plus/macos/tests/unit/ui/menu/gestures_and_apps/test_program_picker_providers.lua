@@ -101,7 +101,7 @@ local function with_provider(kind, options, body)
 		end }
 		package.loaded["modules.gestures.actions_aux_owner"] = { program_available = function() return true end }
 		package.loaded["modules.shortcuts.input_source_conflict"] = { check = function(_, _, callback) callback({}); return true end }
-		package.loaded["adapters.shell_runner"] = {}
+		package.loaded["core.process.adapters.shell_runner"] = {}
 		package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
 		package.loaded["modules.shortcuts.bindings"] = { reconcile_tap_keys = function()
 			if fixture.action == selected then return receipt(options.reconcile) end
@@ -196,7 +196,7 @@ local function with_provider(kind, options, body)
 			end
 		end, state)
 	end, debug.traceback)
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(saved) do package.loaded[name] = value end
 	if not ok then error(failure, 0) end

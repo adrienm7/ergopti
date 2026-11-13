@@ -38,9 +38,9 @@ local NATIVE_HELPER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 --- Clears every stateful module owned by this test fixture.
 local function reset_fixture_modules()
 	package.loaded["modules.keymap.input_sources"] = nil
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	package.loaded["adapters.input_source_selector"] = nil
 	package.loaded["platform.remap.lease_helper"] = nil
 end
@@ -180,7 +180,7 @@ local function status_test(name, body)
 	helpers.it(name, function()
 		helpers.with_stub_scope({
 			"modules.keymap.input_sources", "modules.keymap.layout_install",
-			"adapters.shell_runner", "core.events.timer_scheduler", "adapters.task_lifecycle",
+			"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.process.adapters.task_lifecycle",
 			"adapters.python_interpreter", "core.fs.engine.openstep_plist",
 			"adapters.input_source_selector", "platform.remap.lease_helper",
 		}, body)

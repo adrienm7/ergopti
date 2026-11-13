@@ -150,7 +150,7 @@ local function bridge_fixture(body)
 		package.loaded["ui.action_picker.bridge"] = nil
 		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["adapters.program_providers"] = { create = function()
+		package.loaded["core.process.adapters.program_providers"] = { create = function()
 			local state = owner(); f.owners[#f.owners + 1] = state; return state
 		end }
 		package.loaded["ui.webview_manager"] = {
@@ -240,7 +240,7 @@ helpers.describe("Production Linux program provider picker sessions", function()
 	end
 	helpers.it("keeps manual confirmation working when discovery is unavailable", function()
 		bridge_fixture(function(f)
-			package.loaded["adapters.program_providers"] = { create = function() return nil end }
+			package.loaded["core.process.adapters.program_providers"] = { create = function() return nil end }
 			helpers.assert_true(f.open())
 			f.confirm({ action = "confirm", id = "run_program", parameter = SCALAR })
 			helpers.assert_eq(f.calls, { { "run_program", SCALAR } })
@@ -256,7 +256,7 @@ local function contextual_native_fixture(body)
 			"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.engine.window_titles", "core.ui.engine.webview.presentation",
 			"apps.engine.program_provider_picker" }) do package.loaded[name] = nil end
 		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
-		package.loaded["adapters.program_providers"] = {}
+		package.loaded["core.process.adapters.program_providers"] = {}
 		package.loaded["core.events.loop"] = { add_idle_handler = function() end }
 		local state = { creates = 0, windows = {}, scripts = {}, signals = {}, confirmations = 0 }
 		local window_type = setmetatable({}, { __call = function(_, properties)

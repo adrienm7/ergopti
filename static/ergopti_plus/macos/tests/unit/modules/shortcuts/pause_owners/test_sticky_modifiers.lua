@@ -93,7 +93,7 @@ local function load_real_sticky_pause_owner()
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	})
-	package.loaded["adapters.shell_runner"] = permissive()
+	package.loaded["core.process.adapters.shell_runner"] = permissive()
 	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = permissive()
 	local function scoped_child(pause_name, resume_name, query_name, pending_name)
 		local paused = {}

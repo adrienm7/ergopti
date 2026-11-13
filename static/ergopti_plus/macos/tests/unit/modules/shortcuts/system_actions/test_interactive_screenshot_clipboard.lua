@@ -18,10 +18,10 @@ local SETTINGS_URL =
 	"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 
 local SUBJECT_MODULES = {
-	"adapters.task_lifecycle",
+	"core.process.adapters.task_lifecycle",
 	"core.fs.adapters.file_system",
 	"adapters.screen_capture",
-	"adapters.shell_runner",
+	"core.process.adapters.shell_runner",
 	"infra.notifications",
 	"core.logger.engine.logger",
 	"modules.shortcuts.actions.system_pixel",
@@ -56,13 +56,13 @@ local function with_pixel(options, scenario)
 			pasteboard = { count = 10, image = nil, writes = {} },
 		}
 
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			open = function(target)
 				f.opened[#f.opened + 1] = target
 				return true
 			end,
 		}
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(label, path, callback, args)
 				local task = { label = label, path = path, args = args, callback = callback }
 				f.tasks[#f.tasks + 1] = task

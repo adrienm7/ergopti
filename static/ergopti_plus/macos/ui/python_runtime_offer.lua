@@ -35,7 +35,7 @@ local PYTHON_DOWNLOAD_URL = "https://www.python.org/downloads/macos/"
 local function i18n() return require("core.i18n.engine.i18n") end
 local function dialogs() return require("infra.dialog_util") end
 local function deferred() return require("infra.deferred_work") end
-local function shell() return require("adapters.shell_runner") end
+local function shell() return require("core.process.adapters.shell_runner") end
 
 local _pending_state = nil
 local _scheduled = false

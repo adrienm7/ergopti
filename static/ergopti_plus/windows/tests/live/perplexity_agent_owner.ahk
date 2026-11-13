@@ -32,8 +32,8 @@ t(Key) => Key
 #Include ..\..\infra\json.ahk
 #Include ..\..\core\crypto\crypto.ahk
 #Include ..\..\core\fs\adapters\file_system.ahk
-#Include ..\..\adapters\process_lifecycle.ahk
-#Include ..\..\adapters\shell_runner.ahk
+#Include ..\..\core\process\adapters\lifecycle.ahk
+#Include ..\..\core\process\adapters\shell_runner.ahk
 #Include ..\..\core\network\adapters\proxy_override.ahk
 #Include ..\..\core\network\adapters\http_client.ahk
 #Include ..\..\modules\llm\remote_formats.ahk

@@ -21,7 +21,7 @@ local COPIES = { "/Users/me/ergopti/build/macos/ErgoptiPlus.app" }
 
 local MODULES = {
 	"ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "core.i18n.engine.i18n", "infra.accessibility_wait",
-	"adapters.accessibility_permission", "adapters.shell_runner",
+	"adapters.accessibility_permission", "core.process.adapters.shell_runner",
 }
 
 --- Reads one shipped locale.
@@ -74,7 +74,7 @@ local function with_dialog(body)
 				return wv
 			end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			open = function(url) h.urls[#h.urls + 1] = url; return true end,
 		}
 		h.dialog = helpers.load_with_stubs("ui.permission_dialog", {
@@ -124,7 +124,7 @@ local function with_dialog(body)
 		body(h)
 		-- with_fresh_modules restores the cache too; the explicit release keeps
 		-- the suite-wide shell_runner stub hygiene scan able to see it.
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 	end)
 end
 

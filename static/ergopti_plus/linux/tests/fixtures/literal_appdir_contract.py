@@ -219,7 +219,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
             run(
                 [
                     usr / "bin/luajit",
-                    driver / "adapters/sqlite_process_worker.lua",
+                    driver / "core/process/adapters/sqlite_process_worker.lua",
                     str(os.getpid()),
                     db,
                 ],

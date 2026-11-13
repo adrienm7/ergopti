@@ -71,7 +71,7 @@ helpers.describe("karabiner.watchers: layout refresh is async (HS-197)", functio
 		-- Stub ShellRunner at module level so watchers.lua gets it on require
 		local started = false
 		local poll_callback = nil
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(_, _, on_done)
 				-- Return a fake handle that records whether .start() was invoked
 				return {
@@ -138,7 +138,7 @@ helpers.describe("karabiner.watchers: layout refresh is async (HS-197)", functio
 			end,
 			unsubscribe = function() return true end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, on_done)
 				state.spawn_calls = state.spawn_calls + 1
 				state.executable = executable
@@ -225,7 +225,7 @@ end)
 -- Restore the real adapters for later test files: the stub installed above
 -- (shell_runner without exec) would otherwise leak through package.loaded
 -- into whichever module the runner loads next
-package.loaded["adapters.shell_runner"] = nil
+package.loaded["core.process.adapters.shell_runner"] = nil
 package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["adapters.input_source_broker"] = nil
 package.loaded["platform.remap.watchers"] = nil

@@ -28,7 +28,7 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 local Renderer = require("adapters.graphics_renderer")
 local Scheduler = require("core.events.timer_scheduler")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
 local HexColor = require("core.ui.engine.color_hex")
 

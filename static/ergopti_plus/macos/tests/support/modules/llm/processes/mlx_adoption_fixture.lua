@@ -13,7 +13,7 @@ local OWNED = {
 	"core.logger.engine.log_folders", "_generated.logger_sub_files", "core.logger.adapters.log_transport",
 	"core.lifecycle.engine.launcher_environment", "infra.notifications", "core.i18n.engine.i18n",
 	"infra.config_paths", "infra.text_utils", "modules.llm.api_common",
-	"adapters.task_lifecycle", "adapters.shell_runner", "core.events.timer_scheduler",
+	"core.process.adapters.task_lifecycle", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
 	"core.fs.adapters.json_codec", "modules.llm.api_mlx",
 	"ui.menu.menu_llm.models_manager_mlx_server",
 }
@@ -72,8 +72,8 @@ local function with_adoption(scenario)
 			package.loaded["core.fs.adapters.json_codec"] = {
 				decode = function() return { data = { { id = "org/Model-A" } } } end,
 			}
-			package.loaded["adapters.shell_runner"] = { spawn = function() error("unexpected process dispatch") end }
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = function() error("unexpected process dispatch") end }
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, _, complete, stream, args)
 					local task = { label = label, terminate_calls = 0, args = args, stream = stream }
 					function task:start() self.running = true; return self end

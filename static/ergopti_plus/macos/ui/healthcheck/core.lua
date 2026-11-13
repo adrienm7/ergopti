@@ -402,12 +402,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.program_providers",
+		id       = "core.process.adapters.program_providers",
 		contract = { "create" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.owned_program_runner",
+		id       = "core.process.adapters.owned_program_runner",
 		contract = { "available", "spawn" },
 		wired    = true,
 	},
@@ -627,7 +627,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.process_lifecycle",
+		id       = "core.process.adapters.lifecycle",
 		contract = { "start", "stop" },
 		wired    = true,
 	},
@@ -642,7 +642,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.shell_runner",
+		id       = "core.process.adapters.shell_runner",
 		contract = { "exec", "spawn" },
 		wired    = true,
 	},
@@ -680,17 +680,17 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.task_environment",
+		id       = "core.process.adapters.task_environment",
 		contract = { "sanitize" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.task_lifecycle",
+		id       = "core.process.adapters.task_lifecycle",
 		contract = { "guard_callback", "create", "native", "start" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.task_output_turn",
+		id       = "core.process.adapters.task_output_turn",
 		contract = { "request" },
 		-- The Karabiner lease ACK deadlines prove a task output turn before failing.
 		wired    = true,

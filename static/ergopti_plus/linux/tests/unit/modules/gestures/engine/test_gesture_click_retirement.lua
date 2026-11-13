@@ -5,7 +5,7 @@ local Errors = require("diagnostics.engine.adapter_errors")
 local helpers = require("tests.helpers")
 local function with_manager(body)
 	local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
-	local Process, Clock = require("adapters.owned_process"), require("core.logger.engine.monotonic")
+	local Process, Clock = require("core.process.adapters.owned_process"), require("core.logger.engine.monotonic")
 	local start, now, execute = Process.start, Clock.now_ms, os.execute
 	local state = { paused = false, time = 1000, operations = {}, commands = {} }
 	local function record(command)
@@ -845,7 +845,7 @@ helpers.describe("gesture click retirement", function()
 					if behavior == "throw" then error("sink output unavailable") end
 					manager.disable()
 					manager.execute_action("right_click_toggle", "from-diagnostic")
-					require("adapters.owned_process").start = function() foreign = foreign + 1; error("foreign issuer") end
+					require("core.process.adapters.owned_process").start = function() foreign = foreign + 1; error("foreign issuer") end
 				end
 				manager.execute_action("left_click_toggle", "left"); state.harvest()
 				helpers.assert_eq(#state.diagnostics, 1)

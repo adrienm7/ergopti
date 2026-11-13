@@ -23,7 +23,7 @@ local SHORTCUT_ID = "1B2C3D4E-5F60-4718-9A0B-C1D2E3F40516"
 --- timer layers.
 --- @param body function fn(Aux, world)
 local function with_aux(body)
-	helpers.with_fresh_modules({ "modules.gestures.actions_aux_owner", "adapters.shell_runner",
+	helpers.with_fresh_modules({ "modules.gestures.actions_aux_owner", "core.process.adapters.shell_runner",
 		"core.events.timer_scheduler", "core.logger.engine.logger" }, function()
 		local world = { spawned = {}, timers = {} }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
@@ -44,7 +44,7 @@ local function with_aux(body)
 			end,
 			cancel = function(handle) handle.cancelled = true; return true end,
 		}
-		package.loaded["adapters.shell_runner"] = { spawn = function(executable, args, on_done, on_chunk, env, private)
+		package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, args, on_done, on_chunk, env, private)
 			local handle = { executable = executable, args = args, on_done = on_done, on_chunk = on_chunk,
 				env = env, private = private, observers = {} }
 			world.spawned[#world.spawned + 1] = handle

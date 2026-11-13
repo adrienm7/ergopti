@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local uv, Shell = require("luv"), require("adapters.shell_runner")
+local uv, Shell = require("luv"), require("core.process.adapters.shell_runner")
 local Json = require("core.text.engine.json")
 
 --- Runs an isolated real catalogue without replacing any native file owner.

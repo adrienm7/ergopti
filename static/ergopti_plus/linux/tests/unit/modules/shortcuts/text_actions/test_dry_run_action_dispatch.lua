@@ -68,8 +68,8 @@ local function with_action(route, mode, action, body)
 			logger.set_error_observer(function(_, _, message) world.errors[#world.errors + 1] = message end)
 			package.loaded["core.logger.engine.shim"], environment.Logger = logger, logger
 			local pending, clipboard = nil, "ok"
-			local quote = require("adapters.shell_runner").quote
-			package.loaded["adapters.shell_runner"] = {
+			local quote = require("core.process.adapters.shell_runner").quote
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return true end, quote = quote,
 				exec_checked = function(command)
 					if command:find("dialog_host.lua", 1, true) then return true, "" end

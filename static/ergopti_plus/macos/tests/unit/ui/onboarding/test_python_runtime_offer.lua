@@ -26,7 +26,7 @@ local function load(answer)
 	package.loaded["infra.deferred_work"] = {
 		after = function(_, callback) callback(); return true end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args)
 			record.spawns[#record.spawns + 1] = executable .. " " .. table.concat(args, " ")
 			return { start = function() return true end }
@@ -47,7 +47,7 @@ end
 
 -- Modules the doubles replace; every test restores them (suite order).
 local OWNED = {
-	"ui.python_runtime_offer", "infra.dialog_util", "infra.deferred_work", "adapters.shell_runner", "core.i18n.engine.i18n",
+	"ui.python_runtime_offer", "infra.dialog_util", "infra.deferred_work", "core.process.adapters.shell_runner", "core.i18n.engine.i18n",
 }
 
 --- Runs one case with the doubled modules restored afterwards.

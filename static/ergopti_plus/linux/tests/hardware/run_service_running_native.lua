@@ -17,7 +17,7 @@ function native.close(handle, callback)
 end
 local previous = package.loaded.luv
 package.loaded.luv = native
-local Native = require("adapters.owned_process")
+local Native = require("core.process.adapters.owned_process")
 package.loaded.luv = previous
 local Worker = require("core.lifecycle.engine.native_worker_owner")
 local Port = require("ai.engine.policy.process_port")

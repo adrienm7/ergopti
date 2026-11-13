@@ -12,7 +12,7 @@ helpers.describe("hotstrings_config", function()
 
   -- An explicit configuration directory this suite owns. The shared /tmp holds
   -- other processes' files, any of which a personal-file scan would admit.
-  local Shell = require("adapters.shell_runner")
+  local Shell = require("core.process.adapters.shell_runner")
   local function with_owned_dir(body)
     local dir = assert(os.tmpname())
     os.remove(dir)

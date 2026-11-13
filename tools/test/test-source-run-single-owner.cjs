@@ -123,7 +123,14 @@ for (const file of sources('windows', '.ahk')) {
 	);
 }
 const readinessPublisher = ahkBody('infra/startup_smoke.ahk', 'StartupSmokePublishReady');
-const programInventory = code('windows', 'adapters/program_providers.ahk', ahkComment);
+const programInventory = code(
+	'windows',
+	'core',
+	'process',
+	'adapters',
+	'program_providers.ahk',
+	ahkComment
+);
 expect(
 	programInventory.split('A_IsCompiled').length === 2 &&
 		programInventory.split('A_AhkPath').length === 3 &&

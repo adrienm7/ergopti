@@ -8,7 +8,7 @@
 local helpers = require("tests.helpers")
 
 local NATIVE_CONSUMERS = {
-	"core.fs.adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
+	"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
 	"infra.deferred_work", "core.fs.engine.dir",
 }
 
@@ -32,8 +32,8 @@ local function with_fixture(callback)
 		"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
 		"modules.gestures", "infra.keycodes", "core.logger.engine.logger", "infra.notifications",
 		"adapters.event_provenance", "core.fs.adapters.file_system", "adapters.key_state",
-		"adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
-		"core.fs.adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
+		"core.process.adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
+		"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
 		"infra.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
 		"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",
 	}, function()
@@ -184,7 +184,7 @@ local function make_sys_screenshot_spies(window_override)
 	-- read a different stub's records and see nothing. Cleared here rather than in
 	-- load_with_stubs: several tests install their own adapter doubles into
 	-- package.loaded before calling it, and a blanket adapter sweep wipes those.
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 
 	local spy = { captured_cb = nil, do_after_calls = {}, exec_calls = {}, tasks = {} }
 	local contract = fresh_hs_contract()
@@ -336,7 +336,7 @@ local function load_h01_system(options)
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil
 	package.loaded["modules.gestures"] = options.gestures or {}
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	if options.logger then package.loaded["core.logger.engine.logger"] = options.logger end

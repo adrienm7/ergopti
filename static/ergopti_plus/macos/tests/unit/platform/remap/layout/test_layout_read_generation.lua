@@ -44,12 +44,12 @@ local helpers = require("tests.helpers")
 --- @return table watchers, table ctx
 local function load_watchers()
 	package.loaded["platform.remap.watchers"] = nil
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 
 	local ctx = { spawns = {}, watchdogs = {}, poll_cb = nil }
 
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(_executable, _args, on_done)
 			local rec = { terminated = 0, started = false, settled = false, observers = {} }
 			rec.on_done = function(...)
@@ -198,6 +198,6 @@ end)
 -- (a shell_runner that never execs, a fake timer_scheduler) would otherwise leak
 -- through package.loaded into whichever module the runner loads next, and the
 -- failure surfaces as an order-dependent crash — green locally, red in CI.
-package.loaded["adapters.shell_runner"] = nil
+package.loaded["core.process.adapters.shell_runner"] = nil
 package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["platform.remap.watchers"] = nil

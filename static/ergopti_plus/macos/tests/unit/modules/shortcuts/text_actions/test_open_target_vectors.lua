@@ -40,7 +40,7 @@ end
 --- The modules a fixture replaces; with_fresh_modules restores each one, so a
 --- recording port never reaches the next test file the runner loads.
 local OWNED_MODULES = {
-	"modules.shortcuts.actions.apps", "adapters.window_info", "adapters.shell_runner",
+	"modules.shortcuts.actions.apps", "adapters.window_info", "core.process.adapters.shell_runner",
 	"core.fs.adapters.file_system", "infra.notifications", "core.logger.engine.logger",
 }
 
@@ -59,7 +59,7 @@ local function with_apps(existing, body)
 			path_status = function(path) return (existing or {})[path] and "present" or "absent" end,
 			exists = function(path) return (existing or {})[path] == true end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			open = function(target, on_done)
 				world.opened[#world.opened + 1] = target
 				on_done(true)

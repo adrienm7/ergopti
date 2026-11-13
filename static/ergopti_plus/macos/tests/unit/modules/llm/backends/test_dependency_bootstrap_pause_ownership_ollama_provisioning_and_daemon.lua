@@ -400,7 +400,7 @@ helpers.describe("Native migration caller context fences", function()
 					return owner, stage ~= "prepare_refusal", context
 				end,
 			}
-			local lifecycle = package.loaded["adapters.task_lifecycle"]
+			local lifecycle = package.loaded["core.process.adapters.task_lifecycle"]
 			local native, start = lifecycle.native, lifecycle.start
 			lifecycle.native = function(...)
 				local task = native(...)

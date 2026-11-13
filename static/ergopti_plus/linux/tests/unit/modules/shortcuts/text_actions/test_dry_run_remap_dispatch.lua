@@ -89,7 +89,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				logger.set_error_observer(function(_, _, message) world.errors[#world.errors + 1] = message end)
 				package.loaded["core.logger.engine.shim"], environment.Logger = logger, logger
 				local pending, clipboard = nil, "ok"
-				package.loaded["adapters.shell_runner"] = {
+				package.loaded["core.process.adapters.shell_runner"] = {
 					has_command = function() return true end,
 					exec_checked = function() world.reads = world.reads + 1; return true, clipboard end,
 					with_exact_stdin = function(command, text) pending = text; return command end,

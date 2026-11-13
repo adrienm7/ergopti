@@ -93,7 +93,7 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 	package.loaded["adapters.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 		local captured = { cb = nil }
 		local state = {

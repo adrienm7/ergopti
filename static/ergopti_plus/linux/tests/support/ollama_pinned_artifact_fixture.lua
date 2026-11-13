@@ -126,10 +126,10 @@ local function fixture(options)
  for _, name in ipairs({ "new_pipe", "fs_read", "fs_close", "write", "shutdown" }) do
   package.loaded.luv[name] = function() error("admission controls must not acquire reader I/O") end
  end
- local saved_process = package.loaded["adapters.owned_process"]
- package.loaded["adapters.owned_process"] = { start = function() error("admission controls must not spawn") end }
+ local saved_process = package.loaded["core.process.adapters.owned_process"]
+ package.loaded["core.process.adapters.owned_process"] = { start = function() error("admission controls must not spawn") end }
  local restore = h.restore
- function h.restore() restore(); package.loaded["adapters.owned_process"] = saved_process end
+ function h.restore() restore(); package.loaded["core.process.adapters.owned_process"] = saved_process end
  h.asset = { key = "linux-amd64", version = "0.24.0", name = "ollama-linux-amd64.tar.zst",
   url = "https://github.com/ollama/ollama/releases/download/v0.24.0/ollama-linux-amd64.tar.zst", bytes = 3, sha256 = ABC_SHA256 }
  h.budget = {

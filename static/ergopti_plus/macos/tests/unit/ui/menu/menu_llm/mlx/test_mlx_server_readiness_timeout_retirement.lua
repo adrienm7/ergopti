@@ -18,7 +18,7 @@ local MODULE_NAMES = {
 	"core.i18n.engine.i18n",
 	"infra.config_paths",
 	"modules.llm.api_common",
-	"adapters.task_lifecycle",
+	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"modules.llm.api_mlx",
 	"ui.menu.menu_llm.models_manager_mlx_server",
@@ -100,7 +100,7 @@ helpers.describe("HS-025: MLX readiness timeout retirement", function()
 				end,
 			}
 
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, _, on_done, stream_or_args, args)
 					local task = {
 						label = label,

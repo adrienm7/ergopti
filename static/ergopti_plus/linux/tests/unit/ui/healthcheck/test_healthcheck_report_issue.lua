@@ -349,13 +349,13 @@ end)
 helpers.describe("healthcheck checked save receipts (linux)", function()
 	local function default_save(write, mkdir_ok, reveal_ok)
 		local saved_fs = package.loaded["core.fs.adapters.file_system"]
-		local saved_shell = package.loaded["adapters.shell_runner"]
+		local saved_shell = package.loaded["core.process.adapters.shell_runner"]
 		local writes, directories = {}, {}
 		package.loaded["core.fs.adapters.file_system"] = { write_new = function(path, text)
 			writes[#writes + 1] = { path = path, text = text }
 			return write(path, text)
 		end }
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			quote = function(value) return "'" .. value .. "'" end,
 			run = function(command) directories[#directories + 1] = command; return mkdir_ok ~= false end,
 		}
@@ -366,7 +366,7 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 			end)
 		end)
 		package.loaded["core.fs.adapters.file_system"] = saved_fs
-		package.loaded["adapters.shell_runner"] = saved_shell
+		package.loaded["core.process.adapters.shell_runner"] = saved_shell
 		helpers.assert_true(ok, tostring(result))
 		return result, calls, writes, directories
 	end
@@ -592,7 +592,7 @@ end)
 --- production argv executable to an owned file, never to a desktop handler.
 local function with_native_opener(script, controls, body)
 	local uv = require("luv")
-	local old_owned, old_desktop = package.loaded["adapters.owned_process"], package.loaded["adapters.desktop_opener"]
+	local old_owned, old_desktop = package.loaded["core.process.adapters.owned_process"], package.loaded["adapters.desktop_opener"]
 	local old_report = package.loaded["ui.healthcheck.report"]
 	local timer, native = require("infra.native_timer"), {}
 	local timeout = require("infra.timings").ms("ui", "desktop_open_timeout_ms")
@@ -603,7 +603,7 @@ local function with_native_opener(script, controls, body)
 		end
 		return uv.timer_start(handle, ms, interval, callback)
 	end
-	local Owned = helpers.load_module_with_dependency("adapters.owned_process", "luv", native)
+	local Owned = helpers.load_module_with_dependency("core.process.adapters.owned_process", "luv", native)
 	local Desktop = helpers.load_module("adapters.desktop_opener")
 	local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/diagnostic_opener_XXXXXX"))
 	local executable, target = root .. "/private-opener", root .. "/report.md"
@@ -642,7 +642,7 @@ local function with_native_opener(script, controls, body)
 		for _, path in ipairs({ target .. ".release", target, executable }) do if uv.fs_lstat(path) then assert(uv.fs_unlink(path)) end end
 		assert(uv.fs_rmdir(root))
 	end)
-	package.loaded["adapters.owned_process"], package.loaded["adapters.desktop_opener"] = old_owned, old_desktop
+	package.loaded["core.process.adapters.owned_process"], package.loaded["adapters.desktop_opener"] = old_owned, old_desktop
 	package.loaded["ui.healthcheck.report"] = old_report
 	if not cleaned then error(cleanup_err, 0) end
 	if not ok then error(detail, 0) end

@@ -29,7 +29,7 @@ function M.run(options, callback)
 	options = options or {}
 	return helpers.with_stub_scope({
 		"modules.keystats.context_tracker", "modules.keystats.watchers", "modules.keystats.log_manager",
-		"adapters.secure_field_detector", "adapters.task_lifecycle", "core.events.timer_scheduler",
+		"adapters.secure_field_detector", "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
 		"core.logger.engine.logger", "infra.timings", "metrics.engine.view.private_window", "metrics.engine.capture.physical_lifecycle_observation",
 	}, function()
 		local original_date, original_time = os.date, os.time
@@ -83,7 +83,7 @@ function M.run(options, callback)
 				mouse = { absolutePosition = function() return { x = 0, y = 0 } end },
 			})
 			local function dormant() error("Maintenance must not activate a native timer or task") end
-			package.loaded["adapters.task_lifecycle"] = { native = dormant, start = dormant }
+			package.loaded["core.process.adapters.task_lifecycle"] = { native = dormant, start = dormant }
 			package.loaded["core.events.timer_scheduler"] = { after = dormant, cancel = dormant }
 			package.loaded["infra.timings"] = { ms = function() return 1000 end }
 			local manager = {

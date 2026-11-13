@@ -60,7 +60,7 @@ local i18n = require("core.i18n.engine.i18n")
 local KeyNames = require("platform.input.keycodes.key_names")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local AiActions = require("modules.shortcuts.ai_actions")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 local DesktopNavigation = require("keyboard.engine.desktop_navigation")
 local SystemActions = require("modules.gestures.system_actions")
 local BackgroundCommands = require("modules.gestures.background_commands")
@@ -659,7 +659,7 @@ local BUILTIN_HANDLERS = {
 	end,
 	["alt_tab_monitor"] = function(binding) return M.run_window_switch(binding) end,
 	["open_system_settings"] = function()
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		for _, application in ipairs(SETTINGS_APPLICATIONS) do
 			if Shell.has_command(application) then
 				run_background(shell_quote(application))
@@ -1077,7 +1077,7 @@ end
 local function requirement_holds(token)
 	local tool = token:match("^tool:(.+)$")
 	if tool then
-		local ok, Shell = pcall(require, "adapters.shell_runner")
+		local ok, Shell = pcall(require, "core.process.adapters.shell_runner")
 		if not ok or type(Shell.has_command) ~= "function" then return nil, nil end
 		if Shell.has_command(tool, true) then return true, nil end
 		local hint = i18n.get("dialog.action_picker.requires_tool"):gsub("{1}", function() return tool end)

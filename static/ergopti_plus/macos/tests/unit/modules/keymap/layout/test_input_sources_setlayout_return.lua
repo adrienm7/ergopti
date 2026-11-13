@@ -37,7 +37,7 @@ local function selection_test(name, body)
 	helpers.it(name, function()
 		helpers.with_stub_scope({ "modules.keymap.input_sources", "modules.keymap.layout_install",
 			"adapters.input_source_selector", "platform.remap.lease_helper",
-			"adapters.shell_runner", "core.events.timer_scheduler", "adapters.task_lifecycle" }, function()
+			"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.process.adapters.task_lifecycle" }, function()
 			local resolutions = 0
 			package.loaded["platform.remap.lease_helper"] = {
 				resolve = function()
@@ -53,7 +53,7 @@ end
 
 helpers.describe("set_input_source: a setLayout that returns false must fall through", function()
 	selection_test("tries both hs.keycodes names and then reaches the native TIS fallback", function(resolutions)
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 		local task_args = nil
 		local IS = helpers.load_with_stubs("modules.keymap.input_sources", {
@@ -109,7 +109,7 @@ helpers.describe("set_input_source: a setLayout that returns false must fall thr
 			"a committed child must not be confused with a successful layout switch")
 
 		package.loaded["modules.keymap.input_sources"] = nil
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 	end)
 
@@ -135,7 +135,7 @@ helpers.describe("set_input_source: a setLayout that returns false must fall thr
 		helpers.assert_eq(resolutions(), 0, "a genuine in-process switch must not resolve a native fallback")
 
 		package.loaded["modules.keymap.input_sources"] = nil
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 	end)
 end)

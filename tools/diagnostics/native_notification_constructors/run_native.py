@@ -22,7 +22,7 @@ from receipt import validate
 
 DEPENDENCIES = {
     "ownership": "9b985af7e8bf549cb843b289885a2bea38a67ea3ce44defaf389dab1001fef98",
-    "inventory": "5a14cf8bb972a3ffab6b19ed2996b15b3079bc60a22a4a96bac4fe598aea4a10",
+    "inventory": "453f090f4907e140d0e6529e95f1d713972949962c376a3d1b9c88f633caebe0",
 }
 PINS = (
     "static/ergopti_plus/macos/adapters/application_notifier.lua",

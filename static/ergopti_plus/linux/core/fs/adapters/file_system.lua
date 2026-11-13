@@ -323,7 +323,7 @@ function M.exists(path)
 	-- Minimal Lua installations still have the POSIX shell's metadata builtin.
 	-- Opening the path here mistook unreadability for absence and blocked FIFOs.
 	local ok, present = pcall(function()
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		return Shell.run("test -e " .. Shell.quote(path) .. " 2>/dev/null")
 	end)
 	return ok and present == true

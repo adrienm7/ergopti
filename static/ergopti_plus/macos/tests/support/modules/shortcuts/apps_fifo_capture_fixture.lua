@@ -7,7 +7,7 @@ local M = {}
 local OWNED = {
 	"modules.shortcuts.actions.apps", "adapters.synthetic_input", "adapters.event_provenance",
 	"core.events.timer_scheduler", "core.fs.adapters.storage", "adapters.clipboard", "core.logger.engine.logger", "core.logger.engine.shim", "tests.stubs.hs", "hs",
-	"adapters.window_info", "adapters.window_manager", "adapters.app_launcher", "adapters.shell_runner",
+	"adapters.window_info", "adapters.window_manager", "adapters.app_launcher", "core.process.adapters.shell_runner",
 	"infra.notifications", "core.i18n.engine.i18n", "infra.text_utils",
 	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
 }
@@ -74,7 +74,7 @@ function M.with_world(options, callback)
 		package.loaded['adapters.window_info'] = { getFocused = function() return {appId=options.finder and 'Finder' or 'TextEdit'} end }
 		package.loaded['adapters.window_manager'] = {}
 		package.loaded['adapters.app_launcher'] = {}
-		package.loaded['adapters.shell_runner'] = {}
+		package.loaded['core.process.adapters.shell_runner'] = {}
 		package.loaded['infra.notifications'] = { notify=function() end }
 		package.loaded['core.i18n.engine.i18n'] = {get=function(key) return key end}
 		package.loaded['adapters.clipboard'] = nil

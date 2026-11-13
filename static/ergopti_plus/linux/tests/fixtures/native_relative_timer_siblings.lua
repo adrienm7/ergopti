@@ -10,7 +10,7 @@ ffi.cdef("int mkfifo(const char *pathname, unsigned int mode);")
 local Scheduler = require("core.events.timer_scheduler")
 local Digest = require("core.fs.adapters.file_digest")
 local Http = require("core.network.adapters.http_client")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Loop = require("core.events.loop")
 local directory = assert(uv.fs_mkdtemp("/tmp/ergopti-relative-siblings-XXXXXX"))
 local checks, failures, handles, paths, tokens, pids = 0, 0, {}, {}, {}, {}

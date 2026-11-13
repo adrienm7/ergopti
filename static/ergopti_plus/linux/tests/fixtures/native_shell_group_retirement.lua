@@ -22,8 +22,8 @@ local PR_SET_CHILD_SUBREAPER, WNOHANG = 36, 1
 assert(ffi.C.prctl(PR_SET_CHILD_SUBREAPER, ffi.new("int", 1), ffi.new("int", 0), ffi.new("int", 0), ffi.new("int", 0)) == 0)
 -- The other native admission fixture initializes ShellRunner first. This
 -- order proves the canonical owner's deferred validator cannot create a cycle.
-require("adapters.owned_process")
-local Shell = require("adapters.shell_runner")
+require("core.process.adapters.owned_process")
+local Shell = require("core.process.adapters.shell_runner")
 local directory = assert(uv.fs_mkdtemp("/var/tmp/erg-shell-family-XXXXXX"))
 local checks, failures = 0, 0
 local PROGRAM = [[

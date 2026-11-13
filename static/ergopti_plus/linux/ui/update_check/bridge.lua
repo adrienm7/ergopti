@@ -132,7 +132,7 @@ function M.download_offered(updater, release, ctx)
 	end
 	local function diagnostics_available()
 		if not current() or type(ctx.on_open_today_log) ~= "function" then return false end
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		if shell.has_command("xdg-open") ~= true then return false end
 		local file = require("core.fs.engine.regular_file_reader").open(require("core.logger.engine.sink").main_log_path())
 		if not file then return false end
@@ -300,7 +300,7 @@ local function new_session(updater)
 		-- The notes pane's links: the session checked them against the repository
 		repository = updater.repo_info,
 		open_url = function(url)
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			if not Shell.has_command("xdg-open") then
 				Logger.error(LOG, "xdg-open is unavailable: the release link cannot be opened.")
 				return false

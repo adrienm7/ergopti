@@ -19,7 +19,7 @@ local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboa
 ---   on_settle (called at each wait with the session).
 --- @param body function body(clipboard, session, emit, sleep_ms)
 local function with_session(kind, options, body)
-	local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server" }
+	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local session = { clipboard = "saved", primary = options.primary, writes = {}, combos = {}, pending = nil }
@@ -42,7 +42,7 @@ local function with_session(kind, options, body)
 		session.clipboard = session.pending
 		return true
 	end
-	package.loaded["adapters.shell_runner"] = shell
+	package.loaded["core.process.adapters.shell_runner"] = shell
 	package.loaded["infra.display_server"] = {
 		UNKNOWN = "unknown",
 		is_wayland = function() return kind == "wayland" end,

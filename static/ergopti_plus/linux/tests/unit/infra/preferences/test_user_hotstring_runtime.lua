@@ -334,7 +334,7 @@ helpers.describe("programmable native Linux runtime", function()
 	end
 	helpers.it("(user-hotstrings-native) rechecks actual clipboard settle before paste and restores its original bytes", function()
 		with_runtime(function(f)
-			local Shell, Display = require("adapters.shell_runner"), require("infra.display_server")
+			local Shell, Display = require("core.process.adapters.shell_runner"), require("infra.display_server")
 			local old = { has = Shell.has_command, read = Shell.exec_checked, stdin = Shell.with_exact_stdin,
 				run = Shell.run, wayland = Display.is_wayland, x11 = Display.is_x11 }
 			local writes = {}

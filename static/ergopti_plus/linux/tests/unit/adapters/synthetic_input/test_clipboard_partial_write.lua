@@ -14,13 +14,13 @@ local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboa
 require("adapters.clipboard")
 
 local function with_session(options, body)
-	local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server",
+	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server",
 		"adapters.keyboard_layout", "core.logger.engine.shim" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local state = { current = "saved", writes = {}, wire = {}, waits = {} }
 	local pending
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		has_command = function() return true end,
 		exec_checked = function(command)
 			if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end

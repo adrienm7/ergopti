@@ -86,7 +86,7 @@ end
 -- first. Own the writer too: it captures the cipher reloaded by each scenario.
 local OWNED_MODULES = {
 	"hs.fs", "hs.json", "hs.sqlite3",
-	"core.crypto.crypto", "adapters.shell_runner",
+	"core.crypto.crypto", "core.process.adapters.shell_runner",
 	"modules.keystats.text_cipher", "modules.keystats.text_migration",
 	"modules.keystats.sqlite_writer",
 }
@@ -175,11 +175,11 @@ end
 local function load_runner(store)
 	-- Both adapters capture the global hs at load: reload them under the doubles.
 	package.loaded["core.crypto.crypto"] = nil
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["modules.keystats.text_cipher"] = nil
 	package.loaded["modules.keystats.text_migration"] = nil
 	-- Secret input is written to a popen(3) pipe, never to hs.execute.
-	require("adapters.shell_runner")._set_private_stdin_native(_private_stdin_native)
+	require("core.process.adapters.shell_runner")._set_private_stdin_native(_private_stdin_native)
 	local cipher = require("modules.keystats.text_cipher")
 	cipher._set_machine_id_command("echo ioreg-stub")
 	local migration = require("modules.keystats.text_migration")
@@ -485,7 +485,7 @@ local function assert_scope_restoration(should_throw)
 		local prior = {
 			["hs.json"] = false,
 			["hs.sqlite3"] = { foreign_native = true },
-			["adapters.shell_runner"] = borrowed_runner,
+			["core.process.adapters.shell_runner"] = borrowed_runner,
 			["modules.keystats.text_cipher"] = false,
 			["modules.keystats.sqlite_writer"] = { foreign_writer = true },
 		}

@@ -14,7 +14,7 @@ local OWNED = {
 	"modules.keystats", "modules.llm", "modules.llm.prediction_engine", "ui.tooltip",
 	"modules.dynamic_hotstrings.user_code", "modules.dynamic_hotstrings.rules_engine",
 	"modules.dynamic_hotstrings", "modules.dynamic_hotstrings.personal_info",
-	"ui.menu.programmatic_hotstrings", "infra.dialog_util", "adapters.shell_runner",
+	"ui.menu.programmatic_hotstrings", "infra.dialog_util", "core.process.adapters.shell_runner",
 	"infra.preferences",
 	"adapters.application_notifier", "core.fs.adapters.file_system", "infra.config_paths", "core.i18n.engine.i18n",
 	"adapters.secure_field_detector",
@@ -867,7 +867,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 	helpers.it("opens source through the actual menu adapter without loading or creating it", function()
 		with_native(function(f)
 			local admitted
-			package.loaded["adapters.shell_runner"] = { run = function(executable, argv)
+			package.loaded["core.process.adapters.shell_runner"] = { run = function(executable, argv)
 				admitted = { executable, argv }; return true
 			end }
 			local Menu = require("ui.menu.programmatic_hotstrings")

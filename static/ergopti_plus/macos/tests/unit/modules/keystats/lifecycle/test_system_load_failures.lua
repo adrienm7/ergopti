@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- @return table fixture Persisted events and contextual diagnostics.
 local function complete_sample(status, stdout)
 	local names = {
-		"core.logger.engine.logger", "infra.timings", "adapters.task_lifecycle",
+		"core.logger.engine.logger", "infra.timings", "core.process.adapters.task_lifecycle",
 		"core.events.timer_scheduler", "modules.keystats.log_manager",
 		"modules.keystats.network_watcher", "modules.keystats.watchers",
 	}
@@ -32,7 +32,7 @@ local function complete_sample(status, stdout)
 	}
 	package.loaded["infra.timings"] = { ms = function() return 1 end }
 	package.loaded["core.events.timer_scheduler"] = { cancel = function() return true end }
-	package.loaded["adapters.task_lifecycle"] = {
+	package.loaded["core.process.adapters.task_lifecycle"] = {
 		native = function(_, _, callback) fixture.complete = callback; return {} end,
 		start = function() return true end,
 	}

@@ -22,7 +22,7 @@ helpers.describe("karabiner.watchers: the layout poll is idle-gated (layout-poll
 			subscribe = function() return true end,
 			unsubscribe = function() return true end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(_, _, on_done)
 				spawns = spawns + 1
 				return {
@@ -86,7 +86,7 @@ helpers.describe("karabiner.watchers: the layout poll is idle-gated (layout-poll
 		end)
 		watchers.stop_input_source_watcher()
 		package.loaded["adapters.system_info"] = nil
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["adapters.input_source_broker"] = nil
 		package.loaded["platform.remap.watchers"] = nil

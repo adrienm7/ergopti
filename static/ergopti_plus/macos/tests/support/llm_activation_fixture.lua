@@ -61,7 +61,7 @@ local OWNED_MODULES = {
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"ui.menu.menu_llm.profile_label",
 	"infra.dialog_util",
-	"adapters.shell_runner",
+	"core.process.adapters.shell_runner",
 	"infra.deferred_work",
 	"ui.menu.menu_llm.local_server_panel",
 	"ui.menu.menu_llm.unreachable_backend_offer",

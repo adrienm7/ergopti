@@ -164,7 +164,7 @@ helpers.describe("linux test runner: UTF-8 timing frames", function()
 			.. " && luajit tests/run.lua --only onboarding-linux-trigger 2>&1"
 		helpers.assert_eq(debug.getinfo(io.popen, "S").what, "C", "the capture must use native process I/O")
 		-- A private load cannot inherit another fixture's _set_runner seam.
-		local Shell = helpers.fresh_module("adapters.shell_runner")
+		local Shell = helpers.fresh_module("core.process.adapters.shell_runner")
 		local Errors = require("diagnostics.engine.adapter_errors")
 		local function validate_output(output)
 			helpers.assert_type(output, "string")

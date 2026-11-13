@@ -155,7 +155,7 @@ end
 --- @param callback function Runs with the probes answering without a spawn.
 local function with_controlled_probes(callback)
 	local targets = {
-		{ require("adapters.shell_runner"), "has_command", function() return true end },
+		{ require("core.process.adapters.shell_runner"), "has_command", function() return true end },
 		{ require("adapters.window_switch"), "available", function() return true, nil, nil end },
 		{ require("modules.gestures.program_owner"), "available", function() return true end },
 		{ require("modules.gestures.workspace_switcher"), "detect", function() return {}, nil end },

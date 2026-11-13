@@ -9,7 +9,7 @@ local function assert_false(value) helpers.assert_eq(value, false) end
 require("core.logger.engine.monotonic") -- Load the genuine clock before temporary native ports.
 
 local function read_committed_input(database)
-	local shell = require("adapters.shell_runner")
+	local shell = require("core.process.adapters.shell_runner")
 	assert(shell.has_command("sqlite3"), "SQLite CLI is required for the independent native COMMIT assertion")
 	local ok, retained, failure = shell.exec_checked("sqlite3 -init /dev/null -bail -readonly "
 		.. shell.quote(database) .. " " .. shell.quote("SELECT COUNT(*) FROM events_typing;"))
@@ -19,7 +19,7 @@ end
 
 helpers.describe("native metrics fixture SQLite admission", function()
 	it("native-fixture-sqlite-admission: a missing CLI refuses before opening the independent query", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_eq(type(shell.has_command), "function", "the probe must mirror the real shell API")
 		helpers.assert_eq(type(shell.exec_checked), "function", "the query must mirror the real checked shell API")
 		local original_probe, original_checked = shell.has_command, shell.exec_checked
@@ -49,7 +49,7 @@ helpers.describe("native metrics fixture SQLite admission", function()
 		local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-sqlite-witness-XXXXXX"))
 		local original_path = assert(uv.os_getenv("PATH"), "the test runner must declare PATH")
 		local original_tmp = uv.os_getenv("TMPDIR")
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		local before = {}
 		uv.walk(function(handle) before[handle] = true end)
 		local accepted, detail, pid

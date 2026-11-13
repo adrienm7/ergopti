@@ -11,11 +11,11 @@ local Json = require("core.text.engine.json")
 require("adapters.atspi_focus")
 
 local function with_capture(options, body)
-	local names = { "adapters.atspi_focus", "adapters.owned_process", "luv" }
+	local names = { "adapters.atspi_focus", "core.process.adapters.owned_process", "luv" }
 	local previous, state = {}, { calls = 0 }
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	package.loaded["luv"] = { exepath = function() return "/native/luajit" end, os_getpid = function() return 1234 end }
-	package.loaded["adapters.owned_process"] = { start = function(executable, argv, ports, callback)
+	package.loaded["core.process.adapters.owned_process"] = { start = function(executable, argv, ports, callback)
 		state.calls, state.argv, state.ports, state.callback = state.calls + 1, argv, ports, callback
 		return { on_settled = function() return true end }
 	end }

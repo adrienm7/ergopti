@@ -27,7 +27,7 @@ local helpers = require("tests.helpers")
 -- ===========================================
 
 local MODULE_NAMES = {
-	"adapters.task_lifecycle",
+	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"hs",
 	"infra.dialog_util",
@@ -117,7 +117,7 @@ local function with_fixture(options, scenario)
 	end
 
 	local function noop() end
-	package.loaded["adapters.task_lifecycle"] = { start = function() return false end }
+	package.loaded["core.process.adapters.task_lifecycle"] = { start = function() return false end }
 	package.loaded["core.events.timer_scheduler"] = scheduler
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function() return options.choice end,

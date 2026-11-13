@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"modules.llm.boot_cleanup",
-	"adapters.shell_runner",
+	"core.process.adapters.shell_runner",
 	"modules.llm.api_mlx",
 }
 
@@ -32,7 +32,7 @@ local function with_cleanup(start_result, callback)
 				DEFAULT_PORT = 3460,
 				get_port = function() return 4567 end,
 			}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				spawn = function(executable, args, on_done)
 					state.spawn_calls = state.spawn_calls + 1
 					state.executable = executable
@@ -51,7 +51,7 @@ local function with_cleanup(start_result, callback)
 			local callback_ok, callback_err = xpcall(function()
 				callback(BootCleanup, state)
 			end, debug.traceback)
-			package.loaded["adapters.shell_runner"] = nil
+			package.loaded["core.process.adapters.shell_runner"] = nil
 			if not callback_ok then error(callback_err, 0) end
 		end)
 	end, debug.traceback)

@@ -60,7 +60,7 @@ helpers.describe("logger — sub-file routing falls back instead of vanishing", 
 		L.set_level("DEBUG")
 
 		-- Pre-load the shell adapter so its own require never runs under the stub.
-		pcall(require, "adapters.shell_runner")
+		pcall(require, "core.process.adapters.shell_runner")
 
 		local captured = {}
 		L.set_sink(function(line) captured[#captured + 1] = line end)

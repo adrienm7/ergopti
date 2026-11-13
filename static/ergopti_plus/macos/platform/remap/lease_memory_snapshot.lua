@@ -20,7 +20,7 @@
 local M = {}
 
 local Logger         = require("core.logger.engine.logger")
-local ShellRunner    = require("adapters.shell_runner")
+local ShellRunner    = require("core.process.adapters.shell_runner")
 local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG = "lease_memory"

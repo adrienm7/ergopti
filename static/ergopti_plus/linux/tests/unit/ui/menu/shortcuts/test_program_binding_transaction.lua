@@ -89,7 +89,7 @@ local function with_case(spec, body)
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
 			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() error("picker must not close input") end }
-			package.loaded["adapters.shell_runner"] = { has_command = function() return true end,
+			package.loaded["core.process.adapters.shell_runner"] = { has_command = function() return true end,
 				quote = function(value) return "'" .. value .. "'" end }
 			local gestures = require("modules.gestures.manager")
 			gestures.init({ persist = true, config_path = path, enabled = false })
@@ -180,7 +180,7 @@ local function with_configuration_picker(body)
 		package.loaded["core.logger.engine.shim"] = logger
 		package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
 		package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad" }
-		package.loaded["adapters.program_providers"] = {}
+		package.loaded["core.process.adapters.program_providers"] = {}
 		local gestures = require("modules.gestures.manager")
 		gestures.init({ persist = true, config_path = f.paths.config("config.toml"), enabled = false })
 		local keyboard = require("modules.shortcuts.keyboard_shortcuts")
@@ -589,7 +589,7 @@ helpers.describe("Linux program picker transaction", function()
 			helpers.assert_eq(pick({ is_paused = function() return false end }, gestures, "keyboard__primary_j", "run_program",
 				function() return provider.set_action("primary_j", "run_program") end, NEXT), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
-			local runner = require("adapters.program_runner")
+			local runner = require("core.process.adapters.program_runner")
 			local spawn, acquisitions = runner.spawn, 0
 			runner.spawn = function(...) acquisitions = acquisitions + 1; return spawn(...) end
 			local called, started = pcall(gestures.run_program, "keyboard__primary_j")

@@ -35,7 +35,7 @@ function M.exec(command, input, options)
 	next_id = next_id + 1
 	local prefix = "ERGOPTI_OPENSSL_EXIT_STATUS_" .. tostring({}):gsub("%W", "") .. "_" .. string.format("%.0f", next_id) .. "="
 	local receipt = "printf '\\n" .. prefix .. "%s\\n' \"$?\""
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local framed
 	if input ~= nil then
 		if not Shell.has_command("bash") then return nil, "missing OpenSSL input supervisor" end

@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 --- Runs the real auxiliary owner and scheduler with one controllable native child.
 local function with_owner(callback)
 	helpers.with_stub_scope({ "modules.gestures.actions_aux_owner", "core.events.timer_scheduler",
-		"adapters.shell_runner", "infra.timings", "core.logger.engine.logger" }, function()
+		"core.process.adapters.shell_runner", "infra.timings", "core.logger.engine.logger" }, function()
 		local f = { timers = {}, outcomes = {}, settled = false, observers = {}, terminations = 0 }
 		_G.hs = { timer = { new = function(delay, receive)
 			local native = { delay = delay, active = false, refuse_stop = #f.timers == 0 }
@@ -36,7 +36,7 @@ local function with_owner(callback)
 			onSettled = function(receive) f.observers[#f.observers + 1] = receive; return true end,
 			terminate = function() f.terminations = f.terminations + 1; return true, "pending" end,
 		}
-		package.loaded["adapters.shell_runner"] = { open = function(_, terminal)
+		package.loaded["core.process.adapters.shell_runner"] = { open = function(_, terminal)
 			f.terminal = terminal
 			return true, child
 		end }

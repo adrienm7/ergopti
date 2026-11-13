@@ -317,7 +317,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 
 			with_cleanup(function()
 				with_package_stubs({
-				["adapters.shell_runner"] = {},
+				["core.process.adapters.shell_runner"] = {},
 				["core.i18n.engine.i18n"] = { get = function(key) return key end },
 				["core.logger.engine.logger"] = helpers.make_logger_stub(),
 				["infra.text_utils"] = {

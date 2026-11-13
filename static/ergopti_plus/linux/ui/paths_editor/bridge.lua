@@ -149,7 +149,7 @@ function M.on_message(payload, state, context)
 			if type(getter) == "function" then current = getter() end
 		end
 		local selected, select_err = ConfigDirPicker.pick(
-			dependency(state, "shell", "adapters.shell_runner"),
+			dependency(state, "shell", "core.process.adapters.shell_runner"),
 			config_paths,
 			dependency(state, "i18n", "core.i18n.engine.i18n"),
 			current

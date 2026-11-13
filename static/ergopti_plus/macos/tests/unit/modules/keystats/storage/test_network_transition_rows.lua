@@ -108,7 +108,7 @@ helpers.describe("macOS connectivity transitions: the adapter probes", function(
 		function target:setCallback(fn) self.callback = fn; return self end
 		function target:start() self.started = true; return self end
 		function target:stop() self.started = false; return self end
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		local NetworkInfo = helpers.load_with_stubs("core.network.adapters.info", {
 			task = {
 				new = function(_, callback)

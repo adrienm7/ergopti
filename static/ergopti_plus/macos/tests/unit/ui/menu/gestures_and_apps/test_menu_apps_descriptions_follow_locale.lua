@@ -18,7 +18,7 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 		local previous_hs = _G.hs
 		local ok, err = xpcall(function()
 			helpers.with_fresh_modules({ "ui.menu.menu_apps", "core.logger.engine.logger", "core.fs.engine.paths",
-				"core.i18n.engine.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir" }, function()
+				"core.i18n.engine.i18n", "infra.manifest_menu", "core.process.adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir" }, function()
 				local locale = "fr"
 				local texts = {
 					fr = { ["menu.apps.clone_desc"] = "Dupliquer une application" },
@@ -29,7 +29,7 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 				package.loaded["infra.manifest_menu"] = { build = function(_, _, _, _, _, providers)
 					return providers.apps_installed()
 				end }
-				package.loaded["adapters.task_lifecycle"] = {}
+				package.loaded["core.process.adapters.task_lifecycle"] = {}
 				local scans = 0
 				package.loaded["core.fs.engine.dir"] = { try_entries_quiet = function(directory)
 					if directory:find("/Contents/Resources", 1, true) then return {}, true end

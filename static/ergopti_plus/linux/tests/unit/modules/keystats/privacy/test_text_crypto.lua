@@ -32,7 +32,7 @@ local Heredoc    = require("core.process.shell_heredoc")
 --- replaces the cached instance — a reference captured up here would then be a
 --- stale table whose test seam the cipher never sees.
 local function Shell()
-	return require("adapters.shell_runner")
+	return require("core.process.adapters.shell_runner")
 end
 
 --- A syntactically valid AES-256 key and IV, for the pure command builders.
@@ -242,8 +242,8 @@ end)
 
 helpers.it("text cipher refuses a FIFO machine identity without blocking", function()
 	local uv = require("luv")
-	local previous_shell, previous_cipher = package.loaded["adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"]
-	local shell = helpers.load_module("adapters.shell_runner")
+	local previous_shell, previous_cipher = package.loaded["core.process.adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"]
+	local shell = helpers.load_module("core.process.adapters.shell_runner")
 	shell._set_runner(function(command) return native_receipt(command, "key=" .. KEY .. "\n") end)
 	local cipher = load_cipher()
 	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-machine-id-XXXXXX"))
@@ -257,7 +257,7 @@ helpers.it("text cipher refuses a FIFO machine identity without blocking", funct
 	local called, available = pcall(cipher.is_available)
 	os.remove(path); os.remove(dir)
 	while not exited do uv.run("once") end
-	package.loaded["adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"] = previous_shell, previous_cipher
+	package.loaded["core.process.adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"] = previous_shell, previous_cipher
 	assert(called, available)
 	helpers.assert_eq(available, false, "a FIFO cannot provide a machine identity")
 end)
@@ -266,8 +266,8 @@ for _, fault in ipairs({ "read_throw", "read_nil", "close_throw", "close_false" 
 	helpers.it("text cipher refuses an incomplete machine identity " .. fault, function()
 		local Reader = require("core.fs.engine.regular_file_reader")
 		local original = Reader.open_source
-		local previous_shell, previous_cipher = package.loaded["adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"]
-		local shell = helpers.load_module("adapters.shell_runner")
+		local previous_shell, previous_cipher = package.loaded["core.process.adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"]
+		local shell = helpers.load_module("core.process.adapters.shell_runner")
 		local commands, closes = 0, 0
 		shell._set_runner(function(command) commands = commands + 1; return native_receipt(command, "key=" .. KEY .. "\n") end)
 		local cipher = load_cipher(); cipher._set_machine_id_path("/controlled/machine-id")
@@ -285,7 +285,7 @@ for _, fault in ipairs({ "read_throw", "read_nil", "close_throw", "close_false" 
 		end
 		local called, result = pcall(cipher.is_available)
 		Reader.open_source = original
-		package.loaded["adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"] = previous_shell, previous_cipher
+		package.loaded["core.process.adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"] = previous_shell, previous_cipher
 		helpers.assert_true(called); helpers.assert_eq(result, false)
 		helpers.assert_eq(commands, 0); helpers.assert_eq(closes, 1)
 	end)
@@ -304,9 +304,9 @@ helpers.describe("text_cipher — default machine-ID candidate receipts", functi
 		helpers.it("uses the canonical native machine-ID candidate " .. index .. " (machine-id-fallback-receipts)", function()
 			local Reader = require("core.fs.engine.regular_file_reader")
 			local previous_open = Reader.open_source
-			local previous_shell = package.loaded["adapters.shell_runner"]
+			local previous_shell = package.loaded["core.process.adapters.shell_runner"]
 			local previous_cipher = package.loaded["modules.keystats.text_cipher"]
-			local shell = helpers.load_module("adapters.shell_runner")
+			local shell = helpers.load_module("core.process.adapters.shell_runner")
 			local commands, closed = {}, 0
 			shell._set_runner(function(command) commands[#commands + 1] = command; return native_receipt(command, "key=" .. KEY .. "\n") end)
 			Reader.open_source = function(path, mode)
@@ -336,7 +336,7 @@ helpers.describe("text_cipher — default machine-ID candidate receipts", functi
 				end
 			end)
 			Reader.open_source = previous_open
-			package.loaded["adapters.shell_runner"] = previous_shell
+			package.loaded["core.process.adapters.shell_runner"] = previous_shell
 			package.loaded["modules.keystats.text_cipher"] = previous_cipher
 			helpers.assert_true(ok, tostring(err))
 		end)

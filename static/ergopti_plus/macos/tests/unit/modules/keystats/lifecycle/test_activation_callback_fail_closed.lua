@@ -164,7 +164,7 @@ local function load_keystats(options)
 		end,
 		caffeinate_cb = function() ctx.caffeinate_calls = (ctx.caffeinate_calls or 0) + 1 end,
 	}
-	package.loaded["adapters.process_lifecycle"] = {
+	package.loaded["core.process.adapters.lifecycle"] = {
 		onAppActivate = function(callback) ctx.activation_callback = callback end,
 		start = function()
 			ctx.process_start_calls = ctx.process_start_calls + 1

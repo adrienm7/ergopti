@@ -105,7 +105,7 @@ end
 
 --- Capabilities describe actual native openers and the current failed intent.
 local function network_capabilities(cause)
-	local shell = require("adapters.shell_runner")
+	local shell = require("core.process.adapters.shell_runner")
 	local fs = require("core.fs.adapters.file_system")
 	local function regular_file(path)
 		if type(path) ~= "string" or path:sub(1, 1) ~= "/" then return false end
@@ -137,7 +137,7 @@ end
 --- @return boolean started
 local function reveal(path)
 	local ok, started = pcall(function()
-		local handle = require("adapters.shell_runner").spawn(OPEN_BIN, { "-R", path }, nil)
+		local handle = require("core.process.adapters.shell_runner").spawn(OPEN_BIN, { "-R", path }, nil)
 		return handle ~= nil and handle.start() == true
 	end)
 	if not ok or started ~= true then
@@ -266,7 +266,7 @@ local function present(cause)
 		elseif action == "proxy_settings" then
 			local opened, started = pcall(function()
 				if not failure_is_current(cause) then return false end
-				local handle = require("adapters.shell_runner").spawn(M.OPEN_BIN, { M.NETWORK_SETTINGS_URL }, nil)
+				local handle = require("core.process.adapters.shell_runner").spawn(M.OPEN_BIN, { M.NETWORK_SETTINGS_URL }, nil)
 				return handle ~= nil and handle.start() == true
 			end)
 			if not opened or started ~= true then
@@ -276,7 +276,7 @@ local function present(cause)
 			local _, log_path = network_capabilities(cause)
 			if not log_path or not failure_is_current(cause) then return false end
 			local opened, started = pcall(function()
-				local handle = require("adapters.shell_runner").spawn(OPEN_BIN, { log_path }, nil)
+				local handle = require("core.process.adapters.shell_runner").spawn(OPEN_BIN, { log_path }, nil)
 				return handle ~= nil and handle.start() == true
 			end)
 			if not opened or started ~= true then Logger.error(LOG, "The failure log could not be opened.") end

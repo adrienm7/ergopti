@@ -240,7 +240,7 @@ function M.open(opts, on_confirm, on_cancel)
 		end or nil,
 	}
 	_active_session = session
-	local adapter_ok, adapter = pcall(require, "adapters.program_providers")
+	local adapter_ok, adapter = pcall(require, "core.process.adapters.program_providers")
 	session.providers = ProgramProviderPicker.capture(adapter_ok and adapter or nil)
 	if _active_session ~= session then
 		ProgramProviderPicker.close(session.providers)

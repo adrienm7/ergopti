@@ -15,7 +15,7 @@ local TableUtil = require("core.text.engine.table_util")
 local Logger = require("core.logger.engine.shim")
 -- A caught callback failure is described without running its __tostring.
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 local LibuvExit = require("core.lifecycle.engine.shutdown.libuv_exit")
 local BodyPipe = require("core.network.engine.http_body_pipe")
 local OutputTarget = require("core.network.engine.http_output_target")

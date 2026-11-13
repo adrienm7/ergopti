@@ -61,7 +61,7 @@ local ok, err = xpcall(function()
 	local group, latched = state()
 	assert(group == 1 and latched == 1, "latched-group precondition not established")
 	local done, result = false, nil
-	local operation = require("adapters.owned_process").start(uv.exepath(), {
+	local operation = require("core.process.adapters.owned_process").start(uv.exepath(), {
 		"./adapters/input_source_group_worker.lua", tostring(uv.os_getpid()), require("_generated.native_runtime").x11,
 	}, { owner = "xkb-latched-regression", timeout_ms = 3000 }, function(value) done, result = true, value end)
 	assert(type(operation) == "table", "worker dispatch refused without an owner")
@@ -69,7 +69,7 @@ local ok, err = xpcall(function()
 	assert(type(result) == "table" and result.ok == false, "latched nonzero group was acknowledged")
 	assert(state() == 1, "the test requires the effective group to remain nonzero")
 	done, result = false, nil
-	operation = require("adapters.owned_process").start(uv.exepath(), {
+	operation = require("core.process.adapters.owned_process").start(uv.exepath(), {
 		"./adapters/input_source_group_worker.lua", tostring(uv.os_getpid()), "../unexpected.so",
 	}, { owner = "xkb-invalid-soname-regression", timeout_ms = 3000 }, function(value) done, result = true, value end)
 	assert(type(operation) == "table", "invalid-soname worker dispatch refused without an owner")

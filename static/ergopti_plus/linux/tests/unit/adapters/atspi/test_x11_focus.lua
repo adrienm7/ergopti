@@ -166,7 +166,7 @@ helpers.describe("window_info: the native X11 route", function()
 		local display = helpers.load_module("infra.display_server")
 		display._set_for_test(display.X11, "x11 focus fixture")
 		package.loaded["infra.display_server"] = display
-		local shell = helpers.load_module("adapters.shell_runner")
+		local shell = helpers.load_module("core.process.adapters.shell_runner")
 		local commands = {}
 		shell._set_runner(function(command)
 			commands[#commands + 1] = command
@@ -239,7 +239,7 @@ helpers.describe("window_info: the X11 identity is the WM class (add3-app-identi
 		local display = helpers.load_module("infra.display_server")
 		display._set_for_test(display.X11, "x11 identity fixture")
 		package.loaded["infra.display_server"] = display
-		local shell = helpers.load_module("adapters.shell_runner")
+		local shell = helpers.load_module("core.process.adapters.shell_runner")
 		shell._set_runner(function(command)
 			if command:find("/comm", 1, true) then return comm end
 			return ""
@@ -307,7 +307,7 @@ helpers.describe("window_info and the diagnostic snapshot: the open applications
 		local display = helpers.load_module("infra.display_server")
 		display._set_for_test(kind, "x11 clients fixture")
 		package.loaded["infra.display_server"] = display
-		local shell = helpers.load_module("adapters.shell_runner")
+		local shell = helpers.load_module("core.process.adapters.shell_runner")
 		local commands = {}
 		shell._set_runner(function(command)
 			commands[#commands + 1] = command
@@ -371,7 +371,7 @@ helpers.describe("window_info native process-name records", function()
 		helpers.it("(window-native-comm) preserves focused and listed kernel names with " .. case[1], function()
 			local ffi = require("ffi")
 			ffi.cdef("int prctl(int option, ...);")
-			local names = { "adapters.shell_runner", "adapters.window_info", "adapters.x11_focus", "infra.display_server" }
+			local names = { "core.process.adapters.shell_runner", "adapters.window_info", "adapters.x11_focus", "infra.display_server" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 			local file = assert(io.open("/proc/self/comm", "rb"))
@@ -383,8 +383,8 @@ helpers.describe("window_info native process-name records", function()
 			local called, detail = pcall(function()
 				rename(case[2])
 				local pid = require("luv").os_getpid()
-				local shell = helpers.load_module("adapters.shell_runner")
-				package.loaded["adapters.shell_runner"] = shell
+				local shell = helpers.load_module("core.process.adapters.shell_runner")
+				package.loaded["core.process.adapters.shell_runner"] = shell
 				local display = helpers.load_module("infra.display_server")
 				display._set_for_test("x11", "owned")
 				package.loaded["infra.display_server"] = display

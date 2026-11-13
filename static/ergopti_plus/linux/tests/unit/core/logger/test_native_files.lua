@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local native = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local AppDirs = require("core.fs.engine.app_dirs")
 local SubFiles = require("_generated.logger_sub_files")
 

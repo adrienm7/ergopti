@@ -16,8 +16,8 @@
 
 local Errors = require("diagnostics.engine.adapter_errors")
 local uv = require("luv")
-local ShellRunner = require("adapters.shell_runner")
-local ProcessRunner = require("adapters.process_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local ProcessRunner = require("core.process.adapters.runner")
 
 local TIMEOUT_MS = 500
 local WAIT_MS = 3000

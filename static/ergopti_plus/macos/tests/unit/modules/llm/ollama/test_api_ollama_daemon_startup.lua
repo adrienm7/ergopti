@@ -26,7 +26,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 	-- shared receiver/lifecycle and ShellRunner over controlled native task ports.
 	local function with_startup(starts, callback)
 		helpers.with_stub_scope({
-			"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "adapters.shell_runner",
+			"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "core.process.adapters.shell_runner",
 			"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 			"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
@@ -104,7 +104,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 					return task
 				end },
 			})
-			local shell = require("adapters.shell_runner")
+			local shell = require("core.process.adapters.shell_runner")
 			fixture.shell = shell
 			local ok, err = xpcall(function() callback(api, fixture) end, debug.traceback)
 			-- Retire controlled native objects even when an assertion fails; scoped

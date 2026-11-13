@@ -21,7 +21,7 @@ local M = {}
 local OWNED_MODULES = {
 	"lfs", "core.fs.engine.native_path", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "core.text.engine.toml_codec.source_open",
 	"core.network.adapters.http_client", "adapters.managed_ollama_daemon",
-	"adapters.owned_program_runner", "adapters.running_application",
+	"core.process.adapters.owned_program_runner", "adapters.running_application",
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "infra.notifications",
 	"ai.engine.ollama.local_model_policy", "modules.llm.api_mlx_fetch",
 	"modules.llm.api_mlx_inference", "modules.llm.api_ollama",
@@ -32,7 +32,7 @@ local OWNED_MODULES = {
 	"infra.dialog_util", "core.lifecycle.engine.shutdown.teardown_transaction", "modules.keystats.init",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 	"modules.keystats.kc_bridge", "modules.keystats.watchers", "modules.keystats.timestamp",
-	"modules.keystats.physical_accounting_mode", "adapters.synthetic_input", "adapters.event_provenance", "adapters.process_lifecycle",
+	"modules.keystats.physical_accounting_mode", "adapters.synthetic_input", "adapters.event_provenance", "core.process.adapters.lifecycle",
 	"adapters.keyboard_hook", "adapters.input_source_broker", "core.fs.adapters.storage",
 	"core.events.timer_scheduler", "modules.keystats.aggregator.events",
 	"modules.keystats.aggregator.state", "modules.keystats.aggregator.core",

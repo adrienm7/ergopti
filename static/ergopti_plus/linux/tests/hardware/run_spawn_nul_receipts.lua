@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Shell = require("adapters.shell_runner")
-local Process = require("adapters.process_runner")
+local Shell = require("core.process.adapters.shell_runner")
+local Process = require("core.process.adapters.runner")
 local Digest = require("core.fs.adapters.file_digest")
 local HTTP = require("core.network.adapters.http_client")
 assert(uv.getuid() ~= 0, "native byte boundary checks require an ordinary user")

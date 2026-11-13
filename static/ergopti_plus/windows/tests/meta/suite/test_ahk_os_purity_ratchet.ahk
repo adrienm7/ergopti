@@ -168,7 +168,7 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ;              window_manager adapter, and tightened to that value.
 ; entry point: 2026-07-31, first measurement (DllCall=3, FileIO=5).
 ; 2026-11-03: the startup smoke's mutex probe, exit and deadline moved into
-; adapters/process_lifecycle.ahk; read from this counter at modules+lib 248
+; core/process/adapters/lifecycle.ahk; read from this counter at modules+lib 248
 ; (DllCall=157 COM=2 FileIO=89) and entry 7 (DllCall=6 FileIO=1), tightened.
 ; 2026-11-12: the layout registry watch and the metrics time zone conversions
 ; moved into adapters/registry_notify.ahk and adapters/system_time_zone.ahk;

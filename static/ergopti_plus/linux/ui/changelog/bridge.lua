@@ -36,7 +36,7 @@ local LOG = "bridge.changelog"
 -- Read canonical version from the single-source module (SSoT).
 local Version = require("infra.version")
 local Installation = require("core.lifecycle.engine.installation")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Json = require("core.text.engine.json")
 local Base64 = require("core.lifecycle.engine.compat.base64")
 local ReleaseSources = require("updater.engine.release_sources")

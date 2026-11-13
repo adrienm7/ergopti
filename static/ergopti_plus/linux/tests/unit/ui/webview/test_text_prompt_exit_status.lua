@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local h = require("tests.helpers")
-local Shell = h.load_module("adapters.shell_runner")
+local Shell = h.load_module("core.process.adapters.shell_runner")
 
 --- Writes one exclusively owned fixture file.
 --- @param path string Absolute private path.

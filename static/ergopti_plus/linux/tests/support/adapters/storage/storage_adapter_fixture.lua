@@ -47,7 +47,7 @@ local function storage_cohort_fixture(source, callback)
 		callback(helpers.load_module("core.fs.adapters.storage"), require("core.fs.adapters.file_system"), path, root .. "/snapshot", write, read)
 	end, debug.traceback)
 	os.getenv, package.loaded["core.fs.adapters.storage"] = getenv, previous
-	local Shell = require("adapters.shell_runner"); assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
+	local Shell = require("core.process.adapters.shell_runner"); assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
 	if not okay then error(detail, 0) end
 end
 

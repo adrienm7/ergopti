@@ -58,7 +58,7 @@ local function with_managed(options, callback)
 		local ready
 		handle, ready = adapter.prepare("owned/model:tiny", 11434, "/native/python")
 		helpers.assert_true(ready)
-		local lifecycle = package.loaded["adapters.task_lifecycle"]
+		local lifecycle = package.loaded["core.process.adapters.task_lifecycle"]
 		local native = lifecycle.native
 		lifecycle.native = function(...)
 			local task = native(...)

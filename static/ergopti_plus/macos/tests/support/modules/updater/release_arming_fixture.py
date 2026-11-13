@@ -27,7 +27,7 @@ package.preload['core.fs.adapters.file_system']=function() return {read=function
     local file=assert(io.open(path,'rb'));local body=assert(file:read('a'));assert(file:close());return body
 end} end
 package.preload['core.fs.adapters.json_codec']=function() return Json end
-package.preload['adapters.shell_runner']=function() return {} end
+package.preload['core.process.adapters.shell_runner']=function() return {} end
 local installer=require('modules.updater.release_installer')
 installer._getenv=function(name)
     if name=='ERGOPTI_LAUNCHER_EXECUTABLE' then return app..'/Contents/MacOS/ErgoptiPlus' end

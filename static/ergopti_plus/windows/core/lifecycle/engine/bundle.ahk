@@ -93,7 +93,7 @@ global _BundleDir := ""
 #Include %A_LineFile%\..\..\..\..\_generated\identifiers.ahk
 #Include ../../crypto/crypto.ahk
 #Include ../../fs/adapters/file_system.ahk
-#Include ../../../adapters/process_lifecycle.ahk
+#Include ../../process/adapters/lifecycle.ahk
 #Include *i ../build/bundle_inventory.ahk
 
 

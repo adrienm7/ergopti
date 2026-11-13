@@ -270,7 +270,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 			helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
 			helpers.assert_eq(file.menu[3].title, "menu.hotstrings.open_file")
 			local deferred = require("infra.deferred_work")
-			local shell = require("adapters.shell_runner")
+			local shell = require("core.process.adapters.shell_runner")
 			local original = deferred.after
 			local original_open = shell.open
 			local callback, opened
@@ -304,13 +304,13 @@ end)
 --- @param body function Real category callback observations.
 local function with_category_file(committed, body, change_label)
 	helpers.with_stub_scope({ "infra.manifest_menu", "infra.deferred_work",
-		"core.events.timer_scheduler", "adapters.shell_runner", "modules.keymap", "modules.dynamic_hotstrings",
+		"core.events.timer_scheduler", "core.process.adapters.shell_runner", "modules.keymap", "modules.dynamic_hotstrings",
 		"ui.menu.menu_hotstrings", "ui.menu.menu_hotstrings_custom" }, function()
 		-- Category file opening neither starts nor inspects these unrelated engines.
 		package.loaded["modules.keymap"] = { DEFAULT_STATE = {} }
 		package.loaded["modules.dynamic_hotstrings"] = { DEFAULT_STATE = {} }
 		local callbacks, launches = {}, {}
-		package.loaded["adapters.shell_runner"] = { open = function(path) launches[#launches + 1] = path; return true end }
+		package.loaded["core.process.adapters.shell_runner"] = { open = function(path) launches[#launches + 1] = path; return true end }
 		package.loaded["core.events.timer_scheduler"] = { after = function(_, callback)
 			callbacks[#callbacks + 1] = callback
 			return {}, committed
@@ -370,7 +370,7 @@ helpers.describe("shared category file command", function()
 			local ctx = context(true, true)
 			ctx.hotfile_paths = { alpha = "/user/a.toml" }
 			local command = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3]
-			package.loaded["adapters.shell_runner"].open = nil
+			package.loaded["core.process.adapters.shell_runner"].open = nil
 			helpers.assert_eq(command.fn(), false)
 			helpers.assert_eq(#callbacks, 0)
 			helpers.assert_eq(#launches, 0)

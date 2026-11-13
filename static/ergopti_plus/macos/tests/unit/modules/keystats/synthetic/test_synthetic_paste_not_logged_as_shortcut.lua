@@ -61,7 +61,7 @@ local function load_fixture()
 		check_idle = function() end,
 		perform_maintenance = function() end,
 	}
-	package.loaded["adapters.process_lifecycle"] = {
+	package.loaded["core.process.adapters.lifecycle"] = {
 		onAppActivate = function() end,
 		start = function() return true end,
 		stop = function() return true end,
@@ -151,7 +151,7 @@ local function load_fixture()
 				"modules.keystats.context_tracker",
 				"modules.keystats.kc_bridge",
 				"modules.keystats.watchers",
-				"adapters.process_lifecycle",
+				"core.process.adapters.lifecycle",
 				"adapters.keyboard_hook",
 				"adapters.event_provenance",
 				"adapters.synthetic_input",

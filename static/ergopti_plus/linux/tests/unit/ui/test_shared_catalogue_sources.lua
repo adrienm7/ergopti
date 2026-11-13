@@ -4,7 +4,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("shared UI catalogue sources", function()
 	helpers.it("(ui-catalogue-source) admits regular files and refuses real special files without blocking", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"))
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
@@ -15,7 +15,7 @@ helpers.describe("shared UI catalogue sources", function()
 	end)
 
 	helpers.it("(webview-asset-source) refuses real special assets without blocking", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"))
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))

@@ -36,7 +36,7 @@ local BUFFER_EVENT_CAP = 1024
 local RESET_MODULES = {
 	"adapters.event_provenance", "core.fs.adapters.file_system",
 	"adapters.input_source_broker", "adapters.keyboard_hook",
-	"adapters.process_lifecycle", "adapters.synthetic_input",
+	"core.process.adapters.lifecycle", "adapters.synthetic_input",
 	"core.events.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
 	"hs.timer", "infra.config_paths", "infra.dialog_util", "core.i18n.engine.i18n",
 	"core.logger.engine.logger", "infra.manifest_reader", "infra.timings",
@@ -207,7 +207,7 @@ local function load_fixture(options)
 		perform_maintenance = function() end,
 		caffeinate_cb = function() end,
 	}
-	package.loaded["adapters.process_lifecycle"] = {
+	package.loaded["core.process.adapters.lifecycle"] = {
 		onAppActivate = function() return true end,
 		start = function() return true end,
 		stop = function() return true end,

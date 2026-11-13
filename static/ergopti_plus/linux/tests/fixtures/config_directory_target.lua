@@ -11,7 +11,7 @@ local driver, root, entry, mode = assert(arg[1]), assert(arg[2]), assert(arg[3])
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
 	.. driver .. "/../_shared/?.lua;" .. driver .. "/../_shared/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
-local Shell, Json = require("adapters.shell_runner"), require("core.text.engine.json")
+local Shell, Json = require("core.process.adapters.shell_runner"), require("core.text.engine.json")
 
 -- The application folder under every XDG base, from the shared registry.
 local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name

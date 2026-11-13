@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "adapters.accessibility_copies", "adapters.shell_runner" }
+local MODULES = { "adapters.accessibility_copies", "core.process.adapters.shell_runner" }
 local OWN = "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app"
 
 --- Runs body against a fresh adapter whose shell runner records each spawn.
@@ -21,7 +21,7 @@ local OWN = "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app"
 local function with_probe(body)
 	helpers.with_fresh_modules(MODULES, function()
 		local spawns = {}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, on_done)
 				local spawn = { executable = executable, args = args, on_done = on_done, started = true }
 				spawns[#spawns + 1] = spawn
@@ -29,7 +29,7 @@ local function with_probe(body)
 			end,
 		}
 		body(require("adapters.accessibility_copies"), spawns)
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 	end)
 end
 
@@ -90,7 +90,7 @@ helpers.describe("accessibility copies adapter (accessibility-other-copies)", fu
 
 	helpers.it("reports a probe that did not start", function()
 		with_probe(function(copies)
-			package.loaded["adapters.shell_runner"].spawn = function()
+			package.loaded["core.process.adapters.shell_runner"].spawn = function()
 				return { start = function() return false end }
 			end
 			helpers.assert_eq(copies.find("com.ergoptiplus.app.hammerspoon", OWN, function() end), false)

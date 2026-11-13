@@ -64,7 +64,7 @@ function M.reset(service, bundle_id, on_done)
 		Logger.error(LOG, "Refusing to reset a privacy grant outside this process's bundle identity.")
 		return false
 	end
-	local ShellRunner = require("adapters.shell_runner")
+	local ShellRunner = require("core.process.adapters.shell_runner")
 	local handle = ShellRunner.spawn(TCCUTIL_BIN, { "reset", service, bundle_id },
 		function(exit_code, stdout, stderr)
 			if exit_code == 0 then

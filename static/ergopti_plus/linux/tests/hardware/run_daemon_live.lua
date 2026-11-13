@@ -155,7 +155,7 @@ local log = home .. "/daemon.log"
 
 -- Select the probe's input features through the real owners in its private HOME.
 local interpreter = arg and arg[-1] or "luajit"
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local prepare = string.format("HOME=%s XDG_CONFIG_HOME=%s XDG_DATA_HOME=%s %s -e %s",
 	Shell.quote(home), Shell.quote(home .. "/.config"), Shell.quote(home .. "/.local/share"),
 	Shell.quote(interpreter), Shell.quote('require("tests.support.live_preferences").daemon()'))

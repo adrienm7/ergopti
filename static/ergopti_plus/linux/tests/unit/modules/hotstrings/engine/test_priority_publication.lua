@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 local function with_priority(body, no_engine)
 	local saved = {}
 	for name, value in pairs(package.loaded) do saved[name] = value end
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local directory = os.tmpname()
 	os.remove(directory)
 	assert(Shell.run("mkdir -p " .. Shell.quote(directory)))

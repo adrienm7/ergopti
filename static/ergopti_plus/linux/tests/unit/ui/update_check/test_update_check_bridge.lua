@@ -243,7 +243,7 @@ helpers.describe("update-check window bridge (Linux)", function()
 				.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;") .. "..package.path;"
 				.. "package.loaded['core.lifecycle.engine.installation']={is_source_run=function()return false end};"
 				.. "package.loaded['core.logger.engine.sink']={main_log_path=function()return " .. string.format("%q", path) .. " end};"
-				.. "package.loaded['adapters.shell_runner']={has_command=function()return true end};"
+				.. "package.loaded['core.process.adapters.shell_runner']={has_command=function()return true end};"
 				.. "local window; package.loaded['ui.download_window.bridge']={show=function(v)window=v;return 1 end};"
 				.. "local release={tag='v1',download_url='https://example.invalid/a'}; local u={"
 				.. "get_cached_release=function()return release end,get_state=function()return 'idle' end,"
@@ -393,8 +393,8 @@ helpers.describe("update-check window bridge (Linux)", function()
 
 	helpers.it("opens a repository link of the notes with xdg-open, nothing else", function()
 		scenario(with_notes, function(bridge, context)
-			local saved, commands = package.loaded["adapters.shell_runner"], {}
-			package.loaded["adapters.shell_runner"] = {
+			local saved, commands = package.loaded["core.process.adapters.shell_runner"], {}
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function(binary) return binary == "xdg-open" end,
 				quote = function(text) return "'" .. text .. "'" end,
 				run = function(command) commands[#commands + 1] = command; return true end,
@@ -410,15 +410,15 @@ helpers.describe("update-check window bridge (Linux)", function()
 				helpers.assert_eq(#commands, 1, "a link outside the repository never reaches the shell")
 				helpers.assert_eq(last(context).ok, false)
 			end)
-			package.loaded["adapters.shell_runner"] = saved
+			package.loaded["core.process.adapters.shell_runner"] = saved
 			if not ok then error(err, 0) end
 		end)
 	end)
 
 	helpers.it("says so when xdg-open is missing", function()
 		scenario(with_notes, function(bridge, context)
-			local saved, ran = package.loaded["adapters.shell_runner"], 0
-			package.loaded["adapters.shell_runner"] = {
+			local saved, ran = package.loaded["core.process.adapters.shell_runner"], 0
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return false end,
 				quote = function(text) return text end,
 				run = function() ran = ran + 1; return true end,
@@ -429,7 +429,7 @@ helpers.describe("update-check window bridge (Linux)", function()
 				helpers.assert_eq(ran, 0)
 				helpers.assert_eq(last(context).ok, false)
 			end)
-			package.loaded["adapters.shell_runner"] = saved
+			package.loaded["core.process.adapters.shell_runner"] = saved
 			if not ok then error(err, 0) end
 		end)
 	end)
