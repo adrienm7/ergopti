@@ -25,6 +25,7 @@ const { execFileSync, spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..', '..');
 const MACOS_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
 const PLATFORM_GATE = 'tools/test/test-convention-p-platform-only.cjs';
+const DRIVER_ROOTS_LIB = 'tools/lib/driver-roots.cjs';
 const GATES = [
 	PLATFORM_GATE,
 	'tools/test/test-driver-tree-parity.cjs',
@@ -76,9 +77,13 @@ function verifyPlatformCandidate() {
 		git(['init', '--quiet']);
 		fs.mkdirSync(path.join(fixture, 'tools', 'test'), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, PLATFORM_GATE), path.join(fixture, PLATFORM_GATE));
+		// The gate reads the driver roots through the shared library.
+		fs.mkdirSync(path.join(fixture, 'tools', 'lib'), { recursive: true });
+		fs.copyFileSync(path.join(ROOT, DRIVER_ROOTS_LIB), path.join(fixture, DRIVER_ROOTS_LIB));
 		const seeds = [];
+		// A driver is a tree with a _generated folder (tools/lib/driver-roots.cjs).
 		for (const driver of ['windows', 'macos', 'linux']) {
-			seeds.push(write(`static/ergopti_plus/${driver}/adapters/README.md`));
+			seeds.push(write(`static/ergopti_plus/${driver}/_generated/README.md`));
 			seeds.push(write(`static/ergopti_plus/${driver}/platform/remap/README.md`));
 		}
 		git(['add', '--', ...seeds]);
@@ -91,7 +96,7 @@ function verifyPlatformCandidate() {
 			'the cache probe must really be ignored'
 		);
 		write('static/ergopti_plus/windows/platform/untracked-folder/probe.txt');
-		const extraDriver = write('static/ergopti_plus/scratch-driver/adapters/README.md');
+		const extraDriver = write('static/ergopti_plus/scratch-driver/_generated/README.md');
 		check(
 			0,
 			'untracked platform folders, ignored caches and an untracked driver cannot change symmetry'
