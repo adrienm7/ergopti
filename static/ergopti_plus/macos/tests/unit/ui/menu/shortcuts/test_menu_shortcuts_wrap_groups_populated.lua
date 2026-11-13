@@ -227,16 +227,17 @@ helpers.describe("declared fixed wrap-symbol controls", function()
 		end)
 	end)
 
-	helpers.it("keeps the native paused management rows inert (wrap-controls)", function()
+	-- A pause stops typing, not configuration (EDD-1): the paused typing tap
+	-- reads the pairs live, so the rows commit and apply on resume.
+	helpers.it("keeps the paused management rows available (wrap-controls, edd1-paused-writes)", function()
 		with_wrap_controls({ paused = true }, function(f)
 			local wrap = f.build()
-			helpers.assert_eq(wrap.disabled, true)
+			helpers.assert_true(wrap.disabled ~= true)
 			for _, index in ipairs({ 1, 2, 3, #wrap.menu }) do
-				local row = wrap.menu[index]
-				helpers.assert_eq(row.disabled, true)
-				if row.fn then helpers.assert_eq(row.fn(), false) end
+				helpers.assert_true(wrap.menu[index].disabled ~= true)
 			end
-			helpers.assert_eq(f.calls.saves + f.calls.updates + f.calls.prompts, 0)
+			helpers.assert_eq(wrap.menu[1].fn(), true, "a paused control commits")
+			helpers.assert_eq(f.calls.saves, 1)
 		end)
 	end)
 
@@ -401,17 +402,14 @@ helpers.describe("every fixed wrap mutation retains its exact native receipt", f
 end)
 
 
-helpers.describe("native wrap-control pause eligibility keeps its original truthiness", function()
-	helpers.it("refuses a truthy native pause value before any control effect (wrap-controls)", function()
+helpers.describe("native wrap-control eligibility ignores the pause value", function()
+	helpers.it("keeps the controls available under a truthy native pause value (wrap-controls)", function()
 		with_wrap_controls({ paused = "native pause claim" }, function(f)
 			local wrap = f.build()
-			helpers.assert_eq(wrap.disabled, "native pause claim", "native outer row stays unchanged")
+			helpers.assert_true(wrap.disabled ~= true and wrap.disabled ~= "native pause claim")
 			for _, index in ipairs({ 1, 2, 3, #wrap.menu }) do
-				local row = wrap.menu[index]
-				helpers.assert_eq(row.disabled, true)
-				if row.fn then helpers.assert_eq(row.fn(), false) end
+				helpers.assert_true(wrap.menu[index].disabled ~= true)
 			end
-			helpers.assert_eq(f.calls.saves + f.calls.updates + f.calls.prompts, 0)
 		end)
 	end)
 end)
@@ -745,18 +743,15 @@ helpers.describe("complete declared Shortcut presentation", function()
 		end)
 	end)
 
-	helpers.it("retains the native non-Boolean pause claim while every child transaction refuses", function()
+	helpers.it("keeps the wrap rows and the ChatGPT URL editor available while paused (edd1-paused-writes)", function()
 		with_shortcut_presentation("en", function(f)
 			f.ctx.paused = "native pause claim"
 			local actual = assert(f.build())
 			local wrap = assert(shortcut_nested_row(actual.menu, "Wrapping symbols"))
-			helpers.assert_eq(wrap.disabled, f.ctx.paused)
-			for _, child in ipairs(wrap.menu) do if child.fn then helpers.assert_eq(child.fn(), false) end end
+			helpers.assert_true(wrap.disabled ~= true and wrap.disabled ~= f.ctx.paused)
 			local editor = assert(shortcut_nested_row(actual.menu, "   ↳ Edit ChatGPT URL…"))
-			helpers.assert_eq(editor.disabled, true)
-			helpers.assert_nil(editor.fn)
-			helpers.assert_eq(f.effects.saves + f.effects.updates + f.effects.prompts, 0)
-			helpers.assert_eq(#f.effects.urls, 0)
+			helpers.assert_true(editor.disabled ~= true)
+			helpers.assert_type(editor.fn, "function")
 		end)
 	end)
 end)

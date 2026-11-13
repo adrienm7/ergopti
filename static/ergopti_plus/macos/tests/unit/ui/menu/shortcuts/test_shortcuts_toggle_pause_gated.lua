@@ -46,7 +46,7 @@ local function build_paused()
 			return true
 		end,
 	}
-	local render_ctx = nil
+	local render_ctx, render_lists = nil, nil
 	helpers.load_with_stubs("infra.logger")
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.fs_dir"] = { entries = function() return {} end }
@@ -64,13 +64,16 @@ local function build_paused()
 		decorate_section = function(value) return value end,
 	}
 	package.loaded["ui.menu.menu_utils"] = {}
-	package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(_, _, _, _, ctx)
-		render_ctx = ctx
+	package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(_, _, _, _, ctx, lists)
+		render_ctx, render_lists = ctx, lists
 		return {}
 	end)
 	package.loaded["ui.menu.shortcut_utils"] = {}
 	package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
 	package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
+	package.loaded["ui.menu.menu_tap_keys"] = {
+		provide_rows = function(_, disabled) calls.tap_keys_disabled = disabled; return {} end,
+	}
 	package.loaded["ui.menu.menu_shortcuts"] = nil
 	local MenuShortcuts = require("ui.menu.menu_shortcuts")
 	local state = {
@@ -91,7 +94,7 @@ local function build_paused()
 		state_getters = {},
 	})
 	local toggle = render_ctx and render_ctx.commands and render_ctx.commands["shortcuts_toggle"]
-	return item, toggle, state, calls
+	return item, toggle, state, calls, render_lists
 end
 
 helpers.describe("the Shortcuts master toggle under a pause", function()
@@ -114,6 +117,13 @@ helpers.describe("the Shortcuts master toggle under a pause", function()
 		helpers.assert_eq(toggle(), true)
 		helpers.assert_eq(state.shortcuts, true)
 		helpers.assert_eq(calls.intents, { false, true })
+	end)
+
+	helpers.it("keeps the tap-key rows editable while paused (edd1-paused-writes)", function()
+		local _, _, _, calls, lists = build_paused()
+		helpers.assert_type(lists and lists.tap_keys, "function")
+		lists.tap_keys()
+		helpers.assert_nil(calls.tap_keys_disabled, "a pause does not grey the tap-key rows")
 	end)
 
 	helpers.it("leaves `checked` reporting the stored preference", function()

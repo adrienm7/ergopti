@@ -256,10 +256,11 @@ end)()
 --- Builds the "Symboles encadrant la sélection" submenu and wires the live getter.
 --- @param ctx table Menu context.
 --- @param state table Mutable state table (uses state.wrap_symbol_states, state.custom_wrap_symbols).
---- @param paused boolean Whether the script is currently paused.
+--- The rows run while paused (EDD-1): the paused typing tap reads the pairs
+--- through the live getter, so a change applies on resume.
 --- @param shortcuts table The shortcuts module (for set_wrap_pairs_getter).
 --- @return table hs.menubar submenu items list.
-local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
+local function build_wrap_symbols_submenu(ctx, state, shortcuts)
 	local sym_states   = type(state.wrap_symbol_states)  == "table" and state.wrap_symbol_states  or {}
 	local custom_syms  = type(state.custom_wrap_symbols) == "table" and state.custom_wrap_symbols or {}
 
@@ -286,7 +287,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 		return true
 	end
 	local getters = { wrap_symbols_ready = function()
-		return not paused and not WrapMutation.pending(state)
+		return not WrapMutation.pending(state)
 	end }
 	local sub = ManifestMenu.template_rows("wrap_symbols_global_controls", {
 		[require("settings.engine.keys").COMMAND.WRAP_SYMBOLS_ENABLE_ALL] = function()
@@ -352,15 +353,14 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 			group_items[#group_items + 1] = {
 				label    = lbl,
 				checked  = enabled or nil,
-				disabled = paused or nil,
-				action       = not paused and (function(k)
+				action       = (function(k)
 					return function()
 						return mutate_wrap(function(candidate)
 							candidate.wrap_symbol_states[k] = not (candidate.wrap_symbol_states[k] ~= false)
 							return true
 						end)
 					end
-				end)(pair.left) or nil,
+				end)(pair.left),
 			}
 		end
 
@@ -594,7 +594,8 @@ function M.build(ctx)
 
 	-- The ChatGPT URL editor heads the Ctrl group: the URL belongs to the
 	-- open_chatgpt action, which the Ctrl+G slot runs by default (schema v20).
-	local chatgpt_action = not paused and function()
+	-- A setting: it runs while paused (EDD-1).
+	local chatgpt_action = function()
 			local ok_p, clicked, url = pcall(dialog.text_prompt,
 				i18n.get("dialog.shortcuts.chatgpt_title"),
 				i18n.get("dialog.shortcuts.chatgpt_prompt"),
@@ -614,15 +615,11 @@ function M.build(ctx)
 					or ctx.commit_chatgpt_url(typed.value) ~= true then return false end
 				ctx.updateMenu()
 			end
-		end or nil
+		end
 	local editor_rows = ManifestMenu.template_rows("shortcut_chatgpt_editor_frame", {
-		[require("settings.engine.keys").COMMAND.SHORTCUT_CHATGPT_EDITOR] = function(...)
-			if type(chatgpt_action) ~= "function" then return false end
-			return chatgpt_action(...)
-		end,
-	}, { shortcut_chatgpt_editor_ready = function() return not paused end }, {})
+		[require("settings.engine.keys").COMMAND.SHORTCUT_CHATGPT_EDITOR] = chatgpt_action,
+	}, { shortcut_chatgpt_editor_ready = function() return true end }, {})
 	if not editor_rows then return nil end
-	if paused then editor_rows[1].action = nil end
 	for _, row in ipairs(editor_rows) do ctrl_items[#ctrl_items + 1] = row end
 
 
@@ -892,13 +889,11 @@ function M.build(ctx)
 			local rows = {}
 			for _, row in ipairs(top_items) do rows[#rows + 1] = row end
 			local frame = ManifestMenu.template_rows("shortcut_wrap_frame", {}, {
-				shortcut_wrap_hs_ready = function() return state.shortcuts and not paused or false end,
+				shortcut_wrap_hs_ready = function() return state.shortcuts == true end,
 			}, { shortcut_wrap_symbols_hs = function()
-				return build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
+				return build_wrap_symbols_submenu(ctx, state, shortcuts)
 			end })
 			if not frame then return nil end
-			-- The native outer row historically retains a truthy pause payload.
-			if state.shortcuts and paused then frame[1].disabled = paused end
 			for _, row in ipairs(frame) do rows[#rows + 1] = row end
 			return rows
 		end,
@@ -912,10 +907,11 @@ function M.build(ctx)
 			})
 		end,
 		-- The number-row tap keys, named by what each types under the current
-		-- input source. Greyed only by a pause: with the category off they stay
-		-- editable, so a key can be set up before shortcuts are switched on.
+		-- input source. Never greyed: with the category off they stay editable,
+		-- so a key can be set up before shortcuts are switched on, and while
+		-- paused an edit is kept by reconcile_tap_keys and bound on resume (EDD-1).
 		tap_keys = function(_ctx)
-			return TapKeysMenu.provide_rows(ctx, paused or nil)
+			return TapKeysMenu.provide_rows(ctx, nil)
 		end,
 		["extensions_shortcuts"] = extension_shortcut_rows,
 	}
