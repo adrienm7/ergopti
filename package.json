@@ -603,6 +603,7 @@
 		"test:crash-worker-partial-write": "node ./tools/test/test-crash-worker-partial-write.cjs",
 		"test:typing-metrics-partial-live": "node ./tools/test/test-typing-metrics-partial-live.cjs",
 		"test:linux-bundle-archive-publication": "node ./tools/test/test-linux-bundle-archive-publication.cjs",
+		"test:linux-legacy-update-probes": "node ./tools/test/test-linux-legacy-update-probes.cjs",
 		"test:linux-flatpak-preflight": "node ./tools/test/test-linux-flatpak-preflight.cjs",
 		"test:browser:layout-composer": "node ./tools/test/browser/layout-composer.playwright.cjs",
 		"test:browser:physical-shortcuts": "node ./tools/test/browser/physical-shortcuts.playwright.cjs",
