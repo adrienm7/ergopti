@@ -89,6 +89,7 @@ class UninstallTransactionTests(unittest.TestCase):
             "install/config_home.sh",
             "install/desktop_entry.sh",
             "install/messages.sh",
+            "install/ownership_schema.sh",
         ]:
             destination = source / "linux" / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -231,6 +232,7 @@ class UninstallTransactionTests(unittest.TestCase):
                 self.library / "linux/install/config_home.sh",
                 self.library / "linux/install/desktop_entry.sh",
                 self.library / "linux/install/messages.sh",
+                self.library / "linux/install/ownership_schema.sh",
             ]
         }
         expected_paths.update(
