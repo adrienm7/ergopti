@@ -952,6 +952,28 @@ function run() {
 		const spelled = `\\.\\./${full.get(policy).replace(/\./g, '\\.')}`;
 		assert.ok(out.includes(spelled), `an AutoHotkey include regex follows its file: ${out}`);
 	}
+	// [IO.Path]::Combine($SharedRoot, 'data', 'identifiers.json') with
+	// $SharedRoot = [IO.Path]::Combine($RepoRoot, 'static', 'ergopti_plus',
+	// '_shared'): the pieces follow the file. Left as they were, the Windows
+	// field report collector read identifiers S01 had moved.
+	const ids = '_shared/data/identifiers.json';
+	if (fs.existsSync(path.join(repo, P, ids)) && full.get(ids) !== ids) {
+		const ps1 = 'tools/dev/z.ps1';
+		const script =
+			"$SharedRoot = [IO.Path]::Combine($RepoRoot, 'static', 'ergopti_plus', '_shared')\n" +
+			"$I = [IO.Path]::Combine($SharedRoot, 'data', 'identifiers.json')\n";
+		const out = Apply.rewriteText(script, Plan.scanFile(ps1, script, fullCtx), moved, ps1);
+		const fresh = full
+			.get(ids)
+			.slice('_shared/'.length)
+			.split('/')
+			.map((x) => `'${x}'`)
+			.join(', ');
+		assert.ok(
+			out.includes(`[IO.Path]::Combine($SharedRoot, ${fresh})`),
+			'a PowerShell Combine path follows its file'
+		);
+	}
 	// Third-party code keeps its own paths; our scripts in a vendor folder move.
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/_shared/ui/vendor/fengari-web.js'));
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/windows/vendor/WebView2.ahk'));
