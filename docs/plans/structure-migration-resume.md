@@ -111,6 +111,20 @@ A red outside this list is the step's (the coordinator, 2026-11-12 22:00).
 - Seen in Windows run 43291765266: Windows Build AV-surface ceilings; App
   Cloner.
 
+### Maintainer decisions
+
+- 2026-11-13, via the coordinator: module-prefix sweeps
+  (`name:match("^modules%.")`) and dissolved folders used as scan roots are
+  refused by the tooling (fail fast). Each site gets a listed edit, and the
+  repeated "every driver module" sweeps become one shared predicate over the
+  driver's production roots, with a regression test that can fail. Found on
+  the full chain (178 sweep sites in 71 files, about 131 scan-root sites);
+  an exact rewrite is not viable (`^modules%.` on macOS alone becomes 20
+  prefixes and 48 names).
+- 2026-11-13: land in small blocks: S01+S02, then S03–S05 and so on, each
+  once its CI shows only baseline reds. A flaky-looking red is reported with
+  both run ids; the coordinator judges flake or real.
+
 ### Decisions to review by the maintainer
 
 - C1, the Windows cohort requalification (decided by the coordinator on
@@ -140,16 +154,6 @@ A red outside this list is the step's (the coordinator, 2026-11-12 22:00).
   pinned toolset (no MSVC here): the comments-only changes and `/Brepro`
   without debug records argue it holds; a run of the builder with
   `-UpdateTracked` on the pinned toolset would prove it.
-- Open, proposed (2026-11-13): Lua module-name prefix patterns
-  (`name:match("^modules%.")`, 178 sites in 71 files, almost all test
-  cache sweeps) and dissolved folders used as scan roots (`"adapters"`,
-  `"infra"`, `"ui"` under a driver's tests, about 131 candidate sites). The
-  tooling leaves both untouched today, so after the moves a sweep matches
-  nothing and a scan opens a missing folder. An exact rewrite is not viable
-  (`^modules%.` on macOS alone becomes 20 prefixes and 48 names). Proposed:
-  the tooling refuses both (fail fast, like `lua-prefix-split`); each site
-  then gets a listed edit, and the many identical sweeps of "every driver
-  module" become one shared predicate over the driver's production roots.
 
 ## Next commands
 
