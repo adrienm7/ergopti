@@ -124,6 +124,19 @@ function run() {
 		);
 	}
 
+	// A family that moves together while one file is renamed on the way
+	// (S12: ui/tooltip/tooltip_llm.lua -> core/ui/ui/tooltip/llm.lua): the
+	// sweep follows their common new prefix, which holds nothing else.
+	{
+		const map = new Map([
+			...BASE,
+			['linux/ui/tooltip/init.lua', 'linux/core/ui/ui/tooltip/init.lua'],
+			['linux/ui/tooltip/tooltip_llm.lua', 'linux/core/ui/ui/tooltip/llm.lua']
+		]);
+		const { out } = scan(sweep('^ui%.tooltip'), map);
+		assert.ok(out && out.includes('name:match("^core%.ui%.ui%.tooltip")'), out);
+	}
+
 	// A runtime prefix a listed edit already rewrites at its own step
 	// (edits.cjs) is that edit's: an earlier step that moves another module
 	// under the same prefix refuses nothing (S08 moved a ui module while the
