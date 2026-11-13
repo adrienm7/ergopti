@@ -64,6 +64,11 @@ function M.register(helpers)
 			available = function() return options.available ~= false end,
 			count = function() return #rows end,
 			get_cursor = function() return store.cursor end,
+			clear_rich_text = function(device)
+				store.clears = (store.clears or 0) + 1
+				store.cleared_device = device
+				return options.clear_fails ~= true
+			end,
 			-- Both real backends acknowledge committed cursor writes explicitly.
 			set_cursor = function(value)
 				store.order[#store.order + 1] = "cursor"
@@ -205,11 +210,31 @@ function M.register(helpers)
 			end
 			helpers.assert_eq(store.order, { "cursor", "apply", "cursor", "cursor" },
 				"initial durable intent precedes work; only committed batches advance progress")
+			helpers.assert_eq(store.clears, 1, "the formatted copy is cleared once per encrypt pass")
+			helpers.assert_eq(store.cleared_device, DEVICE, "only the local device's formatted copy is cleared")
 			helpers.assert_eq(store.sets, { "encrypt:0", "encrypt:3", "encrypt:3" })
 			local progress = runner.get_progress()
 			helpers.assert_eq(progress.converted, 3)
 			helpers.assert_eq(progress.scanned, 3)
 			helpers.assert_eq(progress.running, false)
+		end)
+
+		helpers.it("(text-migration-runner-contract) refuses an encrypt pass whose formatted copy stays in clear", function()
+			local store = backend(plain_rows(2), { clear_fails = true })
+			local runner, log = new_runner(store)
+			helpers.assert_eq(runner.start(Plan.MODE_ENCRYPT, DEVICE), false)
+			helpers.assert_eq(runner.is_running(), false)
+			helpers.assert_eq(store.clears, 1)
+			helpers.assert_eq(store.order, {}, "no cursor and no row rewrite after a refused clear")
+			helpers.assert_eq(log.lines[#log.lines].level, "error")
+
+			local decrypting = backend(plain_rows(1))
+			helpers.assert_true(new_runner(decrypting).start(Plan.MODE_DECRYPT, DEVICE))
+			helpers.assert_nil(decrypting.cleared_device, "a decrypt pass never touches the formatted copy")
+
+			local sql = Plan.clear_rich_text_sql("it's")
+			helpers.assert_eq(sql, "UPDATE events_typing SET rich_text = NULL WHERE device_id = 'it''s' "
+				.. "AND rich_text IS NOT NULL;")
 		end)
 
 		helpers.it("(text-migration-runner-contract) round-trips back to the exact original values", function()

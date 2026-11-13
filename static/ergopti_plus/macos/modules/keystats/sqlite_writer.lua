@@ -609,6 +609,11 @@ function _builders.typing(e, id)
 		return nil
 	end
 
+	-- The formatted copy has no reader that decrypts it, so an encrypted
+	-- database stores nothing there, as Windows and Linux always do.
+	local rich_text = nil
+	if not TextCipher.is_enabled() then rich_text = _opt_text(e.rich_text) end
+
 	return Queries.render("events.typing", "native", {
 		device_id = tostring(_device_id), id = id,
 		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
@@ -623,7 +628,7 @@ function _builders.typing(e, id)
 		mouse_distance_px = tonumber(e.mouse_distance_px) or 0,
 		pause_before_ms = tonumber(e.pause_before_ms),
 		battery_level = tonumber(e.battery_level), audio_volume = tonumber(e.audio_volume),
-		wpm = tonumber(e.wpm), text = enc_text, rich_text = _opt_text(e.rich_text), events_json = enc_json,
+		wpm = tonumber(e.wpm), text = enc_text, rich_text = rich_text, events_json = enc_json,
 	})
 end
 
@@ -975,6 +980,19 @@ function M.apply_typing_updates(device_id, updates)
 	if _db:exec("COMMIT;") ~= sqlite3.OK then
 		Logger.error(LOG, "Cannot commit the migration batch: %s.", tostring(_db:errmsg()))
 		pcall(function() _db:exec("ROLLBACK;") end)
+		return false
+	end
+	return true
+end
+
+--- Empties the formatted copy of the typed text for one device, the first
+--- step of an encrypt pass (text_migration_core.clear_rich_text_sql).
+--- @param device_id string
+--- @return boolean True on success.
+function M.clear_rich_text(device_id)
+	if not _db then return false end
+	if _db:exec(Migration.clear_rich_text_sql(device_id)) ~= sqlite3.OK then
+		Logger.error(LOG, "Cannot clear the formatted typed text: %s.", tostring(_db:errmsg()))
 		return false
 	end
 	return true

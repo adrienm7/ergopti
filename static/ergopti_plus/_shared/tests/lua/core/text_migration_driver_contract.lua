@@ -42,6 +42,7 @@ function M.register(helpers)
 		store.port = {
 			available = function() return true end,
 			count = function() return #rows end,
+			clear_rich_text = function() return true end,
 			get_cursor = function() return store.cursor end,
 			-- Both real backends acknowledge committed cursor writes explicitly.
 			set_cursor = function(value) store.cursor = value; return true end,

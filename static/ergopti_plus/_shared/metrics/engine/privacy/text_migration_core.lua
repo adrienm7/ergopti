@@ -66,6 +66,11 @@ M.COLUMNS = {
 	{ name = "events_json", iv_suffix = "j" },
 }
 
+--- Formatted copy of the typed text that no reader decrypts. An encrypted
+--- database keeps it NULL: the writers store nothing there while encryption is
+--- on, and an encrypt pass clears the rows written before (clear_rich_text_sql).
+M.RICH_TEXT_COLUMN = "rich_text"
+
 --- The two directions a migration can run in.
 M.MODE_ENCRYPT = "encrypt"
 M.MODE_DECRYPT = "decrypt"
@@ -166,6 +171,17 @@ function M.count_sql(device_id)
 	-- column would be called "COUNT(*)" and the row would read back as nil.
 	return string.format("SELECT COUNT(*) AS row_count FROM %s WHERE device_id = '%s';",
 		M.TABLE, M.sql_quote(device_id))
+end
+
+--- Clears the formatted copy of the typed text for the local device.
+--- An encrypt pass runs it first: the columns above are encrypted in place,
+--- while this one has no reader that could decrypt it, so it is emptied instead.
+--- Idempotent, and a decrypt pass never restores it.
+--- @param device_id string The LOCAL device; foreign rows are never touched.
+--- @return string One UPDATE statement.
+function M.clear_rich_text_sql(device_id)
+	return string.format("UPDATE %s SET %s = NULL WHERE device_id = '%s' AND %s IS NOT NULL;",
+		M.TABLE, M.RICH_TEXT_COLUMN, M.sql_quote(device_id), M.RICH_TEXT_COLUMN)
 end
 
 --- Builds the batch read.
