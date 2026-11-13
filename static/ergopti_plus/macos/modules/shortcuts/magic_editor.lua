@@ -22,7 +22,7 @@ local Paths = require("core.fs.engine.paths")
 local Manifest = require("infra.manifest_reader")
 local MagicKeySource = require("modules.keymap.magic_key_source")
 local Geometry = require("adapters.keyboard_geometry")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local LOG = "shortcuts.engine.magic_editor_core"
 local SUBSCRIBER = "shortcuts.engine.magic_editor_core"

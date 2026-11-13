@@ -480,7 +480,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 		with_native(function(f)
 			helpers.assert_true(f.User.stop()); f.absent = true
 			helpers.assert_true(f.User.start(f.Keymap)); helpers.assert_true(f.User.set_time_activation(0.5))
-			local Logger = require("infra.logger")
+			local Logger = require("core.logger.engine.logger")
 			local warn, err, warned, errors = Logger.warn, Logger.error, {}, {}
 			Logger.warn = function(module, message, ...)
 				if module == "hotstrings.engine.dynamic.user_code_core" then warned[#warned + 1] = message end

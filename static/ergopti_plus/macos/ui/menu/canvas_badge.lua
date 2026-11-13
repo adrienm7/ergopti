@@ -13,7 +13,7 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local ManifestMenu = require("infra.manifest_menu")
 local LOG    = "canvas_badge"
 local pending_canvas = nil

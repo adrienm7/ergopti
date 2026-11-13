@@ -111,7 +111,7 @@ local function with_remap(files, run)
 		"core.fs.adapters.json_codec",
 		"infra.config_paths",
 		"infra.keycodes",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"infra.toml.codec",
 		"platform.remap.config",
 		"platform.remap.generator",
@@ -119,7 +119,7 @@ local function with_remap(files, run)
 		"platform.remap.managed_rule_removal",
 		"core.text.engine.toml_codec",
 	}, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.config_paths"] = {
 			get_config_dir = function() return "/tmp/ergopti_test" end,
 		}

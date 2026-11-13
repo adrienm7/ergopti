@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "menu.script_chords_transaction"
 
 --- Creates a mutation owner around the existing logical native and disk owners.

@@ -59,7 +59,7 @@ local function load_fixture()
 		return timer
 	end
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.shortcuts.script_control"] = {
 		get_pause_epoch = function()
 			local reentrant_profile = fixture.reenter_on_pause_epoch

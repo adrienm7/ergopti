@@ -22,7 +22,7 @@
 
 local Core      = require("metrics.engine.perf.phase_stats_core")
 local Logger    = require("core.logger.engine.shim")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 
 local LOG = "phase_stats"
 

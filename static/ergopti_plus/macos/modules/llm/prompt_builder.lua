@@ -25,7 +25,7 @@ local M = {}
 
 local Shared = require("ai.engine.prediction.prompt_builder_core")
 local Utf8   = require("core.lifecycle.engine.compat.utf8")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local LOG = "ai.engine.prediction.prompt_builder_core"
 

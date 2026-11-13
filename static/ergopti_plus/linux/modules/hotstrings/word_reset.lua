@@ -53,7 +53,7 @@ local Codec = require("core.text.engine.toml_codec")
 local Preferences = require("infra.hotstring_preferences")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local Engine = require("modules.hotstrings.engine")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local ConfigKeys = require("settings.engine.keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 

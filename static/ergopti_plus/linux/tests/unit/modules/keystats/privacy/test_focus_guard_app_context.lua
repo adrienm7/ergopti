@@ -118,7 +118,7 @@ end
 helpers.describe("Native field application privacy context", function()
 	helpers.it("starts application metrics only when asynchronous focus is admitted", function()
 		fixture(function(guard, logger, state)
-			local clock = require("infra.monotonic")
+			local clock = require("core.logger.engine.monotonic")
 			local previous = clock.now_ms
 			clock.now_ms = function() return state.now end
 			local ok, err = pcall(function()

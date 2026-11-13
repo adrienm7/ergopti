@@ -40,7 +40,7 @@ local STUB_MODULES = {
 	"modules.keymap.registry",
 	"modules.hotstrings.hotstrings_config",
 	"modules.keymap.llm_bridge",
-	"infra.logger",
+	"core.logger.engine.logger",
 }
 for _, mod in ipairs(STUB_MODULES) do
 	package.loaded[mod] = nil
@@ -48,11 +48,11 @@ end
 
 -- Install hs stub first so that modules which reference `hs` at load time
 -- find a valid global. load_with_stubs() sets _G.hs internally.
-local _ = helpers.load_with_stubs("infra.logger")
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Load a fresh Logger instance that we can attach a capture sink to.
-package.loaded["infra.logger"] = nil
-local Logger = require("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local Logger = require("core.logger.engine.logger")
 helpers.admit_logger_privacy(Logger)
 Logger.set_level(Logger.LEVELS.DEBUG)
 

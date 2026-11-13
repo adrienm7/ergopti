@@ -24,8 +24,8 @@ local helpers = require("tests.helpers")
 local DOCUMENT = '{"first": [{"name": "capsword", "value": 1}], "second": [{"name": "capsword", "value": 1}],'
 	.. ' "empty_list": [], "empty_object": {}, "other_empty_list": []}'
 
-helpers.with_fresh_modules({ "core.fs.adapters.json_codec", "infra.logger" }, function()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+helpers.with_fresh_modules({ "core.fs.adapters.json_codec", "core.logger.engine.logger" }, function()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	local JsonCodec = require("core.fs.adapters.json_codec")
 
 	--- Whether a table is reachable twice from a decoded value.

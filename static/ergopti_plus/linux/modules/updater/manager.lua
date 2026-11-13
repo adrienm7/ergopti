@@ -1668,7 +1668,7 @@ local function start_native_download(release, download_url, callback, failure_st
  local initialized, flow = pcall(function()
   local Output = require("infra.archive_output")
   local Transfer = require("modules.updater.archive_transfer")
-  local Clock = require("infra.monotonic")
+  local Clock = require("core.logger.engine.monotonic")
   local native_artifact = rawget(Output, "native_artifact")
   local make_transfer = rawget(Transfer, "new")
   if type(native_artifact) ~= "function" or type(make_transfer) ~= "function"

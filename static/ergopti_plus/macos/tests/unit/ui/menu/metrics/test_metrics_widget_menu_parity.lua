@@ -37,7 +37,7 @@ require("tests.lua.metrics.widget_menu_contract").register(helpers, {
 
 helpers.describe("the shared inert label template capability", function()
 	helpers.it("keeps Linux statuses hidden and cannot bind native callback payloads (metrics-migration-label)", function()
-		helpers.with_stub_scope({ "infra.manifest_menu", "core.i18n.engine.i18n", "infra.logger" }, function()
+		helpers.with_stub_scope({ "infra.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger" }, function()
 			local renderer = helpers.load_with_stubs("infra.manifest_menu")
 			local file = assert(io.open(helpers.shared("tests/corpus/metrics/migration_status_menu.json"), "rb"))
 			local corpus = assert(Json.decode(file:read("*a")))

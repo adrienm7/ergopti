@@ -47,7 +47,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Json = require("core.text.engine.json")
 local Report = require("diagnostics.engine.field_check.report")
 local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")

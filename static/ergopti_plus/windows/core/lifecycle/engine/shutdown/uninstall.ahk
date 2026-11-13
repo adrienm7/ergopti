@@ -9,7 +9,7 @@
 ; ==============================================================================
 
 ; The holder is initialized on first use, including in the headless test runner.
-#Include ../../../../infra/tick_count.ahk
+#Include ../../../logger/engine/tick_count.ahk
 
 UninstallState() {
 	static State := Map()

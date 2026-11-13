@@ -13,13 +13,13 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "core.i18n.engine.i18n", "infra.field_check", "infra.field_check_checks", "ui.field_check" }
+local MODULES = { "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.field_check", "infra.field_check_checks", "ui.field_check" }
 
 --- Loads the window over scripted services.
 --- @param body function(Window, services, world)
 local function with_window(body)
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		-- The label-value join is the locale's own template (common.label_value).
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if key == "common.label_value" then return "{1} : {2}" end

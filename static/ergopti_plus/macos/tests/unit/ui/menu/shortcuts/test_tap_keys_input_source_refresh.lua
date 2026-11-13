@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 local names = {
-	"ui.menu.menu_tap_keys", "modules.shortcuts.tap_keys", "infra.logger",
+	"ui.menu.menu_tap_keys", "modules.shortcuts.tap_keys", "core.logger.engine.logger",
 	"adapters.input_source_broker", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
 	"ui.action_picker", "modules.shortcuts.bindings", "infra.deferred_work",
 }
@@ -32,7 +32,7 @@ helpers.describe("tap-key rows follow the input source", function()
 				get_action = function() return "none" end, display_name = function() return key_name end,
 				binding_id = function(id) return "tap." .. id end,
 			}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local rebuilds = 0
 			local ctx = {
 				gestures = { is_assignable = function() return true end, get_action_label = function(a) return a end },

@@ -11,7 +11,7 @@ Divergences are listed explicitly in
 > suppression) and is designed to be extended by injecting an output sink via
 > `M.set_sink()`. The **Linux** driver runs it via `core/logger/engine/shim.lua` and the
 > **macOS** driver via `infra/logger.lua`; Windows mirrors the same contract in
-> `windows/infra/logger.ahk`.
+> `windows/core/logger/engine/logger.ahk`.
 
 ---
 
@@ -182,7 +182,7 @@ Default level: **10** (all variants active).
 
 A line that passes the filter can still be withheld by one of the two
 suppression layers below. Both are implemented once in the shared Lua core
-(macOS and Linux) and mirrored in `windows/infra/logger.ahk`, and both are
+(macOS and Linux) and mirrored in `windows/core/logger/engine/logger.ahk`, and both are
 pinned by `_shared/tests/corpus/logger/behaviour_vectors.json`, whose `dedup`
 and `repeat` sections all three driver suites replay.
 
@@ -497,11 +497,11 @@ time-independent.
 
 Test-runner integration:
 
-- **AHK**: `windows/tests/unit/infra/logger/test_logger.ahk` includes a section that loads
+- **AHK**: `windows/tests/unit/core/logger/test_logger.ahk` includes a section that loads
   `test_vectors.json` via `JsonParse()` and asserts each expected line (with timestamp
   replaced).
-- **HS**: `macos/tests/unit/infra/logger/test_logger.lua` does the same via `require("lib.json")`.
-- **Linux**: `linux/tests/unit/infra/logger/test_logger_contract.lua` replays the vectors through the
+- **HS**: `macos/tests/unit/core/logger/engine/test_logger.lua` does the same via `require("lib.json")`.
+- **Linux**: `linux/tests/unit/core/logger/test_contract.lua` replays the vectors through the
   shared core, and `linux/tests/meta/corpus/test_corpus_logger_behaviour.lua` replays the behaviour corpus.
 
 ---

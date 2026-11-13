@@ -34,7 +34,7 @@ return function(callback, options)
 		local command_deliveries = 0
 		local function unobserved_command() command_deliveries = command_deliveries + 1 end
 		local outcome = true
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = noop }
 		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
 		local real_strings = hs.json.decode(locale_file:read("*a")); locale_file:close()

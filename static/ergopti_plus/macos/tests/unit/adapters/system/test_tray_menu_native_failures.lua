@@ -34,8 +34,8 @@ local function load_fixture()
 	function menubar:setTitle(_) return native_call("setTitle") end
 	function menubar:delete() return native_call("delete") end
 
-	package.loaded["infra.logger"] = nil
-	local Logger = helpers.load_with_stubs("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 	Logger.set_level("DEBUG")
 	Logger.set_sink(function(line) lines[#lines + 1] = line end)
 	local adapter = helpers.load_with_stubs("adapters.tray_menu", {

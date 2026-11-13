@@ -242,7 +242,7 @@ helpers.describe("update-check window bridge (Linux)", function()
 			local source = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/?/init.lua;"
 				.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;") .. "..package.path;"
 				.. "package.loaded['core.lifecycle.engine.installation']={is_source_run=function()return false end};"
-				.. "package.loaded['infra.logger_sink']={main_log_path=function()return " .. string.format("%q", path) .. " end};"
+				.. "package.loaded['core.logger.engine.sink']={main_log_path=function()return " .. string.format("%q", path) .. " end};"
 				.. "package.loaded['adapters.shell_runner']={has_command=function()return true end};"
 				.. "local window; package.loaded['ui.download_window.bridge']={show=function(v)window=v;return 1 end};"
 				.. "local release={tag='v1',download_url='https://example.invalid/a'}; local u={"

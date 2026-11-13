@@ -18,7 +18,7 @@ local MODULES = {
 	"adapters.hotkey_registrar",
 	"core.fs.adapters.file_system",
 	"core.fs.engine.paths",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.manifest_reader",
 	"modules.gestures.actions",
 	"modules.shortcuts.keyboard_shortcuts",
@@ -95,7 +95,7 @@ local function with_subject(initial_action, scenario)
 		local ok, result = xpcall(fn, debug.traceback, ...)
 		return ok, result
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["modules.gestures.actions"] = {
 		-- The transaction under test is independent of which ids exist; the
 		-- catalogue refusal has its own test (test_action_catalogue_parity.lua).

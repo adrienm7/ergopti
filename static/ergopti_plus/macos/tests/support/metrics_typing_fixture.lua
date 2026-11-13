@@ -31,7 +31,7 @@ local function load_dashboard(scheduler, subscribe, controls)
 	webview.bringToFront = function() error("bringToFront pins the dashboard above other apps") end
 
 	package.loaded["core.events.timer_scheduler"] = scheduler
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["hs.fs"] = { dir = function() return function() end, {} end }
 	package.loaded["hs.json"] = {
 		encode = function() return "{}" end,

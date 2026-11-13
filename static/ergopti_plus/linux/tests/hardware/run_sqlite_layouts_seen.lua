@@ -11,7 +11,7 @@
 --- @return number typed_ms
 local typing_origin_ms
 local function typed_at(offset_ms)
-	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	typing_origin_ms = typing_origin_ms or math.floor(require("core.logger.engine.monotonic").now_ms()) - 10000
 	return typing_origin_ms + offset_ms
 end
 

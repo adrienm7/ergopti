@@ -57,7 +57,7 @@ local function logger_capture()
 	logger.info = function(_, format, ...)
 		capture.successes[#capture.successes + 1] = string.format(format, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	return capture
 end
 
@@ -108,7 +108,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 			current_action_epoch = function() return epoch end,
 		})
 		package.loaded["infra.text_utils"] = require("core.text.engine.utils_core")
-		package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
+		package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
 		package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function(key)
@@ -179,7 +179,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 			current_action_epoch = function() return {} end,
 		})
 		package.loaded["infra.text_utils"] = require("core.text.engine.utils_core")
-		package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
+		package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
 		package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function(key)

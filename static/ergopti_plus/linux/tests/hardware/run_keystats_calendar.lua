@@ -12,7 +12,7 @@ require("core.lifecycle.engine.compat.utf8").install()
 local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
 local Calendar = require("modules.keystats.calendar")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local helpers = require("tests.helpers")
 local uv = require("luv")
 local original_capture, original_now = Calendar.capture, Monotonic.now_ms

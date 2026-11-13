@@ -76,7 +76,7 @@ package.loaded["adapters.python_interpreter"] = { resolve = function() return py
 package.loaded["core.fs.engine.paths"] = { shared = function(relative)
 	return production .. "/static/ergopti_plus/_shared/" .. relative
 end }
-package.loaded["infra.logger"] = setmetatable({}, { __index = function() return function() end end })
+package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return function() end end })
 require("infra.timings")
 package.loaded["adapters.managed_ollama_hint"] = { get = function(directory)
 	local raw = files[receipt_path]

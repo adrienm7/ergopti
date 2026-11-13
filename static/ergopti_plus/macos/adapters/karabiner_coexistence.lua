@@ -29,7 +29,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local KePaths = require("platform.remap.ke_paths")
 
 local LOG = "adapters.karabiner_coexistence"

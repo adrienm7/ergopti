@@ -24,7 +24,7 @@ local M = {}
 local Manifest = require("infra.manifest_reader")
 local Composition = require("settings.engine.scope.composition")
 local Participant = require("settings.engine.scope.participant")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local ConfigKeys = require("settings.engine.keys")
 local LOG = "menu.global_scope"
 

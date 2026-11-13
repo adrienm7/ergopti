@@ -8,7 +8,7 @@
 -- ==============================================================================
 
 local Engine = require("settings.engine.migration.unused_keys")
-local has_logger, Logger = pcall(require, "infra.logger")
+local has_logger, Logger = pcall(require, "core.logger.engine.logger")
 if not has_logger then Logger = require("core.logger.engine.shim") end
 local M = {}
 local sequence = 0

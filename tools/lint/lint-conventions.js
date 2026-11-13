@@ -742,6 +742,7 @@ const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/core/logger/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/lifecycle/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/fs/engine'),
@@ -771,10 +772,12 @@ const ahkAll = [
 // file count and passes.
 const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/core/logger/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/fs/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/core/logger/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/lifecycle/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/fs/engine'),
@@ -786,6 +789,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/core/logger/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/lifecycle/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/fs/engine'),

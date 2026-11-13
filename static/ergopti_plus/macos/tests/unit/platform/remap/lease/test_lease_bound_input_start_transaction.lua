@@ -46,7 +46,7 @@ local function load_remap(options)
 	}
 
 	local function noop() end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, debug = noop, info = noop, warn = noop,
 		error = noop, success = noop, done = noop,
 	}

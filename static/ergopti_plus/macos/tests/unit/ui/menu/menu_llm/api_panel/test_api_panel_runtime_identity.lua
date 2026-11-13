@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 helpers.describe("API panel runtime identity transaction", function()
 	helpers.it("(api-panel-runtime-identity) (no-model-runtime) (remote-identity-generation) resets visible predictions before changing entry identity", function()
 		local module_names = {
-			"modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
+			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
 			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
 		}
 		local saved_modules = {}
@@ -57,7 +57,7 @@ helpers.describe("API panel runtime identity transaction", function()
 			end,
 		}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end,
 			warn = function() end, error = function() end,
 		}
@@ -146,7 +146,7 @@ helpers.describe("API panel runtime identity transaction", function()
 	-- label an earlier build stored is not read.
 	helpers.it("lists entries by their automatic name only", function()
 		local module_names = {
-			"modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
+			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
 			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
 		}
 		local saved_modules = {}
@@ -165,7 +165,7 @@ helpers.describe("API panel runtime identity transaction", function()
 			},
 		}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end,
 			warn = function() end, error = function() end,
 		}

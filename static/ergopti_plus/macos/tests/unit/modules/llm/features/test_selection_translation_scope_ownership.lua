@@ -59,7 +59,7 @@ local function snapshot()
 	for name, value in pairs(package.loaded) do entries[name] = value end
 	local globals = {}
 	for name, value in pairs(_G) do globals[name] = value end
-	return { entries = entries, globals = globals, hs = rawget(_G, "hs"), logger = package.loaded["infra.logger"] }
+	return { entries = entries, globals = globals, hs = rawget(_G, "hs"), logger = package.loaded["core.logger.engine.logger"] }
 end
 
 --- Checks both removed entries and newly published values without rewriting them.
@@ -86,7 +86,7 @@ local function assert_restored(before)
 	assert_entries(before.entries, package.loaded, "package.loaded entries")
 	assert_entries(before.globals, _G, "globals")
 	helpers.assert_true(rawequal(rawget(_G, "hs"), before.hs), "fixture changed the native hs identity")
-	helpers.assert_true(rawequal(package.loaded["infra.logger"], before.logger), "fixture replaced the native logger owner")
+	helpers.assert_true(rawequal(package.loaded["core.logger.engine.logger"], before.logger), "fixture replaced the native logger owner")
 	helpers.assert_true(rawequal(package.loaded["core.logger.engine"], SharedLogger), "fixture replaced the preloaded shared logger")
 end
 

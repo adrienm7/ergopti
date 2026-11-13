@@ -11,7 +11,7 @@ function M.run(config, done)
 		.. root .. "/_shared/?.lua;" .. root .. "/_shared/?/init.lua;" .. package.path
 	local directory = assert(debug.getinfo(1, "S").source:match("^@(.+)/[^/]+$"))
 	local Observer = assert(dofile(directory .. "/macos_action_picker_pool_observer.lua"))
-	local Logger = require("infra.logger")
+	local Logger = require("core.logger.engine.logger")
 	local policy = assert(io.open(root .. "/_shared/diagnostics/data/redaction.json", "rb"))
 	local raw_policy = assert(policy:read("*a")); assert(policy:close())
 	Logger.initialize_privacy(raw_policy)

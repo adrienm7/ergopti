@@ -24,7 +24,7 @@
 ---    typing path: every entry point is a menu or window action.
 --- ==============================================================================
 
-local Logger       = require("infra.logger")
+local Logger       = require("core.logger.engine.logger")
 local Paths        = require("core.fs.engine.paths")
 local ConfigPaths  = require("infra.config_paths")
 local FileSystem   = require("core.fs.adapters.file_system")

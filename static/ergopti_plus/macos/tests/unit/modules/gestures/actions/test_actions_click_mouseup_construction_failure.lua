@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local DEPENDENCIES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.timings",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
@@ -104,7 +104,7 @@ local function with_fixture(failure_mode, body)
 		},
 	}
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		warn = function() end,

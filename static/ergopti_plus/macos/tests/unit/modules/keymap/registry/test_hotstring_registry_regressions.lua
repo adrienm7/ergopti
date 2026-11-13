@@ -270,8 +270,8 @@ end)
 --- ==============================================================================
 
 helpers.describe("Registry -- shifted-comma case variants (':D' emoji safety)", function()
-	package.loaded["infra.logger"] = nil
-	local _ = helpers.load_with_stubs("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	local _ = helpers.load_with_stubs("core.logger.engine.logger")
 	local State = helpers.load_with_stubs("modules.keymap.state")
 
 	--- Reloads the registry so its module-level _state resets, inits a fresh
@@ -344,8 +344,8 @@ end)
 --- ==============================================================================
 
 helpers.describe("Registry — section priority from the shared override file", function()
-	package.loaded["infra.logger"] = nil
-	local _ = helpers.load_with_stubs("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 	--- Reload the registry fresh (resets module _state), mock the TOML reader and
 	--- the hotstrings_config override layer, load one single-entry group, and return

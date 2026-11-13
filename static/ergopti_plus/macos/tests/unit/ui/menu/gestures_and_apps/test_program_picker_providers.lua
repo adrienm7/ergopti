@@ -77,7 +77,7 @@ local function with_provider(kind, options, body)
 			section = function(key) return key end, decorate_section = function(key) return key end }
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...) fixture.errors = fixture.errors + 1; fixture.last_error = string.format(message, ...); if message:find("did not commit", 1, true) then fixture.transaction_error = string.format(message, ...) end end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["infra.dialog_util"] = { text_prompt = function(_, _, _, confirm, cancel)
 			return options.cancel and cancel or confirm, scalar
 		end }

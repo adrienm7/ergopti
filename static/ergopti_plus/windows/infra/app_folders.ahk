@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; The one resolver of the Ergopti root (%LOCALAPPDATA%\Ergopti) and of its
 ; purpose folders, built on the generated _generated/app_dirs.ahk. The logs
-; folder keeps its own resolver in infra/logger.ahk (LoggerDefaultLogsDir),
+; folder keeps its own resolver in core/logger/engine/logger.ahk (LoggerDefaultLogsDir),
 ; which reads the same generated data.
 ;
 ; FEATURES & RATIONALE:

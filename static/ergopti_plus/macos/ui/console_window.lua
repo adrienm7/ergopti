@@ -9,7 +9,7 @@
 
 local M = {}
 local hs = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Paths = require("core.fs.engine.paths")
 local DeferredWork = require("infra.deferred_work")
 local JsonCodec = require("core.fs.adapters.json_codec")

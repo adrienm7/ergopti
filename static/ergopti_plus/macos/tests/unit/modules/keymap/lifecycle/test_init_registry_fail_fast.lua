@@ -32,7 +32,7 @@ local function load_keymap_with_results(results)
 		["adapters.text_sender"] = {},
 		["modules.llm.app_filter"] = {},
 		-- The real timing registry, read when the keymap loads, logs its path walk.
-		["infra.logger"] = helpers.make_logger_stub(),
+		["core.logger.engine.logger"] = helpers.make_logger_stub(),
 		["infra.keycodes"] = {},
 		["infra.manifest_reader"] = {
 			default_for = function() return true end,
@@ -62,7 +62,7 @@ local function load_keymap_with_results(results)
 		},
 		["modules.keymap.terminator_replay"] = {},
 		["layouts.engine.layers.terminators"] = {},
-		["infra.perf"] = {},
+		["core.logger.engine.perf"] = {},
 		["infra.hotpath_profiler"] = {},
 		["modules.diagnostics.hid_diagnostic_mailbox"] = {},
 	}

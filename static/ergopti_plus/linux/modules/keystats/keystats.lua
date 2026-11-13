@@ -32,8 +32,8 @@ local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local Calendar = require("modules.keystats.calendar")
 
 local Logger   = require("core.logger.engine.shim")
-local Monotonic = require("infra.monotonic")
-local Perf = require("infra.perf_counters")
+local Monotonic = require("core.logger.engine.monotonic")
+local Perf = require("core.logger.engine.perf_counters")
 local Timings   = require("infra.timings")
 local EvdevCodes = require("infra.evdev_codes")
 -- Hard requires: the privacy posture must come from the shared manifest, and a

@@ -14,7 +14,7 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Storage = require("core.fs.adapters.storage")
 local DeferredWork = require("infra.deferred_work")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")

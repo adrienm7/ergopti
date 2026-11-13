@@ -37,7 +37,7 @@ local function load_dialog(controls)
 	end
 	local sharing_schema = require("diagnostics.engine.healthcheck.snapshot").load_config(helpers.shared).schema
 	for _, name in ipairs({
-		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "core.i18n.engine.i18n",
+		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "core.logger.engine.logger", "core.i18n.engine.i18n",
 		"core.i18n.engine.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.events.timer_scheduler", "core.fs.adapters.storage", "infra.manifest_reader",
 		"core.lifecycle.engine.shutdown.termination_coordinator",
 	}) do package.loaded[name] = nil end
@@ -54,7 +54,7 @@ local function load_dialog(controls)
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, message, ...) context.errors[#context.errors + 1] = string.format(message, ...) end
 	logger.warn = function(_, message, ...) context.warnings[#context.warnings + 1] = string.format(message, ...) end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
 	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		terminal_in_progress = function() return context.terminal == true end,
@@ -650,7 +650,7 @@ helpers.describe("error dialog native JavaScript receipts", function()
 		local evaluations = install_evaluator(context)
 		context.page({ body = "ready" })
 		helpers.assert_type(evaluations[1].callback, "function")
-		local logger = package.loaded["infra.logger"]
+		local logger = package.loaded["core.logger.engine.logger"]
 		local record_error = logger.error
 		logger.error = function(module, message, ...)
 			record_error(module, message, ...)

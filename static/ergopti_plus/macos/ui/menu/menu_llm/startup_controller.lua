@@ -21,7 +21,7 @@ local M = {}
 
 local hs      = hs
 local llm_mod = require("modules.llm")
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 local Errors  = require("diagnostics.engine.adapter_errors")
 local TimerScheduler = require("core.events.timer_scheduler")
 local JsonCodec = require("core.fs.adapters.json_codec")

@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"ui.download_window",
 	"ui.ui_builder", "ui.webview_close_owner",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"adapters.shell_runner",
 }
 
@@ -92,7 +92,7 @@ local function with_terminal_bridge(callback)
 			end
 			return true, table.unpack(results, 2, results.n)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["adapters.shell_runner"] = {
 			applescript = function(script, on_done)
 				state.applescript_calls = state.applescript_calls + 1

@@ -43,7 +43,7 @@ end
 --- @return table cache Fresh cache adapter.
 local function fresh_cache()
 	package.loaded["core.fs.adapters.toml_cache"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	local cache = helpers.load_with_stubs("core.fs.adapters.toml_cache", {
 		fs = {
 			dir = function() return function() return nil end end,

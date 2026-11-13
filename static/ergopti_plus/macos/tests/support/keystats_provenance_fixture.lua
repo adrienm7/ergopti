@@ -40,7 +40,7 @@ function M.load_keystats()
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return true end,
 	}

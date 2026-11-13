@@ -29,7 +29,7 @@ local function load_window(controls)
 	controls = controls or {}
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes", "ui.healthcheck.report",
-		"infra.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.events.timer_scheduler",
+		"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.events.timer_scheduler",
 		"adapters.clipboard", "adapters.webview_result",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
@@ -49,7 +49,7 @@ local function load_window(controls)
 	logger.session_issues = function() return { warn_count = 0, err_count = 0 } end
 	logger.ERRORS_LOG_FILE = HOME .. "/" .. AppDirs.macos.relative .. "/ErgoptiPlus_errors_2026-09-24.log"
 	logger.UNIFIED_LOG_FILE = HOME .. "/" .. AppDirs.macos.relative .. "/ErgoptiPlus_2026-09-24.log"
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
 	package.loaded["core.i18n.engine.locale"] = { all = function() return { ["menu.debug.healthcheck"] = "Diagnostics" } end }
 	package.loaded["core.events.timer_scheduler"] = {

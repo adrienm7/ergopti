@@ -11,7 +11,7 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local Scope = require("settings.engine.scope.transaction")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "scoped_preferences"
 
 --- Creates a scope owner with terminal native ports and ordinary-save compensation.

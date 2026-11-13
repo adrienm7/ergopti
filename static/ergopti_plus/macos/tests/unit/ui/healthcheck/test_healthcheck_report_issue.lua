@@ -49,8 +49,8 @@ end
 --- Loads the report module with every side effect recorded.
 --- @return table Report, table calls, table overrides
 local function load_report()
-	helpers.load_with_stubs("infra.logger")
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	helpers.load_with_stubs("core.logger.engine.logger")
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["ui.healthcheck.report"] = nil
 	local Report = require("ui.healthcheck.report")
 	local calls = { copy = {}, save = {}, reveal = {}, open = {}, open_url = {}, make_dir = {} }
@@ -109,7 +109,7 @@ end
 -- Direct injections and the timing reader's native path consumer form one fixture.
 local NATIVE_MODULES = {
 	"adapters.shell_runner", "core.events.timer_scheduler", "ui.healthcheck.report",
-	"infra.logger", "infra.timings", "core.fs.engine.paths",
+	"core.logger.engine.logger", "infra.timings", "core.fs.engine.paths",
 }
 
 --- Keeps the complete asynchronous fixture body under one restoration boundary.
@@ -127,7 +127,7 @@ end
 local function native_opener()
 	local Report, calls, overrides = load_report()
 	local native = { tasks = {}, timers = {}, callbacks = {}, current = true, errors = {} }
-	package.loaded["infra.logger"].error = function(_, message, ...)
+	package.loaded["core.logger.engine.logger"].error = function(_, message, ...)
 		native.errors[#native.errors + 1] = string.format(message, ...)
 	end
 	package.loaded["core.events.timer_scheduler"] = {
@@ -575,7 +575,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 	helpers.it("open_path on a file not created yet says so, without an error (open-missing-file)", function()
 		local Report, calls, overrides = load_report()
 		local logged = {}
-		local Logger = package.loaded["infra.logger"]
+		local Logger = package.loaded["core.logger.engine.logger"]
 		Logger.error = function(_, message, ...) logged[#logged + 1] = string.format(message, ...) end
 		Logger.warn = Logger.error
 		overrides.exists = function() return false end

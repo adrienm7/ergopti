@@ -92,7 +92,7 @@ function M.build_world(options)
 			world.logs[#world.logs + 1] = { level = level, text = ok and text or tostring(message) }
 		end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local hs_stub = _G.hs
 	local front_app = {

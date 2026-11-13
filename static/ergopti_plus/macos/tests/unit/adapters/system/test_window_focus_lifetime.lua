@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local function with_windows(options, callback)
 	helpers.with_stub_scope({
 		"adapters.window_manager", "adapters.mouse_control",
-		"modules.gestures.app_switch", "infra.logger",
+		"modules.gestures.app_switch", "core.logger.engine.logger",
 	}, function()
 		local focused = {}
 		local function window(id, pid, behavior)

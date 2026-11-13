@@ -13,9 +13,9 @@ local fixture = require("tests.support.toml_output_fixture")
 --- @param mode string Callback or cleanup failure mode.
 local function check_cleanup(mode)
 	return helpers.with_stub_scope({
-		"infra.toml.writer", "core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger",
+		"infra.toml.writer", "core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger",
 	}, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local writer = helpers.load_with_stubs("infra.toml.writer")
 		local open, remove = io.open, os.remove
 		local path, lock_path, observed_content, observed_lock

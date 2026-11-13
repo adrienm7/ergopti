@@ -16,7 +16,7 @@ local function load_subject(open_url, alert)
 	local errors = {}
 	local dialogs = {}
 	local notifications = {}
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = function() end,
 		success = function() end,
 		info = function() end,

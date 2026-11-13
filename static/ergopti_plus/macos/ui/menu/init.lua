@@ -17,7 +17,7 @@ local hs               = hs
 local notifications    = require("infra.notifications")
 local FeatureNotice    = require("menu.engine.feature_notice")
 local hotstring_editor = require("ui.hotstring_editor")
-local Logger           = require("infra.logger")
+local Logger           = require("core.logger.engine.logger")
 local PhaseStats       = require("infra.phase_stats")
 local text_utils = require("infra.text_utils")
 local i18n             = require("core.i18n.engine.i18n")
@@ -47,7 +47,7 @@ local GlobalActionsTransaction = require("ui.menu.global_actions_transaction")
 local RecoverableFileMoves = require("ui.menu.recoverable_file_moves")
 local FactoryResetJournal = require("infra.factory_reset_journal")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
-local BootProfiler = require("infra.boot_profiler")
+local BootProfiler = require("core.logger.engine.boot_profiler")
 local ConfigPaths = require("infra.config_paths")
 local LogOpeners = require("ui.log_openers")
 local ShellRunner = require("adapters.shell_runner")
@@ -1206,7 +1206,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end,
 		set_log_level             = function(level)
-			local L = require("infra.logger")
+			local L = require("core.logger.engine.logger")
 			-- config.toml's [script] log_level wins at start: rewrite it first.
 			if not require("infra.script_scope").rewrite_configured(require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL, level) then
 				return false

@@ -31,7 +31,7 @@ local M = {}
 --- @param callback function Receives the constructed subject and observations.
 function M.with_sentinel(callback)
 	local names = {
-		"infra.logger", "infra.notifications", "infra.keycodes", "core.i18n.engine.i18n",
+		"core.logger.engine.logger", "infra.notifications", "infra.keycodes", "core.i18n.engine.i18n",
 		"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
 		"adapters.event_provenance", "adapters.synthetic_input",
 		"core.events.timer_scheduler", "adapters.key_state",
@@ -41,7 +41,7 @@ function M.with_sentinel(callback)
 		local logger, failures = callback_logger()
 		local deferred = {}
 		local tap_handler
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["infra.notifications"] = {notify = function() end}
 		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 		package.loaded["infra.keycodes"] = {
@@ -122,7 +122,7 @@ end
 --- @param callback function Receives the constructed subject and observations.
 function M.with_configurable(callback)
 	local names = {
-		"infra.logger", "core.fs.engine.paths", "core.fs.adapters.file_system",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.fs.adapters.file_system",
 		"adapters.hotkey_registrar", "core.fs.adapters.storage", "modules.gestures.actions",
 		"modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord", "infra.config_paths", "infra.preferences",
 	}
@@ -134,7 +134,7 @@ function M.with_configurable(callback)
 		local catalogue = Json.decode(catalogue_file:read("*a"))
 		catalogue_file:close()
 		catalogue.keys = {{id = "a", label = "A"}}
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.fs.engine.paths"] = {shared = function() return "catalogue.json" end}
 		package.loaded["core.fs.adapters.file_system"] = {
 			read = function() return Json.encode(catalogue) end,

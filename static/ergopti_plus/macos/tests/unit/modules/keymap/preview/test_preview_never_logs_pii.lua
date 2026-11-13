@@ -45,8 +45,8 @@ local SENTINEL_PII = "9SENTINEL9"
 -- A deliberately ordinary replacement that MUST still be logged.
 local PUBLIC_REPL = "public-replacement"
 
-package.loaded["infra.logger"] = nil
-local Logger = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 
 
 

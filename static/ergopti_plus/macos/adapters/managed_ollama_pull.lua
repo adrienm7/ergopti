@@ -13,7 +13,7 @@ local FileSystem = require("core.fs.adapters.file_system")
 local FsDir = require("core.fs.engine.dir")
 local Json = require("core.text.engine.json")
 local Receipt = require("core.lifecycle.engine.core.managed_ollama_pull_receipt")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local hs = hs
 local LOG = "adapters.managed_ollama_pull"
 

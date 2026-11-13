@@ -20,7 +20,7 @@
 local M = {}
 
 local hs = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local TaskEnvironment = require("adapters.task_environment")
 

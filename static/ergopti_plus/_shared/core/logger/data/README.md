@@ -7,9 +7,9 @@ Cross-driver specification and test vectors for the 8-variant logger contract.
 Three implementations must conform: `windows/lib/logger.ahk` (1 077 l),
 `macos/lib/logger.lua` (1 145 l) and `_shared/core/logger/engine/init.lua` (281 l, the
 platform-neutral core). Conformance to the **line format** is verified by replaying
-`test_vectors.json` from each driver suite — `windows/tests/unit/infra/logger/test_logger.ahk`,
-`macos/tests/unit/infra/logger/test_logger.lua` and
-`linux/tests/unit/infra/logger/test_logger_contract.lua`. There is no `_shared/core/text/data/domain/Logger.spec.js`;
+`test_vectors.json` from each driver suite — `windows/tests/unit/core/logger/test_logger.ahk`,
+`macos/tests/unit/core/logger/engine/test_logger.lua` and
+`linux/tests/unit/core/logger/test_contract.lua`. There is no `_shared/core/text/data/domain/Logger.spec.js`;
 that file has never existed, and no behavioural corpus covers the rest of the spec
 (severity filtering, ring order, forced flush, dedup, date rollover) — adding one is
 still to be written.
@@ -17,7 +17,7 @@ still to be written.
 > The shared core is consumed by **Linux** through `core/logger/engine/shim.lua` and by the macOS
 > driver through `infra/logger.lua`. Linux installs its file sink with
 > `infra/logger_sink.lua`, so every `Logger.*` call reaches the log files; the sink and the
-> vector replay are pinned by `linux/tests/unit/infra/logger/test_logger_sink.lua` and
+> vector replay are pinned by `linux/tests/unit/core/logger/test_sink.lua` and
 > `test_logger_contract.lua`.
 
 The 8 variants are organised on two axes — importance (`DEBUG`/`INFO`/`WARNING`/`ERROR`) and lifecycle role (`Misc`/`Start`/`End`) — giving `debug`, `trace`, `done`, `info`, `start`, `success`, `warn`, `error`.

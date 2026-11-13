@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "menu.script_action_transaction"
 
 --- Creates an assignment owner around the global writer and preference owners.

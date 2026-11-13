@@ -23,7 +23,7 @@ local M  = {}
 
 local text_utils  = require("infra.text_utils")
 local shared_utils = require("layouts.engine.utils")
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local Timings     = require("infra.timings")
 local Clipboard = require("adapters.clipboard")
 local ClipboardBorrowers = require("infra.clipboard_borrowers")

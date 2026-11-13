@@ -32,7 +32,7 @@
 --- ==============================================================================
 
 local Identifiers = require("core.text.engine.identifiers")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local MainThreadHold = require("core.lifecycle.engine.main_thread_hold")
 local KePaths = require("platform.remap.ke_paths")
 local LeaseMemorySnapshot = require("platform.remap.lease_memory_snapshot")
@@ -215,7 +215,7 @@ function M.lease_with_facts(ports, report, finish, remap, waited)
 	local losses = (counts.ups_without_down or 0) + (counts.downs_without_up or 0) + (counts.stuck or 0)
 	report.step("key_losses", losses == 0 and STATE.pass or STATE.fail, losses)
 	-- A key the driver consumed and never delivered: the dropped-letter owner
-	-- this driver can see (infra/keystroke_integrity.lua).
+	-- this driver can see (core/logger/engine/keystroke_integrity.lua).
 	local swallowed = ports.swallowed_keys()
 	report.step("swallowed_keys", swallowed == 0 and STATE.pass or STATE.fail, swallowed)
 	-- PONG and READY timeouts are the Apple silicon lease failures (117/140).

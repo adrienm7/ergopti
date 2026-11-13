@@ -29,7 +29,7 @@ local function with_start(mode, scenario)
 	with_adoption(function(obj, state, deps)
 		local current_b = true
 		state.b_cancel, state.b_success = 0, 0
-		require("infra.logger").set_sink(function(line)
+		require("core.logger.engine.logger").set_sink(function(line)
 			if state.start_observed or not line:find("Starting MLX server process for model Model-B", 1, true) then return end
 			state.start_observed = true
 			if mode == "healthy" then return end

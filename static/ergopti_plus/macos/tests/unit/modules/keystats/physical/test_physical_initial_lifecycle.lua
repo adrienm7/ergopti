@@ -225,7 +225,7 @@ local Fixture = require("tests.support.keystats_provenance_fixture")
 local NAMES = {
 	"adapters.event_provenance", "adapters.input_source_broker", "adapters.keyboard_hook",
 	"adapters.physical_observation_clock", "adapters.process_lifecycle", "adapters.synthetic_input",
-	"infra.config_paths", "infra.dialog_util", "infra.logger", "infra.manifest_reader",
+	"infra.config_paths", "infra.dialog_util", "core.logger.engine.logger", "infra.manifest_reader",
 	"metrics.engine.capture.physical_lifecycle_observation", "modules.keystats.context_tracker", "modules.keystats.init",
 	"modules.keystats.kc_bridge", "modules.keystats.log_manager", "modules.keystats.watchers", "modules.keymap",
 }
@@ -405,8 +405,8 @@ h.describe("initial native ledger observations", function()
   end)
  end)
  h.it("reads actual initialized system scalars without acquiring a hardware watcher", function()
-  h.with_stub_scope({"modules.keystats.watchers", "modules.keystats.log_manager", "infra.logger", "metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock"}, function()
-   package.loaded["infra.logger"] = h.make_logger_stub()
+  h.with_stub_scope({"modules.keystats.watchers", "modules.keystats.log_manager", "core.logger.engine.logger", "metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock"}, function()
+   package.loaded["core.logger.engine.logger"] = h.make_logger_stub()
    package.loaded["modules.keystats.log_manager"] = {}
    local clocks, queries, records = 0, 0, {}
    local W = h.load_with_stubs("modules.keystats.watchers", {
@@ -435,9 +435,9 @@ do
 local h = require("tests.helpers")
 h.describe("initial system actual hardware retirement debt", function()
 	h.it("cannot qualify refused retained hardware cleanup as locally settled", function()
-		h.with_stub_scope({ "modules.keystats.watchers", "modules.keystats.log_manager", "infra.logger",
+		h.with_stub_scope({ "modules.keystats.watchers", "modules.keystats.log_manager", "core.logger.engine.logger",
 			"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock" }, function()
-			package.loaded["infra.logger"] = h.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = h.make_logger_stub()
 			package.loaded["modules.keystats.log_manager"] = {}
 			local clock, stops, permit, running = 0, 0, false, false
 			local handle = {}

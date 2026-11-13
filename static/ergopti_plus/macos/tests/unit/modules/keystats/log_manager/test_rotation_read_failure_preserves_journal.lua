@@ -37,7 +37,7 @@ local STUBBED_MODULES = {
 	"modules.keystats.physical_accounting_mode",
 	"modules.keystats.physical_wire",
 	"metrics.engine.capture.physical_release",
-	"infra.logger",
+	"core.logger.engine.logger",
 }
 
 local function fake_writer(on_write, on_close, initial_bytes)
@@ -165,7 +165,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 		for _, name in ipairs(STUBBED_MODULES) do package.loaded[name] = nil end
 		local errors, logger = {}, helpers.make_logger_stub()
 		logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				assert(delay == 0 and type(callback) == "function" and scheduled == nil)

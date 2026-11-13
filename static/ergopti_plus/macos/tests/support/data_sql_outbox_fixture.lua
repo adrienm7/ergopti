@@ -19,7 +19,7 @@ local MODULE_KEYS = {
 	"core.fs.adapters.ledger_append", "modules.keystats.log_manager",
 	"modules.keystats.rotation",
 	"modules.keystats.sqlite_writer",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"core.events.timer_scheduler",
 	"modules.keystats.timestamp",
 }
@@ -30,7 +30,7 @@ local MODULE_KEYS = {
 local function run_refused_transaction(failure)
 	return helpers.with_stub_scope(MODULE_KEYS, function()
 		local sqlite = helpers.load_with_stubs("hs").sqlite3
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local observations = {
 			builds = 0,
 			commits = 0,

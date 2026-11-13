@@ -112,7 +112,7 @@ function M.run(options)
 
 	local logger = helpers.make_logger_stub()
 	logger.LEVELS = { DEBUG = 10 }
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.timings"] = {
 		sec = function() return 0.05 end,
 		ms = function() return options.pace_ms or 20 end,

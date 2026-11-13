@@ -61,8 +61,8 @@ for _, name in ipairs(INPUT_READER_PORT_NAMES) do
 end
 _input_reader_ports.has_native_origin_debt = rawget(EvdevReader, "has_native_origin_debt")
 local EvdevCodes = require("infra.evdev_codes")
-local Monotonic = require("infra.monotonic")
-local Perf = require("infra.perf_counters")
+local Monotonic = require("core.logger.engine.monotonic")
+local Perf = require("core.logger.engine.perf_counters")
 local InputEvent = require("infra.input_event")
 local XkbCapture = require("adapters.xkb_capture")
 local ModifierBroker = require("adapters.modifier_broker")

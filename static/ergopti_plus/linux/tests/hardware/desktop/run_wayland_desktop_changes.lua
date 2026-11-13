@@ -22,7 +22,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
 local Display = require("infra.display_server")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local Navigation = require("keyboard.engine.desktop_navigation")
 local Switcher = require("modules.gestures.workspace_switcher")
 local SystemMetrics = require("modules.keystats.system_metrics")

@@ -25,7 +25,7 @@
 --- ==============================================================================
 
 local Names = require("infra.device_names")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local EvdevReader = require("adapters.evdev_reader")
 
 local NODE_FILE, CONTROL_FIFO, OUT_DIR = arg[1], arg[2], arg[3]

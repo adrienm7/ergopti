@@ -21,7 +21,7 @@ local function with_config_fixture(callback)
 			"modules.gestures.actions",
 			"core.fs.adapters.file_system",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"core.fs.engine.paths",
 			"infra.toml.codec",
 			"hs",
@@ -78,7 +78,7 @@ local function with_config_fixture(callback)
 				get = function(key) return key end,
 				has = function() return false end,
 			}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.fs.engine.paths"] = {
 				shared = function() return "/fixture/modifier-chords.json" end,
 			}

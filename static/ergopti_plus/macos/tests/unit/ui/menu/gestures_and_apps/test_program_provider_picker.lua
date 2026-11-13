@@ -16,7 +16,7 @@ local function fixture(body)
 		package.loaded["apps.engine.program_provider_picker"] = nil
 		package.loaded["ui.action_picker"] = nil
 		package.loaded["ui.webview_controller_pool"] = nil
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/controlled/shared" end }
 		package.loaded["infra.timings"] = Timings
@@ -551,7 +551,7 @@ helpers.it("(hs-scalar-json-picker) invalid UTF-8 reason neither dispatches nor 
 		local page = f.pages[1]
 		local initial_scripts = #page.scripts
 		local errors = {}
-		package.loaded["infra.logger"].error = function(_, template, ...)
+		package.loaded["core.logger.engine.logger"].error = function(_, template, ...)
 			errors[#errors + 1] = string.format(template, ...)
 		end
 		f.message(page, { action = "confirm", id = "run_program", parameter = RESERVED })

@@ -158,7 +158,7 @@ check("public software keystats events flush into the selected literal database"
 	local Keystats = require("modules.keystats.keystats")
 	Keystats.init({ sqlite_path = "file:public.sqlite", log_dir = root .. "/logs" })
 	assert(Writer.is_available())
-	local now = require("infra.monotonic").now_ms()
+	local now = require("core.logger.engine.monotonic").now_ms()
 	Keystats.on_keydown("a", now, "public-owned-app")
 	Keystats.on_keydown("b", now + 100, "public-owned-app")
 	require("tests.support.sqlite_flush_native").flush(Keystats)

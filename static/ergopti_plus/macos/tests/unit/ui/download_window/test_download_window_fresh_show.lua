@@ -51,7 +51,7 @@ local function load_fresh()
 	-- other files leave a partial lib.logger in package.loaded, and ui_builder
 	-- captures `local hs = hs` at require-time, so a cached copy would call
 	-- hs.webview.new() against a previous test's stale stub.
-	package.loaded["infra.logger"]    = nil
+	package.loaded["core.logger.engine.logger"]    = nil
 	package.loaded["ui.ui_builder"] = nil
 	local overrides, get_evaluated, fire_navigation, state = make_webview_overrides()
 	return helpers.load_with_stubs("ui.download_window", overrides), get_evaluated, fire_navigation, state

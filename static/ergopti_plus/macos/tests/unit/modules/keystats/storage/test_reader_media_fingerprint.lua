@@ -55,7 +55,7 @@ local function child()
 	local errors = {}
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = sqlite })
 	local projection = require("ui.metrics_typing.projection")
 	local pacer = { pause = function() end }

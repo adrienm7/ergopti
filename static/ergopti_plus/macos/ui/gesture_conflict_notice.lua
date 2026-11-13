@@ -13,7 +13,7 @@ local I18n = require("core.i18n.engine.i18n")
 local Storage = require("core.fs.adapters.storage")
 local Deferred = require("infra.deferred_work")
 local Shell = require("adapters.shell_runner")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "gesture_conflict_notice"
 local pending = {}
 

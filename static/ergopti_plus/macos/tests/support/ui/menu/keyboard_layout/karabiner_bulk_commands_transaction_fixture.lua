@@ -365,10 +365,10 @@ local function build_menu(mode, configure)
 		logs = {},
 		refreshes = 0,
 	}
-	local saved_logger = package.loaded["infra.logger"]
+	local saved_logger = package.loaded["core.logger.engine.logger"]
 	local saved_controller = package.loaded["platform.remap.lease_controller"]
 	local saved_manifest = package.loaded["infra.manifest_menu"]
-	package.loaded["infra.logger"] = recording_logger(observations)
+	package.loaded["core.logger.engine.logger"] = recording_logger(observations)
 	package.loaded["platform.remap.lease_controller"] = {
 		status = function() return "active", { phase = "active" } end,
 		stop = function() return true end,
@@ -389,7 +389,7 @@ local function build_menu(mode, configure)
 	-- Preserve the second group's boundary: its scope rows belong to that
 	-- group, not to the Tap-Holds first-row contract asserted below.
 	built.submenu[#built.submenu + 1] = { title = "menu.shortcuts.key_combinations", submenu = group }
-	package.loaded["infra.logger"] = saved_logger
+	package.loaded["core.logger.engine.logger"] = saved_logger
 	package.loaded["platform.remap.lease_controller"] = saved_controller
 	package.loaded["infra.manifest_menu"] = saved_manifest
 	return built, observations, remap

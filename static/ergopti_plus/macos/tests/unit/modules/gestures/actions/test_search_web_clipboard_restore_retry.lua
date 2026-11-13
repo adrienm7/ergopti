@@ -79,7 +79,7 @@ helpers.describe("search_web: native clipboard refusal retains ownership", funct
 		logger.error = function(_log, message, ...)
 			errors[#errors + 1] = string.format(message, ...)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["infra.timings"] = {
 			sec = function() return 0.2 end,
 		}
@@ -139,7 +139,7 @@ helpers.describe("search_web: native clipboard refusal retains ownership", funct
 			return true
 		end
 		hs_stub.timer.doAfter = function() return nil end
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.timings"] = { sec = function() return 0.2 end }
 		local copies = 0
 		package.loaded["adapters.synthetic_input"] = setmetatable({
@@ -186,7 +186,7 @@ helpers.describe("search_web: native clipboard refusal retains ownership", funct
 			restored = value
 			return true
 		end
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.timings"] = { sec = function() return 0.2 end }
 		package.loaded["adapters.synthetic_input"] = setmetatable({
 			emit_key_stroke = function() return false end,

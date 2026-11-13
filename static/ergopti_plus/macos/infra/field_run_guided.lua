@@ -30,7 +30,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Json = require("core.text.engine.json")
 
 local LOG = "field_run"

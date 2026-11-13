@@ -22,7 +22,7 @@ helpers.describe("typing cache reset transaction", function()
 		with_delivery(function(_, context, _, errors, _, evaluations)
 			local projection = spy_projection_resets()
 			local infos, removed = 0, false
-			package.loaded["infra.logger"].info = function(_, template)
+			package.loaded["core.logger.engine.logger"].info = function(_, template)
 				if template == "Caches cleared by user reset." then infos = infos + 1 end
 			end
 			local reset_id = 0
@@ -50,13 +50,13 @@ helpers.describe("typing cache reset transaction", function()
 			with_delivery(function(_, context, _, errors, _, evaluations)
 				local projection = spy_projection_resets()
 				local infos, removals = 0, 0
-				package.loaded["infra.logger"].info = function(_, template)
+				package.loaded["core.logger.engine.logger"].info = function(_, template)
 					if template == "Caches cleared by user reset." then infos = infos + 1 end
 				end
 				package.loaded["hs.json"].decode = function() return { action = "clear_cache", reset_id = 1 } end
 				if mode == "log_reentry" then
-					local capture = package.loaded["infra.logger"].error
-					package.loaded["infra.logger"].error = function(...)
+					local capture = package.loaded["core.logger.engine.logger"].error
+					package.loaded["core.logger.engine.logger"].error = function(...)
 						capture(...)
 						context.on_close()
 					end

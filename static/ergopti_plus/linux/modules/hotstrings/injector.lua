@@ -36,7 +36,7 @@ local M = {}
 
 local Errors = require("diagnostics.engine.adapter_errors")
 local Logger = require("core.logger.engine.shim")
-local Perf = require("infra.perf_counters")
+local Perf = require("core.logger.engine.perf_counters")
 local EvdevCodes = require("infra.evdev_codes")
 local KeyboardLayout = require("adapters.keyboard_layout")
 local layout_plan, layout_plan_current, layout_plan_view = KeyboardLayout.plan, KeyboardLayout.plan_current, KeyboardLayout.plan_view

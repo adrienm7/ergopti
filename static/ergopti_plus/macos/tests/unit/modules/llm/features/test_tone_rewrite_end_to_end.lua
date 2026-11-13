@@ -140,7 +140,7 @@ local function build_world(selection)
 	local _gestures = helpers.load_with_stubs("modules.gestures")
 	world.actions = require("modules.gestures.actions")
 	world.actions.init({ action_params = {} })
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	-- The pasteboard of the document model, on the hs stub every module shares
 	local hs_stub = _G.hs

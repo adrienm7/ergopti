@@ -27,7 +27,7 @@ end
 
 helpers.describe("keystats: rows in UTC with their recorded offset (utc-offset-rows)", function()
 	helpers.it("the writer stores today.log's local stamp as its UTC instant and offset (utc-offset-rows)", function()
-		helpers.with_stub_scope({ "infra.logger", "modules.keystats.sqlite_writer" }, function()
+		helpers.with_stub_scope({ "core.logger.engine.logger", "modules.keystats.sqlite_writer" }, function()
 			local writer = helpers.load_with_stubs("modules.keystats.sqlite_writer")
 			local stamp = "2026-07-01 23:30:00.125"
 			local utc, offset = LocalTime.from_local(stamp)
@@ -46,11 +46,11 @@ helpers.describe("keystats: rows in UTC with their recorded offset (utc-offset-r
 		helpers.it("the rebuild reads a " .. case.os .. " row " .. (case.offset and "with" or "without")
 			.. " an offset in its lived time (utc-offset-rows)", function()
 			helpers.with_stub_scope({
-				"infra.logger", "core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
+				"core.logger.engine.logger", "core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
 				"modules.keystats.aggregator", "modules.keystats.rotation", "modules.keystats.export",
 				"metrics.engine.metrics", "core.fs.adapters.file_system", "core.events.timer_scheduler",
 			}, function()
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				local seen = {}
 				local db = {}
 				function db:exec() return 0 end

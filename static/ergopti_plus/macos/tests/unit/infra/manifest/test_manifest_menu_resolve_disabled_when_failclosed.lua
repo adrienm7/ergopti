@@ -34,7 +34,7 @@ local MANIFEST = [[
 
 
 --- Builds a logger stub that records every Logger.error call's formatted message.
---- @return table logger_stub Injectable package.loaded["infra.logger"] replacement.
+--- @return table logger_stub Injectable package.loaded["core.logger.engine.logger"] replacement.
 --- @return table error_messages Array of formatted strings passed to Logger.error (grows live).
 local function make_error_capturing_logger()
 	local error_messages = {}

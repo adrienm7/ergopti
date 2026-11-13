@@ -32,7 +32,7 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Layout = require("modules.keymap.layout")
 local Paths  = require("core.fs.engine.paths")
 local i18n   = require("core.i18n.engine.i18n")

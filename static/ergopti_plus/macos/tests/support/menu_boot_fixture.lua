@@ -78,7 +78,7 @@ end
 function M.boot(opts)
 	opts = opts or {}
 	local noop = function() end
-	local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+	local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 	hs_stub.__reset()
 
 	local logs = { errors = {}, warns = {} }
@@ -112,7 +112,7 @@ function M.boot(opts)
 	local refused_saves = 0
 
 	for _, name in ipairs(REAL_MODULES) do package.loaded[name] = nil end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.notifications"] = { notify = noop }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}

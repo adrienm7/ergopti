@@ -163,7 +163,7 @@ end)
 local function load_coordinator(options)
 	local calls = { exits = {}, fatal_exits = {}, errors = {}, teardowns = 0 }
 	local function noop() end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, debug = noop, info = noop, warn = noop, success = noop, done = noop,
 		error = function(_, fmt, ...)
 			calls.errors[#calls.errors + 1] = string.format(fmt, ...)
@@ -220,7 +220,7 @@ end
 helpers.describe("user quit has one global deadline (hs-quit-never-blocks)", function()
 	helpers.it("(hs-quit-never-blocks) force-exits a lease fence that never settles", function()
 		helpers.with_fresh_modules({
-			"infra.logger", "core.lifecycle.engine.shutdown.emergency_exit", "core.lifecycle.engine.shutdown.termination_coordinator",
+			"core.logger.engine.logger", "core.lifecycle.engine.shutdown.emergency_exit", "core.lifecycle.engine.shutdown.termination_coordinator",
 		}, function()
 			local coordinator, calls = load_coordinator({ lease = "never" })
 			helpers.assert_eq(coordinator.request_user_exit("menu_quit"), true)
@@ -242,7 +242,7 @@ helpers.describe("user quit has one global deadline (hs-quit-never-blocks)", fun
 
 	helpers.it("(hs-quit-never-blocks) force-exits a synthetic-input drain that never settles", function()
 		helpers.with_fresh_modules({
-			"infra.logger", "core.lifecycle.engine.shutdown.emergency_exit", "core.lifecycle.engine.shutdown.termination_coordinator",
+			"core.logger.engine.logger", "core.lifecycle.engine.shutdown.emergency_exit", "core.lifecycle.engine.shutdown.termination_coordinator",
 		}, function()
 			local coordinator, calls = load_coordinator({ lease = "fenced", input = "never" })
 			helpers.assert_eq(coordinator.request_user_exit("menu_quit"), true)
@@ -258,7 +258,7 @@ helpers.describe("user quit has one global deadline (hs-quit-never-blocks)", fun
 
 	helpers.it("(hs-quit-never-blocks) a failed lease fence exits instead of cancelling Quit", function()
 		helpers.with_fresh_modules({
-			"infra.logger", "core.lifecycle.engine.shutdown.emergency_exit", "core.lifecycle.engine.shutdown.termination_coordinator",
+			"core.logger.engine.logger", "core.lifecycle.engine.shutdown.emergency_exit", "core.lifecycle.engine.shutdown.termination_coordinator",
 		}, function()
 			local coordinator, calls = load_coordinator({ lease = "never" })
 			coordinator.request_user_exit("menu_quit")
@@ -271,7 +271,7 @@ helpers.describe("user quit has one global deadline (hs-quit-never-blocks)", fun
 
 	helpers.it("(hs-quit-never-blocks) a settling quit exits zero before the deadline", function()
 		helpers.with_fresh_modules({
-			"infra.logger", "core.lifecycle.engine.shutdown.emergency_exit", "core.lifecycle.engine.shutdown.termination_coordinator",
+			"core.logger.engine.logger", "core.lifecycle.engine.shutdown.emergency_exit", "core.lifecycle.engine.shutdown.termination_coordinator",
 		}, function()
 			local coordinator, calls = load_coordinator({ lease = "never" })
 			helpers.assert_eq(coordinator.request_user_exit("menu_quit"), true)

@@ -15,7 +15,7 @@ local Vectors = require("tests.support.sha256_vector_doubles")
 
 
 local function load_crypto(observed, hash_overrides)
-	package.loaded["infra.logger"] = nil
+	package.loaded["core.logger.engine.logger"] = nil
 	local Crypto = helpers.load_with_stubs("core.crypto.crypto", {
 		execute = Vectors.shell_execute(observed),
 		hash = hash_overrides or Vectors.native_hash(observed),
@@ -48,8 +48,8 @@ helpers.describe("core.crypto.crypto: text SHA-256 over the shared byte corpus (
 		local observed = {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, template, ...) logs[#logs + 1] = string.format(template, ...) end
-		helpers.with_fresh_modules({ "core.crypto.crypto", "infra.logger" }, function()
-			package.loaded["infra.logger"] = logger
+		helpers.with_fresh_modules({ "core.crypto.crypto", "core.logger.engine.logger" }, function()
+			package.loaded["core.logger.engine.logger"] = logger
 			local saved_hs = _G.hs
 			_G.hs = {
 				execute = Vectors.shell_execute(observed),

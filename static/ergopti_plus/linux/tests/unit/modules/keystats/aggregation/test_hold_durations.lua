@@ -270,7 +270,7 @@ local function run_hold(transition, expected, options)
 	options = options or {}
 	local writer_name, logger_name = "modules.keystats.sqlite_writer", "modules.keystats.keystats"
 	local previous_writer, previous_logger = package.loaded[writer_name], package.loaded[logger_name]
-	local clock = require("infra.monotonic")
+	local clock = require("core.logger.engine.monotonic")
 	local previous_clock, now = clock.now_ms, 100
 	local writer = Fakes.sqlite_writer()
 	package.loaded[writer_name], package.loaded[logger_name] = writer, nil

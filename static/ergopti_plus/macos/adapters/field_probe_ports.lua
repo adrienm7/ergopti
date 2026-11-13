@@ -82,7 +82,7 @@ local function hold_counts()
 	return {
 		over_250ms = PhaseStats.counter("runtime.timer_hold_over_250ms"),
 		over_1000ms = PhaseStats.counter("runtime.timer_hold_over_1000ms"),
-		worst = require("infra.logger").worst_timer_hold(),
+		worst = require("core.logger.engine.logger").worst_timer_hold(),
 	}
 end
 
@@ -175,7 +175,7 @@ end
 local function parse_toml(path)
 	local ok, document = pcall(require("infra.toml.reader").parse, path)
 	if not ok then
-		require("infra.logger").warn("adapters.field_probe_ports", "A configuration file did not parse: %s.",
+		require("core.logger.engine.logger").warn("adapters.field_probe_ports", "A configuration file did not parse: %s.",
 			tostring(document))
 	end
 	return ok and type(document) == "table"
@@ -184,7 +184,7 @@ end
 --- The logs folder: today's log, a probe write, and the files it holds.
 --- @return table facts { today_present, writable, files, bytes }
 local function log_facts()
-	local Logger = require("infra.logger")
+	local Logger = require("core.logger.engine.logger")
 	local FileSystem = require("core.fs.adapters.file_system")
 	local dir = Logger.logs_dir()
 	local facts = { today_present = FileSystem.exists(Logger.today_log_path()) == true, writable = false,
@@ -325,7 +325,7 @@ local function loopback_server(path, callback)
 			})
 		end
 	end
-	require("infra.logger").warn("adapters.field_probe_ports", "No loopback port could be bound for the HTTP worker check.")
+	require("core.logger.engine.logger").warn("adapters.field_probe_ports", "No loopback port could be bound for the HTTP worker check.")
 	callback(nil)
 end
 
@@ -398,7 +398,7 @@ local function crash_counts(since)
 	end
 	local counts = { driver = 0, driver_earlier = 0, owned = {}, earlier = {}, other = 0 }
 	local function current(modified) return since == nil or modified >= since end
-	recent(require("infra.logger").crash_reports_dir():gsub("/+$", ""), function(_, modified)
+	recent(require("core.logger.engine.logger").crash_reports_dir():gsub("/+$", ""), function(_, modified)
 		if current(modified) then counts.driver = counts.driver + 1
 		else counts.driver_earlier = counts.driver_earlier + 1 end
 	end)
@@ -692,7 +692,7 @@ local function scratch_typing(keys, callback, options)
 		if publication then
 			local retracted, err = pcall(Selftest.retract, publication)
 			if not retracted then
-				require("infra.logger").error("adapters.field_probe_ports", "The selftest window was not retracted: %s.",
+				require("core.logger.engine.logger").error("adapters.field_probe_ports", "The selftest window was not retracted: %s.",
 					tostring(err))
 			end
 			publication = nil
@@ -747,7 +747,7 @@ local function scratch_typing(keys, callback, options)
 		UiBuilder.force_focus(view, true)
 	end)
 	if not ok then
-		require("infra.logger").error("adapters.field_probe_ports", "The scratch field could not open: %s.", tostring(err))
+		require("core.logger.engine.logger").error("adapters.field_probe_ports", "The scratch field could not open: %s.", tostring(err))
 		return settle("scratch_refused")
 	end
 	bound = Timer.after(options.bound_seconds or SCRATCH_BOUND_SECONDS, function()
@@ -795,7 +795,7 @@ local function scratch_typing(keys, callback, options)
 		if publication == nil then
 			local published, generation = pcall(Selftest.publish, reason)
 			if not published then
-				require("infra.logger").error("adapters.field_probe_ports", "The selftest window could not be published: %s.",
+				require("core.logger.engine.logger").error("adapters.field_probe_ports", "The selftest window could not be published: %s.",
 					tostring(generation))
 				return settle("selftest_busy")
 			end
@@ -830,7 +830,7 @@ local function scratch_typing(keys, callback, options)
 		if publication == nil then
 			local published, generation = pcall(Selftest.publish, reason)
 			if not published then
-				require("infra.logger").error("adapters.field_probe_ports", "The selftest window could not be published: %s.",
+				require("core.logger.engine.logger").error("adapters.field_probe_ports", "The selftest window could not be published: %s.",
 					tostring(generation))
 				return settle("selftest_busy")
 			end
@@ -866,7 +866,7 @@ local ROWS_FILE_PREFIX = "ErgoptiFieldRows-"
 --- The boot that started this app (infra/field_check_session.lua).
 --- @return table { complete_ms, cpu_ms, slowest }
 local function boot_facts()
-	local Boot = require("infra.boot_profiler")
+	local Boot = require("core.logger.engine.boot_profiler")
 	return { complete_ms = Boot.boot_complete_ms(), cpu_ms = Boot.boot_cpu_ms(), slowest = Boot.slowest_stages(3) }
 end
 
@@ -1030,13 +1030,13 @@ function M.new()
 		boot_facts = boot_facts,
 		fifo = fifo,
 		apple_shortcut_action = function() return require("modules.gestures.apple_shortcut_action") end,
-		today_log_path = function() return require("infra.logger").today_log_path() end,
+		today_log_path = function() return require("core.logger.engine.logger").today_log_path() end,
 		-- Process CPU and a monotonic clock, both in milliseconds
 		cpu_ms = function() return os.clock() * 1000 end,
 		-- The idle window starts from a collected heap and names its timers.
 		collect_garbage = function() collectgarbage("collect") end,
-		begin_callback_accounting = function() require("infra.logger").begin_callback_accounting() end,
-		end_callback_accounting = function() return require("infra.logger").end_callback_accounting() end,
+		begin_callback_accounting = function() require("core.logger.engine.logger").begin_callback_accounting() end,
+		end_callback_accounting = function() return require("core.logger.engine.logger").end_callback_accounting() end,
 		now_ms = function() return hs.timer.absoluteTime() / 1000000 end,
 	}
 end

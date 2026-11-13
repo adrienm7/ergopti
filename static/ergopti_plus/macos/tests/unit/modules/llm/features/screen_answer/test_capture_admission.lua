@@ -20,7 +20,7 @@ local MODULES = {
 	"modules.llm.profiles", "modules.keystats", "modules.shortcuts.script_control",
 	"modules.shortcuts.actions.screenshot_save", "core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.events.timer_scheduler",
-	"adapters.mouse_control", "infra.logger", "infra.timings", "infra.keycodes",
+	"adapters.mouse_control", "core.logger.engine.logger", "infra.timings", "infra.keycodes",
 	"ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
 	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
 }
@@ -28,7 +28,7 @@ local MODULES = {
 local function with_capture(callback)
 	helpers.with_stub_scope(MODULES, function()
 		local f = { captures = {}, posts = {}, loading = 0, hidden = 0, notices = {}, ready = true, paused = false }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.adapters.file_system"] = {
 			read = function(path)
 				local file = assert(io.open(path, "rb"))

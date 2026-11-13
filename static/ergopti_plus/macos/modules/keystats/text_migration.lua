@@ -36,7 +36,7 @@
 ---    encrypted here either.
 --- ==============================================================================
 
-local Logger       = require("infra.logger")
+local Logger       = require("core.logger.engine.logger")
 local Scheduler    = require("core.events.timer_scheduler")
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local TextCipher   = require("modules.keystats.text_cipher")

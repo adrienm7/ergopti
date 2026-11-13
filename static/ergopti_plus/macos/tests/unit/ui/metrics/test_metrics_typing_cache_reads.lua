@@ -60,7 +60,7 @@ helpers.describe("typing metrics cache reads", function()
 						fresh_reads = fresh_reads + 1
 						return nil
 					end
-					package.loaded["infra.logger"].warn = function(_, message, ...)
+					package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 						warnings[#warnings + 1] = string.format(message, ...)
 					end
 					os.remove = function() unlinks = unlinks + 1; return true end

@@ -14,7 +14,7 @@ local OWNERS = {
 	"core.fs.adapters.file_system", "infra.timings", "metrics.engine.metrics",
 	"modules.keystats.aggregator", "modules.keystats.export",
 	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
-	"modules.keystats.sqlite_writer", "infra.logger",
+	"modules.keystats.sqlite_writer", "core.logger.engine.logger",
 	"core.events.timer_scheduler", "modules.keystats.timestamp",
 }
 

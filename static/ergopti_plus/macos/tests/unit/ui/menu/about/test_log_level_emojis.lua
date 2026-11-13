@@ -8,7 +8,7 @@ local helpers = require("tests.helpers")
 helpers.describe("Menu — log level emojis", function()
 	local builder = helpers.load_with_stubs("ui.menu.builder")
 	local i18n    = require("core.i18n.engine.i18n")
-	local Logger  = require("infra.logger")
+	local Logger  = require("core.logger.engine.logger")
 
 	helpers.admit_logger_privacy(Logger)
 	helpers.it("includes correct emojis in log level selection labels", function()
@@ -110,7 +110,7 @@ end
 --- @param setter function Existing native assignment owner.
 --- @return table row
 local function log_row(value, setter)
-	local logger = require("infra.logger")
+	local logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(logger)
 	logger.set_level(value)
 	local rows = helpers.load_with_stubs("ui.menu.builder").generate({}, {}, { set_log_level = setter })
@@ -126,7 +126,7 @@ end
 helpers.describe("macOS shared Debug log choices", function()
 	for _, state in ipairs(log_corpus().states) do
 		helpers.it("replays the independent four-state matrix for " .. state.selected, function()
-			local logger, observed = require("infra.logger"), {}
+			local logger, observed = require("core.logger.engine.logger"), {}
 			local previous = logger.current_level
 			local ok, detail = pcall(function()
 				local row = log_row(state.selected, function(value) observed[#observed + 1] = value; return true end)
@@ -147,7 +147,7 @@ helpers.describe("macOS shared Debug log choices", function()
 	end
 
 	helpers.it("follows the actual shared order without treating refusal as success", function()
-		local renderer, logger = require("infra.manifest_menu"), require("infra.logger")
+		local renderer, logger = require("infra.manifest_menu"), require("core.logger.engine.logger")
 		local declaration
 		for _, row in ipairs(renderer.get_root().debug_menu) do if row.id == "log_level" then declaration = row end end
 		local previous, threshold = declaration.choices, logger.current_level
@@ -179,7 +179,7 @@ local function check_log_commit(receipt)
 	local ok, detail = pcall(function()
 		local fixture = require("tests.support.menu_boot_fixture").boot()
 		local actions = fixture.global_actions()
-		local logger, storage = require("infra.logger"), require("core.fs.adapters.storage")
+		local logger, storage = require("core.logger.engine.logger"), require("core.fs.adapters.storage")
 		storage_owner, previous_storage_set = storage, storage.set
 		local threshold, writes, published, rebuilt = "INFO", 0, 0, 0
 		local stored_key, stored_value, detached_threshold
@@ -249,7 +249,7 @@ local function debug_parent_fixture(body)
 	local language = locale.current_locale()
 	local callbacks = {}
 	local function setter(value) callbacks[#callbacks + 1] = value; return false end
-	local logger = require("infra.logger")
+	local logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(logger)
 	local threshold = logger.current_level
 	logger.set_level("INFO")

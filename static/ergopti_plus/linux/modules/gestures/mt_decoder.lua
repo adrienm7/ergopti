@@ -172,7 +172,7 @@ function M.new(opts)
 	-- found and fixed in the engine this decoder replaces.
 	local now_sec = opts.now_sec
 	if type(now_sec) ~= "function" then
-		local ok_mono, Monotonic = pcall(require, "infra.monotonic")
+		local ok_mono, Monotonic = pcall(require, "core.logger.engine.monotonic")
 		now_sec = ok_mono and Monotonic.now_sec or os.time
 	end
 

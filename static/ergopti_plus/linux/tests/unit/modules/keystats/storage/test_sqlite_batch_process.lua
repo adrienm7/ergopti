@@ -3,7 +3,7 @@
 --- The transport model exposes each write/shutdown/close receipt independently;
 --- native regressions exercise the same public transport with real SQLite.
 local helpers = require("tests.helpers")
-require("infra.monotonic") -- Never freeze a temporary native port into the clock.
+require("core.logger.engine.monotonic") -- Never freeze a temporary native port into the clock.
 local names = { "luv", "adapters.owned_process", "core.fs.engine.sqlite_batch_process" }
 local function with_transport(body)
 	local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end

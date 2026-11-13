@@ -19,8 +19,8 @@
 local helpers = require("tests.helpers")
 local SyntheticStack = require("tests.support.synthetic_input_stack")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 --- Builds a minimal CoreState object that satisfies the expander's contract.
 --- @return table

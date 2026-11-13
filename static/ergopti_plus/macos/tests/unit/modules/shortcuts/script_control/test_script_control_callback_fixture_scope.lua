@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.script_control_callback_fixture")
 
 local OWNERS = {
-	"infra.logger", "infra.notifications", "infra.keycodes", "core.i18n.engine.i18n", "core.fs.engine.paths",
+	"core.logger.engine.logger", "infra.notifications", "infra.keycodes", "core.i18n.engine.i18n", "core.fs.engine.paths",
 	"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
 	"adapters.event_provenance", "adapters.synthetic_input", "core.events.timer_scheduler",
 	"adapters.key_state", "modules.shortcuts.script_control", "core.fs.adapters.file_system",
@@ -29,7 +29,7 @@ helpers.describe("Script control callback fixture isolation", function()
 					local identity_name = kind == "sentinel" and "infra.keycodes" or "core.fs.adapters.storage"
 					local prior_identity = {}
 					package.loaded[identity_name] = prior_identity
-					package.loaded["infra.logger"] = false
+					package.loaded["core.logger.engine.logger"] = false
 					package.loaded["modules.gestures.actions"] = nil
 					local subject_name = kind == "sentinel"
 						and "modules.shortcuts.script_control" or "modules.shortcuts.keyboard_shortcuts"
@@ -58,7 +58,7 @@ helpers.describe("Script control callback fixture isolation", function()
 					end
 					helpers.assert_eq(reached, failure == "construction" and 0 or 1)
 					helpers.assert_nil(package.loaded["modules.gestures.actions"])
-					helpers.assert_eq(package.loaded["infra.logger"], false)
+					helpers.assert_eq(package.loaded["core.logger.engine.logger"], false)
 					helpers.assert_true(package.loaded[identity_name] == prior_identity)
 					helpers.assert_true(_G.hs == prior_hs)
 				end)

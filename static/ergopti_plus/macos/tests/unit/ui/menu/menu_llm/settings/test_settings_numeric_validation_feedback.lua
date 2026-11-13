@@ -13,7 +13,7 @@ local MODULES = {
 	"core.fs.adapters.storage",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"modules.llm",
 	"modules.llm.api_mlx",
@@ -66,7 +66,7 @@ local function with_fixture(raw, callback)
 	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 	}
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		callback = function(_, _, fn, ...)
 			local results = table.pack(xpcall(fn, debug.traceback, ...))
 			return table.unpack(results, 1, results.n)

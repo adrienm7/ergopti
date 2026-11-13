@@ -36,7 +36,7 @@
 
 local M = {}
 
-local Logger     = require("infra.logger")
+local Logger     = require("core.logger.engine.logger")
 local Shell      = require("adapters.shell_runner")
 local Crypto     = require("core.crypto.crypto")
 local TextCrypto = require("metrics.engine.privacy.text_crypto")

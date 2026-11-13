@@ -24,7 +24,7 @@
 
 local hs = hs
 
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local ShellRunner    = require("adapters.shell_runner")
 local TimerScheduler = require("core.events.timer_scheduler")
 local RunningApplication = require("adapters.running_application")

@@ -337,7 +337,7 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 	helpers.it("reports a consumed physical key whose replay never posts (keystroke-integrity)", function()
 		-- The original was consumed at the fence: a replay that fails before its
 		-- post is a typed key the user never sees, and must be named as such.
-		local Integrity = require("infra.keystroke_integrity")
+		local Integrity = require("core.logger.engine.keystroke_integrity")
 		Integrity.reset()
 		local fixture = make_fixture({ key_post_always_throws = true })
 		local synthetic = fixture.load()

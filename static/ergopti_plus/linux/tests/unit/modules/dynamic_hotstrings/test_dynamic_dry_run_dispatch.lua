@@ -158,7 +158,7 @@ local function exercise(kind, dry_run, options)
 				local environment = setmetatable({ secure_focus_guard = guard, script_actions = scripts,
 					-- Bare keys: the shared expansion delay reads the held modifiers per key.
 					keyboard_hook = { held_modifiers = function() return {} end },
-					Monotonic = require("infra.monotonic"), WordReset = require("modules.hotstrings.word_reset"),
+					Monotonic = require("core.logger.engine.monotonic"), WordReset = require("modules.hotstrings.word_reset"),
 					terminators_mod = require("layouts.engine.layers.terminators"), RepeatKey = repeat_key,
 					MagicKey = require("modules.hotstrings.magic_key"), opts = { dry_run = dry_run },
 					_cached_app_id = "owned-editor", keystats = metrics, engine_mod = engine_mod, engine = engine,

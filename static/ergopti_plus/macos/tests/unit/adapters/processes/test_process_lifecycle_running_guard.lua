@@ -39,15 +39,15 @@ local function load_adapter(options)
 		filter_callbacks    = {},
 	}
 
-	package.loaded["infra.logger"] = nil
-	local real_logger = require("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	local real_logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(real_logger)
 	local logger = setmetatable({}, { __index = real_logger })
 	logger.error = function(_module, fmt, ...)
 		local ok, rendered = pcall(string.format, fmt, ...)
 		ctx.errors[#ctx.errors + 1] = ok and rendered or tostring(fmt)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local watcher_api = {
 		launched   = 1,

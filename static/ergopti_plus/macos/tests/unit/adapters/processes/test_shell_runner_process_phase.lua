@@ -15,11 +15,11 @@ local helpers = require("tests.helpers")
 --- Loads ShellRunner over an hs.execute double, with the real PhaseStats.
 --- @return table ShellRunner, table PhaseStats
 local function load_runner()
-	package.loaded["infra.logger"] = nil
+	package.loaded["core.logger.engine.logger"] = nil
 	helpers.load_with_stubs("adapters.shell_runner", {
 		execute = function() return "out\n", true, "exit", 0 end,
 	})
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.phase_stats"] = nil
 	package.loaded["adapters.shell_runner"] = nil
 	local ShellRunner = require("adapters.shell_runner")

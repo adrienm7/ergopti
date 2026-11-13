@@ -272,7 +272,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 				["infra.config_paths"] = {
 					get = function() return "/tmp/personal_shortcuts.lua" end,
 				},
-				["infra.logger"] = helpers.make_logger_stub(),
+				["core.logger.engine.logger"] = helpers.make_logger_stub(),
 				["infra.text_utils"] = {
 					shell_quote = function(value) return value end,
 				},
@@ -319,7 +319,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 				with_package_stubs({
 				["adapters.shell_runner"] = {},
 				["core.i18n.engine.i18n"] = { get = function(key) return key end },
-				["infra.logger"] = helpers.make_logger_stub(),
+				["core.logger.engine.logger"] = helpers.make_logger_stub(),
 				["infra.text_utils"] = {
 					escape_gsub_replacement = function(value) return value end,
 				},
@@ -378,7 +378,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 
 			with_cleanup(function()
 				with_package_stubs({
-				["infra.logger"] = helpers.make_logger_stub(),
+				["core.logger.engine.logger"] = helpers.make_logger_stub(),
 				}, function()
 				local Notifications = require("infra.notifications")
 				local dispatched, detail = Notifications.notify("Click me")

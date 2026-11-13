@@ -38,11 +38,11 @@ local function load_owner()
 	return helpers.with_stub_scope({
 		"modules.keymap.control_sentinels",
 		"adapters.synthetic_input",
-		"infra.logger",
+		"core.logger.engine.logger",
 	}, function()
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, format, ...) logs[#logs + 1] = string.format(format, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["adapters.synthetic_input"] = {
 			defer_after_callback = function(_label, callback)
 				deferred[#deferred + 1] = callback

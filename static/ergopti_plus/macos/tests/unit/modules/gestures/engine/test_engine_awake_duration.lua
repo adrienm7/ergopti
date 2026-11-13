@@ -14,7 +14,7 @@ local OWNED_MODULES = {
 	"modules.gestures.engine",
 	"modules.gestures.geometry",
 	"core.events.timer_scheduler",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.timings",
 	"adapters.accessibility_permission",
 	"adapters.mouse_control",
@@ -60,7 +60,7 @@ local function with_engine_scope(callback)
 				end,
 			},
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		-- Canonical gestures timings, in seconds, from the shared timing registry.
 		local seconds = {
 			tap_max_ms = 0.7,

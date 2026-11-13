@@ -27,7 +27,7 @@ local function run()
 	-- The fixture isolates logging only; task construction and environment APIs are real.
 	local logger = {}
 	for _, name in ipairs({ "debug", "info", "warn", "error", "start", "success" }) do logger[name] = print end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	local runner = require("adapters.shell_runner")
 	local function rejected_identity()
 		local environment = {}

@@ -185,7 +185,7 @@ require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,
  if results then
   results=json.decode(results)
   local discarded=0
-  package.loaded['infra.logger'].debug=function() discarded=discarded+1 end
+  package.loaded['core.logger.engine.logger'].debug=function() discarded=discarded+1 end
   evaluations[#evaluations].done(results[1])
   evaluations[2].done(results[2])
   assert(#errors==0, 'valid JavaScript results must not report failure')

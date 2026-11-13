@@ -23,7 +23,7 @@
 local M = {}
 
 local hs              = hs
-local Logger          = require("infra.logger")
+local Logger          = require("core.logger.engine.logger")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput  = require("adapters.synthetic_input")
 local Timings         = require("infra.timings")

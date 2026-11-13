@@ -27,14 +27,14 @@ local function with_collector(body)
 	local saved, prior_hs = {}, _G.hs
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local ok, err = xpcall(function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		package.loaded["platform.remap.lease_controller"] = {
 			is_initialized = function() return true end,
 			status = function() return "running", { phase = "running" } end,
 		}
-		package.loaded["infra.key_event_health"] = nil
+		package.loaded["core.logger.engine.key_event_health"] = nil
 		package.loaded["ui.healthcheck.helpers"] = nil
-		body(require("ui.healthcheck.helpers"), require("infra.key_event_health"))
+		body(require("ui.healthcheck.helpers"), require("core.logger.engine.key_event_health"))
 	end, debug.traceback)
 	for name in pairs(package.loaded) do
 		if saved[name] == nil then package.loaded[name] = nil end

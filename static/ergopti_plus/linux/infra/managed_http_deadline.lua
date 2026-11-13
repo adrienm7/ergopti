@@ -10,7 +10,7 @@
 
 local M = {}
 local NativeTimer = require("infra.native_timer")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local Logger = require("core.logger.engine.shim")
 local LOG = "infra.managed_http_deadline"
 local loaded, luv = pcall(require, "luv")

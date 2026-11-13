@@ -16,7 +16,7 @@ local Settings = require("modules.llm.bootstrap_retry_generated")
 local ShellRunner = require("adapters.shell_runner")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local Json = require("core.text.engine.json")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "managed_ollama_hint"
 
 -- The exact lifecycle handle stays strongly reachable until native settlement,

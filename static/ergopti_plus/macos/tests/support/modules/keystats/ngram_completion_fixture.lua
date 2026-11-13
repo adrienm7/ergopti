@@ -28,7 +28,7 @@ M.FAMILIES = {
 
 local OWNERS = {
 	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "infra.paced_json",
-	"infra.logger", "hs.sqlite3", "hs.json", "core.text.engine.json",
+	"core.logger.engine.logger", "hs.sqlite3", "hs.json", "core.text.engine.json",
 }
 
 --- Returns an iterator over the original row identities.
@@ -134,7 +134,7 @@ function M.run(options, callback)
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, template, ...) state.errors[#state.errors + 1] = string.format(template, ...) end
 		logger.warn = function(_, template, ...) state.warnings[#state.warnings + 1] = string.format(template, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = state.sqlite })
 		reader.history_fingerprint_exact = true -- The fixture owns all its rows and mutations.
 		local original_read = reader.read_ngrams

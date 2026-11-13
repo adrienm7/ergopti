@@ -17,8 +17,8 @@
 --- 2. `logger.shim` is NOT the print-fallback in production. Because _shared
 ---    is on package.path, its `pcall(require, "core.logger.engine")` succeeds and it returns
 ---    the shared CORE, whose print fallback is never reached. The core writes only
----    to an injected sink — which is why `infra/logger_sink.lua` exists and is
----    installed by the entry point. See tests/unit/infra/logger/test_logger_sink.lua.
+---    to an injected sink — which is why `core/logger/engine/sink.lua` exists and is
+---    installed by the entry point. See tests/unit/core/logger/test_sink.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Root-cause encoding: the test fails if ANY production Lua file under

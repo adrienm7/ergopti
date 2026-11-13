@@ -28,7 +28,7 @@ local function child()
 		local f = assert(io.open(shared .. '/metrics/data/db/' .. name, 'rb')); local schema = assert(f:read('*a')); assert(f:close()); assert(db:exec(schema) == sqlite.OK)
 	end
 	local helpers = require('tests.helpers'); local logger = helpers.make_logger_stub()
-	package.loaded['infra.logger'] = logger
+	package.loaded['core.logger.engine.logger'] = logger
 	package.loaded['modules.keystats.sqlite_writer'] = { get_db = function() return db end }
 	package.loaded['modules.keystats.export'] = { get_native_app_category = function() return nil end }
 	local aggregator = helpers.load_with_stubs('modules.keystats.aggregator', { sqlite3 = sqlite })

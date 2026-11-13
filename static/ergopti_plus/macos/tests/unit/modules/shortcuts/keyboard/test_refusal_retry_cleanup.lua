@@ -12,9 +12,9 @@ helpers.describe("shortcut retry timer cleanup", function()
 	for _, failure in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("retains the same timer after cancellation returns " .. failure, function()
 			helpers.with_fresh_modules({ "modules.shortcuts.refusal_retry", "core.events.timer_scheduler",
-				"infra.logger" }, function()
+				"core.logger.engine.logger" }, function()
 				local handles, calls, may_stop = {}, {}, false
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["core.events.timer_scheduler"] = {
 					after = function(_, callback)
 						local handle = { callback = callback }
@@ -53,9 +53,9 @@ helpers.describe("shortcut retry timer cleanup", function()
 	for _, boundary in ipairs({ "start", "fire" }) do
 		helpers.it("retains native cleanup debt after a timer " .. boundary .. " refusal", function()
 			helpers.with_fresh_modules({ "modules.shortcuts.refusal_retry", "core.events.timer_scheduler",
-				"infra.logger" }, function()
+				"core.logger.engine.logger" }, function()
 				local handles, calls, may_stop = {}, {}, false
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["core.events.timer_scheduler"] = {
 					after = function(_, callback)
 						local handle = { callback = callback, timer = {} }

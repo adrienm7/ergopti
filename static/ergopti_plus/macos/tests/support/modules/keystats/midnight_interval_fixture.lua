@@ -30,7 +30,7 @@ function M.run(options, callback)
 	return helpers.with_stub_scope({
 		"modules.keystats.context_tracker", "modules.keystats.watchers", "modules.keystats.log_manager",
 		"adapters.secure_field_detector", "adapters.task_lifecycle", "core.events.timer_scheduler",
-		"infra.logger", "infra.timings", "metrics.engine.view.private_window", "metrics.engine.capture.physical_lifecycle_observation",
+		"core.logger.engine.logger", "infra.timings", "metrics.engine.view.private_window", "metrics.engine.capture.physical_lifecycle_observation",
 	}, function()
 		local original_date, original_time = os.date, os.time
 		local state = { rows = {}, errors = {}, flushes = 0, rollover_calls = 0, rollover_accepted = false,
@@ -66,7 +66,7 @@ function M.run(options, callback)
 		local result = table.pack(xpcall(function()
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, format, ...) state.errors[#state.errors + 1] = string.format(format, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["adapters.secure_field_detector"] = {
 				refresh = function() end, isSecureField = function() return false end,
 				isSecureApp = function() return false end,

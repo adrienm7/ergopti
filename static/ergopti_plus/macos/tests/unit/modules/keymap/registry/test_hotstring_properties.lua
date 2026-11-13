@@ -39,8 +39,8 @@ end
 
 -- Warm up the hs stub so that all subsequent plain require() calls share it.
 -- load_with_stubs sets _G.hs and populates package.loaded["hs.*"] sub-modules.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local State = helpers.load_with_stubs("modules.keymap.state")
 
@@ -59,7 +59,7 @@ local function fresh_registry()
 	package.loaded["modules.keymap.registry"]    = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	-- Refresh the hs stub so hs.settings is available for the new require chain
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local R     = require("modules.keymap.registry")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })
 	R.init(state)

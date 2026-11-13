@@ -458,13 +458,13 @@ end)
 helpers.describe("Managed daemon refusal diagnostic", function()
 	helpers.it("(daemon-refusal-logged) logs the serve owner's fixed refusal line and nothing else", function()
 		helpers.with_stub_scope({ "adapters.managed_ollama_daemon", "adapters.shell_runner",
-			"core.lifecycle.engine.core.managed_ollama_daemon_lifecycle", "infra.logger" }, function()
+			"core.lifecycle.engine.core.managed_ollama_daemon_lifecycle", "core.logger.engine.logger" }, function()
 			local logs = {}
 			local Logger = helpers.make_logger_stub()
 			Logger.warn = function(_log, format_string, ...)
 				logs[#logs + 1] = string.format(format_string, ...)
 			end
-			package.loaded["infra.logger"] = Logger
+			package.loaded["core.logger.engine.logger"] = Logger
 			local callbacks = {}
 			package.loaded["adapters.shell_runner"] = {
 				spawn = function(_, _, on_done, on_chunk)

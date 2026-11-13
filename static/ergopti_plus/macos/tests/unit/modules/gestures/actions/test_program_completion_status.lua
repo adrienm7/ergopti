@@ -8,7 +8,7 @@ local HELPER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 
 local OWNED_MODULES = {
 	"modules.gestures.actions_aux_owner", "adapters.shell_runner", "adapters.task_environment",
-	"core.events.timer_scheduler", "infra.logger", "tests.stubs.hs", "hs",
+	"core.events.timer_scheduler", "core.logger.engine.logger", "tests.stubs.hs", "hs",
 	"adapters.owned_program_runner", "platform.remap.lease_helper",
 }
 
@@ -36,7 +36,7 @@ local function with_program_owner(callback)
 			logger.error = function(_, format, ...)
 				fixture.errors[#fixture.errors + 1] = string.format(format, ...)
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["platform.remap.lease_helper"] = { resolve = function()
 				return HELPER, nil, { ERGOPTI_LAUNCHER_EXECUTABLE = HELPER,
 					ERGOPTI_LAUNCHER_DEVICE = "42", ERGOPTI_LAUNCHER_INODE = "73" }

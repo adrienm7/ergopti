@@ -50,7 +50,7 @@ local IOREG_OUTPUT = table.concat({
 local function load_prefetch()
 	local env = { runs = {}, timers = {} }
 	package.loaded["modules.keystats.host_signature"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.shell_runner"] = {
 		run = function(executable, args, on_done)
 			env.runs[#env.runs + 1] = { executable = executable, args = args, on_done = on_done }
@@ -68,7 +68,7 @@ local function load_prefetch()
 end
 
 local PREFETCH_MODULES = {
-	"modules.keystats.host_signature", "infra.logger",
+	"modules.keystats.host_signature", "core.logger.engine.logger",
 	"adapters.shell_runner", "infra.deferred_work",
 }
 

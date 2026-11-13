@@ -15,7 +15,7 @@ local Dialog = require("infra.dialog_util")
 local Shell = require("adapters.shell_runner")
 local I18n = require("core.i18n.engine.i18n")
 local User = require("modules.dynamic_hotstrings")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Features = require("infra.manifest_reader")
 local Publication = require("hotstrings.engine.dynamic.menu_publication").new()
 

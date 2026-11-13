@@ -57,7 +57,7 @@ local DEFAULTS = {
 --- @return table fixture Observable fixture fields and the loaded engine.
 local function load_fixture(loading_result, options)
 	options = options or {}
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 
 	local fixture = {
 		builds = 0,
@@ -70,7 +70,7 @@ local function load_fixture(loading_result, options)
 	}
 	fixture.options = options
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.timings"] = {
 		sec = function(_section, key)
 			return 0.1

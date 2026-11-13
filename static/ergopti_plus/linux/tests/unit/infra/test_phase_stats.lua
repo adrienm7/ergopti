@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.support.logger_fixture").helpers({
-	"infra.phase_stats", "adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "infra.boot_profiler",
-	"infra.perf_counters", "core.text.engine.toml_codec.reader",
+	"infra.phase_stats", "adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "core.logger.engine.boot_profiler",
+	"core.logger.engine.perf_counters", "core.text.engine.toml_codec.reader",
 })
 
 local MS = 1e6
@@ -183,8 +183,8 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 
 	helpers.it("records every closed boot stage as boot.stage with its CPU time as boot.stage_cpu", function()
 		local stats = fixture(20)
-		package.loaded["infra.boot_profiler"] = nil
-		local Boot = require("infra.boot_profiler")
+		package.loaded["core.logger.engine.boot_profiler"] = nil
+		local Boot = require("core.logger.engine.boot_profiler")
 		Boot.begin()
 		Boot.stage("config")
 		Boot.stage_done("config")

@@ -655,7 +655,7 @@ do
 			end
 			for _, name in ipairs({ "adapters.keyboard_hook", "adapters.evdev_reader", "adapters.modifier_broker",
 				"adapters.keyboard_layout", "adapters.secure_field_detector", "adapters.clipboard", "core.events.timer_scheduler",
-				"infra.hotstring_preferences", "infra.llm_preferences", "infra.metrics_preferences", "infra.monotonic",
+				"infra.hotstring_preferences", "infra.llm_preferences", "infra.metrics_preferences", "core.logger.engine.monotonic",
 				"infra.config_paths", "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer",
 				-- Main initialises these owners once; an earlier suite may have loaded them.
 				"modules.keymap.pause_layout_switch", "modules.keymap.layout_emulation" }) do package.loaded[name] = nil end
@@ -679,13 +679,13 @@ do
 			put("core.fs.adapters.storage", require("tests.fakes").storage())
 			local scheduler = require("tests.fakes").timer_scheduler()
 			put("core.events.timer_scheduler", scheduler)
-			put("infra.monotonic", { now_ms = function() return 1000 + scheduler.now * 1000 end, resolution_ms = function() return .001 end })
+			put("core.logger.engine.monotonic", { now_ms = function() return 1000 + scheduler.now * 1000 end, resolution_ms = function() return .001 end })
 			local logger = assert(dofile(root .. "/../_shared/core/logger/engine/init.lua")); logger.set_sink(function(line) state.last_log = tostring(line) end)
 			put("core.logger.engine.shim", logger)
-			put("infra.logger_sink", { install = yes })
+			put("core.logger.engine.sink", { install = yes })
 			put("core.lifecycle.engine.shutdown.session_lock", { protect = yes, acquire = yes })
 			put("infra.script_settings", { apply = yes, current = function() return "ERROR" end })
-			put("infra.boot_profiler", { begin = noop, stage = noop, stage_done = noop, complete = function() return 0 end })
+			put("core.logger.engine.boot_profiler", { begin = noop, stage = noop, stage_done = noop, complete = function() return 0 end })
 			put("infra.diagnostic_snapshot", { pid = function() return "controlled" end, prepare = function() return noop end })
 			put("modules.diagnostics.crash_reporter", { remove_legacy_dumps = function() return 0 end, protect = function(_, body)
 			  local ok, result = xpcall(body, debug.traceback)

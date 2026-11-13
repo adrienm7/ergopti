@@ -36,7 +36,7 @@
 local M = {}
 
 local Vision       = require("ai.engine.prediction.vision")
-local Logger       = require("infra.logger")
+local Logger       = require("core.logger.engine.logger")
 local i18n         = require("core.i18n.engine.i18n")
 local Paths        = require("core.fs.engine.paths")
 local FileSystem   = require("core.fs.adapters.file_system")

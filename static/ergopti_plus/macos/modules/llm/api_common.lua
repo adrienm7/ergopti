@@ -20,7 +20,7 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Paths  = require("core.fs.engine.paths")
 local FileSystem = require("core.fs.adapters.file_system")   -- OS-pure file read (port FileSystem)
 local JsonCodec  = require("core.fs.adapters.json_codec")    -- OS-pure JSON decode (port JsonCodec)

@@ -15,7 +15,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "infra.field_check_probes",
+local MODULES = { "core.logger.engine.logger", "infra.field_check", "infra.field_check_checks", "infra.field_check_probes",
 	"infra.field_check_owned_activation" }
 
 --- A fake Mac following the rule unless told otherwise.
@@ -63,8 +63,8 @@ end
 local function run(check, ports)
 	local result
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		for _, name in ipairs(MODULES) do if name ~= "infra.logger" then package.loaded[name] = nil end end
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		for _, name in ipairs(MODULES) do if name ~= "core.logger.engine.logger" then package.loaded[name] = nil end end
 		local Engine = require("infra.field_check")
 		assert(Engine.run(check, ports, function(done) result = done end), "check did not start")
 	end)

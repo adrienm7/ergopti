@@ -170,7 +170,7 @@ function M.run(options)
 		if prepared then prepared({ boot_ms = boot_ms }) end
 	end
 	-- The real clock: the metrics' desktop source is handed it at startup.
-	env.Monotonic = require("infra.monotonic")
+	env.Monotonic = require("core.logger.engine.monotonic")
 	env.RuntimeGuard = { call = function(_, callback) callback(); return true end, optional_require = function() return nil end }
 	env.webview_manager = { set_daemon_state = function(state) observed.daemon_state = state end,
 		show = function()
@@ -242,7 +242,7 @@ function M.run(options)
 			return { missing_program = function() return nil end, report = function() observed.access_reported = true; return 1 end }
 		elseif name == "core.i18n.engine.i18n" then
 			return { init = noop, set_trigger_provider = noop, get = function(key) return key end }
-		elseif name == "infra.perf_counters" then
+		elseif name == "core.logger.engine.perf_counters" then
 			-- The real counters: the exit path flushes their last interval.
 			return require(name)
 		elseif name == "core.lifecycle.engine.dev_source" then

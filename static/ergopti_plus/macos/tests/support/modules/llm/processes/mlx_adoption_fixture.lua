@@ -9,8 +9,8 @@
 
 local helpers = require("tests.helpers")
 local OWNED = {
-	"infra.logger", "core.logger.engine", "diagnostics.engine.reports.redact", "core.text.engine.json", "core.fs.engine.app_dirs",
-	"infra.log_folders", "_generated.logger_sub_files", "adapters.log_transport",
+	"core.logger.engine.logger", "core.logger.engine", "diagnostics.engine.reports.redact", "core.text.engine.json", "core.fs.engine.app_dirs",
+	"core.logger.engine.log_folders", "_generated.logger_sub_files", "core.logger.adapters.log_transport",
 	"core.lifecycle.engine.launcher_environment", "infra.notifications", "core.i18n.engine.i18n",
 	"infra.config_paths", "infra.text_utils", "modules.llm.api_common",
 	"adapters.task_lifecycle", "adapters.shell_runner", "core.events.timer_scheduler",
@@ -27,9 +27,9 @@ local function with_adoption(scenario)
 			local noop = function() end
 			local state = { tasks = {}, cleanup = {}, logs = {}, callback_errors = {}, current_a = true,
 				a_success = 0, a_cancel = 0, b_success = 0, b_cancel = 0 }
-			package.loaded["adapters.log_transport"] = {}
+			package.loaded["core.logger.adapters.log_transport"] = {}
 			_G.hs = {}
-			local Logger = require("infra.logger")
+			local Logger = require("core.logger.engine.logger")
 			helpers.admit_logger_privacy(Logger)
 			Logger.set_level("INFO")
 			Logger.set_sink(function(line)

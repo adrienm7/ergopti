@@ -14,14 +14,14 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "adapters.field_probe_ports" }
+local MODULES = { "core.logger.engine.logger", "adapters.field_probe_ports" }
 
 --- Runs exec_input over a recording shell runner.
 --- @return table world
 local function run_exec_input()
 	local world = { order = {} }
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.field_probe_ports"] = nil
 		local Ports = require("adapters.field_probe_ports")
 		Ports._shell_runner = {

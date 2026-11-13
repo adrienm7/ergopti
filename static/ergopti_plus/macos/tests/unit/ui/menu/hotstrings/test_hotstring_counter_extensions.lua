@@ -15,10 +15,10 @@ local helpers = require("tests.helpers")
 --- Runs a callback with a fresh counter that must not touch any file.
 --- @param callback function Receives the counter module.
 local function with_counter(callback)
-	return helpers.with_fresh_modules({ "ui.menu.hotstring_counter", "infra.logger", "core.fs.adapters.file_system",
+	return helpers.with_fresh_modules({ "ui.menu.hotstring_counter", "core.logger.engine.logger", "core.fs.adapters.file_system",
 		"core.fs.engine.dir" }, function()
 		local function unexpected_io() error("Counting must not access files", 0) end
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.adapters.file_system"] = { read_with_status = unexpected_io }
 		package.loaded["core.fs.engine.dir"] = { try_entries = unexpected_io }
 		callback(require("ui.menu.hotstring_counter"))

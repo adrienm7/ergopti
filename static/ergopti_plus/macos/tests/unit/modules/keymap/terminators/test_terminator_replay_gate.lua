@@ -177,7 +177,7 @@ end
 
 
 local function capture_replay_errors(callback)
-	local Logger = require("infra.logger")
+	local Logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(Logger)
 	local original_error = Logger.error
 	local errors = {}

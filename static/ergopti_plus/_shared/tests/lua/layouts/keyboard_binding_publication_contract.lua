@@ -52,7 +52,7 @@ function M.register(helpers, driver)
 				package.loaded["modules.gestures"], package.loaded["modules.gestures.actions"] = nil, nil
 				helpers.load_with_stubs("modules.gestures")
 				parameters = require("modules.gestures.actions")
-				logger = assert(package.loaded["infra.logger"], "the actual Actions logger must be available")
+				logger = assert(package.loaded["core.logger.engine.logger"], "the actual Actions logger must be available")
 				package.loaded["core.logger.engine.shim"] = logger
 				preferences = helpers.load_with_stubs("infra.preferences")
 			else

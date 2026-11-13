@@ -164,7 +164,7 @@ helpers.describe("shell_runner stub hygiene across the whole suite", function()
 		local native_scoped = scoped:gsub("helpers.with_fresh_modules", "helpers.with_stub_scope")
 		helpers.assert_true(has_dangling_install(native_scoped) == false,
 			"the native stub scope restores its explicit shell-runner ownership")
-		local unowned_scope = native_scoped:gsub('"adapters.shell_runner"', '"infra.logger"', 1)
+		local unowned_scope = native_scoped:gsub('"adapters.shell_runner"', '"core.logger.engine.logger"', 1)
 		helpers.assert_true(has_dangling_install(unowned_scope),
 			"a scope that does not own shell_runner cannot excuse its dangling install")
 	end)

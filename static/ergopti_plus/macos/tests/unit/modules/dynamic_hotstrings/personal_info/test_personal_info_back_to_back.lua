@@ -25,7 +25,7 @@ end
 
 local function boot(outcomes)
 	package.loaded[TARGET] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.keystats"] = {}
 	package.loaded["ui.personal_info_editor"] = {}
 

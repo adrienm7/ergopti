@@ -16,7 +16,7 @@ local function with_focus(boundary, scenario)
 	for key, value in pairs(package.loaded) do loaded[key] = value end
 	local records = { current = true, moves = 0, raises = 0, focuses = 0, app_focuses = 0 }
 	local ok, err = xpcall(function()
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end, warn = function() end,
 			error = function() end,
 		}

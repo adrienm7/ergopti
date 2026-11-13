@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- Owns native boundary doubles while preserving both real lifecycle adapters.
 --- @param scenario function Receives client, scheduler and independent observations.
 local function with_client(scenario)
-	helpers.with_stub_scope({ "adapters.http_client", "core.events.timer_scheduler", "infra.logger",
+	helpers.with_stub_scope({ "adapters.http_client", "core.events.timer_scheduler", "core.logger.engine.logger",
 		"diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "infra.http_header_policy" }, function()
 		package.loaded["infra.http_header_policy"] = require("tests.support.network.header_policy_fixture").load()
 		local h = { timers = {}, requests = {}, refused = {}, errors = {} }
@@ -49,7 +49,7 @@ local function with_client(scenario)
 				return timer
 			end },
 		}
-		package.loaded["infra.logger"] = setmetatable({ error = function(_, message)
+		package.loaded["core.logger.engine.logger"] = setmetatable({ error = function(_, message)
 			h.errors[#h.errors + 1] = message
 		end }, { __index = function() return function() end end })
 		local scheduler = require("core.events.timer_scheduler")

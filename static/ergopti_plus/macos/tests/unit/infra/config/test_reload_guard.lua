@@ -18,8 +18,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 --- Loads a fresh reload_guard with a clean stubbed persistent store.
 local function fresh()
@@ -120,12 +120,12 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 	end)
 
 	helpers.it("clears terminal rollback state without logging after sink finalization", function()
-		local previous_logger = package.loaded["infra.logger"]
+		local previous_logger = package.loaded["core.logger.engine.logger"]
 		local debug_calls = 0
 		-- The storage adapter's owned-alias state requires a logger with error()
 		-- when it loads; every level counts as reopening the logger.
 		local function count() debug_calls = debug_calls + 1 end
-		package.loaded["infra.logger"] = { debug = count, info = count, warn = count, error = count }
+		package.loaded["core.logger.engine.logger"] = { debug = count, info = count, warn = count, error = count }
 		package.loaded["core.fs.adapters.storage"] = nil
 		package.loaded["core.lifecycle.engine.reload.guard"] = nil
 		local rg = require("core.lifecycle.engine.reload.guard")
@@ -139,6 +139,6 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 			"post-finalizer sentinel cleanup must not reopen the synchronous logger")
 		package.loaded["core.lifecycle.engine.reload.guard"] = nil
 		package.loaded["core.fs.adapters.storage"] = nil
-		package.loaded["infra.logger"] = previous_logger
+		package.loaded["core.logger.engine.logger"] = previous_logger
 	end)
 end)

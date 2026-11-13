@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 local function load_fixture(opts)
 	opts = opts or {}
 	local noop = function() end
-	local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+	local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 	hs_stub.__reset()
 	local runtime = { bindings = true, keyboard = true }
 	local script_actions = { return_key = "script_pause_toggle", backspace = "script_reload", escape = "script_quit" }
@@ -45,7 +45,7 @@ local function load_fixture(opts)
 		update_check_interval_seconds = 3600,
 	}
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = { notify = noop }
 	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
 	package.loaded["infra.text_utils"] = {

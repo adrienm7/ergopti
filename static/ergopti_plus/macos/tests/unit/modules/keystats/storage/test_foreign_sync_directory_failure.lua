@@ -30,9 +30,9 @@ end
 
 helpers.describe("keystats export — foreign directory enumeration", function()
 	helpers.it("distinguishes a missing directory from an uninspectable directory", function()
-		helpers.with_fresh_modules({"infra.logger", "core.i18n.engine.i18n", "core.fs.engine.dir", "core.fs.adapters.file_system",
+		helpers.with_fresh_modules({"core.logger.engine.logger", "core.i18n.engine.i18n", "core.fs.engine.dir", "core.fs.adapters.file_system",
 			"modules.keystats.export"}, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 			local status, failing_path = "error", "/metrics/"
 			package.loaded["core.fs.adapters.file_system"] = {classify_no_follow = function(path)
@@ -61,7 +61,7 @@ helpers.describe("keystats export — foreign directory enumeration", function()
 		helpers.with_fresh_modules({
 			"core.fs.engine.dir",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"modules.keystats.export",
 		}, function()
 			local try_calls = 0
@@ -76,7 +76,7 @@ helpers.describe("keystats export — foreign directory enumeration", function()
 			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 			}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 			local export = helpers.load_with_stubs("modules.keystats.export", {
 				fs = {
@@ -123,7 +123,7 @@ end)
 
 local function ingest_errors(sync_foreign_data_sql)
 	return helpers.with_fresh_modules({
-		"infra.logger",
+		"core.logger.engine.logger",
 		"core.fs.adapters.file_system",
 		"modules.keystats.sqlite_writer",
 		"modules.keystats.aggregator",
@@ -138,7 +138,7 @@ local function ingest_errors(sync_foreign_data_sql)
 			local ok, rendered = pcall(string.format, message, ...)
 			errors[#errors + 1] = ok and rendered or tostring(message)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 
 		local db = {}
 		function db:nrows()
@@ -209,10 +209,10 @@ end)
 
 helpers.describe("foreign sync writer quarantine", function()
 	helpers.it("does not touch the previously captured handle after foreign sync retires it", function()
-		helpers.with_fresh_modules({ "infra.logger", "modules.keystats.sqlite_writer",
+		helpers.with_fresh_modules({ "core.logger.engine.logger", "modules.keystats.sqlite_writer",
 			"modules.keystats.aggregator", "modules.keystats.rotation", "modules.keystats.export",
 			"metrics.engine.metrics", "core.fs.adapters.ledger_append", "modules.keystats.log_manager" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local calls = 0
 			local db = { nrows = function() calls = calls + 1; error("retired handle read") end,
 				exec = function() calls = calls + 1; error("retired handle write") end }

@@ -150,7 +150,7 @@ end
 --- Loads a fresh owner module over a quiet logger.
 --- @return table owner
 function M.load_owner()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["platform.remap.runtime_vhid"] = nil
 	package.loaded["platform.remap.runtime_owner"] = nil

@@ -584,7 +584,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	end
 
 	local result = require(module_name)
-	if module_name == "infra.logger" then M.admit_logger_privacy(result) end
+	if module_name == "core.logger.engine.logger" then M.admit_logger_privacy(result) end
 	return result
 end
 
@@ -903,7 +903,7 @@ end
 
 --- Builds a minimal lib.logger stub suitable for injection via package.loaded.
 --- All log methods are no-ops so modules can log without crashing in headless tests.
---- @return table Logger stub with the same public API as infra/logger.lua.
+--- @return table Logger stub with the same public API as core/logger/engine/logger.lua.
 function M.make_logger_stub()
 	local noop = function() end
 	return {

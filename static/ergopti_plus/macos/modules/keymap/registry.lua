@@ -25,7 +25,7 @@ local text_utils  = require("infra.text_utils")
 -- none, so the same pair of colliding entries elected different winners per OS.
 local HotstringPriority = require("hotstrings.engine.priority")
 local km_utils    = require("modules.keymap.utils")
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local Paths       = require("core.fs.engine.paths")
 local Terminators = require("modules.keymap.terminators")
 local Groups      = require("modules.keymap.registry_groups")

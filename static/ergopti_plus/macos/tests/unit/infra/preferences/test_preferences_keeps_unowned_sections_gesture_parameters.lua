@@ -45,7 +45,7 @@ helpers.describe("Published gesture parameter identity source preservation", fun
 	end
 
 	local function with_file(published, body)
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim",
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim",
 			"modules.gestures", "modules.gestures.actions" }, function()
 			package.loaded["modules.gestures"], package.loaded["modules.gestures.actions"] = nil, nil
 			local gestures
@@ -55,7 +55,7 @@ helpers.describe("Published gesture parameter identity source preservation", fun
 			local logger = helpers.make_logger_stub()
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			package.loaded["core.fs.adapters.file_system"] = nil
 			Outdated.reset_for_tests()
 			local preferences = helpers.load_with_stubs("infra.preferences")
@@ -145,9 +145,9 @@ helpers.describe("macOS real preference root dotted scalar publication", functio
 	}
 	for _, vector in ipairs(vectors) do
 		helpers.it("uses the actual conditional preference publisher for " .. vector.name, function()
-			helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+			helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 				local logger = helpers.make_logger_stub()
-				package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+				package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 				package.loaded["core.fs.adapters.file_system"] = nil
 				local preferences = helpers.load_with_stubs("infra.preferences")
 				local path = os.tmpname()
@@ -175,9 +175,9 @@ end)
 
 helpers.describe("macOS real root dotted numeric admission", function()
 	helpers.it("acknowledges the exact requested finite temperature through the conditional publisher", function()
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 			local logger = helpers.make_logger_stub()
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			package.loaded["core.fs.adapters.file_system"] = nil
 			local preferences = helpers.load_with_stubs("infra.preferences")
 			local path = os.tmpname()
@@ -202,9 +202,9 @@ end)
 
 helpers.describe("macOS real finite header numeric admission", function()
 	helpers.it("reloads an acknowledged exact temperature from its actual conditional source publisher", function()
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 			local logger = helpers.make_logger_stub()
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			package.loaded["core.fs.adapters.file_system"] = nil
 			local preferences = helpers.load_with_stubs("infra.preferences")
 			local path = os.tmpname()
@@ -227,9 +227,9 @@ helpers.describe("macOS real finite header numeric admission", function()
 	end)
 
 	helpers.it("retains acknowledged negative zero through actual conditional preference restart", function()
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 			local logger = helpers.make_logger_stub()
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			package.loaded["core.fs.adapters.file_system"] = nil
 			local preferences = helpers.load_with_stubs("infra.preferences")
 			local path = os.tmpname()
@@ -251,9 +251,9 @@ helpers.describe("macOS real finite header numeric admission", function()
 	end)
 
 	helpers.it("retains the actual source on wrong numeric admission and permits an explicit repaired retry", function()
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 			local logger = helpers.make_logger_stub()
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			package.loaded["core.fs.adapters.file_system"] = nil
 			local preferences = helpers.load_with_stubs("infra.preferences")
 			local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
@@ -289,9 +289,9 @@ helpers.describe("Mac real root inline scalar publication", function()
 	local source = 'llm = { generation = { temperature=0.25, future=9007199254740993 }, private="untouched" } # exact trailer\n'
 	local owned_tail = '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n'
 	local function actual_file(body)
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 			local logger = helpers.make_logger_stub()
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			package.loaded["core.fs.adapters.file_system"] = nil
 			local preferences = helpers.load_with_stubs("infra.preferences")
 			local path = os.tmpname()
@@ -373,9 +373,9 @@ helpers.describe("Mac real section-relative dotted scalar publication", function
 	local source = '[llm] # exact header\ngeneration.temperature=0.25 # owned scalar\ngeneration.future=9007199254740993 # foreign\nprivate="untouched"\n'
 	local owned_tail = '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n'
 	local function actual_file(body)
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 			local logger = helpers.make_logger_stub()
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			package.loaded["core.fs.adapters.file_system"] = nil
 			local preferences = helpers.load_with_stubs("infra.preferences")
 			local path = os.tmpname()
@@ -457,9 +457,9 @@ helpers.describe("Mac real section-relative inline scalar publication", function
 	local source = '[llm] # exact header\ngeneration = { temperature=0.25, future=9007199254740993, empty=[], map={} } # exact outer trailer\nprivate="untouched"\n'
 	local owned_tail = '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n'
 	local function actual_file(body)
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 			local logger = helpers.make_logger_stub()
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			package.loaded["core.fs.adapters.file_system"] = nil
 			local preferences = helpers.load_with_stubs("infra.preferences")
 			local path = os.tmpname()

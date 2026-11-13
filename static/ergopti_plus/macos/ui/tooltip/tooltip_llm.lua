@@ -12,7 +12,7 @@
 
 local M = {}
 local hs = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local EventProvenance = require("adapters.event_provenance")
 local ControlSentinels = require("modules.keymap.control_sentinels")
 local KeyState = require("adapters.key_state")

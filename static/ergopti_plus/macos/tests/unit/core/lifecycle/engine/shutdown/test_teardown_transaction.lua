@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local function load_transaction()
 	local errors = {}
 	local noop = function() end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, debug = noop, info = noop, warn = noop,
 		success = noop, done = noop, trace = noop,
 		error = function(_, message, ...)

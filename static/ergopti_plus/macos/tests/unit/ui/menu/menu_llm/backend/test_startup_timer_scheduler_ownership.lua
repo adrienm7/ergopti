@@ -4,7 +4,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"core.events.timer_scheduler",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"modules.llm",
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"ui.menu.menu_llm.startup_controller",
@@ -60,7 +60,7 @@ local function with_fixture(callback)
 			return timer
 		end
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.llm"] = { BUILTIN_PROFILES = {} }
 		package.loaded["ui.menu.menu_llm.prediction_lock_registry"] = {
 			new = function() error("the fixture injects the exact lock registry") end,

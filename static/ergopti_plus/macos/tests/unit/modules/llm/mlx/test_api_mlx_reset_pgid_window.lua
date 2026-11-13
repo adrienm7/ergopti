@@ -21,7 +21,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"infra.logger", "infra.notifications", "core.i18n.engine.i18n", "infra.config_paths",
+	"core.logger.engine.logger", "infra.notifications", "core.i18n.engine.i18n", "infra.config_paths",
 	"infra.text_utils", "infra.timings", "core.fs.engine.paths", "core.fs.adapters.storage",
 	"adapters.http_client", "core.fs.adapters.json_codec", "adapters.shell_runner",
 	"core.events.timer_scheduler", "modules.llm.profiles",
@@ -52,7 +52,7 @@ local function with_api(scenario)
 				runtime.lines[#runtime.lines + 1] = { level = level, text = text }
 			end
 		end
-		package.loaded["infra.logger"] = setmetatable({
+		package.loaded["core.logger.engine.logger"] = setmetatable({
 			debug = capture("debug"), info = capture("info"), warn = capture("warn"),
 			error = capture("error"),
 			callback = function(_, _, fn, ...) return pcall(fn, ...) end,

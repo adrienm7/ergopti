@@ -26,7 +26,7 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 		package.cpath = ""
 		package.loaded.luv = setmetatable({}, { __index = function() return blocked end })
 		package.loaded.ffi, package.preload.ffi = nil, blocked
-		for _, name in ipairs({ "core.logger.engine", "core.logger.engine.shim", "infra.monotonic", "infra.display_server", "adapters.shell_runner", "adapters.clipboard" }) do
+		for _, name in ipairs({ "core.logger.engine", "core.logger.engine.shim", "core.logger.engine.monotonic", "infra.display_server", "adapters.shell_runner", "adapters.clipboard" }) do
 			package.loaded[name] = nil
 		end
 		logger = require("core.logger.engine")

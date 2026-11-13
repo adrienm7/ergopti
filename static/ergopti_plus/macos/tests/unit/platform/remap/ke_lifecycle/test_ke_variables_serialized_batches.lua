@@ -105,7 +105,7 @@ local function fresh_bridge(options)
 			message = ok and message or tostring(format_string),
 		}
 	end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function(_, ...) log("debug", ...) end,
 		info = function(_, ...) log("info", ...) end,
 		warn = function(_, ...) log("warn", ...) end,
@@ -1003,4 +1003,4 @@ package.loaded["core.fs.adapters.json_codec"] = nil
 package.loaded["platform.remap.ke_paths"] = nil
 package.loaded["platform.remap.lease_contract"] = nil
 package.loaded["platform.remap.lease_controller"] = nil
-package.loaded["infra.logger"] = nil
+package.loaded["core.logger.engine.logger"] = nil

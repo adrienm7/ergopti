@@ -15,7 +15,7 @@ local MODULE_NAMES = {
 	"core.fs.adapters.json_codec",
 	"adapters.shell_runner",
 	"core.events.timer_scheduler",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"modules.llm.api_mlx",
 	"modules.llm.api_mlx_discovery",
@@ -197,7 +197,7 @@ local function with_real_mlx_stack(fn)
 		http_requests = {},
 		tasks = {},
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = { notify = function() end }
 	package.loaded["modules.shortcuts.script_control"] = {
 		is_paused = function() return state.script_paused end,

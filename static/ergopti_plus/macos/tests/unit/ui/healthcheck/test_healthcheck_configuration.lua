@@ -190,7 +190,7 @@ end)
 
 -- Reloaded under the stubbed runtime and restored after the case
 local PROBE_MODULES = {
-	"tests.stubs.hs", "infra.logger", "ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes",
+	"tests.stubs.hs", "core.logger.engine.logger", "ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes",
 	"adapters.system_info", "adapters.key_state", "adapters.network_info", "adapters.accessibility_permission",
 	"adapters.screen_capture", "core.events.timer_scheduler", "diagnostics.engine.healthcheck.configuration",
 }
@@ -205,7 +205,7 @@ local function under_stub(body)
 		hs_stub.execute = function() return "", false end
 		hs_stub.host.vmStat = function() return { memSize = 17179869184, pagesFree = 1000, pageSize = 16384 } end
 		hs_stub.usb = { attachedDevices = function() return {} end }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		body(hs_stub)
 	end)
 	if not ok then error(err, 0) end
@@ -394,7 +394,7 @@ helpers.describe("an over-budget synchronous collection names its slowest collec
 		under_stub(function(hs_stub)
 			slow_configuration_reader({}, 0)
 			local lines = {}
-			package.loaded["infra.logger"].info = function(_, format, ...)
+			package.loaded["core.logger.engine.logger"].info = function(_, format, ...)
 				lines[#lines + 1] = string.format(format, ...)
 			end
 			-- The memory read is the hardware collector's: make it hold the thread

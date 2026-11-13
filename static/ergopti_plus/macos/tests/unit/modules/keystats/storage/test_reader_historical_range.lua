@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local function load_reader(open_count)
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end, trace = function() end, done = function() end,
 		info = function() end, start = function() end, success = function() end,
 		warn = function() end, error = function() end,
@@ -40,8 +40,8 @@ end
 
 helpers.describe("sqlite_reader: historical ranges exclude the live today split", function()
 	helpers.it("returns incomplete and closes the database when a query error cannot be formatted", function()
-		helpers.with_stub_scope({"modules.keystats.sqlite_reader", "infra.logger"}, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_stub_scope({"modules.keystats.sqlite_reader", "core.logger.engine.logger"}, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local calls, closed = 0, 0
 			local opaque = setmetatable({}, {__tostring = function() error("unprintable") end})
 			local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", {

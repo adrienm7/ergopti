@@ -10,8 +10,8 @@ local helpers = require("tests.helpers")
 
 helpers.describe("bounded file read", function()
 	helpers.it("refuses missing and invalid limits before opening a file", function()
-		helpers.with_fresh_modules({ "core.fs.adapters.file_system", "infra.logger" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_fresh_modules({ "core.fs.adapters.file_system", "core.logger.engine.logger" }, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local adapter = require("core.fs.adapters.file_system")
 			for _, limit in ipairs({ -1, 0.5, math.huge, 0 / 0 }) do
 				local content, status = adapter.read_bounded("/PRIVATE_FILE", limit)
@@ -27,8 +27,8 @@ helpers.describe("bounded file read", function()
 		helpers.it("limits the native read for a " .. #data .. " byte file", function()
 			local previous_open, previous_hs = io.open, _G.hs
 			local ok, failure = xpcall(function()
-				helpers.with_fresh_modules({ "core.fs.adapters.file_system", "infra.logger" }, function()
-					package.loaded["infra.logger"] = helpers.make_logger_stub()
+				helpers.with_fresh_modules({ "core.fs.adapters.file_system", "core.logger.engine.logger" }, function()
+					package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 					local adapter = helpers.load_with_stubs("core.fs.adapters.file_system", {
 						fs = { symlinkAttributes = function()
 							return { mode = "file", dev = 1, ino = 2, size = #data }

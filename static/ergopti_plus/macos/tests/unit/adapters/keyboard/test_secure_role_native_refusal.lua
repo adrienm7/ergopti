@@ -7,9 +7,9 @@ local SECURE = "AXSecureTextField"
 --- Loads a fresh detector over a counted native attribute boundary.
 ---@param callback function Receives the detector and declared native controls.
 local function with_detector(callback)
-	return helpers.with_stub_scope({ "adapters.secure_field_detector", "infra.logger", "hs", "tests.stubs.hs" }, function()
+	return helpers.with_stub_scope({ "adapters.secure_field_detector", "core.logger.engine.logger", "hs", "tests.stubs.hs" }, function()
 		local control = { role = "AXTextField", queries = {}, logs = {} }
-		package.loaded["infra.logger"] = { debug = function(_, format, ...)
+		package.loaded["core.logger.engine.logger"] = { debug = function(_, format, ...)
 			control.logs[#control.logs + 1] = string.format(format, ...)
 		end }
 		local field = { attributeValue = function(_, attribute)

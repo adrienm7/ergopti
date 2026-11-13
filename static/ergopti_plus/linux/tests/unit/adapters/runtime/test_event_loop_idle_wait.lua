@@ -62,7 +62,7 @@ helpers.describe("event loop idle wait: the luv idle tick yields", function()
 
 	helpers.it("counts input wakes and quiet waits", function()
 		local loop = helpers.load_module("core.events.loop")
-		local perf = require("infra.perf_counters")
+		local perf = require("core.logger.engine.perf_counters")
 		perf._reset_for_test()
 		local answers, calls = { true, false, true }, 0
 		loop.run({

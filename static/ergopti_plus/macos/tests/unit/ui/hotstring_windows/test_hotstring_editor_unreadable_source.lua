@@ -520,7 +520,7 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 		})
 		editor.init("/virtual/personal_hotstrings.toml", { PERSONAL_GROUP_NAME = "personal" },
 			function() end, 50)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		Logger.set_level("DEBUG")
@@ -552,7 +552,7 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 		}, function()
 			error("injected deferred menu refresh failure", 0)
 		end, 50)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		Logger.set_level("DEBUG")
@@ -589,7 +589,7 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 		end)
 		editor.open("menu")
 
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		Logger.set_level("DEBUG")
