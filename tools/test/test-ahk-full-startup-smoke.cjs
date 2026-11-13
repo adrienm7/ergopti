@@ -234,12 +234,21 @@ function hotstringsRenderTimes(configRoot) {
 // which shares only the dev base and carries no TOML or config change. The two
 // values come from the dev base the boot seeds (its generated config template),
 // not from either branch; every other fixture and counter is unchanged.
+// Raised on 2026-11-13, measured on dev runs 43306862276 and 43457158223:
+// every boot reads 17 more flat values (fresh-config 1162 -> 1179, realistic
+// 1195 -> 1212) and 27 fewer slow lexer steps, the same for each fixture. The
+// tap-hold loader now reads _shared/tap_hold/data/shared_file.toml at its
+// include position for the Mac thumb positions (4984431ee8) and the macOS-only
+// modifiers (11 values, parsed once and cached), the config migrations gained
+// the schema v22 import_companion step (5 values, 23860b1e00), and the timing
+// registry gained tap_hold.max_activation_ms (1 value, 0aa18f15f1). The
+// neutral-defaults boot reads the same documents: 2250 -> 2267.
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
 	'toml.document_parse': { all: 15, [REALISTIC_HOTSTRINGS_FIXTURE]: 18 },
 	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
 	'toml.document_slow_steps': { all: 12841, [REALISTIC_HOTSTRINGS_FIXTURE]: 13582 },
-	'toml.flat_values': { all: 2250, [REALISTIC_HOTSTRINGS_FIXTURE]: 1201 }
+	'toml.flat_values': { all: 2267, [REALISTIC_HOTSTRINGS_FIXTURE]: 1212 }
 };
 
 /**
