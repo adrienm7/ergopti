@@ -240,6 +240,15 @@ ValueSchemaData() {
 				"value", 0,
 				"label_key", "value_check.special.off")],
 			"default_from", Map(
-				"manifest", "tap_holds.lone_modifier_tap_max_ms"))))
+				"manifest", "tap_holds.lone_modifier_tap_max_ms")),
+		"updater.check_interval_seconds", Map(
+			"file", "config.toml",
+			"type", "integer",
+			"unit", "s",
+			"min", 0,
+			"max", 2147483647,
+			"special", [Map(
+				"value", 0,
+				"label_key", "value_check.special.never")])))
 	return Data
 }

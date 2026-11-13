@@ -1380,13 +1380,14 @@ Updater_LoadCheckInterval() {
 		UPDATER_CHECK_INTERVAL := UPDATER_DEFAULT_INTERVAL
 		return
 	}
-	; Only a finite, non-negative whole number carries updater cadence intent.
-	; Coercing a quoted zero or truncating a fraction would disable checks.
-	; A genuine source Boolean remains a TOML_Bool above and is rejected here.
-	if (!(raw is Integer) && !(raw is Float)) || raw != raw || raw < 0
-			|| (raw - raw) != 0 {
-		try LoggerWarn("Updater", "Ignoring invalid check_interval_seconds '{1}' — using default ({2} s).",
-			raw is Object ? Type(raw) : raw, UPDATER_DEFAULT_INTERVAL)
+	; Only a finite whole number within the shared value schema's declaration
+	; carries updater cadence intent. Coercing a quoted zero or truncating a
+	; fraction would disable checks. A genuine source Boolean remains a TOML_Bool
+	; above and is rejected here.
+	Checked := ValueCheckValue(ValueCheckEntryFor(ConfigKey.UPDATER_CHECK_INTERVAL_SECONDS), raw)
+	if !Checked["ok"] {
+		try LoggerWarn("Updater", "Ignoring invalid check_interval_seconds '{1}' ({2}, {3} to {4} s) — using default ({5} s).",
+			raw is Object ? Type(raw) : raw, Checked["reason"], Checked["min"], Checked["max"], UPDATER_DEFAULT_INTERVAL)
 		UPDATER_CHECK_INTERVAL := UPDATER_DEFAULT_INTERVAL
 		return
 	}
@@ -1558,22 +1559,19 @@ Updater_SetCheckInterval(Seconds, Request := unset, IsSuspended := unset, Notify
 	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 		return false
 	}
-	; Coerce defensively: a valid cadence may arrive as a String ("300") or
-	; Float (300.0) — e.g. from a config migration or a future caller, since
-	; Updater_LoadCheckInterval reads strings from TOML. An exact Type() ==
-	; "Integer" test would silently drop those. Reject only genuinely invalid
-	; input (non-numeric or negative) and LoggerWarn so a bad value is visible
-	; in the log rather than disappearing without a trace.
-	try {
-		Seconds := Integer(Seconds)
-	} catch {
-		try LoggerWarn("Updater", "Ignoring non-numeric check interval: {1}.", Seconds)
-		return
-	}
-	if (Seconds < 0) {
-		try LoggerWarn("Updater", "Ignoring negative check interval: {1}.", Seconds)
+	; The consuming boundary checks the shared value schema's declaration. A
+	; whole number written as a string ("300", from a config migration) is
+	; still read as its number; any other string, a fraction (once truncated by
+	; Integer()), NaN, an infinity or a value out of range is refused with a log
+	; line and nothing is written.
+	Candidate := (Seconds is String && RegExMatch(Seconds, "^\d+$")) ? Seconds + 0 : Seconds
+	Checked := ValueCheckValue(ValueCheckEntryFor(ConfigKey.UPDATER_CHECK_INTERVAL_SECONDS), Candidate)
+	if !Checked["ok"] {
+		try LoggerWarn("Updater", "Ignoring invalid check interval '{1}' ({2}).",
+			IsObject(Seconds) ? Type(Seconds) : Seconds, Checked["reason"])
 		return false
 	}
+	Seconds := Integer(Checked["value"])
 	ActionOwner := _Updater_AcquireAsyncActionLease(
 		"Check-interval change", NotifyFn)
 	if !IsObject(ActionOwner)

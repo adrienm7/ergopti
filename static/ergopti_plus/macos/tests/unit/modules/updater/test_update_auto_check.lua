@@ -409,6 +409,14 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		helpers.assert_eq(ctx.owner.interval(), ctx.timing.default_check_interval_sec)
 	end)
 
+	-- The shared value schema's declaration (value-validation).
+	for _, stored in ipairs({ 2147483648, "3600", 3600.5, 0 / 0 }) do
+		helpers.it("uses the default for a saved interval its declaration refuses: " .. tostring(stored), function()
+			local ctx = build({ now = T0, state = { update_check_interval_seconds = stored } })
+			helpers.assert_eq(ctx.owner.interval(), ctx.timing.default_check_interval_sec)
+		end)
+	end
+
 	helpers.it("a refused save keeps the previous interval", function()
 		local ctx = build({ now = T0, state = { update_check_interval_seconds = 3600 }, save_refused = true })
 		helpers.assert_eq(ctx.owner.set_interval(86400), false)

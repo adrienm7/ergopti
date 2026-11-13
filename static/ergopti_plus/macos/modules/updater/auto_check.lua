@@ -158,8 +158,12 @@ end
 local function stored_interval(state, timing)
 	local raw = state[M.STATE_KEY]
 	if raw == nil then return timing.default_check_interval_sec end
-	if type(raw) ~= "number" or raw < 0 or raw == math.huge or raw ~= math.floor(raw) then
-		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds.", tostring(raw))
+	-- The shared value schema's declaration: a whole number of seconds, 0 = never.
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.UPDATER_CHECK_INTERVAL_SECONDS), raw)
+	if not checked.ok then
+		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is refused (%s, %s..%s s).",
+			tostring(raw), checked.reason, tostring(checked.min), tostring(checked.max))
 		return timing.default_check_interval_sec
 	end
 	local seconds = Schedule.snap_interval(raw, timing)

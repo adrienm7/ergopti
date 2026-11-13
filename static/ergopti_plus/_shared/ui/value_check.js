@@ -586,6 +586,19 @@ function requireValue(schema, key, value) {
 			"personal_info.letters.*": {
 				"file": "personal_info.toml",
 				"type": "string"
+			},
+			"updater.check_interval_seconds": {
+				"file": "config.toml",
+				"type": "integer",
+				"unit": "s",
+				"min": 0,
+				"max": 2147483647,
+				"special": [
+					{
+						"value": 0,
+						"label_key": "value_check.special.never"
+					}
+				]
 			}
 		}
 	};
@@ -615,7 +628,8 @@ function requireValue(schema, key, value) {
 		"SHORTCUTS_SEARCH_SEARCH_ENGINE": "shortcuts.search.search_engine",
 		"SHORTCUTS_SEARCH_SEARCH_ENGINE_URL_QUERY": "shortcuts.search.search_engine_url_query",
 		"PERSONAL_INFO_INFO_ANY": "personal_info.info.*",
-		"PERSONAL_INFO_LETTERS_ANY": "personal_info.letters.*"
+		"PERSONAL_INFO_LETTERS_ANY": "personal_info.letters.*",
+		"UPDATER_CHECK_INTERVAL_SECONDS": "updater.check_interval_seconds"
 	};
 
 	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });
