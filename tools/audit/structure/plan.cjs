@@ -461,6 +461,21 @@ function resolvePathToken(raw, file, inTree, byRepoPath, sharedArgument = false,
 				lead,
 				abs: path.posix.normalize(`${PREFIX}_shared/lua/${rest}`)
 			});
+		// A shared file naming a driver's own file by its place under the driver
+		// root (folder .. "/adapters/file_system.lua"): read against each driver
+		// that holds it; it follows only where they all move it alike.
+		if (inTree === '_shared' && !lead && !fileRelative && rest.replace(/^\//, '').includes('/')) {
+			const drivers = Census.DRIVERS.filter((d) =>
+				EXISTING.has(path.posix.normalize(`${PREFIX}${d}/${rest}`))
+			);
+			if (drivers.length)
+				candidates.push({
+					form: 'driver',
+					lead,
+					drivers,
+					abs: path.posix.normalize(`${PREFIX}${drivers[0]}/${rest}`)
+				});
+		}
 	}
 	// require('../../static/ergopti_plus/_shared/x.json') from a tool.
 	if (!inTree && /^\.\.?\//.test(token))
@@ -519,6 +534,17 @@ function resolvePathToken(raw, file, inTree, byRepoPath, sharedArgument = false,
 		};
 	}
 	if (!existing || !byRepoPath.has(existing.abs)) return null;
+	if (existing.form === 'driver') {
+		const rest = existing.abs.slice(`${PREFIX}${existing.drivers[0]}/`.length);
+		const places = new Set(
+			existing.drivers.map((d) => {
+				const old = `${PREFIX}${d}/${rest}`;
+				const target = byRepoPath.has(old) ? byRepoPath.get(old) : old;
+				return target ? path.posix.relative(`${PREFIX}${d}`, target) : null;
+			})
+		);
+		if (places.size !== 1 || places.has(null)) return null;
+	}
 	return {
 		form: existing.form,
 		lead: existing.lead,
