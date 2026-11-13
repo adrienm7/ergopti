@@ -603,7 +603,7 @@ Each closes on a named green hosted or native run, recorded here.
       and the run-timing summary (`run-timing.cjs --step-summary`; Flatpak under 5 min).
       Initial audit preflight [42099804561](https://github.com/adrienm7/ergopti/actions/runs/42099804561) failed Arch native server detection, shared UI browser installation and macOS stubbed replay. Follow-up [42108198520](https://github.com/adrienm7/ergopti/actions/runs/42108198520) at `4ca161c3e512eecc4c78499db0465139c9a71861` is green: 114 successful jobs, with only Release / Publish skipped; Arch integration, shared UI rendering and all OS verdicts passed. Later dead-key preflight [42121216727](https://github.com/adrienm7/ergopti/actions/runs/42121216727), at `04ebe1089bf387ccbfef43bbfd3b2f3e9b1cd6d9`, failed Common / Install and launch (Stable site) at Install production site browsers, followed by its mandatory verdicts. Requalify that browser installation and the final source checkpoint; no successful browser/render receipt follows from the failed step. Hosted results remain separate from physical dead-key receiving.
       2026-11-11 Linux and macOS lanes at `85f3dfee20` (Linux [43012051378](https://github.com/adrienm7/ergopti/actions/runs/43012051378), macOS [43012056158](https://github.com/adrienm7/ergopti/actions/runs/43012056158)): every Linux job is green (Unit, five distribution rows, Integration, five E2E shards, Build, all 20 Install-and-launch rows), including the installed managed Ollama route plan and its Go twin (network-ai, job 130500747601), the X11 cursor-display window switching step (input-display, job 130500747586), the AppImage Build and `install-linux` AppImage row and the per-distribution installs. The run-timing summary ran in Release / Verify (job 130525465817). Flatpak was 378 s cold (over 5 min): 986a3d5629 caches the flatpak-builder module state: cold 568 s, cache saved ([43105583384](https://github.com/adrienm7/ergopti/actions/runs/43105583384) attempt 2, job 130839886024), then warm 58 s with the module cache restored ([43126416939](https://github.com/adrienm7/ergopti/actions/runs/43126416939) at `7188928a48`, Linux Build job 130890961113); Flatpak under 5 min done. That run's Linux lane is green end to end (Linux Verdict job 130894504733). Both runs' Common lot "Distribution and updates" fails only on `test-windows-updater-original-source` (a90dce3444 changed `test_framework.ahk` without resealing: the maintainer's reseal), so Common and Release Verify are red. Still open: Windows, the final source.
-- [ ] **macOS lane.** L32 and L42 Swift in the Build stage; the Issue #101
+- [ ] **macOS lane.** Claimed by worker K (2026-11-13). L32 and L42 Swift in the Build stage; the Issue #101
       Swift and Go cells; native qualification of the Hotstrings category boot publication and the obsolete-leaf
       setters; item 31's lane once its runtime build is green. Already green (run 41257389239): Launcher XCTest,
       Native XCTest (Intel), Build and all five Install-and-launch rows, guardian fixes included; macOS Unit,
@@ -618,9 +618,14 @@ Each closes on a named green hosted or native run, recorded here.
       lane waits on its runtime build, which the pinned runtime rules keep out of scope tonight.
       Requalified 2026-11-11 at `85f3dfee20` in [43012056158](https://github.com/adrienm7/ergopti/actions/runs/43012056158): macOS Unit, Integration, all 12 E2E cells, Build (with the
       layout extension payload receipt) and all five Install-and-launch rows green; macOS Verdict job 130559010960 green.
-- [ ] **Ollama Go cell** (cda1e10c5e) on the final source before a release (passed on run 40021624397).
+      Worker K 2026-11-13: no hosted code work is left here. L32 and L42 are closed above; what remains needs an
+      installed driver on a real Mac (Hotstrings category boot publication, obsolete-leaf setters) or item 31's runtime
+      build, which the pinned runtime rules keep out of reach: hardware and maintainer only.
+- [ ] **Ollama Go cell** Claimed by worker K (2026-11-13). (cda1e10c5e) on the final source before a release (passed on run 40021624397).
       Green again on both architectures in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (Managed Ollama and Managed Ollama build, Intel and Apple silicon);
       it closes only on the release candidate's own source, which tonight's no-release rule excludes.
+      Worker K 2026-11-13: release-only, nothing to change in code; the known macOS Intel flake
+      `TestCancellationAndConcurrentClosePhysicallyRetirePeer` stays with worker G (CI baseline reds).
 - [ ] **40.** Signed native execution of the eight Karabiner default/recommended/switch variants.
       A hosted runner runs the eight variants only against the ad hoc signed app of the "karabiner config"
       Install-and-launch row (`hs_native_bootstrap_probe.py`); the Developer ID signature exists only on a release
@@ -644,10 +649,25 @@ Each closes on a named green hosted or native run, recorded here.
       are green in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137); a composed menu shown by an installed driver needs a real Mac. Windows part is the maintainer's.
 - [ ] **First `main` push after 1.0.9.** CodeQL scans `main` only: the 32 alerts fixed on dev on 4 November
       (a3d69950e5..89b0b774c8) close only once that scan accepts the fixes.
-- [ ] **CodeQL Go.** After the `native_http` Go module is published, re-enable Go and check a non-empty analysis.
-- [ ] **Native Windows TLS fixture.** `X509Store.Add` on the CurrentUser root store blocks on the Windows security
+- [ ] **CodeQL Go.** Claimed by worker K (2026-11-13). After the `native_http` Go module is published, re-enable Go and check a non-empty analysis.
+      Worker K 2026-11-13, code side: there is no CodeQL workflow in the repository (default setup, a repository
+      setting), so re-enabling Go is the maintainer's. Both shared modules carry their own `go.mod` at the package root
+      and physical `go:embed` inputs, as `docs/memory/workflow-and-verification.md` requires. The standalone
+      `native_http` module stays standard-library only by design (`test-managed-bootstrap-policy.cjs`), yet its root
+      package imports `golang.org/x/sys/unix` on Linux and macOS (`listener_event_{linux,darwin}.go`, spliced into
+      Ollama's module); a standalone extraction therefore covers `proxyrelay`, `cmd/ergopti-proxy-relay`, `route_plan`
+      and the other-OS files, and the root package only where the autobuilder may fetch x/sys. Decided by the agent on
+      2026-11-13, to review by the maintainer: no `require` is added, because it would let CI fetch a module
+      (`GOPROXY=off`, "never injected" in `tools/test/fixtures/native-http-receiving/go.mod`); check after enabling
+      that the analysis lists the root package, and pin x/sys v0.37.0 there only if it does not.
+- [ ] **Native Windows TLS fixture.** Claimed by worker K (2026-11-13). `X509Store.Add` on the CurrentUser root store blocks on the Windows security
       warning (`docs/memory/windows-ahk.md`), so these cases need a click; hosted lanes pass in LocalMachine scope.
-- [ ] **Intermittent fixtures.** Close each after it stays green: Linux window switch, cffi-lua clone, desktop-webview
+      Worker K 2026-11-13: no code change. Windows shows that warning for every CurrentUser root and offers no silent
+      path a fixture may use; writing the store registry key to skip it would defeat the warning. Local runs already
+      report the cases NOT EXECUTED at `ChangeTrust(true)` and `--interactive` gives a person 10 s to click; the
+      LocalMachine scope stays refused outside hosted CI. Hardware only: a person runs the native cases with
+      `--interactive` on the Windows PC.
+- [ ] **Intermittent fixtures.** Claimed by worker K (2026-11-13). Close each after it stays green: Linux window switch, cffi-lua clone, desktop-webview
       AI focus, Windows `config` group, macOS Go `TestIdleDeadlinePhysicallyRetiresPeer`, macOS Swift
       `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope`.
       Scan of ci.yml runs 2026-11-07..10 (macOS and Linux): the cursor-display window switch step passed 40/40;
