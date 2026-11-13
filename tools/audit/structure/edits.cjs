@@ -312,8 +312,9 @@ const MODULE_MEMBER_FILES = [
 // Pins of a value derived from a file rather than of its bytes. repin.cjs
 // re-derives each one: the derivation must reproduce the pin from the
 // pre-step bytes, or the step stops, so an entry cannot fall behind its test.
-// `derive(source, holder, lib)` gets the source file and the pin holder as
-// text, and `lib(path)` loads a module of the tree being measured.
+// `derive(source, holder, lib, sourcePath)` gets the source file and the pin
+// holder as text, `lib(path)` loads a module of the tree being measured, and
+// `sourcePath` is the source's absolute path in that tree.
 const DERIVED_PINS = [
 	{
 		file: 'tools/test/fixtures/personal-section-owner-counterexamples.cjs',
@@ -332,6 +333,32 @@ const DERIVED_PINS = [
 			if (at < 0 || last < 0) return null;
 			const original = source.slice(0, at) + row + source.slice(last + end.length);
 			return require('node:crypto').createHash('sha256').update(original).digest('hex');
+		}
+	},
+	{
+		// The Windows proxy relay manifest pins its sources: the Go pin, then
+		// each source of the module by sorted relative path and SHA-256, as the
+		// relay builder computes it. A step that rewrites only their comments,
+		// the module path kept (apply-step.cjs GO_MODULE_PATH), builds the same
+		// binary (checked with the pinned Go on S01), so the pin follows them.
+		file: 'static/ergopti_plus/windows/vendor/ergopti-proxy-relay.json',
+		source: 'static/ergopti_plus/_shared/go/native_http/go.mod',
+		why: 'source_fingerprint is the identity of the relay sources the committed binary was built from',
+		derive(_goMod, holder, _lib, goModPath) {
+			const fs = require('node:fs');
+			const path = require('node:path');
+			const crypto = require('node:crypto');
+			const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
+			const module = path.dirname(goModPath);
+			const sources = ['go.mod'];
+			for (const directory of ['proxyrelay', 'cmd/ergopti-proxy-relay'])
+				for (const name of fs.readdirSync(path.join(module, directory)))
+					if (name.endsWith('.go') && !name.endsWith('_test.go'))
+						sources.push(`${directory}/${name}`);
+			let identity = `${JSON.parse(holder).go_version}\n`;
+			for (const relative of sources.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)))
+				identity += `${relative}\n${sha(fs.readFileSync(path.join(module, relative)))}\n`;
+			return sha(Buffer.from(identity, 'utf8'));
 		}
 	}
 ];
