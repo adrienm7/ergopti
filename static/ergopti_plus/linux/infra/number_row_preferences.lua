@@ -20,12 +20,12 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local ConfigPaths = require("infra.config_paths")
-local ConfigKeys = require("config_keys")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
-local Policy = require("layout.number_row_policy")
+local ConfigKeys = require("settings.engine.keys")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local Policy = require("layouts.engine.layout.number_row_policy")
 local LOG = "infra.number_row_preferences"
 
 -- Role -> the config.toml path and the validator of a stored value.

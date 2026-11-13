@@ -3,10 +3,10 @@
 --- Real bounded filesystem discovery never executes a discovered program.
 local helpers = require("tests.helpers")
 local Native = require("luv")
-local Shared = require("program_providers")
-local Parameter = require("program_parameter")
+local Shared = require("apps.engine.program_providers")
+local Parameter = require("settings.engine.program_parameter")
 local Paths = require("infra.paths")
-local file = assert(io.open(Paths.shared("modules/actions/program_providers.json"), "rb"))
+local file = assert(io.open(Paths.shared("shortcuts/data/actions/program_providers.json"), "rb"))
 local RAW = file:read("*a"); assert(file:close())
 
 local function adapter()

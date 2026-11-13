@@ -27,7 +27,7 @@ const { reportNotExecuted } = require('./lib/host-capabilities.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SCRUB = path.join(ROOT, 'tools/dev/field-log-scrub.py');
-const BUNDLED = path.join(ROOT, 'static/ergopti_plus/_shared/modules/hotstrings');
+const BUNDLED = path.join(ROOT, 'static/ergopti_plus/_shared/hotstrings/data/catalogue');
 const WINDOWS = path.join(ROOT, 'static/ergopti_plus/windows');
 const LINUX = path.join(ROOT, 'static/ergopti_plus/linux');
 const CANARY = 'TYPEDCANARY';

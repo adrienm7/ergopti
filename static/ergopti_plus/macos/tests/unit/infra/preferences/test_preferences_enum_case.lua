@@ -14,14 +14,14 @@ local helpers = require("tests.helpers")
 
 helpers.describe("preferences: enum case variants", function()
 	helpers.it("(config-enum-case) a case variant reads in its manifest spelling, never as outdated", function()
-		helpers.with_fresh_modules({ "logger.shim", "config_outdated", "infra.preferences" }, function()
+		helpers.with_fresh_modules({ "core.logger.engine.shim", "settings.engine.migration.outdated", "infra.preferences" }, function()
 			local warnings = {}
 			local shim = helpers.make_logger_stub()
 			shim.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
-			package.loaded["logger.shim"] = shim
-			helpers.load_with_stubs("config_outdated")
+			package.loaded["core.logger.engine.shim"] = shim
+			helpers.load_with_stubs("settings.engine.migration.outdated")
 			local Preferences = helpers.load_with_stubs("infra.preferences")
-			local TomlCodec = require("toml_codec")
+			local TomlCodec = require("core.text.engine.toml_codec")
 			local source = table.concat({
 				"[llm]",
 				'agent_mode = "Auto"',
@@ -45,7 +45,7 @@ helpers.describe("preferences: enum case variants", function()
 			helpers.assert_eq(flat.layout_virtual_keyboard, "iso")
 			helpers.assert_eq(flat.menubar_icon, "v2")
 			helpers.assert_eq(flat.gesture_modes and flat.gesture_modes.swipe_3_left, "x1")
-			local scan = require("config_unused_keys").find_in_source(source, Preferences.mark_config_reads)
+			local scan = require("settings.engine.migration.unused_keys").find_in_source(source, Preferences.mark_config_reads)
 			helpers.assert_eq(#scan.keys, 0, "the cleanup offers none of them")
 		end)
 	end)

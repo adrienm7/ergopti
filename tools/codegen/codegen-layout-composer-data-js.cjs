@@ -8,8 +8,8 @@
  * the layout composer page and model know: the 49 keys a registry layout
  * defines, each with the macOS code the .keylayout numbers it by and its
  * geometry on an ANSI and an ISO board, from:
- *   - _shared/modules/layouts/mac_keycodes.json (keys, macOS codes, conventions);
- *   - _shared/data/keycodes/physical_keys.json (geometry).
+ *   - _shared/layouts/data/mac_keycodes.json (keys, macOS codes, conventions);
+ *   - _shared/layouts/data/keycodes/physical_keys.json (geometry).
  *
  * FEATURES & RATIONALE:
  * 1. Classic script: `_shared/ui/*` pages load plain `<script src>` tags and
@@ -28,9 +28,9 @@ const fs = require('fs');
 const { shared, sharedRel } = require('../lib/paths.cjs');
 
 const OUT_PATH = shared('ui', 'layout_composer', '_generated', 'composer_data.js');
-const MAC_KEYCODES_PATH = shared('modules', 'layouts', 'mac_keycodes.json');
-const PHYSICAL_KEYS_PATH = shared('data', 'keycodes', 'physical_keys.json');
-const SOURCES = ['modules/layouts/mac_keycodes.json', 'data/keycodes/physical_keys.json'];
+const MAC_KEYCODES_PATH = shared('layouts', 'data', 'mac_keycodes.json');
+const PHYSICAL_KEYS_PATH = shared('layouts', 'data', 'keycodes', 'physical_keys.json');
+const SOURCES = ['layouts/data/mac_keycodes.json', 'layouts/data/keycodes/physical_keys.json'];
 
 // ======================
 // ======= 1/ Data ======

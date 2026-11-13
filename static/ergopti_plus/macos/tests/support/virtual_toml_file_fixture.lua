@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 return function(callback)
 	local original_hs, original_open = _G.hs, io.open
 	local ok, err = xpcall(function()
-		helpers.with_stub_scope({ "infra.logger", "toml_codec.reader", "infra.toml.reader" }, function()
+		helpers.with_stub_scope({ "infra.logger", "core.text.engine.toml_codec.reader", "infra.toml.reader" }, function()
 			local state = { opens = 0, closes = 0, content = '[[section]]\n"a" = { output = "b" }\n' }
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			local function attributes(path)
@@ -23,7 +23,7 @@ return function(callback)
 				return { mode = "directory", dev = 1, ino = 1 }
 			end
 			-- Installs a fresh hs stub whose filesystem answers the virtual tree.
-			helpers.load_with_stubs("toml_codec.reader", {
+			helpers.load_with_stubs("core.text.engine.toml_codec.reader", {
 				fs = { attributes = attributes, symlinkAttributes = attributes, pathToAbsolute = function(path) return path end },
 			})
 			io.open = function()

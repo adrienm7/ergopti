@@ -78,7 +78,7 @@ helpers.describe("CapsWord auto-off lists live in the manifest and the catalogue
 
 	helpers.it("the settings owners spell no pointer kind and no source a catalogue delimiter", function()
 		local Owner = require("infra.capsword_auto_off")
-		local catalogue = require("keymap.terminators_catalogue")
+		local catalogue = require("layouts.engine.layers.terminators_catalogue")
 		local owner_checks = 0
 		for _, selector in ipairs({ "local KEY_MAP = {", "function M.current_values()" }) do
 			local src = strip_comments(helpers.read_driver_source(selector))

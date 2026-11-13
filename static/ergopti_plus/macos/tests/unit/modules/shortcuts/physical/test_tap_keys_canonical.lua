@@ -2,7 +2,7 @@
 
 --- Exercises canonical assignment loading, sparse publication and save baselines.
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 local function with_fixture(source, body)
 	local names = { "adapters.file_system", "adapters.storage", "infra.preferences",
@@ -54,7 +54,7 @@ helpers.describe("canonical macOS tap-key assignments", function()
 			taps.mark_config_reads(Codec.decode(control.content), function(...) marks[table.concat({ ... }, ".")] = true end)
 			helpers.assert_eq(marks["shortcuts.tap_keys.number_row_left"], true)
 			helpers.assert_nil(marks["shortcuts.tap_keys.foreign"])
-			local scan = require("config_unused_keys").find_in_source(control.content,
+			local scan = require("settings.engine.migration.unused_keys").find_in_source(control.content,
 				require("ui.menu.unused_keys_cleanup").collect)
 			helpers.assert_eq(scan.status, "ok")
 			helpers.assert_eq(#scan.keys, 1)

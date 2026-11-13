@@ -4,7 +4,7 @@
 ; MODULE: LLM Prediction Engine — Ports
 ; DESCRIPTION:
 ; The three outside services the prediction engine drives, as the contracts of
-; _shared/lua/llm/request_plan/ports.lua: a TimerScheduler that arms the
+; _shared/ai/engine/request_plan/ports.lua: a TimerScheduler that arms the
 ; debounce and the deferred retries, an HttpClient that sends the remote
 ; inference requests, and a TooltipRenderer that shows the predictions and
 ; their info bar. Production runs on the default owners below; a test hands the

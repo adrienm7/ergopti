@@ -26,7 +26,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
-#Include ../../../../_shared/modules/llm/trigger_policy.ahk
+#Include ../../../../_shared/ai/data/trigger_policy.ahk
 
 
 

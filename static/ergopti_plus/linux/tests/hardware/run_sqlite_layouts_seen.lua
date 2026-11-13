@@ -16,7 +16,7 @@ local function typed_at(offset_ms)
 end
 
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-layouts-seen-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", root .. "/" .. name:lower()))
@@ -29,7 +29,7 @@ local K = require("modules.keystats.keystats")
 local W = require("modules.keystats.sqlite_writer")
 local R = require("modules.keystats.sqlite_reader")
 local Hook = require("adapters.keyboard_hook")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local path, day = root .. "/metrics.sqlite", os.date("%Y-%m-%d")
 local checks, failures = 0, 0
 local function check(name, body)

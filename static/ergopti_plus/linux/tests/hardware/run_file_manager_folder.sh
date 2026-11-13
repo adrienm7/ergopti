@@ -56,7 +56,7 @@ sleep 1
 A="$HOME/plain"; B="$HOME/l'été dir"; C="$HOME/third"
 mkdir -p "$A" "$B" "$C"
 FAILED=0
-receipt() { (cd "$ROOT" && LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" \
+receipt() { (cd "$ROOT" && LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" \
 	luajit tests/hardware/run_file_manager_folder.lua "$@" 2>>"$WORK/receipt.err"); }
 expect() {
 	name=$1; want=$2; shift 2
@@ -99,8 +99,8 @@ else echo "FAIL the terminal is not in the folder (pid ${term:-none})"; FAILED=1
 [ -n "$term" ] && kill "$term"
 activate org.gnome.Nautilus
 
-base=$(cd "$ROOT" && LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" \
-	luajit -e 'require("compat.utf8").install() io.write(require("infra.i18n").get("system_actions.new_text_file_name"))')
+base=$(cd "$ROOT" && LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" \
+	luajit -e 'require("core.lifecycle.engine.compat.utf8").install() io.write(require("infra.i18n").get("system_actions.new_text_file_name"))')
 printf 'kept' > "$B/$base.txt"
 expect "new_text_file_here skips the taken name" "created	$B/$base 2.txt	$base" new_file
 [ "$(cat "$B/$base.txt")" = kept ] && [ -f "$B/$base 2.txt" ] && [ ! -s "$B/$base 2.txt" ] \

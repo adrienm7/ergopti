@@ -2,10 +2,10 @@
 
 // ==========================================
 // AUTO-GENERATED — do not edit manually
-// Source: static/ergopti_plus/_shared/data/keycodes/physical_keys.json
-// Source: static/ergopti_plus/_shared/keymap/layer_actions.toml
-// Source: static/ergopti_plus/_shared/keymap/layers.recommended.toml
-// Source: static/ergopti_plus/_shared/tap_hold/defaults.toml
+// Source: static/ergopti_plus/_shared/layouts/data/keycodes/physical_keys.json
+// Source: static/ergopti_plus/_shared/layouts/data/layer_actions.toml
+// Source: static/ergopti_plus/_shared/layouts/data/layers.recommended.toml
+// Source: static/ergopti_plus/_shared/tap_hold/data/defaults.toml
 // Run: npm run codegen:layer-editor-data:js
 // ==========================================
 

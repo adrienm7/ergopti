@@ -32,17 +32,17 @@
 # tray checks clicked today.
 #
 # The branch, the report folder and the base config key are the field_report
-# names of static/ergopti_plus/_shared/data/identifiers.json; the git steps are
+# names of static/ergopti_plus/_shared/core/text/data/identifiers.json; the git steps are
 # the ones tools/dev/field-report-git.sh runs for the two shell collectors. The
 # logs folder and file names, the installed paths.toml and the default
-# configuration folder come from _shared/modules/paths/app_dirs.toml
+# configuration folder come from _shared/core/fs/data/paths/app_dirs.toml
 # ([logs.windows]: %LOCALAPPDATA%\Ergopti\logs, [config.windows]:
 # %LOCALAPPDATA%\Ergopti\paths.toml and %LOCALAPPDATA%\Ergopti\config).
 #
 # NOT COVERED, AND WHY:
 # - The field run needs a developer driver of this clone already running
 #   (tools/dev/run-windows-dev.ps1): the collector asks it, through the shared
-#   protocol (_shared/data/field_run_protocol.json, infra/field_run.ahk), to
+#   protocol (_shared/diagnostics/data/field_run_protocol.json, infra/field_run.ahk), to
 #   run its steps (windows/data/field_run_steps.json: boot cost, network,
 #   composer) without their windows, and copies the results. It never starts
 #   a driver itself: a second driver beside the maintainer's own spoils both.
@@ -102,17 +102,17 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { Fail 'This co
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $SharedRoot = [IO.Path]::Combine($RepoRoot, 'static', 'ergopti_plus', '_shared')
 $Identifiers = Get-Content -Raw -Encoding UTF8 -LiteralPath (
-	[IO.Path]::Combine($SharedRoot, 'data', 'identifiers.json')) | ConvertFrom-Json
+	[IO.Path]::Combine($SharedRoot, 'core', 'text', 'data', 'identifiers.json')) | ConvertFrom-Json
 if (-not $Identifiers.PSObject.Properties['field_report']) { Fail 'identifiers.json has no field_report group.' }
 $Names = $Identifiers.field_report
 foreach ($Key in 'branch_prefix', 'folder', 'base_config_key') {
 	if (-not $Names.PSObject.Properties[$Key] -or -not $Names.$Key) { Fail "identifiers.json names no field_report.$Key." }
 }
 $AppDirsToml = Get-Content -Raw -Encoding UTF8 -LiteralPath (
-	[IO.Path]::Combine($SharedRoot, 'modules', 'paths', 'app_dirs.toml'))
+	[IO.Path]::Combine($SharedRoot, 'core', 'fs', 'data', 'paths', 'app_dirs.toml'))
 $Utf8 = New-Object System.Text.UTF8Encoding $false
 $DevTools = [IO.Path]::Combine($RepoRoot, 'tools', 'dev')
-$BundledHotstrings = [IO.Path]::Combine($SharedRoot, 'modules', 'hotstrings')
+$BundledHotstrings = [IO.Path]::Combine($SharedRoot, 'hotstrings', 'data', 'catalogue')
 
 # ===========================================
 # ======= 1/ Helpers ========================
@@ -357,7 +357,7 @@ $script:FieldRunResults = ''
 # ready, a refusal or a timeout is a verdict line too, never a prompt.
 function Invoke-FieldRun {
 	$Protocol = Get-Content -Raw -Encoding UTF8 -LiteralPath (
-		[IO.Path]::Combine($SharedRoot, 'data', 'field_run_protocol.json')) | ConvertFrom-Json
+		[IO.Path]::Combine($SharedRoot, 'diagnostics', 'data', 'field_run_protocol.json')) | ConvertFrom-Json
 	$Declared = Get-Content -Raw -Encoding UTF8 -LiteralPath (
 		Join-Path $RepoRoot $Protocol.steps_file.windows) | ConvertFrom-Json
 	$Files = $Protocol.files

@@ -33,7 +33,7 @@ function M.with_manifest(content, logger, callback)
 			package.loaded["infra.logger"] = logger or helpers.make_logger_stub()
 			local renderer = helpers.load_with_stubs("infra.manifest_menu")
 			package.loaded["infra.paths"].shared = function(relative)
-				assert(relative == "modules/menu/menu_manifest.json", "unexpected manifest fixture path")
+				assert(relative == "menu/data/menu_manifest.json", "unexpected manifest fixture path")
 				return path
 			end
 			renderer.invalidate_cache()

@@ -2,7 +2,7 @@
 
 --- Exercises hardware defaults through the real reader and preference writer.
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 helpers.describe("LLM hardware defaults", function()
 	helpers.it("does not probe hardware for metadata or unrelated configuration values", function()

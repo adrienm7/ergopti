@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 local PRIVATE = "PRIVATE_PUBLICATION_ARGUMENT"
 
 local function with_preferences(body)
-	helpers.with_fresh_modules({ "infra.preferences", "infra.logger", "toml_codec.writer", "adapters.file_system" }, function()
+	helpers.with_fresh_modules({ "infra.preferences", "infra.logger", "core.text.engine.toml_codec.writer", "adapters.file_system" }, function()
 		local logs, categories = {}, {}
 		local logger = helpers.make_logger_stub()
 		for _, level in ipairs({ "error", "warn", "info", "debug" }) do
@@ -117,7 +117,7 @@ helpers.describe("private publication diagnostic ownership", function()
 	for _, private in ipairs({ true, false }) do
 		helpers.it("private-publication actual keyboard setter exception " .. (private and "is redacted" or "keeps ordinary details"), function()
 			helpers.with_fresh_modules({ "modules.shortcuts.keyboard_shortcuts", "modules.gestures.actions", "infra.config_paths",
-				"infra.paths", "infra.preferences", "infra.logger", "toml_codec.writer", "adapters.file_system" }, function()
+				"infra.paths", "infra.preferences", "infra.logger", "core.text.engine.toml_codec.writer", "adapters.file_system" }, function()
 				local logs, categories, unavailable = {}, {}, false
 				local logger = helpers.make_logger_stub()
 				for _, level in ipairs({ "error", "warn", "info", "debug" }) do

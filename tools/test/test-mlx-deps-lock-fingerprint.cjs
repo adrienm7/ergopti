@@ -34,8 +34,9 @@ const SOURCE_ROUTE_ORIGINS = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
+	'core',
 	'network',
+	'data',
 	'route_origins.json'
 );
 const SYNC_MARKER = 'VENV_SYNC_RAN';
@@ -574,8 +575,9 @@ try {
 	const routeOrigins = path.join(
 		fixtureRoot,
 		'_shared',
-		'modules',
+		'core',
 		'network',
+		'data',
 		'route_origins.json'
 	);
 	fs.mkdirSync(path.dirname(routeOrigins), { recursive: true });

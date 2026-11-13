@@ -570,7 +570,7 @@ _PICR_DistinctDiscoveredSources(RootSpelling := "temp") {
 Test("personal-file descriptors: recursive native discovery retains distinct exact paths", _PICR_DistinctDiscoveredSources)
 Test("personal-file descriptors: recursive native discovery admits the exact long root", (*) => _PICR_DistinctDiscoveredSources("long"))
 
-#Include %A_LineFile%\..\..\..\..\..\..\..\_shared\modules\hotstrings\personal_scope.ahk
+#Include %A_LineFile%\..\..\..\..\..\..\..\_shared\hotstrings\data\catalogue\personal_scope.ahk
 ; A TOML header comment cannot create or erase known-trigger analytics rows.
 _PICR_CommentedHeaderCatalogue(Kind, Mode, Brackets := 2) {
 	global Features, ScriptInformation, CategoryEnabled

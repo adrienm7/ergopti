@@ -12,7 +12,7 @@ local M = {}
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local uv = require("luv")
 
 --- Checks the public storage API after one actual updater fixture lifetime.
@@ -21,8 +21,8 @@ function M.check(scenario)
 	-- Storage resolves these constructors lazily; load their transitive owners
 	-- before routing the one private store so none can capture this fixture.
 	require("adapters.storage")
-	require("toml_codec.writer")
-	require("config_file_inverse")
+	require("core.text.engine.toml_codec.writer")
+	require("settings.engine.migration.file_inverse")
 	local paths_name, storage_name = "infra.config_paths", "adapters.storage"
 	local previous_paths, previous_storage = package.loaded[paths_name], package.loaded[storage_name]
 	local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-updater-storage-XXXXXX"))
@@ -42,7 +42,7 @@ function M.check(scenario)
 			"a receiving scenario must not memoize its fake writer in the real storage owner")
 		local file = assert(io.open(path, "rb"))
 		local bytes = assert(file:read("*a")); assert(file:close())
-		helpers.assert_eq(require("json").decode(bytes).receiving_fixture_sentinel, "kept")
+		helpers.assert_eq(require("core.text.engine.json").decode(bytes).receiving_fixture_sentinel, "kept")
 		helpers.assert_eq(storage.get("receiving_fixture_sentinel"), "kept")
 	end)
 	package.loaded[paths_name], package.loaded[storage_name] = previous_paths, previous_storage

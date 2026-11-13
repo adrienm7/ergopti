@@ -8,7 +8,7 @@
 # snapshot, crash report) could not say which commit they were built from and
 # printed "unknown". Every package build stamps the commit into the root of the
 # shared tree it ships; both Lua drivers read it through
-# _shared/lua/diagnostics/snapshot.lua (BUILD_STAMP_FILE, BUILD_STAMP_COMMIT_KEY),
+# _shared/diagnostics/engine/snapshot.lua (BUILD_STAMP_FILE, BUILD_STAMP_COMMIT_KEY),
 # whose values tools/test/test-package-builds-stamp-commit.cjs pins to the two
 # constants below. The Windows build stamps BUNDLE_COMMIT in infra/bundle.ahk.
 #

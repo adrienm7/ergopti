@@ -23,7 +23,7 @@ local text_utils  = require("infra.text_utils")
 -- The collision cascade is shared with the Linux driver rather than defined here:
 -- it existed in two Lua copies and one AutoHotkey copy, and the Linux driver had
 -- none, so the same pair of colliding entries elected different winners per OS.
-local HotstringPriority = require("hotstring_priority")
+local HotstringPriority = require("hotstrings.engine.priority")
 local km_utils    = require("modules.keymap.utils")
 local Logger      = require("infra.logger")
 local Paths       = require("infra.paths")
@@ -35,8 +35,8 @@ local RI          = require("modules.keymap.registry_index")
 -- RI.setup(core_state) is called from M.init() to wire up _state for the index functions.
 for k, v in pairs(RI) do M[k] = v end
 
-local PersonalFiles = require("hotstrings.personal_files")
-local TriggerRoi = require("keystats.trigger_roi")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
+local TriggerRoi = require("metrics.engine.privacy.trigger_roi")
 local LOG    = "keymap.registry"
 local _state = nil  -- Injected via M.init(); required before all public functions.
 
@@ -71,7 +71,7 @@ end
 -- outrank "ext." packages, which outrank bundled common ones. The cascade above
 -- these defaults (individual > section > file) is resolved by the loader before
 -- M.add; these are the final fallback.
--- SINGLE SOURCE OF TRUTH: _shared/modules/hotstrings/priority.json, LOADED at
+-- SINGLE SOURCE OF TRUTH: _shared/hotstrings/data/catalogue/priority.json, LOADED at
 -- module-init time (fail-fast: a missing or malformed file logs ERROR and falls
 -- back to the hardcoded tier values). The AHK driver still mirrors the same
 -- values (HSE_PRIORITY_*), locked by tools/test/test-priority-parity.cjs.
@@ -84,7 +84,7 @@ local PRIORITY_PERSONAL = 50
 -- bad JSON, missing key) the hardcoded fallbacks stay and an ERROR is logged.
 do
 	local function _load_priority_tiers()
-		local prio_path = Paths.shared("modules/hotstrings/priority.json")
+		local prio_path = Paths.shared("hotstrings/data/catalogue/priority.json")
 		if not prio_path then
 			Logger.error(LOG, "priority.json: Paths.shared returned nil — keeping hardcoded tiers.")
 			return

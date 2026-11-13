@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local KeyNames = require("keycodes.key_names")
-local check = require("test.menu_row_text")
+local KeyNames = require("platform.input.keycodes.key_names")
+local check = require("tests.lua.menu.row_text")
 
 local SHARED_ROOT = "../_shared"
 
@@ -20,7 +20,7 @@ local SHARED_ROOT = "../_shared"
 --- @param locale string Locale code.
 --- @return function
 local function translator(locale)
-	local catalogue = check.catalogue(SHARED_ROOT, locale, require("json").decode)
+	local catalogue = check.catalogue(SHARED_ROOT, locale, require("core.text.engine.json").decode)
 	return function(key)
 		local text = catalogue[key]
 		return (text == nil or text == "") and key or text
@@ -72,7 +72,7 @@ helpers.describe("the shared key names", function()
 		helpers.assert_eq(KeyNames.physical_label("Numpad7", "linux", fr), "Pavé num. 7")
 		helpers.assert_eq(KeyNames.physical_label("NumpadEnter", "linux", fr), "Pavé num. Entrée")
 		-- Every key position a physical slot can hold reads as text in both locales.
-		local registry = require("json").decode(assert(io.open(SHARED_ROOT .. "/data/keycodes/physical_keys.json")):read("*a"))
+		local registry = require("core.text.engine.json").decode(assert(io.open(SHARED_ROOT .. "/layouts/data/keycodes/physical_keys.json")):read("*a"))
 		local modifiers = { ShiftLeft = true, ShiftRight = true, ControlLeft = true, ControlRight = true,
 			AltLeft = true, AltRight = true, MetaLeft = true, MetaRight = true, CapsLock = true }
 		for _, locale in ipairs({ "fr", "en" }) do
@@ -141,7 +141,7 @@ helpers.describe("the shared key names", function()
 
 	helpers.it("key names: a sticky label names its modifiers on each platform", function()
 		-- 2026-11-03: « 📌 Cmd+Shift rémanents » in every locale, swapped to Win on Windows.
-		local StickyLabel = require("actions.sticky_label")
+		local StickyLabel = require("shortcuts.engine.actions.sticky_label")
 		local fr, en = translator("fr"), translator("en")
 		helpers.assert_eq(StickyLabel.label("sticky_cmd_shift", "sg_actions.sticky_cmd_shift", "macos", fr),
 			"📌 Cmd + Maj rémanents")

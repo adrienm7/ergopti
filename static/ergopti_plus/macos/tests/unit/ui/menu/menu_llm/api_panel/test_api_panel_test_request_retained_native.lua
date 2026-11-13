@@ -28,7 +28,7 @@ helpers.describe("API Add: retained native admission", function()
 		local entry = { id = "old", provider = "openai", model = "old-model", token = "inert-old-secret" }
 		local remote, _, notices = install_doubles({ entries = { entry }, active_id = entry.id, spec = {} })
 		if provider_id then
-			local file = assert(io.open(helpers.driver_root() .. "../_shared/modules/llm/api_providers.json", "rb"))
+			local file = assert(io.open(helpers.driver_root() .. "../_shared/ai/data/api_providers.json", "rb"))
 			local raw = file:read("*a"); assert(file:close())
 			local catalogue = assert(require("adapters.json_codec").decode(raw))
 			remote.PROVIDER_ORDER = { provider_id }
@@ -295,9 +295,9 @@ end
 local function install_api_add_doubles(args, native)
 	install_doubles(args)
 	package.loaded["infra.i18n"] = native
-	local renderer = assert(require("menu.renderer").new({
+	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+		manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 		json_decode = require("adapters.json_codec").decode,
 		i18n = native,
 		logger = helpers.make_logger_stub(),
@@ -375,7 +375,7 @@ end)
 
 helpers.describe("API Add locale scope failure inverse (api-add-controls)", function()
 	helpers.it("restores the actual prior locale cohort after a raised case (api-add-controls)", function()
-		local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+		local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local raised = {}

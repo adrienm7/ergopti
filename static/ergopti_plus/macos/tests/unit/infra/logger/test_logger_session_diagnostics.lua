@@ -13,7 +13,7 @@ local Fixture = require("tests.support.log_transport_fixture")
 --- @param callback function Receives the real logger and transport fixture.
 local function with_logger(callback)
 	helpers.with_stub_scope({
-		"infra.logger", "logger", "infra.launcher_environment", "_generated.logger_sub_files", "socket",
+		"infra.logger", "core.logger.engine", "infra.launcher_environment", "_generated.logger_sub_files", "socket",
 	}, function()
 		Fixture.with_fixture(function()
 			local context = Fixture.new_context()

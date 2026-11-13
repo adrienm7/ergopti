@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local native = require("luv")
 local Shell = require("adapters.shell_runner")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 local SubFiles = require("_generated.logger_sub_files")
 
 -- The marker line the child logs; its topical file comes from the routing
@@ -36,7 +36,7 @@ local function run_endpoint(endpoint)
 	local root = os.tmpname()
 	os.remove(root)
 	assert(Shell.run("mkdir -p -- " .. Shell.quote(root .. "/logs") .. " " .. Shell.quote(root .. "/candidate")
-		.. " " .. Shell.quote(root .. "/shared/modules/diagnostics")))
+		.. " " .. Shell.quote(root .. "/shared/diagnostics/data")))
 	local date = os.date("%Y-%m-%d")
 	local main = root .. "/logs/" .. AppDirs.files.unified_prefix .. date .. AppDirs.files.extension
 	local errors = root .. "/logs/" .. AppDirs.files.errors_prefix .. date .. AppDirs.files.extension
@@ -47,7 +47,7 @@ local function run_endpoint(endpoint)
 		errors = errors,
 		topical = topical,
 		repoint = root .. "/candidate/" .. AppDirs.files.unified_prefix .. date .. AppDirs.files.extension,
-		privacy = root .. "/shared/modules/diagnostics/redaction.json",
+		privacy = root .. "/shared/diagnostics/data/redaction.json",
 	}
 	if endpoint ~= "regular" and endpoint ~= "close" then
 		assert(Shell.run("mkfifo -- " .. Shell.quote(assert(targets[endpoint]))))
@@ -81,7 +81,7 @@ local close_refusals = 0
 if endpoint == "close" then
  local uv = require("luv")
  local open, close, admitted = uv.fs_open, uv.fs_close, nil
- local main = root .. "/logs/" .. require("app_dirs").files.unified_prefix .. os.date("%%Y-%%m-%%d") .. require("app_dirs").files.extension
+ local main = root .. "/logs/" .. require("core.fs.engine.app_dirs").files.unified_prefix .. os.date("%%Y-%%m-%%d") .. require("core.fs.engine.app_dirs").files.extension
  uv.fs_open = function(path, ...)
   local fd, detail, code = open(path, ...)
   if path == main then admitted = fd end

@@ -39,7 +39,7 @@ class NativeFixture:
         macos = self.app / "Contents/Resources/static/ergopti_plus/macos"
         macos.mkdir(parents=True)
         (macos / "init.lua").write_text("-- Must never execute the full driver.")
-        (macos.parent / "_shared/lua").mkdir(parents=True)
+        (macos.parent / "_shared").mkdir(parents=True)
         self.preferences = {probe.CONFIG_KEY: ["physical", "legacy"], "unrelated": 91}
         self.initial = copy.deepcopy(self.preferences)
         self.owners = []

@@ -43,7 +43,7 @@
 _GBA_ManifestPath() {
 	SplitPath(A_ScriptDir, , &WinDir)
 	SplitPath(WinDir, , &EpDir)
-	return EpDir . "\_shared\modules\menu\menu_manifest.json"
+	return EpDir . "\_shared\menu\data\menu_manifest.json"
 }
 
 _GBA_IsForPlatform(Entry, Platform) {

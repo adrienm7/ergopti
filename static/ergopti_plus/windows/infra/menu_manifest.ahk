@@ -101,7 +101,7 @@ _MM_GetManifestRoot() {
 	if (_MM_MANIFEST_ROOT_CACHE != false)
 		return _MM_MANIFEST_ROOT_CACHE
 
-	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
+	FilePath := _SharedDir . "\menu\data\menu_manifest.json"
 	if !FileExist(FilePath) {
 		try LoggerWarn("MenuManifest", "manifest not found at '{1}' — callers fall back to their hard-coded lists.", FilePath)
 		return false

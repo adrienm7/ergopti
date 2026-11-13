@@ -46,14 +46,14 @@ if not os.getenv("DISPLAY") then abort("no X11 display.") end
 -- the environment, the module paths set in package.path by the entry point.
 if os.getenv("LUA_PATH") then abort("run without LUA_PATH, as install/launch.sh starts the daemon.") end
 local driver_root = assert(arg[0]:match("^(/.*)/tests/hardware/desktop/run_encryptor%.lua$"), "run with an absolute path")
-package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;" .. driver_root .. "/../_shared/lua/?.lua;"
-	.. driver_root .. "/../_shared/lua/?/init.lua;" .. package.path
+package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;" .. driver_root .. "/../_shared/?.lua;"
+	.. driver_root .. "/../_shared/?/init.lua;" .. package.path
 for _, tool in ipairs({ "xdotool", "openssl" }) do
 	if os.execute("command -v " .. tool .. " >/dev/null 2>&1") ~= 0 then abort(tool .. " is missing.") end
 end
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 local scratch = assert(arg[1], "usage: run_encryptor.lua <scratch folder>")
 
 --- One line of a command's output.

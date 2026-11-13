@@ -26,7 +26,7 @@ import tarfile
 import tempfile
 import time
 
-RUNTIME_CONTRACT = "static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json"
+RUNTIME_CONTRACT = "static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json"
 IMPORT = '\tnativehttp "github.com/ollama/ollama/internal/ergoptinativehttp"\n'
 
 
@@ -233,7 +233,7 @@ def apply_hooks(source: Path, repository: Path) -> dict[str, str]:
         prepared[relative] = text
     package = source / "internal/ergoptinativehttp"
     package.mkdir(parents=True, exist_ok=False)
-    bridge = repository / "static/ergopti_plus/_shared/go/native_http"
+    bridge = repository / "static/ergopti_plus/_shared/core/network/native/go/native_http"
     for relative in contract["source_fingerprint_paths"]:
         origin = repository / relative
         if origin.suffix == ".go":
@@ -649,7 +649,7 @@ def build(options) -> Path:
     }
     official = options.official_archive.resolve(strict=True)
     release = json.loads(
-        (repository / "static/ergopti_plus/_shared/modules/llm/ollama_release.json").read_text(
+        (repository / "static/ergopti_plus/_shared/ai/data/ollama_release.json").read_text(
             encoding="utf-8"
         )
     )

@@ -23,8 +23,8 @@ local Logger      = require("infra.logger")
 local i18n        = require("infra.i18n")
 local Manifest    = require("infra.manifest_reader")
 local TapKeys     = require("modules.shortcuts.tap_keys")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 local RefusalRetry = require("modules.shortcuts.refusal_retry")
 
 local LOG = "shortcuts.bindings"

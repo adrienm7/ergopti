@@ -11,11 +11,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
-local Json = require("json")
-local Policy = require("control.driver_control")
+local AppDirs = require("core.fs.engine.app_dirs")
+local Json = require("core.text.engine.json")
+local Policy = require("diagnostics.engine.control_driver_control")
 
-require("test.driver_control_contract").run(helpers, helpers.shared(""))
+require("tests.lua.core_lifecycle.driver_control_contract").run(helpers, helpers.shared(""))
 
 local function read(path)
 	local file = assert(io.open(path, "rb"))
@@ -24,7 +24,7 @@ local function read(path)
 	return text
 end
 
-local SPEC_TEXT = read(helpers.shared("modules/control/driver_control.json"))
+local SPEC_TEXT = read(helpers.shared("diagnostics/data/control/driver_control.json"))
 local SPEC = Policy.validate(Json.decode(SPEC_TEXT))
 local TOKEN = Json.decode(read(helpers.shared("tests/corpus/control/driver_control.json"))).token
 local FOLDER = "/Users/u/" .. AppDirs.macos.support_relative .. "/control"
@@ -104,7 +104,7 @@ end
 --- @param options table Native fault controls.
 --- @param callback function Receives the module and independently observable native state.
 local function with_native_world(options, callback)
-	helpers.with_stub_scope({ "infra.driver_control", "infra.logger", "adapters.file_system", "adapters.shell_runner", "adapters.timer_scheduler", "app_dirs" }, function()
+	helpers.with_stub_scope({ "infra.driver_control", "infra.logger", "adapters.file_system", "adapters.shell_runner", "adapters.timer_scheduler", "core.fs.engine.app_dirs" }, function()
 		local state = { files = {}, stops = 0, starts = 0, created = 0, running = false, options = options }
 		state.errors = {}
 		local module

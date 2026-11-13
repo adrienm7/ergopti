@@ -530,7 +530,7 @@ helpers.describe("canonical hotstring cache projection", function()
 		helpers.assert_true(registry.disable_section("rolls", "hc"))
 		local state = { hotstrings = { rolls = false, ["ext:demo:test"] = false } }
 		helpers.assert_true(preferences.save("config", state, { "rolls", "ext:demo:test" }, { keymap = registry }))
-		local decoded = require("toml_codec").decode(files.config)
+		local decoded = require("core.text.engine.toml_codec").decode(files.config)
 		helpers.assert_nil(decoded.hotstrings.groups.rolls)
 		helpers.assert_nil(decoded.hotstrings.modules.rolls.hc)
 		helpers.assert_eq(decoded.hotstrings.groups.future.keep, 9)

@@ -38,7 +38,7 @@ end
 local function with_undo(options, body)
 	Fixture.with(function(guard, state)
 		local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server",
-			"adapters.keyboard_layout", "modules.hotstrings.injector", "adapters.keyboard_hook", "logger.shim" }
+			"adapters.keyboard_layout", "modules.hotstrings.injector", "adapters.keyboard_hook", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local observations = { wire = {}, writes = {}, logs = {}, documents = {
@@ -48,13 +48,13 @@ local function with_undo(options, body)
 				observations.moved = true; state.path = "/field/successor"
 			end
 		end
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("trace")
 		logger.set_sink(function(line)
 			observations.logs[#observations.logs + 1] = line
 			if line:find("Undo: restoring", 1, true) then transition("undo-log") end
 		end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local commands, clipboard = {}, "SAVED"
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,

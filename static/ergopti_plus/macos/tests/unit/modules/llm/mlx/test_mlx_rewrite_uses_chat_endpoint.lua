@@ -15,8 +15,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local Selector = require("llm.profile_selector")
+local json = require("core.text.engine.json")
+local Selector = require("ai.engine.settings.profile_selector")
 
 local function get_upvalue(fn, target)
 	for index = 1, 96 do

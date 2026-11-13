@@ -28,9 +28,9 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local AtspiFocus = require("adapters.atspi_focus")
-local SecureApps = require("secure_apps")
+local SecureApps = require("apps.engine.secure_apps")
 
 local LOG = "adapters.secure_field_detector"
 

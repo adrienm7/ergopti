@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local OWNED = {
-	"infra.logger", "logger", "diagnostics.redact", "json", "app_dirs",
+	"infra.logger", "core.logger.engine", "diagnostics.engine.reports.redact", "core.text.engine.json", "core.fs.engine.app_dirs",
 	"infra.log_folders", "_generated.logger_sub_files", "adapters.log_transport",
 	"infra.launcher_environment", "infra.notifications", "infra.i18n",
 	"infra.config_paths", "infra.text_utils", "modules.llm.api_common",

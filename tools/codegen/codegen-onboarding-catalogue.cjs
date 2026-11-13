@@ -10,14 +10,14 @@
  * each driver platform.
  *
  * Inputs:
- *   _shared/modules/features/manifest.toml   features, scopes, [onboarding]
- *   _shared/modules/hotstrings/_index.toml   languages and category order
- *   _shared/modules/hotstrings/**.toml       file and section descriptions
- *   _shared/tap_hold/defaults.toml           tap-hold keys and each engine's preset
- *   _shared/modules/actions/actions.toml     [karabiner_aliases] of the macOS tap-hold actions
+ *   _shared/settings/data/features/manifest.toml   features, scopes, [onboarding]
+ *   _shared/hotstrings/data/catalogue/_index.toml   languages and category order
+ *   _shared/hotstrings/data/catalogue/**.toml       file and section descriptions
+ *   _shared/tap_hold/data/defaults.toml           tap-hold keys and each engine's preset
+ *   _shared/shortcuts/data/actions/actions.toml     [karabiner_aliases] of the macOS tap-hold actions
  *   macos/platform/remap/data/actions.json   macOS tap-hold action labels without a locale key
- *   _shared/data/locales/*.json              label keys must exist in all 21
- *   _shared/data/locale_names.json           language-pack labels
+ *   _shared/core/i18n/data/locales/*.json              label keys must exist in all 21
+ *   _shared/core/i18n/data/locale_names.json           language-pack labels
  *
  * Outputs:
  *   _shared/ui/_generated/onboarding_catalogue.js    the page's data script
@@ -53,14 +53,14 @@ const { candidateKeys } = require('../lib/manifest-label-keys.cjs');
 const { KEY } = require('../lib/_generated/config_keys.cjs');
 const KeyNames = require('../lib/key-names.cjs');
 
-const MANIFEST_PATH = shared('modules', 'features', 'manifest.toml');
-const HOTSTRINGS_DIR = shared('modules', 'hotstrings');
+const MANIFEST_PATH = shared('settings', 'data', 'features', 'manifest.toml');
+const HOTSTRINGS_DIR = shared('hotstrings', 'data', 'catalogue');
 // The Ergopti layout extension every driver ships and counts as installed. Its
 // manifest binds the Ergopti-only hotstring files (SFB reduction, rolls, the
 // magic key's repeat corrections) to their historical categories and sections.
 const ERGOPTI_EXTENSION_DIR = path.join(REPO_ROOT, 'static', 'layouts', 'registry', 'ergopti');
-const TAP_HOLD_DEFAULTS_PATH = shared('tap_hold', 'defaults.toml');
-const ACTIONS_PATH = shared('modules', 'actions', 'actions.toml');
+const TAP_HOLD_DEFAULTS_PATH = shared('tap_hold', 'data', 'defaults.toml');
+const ACTIONS_PATH = shared('shortcuts', 'data', 'actions', 'actions.toml');
 const MACOS_REMAP_ACTIONS_PATH = path.join(
 	REPO_ROOT,
 	'static',
@@ -71,8 +71,8 @@ const MACOS_REMAP_ACTIONS_PATH = path.join(
 	'data',
 	'actions.json'
 );
-const LOCALE_DIR = shared('data', 'locales');
-const LOCALE_NAMES_PATH = shared('data', 'locale_names.json');
+const LOCALE_DIR = shared('core', 'i18n', 'data', 'locales');
+const LOCALE_NAMES_PATH = shared('core', 'i18n', 'data', 'locale_names.json');
 const PAGE_OUTPUT = shared('ui', '_generated', 'onboarding_catalogue.js');
 const HOST_OUTPUT = shared('ui', '_generated', 'onboarding_catalogue.json');
 const RUN_HINT = 'npm run codegen:onboarding-catalogue';
@@ -254,7 +254,7 @@ function loadLocales() {
 /**
  * Creates the per-platform value projection over the indexed manifest: the
  * same static-entry, sub-key and dynamic-default rules the drivers' readers
- * (_shared/lua/config_defaults.lua, windows/infra/manifest_reader.ahk) apply.
+ * (_shared/settings/engine/publication/defaults.lua, windows/infra/manifest_reader.ahk) apply.
  * @param {Map<string, object>} features Indexed features.
  * @param {object} scopes Manifest scope declarations.
  * @returns {object} Projection helpers.
@@ -1128,7 +1128,7 @@ function createKarabinerLabels(labels) {
 			return segments;
 		};
 		// A sticky label is a template its modifiers fill, as
-		// _shared/lua/actions/sticky_label.lua fills it (« 📌 {1} rémanents »).
+		// _shared/shortcuts/engine/actions/sticky_label.lua fills it (« 📌 {1} rémanents »).
 		const sticky = KeyNames.stickyModifiers(action);
 		if (sticky !== null && labels.hasKey(registryKey))
 			return [
@@ -1209,7 +1209,7 @@ function tapHoldGroups(id, platform, labels) {
 	const karabinerLabel = createKarabinerLabels(labels);
 	const catalog = defaults.tap_hold && defaults.tap_hold.catalog && defaults.tap_hold.catalog.keys;
 	if (!Array.isArray(catalog) || catalog.length === 0) {
-		throw new Error('_shared/tap_hold/defaults.toml declares no [tap_hold.catalog] keys');
+		throw new Error('_shared/tap_hold/data/defaults.toml declares no [tap_hold.catalog] keys');
 	}
 	const recommended = new Set(TAP_HOLD_PRESETS[platform](defaults));
 	const listed = new Set();
@@ -1648,7 +1648,7 @@ function emitPage(catalogue) {
 		'',
 		'// ==========================================',
 		'// AUTO-GENERATED — do not edit manually',
-		`// Source: ${sharedRel('modules', 'features', 'manifest.toml')} [onboarding]`,
+		`// Source: ${sharedRel('settings', 'data', 'features', 'manifest.toml')} [onboarding]`,
 		`// Run: ${RUN_HINT}`,
 		'// ==========================================',
 		'',

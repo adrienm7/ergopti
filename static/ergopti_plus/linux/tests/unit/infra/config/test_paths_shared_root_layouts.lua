@@ -19,7 +19,7 @@
 --- build-linux-rpm.sh and PKGBUILD each stage the driver flat into
 --- /usr/lib/ergopti and nest the shared tree INSIDE it, because a sibling would
 --- land at /usr/lib/_shared — a directory no package may own. On an installed
---- .deb the probe therefore addressed /usr/lib/_shared/data/locales/en.json,
+--- .deb the probe therefore addressed /usr/lib/_shared/core/i18n/data/locales/en.json,
 --- shared_root() returned nil, and every Paths.shared(…) call went nil with it.
 ---
 --- WHY IT WAS INVISIBLE:
@@ -45,7 +45,7 @@ local ok_lfs, lfs = pcall(require, "lfs")
 -- The one file a candidate directory must carry to BE the shared tree. It
 -- mirrors SHARED_PROBE_FILE in infra/paths.lua; a fixture carrying anything else
 -- would prove nothing about what the resolver actually looks for.
-local PROBE_REL = "data/locales/en.json"
+local PROBE_REL = "core/i18n/data/locales/en.json"
 -- The folders of the probe path, outermost first: the fixture follows the
 -- probe wherever the layout puts it.
 local PROBE_FOLDERS = {}
@@ -301,7 +301,7 @@ helpers.describe("infra.paths: shared_root resolves both shipped layouts", funct
 		helpers.assert_eq(resolved, root .. "/_shared",
 			"the packagers stage the driver flat into /usr/lib/ergopti and nest the "
 				.. "shared tree inside it, so a sibling-only probe addressed "
-				.. "/usr/lib/_shared/data/locales/en.json, found nothing, and handed "
+				.. "/usr/lib/_shared/core/i18n/data/locales/en.json, found nothing, and handed "
 				.. "nil to every module asking for a locale, a keycode table, a "
 				.. "hotstring pack or a defaults file")
 		helpers.assert_true(fh ~= nil,
@@ -346,7 +346,7 @@ end)
 helpers.describe("infra.paths: an unresolvable tree is named, not guessed", function()
 
 	helpers.it("returns nil and reports both candidates when neither carries the tree", function()
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local original = logger.error
 		local messages = {}
 		logger.error = function(_tag, fmt, ...)

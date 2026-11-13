@@ -27,7 +27,7 @@
  *
  * KEYS READ AS THEIR NAMES (lot CB):
  * The Tap-Hold rows read LCtrl, RShift and a hold printed `lalt`. No row
- * text, nor any name of _shared/data/keycodes/key_names.json, may hold a key
+ * text, nor any name of _shared/layouts/data/keycodes/key_names.json, may hold a key
  * id or abbreviation in any locale; the rendered walks apply the same judge.
  *
  * THE STRICT RULE, MENU OR NOT:
@@ -46,8 +46,8 @@ const { RAW_KEY_SPELLINGS, rowTextDefect } = require('./lib/menu-row-text.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const ERGOPTI = path.join(ROOT, 'static', 'ergopti_plus');
-const LOCALES = path.join(ERGOPTI, '_shared', 'data', 'locales');
-const MENU_MANIFEST = path.join(ERGOPTI, '_shared', 'modules', 'menu', 'menu_manifest.json');
+const LOCALES = path.join(ERGOPTI, '_shared', 'core', 'i18n', 'data', 'locales');
+const MENU_MANIFEST = path.join(ERGOPTI, '_shared', 'menu', 'data', 'menu_manifest.json');
 const FEATURES = path.join(ERGOPTI, 'windows', '_generated', 'features_manifest.ahk');
 
 const LOCALE_COUNT = 21;

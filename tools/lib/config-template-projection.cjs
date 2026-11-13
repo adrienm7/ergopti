@@ -55,7 +55,7 @@ const HEADER_NAME = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/;
  */
 function driverBanner(platform) {
 	return `# _generated/config_template.toml
-# AUTO-GENERATED from _shared/modules/features/manifest.toml.
+# AUTO-GENERATED from _shared/settings/data/features/manifest.toml.
 # DO NOT EDIT BY HAND — run \`npm run build:manifest\` to refresh.
 # This is the default v2 config copied into config/ergopti_plus/${platform}/
 # on first boot. After that, the user owns the copy.
@@ -63,7 +63,7 @@ function driverBanner(platform) {
 }
 
 const SHARED_BANNER = `# _shared/_generated/config_template.toml
-# AUTO-GENERATED from _shared/modules/features/manifest.toml.
+# AUTO-GENERATED from _shared/settings/data/features/manifest.toml.
 # DO NOT EDIT BY HAND — run \`npm run build:manifest\` to refresh.
 # The default v2 config of the three drivers (ahk, hs, linux), written once.
 # - \`key = value\` holds for every driver whose view contains the table.

@@ -206,7 +206,7 @@ helpers.describe("ApiOllama.get_base_url (configurable port)", function()
 	end)
 
 	-- With no user override set, the port comes from the single source
-	-- (_shared/modules/llm/defaults.json llm_ollama_owned_port = 11435, via DEFAULT_STATE),
+	-- (_shared/ai/data/defaults.json llm_ollama_owned_port = 11435, via DEFAULT_STATE),
 	-- the port of Ergopti's own Ollama, never the stock 11434 a user's own Ollama
 	-- keeps (issue #104). A regression that re-hardcodes a port, or reads the
 	-- stock-port key again, fails here.

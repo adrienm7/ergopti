@@ -12,7 +12,7 @@ records that OS seam without moving those established owners.
 
 Linux needs an owned GIO lookup child, native library admission and compiled
 proxy schemas. macOS does not load those libraries. Shared policy belongs in
-`_shared/lua/network/` and `_shared/modules/network/`; native selection and
+`_shared/core/network/engine/` and `_shared/core/network/data/`; native selection and
 recipient trust remain platform responsibilities. Actual enterprise PAC,
 authentication and certificate acceptance require native qualification; the
 directory's presence does not claim those checks passed.

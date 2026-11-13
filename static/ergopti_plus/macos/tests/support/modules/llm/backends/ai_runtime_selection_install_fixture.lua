@@ -293,8 +293,8 @@ local STUBBED_MODULES = {
 	"ui.menu.menu_llm.models_manager_ollama", "modules.llm.api_common",
 	"modules.llm.ollama_endpoint", "adapters.storage", "adapters.owned_program_runner",
 	"platform.remap.lease_helper", "modules.shortcuts.script_control", "modules.keystats",
-	"core.llm.ollama_runtime_choice", "core.llm.managed_ollama_daemon_lifecycle",
-	"core.llm.managed_ollama_daemon_receipt", "llm.local_model_policy",
+	"core.lifecycle.engine.core.ollama_runtime_choice", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
+	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "ai.engine.ollama.local_model_policy",
 }
 
 local function scoped(callback)

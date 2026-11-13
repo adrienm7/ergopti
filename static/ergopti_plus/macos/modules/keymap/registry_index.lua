@@ -17,9 +17,9 @@ local Storage = require("adapters.storage")
 local Groups = require("modules.keymap.registry_groups")
 local i18n   = require("infra.i18n")
 local ManifestReader = require("infra.manifest_reader")
-local Languages = require("hotstrings.languages")
-local PersonalFiles = require("hotstrings.personal_files")
-local ConfigKeys = require("config_keys")
+local Languages = require("hotstrings.engine.languages")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
+local ConfigKeys = require("settings.engine.keys")
 local SectionKeys = require("modules.keymap.section_keys")
 local LOG    = "keymap.registry"
 
@@ -550,7 +550,7 @@ function M.set_category_scope_enabled(targets, enabled, publish, excluded)
 			end
 		end
 	end
-	local plan, reason = require("hotstrings.personal_adoption").plan_selection(inventory, targets, enabled)
+	local plan, reason = require("hotstrings.engine.catalogue.personal_adoption").plan_selection(inventory, targets, enabled)
 	if not plan then
 		Logger.error(LOG, "Category selection refused: %s.", reason)
 		return false

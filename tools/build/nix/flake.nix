@@ -79,7 +79,7 @@
               mkdir -p $out/bin
               makeWrapper ${runtimeLuaJIT}/bin/luajit $out/bin/ergopti-hotstrings \
                 --add-flags "$out/lib/ergopti/ergopti_hotstrings.lua" \
-                --set LUA_PATH "$out/lib/ergopti/?.lua;$out/lib/ergopti/?/init.lua;$out/lib/ergopti/_shared/lua/?.lua;$out/lib/ergopti/_shared/lua/?/init.lua;;" \
+                --set LUA_PATH "$out/lib/ergopti/?.lua;$out/lib/ergopti/?/init.lua;$out/lib/ergopti/_shared/?.lua;$out/lib/ergopti/_shared/?/init.lua;;" \
                 --prefix PATH : ${nixpkgs.lib.makeBinPath (with pkgs; [
                   xclip wl-clipboard xdotool wmctrl libxkbcommon libnotify curl xdg-utils
                   # Metrics must not borrow key derivation, SQLite or directory

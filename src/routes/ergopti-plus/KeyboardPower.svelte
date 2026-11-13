@@ -10,7 +10,7 @@ defaults TOML, the real HJKL navigation layer, and the small power moves
 
 FEATURES & RATIONALE:
 1. Truthful Mappings: every tap/hold pair and layer mapping shown here is
-   read from _shared/tap_hold/defaults.toml — the previous page displayed
+   read from _shared/tap_hold/data/defaults.toml — the previous page displayed
    outdated mappings.
 ==============================================================================
 -->
@@ -59,7 +59,7 @@ FEATURES & RATIONALE:
 		visibleGroups.reduce((n, g) => n + g.sections.reduce((m, s) => m + s.actions.length, 0), 0)
 	);
 
-	// The 7 shared tap-hold keys — mirrors _shared/tap_hold/defaults.toml.
+	// The 7 shared tap-hold keys — mirrors _shared/tap_hold/data/defaults.toml.
 	const tapHolds = [
 		{
 			key: 'CapsLock',

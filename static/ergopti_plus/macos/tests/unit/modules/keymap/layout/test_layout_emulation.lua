@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function read_all(path)
 	local handle = assert(io.open(path, "rb"))
@@ -19,8 +19,8 @@ local function read_all(path)
 	return text
 end
 
-local KEYCODES = Json.decode(read_all(helpers.shared("modules/layouts/mac_keycodes.json")))
-local REGISTRY = Json.decode_lossless(read_all(helpers.shared("data/keycodes/physical_keys.json")))
+local KEYCODES = Json.decode(read_all(helpers.shared("layouts/data/mac_keycodes.json")))
+local REGISTRY = Json.decode_lossless(read_all(helpers.shared("layouts/data/keycodes/physical_keys.json")))
 local INDEX = Json.decode(read_all(helpers.shared("../../layouts/registry/index.json")))
 
 -- macOS virtual key codes of the keys the cases press (ANSI numbering).
@@ -180,8 +180,8 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 	-- (ILM-002, cmd-chord-us-key).
 	helpers.it("finds a character's US key code for a source that lacks it (cmd-chord-us-key)", function()
 		local M = fixture({ emulated_layout = "ergopti", ergopti_base = true })
-		local table_of = require("json").decode(assert(require("adapters.file_system").read(
-			require("infra.paths").shared("modules/layouts/mac_keycodes.json"))))
+		local table_of = require("core.text.engine.json").decode(assert(require("adapters.file_system").read(
+			require("infra.paths").shared("layouts/data/mac_keycodes.json"))))
 		helpers.assert_eq(M.us_keycode("e", table_of), 14, "kVK_ANSI_E")
 		helpers.assert_eq(M.us_keycode("Z", table_of), 6, "kVK_ANSI_Z")
 		helpers.assert_eq(M.us_keycode("1", table_of), 18, "kVK_ANSI_1")

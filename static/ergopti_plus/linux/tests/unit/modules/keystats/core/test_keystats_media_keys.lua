@@ -89,8 +89,8 @@ helpers.describe("Linux media key metrics (linux-media-key-metrics)", function()
 			helpers.assert_nil(press.keycode)
 			helpers.assert_nil(press.scancode)
 			-- The shared store admits exactly what keystats buffered.
-			local store = require("keystats.media_store")
-			for index, event in ipairs(batch.events) do store.raw_sql("linux-test", index, event, require("json").encode) end
+			local store = require("metrics.engine.media.store")
+			for index, event in ipairs(batch.events) do store.raw_sql("linux-test", index, event, require("core.text.engine.json").encode) end
 			for _, entries in ipairs(calls.scancodes) do
 				helpers.assert_nil(entries[KEY_PLAYPAUSE], "a media key never reaches the numeric heatmap")
 			end

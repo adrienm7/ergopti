@@ -4,7 +4,7 @@
 ; MODULE: Healthcheck / Snapshot + Window
 ; DESCRIPTION:
 ; Session counters, the module contract check, the version 2 snapshot
-; (_shared/modules/diagnostics/schema.json) and the diagnostics window. The
+; (_shared/diagnostics/data/schema.json) and the diagnostics window. The
 ; window loads the shared page (_shared/ui/healthcheck/) through a virtual
 ; host; the page renders the snapshot, keeps the preview of what is shared and
 ; asks for every action by message.
@@ -304,14 +304,14 @@ HealthCheck_Config() {
 	global _HC_Config, _SharedDir
 	if (_HC_Config is Map)
 		return _HC_Config
-	RawSchema := FileRead(_SharedDir . "\modules\diagnostics\schema.json", "UTF-8")
-	RawRedaction := FileRead(_SharedDir . "\modules\diagnostics\redaction.json", "UTF-8")
+	RawSchema := FileRead(_SharedDir . "\diagnostics\data\schema.json", "UTF-8")
+	RawRedaction := FileRead(_SharedDir . "\diagnostics\data\redaction.json", "UTF-8")
 	Schema := JsonParse(RawSchema)
 	if !(Schema is Map) || (Schema.Get("schema_version", 0) != 2)
 		throw ValueError("The diagnostics schema is not a version 2 schema.")
 	; Export labels come from canonical English, independently of UI locale.
 	Schema["export_strings"] := Map()
-	English := JsonParse(FSReadStrict(_SharedDir . "\data\locales\en.json"))
+	English := JsonParse(FSReadStrict(_SharedDir . "\core\i18n\data\locales\en.json"))
 	for Key, Value in English
 		if SubStr(Key, 1, 12) == "healthcheck."
 			Schema["export_strings"][Key] := Value
@@ -321,9 +321,9 @@ HealthCheck_Config() {
 		"raw_schema",    RawSchema,
 		"redaction",     JsonParse(RawRedaction),
 		"raw_redaction", RawRedaction,
-		"templates",     JsonParse(FileRead(_SharedDir . "\modules\diagnostics\issue_templates.json", "UTF-8")),
-		"day_log",       DayLog_CheckLimits(JsonParse(FSReadStrict(_SharedDir . "\modules\diagnostics\day_log.json"))),
-		"repository",    JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["github"])
+		"templates",     JsonParse(FileRead(_SharedDir . "\diagnostics\data\issue_templates.json", "UTF-8")),
+		"day_log",       DayLog_CheckLimits(JsonParse(FSReadStrict(_SharedDir . "\diagnostics\data\day_log.json"))),
+		"repository",    JsonParse(FileRead(_SharedDir . "\updater\data\defaults.json", "UTF-8"))["github"])
 	return _HC_Config
 }
 
@@ -816,7 +816,7 @@ HealthCheck_ShowWindow() {
 				; the strings through the virtual host
 				if !Reuse
 					try _HC_WebView.AddScriptToExecuteOnDocumentCreated(
-						"window.__i18n_base='https://" . HC_VHOST . "/data/locales/';window._i18n_locale='" . Locale . "';")
+						"window.__i18n_base='https://" . HC_VHOST . "/core/i18n/data/locales/';window._i18n_locale='" . Locale . "';")
 
 				; The subscription is bound to this window's epoch, so a late message of
 				; a closed window cannot reach its replacement through the globals.

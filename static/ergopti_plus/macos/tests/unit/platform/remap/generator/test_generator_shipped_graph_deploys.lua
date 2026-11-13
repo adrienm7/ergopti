@@ -62,8 +62,8 @@ local function with_generator(existing, json_codec, run, locale_code, layout_id)
 		"modules.keymap.layout_registry",
 		"infra.i18n",
 		"infra.locale",
-		"locale.core",
-		"toml_codec",
+		"core.i18n.engine.core",
+		"core.text.engine.toml_codec",
 	}, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.config_paths"] = {
@@ -78,7 +78,7 @@ local function with_generator(existing, json_codec, run, locale_code, layout_id)
 			F19_LAYER_NAV_EXITED    = 80,
 		}
 		local toml_stub = { encode = function() return "" end, decode = function() return {} end }
-		package.loaded["toml_codec"] = toml_stub
+		package.loaded["core.text.engine.toml_codec"] = toml_stub
 		package.loaded["infra.toml.codec"] = toml_stub
 		local file_state = { content = existing, writes = 0 }
 		package.loaded["adapters.file_system"] = {
@@ -319,7 +319,7 @@ helpers.describe("Shipped graph declared input-source convention (iso-consumer-m
 				-- product swapped it on the maintainer's Apple ISO keyboard.
 				helpers.assert_eq(virtual, "ansi")
 				local snapshot = require("modules.keymap.layout_registry").snapshot()
-				local entry = assert(require("layouts.registry").find_entry(snapshot.index, scenario.id))
+				local entry = assert(require("layouts.engine.registry.registry_core").find_entry(snapshot.index, scenario.id))
 				local xml = SourceFile.read(helpers.shared("../../layouts/registry/" .. entry.file))
 				-- Independently authored, never the production tables: the usage the
 				-- keyboard of the layout's form reports (an ISO keyboard sends 0x64 left

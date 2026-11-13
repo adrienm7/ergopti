@@ -65,7 +65,7 @@ const isHostProvided = (mod) => HOST_PROVIDED.some((re) => re.test(mod));
 const rootsFor = (driver) => [
 	path.join(SP, driver),
 	path.join(SP, driver, 'tests'),
-	path.join(SP, '_shared', 'lua')
+	path.join(SP, '_shared')
 ];
 
 /** True when `mod` resolves to a real file for this driver. */
@@ -113,7 +113,7 @@ for (const driver of DRIVERS) {
 				if (resolves(driver, mod)) continue;
 				errors.push(
 					`${rel}:${i + 1}: stubs "${mod}", which resolves to no module in ${driver}/ or ` +
-						'_shared/lua/. The stub intercepts nothing: whatever the test thinks it replaced, ' +
+						'_shared/. The stub intercepts nothing: whatever the test thinks it replaced, ' +
 						'the code under test is still using the real one.'
 				);
 			}

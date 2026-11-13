@@ -35,7 +35,7 @@ const FAIL_SYMBOL = '✗';
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const RESOLVER = 'static/ergopti_plus/windows/infra/manifest_descriptions.ahk';
-const EN_LOCALE = 'static/ergopti_plus/_shared/data/locales/en.json';
+const EN_LOCALE = 'static/ergopti_plus/_shared/core/i18n/data/locales/en.json';
 
 // A sample of dynamic-hotstring sections + their folded locale keys. These are
 // the exact labels the tray menu renders for [hotstrings.dynamic.*] entries.

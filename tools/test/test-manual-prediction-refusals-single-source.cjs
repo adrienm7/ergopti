@@ -29,7 +29,7 @@ const SOURCES = {
 	macos: path.join(SP, 'macos', 'modules', 'llm', 'prediction_engine.lua'),
 	linux: path.join(SP, 'linux', 'modules', 'llm', 'prediction_engine.lua')
 };
-const EN = path.join(SP, '_shared', 'data', 'locales', 'en.json');
+const EN = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales', 'en.json');
 const EXPECTED_REASONS = ['paused', 'disabled', 'backend_not_ready', 'empty_context'];
 
 const errors = [];

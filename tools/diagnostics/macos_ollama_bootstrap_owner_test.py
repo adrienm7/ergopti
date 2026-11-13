@@ -19,7 +19,7 @@ SOURCE = Path(os.environ.get("ERGOPTI_SOURCE_ROOT", ROOT))
 POLICY_PATH = Path(
     os.environ.get(
         "ERGOPTI_BOOTSTRAP_POLICY",
-        SOURCE / "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json",
+        SOURCE / "static/ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json",
     )
 )
 
@@ -35,7 +35,8 @@ BOOT = load(
     "bootstrap_owner", ROOT / "static/ergopti_plus/macos/platform/ollama_bootstrap_owner.py"
 )
 PROXY = load(
-    "bootstrap_proxy", SOURCE / "static/ergopti_plus/_shared/python/network_proxy_policy.py"
+    "bootstrap_proxy",
+    SOURCE / "static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py",
 )
 
 

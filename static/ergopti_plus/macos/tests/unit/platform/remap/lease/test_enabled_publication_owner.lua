@@ -320,7 +320,7 @@ helpers.describe("enabled preference conditional publication ownership", functio
 				remap.set_enabled(true)
 				helpers.assert_eq(remap.has_pending_settings_save(), false)
 				helpers.assert_eq(result, false)
-				local codec = require("toml_codec")
+				local codec = require("core.text.engine.toml_codec")
 				local document = assert(codec.decode(assert(fs.read_with_status(path))))
 				helpers.assert_eq(document.karabiner.integration_enabled, false,
 					"the compensating receipt's ON source is never restored")

@@ -10,7 +10,7 @@
 local M = {}
 local Logger = require("infra.logger")
 local LOG = "managed_ollama_daemon"
-local Receipt = require("core.llm.managed_ollama_daemon_receipt")
+local Receipt = require("core.lifecycle.engine.core.managed_ollama_daemon_receipt")
 local MAX_PROTOCOL_BYTES = require("adapters.owned_program_runner").MAX_PROTOCOL_BYTES
 -- The serve owner writes one fixed refusal line on stderr; anything else there
 -- (a traceback names paths) is never logged.
@@ -59,7 +59,7 @@ end
 --- No detach, inherited startup file, sibling task, or readiness timer is used.
 function M.prepare(command, nonce, callbacks)
 	local ShellRunner = require("adapters.shell_runner")
-	local Lifecycle = require("core.llm.managed_ollama_daemon_lifecycle")
+	local Lifecycle = require("core.lifecycle.engine.core.managed_ollama_daemon_lifecycle")
 	local task, handle
 	local acquiring = true
 	local early_delivery = false

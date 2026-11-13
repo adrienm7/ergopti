@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/action_parameters/send_input_vectors.json, which
 --- the Linux and Windows suites replay too, through the real gesture validator
---- and _shared/lua/send_input over the real vocabulary
---- (_shared/modules/actions/send_keys.json).
+--- and _shared/platform/input over the real vocabulary
+--- (_shared/shortcuts/data/actions/send_keys.json).
 ---
 --- ROOT CAUSE ENCODED:
 --- No action could type a chosen text or press a chosen key or shortcut, and
@@ -14,9 +14,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-require("test.action_parameter_label_contract")(helpers, json, helpers.shared(""))
+require("tests.lua.core.action_parameter_label_contract")(helpers, json, helpers.shared(""))
 
 local CORPUS = helpers.shared("tests/corpus/action_parameters/send_input_vectors.json")
 
@@ -36,7 +36,7 @@ package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil
 local _gestures = helpers.load_with_stubs("modules.gestures")
 local Actions = require("modules.gestures.actions")
-local SendInput = require("send_input")
+local SendInput = require("platform.input.send_input")
 
 local ACTIONS = { text = "send_text", key = "send_key", shortcut = "send_shortcut" }
 

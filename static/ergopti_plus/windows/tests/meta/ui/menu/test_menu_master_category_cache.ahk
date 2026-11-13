@@ -102,7 +102,7 @@ Test("menu: _MG_LoadHotstringSubCategories keeps its .Has() guard chain and its 
 _MMCC_ManifestPath() {
 	SplitPath(A_ScriptDir, , &WinDir)
 	SplitPath(WinDir, , &EpDir)
-	return EpDir . "\_shared\modules\menu\menu_manifest.json"
+	return EpDir . "\_shared\menu\data\menu_manifest.json"
 }
 
 _MMCC_CheckDefaultBranchIsTheLiveOne() {

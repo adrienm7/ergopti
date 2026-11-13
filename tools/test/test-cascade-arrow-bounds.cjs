@@ -32,7 +32,7 @@ const path = require('path');
 const read = (file) => fs.readFileSync(file, 'utf8');
 const LEAF = 'cascade_max_arrows';
 
-const manifest = TOML.parse(read(shared('modules/features/manifest.toml')));
+const manifest = TOML.parse(read(shared('settings/data/features/manifest.toml')));
 const entry = (manifest.features.hotstrings || []).find((feature) => feature.id === LEAF);
 assert.ok(entry, `hotstrings.${LEAF} must be declared in the feature manifest`);
 
@@ -52,7 +52,7 @@ assert.strictEqual(entry.default, 3, 'the default chain is three arrows');
 assert.strictEqual(entry.platforms, undefined, 'one setting, identical on the three drivers');
 
 // 2. Schema.
-const schema = JSON.parse(read(shared('core/config_schema/config.schema.json')));
+const schema = JSON.parse(read(shared('settings/data/config_schema/config.schema.json')));
 const findLeaf = (node) => {
 	if (node === null || typeof node !== 'object') return undefined;
 	if (Object.prototype.hasOwnProperty.call(node, LEAF)) return node[LEAF];
@@ -69,7 +69,7 @@ assert.strictEqual(leaf.minimum, low, 'the schema minimum is the lowest setting'
 assert.strictEqual(leaf.maximum, high, 'the schema maximum is the highest setting');
 
 // 3. Engines.
-const luaEngine = read(shared('lua/hotstring_engine/init.lua'));
+const luaEngine = read(shared('hotstrings/engine/matcher/init.lua'));
 assert.ok(luaEngine.includes(`M.CASCADE_MIN_ARROWS = ${low}`), 'the shared Lua engine lower bound');
 assert.ok(
 	luaEngine.includes(`M.CASCADE_MAX_ARROWS = ${high}`),

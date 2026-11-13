@@ -11,7 +11,7 @@ assert(mode == "success" or mode == "failure" or mode == "error", "invalid probe
 local source = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
 local root = assert(source:match("^(.*)/tests/support/property_runner_probe%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 
 local pbt = require("tests.helpers.pbt")
 local check = pbt.check

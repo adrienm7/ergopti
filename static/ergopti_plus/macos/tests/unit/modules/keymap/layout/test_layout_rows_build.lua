@@ -11,9 +11,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Build = require("modules.keymap.layout_rows_build")
-local Rows = require("layouts.keylayout_rows")
+local Rows = require("layouts.engine.composer.keylayout_rows")
 
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"
 
@@ -24,7 +24,7 @@ local function read(path)
 	return text
 end
 
-local KEYCODES = Json.decode(read(helpers.shared("modules/layouts/mac_keycodes.json")))
+local KEYCODES = Json.decode(read(helpers.shared("layouts/data/mac_keycodes.json")))
 local ERGOL = read(REGISTRY_DIR .. "ergol/ergol.keylayout")
 local SOURCE = { id = "ergol", keyboard_name = "Ergo-L", text = ERGOL, convention = "ansi" }
 

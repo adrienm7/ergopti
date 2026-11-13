@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Local OpenAI-Compatible Servers (macOS)
 --- DESCRIPTION:
---- Drives the real catalogue (_shared/modules/llm/local_servers.json), the
+--- Drives the real catalogue (_shared/ai/data/local_servers.json), the
 --- detection (modules/llm/local_servers.lua), the remote backend that sends
 --- their requests (modules/llm/api_remote.lua), the API entry persistence
 --- (modules/llm/init.lua) and the AI menus (local_server_panel, agent_panel),
@@ -49,14 +49,14 @@ local with_panel = Fixture.with_panel
 helpers.describe("Local OpenAI-compatible servers: catalogue (local-openai-backends)", function()
 	helpers.it("lists oMLX, LM Studio, llama.cpp / LocalAI and Jan at their documented ports (local-openai-backends)",
 		function()
-			local catalogue = read_json("modules/llm/local_servers.json")
+			local catalogue = read_json("ai/data/local_servers.json")
 			-- The four first servers keep their place; the others follow them.
 			for index, id in ipairs(SERVERS) do helpers.assert_eq(catalogue.server_order[index], id) end
 			local expected = {
 				omlx = "http://127.0.0.1:8000/v1", lmstudio = "http://127.0.0.1:1234/v1",
 				llamacpp = "http://127.0.0.1:8080/v1", jan = "http://127.0.0.1:1337/v1",
 			}
-			local providers = read_json("modules/llm/api_providers.json").providers
+			local providers = read_json("ai/data/api_providers.json").providers
 			for id, base_url in pairs(expected) do
 				-- The IPv4 literal every server binds by default, never the name
 				-- localhost, which may resolve to ::1 first or follow the system

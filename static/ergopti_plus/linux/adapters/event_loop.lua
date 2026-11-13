@@ -25,10 +25,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local NativeTimer = require("infra.native_timer")
-local NumberPolicy = require("number_policy")
-local ErrorDescription = require("error_description")
+local NumberPolicy = require("core.text.engine.number_policy")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local LOG = "adapters.event_loop"
 
 

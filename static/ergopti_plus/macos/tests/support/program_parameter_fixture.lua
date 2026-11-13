@@ -2,9 +2,9 @@
 
 --- Real writer, preference checkpoint and global writer fence for picker fixtures.
 local helpers = require("tests.helpers")
-local Writer = require("toml_codec.writer")
+local Writer = require("core.text.engine.toml_codec.writer")
 local Manifest = require("infra.manifest_reader")
-local Assignment = require("shortcuts.assignment")
+local Assignment = require("shortcuts.engine.assignment")
 
 return function(gestures, state, kind, read_action, save_attempt, controls)
 	local noop = function() return true end

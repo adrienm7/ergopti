@@ -52,7 +52,16 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const LOCALES = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales');
+const LOCALES = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'i18n',
+	'data',
+	'locales'
+);
 
 // Floors — a guard that reads nothing passes for free.
 const MIN_LOCALES = 21; // The shipped set; adding one raises this deliberately.

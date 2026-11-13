@@ -39,7 +39,10 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
 const EN = JSON.parse(
-	fs.readFileSync(path.join(DRIVERS, '_shared', 'data', 'locales', 'en.json'), 'utf8')
+	fs.readFileSync(
+		path.join(DRIVERS, '_shared', 'core', 'i18n', 'data', 'locales', 'en.json'),
+		'utf8'
+	)
 );
 
 const failures = [];
@@ -283,7 +286,7 @@ function checkMacosInstallCallers() {
 
 function checkReasonKeys() {
 	const lua = fs.readFileSync(
-		path.join(DRIVERS, '_shared/lua/updater/release_install.lua'),
+		path.join(DRIVERS, '_shared/updater/engine/release_install.lua'),
 		'utf8'
 	);
 	const luaBlock = lua.slice(

@@ -1,5 +1,5 @@
 {
-	"description": "Cross-driver tooltip dequeue vectors — stacked row expiry logic from _shared/modules/tooltip/dequeue.js dequeueTestVectors(). Consumed by macOS and AHK dequeue contract tests.",
+	"description": "Cross-driver tooltip dequeue vectors — stacked row expiry logic from _shared/core/ui/data/tooltip/dequeue.js dequeueTestVectors(). Consumed by macOS and AHK dequeue contract tests.",
 	"vectors": [
 		{
 			"id": "mixed_1s_2s_stacked_destuck",

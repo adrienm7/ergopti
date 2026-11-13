@@ -239,7 +239,7 @@ helpers.describe("Extension packs: one catalogue per boot", function()
 		local Manifest = require("infra.manifest_reader")
 		for _, pack in ipairs(found) do
 			for _, file in ipairs(pack.toml_files) do
-				local key = "hotstrings.groups." .. require("hotstrings.extensions").category_key(pack.id, file.stem)
+				local key = "hotstrings.groups." .. require("hotstrings.engine.extensions").category_key(pack.id, file.stem)
 				helpers.assert_eq(Manifest.default_for(key), false, key)
 			end
 		end

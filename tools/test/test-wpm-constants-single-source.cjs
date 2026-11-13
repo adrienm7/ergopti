@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: WPM Readout Constants Single-Source Guard
  * DESCRIPTION:
- * _shared/modules/wpm_widget/constants.toml is the one description of how the
+ * _shared/metrics/data/wpm_widget/constants.toml is the one description of how the
  * typing-speed readouts look on every driver. This gate keeps it that way:
  *   1. every key a driver reads exists in the canon — the shared Lua model's
  *      REQUIRED table (macOS and Linux) and the AHK loader's _WPMWidget_Need
@@ -78,8 +78,8 @@ function modelKeys(src) {
 }
 
 const errors = [];
-const canon = tomlKeys(read('_shared/modules/wpm_widget/constants.toml'));
-const model = modelKeys(read('_shared/lua/wpm_widget/model.lua'));
+const canon = tomlKeys(read('_shared/metrics/data/wpm_widget/constants.toml'));
+const model = modelKeys(read('_shared/metrics/engine/wpm_widget_model.lua'));
 const ahkConfig = read('windows/ui/wpm/wpm_config.ahk');
 const ahk = new Set(
 	[...ahkConfig.matchAll(/_WPMWidget_Need\(wpm_c, "([a-z_]+)", "([a-z_]+)"/g)].map(
@@ -121,7 +121,10 @@ for (const rel of [
 	if (literal)
 		errors.push(`${rel} holds the colour literal ${literal[0]} — the canon owns colours`);
 	// Directly, or through ui/wpm/shared.lua, which is itself checked here.
-	if (!src.includes('require("wpm_widget.model")') && !src.includes('require("ui.wpm.shared")')) {
+	if (
+		!src.includes('require("metrics.engine.wpm_widget_model")') &&
+		!src.includes('require("ui.wpm.shared")')
+	) {
 		errors.push(`${rel} does not draw through the shared model`);
 	}
 }

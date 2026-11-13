@@ -11,7 +11,7 @@
 local M = {}
 local helpers = require("tests.helpers")
 local Focus = require("adapters.atspi_focus")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Builds the original worker closures with separately controlled native events.
 --- @param source string|nil Worker source; absent selects the actual driver file.

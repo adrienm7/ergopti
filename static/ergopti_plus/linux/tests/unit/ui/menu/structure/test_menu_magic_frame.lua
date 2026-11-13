@@ -9,4 +9,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.menu_magic_frame_contract").register(helpers)
+require("tests.lua.menu.magic_frame_contract").register(helpers)

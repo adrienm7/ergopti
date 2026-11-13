@@ -166,11 +166,11 @@ local function with_info_menu(options, callback)
 	package.loaded["modules.llm.profile_settings"] = nil
 	local profiles = require("modules.llm.profile_settings")
 	profiles._reset()
-	local renderer = assert(require("menu.renderer").new({
+	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "linux",
-		manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+		manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
 		json_decode = function(raw)
-			local root = assert(require("json").decode(raw))
+			local root = assert(require("core.text.engine.json").decode(raw))
 			if options.label then root.llm_display_menu[2].i18n = options.label end
 			for index, row in ipairs(root.llm_display_menu) do
 				if row.id == "llm_show_all" then
@@ -185,7 +185,7 @@ local function with_info_menu(options, callback)
 			end
 			return root
 		end,
-		i18n = require("infra.i18n"), logger = require("logger.shim"),
+		i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
 	}))
 	package.loaded["infra.manifest_menu"] = renderer
 	local observed = { writes = 0, redraws = 0, active = true, paused = false, backend = options.backend or "ollama", revision = 0 }
@@ -241,7 +241,7 @@ local function info_bar_corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/info_bar_control.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("LLM shared Info Bar check", function()
@@ -317,7 +317,7 @@ local function show_all_corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/show_all_control.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 --- Finds the declared checkbox after Linux's real tray projection.
@@ -437,12 +437,12 @@ local function token_streaming_corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
-	return assert(require("json").decode(text))
+	return assert(require("core.text.engine.json").decode(text))
 end
 
 helpers.describe("shared token streaming policy", function()
 	helpers.it("replays independent capability and admission vectors (shared-token-streaming)", function()
-		local policy = require("llm.display_policy")
+		local policy = require("ai.engine.settings.display_policy")
 		local corpus = token_streaming_corpus()
 		helpers.assert_eq(#corpus.capabilities, 9)
 		helpers.assert_eq(#corpus.cases, 15)
@@ -537,7 +537,7 @@ local function indentation_corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/indentation_control.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
-	return assert(require("json").decode(text))
+	return assert(require("core.text.engine.json").decode(text))
 end
 
 --- Finds the actual declared numeric submenu, including its selected caption.
@@ -627,7 +627,7 @@ helpers.describe("shared indentation choice", function()
 	end)
 
 	helpers.it("replays independent shared multi-prediction admission and value vectors (shared-indentation)", function()
-		local corpus, policy = indentation_corpus(), require("llm.display_policy")
+		local corpus, policy = indentation_corpus(), require("ai.engine.settings.display_policy")
 		local owner, other = {}, {}
 		for _, vector in ipairs(corpus.cases) do
 			local expected, current = {}, {}
@@ -654,7 +654,7 @@ helpers.describe("LLM retained Info Bar admission", function()
 			for key, value in pairs(vector.current) do current[key] = value end
 			expected.owner = expected.owner == "owned" and owner or other
 			current.owner = current.owner == "owned" and owner or other
-			local decision = require("llm.display_policy").info_bar_intent(expected, current)
+			local decision = require("ai.engine.settings.display_policy").info_bar_intent(expected, current)
 			helpers.assert_eq(decision.admitted, vector.admitted, vector.id)
 			if vector.admitted then helpers.assert_eq(decision.value, vector.value, vector.id) end
 		end
@@ -722,5 +722,5 @@ helpers.describe("LLM retained Info Bar admission", function()
 	end
 end)
 
-require("test.pred_indent_default_contract")(helpers,
-	require("infra.manifest_reader").default_for(require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT))
+require("tests.lua.pred_indent_default_contract")(helpers,
+	require("infra.manifest_reader").default_for(require("settings.engine.keys").KEY.LLM_DISPLAY_PRED_INDENT))

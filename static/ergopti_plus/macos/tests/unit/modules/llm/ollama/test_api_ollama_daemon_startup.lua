@@ -27,7 +27,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 	local function with_startup(starts, callback)
 		helpers.with_stub_scope({
 			"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "adapters.shell_runner",
-			"core.llm.managed_ollama_daemon_receipt", "core.llm.managed_ollama_daemon_lifecycle",
+			"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 			"adapters.http_client", "adapters.timer_scheduler", "adapters.json_codec",
 			"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
@@ -130,11 +130,11 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			client.post = function(url, _, body, done)
 				fixture.posts[#fixture.posts + 1] = { url = url, body = body, done = done }
 			end
-			local json = require("json")
+			local json = require("core.text.engine.json")
 			fixture.codec = package.loaded["adapters.json_codec"]
 			fixture.codec.encode, fixture.codec.decode = json.encode, json.decode
 			package.loaded["adapters.timer_scheduler"].now = function() return 1 end
-			package.loaded["modules.llm.parser"].strip_thinking = require("llm.parser").strip_thinking
+			package.loaded["modules.llm.parser"].strip_thinking = require("ai.engine.api.parser_core").strip_thinking
 			package.loaded["modules.llm.api_common"].protected_call = function(fn, _, ...)
 				return package.loaded["infra.logger"].callback("fixture", "request callback", fn, ...)
 			end
@@ -409,7 +409,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 	helpers.it("(ollama-response-service-affinity) refuses old chat success and missing-model failure after replacement", function()
 		for _, response in ipairs({
 			{ status = 200, body = '{"message":{"content":"old private answer"}}' },
-			{ status = 404, body = require("json").encode({ error = 'model "qwen2.5:7b" not found' }) },
+			{ status = 404, body = require("core.text.engine.json").encode({ error = 'model "qwen2.5:7b" not found' }) },
 			{ status = 503, body = '{"error":"old service failure"}' },
 		}) do
 			with_owned_responses(function(api, fixture)

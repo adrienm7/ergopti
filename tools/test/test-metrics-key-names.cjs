@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Executes the real key name table projection, its page helper and
  * heatmap_win.js, and asserts that the keyboard heatmap names its special keys
- * from _shared/data/keycodes/key_names.json in the user's language and for the
+ * from _shared/layouts/data/keycodes/key_names.json in the user's language and for the
  * recording OS.
  *
  * ROOT CAUSE ENCODED:
@@ -23,7 +23,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const UI = path.resolve(__dirname, '..', '..', 'static', 'ergopti_plus', '_shared', 'ui');
-const LOCALES = path.join(UI, '..', 'data', 'locales');
+const LOCALES = path.join(UI, '..', 'core', 'i18n', 'data', 'locales');
 const read = (...parts) => fs.readFileSync(path.join(UI, ...parts), 'utf8');
 
 /**

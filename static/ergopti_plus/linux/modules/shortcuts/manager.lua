@@ -32,32 +32,32 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Paths  = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
-local TextCase = require("unicode_case")
-local WrapPair = require("wrap_pair")
+local TextCase = require("core.text.engine.unicode_case")
+local WrapPair = require("keyboard.engine.wrap_pair")
 local WrapSettings = require("modules.shortcuts.wrap_symbol_settings")
-local SendInput = require("send_input")
-local TomlCodec = require("toml_codec")
+local SendInput = require("platform.input.send_input")
+local TomlCodec = require("core.text.engine.toml_codec")
 local Clipboard = require("adapters.clipboard")
 local EventLoop = require("adapters.event_loop")
 local ComboEmitter = require("modules.gestures.combo_emitter")
 local Injector = require("modules.hotstrings.injector")
 local EvdevCodes = require("infra.evdev_codes")
 local Monotonic = require("infra.monotonic")
-local CapsWordPolicy = require("caps_word.auto_off")
+local CapsWordPolicy = require("keyboard.engine.caps_word_auto_off")
 local CapsWordAutoOff = require("modules.shortcuts.caps_word_auto_off")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local LOG = "modules.shortcuts.manager"
 local _configuration_owner = nil
 local _capture_text_owner = nil
 local ENABLED_PATH = ConfigKeys.KEY.SHORTCUTS_ENABLED
 
 -- The send_text / send_key / send_shortcut vocabulary, read on first use.
-local SEND_KEYS_REL_PATH = "modules/actions/send_keys.json"
+local SEND_KEYS_REL_PATH = "shortcuts/data/actions/send_keys.json"
 local _send_vocabulary = nil
 
 -- The keys that select the level keyboard_layout reports a character on, for a
@@ -73,7 +73,7 @@ if type(DEFAULT_ENABLED) ~= "boolean" then
 	error("The manifest default for " .. ENABLED_PATH .. " must be a boolean.")
 end
 
-local _writer_ok, TomlWriter = pcall(require, "toml_codec.writer")
+local _writer_ok, TomlWriter = pcall(require, "core.text.engine.toml_codec.writer")
 if not _writer_ok then TomlWriter = nil end
 local collision_read = TomlWriter and TomlWriter.read_classified
 local collision_decode, collision_shared = TomlCodec.decode, Paths.shared
@@ -153,7 +153,7 @@ end
 -- Relative path (from static/ergopti_plus) to the shared wrap-symbol catalogue,
 -- the single source of truth shared with the AHK and macOS drivers — never
 -- hardcode the pair list here; edit the JSON so all 3 drivers stay in sync
-local WRAP_SYMBOLS_REL_PATH = "modules/wrap_symbols/wrap_symbols.json"
+local WRAP_SYMBOLS_REL_PATH = "keyboard/data/wrap_symbols/wrap_symbols.json"
 
 -- Leading UTF-8 BOM bytes; the pure-Lua JSON decoder rejects a byte-order mark
 local UTF8_BOM = "\239\187\191"
@@ -183,7 +183,7 @@ local function load_wrap_pairs()
 	local ordered = {}
 	local groups = {}
 
-	local ok_json, json = pcall(require, "json")
+	local ok_json, json = pcall(require, "core.text.engine.json")
 	if not ok_json or type(json) ~= "table" or type(json.decode) ~= "function" then
 		Logger.error(LOG, "JSON decoder unavailable — wrap-symbol catalogue not loaded.")
 		return lookup, ordered, groups
@@ -290,7 +290,7 @@ function M.get_wrap_pair_list()
 end
 
 --- The left and right symbols a wrap_selection parameter names: a catalogue
---- symbol or a custom left|right pair (_shared/lua/wrap_pair).
+--- symbol or a custom left|right pair (_shared/keyboard/engine).
 --- @param value any The stored parameter.
 --- @return string|nil left
 --- @return string|nil right Both nil when the value names no pair.
@@ -316,7 +316,7 @@ function M.insert_text(text, publication)
 end
 
 --- The vocabulary of the send_text, send_key and send_shortcut parameters,
---- read once from _shared/modules/actions/send_keys.json. A missing or
+--- read once from _shared/shortcuts/data/actions/send_keys.json. A missing or
 --- malformed file raises: every send_* binding would otherwise refuse its value
 --- with no explanation.
 --- @return table The decoded vocabulary.
@@ -324,9 +324,9 @@ function M.send_vocabulary()
 	if _send_vocabulary then return _send_vocabulary end
 	local path = Paths.shared(SEND_KEYS_REL_PATH)
 	local body, status
-	if path then body, status = require("toml_codec.writer").read_classified(path) end
+	if path then body, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then error("shortcuts: cannot read " .. tostring(path)) end
-	local ok, parsed = pcall(require("json").decode, body)
+	local ok, parsed = pcall(require("core.text.engine.json").decode, body)
 	if not ok or type(parsed) ~= "table" or type(parsed.keys) ~= "table"
 		or type(parsed.modifiers) ~= "table" or type(parsed.text_max_code_points) ~= "number" then
 		error("shortcuts: " .. tostring(path) .. " is not a send-input vocabulary")
@@ -335,7 +335,7 @@ function M.send_vocabulary()
 	return parsed
 end
 
---- Parses a send_* parameter (_shared/lua/send_input over the vocabulary).
+--- Parses a send_* parameter (_shared/platform/input over the vocabulary).
 --- @param kind string "text", "key" or "shortcut".
 --- @param value any The stored parameter.
 --- @return table|nil The parse, or nil when the value is invalid.
@@ -1143,14 +1143,14 @@ function M.capture_collision_inventory()
 			and rawequal(wrap_source, source) and wrap_pairs_equal(WRAP_PAIRS, source.pairs)
 			and rawequal(package.loaded["infra.config_paths"], Routes) and Routes.config == route
 			and rawequal(package.loaded["infra.paths"], Paths) and Paths.shared == collision_shared
-			and rawequal(package.loaded["toml_codec.writer"], TomlWriter) and TomlWriter.read_classified == collision_read
-			and rawequal(package.loaded["toml_codec"], TomlCodec) and TomlCodec.decode == collision_decode
-			and rawequal(package.loaded["json"], collision_json) and collision_json.decode == collision_json_decode
+			and rawequal(package.loaded["core.text.engine.toml_codec.writer"], TomlWriter) and TomlWriter.read_classified == collision_read
+			and rawequal(package.loaded["core.text.engine.toml_codec"], TomlCodec) and TomlCodec.decode == collision_decode
+			and rawequal(package.loaded["core.text.engine.json"], collision_json) and collision_json.decode == collision_json_decode
 			and M.configuration_candidate == collision_candidate and M.init == collision_init
 			and M.get_wrap_pair == collision_get_pair and M.is_enabled == collision_enabled
 			and M.is_wrap_on_type_enabled == collision_wrap_enabled and M.configuration_admitted == collision_admitted
 			and TextCase.is_single_character == collision_single_character
-			and rawequal(package.loaded["unicode_case"], TextCase)
+			and rawequal(package.loaded["core.text.engine.unicode_case"], TextCase)
 			and M.capture_collision_inventory == collision_factory
 	end
 	if not runtime() or route("config.toml") ~= path then return nil end

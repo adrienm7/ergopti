@@ -72,7 +72,7 @@ end
 helpers.describe("CapsWord auto-off single source (Linux)", function()
 	helpers.it("no Linux CapsWord source spells a delimiter or pointer-kind list of its own", function()
 		local forbidden_keys = {}
-		for _, def in ipairs(require("keymap.terminators_catalogue")) do
+		for _, def in ipairs(require("layouts.engine.layers.terminators_catalogue")) do
 			if def.key and not NATIVE_KEYS[def.key] then forbidden_keys[#forbidden_keys + 1] = def.key end
 		end
 		helpers.assert_true(#forbidden_keys > 10, "the catalogue must provide the delimiter keys")

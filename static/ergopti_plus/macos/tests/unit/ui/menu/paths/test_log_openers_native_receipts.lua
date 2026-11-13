@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local lfs = require("lfs")
-local shell_quote = require("text_utils").shell_quote
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 local OWNERS = { "ui.log_openers", "infra.logger", "infra.config_paths",
 	"infra.notifications", "adapters.file_system", "infra.fs_dir" }
 

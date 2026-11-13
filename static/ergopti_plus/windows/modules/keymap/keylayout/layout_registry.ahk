@@ -4,8 +4,8 @@
 ; MODULE: Layout Registry (Windows client)
 ; DESCRIPTION:
 ; Where the Windows driver finds registry layouts: the shared registry
-; settings (_shared/modules/layouts/defaults.json), the shared keycode table
-; (_shared/modules/layouts/mac_keycodes.json), the verification of a layout
+; settings (_shared/layouts/data/defaults.json), the shared keycode table
+; (_shared/layouts/data/mac_keycodes.json), the verification of a layout
 ; against its index entry, the local folder that keeps each installed
 ; <id>.keylayout (verified against the entry its installation recorded,
 ; layout_catalogue.ahk), the copy of the registry folder shipped with the
@@ -53,7 +53,7 @@ global LAYOUT_REGISTRY_ID_PATTERN := "^[a-z][a-z0-9_]*$"
 global LAYOUT_REGISTRY_PARTIAL_SUFFIX := ".download"
 
 ; User agent of every registry request: the one of the shared Lua client
-; (_shared/lua/layouts/registry.lua), pinned by test-layouts-defaults-single-source.cjs.
+; (_shared/layouts/engine/registry/registry_core.lua), pinned by test-layouts-defaults-single-source.cjs.
 global LAYOUT_REGISTRY_USER_AGENT := "ErgoptiPlus-Layouts/1.0"
 
 ; How often a running download is polled. Short enough that a layout is ready a
@@ -99,18 +99,18 @@ _LayoutRegistryReadJson(RelativePath) {
 }
 
 /**
- * The [registry] table of _shared/modules/layouts/defaults.json.
+ * The [registry] table of _shared/layouts/data/defaults.json.
  * @returns {Map}
  */
 LayoutRegistry_Settings() {
 	global _LayoutRegistryDefaults
 	if !IsObject(_LayoutRegistryDefaults)
-		_LayoutRegistryDefaults := _LayoutRegistryReadJson("modules\layouts\defaults.json")["registry"]
+		_LayoutRegistryDefaults := _LayoutRegistryReadJson("layouts\data\defaults.json")["registry"]
 	return _LayoutRegistryDefaults
 }
 
 /**
- * The [composer] table of _shared/modules/layouts/defaults.json: the reserved
+ * The [composer] table of _shared/layouts/data/defaults.json: the reserved
  * id the per-layer composer's layout is installed under, the folder that keeps
  * the user's composition and its bounds (docs/design/layout-composer.md).
  * @returns {Map}
@@ -118,7 +118,7 @@ LayoutRegistry_Settings() {
 LayoutRegistry_Composer() {
 	global _LayoutRegistryComposer
 	if !IsObject(_LayoutRegistryComposer)
-		_LayoutRegistryComposer := _LayoutRegistryReadJson("modules\layouts\defaults.json")["composer"]
+		_LayoutRegistryComposer := _LayoutRegistryReadJson("layouts\data\defaults.json")["composer"]
 	return _LayoutRegistryComposer
 }
 
@@ -129,7 +129,7 @@ _LayoutRegistryReadKeycodes(SharedRoot := unset) {
 		SharedRoot := _SharedDir
 	if !(SharedRoot is String) || SharedRoot == ""
 		throw ValueError("The original shared keycode root is unavailable.")
-	Path := SharedRoot . "\modules\layouts\mac_keycodes.json"
+	Path := SharedRoot . "\layouts\data\mac_keycodes.json"
 	if !FileExist(Path)
 		throw Error("Required shared file is missing: " . Path)
 	return JsonParse(FSReadStrict(Path))
@@ -164,7 +164,7 @@ LayoutRegistry_IsValidId(Id) {
 LayoutRegistry_RawUrl(RelativePath) {
 	global _LayoutRegistryGithub
 	if !IsObject(_LayoutRegistryGithub)
-		_LayoutRegistryGithub := _LayoutRegistryReadJson("modules\updater\defaults.json")["github"]
+		_LayoutRegistryGithub := _LayoutRegistryReadJson("updater\data\defaults.json")["github"]
 	Settings := LayoutRegistry_Settings()
 	Url := Settings["raw_url_template"]
 	for Name, Value in Map("owner", _LayoutRegistryGithub["owner"], "repo", _LayoutRegistryGithub["repo"],
@@ -492,7 +492,7 @@ _LayoutRegistryPoll(Job, Req, Polls) {
 /**
  * The AutoHotkey scan code of a key registry layouts define.
  * @param {String} Code - W3C KeyboardEvent.code.
- * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @param {Map} KeycodeTable - Parsed _shared/layouts/data/mac_keycodes.json.
  * @returns {String} "SCnnn".
  * @throws {ValueError} When no layout key has that code.
  */
@@ -648,7 +648,7 @@ LayoutRegistry_MagicKeySource(Inputs) {
  * user-owned keyboard slots, never the physical magic-key owner. A key the
  * user chose is a key of the layout they type on: only its plain press becomes
  * the magic key, and every level and chord stays the layout's, as on macOS and
- * Linux (_shared/lua/keymap/magic_key_source.lua).
+ * Linux (_shared/layouts/engine/layers/magic_key_source.lua).
  * @param {String} Scan - "SCnnn" of the physical magic key.
  * @param {Boolean} Chosen - Whether the user chose it ([hotstrings] magic_key_source).
  * @param {Boolean} CtrlSave - Whether [layout] ctrl_magic_save is on.
@@ -668,7 +668,7 @@ LayoutRegistry_MagicKeyHotkeys(Scan, Chosen, CtrlSave) {
  * The KeyboardEvent.code of a scan code, among the keys registry layouts define:
  * the reverse of LayoutRegistry_KeyScan, for a key the user just pressed.
  * @param {String} Scan - "SCnnn", any case.
- * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @param {Map} KeycodeTable - Parsed _shared/layouts/data/mac_keycodes.json.
  * @returns {String} The code, or "" when no layout key has that scan code.
  */
 LayoutRegistry_KeyCode(Scan, KeycodeTable) {

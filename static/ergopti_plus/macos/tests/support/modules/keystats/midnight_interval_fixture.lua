@@ -30,7 +30,7 @@ function M.run(options, callback)
 	return helpers.with_stub_scope({
 		"modules.keystats.context_tracker", "modules.keystats.watchers", "modules.keystats.log_manager",
 		"adapters.secure_field_detector", "adapters.task_lifecycle", "adapters.timer_scheduler",
-		"infra.logger", "infra.timings", "keystats.private_window", "keystats.physical_lifecycle_observation",
+		"infra.logger", "infra.timings", "metrics.engine.view.private_window", "metrics.engine.capture.physical_lifecycle_observation",
 	}, function()
 		local original_date, original_time = os.date, os.time
 		local state = { rows = {}, errors = {}, flushes = 0, rollover_calls = 0, rollover_accepted = false,

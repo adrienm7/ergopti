@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local HOME = "/Users/test/" .. AppDirs.macos.support_relative .. "/RemapRuntime/16.3.0-ergopti.1"
 local DIGEST = string.rep("ab", 32)

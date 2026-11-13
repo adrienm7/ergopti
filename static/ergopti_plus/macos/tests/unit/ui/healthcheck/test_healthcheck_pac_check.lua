@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local PacCheck = require("network.pac_check")
+local PacCheck = require("core.network.engine.pac_check")
 
 helpers.describe("PAC check", function()
 	helpers.it("accepts an ASCII PAC that defines FindProxyForURL", function()

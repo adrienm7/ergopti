@@ -8,7 +8,7 @@
 
 local helpers = require("tests.helpers")
 local OWNED = { "infra.logger", "adapters.http_client", "adapters.timer_scheduler",
-	"ui.menu.menu_llm.ollama_enable_probe", "llm.enable_admission" }
+	"ui.menu.menu_llm.ollama_enable_probe", "ai.engine.settings.enable_admission_core" }
 
 -- ===================================
 -- ===================================

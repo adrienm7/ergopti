@@ -10,17 +10,17 @@
 --- ==============================================================================
 
 local M = {}
-local Layers = require("keymap.layers")
-local Json = require("json")
-local Toml = require("toml_codec")
-local Writer = require("toml_codec.writer")
-local Outdated = require("config_outdated")
-local Logger = require("logger.shim")
+local Layers = require("layouts.engine.layers.layers")
+local Json = require("core.text.engine.json")
+local Toml = require("core.text.engine.toml_codec")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Outdated = require("settings.engine.migration.outdated")
+local Logger = require("core.logger.engine.shim")
 local InputEvent = require("infra.input_event")
 
 local LOG = "platform.remap.nav_layer"
 
-local Brightness = require("brightness_actions").load()
+local Brightness = require("shortcuts.engine.brightness_actions").load()
 
 local MODIFIER_KEYS = { ctrl = "ControlLeft", alt = "AltLeft", shift = "ShiftLeft", meta = "MetaLeft" }
 
@@ -107,11 +107,11 @@ local function source_ports_current()
 	if not rawequal(package.loaded["platform.remap.nav_layer"], M) or getmetatable(M) ~= nil
 		or rawget(M, "load") ~= original_load or rawget(M, "compile") ~= original_compile
 		or rawget(M, "capture_source_observation") ~= original_capture
-		or not rawequal(package.loaded["toml_codec.writer"], Writer) or getmetatable(Writer) ~= nil
+		or not rawequal(package.loaded["core.text.engine.toml_codec.writer"], Writer) or getmetatable(Writer) ~= nil
 		or rawget(Writer, "read_classified") ~= original_read
-		or not rawequal(package.loaded["json"], Json) or getmetatable(Json) ~= nil or rawget(Json, "decode") ~= original_json
-		or not rawequal(package.loaded["toml_codec"], Toml) or getmetatable(Toml) ~= nil or rawget(Toml, "decode") ~= original_toml
-		or not rawequal(package.loaded["keymap.layers"], Layers) or getmetatable(Layers) ~= nil then return false end
+		or not rawequal(package.loaded["core.text.engine.json"], Json) or getmetatable(Json) ~= nil or rawget(Json, "decode") ~= original_json
+		or not rawequal(package.loaded["core.text.engine.toml_codec"], Toml) or getmetatable(Toml) ~= nil or rawget(Toml, "decode") ~= original_toml
+		or not rawequal(package.loaded["layouts.engine.layers.layers"], Layers) or getmetatable(Layers) ~= nil then return false end
 	for _, name in ipairs(LAYER_PORT_NAMES) do
 		local port = layer_ports[name]
 		if type(port) ~= "function" or rawget(Layers, name) ~= port then return false end

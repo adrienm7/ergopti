@@ -161,7 +161,7 @@ final class EmbeddedFatalReportTests: XCTestCase {
 
 	private static let localesDirectory = URL(fileURLWithPath: #filePath)
 		.deletingLastPathComponent()
-		.appendingPathComponent("../../../../_shared/data/locales")
+		.appendingPathComponent("../../../../_shared/core/i18n/data/locales")
 		.standardizedFileURL.path
 
 	func testStoreReadsWhatItWasGivenAndClearsIt() throws {

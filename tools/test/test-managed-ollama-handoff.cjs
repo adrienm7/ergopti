@@ -29,7 +29,7 @@ const { API_PAGE_SIZE } = require('../ci/github-api-page.cjs');
 const { roleLot } = require('../ci/macos-stage-roles.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CONTRACT_PATH = 'static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json';
+const CONTRACT_PATH = 'static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json';
 const CONTRACT_BYTES = fs.readFileSync(path.join(ROOT, CONTRACT_PATH));
 const CONTRACT = JSON.parse(CONTRACT_BYTES.toString('utf8'));
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');

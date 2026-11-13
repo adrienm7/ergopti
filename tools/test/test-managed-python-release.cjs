@@ -49,7 +49,7 @@ const output = render(data, identifiers);
 assert.equal(identifiers.hosts.github, 'github.com');
 assert.ok(
 	output[SHELL_OUTPUT].includes(
-		'\n. "$(dirname "${BASH_SOURCE[0]}")/../../../_shared/data/identifiers.sh" || return 78\n'
+		'\n. "$(dirname "${BASH_SOURCE[0]}")/../../../_shared/core/text/data/identifiers.sh" || return 78\n'
 	),
 	'the projection sources the shared host before it names a download'
 );
@@ -77,7 +77,7 @@ assert.ok(
 assert.deepEqual(JSON.parse(output[METADATA_OUTPUT]), data.downloads);
 assert.equal(
 	LUA_LOCATOR_OUTPUT,
-	'static/ergopti_plus/_shared/lua/core/llm/managed_python_locator.lua'
+	'static/ergopti_plus/_shared/core/lifecycle/engine/core/managed_python_locator.lua'
 );
 assert.match(
 	output[LUA_LOCATOR_OUTPUT],
@@ -189,7 +189,7 @@ for (const prefix of nativePrefixes) {
 		for (const relative of [
 			SOURCE,
 			IDENTIFIERS,
-			'static/ergopti_plus/_shared/data/identifiers.sh',
+			'static/ergopti_plus/_shared/core/text/data/identifiers.sh',
 			'static/ergopti_plus/macos/modules/llm/uv-release.sh'
 		]) {
 			const target = path.join(temporary, relative);
@@ -282,7 +282,7 @@ for (const prefix of nativePrefixes) {
 		// Without the shared identifiers the selection stops instead of naming a hostless URL.
 		const shellIdentifiers = path.join(
 			temporary,
-			'static/ergopti_plus/_shared/data/identifiers.sh'
+			'static/ergopti_plus/_shared/core/text/data/identifiers.sh'
 		);
 		const identifierBytes = fs.readFileSync(shellIdentifiers);
 		fs.unlinkSync(shellIdentifiers);

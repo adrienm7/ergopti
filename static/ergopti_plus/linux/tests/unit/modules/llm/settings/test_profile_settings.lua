@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
-local RegistryCodec = require("llm.profile_registry_codec")
+local RegistryCodec = require("ai.engine.settings.profile_registry_codec")
 
 
 --- Binds the actual idle live owner without replacing the profile/save collaborators.
@@ -83,7 +83,7 @@ helpers.describe("model profile recommendation: shared policy", function()
 		local catalogue = { 42, { families = 12 }, { families = { false, { models = 1 },
 			{ models = { 42, { name = "Valid", type = "completion" } } } } } }
 		local policy = { advanced_min_parameters_b = 2, batch_min_parameters_b = 4 }
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local original, warnings = logger.warn, {}
 		logger.warn = function(_, message) warnings[#warnings + 1] = message end
 		local ok, err = pcall(function()
@@ -350,17 +350,17 @@ helpers.describe("LLM user profiles: tray reachability", function()
 		}), true)
 		helpers.assert_eq(settings.list_user()[1].label, "Menu updated")
 		local Paths = require("infra.paths")
-		local Json = require("json")
-		local file = assert(io.open(Paths.shared("modules/menu/menu_manifest.json"), "r"))
+		local Json = require("core.text.engine.json")
+		local file = assert(io.open(Paths.shared("menu/data/menu_manifest.json"), "r"))
 		local document = Json.decode(file:read("*a"))
 		file:close()
 		document.llm_profile_commands[1].i18n = "button.cancel"
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "linux",
-			manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 			json_decode = function() return document end,
 			i18n = require("infra.i18n"),
-			logger = require("logger.shim"),
+			logger = require("core.logger.engine.shim"),
 		}))
 		replace("infra.manifest_menu", renderer)
 		menu_builder = helpers.load_module("ui.menu.builder")
@@ -392,7 +392,7 @@ helpers.describe("LLM profile settings: a prompt named by a binding", function()
 		for index, profile in ipairs(settings.list_built_in()) do ids[index] = profile.id end
 		helpers.assert_eq(table.concat(ids, ","),
 			"raw,basic,advanced,batch_advanced,rewrite,tone_familiar,tone_neutral,tone_formal,tone_very_formal,translate_en,translate_ja")
-		helpers.assert_true(require("llm.rewrite").is_rewrite_profile(settings.resolve_id("rewrite")),
+		helpers.assert_true(require("ai.engine.prediction.rewrite").is_rewrite_profile(settings.resolve_id("rewrite")),
 			"the rewrite built-in is recognised by its prompt")
 		helpers.assert_true(settings.set("active", "rewrite", "small"), "and selectable like the others")
 		restore()
@@ -536,15 +536,15 @@ helpers.describe("shared Clone Profile command", function()
 			helpers.assert_eq(fresh_clone.fn(), false, "a fresh row still preserves native editor refusal")
 			helpers.assert_eq(calls, 2)
 			local Paths = require("infra.paths")
-			local file = assert(io.open(Paths.shared("modules/menu/menu_manifest.json"), "r"))
-			local manifest = require("json").decode(file:read("*a"))
+			local file = assert(io.open(Paths.shared("menu/data/menu_manifest.json"), "r"))
+			local manifest = require("core.text.engine.json").decode(file:read("*a"))
 			file:close()
 			for _, declaration in ipairs(manifest.llm_profile_commands) do
 				if declaration.id == "llm_profile_clone" then declaration.i18n = "button.cancel" end
 			end
-			replace("infra.manifest_menu", assert(require("menu.renderer").new({
-				platform = "linux", manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
-				json_decode = function() return manifest end, i18n = i18n, logger = require("logger.shim"),
+			replace("infra.manifest_menu", assert(require("menu.engine.renderer").new({
+				platform = "linux", manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
+				json_decode = function() return manifest end, i18n = i18n, logger = require("core.logger.engine.shim"),
 			})))
 			builder = helpers.load_module("ui.menu.builder")
 			local changed = find(builder.build(context), i18n.get("button.cancel"))

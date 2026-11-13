@@ -32,7 +32,7 @@ local M = {}
 local Logger         = require("infra.logger")
 local Injector       = require("adapters.modifier_injector")
 local TimerScheduler = require("adapters.timer_scheduler")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "gestures.sticky"
 

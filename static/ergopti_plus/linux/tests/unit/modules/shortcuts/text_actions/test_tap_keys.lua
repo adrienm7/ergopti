@@ -17,8 +17,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local TomlCodec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local TomlCodec = require("core.text.engine.toml_codec")
 
 -- fr(azerty) and us(intl), cut to the three keys: TLDE (KEY_GRAVE, 41), AE11
 -- (KEY_MINUS, 12) and AE12 (KEY_EQUAL, 13). XKB keycodes are evdev + 8.
@@ -107,7 +107,7 @@ helpers.describe("Linux number-row tap keys (tap-keys)", function()
 
 	helpers.it("tap-config-owner: refuses a file change between admission and write", function()
 		local TapKeys, log = fresh({ ["shortcuts.tap_keys.number_row_left"] = "screen_capture" })
-		local Writer, original = require("toml_codec.writer"), require("toml_codec.writer").batch_write
+		local Writer, original = require("core.text.engine.toml_codec.writer"), require("core.text.engine.toml_codec.writer").batch_write
 		local external = '[shortcuts.tap_keys]\nnumber_row_left = "send_shortcut"\n'
 		local ok, err = pcall(function()
 			helpers.assert_eq(TapKeys.get_action("number_row_left"), "screen_capture")

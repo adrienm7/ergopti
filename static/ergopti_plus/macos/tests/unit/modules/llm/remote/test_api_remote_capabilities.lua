@@ -18,7 +18,7 @@
 local helpers = require("tests.helpers")
 
 -- The shared logger keeps one process identity, as in the canonical runner.
-require("logger")
+require("core.logger.engine")
 
 --- The recorded listing answers of the shared corpus.
 --- @return table answers listing -> decoded body
@@ -26,25 +26,25 @@ local function answers()
 	local fh = assert(io.open(helpers.shared("tests/corpus/llm/model_capabilities_vectors.json"), "r"))
 	local raw = fh:read("*a")
 	fh:close()
-	return assert(require("json").decode(raw)).answers
+	return assert(require("core.text.engine.json").decode(raw)).answers
 end
 
 local function with_remote(callback)
 	helpers.with_stub_scope({
 		"modules.llm.api_remote", "modules.llm.api_token_crypto", "modules.keystats",
 		"modules.shortcuts.script_control", "adapters.http_client",
-		"llm.remote_response_classifier", "modules.llm.local_servers",
+		"ai.engine.policy.remote_response_classifier", "modules.llm.local_servers",
 		"modules.llm.provider_uses", "modules.llm.progressive_reveal",
 		"modules.llm.api_common", "modules.llm.profiles", "modules.llm.parser",
 		"infra.logger", "adapters.timer_scheduler", "adapters.file_system",
 		"adapters.json_codec", "adapters.storage", "infra.manifest_reader",
-		"llm.provider_config_policy", "llm.remote_formats", "llm.profile_selector",
-		"llm.parser", "llm.prompt_builder", "llm.local_server_auth", "llm.thinking_off", "llm.local_server_discovery",
-		"llm.model_capabilities", "modules.llm.thinking_families",
-		"compat.utf8", "config_defaults", "diagnostics.operation_reporter",
-		"hotstrings.personal_files", "infra.fs_dir", "infra.toml.reader",
-		"json", "lfs", "logger.shim", "text_utils", "toml_codec.basic_string",
-		"toml_codec.bom", "toml_codec.key_path", "toml_codec.reader", "toml_codec.record_scanner",
+		"ai.engine.policy.provider_config_policy", "ai.engine.api.remote_formats", "ai.engine.settings.profile_selector",
+		"ai.engine.api.parser_core", "ai.engine.prediction.prompt_builder_core", "ai.engine.local_servers.auth", "ai.engine.policy.thinking_off", "ai.engine.local_servers.discovery",
+		"ai.engine.local_servers.model_capabilities", "modules.llm.thinking_families",
+		"core.lifecycle.engine.compat.utf8", "settings.engine.publication.defaults", "diagnostics.engine.operation_reporter",
+		"hotstrings.engine.catalogue.personal_files", "infra.fs_dir", "infra.toml.reader",
+		"core.text.engine.json", "lfs", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
+		"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 	}, function()
 		local pending, posts, gets, timers, clients = {}, {}, {}, {}, 0
 		package.loaded["infra.logger"] = {
@@ -107,7 +107,7 @@ local function chat(remote, io, provider, model)
 	remote.request_chat(provider, model, { model = model, max_tokens = 16, messages = {} }, function() end, function() end)
 	while io.pending[1] do table.remove(io.pending, 1).done(true, "cleartext-key") end
 	helpers.assert_eq(#io.posts, before + 1, "one request is posted")
-	return require("json").decode(io.posts[#io.posts].body)
+	return require("core.text.engine.json").decode(io.posts[#io.posts].body)
 end
 
 --- Runs the scheduled timers once.
@@ -134,7 +134,7 @@ helpers.describe("api_remote: capability listings skip what a model lacks (think
 			helpers.assert_eq(#io.gets, 1, "one listing request")
 			helpers.assert_true(io.gets[1].url:find("/models?limit=1000", 1, true) ~= nil, io.gets[1].url)
 			helpers.assert_eq(io.gets[1].headers["x-api-key"], "cleartext-key", "the entry's key reads it")
-			io.gets[1].done({ ok = true, status = 200, body = require("json").encode(answers().anthropic) })
+			io.gets[1].done({ ok = true, status = 200, body = require("core.text.engine.json").encode(answers().anthropic) })
 			helpers.assert_eq(chat(remote, io, "anthropic", "claude-opus-5").thinking, nil,
 				"the listing says disabled is not supported")
 			helpers.assert_eq(chat(remote, io, "anthropic", "claude-sonnet-5").thinking.type, "disabled",

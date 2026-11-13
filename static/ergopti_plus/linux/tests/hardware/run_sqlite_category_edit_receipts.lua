@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-category-transactions-XXXXXX"))
 local previous_xdg = {}
 local checks, failures = 0, 0
@@ -48,8 +48,8 @@ local function check(name, fn)
 	end
 end
 
-local Store = require("keystats.app_category_store")
-local Json = require("json")
+local Store = require("metrics.engine.apps.category_store")
+local Json = require("core.text.engine.json")
 local category_path = root .. "/config/ergopti/" .. Store.FILE_NAME
 
 local function read_category_file()

@@ -13,12 +13,12 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 -- API keys live in the desktop secret service: this process gets the in-memory
 -- one the unit runner uses, never a keyring the container does not run.
 require("tests.support.secret_service_fake").isolate()
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 for _, level in ipairs({ "error", "warn", "info" }) do
 	local original = Logger[level]
 	Logger[level] = function(tag, format, ...)

@@ -5,11 +5,11 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
-local Transaction = require("config_scope_transaction")
-local FencedTransaction = require("config_scope_fenced_transaction")
-local Codec = require("toml_codec")
-local Logger = require("logger.shim")
-local KEY = require("config_keys").KEY
+local Transaction = require("settings.engine.scope.transaction")
+local FencedTransaction = require("settings.engine.scope.fenced_transaction")
+local Codec = require("core.text.engine.toml_codec")
+local Logger = require("core.logger.engine.shim")
+local KEY = require("settings.engine.keys").KEY
 local LOG = "infra.metrics_scope"
 local _owner, _sequence = nil, 0
 require("infra.scope_registry").register("metrics_scope", function() return _owner ~= nil and _owner.pending() == true end)
@@ -102,7 +102,7 @@ end
 --- The metrics participant of a composed scope, bound to the retained owner.
 --- @return table participant See config_scope_composition.
 function M.participant()
-	return require("config_scope_participant").synchronous({
+	return require("settings.engine.scope.participant").synchronous({
 		apply = function(mode) return M.apply(mode) end,
 		owner = function() return _owner end,
 	})

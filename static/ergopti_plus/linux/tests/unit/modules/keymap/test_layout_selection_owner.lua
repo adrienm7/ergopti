@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Controller = require("layouts.manager_bridge")
+local Json = require("core.text.engine.json")
+local Controller = require("layouts.engine.manager_bridge")
 
 --- Runs a fresh real registry with controlled native completion ordering.
 --- @param body function Receives the registry, dependencies and observable world.

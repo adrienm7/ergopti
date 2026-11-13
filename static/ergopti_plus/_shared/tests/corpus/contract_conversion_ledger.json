@@ -13,7 +13,7 @@
 			"windows_consumer": "One AHK consumer calls the Windows TOML batch writer's prepare step for each vector and compares accepted, detail and candidate bytes; decoded checks use the Windows TOML codec.",
 			"sources": [
 				{
-					"contract": "static/ergopti_plus/_shared/lua/test/toml_batch_existing_key_contract.lua",
+					"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_batch_existing_key_contract.lua",
 					"moved": [
 						{
 							"case": "deletes a table declared by an empty header and keeps every comment",
@@ -89,7 +89,7 @@
 					]
 				},
 				{
-					"contract": "static/ergopti_plus/_shared/lua/test/toml_quoted_headers_contract.lua",
+					"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_quoted_headers_contract.lua",
 					"moved": [
 						{
 							"case": "deletes an owned extension leaf while preserving all neighboring bytes",
@@ -150,7 +150,7 @@
 					]
 				},
 				{
-					"contract": "static/ergopti_plus/_shared/lua/test/toml_dotted_keys_contract.lua",
+					"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_dotted_keys_contract.lua",
 					"moved": [
 						{
 							"case": "unchanged dotted value keeps every original byte",
@@ -376,7 +376,7 @@
 			"windows_consumer": "One AHK consumer calls the Windows writer's inline hint step and prepare step on (source, rows) and decodes the candidate for the decoded checks.",
 			"sources": [
 				{
-					"contract": "static/ergopti_plus/_shared/lua/test/toml_batch_existing_key_contract.lua",
+					"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_batch_existing_key_contract.lua",
 					"moved": [
 						{
 							"case": "withholds the entire mixed inline group ",
@@ -481,7 +481,7 @@
 			"windows_consumer": "One AHK consumer calls the Windows leaf-row planner and batch writer in that order and decodes the candidate for the decoded checks.",
 			"sources": [
 				{
-					"contract": "static/ergopti_plus/_shared/lua/test/toml_leaf_rows_contract.lua",
+					"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_leaf_rows_contract.lua",
 					"moved": [
 						{
 							"case": "writes bare leaves as ordinary table rows in an absent file",
@@ -516,7 +516,7 @@
 					]
 				},
 				{
-					"contract": "static/ergopti_plus/_shared/lua/test/toml_batch_existing_key_contract.lua",
+					"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_batch_existing_key_contract.lua",
 					"moved": [
 						{
 							"case": "keeps genuine source-shaped scalar requests exact despite decoded integer aliasing",
@@ -538,7 +538,7 @@
 			"windows_consumer": "One AHK consumer calls the Windows hotstring TOML reader on each text and compares the committed verdict, sections, first output, order, source entry count and metadata delays.",
 			"sources": [
 				{
-					"contract": "static/ergopti_plus/_shared/lua/test/toml_quoted_headers_contract.lua",
+					"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_quoted_headers_contract.lua",
 					"moved": [
 						{
 							"case": "(toml-hotstring-header) rejects an incomplete or malformed header ",
@@ -655,7 +655,7 @@
 			"windows_consumer": "One AHK consumer builds the frame row in the Windows menu engine, applies each named mutation and compares the label or the refusal.",
 			"sources": [
 				{
-					"contract": "static/ergopti_plus/_shared/lua/test/menu_numbered_caption_contract.lua",
+					"contract": "static/ergopti_plus/_shared/tests/lua/menu/numbered_caption_contract.lua",
 					"moved": [
 						{
 							"absent": [
@@ -700,7 +700,7 @@
 			"windows_consumer": "One AHK consumer calls the Windows manifest reader's scope inventory and plan with an owner built from the generated action catalogue.",
 			"sources": [
 				{
-					"contract": "static/ergopti_plus/_shared/lua/test/config_scope_plan_contract.lua",
+					"contract": "static/ergopti_plus/_shared/tests/lua/settings/scope_plan_contract.lua",
 					"moved": [
 						{
 							"absent": [
@@ -765,7 +765,7 @@
 	},
 	"contracts": [
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/config_scope_composition_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/scope_composition_contract.lua",
 			"lua_sites": 40,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -932,7 +932,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/config_scope_file_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/scope_file_contract.lua",
 			"lua_sites": 6,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -963,7 +963,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/config_scope_plan_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/scope_plan_contract.lua",
 			"lua_sites": 14,
 			"data_driven": [
 				{
@@ -1027,7 +1027,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/config_scope_script_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/scope_script_contract.lua",
 			"lua_sites": 11,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1078,7 +1078,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/config_scope_script_field_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/scope_script_field_contract.lua",
 			"lua_sites": 7,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1113,7 +1113,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/config_scope_script_level_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/scope_script_level_contract.lua",
 			"lua_sites": 3,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1132,7 +1132,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/config_scope_script_runtime_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/scope_script_runtime_contract.lua",
 			"lua_sites": 15,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1199,7 +1199,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/config_scope_transaction_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/scope_transaction_contract.lua",
 			"lua_sites": 33,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1338,7 +1338,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_caption_layout_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/caption_layout_contract.lua",
 			"lua_sites": 5,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1366,7 +1366,7 @@
 			"row_corpus": "menus/inert_caption_layouts.json"
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_command_group_affix_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/command_group_affix_contract.lua",
 			"lua_sites": 13,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1426,7 +1426,7 @@
 			"row_corpus": "menus/command_group_caption_layouts.json"
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_command_literal_prefix_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/command_literal_prefix_contract.lua",
 			"lua_sites": 7,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1462,7 +1462,7 @@
 			"row_corpus": "menus/command_literal_prefixes.json"
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_disabled_reasons_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/disabled_reasons_contract.lua",
 			"lua_sites": 1,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1474,7 +1474,7 @@
 			"row_corpus": "menus/disabled_reasons.json"
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_dynamic_caption_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/dynamic_caption_contract.lua",
 			"lua_sites": 7,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1510,7 +1510,7 @@
 			"row_corpus": "menus/inert_dynamic_captions.json"
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_fixed_feature_parent_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/fixed_feature_parent_contract.lua",
 			"lua_sites": 5,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1538,7 +1538,7 @@
 			"row_corpus": "menus/fixed_feature_parents.json"
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_group_row_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/group_row_contract.lua",
 			"lua_sites": 17,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1613,7 +1613,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_layout_caption_values_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/layout_caption_values_contract.lua",
 			"lua_sites": 8,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1653,7 +1653,7 @@
 			"row_corpus": "menus/layout_caption_values.json"
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_magic_frame_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/magic_frame_contract.lua",
 			"lua_sites": 6,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1684,7 +1684,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_native_child_rows.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/native_child_rows.lua",
 			"lua_sites": 6,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1715,7 +1715,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_native_composition.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/native_composition.lua",
 			"lua_sites": 7,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1750,7 +1750,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_numbered_caption_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/numbered_caption_contract.lua",
 			"lua_sites": 5,
 			"data_driven": [
 				{
@@ -1778,14 +1778,14 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_off_platform.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/off_platform.lua",
 			"lua_sites": 0,
 			"note": "A helper module for the menu contracts: it registers no case of its own.",
 			"data_driven": [],
 			"stays_in_lua": []
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_parent_source_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/parent_source_contract.lua",
 			"lua_sites": 9,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1828,7 +1828,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_personal_info_source_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/personal_info_source_contract.lua",
 			"lua_sites": 5,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1855,7 +1855,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_platform_lookup.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/platform_lookup.lua",
 			"lua_sites": 8,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1894,7 +1894,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_row_dialect_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/row_dialect_contract.lua",
 			"lua_sites": 6,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -1925,7 +1925,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_row_order_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/row_order_contract.lua",
 			"lua_sites": 4,
 			"data_driven": [
 				{
@@ -1949,28 +1949,28 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_row_text.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/row_text.lua",
 			"lua_sites": 0,
 			"note": "A helper module for the tray text walks: it registers no case of its own.",
 			"data_driven": [],
 			"stays_in_lua": []
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_section_headers.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/section_headers.lua",
 			"lua_sites": 0,
 			"note": "A helper module for the section header checks of the tray walks: it registers no case of its own.",
 			"data_driven": [],
 			"stays_in_lua": []
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_separators.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/separators.lua",
 			"lua_sites": 0,
 			"note": "A helper module for the menu contracts: it registers no case of its own.",
 			"data_driven": [],
 			"stays_in_lua": []
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_separators_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/separators_contract.lua",
 			"lua_sites": 2,
 			"data_driven": [
 				{
@@ -1986,7 +1986,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/menu_top_level_separator_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/menu/top_level_separator_contract.lua",
 			"lua_sites": 5,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -2014,7 +2014,7 @@
 			"row_corpus": "menus/top_level_separators_original.json"
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/toml_batch_existing_key_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_batch_existing_key_contract.lua",
 			"lua_sites": 10,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -2061,7 +2061,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/toml_document_shapes_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_document_shapes_contract.lua",
 			"lua_sites": 12,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -2116,7 +2116,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/toml_dotted_keys_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_dotted_keys_contract.lua",
 			"lua_sites": 10,
 			"data_driven": [
 				{
@@ -2164,7 +2164,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/toml_leaf_rows_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_leaf_rows_contract.lua",
 			"lua_sites": 2,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -2179,7 +2179,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/toml_noop_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_noop_contract.lua",
 			"lua_sites": 4,
 			"data_driven": [
 				{
@@ -2203,7 +2203,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/toml_quoted_headers_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_quoted_headers_contract.lua",
 			"lua_sites": 8,
 			"data_driven": [],
 			"stays_in_lua": [
@@ -2242,7 +2242,7 @@
 			]
 		},
 		{
-			"contract": "static/ergopti_plus/_shared/lua/test/toml_source_preservation_contract.lua",
+			"contract": "static/ergopti_plus/_shared/tests/lua/settings/toml_source_preservation_contract.lua",
 			"lua_sites": 1,
 			"data_driven": [
 				{

@@ -14,13 +14,13 @@ helpers.describe("linux-callback-error-description", function()
 		{ name = "fraction", value = -0.125 }, { name = "false", value = false },
 		{ name = "true", value = true }, { name = "nil" } }) do
 		helpers.it("linux-callback-error-description: preserves " .. case.name .. " text", function()
-			local policy = require("error_description")
+			local policy = require("diagnostics.engine.reports.error_description")
 			helpers.assert_eq(policy.describe(case.value), tostring(case.value))
 		end)
 	end
 	for _, throwing in ipairs({ false, true }) do
 		helpers.it("linux-callback-error-description: never runs a " .. (throwing and "throwing" or "successful") .. " object formatter", function()
-			local policy = require("error_description")
+			local policy = require("diagnostics.engine.reports.error_description")
 			local calls = 0
 			local failure = setmetatable({}, { __tostring = function()
 				calls = calls + 1
@@ -32,7 +32,7 @@ helpers.describe("linux-callback-error-description", function()
 		end)
 	end
 	helpers.it("linux-callback-error-description: describes functions and threads without invocation", function()
-		local policy = require("error_description")
+		local policy = require("diagnostics.engine.reports.error_description")
 		local calls = 0
 		local function failure() calls = calls + 1 end
 		helpers.assert_eq(policy.describe(failure), "error object (function)")
@@ -40,7 +40,7 @@ helpers.describe("linux-callback-error-description", function()
 		helpers.assert_eq(calls, 0)
 	end)
 	helpers.it("linux-callback-error-description: describes actual userdata by type", function()
-		local policy = require("error_description")
+		local policy = require("diagnostics.engine.reports.error_description")
 		local file = assert(io.tmpfile())
 		local description = policy.describe(file)
 		assert(file:close())
@@ -113,10 +113,10 @@ helpers.describe("linux-http-callback-error-description", function()
 		local logs = {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...) logs[#logs + 1] = string.format(message, ...) end
-		local previous_logger, previous_client = package.loaded["logger.shim"], package.loaded["adapters.curl_http_client"]
-		package.loaded["logger.shim"], package.loaded["adapters.curl_http_client"] = logger, nil
+		local previous_logger, previous_client = package.loaded["core.logger.engine.shim"], package.loaded["adapters.curl_http_client"]
+		package.loaded["core.logger.engine.shim"], package.loaded["adapters.curl_http_client"] = logger, nil
 		local loaded, client = pcall(require, "adapters.curl_http_client")
-		package.loaded["logger.shim"], package.loaded["adapters.curl_http_client"] = previous_logger, previous_client
+		package.loaded["core.logger.engine.shim"], package.loaded["adapters.curl_http_client"] = previous_logger, previous_client
 		if not loaded then error(client, 0) end
 		return client, logs
 	end

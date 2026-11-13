@@ -49,7 +49,7 @@ const LLM_PROMPT_CORPUS = path.join(
 	'llm_prompt_vectors.json'
 );
 const VISION_CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'llm', 'vision_vectors.json');
-const VOCABULARY = path.join(SP, '_shared', 'modules', 'actions', 'send_keys.json');
+const VOCABULARY = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'send_keys.json');
 
 /** Admits only the exact canonical scope record and one host line terminator. */
 function sdkScopeRecordMatches(output, scope) {

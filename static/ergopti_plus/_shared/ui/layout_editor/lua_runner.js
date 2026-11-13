@@ -4,14 +4,14 @@
  * ==============================================================================
  * MODULE: Layout Editor Lua Runner
  * DESCRIPTION:
- * Runs the shared Lua export adapter (_shared/lua/layouts/source_export.lua)
+ * Runs the shared Lua export adapter (_shared/layouts/engine/composer/source_export.lua)
  * in the page through the vendored fengari VM (vendor/fengari-web.js, Lua 5.3),
  * so the browser reads a .keylayout and converts it to XKB with the code the
  * repository tool runs under Lua 5.4 (tools/lib/layout_source_export.lua).
  *
  * FEATURES & RATIONALE:
  * 1. One module list: MODULES names every Lua module the adapter loads; the
- *    host fetches exactly those sources (`../../lua/<name>.lua`).
+ *    host fetches exactly those sources (`../../<name>.lua`).
  * 2. Same data path as the tool: the input crosses as JSON text and the
  *    result comes back as the Lua json module's encoding.
  * 3. Fail fast: a module that does not compile, or a Lua error, throws with
@@ -24,19 +24,19 @@ var LayoutLuaRunner = (function () {
 
 	// Every module source_export.lua requires, directly or not, in load order.
 	const MODULES = [
-		'compat.utf8',
-		'json',
-		'table_util',
-		'layouts.keylayout',
-		'layouts.xkb_converter',
-		'layouts.source_export'
+		'core.lifecycle.engine.compat.utf8',
+		'core.text.engine.json',
+		'core.text.engine.table_util',
+		'layouts.engine.composer.keylayout',
+		'layouts.engine.composer.xkb_converter',
+		'layouts.engine.composer.source_export'
 	];
 
 	// Encodes the step's result with the shared json module, as the tool's adapter does.
 	const ENTRY =
 		'local step, text = ...\n' +
-		'local Json = require("json")\n' +
-		'local SourceExport = require("layouts.source_export")\n' +
+		'local Json = require("core.text.engine.json")\n' +
+		'local SourceExport = require("layouts.engine.composer.source_export")\n' +
 		'return Json.encode(SourceExport[step](assert(Json.decode(text))))\n';
 
 	/**

@@ -41,11 +41,11 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
 
 // All three Lua trees. The trap is a property of the language, not of a driver,
-// and _shared/lua is consumed by two of them.
+// and _shared is consumed by two of them.
 const TREES = [
 	{ name: 'macos', dir: path.join(DRIVERS, 'macos') },
 	{ name: 'linux', dir: path.join(DRIVERS, 'linux') },
-	{ name: '_shared', dir: path.join(DRIVERS, '_shared', 'lua') }
+	{ name: '_shared', dir: path.join(DRIVERS, '_shared') }
 ];
 
 // Third-party source is not ours to fix, and tests may construct the shape on

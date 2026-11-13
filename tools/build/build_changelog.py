@@ -33,9 +33,10 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-# The GitHub host is declared once in _shared/data/identifiers.json.
+# The GitHub host is declared once in _shared/core/text/data/identifiers.json.
 _IDENTIFIERS = (
-    Path(__file__).resolve().parents[2] / "static/ergopti_plus/_shared/data/identifiers.py"
+    Path(__file__).resolve().parents[2]
+    / "static/ergopti_plus/_shared/core/text/data/identifiers.py"
 )
 sys.path.insert(0, str(_IDENTIFIERS.parent))
 _bytecode_default = sys.dont_write_bytecode

@@ -10,7 +10,7 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Scope = require("config_scope_transaction")
+local Scope = require("settings.engine.scope.transaction")
 local Logger = require("infra.logger")
 local LOG = "scoped_preferences"
 

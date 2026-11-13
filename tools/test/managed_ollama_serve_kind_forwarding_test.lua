@@ -10,12 +10,12 @@ end
 local api = read("modules/llm/api_ollama.lua")
 local body = assert(api:match("(local resolved_ok, ollama_bin, binary_err, source_kind.-)\n%s*local serve_handle"),
 	"The canonical API must classify before foreground acquisition")
-local Choice = assert(loadfile(root .. "/static/ergopti_plus/_shared/lua/core/llm/ollama_runtime_choice.lua"))()
+local Choice = assert(loadfile(root .. "/static/ergopti_plus/_shared/core/lifecycle/engine/core/ollama_runtime_choice.lua"))()
 local binary, source_kind, authorized = "/canonical/ollama", "native_managed", true
 local built, failure, detail = {}, nil, nil
 -- The extracted body names its refusals by the API's module-level `Errors`
 -- upvalue (the closed adapter error ids); provide the same real module.
-local Errors = assert(loadfile(production .. "/static/ergopti_plus/_shared/lua/adapter_errors.lua"))()
+local Errors = assert(loadfile(production .. "/static/ergopti_plus/_shared/diagnostics/engine/adapter_errors.lua"))()
 local environment = setmetatable({
 	Errors = Errors,
 	OllamaBinary = { resolve = function() return binary, "controlled-refusal", source_kind end },

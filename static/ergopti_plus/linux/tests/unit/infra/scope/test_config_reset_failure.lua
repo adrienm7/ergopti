@@ -9,4 +9,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.config_reset_failure_contract")(helpers, require("json"), helpers.driver_root() .. "/../_shared")
+require("tests.lua.settings.reset_failure_contract")(helpers, require("core.text.engine.json"), helpers.driver_root() .. "/../_shared")

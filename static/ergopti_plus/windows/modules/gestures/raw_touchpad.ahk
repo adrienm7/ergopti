@@ -41,7 +41,7 @@ global _RawTouchpadOwner := ""
 global _RawTouchpadReceiver := ""
 
 ; The sensitivity choices, in millimetres: the copy of
-; _shared/lua/gestures/sensitivity.lua's OPTIONS that
+; _shared/gestures/engine/sensitivity.lua's OPTIONS that
 ; test_gesture_incremental_rule.ahk pins to the shared menu corpus.
 global GESTURE_SENSITIVITY_OPTIONS := [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0,
 	7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0, 40.0, 50.0, 60.0]

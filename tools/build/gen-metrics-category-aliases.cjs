@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Metrics Default-Category Alias Generator
  * DESCRIPTION:
- * Emits _shared/data/metrics_general_category_aliases.json — every localised
+ * Emits _shared/metrics/data/metrics_general_category_aliases.json — every localised
  * spelling of the metrics "General" category, in every shipped locale — and
  * the page-data script _shared/ui/_generated/metrics_general_category_aliases.js
  * built from the same document (a page cannot read the JSON file, so the apps
@@ -38,12 +38,22 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const LOCALES_DIR = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales');
+const LOCALES_DIR = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'i18n',
+	'data',
+	'locales'
+);
 const OUT = path.join(
 	ROOT,
 	'static',
 	'ergopti_plus',
 	'_shared',
+	'metrics',
 	'data',
 	'metrics_general_category_aliases.json'
 );
@@ -97,7 +107,7 @@ function renderScript(doc) {
 		'// _shared/ui/_generated/metrics_general_category_aliases.js\n\n' +
 		'// ==========================================\n' +
 		'// AUTO-GENERATED — do not edit manually\n' +
-		'// Source: static/ergopti_plus/_shared/data/metrics_general_category_aliases.json\n' +
+		'// Source: static/ergopti_plus/_shared/metrics/data/metrics_general_category_aliases.json\n' +
 		'// Run: node tools/build/gen-metrics-category-aliases.cjs\n' +
 		'// ==========================================\n\n' +
 		'// Every localised spelling of the metrics default category, as page data.\n' +

@@ -15,7 +15,7 @@
 --- Exits 0 and prints "ALL SAME" when every case agrees.
 --- ==============================================================================
 
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local ffi = require("ffi")
 local luv = require("luv")
 local DisplayServer = require("infra.display_server")

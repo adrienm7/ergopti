@@ -2,11 +2,11 @@
 
 --- Retains exact synthetic buttons and bounded native helpers through retirement.
 local M = {}
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 local Process = require("adapters.owned_process")
 local Timings = require("infra.timings")
 local Clock = require("infra.monotonic")
-local warn = require("logger.shim").warn
+local warn = require("core.logger.engine.shim").warn
 local LOG = "modules.gestures.click_hold"
 
 --- Builds a button owner; only native physical settlement can authorize an UP.

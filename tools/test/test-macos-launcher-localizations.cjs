@@ -12,7 +12,7 @@
  * ROOT CAUSE ENCODED:
  * 1. generate_info_plist declares CFBundleDevelopmentRegion (en) and a
  *    CFBundleLocalizations array filled by tools/build/launcher_localizations.py;
- * 2. that helper lists every locale of _shared/data/locale_order.json, in
+ * 2. that helper lists every locale of _shared/core/i18n/data/locale_order.json, in
  *    order, in macOS identifiers (no -> nb, zh -> zh-Hans), with no duplicate,
  *    so a language added to the driver is declared without a second edit;
  * 3. every declared localization names a locale catalogue the bundle ships.
@@ -28,7 +28,7 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..', '..');
 const BUILD_SCRIPT = path.join(ROOT, 'tools', 'build', 'build_macos_app.sh');
 const HELPER = path.join(ROOT, 'tools', 'build', 'launcher_localizations.py');
-const SHARED_DATA = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data');
+const SHARED_DATA = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const APPLE_IDENTIFIERS = { no: 'nb', zh: 'zh-Hans' };
 
 const failures = [];
@@ -76,7 +76,7 @@ const run = spawnSync(python, [HELPER], { encoding: 'utf8' });
 expect(run.status === 0, `launcher_localizations.py failed: ${(run.stderr || '').trim()}`);
 const declared = [...(run.stdout || '').matchAll(/<string>([^<]+)<\/string>/g)].map((m) => m[1]);
 const order = JSON.parse(
-	fs.readFileSync(path.join(SHARED_DATA, 'locale_order.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED_DATA, 'core/i18n/data/locale_order.json'), 'utf8')
 ).order;
 const expected = order.map((code) => APPLE_IDENTIFIERS[code] || code);
 expect(order.length === 21, `locale_order.json lists ${order.length} locales, expected 21`);
@@ -90,7 +90,7 @@ expect(declared.includes('en'), 'the development region must be one of the local
 // 3. Every declared localization is a catalogue the bundle ships
 const catalogues = new Set(
 	fs
-		.readdirSync(path.join(SHARED_DATA, 'locales'))
+		.readdirSync(path.join(SHARED_DATA, 'core/i18n/data/locales'))
 		.filter((name) => name.endsWith('.json'))
 		.map((name) => name.replace(/\.json$/, ''))
 );

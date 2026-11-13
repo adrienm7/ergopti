@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 
-local Engine = require("hotstring_engine")
+local Engine = require("hotstrings.engine.matcher")
 
 --- Reads the shared corpus.
 --- @return table corpus
@@ -20,7 +20,7 @@ local function load_corpus()
 	local file = assert(io.open(path, "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw), "final_result_vectors.json must be valid JSON")
+	return assert(require("core.text.engine.json").decode(raw), "final_result_vectors.json must be valid JSON")
 end
 
 --- Whether a typed character is an end character in this corpus.

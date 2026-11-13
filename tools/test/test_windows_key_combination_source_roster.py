@@ -18,8 +18,8 @@ import sys
 import tempfile
 import types
 
-OLD = "a60f016ec2a530831fc5ae03015a60f1356ed4cb36035eeb1ab3e59bbcbfaeae"
-HELPER = "274f1a3e28279289404b87491e7a43b6974e7a58791197f0baf1ee6a1fd10516"
+OLD = "3b7b7049ba7f507c7c5f3225d48ed348fea2a68a17647d3b969aa303e8958d6c"
+HELPER = "3e13e82b3129557edfbe04cc7c7f1a7d51a8bfc5dcc4ccbd736dc15463c8fada"
 CHILD = "dc40081e96f631447d71678a7def720b19f34986ba7a57d759e25cdd6df87aec"
 CONTROL = "7adf645a1a2b79b9358d7e793dd12ccb0b113f25d49b50ef991a37079b4a470a"
 W = "static/ergopti_plus/windows/"
@@ -49,8 +49,8 @@ BUILDS = {
     "tools/build/build_windows_nav_owner.ps1",
     "tools/build/build_windows_network_pac.ps1",
     "tools/build/prepare_network_pac_sources.py",
-    S + "data/linux_native_runtime.json",
-    S + "modules/network/pac_helpers.js",
+    S + "core/network/data/linux_native_runtime.json",
+    S + "core/network/data/pac_helpers.js",
 }
 
 

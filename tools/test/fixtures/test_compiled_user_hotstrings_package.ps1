@@ -20,7 +20,7 @@ Invoke-Expression $function.Extent.Text
 $root = Join-Path ([IO.Path]::GetTempPath()) ('ergopti-worker-package-' + [guid]::NewGuid().ToString('N'))
 $sha = 'a' * 40
 $identity = "0.0.0-dev`n$sha"
-$shared = Join-Path $root 'static/ergopti_plus/_shared/modules/hotstrings/user_code.ahk'
+$shared = Join-Path $root 'static/ergopti_plus/_shared/hotstrings/data/catalogue/user_code.ahk'
 $vendor = Join-Path $root 'vendor/ergopti_user_hotstrings.ahk'
 $marker = Join-Path $root '.bundle-version'
 $utf8Bom = [Text.UTF8Encoding]::new($true)
@@ -32,12 +32,12 @@ function Expect-Refusal([scriptblock] $Call) {
 }
 try {
     $null = New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($shared)), ([IO.Path]::GetDirectoryName($vendor))
-    Copy-Item -LiteralPath (Join-Path $Checkout 'static/ergopti_plus/_shared/modules/hotstrings/user_code.ahk') -Destination $shared
+    Copy-Item -LiteralPath (Join-Path $Checkout 'static/ergopti_plus/_shared/hotstrings/data/catalogue/user_code.ahk') -Destination $shared
     Copy-Item -LiteralPath (Join-Path $Checkout 'static/ergopti_plus/windows/vendor/ergopti_user_hotstrings.ahk') -Destination $vendor
     [IO.File]::WriteAllText($marker, $identity, $utf8Bom)
     $digests = Get-AdmittedWorkerDependencies $Checkout $root $identity $sha
     if ($digests.Count -ne 2 -or !$digests.ContainsKey('vendor/ergopti_user_hotstrings.ahk') -or
-        !$digests.ContainsKey('static/ergopti_plus/_shared/modules/hotstrings/user_code.ahk')) {
+        !$digests.ContainsKey('static/ergopti_plus/_shared/hotstrings/data/catalogue/user_code.ahk')) {
         throw 'The independently constructed healthy bundle was refused or misidentified.'
     }
     $passed++

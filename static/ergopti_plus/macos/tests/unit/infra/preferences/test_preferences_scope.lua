@@ -1,7 +1,7 @@
 --- tests/unit/infra/preferences/test_preferences_scope.lua
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 local function fixture(source)
 	package.loaded["modules.gestures.engine"] = nil
@@ -118,7 +118,7 @@ helpers.describe("macOS scoped preference table owner", function()
 			options.manifest = require("infra.manifest_reader")
 			local candidate = result == true and "[invalid" or '[gestures]\nfuture = "preserve"\n'
 			options.prepare_batch = function() return result, nil, candidate, { status = "ok", content = original } end
-			local owner = require("config_scope_transaction").new(options)
+			local owner = require("settings.engine.scope.transaction").new(options)
 			helpers.assert_eq(owner.apply("gestures", "clear"), false)
 			helpers.assert_eq(files.config, original)
 			helpers.assert_eq(#writes, 0)

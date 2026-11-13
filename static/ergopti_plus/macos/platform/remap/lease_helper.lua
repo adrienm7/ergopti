@@ -22,7 +22,7 @@
 local M = {}
 
 local hs = hs
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local DevSource = require("infra.dev_source")
 local HELPER_ENV = "ERGOPTI_LAUNCHER_EXECUTABLE"
 local HELPER_DEVICE_ENV = "ERGOPTI_LAUNCHER_DEVICE"

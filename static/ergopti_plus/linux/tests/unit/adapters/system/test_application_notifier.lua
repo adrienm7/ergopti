@@ -23,7 +23,7 @@ helpers.describe("application notification captions", function()
 	helpers.it("composes application labels without changing the generic port (application-caption-policy)", function()
 		local Paths = require("infra.paths")
 		local fixture = assert(loadfile(Paths.shared("tests/fixtures/application_notification_titles.lua")))()
-		fixture.run(helpers.assert_eq, "linux", require("window_titles").compose, {
+		fixture.run(helpers.assert_eq, "linux", require("core.ui.engine.window_titles").compose, {
 			default = "ErgoptiPlus", named = "ErgoptiPlus — Bare label", decorated = "ErgoptiPlus — ⚠ Bare label",
 		})
 	end)
@@ -44,13 +44,13 @@ end)
 --- No native window, desktop command, notification delivery or click is observed.
 --- @param body function Receives recording ports and actual notice owners.
 local function with_owned_notice(body)
-	local names = { "adapters.application_notifier", "adapters.notifier", "application_notifier",
-		"window_titles", "adapters.shell_runner", "logger.shim", "infra.i18n", "infra.locale" }
+	local names = { "adapters.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
+		"core.ui.engine.window_titles", "adapters.shell_runner", "core.logger.engine.shim", "infra.i18n", "infra.locale" }
 	local saved, native = {}, nil
 	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 	local c = { commands = {}, argv = {}, quoted = {}, available = true, native_result = true }
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
-	package.loaded["window_titles"] = nil
+	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
+	package.loaded["core.ui.engine.window_titles"] = nil
 	package.loaded["infra.i18n"] = {
 		get_locale = function() return "en" end,
 		get = function(key)
@@ -182,8 +182,8 @@ helpers.describe("owned application notifications", function()
 		end)
 	end)
 	helpers.it("restores the exact scoped dependency owners after a fixture-body refusal", function()
-		local names = { "adapters.application_notifier", "adapters.notifier", "application_notifier",
-			"window_titles", "adapters.shell_runner", "logger.shim", "infra.i18n", "infra.locale",
+		local names = { "adapters.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
+			"core.ui.engine.window_titles", "adapters.shell_runner", "core.logger.engine.shim", "infra.i18n", "infra.locale",
 			"lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline", "adapters.event_loop",
 			"ui.webkit_host", "ui.webview_manager", "ui.changelog.bridge" }
 		local previous = {}

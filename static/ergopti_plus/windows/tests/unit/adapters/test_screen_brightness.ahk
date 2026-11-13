@@ -13,7 +13,7 @@
 
 _SBT_Data() {
 	global _SharedDir
-	return JsonParse(FileRead(_SharedDir . "\modules\actions\brightness.json", "UTF-8"))
+	return JsonParse(FileRead(_SharedDir . "\shortcuts\data\actions\brightness.json", "UTF-8"))
 }
 
 _SBT_Corpus() {
@@ -412,7 +412,7 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
 		"-File", _DriverDir . "\tests\fixtures\screen_brightness_provider.ps1",
 		"-Worker", _VendorDir . "\ergopti_brightness_worker.ps1",
-		"-FixturePolicyPath", _SharedDir . "\modules\actions\brightness.json",
+		"-FixturePolicyPath", _SharedDir . "\shortcuts\data\actions\brightness.json",
 		"-Action", "brightness_up", "-Mode", Mode]
 	MarkerPath := _SBT_DiagnosticMarkerCreate()
 	if MarkerPath != ""

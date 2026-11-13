@@ -4,9 +4,9 @@
  * ==============================================================================
  * MODULE: Key Names (build and test side)
  * DESCRIPTION:
- * Reads `_shared/data/keycodes/key_names.json`, the one table naming a key or
+ * Reads `_shared/layouts/data/keycodes/key_names.json`, the one table naming a key or
  * modifier in visible text, for the generators and gates written in Node. The
- * drivers read its projections (_shared/lua/keycodes/key_names.lua and
+ * drivers read its projections (_shared/platform/input/keycodes/key_names.lua and
  * windows/infra/key_names.ahk); this is the same rule.
  * ==============================================================================
  */
@@ -16,7 +16,9 @@
 const fs = require('fs');
 const { shared } = require('./paths.cjs');
 
-const TABLE = JSON.parse(fs.readFileSync(shared('data', 'keycodes', 'key_names.json'), 'utf8'));
+const TABLE = JSON.parse(
+	fs.readFileSync(shared('layouts', 'data', 'keycodes', 'key_names.json'), 'utf8')
+);
 
 // The tap-hold catalogue and the manifests name a driver ahk/hs/linux.
 const PLATFORM_OF = {
@@ -68,7 +70,7 @@ function rawSpellings() {
 
 /**
  * The key ids a sticky action holds, read from its id as
- * _shared/lua/actions/sticky_label.lua reads them (Option is the Alt key);
+ * _shared/shortcuts/engine/actions/sticky_label.lua reads them (Option is the Alt key);
  * null for an action that is no sticky combination (sticky_hyper is named by
  * its own word, with no {1}).
  * @param {string} action Action id.

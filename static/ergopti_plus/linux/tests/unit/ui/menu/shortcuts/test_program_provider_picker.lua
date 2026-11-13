@@ -15,8 +15,8 @@ end
 
 local function shared(body)
 	isolated(function()
-		package.loaded.program_provider_picker = nil
-		body(require("program_provider_picker"))
+		package.loaded["apps.engine.program_provider_picker"] = nil
+		body(require("apps.engine.program_provider_picker"))
 	end)
 end
 
@@ -146,9 +146,9 @@ end)
 local function bridge_fixture(body)
 	isolated(function()
 		local f = { owners = {}, calls = {}, scripts = {}, visible = false, hide_refused = false }
-		package.loaded.program_provider_picker = nil
+		package.loaded["apps.engine.program_provider_picker"] = nil
 		package.loaded["ui.action_picker.bridge"] = nil
-		package.loaded["logger.shim"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["adapters.program_providers"] = { create = function()
 			local state = owner(); f.owners[#f.owners + 1] = state; return state
@@ -253,9 +253,9 @@ end)
 local function contextual_native_fixture(body)
 	isolated(function()
 		for _, name in ipairs({ "ui.webview_manager", "ui.action_picker.bridge", "ui.webkit_host",
-			"infra.i18n", "infra.locale", "locale.core", "window_titles", "webview.presentation",
-			"program_provider_picker" }) do package.loaded[name] = nil end
-		package.loaded["logger.shim"] = helpers.make_logger_stub()
+			"infra.i18n", "infra.locale", "core.i18n.engine.core", "core.ui.engine.window_titles", "core.ui.engine.webview.presentation",
+			"apps.engine.program_provider_picker" }) do package.loaded[name] = nil end
+		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 		package.loaded["adapters.program_providers"] = {}
 		package.loaded["adapters.event_loop"] = { add_idle_handler = function() end }
 		local state = { creates = 0, windows = {}, scripts = {}, signals = {}, confirmations = 0 }
@@ -303,7 +303,7 @@ local function contextual_native_fixture(body)
 		}
 		local locale = require("infra.locale")
 		local i18n = require("infra.i18n")
-		local core = require("locale.core")
+		local core = require("core.i18n.engine.core")
 		local original_get = core.get
 		core.get = function(key)
 			if state.translate_hook then state.translate_hook(key) end
@@ -315,7 +315,7 @@ local function contextual_native_fixture(body)
 			return "<html>inert boundary fixture</html>"
 		end
 		local picker = require("ui.action_picker.bridge")
-		local titles = require("window_titles")
+		local titles = require("core.ui.engine.window_titles")
 		function state.open(suffix, id)
 			return picker.open({ presentation_id = id or "tap_hold_action", presentation_suffix = suffix,
 				items = {}, current = "__native__", allow_native = true, native_label = "original native label" }, function()
@@ -331,7 +331,7 @@ local function contextual_native_fixture(body)
 end
 
 local contextual_file = assert(io.open(helpers.driver_root() .. "/../macos/tests/fixtures/contextual_picker_original_prefixes.json", "rb"))
-local contextual_original = assert(require("json").decode(contextual_file:read("*a")))
+local contextual_original = assert(require("core.text.engine.json").decode(contextual_file:read("*a")))
 contextual_file:close()
 helpers.describe("declared Linux tap action page-title receiving", function()
 	for code, expected in pairs(contextual_original.locales) do
@@ -351,7 +351,7 @@ helpers.describe("declared Linux tap action page-title receiving", function()
 					helpers.assert_eq(state.confirmations, 0, "Title receipt grants no action or Writer effect")
 					picker.on_message({ action = "ready" }, {})
 					helpers.assert_eq(#state.scripts, 1)
-					local pushed = assert(require("json").decode(state.scripts[1]:match("^init%((.*)%)$")))
+					local pushed = assert(require("core.text.engine.json").decode(state.scripts[1]:match("^init%((.*)%)$")))
 					helpers.assert_eq(pushed.title, expected.linux_prefix .. suffix)
 				end)
 			end)

@@ -2,7 +2,7 @@
 
 // ==========================================
 // AUTO-GENERATED — do not edit manually
-// Source: static/ergopti_plus/_shared/modules/updater/channels.json
+// Source: static/ergopti_plus/_shared/updater/data/channels.json
 // Run: npm run codegen:update-channels
 // ==========================================
 

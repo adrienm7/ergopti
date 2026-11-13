@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Order = require("hotstrings.section_order")
-local json = require("json")
+local Order = require("hotstrings.engine.section_order")
+local json = require("core.text.engine.json")
 
 helpers.describe("hotstring-section-order", function()
 	local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/hotstrings/section_order_vectors.json", "rb"))
@@ -77,7 +77,7 @@ helpers.describe("hotstring-section-order", function()
 		helpers.assert_eq(writes, 0)
 	end)
 	helpers.it("hotstring-section-order: every category keeps its own stored order key", function()
-		local Languages = require("hotstrings.languages")
+		local Languages = require("hotstrings.engine.languages")
 		local corpus = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/hotstrings/section_order_category_vectors.json", "rb"))
 		local categories = json.decode(corpus:read("*a")).vectors
 		corpus:close()

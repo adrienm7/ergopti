@@ -9,7 +9,7 @@
 
  FEATURES & RATIONALE:
  1. One source: the channel ids and appcast names come from the shared registry
-    (kUpdateChannelFeeds, generated from _shared/modules/updater/channels.json).
+    (kUpdateChannelFeeds, generated from _shared/updater/data/channels.json).
  2. Same feed directory: a channel's appcast sits beside the bundle's SUFeedURL
     on the sparkle-appcasts branch, so only the file name changes.
  3. Survives relaunch: the selection is kept in the launcher's defaults, so

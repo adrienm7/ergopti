@@ -34,7 +34,7 @@ const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const CATALOGUE = path.join(SP, '_shared', 'modules', 'actions', 'actions.toml');
+const CATALOGUE = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'actions.toml');
 const OUT = path.join(SP, 'linux', '_generated', 'gesture_emit_actions.lua');
 
 const sg = toml.parse(fs.readFileSync(CATALOGUE, 'utf8')).sg_actions || {};
@@ -71,7 +71,7 @@ const q = (s) => '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '
 
 const lines = [];
 lines.push('--- _generated/gesture_emit_actions.lua');
-lines.push('--- AUTO-GENERATED from _shared/modules/actions/actions.toml.');
+lines.push('--- AUTO-GENERATED from _shared/shortcuts/data/actions/actions.toml.');
 lines.push(
 	'--- DO NOT EDIT BY HAND — run `npm run codegen:gesture-emit-actions:linux` to refresh.'
 );

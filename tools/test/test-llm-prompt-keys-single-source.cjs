@@ -63,7 +63,7 @@ const DELAY_PROMPTS = ['menu.settings.delay_prompt', 'menu.llm.debounce_prompt']
 
 check('catalogues', () => {
 	for (const locale of LOCALES) {
-		const catalogue = JSON.parse(read(`${PLUS}/_shared/data/locales/${locale}.json`));
+		const catalogue = JSON.parse(read(`${PLUS}/_shared/core/i18n/data/locales/${locale}.json`));
 		for (const key of RETIRED) assert(!(key in catalogue), `${locale} still carries ${key}`);
 		for (const key of SHARED) assert(typeof catalogue[key] === 'string', `${locale} lacks ${key}`);
 		assert.strictEqual(
@@ -81,7 +81,7 @@ check('catalogues', () => {
 
 check('the shared port row label', () => {
 	for (const locale of LOCALES) {
-		const catalogue = JSON.parse(read(`${PLUS}/_shared/data/locales/${locale}.json`));
+		const catalogue = JSON.parse(read(`${PLUS}/_shared/core/i18n/data/locales/${locale}.json`));
 		assert.strictEqual(
 			(catalogue[PORT_LABEL].match(/%s/g) || []).length,
 			2,

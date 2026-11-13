@@ -297,7 +297,7 @@ const WINDOWS_APPS = {
 		checks: () => {
 			const shared = JSON.parse(
 				fs.readFileSync(
-					path.join(ROOT, SP, '_shared/modules/shortcuts/physical_shortcuts.json'),
+					path.join(ROOT, SP, '_shared/shortcuts/data/physical_shortcuts.json'),
 					'utf8'
 				)
 			);
@@ -312,7 +312,7 @@ const WINDOWS_APPS = {
 			);
 			assert.match(
 				reader,
-				/PhysicalShortcutsShared\(\) \{[\s\S]*?"\\modules\\shortcuts\\physical_shortcuts\.json"/,
+				/PhysicalShortcutsShared\(\) \{[\s\S]*?"\\shortcuts\\data\\physical_shortcuts\.json"/,
 				'the Windows reader loads the shared physical shortcut identifiers'
 			);
 			return [
@@ -496,7 +496,7 @@ assert.equal(sharedPhysicalEditor(undefined), false);
 // The menu rows live in the tray-menu source, beside the generated manifest.
 const canonicalMenu = require('../lib/menu-source.cjs').readMenuTables(parseToml);
 const generatedMenu = JSON.parse(
-	fs.readFileSync(path.join(ROOT, SP, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+	fs.readFileSync(path.join(ROOT, SP, '_shared/menu/data/menu_manifest.json'), 'utf8')
 );
 for (const [name, menu] of [
 	['canonical', canonicalMenu],
@@ -510,7 +510,7 @@ for (const [name, menu] of [
 		`${name}: the physical editor row is shared and names its unqualified delivery`
 	);
 }
-const localeDirectory = path.join(ROOT, SP, '_shared/data/locales');
+const localeDirectory = path.join(ROOT, SP, '_shared/core/i18n/data/locales');
 const localeFiles = fs.readdirSync(localeDirectory).filter((name) => name.endsWith('.json'));
 assert.equal(localeFiles.length, 21, 'physical editor reasons must cover all 21 locales');
 for (const name of localeFiles) {

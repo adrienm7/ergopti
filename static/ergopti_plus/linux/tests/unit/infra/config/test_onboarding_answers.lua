@@ -11,9 +11,9 @@
 
 local helpers = require("tests.helpers")
 
-require("test.onboarding_answers_contract").register(helpers, { driver = "linux" })
+require("tests.lua.onboarding.answers_contract").register(helpers, { driver = "linux" })
 
-require("test.onboarding_publication_contract").register(helpers)
+require("tests.lua.onboarding.publication_contract").register(helpers)
 
 
 helpers.describe("Linux wizard retained native publication phases", function()

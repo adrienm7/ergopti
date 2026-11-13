@@ -9,4 +9,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.config_save_failure_contract")(helpers, helpers.driver_root())
+require("tests.lua.settings.save_failure_contract")(helpers, helpers.driver_root())

@@ -19,7 +19,7 @@ local M = {}
 local llm_mod = require("modules.llm")
 local i18n    = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
-local DisplayPolicy = require("llm.display_policy")
+local DisplayPolicy = require("ai.engine.settings.display_policy")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
 local Manifest = require("infra.manifest_reader")
@@ -75,7 +75,7 @@ function M.build(ctx)
 		return snapshot
 	end
 	local streaming_source = streaming_snapshot()
-	local indent_values = DisplayPolicy.indentation_values(Manifest.find_entry_by_path(require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT))
+	local indent_values = DisplayPolicy.indentation_values(Manifest.find_entry_by_path(require("settings.engine.keys").KEY.LLM_DISPLAY_PRED_INDENT))
 	local function indentation_snapshot()
 		local snapshot = streaming_snapshot()
 		local indentation = settings_mgr.setting_snapshot("llm_pred_indent")
@@ -132,7 +132,7 @@ function M.build(ctx)
 
 	local display_ctx = {
 		commands = {
-			[require("config_keys").COMMAND.LLM_INDENTATION] = function(value)
+			[require("settings.engine.keys").COMMAND.LLM_INDENTATION] = function(value)
 				local current = indentation_snapshot()
 				if not Preferences.source_matches(indentation_source.source, current.source) then return false end
 				local decision = DisplayPolicy.indentation_intent(indentation_source, current, value, indent_values)
@@ -144,7 +144,7 @@ function M.build(ctx)
 						ConfigPaths.get("ConfigTomlPath"), current.source),
 				})
 			end,
-			[require("config_keys").COMMAND.LLM_SHOW_ALL] = function()
+			[require("settings.engine.keys").COMMAND.LLM_SHOW_ALL] = function()
 				if not show_all_ready() then return false end
 				local current = streaming_snapshot()
 				if streaming_source.blocked ~= false or streaming_source.paused ~= false
@@ -162,7 +162,7 @@ function M.build(ctx)
 						ConfigPaths.get("ConfigTomlPath"), current.source),
 				})
 			end,
-			[require("config_keys").COMMAND.LLM_TOKEN_STREAMING] = function()
+			[require("settings.engine.keys").COMMAND.LLM_TOKEN_STREAMING] = function()
 				local current = streaming_snapshot()
 				if not Preferences.source_matches(streaming_source.source, current.source) then return false end
 				local decision = DisplayPolicy.streaming_intent(streaming_source, current)
@@ -175,7 +175,7 @@ function M.build(ctx)
 					publication_guard = publication_guard,
 				})
 			end,
-			[require("config_keys").COMMAND.LLM_INFO_BAR] = function()
+			[require("settings.engine.keys").COMMAND.LLM_INFO_BAR] = function()
 				local current = info_bar_snapshot()
 				if not Preferences.source_matches(info_bar_source.source, current.source) then return false end
 				local decision = DisplayPolicy.info_bar_intent(info_bar_source, current)
@@ -189,7 +189,7 @@ function M.build(ctx)
 			end,
 		},
 		state_getters = {
-			[require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT] = function() return indentation_source.indentation end,
+			[require("settings.engine.keys").KEY.LLM_DISPLAY_PRED_INDENT] = function() return indentation_source.indentation end,
 			["llm_indentation_ready"] = function() return DisplayPolicy.indentation_ready(indentation_source) end,
 			["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(state.llm_streaming_multi) end,
 			["llm_show_all_ready"] = show_all_ready,

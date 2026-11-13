@@ -13,7 +13,7 @@ local function fixture(body)
 	for key, value in pairs(package.loaded) do saved[key] = value end
 	local f = { pages = {}, owners = {}, calls = {}, delete_throws = false }
 	local ok, failure = xpcall(function()
-		package.loaded.program_provider_picker = nil
+		package.loaded["apps.engine.program_provider_picker"] = nil
 		package.loaded["ui.action_picker"] = nil
 		package.loaded["ui.webview_controller_pool"] = nil
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -275,7 +275,7 @@ local UNAVAILABLE = "platform_reason.program_runner_unavailable"
 helpers.describe("Actual macOS reserved program assignment availability", function()
 	helpers.it("manual reserved refusal keeps the editor retryable for an ordinary repair", function()
 		fixture(function(f)
-			_G.hs.json.encode = require("json").encode
+			_G.hs.json.encode = require("core.text.engine.json").encode
 			helpers.assert_true(f.open())
 			local page = f.pages[1]
 			f.message(page, { action = "confirm", id = "run_program", parameter = RESERVED })
@@ -291,7 +291,7 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 	end)
 	helpers.it("resolved reserved descriptors obey the same host refusal", function()
 		fixture(function(f)
-			_G.hs.json.encode = require("json").encode
+			_G.hs.json.encode = require("core.text.engine.json").encode
 			helpers.assert_true(f.open())
 			f.owners[1].resolve = function() return RESERVED end
 			f.confirm(f.pages[1])
@@ -313,7 +313,7 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 	}) do
 		helpers.it("actual native predicate presentation: " .. case[1], function()
 			fixture(function(f)
-				local Json = require("json")
+				local Json = require("core.text.engine.json")
 				local scalar = Json.encode({ version = 1, executable = case[2], arguments = Json.array(case[3]) })
 				helpers.assert_eq(f.native.is_chosen_program(case[2], case[3]), case[4])
 				helpers.assert_eq(f.utils.program_assignment_reason(scalar), case[4] and UNAVAILABLE or nil)
@@ -323,7 +323,7 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 	end
 	helpers.it("malformed syntax stays with the existing parameter owner", function()
 		fixture(function(f)
-			helpers.assert_eq(require("program_parameter").parse("not JSON", "posix"), nil)
+			helpers.assert_eq(require("settings.engine.program_parameter").parse("not JSON", "posix"), nil)
 			helpers.assert_eq(f.utils.program_assignment_reason("not JSON"), nil)
 			helpers.assert_eq(f.native_tasks, 0)
 		end)
@@ -332,7 +332,7 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 		helpers.it("unavailable native classifier refuses without disabling ordinary repair: " .. mode, function()
 			fixture(function(f)
 				local original = f.native.is_chosen_program
-				_G.hs.json.encode = require("json").encode
+				_G.hs.json.encode = require("core.text.engine.json").encode
 				helpers.assert_true(f.open())
 				if mode == "missing" then f.native.is_chosen_program = nil
 				else f.native.is_chosen_program = function()
@@ -382,7 +382,7 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 	helpers.it("reason encoding replacement cannot warn the retired page", function()
 		fixture(function(f)
 			helpers.assert_true(f.open())
-			local old, Json = f.pages[1], require("json")
+			local old, Json = f.pages[1], require("core.text.engine.json")
 			local old_scripts = #old.scripts
 			local original = Json.quote
 			local ok, err = xpcall(function()
@@ -452,9 +452,9 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 		fixture(function(f)
 			f.typed = RESERVED
 			local scalar = f.utils.ask_parameter_value({ parameter_prompt = function() return "Program" end }, "run_program", "program", "T", RESERVED)
-			local planner = require("shortcuts.physical_entries").new({ parse = function() return true end, owns = function() return true end }, {
+			local planner = require("shortcuts.engine.physical_entries").new({ parse = function() return true end, owns = function() return true end }, {
 				is_assignable = function() return true end, get_action_parameter_spec = function() return "program" end,
-				validate_action_parameter = function(_, value) return require("program_parameter").parse(value, "posix") ~= nil end,
+				validate_action_parameter = function(_, value) return require("settings.engine.program_parameter").parse(value, "posix") ~= nil end,
 				split_action_parameter_key = function() return nil end,
 			}, { parameter_section = "gestures.action_parameters" })
 			local rows, reason = planner.plan({ operation = "add", slot = "position", action = "run_program", parameter = scalar }, { assignments = {}, parameters = {} })
@@ -469,7 +469,7 @@ end)
 helpers.describe("action picker scalar native JSON boundary", function()
 	helpers.it("(hs-scalar-json-picker) actual unavailable reason reaches the retained picker with native table-only JSON", function()
 		fixture(function(f)
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local reason = 'Unavailable é漢😀\r\n\t"\\");globalThis.__injected=true;//'
 			f.locale.get = function(key) return key == UNAVAILABLE and reason or key end
 			local native_tables = 0
@@ -497,7 +497,7 @@ helpers.describe("action picker scalar native JSON boundary", function()
 	for _, mode in ipairs({ "nil", "false", "throw" }) do
 		helpers.it("(hs-scalar-json-picker) unavailable reason quotation " .. mode .. " cannot confirm", function()
 			fixture(function(f)
-				local Json = require("json")
+				local Json = require("core.text.engine.json")
 				local original = Json.quote
 				local ok, err = xpcall(function()
 					helpers.assert_true(f.open())
@@ -519,7 +519,7 @@ helpers.describe("action picker scalar native JSON boundary", function()
 	end
 	helpers.it("(hs-scalar-json-picker) reason encoding reentry cannot target a replacement picker", function()
 		fixture(function(f)
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local original = Json.quote
 			local ok, err = xpcall(function()
 				helpers.assert_true(f.open())

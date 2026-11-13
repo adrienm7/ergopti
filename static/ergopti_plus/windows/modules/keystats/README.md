@@ -15,7 +15,7 @@ Rich aggregation (n-grams, bursts, ergonomic streaks) is ported: the walker (`ke
 | `WindowInfo`     | Active app and window title for app-switch / window-switch events |
 | `TimerScheduler` | Ingest tick, idle detection, and flush scheduling                 |
 
-## Domain module (`_shared/core/domain/`)
+## Domain module (`_shared/core/text/data/domain/`)
 
 No direct domain spec. Implements the schema defined in `_shared/data/KEYSTATS_SPEC.md`. Per-device isolation uses a UUID derived from the Windows `MachineGuid` registry key.
 

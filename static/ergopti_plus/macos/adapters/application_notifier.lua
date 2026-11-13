@@ -23,9 +23,9 @@ local M = {}
 --- @param opts table|nil Native body and kind options.
 --- @return boolean accepted Exact generic native dispatch result.
 function M.send(label, opts)
-	local notifier = require("application_notifier").new(function(caption, title, options)
+	local notifier = require("platform.focus.application_notifier_core").new(function(caption, title, options)
 		return require("adapters.notifier").send(caption(title), options)
-	end, require("window_titles").compose)
+	end, require("core.ui.engine.window_titles").compose)
 	return notifier.send(label, opts)
 end
 
@@ -34,12 +34,12 @@ end
 --- @param properties table Native notification properties with a canonical bare title.
 --- @return any notification Exact hs.notify.new result.
 function M.new(callback, properties)
-	local notifier = require("application_notifier").new(function(caption, action, options)
+	local notifier = require("platform.focus.application_notifier_core").new(function(caption, action, options)
 		local titled = {}
 		for key, value in pairs(options) do titled[key] = value end
 		titled.title = caption(options.title)
 		return hs.notify.new(action, titled)
-	end, require("window_titles").compose)
+	end, require("core.ui.engine.window_titles").compose)
 	return notifier.send(callback, properties)
 end
 

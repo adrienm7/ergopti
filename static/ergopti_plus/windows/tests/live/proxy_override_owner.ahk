@@ -72,7 +72,7 @@ _OwnerMain(PlanPath) {
 	Plan := JsonParse(FileRead(PlanPath, "UTF-8"))
 	_SharedDir := Plan["shared"]
 	_VendorDir := Plan["vendor"]
-	_OwnerTexts := JsonParse(FileRead(_SharedDir . "\data\locales\en.json", "UTF-8"))
+	_OwnerTexts := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\en.json", "UTF-8"))
 	Declaration := ProxyOverride_Declaration()
 	Features := Map(Declaration["section"], Map(Declaration["key"], Plan["stored"] is String ? Plan["stored"] : ""))
 	Result := Map("published", ProxyOverride_Publish(Plan["stored"]))

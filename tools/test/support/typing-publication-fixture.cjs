@@ -19,8 +19,8 @@ function actualLuaPublications(empty = false, applicationName) {
 		cwd: path.join(root, 'macos'),
 		encoding: 'utf8',
 		input: `
-package.path=package.path..';../_shared/lua/?.lua;../_shared/lua/?/init.lua;./?.lua;./?/init.lua'
-local json=require('json')
+package.path=package.path..';../_shared/?.lua;../_shared/?/init.lua;./?.lua;./?/init.lua'
+local json=require('core.text.engine.json')
 local empty=${empty ? 'true' : 'false'}
 local application_name=${applicationName === undefined ? 'nil' : JSON.stringify(applicationName)}
 local now,rev=0,1
@@ -104,8 +104,8 @@ function actualLuaFallback() {
 		cwd: path.join(root, 'macos'),
 		encoding: 'utf8',
 		input: `
-package.path=package.path..';../_shared/lua/?.lua;../_shared/lua/?/init.lua;./?.lua;./?/init.lua'
-local json=require('json')
+package.path=package.path..';../_shared/?.lua;../_shared/?/init.lua;./?.lua;./?/init.lua'
+local json=require('core.text.engine.json')
 local now=0
 local timers,evaluations,publications={},{},{}
 local dashboard,context=require('tests.support.metrics_typing_fixture')({

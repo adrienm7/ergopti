@@ -43,7 +43,7 @@ _WinHttpTransport_Controls() {
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
 				_DriverDir . "\tests\fixtures\winhttp_transport_controls.ps1",
 				"-TransportPath", _VendorDir . "\ergopti_winhttp_transport.ps1",
-				"-SchemaPath", _SharedDir . "\modules\network\managed_network.json"],
+				"-SchemaPath", _SharedDir . "\core\network\data\managed_network.json"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 16384)
 		AssertTrue(Handle.start(), "the WinHTTP control fixture process must start")
 		Started := A_TickCount

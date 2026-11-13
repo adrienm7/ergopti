@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One reducer for every driver: classification and debounce live in
----    _shared/lua/keystats/window_topology.lua and capture_presence.lua.
+---    _shared/metrics/engine/system/window_topology.lua and capture_presence.lua.
 --- 2. No timer of its own: the keystats maintenance tick calls tick(), which
 ---    reads topology at the shared [keystats] topo_tick_ms and the application
 ---    list at av_state_slow_tick_ms, through adapters/window_info (no fork).
@@ -24,8 +24,8 @@ local M = {}
 
 local Logger = require("infra.logger")
 local Timings = require("infra.timings")
-local Topology = require("keystats.window_topology")
-local Capture = require("keystats.capture_presence")
+local Topology = require("metrics.engine.system.window_topology")
+local Capture = require("metrics.engine.capture_presence")
 
 local LOG = "keystats.topology_watcher"
 

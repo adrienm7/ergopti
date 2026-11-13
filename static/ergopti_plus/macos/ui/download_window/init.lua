@@ -38,7 +38,7 @@ local i18n       = require("infra.i18n")
 local text_utils = require("infra.text_utils")
 local JavaScript = require("ui.download_window.javascript")
 local PendingQueue = require("ui.download_window.pending_queue")
-local NativeTheme = require("native_theme_data")
+local NativeTheme = require("core.ui.engine.native_theme_data")
 
 local LOG = "download_window"
 

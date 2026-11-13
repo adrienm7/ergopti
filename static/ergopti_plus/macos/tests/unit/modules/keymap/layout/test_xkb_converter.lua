@@ -10,8 +10,8 @@
 local helpers = require("tests.helpers")
 local shared = helpers.shared
 
-require("test.xkb_converter_contract").register(helpers, {
+require("tests.lua.layouts.xkb_converter_contract").register(helpers, {
 	vectors = shared("tests/corpus/keylayout/xkb_conversion_vectors.json"),
-	keycodes = shared("modules/layouts/mac_keycodes.json"),
+	keycodes = shared("layouts/data/mac_keycodes.json"),
 	data_dir = helpers.driver_root() .. "/../../ergopti/linux/xkb_generation/data",
 })

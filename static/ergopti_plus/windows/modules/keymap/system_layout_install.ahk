@@ -6,7 +6,7 @@
 ; Layout > « Download the Ergopti system layout installer »: says whether the
 ; Ergopti keyboard layout is installed as a Windows system layout and, when
 ; asked, opens the download of the stand-alone installer the release publishes
-; (release_asset of _shared/modules/layouts/windows_system_layout.json, built
+; (release_asset of _shared/layouts/data/windows_system_layout.json, built
 ; by tools/build/build_windows_keyboard_layout.ps1 -PackagePath). The user runs
 ; its install.cmd; from then on the layout is one of the user's layouts:
 ; Layout > « Input sources » and the pause and resume switch (also at the driver
@@ -50,7 +50,7 @@ SystemLayout_Spec(ReadFn := 0) {
 	global _SharedDir
 	if !HasMethod(ReadFn, "Call")
 		ReadFn := FSRead
-	Path := _SharedDir . "\modules\layouts\windows_system_layout.json"
+	Path := _SharedDir . "\layouts\data\windows_system_layout.json"
 	Text := ReadFn.Call(Path)
 	if !(Text is String)
 		throw Error("the Windows system layout description is unreadable: " . Path)

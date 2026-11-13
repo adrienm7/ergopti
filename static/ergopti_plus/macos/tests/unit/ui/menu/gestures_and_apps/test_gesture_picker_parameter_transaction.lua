@@ -72,10 +72,10 @@ local function with_picker(options, callback)
 		end }
 		-- The provider's declared child must use a fresh real renderer. Keep
 		-- only the original fixture's parent-provider capture controlled.
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("json").decode,
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.text.engine.json").decode,
 			i18n = package.loaded["infra.i18n"], logger = logger,
 		}))
 		package.loaded["infra.manifest_menu"] = {

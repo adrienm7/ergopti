@@ -2,7 +2,7 @@
 
 --- Exercises the private async protocol without replacing native ownership rules.
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 -- Native transitive owners must initialize before a scoped transport substitution.
 require("adapters.atspi_focus")
 
@@ -41,7 +41,7 @@ helpers.describe("owned asynchronous AT-SPI context protocol", function()
 		fixture(function(state)
 			assert(state.executable == "/owned/lua")
 			assert(state.argv[1]:match("/adapters/atspi_context_worker%.lua$"))
-			assert(state.argv[5] == require("infra.paths").shared("lua"))
+			assert(state.argv[5] == require("infra.paths").shared(""))
 			assert(state.argv[6] == "1234" and #state.argv == 6)
 			assert(state.options.timeout_ms == 1000 and state.options.capture_output == false and state.options.capture_tail == false)
 			for _, value in ipairs(state.argv) do assert(not value:find("PRIVATE_TITLE_CANARY", 1, true)) end
@@ -85,7 +85,7 @@ helpers.describe("owned asynchronous AT-SPI selected-range protocol", function()
 		fixture(function(state)
 			helpers.assert_eq(#state.argv, 7)
 			helpers.assert_eq(state.argv[7], "selection")
-			helpers.assert_eq(state.argv[5], require("infra.paths").shared("lua"))
+			helpers.assert_eq(state.argv[5], require("infra.paths").shared(""))
 			helpers.assert_eq(state.options.timeout_ms, require("infra.timings").ms("privacy", "atspi_probe_timeout_ms"))
 			helpers.assert_eq(state.options.capture_output, false)
 			helpers.assert_eq(state.options.capture_tail, false)

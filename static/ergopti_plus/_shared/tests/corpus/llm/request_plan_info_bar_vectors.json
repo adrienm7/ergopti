@@ -1,8 +1,8 @@
 {
-	"_comment": "The pieces of the info bar under the predictions, replayed through _shared/lua/llm/request_plan/info_bar.lua by the macOS and Linux runners. Pieces come in the order model, backend, the prompt's short name, position i/n; a prompt label is cut at its first em dash on every OS (Linux used to keep a label that begins with the dash). Deliberate differences stay in the options: require_model is macOS (no model, no bar), position is Linux (it cycles candidates and shows i/n; macOS lists them all). The separator is the driver's: macOS joins with an em dash, Linux with a middle dot.",
+	"_comment": "The pieces of the info bar under the predictions, replayed through _shared/ai/engine/request_plan/info_bar.lua by the macOS and Linux runners. Pieces come in the order model, backend, the prompt's short name, position i/n; a prompt label is cut at its first em dash on every OS (Linux used to keep a label that begins with the dash). Deliberate differences stay in the options: require_model is macOS (no model, no bar), position is Linux (it cycles candidates and shows i/n; macOS lists them all). The separator is the driver's: macOS joins with an em dash, Linux with a middle dot.",
 	"drivers": {
-		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
-		"linux": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
+		"macos": "Replays every vector (_shared/tests/lua/ai/request_plan_contract.lua).",
+		"linux": "Replays every vector (_shared/tests/lua/ai/request_plan_contract.lua).",
 		"windows": "Replays every vector through LLM_InfoBar_Parts (tests/meta/corpus/test_corpus_llm_request_plan.ahk). The tooltip passes require_model and joins with an em dash, as macOS does."
 	},
 	"differences": {

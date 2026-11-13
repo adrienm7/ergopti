@@ -36,8 +36,8 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local CrashReport = require("crash_report")
-local NativePath = require("native_path")
+local CrashReport = require("diagnostics.engine.reports.crash_report")
+local NativePath = require("core.fs.engine.native_path")
 local i18n   = require("infra.i18n")
 
 local LOG = "crash_reporter"
@@ -254,7 +254,7 @@ function M.report(err, context)
 		-- steps, which a report without a page completes at once
 		local ok_run, snap = pcall(hc.run, { complete_local = true })
 		if ok_run and type(snap) == "table" and type(snap.sections) == "table" then
-			-- The version 2 snapshot of _shared/modules/diagnostics/schema.json
+			-- The version 2 snapshot of _shared/diagnostics/data/schema.json
 			local sections = snap.sections
 			local system, versions = sections.system or {}, sections.versions or {}
 			local developer, issues = sections.developer or {}, sections.issues or {}

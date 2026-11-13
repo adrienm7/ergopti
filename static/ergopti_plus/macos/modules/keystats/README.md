@@ -15,7 +15,7 @@ Low-level event tap daemon that intercepts, timestamps, and stores every human k
 | `Storage`             | SQLite writes via `sqlite_writer` and `sqlite_reader` |
 | `TimerScheduler`      | Idle check, maintenance, and flush timers             |
 
-## Domain module (`_shared/core/domain/`)
+## Domain module (`_shared/core/text/data/domain/`)
 
 No domain spec directly — the keystats implements the on-disk schema described in `_shared/data/KEYSTATS_SPEC.md`. The `kc_bridge` sub-module exposes keycode translation consumed by `karabiner`.
 
@@ -57,7 +57,7 @@ never suppressed instead, because it is also a real key.
 The stream credits the macOS keycode Quartz would report for the same key:
 `physical_key_identity.lua` resolves a raw HID usage through the generated
 `_generated/hid_key_identity.lua` (from the shared registry and
-`_shared/data/keycodes/hid_usages.json`), using the device's
+`_shared/layouts/data/keycodes/hid_usages.json`), using the device's
 keyboard type only for the ISO swap pair, and maps fn/globe to the fn keycode.
 `physical_delivery.lua` tallies a press it cannot attribute in `uncounted()`
 instead of retiring the capture, and `physical_baseline.lua` admits only the

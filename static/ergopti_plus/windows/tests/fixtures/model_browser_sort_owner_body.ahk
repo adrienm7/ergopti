@@ -75,7 +75,7 @@ _MBS_Main() {
 	_MBS_Require(Mode == "edges" || Mode == "order" || Mode == "clone", "The sort mode must be explicit.")
 	OnError(_MBS_Error)
 	try {
-		Path := _SharedDir . "\modules\llm\models.json"
+		Path := _SharedDir . "\ai\data\models.json"
 		Before := FSReadBytesStrict(Path), BeforeHash := CryptoSha256Bytes(Before)
 		_MBS_Require(Before.Size > 0 && BeforeHash != "", "The private authentic catalogue RAW image must be readable.")
 		Index := LLM_GetModelIndex(), CountBefore := Index.Count

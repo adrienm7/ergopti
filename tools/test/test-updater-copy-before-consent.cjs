@@ -29,7 +29,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..', '..');
-const localesDir = path.join(root, 'static', 'ergopti_plus', '_shared', 'data', 'locales');
+const localesDir = path.join(
+	root,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'i18n',
+	'data',
+	'locales'
+);
 const errors = [];
 
 // Everything the drivers show between finding an update and the user's choice

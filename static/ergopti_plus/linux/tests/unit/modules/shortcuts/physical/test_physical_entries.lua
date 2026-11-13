@@ -2,8 +2,8 @@
 
 --- Replays the independent user physical-entry contract through the Linux gate.
 local helpers = require("tests.helpers")
-local Json = require("json")
-local PhysicalSlots = require("shortcuts.physical_slots")
+local Json = require("core.text.engine.json")
+local PhysicalSlots = require("shortcuts.engine.physical_slots")
 
 --- Reads checked-in independent vectors and canonical registry metadata.
 --- @param relative string Path below the shared tree.
@@ -16,5 +16,5 @@ local function read_shared(relative)
 	return Json.decode(raw)
 end
 
-require("test.physical_entries_contract")(helpers, require("shortcuts.physical_entries"),
-	PhysicalSlots, read_shared("data/keycodes/physical_keys.json"))
+require("tests.lua.layouts.physical_entries_contract")(helpers, require("shortcuts.engine.physical_entries"),
+	PhysicalSlots, read_shared("layouts/data/keycodes/physical_keys.json"))

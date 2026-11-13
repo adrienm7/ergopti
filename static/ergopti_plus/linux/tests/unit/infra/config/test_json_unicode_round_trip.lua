@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Bridge = helpers.load_module("infra.llm_bridge")
 
 for _, codec in ipairs({
@@ -57,4 +57,4 @@ helpers.describe("llm bridge: a streamed line with an escaped accent", function(
 	end)
 end)
 
-require("test.json_root_source_contract")(helpers, Json)
+require("tests.lua.core_text.json_root_source_contract")(helpers, Json)

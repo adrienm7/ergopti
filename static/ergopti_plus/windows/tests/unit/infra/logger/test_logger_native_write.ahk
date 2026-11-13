@@ -508,7 +508,7 @@ _LNWPrivacyWrite(State, Handle, Bytes, ByteCount, &Written) {
 
 _LNWPrivacyContext(User) {
 	global _SharedDir
-	Rules := JsonParse(FileRead(_SharedDir . "\modules\diagnostics\redaction.json", "UTF-8"))
+	Rules := JsonParse(FileRead(_SharedDir . "\diagnostics\data\redaction.json", "UTF-8"))
 	return Map("rules", Rules, "context", Map("home", "C:\Users\" . User, "user", User, "case_insensitive", true))
 }
 

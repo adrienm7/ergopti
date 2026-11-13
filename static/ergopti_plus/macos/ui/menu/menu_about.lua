@@ -33,10 +33,10 @@ local Logger    = require("infra.logger")
 local i18n      = require("infra.i18n")
 local changelog = require("ui.changelog")
 local Updater   = require("modules.updater")
-local VersionLabel = require("updater.version_label")
+local VersionLabel = require("updater.engine.version_label")
 local ManifestMenu = require("infra.manifest_menu")
 local UpdateLauncher = require("adapters.update_launcher")
-local CheckNotice = require("updater.check_notice")
+local CheckNotice = require("updater.engine.check_notice")
 local Notifications = require("infra.notifications")
 local LOG       = "menu_about"
 
@@ -138,14 +138,14 @@ local function notify_check_without_window(checks, owner, on_change)
 end
 
 local function channel_picker(owner, subscribed)
-	return ManifestMenu.choice_row("about_update_channel_menu", require("config_keys").COMMAND.UPDATE_CHANNEL, {
+	return ManifestMenu.choice_row("about_update_channel_menu", require("settings.engine.keys").COMMAND.UPDATE_CHANNEL, {
 		update_channel = function(id)
 			Logger.info(LOG, "User chose the update channel '%s'.", id)
 			local ok, committed = pcall(owner.set, id)
 			return ok and committed == true
 		end,
 	}, {
-		[require("config_keys").KEY.UPDATER_CHANNEL] = function() return subscribed end,
+		[require("settings.engine.keys").KEY.UPDATER_CHANNEL] = function() return subscribed end,
 		installed_build = function() return not is_local_source() end,
 	})
 end
@@ -156,14 +156,14 @@ end
 --- @param stored_seconds number|nil A source run's snapped interval, without an owner.
 --- @return table row A provider row with its items.
 local function frequency_picker(checks, stored_seconds)
-	return ManifestMenu.choice_row("about_update_frequency_menu", require("config_keys").COMMAND.UPDATE_CHECK_INTERVAL, {
+	return ManifestMenu.choice_row("about_update_frequency_menu", require("settings.engine.keys").COMMAND.UPDATE_CHECK_INTERVAL, {
 		update_check_interval = function(seconds)
 			if type(checks) ~= "table" then return false end
 			Logger.info(LOG, "User chose the check interval %ds.", seconds)
 			return checks.set_interval(seconds) == true
 		end,
 	}, {
-		[require("config_keys").KEY.UPDATER_CHECK_INTERVAL_SECONDS] = function()
+		[require("settings.engine.keys").KEY.UPDATER_CHECK_INTERVAL_SECONDS] = function()
 			if stored_seconds ~= nil then return stored_seconds end
 			return checks.interval()
 		end,
@@ -270,8 +270,8 @@ function M.build(ctx, actions)
 				return changelog.complete_pending_install()
 			end
 		end
-		local check_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
-			[require("config_keys").COMMAND.ABOUT_SOURCE_CHECK] = check_action,
+		local check_row = ManifestMenu.command_row("about_source_menu", require("settings.engine.keys").COMMAND.ABOUT_SOURCE_CHECK, {
+			[require("settings.engine.keys").COMMAND.ABOUT_SOURCE_CHECK] = check_action,
 		}, { ["about_source_release_ready"] = function() return not local_src end })
 		if check_row then
 			if offered_label then check_row.label = offered_label end
@@ -288,8 +288,8 @@ function M.build(ctx, actions)
 		-- out, nobody could tell whether the automatic update exists.
 		local state = type(ctx) == "table" and type(ctx.state) == "table" and ctx.state or {}
 		local seconds = require("modules.updater.auto_check").stored_interval(state)
-		local source_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
-			[require("config_keys").COMMAND.ABOUT_SOURCE_CHECK] = function() return false end,
+		local source_row = ManifestMenu.command_row("about_source_menu", require("settings.engine.keys").COMMAND.ABOUT_SOURCE_CHECK, {
+			[require("settings.engine.keys").COMMAND.ABOUT_SOURCE_CHECK] = function() return false end,
 		}, { ["about_source_release_ready"] = function() return not local_src end })
 		if source_row then table.insert(menu_items, source_row) end
 		table.insert(menu_items, frequency_picker(nil, seconds))
@@ -303,14 +303,14 @@ function M.build(ctx, actions)
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
 	render_ctx.commands = {
-		[require("config_keys").COMMAND.ABOUT_CHANGELOG] = function()
+		[require("settings.engine.keys").COMMAND.ABOUT_CHANGELOG] = function()
 			Logger.info(LOG, "User opened changelog (channel: %s).", channel)
 			show_changelog(channel, owner)
 		end,
-		[require("config_keys").COMMAND.ABOUT_RELEASES_PAGE] = function() hs.urlevent.openURL(releases_page_url()) end,
+		[require("settings.engine.keys").COMMAND.ABOUT_RELEASES_PAGE] = function() hs.urlevent.openURL(releases_page_url()) end,
 		-- The menu session's uninstall transaction; an unregistered command is
 		-- reported by the renderer and draws no row that would do nothing.
-		[require("config_keys").COMMAND.START_AT_LOGIN] = type(actions) == "table" and actions.start_at_login or nil,
+		[require("settings.engine.keys").COMMAND.START_AT_LOGIN] = type(actions) == "table" and actions.start_at_login or nil,
 		["uninstall"] = type(actions) == "table" and actions.uninstall or nil,
 	}
 	-- A local version run from source has nothing to uninstall: the row stays,

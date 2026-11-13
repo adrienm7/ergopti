@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Feature Requirements Gate
  * DESCRIPTION:
- * Every feature of _shared/modules/features/manifest.toml declares, per OS it
+ * Every feature of _shared/settings/data/features/manifest.toml declares, per OS it
  * is available on, what it needs outside its driver. This gate derives the same
  * lists from the drivers (tools/lib/feature-requirements.cjs) and fails, per
  * OS, in both directions: a feature that reaches a requirement without

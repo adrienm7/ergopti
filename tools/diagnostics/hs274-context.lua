@@ -5,7 +5,7 @@ local Privacy = require("modules.keystats.privacy_context")
 local Timestamp = require("modules.keystats.timestamp")
 local Lifecycle = require("adapters.process_lifecycle")
 local Secure = require("adapters.secure_field_detector")
-local PrivateWindow = require("keystats.private_window")
+local PrivateWindow = require("metrics.engine.view.private_window")
 local M = {}
 
 function M.new(capacity, observations, on_error)

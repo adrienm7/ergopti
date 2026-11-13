@@ -61,7 +61,7 @@ local function fresh_manager()
 			return { "peer-device" }
 		end,
 	}
-	package.loaded["keystats.metrics"] = {}
+	package.loaded["metrics.engine.metrics"] = {}
 	package.loaded["modules.keystats.log_manager"] = nil
 	return EmptyLedger.load()
 end

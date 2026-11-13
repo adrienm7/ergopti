@@ -14,7 +14,7 @@ local Paths = require("infra.paths")
 local Command = require("modules.keystats.sqlite_command")
 local Writer = require("modules.keystats.sqlite_writer")
 local Reader = require("modules.keystats.sqlite_reader")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 assert(uv.getuid() ~= 0, "profile receipts require an ordinary account")
 local home = assert(os.getenv("HOME"), "actual login home is required")
 local profile = assert(io.open(home .. "/.sqliterc", "rb"))
@@ -27,7 +27,7 @@ assert(not uv.fs_lstat(marker), "owned profile marker already exists before any 
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-sqlite-init-XXXXXX"))
 local database = root .. "/seeded.sqlite"
 local checks, failures = 0, 0
-local schema = assert(io.open(assert(Paths.shared_root()) .. "/data/db/schema.sql", "rb"))
+local schema = assert(io.open(assert(Paths.shared_root()) .. "/metrics/data/db/schema.sql", "rb"))
 local sql = assert(schema:read("*a")); assert(schema:close())
 -- Seed independently of the builder under test. Explicit native init isolation
 -- is the control proving the fixture itself has usable schema and exact data.

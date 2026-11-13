@@ -145,7 +145,7 @@ function runResult({ root, source, spec, invoke, runtimeVersion, receiptPath }) 
 				'-Folder',
 				folder,
 				'-SpecPath',
-				path.join(root, 'static/ergopti_plus/_shared/modules/control/driver_control.json'),
+				path.join(root, 'static/ergopti_plus/_shared/diagnostics/data/control/driver_control.json'),
 				'-RequestId',
 				requestId,
 				'-DriverPid',

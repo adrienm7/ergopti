@@ -5,8 +5,8 @@
  * MODULE: Shared Lua Features Manifest Loads Each Driver's Own Manifest
  * DESCRIPTION:
  * The macOS and Linux drivers load one shared manifest table
- * (_shared/lua/features/manifest_data.lua) projected at load by
- * _shared/lua/features/manifest.lua, instead of a full generated copy each.
+ * (_shared/settings/engine/features/manifest_data.lua) projected at load by
+ * _shared/settings/engine/features/manifest.lua, instead of a full generated copy each.
  * This test loads every driver's _generated/features_manifest.lua in a real Lua
  * interpreter and compares the table it returns with the generator's model of
  * that driver (luaDriverManifest, the one the per-driver copies used to print),
@@ -71,7 +71,7 @@ end
  */
 function runLua(driverRoot, body) {
 	const source =
-		`package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path\n` +
+		`package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path\n` +
 		SERIALIZER +
 		body;
 	const result = spawnSync(LUA, ['-'], {
@@ -117,7 +117,7 @@ for (const platform of Object.keys(DRIVER_ROOTS)) {
 		.filter((line) => line !== '' && !line.startsWith('---'));
 	assert.deepEqual(
 		body,
-		[`return require("features.manifest").for_platform("${platform}")`],
+		[`return require("settings.engine.features.manifest").for_platform("${platform}")`],
 		`${driverRoot}: the driver manifest declares something besides its projection`
 	);
 	checks += 1;
@@ -166,7 +166,7 @@ for (const platform of Object.keys(DRIVER_ROOTS)) {
 	// 3. Fresh tables.
 	const fresh = runLua(
 		driverRoot,
-		`local Manifest = require("features.manifest")
+		`local Manifest = require("settings.engine.features.manifest")
 		local first = Manifest.for_platform(${JSON.stringify(platform)})
 		local path = first.features[1].path
 		first.features[1].path = "edited"; first.sections.script.platforms[1] = "edited"
@@ -187,7 +187,7 @@ for (const platform of Object.keys(DRIVER_ROOTS)) {
 // 4. An unknown driver is refused.
 const refused = runLua(
 	'macos',
-	`local Manifest = require("features.manifest")
+	`local Manifest = require("settings.engine.features.manifest")
 	local ok, err = pcall(function() return Manifest.for_platform("ahk") end)
 	io.write(tostring(not ok and tostring(err):find("unknown driver ahk", 1, true) ~= nil))`
 );

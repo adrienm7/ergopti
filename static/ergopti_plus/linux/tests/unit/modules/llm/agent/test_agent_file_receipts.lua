@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Shell = require("adapters.shell_runner")
 
 local FAULTS = { "write_nil", "write_false", "write_throw", "close_nil", "close_false", "close_throw" }
@@ -133,7 +133,7 @@ helpers.describe("agent file completion receipts", function()
 						callback({ ok = true, code = 0 }); return {}
 					end,
 				})
-				local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/llm/agent.json", "r"))
+				local file = assert(io.open(helpers.driver_root() .. "/../_shared/ai/data/agent.json", "r"))
 				local config = assert(Json.decode(file:read("*a"))); assert(file:close())
 				local action = { type = "reminder", title = "Owned reminder" }
 				local function done(accepted) completed[#completed + 1] = accepted end
@@ -165,7 +165,7 @@ helpers.it("calendar refuses an existing FIFO without removing it", function()
 		Connector._set_deps_for_test({ private_dir = function() return private end,
 			random_hex = function() return "00ff" end, utc_stamp = function() return "20261023T120000Z" end,
 			run = function(_, _, _, callback) starts = starts + 1; callback({ ok = true, code = 0 }); return {} end })
-		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/llm/agent.json", "r"))
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/ai/data/agent.json", "r"))
 		local config = assert(Json.decode(file:read("*a"))); assert(file:close())
 		local exited, process = false, nil
 		process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$1" > /dev/null', "fixture", path } }, function()
@@ -190,7 +190,7 @@ helpers.it("calendar cleanup preserves a replaced temporary file", function()
 		Connector._set_deps_for_test({ private_dir = function() return private end,
 			random_hex = function() return "00ff" end, utc_stamp = function() return "20261023T120000Z" end,
 			run = function(_, _, _, callback) callback({ ok = true, code = 0 }); return {} end })
-		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/llm/agent.json", "r"))
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/ai/data/agent.json", "r"))
 		local config = assert(Json.decode(file:read("*a"))); assert(file:close())
 		helpers.assert_true(Connector.run(config, { type = "reminder", title = "Owned reminder" }, function() end))
 		assert(os.rename(path, path .. ".old"))
@@ -210,7 +210,7 @@ helpers.it("calendar startup exception preserves an unowned destination", functi
 		local foreign = assert(io.open(path, "wb")); assert(foreign:write("foreign data")); assert(foreign:close())
 		Connector._set_deps_for_test({ private_dir = function() return private end,
 			random_hex = function() return "00ff" end, utc_stamp = function() return "20261023T120000Z" end })
-		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/llm/agent.json", "r"))
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/ai/data/agent.json", "r"))
 		local config = assert(Json.decode(file:read("*a"))); assert(file:close())
 		local original = Writer.open
 		Writer.open = function() error("injected native open exception") end

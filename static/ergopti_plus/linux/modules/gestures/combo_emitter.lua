@@ -16,8 +16,8 @@
 ---
 --- WHY A BOUNDED TABLE AND NOT ALL OF X11:
 --- The combos are not arbitrary user input. They come from
---- `_shared/modules/actions/actions.toml` through the generated table, and from
---- the modifier chords of `_shared/modules/actions/modifier_chords.json` (Ctrl+A,
+--- `_shared/shortcuts/data/actions/actions.toml` through the generated table, and from
+--- the modifier chords of `_shared/shortcuts/data/actions/modifier_chords.json` (Ctrl+A,
 --- Super+1, Alt+.), which name the letters, the digits, Space, Return, the
 --- period and the comma, and from the media keys the volume, brightness and
 --- track actions fall back to. Mapping those is bounded and checkable; mapping "all of
@@ -39,7 +39,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local EvdevCodes = require("infra.evdev_codes")
 
 local LOG = "gestures.combo_emitter"

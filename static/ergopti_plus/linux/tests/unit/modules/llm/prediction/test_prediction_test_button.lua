@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
 
-require("test.test_prediction_contract")(helpers)
+require("tests.lua.ai.test_prediction_contract")(helpers)
 
 local held = {}
 
@@ -32,7 +32,7 @@ end
 --- @return table engine, table seen
 local function fixture(state)
 	local seen = { chats = {}, notices = {} }
-	replace("logger.shim", state.logger or helpers.make_logger_stub())
+	replace("core.logger.engine.shim", state.logger or helpers.make_logger_stub())
 	replace("modules.llm.profiles", {
 		init = function() end,
 		is_enabled = function() return state.enabled ~= false end,
@@ -92,7 +92,7 @@ helpers.describe("Linux test prediction engine", function()
 	end)
 
 	helpers.it("shows but does not log the backend's untrusted failure text", function()
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 		local logs = {}
 		logger.set_level("trace")
 		logger.set_sink(function(line) logs[#logs + 1] = line end)

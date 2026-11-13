@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 	helpers.it("keeps both actual resolution loops ordered rather than relying on pairs array traversal", function()
@@ -24,7 +24,7 @@ helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 	end)
 
 	helpers.it("keeps every declared overlapping prefix longest-first", function()
-		local file = assert(io.open(helpers.shared("modules/actions/modifier_chords.json"), "rb"))
+		local file = assert(io.open(helpers.shared("shortcuts/data/actions/modifier_chords.json"), "rb"))
 		local catalogue = Json.decode(file:read("*a")); file:close()
 		local groups = catalogue.platforms.macos.shortcut_groups
 		helpers.assert_true(type(groups) == "table" and #groups > 0)

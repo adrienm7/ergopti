@@ -33,7 +33,7 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 	CredentialPath := Fixture.directory . "\api_entries.json"
 	Assert(FSWriteDurable(CredentialPath, '{"token":"keep"}'))
 	Fixture.options["tap_hold_path"] := TapPath
-	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\defaults.toml"
+	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\data\defaults.toml"
 	Bundle := 0, Refusal := 0, Launches := 0, Backups := 0, Handle := -1
 	Port := ConfigTransitionProductionPort()
 	AssertTrue(ConfigTransitionProductionPort(Port), "global scope uses the actual unchanged native port owner")

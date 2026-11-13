@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local SharedParser = require("llm.parser")
+local SharedParser = require("ai.engine.api.parser_core")
 
 
 
@@ -52,7 +52,7 @@ local API_COMMON = {
 	end,
 	log_prediction_summary = function() end,
 	is_authentication_failure = function(failure)
-		return require("llm.failure_class").is_authentication_failure(failure)
+		return require("ai.engine.policy.failure_class").is_authentication_failure(failure)
 	end,
 	protected_call = function(callback, _label, ...)
 		if type(callback) == "function" then return callback(...) end

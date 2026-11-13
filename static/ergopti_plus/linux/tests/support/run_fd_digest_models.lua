@@ -14,7 +14,7 @@ if not driver_root then
 	driver_root = "."
 end
 package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;"
-	.. driver_root .. "/../_shared/lua/?.lua;" .. driver_root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. driver_root .. "/../_shared/?.lua;" .. driver_root .. "/../_shared/?/init.lua;" .. package.path
 
 assert(_VERSION == "Lua 5.1" or _VERSION == "Lua 5.4", "Required Lua ABI unavailable")
 if _VERSION == "Lua 5.1" then

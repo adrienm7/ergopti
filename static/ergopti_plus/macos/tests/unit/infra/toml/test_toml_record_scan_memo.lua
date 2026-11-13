@@ -28,7 +28,7 @@ end
 
 helpers.describe("TOML record scan memo", function()
 	helpers.it("does not scan a text it scanned a moment ago", function()
-		local Scanner = require("toml_codec.record_scanner")
+		local Scanner = require("core.text.engine.toml_codec.record_scanner")
 		local text = SOURCE .. "# memo probe " .. tostring(os.clock()) .. "\n"
 		helpers.assert_true(count_find_calls(function() Scanner.scan_records(text, { quoted_headers = true }) end) > 0,
 			"the first scan of a text must scan it")
@@ -37,7 +37,7 @@ helpers.describe("TOML record scan memo", function()
 	end)
 
 	helpers.it("keeps the quoted and bare header grammars apart", function()
-		local Scanner = require("toml_codec.record_scanner")
+		local Scanner = require("core.text.engine.toml_codec.record_scanner")
 		local quoted = Scanner.scan_records(SOURCE, { quoted_headers = true })
 		local bare = Scanner.scan_records(SOURCE)
 		helpers.assert_eq(quoted.records[1].addressable, true)
@@ -47,7 +47,7 @@ helpers.describe("TOML record scan memo", function()
 	end)
 
 	helpers.it("hands every caller an independent scan and repeats a refusal", function()
-		local Scanner = require("toml_codec.record_scanner")
+		local Scanner = require("core.text.engine.toml_codec.record_scanner")
 		local first = Scanner.scan_records(SOURCE, { quoted_headers = true })
 		first.records[2].value = "mutated"
 		first.lines[1].text = "mutated"

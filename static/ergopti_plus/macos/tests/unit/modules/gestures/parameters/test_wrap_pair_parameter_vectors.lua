@@ -4,7 +4,7 @@
 --- MODULE: wrap_selection parameter replays the shared vectors (macOS)
 --- DESCRIPTION:
 --- The wrap_selection action takes a wrap_pair parameter: a symbol of the
---- built-in catalogue (_shared/modules/wrap_symbols/wrap_symbols.json) or a
+--- built-in catalogue (_shared/keyboard/data/wrap_symbols/wrap_symbols.json) or a
 --- custom left|right pair. This replays
 --- _shared/tests/corpus/action_parameters/wrap_pair_vectors.json, which the Linux
 --- and Windows suites replay too, through the real gesture validator and the
@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local CORPUS = helpers.shared("tests/corpus/action_parameters/wrap_pair_vectors.json")
 

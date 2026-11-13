@@ -5,18 +5,18 @@
 --- DESCRIPTION:
 --- Regression api-entry-auto-name. Replays
 --- _shared/tests/corpus/llm/api_entry_names_vectors.json through
---- _shared/lua/llm/api_entry_names.lua, the rule every tray names a remote API
+--- _shared/ai/engine/api/entry_names.lua, the rule every tray names a remote API
 --- entry by: <provider>/<model>, told apart by host, then by order, when two
 --- entries share it. The AutoHotkey port replays the same corpus.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.path
+package.path = SHARED .. "?.lua;" .. SHARED .. "?/init.lua;" .. package.path
 
-local EntryNames = require("llm.api_entry_names")
+local EntryNames = require("ai.engine.api.entry_names")
 
 --- @return table decoded The corpus.
 local function corpus()

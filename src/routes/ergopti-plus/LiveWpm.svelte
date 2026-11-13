@@ -12,7 +12,7 @@ suggestion injects several characters at once — the whole point of the metric.
 
 FEATURES & RATIONALE:
 1. Faithful style: the pill geometry and the source colours mirror
-   _shared/modules/wpm_widget/constants.toml (manual blue, AI purple,
+   _shared/metrics/data/wpm_widget/constants.toml (manual blue, AI purple,
    hotstring = the family colour), so the demo reads as the real widget.
 2. Real computation, not a fake needle: MPM is (chars / 5) over a sliding
    window, so bursts from expansions produce genuine, proportional jumps.
@@ -22,7 +22,7 @@ FEATURES & RATIONALE:
 <script>
 	import { onMount } from 'svelte';
 
-	// ── Widget canon, mirrored from _shared/modules/wpm_widget/constants.toml ──
+	// ── Widget canon, mirrored from _shared/metrics/data/wpm_widget/constants.toml ──
 	/** Blue background for manual keystrokes. */
 	const COLOR_MANUAL = '#0055cc';
 	/** Purple background for AI-generated keystrokes. */

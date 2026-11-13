@@ -6,7 +6,7 @@
 --- Lets tools/dev/collect-linux-field-report.sh ask the running daemon to run
 --- its Debug field checks with no window and write one JSON result per step,
 --- so a maintainer's field report needs no click. The protocol is the one
---- every driver shares, _shared/data/field_run_protocol.json (macOS was first,
+--- every driver shares, _shared/diagnostics/data/field_run_protocol.json (macOS was first,
 --- macos/infra/field_run.lua): file names, verdicts, refusal reasons, the
 --- identifier rules, the folders and the keys each document carries are read
 --- from it, never repeated here. data/field_run_steps.json, the Linux steps file
@@ -40,9 +40,9 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Json = require("json")
-local Report = require("field_check_report")
+local Logger = require("core.logger.engine.shim")
+local Json = require("core.text.engine.json")
+local Report = require("diagnostics.engine.field_check.report")
 
 local LOG = "infra.field_run"
 local PRIVATE_MODE = 448 -- 0700
@@ -64,7 +64,7 @@ local MAX_STEPS = 98
 M.RELOAD_TRIGGER = "field run"
 
 -- The shared declaration, from the shared tree.
-M.PROTOCOL_PATH = "data/field_run_protocol.json"
+M.PROTOCOL_PATH = "diagnostics/data/field_run_protocol.json"
 
 -- The headless runner of each declared check.
 M.CHECK_RUNNERS = {
@@ -131,7 +131,7 @@ end
 
 --- Builds the Linux declaration from the shared protocol and the Linux steps.
 --- A malformed or unsupported declaration stops the caller.
---- @param protocol table Decoded _shared/data/field_run_protocol.json.
+--- @param protocol table Decoded _shared/diagnostics/data/field_run_protocol.json.
 --- @param linux table Decoded data/field_run_steps.json.
 --- @return table spec The protocol's names and rules, the steps, step_by_id and matchers.
 function M.declaration(protocol, linux)

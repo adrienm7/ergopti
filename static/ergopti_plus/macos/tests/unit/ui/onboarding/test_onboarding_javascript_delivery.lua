@@ -390,7 +390,7 @@ helpers.describe("onboarding captured initialization publication", function()
 			state.encode = function(payload)
 				state.encode = nil
 				helpers.assert_true(onboarding.run("/virtual/other/config.toml"))
-				return require("json").encode(payload)
+				return require("core.text.engine.json").encode(payload)
 			end
 			state.fire_timer(1)
 			helpers.assert_eq(state.read_paths[1], "/virtual/config.toml")
@@ -416,7 +416,7 @@ helpers.describe("onboarding active initialization reservation", function()
 			state.encode = function(payload)
 				state.encode = nil
 				helpers.assert_true(onboarding.run("/virtual/config.toml"))
-				return require("json").encode(payload)
+				return require("core.text.engine.json").encode(payload)
 			end
 			state.fire_timer(1)
 			helpers.assert_eq(state.timer_attempts, 1)
@@ -470,7 +470,7 @@ helpers.describe("onboarding active initialization reservation", function()
 				helpers.assert_true(onboarding.run("/virtual/other/config.toml"))
 				state.receiver({ body = { action = "ready" } })
 				attempts_during_encoding = state.timer_attempts
-				return require("json").encode(payload)
+				return require("core.text.engine.json").encode(payload)
 			end
 			state.fire_timer(1)
 			helpers.assert_eq(attempts_during_encoding, 1, "active submission cannot allocate a second timer inline")

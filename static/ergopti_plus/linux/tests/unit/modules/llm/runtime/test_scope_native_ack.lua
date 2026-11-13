@@ -58,9 +58,9 @@ helpers.describe("LLM scope native acknowledgements", function()
 	end)
 
 	helpers.it("requires native GTK hide readback and retains a failed window for retry", function()
-		isolated({ "adapters.graphics_renderer", "tooltip.layout", "tooltip.tint" }, function()
-			package.loaded["tooltip.layout"] = { compute_position = function() return { x = 0, y = 0 } end }
-			package.loaded["tooltip.tint"] = { mix = function() return {} end }
+		isolated({ "adapters.graphics_renderer", "core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.tint" }, function()
+			package.loaded["core.ui.engine.tooltip.layout"] = { compute_position = function() return { x = 0, y = 0 } end }
+			package.loaded["core.ui.engine.tooltip.tint"] = { mix = function() return {} end }
 			local visible, refuse, raises, on_hide, on_show, refuse_show = true, true, false, nil, nil, false
 			local noop = function() end
 			local window = setmetatable({

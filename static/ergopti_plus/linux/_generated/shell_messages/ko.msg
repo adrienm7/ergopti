@@ -1,5 +1,5 @@
 # linux/_generated/shell_messages/ko.msg
-# AUTO-GENERATED from _shared/data/locales/ko.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/ko.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT 네트워킹 모듈을 소스에서 빌드했습니다.
 build_luv.recipe_required=luv 네이티브 빌드에는 소스 레시피가 필요합니다.

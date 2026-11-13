@@ -2241,8 +2241,8 @@ function personalSectionChoicePublication(source, platform, manifest) {
 			ManifestMenu: 'infra.manifest_menu',
 			PersonalFileScope: 'infra.personal_file_scope',
 			KeymapLifecycle: 'ui.menu.keymap_lifecycle',
-			PersonalFiles: 'hotstrings.personal_files',
-			Labels: 'menu.labels'
+			PersonalFiles: 'hotstrings.engine.catalogue.personal_files',
+			Labels: 'menu.engine.labels'
 		};
 		for (const [name, path] of Object.entries(imports)) {
 			const record = luaLocal(moduleGraph, name);

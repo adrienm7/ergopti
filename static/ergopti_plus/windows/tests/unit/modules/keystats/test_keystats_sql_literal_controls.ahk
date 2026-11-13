@@ -8,7 +8,7 @@
 ; data.sql ledger, whose reader translates CRLF to LF and skips NUL bytes as
 ; the hole of an interrupted append. A raw NUL in a literal therefore cut the
 ; statement short or vanished from the value, and a CR inside a CRLF pair was
-; lost. The shared policy (_shared/lua/sqlite/literal.lua) expresses CR and
+; lost. The shared policy (_shared/core/fs/engine/sqlite/literal.lua) expresses CR and
 ; NUL as SQLite char() concatenations; each Windows encoder must keep every
 ; value byte-exact through both paths. hex(v) computed by SQLite is the
 ; independent oracle for the stored bytes.

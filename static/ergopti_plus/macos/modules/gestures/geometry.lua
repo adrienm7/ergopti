@@ -18,16 +18,16 @@
 ---    live here and the engine reads them back through this module, so the
 ---    direction classifier and the commit-time threshold check can never drift.
 --- 3. One classifier on every driver — computeDir and slotForDir delegate to
----    _shared/lua/gestures/direction.lua, which the Linux evdev decoder uses too:
+---    _shared/gestures/engine/direction.lua, which the Linux evdev decoder uses too:
 ---    25/65 degree sectors, a Manhattan-total diagonal gate (adx + ady), and the
 ---    dominant axis below the diagonal minimum. This module keeps the macOS
 ---    units and the two-finger tuning only.
 --- ==============================================================================
 
 local M = {}
-local Direction = require("gestures.direction")
-local Incremental = require("gestures.incremental")
-local ContactJoin = require("gestures.contact_join")
+local Direction = require("gestures.engine.direction")
+local Incremental = require("gestures.engine.incremental")
+local ContactJoin = require("gestures.engine.contact_join")
 
 
 
@@ -52,7 +52,7 @@ M.SWIPE_MIN, M.SWIPE_DIAG_MIN = Direction.minimums_mm(3, MINIMUMS) -- 3/4/5 fing
 -- 2 fingers: horiz/vert (left to macOS, diagonal only), and the total distance of a diagonal
 M.SWIPE_MIN_2, M.DIAG_MIN_2 = Direction.minimums_mm(2, MINIMUMS)
 
--- Incremental mode: the shared step rule (_shared/lua/gestures/incremental.lua),
+-- Incremental mode: the shared step rule (_shared/gestures/engine/incremental.lua),
 -- the same one the Linux gesture manager counts with.
 M.INCREMENTAL_FIRST_STEP = Incremental.FIRST_STEP
 M.MAX_INCREMENTAL_ACTIONS_PER_FRAME = Incremental.MAX_ACTIONS_PER_FRAME
@@ -131,7 +131,7 @@ end
 
 --- Tells why the contacts of one frame cannot be three fingers of one hand:
 --- a far or oversized third contact, a resting thumb beside a pair (shared
---- rule, _shared/lua/gestures/contact_join.lua; the trackpad reports
+--- rule, _shared/gestures/engine/contact_join.lua; the trackpad reports
 --- millimetres). Any other count is not judged.
 --- @param touches table Trackpad touch arrays.
 --- @return string|nil reason "far" or "oversized", nil when admitted.

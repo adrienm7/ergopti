@@ -11,8 +11,8 @@
 local M = {}
 M.bridge_name = "dl_bridge"
 
-local Json = require("json")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
 
 local APP_NAME = "download_window"
 local LOG = "bridge.download_window"
@@ -74,10 +74,10 @@ end
 --- Loads the one canonical policy through the driver's native file owner.
 local function contract()
 	if not _contract then
-		local path = require("infra.paths").shared("modules/network/managed_network.json")
-		local source, status = require("toml_codec.writer").read_classified(path)
+		local path = require("infra.paths").shared("core/network/data/managed_network.json")
+		local source, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 		assert(status == "ok", "managed network policy read or close refused")
-		_contract = require("network.failure").new(Json.decode(source))
+		_contract = require("core.network.engine.failure").new(Json.decode(source))
 	end
 	return _contract
 end
