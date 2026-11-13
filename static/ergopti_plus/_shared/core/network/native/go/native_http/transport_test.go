@@ -28,6 +28,10 @@ func TestMain(m *testing.M) {
 		json.Unmarshal(input, &request)
 		request["pid"] = os.Getpid()
 		request["argv"] = os.Args[1:]
+		// A slow runner's late peer start, reproduced on demand.
+		if delay, err := strconv.Atoi(os.Getenv("ERGOPTI_TEST_PEER_START_DELAY_MS")); err == nil {
+			time.Sleep(time.Duration(delay) * time.Millisecond)
+		}
 		record, _ := os.OpenFile(os.Getenv("ERGOPTI_TEST_RECORD"), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 		json.NewEncoder(record).Encode(request)
 		record.Close()
@@ -226,13 +230,42 @@ func TestGoRedirectPolicyRetainsFullURLAndStripsForeignAuth(t *testing.T) {
 	}
 }
 
+// recordedPeer cancels once the peer has written its receipt. A fixed 120 ms
+// deadline (and a 200 ms idle clock that starts with the worker process) could
+// end the request before a slow runner had even started the peer, so no
+// receipt existed and the physical-retirement check read none: the flake on
+// the macOS Intel Managed Ollama cell.
+func recordedPeer(t *testing.T, path string, cancel context.CancelFunc) {
+	t.Helper()
+	go func() {
+		deadline := time.Now().Add(30 * time.Second)
+		for time.Now().Before(deadline) {
+			if bytes, err := os.ReadFile(path); err == nil && strings.HasSuffix(string(bytes), "\n") {
+				break
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		cancel()
+	}()
+}
+
 func TestCancellationAndConcurrentClosePhysicallyRetirePeer(t *testing.T) {
-	for _, mode := range []string{"stall-header", "cancel-body", "stall-body"} {
-		t.Run(mode, func(t *testing.T) {
+	for _, name := range []string{"stall-header", "cancel-body", "stall-body", "slow-start"} {
+		t.Run(name, func(t *testing.T) {
+			mode := name
+			if name == "slow-start" {
+				// Later than the old 120 ms deadline and 200 ms idle clock.
+				mode = "stall-header"
+				t.Setenv("ERGOPTI_TEST_PEER_START_DELAY_MS", "300")
+			}
 			transport, record := peerTransport(t, mode)
-			transport.IdleTimeout = 200 * time.Millisecond
-			context, cancel := context.WithTimeout(context.Background(), 120*time.Millisecond)
+			// A backstop only: cancellation, not the idle clock, ends each case.
+			transport.IdleTimeout = 30 * time.Second
+			context, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			if mode != "cancel-body" {
+				recordedPeer(t, record, cancel)
+			}
 			request, _ := http.NewRequestWithContext(context, "GET", "https://example.test/blob", nil)
 			response, err := transport.RoundTrip(request)
 			if response != nil {
