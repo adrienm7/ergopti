@@ -1810,6 +1810,26 @@ function scanFile(file, text, ctx) {
 				newRepo: target
 			});
 		}
+	// /^#Include unit\/infra\/lifecycle\/test_x\.ahk$/m or
+	// /path\.join\(driver, 'infra\/openssl_digest\.lua'\)/ in a tool: a path
+	// escaped for a JavaScript regular expression, relative to a folder the
+	// tool does not spell. A tail exactly one file ends with follows that file
+	// from the same base, escaped the same way.
+	if (/^tools\/.*\.(c?js|mjs)$/.test(file))
+		for (const m of text.matchAll(/(?<![\w\\/])((?:[\w-]+\\\/)+[\w-]+)\\\.(\w+)(?![\w\\])/g)) {
+			const tail = `${m[1].replace(/\\\//g, '/')}.${m[2]}`;
+			const owners = filesEndingWith(tail);
+			if (owners.length !== 1 || !byRepoPath.has(owners[0])) continue;
+			const base = owners[0].slice(0, owners[0].length - tail.length - 1);
+			const target = byRepoPath.get(owners[0]);
+			if (!base || !target || target === PREFIX || target === SPLIT) continue;
+			if (!target.startsWith(`${base}/`) || target === owners[0]) continue;
+			const rel = target.slice(base.length + 1);
+			add('path-regex', m[0], rel.replace(/\./g, '\\.').replace(/\//g, '\\/'), {
+				oldRepo: owners[0],
+				newRepo: target
+			});
+		}
 	// SPEC_ONLY = { 'modules/tooltip/tint.js': … } in a tool: a bare path that
 	// names a file under _shared and nothing else follows that file.
 	// A captured source (a .txt snapshot of a predecessor) keeps what it held.
