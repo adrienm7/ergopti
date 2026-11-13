@@ -142,6 +142,16 @@ function run() {
 		/frame\.json: [0-9a-f]{64} -> [0-9a-f]{64} \(w\/a\.txt -> x\/a\.txt\)/
 	);
 	assert.equal(requalificationSection([]), '');
+	// A pin re-pinned in one round follows its file again when a later round
+	// (after a generator) changes the file once more.
+	const rounds = scratch({ 'f.txt': 'one\n', 'p.txt': `${sha('one\n')}\n` });
+	const history = {};
+	rounds.write('f.txt', 'two\n');
+	repin({ root: rounds.root, derived: [], history });
+	rounds.write('f.txt', 'three\n');
+	repin({ root: rounds.root, derived: [], history });
+	assert.equal(fs.readFileSync(path.join(rounds.root, 'p.txt'), 'utf8'), `${sha('three\n')}\n`);
+	fs.rmSync(rounds.root, { recursive: true, force: true });
 	// A requalified pin of a file the step removed names nothing: the step stops.
 	const orphan = scratch({ 'gone.txt': 'g\n', 'frame.json': `"${sha('g\n')}"\n` });
 	orphan.git('rm', '-q', 'gone.txt');

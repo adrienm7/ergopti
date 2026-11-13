@@ -31,7 +31,7 @@
  *
  * USAGE:
  *   node tools/audit/structure/repin.cjs [--base <rev>] [--moves <file>] [--check]
- *     [--derived-before <values>] [--requalify-out <records>]
+ *     [--derived-before <values>] [--requalify-out <records>] [--history <values>]
  *   node tools/audit/structure/repin.cjs --derive-out <values>
  *   Compares the working tree with <rev> (HEAD by default), rewrites the pins
  *   and prints one line per re-pinned file. <file> is the JSON list of
@@ -39,7 +39,9 @@
  *   and fails when a pin is stale. --derive-out records the derived pins of the
  *   tree before a step; --derived-before hands them to the re-pin after it.
  *   --requalify-out appends the requalified pins (edits.cjs REQUALIFIED_PINS)
- *   to a JSON list the runner writes into the step's commit body.
+ *   to a JSON list the runner writes into the step's commit body. --history
+ *   keeps the values written per file across the runner's rounds, so a pin
+ *   re-pinned to a value its file later outgrows follows it again.
  * ==============================================================================
  */
 
@@ -158,7 +160,8 @@ function repin({
 	derived = Edits.DERIVED_PINS,
 	derivedBefore = null,
 	requalify = Edits.REQUALIFIED_PINS,
-	requalifications = []
+	requalifications = [],
+	history = {}
 } = {}) {
 	const edits = new Map();
 	const contents = new Map();
@@ -203,12 +206,24 @@ function repin({
 			const to = sha256(
 				typeof cached === 'string' ? Buffer.from(cached, 'utf8') : fs.readFileSync(abs)
 			);
-			if (from === to) continue;
-			if (next.has(from) && next.get(from) !== to) ambiguous.add(from);
-			else {
-				next.set(from, to);
-				origin.set(from, [old, now]);
+			if (from !== to) {
+				if (next.has(from) && next.get(from) !== to) ambiguous.add(from);
+				else {
+					next.set(from, to);
+					origin.set(from, [old, now]);
+				}
 			}
+			// An earlier round of the same step re-pinned this file's pins to a
+			// value it has since outgrown (a generator rewrote it): each value
+			// recorded for it follows it too.
+			for (const was of history[now] || [])
+				if (was !== to && was !== from) {
+					if (next.has(was) && next.get(was) !== to) ambiguous.add(was);
+					else {
+						next.set(was, to);
+						origin.set(was, [old, now]);
+					}
+				}
 		}
 		let changed = false;
 		for (const f of files) {
@@ -226,6 +241,8 @@ function repin({
 				const to = next.get(h);
 				if (!to) return h;
 				pins.push([h, to]);
+				const target = origin.get(h)[1];
+				history[target] = [...new Set([...(history[target] || []), to])];
 				if (requalified.has(f)) {
 					const [oldPath, newPath] = origin.get(h);
 					requalifications.push({ file: f, from: h, to, oldPath, newPath });
@@ -304,7 +321,15 @@ function main() {
 	const derivedBefore =
 		beforeAt >= 0 ? JSON.parse(fs.readFileSync(args[beforeAt + 1], 'utf8')) : null;
 	const requalifications = [];
-	const edits = repin({ base, write: !check, moves, derivedBefore, requalifications });
+	// The values each round of the runner wrote, per file, for the next round.
+	const historyAt = args.indexOf('--history');
+	const historyFile = historyAt >= 0 ? args[historyAt + 1] : null;
+	const history =
+		historyFile && fs.existsSync(historyFile)
+			? JSON.parse(fs.readFileSync(historyFile, 'utf8'))
+			: {};
+	const edits = repin({ base, write: !check, moves, derivedBefore, requalifications, history });
+	if (historyFile) fs.writeFileSync(historyFile, JSON.stringify(history, null, 1) + '\n');
 	// Every round of the runner adds its requalified pins to the step's list.
 	const outAt = args.indexOf('--requalify-out');
 	if (outAt >= 0) {

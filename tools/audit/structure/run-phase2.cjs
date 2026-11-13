@@ -197,6 +197,11 @@ function runStep(key, opts) {
 		git('rev-parse', '--git-path', 'ergopti-structure-requalify.json').trim()
 	);
 	fs.rmSync(requalifyFile, { force: true });
+	const historyFile = path.resolve(
+		ROOT,
+		git('rev-parse', '--git-path', 'ergopti-structure-pin-history.json').trim()
+	);
+	fs.rmSync(historyFile, { force: true });
 	const derived = run(process.execPath, [REPIN, '--derive-out', derivedFile]);
 	if (derived.status !== 0)
 		throw Object.assign(new Error(`${key}: derived pins:\n${derived.tail}`), { receipt });
@@ -223,7 +228,9 @@ function runStep(key, opts) {
 			'--derived-before',
 			derivedFile,
 			'--requalify-out',
-			requalifyFile
+			requalifyFile,
+			'--history',
+			historyFile
 		]);
 		const repinned = Number((pinned.tail.match(/\[repin\] (\d+) file/) || [])[1]);
 		if (round > 1 && repinned === 0) break;
