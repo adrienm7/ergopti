@@ -247,11 +247,30 @@ try {
 		);
 		const command = desktop.match(/^Exec=(.+)$/m);
 		assert.ok(command, 'staged desktop must name its executable');
+		// systemctl answers 3 to is-active for a stopped unit: the entry starts it.
+		stub('systemctl', '[ "$2" = is-active ] && exit 3\nexit 0');
+		try {
+			const result = launchDaemon(...command[1].trim().split(/\s+/).slice(1));
+			assert.equal(result.status, 0, result.stderr);
+			const invoked = fs.readFileSync(calls, 'utf8');
+			assert.match(invoked, /systemctl --user start ergopti-hotstrings.service/);
+			assert.doesNotMatch(invoked, /luajit|pkexec/);
+		} finally {
+			stub('systemctl', 'exit 0');
+		}
+	});
+	check('arch-desktop-relaunch-restarts-a-running-unit', () => {
+		// MLC-003: a relaunch from the application menu restarts an active unit.
+		const desktop = fs.readFileSync(
+			path.join(pkgdir, 'usr/share/applications/ergopti.desktop'),
+			'utf8'
+		);
+		const command = desktop.match(/^Exec=(.+)$/m);
 		const result = launchDaemon(...command[1].trim().split(/\s+/).slice(1));
 		assert.equal(result.status, 0, result.stderr);
 		const invoked = fs.readFileSync(calls, 'utf8');
-		assert.match(invoked, /systemctl --user start ergopti-hotstrings.service/);
-		assert.doesNotMatch(invoked, /luajit|pkexec/);
+		assert.match(invoked, /systemctl --user restart ergopti-hotstrings.service/);
+		assert.doesNotMatch(invoked, /systemctl --user start |luajit|pkexec/);
 	});
 	check('arch-unit-permission-refusal-prevents-daemon-start', () => {
 		stub('id', 'if [ "$1" = -u ]; then echo 1000; else echo users; fi');
