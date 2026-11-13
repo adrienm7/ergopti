@@ -96,6 +96,22 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '\t\t{ name = "a system package (/usr/lib/ergopti)", chunk = "/usr/lib/ergopti/core/i18n/engine/locale.lua" },\n\t\t{ name = "a relative checkout launch", chunk = "./core/i18n/engine/locale.lua" },'
 	},
 	{
+		// The input probe's child drops the probe's relative includes, which named
+		// only adapters/ until S03 moved its clock to core/events: any relative
+		// include is the probe's own, and the count stays its two.
+		file: 'static/ergopti_plus/windows/tests/unit/infra/input_probe/test_input_probe_rival_owner.ahk',
+		moves: 'windows/adapters/boot_clock.ahk',
+		from: '\tBody := RegExReplace(Body, "m)^#Include\\s+\\.\\./adapters/\\S+\\R", "", &RelativeIncludes)',
+		to: '\tBody := RegExReplace(Body, "m)^#Include\\s+\\.\\./\\S+\\R", "", &RelativeIncludes)'
+	},
+	{
+		// The same relative includes of the probe, in the entry owner's child.
+		file: 'static/ergopti_plus/windows/tests/unit/infra/input_probe/test_input_probe_entry_owner.ahk',
+		moves: 'windows/adapters/boot_clock.ahk',
+		from: '\tSource := RegExReplace(Source, "m)^#Include\\s+\\.\\./adapters/\\S+\\R", "")',
+		to: '\tSource := RegExReplace(Source, "m)^#Include\\s+\\.\\./\\S+\\R", "")'
+	},
+	{
 		// The port wiring check joins each Lua driver's file-system adapter with
 		// the driver as a variable piece; S04 moves both to core/fs/adapters.
 		file: 'tools/test/test-file-system-port-wired.cjs',
