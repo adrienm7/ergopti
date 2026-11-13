@@ -491,8 +491,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       rule of `LegacyFolderRebased`; the logger's entries move, the user's own files stay (tests
       `legacy-folder-custom-logs`).
 
-- [ ] **Hotstring header rows outlive their expiry** in the « both » stack of `llm.trigger.while_hotstring_tooltip`
+- [x] **Hotstring header rows outlive their expiry** in the « both » stack of `llm.trigger.while_hotstring_tooltip`
       until the next render.
+      Done 2026-11-13 by worker E: the panel arms a repaint at its first header deadline
+      (`_LLM_TooltipArmSharedHeaderExpiry`, through the repaint-only `_LLM_TooltipRenderOwnedNavigation`); test
+      `llm-hotstring-tooltip-both-expiry`. Seeing the row leave on screen is in TODO-tests-windows.md.
 
 - [x] **Restored API entry without a usable key.** DPAPI keeps the key inside the backup: check whether a restore under
       another user or machine yields an unusable key, and give it the « API key… » re-enter row as macOS and Linux do.

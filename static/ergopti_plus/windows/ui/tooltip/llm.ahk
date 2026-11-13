@@ -1446,6 +1446,47 @@ _LLM_TooltipSharedHotstringItems() {
 	return (Current && Rows.Length > 0) ? Rows : []
 }
 
+; Milliseconds until the first shared hotstring row expires, or 0 when none of
+; them has a deadline still ahead. Pure.
+; @param {Array} Items - The header rows (FireDecision items).
+; @param {Integer} NowTick - The current tick.
+; @returns {Integer}
+_LLM_TooltipSharedHeaderNextExpiryMs(Items, NowTick) {
+	Next := 0
+	for , Item in Items {
+		if !_TooltipItemHasAbsoluteDeadline(Item)
+			continue
+		Left := TickRemaining64(Item.ExpireOriginTick, Item.ExpireDurationMs, NowTick)
+		if (Left > 0 && (Next == 0 || Left < Next))
+			Next := Left
+	}
+	return Next
+}
+
+; Repaints the panel just after its first shared hotstring row expires, so the
+; row leaves the « both » stack on its own deadline as it does alone; the
+; repaint leaves expired rows out and arms the next one.
+; @param {Array} HeaderItems - The rows the panel just drew.
+_LLM_TooltipArmSharedHeaderExpiry(HeaderItems) {
+	global _TooltipActiveSurface
+	DelayMs := _LLM_TooltipSharedHeaderNextExpiryMs(HeaderItems, A_TickCount)
+	if (DelayMs <= 0 || !IsObject(_TooltipActiveSurface))
+		return false
+	SetTimer(_LLM_TooltipExpireSharedHeader.Bind(_TooltipActiveSurface), -(DelayMs + 1))
+	return true
+}
+
+; The timer of _LLM_TooltipArmSharedHeaderExpiry: repaints the exact surface it
+; was armed for, through the repaint-only path, and nothing once it is gone.
+; @param {Object} Surface - The surface that drew the rows.
+_LLM_TooltipExpireSharedHeader(Surface) {
+	global _TooltipActiveSurface
+	if A_IsSuspended || !IsObject(_TooltipActiveSurface) || ObjPtr(_TooltipActiveSurface) != ObjPtr(Surface)
+		return false
+	Record := _LLM_TooltipPresentedFromSurface(Surface)
+	return IsObject(Record) && _LLM_TooltipRenderOwnedNavigation(Record, Surface)
+}
+
 ; Geometry of the hotstring rows heading a shared panel, drawn like the
 ; hotstring stack: a band per row, each followed by its 1 px rule (the last one
 ; separates the predictions). Pure, layout units.
@@ -1890,6 +1931,9 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		return false
     if (RenderGeneration != _TooltipGeneration)
         return false
+	; A shared hotstring row leaves on its own expiry, not at the next render.
+	if (HeaderItems.Length > 0)
+		_LLM_TooltipArmSharedHeaderExpiry(HeaderItems)
     return true
 	} catch Error as Err {
 		; Before presentation, this function alone owns the partially built Gui.
