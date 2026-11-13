@@ -190,7 +190,8 @@ function rewriteText(text, rows, movedRepo, file) {
 				'shared-prefix',
 				'source-check',
 				'tree-list',
-				'lua-concat'
+				'lua-concat',
+				'ahk-scriptdir'
 			].includes(row.kind)
 		) {
 			swap(row.old, row.new);
