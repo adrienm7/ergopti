@@ -381,7 +381,10 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       key_state_polling 69/58. The excess is already on `dev` (Build was skipped on every earlier run), at most +2
       key_state_polling from ILD-2 `_KLE_RealCtrlHeld`. The maintainer sets the new ceilings; they guard the antivirus
       surface, so no agent raises them alone.
-- [ ] **Linux hardware test still passes the removed pause argument (found 2026-11-12).**
+- [x] **Linux hardware test still passes the removed pause argument (found 2026-11-12).** Done 2026-11-13 (worker D):
+      the three calls pass the edit source only, and the paused step now expects the copy to run (EDD-1: a pause stops
+      typing, not configuration) and an unchanged copy to keep both files byte for byte; the paused session still
+      forwards the pair. Needs `/dev/uinput`, so only the Linux E2E desktop-webview job runs it.
       `linux/tests/hardware/run_simultaneous_configuration_real.lua` still passes `script.is_paused` to `Scope.edit`
       and `Scope.copy_taps_to_chords`, which take `expected_source` there since the EDD-1 pause-argument removal,
       so the pause function lands in `expected_source` and Linux E2E
