@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "wyłączone",
 	"value_check.special.no_time_limit": "bez limitu czasu",
 	"value_check.special.never": "nigdy",
+	"value_check.special.unlimited": "bez limitu",
 	"physical_shortcuts.window_title": "Skróty fizyczne",
 	"physical_shortcuts.position": "Położenie klawisza",
 	"physical_shortcuts.manual_hint": "Wybierz położenie klawisza niezależnie od wpisywanego znaku.",

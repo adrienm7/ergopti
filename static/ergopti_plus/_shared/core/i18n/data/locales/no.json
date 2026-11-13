@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "av",
 	"value_check.special.no_time_limit": "ingen tidsgrense",
 	"value_check.special.never": "aldri",
+	"value_check.special.unlimited": "ingen grense",
 	"physical_shortcuts.window_title": "Fysiske snarveier",
 	"physical_shortcuts.position": "Tastens posisjon",
 	"physical_shortcuts.manual_hint": "Velg en tastposisjon uavhengig av tegnet tasten skriver.",

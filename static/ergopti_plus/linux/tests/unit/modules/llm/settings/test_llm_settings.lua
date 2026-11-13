@@ -217,6 +217,27 @@ helpers.describe("llm settings: the bounds", function()
 				.. "sides")
 	end)
 
+	-- The bounds are the shared value schema's, the same on the three drivers
+	-- (value-validation): checking them against the declarations pins that.
+	helpers.it("takes every range from the shared value schema (value-validation)", function()
+		local settings = load_over_storage()
+		local ValueCheck = require("settings.engine.value_check")
+		local KEY = require("settings.engine.keys").KEY
+		local declared = {
+			temperature = KEY.LLM_GENERATION_TEMPERATURE, context_length = KEY.LLM_GENERATION_CONTEXT_LENGTH,
+			min_words = KEY.LLM_GENERATION_MIN_WORDS, max_words = KEY.LLM_GENERATION_MAX_WORDS,
+		}
+		local results = {}
+		for name, key in pairs(declared) do
+			local bounds = settings.bounds(name)
+			local entry = ValueCheck.declaration(key)
+			results[#results + 1] = { name, bounds.min == entry.min and bounds.max == entry.max }
+			results[#results + 1] = { name .. " past max", settings.set(name, entry.max + 1) ~= true }
+		end
+		drop_storage()
+		for _, row in ipairs(results) do helpers.assert_true(row[2], row[1]) end
+	end)
+
 	helpers.it("offers only presets inside the range", function()
 		local settings = load_over_storage()
 		local checked = 0

@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "متوقف",
 	"value_check.special.no_time_limit": "بلا حد زمني",
 	"value_check.special.never": "أبدًا",
+	"value_check.special.unlimited": "بلا حد",
 	"physical_shortcuts.window_title": "اختصارات المفاتيح الفعلية",
 	"physical_shortcuts.position": "موضع المفتاح",
 	"physical_shortcuts.manual_hint": "اختر موضع المفتاح بصرف النظر عن الحرف الذي يكتبه.",

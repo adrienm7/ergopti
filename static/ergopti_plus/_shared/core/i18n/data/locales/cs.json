@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "vypnuto",
 	"value_check.special.no_time_limit": "bez časového limitu",
 	"value_check.special.never": "nikdy",
+	"value_check.special.unlimited": "bez limitu",
 	"physical_shortcuts.window_title": "Fyzické zkratky",
 	"physical_shortcuts.position": "Pozice klávesy",
 	"physical_shortcuts.manual_hint": "Vyberte pozici klávesy nezávisle na zadávaném znaku.",

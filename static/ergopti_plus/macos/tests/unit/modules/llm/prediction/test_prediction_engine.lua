@@ -670,8 +670,8 @@ helpers.describe("prediction_engine — configuration setters", function()
 
 	-- F-M10: a wrong-typed config.toml / plist value (e.g. max_words = "five")
 	-- reached `<=`/`>` in the prompt_builder and `> 0` in the menu, crashing both.
-	-- The setters now coerce + fail closed to the numeric default.
-	helpers.it("min/max setters coerce runtime values without publishing hs.settings", function()
+	-- The setters now check the shared value schema and keep the value in force.
+	helpers.it("min/max setters keep numeric runtime values without publishing hs.settings", function()
 		local original_set = hs.settings.set
 		local writes = {}
 		hs.settings.set = function(key, value)
@@ -685,8 +685,11 @@ helpers.describe("prediction_engine — configuration setters", function()
 			PE.set_llm_min_words("seven")
 			local min_found, mn = PE.get_llm_runtime_setting("llm_min_words")
 
-			-- A genuine numeric string is still accepted (coerced).
-			PE.set_llm_max_words("12")
+			-- A numeric string is refused too (value-validation): the stored type is
+			-- a number, and the setter fails fast instead of coercing.
+			local string_refused = PE.set_llm_max_words("12") == false
+			local admitted = PE.set_llm_max_words(12) == true
+			local beyond_refused = PE.set_llm_max_words(10001) == false
 			local numeric_found, numeric_max = PE.get_llm_runtime_setting("llm_max_words")
 			return {
 				max_found = max_found,
@@ -695,6 +698,9 @@ helpers.describe("prediction_engine — configuration setters", function()
 				min_value = mn,
 				numeric_found = numeric_found,
 				numeric_max = numeric_max,
+				string_refused = string_refused,
+				admitted = admitted,
+				beyond_refused = beyond_refused,
 			}
 		end, debug.traceback)
 		hs.settings.set = original_set
@@ -712,6 +718,9 @@ helpers.describe("prediction_engine — configuration setters", function()
 		helpers.assert_eq(type(values.min_value), "number")
 		helpers.assert_eq(values.numeric_found, true)
 		helpers.assert_eq(values.numeric_max, 12)
+		helpers.assert_true(values.string_refused, "a string is refused at the engine boundary")
+		helpers.assert_true(values.admitted, "a declared whole number is admitted")
+		helpers.assert_true(values.beyond_refused, "a value past the declared maximum is refused")
 		helpers.assert_eq(writes, {},
 			"SettingsManager is the sole native plist publisher for min/max words")
 	end)

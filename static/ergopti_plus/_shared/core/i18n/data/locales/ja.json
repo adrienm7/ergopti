@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "オフ",
 	"value_check.special.no_time_limit": "時間制限なし",
 	"value_check.special.never": "しない",
+	"value_check.special.unlimited": "制限なし",
 	"physical_shortcuts.window_title": "物理キーのショートカット",
 	"physical_shortcuts.position": "キーの位置",
 	"physical_shortcuts.manual_hint": "入力される文字に関係なく、キーの位置を選択してください。",

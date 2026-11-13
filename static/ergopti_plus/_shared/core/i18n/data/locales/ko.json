@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "끔",
 	"value_check.special.no_time_limit": "시간 제한 없음",
 	"value_check.special.never": "안 함",
+	"value_check.special.unlimited": "제한 없음",
 	"physical_shortcuts.window_title": "물리 키 단축키",
 	"physical_shortcuts.position": "키 위치",
 	"physical_shortcuts.manual_hint": "입력되는 문자와 관계없이 키 위치를 선택하세요.",

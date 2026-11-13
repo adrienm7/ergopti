@@ -87,6 +87,72 @@ ValueSchemaData() {
 			"type", "integer",
 			"min", 0,
 			"max", 100),
+		"llm.generation.context_length", Map(
+			"file", "config.toml",
+			"type", "integer",
+			"unit", "characters",
+			"min", 80,
+			"max", 4000,
+			"default_from", Map(
+				"manifest", "llm.generation.context_length"),
+			"max_from", Map(
+				"file", "ai/engine/policy/context_buffer.lua",
+				"pattern", "M\.MAX_CONTEXT_LENGTH = ([0-9]+)")),
+		"llm.generation.max_words", Map(
+			"file", "config.toml",
+			"type", "integer",
+			"unit", "words",
+			"min", 0,
+			"max", 10000,
+			"special", [Map(
+				"value", 0,
+				"label_key", "value_check.special.unlimited")],
+			"default_from", Map(
+				"manifest", "llm.generation.max_words")),
+		"llm.generation.min_words", Map(
+			"file", "config.toml",
+			"type", "integer",
+			"unit", "words",
+			"min", 1,
+			"max", 20,
+			"default_from", Map(
+				"manifest", "llm.generation.min_words")),
+		"llm.generation.temperature", Map(
+			"file", "config.toml",
+			"type", "decimal",
+			"min", 0,
+			"max", 1.3,
+			"default_from", Map(
+				"manifest", "llm.generation.temperature"),
+			"max_from", Map(
+				"file", "ai/data/inference.json",
+				"pattern", "`"max_temperature`": ([0-9.]+)")),
+		"llm.profiles.num_predictions", Map(
+			"file", "config.toml",
+			"type", "integer",
+			"min", 1,
+			"max", 10,
+			"default_from", Map(
+				"manifest", "llm.profiles.num_predictions")),
+		"llm.trigger.debounce_ms", Map(
+			"file", "config.toml",
+			"type", "integer",
+			"unit", "ms",
+			"min", 50,
+			"max", 10000,
+			"special", [Map(
+				"value", -1,
+				"label_key", "value_check.special.never")],
+			"default_from", Map(
+				"manifest", "llm.trigger.debounce_ms")),
+		"llm.trigger.min_request_interval_ms", Map(
+			"file", "config.toml",
+			"type", "integer",
+			"unit", "ms",
+			"min", 0,
+			"max", 10000,
+			"default_from", Map(
+				"manifest", "llm.trigger.min_request_interval_ms")),
 		"mod_combos.simultaneous_threshold_ms", Map(
 			"file", "config.toml",
 			"type", "integer",

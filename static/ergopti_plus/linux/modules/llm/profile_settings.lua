@@ -31,8 +31,9 @@ local DEFINITIONS = {
 	num_predictions = {
 		path = KEY.LLM_PROFILES_NUM_PREDICTIONS,
 		type = "number",
-		min = 1,
-		max = 10,
+		-- The shared value schema's declaration owns the range.
+		min = require("settings.engine.value_check").declaration(KEY.LLM_PROFILES_NUM_PREDICTIONS).min,
+		max = require("settings.engine.value_check").declaration(KEY.LLM_PROFILES_NUM_PREDICTIONS).max,
 	},
 	auto_profile_for_model = {
 		path = KEY.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL,

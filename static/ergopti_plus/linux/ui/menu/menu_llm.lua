@@ -68,12 +68,20 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 	local function current()
 		return owner_current() and revision_current(revision) == true and ports_current()
 	end
-	local function refused(page_current, invalid)
+	local function refused(page_current, invalid, value)
 		Logger.error(LOG, "Numeric setting '%s' refused: its opening configuration is no longer current.", name)
 		if page_current and page_current() ~= true then return false end
 		local okay, notifier = pcall(require, "adapters.notifier")
 		if okay and type(notifier.send) == "function" and (not page_current or page_current() == true) then
 			local message = i18n_safe(invalid and "menu.llm.word_limits_incompatible" or "dialog.personal_info.save_failed_title")
+			-- A value outside its shared value schema declaration is named with its
+			-- range; only a value inside it can be the word-limit conflict.
+			if invalid then
+				local ValueCheck = require("settings.engine.value_check")
+				local known, entry = pcall(ValueCheck.declaration, path)
+				local checked = known and ValueCheck.check_value(entry, value)
+				if checked and not checked.ok then message = ValueCheck.refusal_text(path, checked, i18n_safe) end
+			end
 			if not page_current or page_current() == true then pcall(notifier.send, message, { level = "error" }) end
 		end
 		return false
@@ -96,7 +104,7 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 			local reread, _, observed = pcall(get_many, { path })
 			if not reread or type(observed) ~= "table" or observed.status ~= source.status
 				or observed.content ~= source.content then return false end
-			return refused(page_current, reason == "invalid")
+			return refused(page_current, reason == "invalid", value)
 		end
 		if not owner_current() or (page_current and page_current() ~= true) then return false end
 		if type(refresh) == "function" then refresh() end

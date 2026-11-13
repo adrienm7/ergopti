@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "désactivé",
 	"value_check.special.no_time_limit": "sans limite de temps",
 	"value_check.special.never": "jamais",
+	"value_check.special.unlimited": "sans limite",
 	"physical_shortcuts.window_title": "Raccourcis physiques",
 	"physical_shortcuts.position": "Position de la touche",
 	"physical_shortcuts.manual_hint": "Choisissez une position de touche, indépendamment du caractère saisi.",

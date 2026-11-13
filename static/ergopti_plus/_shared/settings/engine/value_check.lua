@@ -188,7 +188,7 @@ end
 function M.parse_entry(entry, text)
 	if type(text) ~= "string" then return entry_refusal("wrong_type", entry) end
 	if entry.type == "string" or entry.type == "path" then return M.check_value(entry, text) end
-	local trimmed = text:match("^%s*(.-)%s*$")
+	local trimmed = require("core.text.engine.utils_core").trim(text)
 	if trimmed == "" then return entry_refusal("empty", entry) end
 	if entry.type == "integer" or entry.type == "decimal" then
 		local integral = trimmed:match("^[+-]?%d+$")

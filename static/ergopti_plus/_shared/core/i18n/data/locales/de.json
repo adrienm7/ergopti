@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "aus",
 	"value_check.special.no_time_limit": "ohne Zeitlimit",
 	"value_check.special.never": "nie",
+	"value_check.special.unlimited": "ohne Grenze",
 	"physical_shortcuts.window_title": "Physische Tastenkürzel",
 	"physical_shortcuts.position": "Tastenposition",
 	"physical_shortcuts.manual_hint": "Wählen Sie eine Tastenposition unabhängig vom eingegebenen Zeichen.",

@@ -113,26 +113,29 @@ local function with_fixture(raw, callback)
 	if not ok then error(err, 0) end
 end
 
+-- A value its shared value schema declaration refuses is named with the
+-- declared range; the suite's i18n answers keys, so the body is the range
+-- sentence's key (and the special value's for the debounce).
 local INVALID_ROUTES = {
 	{
 		name = "context above retention limit",
 		raw = "4001",
 		title = "menu.settings.context_length_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_integer_unit",
 		invoke = function(manager) return manager.set_context_length() end,
 	},
 	{
 		name = "temperature above the maximum",
 		raw = "2",
 		title = "menu.settings.temperature_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_decimal",
 		invoke = function(manager) return manager.set_temperature() end,
 	},
 	{
 		name = "temperature below the minimum",
 		raw = "-0.1",
 		title = "menu.settings.temperature_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_decimal",
 		invoke = function(manager) return manager.set_temperature() end,
 	},
 	{
@@ -163,14 +166,14 @@ local INVALID_ROUTES = {
 		name = "debounce overflow",
 		raw = "1e999",
 		title = "menu.settings.delay_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_integer_unit dialog.value_check.special",
 		invoke = function(manager) return manager.set_debounce() end,
 	},
 	{
 		name = "unsupported negative debounce",
 		raw = "-2",
 		title = "menu.settings.delay_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_integer_unit dialog.value_check.special",
 		invoke = function(manager) return manager.set_debounce() end,
 	},
 	{
@@ -183,14 +186,14 @@ local INVALID_ROUTES = {
 		name = "request interval overflow",
 		raw = "1e999",
 		title = "menu.settings.min_interval_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_integer_unit",
 		invoke = function(manager) return manager.set_min_request_interval() end,
 	},
 	{
 		name = "negative request interval (only the debounce has a never)",
 		raw = "-1",
 		title = "menu.settings.min_interval_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_integer_unit",
 		invoke = function(manager) return manager.set_min_request_interval() end,
 	},
 	{

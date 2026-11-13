@@ -35,23 +35,33 @@ local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 local LOG = "modules.llm.settings"
 
--- What each setting accepts. The bounds are the ones the menu offers and the
--- ones a hand-edited config is judged against — a single source, so the two
--- cannot disagree about what is valid.
+-- What each setting accepts: its declaration in the shared value schema
+-- (_shared/settings/data/value_schema), the one source the menu, a hand-edited
+-- config and the other drivers are judged against.
 --
 -- Temperature above 1.3 stops being creativity and becomes noise; the shared
--- inference canon caps its own diversity ladder at exactly that, and a setting
--- that allowed more would let the menu ask for something the backend clamps.
+-- inference canon caps its own diversity ladder at exactly that (the schema's
+-- maximum is pinned to it). Below about eighty characters of context the model
+-- has less than a sentence to work from; the upper bound is the context
+-- buffer's limit.
+local ValueCheck = require("settings.engine.value_check")
+
+--- The bounds of one declared setting.
+--- @param key string Value schema key.
+--- @return table bounds { min, max, integer }
+local function declared(key)
+	local entry = ValueCheck.declaration(key)
+	return { min = entry.min, max = entry.max, integer = entry.type == "integer" }
+end
+
 local BOUNDS = {
-	temperature = { min = 0.0, max = 1.3 },
-	-- Below about eighty characters the model has less than a sentence to work
-	-- from and predicts the language rather than the user. The upper bound is
-	-- where a local model's prompt handling starts to cost more than the
-	-- prediction saves.
-	context_length = { min = 80, max = ContextBuffer.MAX_CONTEXT_LENGTH, integer = true },
-	min_words = { min = 1, max = 20, integer = true },
-	max_words = { min = 0, max = 10000, integer = true },
+	temperature = declared(KEY.LLM_GENERATION_TEMPERATURE),
+	context_length = declared(KEY.LLM_GENERATION_CONTEXT_LENGTH),
+	min_words = declared(KEY.LLM_GENERATION_MIN_WORDS),
+	max_words = declared(KEY.LLM_GENERATION_MAX_WORDS),
 }
+assert(BOUNDS.context_length.max == ContextBuffer.MAX_CONTEXT_LENGTH,
+	"the declared context length maximum must be the context buffer's limit")
 
 -- The manifest paths behind each setting, which are also the storage keys:
 -- one key each rather than one blob, so a corrupt entry costs one setting

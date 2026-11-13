@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "disattivato",
 	"value_check.special.no_time_limit": "nessun limite di tempo",
 	"value_check.special.never": "mai",
+	"value_check.special.unlimited": "nessun limite",
 	"physical_shortcuts.window_title": "Scorciatoie fisiche",
 	"physical_shortcuts.position": "Posizione del tasto",
 	"physical_shortcuts.manual_hint": "Scegli una posizione del tasto, indipendentemente dal carattere digitato.",

@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "关闭",
 	"value_check.special.no_time_limit": "无时间限制",
 	"value_check.special.never": "从不",
+	"value_check.special.unlimited": "无限制",
 	"physical_shortcuts.window_title": "物理按键快捷键",
 	"physical_shortcuts.position": "按键位置",
 	"physical_shortcuts.manual_hint": "请选择按键位置，与输入的字符无关。",

@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "off",
 	"value_check.special.no_time_limit": "no time limit",
 	"value_check.special.never": "never",
+	"value_check.special.unlimited": "no limit",
 	"physical_shortcuts.window_title": "Physical shortcuts",
 	"physical_shortcuts.position": "Key position",
 	"physical_shortcuts.manual_hint": "Select a key position, independently of the character it types.",

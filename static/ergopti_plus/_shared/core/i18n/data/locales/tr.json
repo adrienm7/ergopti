@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "kapalı",
 	"value_check.special.no_time_limit": "süre sınırı yok",
 	"value_check.special.never": "asla",
+	"value_check.special.unlimited": "sınır yok",
 	"physical_shortcuts.window_title": "Fiziksel tuş kısayolları",
 	"physical_shortcuts.position": "Tuş konumu",
 	"physical_shortcuts.manual_hint": "Yazılan karakterden bağımsız olarak bir tuş konumu seçin.",
