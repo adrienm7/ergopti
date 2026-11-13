@@ -444,3 +444,26 @@ _TLL_WaitSharesNoHotstringRows() {
 }
 Test("llm tooltip layout: waiting shares no hotstring row (llm-hotstring-tooltip-wait)",
 	_TLL_WaitSharesNoHotstringRows)
+
+; A shared hotstring row leaves the « both » stack on its own deadline: the panel
+; arms its repaint at the first row deadline still ahead, and none without one.
+_TLL_SharedHeaderExpiryIsArmed() {
+	global _TooltipActiveSurface
+	Now := 1000000
+	Rows := [{ Text: "btw", FireDecision: {}, ExpireOriginTick: Now - 500, ExpireDurationMs: 2000 },
+		{ Text: "afaik", FireDecision: {}, ExpireOriginTick: Now - 100, ExpireDurationMs: 800 },
+		{ Text: "gone", FireDecision: {}, ExpireOriginTick: Now - 900, ExpireDurationMs: 300 }]
+	AssertEqual(700, _LLM_TooltipSharedHeaderNextExpiryMs(Rows, Now), "the first deadline still ahead")
+	AssertEqual(0, _LLM_TooltipSharedHeaderNextExpiryMs([{ Text: "free", FireDecision: {} }], Now),
+		"a row without a deadline arms nothing")
+	SavedSurface := _TooltipActiveSurface
+	try {
+		_TooltipActiveSurface := 0
+		AssertFalse(_LLM_TooltipArmSharedHeaderExpiry(Rows), "no surface, no repaint")
+		Gone := { DecisionItems: [] }
+		AssertFalse(_LLM_TooltipExpireSharedHeader(Gone), "a replaced surface is never repainted")
+	} finally _TooltipActiveSurface := SavedSurface
+}
+Test("llm tooltip layout: a shared hotstring row leaves on its own expiry (llm-hotstring-tooltip-both-expiry)",
+	_TLL_SharedHeaderExpiryIsArmed)
+
