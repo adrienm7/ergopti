@@ -374,6 +374,9 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       so the pause function lands in `expected_source` and Linux E2E
       desktop-webview fails (« original publisher clears only the known third slot », line 252). Drop the argument,
       then confirm with that E2E job.
+      Claimed by worker A: both calls now pass only `edit_source()`, and the paused copy is expected to succeed
+      with identical bytes (EDD-1); `test_hardware_scope_calls_take_one_source.lua` guards the argument. Left:
+      the Linux E2E desktop-webview proof.
 - [ ] **Windows global restore and the preferences source (found 2026-11-12).** On macOS the remap save wrote
       `config.toml` without handing the bytes to the preferences, so « Restore recommended values » refused at the
       shortcuts participant (fixed in 3e209162 by `Preferences.replace_source`). Check whether the AHK global restore
