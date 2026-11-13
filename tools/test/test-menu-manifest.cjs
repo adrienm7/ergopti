@@ -9406,7 +9406,7 @@ console.log(
 		);
 	}
 	for (const [driver, file, signature] of [
-		['hs', 'macos/ui/menu/menu_metrics.lua', 'function M.build(ctx)'],
+		['hs', 'macos/metrics/ui/menu/metrics.lua', 'function M.build(ctx)'],
 		['linux', 'linux/menu/ui/builder/builder.lua', 'local function _build_metrics(ctx)']
 	]) {
 		const source = readSourceFile(path.join(base, file));

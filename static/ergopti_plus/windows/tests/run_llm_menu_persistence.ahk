@@ -29,7 +29,7 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../core/i18n/engine/i18n.ahk
 #Include ../keyboard/engine/layers/chord.ahk
 #Include ../platform/input/hotkey_registrar.ahk
-#Include ../infra/hotpath_profiler.ahk
+#Include ../metrics/engine/perf/hotpath_profiler.ahk
 #Include ../core/text/engine/toml/helpers.ahk
 #Include ../core/text/engine/toml/loader.ahk
 #Include ../core/text/engine/toml/config_loader.ahk
@@ -42,8 +42,8 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../keyboard/engine/magic_editor.ahk
 #Include ../settings/engine/io.ahk
 #Include ../settings/engine/scope/scope.ahk
-#Include ../infra/metrics/metrics_filters.ahk
-#Include ../infra/metrics/metrics_shortcuts.ahk
+#Include ../metrics/engine/filters.ahk
+#Include ../metrics/engine/shortcuts.ahk
 #Include support/wpm_widget_state_contract.ahk
 #Include support/config_journal_fixtures.ahk
 #Include ../ai/engine/settings/models.ahk

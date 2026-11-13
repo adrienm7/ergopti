@@ -152,7 +152,7 @@ function M.load(overrides)
 	end
 	M.extend(files, get_current_paths)
 	package.loaded["core.fs.adapters.ledger_append"] = nil
-	manager = helpers.load_with_stubs("modules.keystats.log_manager", overrides)
+	manager = helpers.load_with_stubs("metrics.engine.journal.log_manager", overrides)
 	-- Scenarios may wrap the public method; retain its actual path owner.
 	ingest_once = manager.ingest_once
 	-- Init replaces this upvalue table; every later acquisition reads it again.

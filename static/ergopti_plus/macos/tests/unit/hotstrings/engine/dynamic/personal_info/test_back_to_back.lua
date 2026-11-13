@@ -26,7 +26,7 @@ end
 local function boot(outcomes)
 	package.loaded[TARGET] = nil
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.keystats"] = {}
+	package.loaded["metrics.engine"] = {}
 	package.loaded["hotstrings.ui.personal_info_editor"] = {}
 
 	local record = { attempts = {}, synthetic = {} }

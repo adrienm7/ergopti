@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 local function load_fixture(opts)
 	opts = opts or {}
 	local notifications = {}
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		notify_synthetic = function(text, source, deletes, variant)
 			notifications[#notifications + 1] = {
 				text = text, source = source, deletes = deletes, variant = variant,
@@ -49,7 +49,7 @@ local function load_fixture(opts)
 		notifications = notifications,
 		hs = require("hs"),
 		cleanup = function()
-			package.loaded["modules.keystats"] = nil
+			package.loaded["metrics.engine"] = nil
 			package.loaded["hotstrings.engine.expander.expander"] = nil
 			package.loaded["hotstrings.engine.expander.terminator_replay"] = nil
 		end,

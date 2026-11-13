@@ -74,7 +74,7 @@ local function load_fixture()
 		if type(name) == "string" and (
 			name:match("^hotstrings%.engine%.expander")
 			or name:match("^ai%.engine")
-			or name:match("^modules%.keystats")
+			or name:match("^metrics%.engine")
 			or name:match("^core%.ui%.ui%.tooltip")
 			or name == "platform.input.synthetic_input"
 			or name == "diagnostics.adapters.event_provenance"

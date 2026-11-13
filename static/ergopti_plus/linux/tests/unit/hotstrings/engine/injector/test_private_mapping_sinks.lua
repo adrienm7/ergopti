@@ -84,8 +84,8 @@ local function flush_expansion(is_private)
 	setmetatable(fake_writer, { __index = Fakes.sqlite_writer() })
 	require("tests.support.sqlite_flush_fake").attach(fake_writer)
 
-	local writer_name = "modules.keystats.sqlite_writer"
-	local logger_name = "modules.keystats.keystats"
+	local writer_name = "metrics.engine.journal.sqlite_writer"
+	local logger_name = "metrics.engine.keystats"
 	local previous_writer, previous_logger = package.loaded[writer_name], package.loaded[logger_name]
 	package.loaded[writer_name] = fake_writer
 	package.loaded[logger_name] = nil
@@ -186,8 +186,8 @@ helpers.describe("private mapping: the synthetic character record", function()
 		-- and the dashboard's LLM-gain figure read zero on a machine that had used
 		-- it all day.
 		local calls = { app_days = {} }
-		local writer_name = "modules.keystats.sqlite_writer"
-		local logger_name = "modules.keystats.keystats"
+		local writer_name = "metrics.engine.journal.sqlite_writer"
+		local logger_name = "metrics.engine.keystats"
 		local prev_writer, prev_logger = package.loaded[writer_name], package.loaded[logger_name]
 		package.loaded[writer_name] = {
 			open_db = function() return true end,

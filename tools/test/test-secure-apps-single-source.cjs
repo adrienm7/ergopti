@@ -61,7 +61,7 @@ for (const app of document.apps || []) {
 const LUA_SOURCES = [
 	'macos/platform/focus/secure_field_detector.lua',
 	'linux/platform/focus/secure_field_detector.lua',
-	'linux/modules/keystats/keystats.lua'
+	'linux/metrics/engine/keystats.lua'
 ];
 const LOCAL_LIST =
 	/\[\s*"(?:1password|bitwarden|keepassxc|lastpass|dashlane)"\s*\]\s*=|^\s*"(?:1password|bitwarden|keepass|lastpass)"\s*,/im;

@@ -138,7 +138,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
   keys in `windows/keyboard/engine/keys/combinations.ahk` (0 allowed) and 25 in
   `windows/ui/menu/menu_shortcuts.ahk` (22 allowed): use the generated
   `ConfigKey`/`ConfigLeaf` constants. `tools/test/test-duplicate-constant-names.cjs`:
-  `WINDOW_MS` gained a copy in `windows/infra/hotpath_profiler.ahk`, and its
+  `WINDOW_MS` gained a copy in `windows/metrics/engine/perf/hotpath_profiler.ahk`, and its
   copies (`shell_runner.ahk`, `hotpath_profiler.ahk`, `wpm_display.ahk`) now
   hold different values; give each concept its own name or one home.
 
@@ -384,7 +384,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   "(the remote catalogue is pending on Windows …)" parenthesis.
 - PAR-53, slow segments judged on their own time (2026-10-31 night, nothing
   left on macOS or Linux): `HotPath_LogIfSlow` in
-  `windows/infra/hotpath_profiler.ahk` still compares the wall clock
+  `windows/metrics/engine/perf/hotpath_profiler.ahk` still compares the wall clock
   (`ElapsedMs > SlowMs`) and only prints `[excl …, nested …]` once that wall
   clock is over. macOS and Linux judge the exclusive time and bill a slow
   child to itself, not to its parent, through `_shared/metrics/engine/perf/hotpath_segments.lua`

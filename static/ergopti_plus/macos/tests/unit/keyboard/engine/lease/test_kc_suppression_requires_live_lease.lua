@@ -166,7 +166,7 @@ local function load_remap(initially_enabled, options)
 		get = function() return "missing-config.toml" end,
 		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}
-	package.loaded["modules.keystats.kc_bridge"] = {
+	package.loaded["metrics.adapters.kc_bridge"] = {
 		refresh_managed_set = function(tap_hold_config)
 			ctx.suppresses_personal_output = next(tap_hold_config) ~= nil
 			return true

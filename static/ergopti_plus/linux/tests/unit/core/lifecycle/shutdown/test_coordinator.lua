@@ -1607,7 +1607,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 			"hotstrings.engine.magic_key_source", "hotstrings.engine.repeat_key", "modules.shortcuts.keyboard_shortcuts",
 			"hotstrings.engine.device_finder", "platform.input.event", "core.logger.engine.monotonic", "menu.engine.manifest_reader",
 			"settings.engine.scope.script_settings", "core.timing.engine.timings", "modules.shortcuts.script_actions", "diagnostics.engine.reports.crash_reporter",
-			"modules.keystats.focus_guard", "platform.input.capture_gate", "core.logger.engine.boot_profiler", "diagnostics.engine.reports.snapshot" }) do
+			"metrics.engine.focus_guard", "platform.input.capture_gate", "core.logger.engine.boot_profiler", "diagnostics.engine.reports.snapshot" }) do
 			modules[name] = {}
 		end
 		modules["core.lifecycle.engine.shutdown.session_lock"] = { protect = function() return true end }
@@ -1622,7 +1622,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		modules["settings.engine.migration.legacy_folder_migration"] = require("tests.support.legacy_folder_migration_stub")
 		modules["core.logger.engine.shim"] = { info = noop, error = noop, warn = noop, debug = noop, success = noop }
 		modules["core.logger.engine.sink"] = { install = function() return true end }
-		modules["modules.keystats.keystats"] = { stop = function() return true end }
+		modules["metrics.engine.keystats"] = { stop = function() return true end }
 		modules["ai.engine.agent.learning"] = { flush = noop }
 		modules["core.events.timer_scheduler"] = scheduler or { cancelAll = function() state.timers = state.timers + 1; return true end }
 		modules["platform.input.keyboard_hook"] = {

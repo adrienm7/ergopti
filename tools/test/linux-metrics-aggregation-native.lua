@@ -13,8 +13,8 @@ package.loaded['core.logger.engine.shim'] = {
 	error = function(_, message) error(message) end,
 }
 local json = require('core.text.engine.json')
-local command = require('modules.keystats.sqlite_command')
-local reader = require('modules.keystats.sqlite_reader')
+local command = require('metrics.engine.journal.sqlite_command')
+local reader = require('metrics.engine.reader.sqlite_reader')
 local original_build, original_popen = command.build, io.popen
 local row_count = 0
 local first_native_output

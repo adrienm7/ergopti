@@ -29,7 +29,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("core.logger.engine.logger")
-local PhaseStats = require("infra.phase_stats")
+local PhaseStats = require("metrics.engine.perf.phase_stats")
 local DeferredWork = require("core.timing.engine.deferred_work")
 local TaskEnvironment = require("core.process.adapters.task_environment")
 local RuntimeLog = require("diagnostics.engine.runtime_log")

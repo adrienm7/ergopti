@@ -9,7 +9,7 @@
 --- Every other function is the shared reader's own.
 --- ==============================================================================
 
-local PhaseStats = require("infra.phase_stats")
+local PhaseStats = require("metrics.engine.perf.phase_stats")
 
 -- The shared reader is resolved at every use, not captured: a caller that
 -- replaces it (a test, a reload) is honoured, as when it was required directly.

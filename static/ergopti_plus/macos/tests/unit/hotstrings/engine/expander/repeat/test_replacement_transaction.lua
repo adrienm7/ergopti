@@ -36,13 +36,13 @@ local function make_llm()
 end
 
 local function load_subject(keystats)
-	package.loaded["modules.keystats"] = keystats
+	package.loaded["metrics.engine"] = keystats
 	local subject, synthetic = SyntheticStack.load("hotstrings.engine.expander.expander")
 	return subject, synthetic
 end
 
 local function cleanup()
-	package.loaded["modules.keystats"] = nil
+	package.loaded["metrics.engine"] = nil
 	package.loaded["hotstrings.engine.expander.expander"] = nil
 end
 

@@ -17,7 +17,7 @@ local STUBBED_MODULES = {
 	"core.text.engine.utils",
 	"ai.engine",
 	"platform.input.keycodes",
-	"modules.keystats",
+	"metrics.engine",
 	"core.ui.ui.tooltip",
 	"ai.engine.prediction.engine",
 	"settings.engine.registry",
@@ -78,7 +78,7 @@ local function load_fixture(options, lifetime)
 		RETURN = 36,
 		F16_LLM_CHAIN_SIGNAL = 106,
 	}
-	package.loaded["modules.keystats"] = setmetatable({}, {
+	package.loaded["metrics.engine"] = setmetatable({}, {
 		__index = function() return function() end end,
 	})
 

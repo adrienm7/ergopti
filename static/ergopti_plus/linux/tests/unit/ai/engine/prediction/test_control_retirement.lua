@@ -58,7 +58,7 @@ local function scenario(options, body)
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
 		end
-		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
+		for _, name in ipairs({ "metrics.engine.focus_guard", "metrics.engine.keystats", "platform.focus.secure_field_detector",
 			"hotstrings.engine.word_reset", "hotstrings.engine.matcher.preferences", "layouts.adapters.keyboard_layout",
 			"hotstrings.engine.injector", "clipboard.adapters.clipboard" }) do package.loaded[name] = nil end
 		local state = { text = "", caret = 0, wire = {}, held = {}, requests = {}, submissions = {},
@@ -87,7 +87,7 @@ local function scenario(options, body)
 			cancel = function() state.cancelled = state.cancelled + 1; return true end,
 		}
 		prediction = require("ai.engine.prediction.engine")
-		local policy = require("modules.keystats.keystats")
+		local policy = require("metrics.engine.keystats")
 		local configuration = assert(policy.configuration_snapshot()); configuration.private_filter_enabled = false
 		assert(policy.apply_configuration(configuration))
 		local listener, snapshot
@@ -97,7 +97,7 @@ local function scenario(options, body)
 			end, snapshot = function() return snapshot end,
 			invalidate = function() snapshot = nil; listener(nil) end }
 		local scheduler = require("tests.fakes").timer_scheduler()
-		guard = require("modules.keystats.focus_guard").new({ watch = watch,
+		guard = require("metrics.engine.focus_guard").new({ watch = watch,
 			detector = require("platform.focus.secure_field_detector"), keystats = policy, prediction = prediction,
 			now_ms = function() return 1000 + scheduler.now * 1000 end,
 			capture_context = function() return { app_id = "owned-editor", title = "owned-field", native_identity = "owned-window" } end,
@@ -655,7 +655,7 @@ do
 			end
 			for _, name in ipairs({ "platform.input.keyboard_hook", "platform.input.evdev_reader", "platform.input.modifier_broker",
 				"layouts.adapters.keyboard_layout", "platform.focus.secure_field_detector", "clipboard.adapters.clipboard", "core.events.timer_scheduler",
-				"hotstrings.engine.matcher.preferences", "ai.engine.preferences", "infra.metrics_preferences", "core.logger.engine.monotonic",
+				"hotstrings.engine.matcher.preferences", "ai.engine.preferences", "metrics.engine.preferences", "core.logger.engine.monotonic",
 				"settings.engine.paths", "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer",
 				-- Main initialises these owners once; an earlier suite may have loaded them.
 				"layouts.engine.emulation.pause_layout_switch", "layouts.engine.registry.emulation" }) do package.loaded[name] = nil end
@@ -738,7 +738,7 @@ do
 			local overlay = { show = function(rows, meta) state.overlays = rows; state.visible = #rows > 0; state.loading = meta and meta.loading; return true end,
 			  hide = function() state.overlays = {}; state.visible = false; return true end, is_showing = function() return state.visible == true end,
 			  move = yes, active_index = function() return 1 end }
-			local policy = require("modules.keystats.keystats")
+			local policy = require("metrics.engine.keystats")
 			-- Metrics persistence is outside this semantic audit; privacy policy methods remain real.
 			for _, name in ipairs({ "init", "record_physical_key", "record_synthetic_output", "record_suggestion", "record_shortcut", "on_keydown", "on_hotstring", "record_correction", "cancel_hold_intervals" }) do policy[name] = noop end
 			local watch = require("tests.support.focus_watch_fixture").new()
@@ -754,7 +754,7 @@ do
 			    callback({ app_id = app, title = "owned ordinary field", native_identity = "owned-audit-frame" })
 			    return { cancel = yes, is_settled = yes }
 			  end }
-			local focus_module = require("modules.keystats.focus_guard")
+			local focus_module = require("metrics.engine.focus_guard")
 			local original_focus_new = focus_module.new
 			focus_module.new = function(options) state.guard = original_focus_new(options); return state.guard end
 			local engine_module = require("hotstrings.engine.engine")

@@ -44,7 +44,7 @@ OnError(_NativeDesktopStartupError)
 _TestResultsBeginRun()
 #Include ../core/lifecycle/engine/app_state.ahk
 #Include test_stubs.ahk
-#Include ../infra/hotpath_profiler.ahk
+#Include ../metrics/engine/perf/hotpath_profiler.ahk
 #Include ../core/text/engine/json.ahk
 #Include ../core/text/engine/number.ahk
 #Include ../core/logger/engine/wall_clock.ahk

@@ -376,7 +376,7 @@ helpers.describe("ui.bridge_handlers", function()
 
 		helpers.it("(onboarding-metrics-path) restores a warm preference path owner after a resolver failure", function()
 			local paths = require("settings.engine.paths")
-			local preferences = require("infra.metrics_preferences")
+			local preferences = require("metrics.engine.preferences")
 			local failure, visited = {}, 0
 			local ok, detail = pcall(with_real_config_paths, function(fresh)
 				helpers.assert_true(not rawequal(fresh, paths), "exercise a genuine fresh resolver")
@@ -388,7 +388,7 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_true(rawequal(detail, failure), "preserve the resolver's original failure")
 			helpers.assert_eq(visited, 1)
 			helpers.assert_true(rawequal(require("settings.engine.paths"), paths), "a failed resolver cannot replace the warm preference path owner")
-			helpers.assert_true(rawequal(require("infra.metrics_preferences"), preferences))
+			helpers.assert_true(rawequal(require("metrics.engine.preferences"), preferences))
 		end)
 
 		helpers.it("(onboarding-window-title) the product name appears once in the window title", function()

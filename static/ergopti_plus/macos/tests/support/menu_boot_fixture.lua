@@ -211,7 +211,7 @@ function M.boot(opts)
 	}
 	for _, module_name in ipairs({
 		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "layouts.ui.menu.keyboard_layout",
-		"hotstrings.ui.menu.hotstrings", "ui.menu.menu_metrics", "ui.menu.menu_tap_holds",
+		"hotstrings.ui.menu.hotstrings", "metrics.ui.menu.metrics", "ui.menu.menu_tap_holds",
 		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
 		package.loaded[module_name] = {}
@@ -222,7 +222,7 @@ function M.boot(opts)
 	package.loaded["gestures.engine"] = {
 		SINGLE_SLOTS = { "swipe_left" }, DEFAULT_GESTURES = { swipe_left = "none" },
 	}
-	package.loaded["modules.keystats.text_cipher"] = { set_enabled = function() return true end }
+	package.loaded["metrics.engine.privacy.text_cipher"] = { set_enabled = function() return true end }
 
 	local identity = function() return true end
 	package.loaded["ai.engine"] = {
@@ -232,7 +232,7 @@ function M.boot(opts)
 		set_llm_model_ollama = identity,
 		set_llm_model_mlx = identity,
 	}
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		set_options = noop,
 		set_disabled_apps = noop,
 		start = function()

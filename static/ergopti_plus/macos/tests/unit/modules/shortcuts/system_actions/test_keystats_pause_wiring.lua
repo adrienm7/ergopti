@@ -45,11 +45,11 @@ helpers.describe("keystats pause wiring — source-level invariant (e2e-pause-su
 	end)
 
 	helpers.it("keystats/init.lua handle_key checks _script_control.is_paused (real mechanism)", function()
-		-- Selected by a declaration unique to modules/keystats/init.lua rather than by
+		-- Selected by a declaration unique to metrics/engine/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function ensure_browser_window_watchers")
-		helpers.assert_true(src ~= nil, "modules/keystats/init.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "metrics/engine/init.lua source must be locatable")
 		helpers.assert_true(src:find("_script_control.is_paused", 1, true) ~= nil,
 			"keystats/init.lua must poll _script_control.is_paused — the real silence mechanism")
 	end)
@@ -81,7 +81,7 @@ helpers.describe("keystats pause wiring — timer/watcher callbacks guarded (e2e
 			local s = helpers.read_driver_source(selector)
 			return s
 		end
-		local init_src = read_src("local function ensure_browser_window_watchers") -- modules/keystats/init.lua
+		local init_src = read_src("local function ensure_browser_window_watchers") -- metrics/engine/init.lua
 		helpers.assert_true(init_src ~= nil, "keystats/init.lua must be readable")
 		local watchers_src = read_src("local function poll_mouse_distance")
 		helpers.assert_true(watchers_src ~= nil, "keystats/watchers.lua must be readable")

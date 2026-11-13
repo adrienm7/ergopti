@@ -49,7 +49,7 @@ const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const REGISTRY_PATH = '_shared/core/timing/data/constants.toml';
 const MS_PER_SEC = 1000;
 
-const KEYSTATS = 'windows/modules/keystats/';
+const KEYSTATS = 'windows/metrics/engine/';
 
 /**
  * Builds one pin. `name` is the declared AHK constant; `unit` is 'sec' when the

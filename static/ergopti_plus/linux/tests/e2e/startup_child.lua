@@ -301,7 +301,7 @@ package.preload["core.events.loop"] = function()
 	-- The real deferred queue: start-up schedules work on it.
 	local adapter = dofile("core/events/loop.lua")
 	local function settle_metrics()
-		local uv, collector = require("luv"), require("modules.keystats.keystats")
+		local uv, collector = require("luv"), require("metrics.engine.keystats")
 		if not collector.has_flush_debt() then return end
 		record("FACT", "metrics_pending_before_pump=" .. tostring(collector.is_flush_pending()))
 		local deadline = uv.hrtime() + require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1e6

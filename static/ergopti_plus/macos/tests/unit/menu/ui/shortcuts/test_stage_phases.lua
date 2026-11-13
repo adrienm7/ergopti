@@ -20,14 +20,14 @@ local names = {
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
 	"modules.shortcuts.actions.text", "core.i18n.engine.i18n", "core.logger.engine.logger", "menu.engine.manifest_menu",
 	"core.timing.engine.deferred_work", "layouts.adapters.input_source_broker", "menu.ui.builder.utils",
-	"core.fs.engine.paths", "menu.engine.renderer", "infra.phase_stats",
+	"core.fs.engine.paths", "menu.engine.renderer", "metrics.engine.perf.phase_stats",
 }
 
 helpers.describe("menu_shortcuts: each provider records a named phase (menu-shortcuts-stage-phases)", function()
 	helpers.it("a build records one phase per provider, even a raising one (menu-shortcuts-stage-phases)", function()
 		helpers.with_fresh_modules(names, function()
 			local recorded = {}
-			package.loaded["infra.phase_stats"] = {
+			package.loaded["metrics.engine.perf.phase_stats"] = {
 				now = function() return 0 end,
 				stop = function(name) recorded[name] = (recorded[name] or 0) + 1 end,
 				count = function() end,

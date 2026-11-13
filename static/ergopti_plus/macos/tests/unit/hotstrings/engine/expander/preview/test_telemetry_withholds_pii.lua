@@ -82,7 +82,7 @@ local function load_bridge_with_recording_keystats()
 	-- captures its keystats upvalue at require time (llm_bridge.lua:36).
 	require("hotstrings.engine.expander.state")
 
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		log_hotstring_suggested = function(_app, trigger, replacement, h_type)
 			persisted.suggested[#persisted.suggested + 1] =
 				{ trigger = trigger, replacement = replacement, h_type = h_type }

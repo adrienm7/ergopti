@@ -211,7 +211,7 @@ local function load_real_shortcut_delivery_owner()
 	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return "https://example.invalid" end,
 	}
-	package.loaded["modules.keystats"] = { log_shortcut = function() return true end }
+	package.loaded["metrics.engine"] = { log_shortcut = function() return true end }
 	reset_module("modules.shortcuts.bindings")
 	local bindings = require("modules.shortcuts.bindings")
 

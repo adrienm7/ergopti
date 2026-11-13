@@ -31,9 +31,9 @@ local LITERAL = "Literal {Left} {U+0041}"
 local function rules_engine_user_preview()
 	local result
 	helpers.with_stub_scope({ "hotstrings.engine.dynamic.rules_engine", "hotstrings.engine.dynamic.core",
-		"hotstrings.engine.dynamic.user_code", "modules.keystats", "modules.keystats.init" }, function()
+		"hotstrings.engine.dynamic.user_code", "metrics.engine", "modules.keystats.init" }, function()
 		local closed_keystats = {}
-		package.loaded["modules.keystats"] = closed_keystats
+		package.loaded["metrics.engine"] = closed_keystats
 		package.loaded["modules.keystats.init"] = closed_keystats
 		local Rules = helpers.load_with_stubs("hotstrings.engine.dynamic.rules_engine")
 		package.loaded["hotstrings.engine.dynamic.user_code"] = {
@@ -74,7 +74,7 @@ local function render_provider_row(provider_result)
 	helpers.with_stub_scope({
 		"platform.input.synthetic_input", "core.events.timer_scheduler", "core.logger.engine.logger",
 		"menu.engine.manifest_reader", "hotstrings.engine.catalogue.config",
-		"hotstrings.engine.expander.expander", "modules.keystats", "ai.engine",
+		"hotstrings.engine.expander.expander", "metrics.engine", "ai.engine",
 		"ai.engine.prediction.engine", "core.ui.ui.tooltip", "ai.engine.bridge",
 	}, function()
 		local scheduled = {}
@@ -98,7 +98,7 @@ local function render_provider_row(provider_result)
 		package.loaded["hotstrings.engine.expander.expander"] = {
 			resolve_magic_action = function() return { winner = nil, candidates = {} } end,
 		}
-		package.loaded["modules.keystats"] = {
+		package.loaded["metrics.engine"] = {
 			log_hotstring_suggested = function() end,
 			log_hotstring_dismissed = function() end,
 		}

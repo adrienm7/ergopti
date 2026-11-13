@@ -16,7 +16,7 @@ local function load_fixture(keystats)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
 			name:match("^hotstrings%.engine%.expander")
-			or name == "modules.keystats"
+			or name == "metrics.engine"
 			or name:match("^adapters%.")
 			or name == "core.logger.engine.logger"
 			or name == "core.timing.engine.timings"
@@ -41,7 +41,7 @@ local function load_fixture(keystats)
 			return key == "clipboard_restore_ms" and 0.15 or 0.08
 		end,
 	}
-	if keystats then package.loaded["modules.keystats"] = keystats end
+	if keystats then package.loaded["metrics.engine"] = keystats end
 
 	return {
 		hs = hs_stub,

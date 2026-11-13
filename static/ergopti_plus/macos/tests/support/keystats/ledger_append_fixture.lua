@@ -11,10 +11,10 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNED = { "tests.support.file_system_transaction_fixture", "core.fs.adapters.file_system", "core.fs.engine.dir",
-	"core.logger.engine.logger", "core.fs.adapters.ledger_append", "core.timing.engine.timings", "metrics.engine.metrics", "modules.keystats.aggregator",
-	"modules.keystats.export", "modules.keystats.log_manager", "modules.keystats.rotation",
-	"modules.keystats.sqlite_writer", "core.events.timer_scheduler", "modules.keystats.timestamp", "lfs",
-	"modules.keystats.physical_accounting_mode", "modules.keystats.physical_wire", "metrics.engine.capture.physical_release",
+	"core.logger.engine.logger", "core.fs.adapters.ledger_append", "core.timing.engine.timings", "metrics.engine.metrics", "metrics.engine.aggregator.aggregator",
+	"metrics.engine.reader.export", "metrics.engine.journal.log_manager", "metrics.engine.journal.rotation",
+	"metrics.engine.journal.sqlite_writer", "core.events.timer_scheduler", "metrics.engine.journal.timestamp", "lfs",
+	"metrics.engine.capture.physical_accounting_mode", "metrics.engine.capture.physical_wire", "metrics.engine.capture.physical_release",
 	"core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path", "diagnostics.engine.operation_reporter", "core.text.engine.toml.reader",
 	"core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8" }
 
@@ -76,23 +76,23 @@ function M.with_manager(scenario)
 				package.loaded["core.fs.adapters.file_system"] = adapter
 				package.loaded["core.timing.engine.timings"] = { sec = function() return 1 end, ms = function() return 5000 end }
 				package.loaded["metrics.engine.metrics"] = {}
-				package.loaded["modules.keystats.aggregator"] = {}
-				local export = helpers.load_with_stubs("modules.keystats.export")
-				package.loaded["modules.keystats.export"] = {
+				package.loaded["metrics.engine.aggregator.aggregator"] = {}
+				local export = helpers.load_with_stubs("metrics.engine.reader.export")
+				package.loaded["metrics.engine.reader.export"] = {
 					cleanup = function() return true end,
 					sync_foreign_data_sql = function() return {} end,
 					_last_complete_batch_offset = export._last_complete_batch_offset,
 				}
-				package.loaded["modules.keystats.rotation"] = {
+				package.loaded["metrics.engine.journal.rotation"] = {
 					read_new_entries = function() state.reads = state.reads + 1; return {}, 0, "eof" end,
 					get_offset = function() return 0 end,
 					rollover = function() state.rotations = (state.rotations or 0) + 1; return true end,
 				}
-				package.loaded["modules.keystats.sqlite_writer"] = {
+				package.loaded["metrics.engine.journal.sqlite_writer"] = {
 					get_db = function() if not state.closed then return db end end,
 					close_db = function() state.closed = true; return true end,
 				}
-				local manager = helpers.load_with_stubs("modules.keystats.log_manager")
+				local manager = helpers.load_with_stubs("metrics.engine.journal.log_manager")
 				upvalue(upvalue(manager.ingest_once, "_flush_local_data_sql_outbox"), "_paths").data_sql_path = state.path
 				function state.activate()
 					local check = upvalue(manager.day_rollover, "_require_state")
@@ -105,8 +105,8 @@ function M.with_manager(scenario)
 				function state.restart()
 					state.closed = false
 					package.loaded["core.fs.adapters.ledger_append"] = nil
-					package.loaded["modules.keystats.log_manager"] = nil
-					manager = helpers.load_with_stubs("modules.keystats.log_manager")
+					package.loaded["metrics.engine.journal.log_manager"] = nil
+					manager = helpers.load_with_stubs("metrics.engine.journal.log_manager")
 					upvalue(upvalue(manager.ingest_once, "_flush_local_data_sql_outbox"), "_paths").data_sql_path = state.path
 					return manager
 				end

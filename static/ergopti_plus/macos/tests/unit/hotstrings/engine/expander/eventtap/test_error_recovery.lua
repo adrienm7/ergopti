@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 local RESET_MODULES = {
 	"diagnostics.adapters.event_provenance", "platform.input.synthetic_input",
 	"core.logger.engine.logger", "core.text.engine.utils",
-	"hotstrings.engine.catalogue.config", "modules.keystats",
+	"hotstrings.engine.catalogue.config", "metrics.engine",
 	"hotstrings.engine.expander", "modules.keymap.init", "hotstrings.engine.expander.expander",
 	"ai.engine.bridge", "settings.engine.registry",
 	"hotstrings.engine.expander.state", "hotstrings.engine.expander.terminator_replay",

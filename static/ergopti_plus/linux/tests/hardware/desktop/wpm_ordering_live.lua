@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: WPM Widget Ordering, Visibility and Colour, On A Real Display
 --- DESCRIPTION:
---- The floating WPM widget (ui/wpm/widget.lua over its real GTK surface) fed by
---- the real metrics collector (modules/keystats/keystats.lua with its native
+--- The floating WPM widget (metrics/ui/wpm/widget.lua over its real GTK surface) fed by
+--- the real metrics collector (metrics/engine/keystats.lua with its native
 --- SQLite owner), through the two callbacks the daemon calls: the collector's
 --- on_keydown for a physical key, and the widget's observe_pointer for a
 --- physical pointer event. Checked against the shown window and real cairo
@@ -33,15 +33,15 @@ local ok_lgi, lgi = pcall(require, "lgi")
 if not ok_lgi then abort("lgi is not installed") end
 local Gtk = lgi.require("Gtk", "3.0")
 local Gdk = lgi.require("Gdk", "3.0")
-local Surface = require("adapters.wpm_surface")
+local Surface = require("metrics.adapters.wpm_surface")
 if not Surface.is_available() then abort("the widget surface cannot bind GTK") end
 
 require("core.i18n.engine.i18n").init()
 local Monotonic = require("core.logger.engine.monotonic")
 local Model = require("metrics.engine.wpm_widget_model")
-local Constants = require("infra.wpm_constants")
+local Constants = require("metrics.engine.wpm.constants")
 local Timings = require("core.timing.engine.timings")
-local Widget = require("ui.wpm.widget")
+local Widget = require("metrics.ui.wpm.widget")
 local Preview = require("core.ui.ui.tooltip.preview")
 local Hotstrings = require("hotstrings.engine.catalogue.config")
 local canon = assert(Constants.load(), "the shared canon must load")

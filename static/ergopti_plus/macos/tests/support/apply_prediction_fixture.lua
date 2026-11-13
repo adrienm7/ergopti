@@ -121,7 +121,7 @@ function M.run(options)
 	local accepted_count = 0
 	local notified_count = 0
 	local keystats_buffers = {}
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		log_hotstring_suggested = noop,
 		log_hotstring_dismissed = noop,
 		notify_synthetic = function() notified_count = notified_count + 1 end,

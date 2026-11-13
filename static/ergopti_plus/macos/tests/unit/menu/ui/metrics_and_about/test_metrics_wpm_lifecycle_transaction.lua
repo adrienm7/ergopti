@@ -42,7 +42,7 @@ local function load_menu(options)
 		keystats_module = options.keystats_module
 		keystats_module.DEFAULT_STATE = keystats_module.DEFAULT_STATE or defaults
 	end
-	package.loaded["modules.keystats"] = keystats_module
+	package.loaded["metrics.engine"] = keystats_module
 	package.loaded["apps.engine.picker"] = { build_menu = function() return {} end }
 	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function() return "button.activate" end,
@@ -82,7 +82,7 @@ local function load_menu(options)
 	local menubar_stop = options.menubar_stop or function() return true end
 	local widget_start = options.widget_start or function() return true end
 	local widget_stop = options.widget_stop or function() return true end
-	package.loaded["ui.wpm.wpm_menubar"] = {
+	package.loaded["metrics.ui.wpm.menubar"] = {
 		start = function()
 			context.menubar_starts = context.menubar_starts + 1
 			return menubar_start()
@@ -93,7 +93,7 @@ local function load_menu(options)
 		end,
 		set_use_source_colors = function() end,
 	}
-	package.loaded["ui.wpm.wpm_widget"] = {
+	package.loaded["metrics.ui.wpm.widget"] = {
 		start = function(graph)
 			context.widget_starts = context.widget_starts + 1
 			return widget_start(graph)
@@ -105,12 +105,12 @@ local function load_menu(options)
 		set_use_source_colors = function() end,
 	}
 
-	if options.native_menubar then package.loaded["ui.wpm.wpm_menubar"] = options.native_menubar end
+	if options.native_menubar then package.loaded["metrics.ui.wpm.menubar"] = options.native_menubar end
 
 	context.state = {}
 	for key, value in pairs(defaults) do context.state[key] = value end
-	package.loaded["ui.menu.menu_metrics"] = nil
-	local MenuMetrics = require("ui.menu.menu_metrics")
+	package.loaded["metrics.ui.menu.metrics"] = nil
+	local MenuMetrics = require("metrics.ui.menu.metrics")
 	context.menu = MenuMetrics.build({
 		state = context.state,
 		save_prefs = function()

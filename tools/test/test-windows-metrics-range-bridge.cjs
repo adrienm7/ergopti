@@ -23,10 +23,10 @@ const data = read('static/ergopti_plus/_shared/ui/metrics_typing/data.js');
 const html = read('static/ergopti_plus/_shared/ui/metrics_typing/index.html');
 const main = read('static/ergopti_plus/_shared/ui/metrics_typing/main.js');
 const state = read('static/ergopti_plus/_shared/ui/metrics_typing/state.js');
-const host = read('static/ergopti_plus/windows/modules/keystats/keystats_webview.ahk');
-const worker = read('static/ergopti_plus/windows/modules/keystats/keystats_prefetch.ahk');
-const macos = read('static/ergopti_plus/macos/ui/metrics_typing/init.lua');
-const linux = read('static/ergopti_plus/linux/ui/metrics_typing/bridge.lua');
+const host = read('static/ergopti_plus/windows/metrics/engine/view/webview.ahk');
+const worker = read('static/ergopti_plus/windows/metrics/engine/journal/prefetch.ahk');
+const macos = read('static/ergopti_plus/macos/metrics/ui/metrics_typing/init.lua');
+const linux = read('static/ergopti_plus/linux/metrics/ui/metrics_typing/bridge.lua');
 
 assert.match(
 	data,

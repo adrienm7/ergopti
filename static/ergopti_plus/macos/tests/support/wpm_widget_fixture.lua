@@ -8,8 +8,8 @@ local helpers = require("tests.helpers")
 --- @param callback function Receives the widget and its native state.
 --- @param position table|nil Persisted coordinates keyed by storage setting.
 local function with_widget(callback, position)
-	helpers.with_stub_scope({ "ui.wpm.wpm_widget", "ui.wpm.shared", "core.ui.ui.tooltip",
-		"modules.keystats", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings", "core.events.timer_scheduler",
+	helpers.with_stub_scope({ "metrics.ui.wpm.widget", "metrics.ui.wpm.shared", "core.ui.ui.tooltip",
+		"metrics.engine", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings", "core.events.timer_scheduler",
 		"core.ui.adapters.graphics_renderer", "core.fs.adapters.storage" }, function()
 		local state = { timers = {}, taps = {}, canvases = {}, logs = {}, now = 1, last_input = 1, preview = false }
 		local function phase(name)
@@ -26,12 +26,12 @@ local function with_widget(callback, position)
 		package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 		package.loaded["core.fs.adapters.storage"] = { get = function(key) return position and position[key] end,
 			set = function() end, delete = function() end }
-		package.loaded["modules.keystats"] = { get_live_stats = function()
+		package.loaded["metrics.engine"] = { get_live_stats = function()
 			phase("stats")
 			if state.stats_failure then error("PRIVATE_DETAIL") end
 			return { wpm = 42, last_input_time = state.last_input }
 		end }
-		package.loaded["ui.wpm.shared"] = { get_active_source = function() return "manual" end,
+		package.loaded["metrics.ui.wpm.shared"] = { get_active_source = function() return "manual" end,
 			resolve_group_hex = function() return nil end, unit_label = function() return "WPM" end }
 		package.loaded["core.ui.ui.tooltip"] = { is_visible = function() phase("tooltip"); return state.preview end }
 		package.loaded["core.events.timer_scheduler"] = {
@@ -82,7 +82,7 @@ local function with_widget(callback, position)
 			phase("create")
 			return canvas
 		end }
-		local widget = helpers.load_with_stubs("ui.wpm.wpm_widget", {
+		local widget = helpers.load_with_stubs("metrics.ui.wpm.widget", {
 			timer = { absoluteTime = function() return state.now * 1000000000 end },
 			screen = { mainScreen = function()
 				phase("screen")

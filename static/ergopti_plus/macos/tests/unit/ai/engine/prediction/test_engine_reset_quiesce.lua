@@ -70,7 +70,7 @@ local function load_fixture(cancel_result)
 	}
 	package.loaded["ai.engine.prediction.app_filter"] = { is_blocked = function() return false end }
 	package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm_dismissed = function() end,
 	}

@@ -24,7 +24,7 @@ global _DriverStartupSmokeDir := ""
 #Include ../../diagnostics/engine/reports/error_net.ahk
 OnError(ErgoptiGlobalErrorHandler)
 OnExit(_PathsEarlyObserveExit)
-#Include ../../infra/hotpath_profiler.ahk
+#Include ../../metrics/engine/perf/hotpath_profiler.ahk
 #Include ../../_generated/app_dirs.ahk
 #Include ../../apps/engine/folders.ahk
 #Include ../../core/text/engine/toml/helpers.ahk

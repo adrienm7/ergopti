@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.support.logger_fixture").helpers({
-	"core.logger.engine.perf_counters", "core.logger.engine.boot_profiler", "infra.phase_stats", "core.logger.engine.sink",
+	"core.logger.engine.perf_counters", "core.logger.engine.boot_profiler", "metrics.engine.perf.phase_stats", "core.logger.engine.sink",
 })
 
 --- Loads fresh counters and a logger capturing every delivered line.

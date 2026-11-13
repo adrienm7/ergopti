@@ -553,8 +553,8 @@ end)
 helpers.describe("diagnostics bridge fixture ownership", function()
 	helpers.it("restores exact collaborators and warm preference paths after a body failure", function()
 		local paths = require("settings.engine.paths")
-		local preferences = require("infra.metrics_preferences")
-		local names = { "settings.engine.paths", "infra.metrics_preferences", "core.ui.ui.webview_manager", "clipboard.adapters.clipboard",
+		local preferences = require("metrics.engine.preferences")
+		local names = { "settings.engine.paths", "metrics.engine.preferences", "core.ui.ui.webview_manager", "clipboard.adapters.clipboard",
 			"diagnostics.ui.healthcheck.bridge", "diagnostics.ui.healthcheck.report", "diagnostics.ui.healthcheck.probes" }
 		local before = {}
 		for _, name in ipairs(names) do before[name] = package.loaded[name] end
@@ -574,7 +574,7 @@ helpers.describe("diagnostics bridge fixture ownership", function()
 			helpers.assert_true(rawequal(package.loaded[name], before[name]), "restore original cache identity: " .. name)
 		end
 		helpers.assert_true(rawequal(require("settings.engine.paths"), paths))
-		helpers.assert_true(rawequal(require("infra.metrics_preferences"), preferences))
+		helpers.assert_true(rawequal(require("metrics.engine.preferences"), preferences))
 		helpers.assert_true(logger.warn == warn and sink.log_dir == log_dir and os.getenv == getenv)
 	end)
 end)

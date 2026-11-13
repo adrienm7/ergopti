@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local NativeCommand = require("modules.keystats.sqlite_command")
+local NativeCommand = require("metrics.engine.journal.sqlite_command")
 
 local Json = require("core.text.engine.json")
 
@@ -35,8 +35,8 @@ local EXPECTED = {
 --- @param body function Receives the freshly loaded reader module.
 --- @return table Every SQL statement the reader issued, in order.
 local function with_stubbed_sqlite(responder, body)
-	local command_name = "modules.keystats.sqlite_command"
-	local reader_name = "modules.keystats.sqlite_reader"
+	local command_name = "metrics.engine.journal.sqlite_command"
+	local reader_name = "metrics.engine.reader.sqlite_reader"
 	local previous_command = package.loaded[command_name]
 	local previous_reader = package.loaded[reader_name]
 	local previous_popen = io.popen

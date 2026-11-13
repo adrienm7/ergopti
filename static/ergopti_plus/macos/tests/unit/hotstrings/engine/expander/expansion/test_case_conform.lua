@@ -44,7 +44,7 @@ local ENGINE_OWNERSHIP = {
 	"core.text.engine.utils",
 	"core.text.engine.utils_core",
 	"core.ui.ui.tooltip",
-	"modules.keystats",
+	"metrics.engine",
 }
 
 
@@ -189,7 +189,7 @@ end)
 local function fresh_engine()
 	return helpers.with_fresh_modules(ENGINE_OWNERSHIP, function()
 		package.loaded["core.ui.ui.tooltip"] = { hide = function() end, hide_forced = function() end }
-		package.loaded["modules.keystats"] = {
+		package.loaded["metrics.engine"] = {
 			notify_synthetic = function() end,
 			set_buffer       = function() end,
 			log_hotstring    = function() end,

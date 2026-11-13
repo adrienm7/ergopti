@@ -13,8 +13,8 @@ local Codec = require("core.text.engine.toml_codec")
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
-		local names = { "settings.engine.paths", "infra.metrics_preferences", "modules.keystats.keystats",
-			"core.fs.adapters.storage", "ui.wpm.widget", "ui.wpm.tray_readout" }
+		local names = { "settings.engine.paths", "metrics.engine.preferences", "metrics.engine.keystats",
+			"core.fs.adapters.storage", "metrics.ui.wpm.widget", "metrics.ui.wpm.tray_readout" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local ok, err = pcall(function()
@@ -22,8 +22,8 @@ local function with_config(source, body)
 				helpers.assert_eq(name, "config.toml")
 				return path
 			end }
-			package.loaded["infra.metrics_preferences"] = nil
-			body(require("infra.metrics_preferences"), path)
+			package.loaded["metrics.engine.preferences"] = nil
+			body(require("metrics.engine.preferences"), path)
 		end)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(err, 0) end
@@ -51,7 +51,7 @@ helpers.it("strict metrics encryption: real-file reload distinguishes malformed 
 			helpers.assert_eq(preferences.get("metrics.encrypt"), case.expected, "ordinary neutral-default behavior is unchanged")
 			local strict = preferences.get("metrics.encrypt", true)
 			if case.known then helpers.assert_eq(strict, case.expected) else helpers.assert_nil(strict) end
-			local fresh = helpers.load_module("infra.metrics_preferences")
+			local fresh = helpers.load_module("metrics.engine.preferences")
 			helpers.assert_eq(fresh.get("metrics.encrypt", true), strict, "fresh and retained owners classify the same source")
 		end
 	end)
@@ -73,7 +73,7 @@ helpers.describe("canonical metrics preferences", function()
 				["wpm_widget.source_colors"] = true, ["wpm_menubar.colors"] = true,
 				["wpm_widget.pos_x"] = 300, ["wpm_widget.pos_y"] = 400,
 			} })
-			for _, name in ipairs({ "ui.wpm.widget", "ui.wpm.tray_readout" }) do
+			for _, name in ipairs({ "metrics.ui.wpm.widget", "metrics.ui.wpm.tray_readout" }) do
 				package.loaded[name] = nil
 				local readout = require(name)
 				helpers.assert_eq(readout.restore(), false)
@@ -99,8 +99,8 @@ helpers.describe("canonical metrics preferences", function()
 			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {
 				["metrics.enabled"] = false, ["metrics.private_filter_enabled"] = true,
 			} })
-			package.loaded["modules.keystats.keystats"] = nil
-			local collector = require("modules.keystats.keystats")
+			package.loaded["metrics.engine.keystats"] = nil
+			local collector = require("metrics.engine.keystats")
 			collector.init({ sqlite_path = path .. ".sqlite", log_dir = path .. ".logs" })
 			helpers.assert_eq(collector.is_enabled(), true)
 			helpers.assert_eq(collector.get_privacy_state().private_filter_enabled, false)
@@ -127,8 +127,8 @@ helpers.describe("canonical metrics preferences", function()
 			helpers.assert_eq(config.metrics.enabled, true)
 			helpers.assert_eq(config.metrics.unknown, "keep")
 			helpers.assert_eq(config.other.value, 9)
-			package.loaded["infra.metrics_preferences"] = nil
-			local restarted = require("infra.metrics_preferences")
+			package.loaded["metrics.engine.preferences"] = nil
+			local restarted = require("metrics.engine.preferences")
 			helpers.assert_eq(restarted.get("metrics.enabled"), true)
 			helpers.assert_true(restarted.set("metrics.enabled", false))
 			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).metrics.enabled, nil)
@@ -176,8 +176,8 @@ helpers.describe("canonical metrics preferences", function()
 			local config = Codec.decode(Sandbox.read_bytes(path))
 			helpers.assert_eq(config.metrics.disabled_apps, { "firefox", "org.gnome.Terminal" })
 			helpers.assert_eq(config.metrics.unknown, "keep")
-			package.loaded["infra.metrics_preferences"] = nil
-			local restarted = require("infra.metrics_preferences")
+			package.loaded["metrics.engine.preferences"] = nil
+			local restarted = require("metrics.engine.preferences")
 			helpers.assert_eq(restarted.get_list("metrics.disabled_apps"), { "firefox", "org.gnome.Terminal" })
 			helpers.assert_true(restarted.set("metrics.disabled_apps", {}))
 			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).metrics.disabled_apps, nil)
@@ -195,8 +195,8 @@ helpers.describe("canonical metrics preferences", function()
 	helpers.it("an excluded application is kept out of the metrics and nothing else", function()
 		with_config('[metrics]\nenabled = true\ndisabled_apps = ["Firefox"]\n', function(_, path)
 			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {} })
-			package.loaded["modules.keystats.keystats"] = nil
-			local collector = require("modules.keystats.keystats")
+			package.loaded["metrics.engine.keystats"] = nil
+			local collector = require("metrics.engine.keystats")
 			collector.init({ sqlite_path = path .. ".sqlite", log_dir = path .. ".logs" })
 			helpers.assert_eq(collector.get_disabled_apps(), { "Firefox" })
 			helpers.assert_true(collector.is_app_excluded("firefox"), "matched without regard to case")

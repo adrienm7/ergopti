@@ -27,8 +27,8 @@ if arg[1] == "--no-luv" then
 	package.loaded.luv = nil
 	package.preload.luv = function() error("deliberately absent native dependency") end
 	require("core.lifecycle.engine.compat.utf8").install()
-	local K = require("modules.keystats.keystats")
-	local W = require("modules.keystats.sqlite_writer")
+	local K = require("metrics.engine.keystats")
+	local W = require("metrics.engine.journal.sqlite_writer")
 	local initialized = K.init({ sqlite_path = arg[2] .. "/minimal.sqlite", log_dir = arg[2] .. "/logs" })
 	if not rawget(_G, "jit") then
 		-- Stock Lua has neither luv nor an FFI descriptor API, so the private
@@ -65,7 +65,7 @@ if arg[1] == "--no-luv" then
 	assert(K.get_flush_status().stopping and not K.has_flush_debt())
 	assert(#assert(W.query_rows("SELECT id FROM events_typing;")) == 0)
 	assert(W.get_revision() == revision, "unavailable flush must not advance the durable watermark")
-	local stored = assert(require("modules.keystats.app_category_file").load())
+	local stored = assert(require("metrics.engine.apps.category_file").load())
 	assert(edited == (require("metrics.engine.apps.category_store").projection(stored).minimal ~= nil),
 		"the edit result must match what the category file holds")
 	assert(W.get_meta("app_score.minimal") == nil, "the category edit must not fall back to SQLite")
@@ -120,8 +120,8 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled=true\n") and config:close())
-local K = require("modules.keystats.keystats")
-local W = require("modules.keystats.sqlite_writer")
+local K = require("metrics.engine.keystats")
+local W = require("metrics.engine.journal.sqlite_writer")
 local Process = require("core.fs.engine.sqlite_batch_process")
 local Drain = require("tests.support.sqlite_flush_native")
 local Logger = require("core.logger.engine")
@@ -313,7 +313,7 @@ pass("selected-app character and physical-key totals are identical before and af
 
 -- Inclusive historical/future intervals must exclude both today's persisted
 -- data and the newer RAM delta; committing the latter cannot widen the range.
-local Reader = require("modules.keystats.sqlite_reader")
+local Reader = require("metrics.engine.reader.sqlite_reader")
 local selected_app = "org.example.selected"
 local today = os.date("%Y-%m-%d")
 assert(W.upsert_ngrams("owned-range-history", "2020-01-01", selected_app, { h = { c = 3 } }, "ngram_chars"))

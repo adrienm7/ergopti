@@ -19,11 +19,11 @@ Refresh rates, the colour hold and the idle hide are timings, and live in
 
 ## Driver implementations
 
-| Driver  | Consumer                                                                                                 |
-| ------- | -------------------------------------------------------------------------------------------------------- |
-| macOS   | `macos/ui/wpm/{wpm_widget,wpm_menubar,shared}.lua` through `_shared/metrics/engine/wpm_widget_model.lua` |
-| Linux   | `linux/ui/wpm/{widget,tray_readout}.lua` through `_shared/metrics/engine/wpm_widget_model.lua`           |
-| Windows | `windows/ui/wpm/wpm_config.ahk` (`WPMWidget_LoadSharedConst`)                                            |
+| Driver  | Consumer                                                                                                         |
+| ------- | ---------------------------------------------------------------------------------------------------------------- |
+| macOS   | `macos/metrics/ui/wpm/{wpm_widget,wpm_menubar,shared}.lua` through `_shared/metrics/engine/wpm_widget_model.lua` |
+| Linux   | `linux/metrics/ui/wpm/{widget,tray_readout}.lua` through `_shared/metrics/engine/wpm_widget_model.lua`           |
+| Windows | `windows/metrics/ui/wpm/config.ahk` (`WPMWidget_LoadSharedConst`)                                                |
 
 The two Lua drivers also share every decision the readouts make — colours per
 source, the graph's curve, when to show, the default place — in

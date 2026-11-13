@@ -14,10 +14,10 @@ local helpers = require("tests.helpers")
 --- @param now number Milliseconds the clock reads.
 --- @return table counters
 local function fresh(now)
-	package.loaded["infra.typed_input_withheld"] = nil
+	package.loaded["metrics.engine.typed_input_withheld"] = nil
 	local saved = package.loaded["core.logger.engine.monotonic"]
 	package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return now end }
-	local counters = require("infra.typed_input_withheld")
+	local counters = require("metrics.engine.typed_input_withheld")
 	return counters, function() package.loaded["core.logger.engine.monotonic"] = saved end
 end
 
@@ -79,7 +79,7 @@ helpers.describe("typed input withheld counters", function()
 		local body = source:sub(first, last)
 		helpers.assert_true(body ~= "", "handle_char must be found")
 		for _, reason in ipairs({ "queued_during_injection", "press_not_admitted", "field_not_admitted", "prediction_refused" }) do
-			helpers.assert_true(body:find('require("infra.typed_input_withheld").record("' .. reason .. '"', 1, true) ~= nil,
+			helpers.assert_true(body:find('require("metrics.engine.typed_input_withheld").record("' .. reason .. '"', 1, true) ~= nil,
 				"handle_char must count " .. reason)
 		end
 	end)

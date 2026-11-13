@@ -33,7 +33,7 @@ end
 assert(uv.os_setenv("PATH", bin)); assert(Shell.has_command("sqlite3") == false)
 local Writer = require("core.fs.engine.regular_file_writer")
 local native_open = Writer.open
-local Keystats, Sqlite = require("modules.keystats.keystats"), require("modules.keystats.sqlite_writer")
+local Keystats, Sqlite = require("metrics.engine.keystats"), require("metrics.engine.journal.sqlite_writer")
 require("tests.support.metrics_preferences_fixture").with(function()
 	Keystats.init({ log_dir = logs, sqlite_path = folder .. "/metrics.sqlite" })
 	assert(Sqlite.is_available() == false and Sqlite.get_db_path() == nil, "the actual SQLite store must be unavailable")

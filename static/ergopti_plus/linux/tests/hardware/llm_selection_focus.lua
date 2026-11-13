@@ -74,8 +74,8 @@ package.loaded["ai.engine.api.api_remote"] = {
 }
 local Engine = require("ai.engine.prediction.engine")
 local Tone = require("ai.engine.prediction.tone")
-local Keystats = require("modules.keystats.keystats")
-local Guard = require("modules.keystats.focus_guard").new({
+local Keystats = require("metrics.engine.keystats")
+local Guard = require("metrics.engine.focus_guard").new({
 	watch = Watch, detector = Detector, keystats = Keystats, prediction = Engine,
 	now_ms = Clock.now_ms, retry_ms = Timings.ms("privacy", "context_retry_ms"),
 	capture_context_async = Window.start_privacy_context,

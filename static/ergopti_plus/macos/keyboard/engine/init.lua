@@ -55,7 +55,7 @@ local NavigationInventory = { config = Config.load_user_config, save = Config.sa
 -- keystats feature is disabled. A load failure must keep generated rules
 -- PAUSED; activating without it would let a later keystats start classify
 -- Karabiner output as physical input.
-local ok_kcb, KcBridge = pcall(require, "modules.keystats.kc_bridge")
+local ok_kcb, KcBridge = pcall(require, "metrics.adapters.kc_bridge")
 if not ok_kcb then KcBridge = nil end
 
 local LOG = "karabiner"
@@ -6432,7 +6432,7 @@ function M.regenerate(
 	-- codes in place rather than rebuilding 673 action tables.
 	-- Each stage is a phase: a late run loop or a hold names the stage that cost
 	-- (2026-10-31: 360 ms for a layout-settle regeneration that changed nothing).
-	local Phases = require("infra.phase_stats")
+	local Phases = require("metrics.engine.perf.phase_stats")
 	local stage_started = Phases.now()
 	if M.AVAILABLE_ACTIONS then
 		local layout_ok = resolve_current_layout_actions("Karabiner regeneration layout-action resolution")

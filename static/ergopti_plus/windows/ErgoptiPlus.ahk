@@ -386,7 +386,7 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 #Include diagnostics/engine/reports/issue_report.ahk
 #Include diagnostics/engine/reports/error_policy.ahk
 #Include diagnostics/engine/reports/error_report.ahk
-#Include infra/hotpath_profiler.ahk
+#Include metrics/engine/perf/hotpath_profiler.ahk
 #Include core/logger/engine/perf_budget.ahk
 #Include settings/engine/registry.ahk
 #Include core/lifecycle/engine/app_state.ahk
@@ -587,9 +587,9 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include layouts/engine/keylayout/extension.ahk
 #Include apps/engine/picker.ahk
 #Include settings/engine/shortcuts.ahk
-#Include infra/metrics/metrics_shortcuts.ahk
-#Include infra/metrics/metrics_filters.ahk
-#Include ui/wpm/init.ahk
+#Include metrics/engine/shortcuts.ahk
+#Include metrics/engine/filters.ahk
+#Include metrics/ui/wpm/init.ahk
 #Include core/fs/engine/sqlite3.ahk
 #Include vendor/ComVar.ahk
 #Include vendor/Promise.ahk
@@ -600,21 +600,21 @@ BootProfile_Stamp("WebView and metrics UI state initialised")
 #Include ui/download_window/session.ahk
 #Include ui/download_window/init.ahk
 #Include diagnostics/ui/console_window.ahk
-#Include modules/keystats/keystats_app_categories.ahk
-#Include modules/keystats/keystats.ahk
-#Include modules/keystats/keystats_hotstring_log.ahk
-#Include modules/keystats/keystats_walker.ahk
-#Include modules/keystats/keystats_hook.ahk
-#Include modules/keystats/keystats_watchers.ahk
-#Include modules/keystats/keystats_mouse.ahk
-#Include modules/keystats/keystats_sensors.ahk
-#Include modules/keystats/keystats_ergonomics.ahk
-#Include modules/keystats/keystats_window_topology.ahk
-#Include modules/keystats/keystats_av_state.ahk
-#Include modules/keystats/keystats_network.ahk
-#Include modules/keystats/keystats_clipboard.ahk
-#Include modules/keystats/keystats_roi_prune.ahk
-#Include modules/keystats/keystats_trigger_roi.ahk
+#Include metrics/engine/apps/categories.ahk
+#Include metrics/engine/keystats.ahk
+#Include metrics/engine/journal/hotstring_log.ahk
+#Include metrics/engine/walker/walker.ahk
+#Include metrics/engine/capture/hook.ahk
+#Include metrics/engine/system/watchers.ahk
+#Include metrics/engine/capture/mouse.ahk
+#Include metrics/engine/capture/sensors.ahk
+#Include metrics/engine/ergonomics.ahk
+#Include metrics/engine/system/window_topology.ahk
+#Include metrics/engine/capture/av_state.ahk
+#Include metrics/engine/system/network.ahk
+#Include metrics/engine/capture/clipboard.ahk
+#Include metrics/engine/privacy/roi_prune.ahk
+#Include metrics/engine/privacy/trigger_roi.ahk
 
 ; Bundled extension shortcut menus — each defines BuildExtMenu_<id>().
 ; ``*i`` keeps the driver runnable if an extension is removed without
@@ -625,10 +625,10 @@ BootProfile_Stamp("WebView and metrics UI state initialised")
 ; BuildExtMenu_ergopti_demo() was never defined and the extensions submenu never
 ; rendered.
 #Include *i ..\extensions\ergopti-demo\shortcuts\menu.ahk
-#Include modules/keystats/keystats_reader.ahk
-#Include modules/keystats/keystats_prefetch.ahk
-#Include modules/keystats/keystats_webview.ahk
-#Include modules/keystats/keystats_ui.ahk
+#Include metrics/engine/reader/reader.ahk
+#Include metrics/engine/journal/prefetch.ahk
+#Include metrics/engine/view/webview.ahk
+#Include metrics/engine/view/ui.ahk
 BootProfile_Stamp("Keystats modules initialised")
 
 ; A detached prefetch worker shares these projection modules but must never run

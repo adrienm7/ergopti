@@ -108,7 +108,7 @@ helpers.describe("Linux owned unknown-context reset boundaries", function()
 					local start = assert(source:find(marker, 1, true), "actual callback must exist") + #marker
 					local prefix = assert(source:sub(start):match("^(.-engine:reset%b())"), "callback reset must exist")
 					local compile = loadstring or load
-					local callback = assert(compile("return function(engine, privacy_owners, wrap_on_type)\nlocal keystats = require(\"modules.keystats.keystats\")\nlocal _undoable, _last_offered, tooltip_preview, llm_overlay\n"
+					local callback = assert(compile("return function(engine, privacy_owners, wrap_on_type)\nlocal keystats = require(\"metrics.engine.keystats\")\nlocal _undoable, _last_offered, tooltip_preview, llm_overlay\n"
 						.. prefix .. "\nend", "@actual-unknown-reset-prefix"))()
 					local engine = Core.new()
 					helpers.assert_true(engine:load_mappings({ { trigger = "date", replacement = "owned-result", is_word = true } }))
@@ -168,7 +168,7 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 			helpers.assert_nil(source:find(marker, first + 1, true), "reviewed marker must be unique: " .. marker)
 			local prefix = assert(source:sub(first + #marker):match("^(.-engine:reset%b())"), "site must reset: " .. marker)
 			local callback = assert(compile("return function(engine, injector, Logger)\n"
-				.. "local keystats = require(\"modules.keystats.keystats\")\n"
+				.. "local keystats = require(\"metrics.engine.keystats\")\n"
 				.. "local _undoable, _last_offered, tooltip_preview, llm_overlay, prediction_engine\n"
 				.. "local LOG, undo, text, publication = \"fixture\", { trigger = \"adn\" }, \"owned\", {}\n"
 				-- The marker line itself is not part of the prefix: seed what it bound.

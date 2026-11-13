@@ -174,7 +174,7 @@ require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,
  local cached=evaluations[2].code
  package.loaded['hs.json'].encode=json.encode
  dashboard._app_icon_cache={Editor=false}
- package.loaded['modules.keystats.sqlite_reader'].read_manifest=function()
+ package.loaded['metrics.engine.reader.sqlite_reader'].read_manifest=function()
   return {['2026-01-01']={Editor={app_time_ms=10}}},true
  end
  assert(dashboard.push_live_update())
@@ -239,10 +239,10 @@ require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,
  package.loaded['hs.json'].encode=json.encode
  dashboard._app_icon_cache={Editor=false}
  local duration=10
- package.loaded['modules.keystats.sqlite_reader'].read_manifest=function()
+ package.loaded['metrics.engine.reader.sqlite_reader'].read_manifest=function()
   return {['2026-01-01']={Editor={app_time_ms=duration}}},true
  end
- package.loaded['modules.keystats.log_manager'].get_db_rev=function() return duration end
+ package.loaded['metrics.engine.journal.log_manager'].get_db_rev=function() return duration end
  local function fresh()
   assert(dashboard.push_live_update())
   pending[#pending]()
@@ -312,7 +312,7 @@ require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,
  local files=package.loaded['core.fs.adapters.file_system']
  files.read_with_status=function() return saved,'ok' end
  files.write_if_unchanged=function(_,content) saved=content; return true end
- package.loaded['modules.keystats.sqlite_reader'].read_manifest=function()
+ package.loaded['metrics.engine.reader.sqlite_reader'].read_manifest=function()
   return {['2026-10-20']=day},true
  end
  assert(dashboard.push_live_update())
@@ -392,7 +392,7 @@ test('loaded HTML admits the exact Lua readiness query and paints normal native 
 	);
 	assert.equal(f.scripts.includes('script.js'), false, 'the legacy dashboard is not loaded');
 	const lua = fs.readFileSync(
-		path.resolve(__dirname, '../../static/ergopti_plus/macos/ui/metrics_apps/init.lua'),
+		path.resolve(__dirname, '../../static/ergopti_plus/macos/metrics/ui/metrics_apps/init.lua'),
 		'utf8'
 	);
 	const query =

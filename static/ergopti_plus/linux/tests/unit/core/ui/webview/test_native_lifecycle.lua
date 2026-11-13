@@ -85,7 +85,7 @@ local run_contract = function(helpers,load_manager,load_host)
    controls.idle_handlers[#controls.idle_handlers+1]=fn
   end}
   package.loaded['core.i18n.engine.i18n']={get=function(key)return key end,get_locale=function()return 'en'end}
-  package.loaded['ui.metrics_typing.bridge']={bridge_name='metrics_typing_bridge',on_message=function(...)if controls.message then return controls.message(...)end;return true end,
+  package.loaded['metrics.ui.metrics_typing.bridge']={bridge_name='metrics_typing_bridge',on_message=function(...)if controls.message then return controls.message(...)end;return true end,
    on_window_closed=function(epoch)controls.closed[#controls.closed+1]=epoch end}
   local called,detail=pcall(function()
    local titles=require('core.ui.engine.window_titles');package.loaded['core.ui.engine.window_titles']={compose=titles.compose,key_for_app=function(app)if app=='physical_shortcuts'then return 'physical_shortcuts.window_title'end;return titles.key_for_app(app)end}

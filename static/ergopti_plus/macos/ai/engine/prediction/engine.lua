@@ -47,7 +47,7 @@ local Paths            = require("core.fs.engine.paths")
 local i18n             = require("core.i18n.engine.i18n")
 local Keycodes         = require("platform.input.keycodes")
 local tooltip          = require("core.ui.ui.tooltip")
-local keystats        = require("modules.keystats")
+local keystats        = require("metrics.engine")
 local ConfigKeys = require("settings.engine.keys")
 
 local LOG    = "llm.prediction_engine"

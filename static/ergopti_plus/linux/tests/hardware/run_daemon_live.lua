@@ -646,7 +646,7 @@ if #failures == 0 then
 	os.exit(0)
 end
 -- A failed "//" or rewrite check names where the typed text went: the daemon
--- logs its withheld-input counts as it exits (infra/typed_input_withheld.lua).
+-- logs its withheld-input counts as it exits (metrics/engine/typed_input_withheld.lua).
 if ai_failures_from and #failures >= ai_failures_from then
 	local function withheld_summary()
 		local fh = io.open(log, "r")

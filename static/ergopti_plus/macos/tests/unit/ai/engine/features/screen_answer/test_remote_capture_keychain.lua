@@ -20,7 +20,7 @@ local MODULES = {
 	"ai.engine.local_servers.warmup_controller", "ai.engine.api.streaming_handler",
 	"ai.engine.prediction.prompt_builder", "ai.engine.prediction.app_filter", "ai.engine.api.common",
 	"ai.engine.api.remote", "ai.engine.api.mlx", "ai.engine.api.ollama",
-	"ai.engine.settings.profiles", "modules.keystats", "modules.shortcuts.script_control",
+	"ai.engine.settings.profiles", "metrics.engine", "modules.shortcuts.script_control",
 	"modules.shortcuts.actions.screenshot_save", "core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.events.timer_scheduler",
 	"adapters.mouse_control", "core.logger.engine.logger", "core.timing.engine.timings", "platform.input.keycodes",
@@ -94,7 +94,7 @@ local function with_capture(callback)
 		package.loaded["ai.engine.api.ollama"] = { stop_warmup = function() return true end }
 		package.loaded["ai.engine.prediction.prompt_builder"] = {}
 		package.loaded["ai.engine.prediction.app_filter"] = {}
-		package.loaded["modules.keystats"] = {}
+		package.loaded["metrics.engine"] = {}
 		package.loaded["ai.engine.settings.profiles"] = { prompt_language = function() return "en" end }
 		package.loaded["modules.shortcuts.script_control"] = {
 			is_paused = function() return f.paused end,

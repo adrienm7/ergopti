@@ -11,8 +11,8 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Writer = require("modules.keystats.sqlite_writer")
-local Reader = require("modules.keystats.sqlite_reader")
+local Writer = require("metrics.engine.journal.sqlite_writer")
+local Reader = require("metrics.engine.reader.sqlite_reader")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-sqlite-literals-XXXXXX"))
 local database = root .. "/metrics.sqlite"
 local checks, failures = 0, 0

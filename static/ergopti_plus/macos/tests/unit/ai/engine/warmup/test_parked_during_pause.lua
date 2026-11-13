@@ -50,11 +50,11 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"ai.engine.local_servers.warmup_controller",
 	"ai.engine.api.ollama",
 	"ai.engine.api.remote",
-	"ui.wpm.wpm_menubar",
-	"ui.wpm.wpm_widget",
+	"metrics.ui.wpm.menubar",
+	"metrics.ui.wpm.widget",
 	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
-	"modules.keystats",
+	"metrics.engine",
 }
 
 local function exercise_committed_backend_pause()
@@ -135,19 +135,19 @@ local function exercise_committed_backend_pause()
 			pause_warmup = function() return true end,
 			resume_warmup = function() return true end,
 		}
-		package.loaded["ui.wpm.wpm_menubar"] = {
+		package.loaded["metrics.ui.wpm.menubar"] = {
 			is_running = function() return false end,
 			stop = function() return true end,
 			resume_after_pause = function() return true end,
 		}
-		package.loaded["ui.wpm.wpm_widget"] = {
+		package.loaded["metrics.ui.wpm.widget"] = {
 			is_running = function() return false end,
 			stop = function() return true end,
 			resume_after_pause = function() return true end,
 		}
 		package.loaded["keyboard.engine.runtime.onboarding"] = { stop = function() return true end }
 		package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
-		package.loaded["modules.keystats"] = { resync_context = function() return true end }
+		package.loaded["metrics.engine"] = { resync_context = function() return true end }
 
 		local ScriptControl = helpers.load_with_stubs("modules.shortcuts.script_control")
 		local pause_accepted = ScriptControl.pause_all()

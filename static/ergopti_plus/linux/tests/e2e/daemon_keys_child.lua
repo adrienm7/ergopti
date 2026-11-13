@@ -286,7 +286,7 @@ for _, name in ipairs(MENU_ROWS_FILE and {} or { "core.ui.ui.tooltip.preview", "
 	"menu.ui.builder.builder", "modules.updater.manager",
 	"gestures.engine.manager", "platform.focus.window_info", "core.process.adapters.lifecycle",
 	"core.ui.ui.webview_manager",
-	"core.fs.engine.file_watchers", "ui.wpm.widget", "modules.keystats.system_metrics", "platform.system.notifier" }) do
+	"core.fs.engine.file_watchers", "metrics.ui.wpm.widget", "metrics.engine.system.metrics", "platform.system.notifier" }) do
 	package.preload[name] = function() error("disabled for the daemon key scenarios") end
 end
 if not MENU_ROWS_FILE and not WITH_LLM then

@@ -8,8 +8,8 @@ local Quote = require("core.text.engine.utils_core").shell_quote
 local M = {}
 local OWNERS = {
 	"tests.stubs.hs", "core.logger.engine.logger", "core.fs.engine.dir", "core.fs.adapters.file_system", "core.fs.adapters.ledger_append",
-	"core.events.timer_scheduler", "modules.keystats.log_manager", "modules.keystats.rotation",
-	"modules.keystats.sqlite_writer", "modules.keystats.aggregator", "modules.keystats.export",
+	"core.events.timer_scheduler", "metrics.engine.journal.log_manager", "metrics.engine.journal.rotation",
+	"metrics.engine.journal.sqlite_writer", "metrics.engine.aggregator.aggregator", "metrics.engine.reader.export",
 	"hs.fs", "hs.timer", "hs.json", "hs.sqlite3",
 }
 local function write(path, body)
@@ -68,15 +68,15 @@ function M.run(callback)
 			logger.error = function(_, format, ...) context.errors[#context.errors + 1] = string.format(format, ...) end
 			package.loaded["core.logger.engine.logger"] = logger
 			context.files = require("core.fs.adapters.file_system")
-			package.loaded["modules.keystats.sqlite_writer"] = { init = function(options)
+			package.loaded["metrics.engine.journal.sqlite_writer"] = { init = function(options)
 				context.cache_path = options.paths.sqlite_path
 				assert(context.cache_path:sub(1, #root + 7) == root .. "/cache/", "cache escaped the owned cache root")
 			end, open_db = function() return false end,
 				get_db = function() return nil end, close_db = function() return true end }
-			package.loaded["modules.keystats.aggregator"] = { init = function() end }
-			package.loaded["modules.keystats.export"] = { init = function() end, cleanup = function() return true end }
+			package.loaded["metrics.engine.aggregator.aggregator"] = { init = function() end }
+			package.loaded["metrics.engine.reader.export"] = { init = function() end, cleanup = function() return true end }
 			package.loaded["core.fs.adapters.ledger_append"] = { recover = function() return true end, cleanup = function() return true end }
-			local manager = require("modules.keystats.log_manager")
+			local manager = require("metrics.engine.journal.log_manager")
 			context.init = function(metrics) return manager.init({ LOG_DIR = metrics or context.metrics, CACHE_DIR = root .. "/cache" }) end
 			local actual_open, actual_getenv, opened = io.open, os.getenv, {}
 			-- Bind only this process-local native port; preserve every other env

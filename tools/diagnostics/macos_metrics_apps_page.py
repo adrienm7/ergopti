@@ -26,12 +26,12 @@ DEPENDENCIES = (
     "static/ergopti_plus/macos/core/events/timer_scheduler.lua",
     "static/ergopti_plus/macos/core/timing/engine/deferred_work.lua",
     "static/ergopti_plus/macos/core/ui/adapters/webview_result.lua",
-    "static/ergopti_plus/macos/ui/metrics_apps/init.lua",
+    "static/ergopti_plus/macos/metrics/ui/metrics_apps/init.lua",
     "static/ergopti_plus/_shared/core/ui/engine/webview/i18n_seed.lua",
     "static/ergopti_plus/_shared/core/i18n/data/locales/fr.json",
 )
 PAGE = "static/ergopti_plus/_shared/ui/metrics_apps/index.html"
-CALLER = "static/ergopti_plus/macos/ui/metrics_apps/init.lua"
+CALLER = "static/ergopti_plus/macos/metrics/ui/metrics_apps/init.lua"
 
 # Ordered admission contract for the actual page; every declared asset is hashed below.
 PAGE_SCRIPTS = (

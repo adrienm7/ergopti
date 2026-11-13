@@ -41,7 +41,7 @@ M.MARKER_VALUE = 1
 -- Every saved list of application identities, with the preference owner that
 -- reads and persists it.
 M.LISTS = {
-	{ path = ConfigKeys.KEY.METRICS_DISABLED_APPS, owner = "infra.metrics_preferences" },
+	{ path = ConfigKeys.KEY.METRICS_DISABLED_APPS, owner = "metrics.engine.preferences" },
 	{ path = ConfigKeys.KEY.LLM_TRIGGER_DISABLED_APPS, owner = "ai.engine.preferences" },
 	{ path = ConfigKeys.KEY.LLM_AGENT_DISABLED_APPS, owner = "ai.engine.preferences" },
 }
@@ -116,7 +116,7 @@ end
 --- @return table|nil list nil when the owner refuses the value.
 local function read_list(spec)
 	local owner = require(spec.owner)
-	if spec.owner == "infra.metrics_preferences" then return owner.get_list(spec.path) end
+	if spec.owner == "metrics.engine.preferences" then return owner.get_list(spec.path) end
 	local value, status = owner.get_with_status(spec.path)
 	if status == "absent" then return {} end
 	if status ~= "ok" or type(value) ~= "table" then return nil end

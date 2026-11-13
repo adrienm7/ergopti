@@ -575,7 +575,7 @@ function M.resolve_layout_actions(list, product)
 	-- native work, and the registry snapshot and the per-character keycode
 	-- lookups are its two candidates (field report 2026-11-03); the next report
 	-- names the one to move before anything is changed.
-	local Phases = require("infra.phase_stats")
+	local Phases = require("metrics.engine.perf.phase_stats")
 	local stage_started = Phases.now()
 	local form = Layout.keyboard_form()
 	Phases.stop("karabiner.layout_actions.keyboard_form", stage_started)

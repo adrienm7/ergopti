@@ -53,7 +53,7 @@ local OWNED_MODULES = {
 	"core.network.adapters.http_client",
 	"gestures.engine.engine",
 	"gestures.engine.actions",
-	"modules.keystats",
+	"metrics.engine",
 	"ai.engine",
 	"ai.engine.api.mlx",
 	"ai.engine.api.ollama",
@@ -62,8 +62,8 @@ local OWNED_MODULES = {
 	"ai.engine.ollama.binary",
 	"ai.engine.ollama.server_command",
 	"modules.shortcuts.script_control",
-	"ui.wpm.wpm_menubar",
-	"ui.wpm.wpm_widget",
+	"metrics.ui.wpm.menubar",
+	"metrics.ui.wpm.widget",
 	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
 	"ui.download_window",
@@ -396,7 +396,7 @@ local function with_fixture(callback)
 			})
 			package.loaded["ai.engine.api.ollama"] = native.daemon.api
 
-			for _, module_name in ipairs({ "ui.wpm.wpm_menubar", "ui.wpm.wpm_widget" }) do
+			for _, module_name in ipairs({ "metrics.ui.wpm.menubar", "metrics.ui.wpm.widget" }) do
 				package.loaded[module_name] = {
 					is_running = function() return false end,
 					stop = function() return true end,
@@ -405,7 +405,7 @@ local function with_fixture(callback)
 			end
 			package.loaded["keyboard.engine.runtime.onboarding"] = { stop = function() return true end }
 			package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
-			package.loaded["modules.keystats"] = {
+			package.loaded["metrics.engine"] = {
 				resync_context = function() return true end,
 				log_shortcut = function() return true end,
 			}

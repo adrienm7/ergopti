@@ -17,10 +17,10 @@ end
 assert(uv.fs_mkdir(root .. "/config", 448)); assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local file = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(file:write("[metrics]\nenabled=true\nencrypt=true\n") and file:close())
-local Cipher = require("modules.keystats.text_cipher")
+local Cipher = require("metrics.engine.privacy.text_cipher")
 local AES = require("core.network.engine.openssl_cipher")
-local K = require("modules.keystats.keystats")
-local W = require("modules.keystats.sqlite_writer")
+local K = require("metrics.engine.keystats")
+local W = require("metrics.engine.journal.sqlite_writer")
 local Drain = require("tests.support.sqlite_flush_native")
 local checks = 0
 local function pass(name) checks = checks + 1; print("PASS " .. name) end

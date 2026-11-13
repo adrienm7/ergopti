@@ -28,7 +28,7 @@ end
 function M.run(options, callback)
 	options = options or {}
 	return helpers.with_stub_scope({
-		"modules.keystats.context_tracker", "modules.keystats.watchers", "modules.keystats.log_manager",
+		"metrics.engine.context_tracker", "metrics.engine.system.watchers", "metrics.engine.journal.log_manager",
 		"platform.focus.secure_field_detector", "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
 		"core.logger.engine.logger", "core.timing.engine.timings", "metrics.engine.view.private_window", "metrics.engine.capture.physical_lifecycle_observation",
 	}, function()
@@ -75,7 +75,7 @@ function M.run(options, callback)
 				bundleID = function() return "test." .. state.name end,
 				path = function() return "/" .. state.name .. ".app" end,
 				pid = function() return state.name == "Editor" and 42 or 43 end }
-			local tracker = helpers.load_with_stubs("modules.keystats.context_tracker", {
+			local tracker = helpers.load_with_stubs("metrics.engine.context_tracker", {
 				timer = { absoluteTime = function() return BASE_NS + (state.elapsed + 3600) * 1000000000 end },
 				application = { watcher = { activated = 1 }, frontmostApplication = function() return app end },
 				window = { focusedWindow = function() return nil end },
@@ -97,8 +97,8 @@ function M.run(options, callback)
 					state.rows[#state.rows + 1] = { from = from, to = to, duration = duration, timestamp = timestamp }
 				end,
 			}
-			package.loaded["modules.keystats.log_manager"] = manager
-			local watchers = require("modules.keystats.watchers")
+			package.loaded["metrics.engine.journal.log_manager"] = manager
+			local watchers = require("metrics.engine.system.watchers")
 			local core = { is_enabled = true, today_idx = { sentinel = true }, ngram_context = {},
 				buffer_events = {}, mouse_distance_px = 0 }
 			local function not_paused() return false end

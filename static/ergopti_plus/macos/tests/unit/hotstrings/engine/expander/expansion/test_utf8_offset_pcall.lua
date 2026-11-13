@@ -410,12 +410,12 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			"hotstrings.engine.expander.terminators",
 			"ai.engine",
 			"ai.engine.prediction.engine",
-			"modules.keystats",
+			"metrics.engine",
 			"hotstrings.engine.catalogue.config",
 			"core.text.engine.utils",
 			"platform.input.keycodes",
 			"core.logger.engine.perf",
-			"infra.hotpath_profiler",
+			"metrics.engine.perf.hotpath_profiler",
 			"core.ui.ui.tooltip",
 		}
 		for _, mod in ipairs(to_clear) do package.loaded[mod] = nil end
@@ -443,12 +443,12 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			sample     = function() end,
 			set_enabled = function() end,
 		}
-		package.loaded["infra.hotpath_profiler"] = {
+		package.loaded["metrics.engine.perf.hotpath_profiler"] = {
 			now        = function() return 0 end,
 			elapsed_ms = function(_) return 0 end,
 			log_if_slow = function() end,
 		}
-		package.loaded["modules.keystats"] = {
+		package.loaded["metrics.engine"] = {
 			log_hotstring_suggested = function() end,
 			log_hotstring_dismissed = function() end,
 			notify_synthetic        = function() end,

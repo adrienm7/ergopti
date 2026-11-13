@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("Metrics submenu reaches the tray populated", function()
 	helpers.it("the rendered tray row carries the manifest's metrics rows", function()
-		local metrics = helpers.load_with_stubs("ui.menu.menu_metrics")
+		local metrics = helpers.load_with_stubs("metrics.ui.menu.metrics")
 		local ManifestMenu = require("menu.engine.manifest_menu")
 		local item = metrics.build({
 			state      = {},
@@ -40,13 +40,13 @@ end)
 --- Replays the genuine Metrics owner without changing its completed child route.
 --- @param body function Structural source and parent assertions.
 local function metrics_parent_fixture(body)
-	local names = { "ui.menu.menu_metrics", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "hs.fs" }
+	local names = { "metrics.ui.menu.metrics", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "hs.fs" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	package.loaded["hs.fs"] = hs.fs
 	local renderer, locale = require("menu.engine.manifest_menu"), require("core.i18n.engine.locale")
 	local language = locale.current_locale()
 	locale.set_locale("en")
-	local native = require("ui.menu.menu_metrics")
+	local native = require("metrics.ui.menu.metrics")
 	local observed = { builds=0, parents=0, getters=0 }
 	local function build(paused, enabled)
 		local state = { keystats_enabled=enabled }

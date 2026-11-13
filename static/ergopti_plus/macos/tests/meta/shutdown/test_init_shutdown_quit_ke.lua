@@ -83,7 +83,7 @@ helpers.describe("init.lua shutdown uses exact Karabiner lease revocation", func
 		helpers.assert_true(keystats_at ~= nil and next_step_at ~= nil and keystats_at < next_step_at,
 			"the controlled teardown must expose a bounded keystats step")
 		local body = code:sub(keystats_at, next_step_at - 1)
-		helpers.assert_true(body:find('package.loaded["modules.keystats"]', 1, true) ~= nil)
+		helpers.assert_true(body:find('package.loaded["metrics.engine"]', 1, true) ~= nil)
 		helpers.assert_true(body:find('type(module.shutdown) ~= "function"', 1, true) ~= nil,
 			"terminal teardown must fail closed when the KC-aware shutdown boundary is absent")
 		helpers.assert_true(body:find("return module.shutdown()", 1, true) ~= nil,

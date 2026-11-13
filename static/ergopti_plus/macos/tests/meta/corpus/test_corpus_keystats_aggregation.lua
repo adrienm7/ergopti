@@ -70,7 +70,7 @@ end
 --- Reads the live agg_batch via the shared state singleton.
 --- @return table The current S.agg_batch (may be nil before first walk).
 local function get_batch()
-	local S = require("modules.keystats.aggregator.state")
+	local S = require("metrics.engine.aggregator.state")
 	return S.agg_batch
 end
 
@@ -107,7 +107,7 @@ end
 --- @param app string Application name.
 --- @return table|nil
 local function read_ctx(app)
-	local S = require("modules.keystats.aggregator.state")
+	local S = require("metrics.engine.aggregator.state")
 	if not S.ngram_ctx then return nil end
 	return S.ngram_ctx[app]
 end
@@ -284,16 +284,16 @@ local function setup_and_replay(vec)
 	-- known member explicitly: mutating package.loaded during pairs() is not a
 	-- portable invalidation strategy, and can leave an event walker capturing a
 	-- previous Core/State singleton under a different discovery order in CI.
-	package.loaded["modules.keystats.aggregator"]       = nil
-	package.loaded["modules.keystats.aggregator.core"]  = nil
-	package.loaded["modules.keystats.aggregator.events"] = nil
-	package.loaded["modules.keystats.aggregator.sql"]   = nil
-	package.loaded["modules.keystats.aggregator.state"] = nil
-	package.loaded["modules.keystats.sqlite_writer"] = {
+	package.loaded["metrics.engine.aggregator.aggregator"]       = nil
+	package.loaded["metrics.engine.aggregator.core"]  = nil
+	package.loaded["metrics.engine.aggregator.events"] = nil
+	package.loaded["metrics.engine.aggregator.sql"]   = nil
+	package.loaded["metrics.engine.aggregator.state"] = nil
+	package.loaded["metrics.engine.journal.sqlite_writer"] = {
 		get_db = function() return nil end,
 		init   = function() end,
 	}
-	package.loaded["modules.keystats.export"] = {
+	package.loaded["metrics.engine.reader.export"] = {
 		get_native_app_category = function() return "Development" end,
 		init = function() end,
 	}
@@ -310,12 +310,12 @@ local function setup_and_replay(vec)
 		sec = function(_section, _key) return 1.0  end,
 	}
 
-	local agg = helpers.load_with_stubs("modules.keystats.aggregator")
+	local agg = helpers.load_with_stubs("metrics.engine.aggregator.aggregator")
 
 	-- Reset the shared state singleton — it persists across load_with_stubs
 	-- reloads (only the top-level module is cleared, not its sub-modules),
 	-- so a previous test's init() would leave S.initialized=true and leak
-	local S = require("modules.keystats.aggregator.state")
+	local S = require("metrics.engine.aggregator.state")
 	S.initialized = false
 	S.agg_batch   = nil
 	S.ngram_ctx   = nil
@@ -641,7 +641,7 @@ end)
 
 helpers.describe("keystats aggregation corpus — cleanup", function()
 	helpers.it("resets aggregator state singleton to prevent leak into other tests", function()
-		local S = require("modules.keystats.aggregator.state")
+		local S = require("metrics.engine.aggregator.state")
 		S.initialized = false
 		S.agg_batch   = nil
 		S.ngram_ctx   = nil
@@ -733,7 +733,7 @@ helpers.describe("keystats correction sequence corpus", function()
 						vec.id .. ": " .. family .. " counts an unexpected " .. token)
 				end
 			end
-			local S = require("modules.keystats.aggregator.state")
+			local S = require("metrics.engine.aggregator.state")
 			S.initialized, S.agg_batch, S.ngram_ctx, S.device_id = false, nil, nil, nil
 		end)
 	end
@@ -767,7 +767,7 @@ do
 		label = "keystats aggregation corpus — shared readings (macOS)",
 		replay = function(vec)
 			setup_and_replay(vec)
-			local S = require("modules.keystats.aggregator.state")
+			local S = require("metrics.engine.aggregator.state")
 			local batch, contexts = S.agg_batch, S.ngram_ctx or {}
 			S.initialized, S.agg_batch, S.ngram_ctx, S.device_id = false, nil, nil, nil
 			return batch, function(app) return contexts[app] end

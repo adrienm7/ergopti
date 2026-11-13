@@ -11,8 +11,8 @@
 
 local uv = require("luv")
 require("core.lifecycle.engine.compat.utf8").install()
-local Keystats = require("modules.keystats.keystats")
-local Writer = require("modules.keystats.sqlite_writer")
+local Keystats = require("metrics.engine.keystats")
+local Writer = require("metrics.engine.journal.sqlite_writer")
 if arg[1] == "--owned-child" then
 	Keystats.init({ sqlite_path = assert(arg[2]), log_dir = assert(arg[3]) })
 	assert(Keystats.is_enabled())

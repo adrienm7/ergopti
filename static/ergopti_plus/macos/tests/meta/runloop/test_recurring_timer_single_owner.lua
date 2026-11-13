@@ -32,8 +32,8 @@ local PRODUCTION_SOURCE_FLOOR = 200
 local RAW_TIMER_NEW_OWNERS = {
 	["core.events.timer_scheduler"] = "canonical native timer owner",
 	["core.lifecycle.engine.launcher_guard"] = "runs before TimerScheduler and publishes before start",
-	["modules.keystats"] = "legacy keystats runtime transaction pending migration",
-	["modules.keystats.log_manager"] = "legacy ingest owner pending migration",
+	["metrics.engine"] = "legacy keystats runtime transaction pending migration",
+	["metrics.engine.journal.log_manager"] = "legacy ingest owner pending migration",
 	["hotstrings.engine.expander"] = "legacy tap-watchdog owner pending migration",
 	["keyboard.engine.runtime.watchers"] = "legacy layout-poll owner pending migration",
 }

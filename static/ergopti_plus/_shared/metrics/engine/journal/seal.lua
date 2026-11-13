@@ -6,7 +6,7 @@
 --- Seals the literal typed text of a typing row before it is written to the
 --- today.log JSONL journal, and reopens it when the journal is read back. The
 --- Windows mirror is KL_JournalSealEntry / KL_JournalUnsealEntry in
---- windows/modules/keystats/keystats_journal.ahk; both seal the same fields.
+--- windows/metrics/engine/journal/journal.ahk; both seal the same fields.
 ---
 --- FEATURES & RATIONALE:
 --- 1. "Encrypt logs on disk" used to seal only the SQL columns, while every

@@ -70,10 +70,10 @@ local function load_real_wpm_surface(module_name)
 		end,
 	}
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		get_live_stats = function() return { wpm = 0 } end,
 	}
-	package.loaded["ui.wpm.shared"] = {
+	package.loaded["metrics.ui.wpm.shared"] = {
 		get_active_source = function() return "none" end,
 		get_source_color = function() return nil end,
 		format_mpm_label = function(value) return tostring(value) end,
@@ -99,8 +99,8 @@ end
 
 helpers.describe("HS-012 real WPM pause-restoration debt", function()
 	for _, module_name in ipairs({
-		"ui.wpm.wpm_menubar",
-		"ui.wpm.wpm_widget",
+		"metrics.ui.wpm.menubar",
+		"metrics.ui.wpm.widget",
 	}) do
 		helpers.it(module_name .. " survives stop-refusal, rollback-refusal, retry, resume", function()
 			local surface, ctx = load_real_wpm_surface(module_name)

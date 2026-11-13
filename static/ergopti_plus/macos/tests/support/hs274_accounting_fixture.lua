@@ -30,13 +30,13 @@ local OWNED_MODULES = {
 	"ai.engine.api.opaque_network_admission", "ai.engine.prediction.progressive_reveal",
 	"hs", "tests.stubs.hs", "core.logger.engine.logger", "menu.engine.manifest_reader", "settings.engine.paths",
 	"core.ui.engine.dialog_util", "core.lifecycle.engine.shutdown.teardown_transaction", "modules.keystats.init",
-	"modules.keystats.log_manager", "modules.keystats.context_tracker",
-	"modules.keystats.kc_bridge", "modules.keystats.watchers", "modules.keystats.timestamp",
-	"modules.keystats.physical_accounting_mode", "platform.input.synthetic_input", "diagnostics.adapters.event_provenance", "core.process.adapters.lifecycle",
+	"metrics.engine.journal.log_manager", "metrics.engine.context_tracker",
+	"metrics.adapters.kc_bridge", "metrics.engine.system.watchers", "metrics.engine.journal.timestamp",
+	"metrics.engine.capture.physical_accounting_mode", "platform.input.synthetic_input", "diagnostics.adapters.event_provenance", "core.process.adapters.lifecycle",
 	"platform.input.keyboard_hook", "layouts.adapters.input_source_broker", "core.fs.adapters.storage",
-	"core.events.timer_scheduler", "modules.keystats.aggregator.events",
-	"modules.keystats.aggregator.state", "modules.keystats.aggregator.core",
-	"modules.keystats.aggregator.physical", "ui.metrics_typing.init",
+	"core.events.timer_scheduler", "metrics.engine.aggregator.events",
+	"metrics.engine.aggregator.state", "metrics.engine.aggregator.core",
+	"metrics.engine.aggregator.physical", "ui.metrics_typing.init",
 }
 
 -- The calendar day and application every scenario records under.
@@ -103,7 +103,7 @@ function M.run(callback)
 		fixture.state.session_start_time = 1
 
 		local system_events = {}
-		local log_manager = package.loaded["modules.keystats.log_manager"]
+		local log_manager = package.loaded["metrics.engine.journal.log_manager"]
 		log_manager.log_modifier_press = function(keycode, app)
 			system_events[#system_events + 1] = { action = "modifier_press", keycode = keycode, app = app }
 		end
@@ -114,8 +114,8 @@ function M.run(callback)
 
 		local credits = {}
 		local scenario = {
-			kc_bridge = package.loaded["modules.keystats.kc_bridge"],
-			mode = require("modules.keystats.physical_accounting_mode"),
+			kc_bridge = package.loaded["metrics.adapters.kc_bridge"],
+			mode = require("metrics.engine.capture.physical_accounting_mode"),
 			state = fixture.state,
 			system_events = system_events,
 		}
@@ -159,9 +159,9 @@ function M.run(callback)
 		end
 
 		function scenario.aggregate()
-			local Events = require("modules.keystats.aggregator.events")
-			local State = require("modules.keystats.aggregator.state")
-			local Core = require("modules.keystats.aggregator.core")
+			local Events = require("metrics.engine.aggregator.events")
+			local State = require("metrics.engine.aggregator.state")
+			local Core = require("metrics.engine.aggregator.core")
 			State.initialized = true
 			State.device_id = "hs274-accounting"
 			Core.reset_batch()

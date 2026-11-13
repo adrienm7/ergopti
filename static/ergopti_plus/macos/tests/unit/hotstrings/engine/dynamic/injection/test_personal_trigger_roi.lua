@@ -12,9 +12,9 @@ local helpers = require("tests.helpers")
 
 helpers.describe("personal information trigger ROI", function()
 	helpers.it("counts an accepted private multi-field expansion once and refuses failed injection", function()
-		helpers.with_stub_scope({ "modules.keystats", "hotstrings.engine.dynamic.personal_info" }, function()
+		helpers.with_stub_scope({ "metrics.engine", "hotstrings.engine.dynamic.personal_info" }, function()
 			local calls = {}
-			package.loaded["modules.keystats"] = {
+			package.loaded["metrics.engine"] = {
 				log_private_hotstring = function(trigger, output)
 					calls[#calls + 1] = { trigger, output }
 					return true

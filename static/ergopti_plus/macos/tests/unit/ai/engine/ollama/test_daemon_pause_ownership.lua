@@ -192,7 +192,7 @@ local function load_fixture()
 		OLLAMA_KEEP_ALIVE = "5m",
 		get_retry_policy = function() return 1, 0, 0 end,
 	}
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		resync_context = function() return true end,
 		log_shortcut = function() return true end,
 	}
@@ -245,8 +245,8 @@ local function load_fixture()
 			return true
 		end,
 	}
-	package.loaded["ui.wpm.wpm_menubar"] = { is_running = function() return false end }
-	package.loaded["ui.wpm.wpm_widget"] = { is_running = function() return false end }
+	package.loaded["metrics.ui.wpm.menubar"] = { is_running = function() return false end }
+	package.loaded["metrics.ui.wpm.widget"] = { is_running = function() return false end }
 	package.loaded["keyboard.engine.runtime.onboarding"] = { stop = function() return true end }
 	package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 	local script_control = helpers.load_with_stubs("modules.shortcuts.script_control", hs_overrides)

@@ -33,8 +33,8 @@ package.loaded["core.logger.engine.logger"] = {
 }
 
 package.loaded["core.events.timer_scheduler"] = nil
-package.loaded["infra.hotpath_profiler"] = nil
-local hot = require("infra.hotpath_profiler")
+package.loaded["metrics.engine.perf.hotpath_profiler"] = nil
+local hot = require("metrics.engine.perf.hotpath_profiler")
 
 -- Controllable nanosecond clock, restored at file end.
 local NS        = 0
@@ -129,7 +129,7 @@ helpers.describe("infra.hotpath_profiler.log_if_slow", function()
 	end)
 end)
 
-helpers.describe("infra.hotpath_profiler nesting attribution", function()
+helpers.describe("metrics.engine.perf.hotpath_profiler nesting attribution", function()
 	helpers.it("reports a slow match with keydown as its parent and does not bill keydown", function()
 		reset_capture()
 		hot._reset_for_test()

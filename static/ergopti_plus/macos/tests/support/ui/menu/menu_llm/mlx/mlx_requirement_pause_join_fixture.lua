@@ -26,7 +26,7 @@ local OWNED_MODULES = {
 	"core.process.adapters.task_lifecycle",
 	"gestures.engine.engine",
 	"gestures.engine.actions",
-	"modules.keystats",
+	"metrics.engine",
 	"ai.engine",
 	"ai.engine.api.common",
 	"ai.engine.api.mlx",
@@ -36,8 +36,8 @@ local OWNED_MODULES = {
 	"ai.engine.api.remote",
 	"ai.engine.local_servers.warmup_controller",
 	"modules.shortcuts.script_control",
-	"ui.wpm.wpm_menubar",
-	"ui.wpm.wpm_widget",
+	"metrics.ui.wpm.menubar",
+	"metrics.ui.wpm.widget",
 	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
 	"ai.ui.menu.profile_label",
@@ -297,7 +297,7 @@ local function install_subject_stubs(native)
 			resume_warmup = function() return true end,
 		}
 	end
-	for _, module_name in ipairs({ "ui.wpm.wpm_menubar", "ui.wpm.wpm_widget" }) do
+	for _, module_name in ipairs({ "metrics.ui.wpm.menubar", "metrics.ui.wpm.widget" }) do
 		package.loaded[module_name] = {
 			is_running = function() return false end,
 			stop = function() return true end,
@@ -308,7 +308,7 @@ local function install_subject_stubs(native)
 		stop = function() return true end,
 	}
 	package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		resync_context = function() return true end,
 		log_shortcut = function() return true end,
 	}

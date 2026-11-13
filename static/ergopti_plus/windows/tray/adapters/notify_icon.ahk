@@ -4,9 +4,9 @@
 ; MODULE: Notification Icon Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; Owns one extra notification-area icon beside the AutoHotkey tray icon, and
-; paints a short number into an icon handle. ui/wpm/wpm_tray_readout.ahk uses it
+; paints a short number into an icon handle. metrics/ui/wpm/tray_readout.ahk uses it
 ; for the live typing speed, the Windows counterpart of the macOS menu bar
-; readout and of linux/ui/wpm/tray_readout.lua.
+; readout and of linux/metrics/ui/wpm/tray_readout.lua.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One icon per (window, id) pair. AutoHotkey keeps uID 1028 for its own icon,

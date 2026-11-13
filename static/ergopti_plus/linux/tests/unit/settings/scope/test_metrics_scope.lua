@@ -9,25 +9,25 @@ local SOURCE = '[metrics]\nenabled = true\nprivate_filter_enabled = false\nwpm_w
 
 local function with_scope(body)
 	Sandbox.with_config(SOURCE, function(path)
-		local names = { "settings.engine.paths", "infra.metrics_preferences", "infra.metrics_scope",
-			"modules.keystats.keystats", "modules.keystats.text_cipher", "modules.keystats.text_migration",
-			"ui.wpm.widget", "ui.wpm.tray_readout" }
+		local names = { "settings.engine.paths", "metrics.engine.preferences", "metrics.engine.scope",
+			"metrics.engine.keystats", "metrics.engine.privacy.text_cipher", "metrics.engine.privacy.text_migration",
+			"metrics.ui.wpm.widget", "metrics.ui.wpm.tray_readout" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local controls = { cipher = false, migrations = 0, backups = {} }
 		local backup = path .. ".scope-backup"
 		local ok, err = pcall(function()
 			package.loaded["settings.engine.paths"] = { config = function() return path end }
-			package.loaded["modules.keystats.text_cipher"] = {
+			package.loaded["metrics.engine.privacy.text_cipher"] = {
 				is_enabled = function() return controls.cipher end, is_available = function() return true end,
 				set_enabled = function(value) controls.cipher = value; return true end,
 			}
-			package.loaded["modules.keystats.text_migration"] = {
+			package.loaded["metrics.engine.privacy.text_migration"] = {
 				is_running = function() return controls.migrating == true end,
 				start = function() controls.migrations = controls.migrations + 1 end,
 			}
-			local collector = require("modules.keystats.keystats")
-			local widget, readout = require("ui.wpm.widget"), require("ui.wpm.tray_readout")
+			local collector = require("metrics.engine.keystats")
+			local widget, readout = require("metrics.ui.wpm.widget"), require("metrics.ui.wpm.tray_readout")
 			local surface = { hide = function() if controls.hide then return controls.hide() end; return true end }
 			widget._set_surface(surface)
 			helpers.assert_true(collector.set_enabled(true))
@@ -44,7 +44,7 @@ local function with_scope(body)
 				end,
 			}
 			controls.files = files
-			local owner = require("infra.metrics_scope").new({ path = path, backup_path = backup,
+			local owner = require("metrics.engine.scope").new({ path = path, backup_path = backup,
 				collector = collector, widget = widget, readout = readout, files = files })
 			body(owner, collector, widget, readout, controls, path, backup)
 		end)
@@ -365,7 +365,7 @@ helpers.describe("metrics private native claim", function()
 	end)
 	helpers.it("releases the actual preference primitive without hiding public pending", function()
 		with_scope(function(_, _, _, _, controls, path, backup)
-			local Preferences = require("infra.metrics_preferences")
+			local Preferences = require("metrics.engine.preferences")
 			local public, claim, primary = {}, {}, nil
 			local runtime = "original"
 			claim.pending = function() return primary.pending() end
@@ -407,7 +407,7 @@ helpers.describe("metrics retained native release debt", function()
 		{ name = "exception", reply = function() error("native metrics release refused") end },
 	}
 	local function controlled_scope(collector, widget, readout, controls, path, refusal)
-		local Preferences = require("infra.metrics_preferences")
+		local Preferences = require("metrics.engine.preferences")
 		local acquire, release = Preferences.acquire, Preferences.release
 		local blocked, live, scope = true, nil, nil
 		Preferences.acquire = function(token)
@@ -424,7 +424,7 @@ helpers.describe("metrics retained native release debt", function()
 			if accepted == true then live = nil end
 			return accepted
 		end
-		scope = require("infra.metrics_scope").new({ path = path, backup_path = path .. ".scope-backup",
+		scope = require("metrics.engine.scope").new({ path = path, backup_path = path .. ".scope-backup",
 			collector = collector, widget = widget, readout = readout, files = controls.files })
 		return scope, function(value) blocked = value == true end, function() return live end
 	end
@@ -436,7 +436,7 @@ helpers.describe("metrics retained native release debt", function()
 		helpers.assert_eq(readout.is_running(), true)
 		helpers.assert_eq(controls.migrations, 0, "preference compensation cannot start history conversion")
 		helpers.assert_nil(claim())
-		helpers.assert_eq(require("infra.metrics_preferences").admit(), true)
+		helpers.assert_eq(require("metrics.engine.preferences").admit(), true)
 	end
 	for _, mode in ipairs({ "clear", "recommended" }) do
 		for _, receipt in ipairs(receipts) do
@@ -472,7 +472,7 @@ helpers.describe("metrics retained native release debt", function()
 			unblock()
 			helpers.assert_eq(scope.retry_restore(), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
-			helpers.assert_eq(require("infra.metrics_preferences").admit(), false)
+			helpers.assert_eq(require("metrics.engine.preferences").admit(), false)
 			Sandbox.write_bytes(path, candidate) -- Explicit fixture repair of the retained candidate generation.
 			helpers.assert_eq(scope.retry_restore(), true)
 			restored(collector, widget, readout, controls, path, claim)
@@ -528,7 +528,7 @@ helpers.describe("metrics retained native release debt", function()
 		-- Windows refused the same click with an error window; here it was
 		-- dropped without a word. The refusal stays, and now it is logged.
 		with_scope(function(_owner, collector)
-			local Preferences = require("infra.metrics_preferences")
+			local Preferences = require("metrics.engine.preferences")
 			local Logger = require("core.logger.engine.shim")
 			local claim = { pending = function() return false end }
 			helpers.assert_true(Preferences.acquire(claim))

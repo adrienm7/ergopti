@@ -20,7 +20,7 @@ local RESET_MODULES = {
 	"diagnostics.engine.hid_diagnostic_mailbox",
 	"platform.input.synthetic_input", "diagnostics.adapters.event_provenance",
 	"core.events.timer_scheduler",
-	"core.logger.engine.logger", "core.logger.engine.perf", "infra.hotpath_profiler",
+	"core.logger.engine.logger", "core.logger.engine.perf", "metrics.engine.perf.hotpath_profiler",
 	"menu.engine.manifest_reader", "platform.input.keycodes", "layouts.engine.layers.terminators",
 }
 
@@ -255,7 +255,7 @@ local function load_fixture(prepare_input)
 		pcall = function(_, fn, ...) return pcall(fn, ...) end,
 	})
 	package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
-	package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
+	package.loaded["metrics.engine.perf.hotpath_profiler"] = api({ now = function() return 0 end })
 	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function(key)
 			if key == "hotstrings.expansion_delay" then return 0 end

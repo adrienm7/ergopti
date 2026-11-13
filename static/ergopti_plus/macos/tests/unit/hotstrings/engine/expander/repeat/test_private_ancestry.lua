@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 --- @return table fixture
 local function load_fixture(opts)
 	local notifications, marks = {}, {}
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		notify_synthetic = function(text, source, deletes, variant, _, is_private)
 			notifications[#notifications + 1] = {
 				text = text, source = source, deletes = deletes, variant = variant, private = is_private,
@@ -48,7 +48,7 @@ local function load_fixture(opts)
 		expander = expander, synthetic = synthetic, state = state,
 		notifications = notifications, marks = marks,
 		cleanup = function()
-			package.loaded["modules.keystats"] = nil
+			package.loaded["metrics.engine"] = nil
 			package.loaded["hotstrings.engine.expander.expander"] = nil
 			package.loaded["hotstrings.engine.expander.terminator_replay"] = nil
 		end,

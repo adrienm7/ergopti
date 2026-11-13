@@ -34,17 +34,17 @@ if not ok_lgi then abort("lgi is not installed.") end
 local Gtk = lgi.require("Gtk", "3.0")
 local Gdk = lgi.require("Gdk", "3.0")
 
-local Surface = require("adapters.wpm_surface")
+local Surface = require("metrics.adapters.wpm_surface")
 local Indicator = require("tray.adapters.appindicator")
 if not Surface.is_available() then abort("the widget surface cannot bind GTK.") end
 if not Indicator.is_available() then abort("the tray library cannot bind.") end
 
 local Model = require("metrics.engine.wpm_widget_model")
 local Activity = require("metrics.engine.wpm.activity")
-local Constants = require("infra.wpm_constants")
+local Constants = require("metrics.engine.wpm.constants")
 local Timings = require("core.timing.engine.timings")
-local Widget = require("ui.wpm.widget")
-local Readout = require("ui.wpm.tray_readout")
+local Widget = require("metrics.ui.wpm.widget")
+local Readout = require("metrics.ui.wpm.tray_readout")
 local canon = assert(Constants.load(), "the shared canon must load")
 
 local failures = {}

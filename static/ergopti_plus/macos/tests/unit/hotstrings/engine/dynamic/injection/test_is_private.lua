@@ -135,7 +135,7 @@ helpers.describe("rules_engine: the interceptor injection reaches inject_dynamic
 
 	helpers.it("hands is_private = true to keymap.inject_dynamic", function()
 		local private_calls = {}
-		package.loaded["modules.keystats"] = {
+		package.loaded["metrics.engine"] = {
 			log_private_hotstring = function(trigger, replacement)
 				private_calls[#private_calls + 1] = { trigger, replacement }
 			end,
@@ -205,7 +205,7 @@ helpers.describe("expander: is_private is forwarded to the keystats, not dropped
 		local Expander = helpers.load_with_stubs("hotstrings.engine.expander.expander")
 
 		local seen = {}
-		package.loaded["modules.keystats"] = {
+		package.loaded["metrics.engine"] = {
 			notify_synthetic = function(...)
 				seen.n          = select("#", ...)
 				seen.is_private = select(NOTIFY_SYNTHETIC_PRIVATE_ARG, ...)
@@ -265,7 +265,7 @@ helpers.describe("expander: is_private is forwarded to the keystats, not dropped
 			.. "a flag that is accepted and dropped is worse than one that is absent")
 		helpers.assert_eq(#marked, 1, "a private replacement tells the AI bridge to forget its context")
 
-		package.loaded["modules.keystats"] = nil
+		package.loaded["metrics.engine"] = nil
 	end)
 
 end)

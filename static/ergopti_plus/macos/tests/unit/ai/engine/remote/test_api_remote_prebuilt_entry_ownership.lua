@@ -16,7 +16,7 @@ require("core.logger.engine")
 
 local function with_remote(callback)
 	helpers.with_stub_scope({
-		"ai.engine.api.remote", "ai.engine.api.token_crypto", "modules.keystats",
+		"ai.engine.api.remote", "ai.engine.api.token_crypto", "metrics.engine",
 		"modules.shortcuts.script_control", "core.network.adapters.http_client",
 		"ai.engine.policy.remote_response_classifier", "ai.engine.local_servers.local_servers",
 		"ai.engine.api.provider_uses", "ai.engine.prediction.progressive_reveal",
@@ -39,7 +39,7 @@ local function with_remote(callback)
 			pcall = function(_, callback, ...) return pcall(callback, ...) end,
 			callback = function(_, _, callback, ...) return pcall(callback, ...) end,
 		}
-		package.loaded["modules.keystats"] = {}
+		package.loaded["metrics.engine"] = {}
 		package.loaded["modules.shortcuts.script_control"] = {
 			is_paused = function() return false end,
 			get_pause_epoch = function() return 0 end,

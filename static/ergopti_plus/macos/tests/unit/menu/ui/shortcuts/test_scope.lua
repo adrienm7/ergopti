@@ -2,7 +2,7 @@
 
 --- Exercises complete native shortcut scopes against real persistence and rollback owners.
 local helpers = require("tests.helpers")
-local MetricsState = require("infra.metrics_state_keys")
+local MetricsState = require("metrics.engine.state_keys")
 local Fixture = require("tests.support.shortcuts_scope_fixture")
 local Codec = require("core.text.engine.toml_codec")
 

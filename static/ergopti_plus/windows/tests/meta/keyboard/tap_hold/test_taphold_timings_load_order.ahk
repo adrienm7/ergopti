@@ -57,7 +57,7 @@ _TTLO_EverySentinelFilePrecedesBoot() {
 	Pairs := Map(
 		"keyboard/engine/keys/constants.ahk",        "TapHoldsLoadTimings",
 		"hotstrings/engine/catalogue/config.ahk",   "HotstringsConfigLoadSharedDefaults",
-		"modules/keystats/keystats_walker.ahk", "KeystatsWalkerLoadTimings",
+		"metrics/engine/walker/walker.ahk", "KeystatsWalkerLoadTimings",
 		"ai/engine/api/ollama.ahk",             "LLMApiLoadTimings",
 		"core/ui/engine/style.ahk",                       "UiStyle_LoadSharedConst"
 	)

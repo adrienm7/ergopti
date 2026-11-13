@@ -180,7 +180,7 @@ check('every budget is the value its declaration holds', () => {
 	assert.equal(
 		described.budgets['keystats.ingest'],
 		Number(
-			read('static/ergopti_plus/macos/modules/keystats/ingest_trace.lua').match(
+			read('static/ergopti_plus/macos/metrics/engine/journal/ingest_trace.lua').match(
 				/^M\.REPORT_THRESHOLD_MS = (\d+)/m
 			)[1]
 		)
@@ -198,7 +198,7 @@ check('every budget is the value its declaration holds', () => {
 		['llm.ttft', 'prediction_display_ms']
 	])
 		assert.equal(described.budgets[prefix], key(name), `${prefix} reads [budgets] ${name}`);
-	const windows = read('static/ergopti_plus/windows/infra/hotpath_profiler.ahk');
+	const windows = read('static/ergopti_plus/windows/metrics/engine/perf/hotpath_profiler.ahk');
 	assert.equal(
 		described.segments['UIA.SelectionPoll'],
 		Number(windows.match(/"UIA\.SelectionPoll", (\d+(?:\.\d+)?)/)[1])
@@ -221,8 +221,8 @@ try {
 		copy('static/ergopti_plus/macos/settings/engine/preferences/preferences.lua', (text) =>
 			text.replace(/^local SLOW_SAVE_REPORT_MS = /m, 'local SAVE_REPORT_MS = ')
 		);
-		copy('static/ergopti_plus/macos/modules/keystats/ingest_trace.lua');
-		copy('static/ergopti_plus/windows/infra/hotpath_profiler.ahk');
+		copy('static/ergopti_plus/macos/metrics/engine/journal/ingest_trace.lua');
+		copy('static/ergopti_plus/windows/metrics/engine/perf/hotpath_profiler.ahk');
 		const run = analyse(['--repo', repo, '--describe']);
 		assert.notEqual(run.status, 0, 'a moved declaration must fail the run');
 		assert.match(run.stderr, /preferences\.lua no longer declares the preferences\.save budget/);

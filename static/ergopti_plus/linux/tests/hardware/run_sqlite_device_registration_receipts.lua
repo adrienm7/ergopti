@@ -11,10 +11,10 @@
 local uv = require("luv")
 require("core.lifecycle.engine.compat.utf8").install()
 if arg[1] == "--owned-startup" then
-	local Keystats = require("modules.keystats.keystats")
+	local Keystats = require("metrics.engine.keystats")
 	Keystats.init({ sqlite_path = assert(arg[2]), log_dir = assert(arg[3]) })
 	assert(Keystats.is_enabled())
-	require("modules.keystats.sqlite_writer").close_db()
+	require("metrics.engine.journal.sqlite_writer").close_db()
 	os.exit(0)
 end
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-registration-receipts-XXXXXX"))
@@ -25,8 +25,8 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local Keystats = require("modules.keystats.keystats")
-local Writer = require("modules.keystats.sqlite_writer")
+local Keystats = require("metrics.engine.keystats")
+local Writer = require("metrics.engine.journal.sqlite_writer")
 local database = root .. "/metrics.sqlite"
 local checks, failures = 0, 0
 Keystats.init({ sqlite_path = database, log_dir = root .. "/logs" })

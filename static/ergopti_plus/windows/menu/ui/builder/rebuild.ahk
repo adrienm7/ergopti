@@ -11,7 +11,7 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
-#Include ../../../infra/phase_stats.ahk
+#Include ../../../metrics/engine/perf/phase_stats.ahk
 #Include ../../../core/logger/engine/perf_budget.ahk
 
 

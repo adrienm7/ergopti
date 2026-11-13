@@ -111,7 +111,7 @@ local _idle_wait = nil      -- Optional input wait supplied by run(); see _yield
 
 local Monotonic = require("core.logger.engine.monotonic")
 local Perf = require("core.logger.engine.perf_counters")
-local PhaseStats = require("infra.phase_stats")
+local PhaseStats = require("metrics.engine.perf.phase_stats")
 
 
 -- =========================================

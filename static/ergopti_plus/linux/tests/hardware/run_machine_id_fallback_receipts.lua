@@ -12,9 +12,9 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Cipher = require("modules.keystats.text_cipher")
+local Cipher = require("metrics.engine.privacy.text_cipher")
 local Codec = require("metrics.engine.privacy.text_crypto")
-local Writer = require("modules.keystats.sqlite_writer")
+local Writer = require("metrics.engine.journal.sqlite_writer")
 local Json = require("core.text.engine.json")
 assert(uv.getuid() ~= 0, "cipher validation must run as an ordinary user")
 local function first_line(path)

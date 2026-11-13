@@ -19,7 +19,7 @@ local OWNED = {
 	"hotstrings.engine.matcher.engine", "core.logger.engine.keystroke_integrity", "core.logger.engine.logger",
 	"core.text.engine.utils", "core.timing.engine.timings", "core.text.engine.json",
 	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",
-	"core.logger.engine.shim", "modules.keystats", "hotstrings.engine.expander.expander",
+	"core.logger.engine.shim", "metrics.engine", "hotstrings.engine.expander.expander",
 	"hotstrings.engine.expander.state", "hotstrings.engine.expander.terminator_replay", "hotstrings.engine.expander.terminators",
 	"hotstrings.engine.expander.utils", "clipboard.adapters.clipboard", "tests.stubs.hs", "core.text.engine.utils_core",
 }
@@ -127,7 +127,7 @@ local function load_fixture(options)
 			return key == "terminal_hotstring_key_delay_ms" and 20 or 20
 		end,
 	}
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		notify_synthetic = function() end,
 		set_buffer = function() end,
 		log_hotstring = function() end,

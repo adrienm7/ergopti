@@ -17,7 +17,7 @@
 ; ==============================================================================
 
 #Include ../../events/boot_clock.ahk
-#Include ../../../infra/phase_stats.ahk
+#Include ../../../metrics/engine/perf/phase_stats.ahk
 
 global _BOOT_PROFILE_LAST  := 0  ; A_TickCount captured at the previous mark
 global _BOOT_PROFILE_START  := 0  ; A_TickCount captured at BootProfile_Begin

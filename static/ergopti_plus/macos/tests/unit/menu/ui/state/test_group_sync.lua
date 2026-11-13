@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local MetricsState = require("infra.metrics_state_keys")
+local MetricsState = require("metrics.engine.state_keys")
 
 local original_deferred_work = package.loaded["core.timing.engine.deferred_work"]
 local original_subject = package.loaded["menu.ui.builder.state"]

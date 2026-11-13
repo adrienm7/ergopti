@@ -34,7 +34,7 @@ local STUB_MODULES = {
 	"core.text.engine.utils",
 	"ai.engine",
 	"platform.input.keycodes",
-	"modules.keystats",
+	"metrics.engine",
 	"core.ui.ui.tooltip",
 	"ai.engine.prediction.engine",
 	"settings.engine.registry",
@@ -95,7 +95,7 @@ package.loaded["platform.input.keycodes"] = {
 }
 
 -- modules.keystats: no-op stub.
-package.loaded["modules.keystats"] = {
+package.loaded["metrics.engine"] = {
 	log_hotstring_suggested = function() end,
 	log_hotstring_dismissed = function() end,
 	log_llm_accepted        = function() end,

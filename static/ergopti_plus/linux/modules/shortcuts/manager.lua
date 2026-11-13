@@ -133,7 +133,7 @@ end
 --- reason a shortcut does not run.
 --- @param key string Stable action name; the dashboard groups by it.
 local function record(key)
-	local ok, keystats = pcall(require, "modules.keystats.keystats")
+	local ok, keystats = pcall(require, "metrics.engine.keystats")
 	if not ok or type(keystats.record_shortcut) ~= "function" then return end
 	local app = "unknown"
 	local ok_win, WindowInfo = pcall(require, "platform.focus.window_info")

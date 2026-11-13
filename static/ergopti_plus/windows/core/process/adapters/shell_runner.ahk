@@ -36,7 +36,7 @@
 ; no counterpart in _shared/core/ports/ — it wraps Windows-only process spawning.
 ; ==============================================================================
 
-#Include ../../../infra/phase_stats.ahk
+#Include ../../../metrics/engine/perf/phase_stats.ahk
 
 #Include ../../logger/engine/tick_count.ahk
 

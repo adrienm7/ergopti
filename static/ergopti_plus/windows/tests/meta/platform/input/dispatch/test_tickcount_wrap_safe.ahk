@@ -114,8 +114,8 @@ Test("logger: ERROR dedup TickCount delta uses wrap-safe (now - last + 0x1000000
 
 _TTCWS_WpmWidgetWrapSafe() {
 	; Scan the whole wpm module (init.ahk + wpm_widget.ahk after the F3 split).
-	Src := _TTCWS_StripLineComments(_DriverDirConcat("ui/wpm"))
-	Assert(Src != "", "ui/wpm sources must be readable")
+	Src := _TTCWS_StripLineComments(_DriverDirConcat("metrics/ui/wpm"))
+	Assert(Src != "", "metrics/ui/wpm sources must be readable")
 
 	; A_TickCount is the 64-bit GetTickCount64 on the supported runtime, so the
 	; event-age helper measures through the canonical TickElapsed64 rather than

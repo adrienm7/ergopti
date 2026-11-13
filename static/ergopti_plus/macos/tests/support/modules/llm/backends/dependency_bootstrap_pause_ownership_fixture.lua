@@ -324,15 +324,15 @@ local function load_fixture(options)
 				resume_warmup = function() return true end,
 			}
 		end
-		package.loaded["ui.wpm.wpm_menubar"] = { is_running = function() return false end }
-		package.loaded["ui.wpm.wpm_widget"] = { is_running = function() return false end }
+		package.loaded["metrics.ui.wpm.menubar"] = { is_running = function() return false end }
+		package.loaded["metrics.ui.wpm.widget"] = { is_running = function() return false end }
 		package.loaded["keyboard.engine.runtime.onboarding"] = {
 			stop = function() return true end,
 		}
 		package.loaded["core.ui.ui.tooltip"] = {
 			hide_forced = function() return true end,
 		}
-		package.loaded["modules.keystats"] = {
+		package.loaded["metrics.engine"] = {
 			resync_context = function() return true end,
 			log_shortcut = function() return true end,
 		}

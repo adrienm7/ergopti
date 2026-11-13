@@ -39,7 +39,7 @@ local CommandLines = require("tests.support.command_lines")
 
 -- Source subtrees that ship in the driver. tests/, vendor/ and _generated/ are
 -- excluded: stubs legitimately declare keyStroke with a two-argument signature.
-local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics" }
 
 -- Minimum argument count for a correct call: (modifiers, character, delay).
 local REQUIRED_ARG_COUNT = 3

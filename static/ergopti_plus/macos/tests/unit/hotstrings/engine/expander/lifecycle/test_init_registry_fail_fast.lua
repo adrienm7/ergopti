@@ -63,7 +63,7 @@ local function load_keymap_with_results(results)
 		["hotstrings.engine.expander.terminator_replay"] = {},
 		["layouts.engine.layers.terminators"] = {},
 		["core.logger.engine.perf"] = {},
-		["infra.hotpath_profiler"] = {},
+		["metrics.engine.perf.hotpath_profiler"] = {},
 		["diagnostics.engine.hid_diagnostic_mailbox"] = {},
 	}
 

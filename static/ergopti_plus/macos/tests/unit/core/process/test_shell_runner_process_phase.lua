@@ -20,10 +20,10 @@ local function load_runner()
 		execute = function() return "out\n", true, "exit", 0 end,
 	})
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.phase_stats"] = nil
+	package.loaded["metrics.engine.perf.phase_stats"] = nil
 	package.loaded["core.process.adapters.shell_runner"] = nil
 	local ShellRunner = require("core.process.adapters.shell_runner")
-	local PhaseStats = require("infra.phase_stats")
+	local PhaseStats = require("metrics.engine.perf.phase_stats")
 	PhaseStats.reset()
 	return ShellRunner, PhaseStats
 end

@@ -47,7 +47,7 @@ function M.register(helpers)
 
 	helpers.describe("connectivity transitions (network-transitions)", function()
 		helpers.it("network-windows-kinds: the kinds and the NCSI host are the Windows ones", function()
-			local ahk = read(Paths.shared("") .. "/../windows/modules/keystats/keystats_network.ahk")
+			local ahk = read(Paths.shared("") .. "/../windows/metrics/engine/system/network.ahk")
 			for kind in pairs(Transitions.KINDS) do
 				helpers.assert_true(ahk:find('"' .. kind .. '"', 1, true) ~= nil, kind .. " is a Windows kind")
 			end

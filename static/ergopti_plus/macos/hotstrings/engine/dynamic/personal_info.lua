@@ -23,7 +23,7 @@ local LOG      = "personal_info"
 local ok_editor, ui_editor = pcall(require, "hotstrings.ui.personal_info_editor")
 if not ok_editor then ui_editor = nil end
 
-local ok_kl, keystats = pcall(require, "modules.keystats")
+local ok_kl, keystats = pcall(require, "metrics.engine")
 if not ok_kl then keystats = nil end
 local FileSystem = require("core.fs.adapters.file_system")
 local BasicString = require("core.text.engine.toml_codec.basic_string")

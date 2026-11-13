@@ -80,7 +80,7 @@ function M.get_port()
 	return resolve_ollama_port()
 end
 
-local ok_kl, keystats = pcall(require, "modules.keystats")
+local ok_kl, keystats = pcall(require, "metrics.engine")
 if not ok_kl then keystats = nil end
 
 local _req_counter = 0

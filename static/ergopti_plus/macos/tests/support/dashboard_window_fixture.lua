@@ -14,7 +14,7 @@ local function with_window(module_name, callback)
 		helpers.with_fresh_modules({
 			module_name, "tests.stubs.hs", "hs", "hs.fs", "hs.json", "core.ui.ui.builder",
 			"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.timing.engine.deferred_work",
-			"core.ui.engine.dialog_util", "core.events.timer_scheduler", "modules.keystats.log_manager",
+			"core.ui.engine.dialog_util", "core.events.timer_scheduler", "metrics.engine.journal.log_manager",
 		}, function()
 			local native = require("tests.stubs.hs")
 			native.__reset()
@@ -35,7 +35,7 @@ local function with_window(module_name, callback)
 			}
 			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return true end }
 			package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
-			package.loaded["modules.keystats.log_manager"] = { on_ingest_done = function() return true end }
+			package.loaded["metrics.engine.journal.log_manager"] = { on_ingest_done = function() return true end }
 			package.loaded["core.events.timer_scheduler"] = {
 				after = function() return { timer = {} }, true end,
 				cancel = function(handle) handle.timer = nil; return true end,

@@ -124,7 +124,7 @@ const ALLOWLIST = [
 		reason: 'hotstring preview and LLM prediction tooltip canvases at the caret'
 	},
 	{
-		file: 'macos/ui/wpm/wpm_widget.lua',
+		file: 'macos/metrics/ui/wpm/widget.lua',
 		kinds: { 'mac.level': 1, 'overlay.adapter': 1 },
 		reason: 'WPM widget: a click-through HUD canvas, never focused'
 	},
@@ -163,7 +163,7 @@ const ALLOWLIST = [
 		reason: 'LLM prediction panel, click-through and never activated'
 	},
 	{
-		file: 'windows/ui/wpm/wpm_widget.ahk',
+		file: 'windows/metrics/ui/wpm/widget.ahk',
 		kinds: { 'win.alwaysOnTop': 2 },
 		reason: 'WPM widget and its graph: layered HUD windows, never focused'
 	},
@@ -193,12 +193,12 @@ const ALLOWLIST = [
 		reason: 'hotstring preview tooltip: an undecorated click-through popup'
 	},
 	{
-		file: 'linux/adapters/wpm_surface.lua',
+		file: 'linux/metrics/adapters/wpm_surface.lua',
 		kinds: { 'linux.keepAbove': 1, 'linux.popup': 3, 'overlay.adapter': 1 },
 		reason: 'WPM widget surface: an undecorated popup that never takes focus'
 	},
 	{
-		file: 'linux/ui/wpm/widget.lua',
+		file: 'linux/metrics/ui/wpm/widget.lua',
 		kinds: { 'overlay.adapter': 1 },
 		reason: 'WPM widget drawn on the WPM overlay surface'
 	},
@@ -926,7 +926,7 @@ record(
 	/hs\.focus\(true\)/.test(read('static/ergopti_plus/macos/core/ui/engine/dialog_util.lua'))
 );
 
-const metricsTyping = read('static/ergopti_plus/macos/ui/metrics_typing/init.lua');
+const metricsTyping = read('static/ergopti_plus/macos/metrics/ui/metrics_typing/init.lua');
 record(
 	'Metrics Typing: redundant raise_now removed',
 	!/local function raise_now/.test(metricsTyping)

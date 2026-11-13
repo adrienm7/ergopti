@@ -451,7 +451,7 @@ local function auto_disable_awake(expected_started_at)
 	if awake_started_at then
 		local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
 		if dur_ms > 0 then
-			local ok_lm, log_manager = pcall(require, "modules.keystats.log_manager")
+			local ok_lm, log_manager = pcall(require, "metrics.engine.journal.log_manager")
 			if ok_lm and log_manager then
 				if type(log_manager.log_passive_period) == "function" then
 					pcall(log_manager.log_passive_period, "awake", dur_ms)
@@ -491,7 +491,7 @@ function M.toggle_awake()
 		if awake_started_at then
 			local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
 			if dur_ms > 0 then
-				local ok_lm, log_manager = pcall(require, "modules.keystats.log_manager")
+				local ok_lm, log_manager = pcall(require, "metrics.engine.journal.log_manager")
 				if ok_lm and log_manager then
 					if type(log_manager.log_passive_period) == "function" then
 						pcall(log_manager.log_passive_period, "awake", dur_ms)

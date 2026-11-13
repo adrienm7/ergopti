@@ -41,7 +41,7 @@ local STAMP_PATTERN = "^ERGOPTI_RELOAD_REQUEST_V1\nrequested_at_ms=(%d+)\n$"
 
 --- Reads the wall clock in epoch milliseconds (the daemon's one reader); tests replace it.
 local function wall_clock_ms()
-	return require("modules.keystats.calendar").wall_ms()
+	return require("metrics.engine.calendar").wall_ms()
 end
 
 local _clock = wall_clock_ms

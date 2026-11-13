@@ -12,7 +12,7 @@ local function fresh_runtime(effects)
 		if type(name) == "string" and (
 			name:match("^hotstrings%.engine%.expander")
 			or name:match("^adapters%.")
-			or name == "modules.keystats"
+			or name == "metrics.engine"
 			or name == "ai.engine"
 			or name == "ai.engine.prediction.engine"
 			or name == "core.ui.ui.tooltip"
@@ -34,7 +34,7 @@ local function fresh_runtime(effects)
 			return true
 		end,
 	}
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		log_hotstring_suggested = function() end,
 		log_hotstring_dismissed = function() end,
 		log_llm_accepted = function() end,

@@ -38,7 +38,7 @@ local TERMINATOR  = " "
 --- @return table Recorder with `suggested` and `accepted` lists.
 local function install_keystats_recorder()
 	local rec = { suggested = {}, accepted = {} }
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		log_hotstring_suggested = function(...)
 			table.insert(rec.suggested, { argc = select("#", ...), args = { ... } })
 		end,

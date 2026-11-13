@@ -28,7 +28,7 @@ local OWNED = {
 	"core.logger.engine.logger", "core.fs.engine.paths", "core.text.engine.utils",
 	"core.timing.engine.timings", "core.text.engine.toml.reader", "core.text.engine.json",
 	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",
-	"core.logger.engine.shim", "modules.keystats", "hotstrings.engine.expander.expander",
+	"core.logger.engine.shim", "metrics.engine", "hotstrings.engine.expander.expander",
 	"hotstrings.engine.expander.state", "hotstrings.engine.expander.terminator_replay", "hotstrings.engine.expander.terminators",
 	"hotstrings.engine.expander.utils", "tests.stubs.hs", "core.text.engine.utils_core",
 	"core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path",
@@ -81,7 +81,7 @@ function M.with_world(options, scenario)
 				end
 			end
 			f.key_observer = observe
-			package.loaded["modules.keystats"] = {}
+			package.loaded["metrics.engine"] = {}
 			local utils = require("hotstrings.engine.expander.utils")
 			local sender = require("platform.input.text_sender")
 			helpers.assert_eq(sender.terminalInputTarget() ~= nil, options.terminal == true)

@@ -207,9 +207,9 @@ return function()
 			fault_ports = require("tests.support.keystats.rollover_marker_fault_ports").install({
 				case = case, phase = phase, ledger = ledger, journal = journal,
 				adapter = adapter, json = Json, fs = Lfs, streams = native_streams })
-			manager = require("modules.keystats.log_manager")
-			writer = require("modules.keystats.sqlite_writer")
-			rotation = require("modules.keystats.rotation")
+			manager = require("metrics.engine.journal.log_manager")
+			writer = require("metrics.engine.journal.sqlite_writer")
+			rotation = require("metrics.engine.journal.rotation")
 			scheduler = require("core.events.timer_scheduler")
 			-- Begin this physical recovery scenario with an existing user ignore.
 			local ignore = temporary .. "/metrics/.gitignore"

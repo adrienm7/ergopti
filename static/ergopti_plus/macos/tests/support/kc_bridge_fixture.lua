@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
 	"core.logger.engine.logger", "settings.engine.paths", "core.events.timer_scheduler",
-	"modules.keystats.kc_bridge", "modules.keystats", "tests.stubs.hs",
+	"metrics.adapters.kc_bridge", "metrics.engine", "tests.stubs.hs",
 }
 
 --- Owns one real ledger and its bridge for the complete scenario lifetime.
@@ -68,7 +68,7 @@ function M.with_context(callback)
 				assert(bridge == nil, "fixture bridge already constructed")
 				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["settings.engine.paths"] = { get_config_dir = function() return root end }
-				bridge = helpers.load_with_stubs("modules.keystats.kc_bridge", overrides)
+				bridge = helpers.load_with_stubs("metrics.adapters.kc_bridge", overrides)
 				return bridge
 			end
 			--- Appends a real physical-key ledger row and always closes the writer.

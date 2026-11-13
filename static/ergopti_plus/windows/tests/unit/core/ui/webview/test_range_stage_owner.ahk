@@ -92,11 +92,11 @@ for Mode in ["consume", "stale-ack", "stale-native", "invalid", "wrong-sender", 
 	Test("WebView range stage: " . Mode . " acknowledgement (range-stage-owner)",
 		_WVSO_WithFixture.Bind(_WRSO_Acknowledge.Bind(Mode)))
 
-#Include ../../../modules/keystats/metrics/test_metrics_message_owner.ahk
+#Include ../../../metrics/engine/metrics/test_message_owner.ahk
 
 #Include test_core_identity.ahk
 
-#Include ../../../modules/keystats/metrics/test_metrics_clear_cache_owner.ahk
+#Include ../../../metrics/engine/metrics/test_clear_cache_owner.ahk
 
 #Include test_editor_early_show_owner.ahk
 

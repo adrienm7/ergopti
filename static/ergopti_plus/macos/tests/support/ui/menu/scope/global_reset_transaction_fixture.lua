@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local MODULE_KEYS = {
-	"ui.menu.metrics_scope",
+	"metrics.ui.menu.scope",
 	"hotstrings.ui.menu.scope",
 	"hotstrings.engine.catalogue.config",
 	"menu.ui.transactions.global_scope",
@@ -45,13 +45,13 @@ local MODULE_KEYS = {
 	"ui.menu.menu_shortcuts",
 	"layouts.ui.menu.keyboard_layout",
 	"hotstrings.ui.menu.hotstrings",
-	"ui.menu.menu_metrics",
+	"metrics.ui.menu.metrics",
 	"ui.menu.menu_tap_holds",
 	"apps.ui.menu.apps",
 	"ui.menu.menu_about",
 	"ai.ui.menu",
 	"ai.engine",
-	"modules.keystats",
+	"metrics.engine",
 	"modules.shortcuts",
 	"hotstrings.engine.dynamic",
 	"gestures.engine",
@@ -525,14 +525,14 @@ local function with_menu_fixture(options, callback)
 
 	for _, module_name in ipairs({
 		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "layouts.ui.menu.keyboard_layout",
-		"hotstrings.ui.menu.hotstrings", "ui.menu.menu_metrics", "ui.menu.menu_tap_holds",
+		"hotstrings.ui.menu.hotstrings", "metrics.ui.menu.metrics", "ui.menu.menu_tap_holds",
 		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
 		package.loaded[module_name] = {}
 	end
 	package.loaded["ai.ui.menu"] = { create = function() return {} end }
 	package.loaded["ai.engine"] = { set_backend = noop }
-	package.loaded["modules.keystats"] = {}
+	package.loaded["metrics.engine"] = {}
 	package.loaded["hotstrings.engine.dynamic"] = {}
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
 	package.loaded["gestures.engine"] = {

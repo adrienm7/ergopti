@@ -78,7 +78,7 @@ end
 --- The main-thread holds counted since the last phase summary.
 --- @return table counts { over_250ms, over_1000ms }
 local function hold_counts()
-	local PhaseStats = require("infra.phase_stats")
+	local PhaseStats = require("metrics.engine.perf.phase_stats")
 	return {
 		over_250ms = PhaseStats.counter("runtime.timer_hold_over_250ms"),
 		over_1000ms = PhaseStats.counter("runtime.timer_hold_over_1000ms"),
@@ -221,7 +221,7 @@ end
 --- The keystats database, when the keystats module resolved it.
 --- @return table database { path|nil, present }
 local function keystats_database()
-	local manager = package.loaded["modules.keystats.log_manager"]
+	local manager = package.loaded["metrics.engine.journal.log_manager"]
 	local path = type(manager) == "table" and type(manager.get_sqlite_path) == "function"
 		and manager.get_sqlite_path() or nil
 	if type(path) ~= "string" or path == "" then return { path = nil, present = false } end
@@ -614,7 +614,7 @@ local function menu_rebuild()
 	if type(menu) ~= "table" or type(menu.timed_rebuild) ~= "function" then return nil end
 	-- The rebuild is synchronous, so each layout phase's total grows by what
 	-- this rebuild spent in it: the slowest names the stage to fix.
-	local PhaseStats = require("infra.phase_stats")
+	local PhaseStats = require("metrics.engine.perf.phase_stats")
 	local layout = package.loaded["layouts.ui.menu.keyboard_layout"]
 	local phases = type(layout) == "table" and type(layout.PHASES) == "table" and layout.PHASES or {}
 	local function totals()
@@ -645,7 +645,7 @@ end
 --- context tracker is loaded.
 --- @return table|nil counts { already_watched, failed }
 local function ax_value_watch_counts()
-	local tracker = package.loaded["modules.keystats.context_tracker"]
+	local tracker = package.loaded["metrics.engine.context_tracker"]
 	if type(tracker) ~= "table" or type(tracker.ax_value_watch_counts) ~= "function" then return nil end
 	return tracker.ax_value_watch_counts()
 end
@@ -968,11 +968,11 @@ function M.new()
 		watcher_owners = watcher_owners,
 		keystats_database = keystats_database,
 		hold_keystats_writes = function(seconds)
-			local manager = package.loaded["modules.keystats.log_manager"]
+			local manager = package.loaded["metrics.engine.journal.log_manager"]
 			return type(manager) == "table" and manager.hold_recovery(seconds) == true
 		end,
 		keystats_recovering = function()
-			local manager = package.loaded["modules.keystats.log_manager"]
+			local manager = package.loaded["metrics.engine.journal.log_manager"]
 			return type(manager) == "table" and manager.is_recovering() == true
 		end,
 		launcher = launcher,

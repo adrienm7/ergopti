@@ -20,7 +20,7 @@
 #Include ../../core/logger/engine/tick_count.ahk
 #Include ../../core/logger/engine/wall_clock.ahk
 #Include ../../core/logger/engine/logger.ahk
-#Include ../../infra/hotpath_profiler.ahk
+#Include ../../metrics/engine/perf/hotpath_profiler.ahk
 #Include ../../core/fs/adapters/file_system.ahk
 #Include ../../core/crypto/crypto.ahk
 #Include ../../core/ui/adapters/webview_profiles.ahk
@@ -28,10 +28,10 @@
 #Include ../../settings/engine/migration/transition.ahk
 #Include ../../settings/engine/migration/transition_runtime.ahk
 #Include ../../core/lifecycle/engine/reload/terminal_handoff.ahk
-#Include ../../modules/keystats/keystats_json.ahk
-#Include ../../modules/keystats/keystats_walker_core.ahk
-#Include ../../modules/keystats/keystats_prefetch.ahk
-#Include ../../modules/keystats/keystats_webview.ahk
+#Include ../../metrics/engine/json.ahk
+#Include ../../metrics/engine/walker/walker_core.ahk
+#Include ../../metrics/engine/journal/prefetch.ahk
+#Include ../../metrics/engine/view/webview.ahk
 
 class _MVSP_PassiveCoreProbe {
 	Reads := 0
@@ -309,7 +309,7 @@ _MVSP_Main() {
 		_MVSP_Require(RegExMatch(_MVSP.Token, "^[A-Za-z0-9_-]+$"), "The private probe token is invalid.")
 		_MVSP_Require(!FSStrictExists(_MVSP.Root), "The probe cannot adopt an existing private destination.")
 		FixtureHash := _MVSP_Hash(A_ScriptFullPath)
-		HostHash := _MVSP_Hash(A_ScriptDir . "\..\..\modules\keystats\keystats_webview.ahk")
+		HostHash := _MVSP_Hash(A_ScriptDir . "\..\..\metrics\engine\view\webview.ahk")
 		RuntimeHash := _MVSP_Hash(A_AhkPath)
 		_MVSP_Require(FixtureHash == A_Args[3] && HostHash == A_Args[4] && RuntimeHash == A_Args[5],
 			"The actual native child sources differ from the parent's launch receipt.")

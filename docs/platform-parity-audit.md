@@ -332,7 +332,7 @@ The English catalogue also contains stale Linux claims. The reason
 backend, profile, trigger or display surfaces, while `linux/ai/ui/menu/llm.lua`
 provides them and `menu.toml` explicitly selects Linux's inline generation
 provider. `platform_reason.metrics_extras_are_not_on_linux` says there is no
-per-application exclusion, while `linux/ui/menu/menu_metrics.lua` and
+per-application exclusion, while `linux/metrics/ui/menu/metrics.lua` and
 `modules/keystats/keystats.lua` implement it. These strings are not reliable
 proof of absence; correcting and propagating their translations is tracked in
 TODO. The Linux action `open_personal_shortcuts` additionally resolves

@@ -6,7 +6,7 @@
 	"vectors": [
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/infra/hotpath_profiler.lua",
+			"source": "static/ergopti_plus/macos/metrics/engine/perf/hotpath_profiler.lua",
 			"template": "Slow %s: %.2f ms own, %.2f ms total, parent %s (%d similar since the last line).",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow hotstring.expand: 6.86 ms own, 6.86 ms total, parent hotstring.match (0 similar since the last line).",
 			"expect": {
@@ -23,7 +23,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/infra/hotpath_profiler.lua",
+			"source": "static/ergopti_plus/macos/metrics/engine/perf/hotpath_profiler.lua",
 			"template": "Slow %s: %.2f ms own, %.2f ms total, parent %s (%d similar since the last line).",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow tooltip.show_predictions: 13.36 ms own, 13.36 ms total, parent none (0 similar since the last line).",
 			"expect": {
@@ -181,7 +181,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/modules/keystats/ingest_trace.lua",
+			"source": "static/ergopti_plus/macos/metrics/engine/journal/ingest_trace.lua",
 			"template": "Slow ingest tick %d ms (%s ms%s; entries=%d statements=%d).",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [keystats.log_manager] Slow ingest tick 513 ms (drain=0 foreign=0 outbox=278 ms; entries=3 statements=4).",
 			"expect": {
@@ -384,7 +384,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/modules/keystats/init.lua",
+			"source": "static/ergopti_plus/macos/metrics/engine/init.lua",
 			"template": "Keystats event tap found disabled — restarting.",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [keystats] Keystats event tap found disabled — restarting.",
 			"expect": {
@@ -603,7 +603,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/infra/hotpath_profiler.ahk",
+			"source": "static/ergopti_plus/windows/metrics/engine/perf/hotpath_profiler.ahk",
 			"template": "Slow {1}: {2:.2f} ms own, {3:.2f} ms total, parent {4} ({5} similar since the last line).",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow HSE.Dispatch: 7.25 ms own, 11.40 ms total, parent OnChar (0 similar since the last line).",
 			"expect": {
@@ -620,7 +620,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/infra/hotpath_profiler.ahk",
+			"source": "static/ergopti_plus/windows/metrics/engine/perf/hotpath_profiler.ahk",
 			"template": "Slow {1}: {2:.2f} ms own, {3:.2f} ms total, parent {4} ({5} similar since the last line).",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow UIA.SelectionPoll: 61.20 ms own, 61.20 ms total, parent none (0 similar since the last line).",
 			"expect": {
@@ -636,7 +636,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/infra/hotpath_profiler.ahk",
+			"source": "static/ergopti_plus/windows/metrics/engine/perf/hotpath_profiler.ahk",
 			"template": "Slow {1}: {2:.2f} ms own, {3:.2f} ms total, parent {4} ({5} similar since the last line).",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow Tooltip.Present: 12.50 ms own, 12.50 ms total, parent none (0 similar since the last line).",
 			"expect": {
@@ -653,7 +653,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/infra/hotpath_profiler.ahk",
+			"source": "static/ergopti_plus/windows/metrics/engine/perf/hotpath_profiler.ahk",
 			"template": "Latency '{1}': count={2}, mean={3:.4f} ms, min={4:.4f} ms, max={5:.4f} ms, slow={6}, ge1={7}, ge5={8}, ge10={9}, ge50={10}.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [HotPath] Latency 'Hook.KeyDown': count=420, mean=0.3100 ms, min=0.0500 ms, max=6.2000 ms, slow=2, ge1=10, ge5=2, ge10=0, ge50=0.",
 			"expect": {
@@ -799,7 +799,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/infra/phase_stats.ahk",
+			"source": "static/ergopti_plus/windows/metrics/engine/perf/phase_stats.ahk",
 			"template": "Phase summary [{1}] over {2} s: {3}.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [Perf] Phase summary [menu] over 60 s: rebuild n=2 mean=140.50 max=181.00 total=281.0 ms | #rebuilds=2.",
 			"expect": {

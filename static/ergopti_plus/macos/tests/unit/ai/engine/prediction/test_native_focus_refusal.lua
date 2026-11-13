@@ -43,7 +43,7 @@ local OWNED = {
 	"core.logger.engine",
 	"core.logger.engine.shim",
 	"menu.engine.labels",
-	"modules.keystats",
+	"metrics.engine",
 	"hotstrings.engine.expander.utils",
 	"ai.engine",
 	"ai.engine.api.common",

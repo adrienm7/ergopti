@@ -1,7 +1,7 @@
 --- tests/unit/menu/ui/metrics/test_scope.lua
 
 local helpers = require("tests.helpers")
-local MetricsState = require("infra.metrics_state_keys")
+local MetricsState = require("metrics.engine.state_keys")
 local Codec = require("core.text.engine.toml_codec")
 local FS = require("core.fs.adapters.file_system")
 local Manifest = require("menu.engine.manifest_reader")
@@ -29,7 +29,7 @@ local function fixture(demoted)
 	}
 	package.loaded["core.fs.adapters.file_system"] = adapter
 	local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
-	package.loaded["ui.menu.metrics_scope"] = nil
+	package.loaded["metrics.ui.menu.scope"] = nil
 	Preferences.load("config")
 	local state = {}
 	for _, row in ipairs(Manifest.scope_operations("metrics", "clear")) do
@@ -71,7 +71,7 @@ local function fixture(demoted)
 		initial_preferences = Preferences.snapshot(state, {}, {}), restore_runtime = function() return true end,
 		snapshot_view = demotions.persisted_view,
 	})
-	local owner = require("ui.menu.metrics_scope").new({
+	local owner = require("metrics.ui.menu.scope").new({
 		path = "config", files = adapter, state = state, preferences = Preferences, checkpoint = checkpoint,
 		demotions = demotions, core = core, menubar = display(bar), widget = display(widget),
 		capture_preferences = function() return Preferences.snapshot(state, {}, {}) end,
@@ -178,7 +178,7 @@ helpers.describe("Metrics scope provider", function()
 		local old, captured = renderer.build
 		renderer.build = function(_, _, _, _, ctx) captured = ctx; return {} end
 		local ok, err = xpcall(function()
-			local menu = helpers.load_with_stubs("ui.menu.menu_metrics")
+			local menu = helpers.load_with_stubs("metrics.ui.menu.metrics")
 			local selected, mode, paused
 			menu.build({ state = { keystats_enabled = false, keystats_disabled_apps = {} },
 				base_dir = helpers.driver_root(), updateMenu = function() end,

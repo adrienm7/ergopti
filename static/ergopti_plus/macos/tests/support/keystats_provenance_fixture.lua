@@ -51,7 +51,7 @@ function M.load_keystats()
 	}
 	package.loaded["core.ui.engine.dialog_util"] = { alert = function() end }
 
-	package.loaded["modules.keystats.log_manager"] = {
+	package.loaded["metrics.engine.journal.log_manager"] = {
 		init = function(core_state) state = core_state; return true end,
 		ensure_ingest_running = function() return true end,
 		defer_flush_buffer = function() return true end,
@@ -76,7 +76,7 @@ function M.load_keystats()
 		end,
 		stop = function() return true end,
 	}
-	package.loaded["modules.keystats.context_tracker"] = {
+	package.loaded["metrics.engine.context_tracker"] = {
 		init = function(core_state, _log_manager, is_paused)
 			state = core_state
 			return type(core_state) == "table" and type(is_paused) == "function"
@@ -105,9 +105,9 @@ function M.load_keystats()
 		is_running = function() return kc_running end,
 		is_ke_managed_output_kc = function() return false end,
 	}
-	package.loaded["modules.keystats.kc_bridge"] = kc_bridge
+	package.loaded["metrics.adapters.kc_bridge"] = kc_bridge
 	local hardware_running = false
-	package.loaded["modules.keystats.watchers"] = {
+	package.loaded["metrics.engine.system.watchers"] = {
 		init = function(core_state, is_paused)
 			return type(core_state) == "table" and type(is_paused) == "function"
 		end,

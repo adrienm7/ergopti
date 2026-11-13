@@ -15,7 +15,7 @@ local Shell = require("core.process.adapters.shell_runner")
 assert(Shell.run("false") == false, "a real failed shell command must never satisfy fixture setup")
 local database = os.tmpname()
 local ok, failure = xpcall(function()
-	local writer = require("modules.keystats.sqlite_writer")
+	local writer = require("metrics.engine.journal.sqlite_writer")
 	local opened, admitted = pcall(writer.open_db, database)
 	assert(opened, "missing descriptor APIs must refuse explicitly rather than throw during import: "
 		.. require("diagnostics.engine.reports.error_description").describe(admitted))

@@ -377,14 +377,14 @@ BUDGETS = (
     ),
     (
         "keystats.ingest",
-        "static/ergopti_plus/macos/modules/keystats/ingest_trace.lua",
+        "static/ergopti_plus/macos/metrics/engine/journal/ingest_trace.lua",
         r"(?m)^M\.REPORT_THRESHOLD_MS = (\d+)",
         True,
     ),
 )
 # Windows declares a slower threshold for a few hot-path labels.
 WINDOWS_SEGMENT_BUDGETS = (
-    "static/ergopti_plus/windows/infra/hotpath_profiler.ahk",
+    "static/ergopti_plus/windows/metrics/engine/perf/hotpath_profiler.ahk",
     r"_HOTPATH_SLOW_MS_BY_SEGMENT := Map\((?P<body>.*?)\n\)",
 )
 

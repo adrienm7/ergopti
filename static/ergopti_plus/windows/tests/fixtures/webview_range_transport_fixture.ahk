@@ -13,8 +13,8 @@
 #Include ../../core/text/engine/json.ahk
 #Include ../../core/text/engine/utils.ahk
 #Include ../../core/ui/adapters/webview_profiles.ahk
-#Include ../../modules/keystats/keystats_webview_range_script.ahk
-#Include ../../modules/keystats/keystats_webview_range_mount.ahk
+#Include ../../metrics/engine/view/webview_range_script.ahk
+#Include ../../metrics/engine/view/webview_range_mount.ahk
 
 OnError(_NWRT_Error)
 global _NWRT_Root := A_Args[1]

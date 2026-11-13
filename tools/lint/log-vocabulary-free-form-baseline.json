@@ -13,7 +13,7 @@
 		"static/ergopti_plus/windows/platform/input/hook_dispatcher.ahk": 1,
 		"static/ergopti_plus/windows/core/lifecycle/engine/lifecycle.ahk": 1,
 		"static/ergopti_plus/windows/ai/engine/bridge.ahk": 1,
-		"static/ergopti_plus/windows/modules/keystats/keystats_reader_rebuild.ahk": 1,
+		"static/ergopti_plus/windows/metrics/engine/reader/rebuild.ahk": 1,
 		"static/ergopti_plus/windows/ai/engine/agent/agent.ahk": 4,
 		"static/ergopti_plus/windows/ai/engine/agent/action.ahk": 2,
 		"static/ergopti_plus/windows/ai/engine/prediction/prompt_action.ahk": 8,
@@ -26,6 +26,6 @@
 	},
 	"phase": {
 		"static/ergopti_plus/windows/settings/engine/migration/transition.ahk": 1,
-		"static/ergopti_plus/windows/modules/keystats/keystats_prefetch.ahk": 2
+		"static/ergopti_plus/windows/metrics/engine/journal/prefetch.ahk": 2
 	}
 }

@@ -41,9 +41,9 @@ end
 --- @param body function function(fixture).
 local function with_fixture(seal_result, body)
 	local trace = {}
-	local previous_keystats = package.loaded["modules.keystats"]
+	local previous_keystats = package.loaded["metrics.engine"]
 	local previous_timings = package.loaded["core.timing.engine.timings"]
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		notify_synthetic = function()
 			trace[#trace + 1] = "telemetry"
 		end,
@@ -59,7 +59,7 @@ local function with_fixture(seal_result, body)
 		local expander, adapter = SyntheticStack.load("hotstrings.engine.expander.expander")
 		return expander, adapter
 	end)
-	package.loaded["modules.keystats"] = previous_keystats
+	package.loaded["metrics.engine"] = previous_keystats
 	package.loaded["core.timing.engine.timings"] = previous_timings
 	if not loaded_ok then error(expander_or_err, 0) end
 	local expander = expander_or_err
@@ -312,8 +312,8 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 	end)
 
 	helpers.it("keeps Enter behind a paced plan longer than the base watchdog margin", function()
-		local previous_keystats = package.loaded["modules.keystats"]
-		package.loaded["modules.keystats"] = {
+		local previous_keystats = package.loaded["metrics.engine"]
+		package.loaded["metrics.engine"] = {
 			notify_synthetic = function() end,
 			set_buffer = function() end,
 		}
@@ -338,7 +338,7 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 		local expander, synthetic = SyntheticStack.load("hotstrings.engine.expander.expander", {
 			eventtap = event_hs.eventtap,
 		})
-		package.loaded["modules.keystats"] = previous_keystats
+		package.loaded["metrics.engine"] = previous_keystats
 		local text_sender = require("platform.input.text_sender")
 		local replay = require("hotstrings.engine.expander.terminator_replay")
 		local original_target = text_sender.terminalInputTarget

@@ -123,7 +123,7 @@ _BICE_TypesIn(Src) {
 
 ; Event type literals as the keystats actually emits them.
 _BICE_EmittedTypes() {
-	return _BICE_TypesIn(_StripFullLineComments(_DriverDirConcat("modules/keystats")))
+	return _BICE_TypesIn(_StripFullLineComments(_DriverDirConcat("metrics/engine")))
 }
 
 ; The scan reads emitter Maps, not a builder's list of excluded entry fields:

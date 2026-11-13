@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays keystats/metrics_maintenance_vectors.json, which the Linux suite
 ; replays through the shared Lua helper, through the Windows owners: the
-; tombstone and the Export name of modules/keystats/keystats_maintenance.ahk,
+; tombstone and the Export name of metrics/engine/journal/maintenance.ahk,
 ; the events_system row builder, and the reader's schema loader, which installs
 ; _shared/metrics/data/db/purge_schema.sql.
 ;

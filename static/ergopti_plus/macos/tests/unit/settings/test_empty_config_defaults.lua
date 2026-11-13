@@ -1,12 +1,12 @@
 --- tests/unit/settings/test_empty_config_defaults.lua
 
 local helpers = require("tests.helpers")
-local MetricsState = require("infra.metrics_state_keys")
+local MetricsState = require("metrics.engine.state_keys")
 
 helpers.describe("empty configuration boot projection", function()
 	helpers.it("keeps the AI menu neutral and takes privacy parameters from the shared owner", function()
-		helpers.with_fresh_modules({ "modules.keystats.kc_bridge" }, function()
-		package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
+		helpers.with_fresh_modules({ "metrics.adapters.kc_bridge" }, function()
+		package.loaded["metrics.adapters.kc_bridge"] = { init = function() return true end }
 		local menu = helpers.load_with_stubs("ai.ui.menu")
 		local manifest = require("menu.engine.manifest_reader")
 		helpers.assert_eq(menu.DEFAULT_STATE.llm_enabled, false)
@@ -21,9 +21,9 @@ helpers.describe("empty configuration boot projection", function()
 	end)
 
 	helpers.it("declares every metrics and input-source default in the shared manifest", function()
-		helpers.with_fresh_modules({ "modules.keystats.kc_bridge" }, function()
-		package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
-		local metrics = helpers.load_with_stubs("ui.menu.menu_metrics").DEFAULT_STATE
+		helpers.with_fresh_modules({ "metrics.adapters.kc_bridge" }, function()
+		package.loaded["metrics.adapters.kc_bridge"] = { init = function() return true end }
+		local metrics = helpers.load_with_stubs("metrics.ui.menu.metrics").DEFAULT_STATE
 		local layout = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout").DEFAULT_STATE
 		local manifest = require("menu.engine.manifest_reader")
 		-- The state keeps its historical in-memory names; the configuration keys are the shared ones.
@@ -71,10 +71,10 @@ helpers.describe("empty configuration boot projection", function()
 	end)
 
 	helpers.it("keeps every real input module neutral without importing its recommended children", function()
-		helpers.with_fresh_modules({ "modules.keystats.kc_bridge" }, function()
+		helpers.with_fresh_modules({ "metrics.adapters.kc_bridge" }, function()
 		-- The native bridge acquires producers at module load; this projection
 		-- fixture supplies only that boundary, never any feature/default values.
-		package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
+		package.loaded["metrics.adapters.kc_bridge"] = { init = function() return true end }
 		local modules = {}
 		for _, name in ipairs({ "keymap", "dynamic_hotstrings", "shortcuts", "gestures", "keystats" }) do
 			modules[name] = helpers.load_with_stubs("modules." .. name)

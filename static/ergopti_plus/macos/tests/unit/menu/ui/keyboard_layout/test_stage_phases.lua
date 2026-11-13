@@ -15,7 +15,7 @@ local Fixture = require("tests.support.ui.menu.keyboard_layout.menu_keyboard_lay
 
 helpers.describe("Keyboard layout row build stages", function()
 	helpers.it("records each stage as a phase, in build order", function()
-		local PhaseStats = require("infra.phase_stats")
+		local PhaseStats = require("metrics.engine.perf.phase_stats")
 		local original, stopped = PhaseStats.stop, {}
 		PhaseStats.stop = function(name, started, ...)
 			if type(name) == "string" and name:find("^menu_keyboard_layout%.") then stopped[#stopped + 1] = name end

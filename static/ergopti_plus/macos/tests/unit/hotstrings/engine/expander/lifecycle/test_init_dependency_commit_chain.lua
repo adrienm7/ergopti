@@ -188,7 +188,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 				end,
 			},
 			["hotstrings.engine.expander.terminators"] = {},
-			["modules.keystats"] = {},
+			["metrics.engine"] = {},
 		}, function(expander)
 			helpers.assert_eq(expander.init({}, {}, {}), false)
 			helpers.assert_eq(replay_calls, 1)
@@ -211,7 +211,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 			["ai.engine"] = { DEFAULT_STATE = {} },
 			["core.logger.engine.logger"] = LOGGER_STUB,
 			["platform.input.keycodes"] = { ESCAPE = 53, RETURN = 36, F16_LLM_CHAIN_SIGNAL = 106 },
-			["modules.keystats"] = {},
+			["metrics.engine"] = {},
 			["core.ui.ui.tooltip"] = {
 				set_runtime_guard = function() tooltip_guard_calls = tooltip_guard_calls + 1 end,
 			},
@@ -352,7 +352,7 @@ local function with_prediction_results(warmup_result, streaming_result, callback
 			set_navigate_callback = noop,
 			set_enter_validates = noop,
 		}),
-		["modules.keystats"] = {},
+		["metrics.engine"] = {},
 	}, function(engine)
 		callback(engine, calls)
 	end)

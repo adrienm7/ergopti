@@ -32,7 +32,7 @@ end
 --- @return table state, table expander, table registry, table view
 local function fresh_engine(rules, max_arrows)
 	package.loaded["core.ui.ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		notify_synthetic = function() end,
 		set_buffer       = function() end,
 		log_hotstring    = function() end,

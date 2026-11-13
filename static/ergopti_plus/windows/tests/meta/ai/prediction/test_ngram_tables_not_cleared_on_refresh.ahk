@@ -12,7 +12,7 @@
 ; A warm refresh must still retain the rebuilt tables and merge only the live
 ; walker delta, never replay the full history on each update.
 ;
-; SCOPE: source introspection of modules/keystats/keystats_reader.ahk.
+; SCOPE: source introspection of metrics/engine/reader/reader.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -39,7 +39,7 @@ _NTNC_ReadSource(FileName) {
 
 _NTNC_CheckNgramClearedForColdReplay() {
 	Src := _NTNC_ReadSource("keystats_reader.ahk")
-	Assert(Src != "", "modules/keystats/keystats_reader.ahk must be readable")
+	Assert(Src != "", "metrics/engine/reader/reader.ahk must be readable")
 
 	Body := _DriverFuncBody("KLR_ClearAggregates")
 	Assert(Body != "", "KLR_ClearAggregates must be present in keystats_reader.ahk")
@@ -57,7 +57,7 @@ _NTNC_CheckNgramClearedForColdReplay() {
 
 _NTNC_CheckAggStillCleared() {
 	Src := _NTNC_ReadSource("keystats_reader.ahk")
-	Assert(Src != "", "modules/keystats/keystats_reader.ahk must be readable")
+	Assert(Src != "", "metrics/engine/reader/reader.ahk must be readable")
 
 	Body := _DriverFuncBody("KLR_ClearAggregates")
 	Assert(Body != "", "KLR_ClearAggregates must be present in keystats_reader.ahk")

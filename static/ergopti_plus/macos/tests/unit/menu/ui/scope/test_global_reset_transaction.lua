@@ -472,7 +472,7 @@ helpers.describe("metrics scope menu composition", function()
 				dialog_args = { ... }
 				return selected
 			end }
-			package.loaded["ui.menu.metrics_scope"] = { new = function(options)
+			package.loaded["metrics.ui.menu.scope"] = { new = function(options)
 				received = options
 				return { apply = function(mode)
 					return options.admission("metrics scope fixture", function()

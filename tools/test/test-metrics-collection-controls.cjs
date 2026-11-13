@@ -66,11 +66,11 @@ check('manifest rows', () => {
 // 2. Each driver wires the rows to its own keystats.
 const wiring = {
 	windows: {
-		menu: `${PLUS}/windows/ui/menu/menu_metrics.ahk`,
+		menu: `${PLUS}/windows/metrics/ui/menu/metrics.ahk`,
 		patterns: [/"metrics_suspend"\s*,/, /"metrics_reset_session"\s*,/, /"metrics_suspended"\s*,/]
 	},
 	macos: {
-		menu: `${PLUS}/macos/ui/menu/menu_metrics.lua`,
+		menu: `${PLUS}/macos/metrics/ui/menu/metrics.lua`,
 		patterns: [
 			/\["metrics_suspend"\]\s*=/,
 			/\["metrics_reset_session"\]\s*=/,
@@ -96,7 +96,7 @@ for (const [driver, spec] of Object.entries(wiring)) {
 
 // 3. The pause is its own state, never the password flag.
 check('linux pause state', () => {
-	const source = read(`${PLUS}/linux/modules/keystats/keystats.lua`);
+	const source = read(`${PLUS}/linux/metrics/engine/keystats.lua`);
 	assert(/^local _suspended = false$/m.test(source), 'Linux keystats keeps a state of its own');
 	assert(/function M\.suspend_collection\(\)/.test(source), 'Linux exposes suspend_collection');
 	assert(/function M\.resume_collection\(\)/.test(source), 'Linux exposes resume_collection');
@@ -111,17 +111,17 @@ check('linux pause state', () => {
 	);
 });
 check('macos pause state', () => {
-	const source = read(`${PLUS}/macos/modules/keystats/init.lua`);
+	const source = read(`${PLUS}/macos/metrics/engine/init.lua`);
 	assert(/function M\.suspend_collection\(\)/.test(source), 'macOS exposes suspend_collection');
 	assert(/function M\.reset_session\(\)/.test(source), 'macOS exposes reset_session');
-	const privacy = read(`${PLUS}/macos/modules/keystats/privacy_context.lua`);
+	const privacy = read(`${PLUS}/macos/metrics/engine/privacy/context.lua`);
 	assert(
 		/state\.collection_suspended/.test(privacy),
 		'the shared recording gate consults the pause'
 	);
 });
 check('windows pause state', () => {
-	const source = read(`${PLUS}/windows/modules/keystats/keystats_collection.ahk`);
+	const source = read(`${PLUS}/windows/metrics/engine/capture/collection.ahk`);
 	assert(/static suspended := false/.test(source), 'Windows keeps the pause in its own class');
 	assert(/^KL_ResetSession\(/m.test(source), 'Windows exposes the session reset');
 });
@@ -142,19 +142,17 @@ check('linux replays the vectors', () => {
 	);
 });
 check('macos replays the vectors', () => {
-	const source = read(
-		`${PLUS}/macos/tests/unit/modules/keystats/lifecycle/test_keystats_privacy.lua`
-	);
+	const source = read(`${PLUS}/macos/tests/unit/metrics/engine/lifecycle/test_privacy.lua`);
 	assert(source.includes('corpus/metrics/collection_session_vectors.json'));
 });
 check('windows replays the vectors', () => {
-	const source = read(`${PLUS}/windows/tests/unit/modules/keystats/test_keystats_collection.ahk`);
+	const source = read(`${PLUS}/windows/tests/unit/metrics/engine/capture/test_collection.ahk`);
 	assert(source.includes('collection_session_vectors.json'));
 });
 
 // 5. The Windows capture paths cannot bypass the pause.
 check('windows capture sources', () => {
-	const dir = `${PLUS}/windows/modules/keystats`;
+	const dir = `${PLUS}/windows/metrics/engine`;
 	const mouse = read(`${dir}/keystats_mouse.ahk`);
 	assert(
 		!/\bA_IsSuspended\b/.test(mouse.replace(/^\s*;.*$/gm, '')),

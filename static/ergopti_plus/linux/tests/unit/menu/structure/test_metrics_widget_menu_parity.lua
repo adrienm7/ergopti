@@ -21,8 +21,8 @@ require("tests.lua.metrics.widget_menu_contract").register(helpers, {
 	declared = declared,
 	translate = function(key) return require("core.i18n.engine.i18n").get(key) end,
 	build = function(values)
-		local previous = package.loaded["ui.wpm.widget"]
-		package.loaded["ui.wpm.widget"] = {
+		local previous = package.loaded["metrics.ui.wpm.widget"]
+		package.loaded["metrics.ui.wpm.widget"] = {
 			is_running = function() return values.wpm_widget_visible end,
 			uses_source_colors = function() return values.metrics_widget_colors end,
 			uses_graph = function() return values.metrics_widget_graph end,
@@ -40,7 +40,7 @@ require("tests.lua.metrics.widget_menu_contract").register(helpers, {
 			end
 			error("Metrics must reach the actual tray")
 		end, debug.traceback)
-		package.loaded["ui.wpm.widget"] = previous
+		package.loaded["metrics.ui.wpm.widget"] = previous
 		if not ok then error(result, 0) end
 		return result
 	end,
@@ -53,8 +53,8 @@ helpers.describe("Metrics widget commands", function()
 		local ok, err = xpcall(function()
 			require("tests.lua.settings.unused_keys_contract").sandbox.with_config("[metrics]\nenabled = false\n", function(path)
 				package.loaded["settings.engine.paths"] = { config = function() return path end }
-				package.loaded["infra.metrics_preferences"], package.loaded["modules.keystats.keystats"] = nil, nil
-				local stats = require("modules.keystats.keystats")
+				package.loaded["metrics.engine.preferences"], package.loaded["metrics.engine.keystats"] = nil, nil
+				local stats = require("metrics.engine.keystats")
 				local changes = 0
 				local rows = helpers.load_module("menu.ui.builder.builder").build({ keystats = stats,
 					on_menu_changed = function() changes = changes + 1 end })
@@ -92,7 +92,7 @@ helpers.describe("Metrics widget commands", function()
 		for _, accepted in ipairs({ false, true }) do
 			helpers.it("metrics-widget-command " .. spec.id .. " " .. tostring(accepted), function()
 				local calls = { start = 0, stop = 0, colors = 0, graph = 0, rebuild = 0 }
-				local previous = package.loaded["ui.wpm.widget"]
+				local previous = package.loaded["metrics.ui.wpm.widget"]
 				local widget = {
 					is_running = function() return true end,
 					uses_source_colors = function() return false end,
@@ -110,7 +110,7 @@ helpers.describe("Metrics widget commands", function()
 						return accepted
 					end,
 				}
-				package.loaded["ui.wpm.widget"] = widget
+				package.loaded["metrics.ui.wpm.widget"] = widget
 				local ok, err = xpcall(function()
 					local rows = helpers.load_module("menu.ui.builder.builder").build({
 						keystats = { is_enabled = function() return true end,
@@ -133,7 +133,7 @@ helpers.describe("Metrics widget commands", function()
 					helpers.assert_eq(calls.graph, spec.id == "include_realtime" and 1 or 0)
 					helpers.assert_eq(calls.rebuild, accepted and 1 or 0, "only an acknowledged native commit rebuilds the menu")
 				end, debug.traceback)
-				package.loaded["ui.wpm.widget"] = previous
+				package.loaded["metrics.ui.wpm.widget"] = previous
 				if not ok then error(err, 0) end
 			end)
 		end

@@ -6,7 +6,7 @@
 #Warn LocalSameAsGlobal, Off
 #Include ../test_framework.ahk
 #Include ../../core/logger/engine/logger.ahk
-#Include ../../infra/hotpath_profiler.ahk
+#Include ../../metrics/engine/perf/hotpath_profiler.ahk
 #Include ../../core/fs/adapters/file_system.ahk
 #Include ../../core/text/engine/toml/helpers.ahk
 

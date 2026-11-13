@@ -56,7 +56,7 @@ local Redact = require("diagnostics.engine.reports.redact")
 local NativePath = require("core.fs.engine.native_path")
 local Json = require("core.text.engine.json")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
-local PhaseStats = require("infra.phase_stats")
+local PhaseStats = require("metrics.engine.perf.phase_stats")
 local _redact_message = nil
 -- The configuration directory the user chose, followed for the redactor: its
 -- folder and file names are personal, and the user may move it at runtime.

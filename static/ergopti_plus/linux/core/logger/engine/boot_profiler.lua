@@ -33,7 +33,7 @@ local TableUtil = require("core.text.engine.table_util")
 
 local Logger    = require("core.logger.engine.shim")
 local Monotonic = require("core.logger.engine.monotonic")
-local PhaseStats = require("infra.phase_stats")
+local PhaseStats = require("metrics.engine.perf.phase_stats")
 
 local LOG = "BootProfile"
 

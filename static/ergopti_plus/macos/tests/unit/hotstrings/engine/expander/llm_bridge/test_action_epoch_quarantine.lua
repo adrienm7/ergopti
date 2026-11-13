@@ -63,7 +63,7 @@ local function load_fixture(reset_result)
 		RETURN = 36,
 		F16_LLM_CHAIN_SIGNAL = 106,
 	}
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		log_hotstring_suggested = function() end,
 		log_hotstring_dismissed = function() end,
 		log_llm_accepted = function() end,

@@ -5,9 +5,9 @@ local codec = require("core.text.engine.toml_codec")
 
 helpers.describe("sparse preference transactions", function()
 	helpers.it("saves a real neutral module snapshot without adding enabled overrides", function()
-		helpers.with_fresh_modules({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "modules.keystats.kc_bridge" }, function()
+		helpers.with_fresh_modules({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "metrics.adapters.kc_bridge" }, function()
 			local source = '[future]\nkeep = 99\n'
-			package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
+			package.loaded["metrics.adapters.kc_bridge"] = { init = function() return true end }
 			local modules = {}
 			for key, name in pairs({ keymap = "keymap", dyn_hot_mod = "dynamic_hotstrings",
 				shortcuts_mod = "shortcuts", gestures = "gestures", keystats = "keystats" }) do

@@ -55,7 +55,7 @@ function M.new(ports)
 	local now_ms = ports.now_ms or require("core.logger.engine.monotonic").now_ms
 	-- A finished session is the day's awake_ms, as on Windows and macOS (KMD-3).
 	local record_session = ports.record_session or function(duration_ms)
-		return require("modules.keystats.system_metrics").record_awake_session(duration_ms)
+		return require("metrics.engine.system.metrics").record_awake_session(duration_ms)
 	end
 	local current
 	local owner = {}

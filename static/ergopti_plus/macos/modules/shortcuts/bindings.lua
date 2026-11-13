@@ -201,7 +201,7 @@ local _chatgpt_url = nil
 --- @param label string The canonical shortcut label (e.g. "Ctrl+T").
 --- @param app_name string The name of the app in which the shortcut fired.
 local function log_shortcut(label, app_name)
-	local ok_kl, kl = pcall(require, "modules.keystats")
+	local ok_kl, kl = pcall(require, "metrics.engine")
 	if ok_kl and kl and type(kl.log_shortcut) == "function" then
 		pcall(kl.log_shortcut, label, app_name)
 	end

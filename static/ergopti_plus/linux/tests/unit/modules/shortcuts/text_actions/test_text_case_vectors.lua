@@ -55,7 +55,7 @@ local function transformed_by(action_name, selected)
 		event_loop = "core.events.loop",
 		combo = "gestures.engine.combo_emitter",
 		injector = "hotstrings.engine.injector",
-		keystats = "modules.keystats.keystats",
+		keystats = "metrics.engine.keystats",
 	}
 	local previous = {}
 	for key, name in pairs(names) do previous[key] = package.loaded[name] end

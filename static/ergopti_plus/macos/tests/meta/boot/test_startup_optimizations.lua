@@ -53,7 +53,7 @@ end
 -- ======================================================
 
 helpers.describe("startup: keystats watches browsers without hs.window.filter (keystats-no-window-filter)", function()
-	local src = read_code("local function ensure_browser_window_watchers") -- modules/keystats/init.lua
+	local src = read_code("local function ensure_browser_window_watchers") -- metrics/engine/init.lua
 
 	helpers.it("(keystats-no-window-filter) the keystats never instantiates hs.window.filter", function()
 		helpers.assert_true(src:find("hs.window.filter", 1, true) == nil,

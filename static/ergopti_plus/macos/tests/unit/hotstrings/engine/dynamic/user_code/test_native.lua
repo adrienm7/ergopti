@@ -11,7 +11,7 @@ local SyntheticStack = require("tests.support.synthetic_input_stack")
 
 local OWNED = {
 	"hotstrings.engine.expander", "hotstrings.engine.expander.state", "hotstrings.engine.expander.expander", "ai.engine.bridge",
-	"modules.keystats", "ai.engine", "ai.engine.prediction.engine", "core.ui.ui.tooltip",
+	"metrics.engine", "ai.engine", "ai.engine.prediction.engine", "core.ui.ui.tooltip",
 	"hotstrings.engine.dynamic.user_code", "hotstrings.engine.dynamic.rules_engine",
 	"hotstrings.engine.dynamic", "hotstrings.engine.dynamic.personal_info",
 	"hotstrings.ui.menu.programmatic_hotstrings", "core.ui.engine.dialog_util", "core.process.adapters.shell_runner",
@@ -62,7 +62,7 @@ local function with_native(body)
 			fixture.state = CoreState.new(...)
 			return fixture.state
 		end }
-		package.loaded["modules.keystats"] = setmetatable({}, { __index = function() return function() end end })
+		package.loaded["metrics.engine"] = setmetatable({}, { __index = function() return function() end end })
 		package.loaded["ai.engine"] = { DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = false },
 			check_modifiers = function() return false end }
 		package.loaded["ai.engine.prediction.engine"] = setmetatable({

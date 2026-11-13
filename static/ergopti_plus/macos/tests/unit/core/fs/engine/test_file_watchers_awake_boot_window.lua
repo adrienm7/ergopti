@@ -17,7 +17,7 @@ local OWNED_MODULES = {
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.lifecycle.engine.reload.gate", "core.fs.engine.native_path",
 	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.fs.adapters.storage", "core.timing.engine.timings", "core.fs.adapters.file_system",
-	"ui.metrics_typing", "ui.metrics_apps", "ui.metrics_apps.init", "hotstrings.ui.hotstring_editor",
+	"metrics.ui.metrics_typing", "metrics.ui.metrics_apps", "ui.metrics_apps.init", "hotstrings.ui.hotstring_editor",
 }
 
 local BASE_ROOT = "/Users/test/Ergopti"

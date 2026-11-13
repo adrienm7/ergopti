@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local MetricsState = require("infra.metrics_state_keys")
+local MetricsState = require("metrics.engine.state_keys")
 
 --- Loads a fresh registry module with a silent logger.
 --- @return table SessionDemotions

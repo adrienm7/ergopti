@@ -608,7 +608,7 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("metrics_apps_bridge", function()
-    local handler = helpers.load_module("ui.metrics_apps.bridge")
+    local handler = helpers.load_module("metrics.ui.metrics_apps.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -658,7 +658,7 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("metrics_typing_bridge", function()
-    local handler = helpers.load_module("ui.metrics_typing.bridge")
+    local handler = helpers.load_module("metrics.ui.metrics_typing.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()

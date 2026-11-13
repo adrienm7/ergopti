@@ -52,8 +52,8 @@ local OWNED_MODULES = {
 	"ai.engine.local_servers.warmup_controller",
 	"ai.engine.api.ollama",
 	"ai.engine.api.remote",
-	"ui.wpm.wpm_menubar",
-	"ui.wpm.wpm_widget",
+	"metrics.ui.wpm.menubar",
+	"metrics.ui.wpm.widget",
 	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
 	"modules.shortcuts.script_control",
@@ -629,12 +629,12 @@ local function build_fixture(backend, save_results, options)
 			pause_warmup = function() return true end,
 			resume_warmup = function() return true end,
 		}
-		package.loaded["ui.wpm.wpm_menubar"] = {
+		package.loaded["metrics.ui.wpm.menubar"] = {
 			is_running = function() return false end,
 			stop = function() return true end,
 			resume_after_pause = function() return true end,
 		}
-		package.loaded["ui.wpm.wpm_widget"] = {
+		package.loaded["metrics.ui.wpm.widget"] = {
 			is_running = function() return false end,
 			stop = function() return true end,
 			resume_after_pause = function() return true end,

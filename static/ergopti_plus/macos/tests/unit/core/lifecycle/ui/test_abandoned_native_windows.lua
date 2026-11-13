@@ -17,12 +17,12 @@ require("core.logger.engine")
 local function with_window(module_name, scenario)
 	helpers.with_stub_scope({
 		"ui.download_window", "ui.download_window.javascript", "ui.download_window.pending_queue",
-		"ui.metrics_typing", "ui.metrics_typing.projection", "ui.metrics_typing.snapshot",
+		"metrics.ui.metrics_typing", "metrics.ui.metrics_typing.projection", "metrics.ui.metrics_typing.snapshot",
 		"core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.events.timer_scheduler", "core.timing.engine.deferred_work", "core.timing.engine.paced_job", "core.timing.engine.paced_json",
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
 		"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
-		"modules.keystats.log_manager", "tests.support.native_webview_close_fixture",
+		"metrics.engine.journal.log_manager", "tests.support.native_webview_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, script_refs = {}, timers = {} }
 		local construct = require("tests.support.native_webview_close_fixture")(h)
@@ -35,7 +35,7 @@ local function with_window(module_name, scenario)
 			end
 			return view
 		end
-		package.loaded["modules.keystats.log_manager"] = { on_ingest_done = function() return true end }
+		package.loaded["metrics.engine.journal.log_manager"] = { on_ingest_done = function() return true end }
 		local window = helpers.load_with_stubs(module_name, {
 			webview = { new = new_window, windowMasks = { titled = 1, closable = 2, resizable = 8 },
 				usercontent = { new = function()
@@ -77,7 +77,7 @@ local function with_window(module_name, scenario)
 end
 
 helpers.describe("discarded UI windows release native references", function()
-	for _, module_name in ipairs({ "ui.download_window", "ui.metrics_typing" }) do
+	for _, module_name in ipairs({ "ui.download_window", "metrics.ui.metrics_typing" }) do
 		helpers.it("retires user-closed " .. module_name .. " and opens a healthy successor", function()
 			with_window(module_name, function(window, h)
 				helpers.assert_true(h.show())
@@ -91,13 +91,13 @@ helpers.describe("discarded UI windows release native references", function()
 				local successor = h.windows[2]
 				helpers.assert_true(h.retained[successor])
 				helpers.assert_eq(successor.disposed, false)
-				if module_name == "ui.metrics_typing" then helpers.assert_eq(window._wv, successor)
+				if module_name == "metrics.ui.metrics_typing" then helpers.assert_eq(window._wv, successor)
 				else helpers.assert_true(window.is_active()) end
 				helpers.assert_true(h.close())
 				h.drain()
 				helpers.assert_nil(next(h.retained))
 				helpers.assert_nil(next(h.script_refs))
-				if module_name == "ui.metrics_typing" then helpers.assert_nil(window._timer) end
+				if module_name == "metrics.ui.metrics_typing" then helpers.assert_nil(window._timer) end
 			end)
 		end)
 
@@ -115,7 +115,7 @@ helpers.describe("discarded UI windows release native references", function()
 				helpers.assert_eq(first.deletes, 1)
 				helpers.assert_true(h.retained[successor], "old close must not consume the new window")
 				helpers.assert_eq(successor.disposed, false)
-				if module_name == "ui.metrics_typing" then helpers.assert_eq(window._wv, successor)
+				if module_name == "metrics.ui.metrics_typing" then helpers.assert_eq(window._wv, successor)
 				else helpers.assert_true(window.is_active()) end
 				helpers.assert_true(h.close())
 				h.drain()

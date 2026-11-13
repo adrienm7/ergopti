@@ -50,14 +50,14 @@ local function load_dashboard(scheduler, subscribe, controls)
 			return webview
 		end,
 	}
-	package.loaded["modules.keystats.log_manager"] = {
+	package.loaded["metrics.engine.journal.log_manager"] = {
 		on_ingest_done = subscribe or function(callback)
 			context.on_ingest = callback
 			return true
 		end,
 	}
 
-	local dashboard = helpers.load_with_stubs("ui.metrics_typing", {
+	local dashboard = helpers.load_with_stubs("metrics.ui.metrics_typing", {
 		screen = {
 			mainScreen = function()
 				return { frame = function() return { x = 0, y = 0, w = 1400, h = 900 } end }

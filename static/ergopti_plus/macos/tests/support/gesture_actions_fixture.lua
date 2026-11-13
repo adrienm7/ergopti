@@ -15,7 +15,7 @@ local OWNERS = {
 	"diagnostics.engine.reports.error_description",
 	-- The real logger's shared core and the phase counters it records into.
 	"core.logger.engine",
-	"infra.phase_stats",
+	"metrics.engine.perf.phase_stats",
 	-- The phase counters' bookkeeping, shared with the Linux driver.
 	"metrics.engine.perf.phase_stats_core",
 	-- The real paths, logger and configuration owners split paths through this pure owner,

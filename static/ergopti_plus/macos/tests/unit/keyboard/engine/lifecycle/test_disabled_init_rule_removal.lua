@@ -23,7 +23,7 @@ local OWNED_MODULES = {
 	"platform.input.hotkey_registrar",
 	"core.timing.engine.timings",
 	"settings.engine.paths",
-	"modules.keystats.kc_bridge",
+	"metrics.adapters.kc_bridge",
 	"gestures.engine.engine",
 	"keyboard.engine",
 }
@@ -133,7 +133,7 @@ local function run_disabled_init(removal_succeeds)
 		package.loaded["platform.input.hotkey_registrar"] = { unbind = function() end }
 		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 		package.loaded["settings.engine.paths"] = { get = function() return "existing-config.toml" end }
-		package.loaded["modules.keystats.kc_bridge"] = {
+		package.loaded["metrics.adapters.kc_bridge"] = {
 			refresh_managed_set = function() return true end,
 		}
 		package.loaded["gestures.engine.engine"] = {}

@@ -39,7 +39,7 @@ local StreamRetirement = require("ai.engine.local_servers.mlx_stream_retirement"
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
 
-local ok_kl, keystats = pcall(require, "modules.keystats")
+local ok_kl, keystats = pcall(require, "metrics.engine")
 if not ok_kl then keystats = nil end
 
 -- Dedicated client for non-streaming inference POSTs; isolated so it never shares

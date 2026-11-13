@@ -118,10 +118,7 @@ assert.match(lua, /apply_category_off\(finished, roles, off_reason_key\)/);
 const windows = 'static/ergopti_plus/windows/';
 const ahk = fs.readFileSync(path.join(ROOT, windows, 'menu/engine/manifest_menu.ahk'), 'utf8');
 assert.match(ahk, /_MR_ApplyCategoryOff\(Result, OffRule\)/);
-const keystats = fs.readFileSync(
-	path.join(ROOT, windows, 'modules/keystats/keystats_ui.ahk'),
-	'utf8'
-);
+const keystats = fs.readFileSync(path.join(ROOT, windows, 'metrics/engine/view/ui.ahk'), 'utf8');
 assert.doesNotMatch(keystats, /RequireEnabled/, 'a reader row opens its window with metrics off');
 
 console.log('test-menu-category-off-rule: passed.');

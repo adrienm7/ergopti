@@ -28,7 +28,7 @@
 ;
 ; The scroll guards (2, 3) and the gate itself are observed by calling the real
 ; handlers under a real Suspend in
-; tests/unit/modules/keystats/test_keystats_mouse_privacy_transaction.ahk. The
+; tests/unit/metrics/engine/capture/test_mouse_privacy_transaction.ahk. The
 ; click guards (1) stay source scans: _KL_Mouse_GestureAuthorized refuses a
 ; held capture again before the bump, so removing the outer guard changes no
 ; observable counter and a behavioural test of it could not fail.

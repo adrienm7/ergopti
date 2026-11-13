@@ -20,12 +20,12 @@ local OWNERS = {
 	"core.ui.engine.dialog_util",
 	"core.lifecycle.engine.shutdown.teardown_transaction",
 	"modules.keystats.init",
-	"modules.keystats.log_manager",
-	"modules.keystats.context_tracker",
-	"modules.keystats.kc_bridge",
-	"modules.keystats.watchers",
-	"modules.keystats.timestamp",
-	"modules.keystats.physical_accounting_mode",
+	"metrics.engine.journal.log_manager",
+	"metrics.engine.context_tracker",
+	"metrics.adapters.kc_bridge",
+	"metrics.engine.system.watchers",
+	"metrics.engine.journal.timestamp",
+	"metrics.engine.capture.physical_accounting_mode",
 	"platform.input.synthetic_input",
 	"diagnostics.adapters.event_provenance",
 	"core.process.adapters.lifecycle",
@@ -33,13 +33,13 @@ local OWNERS = {
 	"layouts.adapters.input_source_broker",
 	"core.fs.adapters.storage",
 	"core.events.timer_scheduler",
-	"modules.keystats.aggregator.events",
-	"modules.keystats.aggregator.state",
-	"modules.keystats.aggregator.core",
-	"modules.keystats.aggregator.physical",
+	"metrics.engine.aggregator.events",
+	"metrics.engine.aggregator.state",
+	"metrics.engine.aggregator.core",
+	"metrics.engine.aggregator.physical",
 	"ui.metrics_typing.init",
-	"modules.keystats",
-	"modules.keystats.privacy_context",
+	"metrics.engine",
+	"metrics.engine.privacy.context",
 	"platform.focus.secure_field_detector",
 	"metrics.engine.view.private_window",
 	"metrics.engine.metrics",
@@ -57,8 +57,8 @@ local OWNERS = {
 	"ai.engine.api.ollama",
 	"ai.engine.api.remote",
 	"ai.engine.local_servers.warmup_controller",
-	"ui.wpm.wpm_menubar",
-	"ui.wpm.wpm_widget",
+	"metrics.ui.wpm.menubar",
+	"metrics.ui.wpm.widget",
 	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
 	"core.text.engine.toml.reader",
@@ -165,7 +165,7 @@ function M.with_runtime(callback)
 				return watcher
 			end } }
 			native = { name = "TextEdit", pid = 101, bundle = "com.apple.TextEdit", fault = nil }
-			local manager = assert(package.loaded["modules.keystats.log_manager"])
+			local manager = assert(package.loaded["metrics.engine.journal.log_manager"])
 			obs.modifier_presses = 0
 			manager.log_modifier_press = function() obs.modifier_presses = obs.modifier_presses + 1 end
 			manager.log_modifier_hold = function() end
@@ -213,9 +213,9 @@ function M.with_runtime(callback)
 			end
 			hs.axuielement.observer = { new = function() return nil end }
 			package.loaded["platform.focus.secure_field_detector"] = nil
-			local tracker_path = driver .. "/modules/keystats/context_tracker.lua"
+			local tracker_path = driver .. "/metrics/engine/context_tracker.lua"
 			tracker = assert(loadfile(tracker_path))()
-			local tracker_port = assert(package.loaded["modules.keystats.context_tracker"])
+			local tracker_port = assert(package.loaded["metrics.engine.context_tracker"])
 			local original_tracker_init = assert(tracker_port.init)
 			local actual_tracker_init_arguments
 			tracker_port.init = function(...)
@@ -250,13 +250,13 @@ function M.with_runtime(callback)
 				package.loaded[name] = { pause_warmup = yes, resume_warmup = yes, stop_warmup = yes, stop = yes,
 					retry_deferred_warmup = yes }
 			end
-			for _, name in ipairs({ "ui.wpm.wpm_menubar", "ui.wpm.wpm_widget" }) do package.loaded[name] = { is_running = function() return false end } end
+			for _, name in ipairs({ "metrics.ui.wpm.menubar", "metrics.ui.wpm.widget" }) do package.loaded[name] = { is_running = function() return false end } end
 			package.loaded["keyboard.engine.runtime.onboarding"] = { stop = yes }
 			package.loaded["core.ui.ui.tooltip"] = { hide_forced = yes }
 			local control_path = driver .. "/modules/shortcuts/script_control.lua"
 			control = assert(loadfile(control_path))()
 			package.loaded["modules.shortcuts.script_control"] = control
-			package.loaded["modules.keystats"] = engine
+			package.loaded["metrics.engine"] = engine
 			local keymap = { pause_processing = yes, resume_processing = yes, reset_predictions_for_pause = yes }
 			local shortcuts = { is_bindings_started = function() return false end,
 				has_bindings_pause_debt = function() return false end, pause_bindings = yes, release_bindings_pause_claim = yes }
@@ -275,7 +275,7 @@ function M.with_runtime(callback)
 			end
 			assert(actual_tracker_init_arguments and actual_tracker_init_arguments.n == 4)
 			assert(rawequal(actual_tracker_init_arguments[1], fixture.state)
-				and rawequal(actual_tracker_init_arguments[2], package.loaded["modules.keystats.log_manager"])
+				and rawequal(actual_tracker_init_arguments[2], package.loaded["metrics.engine.journal.log_manager"])
 				and type(actual_tracker_init_arguments[3]) == "function"
 				and type(actual_tracker_init_arguments[4]) == "function",
 				"The actual engine init boundary must supply the exact context/modifier owners")

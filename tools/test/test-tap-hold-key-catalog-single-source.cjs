@@ -376,7 +376,7 @@ const linuxHook = stripLineComments(
 );
 const linuxDaemon = stripLineComments(read(path.join(SP, 'linux/ergopti_hotstrings.lua')), '.lua');
 const linuxKeystats = stripLineComments(
-	read(path.join(SP, 'linux/modules/keystats/keystats.lua')),
+	read(path.join(SP, 'linux/metrics/engine/keystats.lua')),
 	'.lua'
 );
 
@@ -461,7 +461,7 @@ function savedLinuxOneShotClosure(sources) {
 		'refresh_capture'
 	];
 	const capture = '_native_hook = package.loaded["platform.input.keyboard_hook"]';
-	const managerAt = daemon.indexOf('require("modules.keystats.keystats")');
+	const managerAt = daemon.indexOf('require("metrics.engine.keystats")');
 	const hookAt = daemon.indexOf('require("platform.input.keyboard_hook")');
 	return (
 		assignment?.trim().replace(/\s+/g, ' ') ===
@@ -721,7 +721,7 @@ for (const [index, token] of [
 		'local function current() return _input_runtime_current(ctx, not ctx.used) and _input_guard_current(ctx) end'
 	],
 	[4, 'pcall(_input_ports.arm_one_shot, ctx.issuer, ctx.at_ms, current)'],
-	[5, 'require("modules.keystats.keystats")'],
+	[5, 'require("metrics.engine.keystats")'],
 	[5, 'TapHold.init({'],
 	[6, 'require("platform.remap.tap_hold_manager")']
 ]) {

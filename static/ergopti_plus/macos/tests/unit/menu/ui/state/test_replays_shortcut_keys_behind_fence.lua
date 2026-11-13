@@ -47,7 +47,7 @@ local MENU_STATE_MODULES = {
 	"menu.ui.keyboard.keymap_lifecycle",
 	"core.fs.adapters.storage",
 	"core.timing.engine.deferred_work",
-	"modules.keystats.text_cipher",
+	"metrics.engine.privacy.text_cipher",
 }
 
 --- Runs the real sync_state_to_modules against the real Bindings registry.

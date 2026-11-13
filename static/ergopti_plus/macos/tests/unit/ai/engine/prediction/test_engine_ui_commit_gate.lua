@@ -141,7 +141,7 @@ local function load_fixture(loading_result, options)
 	}
 	package.loaded["ai.engine.prediction.app_filter"] = { is_blocked = function() return false end }
 	package.loaded["modules.shortcuts.script_control"] = nil
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm_dismissed = function() end,
 	}

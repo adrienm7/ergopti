@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local MetricsState = require("infra.metrics_state_keys")
+local MetricsState = require("metrics.engine.state_keys")
 
 local MODULES = {
 	"hs.fs",
@@ -19,8 +19,8 @@ local MODULES = {
 	"menu.engine.manifest_reader",
 	"menu.engine.manifest_menu",
 	"core.text.engine.utils",
-	"modules.keystats",
-	"ui.menu.menu_metrics",
+	"metrics.engine",
+	"metrics.ui.menu.metrics",
 }
 
 local FILTERS = {
@@ -112,7 +112,7 @@ local function with_filter(filter, options, callback)
 		resolve_disabled_when = function() return false end,
 	}
 	package.loaded["core.text.engine.utils"] = {}
-	package.loaded["modules.keystats"] = keystats
+	package.loaded["metrics.engine"] = keystats
 
 	local state = {
 		keystats_disabled_apps = {},
@@ -127,7 +127,7 @@ local function with_filter(filter, options, callback)
 		keystats_secure_filter_enabled = true,
 		keystats_system_auth_filter_enabled = true,
 	}
-	local MenuMetrics = require("ui.menu.menu_metrics")
+	local MenuMetrics = require("metrics.ui.menu.metrics")
 	MenuMetrics.build({
 		state = state,
 		save_prefs = function()

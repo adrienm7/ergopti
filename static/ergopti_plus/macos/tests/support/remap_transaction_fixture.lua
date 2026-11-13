@@ -20,7 +20,7 @@ local OWNED_MODULES = {
 	"core.timing.engine.timings",
 	"core.events.timer_scheduler",
 	"settings.engine.paths",
-	"modules.keystats.kc_bridge",
+	"metrics.adapters.kc_bridge",
 	"gestures.engine.engine",
 	"modules.shortcuts",
 	"keyboard.engine.runtime.onboarding",
@@ -38,10 +38,10 @@ local OWNED_MODULES = {
 	"ai.engine.api.mlx",
 	"ai.engine.api.ollama",
 	"ai.engine.api.remote",
-	"ui.wpm.wpm_menubar",
-	"ui.wpm.wpm_widget",
+	"metrics.ui.wpm.menubar",
+	"metrics.ui.wpm.widget",
 	"core.ui.ui.tooltip",
-	"modules.keystats",
+	"metrics.engine",
 	"platform.input.synthetic_input",
 	"modules.shortcuts.script_control",
 	"keyboard.adapters.karabiner.ke_variables",
@@ -496,7 +496,7 @@ return function(run, dependencies)
 				get = function() return "missing-config.toml" end,
 				get_config_dir = function() return config_dir end,
 			}
-			package.loaded["modules.keystats.kc_bridge"] = {
+			package.loaded["metrics.adapters.kc_bridge"] = {
 				refresh_managed_set = function()
 					calls.classifier_refreshes = calls.classifier_refreshes + 1
 					if options.classifier_succeeds == false then error("classifier failed") end
@@ -810,10 +810,10 @@ return function(run, dependencies)
 			}
 			package.loaded["ai.engine.api.ollama"] = { stop_warmup = record("ollama_stop") }
 			package.loaded["ai.engine.api.remote"] = { stop_warmup = function() return true end }
-			package.loaded["ui.wpm.wpm_menubar"] = {
+			package.loaded["metrics.ui.wpm.menubar"] = {
 				is_running = function() return false end,
 			}
-			package.loaded["ui.wpm.wpm_widget"] = {
+			package.loaded["metrics.ui.wpm.widget"] = {
 				is_running = function() return false end,
 			}
 			package.loaded["keyboard.engine.runtime.onboarding"] = {
@@ -823,7 +823,7 @@ return function(run, dependencies)
 				end,
 			}
 			package.loaded["core.ui.ui.tooltip"] = { hide_forced = record("tooltip_hide") }
-			package.loaded["modules.keystats"] = {
+			package.loaded["metrics.engine"] = {
 				resync_context = record("keystats_resync"),
 				log_shortcut = function() end,
 			}

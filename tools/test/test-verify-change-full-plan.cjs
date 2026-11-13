@@ -102,7 +102,7 @@ for (const file of [
 	// The metrics apps page probe pins this page's script census: adding
 	// theme_tokens.js to it skipped these controls and failed only on macOS CI.
 	'static/ergopti_plus/_shared/ui/metrics_apps/index.html',
-	'static/ergopti_plus/macos/ui/metrics_apps/init.lua'
+	'static/ergopti_plus/macos/metrics/ui/metrics_apps/init.lua'
 ])
 	assert(
 		selectGates([file]).has('macos-tooltip-canvas'),
@@ -232,7 +232,7 @@ for (const file of [
 }
 const mixedAhk = selectGates([
 	'docs/audits/performance/ahk/report.md',
-	'static/ergopti_plus/windows/modules/keystats/keystats_reader_db.ahk'
+	'static/ergopti_plus/windows/metrics/engine/reader/db.ahk'
 ]);
 for (const gate of ['report-style', 'ahk-encoding', 'ahk-suite', 'ahk-parse', 'ahk-e2e']) {
 	assert(mixedAhk.has(gate), `mixed report and production AHK must retain ${gate}`);

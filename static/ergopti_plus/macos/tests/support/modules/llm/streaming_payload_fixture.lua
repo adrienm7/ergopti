@@ -14,7 +14,7 @@ local OWNED = {
 	"ai.engine.local_servers.mlx_stream_retirement", "ai.engine.ollama.endpoint", "ai.engine.api.parser",
 	"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.network.adapters.http_client", "core.fs.adapters.file_system",
 	"core.logger.engine.logger", "core.ui.engine.notifications", "core.timing.engine.timings", "core.text.engine.utils",
-	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
+	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "metrics.engine",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.lifecycle.engine.compat.utf8", "core.text.engine.toml.reader", "core.text.engine.json",
 	"ai.engine.api.parser_core", "core.logger.engine", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
 	"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
@@ -38,7 +38,7 @@ local function with_stream(backend, callback)
 	helpers.with_stub_scope(OWNED, function()
 		-- Transport, scheduling, metrics and diagnostic boundaries are irrelevant
 		-- until the real request path admits its payload. Keep those ports local.
-		package.loaded["modules.keystats"] = {}
+		package.loaded["metrics.engine"] = {}
 		package.loaded["core.fs.adapters.file_system"] = { exists = function(path)
 			local file = io.open(path, "rb"); if not file then return false end
 			assert(file:close()); return true

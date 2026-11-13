@@ -130,14 +130,14 @@ function M.with_publication(options, callback)
 					if path == "/fixture/db.sqlite" then return { mode = "file" } end
 				end
 				package.loaded["hs.sqlite3"] = state.sqlite
-				package.loaded["modules.keystats.sqlite_reader"] = nil
-				local reader = require("modules.keystats.sqlite_reader")
+				package.loaded["metrics.engine.reader.sqlite_reader"] = nil
+				local reader = require("metrics.engine.reader.sqlite_reader")
 				reader.history_fingerprint_exact = true -- The fixture owns every row and mutation, so its fingerprint is exact.
 				observe_manifest(state, reader)
-				package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return "/fixture/db.sqlite" end
+				package.loaded["metrics.engine.journal.log_manager"].get_sqlite_path = function() return "/fixture/db.sqlite" end
 				dashboard._app_icon_cache.Editor = false
 				state.saves, state.disk_files = {}, {}
-				local Snapshot = package.loaded["ui.metrics_typing.snapshot"]
+				local Snapshot = package.loaded["metrics.ui.metrics_typing.snapshot"]
 				local original_save = Snapshot.save
 				local filesystem = package.loaded["core.fs.adapters.file_system"]
 				filesystem.read_with_status = function(path)

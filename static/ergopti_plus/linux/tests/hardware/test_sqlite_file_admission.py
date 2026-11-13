@@ -28,7 +28,7 @@ if mode == 'schema_fifo' then
     return shared(name)
   end
 end
-local writer = require('modules.keystats.sqlite_writer')
+local writer = require('metrics.engine.journal.sqlite_writer')
 local refused = mode ~= 'absent' and mode ~= 'empty'
 local selected = mode == 'nul_fifo' and (database .. string.char(0) .. 'suffix') or database
 local opened = writer.open_db(selected)

@@ -222,7 +222,7 @@ _SecurityCorpus_RunAll()
 
 
 ; --- Async secure-field verdict contract (mirror of KL_PwClassStyleVerdict) ---
-; Production lives in modules/keystats/keystats.ahk, which the headless runner
+; Production lives in metrics/engine/keystats.ahk, which the headless runner
 ; cannot load, so this mirror pins the privacy-critical decision the async
 ; detector depends on: the keystroke thread suppresses (fails safe) whenever the
 ; Win32 layer is INCONCLUSIVE. The verdict must therefore only report

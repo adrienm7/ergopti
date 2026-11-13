@@ -279,11 +279,11 @@ workload("trig_lower_100k", function()
 end)
 
 workload("keystats_walk_tick", function()
-	package.loaded["modules.keystats.export"] = { get_native_app_category = function() return "Development" end }
-	package.loaded["modules.keystats.sqlite_writer"] = { get_db = function() return nil end }
-	local Aggregator = helpers.load_with_stubs("modules.keystats.aggregator")
+	package.loaded["metrics.engine.reader.export"] = { get_native_app_category = function() return "Development" end }
+	package.loaded["metrics.engine.journal.sqlite_writer"] = { get_db = function() return nil end }
+	local Aggregator = helpers.load_with_stubs("metrics.engine.aggregator.aggregator")
 	Aggregator.init({ device_id = "bench" })
-	local pause = require("modules.keystats.aggregator.core").MAX_KEYSTROKE_DELAY_MS + 1
+	local pause = require("metrics.engine.aggregator.core").MAX_KEYSTROKE_DELAY_MS + 1
 	local tick = typing_entry(TICK_KEYS, pause)
 	local backlog = {}
 	for index = 1, BACKLOG_ENTRIES do backlog[index] = typing_entry(BACKLOG_KEYS, pause) end

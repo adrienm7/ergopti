@@ -47,8 +47,8 @@ local IGNORED_RECEIVERS = { captured = true, Logger = true }
 
 -- Functions reached one level below a step that do the step's real work
 local TRANSITIVE_BODIES = {
-	{ module = "modules.keystats", header = "local function teardown_runtime(" },
-	{ module = "modules.keystats.log_manager", header = "function M.stop(" },
+	{ module = "metrics.engine", header = "local function teardown_runtime(" },
+	{ module = "metrics.engine.journal.log_manager", header = "function M.stop(" },
 	{ module = "ai.ui.menu", header = "local function start_detached_sweep(" },
 	-- The MLX stop runs ahead of the step list, awaiting the exact task callback
 	{ module = "ai.ui.menu", header = "function M.stop_mlx_server(" },
@@ -164,7 +164,7 @@ helpers.describe("quit teardown step bodies never block (hs-quit-never-blocks)",
 	end)
 
 	helpers.it("(hs-quit-never-blocks) the process-exit log-manager stop does not ingest", function()
-		local body = function_body(read_module("modules.keystats.log_manager"), "function M.stop(")
+		local body = function_body(read_module("metrics.engine.journal.log_manager"), "function M.stop(")
 		local code = strip_comments(body)
 		local branch = code:match("if process_exit then(.-)\n\telse\n")
 		helpers.assert_true(branch ~= nil, "LogManager.stop must branch on process_exit")

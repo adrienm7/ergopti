@@ -19,7 +19,7 @@ logger.error = logger.warn
 package.loaded['core.logger.engine.shim'] = logger
 package.loaded['infra.logger'] = logger
 package.loaded['hs.json'] = json
-local command = require('modules.keystats.sqlite_command')
+local command = require('metrics.engine.journal.sqlite_command')
 
 local original_popen = io.popen
 io.popen = function(...)

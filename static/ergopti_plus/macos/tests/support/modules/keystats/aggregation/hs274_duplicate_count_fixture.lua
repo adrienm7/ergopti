@@ -33,15 +33,15 @@ end
 
 local function with_system_policy_callback(vector, body)
 	Accounting.run(function(scenario)
-		local startup_tracker = package.loaded["modules.keystats.context_tracker"]
+		local startup_tracker = package.loaded["metrics.engine.context_tracker"]
 		local lifecycle = package.loaded["core.process.adapters.lifecycle"]
-		local manager = package.loaded["modules.keystats.log_manager"]
+		local manager = package.loaded["metrics.engine.journal.log_manager"]
 		local previous_activation, previous_append = lifecycle.onAppActivate, manager.append_log
 		local ports = { "init", "app_watcher_cb", "update_private_status", "update_ax_observer",
 			"capture_frontmost_app", "resync_context" }
 		local previous_ports = {}
 		for _, name in ipairs(ports) do previous_ports[name] = startup_tracker[name] end
-		helpers.with_fresh_modules({ "modules.keystats.context_tracker", "platform.focus.secure_field_detector" }, function()
+		helpers.with_fresh_modules({ "metrics.engine.context_tracker", "platform.focus.secure_field_detector" }, function()
 			local native = _G.hs
 			local previous_app, previous_window = native.application, native.window
 			local previous_ax, previous_caffeinate = native.axuielement, native.caffeinate
@@ -91,7 +91,7 @@ local function with_system_policy_callback(vector, body)
 				native.caffeinate = { watcher = { new = function()
 					return { start = function(self) return self end, stop = function(self) return self end }
 				end } }
-				tracker = require("modules.keystats.context_tracker")
+				tracker = require("metrics.engine.context_tracker")
 				for _, name in ipairs(ports) do if name ~= "init" then startup_tracker[name] = tracker[name] end end
 				startup_tracker.init = function(state, log_manager, paused)
 					controls.startup_dependencies = { state, log_manager, paused }
@@ -122,7 +122,7 @@ local function with_system_policy_callback(vector, body)
 					controls.current_app = apps[kind]
 					local roles, subroles, titles = controls.role_reads, controls.subrole_reads, controls.title_reads
 					helpers.assert_eq(_G.hs, native)
-					helpers.assert_eq(package.loaded["modules.keystats.context_tracker"], tracker)
+					helpers.assert_eq(package.loaded["metrics.engine.context_tracker"], tracker)
 					helpers.assert_eq(controls.activation_callback, retained_activation)
 					retained_activation(controls.current_app:name(), controls.current_app)
 					helpers.assert_true(controls.role_reads > roles and controls.subrole_reads > subroles,
@@ -323,16 +323,16 @@ local private_modifier_vectors = {
 
 local function with_private_window_callback(vector, body)
 	Accounting.run(function(scenario)
-		local startup_tracker = package.loaded["modules.keystats.context_tracker"]
+		local startup_tracker = package.loaded["metrics.engine.context_tracker"]
 		local lifecycle = package.loaded["core.process.adapters.lifecycle"]
-		local manager = package.loaded["modules.keystats.log_manager"]
+		local manager = package.loaded["metrics.engine.journal.log_manager"]
 		local original_activation = lifecycle.onAppActivate
 		local original_append = manager.append_log
 		local port_names = { "init", "app_watcher_cb", "update_private_status", "update_ax_observer",
 			"capture_frontmost_app", "resync_context" }
 		local previous_ports = {}
 		for _, name in ipairs(port_names) do previous_ports[name] = startup_tracker[name] end
-		helpers.with_fresh_modules({ "modules.keystats.context_tracker", "platform.focus.secure_field_detector" }, function()
+		helpers.with_fresh_modules({ "metrics.engine.context_tracker", "platform.focus.secure_field_detector" }, function()
 			local native = _G.hs
 			local previous_application, previous_window = native.application, native.window
 			local previous_ax, previous_caffeinate = native.axuielement, native.caffeinate
@@ -403,7 +403,7 @@ local function with_private_window_callback(vector, body)
 				native.caffeinate = { watcher = { new = function()
 					return { start = function(self) return self end, stop = function(self) return self end }
 				end } }
-				tracker = require("modules.keystats.context_tracker")
+				tracker = require("metrics.engine.context_tracker")
 				for _, name in ipairs(port_names) do
 					if name ~= "init" then startup_tracker[name] = tracker[name] end
 				end
@@ -457,7 +457,7 @@ local function with_private_window_callback(vector, body)
 					controls.title = private and vector.private_title or vector.ordinary_title
 					local reads = controls.title_reads
 					helpers.assert_eq(_G.hs, native)
-					helpers.assert_eq(package.loaded["modules.keystats.context_tracker"], tracker)
+					helpers.assert_eq(package.loaded["metrics.engine.context_tracker"], tracker)
 					helpers.assert_eq(scenario.state.is_secure_field, controls.expected_secure)
 					local deliver = vector.registered_event == "windowFocused"
 						and controls.focus_callback or controls.title_callback

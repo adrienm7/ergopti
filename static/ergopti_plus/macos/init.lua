@@ -343,7 +343,7 @@ local function abort_pre_runtime_boot(stage, detail, alert_key, before_exit)
 	-- for as long as the dialog stays up.
 	local quiet_ok, quiet_err = pcall(function()
 		if TimerScheduler.cancelAll() ~= true then error("a native timer refused to stop") end
-		local kc_bridge = package.loaded["modules.keystats.kc_bridge"]
+		local kc_bridge = package.loaded["metrics.adapters.kc_bridge"]
 		if type(kc_bridge) == "table" and kc_bridge.stop() ~= true then
 			error("the KC ledger bridge did not stop")
 		end
@@ -695,7 +695,7 @@ local function settle_loaded_physical_owner(on_teardown_ready)
 	-- are still live. This port never loads or initializes the dormant module.
 	local physical = _local_teardown_state.physical
 	if physical == nil then
-		local owner = rawget(package.loaded, "modules.keystats.physical_history_session")
+		local owner = rawget(package.loaded, "metrics.engine.capture.physical_history_session")
 		if owner == nil then
 			physical = { settled = true }
 		else
@@ -714,7 +714,7 @@ local function settle_loaded_physical_owner(on_teardown_ready)
 		_local_teardown_state.physical = physical
 	end
 	local function current()
-		local owner = rawget(package.loaded, "modules.keystats.physical_history_session")
+		local owner = rawget(package.loaded, "metrics.engine.capture.physical_history_session")
 		if physical.owner == nil then return owner == nil end
 		return rawequal(owner, physical.owner)
 			and rawequal(rawget(physical.owner, "stop"), physical.stop)
@@ -957,7 +957,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		{
 			name = "keystats",
 			run = function()
-				local module = package.loaded["modules.keystats"]
+				local module = package.loaded["metrics.engine"]
 				if module == nil then return true end
 				if type(module) ~= "table" or type(module.shutdown) ~= "function" then
 					error("modules.keystats.shutdown is unavailable")
@@ -2163,7 +2163,7 @@ for _, fname in ipairs(toml_fnames) do
 	local own = hotstrings_dir .. fname
 	local path, section_sources = ExtensionPacks.route(name, own, is_user_hotstrings_copy(own))
 	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
-	local PhaseStats = require("infra.phase_stats")
+	local PhaseStats = require("metrics.engine.perf.phase_stats")
 	local load_started = PhaseStats.now()
 	local receipt = CommonHotstringsBoot.load(keymap, name, path, section_sources, hotfiles, hotfile_paths)
 	local load_ms = PhaseStats.stop("hotstring_load.common_file", load_started)
@@ -2502,7 +2502,7 @@ if _reload_started_epoch_ms then
 end
 -- Permanent phase counters (hot path, menu, boot sub-stages, config parses,
 -- child processes): one summary line per family every interval, never at boot.
-require("infra.phase_stats").start()
+require("metrics.engine.perf.phase_stats").start()
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
 Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")

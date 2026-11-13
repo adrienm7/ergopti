@@ -644,8 +644,8 @@ local function pause_all()
 	end
 
 	for _, owner in ipairs({
-		{ module = "ui.wpm.wpm_menubar", label = "wpm_menubar" },
-		{ module = "ui.wpm.wpm_widget", label = "wpm_widget" },
+		{ module = "metrics.ui.wpm.menubar", label = "wpm_menubar" },
+		{ module = "metrics.ui.wpm.widget", label = "wpm_widget" },
 	}) do
 		local surface, surface_reason = require_pause_module(owner.module)
 		if surface_reason then return false, surface_reason end
@@ -889,10 +889,10 @@ local function resume_all()
 	-- This one-shot refresh is deliberately best-effort: metrics OFF leaves the
 	-- keystats uninitialized, and resync_context() then returns false even though
 	-- resume is otherwise valid. It activates nothing and therefore needs no inverse.
-	local ok_kl, kl = pcall(require, "modules.keystats")
+	local ok_kl, kl = pcall(require, "metrics.engine")
 	if not ok_kl then
 		Logger.warn(LOG, "Optional resume operation failed without blocking activation: %s.",
-			"require(modules.keystats) raised: " .. tostring(kl))
+			"require(metrics.engine) raised: " .. tostring(kl))
 		kl = nil
 	end
 	if kl and type(kl.resync_context) == "function" then
@@ -1452,7 +1452,7 @@ end
 --- Logs a shortcut activation via the keystats if available.
 --- @param label string Human-readable shortcut label for the log.
 local function log_shortcut_if_available(label)
-	local ok_kl, kl = pcall(require, "modules.keystats")
+	local ok_kl, kl = pcall(require, "metrics.engine")
 	if ok_kl and kl and type(kl.log_shortcut) == "function" then
 		local app = hs.application.frontmostApplication()
 		Logger.callback(LOG, "Shortcut telemetry", kl.log_shortcut,

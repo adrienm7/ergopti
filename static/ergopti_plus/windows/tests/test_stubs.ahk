@@ -558,7 +558,7 @@ UninstallHotstringHooks() {
 ; ── Active-app cache simulators — bypass WinGet* calls so the
 ; ── Notepad / Office branches of HotstringHandler can be exercised in tests.
 ;
-; These write to the REAL KLHook class (modules/keystats/keystats_hook.ahk is
+; These write to the REAL KLHook class (metrics/engine/capture/hook.ahk is
 ; included by the runner so the typing-row privacy test can drive its callbacks).
 ; The old `if !IsSet(KLHook) KLHook := {}` fallback is gone and must stay gone:
 ; assigning to the name makes AHK treat KLHook as a global variable, and the
@@ -646,7 +646,7 @@ InstallSendNoOps() {
 
 ; These functions are called by ai/engine/prediction/engine.ahk at
 ; runtime. In production they live in core/ui/ui/tooltip/tooltip_llm.ahk and
-; modules/keystats/keystats.ahk (which register hotkeys or OS hooks
+; metrics/engine/keystats.ahk (which register hotkeys or OS hooks
 ; and therefore cannot be #Included by the test runner). The stubs
 ; below record calls so individual tests can assert on them.
 
@@ -839,7 +839,7 @@ KL_LogLlmSuggested(app_name, count) {
     _Stub_LlmSuggestedCalls.Push({ app_name: app_name, count: count })
 }
 
-; The hotstring preview's own telemetry pair, from modules/keystats/keystats.ahk.
+; The hotstring preview's own telemetry pair, from metrics/engine/keystats.ahk.
 ; The prefix watcher calls both inside a ``try``, so before these existed the
 ; calls simply failed and no test could observe whether the sink was reached —
 ; which is exactly what a privacy guard on that sink has to assert.
@@ -859,7 +859,7 @@ KL_LogHotstringDismissed(trigger, replacement, h_type := "unknown", app_name := 
 }
 
 ; ── The persisted-row sink and the counters KL_LogHotstring drives ────────────
-; modules/keystats/keystats_hotstring_log.ahk is included by the runner (the
+; metrics/engine/journal/hotstring_log.ahk is included by the runner (the
 ; rest of keystats.ahk installs OS hooks at load and cannot be), so these four
 ; are what stands between it and the disk. Recording rather than no-op: the
 ; privacy contract is about the CONTENT of the row that reaches KL_AppendLog, so
@@ -958,7 +958,7 @@ class Keystats {
     static session_url    := ""
     static session_layout := ""
     static session_field_role := ""
-    ; Needed by KL_BuildInserts / KL_AllocEventId (modules/keystats/keystats_sql.ahk)
+    ; Needed by KL_BuildInserts / KL_AllocEventId (metrics/engine/journal/sql.ahk)
     ; when that pure builder module is exercised directly from unit tests.
     static _device_id_lit := "'test-device'"
     ; Raw (unquoted) id, used by KL_BuildInsertTyping to derive the at-rest
@@ -971,7 +971,7 @@ class Keystats {
 	static health_privacy_hits := 0
 	static _retry_snapshots := []
 	static _flush_in_progress := false
-    ; Ledger location + lifecycle flag, read by modules/keystats/
+    ; Ledger location + lifecycle flag, read by metrics/engine/
     ; keystats_text_migration.ahk. AHK v2 THROWS on an undeclared static, so a
     ; missing field here is a crash in the migration test rather than a skip.
     static initialized    := false
@@ -989,7 +989,7 @@ class Keystats {
     ; Production's journal bookmark: KLPF_CaptureForegroundProjection and
     ; KLPF_ForegroundProjectionCurrent read it once the resident store matches.
     static today_log_offset := 0
-    ; Read by KL_LogHotstring (modules/keystats/keystats_hotstring_log.ahk):
+    ; Read by KL_LogHotstring (metrics/engine/journal/hotstring_log.ahk):
     ; the app the row is attributed to, and the flush bookkeeping it updates.
     static session_app    := "test.exe"
     static last_flush_time := 0

@@ -336,8 +336,8 @@ local function with_native_apps_parent(language, body)
 	if acquired then released = native.scope_release(owner) == true end
 	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
 	local cleanup, cleanup_error = pcall(function()
-		local bridge = package.loaded["modules.keystats.kc_bridge"]
-		if bridge and not rawequal(bridge, previous["modules.keystats.kc_bridge"]) then bridge.stop() end
+		local bridge = package.loaded["metrics.adapters.kc_bridge"]
+		if bridge and not rawequal(bridge, previous["metrics.adapters.kc_bridge"]) then bridge.stop() end
 		local scheduler = package.loaded["core.events.timer_scheduler"]
 		if scheduler and not rawequal(scheduler, previous["core.events.timer_scheduler"]) then helpers.assert_eq(scheduler.cancelAll(), true) end
 		if scratch then

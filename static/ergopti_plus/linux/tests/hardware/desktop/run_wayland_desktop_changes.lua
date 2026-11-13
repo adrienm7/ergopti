@@ -25,7 +25,7 @@ local Display = require("core.ui.engine.display_server")
 local Monotonic = require("core.logger.engine.monotonic")
 local Navigation = require("keyboard.engine.desktop_navigation")
 local Switcher = require("gestures.adapters.workspace_switcher")
-local SystemMetrics = require("modules.keystats.system_metrics")
+local SystemMetrics = require("metrics.engine.system.metrics")
 
 local UNMEASURED_REASON = "platform_reason.desktop_changes_need_workspace_interface"
 -- Past the switcher's 1 s reuse window, so each observation is a fresh query.

@@ -86,7 +86,7 @@ helpers.describe("keymap.expander: perform_text_replacement survives notify_synt
 		-- notify_synthetic's own utf8.codes crash on malformed UTF-8 input BEFORE
 		-- the keystats-side fix guards it — pins that the CALL SITE in expander.lua
 		-- must not let this propagate regardless of what notify_synthetic does.
-		package.loaded["modules.keystats"] = {
+		package.loaded["metrics.engine"] = {
 			notify_synthetic = function() error("simulated malformed-UTF-8 crash") end,
 			set_buffer       = function() end,
 		}
@@ -115,7 +115,7 @@ helpers.describe("keymap.expander: perform_text_replacement survives notify_synt
 
 		-- Must run before any assertion could fail-and-return-early below:
 		-- this test is the only one that ever assigns a raising stub into
-		-- package.loaded["modules.keystats"]. Without clearing it here, the
+		-- package.loaded["metrics.engine"]. Without clearing it here, the
 		-- poisoned stub leaks into every later test file that requires
 		-- modules.keystats in this same Lua process — it doesn't crash them
 		-- (the real notify_synthetic pcall guard swallows it), but for a
@@ -123,7 +123,7 @@ helpers.describe("keymap.expander: perform_text_replacement survives notify_synt
 		-- value or side effects, the always-raising stub silently changes
 		-- behaviour and fails unrelated tests with this file's own error
 		-- message, which is exactly what happened in CI on 2026-07-01.
-		package.loaded["modules.keystats"] = nil
+		package.loaded["metrics.engine"] = nil
 
 		helpers.assert_true(ok, "perform_text_replacement must not propagate a notify_synthetic error")
 		helpers.assert_true(replaced, "telemetry failure must not veto a valid replacement")
@@ -138,7 +138,7 @@ helpers.describe("keymap.expander: perform_text_replacement survives notify_synt
 	end)
 
 	helpers.it("seals repeat-key output and releases its transaction when notification raises", function()
-		package.loaded["modules.keystats"] = {
+		package.loaded["metrics.engine"] = {
 			notify_synthetic = function() error("simulated repeat telemetry failure") end,
 			set_buffer       = function() end,
 		}
@@ -150,7 +150,7 @@ helpers.describe("keymap.expander: perform_text_replacement survives notify_synt
 		local call_ok, fired = pcall(E.try_repeat_feature, "★", false)
 		local consume, events = SyntheticInput.leave_callback(fired)
 		if hs and hs.timer and hs.timer.__fire_all then hs.timer.__fire_all() end
-		package.loaded["modules.keystats"] = nil
+		package.loaded["metrics.engine"] = nil
 
 		helpers.assert_true(call_ok,
 			"telemetry failure must not escape the repeat-key producer")

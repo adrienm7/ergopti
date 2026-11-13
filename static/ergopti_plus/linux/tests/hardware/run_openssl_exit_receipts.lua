@@ -52,8 +52,8 @@ assert(uv.fs_chmod(root .. "/openssl", 448))
 assert(uv.os_setenv("PATH", root .. ":" .. previous_path))
 local function mode(fault) write(root .. "/mode", tostring(fault or 0)); write(root .. "/calls", "") end
 local function fresh()
-	package.loaded["modules.keystats.text_cipher"] = nil
-	local subject = require("modules.keystats.text_cipher")
+	package.loaded["metrics.engine.privacy.text_cipher"] = nil
+	local subject = require("metrics.engine.privacy.text_cipher")
 	subject._set_machine_id_path(root .. "/machine-id")
 	return subject
 end
@@ -224,7 +224,7 @@ check("warm row operations need no shell command, temporary output or key-bearin
 	assert(ok, err); assert(not uv.fs_lstat(root .. "/absent-output"))
 end)
 check("actual SQLite refuses failed EVP and admits exactly one healthy encrypted retry", function()
-	writer = require("modules.keystats.sqlite_writer")
+	writer = require("metrics.engine.journal.sqlite_writer")
 	assert(writer.open_db(root .. "/metrics.sqlite"))
 	for _, stage in ipairs({ "Init", "Update", "Final" }) do
 		fault = stage
@@ -242,10 +242,10 @@ check("saved ON without EVP keeps real collector SQL closed and recovers retaine
 	local preferences = require("tests.support.metrics_preferences_fixture").new({ initial = {
 		["metrics.encrypt"] = true, ["metrics.enabled"] = true,
 	} })
-	package.loaded["infra.metrics_preferences"] = preferences
-	package.loaded["modules.keystats.keystats"] = nil
+	package.loaded["metrics.engine.preferences"] = preferences
+	package.loaded["metrics.engine.keystats"] = nil
 	AES.available = false
-	local K = require("modules.keystats.keystats")
+	local K = require("metrics.engine.keystats")
 	assert(K.init({ sqlite_path = root .. "/collector.sqlite", log_dir = root .. "/logs" }) ~= false)
 	assert(K.is_encrypt_enabled() and cipher.is_enabled() and K.get_privacy_state().encrypt)
 	K.on_keydown("a", typed_at(1000), "synthetic-app")

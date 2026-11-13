@@ -207,10 +207,10 @@ function M.run(options)
 			end, report_quit = function(reason)
 				observed.boot_quit_reason = reason; record("updater.boot_quit"); return false
 			end }
-		elseif name == "adapters.wpm_surface" then
+		elseif name == "metrics.adapters.wpm_surface" then
 			-- The floating WPM widget pumps its own window, tray or not.
 			return { pump = function() record("wpm.pump"); return 0 end }
-		elseif name == "infra.typed_input_withheld" then
+		elseif name == "metrics.engine.typed_input_withheld" then
 			-- The session's withheld-input summary is logged as the daemon exits.
 			return { summary = function() record("withheld.summary"); return "controlled withheld summary" end }
 		elseif name == "core.timing.engine.reload_timing" then
@@ -222,7 +222,7 @@ function M.run(options)
 				observed.field_run = field_options
 				return { stop = function() return true end }
 			end }
-		elseif name == "modules.keystats.topology_metrics" then
+		elseif name == "metrics.engine.system.topology_metrics" then
 			-- Window topology binds its X11 source at startup and closes its capture interval at stop.
 			return { bind_topology_source = noop, daemon_tick = noop, daemon_stop = noop }
 		elseif name == "infra.personal_shortcuts" then
@@ -232,7 +232,7 @@ function M.run(options)
 			-- No X11 desktop in the fixture: the Wayland workspace reader is asked,
 			-- and this session has none (its own cases: test_workspace_switcher).
 			return { current_workspace_source = function() record("workspace.source"); return nil, "unsupported" end }
-		elseif name == "modules.keystats.tap_click_sources" then
+		elseif name == "metrics.engine.tap_click_sources" then
 			-- The touchpad tap count binds its sources into keystats (its own
 			-- cases: test_keystats_pointer_metrics, test_tap_to_click_setting).
 			return { bind = noop }

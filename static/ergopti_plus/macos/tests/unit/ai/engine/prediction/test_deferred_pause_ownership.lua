@@ -184,7 +184,7 @@ local function load_fixture()
 		tint = function() return nil end,
 	}
 	fixture.tooltip = package.loaded["core.ui.ui.tooltip"]
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm_dismissed = function()
 			if fixture.pause_in_callback == true then

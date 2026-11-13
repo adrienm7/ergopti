@@ -21,7 +21,7 @@ local RESET_MODULES = {
 	"core.logger.engine.logger", "core.logger.adapters.log_transport", "diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.fs.engine.paths", "core.timing.engine.timings",
-	"ai.engine", "ai.engine.prediction.engine", "modules.keystats",
+	"ai.engine", "ai.engine.prediction.engine", "metrics.engine",
 	"core.ui.ui.tooltip", "hotstrings.engine.catalogue.config", "core.ui.adapters.tooltip_renderer",
 	"core.fs.adapters.file_system",
 	"hotstrings.engine.expander", "modules.keymap.init", "settings.engine.registry",
@@ -134,7 +134,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 			has_pending_work    = function() return false end,
 			is_visible = function() return false end,
 		}
-		package.loaded["modules.keystats"] = setmetatable({
+		package.loaded["metrics.engine"] = setmetatable({
 			notify_synthetic = noop,
 			set_buffer = noop,
 		}, { __index = function() return noop end })

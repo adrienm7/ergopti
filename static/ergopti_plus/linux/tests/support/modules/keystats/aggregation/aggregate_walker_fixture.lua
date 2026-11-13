@@ -14,7 +14,7 @@ local it = require("tests.support.metrics_preferences_fixture").it
 
 local Fakes = helpers.load_module("tests.fakes")
 
-local Walker = helpers.load_module("modules.keystats.aggregate_walker")
+local Walker = helpers.load_module("metrics.engine.aggregate_walker")
 
 local Timings = helpers.load_module("core.timing.engine.timings")
 

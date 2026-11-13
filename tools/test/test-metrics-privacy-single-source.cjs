@@ -53,17 +53,10 @@ const MANIFEST = P(
 	'features',
 	'manifest.toml'
 );
-const AHK_FILTERS = P(
-	'static',
-	'ergopti_plus',
-	'windows',
-	'infra',
-	'metrics',
-	'metrics_filters.ahk'
-);
+const AHK_FILTERS = P('static', 'ergopti_plus', 'windows', 'metrics', 'engine', 'filters.ahk');
 const AHK_LOADER = P('static', 'ergopti_plus', 'windows', 'settings', 'engine', 'shortcuts.ahk');
 const AHK_WRITER = P('static', 'ergopti_plus', 'windows', 'settings', 'engine', 'io.ahk');
-const HS_KEYSTATS = P('static', 'ergopti_plus', 'macos', 'modules', 'keystats', 'init.lua');
+const HS_KEYSTATS = P('static', 'ergopti_plus', 'macos', 'metrics', 'engine', 'init.lua');
 
 // The canonical id of each setting, and the default it must resolve to.
 const CANONICAL = [
@@ -239,7 +232,7 @@ for (const id of [
 		hsKeystats.includes(`Manifest.default_for(KEY.${constant})`);
 	if (hsKeystats && !resolvesLiteral && !resolvesConstant) {
 		errors.push(
-			`macos/modules/keystats/init.lua does not resolve metrics.${id} from the manifest — ` +
+			`macos/metrics/engine/init.lua does not resolve metrics.${id} from the manifest — ` +
 				'the two drivers are back to two independent privacy defaults'
 		);
 	}

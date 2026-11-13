@@ -317,7 +317,7 @@ helpers.describe("menu-state shortcut synchronization requires exact lifecycle s
 		package.loaded["menu.ui.keyboard.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
-		package.loaded["modules.keystats.text_cipher"] = { set_enabled = function() end }
+		package.loaded["metrics.engine.privacy.text_cipher"] = { set_enabled = function() end }
 		package.loaded["menu.ui.builder.state"] = nil
 		local MenuState = require("menu.ui.builder.state")
 
@@ -339,7 +339,7 @@ helpers.describe("menu-state shortcut synchronization requires exact lifecycle s
 		package.loaded["menu.ui.keyboard.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
-		package.loaded["modules.keystats.text_cipher"] = { set_enabled = function() end }
+		package.loaded["metrics.engine.privacy.text_cipher"] = { set_enabled = function() end }
 		package.loaded["menu.ui.builder.state"] = nil
 		local MenuState = require("menu.ui.builder.state")
 

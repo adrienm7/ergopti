@@ -19,7 +19,7 @@ local OWNERS = {
 	-- The record scanner memoizes one text's scans through this owner.
 	"core.text.engine.toml_codec.source_memo",
 	-- The real logger records its phase counters into this owner.
-	"infra.phase_stats",
+	"metrics.engine.perf.phase_stats",
 	-- The phase counters' bookkeeping, shared with the Linux driver.
 	"metrics.engine.perf.phase_stats_core",
 	-- The renderer configuration and the paths walk split paths through this pure owner.

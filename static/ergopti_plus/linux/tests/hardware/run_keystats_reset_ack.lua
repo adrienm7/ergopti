@@ -33,9 +33,9 @@ for _, successor in ipairs({ false, true }) do
 			Fixture.with(function(k)
 				k.init({ sqlite_path = path })
 				require("tests.support.metrics_consent_fixture").enable(k)
-				local system = require("modules.keystats.system_metrics")
+				local system = require("metrics.engine.system.metrics")
 				assert(system.sample())
-				local writer = require("modules.keystats.sqlite_writer")
+				local writer = require("metrics.engine.journal.sqlite_writer")
 				local start, operations, released = writer.start_flush, {}, false
 				writer.start_flush = function(...)
 					local native = assert(start(...))

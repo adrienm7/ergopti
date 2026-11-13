@@ -70,7 +70,7 @@ end
 helpers.describe("event taps probe", function()
 	helpers.it("(worst-hold-site) names the worst hold by file and line only", function()
 		local ports, world = make_ports()
-		world.worst = { ms = 1309.6, site = "/Users/jane/ergopti/static/ergopti_plus/macos/modules/keystats/log_manager.lua:1722" }
+		world.worst = { ms = 1309.6, site = "/Users/jane/ergopti/static/ergopti_plus/macos/metrics/engine/journal/log_manager.lua:1722" }
 		local steps = run(ports)
 		helpers.assert_eq(steps.worst_hold_ms.value, "1309")
 		helpers.assert_eq(steps.worst_hold_site.value, "log_manager:1722", "the owner to fix, with no user path")

@@ -18,7 +18,7 @@ local notifications    = require("core.ui.engine.notifications")
 local FeatureNotice    = require("menu.engine.feature_notice")
 local hotstring_editor = require("hotstrings.ui.hotstring_editor")
 local Logger           = require("core.logger.engine.logger")
-local PhaseStats       = require("infra.phase_stats")
+local PhaseStats       = require("metrics.engine.perf.phase_stats")
 local text_utils = require("core.text.engine.utils")
 local i18n             = require("core.i18n.engine.i18n")
 local ui_restore       = require("menu.engine.ui_restore")
@@ -109,7 +109,7 @@ local menu_mods = _branch_rows.wrap({
 	keyboard_layout = safe_require("layouts.ui.menu.keyboard_layout", "keyboard layout menu"),
 	hotstrings      = safe_require("hotstrings.ui.menu.hotstrings",      "hotstrings menu"),
 	llm             = safe_require("ai.ui.menu",             "AI menu"),
-	keystats       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
+	keystats       = safe_require("metrics.ui.menu.metrics",         "metrics menu"),
 	tap_holds       = safe_require("ui.menu.menu_tap_holds",    "tap-holds menu"),
 	apps            = safe_require("apps.ui.menu.apps",            "apps menu"),
 	about           = safe_require("ui.menu.menu_about",           "about/update menu"),
@@ -118,7 +118,7 @@ local menu_mods = _branch_rows.wrap({
 -- Load core modules
 local core_mods = {
 	llm           = safe_require("ai.engine", "AI engine"),
-	keystats     = safe_require("modules.keystats", "metrics engine"),
+	keystats     = safe_require("metrics.engine", "metrics engine"),
 	shortcuts_mod = safe_require("modules.shortcuts", "shortcuts engine"),
 	dyn_hot_mod   = safe_require("hotstrings.engine.dynamic", "dynamic hotstrings engine"),
 	capsword_auto_off = safe_require("keyboard.engine.capsword_auto_off", "CapsWord auto-off settings"),
@@ -999,16 +999,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			show_metrics = function()
 				-- Toggle: close if open and focused, otherwise open or present it
 				local closed = close_loaded_dashboard(
-					"ui.metrics_typing", "Typing dashboard")
+					"metrics.ui.metrics_typing", "Typing dashboard")
 				if closed ~= nil then return closed end
 				if core_mods.keystats and type(core_mods.keystats.show_metrics) == "function" then pcall(core_mods.keystats.show_metrics) end
 			end,
 			show_apps_time = function()
 				-- Toggle: close if open and focused, otherwise open or present it
 				local closed = close_loaded_dashboard(
-					"ui.metrics_apps", "Apps dashboard")
+					"metrics.ui.metrics_apps", "Apps dashboard")
 				if closed ~= nil then return closed end
-				local ok_at, at = pcall(require, "ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
+				local ok_at, at = pcall(require, "metrics.ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end,
 			open_config = function()
 				return DeferredWork.after(0, function()
@@ -1181,11 +1181,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- Both overlays expose show(), never toggle(): the toggle guard below
 		-- always failed its type check, so these two entries were silent no-ops.
 		open_metrics_typing       = function()
-			local ok, m = pcall(require, "ui.metrics_typing")
+			local ok, m = pcall(require, "metrics.ui.metrics_typing")
 			if ok and type(m.show) == "function" then pcall(m.show) end
 		end,
 		open_metrics_apps         = function()
-			local ok, m = pcall(require, "ui.metrics_apps")
+			local ok, m = pcall(require, "metrics.ui.metrics_apps")
 			if ok and type(m.show) == "function" then pcall(m.show) end
 		end,
 		open_script_source        = function() return open_async(base_dir .. "init.lua") end,
@@ -1359,11 +1359,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if scope == "metrics" then
 			if read_only_reason ~= nil then return nil end
 			if not metrics_scope then
-				metrics_scope = require("ui.menu.metrics_scope").new({
+				metrics_scope = require("metrics.ui.menu.scope").new({
 					path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					demotions = session_demotions, core = core_mods.keystats,
-					menubar = require("ui.wpm.wpm_menubar"), widget = require("ui.wpm.wpm_widget"),
+					menubar = require("metrics.ui.wpm.menubar"), widget = require("metrics.ui.wpm.widget"),
 					script_control = core_mods.shortcuts_mod,
 					activation_pending = MenuState.metrics_start_pending,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,

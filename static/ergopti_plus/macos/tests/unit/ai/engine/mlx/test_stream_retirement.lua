@@ -16,7 +16,7 @@ local OWNED = {
 	"core.ui.engine.notifications", "core.text.engine.json", "ai.engine.prediction.progressive_reveal",
 	"ai.engine.api.mlx", "ai.engine.api.mlx_fetch", "ai.engine.api.mlx_discovery",
 	"ai.engine.local_servers.mlx_stream_retirement",
-	"ai.engine.api.mlx_inference", "core.process.adapters.shell_runner", "modules.keystats",
+	"ai.engine.api.mlx_inference", "core.process.adapters.shell_runner", "metrics.engine",
 	"core.logger.engine.logger", "core.events.timer_scheduler", "core.network.adapters.http_client",
 	"ai.engine.api.common", "ai.engine.api.parser", "ai.engine.settings.profiles",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "ai.engine.api.parser_core", "ai.engine.settings.profile_selector",
@@ -36,7 +36,7 @@ local function with_stream(scenario)
 		helpers.with_stub_scope(OWNED, function()
 			local f = { native = {}, timers = {}, failures = 0 }
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-			package.loaded["modules.keystats"] = {}
+			package.loaded["metrics.engine"] = {}
 			package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }
 			package.loaded["core.events.timer_scheduler"] = {
 				now = function() return 0 end,

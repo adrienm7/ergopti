@@ -112,11 +112,11 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"ai.engine.local_servers.warmup_controller",
 	"ai.engine.api.ollama",
 	"ai.engine.api.remote",
-	"ui.wpm.wpm_menubar",
-	"ui.wpm.wpm_widget",
+	"metrics.ui.wpm.menubar",
+	"metrics.ui.wpm.widget",
 	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
-	"modules.keystats",
+	"metrics.engine",
 }
 
 --- Drives the real ScriptControl transaction over either the exact warmup-owner
@@ -208,19 +208,19 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 			pause_warmup = function() return true end,
 			resume_warmup = function() return true end,
 		}
-		package.loaded["ui.wpm.wpm_menubar"] = {
+		package.loaded["metrics.ui.wpm.menubar"] = {
 			is_running = function() return false end,
 			stop = function() return true end,
 			resume_after_pause = function() return true end,
 		}
-		package.loaded["ui.wpm.wpm_widget"] = {
+		package.loaded["metrics.ui.wpm.widget"] = {
 			is_running = function() return false end,
 			stop = function() return true end,
 			resume_after_pause = function() return true end,
 		}
 		package.loaded["keyboard.engine.runtime.onboarding"] = { stop = function() return true end }
 		package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
-		package.loaded["modules.keystats"] = { resync_context = function() return true end }
+		package.loaded["metrics.engine"] = { resync_context = function() return true end }
 
 		local ScriptControl = helpers.load_with_stubs("modules.shortcuts.script_control")
 		local pause_accepted = ScriptControl.pause_all()
@@ -314,7 +314,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			"ai.engine.api.mlx_discovery", "ai.engine.prediction.engine",
 			"ai.engine", "ai.engine.local_servers.warmup_controller", "ai.engine.prediction.prompt_builder",
 			"ai.engine.api.streaming_handler", "ai.engine.prediction.app_filter", "ai.engine.api.common",
-			"core.ui.ui.tooltip", "modules.keystats", "core.ui.engine.notifications", "platform.input.keycodes",
+			"core.ui.ui.tooltip", "metrics.engine", "core.ui.engine.notifications", "platform.input.keycodes",
 		}) do
 			saved[name] = package.loaded[name]
 		end
@@ -429,7 +429,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			show_loading = function() return true end, show_predictions = function() return true end,
 			tint = function(_) return nil end,
 		}
-		package.loaded["modules.keystats"] = {
+		package.loaded["metrics.engine"] = {
 			get_live_stats = function() return { wpm_physical = 0 } end,
 			log_llm_dismissed = function(_, _p) end,
 		}

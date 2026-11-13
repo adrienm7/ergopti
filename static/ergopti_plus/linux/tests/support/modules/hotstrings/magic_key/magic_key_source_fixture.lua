@@ -291,7 +291,7 @@ local function capture_pause_controller(Source, state)
 	local callback = assert(load("return function(paused)" .. body .. "\nend", "genuine-daemon-pause", "t", {
 		privacy_owners = {},
 		MagicKeySource = Source,
-		keystats = require("modules.keystats.keystats"),
+		keystats = require("metrics.engine.keystats"),
 		TapHold = { set_paused = function() end },
 		package = { loaded = {} },
 	}))()

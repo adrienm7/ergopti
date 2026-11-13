@@ -27,8 +27,8 @@ helpers.describe("script_control pause/resume warmup symmetry", function()
 			"ai.engine.api.mlx",
 			"ai.engine.api.ollama",
 			"ai.engine.api.remote",
-			"ui.wpm.wpm_menubar",
-			"ui.wpm.wpm_widget",
+			"metrics.ui.wpm.menubar",
+			"metrics.ui.wpm.widget",
 			"keyboard.engine.runtime.onboarding",
 			"core.ui.ui.tooltip",
 		}
@@ -67,10 +67,10 @@ helpers.describe("script_control pause/resume warmup symmetry", function()
 		}
 		package.loaded["ai.engine.api.ollama"] = { stop_warmup = function() return true end }
 		package.loaded["ai.engine.api.remote"] = { stop_warmup = function() return true end }
-		package.loaded["ui.wpm.wpm_menubar"] = {
+		package.loaded["metrics.ui.wpm.menubar"] = {
 			is_running = function() return false end,
 		}
-		package.loaded["ui.wpm.wpm_widget"] = {
+		package.loaded["metrics.ui.wpm.widget"] = {
 			is_running = function() return false end,
 		}
 		package.loaded["keyboard.engine.runtime.onboarding"] = { stop = function() return true end }

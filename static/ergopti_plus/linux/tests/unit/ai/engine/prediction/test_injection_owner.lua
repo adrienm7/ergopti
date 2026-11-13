@@ -21,7 +21,7 @@ local function scenario(action, phase, body)
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
 		end
-		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
+		for _, name in ipairs({ "metrics.engine.focus_guard", "metrics.engine.keystats", "platform.focus.secure_field_detector",
 			"clipboard.adapters.clipboard", "layouts.adapters.keyboard_layout", "hotstrings.engine.injector" }) do package.loaded[name] = nil end
 		local state = { logs = {}, bus = ":1.23", path = "/field/original", role = 61, now = 1000,
 			rows = {}, held = {}, writes = {}, requests = {}, errors = {}, stopped = 0, resets = 0, output = 0, paused = false,
@@ -31,7 +31,7 @@ local function scenario(action, phase, body)
 		logger.set_sink(function(line) state.logs[#state.logs + 1] = line end)
 		logger.set_error_observer(function(_, template) state.errors[#state.errors + 1] = template end)
 		package.loaded["core.logger.engine.shim"] = logger
-		local policy = require("modules.keystats.keystats")
+		local policy = require("metrics.engine.keystats")
 		local configuration = assert(policy.configuration_snapshot()); configuration.private_filter_enabled = false
 		assert(policy.apply_configuration(configuration))
 		package.loaded["ai.engine.preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = {
@@ -60,7 +60,7 @@ local function scenario(action, phase, body)
 			snapshot = function() return receipt end,
 			invalidate = function() receipt = nil; listener(nil) end,
 		}
-		guard = require("modules.keystats.focus_guard").new({ watch = watch,
+		guard = require("metrics.engine.focus_guard").new({ watch = watch,
 			detector = require("platform.focus.secure_field_detector"), keystats = policy, prediction = engine,
 			now_ms = function() return state.now end,
 			capture_context = function() return { app_id = "owned-editor", title = "owned-field", native_identity = "owned-window" } end,

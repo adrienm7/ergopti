@@ -20,7 +20,7 @@ local function with_capture(body)
 	package.loaded["core.logger.engine.logger"] = nil
 	local Fresh = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(Fresh)
-	local PhaseStats = require("infra.phase_stats")
+	local PhaseStats = require("metrics.engine.perf.phase_stats")
 	PhaseStats.reset()
 	local hs = _G.hs
 	local saved = {

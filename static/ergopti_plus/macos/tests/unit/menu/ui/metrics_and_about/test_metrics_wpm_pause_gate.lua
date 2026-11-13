@@ -19,11 +19,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu_metrics: WPM widget/menubar are pause-gated in build (F-MED-6)", function()
 	local function read_src()
-		-- Selected by a declaration unique to ui/menu/menu_metrics.lua rather than by
+		-- Selected by a declaration unique to metrics/ui/menu/metrics.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("\"dialog.metrics.security_warning_title\"")
-		helpers.assert_true(src ~= nil, "ui/menu/menu_metrics.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "metrics/ui/menu/metrics.lua source must be locatable")
 		return src
 	end
 

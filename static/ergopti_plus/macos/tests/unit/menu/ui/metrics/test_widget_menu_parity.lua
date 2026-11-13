@@ -21,7 +21,7 @@ require("tests.lua.metrics.widget_menu_contract").register(helpers, {
 	declared = declared,
 	translate = function(key) return require("core.i18n.engine.i18n").get(key) end,
 	build = function(values)
-		local menu = helpers.load_with_stubs("ui.menu.menu_metrics")
+		local menu = helpers.load_with_stubs("metrics.ui.menu.metrics")
 		return menu.build({
 			state = {
 				keystats_enabled = values.keystats_enabled,

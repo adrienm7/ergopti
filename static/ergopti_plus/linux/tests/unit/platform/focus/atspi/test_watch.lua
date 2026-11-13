@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local Watch = require("platform.focus.atspi_focus_watch")
-local Guard = require("modules.keystats.focus_guard")
+local Guard = require("metrics.engine.focus_guard")
 
 helpers.describe("native focus descriptor close receipts", function()
 	for _, refused in ipairs({ 41, 42, "throw" }) do

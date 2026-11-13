@@ -1088,7 +1088,7 @@ _PrefixStampCompletedInput(Char) {
 
 ; Profiling shim around _OnPrefixChar: times the entire per-keystroke match +
 ; render path with sub-millisecond precision and logs only keystrokes slower than
-; the threshold (see infra/hotpath_profiler.ahk). The InputHook binds here rather
+; the threshold (see metrics/engine/perf/hotpath_profiler.ahk). The InputHook binds here rather
 ; than directly to _OnPrefixChar so the timing wraps every one of the hot
 ; function's return paths without touching the function itself. Timing does not
 ; require the character: passing it would disclose typing at WARNING level.

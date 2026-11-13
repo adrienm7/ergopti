@@ -29,7 +29,7 @@ local function routed_gestures()
 		event_loop = "core.events.loop",
 		combo = "gestures.engine.combo_emitter",
 		injector = "hotstrings.engine.injector",
-		keystats = "modules.keystats.keystats",
+		keystats = "metrics.engine.keystats",
 	}
 	local log = { presses = {}, injected = {}, transformed = {} }
 	package.loaded[names.clipboard] = {

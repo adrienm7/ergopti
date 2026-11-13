@@ -48,9 +48,9 @@ return function()
 			"walk_typing", "walk_app_switch", "walk_window_switch", "walk_system_event" }) do
 			aggregator[key] = function() return true end
 		end
-		package.loaded["modules.keystats.aggregator"] = aggregator
-		local export = helpers.load_with_stubs("modules.keystats.export")
-		package.loaded["modules.keystats.export"] = { cleanup = function() return true end,  init = function() end,
+		package.loaded["metrics.engine.aggregator.aggregator"] = aggregator
+		local export = helpers.load_with_stubs("metrics.engine.reader.export")
+		package.loaded["metrics.engine.reader.export"] = { cleanup = function() return true end,  init = function() end,
 			sync_foreign_data_sql = function() return {} end, _last_complete_batch_offset = export._last_complete_batch_offset }
 		local db, opened, timers, offset = nil, false, {}, nil
 		local path = temporary .. "/metrics/by_device/device/data.sql"
@@ -76,17 +76,17 @@ return function()
 		writer.get_next_event_id = function() return 101 end
 		writer.set_next_event_id = function() end
 		writer.persist_next_event_id = function() return true end
-		package.loaded["modules.keystats.sqlite_writer"] = writer
+		package.loaded["metrics.engine.journal.sqlite_writer"] = writer
 		-- The fresh-cache replay publishes its cursor when it ends (L64), after
 		-- Rotation.init received the fresh cache's 0.
 		local rotation = { init = function(options) offset = options.today_log_offset end,
 			set_offset = function(value) offset = value end,
 			is_initialized = function() return true end, read_new_entries = function() return {}, 0, "eof" end }
-		package.loaded["modules.keystats.rotation"] = rotation
+		package.loaded["metrics.engine.journal.rotation"] = rotation
 		local phase = assert(os.getenv("ERGOPTI_LEDGER_IO_PHASE"))
 		local original_open = io.open
 		local lfs = require("lfs")
-		local manager = helpers.load_with_stubs("modules.keystats.log_manager", {
+		local manager = helpers.load_with_stubs("metrics.engine.journal.log_manager", {
 			fs = { attributes = lfs.attributes, dir = lfs.dir, mkdir = lfs.mkdir, symlinkAttributes = lfs.symlinkattributes },
 			execute = function() return "fixture-host-identity" end,
 			timer = { absoluteTime = function() return 1000000000 end, secondsSinceEpoch = function() return 1 end,

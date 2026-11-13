@@ -176,7 +176,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			"hotstrings.engine.expander.utils",
 			"ai.engine",
 			"ai.engine.prediction.engine",
-			"modules.keystats",
+			"metrics.engine",
 			"core.ui.ui.tooltip",
 			"ai.engine.bridge",
 		}
@@ -226,7 +226,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			get_llm_enabled = function() return false end,
 			reset = function() reset_count = reset_count + 1; return true end,
 		}
-		package.loaded["modules.keystats"] = {}
+		package.loaded["metrics.engine"] = {}
 		package.loaded["core.ui.ui.tooltip"] = {
 			set_runtime_guard = function() end,
 			set_accept_callback = function() end,

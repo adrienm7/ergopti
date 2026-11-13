@@ -18,9 +18,9 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local Keystats = require("modules.keystats.keystats")
-local Writer = require("modules.keystats.sqlite_writer")
-local Reader = require("modules.keystats.sqlite_reader")
+local Keystats = require("metrics.engine.keystats")
+local Writer = require("metrics.engine.journal.sqlite_writer")
+local Reader = require("metrics.engine.reader.sqlite_reader")
 local database = root .. "/metrics.sqlite"
 local today = os.date("%Y-%m-%d")
 -- An elapsed 24 hours can still be today on a 25-hour local calendar day.

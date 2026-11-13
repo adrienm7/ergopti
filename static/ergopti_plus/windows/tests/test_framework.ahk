@@ -788,11 +788,11 @@ global TEST_MODULE_GROUPS := [
 	; Keyboard remapping, layouts and gestures.
 	["keymap-gestures", "^unit/(platform/remap|modules/(keymap|gestures))/"],
 	; Keystats capture, storage and metrics.
-	["keystats", "^unit/modules/keystats/"],
+	["keystats", "^unit/metrics/"],
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
 	["ui", "^unit/"],
 	; Adapters, platform services, shared infrastructure and the test runner.
-	["core", "^unit/(adapters|platform|infra|suite|core|settings|menu|tray|ai|apps|clipboard|diagnostics|gestures|hotstrings|keyboard|layouts)/"]
+	["core", "^unit/(adapters|platform|infra|suite|core|settings|menu|tray|ai|apps|clipboard|diagnostics|gestures|hotstrings|keyboard|layouts|metrics)/"]
 ]
 
 ; The test category of a registering test file; a file no category declares is refused.

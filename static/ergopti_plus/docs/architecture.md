@@ -37,7 +37,6 @@ graph TD
 
     subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
         LINUX_window_switch["WindowSwitch.lua"]
-        LINUX_wpm_surface["WpmSurface.lua"]
     end
 
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]

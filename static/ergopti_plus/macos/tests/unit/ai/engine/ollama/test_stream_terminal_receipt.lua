@@ -31,7 +31,7 @@ end
 --- @param case table Transport chunks and expected terminal result.
 local function run_case(case)
 	helpers.with_stub_scope({ "ai.engine.api.ollama", "ai.engine",
-		"modules.keystats", "ai.engine.api.common", "ai.engine.settings.profiles",
+		"metrics.engine", "ai.engine.api.common", "ai.engine.settings.profiles",
 		"ai.engine.ollama.endpoint", "ai.engine.prediction.progressive_reveal",
 		"core.fs.adapters.storage", "core.fs.adapters.file_system", "core.ui.engine.notifications",
 		"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
@@ -43,7 +43,7 @@ local function run_case(case)
 		assert(file:close())
 		local defaults = assert(require("core.text.engine.json").decode(raw))
 		package.loaded["ai.engine"] = { DEFAULT_STATE = defaults }
-		package.loaded["modules.keystats"] = { log_llm = function() end }
+		package.loaded["metrics.engine"] = { log_llm = function() end }
 		local api = helpers.load_with_stubs("ai.engine.api.ollama")
 		local stream = upvalue(api.fetch_batch, "post_and_parse_streaming")
 		local shell = upvalue(stream, "ShellRunner")

@@ -14,14 +14,14 @@ local MODULE_KEYS = {
 	"core.fs.adapters.file_system",
 	"core.timing.engine.timings",
 	"metrics.engine.metrics",
-	"modules.keystats.aggregator",
-	"modules.keystats.export",
-	"core.fs.adapters.ledger_append", "modules.keystats.log_manager",
-	"modules.keystats.rotation",
-	"modules.keystats.sqlite_writer",
+	"metrics.engine.aggregator.aggregator",
+	"metrics.engine.reader.export",
+	"core.fs.adapters.ledger_append", "metrics.engine.journal.log_manager",
+	"metrics.engine.journal.rotation",
+	"metrics.engine.journal.sqlite_writer",
 	"core.logger.engine.logger",
 	"core.events.timer_scheduler",
-	"modules.keystats.timestamp",
+	"metrics.engine.journal.timestamp",
 }
 
 --- Runs both ingest retries inside one isolated module and native scope.
@@ -74,7 +74,7 @@ local function run_refused_transaction(failure)
 			sec = function() return 1 end,
 		}
 		package.loaded["metrics.engine.metrics"] = {}
-		package.loaded["modules.keystats.aggregator"] = {
+		package.loaded["metrics.engine.aggregator.aggregator"] = {
 			flush = function() return true end,
 			get_ngram_ctx = function() return {} end,
 			reset_batch = function() observations.resets = observations.resets + 1 end,
@@ -82,11 +82,11 @@ local function run_refused_transaction(failure)
 			set_ngram_ctx = function() end,
 			walk_system_event = function() end,
 		}
-		package.loaded["modules.keystats.export"] = {
+		package.loaded["metrics.engine.reader.export"] = {
 			cleanup = function() return true end,
 			sync_foreign_data_sql = function() return {} end,
 		}
-		package.loaded["modules.keystats.rotation"] = {
+		package.loaded["metrics.engine.journal.rotation"] = {
 			get_date = function() return "2026-08-25" end,
 			get_offset = function() return 0 end,
 			read_new_entries = function()
@@ -95,7 +95,7 @@ local function run_refused_transaction(failure)
 			end,
 			set_offset = function() observations.offset_writes = observations.offset_writes + 1 end,
 		}
-		package.loaded["modules.keystats.sqlite_writer"] = {
+		package.loaded["metrics.engine.journal.sqlite_writer"] = {
 			build_inserts = function()
 				observations.builds = observations.builds + 1
 				next_event_id = next_event_id + 1
@@ -107,7 +107,7 @@ local function run_refused_transaction(failure)
 			set_next_event_id = function(value) next_event_id = value end,
 		}
 
-		package.loaded["modules.keystats.log_manager"] = nil
+		package.loaded["metrics.engine.journal.log_manager"] = nil
 		local manager = EmptyLedger.load()
 		manager.ingest_once()
 		manager.ingest_once()

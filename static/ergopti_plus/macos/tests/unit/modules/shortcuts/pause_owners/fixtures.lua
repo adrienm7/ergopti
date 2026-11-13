@@ -191,12 +191,12 @@ local function load_inventory_context(options)
 		pause_warmup = invoke("remote_warmup", "pause"),
 		resume_warmup = invoke("remote_warmup", "resume"),
 	}
-	package.loaded["ui.wpm.wpm_menubar"] = {
+	package.loaded["metrics.ui.wpm.menubar"] = {
 		is_running = function() return ctx.active.wpm_menubar end,
 		stop = invoke("wpm_menubar", "pause"),
 		resume_after_pause = invoke("wpm_menubar", "resume"),
 	}
-	package.loaded["ui.wpm.wpm_widget"] = {
+	package.loaded["metrics.ui.wpm.widget"] = {
 		is_running = function() return ctx.active.wpm_widget end,
 		stop = invoke("wpm_widget", "pause"),
 		resume_after_pause = invoke("wpm_widget", "resume"),
@@ -207,7 +207,7 @@ local function load_inventory_context(options)
 	package.loaded["core.ui.ui.tooltip"] = {
 		hide_forced = invoke("tooltip", "pause"),
 	}
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		resync_context = function() return true end,
 		log_shortcut = function() end,
 	}

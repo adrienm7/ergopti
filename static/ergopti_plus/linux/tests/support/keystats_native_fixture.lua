@@ -13,8 +13,8 @@ local helpers = require("tests.helpers")
 local Timings = require("core.timing.engine.timings")
 local uv = require("luv")
 
-local MODULES = { "modules.keystats.keystats", "modules.keystats.metrics_collector", "modules.keystats.sqlite_writer",
-	"modules.keystats.roi_policy" }
+local MODULES = { "metrics.engine.keystats", "metrics.engine.collector", "metrics.engine.journal.sqlite_writer",
+	"metrics.engine.privacy.roi_policy" }
 
 -- Public vocabulary; true marks a physical phase that can own a native child.
 -- Unknown phases cannot claim new wait budgets.
@@ -89,7 +89,7 @@ function M.with(body)
 	local previous_storage = package.loaded["core.fs.adapters.storage"]
 	local collector
 	local ok, err = xpcall(function()
-		collector = require("modules.keystats.keystats")
+		collector = require("metrics.engine.keystats")
 		body(collector)
 	end, debug.traceback)
 	local cleanup_ok, cleanup_err = pcall(function()

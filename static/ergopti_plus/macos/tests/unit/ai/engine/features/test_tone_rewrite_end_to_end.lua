@@ -208,7 +208,7 @@ local function build_world(selection)
 		name = "ToneApp", bundleID = "test.tone", path = "/Applications/Tone.app",
 	})
 	package.loaded["modules.shortcuts.script_control"] = nil
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end,
 		log_llm_failed = function() end,

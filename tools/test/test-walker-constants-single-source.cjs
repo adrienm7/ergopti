@@ -42,12 +42,12 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const P = (rel) => path.join(ROOT, 'static/ergopti_plus', rel);
 
 const SHARED = '_shared/metrics/engine/aggregator/helpers.lua';
-const AHK_WALKER = 'windows/modules/keystats/keystats_walker_core.ahk';
+const AHK_WALKER = 'windows/metrics/engine/walker/walker_core.ahk';
 const HS_AGGREGATOR = [
-	'macos/modules/keystats/aggregator/core.lua',
-	'macos/modules/keystats/aggregator/events.lua',
-	'macos/modules/keystats/aggregator/sql.lua',
-	'macos/modules/keystats/aggregator/state.lua'
+	'macos/metrics/engine/aggregator/core.lua',
+	'macos/metrics/engine/aggregator/events.lua',
+	'macos/metrics/engine/aggregator/sql.lua',
+	'macos/metrics/engine/aggregator/state.lua'
 ];
 
 const errors = [];

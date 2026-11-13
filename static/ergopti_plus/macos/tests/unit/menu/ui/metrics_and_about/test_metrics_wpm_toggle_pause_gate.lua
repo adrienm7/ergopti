@@ -13,15 +13,15 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local MetricsState = require("infra.metrics_state_keys")
+local MetricsState = require("metrics.engine.state_keys")
 
 helpers.describe("menu_metrics WPM toggle handlers gate start() on pause", function()
 	local function read_src()
-		-- Selected by a declaration unique to ui/menu/menu_metrics.lua rather than by
+		-- Selected by a declaration unique to metrics/ui/menu/metrics.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local s = helpers.read_driver_source("\"dialog.metrics.security_warning_title\"")
-		helpers.assert_true(s ~= nil, "ui/menu/menu_metrics.lua source must be locatable")
+		helpers.assert_true(s ~= nil, "metrics/ui/menu/metrics.lua source must be locatable")
 		return s
 	end
 

@@ -46,7 +46,7 @@ helpers.describe("wpm_widget.resolve_shared_constants_path", function()
 		-- — makes resolve_shared_constants_path log exactly that and the widget go
 		-- non-functional at boot (project-shared-tree-layout bypass gotcha).
 		log_calls = {}
-		local WpmWidget = helpers.load_with_stubs("ui.wpm.wpm_widget")
+		local WpmWidget = helpers.load_with_stubs("metrics.ui.wpm.widget")
 		helpers.assert_true(WpmWidget ~= nil, "wpm_widget module must load")
 
 		local not_found = {}

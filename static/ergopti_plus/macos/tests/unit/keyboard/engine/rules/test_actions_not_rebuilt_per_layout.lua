@@ -135,7 +135,7 @@ helpers.describe("karabiner actions: a layout change re-resolves, not rebuilds",
 	-- keycode lookups hold it.
 	helpers.it("times the registry snapshot and the keycode lookups apart", function()
 		local Config = load_config()
-		local Phases = require("infra.phase_stats")
+		local Phases = require("metrics.engine.perf.phase_stats")
 		Phases.reset()
 		Config.resolve_layout_actions({ { id = "x", logical_char = "e" } })
 		for _, name in ipairs({ "karabiner.layout_actions.keyboard_form", "karabiner.layout_actions.key_codes" }) do

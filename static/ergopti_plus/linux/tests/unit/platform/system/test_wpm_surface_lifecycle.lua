@@ -10,9 +10,9 @@
 local helpers = require("tests.helpers")
 
 local function with_surface(body)
-	local previous = package.loaded["adapters.wpm_surface"]
-	package.loaded["adapters.wpm_surface"] = nil
-	local surface = require("adapters.wpm_surface")
+	local previous = package.loaded["metrics.adapters.wpm_surface"]
+	package.loaded["metrics.adapters.wpm_surface"] = nil
+	local surface = require("metrics.adapters.wpm_surface")
 	local state = { visible = false }
 	local window = setmetatable({
 		get_screen = function() return { get_rgba_visual = function() return nil end } end,
@@ -28,7 +28,7 @@ local function with_surface(body)
 		Gdk = { EventMask = { BUTTON_PRESS_MASK = 1, BUTTON_RELEASE_MASK = 2, POINTER_MOTION_MASK = 4 } },
 	})
 	local ok, err = pcall(body, surface, state)
-	package.loaded["adapters.wpm_surface"] = previous
+	package.loaded["metrics.adapters.wpm_surface"] = previous
 	if not ok then error(err, 0) end
 end
 

@@ -20,7 +20,7 @@ local hs = hs
 local ok_utils, km_utils = pcall(require, "hotstrings.engine.expander.utils")
 if not ok_utils then km_utils = nil end
 
-local ok_kl, keystats = pcall(require, "modules.keystats")
+local ok_kl, keystats = pcall(require, "metrics.engine")
 if not ok_kl then keystats = nil end
 
 local SharedEngine = require("hotstrings.engine.dynamic.core")

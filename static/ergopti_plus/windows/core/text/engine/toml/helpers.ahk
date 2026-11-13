@@ -29,7 +29,7 @@
 ;    changed unrepresentable namespaces refuse before any staging write.
 ; ==============================================================================
 
-#Include ../../../../infra/phase_stats.ahk
+#Include ../../../../metrics/engine/perf/phase_stats.ahk
 
 #Requires Autohotkey v2.0+
 

@@ -17,7 +17,7 @@ local function with_manager(selected, body)
 		event_loop = "core.events.loop",
 		combo = "gestures.engine.combo_emitter",
 		injector = "hotstrings.engine.injector",
-		keystats = "modules.keystats.keystats",
+		keystats = "metrics.engine.keystats",
 		hook = "platform.input.keyboard_hook",
 	}
 	local previous = {}
@@ -271,7 +271,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 	helpers.it("rechecks a real reservation acquired inside protected metric delivery (selection-caps-word)", function()
 		with_caps_word_menu(function(manager, row, changed)
 			local owner, observed = {}, {}
-			package.loaded["modules.keystats.keystats"].record_shortcut = function(_, key)
+			package.loaded["metrics.engine.keystats"].record_shortcut = function(_, key)
 				observed.key = key
 				observed.acquired = manager.acquire_configuration(owner)
 			end
@@ -283,7 +283,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 			helpers.assert_eq(manager.configuration_snapshot(owner).caps_word_active, false)
 			helpers.assert_eq(changed.count, 0)
 			helpers.assert_eq(manager.release_configuration(owner), true)
-			package.loaded["modules.keystats.keystats"].record_shortcut = function() end
+			package.loaded["metrics.engine.keystats"].record_shortcut = function() end
 			helpers.assert_eq(row().fn(), true)
 			helpers.assert_eq(manager.is_caps_word_active(), true)
 		end)
@@ -292,7 +292,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 	helpers.it("keeps a metric callback's acknowledged reservation even when it throws (selection-caps-word)", function()
 		with_caps_word_menu(function(manager, row, changed)
 			local owner, observed = {}, {}
-			package.loaded["modules.keystats.keystats"].record_shortcut = function()
+			package.loaded["metrics.engine.keystats"].record_shortcut = function()
 				observed.acquired = manager.acquire_configuration(owner)
 				error("controlled metric failure after reservation")
 			end
@@ -410,7 +410,7 @@ helpers.describe("shared selection case command ownership", function()
 		helpers.it("rechecks " .. vector.id .. " reservation after protected metrics (selection-case-command)", function()
 			with_case_menu(function(manager, item, observed)
 				local owner = {}
-				package.loaded["modules.keystats.keystats"].record_shortcut = function(_, key)
+				package.loaded["metrics.engine.keystats"].record_shortcut = function(_, key)
 					observed.metric_key = key
 					observed.acquired = manager.acquire_configuration(owner)
 					error("controlled metric refusal after reservation")
@@ -422,7 +422,7 @@ helpers.describe("shared selection case command ownership", function()
 				helpers.assert_eq(observed.clipboard_calls, 0)
 				helpers.assert_eq(observed.replacement, nil)
 				helpers.assert_eq(manager.release_configuration(owner), true)
-				package.loaded["modules.keystats.keystats"].record_shortcut = function() end
+				package.loaded["metrics.engine.keystats"].record_shortcut = function() end
 				helpers.assert_eq(item(vector.label_key).fn(), true)
 				helpers.assert_eq(observed.clipboard_calls, 1)
 			end)
@@ -489,7 +489,7 @@ helpers.describe("shared selection case command ownership", function()
 			helpers.assert_eq(manager.transform_to_titlecase(), true)
 			helpers.assert_eq(observed.replacement, "«Été» Straße Москва")
 			local owner = {}
-			package.loaded["modules.keystats.keystats"].record_shortcut = function()
+			package.loaded["metrics.engine.keystats"].record_shortcut = function()
 				observed.acquired = manager.acquire_configuration(owner)
 			end
 			local before = observed.clipboard_calls

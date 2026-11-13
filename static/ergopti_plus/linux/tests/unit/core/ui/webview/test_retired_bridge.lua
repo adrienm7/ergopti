@@ -18,7 +18,7 @@ local function with_manager(run)
 	manager.build_page_html = function() return "owned page fixture" end
 	manager._create_gtk_window = function() return true end
 	local calls = {}
-	local name = "ui.metrics_typing.bridge"
+	local name = "metrics.ui.metrics_typing.bridge"
 	local previous = package.loaded[name]
 	package.loaded[name] = {
 		bridge_name = "metrics_typing_bridge",

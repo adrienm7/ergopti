@@ -457,11 +457,11 @@
 			"proof_tier": "integration",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/keystats/keystats.lua",
-				"static/ergopti_plus/linux/modules/keystats/metrics_collector.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/keystats/privacy/test_keystats_privacy_filters.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/keystats/core/test_metrics_toggles_persist.lua",
-				"static/ergopti_plus/linux/tests/unit/ui/metrics/test_wpm_readouts.lua",
+				"static/ergopti_plus/linux/metrics/engine/keystats.lua",
+				"static/ergopti_plus/linux/metrics/engine/collector.lua",
+				"static/ergopti_plus/linux/tests/unit/metrics/engine/privacy/test_filters.lua",
+				"static/ergopti_plus/linux/tests/unit/metrics/engine/core/test_toggles_persist.lua",
+				"static/ergopti_plus/linux/tests/unit/metrics/ui/test_wpm_readouts.lua",
 				"static/ergopti_plus/linux/tests/hardware/run_wpm_readouts_live.lua"
 			]
 		},
@@ -1212,7 +1212,7 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/keystats/keystats.lua",
+				"static/ergopti_plus/linux/metrics/engine/keystats.lua",
 				"static/ergopti_plus/linux/apps/ui/menu/exclusion_rows.lua",
 				"static/ergopti_plus/linux/menu/ui/builder/builder.lua",
 				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_metrics_preferences.lua"

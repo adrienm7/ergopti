@@ -7,9 +7,9 @@
 --- path points to a disposable synthetic identity; no physical input is used.
 --- ==============================================================================
 local uv = require("luv")
-local Writer = require("modules.keystats.sqlite_writer")
-local Cipher = require("modules.keystats.text_cipher")
-local Migration = require("modules.keystats.text_migration")
+local Writer = require("metrics.engine.journal.sqlite_writer")
+local Cipher = require("metrics.engine.privacy.text_cipher")
+local Migration = require("metrics.engine.privacy.text_migration")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-exact-ids-XXXXXX"))
 local machine = assert(io.open(root .. "/machine-id", "wb"))
 assert(machine:write("0123456789abcdef0123456789abcdef\n")); assert(machine:close())

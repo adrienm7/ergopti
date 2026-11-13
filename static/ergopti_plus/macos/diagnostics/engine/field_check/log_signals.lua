@@ -55,7 +55,7 @@ M.ERROR_SIGNALS = {
 	{ step = "log_window_toggle_errors", name = "window_toggle" },
 	-- hotstrings/engine/dynamic: a personal or dynamic start rolled back.
 	{ step = "log_start_rollbacks", name = "start_rollback" },
-	-- modules/keystats: a day rollover that skipped or stalled its rotation.
+	-- metrics: a day rollover that skipped or stalled its rotation.
 	{ step = "log_keystats_rotation_warnings", name = "rotation_warning" },
 	-- ai/ui/menu/models/manager_ollama.lua: a pull that failed its digest check.
 	{ step = "log_digest_mismatches", name = "digest_mismatch" },

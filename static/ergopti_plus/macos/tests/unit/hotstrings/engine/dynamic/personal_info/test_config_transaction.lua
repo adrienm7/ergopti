@@ -11,7 +11,7 @@ local helpers = require('tests.helpers')
 local modules = {
 	'hotstrings.engine.dynamic.personal_info', 'core.fs.adapters.file_system',
 	'core.logger.engine.logger', 'platform.input.synthetic_input', 'hotstrings.ui.personal_info_editor',
-	'modules.keystats',
+	'metrics.engine',
 	'menu.engine.manifest_reader', 'hotstrings.engine.catalogue.personal_info_fields',
 }
 local function with_subject(content, run)
@@ -35,7 +35,7 @@ local function with_subject(content, run)
 		package.loaded['core.logger.engine.logger'] = logger
 		package.loaded['platform.input.synthetic_input'] = {}
 		package.loaded['hotstrings.ui.personal_info_editor'] = {}
-		package.loaded['modules.keystats'] = {}
+		package.loaded['metrics.engine'] = {}
 		local subject = require('hotstrings.engine.dynamic.personal_info')
 		local keymap = {
 			get_trigger_char = function() return '@' end,

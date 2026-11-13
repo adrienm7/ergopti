@@ -219,7 +219,8 @@ try {
 						'gestures',
 						'hotstrings',
 						'keyboard',
-						'layouts'
+						'layouts',
+						'metrics'
 					])
 		);
 		reset();

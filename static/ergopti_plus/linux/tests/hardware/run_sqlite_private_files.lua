@@ -39,8 +39,8 @@ end
 if arg[2] == "close-refusal" then
 	Private = require("core.fs.engine.private_sqlite_file")
 	require("tests.support.metrics_preferences_fixture").with(function()
-		local writer = require("modules.keystats.sqlite_writer")
-		local collector = require("modules.keystats.keystats")
+		local writer = require("metrics.engine.journal.sqlite_writer")
+		local collector = require("metrics.engine.keystats")
 		local open, close = uv.fs_open, uv.fs_close
 		local owned, opens, closes = nil, 0, 0
 		uv.fs_open = function(path, ...)
@@ -71,7 +71,7 @@ local ok, failure = xpcall(function()
 		Fixture.with(function(k)
 			k.init({ sqlite_path = database, log_dir = directory })
 			require("tests.support.metrics_consent_fixture").enable(k)
-			local writer = require("modules.keystats.sqlite_writer")
+			local writer = require("metrics.engine.journal.sqlite_writer")
 			assert(writer.is_available())
 			assert(uv.fs_stat(database).mode % 4096 == 384, "new SQLite database must be private under ambient umask")
 			Private = require("core.fs.engine.private_sqlite_file")
@@ -112,7 +112,7 @@ local ok, failure = xpcall(function()
 			assert(writer.query_rows("SELECT text FROM events_typing;")[1] == token)
 			-- Observe real companion creation while the native CLI transaction is
 			-- still open; the canonical command boundary owns its original umask.
-			local Command = require("modules.keystats.sqlite_command")
+			local Command = require("metrics.engine.journal.sqlite_command")
 			local quote = require("core.text.engine.utils_core").shell_quote
 			local function sql_output(sql)
 				local command = assert(Command.build(database, sql, { capture_stderr = true, capture_exit = true }))

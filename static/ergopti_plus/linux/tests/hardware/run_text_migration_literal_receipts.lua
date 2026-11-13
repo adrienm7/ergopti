@@ -9,9 +9,9 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Writer = require("modules.keystats.sqlite_writer")
-local Cipher = require("modules.keystats.text_cipher")
-local Migration = require("modules.keystats.text_migration")
+local Writer = require("metrics.engine.journal.sqlite_writer")
+local Cipher = require("metrics.engine.privacy.text_cipher")
+local Migration = require("metrics.engine.privacy.text_migration")
 local TextCrypto = require("metrics.engine.privacy.text_crypto")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-migration-literals-XXXXXX"))
 local machine = assert(io.open(root .. "/machine-id", "wb"))

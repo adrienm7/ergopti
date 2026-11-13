@@ -56,7 +56,7 @@ end
 --- @param body function Functional test body.
 --- @param options table|nil Initial values and refused-write switch.
 function M.with(body, options)
-	local preferences = require("infra.metrics_preferences")
+	local preferences = require("metrics.engine.preferences")
 	local old_snapshot, old_get, old_set = preferences.snapshot, preferences.get, preferences.set
 	local fake = M.new(options)
 	preferences.snapshot = fake.snapshot

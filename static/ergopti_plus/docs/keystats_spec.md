@@ -7,7 +7,7 @@ synchronisation entre plusieurs machines (mac + pc + autre mac…) avec
 via du caching en base.
 
 Toutes les références à des numéros de ligne renvoient à
-`static/ergopti_plus/macos/modules/keystats/{init,log_manager,context_tracker,kc_bridge}.lua`.
+`static/ergopti_plus/macos/metrics/{init,log_manager,context_tracker,kc_bridge}.lua`.
 
 ---
 
@@ -282,7 +282,7 @@ joint sur device_id pour router vers le mapping macOS ou Windows.
 ## 11. Plan d’architecture AHK
 
 ```
-static/ergopti_plus/windows/modules/keystats/
+static/ergopti_plus/windows/metrics/engine/
   init.ahk           ; api publique
   event_loop.ahk     ; hook clavier/souris bas-niveau, pipeline filtres
   buffer.ahk         ; buffer_events / rich_chunks / synth_queue
@@ -1081,7 +1081,7 @@ Séance 2 (extraction UI partagée + branchement HS) :
 - `static/ergopti_plus/_shared/scripts/data_sql_parser.lua` — utilitaire
   partagé pour parser les batches data.sql (utilisé par le replay HS,
   servira aussi côté AHK).
-- Mise à jour de `static/ergopti_plus/macos/modules/keystats/log_manager.lua`
+- Mise à jour de `static/ergopti_plus/macos/metrics/engine/journal/log_manager.lua`
   pour écrire `today.log` (JSONL) + `data.sql` (texte append-only) +
   `db.sqlite` dans tmpdir, au lieu de .log + .idx + manifest.json.
 - Mise à jour de `static/ergopti_plus/macos/ui/metrics_*/init.lua`
@@ -1089,7 +1089,7 @@ Séance 2 (extraction UI partagée + branchement HS) :
 
 Séance 3 (port AHK keystats) :
 
-- Tout sous `static/ergopti_plus/windows/modules/keystats/` (cf. §11).
+- Tout sous `static/ergopti_plus/windows/metrics/engine/` (cf. §11).
 - Tests unitaires AHK qui valident la parité byte-pour-byte de `data.sql`
   généré par AHK vs HS pour des inputs identiques (modulo timestamps et
   device_id).

@@ -179,13 +179,13 @@ check(
 	'purge-schema-installed: every driver installs the triggers where it opens or replays a store',
 	() => {
 		for (const relative of [
-			'linux/modules/keystats/sqlite_writer.lua',
-			'macos/modules/keystats/sqlite_writer.lua',
-			'windows/modules/keystats/keystats_reader_db.ahk'
+			'linux/metrics/engine/journal/sqlite_writer.lua',
+			'macos/metrics/engine/journal/sqlite_writer.lua',
+			'windows/metrics/engine/reader/db.ahk'
 		])
 			assert.match(read(relative), /data[\\/]+db[\\/]+purge_schema\.sql/, relative);
 		assert.match(
-			read('windows/modules/keystats/keystats_reader_db.ahk'),
+			read('windows/metrics/engine/reader/db.ahk'),
 			/KLR_ApplyIncremental\(db, tails, logPath\) \{[\s\S]{0,400}KLR_LoadPurgeSchema\(db\)/,
 			'a restored Windows image installs the triggers before applying a tail'
 		);
@@ -193,7 +193,7 @@ check(
 );
 
 check('windows-vectors: the Windows module renders the shared names and tombstone', () => {
-	const source = read('windows/modules/keystats/keystats_maintenance.ahk');
+	const source = read('windows/metrics/engine/journal/maintenance.ahk');
 	assert.ok(source.includes(`TOMBSTONE_ACTION := "${VECTORS.tombstone.action}"`));
 	assert.ok(source.includes(`EXPORT_PREFIX := "${VECTORS.export.prefix}"`));
 	assert.ok(source.includes(`EXPORT_EXTENSION := "${VECTORS.export.extension}"`));
@@ -206,7 +206,7 @@ check('windows-vectors: the Windows module renders the shared names and tombston
 		'the tombstone carries the UTC instant of its journal stamp'
 	);
 	assert.match(
-		read('windows/modules/keystats/keystats_sql.ahk'),
+		read('windows/metrics/engine/journal/sql.ahk'),
 		/KL_EventTime\(e\) \{[\s\S]{0,200}Instant := KL_TimestampFromLocal\(LocalTs\)[\s\S]{0,100}"ts", Instant\["ts"\]/,
 		'the events_system row stores the same UTC instant'
 	);

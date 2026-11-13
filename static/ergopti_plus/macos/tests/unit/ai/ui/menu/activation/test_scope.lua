@@ -2,7 +2,7 @@
 
 --- Runs the real planner, preference owner, runtime reconciler and transaction.
 local helpers = require("tests.helpers")
-local MetricsState = require("infra.metrics_state_keys")
+local MetricsState = require("metrics.engine.state_keys")
 local Codec = require("core.text.engine.toml_codec")
 local Manifest = require("menu.engine.manifest_reader")
 local FS = require("core.fs.adapters.file_system")

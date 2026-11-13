@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local Logger     = require("core.logger.engine.shim")
-local PhaseStats = require("infra.phase_stats")
+local PhaseStats = require("metrics.engine.perf.phase_stats")
 
 local LOG = "menu.ui.builder.timed_build"
 

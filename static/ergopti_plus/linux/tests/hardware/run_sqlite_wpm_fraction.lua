@@ -29,8 +29,8 @@ assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
 
-local Keystats = require("modules.keystats.keystats")
-local Writer = require("modules.keystats.sqlite_writer")
+local Keystats = require("metrics.engine.keystats")
+local Writer = require("metrics.engine.journal.sqlite_writer")
 local Metrics = require("metrics.engine.metrics")
 local Json = require("core.text.engine.json")
 local path = root .. "/metrics.sqlite"

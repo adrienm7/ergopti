@@ -92,7 +92,7 @@ local LOG            = "llm.api_remote"
 local _local_probe_clients = {}
 local _retiring_local_probe_clients = setmetatable({}, { __mode = "k" })
 
-local ok_kl, keystats = pcall(require, "modules.keystats")
+local ok_kl, keystats = pcall(require, "metrics.engine")
 if not ok_kl then keystats = nil end
 
 

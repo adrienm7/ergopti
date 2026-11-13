@@ -157,7 +157,7 @@ _CryptoSha256Cng(Data) {
 ; adapter, because the OS-purity ratchet requires every DllCall to sit inside
 ; adapters/ — and CNG is exactly the kind of OS primitive an adapter exists to
 ; wrap. The envelope format and the orchestration live in
-; modules/keystats/keystats_text_cipher.ahk, which calls these and holds no
+; metrics/engine/privacy/text_cipher.ahk, which calls these and holds no
 ; DllCall of its own.
 
 ; BCRYPT_ALG_HANDLE_HMAC_FLAG — the SHA-256 provider must be opened with this to

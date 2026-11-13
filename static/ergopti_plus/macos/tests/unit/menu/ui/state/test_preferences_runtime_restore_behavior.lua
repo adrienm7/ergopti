@@ -19,7 +19,7 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 		package.loaded["menu.ui.keyboard.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
-		package.loaded["modules.keystats.text_cipher"] = { set_enabled = noop }
+		package.loaded["metrics.engine.privacy.text_cipher"] = { set_enabled = noop }
 		package.loaded["settings.ui.menu.preferences_transaction"] = nil
 		package.loaded["menu.ui.builder.state"] = nil
 		local Transaction = require("settings.ui.menu.preferences_transaction")

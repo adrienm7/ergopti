@@ -22,8 +22,8 @@ package.loaded["core.logger.engine.logger"] = {
 	LEVELS = { DEBUG = 1, INFO = 2, WARNING = 3, ERROR = 4 },
 	error = function() end, start = function() end, done = function() end,
 }
-package.loaded["infra.phase_stats"] = nil
-local Stats = require("infra.phase_stats")
+package.loaded["metrics.engine.perf.phase_stats"] = nil
+local Stats = require("metrics.engine.perf.phase_stats")
 
 local NS = 0
 Stats.use_clock(function() return NS end)
@@ -35,7 +35,7 @@ local function fresh()
 	info_enabled = true
 end
 
-helpers.describe("infra.phase_stats recording", function()
+helpers.describe("metrics.engine.perf.phase_stats recording", function()
 	helpers.it("keeps count, total and maximum per phase", function()
 		fresh()
 		Stats.add("keymap.match", 1 * MS)
@@ -64,7 +64,7 @@ helpers.describe("infra.phase_stats recording", function()
 	end)
 end)
 
-helpers.describe("infra.phase_stats flush", function()
+helpers.describe("metrics.engine.perf.phase_stats flush", function()
 	helpers.it("emits one evidence line per family plus the memory line", function()
 		fresh()
 		Stats.add("keymap.match", 1 * MS)
@@ -98,7 +98,7 @@ helpers.describe("infra.phase_stats flush", function()
 	end)
 end)
 
-helpers.describe("infra.phase_stats hold attribution", function()
+helpers.describe("metrics.engine.perf.phase_stats hold attribution", function()
 	helpers.it("names the long phases that ended inside the held window", function()
 		fresh()
 		NS = 500 * MS
@@ -118,7 +118,7 @@ helpers.describe("infra.phase_stats hold attribution", function()
 	end)
 end)
 
-helpers.describe("infra.phase_stats lifecycle", function()
+helpers.describe("metrics.engine.perf.phase_stats lifecycle", function()
 	helpers.it("arms one timer, refuses a second start and stops it paired", function()
 		fresh()
 		local real_timer = package.loaded["core.events.timer_scheduler"]
@@ -141,4 +141,4 @@ helpers.describe("infra.phase_stats lifecycle", function()
 end)
 
 package.loaded["core.logger.engine.logger"] = real_logger
-package.loaded["infra.phase_stats"] = nil
+package.loaded["metrics.engine.perf.phase_stats"] = nil

@@ -40,7 +40,7 @@ local STUB_MODULES = {
 	"platform.system.info",
 	"keyboard.adapters.runtime.deploy_pacing",
 	"core.ui.engine.notifications",
-	"modules.keystats.kc_bridge",
+	"metrics.adapters.kc_bridge",
 	"gestures.engine.engine",
 	"modules.shortcuts",
 	"hs.caffeinate.watcher",
@@ -620,7 +620,7 @@ local function with_remap(options, body)
 			return true
 		end,
 	}
-	package.loaded["modules.keystats.kc_bridge"] = {
+	package.loaded["metrics.adapters.kc_bridge"] = {
 		clear_managed_set = function() return true end,
 		refresh_managed_set = function()
 			calls.classifier_refreshes = calls.classifier_refreshes + 1

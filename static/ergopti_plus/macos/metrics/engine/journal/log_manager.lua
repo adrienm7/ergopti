@@ -1,0 +1,3363 @@
+--- metrics/engine/journal/log_manager.lua
+
+--- ==============================================================================
+--- MODULE: Keystats Log Manager
+--- DESCRIPTION:
+--- Thin orchestrator for all on-disk persistence for the keystats. Implements
+--- the storage model from static/ergopti_plus/KEYSTATS_SPEC.md:
+---
+---     <config_dir>/metrics/by_device/<device_id>/device.json
+---     <config_dir>/metrics/by_device/<device_id>/data.sql       (append-only SQL)
+---     <config_dir>/metrics/by_device/<device_id>/today.log      (JSONL hot path)
+---     ~/Library/Caches/<app>/metrics/<device_id>/db.sqlite      (cache mirror)
+---
+--- SUBMODULES (each owns a distinct concern):
+--- - sqlite_writer  — SQLite lifecycle, schema bootstrap, INSERT builders.
+--- - aggregator     — N-gram / burst / session walking + batch DB flush.
+--- - rotation       — today.log append, tail read, day rollover.
+--- - export         — App category lookup, device id, SQLite path/rev, foreign sync.
+---
+--- FEATURES & RATIONALE:
+--- 1. Source of truth on disk is plain SQL text — Git-friendly, no helper
+---    needed (KEYSTATS_SPEC §1.6).
+--- 2. SQLite cache lives in the user's Caches folder, which survives a reboot;
+---    the user-visible folder only has data.sql + device.json (KEYSTATS_SPEC §1.7).
+--- 3. Hot path never blocks on SQLite: keystroke handler appends a JSONL line;
+---    aggregation runs in the ingest tick.
+--- 4. Ingest is crash-safe — INSERT OR IGNORE in a transaction is idempotent
+---    on replay (KEYSTATS_SPEC §15.2).
+---
+--- DEPENDENCIES:
+--- - lib.logger (project-wide logger).
+--- - hs.json, hs.sqlite3, hs.fs, hs.timer.
+--- ==============================================================================
+
+local M = {}
+
+local NetworkTransitions = require("metrics.engine.system.network_transitions")
+local LocalTime = require("metrics.engine.local_time")
+local hs      = hs
+local fs      = require("hs.fs")
+local NativePath = require("core.fs.engine.native_path")
+local text_utils = require("core.text.engine.utils")
+local json    = require("hs.json")
+local sqlite3 = require("hs.sqlite3")
+local timer   = require("hs.timer")
+
+local Logger  = require("core.logger.engine.logger")
+local Timings = require("core.timing.engine.timings")
+local Literal = require("core.fs.engine.sqlite.literal")
+local Queries = require("metrics.engine.queries")
+local i18n    = require("core.i18n.engine.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
+local FileSystem = require("core.fs.adapters.file_system")
+local MetadataCommandStats = require("diagnostics.adapters.metadata_command_stats")
+local LedgerAppend = require("core.fs.adapters.ledger_append")
+local TimerScheduler = require("core.events.timer_scheduler")
+local PowerSource = require("platform.system.power_source")
+local LOG     = "keystats.log_manager"
+
+local TextCipher = require("metrics.engine.privacy.text_cipher")
+local TriggerRoi = require("metrics.engine.privacy.trigger_roi")
+local RebuildSnapshot = require("metrics.engine.reader.rebuild_snapshot")
+local SqliteWriter = require("metrics.engine.journal.sqlite_writer")
+local Aggregator   = require("metrics.engine.aggregator.aggregator")
+local Rotation     = require("metrics.engine.journal.rotation")
+local IngestTrace  = require("metrics.engine.journal.ingest_trace")
+local Export       = require("metrics.engine.reader.export")
+local LedgerReplay = require("metrics.engine.reader.ledger_replay")
+local HostSignature = require("metrics.engine.capture.host_signature")
+local Metrics      = require("metrics.engine.metrics")
+
+
+
+
+
+-- ============================
+-- ============================
+-- ======= 1/ Constants =======
+-- ============================
+-- ============================
+
+--- Background ingest tick period (KEYSTATS_SPEC §4). Shared cross-driver value
+--- ([keystats] ingest_tick_ms).
+local INGEST_TICK_SEC = Timings.sec("keystats", "ingest_tick_ms")
+
+--- Cap on the per-event delay credited to WPM calculation. Shared cross-driver
+--- value ([keystats] max_keystroke_delay_ms).
+local WPM_MAX_EVENT_DELAY_MS = Timings.ms("keystats", "max_keystroke_delay_ms")
+
+--- Refused journal bytes rotation re-verifies per deferred retry turn.
+local JOURNAL_RECOVERY_TURN_BYTES = Timings.count("limits", "journal_recovery_turn_bytes")
+
+--- Main-thread budget of one aggregate-recovery slice. A full recovery scans
+--- every ledger and replays every raw row (22 s on a months-old Mac ledger), so
+--- it yields to the event taps whenever a slice has run this long.
+local RECOVERY_SLICE_NS = 8 * 1000 * 1000
+
+--- Pause between two recovery slices: long enough for queued key events and
+--- timers to run, short enough that a recovery finishes close to its CPU cost.
+local RECOVERY_RESUME_SEC = 0.01
+
+--- CPU share one recovery may take on battery. At the mains pause it took 45 %
+--- of a core for minutes (field run 2026-11-01: 1554 slices in the 30 s idle
+--- window, on battery); the idle check allows 3 % and the driver idles near 2 %.
+local RECOVERY_BATTERY_CPU_SHARE = 0.005
+
+--- Longest pause after a slice on battery: one slice that overran its budget (a
+--- 300 ms flush) must not silence the recovery for a whole minute.
+local RECOVERY_BATTERY_MAX_PAUSE_SEC = 30
+
+--- A power source read is a native call: slices reuse it for this long.
+local RECOVERY_POWER_RECHECK_NS = 5 * 1000 * 1000 * 1000
+
+--- How often a recovery held for a lock-free reader asks whether it may go on.
+local RECOVERY_HOLD_RECHECK_SEC = 0.25
+
+--- Raw rows replayed between two budget checks; a clock read per row would cost
+--- more than the walk itself.
+local RECOVERY_PACE_ROWS = 64
+
+--- Derived rows one recovery transaction deletes. A single-transaction delete
+--- of a large partition (3 million n-gram rows) took 9.5 s on a synthetic cache
+--- and held the main thread 5.3 s in the 2026-10-27 field session; 500 rows per
+--- committed batch measured 30 ms with synchronous=FULL, so 100 stays near the
+--- 8 ms slice budget.
+local RECOVERY_DELETE_BATCH_ROWS = 100
+
+--- Maximum drain iterations during day_rollover. At 5000 lines/batch this
+--- covers 100 000 lines before giving up and preserving the file.
+local MAX_ROLLOVER_DRAIN_ITERS = 20
+
+
+
+
+
+-- ===============================
+-- ===============================
+-- ======= 2/ Module State =======
+-- ===============================
+-- ===============================
+
+--- Shared CoreState (set by M.init).
+local _state = nil
+
+-- Only a committed lifecycle may accept new physical work. Teardown revokes
+-- admission before touching native resources; already-owned FIFO work survives.
+local _physical_sink_active, _physical_sink_generation = false, 0
+local PhysicalAccounting = require("metrics.engine.capture.physical_accounting_mode")
+local PhysicalWire = require("metrics.engine.capture.physical_wire")
+local PhysicalRelease = require("metrics.engine.capture.physical_release")
+
+--- Device identity, read from / written to device.json.
+local _device_id  = nil
+local _device_obj = nil
+
+--- Resolved paths (filled by `_resolve_paths`).
+local _paths = {}
+
+--- Background ingest timer.
+local _ingest_timer = nil
+local _ingest_timer_committed = false
+
+--- A failed initialization retains this flag until every partially acquired
+--- timer/database has been released. No later init may publish over that debt.
+local _init_cleanup_pending = false
+
+--- Exact create-only publication to settle before admitting any later metrics root.
+local _initial_publication_pending = nil
+
+--- Last foreign-sync failure already surfaced by the log-manager boundary.
+--- Repeated ingest ticks retain the retry without alternating two ERROR lines
+--- with infra.fs_dir's own diagnostic; a changed failure is reported again.
+local _foreign_sync_error_key = nil
+
+--- Retry rollover before any producer queue drain or journal EOF check.
+local _pending_rollover = false
+
+--- The one running cooperative aggregate recovery, or nil. It owns the shared
+--- Aggregator state while it runs, so ingest waits for it (today.log buffers).
+local _recovery = nil
+local _staging_recovery = false
+
+--- Runtime fence mirroring the durable pending replay row until publication commits.
+local _local_ledger_replay_pending = false
+
+--- Registered post-ingest listeners — called after every successful ingest cycle.
+--- Each entry is a function(); failures are logged and contained so one broken
+--- listener cannot prevent the others from firing. Register via M.on_ingest_done().
+local _ingest_listeners = {}
+
+--- Whether `_uuid_v4` has seeded math.randomseed.
+local _uuid_seeded = false
+
+--- Ordered outbox used when an eventtap must detach a typing run without doing
+--- any serialization or file I/O. Once this queue is non-empty, later
+--- append_log() calls join it so they cannot overtake the detached run.
+local _deferred_log_queue = {}
+local _deferred_log_head  = 1
+local _deferred_log_tail  = 0
+local _deferred_log_timer = nil
+local _deferred_log_busy = false
+
+--- Retry delay after a timer-allocation or sink failure. The ingest timer also
+--- retries the queue, so a one-shot scheduling failure cannot strand it.
+local DEFERRED_LOG_RETRY_SEC = 0.1
+
+
+
+
+
+-- ==================================
+-- ==================================
+-- ======= 3/ Private Helpers =======
+-- ==================================
+-- ==================================
+
+--- Guards every public function against being called before M.init().
+local function _require_state(func_name)
+	if not _state then
+		-- Early boot events (wake, lock, etc.) can trigger calls before the
+		-- engine has finished its M.init() handshake. We ignore them quietly
+		-- at DEBUG level rather than emitting a scary ERROR.
+		Logger.debug(LOG, "'%s' called before M.init() — ignoring early boot event.", func_name)
+		return false
+	end
+	return true
+end
+
+--- Returns a "%Y-%m-%d HH:MM:SS.mmm" timestamp string (local time).
+-- Single-sourced in metrics/engine/journal/timestamp.lua so the seconds and the .mmm
+-- fraction share one wall clock (F-L1).
+local Timestamp = require("metrics.engine.journal.timestamp")
+local Maintenance = require("metrics.engine.maintenance")
+local _now_ts = Timestamp.now_ts
+
+--- Returns today's "YYYY-MM-DD" string.
+local function _today()
+	return os.date("%Y-%m-%d")
+end
+
+--- mkdir -p equivalent. An existing directory is answered from its attributes:
+--- each `mkdir -p` forks a shell from the Hammerspoon process and waited about
+--- 40 ms on the Mac, and keystats start ran four of them on every boot (L18).
+--- @param path string Directory pathname.
+--- @return boolean forked True when the shell command had to run.
+local function _mkdir_p(path)
+	local ok, mode = pcall(fs.attributes, path, "mode")
+	if ok and mode == "directory" then return false end
+	pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(path))
+	return true
+end
+
+--- Generates a UUID v4 (RFC 4122).
+local function _uuid_v4()
+	if not _uuid_seeded then
+		math.randomseed(math.floor(hs.timer.absoluteTime() / 1000))
+		for _ = 1, 5 do math.random() end
+		_uuid_seeded = true
+	end
+	local b = {}
+	for i = 1, 16 do b[i] = math.random(0, 255) end
+	b[7] = (b[7] & 0x0F) | 0x40
+	b[9] = (b[9] & 0x3F) | 0x80
+	return string.format(
+		"%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+		b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8],
+		b[9], b[10], b[11], b[12], b[13], b[14], b[15], b[16])
+end
+
+--- Returns the macOS hardware UUID (KEYSTATS_SPEC §16.1). The deferred boot
+--- start prefetches it off the main thread (metrics/engine/capture/host_signature.lua):
+--- this synchronous pipeline held the run loop 151 ms at boot+1 s. It still
+--- runs when nothing prefetched the value, e.g. a later Metrics toggle.
+local function _host_signature()
+	local prefetched = HostSignature.value()
+	if prefetched then return prefetched end
+	Logger.debug(LOG, "Hardware UUID not prefetched (%s); reading it synchronously.",
+		HostSignature.status())
+	local cmd = "ioreg -d2 -c IOPlatformExpertDevice "
+		.. "| grep IOPlatformUUID | awk -F\\\" '{print $4}'"
+	local ok, out = pcall(hs.execute, cmd)
+	if ok and type(out) == "string" then
+		out = out:gsub("[%s\n\r]+", "")
+		if #out >= 8 then return out end
+	end
+	local host = (hs.host and hs.host.localizedName and hs.host.localizedName()) or "unknown"
+	return "fallback:" .. host
+end
+
+
+
+
+
+-- ==================================
+-- ==================================
+-- ======= 4/ Path Resolution =======
+-- ==================================
+-- ==================================
+
+--- The cache folder of earlier versions, <TMPDIR>/ergopti_metrics/, or nil
+--- without a TMPDIR. Read only to adopt a cache that is still there.
+--- @return string|nil root With a trailing separator.
+local function _legacy_cache_root()
+	local t = os.getenv("TMPDIR")
+	if type(t) ~= "string" or t:sub(1, 1) ~= "/" then return nil end
+	return NativePath.with_trailing_separator(t) .. "ergopti_metrics/"
+end
+
+--- Compute every path the log manager touches once `device_id` is known.
+--- @param metrics_dir string The metrics root (CoreState.LOG_DIR).
+--- @param cache_dir   string The SQLite cache root (CoreState.CACHE_DIR).
+--- @param device_id   string The current device's UUID.
+--- @return table Resolved path bundle. The caller publishes it only after the
+--- device identity transaction commits.
+local function _resolve_paths(metrics_dir, cache_dir, device_id)
+	local md = NativePath.with_trailing_separator(metrics_dir)
+
+	local by_dev  = md .. "by_device/" .. device_id .. "/"
+	local cache   = NativePath.with_trailing_separator(cache_dir) .. device_id .. "/"
+	local legacy  = _legacy_cache_root()
+
+	return {
+		metrics_dir      = md,
+		by_device_dir    = by_dev,
+		device_json_path = by_dev .. "device.json",
+		data_sql_path    = by_dev .. "data.sql",
+		today_log_path   = by_dev .. "today.log",
+		cache_dir        = cache,
+		sqlite_path      = cache .. "db.sqlite",
+		legacy_sqlite_path = legacy and (legacy .. device_id .. "/db.sqlite") or nil,
+	}
+end
+
+--- Moves a cache left in TMPDIR by an earlier version into the persistent cache
+--- folder, once, before any connection exists. A rollback journal moves first:
+--- a database without its hot journal would lose an interrupted transaction.
+--- When the move is refused (another volume), the bounded replay rebuilds it.
+--- @param paths table Resolved path bundle.
+local function _adopt_legacy_cache(paths)
+	local legacy = paths.legacy_sqlite_path
+	if not legacy or legacy == paths.sqlite_path then return end
+	if fs.attributes(paths.sqlite_path) ~= nil or fs.attributes(legacy) == nil then return end
+	local journal_ok = true
+	if fs.attributes(legacy .. "-journal") ~= nil then
+		journal_ok = os.rename(legacy .. "-journal", paths.sqlite_path .. "-journal") == true
+	end
+	local moved = journal_ok and os.rename(legacy, paths.sqlite_path) == true
+	if moved then
+		Logger.info(LOG, "Moved the metrics cache out of TMPDIR into the persistent cache folder.")
+	else
+		Logger.warn(LOG, "The TMPDIR metrics cache could not be moved; the ledger replay rebuilds it.")
+	end
+end
+
+
+
+
+
+-- ==================================
+-- ==================================
+-- ======= 5/ Device Identity =======
+-- ==================================
+-- ==================================
+
+--- Loads `device.json` for the current host. Reuses an existing UUID if the
+--- host_signature matches; otherwise generates a new UUID only after every
+--- existing candidate was read and decoded successfully. KEYSTATS_SPEC §16.1.
+--- @param metrics_dir string The metrics root.
+--- @return table|nil device The fully populated device object, or nil when the
+--- identity scan did not commit.
+--- @return boolean needs_publication True only for a newly generated identity.
+local function _resolve_device(metrics_dir)
+	local md = NativePath.with_trailing_separator(metrics_dir)
+	local by_root = md .. "by_device/"
+	_mkdir_p(by_root)
+
+	local current_host = _host_signature()
+	local dir_ok, iterator, dir_state = pcall(fs.dir, by_root)
+	if not dir_ok or type(iterator) ~= "function" then
+		Logger.error(LOG, "Cannot enumerate existing device identities; initialization refused.")
+		return nil
+	end
+
+	local scan_ok, matching_device, unresolved_candidate = pcall(function()
+		local unresolved = false
+		for entry in iterator, dir_state do
+			if entry ~= "." and entry ~= ".." then
+				local candidate_dir = by_root .. entry
+				local djpath = candidate_dir .. "/device.json"
+				local raw, read_status = FileSystem.read_with_status(djpath)
+				if read_status ~= "absent" then
+					if read_status ~= "ok" or type(raw) ~= "string" then
+						unresolved = true
+					else
+						local decode_ok, obj = pcall(json.decode, raw)
+						local valid = decode_ok and type(obj) == "table"
+							and type(obj.device_id) == "string" and obj.device_id ~= ""
+							and type(obj.host_signature) == "string" and obj.host_signature ~= ""
+						if not valid then
+							unresolved = true
+						elseif obj.host_signature == current_host then
+							return obj, false
+						end
+					end
+				end
+			end
+		end
+		return nil, unresolved
+	end)
+
+	if not scan_ok then
+		Logger.error(LOG, "Existing device identity scan failed; initialization refused.")
+		return nil
+	end
+	if matching_device then return matching_device, false end
+	if unresolved_candidate then
+		Logger.error(LOG, "An existing device identity could not be owned; initialization refused.")
+		return nil
+	end
+
+	return {
+		device_id      = _uuid_v4(),
+		name           = (hs.host and hs.host.localizedName and hs.host.localizedName()) or "Mac",
+		os             = "darwin",
+		os_version     = (hs.host and hs.host.operatingSystemVersionString and hs.host.operatingSystemVersionString()) or "",
+		host_signature = current_host,
+		created_at     = _now_ts(),
+		schema_version = 1,
+	}, true
+end
+
+--- Publishes a new device identity without replacing a concurrent winner.
+--- @return boolean committed
+--- @return table|nil published_device Exact created/adopted device object.
+local function _write_device_json(obj, device_json_path)
+	local encode_ok, encoded = pcall(json.encode, obj)
+	if not encode_ok or type(encoded) ~= "string" then
+		Logger.error(LOG, "Cannot encode device identity; initialization refused.")
+		return false
+	end
+
+	-- A generated identity is derived from proven absence. Replacing an entry
+	-- that appeared after the scan would steal another process's identity.
+	local write_ok, created, create_status = pcall(
+		FileSystem.create_if_absent,
+		device_json_path,
+		encoded
+	)
+	if not write_ok then
+		Logger.error(LOG, "Device identity publication did not commit; initialization refused.")
+		return false, nil
+	end
+	if created == true and create_status == "created" then return true, obj end
+	if create_status ~= "exists" then
+		Logger.error(LOG, "Device identity publication did not commit; initialization refused.")
+		return false, nil
+	end
+
+	-- Another initializer won the same create-only target. Adopt only an exact,
+	-- internally consistent identity for this host and directory; every other
+	-- outcome is ambiguous and therefore fails closed.
+	local read_ok, raw, read_status = pcall(FileSystem.read_with_status, device_json_path)
+	if not read_ok or read_status ~= "ok" or type(raw) ~= "string" then
+		Logger.error(LOG, "Concurrent device identity could not be owned; initialization refused.")
+		return false, nil
+	end
+	local decode_ok, winner = pcall(json.decode, raw)
+	local valid = decode_ok and type(winner) == "table"
+		and type(winner.device_id) == "string" and winner.device_id == obj.device_id
+		and type(winner.host_signature) == "string"
+		and winner.host_signature == obj.host_signature
+	if not valid then
+		Logger.error(LOG, "Concurrent device identity was inconsistent; initialization refused.")
+		return false, nil
+	end
+	Logger.info(LOG, "Adopted the concurrently published device identity.")
+	return true, winner
+end
+
+
+
+
+
+-- ==============================================================
+-- ==============================================================
+-- ======= 6/ Public log_* event entry points (delegates) =======
+-- ==============================================================
+-- ==============================================================
+
+local _drain_deferred_logs
+
+
+--- Returns whether the ordered deferred outbox contains any work.
+--- @return boolean
+local function _has_deferred_logs()
+	return _deferred_log_head <= _deferred_log_tail
+end
+
+
+--- Appends one operation to the in-memory ordered outbox.
+--- @param operation table Ordered entry, typing snapshot, or deferred builder.
+local function _queue_deferred_log(operation)
+	_deferred_log_tail = _deferred_log_tail + 1
+	_deferred_log_queue[_deferred_log_tail] = operation
+end
+
+
+--- Schedules the outbox drain on the next run-loop turn.
+--- The shared scheduler publishes the exact unstarted native candidate before
+--- activation. If start raises after activation and rollback refuses, that
+--- candidate remains the only owner and blocks every sibling drain timer until
+--- teardown can retry its cleanup.
+--- @param delay number|nil Delay in seconds (zero for the initial drain).
+--- @return boolean scheduled
+local function _schedule_deferred_log_drain(delay)
+	if not _has_deferred_logs() then return true end
+	if _deferred_log_timer ~= nil then
+		return _deferred_log_timer.committed == true
+	end
+
+	-- Forward-declare before the closure: declaring this local below the closure
+	-- would bind the callback to a nil global instead of the scheduler handle.
+	local scheduled_handle
+	local committed
+	scheduled_handle, committed = TimerScheduler.after(delay or 0, function()
+		-- TimerScheduler fences repeat delivery before invoking us. Clear the
+		-- scheduling gate only when its exact native cleanup actually settled.
+		if _deferred_log_timer == scheduled_handle
+			and scheduled_handle.timer == nil then
+			_deferred_log_timer = nil
+		end
+		local drained_ok, drain_err = xpcall(_drain_deferred_logs, debug.traceback)
+		if not drained_ok then
+			Logger.error(LOG, "Deferred keystats drain failed: %s.", tostring(drain_err))
+		end
+		if _has_deferred_logs() then
+			_schedule_deferred_log_drain(DEFERRED_LOG_RETRY_SEC)
+		end
+	end)
+
+	-- A failed acquisition can still own a live candidate when native start
+	-- activated and then raised while rollback refused. Retain that exact debt;
+	-- otherwise discard the settled wrapper so a later ingest/action may retry.
+	if scheduled_handle and scheduled_handle.timer ~= nil then
+		_deferred_log_timer = scheduled_handle
+	end
+	if committed ~= true then
+		if not scheduled_handle or scheduled_handle.timer == nil then
+			_deferred_log_timer = nil
+		end
+		Logger.error(LOG, "Cannot schedule deferred keystats drain transactionally.")
+		return false
+	end
+	_deferred_log_timer = scheduled_handle
+	return true
+end
+
+
+--- Captures the scalar context shared by physical and synthetic typing records.
+--- The epoch stays numeric here so timestamp formatting remains outside input
+--- callbacks with the rest of the deferred typing-entry construction.
+--- @return table snapshot
+local function _capture_typing_context(timestamp_epoch)
+	return {
+		timestamp_epoch       = timestamp_epoch or Timestamp.now_epoch(),
+		session_app_name      = _state.session_app_name,
+		session_win_title     = _state.session_win_title,
+		session_url           = _state.session_url,
+		session_field_role    = _state.session_field_role,
+		session_layout        = _state.session_layout,
+		session_document_path = _state.session_document_path,
+		is_fullscreen         = _state.is_fullscreen,
+		in_meeting            = _state.in_meeting,
+		session_mouse_clicks  = _state.session_mouse_clicks,
+		session_mouse_scrolls = _state.session_mouse_scrolls,
+		mouse_distance_px     = _state.mouse_distance_px,
+		current_session_pause = _state.current_session_pause,
+		current_battery_level = _state.current_battery_level,
+		current_audio_volume  = _state.current_audio_volume,
+	}
+end
+
+
+--- Detaches the current mutable typing run in O(1).
+--- No loop, JSON encoding, SQLite access, or file append is allowed here: this
+--- function is the action-epoch backstop reached from the keyboard eventtap.
+--- @return table|nil snapshot
+local function _detach_buffer_snapshot()
+	if #_state.buffer_events == 0
+		and _state.session_mouse_clicks == 0
+		and _state.session_mouse_scrolls == 0
+		and (_state.mouse_distance_px or 0) == 0 then
+		return nil
+	end
+
+	local captured_epoch = type(_state.buffer_started_epoch) == "number"
+		and _state.buffer_started_epoch or nil
+	local snapshot = _capture_typing_context(captured_epoch)
+	snapshot.buffer_events = _state.buffer_events
+	snapshot.buffer_text = _state.buffer_text
+	snapshot.rich_chunks = _state.rich_chunks or {}
+
+	_state.buffer_events         = {}
+	_state.buffer_text           = ""
+	_state.rich_chunks           = {}
+	_state.buffer_started_epoch  = nil
+	_state.last_time             = 0
+	_state.session_mouse_clicks  = 0
+	_state.session_mouse_scrolls = 0
+	_state.mouse_distance_px     = 0
+	_state.last_flush_time       = hs.timer.absoluteTime() / 1000000
+	return snapshot
+end
+
+
+--- Converts an immutable detached snapshot into its persisted typing entry.
+--- @param snapshot table Snapshot returned by _detach_buffer_snapshot().
+--- @return table entry
+local function _typing_entry_from_snapshot(snapshot)
+	local total_time_ms, total_chars = 0, 0
+	for _, ev in ipairs(snapshot.buffer_events) do
+		local meta = ev[3] or {}
+		if not meta.s then
+			local d = math.min(ev[2] or 0, WPM_MAX_EVENT_DELAY_MS)
+			total_time_ms = total_time_ms + d
+			total_chars   = total_chars + 1
+		end
+	end
+	local wpm = Metrics.compute_wpm_from_events(total_chars, total_time_ms)
+
+	local rich_str, cur_type, cur_text = "", nil, ""
+	local function flush_chunk()
+		if not cur_type then return end
+		if cur_type == "text" then
+			rich_str = rich_str .. cur_text
+		elseif cur_type == "correction" then
+			rich_str = rich_str .. "<correction><del>" .. cur_text .. "</del></correction>"
+		else
+			rich_str = rich_str .. "<autocomplete type=\"" .. cur_type .. "\">"
+				.. cur_text .. "</autocomplete>"
+		end
+	end
+	for _, chunk in ipairs(snapshot.rich_chunks) do
+		if chunk.type == cur_type then
+			cur_text = cur_text .. chunk.text
+		else
+			flush_chunk()
+			cur_type = chunk.type
+			cur_text = chunk.text
+		end
+	end
+	flush_chunk()
+
+	return {
+		type              = "typing",
+		timestamp         = Timestamp.format_epoch(snapshot.timestamp_epoch),
+		text              = snapshot.buffer_text,
+		rich_text         = rich_str,
+		app               = snapshot.session_app_name,
+		title             = snapshot.session_win_title,
+		url               = snapshot.session_url,
+		field_role        = snapshot.session_field_role,
+		layout            = snapshot.session_layout,
+		document_path     = snapshot.session_document_path,
+		is_fullscreen     = snapshot.is_fullscreen,
+		in_meeting        = snapshot.in_meeting,
+		mouse_clicks      = snapshot.session_mouse_clicks,
+		mouse_scrolls     = snapshot.session_mouse_scrolls,
+		mouse_distance_px = math.floor(snapshot.mouse_distance_px or 0),
+		pause_before_ms   = snapshot.current_session_pause,
+		battery_level     = snapshot.current_battery_level,
+		audio_volume      = snapshot.current_audio_volume,
+		wpm               = tonumber(string.format("%.1f", wpm)),
+		events            = snapshot.buffer_events,
+	}
+end
+
+
+--- Reads an explicit policy without treating an unavailable cipher as permission.
+local function roi_text_allowed()
+	if type(TextCipher.roi_text_enabled) ~= "function" then return false end
+	local called, allowed = pcall(TextCipher.roi_text_enabled)
+	return called and allowed == true
+end
+
+--- Drops selected operations while retaining the exact order of every other owner.
+local function compact_deferred_logs(keep)
+	local retained = {}
+	for index = _deferred_log_head, _deferred_log_tail do
+		local operation = assert(_deferred_log_queue[index], "keystats deferred-log queue is sparse")
+		if keep(operation) then retained[#retained + 1] = operation end
+	end
+	_deferred_log_queue, _deferred_log_head, _deferred_log_tail = retained, 1, #retained
+end
+
+--- Retires unwritten ROI text and settles only a receipt already started before the request.
+--- No plaintext row is rebuilt or truncated. A failed receipt keeps its exact FIFO owner.
+--- @return boolean settled Whether encryption may now publish its new posture.
+function M.retire_roi_text()
+	if _deferred_log_busy then return false end
+	local pending
+	compact_deferred_logs(function(operation)
+		if not operation.roi_text then return true end
+		if operation.entry ~= nil and type(Rotation.has_pending_entry) == "function"
+			and Rotation.has_pending_entry(operation.entry) then
+			assert(pending == nil, "multiple ROI entries own one journal receipt")
+			pending = operation
+			return true
+		end
+		return false
+	end)
+	if pending == nil then return true end
+	_deferred_log_busy = true
+	local called, accepted = pcall(Rotation.append_log, pending.entry)
+	_deferred_log_busy = false
+	if not called or accepted ~= true then return false end
+	compact_deferred_logs(function(operation) return operation ~= pending end)
+	return true
+end
+
+--- A started receipt is historical work; every unstarted textual operation is revocable.
+local function retire_deferred_roi(operation)
+	return operation.roi_text and not roi_text_allowed()
+		and not (operation.entry ~= nil and type(Rotation.has_pending_entry) == "function"
+			and Rotation.has_pending_entry(operation.entry))
+end
+
+--- Drains queued operations in strict insertion order.
+--- The head advances only after Rotation returns exact true, so either a thrown
+--- or non-throwing filesystem refusal leaves the exact item available for retry.
+--- @return boolean drained Whether the queue is now empty.
+local function drain_deferred_operations()
+	while _has_deferred_logs() do
+		local operation = assert(_deferred_log_queue[_deferred_log_head],
+			"keystats deferred-log queue is sparse")
+		if retire_deferred_roi(operation) then
+			_deferred_log_queue[_deferred_log_head] = nil
+			_deferred_log_head = _deferred_log_head + 1
+		else
+			local is_builder = operation.kind == "typing_builder"
+				or operation.kind == "entry_builder"
+			if is_builder and operation.prepared ~= true then
+				local build_ok, built_or_err = xpcall(operation.build, debug.traceback)
+				local valid_typing = operation.kind ~= "typing_builder"
+					or (type(built_or_err) == "table"
+						and type(built_or_err.buffer_events) == "table"
+						and type(built_or_err.rich_chunks) == "table")
+				if not build_ok or type(built_or_err) ~= "table" or not valid_typing then
+					Logger.error(LOG, "Cannot prepare deferred keystats entry: %s.",
+						tostring(build_ok and "builder returned an invalid snapshot" or built_or_err))
+					return false
+				end
+				if operation.kind == "typing_builder" then
+					operation.value.buffer_events = built_or_err.buffer_events
+					operation.value.buffer_text = type(built_or_err.buffer_text) == "string"
+						and built_or_err.buffer_text or ""
+					operation.value.rich_chunks = built_or_err.rich_chunks
+				else
+					operation.value = built_or_err
+				end
+				operation.prepared = true
+				operation.build = nil
+			end
+			-- Rotation retains the first serialized receipt after a refused write.
+			-- Reuse this exact prepared entry, including detached typing snapshots.
+			if operation.entry == nil then
+				operation.entry = (operation.kind == "entry" or operation.kind == "entry_builder")
+					and operation.value or _typing_entry_from_snapshot(operation.value)
+			end
+			local entry = operation.entry
+			operation.roi_text = operation.roi_text or TriggerRoi.is_text_event(entry)
+			-- A builder may reenter the encryption boundary. Check the policy
+			-- again after construction, before any new receipt can start.
+			if not retire_deferred_roi(operation) then
+				local ok, accepted_or_err = xpcall(function()
+					return Rotation.append_log(entry)
+				end, debug.traceback)
+				if not ok or accepted_or_err ~= true then
+					Logger.error(LOG, "Cannot append deferred keystats entry: %s.",
+						tostring(accepted_or_err))
+					return false
+				end
+			end
+			_deferred_log_queue[_deferred_log_head] = nil
+			_deferred_log_head = _deferred_log_head + 1
+		end
+	end
+	_deferred_log_head = 1
+	_deferred_log_tail = 0
+	return true
+end
+
+
+--- Prevents an encryption transition from mutating an in-flight FIFO traversal.
+_drain_deferred_logs = function()
+	if _deferred_log_busy then return false end
+	_deferred_log_busy = true
+	local called, accepted = xpcall(drain_deferred_operations, debug.traceback)
+	_deferred_log_busy = false
+	if not called then
+		Logger.error(LOG, "Deferred keystats drain failed: %s.", tostring(accepted))
+		return false
+	end
+	return accepted
+end
+
+--- Append a single event entry to today.log as a JSONL line.
+--- The FIFO owns the entry before this function returns; persistence occurs only
+--- from the retained drain after an eventtap callback has returned.
+--- @param entry table The event entry. Must contain a `type` field.
+--- @return boolean accepted True once the ordered outbox owns the entry.
+function M.append_log(entry)
+	local roi_text = TriggerRoi.is_text_event(entry)
+	if roi_text and not roi_text_allowed() then return false end
+	_queue_deferred_log({ kind = "entry", value = entry, roi_text = roi_text })
+	-- Queue insertion is the acceptance boundary. Persistence never runs in the
+	-- caller because append_log is reached from keyboard and mouse eventtaps.
+	-- The ingest tick and stop path independently retry accepted work if timer
+	-- allocation is temporarily unavailable.
+	_schedule_deferred_log_drain(0)
+	return true
+end
+
+--- Defers construction and persistence of one non-typing entry.
+--- @param builder function Zero-argument function returning an entry table.
+--- @param roi_text boolean|nil Whether encryption revokes this textual ROI operation.
+--- @return boolean accepted True once the ordered outbox owns the builder.
+function M.defer_entry_builder(builder, roi_text)
+	if not _require_state("defer_entry_builder") then return false end
+	if type(builder) ~= "function" then
+		Logger.error(LOG, "defer_entry_builder(): builder must be a function.")
+		return false
+	end
+	if roi_text == true and not roi_text_allowed() then return false end
+	_queue_deferred_log({
+		kind = "entry_builder",
+		roi_text = roi_text == true,
+		build = builder,
+		prepared = false,
+	})
+	_schedule_deferred_log_drain(0)
+	return true
+end
+
+--- Detaches the keystroke buffer accumulated in CoreState and queues it for
+--- serialization and persistence after the caller returns.
+--- @return boolean|nil accepted True after detachment, nil when empty or uninitialized.
+function M.flush_buffer()
+	if not _require_state("flush_buffer") then return end
+	local snapshot = _detach_buffer_snapshot()
+	if not snapshot then return end
+	_queue_deferred_log({ kind = "typing_snapshot", value = snapshot })
+	_schedule_deferred_log_drain(0)
+	return true
+end
+
+--- Captures typing context now and defers an expensive snapshot builder.
+--- The builder runs at most once after the originating eventtap has returned;
+--- an append refusal retries the already-prepared immutable snapshot.
+--- @param builder function Zero-argument function returning buffer_events,
+--- rich_chunks, and optional buffer_text fields.
+--- @return boolean accepted True once the ordered outbox owns the builder.
+function M.defer_typing_builder(builder)
+	if not _require_state("defer_typing_builder") then return false end
+	if type(builder) ~= "function" then
+		Logger.error(LOG, "defer_typing_builder(): builder must be a function.")
+		return false
+	end
+	_queue_deferred_log({
+		kind = "typing_builder",
+		value = _capture_typing_context(),
+		build = builder,
+		prepared = false,
+	})
+	_schedule_deferred_log_drain(0)
+	return true
+end
+
+--- Detaches the current typing buffer and queues it for a post-eventtap drain.
+--- This is the only flush primitive allowed in an eventtap action-epoch
+--- backstop. It performs O(1) table swaps and never calls the persistence sink.
+--- @return boolean accepted False only when no initialized outbox can accept work.
+function M.defer_flush_buffer()
+	if not _require_state("defer_flush_buffer") then return false end
+	local snapshot = _detach_buffer_snapshot()
+	if snapshot then
+		_queue_deferred_log({ kind = "typing_snapshot", value = snapshot })
+	end
+	if not _has_deferred_logs() then return true end
+	-- The snapshot is already owned by the FIFO; reporting the scheduling result
+	-- as acceptance made the epoch listener retry the completed detach and abort
+	-- every later physical key when timer allocation stayed unavailable
+	_schedule_deferred_log_drain(0)
+	return true
+end
+
+---@param prev_app string
+---@param next_app string|nil nil closes an interval without adding a switch edge.
+---@param duration_ms number
+---@param timestamp string|nil Optional timestamp for a midnight split.
+function M.log_app_switch(prev_app, next_app, duration_ms, timestamp)
+	if not _require_state("log_app_switch") then return end
+	M.append_log({
+		type = "app_switch", prev_app = prev_app, next_app = next_app,
+		duration_ms = duration_ms, timestamp = timestamp,
+	})
+end
+
+function M.log_system_event(event_type, metadata)
+	if not _require_state("log_system_event") then return end
+	local entry = { type = "system_event", action = event_type }
+	if type(metadata) == "table" then
+		for k, v in pairs(metadata) do entry[k] = v end
+	end
+	M.append_log(entry)
+end
+
+--- Validates and copies the common physical event fields before queue ownership.
+--- @param press table Capture, exact device, keycode, original app and timestamp.
+--- @param action string Physical press or release action.
+--- @return table entry Detached scalar fields only.
+local function _physical_entry(press, action)
+	assert(type(press) == "table" and getmetatable(press) == nil, "Invalid physical press")
+	assert(type(press.capture) == "string" and press.capture ~= "", "Missing physical capture")
+	assert(type(press.device) == "string" and press.device:match("^[1-9]%d*$"), "Invalid physical device")
+	PhysicalWire.decimal(press.device, true)
+	assert(type(press.keycode) == "number" and press.keycode >= 0 and press.keycode % 1 == 0,
+		"Invalid physical keycode")
+	assert(type(press.app) == "string" and press.app ~= "", "Missing original physical application")
+	assert(type(press.timestamp) == "string"
+		and press.timestamp:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$"),
+		"Invalid original physical timestamp")
+	return { type = "system_event", action = action, capture = press.capture, device = press.device,
+		keycode = press.keycode, app = press.app, timestamp = press.timestamp }
+end
+
+--- Accepts one validated physical press into the ordered outbox by value.
+--- Retained event-time privacy is the capture owner's responsibility; consulting
+--- current focus here would reclassify delayed input. Exact true means FIFO
+--- ownership, not durable storage or SQLite ingestion.
+--- @param press table Capture, exact device, keycode, original app and timestamp.
+--- @return boolean accepted False when lifecycle or capture ownership is revoked.
+function M.log_physical_press(press)
+	if not _require_state("log_physical_press") then return false end
+	if not _physical_sink_active then return false end
+	local entry = _physical_entry(press, "physical_press")
+	if PhysicalAccounting.admitted_capture() ~= entry.capture then return false end
+	return M.append_log(entry)
+end
+
+--- Accepts one approved matched release by value under the same capture owner.
+--- The caller supplies its approved immutable app/date context and HID duration;
+--- current privacy or delivery time cannot redefine that historical decision.
+--- @param release table Common physical fields and nonnegative integer hold_ms.
+--- @return boolean accepted Exact true transfers ownership to the ordered FIFO.
+function M.log_physical_release(release)
+	if not _require_state("log_physical_release") then return false end
+	if not _physical_sink_active then return false end
+	local entry = _physical_entry(release, "physical_release")
+	entry.hold_ms = PhysicalRelease.duration(release.hold_ms)
+	if PhysicalAccounting.admitted_capture() ~= entry.capture then return false end
+	return M.append_log(entry)
+end
+
+--- Queues one admitted media event with an exact FIFO ownership acknowledgement.
+--- Durable acceptance is independently handled by the retained ingest transaction.
+---@param action string physical_media_press or physical_media_release.
+---@param row table Captured original identity and matched hold metadata.
+---@return boolean accepted
+function M.log_physical_media(action, row)
+	if not _require_state("log_physical_media") then return false end
+	if not _physical_sink_active then return false end
+	local generation = _physical_sink_generation
+	assert(type(row) == "table" and getmetatable(row) == nil, "Invalid physical media event")
+	assert(type(row.timestamp) == "string"
+		and row.timestamp:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$"),
+		"Invalid original physical media timestamp")
+	PhysicalWire.decimal(row.device, true)
+	local store = require("metrics.engine.media.store")
+	local batch = require("metrics.engine.aggregator.helpers").new_batch()
+	local entry = { type = "system_event", action = action }
+	for _, name in ipairs({ "timestamp", "capture", "device", "app", "media_id", "hold_ms", "keycode", "scancode" }) do
+		entry[name] = row[name]
+	end
+	local core = require("metrics.engine.aggregator.core")
+	store.replay(core.media_policy(), batch, { entry }, core.HOLD_THRESHOLD_MS)
+	if not _physical_sink_active or _physical_sink_generation ~= generation
+		or PhysicalAccounting.admitted_capture() ~= entry.capture then return false end
+	return M.append_log(entry)
+end
+
+function M.log_shortcut(shortcut_key, app_name)
+	if not _require_state("log_shortcut") then return end
+	if type(shortcut_key) ~= "string" or shortcut_key == "" then return end
+	M.append_log({
+		type = "shortcut", key = shortcut_key,
+		app  = (type(app_name) == "string" and app_name ~= "") and app_name or "Unknown",
+	})
+end
+
+--- Queues one events_clipboard row (modules/keystats/clipboard_telemetry);
+--- only the kind's own metadata keys are kept, never clipboard content.
+--- @param kind string One of keystats.clipboard_events KINDS.
+--- @param app_name string Foreground application name.
+--- @param meta table The kind's metadata.
+--- @return boolean|nil accepted
+function M.log_clipboard_event(kind, app_name, meta)
+	if not _require_state("log_clipboard_event") then return end
+	local fields = require("metrics.engine.capture.clipboard_events").KINDS[kind]
+	assert(fields and type(meta) == "table", "not an events_clipboard row: " .. tostring(kind))
+	local entry = {
+		type = kind,
+		app = (type(app_name) == "string" and app_name ~= "") and app_name or "Unknown",
+	}
+	for _, name in ipairs(fields) do entry[name] = meta[name] end
+	return M.append_log(entry)
+end
+
+function M.log_modifier_press(keycode, app_name)
+	if not _require_state("log_modifier_press") then return end
+	M.append_log({ type = "system_event", action = "modifier_press", keycode = keycode, app = app_name })
+end
+
+function M.log_modifier_hold(keycode, app_name, hold_ms)
+	if not _require_state("log_modifier_hold") then return end
+	M.append_log({ type = "system_event", action = "modifier_hold", keycode = keycode, app = app_name, hold_ms = hold_ms })
+end
+
+function M.log_karabiner_press(keycode, app_name)
+	if not _require_state("log_karabiner_press") then return end
+	M.append_log({ type = "system_event", action = "karabiner_press", keycode = keycode, app = app_name })
+end
+
+function M.log_karabiner_release(keycode, app_name, hold_ms)
+	if not _require_state("log_karabiner_release") then return end
+	M.append_log({ type = "system_event", action = "karabiner_release", keycode = keycode, app = app_name, hold_ms = hold_ms })
+end
+
+function M.log_passive_period(kind, duration_ms)
+	if not _require_state("log_passive_period") then return end
+	M.append_log({ type = "system_event", action = "passive_period", kind = kind, duration_ms = duration_ms })
+end
+
+function M.tag_awake_focus(app_name, duration_ms)
+	if not _require_state("tag_awake_focus") then return end
+	M.append_log({ type = "system_event", action = "awake_focus", app = app_name, duration_ms = duration_ms })
+end
+
+function M.log_focus_first_key(app_name, latency_ms)
+	if not _require_state("log_focus_first_key") then return end
+	M.append_log({ type = "system_event", action = "focus_first_key", app = app_name, latency_ms = latency_ms })
+end
+
+function M.increment_manifest_stat(app_name, stat_key, amount)
+	if not _require_state("increment_manifest_stat") then return end
+	M.append_log({ type = "system_event", action = "manifest_increment", app = app_name, stat = stat_key, amount = tonumber(amount) or 1 })
+end
+
+
+
+
+
+-- ============================================================
+-- ============================================================
+-- ======= 7/ Export delegate accessors (thin wrappers) =======
+-- ============================================================
+-- ============================================================
+
+--- Delegates to Export.get_native_app_category.
+function M.get_native_app_category(app_name)
+	return Export.get_native_app_category(app_name)
+end
+
+--- Delegates to Export.get_device_short_id.
+function M.get_device_short_id()
+	return Export.get_device_short_id()
+end
+
+--- Delegates to Export.get_sqlite_path.
+function M.get_sqlite_path()
+	return Export.get_sqlite_path()
+end
+
+--- Delegates to Export.get_db_rev.
+function M.get_db_rev()
+	return Export.get_db_rev()
+end
+
+--- Register a callback to be called after every successful ingest cycle.
+--- The callback receives no arguments; use M.get_db_rev() to read the new rev.
+--- Errors inside the callback are logged and contained.
+---@param fn function The listener to register.
+---@return boolean registered True only after the listener is owned.
+function M.on_ingest_done(fn)
+	assert(type(fn) == "function", "on_ingest_done requires a callback")
+	table.insert(_ingest_listeners, fn)
+	return true
+end
+
+local function _notify_ingest_listeners()
+	for index, fn in ipairs(_ingest_listeners) do
+		Logger.callback(LOG, "Ingest listener #" .. tostring(index), fn)
+	end
+end
+
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 8/ Ingest Tick Orchestrator =======
+-- ===========================================
+-- ===========================================
+
+--- Helper to safely SQL-escape a string.
+local function _sq(s)
+	return "'" .. Literal.escape(tostring(s)) .. "'"
+end
+
+--- Require an exact SQLite success code inside a transaction.
+--- lsqlite3 reports lock and I/O failures as return codes, not Lua errors, so a
+--- surrounding pcall is not a commit verdict by itself.
+--- @param db userdata|table SQLite handle.
+--- @param sql string Statement to execute.
+--- @param action string Stable diagnostic describing the intended mutation.
+local function _exec_sqlite_or_error(db, sql, action)
+	local rc = db:exec(sql)
+	if rc == sqlite3.OK then return end
+	local detail = db:errmsg() or ("SQLite result " .. tostring(rc))
+	error(action .. ": " .. tostring(detail), 0)
+end
+
+--- Attempt a transaction rollback and keep a native refusal visible.
+--- @param db userdata|table SQLite handle.
+--- @param action string Transaction label for diagnostics.
+--- @return boolean True only when SQLite accepted the rollback.
+local function _rollback_sqlite(db, action)
+	local ok, rc_or_error = pcall(function() return db:exec("ROLLBACK;") end)
+	if ok and rc_or_error == sqlite3.OK then return true end
+	local detail = ok and (db:errmsg() or ("SQLite result " .. tostring(rc_or_error)))
+		or rc_or_error
+	Logger.error(LOG, "%s rollback failed: %s.", action, tostring(detail))
+	return false
+end
+
+local DATA_SQL_OUTBOX_KEY = "local_data_sql_outbox"
+local REPLAY_FLUSH_EVENT_COUNT = 500
+-- Revision 6 counts the night wakes of past days. Revision 5 rebuilds the measured sleep, lock and keep-awake durations the
+-- system walker used to drop. Revision 4 rebuilds typing contexts and settles
+-- them at durable rollover boundaries. Revision 3 introduced n-gram token
+-- encoding 2.
+local AGGREGATE_CACHE_REVISION = "6"
+local PRE_ENCODING_REVISION = "2"
+local PRE_ENCODING_BACKUP_SUFFIX = ".pre-ngram-encoding-2.bak"
+-- Every table written by ../aggregator/sql.lua.  Replaying a device's canonical
+-- raw rows is additive, so its old derived partition must be cleared first.
+local DERIVED_DEVICE_TABLES = {
+	"agg_app_day", "agg_app_day_buckets", "agg_app_day_burst", "agg_app_day_session",
+	"agg_app_day_chars_class", "agg_app_day_errors", "agg_app_day_ergo",
+	"agg_app_day_layouts", "agg_app_day_kc_hold", "agg_app_day_titles",
+	"agg_app_day_hourly", "agg_app_day_hourly_min5", "agg_app_day_switches_to",
+	"agg_system_day",
+	"ngram_chars", "ngram_bigrams", "ngram_trigrams", "ngram_quadgrams",
+	"ngram_pentagrams", "ngram_hexagrams", "ngram_heptagrams", "ngram_words",
+	"ngram_word_bigrams", "ngram_shortcuts", "ngram_shortcut_bigrams",
+	"ngram_keycodes", "ngram_scancodes", "ngram_media_keys", "agg_app_day_media_hold",
+}
+
+--- Returns the byte offset through the last complete transaction in a ledger.
+--- A torn append may end after BEGIN TRANSACTION; applying that suffix would
+--- leave the recovered cache in a transaction and poison the first live ingest.
+---@param ledger string
+---@return integer
+local function _last_complete_ledger_offset(ledger)
+	return Export._last_complete_batch_offset(ledger)
+end
+
+--- Recognize only standalone producer markers after the last complete batch.
+--- User text inside SQL and torn batches cannot authorize a context reset.
+---@param trailing string
+---@return boolean
+local function _has_trailing_rollover(trailing)
+	local found = false
+	for line in trailing:gmatch("[^\n]+") do
+		if not line:match("^%s*$") then
+			local previous, date = line:match("^%-%- === day rollover (.-) %-%> (%d%d%d%d%-%d%d%-%d%d) ===$")
+			if not date or (previous ~= "" and not previous:match("^%d%d%d%d%-%d%d%-%d%d$")) then return false end
+			found = true
+		end
+	end
+	return found
+end
+
+--- Derive the current today.log cursor from durable local ledger comments.
+--- data.sql records byte offsets for every successful ingest batch. Reusing the
+--- most recent offset after a tmp-cache loss prevents already-ledgered JSONL
+--- lines from being assigned fresh ids and counted a second time at next boot.
+---@param ledger string
+---@param complete_offset integer
+---@return table { offset: integer, date: string|nil, trailing_rollover: boolean }
+local function _local_ledger_replay_cursor(ledger, complete_offset)
+	local full_ledger = ledger or ""
+	local safe_ledger = full_ledger:sub(1, complete_offset or 0)
+	-- Day-rollover markers are deliberately written after the final transaction
+	-- (they are comments, not SQL statements). Preserve a complete trailing
+	-- marker so a newly-created today.log resumes at byte 0; reject any suffix
+	-- containing a partial BEGIN/INSERT batch, which is not yet durable.
+	local trailing = full_ledger:sub((complete_offset or 0) + 1)
+	local trailing_rollover = false
+	if trailing:match("^%s*%-%- === day rollover .- %-%> %d%d%d%d%-%d%d%-%d%d ===%s*$") then
+		safe_ledger = safe_ledger .. trailing
+		trailing_rollover = _has_trailing_rollover(trailing)
+	end
+	local offset, date, segment_start = 0, nil, 1
+	local pos = 1
+	while true do
+		local _, e, next_date = safe_ledger:find(
+			"%-%- === day rollover .- %-%> (%d%d%d%d%-%d%d%-%d%d) ===", pos)
+		if not e then break end
+		date = next_date
+		segment_start = e + 1
+		pos = e + 1
+	end
+
+	pos = segment_start
+	while true do
+		local _, e, batch_ts, _, batch_end = safe_ledger:find(
+			"%-%- === ingest batch ([^%(]-) %(offset (%d+) %-%> (%d+),", pos)
+		if not e then break end
+		offset = tonumber(batch_end) or offset
+		if not date then date = batch_ts:match("(%d%d%d%d%-%d%d%-%d%d)") end
+		pos = e + 1
+	end
+	return { offset = offset, date = date, trailing_rollover = trailing_rollover }
+end
+
+-- Test seam for the restart/deduplication invariant above.
+M._local_ledger_replay_cursor = _local_ledger_replay_cursor
+
+-- Forward-declared: the replay below and the paced deletes call it; it is
+-- defined with the recovery coroutine it yields.
+local _recovery_pace
+-- Assigned beside M.request_metrics_maintenance; the ingest settles it.
+local _advance_maintenance
+
+--- Meta key holding the resumable state of a pending local-ledger replay. It
+--- is written when a fresh cache is created and removed once the replayed
+--- cursor and id counter are published; while present, ingest waits and every
+--- start resumes the replay at the persisted batch boundary.
+local LEDGER_REPLAY_KEY = "local_ledger_replay"
+
+--- Bytes between two progress lines of a long replay.
+local LEDGER_REPLAY_PROGRESS_BYTES = 32 * 1024 * 1024
+
+--- Meta key holding the resume point of a full aggregate rebuild. It commits in
+--- the same transaction as the rows it counts, so an interrupted rebuild resumes
+--- exactly there instead of clearing and walking everything again at each start.
+local RECOVERY_PROGRESS_KEY = "aggregate_recovery_progress"
+
+--- Order of a rebuild's stages inside one device partition.
+local RECOVERY_STAGE_RANK = { clear = 0, typing = 1, app_switch = 2, window_switch = 3, system = 4, network = 5 }
+
+--- Reads the pending replay state, or nil when no replay is pending.
+---@param db userdata
+---@return table|nil state
+local function _read_ledger_replay_state(db)
+	local stored = nil
+	for row in db:nrows("SELECT value FROM meta WHERE key=" .. _sq(LEDGER_REPLAY_KEY)) do
+		stored = row.value or ""
+	end
+	if stored == nil then return nil end
+	local ok, decoded = pcall(json.decode, stored)
+	if ok and LedgerReplay.is_state(decoded) then return decoded end
+	-- An unreadable state restarts the replay: batches are idempotent.
+	Logger.warn(LOG, "Local ledger replay state is unreadable; the replay restarts at byte 0.")
+	return LedgerReplay.new_state()
+end
+
+--- Persists the replay state; the cache row is the resume point of the next start.
+---@param db userdata
+---@param state table
+---@return boolean
+local function _write_ledger_replay_state(db, state)
+	local ok, encoded = pcall(json.encode, state)
+	if not ok or type(encoded) ~= "string" then return false end
+	return db:exec("INSERT OR REPLACE INTO meta(key, value) VALUES(" .. _sq(LEDGER_REPLAY_KEY) .. ", "
+		.. _sq(encoded) .. ");") == sqlite3.OK
+end
+
+--- Restore the exact replay owner's durable mode before publication or release.
+--- A refusal retains its flag so teardown can retry without closing the database.
+---@param db userdata
+---@param job table|nil Exact recovery owner, when running cooperatively.
+---@return boolean restored
+local function _restore_replay_durability(db, job)
+	local called, rc = pcall(db.exec, db, SqliteWriter.SYNCHRONOUS_PRAGMA)
+	if not called or rc ~= sqlite3.OK then
+		Logger.error(LOG, "Cannot restore the cache's durable commit mode; replay publication remains blocked.")
+		return false
+	end
+	if job then job.durability_off = nil end
+	return true
+end
+
+--- Replays the durable portion of this device's ledger into the cache in
+--- bounded steps. Inside the recovery coroutine each step stops at the slice
+--- budget and the coroutine yields, so the main thread never waits for more than
+--- one step; outside it (tests) the steps run back to back.
+---@param db userdata
+---@param state table Resumable replay state.
+---@return boolean ok
+---@return table cursor
+local function _replay_local_data_sql(db, state)
+	local empty_cursor = { offset = 0, date = nil }
+	local attrs = fs.attributes(_paths.data_sql_path)
+	local size = type(attrs) == "table" and math.tointeger(attrs.size) or nil
+	if size == nil or size < 0 or not LedgerReplay.is_state(state) or state.offset > size then
+		Logger.error(LOG, "Local data.sql size or replay state could not be verified.")
+		return false, empty_cursor
+	end
+	if size == 0 then return true, empty_cursor end
+	local started_ns, resumed_at = timer.absoluteTime(), state.offset or 0
+	local replay_job = _recovery
+	local next_progress = resumed_at + LEDGER_REPLAY_PROGRESS_BYTES
+	Logger.start(LOG, "Replaying the local ledger into a fresh cache from byte %d of %d…", resumed_at, size)
+	-- Every ledger batch is its own transaction: with synchronous=FULL each one
+	-- waits for a disk flush, which is what made the Mac replay 320 MB in 138 s.
+	-- The cache is disposable and the replay idempotent and resumable, so its
+	-- batches commit without a flush; the durable mode is restored before any
+	-- live write, and its first commit flushes the whole file.
+	if db:exec("PRAGMA synchronous = OFF;") ~= sqlite3.OK then
+		Logger.warn(LOG, "The replay keeps flushing every batch: %s.", tostring(db:errmsg()))
+	elseif replay_job then
+		-- An interrupted replay retains this exact restoration owner.
+		replay_job.durability_off = true
+	end
+	local function restore_durability()
+		return _restore_replay_durability(db, replay_job)
+	end
+	local exec = function(sql)
+		local rc = db:exec(sql)
+		if rc == sqlite3.OK then return true end
+		local detail = db:errmsg() or ("SQLite result " .. tostring(rc))
+		pcall(function() db:exec("ROLLBACK;") end)
+		return false, detail
+	end
+	while true do
+		local job = _recovery
+		local deadline = job and job.slice_start_ns and (job.slice_start_ns + RECOVERY_SLICE_NS)
+			or timer.absoluteTime()
+		local status, detail = LedgerReplay.step({
+			path = _paths.data_sql_path, size = size, state = state, exec = exec,
+			clock = timer.absoluteTime, deadline = deadline, cursor = _local_ledger_replay_cursor,
+		})
+		if status == "failed" then
+			restore_durability()
+			Logger.error(LOG, "Local data.sql replay failed at byte %d: %s.", state.offset, tostring(detail))
+			return false, empty_cursor
+		end
+		if status == "done" then
+			if not restore_durability() then return false, empty_cursor end
+			Logger.success(LOG, "Replayed %d durable local-ledger byte(s) (%d this start) in %.0f ms.",
+				state.offset, state.offset - resumed_at, (timer.absoluteTime() - started_ns) / 1e6)
+			return true, detail
+		end
+		if not _write_ledger_replay_state(db, state) then
+			Logger.warn(LOG, "Local ledger replay progress could not be saved; a restart repeats its last steps.")
+		end
+		if state.offset >= next_progress then
+			next_progress = state.offset + LEDGER_REPLAY_PROGRESS_BYTES
+			Logger.info(LOG, "Local ledger replay: %d of %d MB.", state.offset // (1024 * 1024), size // (1024 * 1024))
+		end
+		_recovery_pace()
+	end
+end
+
+-- Exposes the real replay boundary to the recovery regression fixture.
+M._replay_local_data_sql = _replay_local_data_sql
+
+--- Persists the resume point of a full rebuild.
+---@param db userdata
+---@param progress table Resume point; takes the walker context as it is now.
+---@return boolean written
+local function _write_recovery_progress(db, progress)
+	progress.ctx = Aggregator.get_ngram_ctx() or {}
+	local ok, encoded = pcall(json.encode, progress)
+	if not ok or type(encoded) ~= "string" then return false end
+	return db:exec("INSERT OR REPLACE INTO meta(key, value) VALUES(" .. _sq(RECOVERY_PROGRESS_KEY) .. ", "
+		.. _sq(encoded) .. ");") == sqlite3.OK
+end
+
+--- Reads the resume point of an interrupted rebuild of the current revision.
+--- Anything else restarts the rebuild, which is always safe.
+---@param db userdata
+---@return table|nil progress
+local function _read_recovery_progress(db)
+	local stored = nil
+	for row in db:nrows("SELECT value FROM meta WHERE key=" .. _sq(RECOVERY_PROGRESS_KEY)) do
+		stored = row.value
+	end
+	if type(stored) ~= "string" then return nil end
+	local ok, progress = pcall(json.decode, stored)
+	if ok and type(progress) == "table" and progress.revision == AGGREGATE_CACHE_REVISION
+		and type(progress.devices) == "table" and type(progress.cutoffs) == "table"
+		and progress.devices[math.tointeger(progress.index) or 0] ~= nil
+		and RECOVERY_STAGE_RANK[progress.stage] ~= nil then
+		progress.index = math.tointeger(progress.index)
+		return progress
+	end
+	Logger.warn(LOG, "Aggregate recovery progress is unreadable; the rebuild restarts.")
+	return nil
+end
+
+--- The resume point of the recovery running in this coroutine, or nil: a partial
+--- rebuild from ingest shares the flush below and has none.
+---@return table|nil progress
+local function _running_recovery_progress()
+	local job = _recovery
+	if _staging_recovery or job == nil or coroutine.running() ~= job.co then return nil end
+	return job.progress
+end
+
+--- Flush the current recovery walker batch atomically.
+---@param db userdata
+---@return boolean
+local function _flush_recovery_batch(db)
+	local begin_rc = db:exec("BEGIN TRANSACTION;")
+	if begin_rc ~= sqlite3.OK then
+		Logger.error(LOG, "Cannot begin aggregate recovery transaction: %s.", db:errmsg() or "?")
+		return false
+	end
+	local ok, flushed_or_err = pcall(Aggregator.flush, db)
+	if not ok or not flushed_or_err then
+		pcall(function() db:exec("ROLLBACK;") end)
+		Logger.error(LOG, "Aggregate recovery flush failed: %s.", tostring(flushed_or_err or "pending aggregate rows"))
+		return false
+	end
+	-- Inside the transaction: a resume point ahead of or behind its rows would
+	-- lose events or count them twice.
+	local progress = _running_recovery_progress()
+	if progress ~= nil and not _write_recovery_progress(db, progress) then
+		pcall(function() db:exec("ROLLBACK;") end)
+		Logger.error(LOG, "Aggregate recovery progress could not be written: %s.", db:errmsg() or "?")
+		return false
+	end
+	local commit_rc = db:exec("COMMIT;")
+	if commit_rc ~= sqlite3.OK then
+		pcall(function() db:exec("ROLLBACK;") end)
+		Logger.error(LOG, "Cannot commit aggregate recovery transaction: %s.", db:errmsg() or "?")
+		return false
+	end
+	Aggregator.reset_batch()
+	return true
+end
+
+--- Remove a single device partition in one transaction (outside the recovery).
+---@param db userdata
+---@param device_id string
+---@return boolean
+local function _clear_derived_device_rows_at_once(db, device_id)
+	local begin_rc = db:exec("BEGIN TRANSACTION;")
+	if begin_rc ~= sqlite3.OK then return false end
+	local ok, err = pcall(function()
+		for _, table_name in ipairs(DERIVED_DEVICE_TABLES) do
+			local rc = db:exec("DELETE FROM " .. table_name .. " WHERE device_id=" .. _sq(device_id) .. ";")
+			if rc ~= sqlite3.OK then error(db:errmsg() or ("cannot clear " .. table_name)) end
+		end
+		local commit_rc = db:exec("COMMIT;")
+		if commit_rc ~= sqlite3.OK then error(db:errmsg() or "cannot commit derived cleanup") end
+	end)
+	if not ok then
+		_rollback_sqlite(db, "Data.sql outbox clear")
+		Logger.error(LOG, "Cannot clear derived device rows: %s.", tostring(err))
+		return false
+	end
+	return true
+end
+
+
+--- Remove a single device partition before deterministic re-aggregation.
+--- Inside the cooperative recovery it deletes in committed batches with a pace
+--- point between them, so one slice never holds a whole partition delete; the
+--- partition is not marked rebuilt until the recovery ends, so a stop between
+--- batches repeats it at the next start.
+---@param db userdata
+---@param device_id string
+---@return boolean
+local function _clear_derived_device_rows(db, device_id)
+	local job = _recovery
+	if job == nil or coroutine.running() ~= job.co then
+		return _clear_derived_device_rows_at_once(db, device_id)
+	end
+	-- Small partitions keep the single-transaction delete; only a table holding
+	-- more than one batch for this device is deleted in paced batches.
+	local partition = " WHERE device_id=" .. _sq(device_id)
+	local large = {}
+	for _, table_name in ipairs(DERIVED_DEVICE_TABLES) do
+		for _ in db:nrows("SELECT 1 AS left_over FROM " .. table_name .. partition
+			.. " LIMIT 1 OFFSET " .. RECOVERY_DELETE_BATCH_ROWS .. ";") do
+			large[#large + 1] = table_name
+		end
+	end
+	for _, table_name in ipairs(large) do
+		local statement = "DELETE FROM " .. table_name .. " WHERE rowid IN (SELECT rowid FROM " .. table_name
+			.. partition .. " LIMIT " .. RECOVERY_DELETE_BATCH_ROWS .. ");"
+		local probe = "SELECT 1 AS left_over FROM " .. table_name .. partition .. " LIMIT 1 OFFSET "
+			.. RECOVERY_DELETE_BATCH_ROWS .. ";"
+		local remaining = true
+		while remaining do
+			local ok, err = pcall(function()
+				if db:exec("BEGIN TRANSACTION;") ~= sqlite3.OK then error(db:errmsg() or "cannot begin derived cleanup") end
+				if db:exec(statement) ~= sqlite3.OK then error(db:errmsg() or ("cannot clear " .. table_name)) end
+				if db:exec("COMMIT;") ~= sqlite3.OK then error(db:errmsg() or "cannot commit derived cleanup") end
+				remaining = false
+				for _ in db:nrows(probe) do remaining = true end
+			end)
+			if not ok then
+				_rollback_sqlite(db, "Derived row cleanup")
+				Logger.error(LOG, "Cannot clear derived device rows: %s.", tostring(err))
+				return false
+			end
+			-- Between two committed batches: a yield never leaves a transaction open.
+			_recovery_pace()
+		end
+	end
+	-- What is left is at most one batch per table: one transaction, as before.
+	return _clear_derived_device_rows_at_once(db, device_id)
+end
+
+--- Return the local-only ledger batch waiting to reach data.sql.
+--- This value must never be appended to data.sql itself: it is a cursor-local
+--- recovery record, not data to replay into a different device cache.
+local function _get_local_outbox(db)
+	local outbox = ""
+	for row in db:nrows("SELECT value FROM meta WHERE key=" .. _sq(DATA_SQL_OUTBOX_KEY)) do
+		outbox = type(row.value) == "string" and row.value or ""
+	end
+	return outbox
+end
+
+--- Yields the running aggregate recovery once its slice has spent its budget.
+--- A no-op outside that coroutine, so the ingest partition rebuild and tests that
+--- call the rebuild directly keep running it to completion. Callers yield only
+--- between SQLite transactions, never inside one.
+_recovery_pace = function()
+	local job = _recovery
+	if job == nil or coroutine.running() ~= job.co then return end
+	if timer.absoluteTime() - job.slice_start_ns >= RECOVERY_SLICE_NS then coroutine.yield() end
+end
+
+--- Validate a missing/lagging canonical prefix against the committed local outbox.
+--- Membership, not min/max, matters because global event ids may be sparse.
+local function _outbox_covers_typing(db, device_id, after_id)
+	if device_id ~= _device_id then return false end
+	local outbox = _get_local_outbox(db)
+	local complete = _last_complete_ledger_offset(outbox)
+	if complete == 0 or not outbox:sub(complete + 1):match("^%s*$") then return false end
+	local facts = Export._typing_rollover_boundaries(outbox, _sq(device_id), true, _has_trailing_rollover)
+	if not facts or facts.unreadable or facts.has_markers then return false end
+	local condition = after_id ~= nil and (" AND id>" .. tostring(after_id)) or ""
+	local covered = true
+	for row in db:nrows("SELECT id FROM events_typing WHERE device_id=" .. _sq(device_id) .. condition) do
+		if not facts.ids[tonumber(row.id)] then covered = false end
+	end
+	return covered
+end
+
+--- Read boundaries before any derived DELETE; cache-only rows need exact authority.
+local function _typing_replay_cutoffs(db, device_id)
+	local raw_max = nil
+	for row in db:nrows("SELECT MAX(id) AS max_id FROM events_typing WHERE device_id=" .. _sq(device_id)) do
+		raw_max = tonumber(row.max_id)
+	end
+	if raw_max == nil then return {} end
+	if device_id == "." or device_id == ".." or device_id:find("/", 1, true)
+		or device_id:find("\\", 1, true) or device_id:find("\0", 1, true) then
+		return nil, "raw device has no canonical folder identity"
+	end
+	local path = device_id == _device_id and _paths.data_sql_path
+		or (_paths.metrics_dir .. "by_device/" .. device_id .. "/data.sql")
+	local attrs = fs.attributes(path)
+	if not attrs or (attrs.size or 0) == 0 then
+		if _outbox_covers_typing(db, device_id) then return {} end
+		return nil, "retained typing has no canonical ledger or complete local outbox"
+	end
+	local ledger = FileSystem.read(path)
+	if type(ledger) ~= "string" or #ledger ~= attrs.size then
+		return nil, "canonical typing ledger could not be read completely"
+	end
+	local facts, detail = Export._typing_rollover_boundaries(ledger, _sq(device_id), false,
+		_has_trailing_rollover, _recovery_pace)
+	if not facts then return nil, detail end
+	if facts.regression then
+		Logger.warn(LOG, "Typing ids restart at ledger byte %d (id %d after rollover bound %d): "
+			.. "rebuilding without day-boundary context resets.",
+			facts.regression.at, facts.regression.id, facts.regression.bound)
+	end
+	if facts.has_markers and raw_max > (facts.max_id or -1)
+		and not _outbox_covers_typing(db, device_id, facts.max_id or -1) then
+		return nil, "typing ahead of canonical rollover facts is not owned by the local outbox"
+	end
+	return facts.cutoffs
+end
+
+--- Rebuild UI aggregate tables from canonical raw rows.  Passing device ids
+--- rebuilds only those partitions after a foreign ledger import; omitting it
+--- repairs the entire cache (first start or an aggregate-version migration).
+---@param db userdata
+---@param requested_device_ids string[]|nil
+---@return boolean
+local function _rebuild_aggregates_from_raw(db, requested_device_ids)
+	local device_ids = {}
+	local rebuilding_local = false
+	-- The resume point of an interrupted full rebuild, read before it moves on.
+	local resume = requested_device_ids == nil and _running_recovery_progress() or nil
+	if resume ~= nil then
+		device_ids, rebuilding_local = resume.devices, true
+	elseif type(requested_device_ids) == "table" then
+		local seen = {}
+		for _, device_id in ipairs(requested_device_ids) do
+			if type(device_id) == "string" and device_id ~= "" and not seen[device_id] then
+				seen[device_id] = true
+				table.insert(device_ids, device_id)
+				if device_id == _device_id then rebuilding_local = true end
+			end
+		end
+	else
+		local device_sql = [[SELECT DISTINCT device_id FROM (
+			SELECT device_id FROM events_typing UNION SELECT device_id FROM events_app_switch
+			UNION SELECT device_id FROM events_window_switch UNION SELECT device_id FROM events_system
+		) ORDER BY device_id;]]
+		local ok_devices, device_err = pcall(function()
+			for row in db:nrows(device_sql) do
+				if type(row.device_id) == "string" and row.device_id ~= "" then
+					table.insert(device_ids, row.device_id)
+				end
+			end
+		end)
+		if not ok_devices then
+			Logger.error(LOG, "Cannot enumerate raw devices for aggregate recovery: %s.", tostring(device_err))
+			return false
+		end
+		-- Leave the live local context selected at the end of a full recovery.
+		for i = #device_ids, 1, -1 do
+			if device_ids[i] == _device_id then
+				rebuilding_local = true
+				table.remove(device_ids, i)
+				table.insert(device_ids, _device_id)
+				break
+			end
+		end
+		if not rebuilding_local then table.insert(device_ids, _device_id); rebuilding_local = true end
+	end
+	if #device_ids == 0 then return true end
+
+	-- Validate every partition first; a later source refusal must not erase an earlier one.
+	-- A resumed rebuild kept them: the scan reads the whole ledger into memory.
+	local boundary_maps = resume ~= nil and resume.cutoffs or {}
+	if resume == nil then
+		for _, replay_device_id in ipairs(device_ids) do
+			local read_ok, cutoffs, detail = pcall(_typing_replay_cutoffs, db, replay_device_id)
+			if not read_ok or not cutoffs then
+				Logger.error(LOG, "Cannot read typing rollover facts: %s.", tostring(read_ok and detail or cutoffs))
+				return false
+			end
+			boundary_maps[replay_device_id] = cutoffs
+		end
+	end
+
+	-- Only the full rebuild of the recovery coroutine owns a resume point.
+	local progress = resume
+	local job = _recovery
+	if progress == nil and requested_device_ids == nil and job ~= nil and coroutine.running() == job.co then
+		progress = { revision = AGGREGATE_CACHE_REVISION, devices = device_ids, cutoffs = boundary_maps,
+			index = 1, stage = "clear", segment = 1 }
+		if _write_recovery_progress(db, progress) then
+			job.progress = progress
+		else
+			Logger.warn(LOG, "Aggregate recovery progress could not be saved; a restart repeats the whole rebuild.")
+			progress = nil
+		end
+	end
+
+	-- Foreign-only recovery must not inject the other device's n-gram continuity
+	-- into the next local typing event.
+	local saved_local_ctx = nil
+	if not rebuilding_local then
+		local ok_ctx, encoded = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
+		if ok_ctx then saved_local_ctx = encoded end
+	end
+
+	for device_index = progress and progress.index or 1, #device_ids do
+		local replay_device_id = device_ids[device_index]
+		-- The exact row this walk resumes after, copied before `progress` moves on.
+		local start = nil
+		if resume ~= nil and device_index == resume.index and resume.stage ~= "clear" then
+			start = { stage = resume.stage, segment = resume.segment, ts = resume.ts, id = resume.id, ctx = resume.ctx }
+		end
+		if start == nil and not _clear_derived_device_rows(db, replay_device_id) then return false end
+		Aggregator.set_device_id(replay_device_id)
+		Aggregator.reset_ngram_ctx()
+		Aggregator.reset_batch()
+		if start ~= nil then Aggregator.set_ngram_ctx(start.ctx or {})
+		elseif progress ~= nil then progress.stage, progress.segment, progress.ts, progress.id = "typing", 1, nil, nil end
+
+		local function due(stage)
+			return start == nil or RECOVERY_STAGE_RANK[stage] >= RECOVERY_STAGE_RANK[start.stage]
+		end
+		-- The walk's own (ts, id) order: rows up to the resume point are committed.
+		local function after_resume_point(stage, segment)
+			if start == nil or start.ts == nil or start.stage ~= stage or start.segment ~= segment then return "" end
+			local stamp = _sq(start.ts)
+			return " AND (ts>" .. stamp .. " OR (ts=" .. stamp .. " AND id>"
+				.. tostring(math.tointeger(start.id) or start.id) .. "))"
+		end
+		local function reached(stage, segment, row)
+			if progress ~= nil then
+				progress.stage, progress.segment, progress.ts, progress.id = stage, segment, row.ts, row.id
+			end
+		end
+		local processed = 0
+		local function flush_if_needed(force)
+			if processed == 0 or (not force and processed < REPLAY_FLUSH_EVENT_COUNT) then return true end
+			if not _flush_recovery_batch(db) then return false end
+			processed = 0
+			return true
+		end
+		local function walked()
+			processed = processed + 1
+			if not flush_if_needed(false) then return false end
+			-- After the flush: a yield never leaves a recovery transaction open.
+			if processed % RECOVERY_PACE_ROWS == 0 then _recovery_pace() end
+			return true
+		end
+		local quoted_device = _sq(replay_device_id)
+		-- A row's hour, night wake and day are read in the local time its user
+		-- lived: its UTC ts plus its recorded offset (keystats.local_time,
+		-- maintainer decision KMD-1). A Linux row recorded before the column held
+		-- UTC and is read with this Mac's current offset, which the log notes.
+		local device_os
+		for row in db:nrows("SELECT os FROM devices WHERE device_id=" .. quoted_device) do device_os = row.os end
+		local legacy_utc, current_offset, legacy_rows = device_os == "linux", LocalTime.offset_at(os.time()), 0
+		local function lived(row)
+			local offset = math.tointeger(row.utc_offset_min)
+			if offset == nil and legacy_utc then legacy_rows = legacy_rows + 1 end
+			return LocalTime.local_ts(row.ts, offset, legacy_utc, current_offset)
+		end
+		local ok, replay_err = pcall(function()
+			local cutoffs = boundary_maps[replay_device_id]
+			local first_segment = start ~= nil and start.stage == "typing" and start.segment or 1
+			local previous = cutoffs[first_segment - 1]
+			if due("typing") then
+				for segment = first_segment, #cutoffs + 1 do
+					local upper = cutoffs[segment]
+					local range = previous ~= nil and (" AND id>" .. tostring(previous)) or ""
+					if upper ~= nil then range = range .. " AND id<=" .. tostring(upper) end
+					range = range .. after_resume_point("typing", segment)
+					for row in db:nrows("SELECT ts, app, title, layout, events_json, id, utc_offset_min FROM events_typing WHERE device_id="
+						.. quoted_device .. range .. " ORDER BY ts, id") do
+						local decrypt_ok, plaintext = pcall(TextCipher.decrypt, row.events_json)
+						if not decrypt_ok or type(plaintext) ~= "string" then error("typing event decryption failed", 0) end
+						-- The producer writes an event array; older empty records may be
+						-- encoded as {}. A JSON object or sparse/malformed array must not
+						-- be certified as an empty successful reconstruction.
+						if not plaintext:match("^%s*%[") and not plaintext:match("^%s*{%s*}%s*$") then
+							error("typing event shape refused", 0)
+						end
+						local decoded_ok, events = pcall(json.decode, plaintext)
+						if not decoded_ok or type(events) ~= "table" then error("typing event decoding failed", 0) end
+						local count = 0
+						for key, event in pairs(events) do
+							count = count + 1
+							if math.type(key) ~= "integer" or key < 1 or type(event) ~= "table"
+								or type(event[1]) ~= "string" then error("typing event shape refused", 0) end
+						end
+						for index = 1, count do
+							if events[index] == nil then error("typing event shape refused", 0) end
+						end
+						Aggregator.walk_typing({ timestamp=lived(row), app=row.app, title=row.title, layout=row.layout, events=events })
+						plaintext = nil
+						reached("typing", segment, row)
+						if not walked() then error("typing aggregate flush failed") end
+					end
+					if upper ~= nil then
+						-- Commit this boundary even when the previous row ended exactly at a
+						-- flush limit: the closure and its resume point are one transaction.
+						assert(Aggregator.settle_contexts() == true, "cannot settle typing boundary")
+						Aggregator.reset_ngram_ctx()
+						if progress ~= nil then
+							progress.stage, progress.segment, progress.ts, progress.id = "typing", segment + 1, nil, nil
+						end
+						processed = math.max(processed, 1)
+						if not flush_if_needed(true) then error("typing boundary flush failed") end
+						previous = upper
+					end
+				end
+			end
+			if due("app_switch") then
+				for row in db:nrows("SELECT ts, prev_app, next_app, duration_ms, id, utc_offset_min FROM events_app_switch WHERE device_id=" .. quoted_device .. after_resume_point("app_switch", 1) .. " ORDER BY ts, id") do
+					Aggregator.walk_app_switch({ timestamp=lived(row), prev_app=row.prev_app, next_app=row.next_app, duration_ms=row.duration_ms })
+					reached("app_switch", 1, row)
+					if not walked() then error("app-switch aggregate flush failed") end
+				end
+			end
+			if due("window_switch") then
+				for row in db:nrows("SELECT ts, app, prev_title, next_title, duration_ms, id, utc_offset_min FROM events_window_switch WHERE device_id=" .. quoted_device .. after_resume_point("window_switch", 1) .. " ORDER BY ts, id") do
+					Aggregator.walk_window_switch({ timestamp=lived(row), app=row.app, prev_title=row.prev_title, next_title=row.next_title, duration_ms=row.duration_ms })
+					reached("window_switch", 1, row)
+					if not walked() then error("window-switch aggregate flush failed") end
+				end
+			end
+			if due("system") then
+				for row in db:nrows("SELECT ts, action, metadata_json, id, utc_offset_min FROM events_system WHERE device_id=" .. quoted_device .. after_resume_point("system", 1) .. " ORDER BY ts, id") do
+					local entry = {}
+					local decoded_ok, metadata = pcall(json.decode, row.metadata_json or "{}")
+					if decoded_ok and type(metadata) == "table" then
+						for key, value in pairs(metadata) do entry[key] = value end
+					end
+					entry.timestamp, entry.action = lived(row), row.action
+					Aggregator.walk_system_event(entry)
+					reached("system", 1, row)
+					if not walked() then error("system aggregate flush failed") end
+				end
+			end
+			-- Windows records its Wi-Fi changes as network_change rows; its own
+			-- rebuild counts the transitions among them with the rows above.
+			if due("network") then
+				for row in db:nrows("SELECT ts, kind, meta_json, id, utc_offset_min FROM events_network WHERE device_id=" .. quoted_device .. after_resume_point("network", 1) .. " ORDER BY ts, id") do
+					if row.kind == "network_change" then
+						local decoded_ok, metadata = pcall(json.decode, row.meta_json or "{}")
+						if decoded_ok and NetworkTransitions.is_wifi_change(metadata) then
+							Aggregator.walk_system_event({ timestamp = lived(row), action = "wifi_change" })
+						end
+					end
+					reached("network", 1, row)
+					if not walked() then error("network aggregate flush failed") end
+				end
+			end
+			if not flush_if_needed(true) then error("final aggregate flush failed") end
+			if legacy_rows > 0 then
+				Logger.info(LOG, "%d row(s) of Linux device %s predate the UTC offset column; read with this Mac's offset (%+d min).",
+					legacy_rows, tostring(replay_device_id), current_offset)
+			end
+		end)
+		if not ok then
+			Aggregator.set_device_id(_device_id)
+			Aggregator.reset_batch()
+			if saved_local_ctx then
+				local restored_ok, restored_ctx = pcall(json.decode, saved_local_ctx)
+				if restored_ok and type(restored_ctx) == "table" then Aggregator.set_ngram_ctx(restored_ctx)
+				else Aggregator.reset_ngram_ctx() end
+			else
+				Aggregator.reset_ngram_ctx()
+			end
+			Logger.error(LOG, "Device aggregate recovery failed: %s.", tostring(replay_err))
+			return false
+		end
+		if progress ~= nil and device_index < #device_ids then
+			progress.index, progress.stage, progress.segment, progress.ts, progress.id =
+				device_index + 1, "clear", 1, nil, nil
+			if not _write_recovery_progress(db, progress) then
+				Logger.warn(LOG, "Aggregate recovery progress could not be saved between two devices.")
+			end
+		end
+	end
+	Aggregator.set_device_id(_device_id)
+	if saved_local_ctx then
+		local restored_ok, restored_ctx = pcall(json.decode, saved_local_ctx)
+		if restored_ok and type(restored_ctx) == "table" then Aggregator.set_ngram_ctx(restored_ctx)
+		else Aggregator.reset_ngram_ctx() end
+	end
+	return true
+end
+
+--- Rebuild each partition in a private SQLite snapshot, then atomically publish
+--- only if the canonical handle and its complete change witness are unchanged.
+--- No intermediate stage cursor is durable: an interrupted job starts again.
+local _aggregate_cache_revision
+local function _publish_rebuilt_partitions(owner, requested_device_ids)
+	local devices, seen = {}, {}
+	local function add(id)
+		if type(id) == "string" and id ~= "" and not seen[id] then
+			seen[id] = true; devices[#devices + 1] = id
+		end
+	end
+	local initial = RebuildSnapshot.witness(owner)
+	if not initial or SqliteWriter.get_db() ~= owner then return false end
+	if type(requested_device_ids) == "table" then
+		for _, id in ipairs(requested_device_ids) do add(id) end
+	else
+		local enumerated = pcall(function()
+			for row in owner:nrows([[SELECT DISTINCT device_id FROM (
+				SELECT device_id FROM events_typing UNION SELECT device_id FROM events_app_switch
+				UNION SELECT device_id FROM events_window_switch UNION SELECT device_id FROM events_system
+			) ORDER BY device_id;]]) do add(row.device_id) end
+		end)
+		if not enumerated then return false end
+		for i = #devices, 1, -1 do if devices[i] == _device_id then table.remove(devices, i) end end
+		seen[_device_id] = nil; add(_device_id)
+	end
+	if #devices == 0 then return true end
+	-- Revoke the old global certificate before publishing any partition. The
+	-- same lock verifies that enumeration observed the captured source.
+	local previous_revision, begin_open = nil, false
+	local fenced = pcall(function()
+		assert(owner:exec("BEGIN IMMEDIATE;") == sqlite3.OK, "rebuild fence refused")
+		begin_open = true
+		assert(SqliteWriter.get_db() == owner and RebuildSnapshot.same(initial, RebuildSnapshot.witness(owner)), "source changed")
+		previous_revision = _aggregate_cache_revision(owner)
+		assert(owner:exec("INSERT OR REPLACE INTO meta(key,value) VALUES('aggregate_cache_revision','0');") == sqlite3.OK,
+			"cannot revoke old certificate")
+		initial = assert(RebuildSnapshot.witness(owner), "cannot observe fenced source")
+		assert(owner:exec("COMMIT;") == sqlite3.OK, "cannot commit rebuild fence")
+		begin_open = false
+	end)
+	if not fenced then
+		if begin_open then
+			local rolled, rc = pcall(owner.exec, owner, "ROLLBACK;")
+			if not rolled or rc ~= sqlite3.OK then SqliteWriter.quarantine_db(owner) end
+		end
+		return false
+	end
+	local job = _recovery
+	local snapshot, failure, poisoned = RebuildSnapshot.open(owner, sqlite3, DERIVED_DEVICE_TABLES,
+		SqliteWriter.get_db, _recovery_pace, timer.absoluteTime, function(cleanup)
+			if job and coroutine.running() == job.co then job.stage_cleanup = cleanup end
+		end, { acquire = SqliteWriter.acquire_backup_source, release = SqliteWriter.release_backup_source })
+	if not snapshot then
+		if poisoned then SqliteWriter.quarantine_db(owner) end
+		if job then job.stage_cleanup = nil end
+		Logger.error(LOG, "Cannot create aggregate reconstruction snapshot: %s.", tostring(failure))
+		return false
+	end
+	local worked, accepted = pcall(function()
+		if not RebuildSnapshot.same(initial, snapshot.captured) then return false end
+		-- Refuse any unproved ledger before publishing the first partition.
+		for _, device in ipairs(devices) do
+			local ok, cutoffs = pcall(_typing_replay_cutoffs, snapshot.db, device)
+			if not ok or not cutoffs then return false end
+		end
+		for index, device in ipairs(devices) do
+			_staging_recovery = true
+			local walked, result = pcall(_rebuild_aggregates_from_raw, snapshot.db, { device })
+			_staging_recovery = false
+			if not walked or result ~= true then return false end
+			-- Every published partition invalidates readers even if a later
+			-- partition fails; only the last can certify the whole rebuild.
+			local finish_sql = Queries.render("meta.rev_bump", "native")
+			if index == #devices then
+				local full = requested_device_ids == nil
+				local compatible = full or previous_revision == AGGREGATE_CACHE_REVISION
+				local parts = {}
+				if compatible then
+					local encoded_ok, context = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
+					if not encoded_ok or type(context) ~= "string" then return false end
+					parts[#parts + 1] = "UPDATE meta SET value=" .. _sq(context) .. " WHERE key='ngram_ctx_json';"
+					parts[#parts + 1] = "UPDATE meta SET value=" .. _sq(AGGREGATE_CACHE_REVISION) .. " WHERE key='aggregate_cache_revision';"
+					parts[#parts + 1] = "DELETE FROM meta WHERE key=" .. _sq(RECOVERY_PROGRESS_KEY) .. ";"
+				end
+				parts[#parts + 1] = Queries.render("meta.rev_bump", "native")
+				finish_sql = table.concat(parts, "\n")
+			end
+			local published, next_witness, poisoned = RebuildSnapshot.publish(snapshot, _sq(device), finish_sql)
+			if poisoned then SqliteWriter.quarantine_db(owner) end
+			if not published then return false end
+			snapshot.captured = next_witness
+			-- Do not recopy already published partitions into the next attachment.
+			for _, name in ipairs(DERIVED_DEVICE_TABLES) do
+				if snapshot.db:exec("DELETE FROM temp." .. name .. " WHERE device_id=" .. _sq(device) .. ";") ~= sqlite3.OK then
+					return false
+				end
+			end
+		end
+		return true
+	end)
+	_staging_recovery = false
+	local closed = RebuildSnapshot.close(snapshot)
+	if job then job.stage_cleanup = nil end
+	return worked and accepted == true and closed
+end
+
+--- Synchronise cache metadata after a successful fresh-cache recovery.
+---@param db userdata
+---@param cursor table
+local function _persist_recovery_state(db, cursor)
+	local max_id = 0
+	for row in db:nrows("SELECT MAX(id) AS max_id FROM ("
+		.. "SELECT id FROM events_typing WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_app_switch WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_window_switch WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_shortcut WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_system WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_hotstring WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_llm WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_session WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_clipboard WHERE device_id=" .. _sq(_device_id)
+		.. ")") do
+		max_id = tonumber(row.max_id) or 0
+	end
+	local context_ok, context_json = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
+	if not context_ok or type(context_json) ~= "string" then
+		Logger.error(LOG, "Cannot encode the replayed typing context; replay publication remains pending.")
+		return false
+	end
+	local old_id = SqliteWriter.get_next_event_id()
+	local published, failure = pcall(function()
+		assert(db:exec("BEGIN TRANSACTION;") == sqlite3.OK, "cannot begin replay publication")
+		SqliteWriter.set_next_event_id(max_id + 1)
+		assert(SqliteWriter.persist_next_event_id() == true, "cannot publish the replayed event id")
+		assert(db:exec(string.format("UPDATE meta SET value='%d' WHERE key='today_log_offset';", tonumber(cursor.offset) or 0)) == sqlite3.OK,
+			"cannot publish the replayed cursor")
+		assert(db:exec("UPDATE meta SET value=" .. _sq(cursor.date or "") .. " WHERE key='today_log_date';") == sqlite3.OK,
+			"cannot publish the replayed date")
+		assert(db:exec("UPDATE meta SET value=" .. _sq(context_json) .. " WHERE key='ngram_ctx_json';") == sqlite3.OK,
+			"cannot publish the replayed context")
+		assert(db:exec("COMMIT;") == sqlite3.OK, "cannot commit replay publication")
+	end)
+	if not published then
+		local rolled_back, rollback_rc = pcall(db.exec, db, "ROLLBACK;")
+		if not rolled_back or rollback_rc ~= sqlite3.OK then
+			Logger.error(LOG, "Replay publication rollback remains pending.")
+		end
+		SqliteWriter.set_next_event_id(old_id)
+		Logger.error(LOG, "Replay metadata publication refused: %s.", tostring(failure))
+		return false
+	end
+	return true
+end
+
+--- Return the aggregate-cache compatibility marker from meta.
+---@param db userdata
+---@return string
+_aggregate_cache_revision = function(db)
+	local revision = "0"
+	for row in db:nrows("SELECT value FROM meta WHERE key='aggregate_cache_revision'") do
+		revision = tostring(row.value or "0")
+	end
+	return revision
+end
+
+--- Copies the cache of the old token encoding aside before its keys are rebuilt.
+--- The ledgers stay the source, so a refused copy is reported, not fatal; a copy
+--- that already exists is the older one and stays. SQLite refuses VACUUM while
+--- any statement of this connection is running, so every row loop that ran
+--- before it must drain its statement (tests/meta/lua_safety/test_sqlite_row_loops_drain.lua).
+---@param db userdata
+local function _keep_pre_encoding_cache(db)
+	local backup = _paths.sqlite_path .. PRE_ENCODING_BACKUP_SUFFIX
+	if fs.attributes(backup) ~= nil then return end
+	if db:exec("VACUUM INTO " .. _sq(backup) .. ";") ~= sqlite3.OK then
+		Logger.error(LOG, "Cannot keep the metrics cache before its rebuild: %s.", tostring(db:errmsg()))
+		return
+	end
+	Logger.info(LOG, "Metrics cache kept as %s before the n-gram keys are rebuilt.", backup)
+end
+
+--- Mark a fully rebuilt derived cache and make every dashboard snapshot stale.
+---@param db userdata
+---@param partition_only boolean|nil A partial refresh cannot certify an older global cache.
+---@return boolean
+local function _mark_aggregate_cache_rebuilt(db, partition_only)
+	local begin_rc = db:exec("BEGIN TRANSACTION;")
+	if begin_rc ~= sqlite3.OK then return false end
+	local ok, err = pcall(function()
+		-- A foreign-only refresh has no authority over an unfinished global migration.
+		if partition_only ~= true or _aggregate_cache_revision(db) == AGGREGATE_CACHE_REVISION then
+			local context_json = json.encode(Aggregator.get_ngram_ctx() or {})
+			if type(context_json) ~= "string" then error("cannot encode rebuilt typing context") end
+			_exec_sqlite_or_error(db, "UPDATE meta SET value=" .. _sq(context_json)
+				.. " WHERE key='ngram_ctx_json';", "cannot persist rebuilt typing context")
+			local version_rc = db:exec("UPDATE meta SET value=" .. _sq(AGGREGATE_CACHE_REVISION)
+				.. " WHERE key='aggregate_cache_revision';")
+			if version_rc ~= sqlite3.OK then error(db:errmsg() or "cannot update aggregate cache revision") end
+			_exec_sqlite_or_error(db, "DELETE FROM meta WHERE key=" .. _sq(RECOVERY_PROGRESS_KEY) .. ";",
+				"cannot retire the rebuild's resume point")
+		end
+		local rev_rc = db:exec(Queries.render("meta.rev_bump", "native"))
+		if rev_rc ~= sqlite3.OK then error(db:errmsg() or "cannot update metrics revision") end
+		local commit_rc = db:exec("COMMIT;")
+		if commit_rc ~= sqlite3.OK then error(db:errmsg() or "cannot commit aggregate cache revision") end
+	end)
+	if not ok then
+		pcall(function() db:exec("ROLLBACK;") end)
+		Logger.error(LOG, "Cannot mark aggregate cache rebuilt: %s.", tostring(err))
+		return false
+	end
+	return true
+end
+
+--- Clear the outbox only after its full batch has reached the append-only ledger.
+--- A failure after the write leaves an idempotent INSERT OR IGNORE batch to retry.
+local function _clear_local_outbox(db)
+	local ok, err = pcall(function()
+		_exec_sqlite_or_error(db, "BEGIN TRANSACTION;", "cannot begin data.sql outbox clear")
+		_exec_sqlite_or_error(db,
+			"UPDATE meta SET value='' WHERE key=" .. _sq(DATA_SQL_OUTBOX_KEY) .. ";",
+			"cannot clear data.sql outbox")
+		_exec_sqlite_or_error(db, "COMMIT;", "cannot commit data.sql outbox clear")
+	end)
+	if not ok then
+		_rollback_sqlite(db, "Data.sql outbox clear")
+		Logger.error(LOG, "Cannot clear committed data.sql outbox: %s.", tostring(err))
+		return false
+	end
+	return true
+end
+
+--- Admits only complete ledger transactions and harmless trailing comments.
+local function _ledger_origin_is_complete(content)
+	local committed = _last_complete_ledger_offset(content)
+	local suffix = content:sub(committed + 1):gsub("%-%-[^\n]*", ""):gsub("%s+", "")
+	return suffix == "" or (committed == 0 and suffix == "PRAGMAforeign_keys=OFF;")
+end
+
+--- Flush a committed local batch before allocating any new event id.
+--- The adjacent durable intent also survives loss of the disposable SQLite cache.
+--- @return boolean True when the exact batch and its publication journal settled.
+--- @param stage function|nil Receives each LedgerAppend.FLUSH_STAGES name (ingest trace).
+local function _flush_local_data_sql_outbox(db, stage)
+	local batch_text = _get_local_outbox(db)
+	return LedgerAppend.flush(_paths.data_sql_path, batch_text, function()
+		return _clear_local_outbox(db)
+	end, _ledger_origin_is_complete, stage)
+end
+
+--- Commits the idempotent rollover cursor reset before its durable intent settles.
+local function _reset_rollover_cache(next_date, receipt)
+	if type(receipt) ~= "table" or type(receipt.path) ~= "string"
+		or type(receipt.resolved) ~= "string" or type(receipt.dev) ~= "number"
+		or type(receipt.ino) ~= "number" or type(receipt.offset) ~= "number"
+		or type(receipt.batch) ~= "string" then return false end
+	local identity_ok, identity = pcall(json.encode,
+		{ receipt.path, receipt.resolved, receipt.dev, receipt.ino, receipt.offset, receipt.batch })
+	if not identity_ok or type(identity) ~= "string" then return false end
+	local db = SqliteWriter.get_db()
+	if not db or Aggregator.has_pending_batch() then return false end
+	local encoded_ok, encoded = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
+	if not encoded_ok or type(encoded) ~= "string" then return false end
+	local begun, committed, replay_scheduled = false, false, false
+	local ok, err = pcall(function()
+		_exec_sqlite_or_error(db, "BEGIN TRANSACTION;", "cannot begin rollover reset")
+		begun = true
+		if _get_local_outbox(db) ~= "" then error("rollover reset requires an empty SQL outbox", 0) end
+		local previous_identity
+		for row in db:nrows("SELECT value FROM meta WHERE key='rollover_settlement_receipt';") do previous_identity = row.value end
+		if _aggregate_cache_revision(db) ~= AGGREGATE_CACHE_REVISION then
+			-- An old reset may already have committed before upgrade. In either
+			-- phase, the durable ledger must be replayed before certification.
+			assert(_write_ledger_replay_state(db, LedgerReplay.new_state()), "cannot schedule complete ledger replay")
+			replay_scheduled = true
+			_exec_sqlite_or_error(db, "UPDATE meta SET value='0' WHERE key='aggregate_cache_revision';",
+				"cannot revoke old aggregate certification")
+		elseif previous_identity ~= identity then
+			-- A cold start can recover the intent before the live walker is restored.
+			local persisted
+			for row in db:nrows("SELECT value FROM meta WHERE key='ngram_ctx_json';") do persisted = row.value end
+			assert(type(persisted) == "string", "rollover context is missing")
+			local decoded, context = pcall(json.decode, persisted)
+			assert(decoded and type(context) == "table", "cannot restore rollover context")
+			Aggregator.set_ngram_ctx(context)
+			assert(Aggregator.settle_contexts() == true, "cannot settle rollover context")
+			assert(Aggregator.flush(db) == true, "cannot flush rollover context")
+			_exec_sqlite_or_error(db, Queries.render("meta.rev_bump", "native"), "cannot increment metrics revision")
+		end
+		_exec_sqlite_or_error(db, "INSERT OR REPLACE INTO meta(key,value) VALUES('rollover_settlement_receipt',"
+			.. _sq(identity) .. ");", "cannot record rollover identity")
+		_exec_sqlite_or_error(db, "UPDATE meta SET value='0' WHERE key='today_log_offset';", "cannot reset rollover offset")
+		_exec_sqlite_or_error(db, "UPDATE meta SET value=" .. _sq(next_date) .. " WHERE key='today_log_date';", "cannot reset rollover date")
+		_exec_sqlite_or_error(db, "UPDATE meta SET value='{}' WHERE key='ngram_ctx_json';", "cannot reset rollover context")
+		_exec_sqlite_or_error(db, "COMMIT;", "cannot commit rollover reset")
+		committed = true
+	end)
+	if not ok then
+		if begun and not committed and not _rollback_sqlite(db, "Rollover reset") then SqliteWriter.quarantine_db(db) end
+		Aggregator.reset_batch()
+		local restored, ctx = pcall(json.decode, encoded)
+		if restored and type(ctx) == "table" then Aggregator.set_ngram_ctx(ctx) else Aggregator.reset_ngram_ctx() end
+		Logger.error(LOG, "Rollover cache reset remains pending: %s.", tostring(err))
+		return false
+	end
+	Aggregator.reset_batch()
+	if replay_scheduled then _local_ledger_replay_pending = true end
+	return true
+end
+
+--- Completes the exact fenced attempt; never begins another after uncertain release.
+local function _resume_pending_rollover(read_status)
+	if not _pending_rollover then return true end
+	if Rotation.rollover(_paths.data_sql_path, read_status,
+		_reset_rollover_cache, _ledger_origin_is_complete) ~= true then return false end
+	Aggregator.reset_ngram_ctx()
+	_pending_rollover = false
+	return true
+end
+
+--- Runs foreign ledger sync behind one checked boundary for ingest and startup.
+---@param on_applied fun(device_id:string):boolean|nil|nil
+---@return string[] synced_devices
+local function _sync_foreign_data_sql(on_applied)
+	local call_ok, result_or_err, detail = xpcall(function()
+		return Export.sync_foreign_data_sql(on_applied)
+	end, debug.traceback)
+	if call_ok and type(result_or_err) == "table" then
+		_foreign_sync_error_key = nil
+		return result_or_err
+	end
+
+	local failure_kind = call_ok and "did not commit" or "raised"
+	local failure_detail = call_ok and detail or result_or_err
+	local error_key = failure_kind .. ":" .. tostring(failure_detail)
+	if _foreign_sync_error_key ~= error_key then
+		Logger.error(LOG, "Foreign data.sql sync %s: %s.",
+			failure_kind, tostring(failure_detail))
+		_foreign_sync_error_key = error_key
+	end
+	return {}
+end
+
+--- Hands the shared Aggregator back to live ingest after a recovery ended.
+--- meta holds the rebuilt context after a success and the live one otherwise,
+--- because a failed or interrupted recovery never marks the cache rebuilt.
+--- @param db userdata The recovery's SQLite handle.
+local function _restore_live_aggregator(db)
+	Aggregator.set_device_id(_device_id)
+	Aggregator.reset_batch()
+	local restored = false
+	local read_ok, read_err = pcall(function()
+		for row in db:nrows("SELECT value FROM meta WHERE key='ngram_ctx_json'") do
+			local ok, decoded = pcall(json.decode, row.value or "{}")
+			if ok and type(decoded) == "table" then
+				Aggregator.set_ngram_ctx(decoded)
+				restored = true
+			end
+		end
+	end)
+	if not restored then
+		if not read_ok then
+			Logger.error(LOG, "Cannot restore the live typing context after recovery: %s.", tostring(read_err))
+		end
+		Aggregator.reset_ngram_ctx()
+	end
+end
+
+--- Full aggregate recovery: foreign raw import, rollover facts, deterministic
+--- walk and the revision mark. Runs inside the recovery coroutine.
+--- @param db userdata SQLite handle.
+local function _recover_aggregate_cache(db, replay_state)
+	if replay_state ~= nil then
+		local replay_ok, cursor = _replay_local_data_sql(db, replay_state)
+		if not replay_ok then
+			Logger.error(LOG, "Skipped aggregate recovery because local ledger replay failed.")
+			return
+		end
+		-- The replayed raw ids and today.log cursor are owned by the ledger, not
+		-- by the derived rebuild. Publishing them only after a successful rebuild
+		-- left a failed one with next_event_id=1 and offset 0: every new event
+		-- then collided with a replayed id (INSERT OR IGNORE dropped it from the
+		-- cache) and data.sql gained the id restart that refuses later rebuilds.
+		if _persist_recovery_state(db, cursor) ~= true then return end
+		Rotation.set_offset(tonumber(cursor.offset) or 0, cursor.date)
+		if db:exec("DELETE FROM meta WHERE key=" .. _sq(LEDGER_REPLAY_KEY) .. ";") ~= sqlite3.OK then
+			Logger.error(LOG, "The finished ledger replay could not be marked; the next start repeats it.")
+			return
+		end
+		_local_ledger_replay_pending = false
+	end
+	-- Foreign ledgers also carry raw rows only. Import them before the
+	-- deterministic aggregate walk so cross-device totals survive a normal
+	-- TMPDIR purge and older caches gain the missing foreign aggregates. A resumed
+	-- walk leaves them to ingest, whose partition rebuild counts what they add:
+	-- a row imported here could land before its resume point and never be walked.
+	if _running_recovery_progress() == nil then _sync_foreign_data_sql() end
+	if not _publish_rebuilt_partitions(db) then
+		Logger.error(LOG, "Aggregate cache recovery failed; raw events remain durable for retry.")
+	else
+		Logger.success(LOG, "Rebuilt aggregate cache from durable raw ledgers.")
+	end
+end
+
+local _cancel_aggregate_recovery
+
+--- The pause after a slice. On the mains the recovery finishes close to its CPU
+--- cost; on battery the pause scales with the time the slice really took, so the
+--- CPU share holds whatever a slice overran by.
+--- @param job table The running recovery.
+--- @param slice_ns number How long the slice ran.
+--- @return number seconds
+local function _recovery_pause_sec(job, slice_ns)
+	local now = timer.absoluteTime()
+	if job.power_read_ns == nil or now - job.power_read_ns >= RECOVERY_POWER_RECHECK_NS then
+		job.power_read_ns = now
+		local on_battery = PowerSource.on_battery()
+		if on_battery ~= job.on_battery then
+			Logger.info(LOG, "Aggregate cache recovery paced for %s.", on_battery and "the battery" or "the mains")
+		end
+		job.on_battery = on_battery
+	end
+	if not job.on_battery then return RECOVERY_RESUME_SEC end
+	return math.min(RECOVERY_BATTERY_MAX_PAUSE_SEC,
+		math.max(RECOVERY_RESUME_SEC, slice_ns / 1e9 / RECOVERY_BATTERY_CPU_SHARE))
+end
+
+--- Runs one budgeted slice of the recovery and schedules the next one.
+--- @param job table The exact recovery owned by `_recovery`.
+local function _run_recovery_slice(job)
+	if _recovery ~= job or job.cancelled then return end
+	--- Forward-declared handle: the callback compares against this exact one.
+	local function schedule(delay_sec)
+		local handle
+		local committed
+		handle, committed = TimerScheduler.after(delay_sec, function()
+			if job.handle == handle then job.handle = nil end
+			_run_recovery_slice(job)
+		end)
+		if handle and handle.timer ~= nil then job.handle = handle end
+		if committed ~= true then
+			-- Nothing is marked rebuilt, so the next start resumes the recovery.
+			Logger.error(LOG, "Aggregate cache recovery could not schedule its next slice; it retries at the next start.")
+			_cancel_aggregate_recovery()
+		end
+	end
+	if job.held_until_ns ~= nil then
+		if timer.absoluteTime() < job.held_until_ns then return schedule(RECOVERY_HOLD_RECHECK_SEC) end
+		job.held_until_ns = nil
+	end
+	job.slice_start_ns = timer.absoluteTime()
+	job.slices = job.slices + 1
+	local resumed, resume_err = coroutine.resume(job.co)
+	if not resumed then
+		Logger.error(LOG, "Aggregate cache recovery raised: %s.", tostring(resume_err))
+	end
+	if coroutine.status(job.co) == "dead" then
+		if job.stage_cleanup then
+			local ok, cleaned = pcall(job.stage_cleanup)
+			if not ok or not cleaned then return end
+			job.stage_cleanup = nil
+		end
+		_staging_recovery = false
+		if job.durability_off and not _restore_replay_durability(job.db, job) then return end
+		_recovery = nil
+		if not _local_ledger_replay_pending then _restore_live_aggregator(job.db) end
+		if job.slices > 1 then
+			Logger.done(LOG, "Aggregate cache recovery ended after %d slice(s) over %.0f ms.",
+				job.slices, (timer.absoluteTime() - job.started_ns) / 1e6)
+		end
+		return
+	end
+	if job.slices == 1 then
+		Logger.info(LOG, "Aggregate cache recovery continues in %.0f ms slices; ingest waits for it.",
+			RECOVERY_SLICE_NS / 1e6)
+	end
+	schedule(_recovery_pause_sec(job, timer.absoluteTime() - job.slice_start_ns))
+end
+
+--- Starts the aggregate recovery as a coroutine fed by timer slices. The first
+--- slice runs now, so a small cache recovers before init returns.
+--- @param db userdata SQLite handle.
+local function _start_aggregate_recovery(db, replay_state)
+	assert(_recovery == nil, "one aggregate recovery at a time")
+	local job = { db = db, slices = 0, started_ns = timer.absoluteTime(), handle = nil }
+	job.co = coroutine.create(function() _recover_aggregate_cache(db, replay_state) end)
+	-- A pending ledger replay means a fresh cache: nothing of a rebuild survived.
+	-- Staging is private and transient; a restarted process rebuilds all partitions.
+	job.progress = nil
+	if job.progress ~= nil then
+		Logger.info(LOG, "Aggregate cache recovery resumes at device %d of %d (%s).",
+			job.progress.index, #job.progress.devices, tostring(job.progress.stage))
+	end
+	_recovery = job
+	_run_recovery_slice(job)
+end
+
+--- Abandons a running recovery before teardown. Its derived rows stay unmarked
+--- and its resume point stays committed, so the next start continues from there;
+--- no SQLite transaction is open between slices.
+--- @return boolean settled False while its timer cleanup remains pending.
+_cancel_aggregate_recovery = function()
+	local job = _recovery
+	if job == nil then return true end
+	job.cancelled = true
+	local settled = true
+	if job.handle ~= nil then
+		local ok, cancelled = xpcall(function() return TimerScheduler.cancel(job.handle) end, debug.traceback)
+		settled = ok and cancelled == true
+		if settled then job.handle = nil
+		else
+			pcall(Logger.error, LOG, "Aggregate recovery timer cleanup remains pending: %s.", tostring(cancelled))
+		end
+	end
+	if job.stage_cleanup then
+		local ok, cleaned = pcall(job.stage_cleanup)
+		if not ok or not cleaned then settled = false else job.stage_cleanup = nil end
+	end
+	if job.durability_off and not _restore_replay_durability(job.db, job) then settled = false end
+	if settled then _staging_recovery = false; _recovery = nil end
+	pcall(Logger.warn, LOG, "Aggregate cache recovery interrupted after %d slice(s); it continues at the next start.",
+		job.slices)
+	if not _local_ledger_replay_pending then pcall(_restore_live_aggregator, job.db) end
+	return settled
+end
+
+--- Reports whether the cooperative aggregate recovery is still running.
+--- @return boolean
+function M.is_recovering()
+	return _recovery ~= nil
+end
+
+--- Keeps a running recovery from writing for a while: between two slices no
+--- transaction is open, so a lock-free reader sees one stable file. The next
+--- slice then waits, and a pending timer changes nothing.
+--- @param seconds number How long to hold; 0 releases the hold now.
+--- @return boolean held True when a recovery was running.
+function M.hold_recovery(seconds)
+	local job = _recovery
+	if job == nil then return false end
+	job.held_until_ns = seconds > 0 and timer.absoluteTime() + seconds * 1e9 or nil
+	return true
+end
+
+--- Run one ingest cycle: pull new today.log entries, append SQL batch to
+--- data.sql, apply it to db.sqlite, update aggregate tables.
+--- The dashboard's one Export or Purge, owned until the writer settles.
+local _maintenance_request = nil
+
+--- Completes the dashboard request once, with its receipt.
+--- @param request table The owned request.
+--- @param success boolean Whether the operation committed.
+--- @param path string|nil The Export copy.
+local function _finish_maintenance(request, success, path)
+	if _maintenance_request ~= request then return end
+	_maintenance_request = nil
+	if success then
+		Logger.success(LOG, "Metrics %s done.", request.kind)
+	else
+		Logger.error(LOG, "Metrics %s refused; the store is unchanged.", request.kind)
+	end
+	Logger.callback(LOG, "Metrics " .. request.kind .. " completion", function() request.complete(success, path) end)
+end
+
+--- Acts on the store after an ingest: a Purge completes once its tombstone
+--- committed (or fails once the ingest settled without it); an Export copies
+--- the store only once the ingest has settled.
+--- @param db userdata The writer's SQLite handle.
+--- @param settled boolean Whether today.log was read to its end.
+_advance_maintenance = function(db, settled)
+	local request = _maintenance_request
+	if not request then return end
+	if request.kind == "purge" then
+		local found = false
+		for _ in db:nrows("SELECT 1 FROM events_system WHERE action=" .. _sq(Maintenance.TOMBSTONE_ACTION)
+			.. " AND ts=" .. _sq(request.tombstone.ts) .. " LIMIT 1") do found = true end
+		if found or settled then _finish_maintenance(request, found) end
+		return
+	end
+	if not settled then return end
+	local folder, reason = Maintenance.downloads_dir(os.getenv)
+	if not folder or not FileSystem.exists(folder) then
+		Logger.error(LOG, "Metrics export has no destination folder (%s).", tostring(reason or folder))
+		return _finish_maintenance(request, false)
+	end
+	local path = folder .. "/" .. Maintenance.export_file_name(os.time())
+	local copied = pcall(_exec_sqlite_or_error, db, Queries.render("export.vacuum_into", "native", { path = path }),
+		"Metrics export")
+	_finish_maintenance(request, copied, copied and path or nil)
+end
+
+--- Owns one dashboard Export or Purge through this single writer. Both wait
+--- until the ingest has settled; a Purge first queues its tombstone, which the
+--- ingest commits to SQLite and data.sql, and which every device applies while
+--- replaying (purge_schema.sql).
+--- @param kind string "export" or "purge".
+--- @param complete function Receives success and, for an Export, its path.
+--- @return boolean accepted Whether this request owns its completion.
+function M.request_metrics_maintenance(kind, complete)
+	if not Maintenance.KINDS[kind] or type(complete) ~= "function" then
+		Logger.error(LOG, "Metrics maintenance needs a known kind and a completion callback.")
+		return false
+	end
+	if not _require_state("request_metrics_maintenance") or _maintenance_request
+		or not SqliteWriter.get_db() then return false end
+	local request = { kind = kind, complete = complete }
+	_maintenance_request = request
+	Logger.start(LOG, "Metrics %s requested; waiting for the ingest to settle.", kind)
+	M.flush_buffer()
+	if kind == "purge" then
+		request.tombstone = Maintenance.tombstone(Timestamp.now_epoch())
+		M.append_log({ type = "system_event", action = request.tombstone.action,
+			timestamp = request.tombstone.ts, utc = request.tombstone.metadata.utc })
+	end
+	M.ingest_once()
+	return true
+end
+
+function M.ingest_once()
+	-- Settle an already-owned rollover before starting a newly required replay;
+	-- no ingest may pass the durable replay fence after its reset commits.
+	if _recovery ~= nil then return false end
+	if _pending_rollover and not _resume_pending_rollover() then return false end
+	if _local_ledger_replay_pending then
+		local db = SqliteWriter.get_db()
+		local state = db and _read_ledger_replay_state(db)
+		if db and state then _start_aggregate_recovery(db, state) end
+		return false
+	end
+
+	local trace = IngestTrace.begin(function() return timer.absoluteTime() end, function(line)
+		Logger.warn(LOG, "%s", line)
+	end)
+	-- A failed timer allocation still leaves the ordered outbox intact. The
+	-- recurring ingest tick is the independent retry path that guarantees an
+	-- action with no following key cannot strand its detached typing run.
+	if _has_deferred_logs() then _drain_deferred_logs() end
+	local db = SqliteWriter.get_db()
+	trace.mark("drain")
+	if not db then return end
+
+	local foreign_devices = _sync_foreign_data_sql(function(device_id)
+		return _publish_rebuilt_partitions(db, { device_id })
+	end)
+	trace.mark("foreign")
+	-- Foreign reconstruction can quarantine and consume the exact writer. Never
+	-- use the handle captured before that callback without reacquiring ownership.
+	if SqliteWriter.get_db() ~= db then
+		Logger.error(LOG, "Ingest stopped after its SQLite writer was quarantined.")
+		trace.finish()
+		return false
+	end
+	-- A previous cache transaction may have committed while data.sql was locked.
+	-- Drain that exact source batch first so a tmp-cache loss can never make it
+	-- invisible to sync/replay, and so we never allocate new ids for old JSONL.
+	if not _flush_local_data_sql_outbox(db) then
+		if #foreign_devices > 0 then _notify_ingest_listeners() end
+		trace.finish()
+		return
+	end
+	trace.mark("outbox")
+
+	local entries, new_offset, read_status = Rotation.read_new_entries()
+	trace.mark("read")
+	if read_status == "failed" then
+		Logger.warn(LOG, "Ingest skipped because today.log tail read did not commit.")
+		trace.finish()
+		return false
+	end
+	if #entries == 0 then
+		if #foreign_devices > 0 then _notify_ingest_listeners() end
+		trace.finish()
+		-- Nothing deferred, the data.sql outbox empty and today.log read to its
+		-- end: the writer's flush has settled for a dashboard Export or Purge.
+		_advance_maintenance(db, true)
+		return
+	end
+
+	-- Snapshot the event-id counter BEFORE build_inserts allocates ids: if the
+	-- transaction below rolls back, the offset is not advanced and this exact batch
+	-- is re-read next tick — restoring the counter makes the retry reuse the same
+	-- ids so INSERT OR IGNORE dedups them, rather than re-keying with fresh ids and
+	-- leaving a permanent id gap (which desyncs a data.sql peer replay).
+	local saved_event_id = SqliteWriter.get_next_event_id()
+	-- The walker mutates its n-gram/session context before aggregate UPSERTs are
+	-- committed. Keep a serialised snapshot so a failed aggregate transaction can
+	-- retry the same JSONL rows without double-counting their continuity state.
+	local saved_ngram_ctx_json = nil
+	local ctx_snapshot_ok, ctx_snapshot = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
+	if ctx_snapshot_ok then saved_ngram_ctx_json = ctx_snapshot end
+
+	local statements = {}
+	local built = pcall(function()
+		for _, item in ipairs(entries) do
+			for _, sql in ipairs(SqliteWriter.build_inserts(item.entry)) do
+				table.insert(statements, sql)
+			end
+		end
+	end)
+	if not built then
+		-- No statement has run and the log offset still points at this batch.
+		SqliteWriter.set_next_event_id(saved_event_id)
+		Logger.error(LOG, "Cannot build the ingest batch; the log remains pending for retry.")
+		trace.finish()
+		return false
+	end
+	trace.mark("build")
+	trace.count("entries", #entries)
+	trace.count("statements", #statements)
+	if #statements == 0 then
+		Rotation.set_offset(new_offset, Rotation.get_date())
+		if #foreign_devices > 0 then _notify_ingest_listeners() end
+		trace.finish()
+		return
+	end
+
+	-- Build the SQL text upfront; write to data.sql only AFTER the SQLite
+	-- transaction commits successfully — a failed COMMIT must not leave
+	-- unreplayable statements in the append-only source-of-truth file.
+	local batch_text = string.format(
+		"\n-- === ingest batch %s (offset %d -> %d, %d entry(ies)) ===\nBEGIN TRANSACTION;\n%s\nCOMMIT;\n",
+		_now_ts(), Rotation.get_offset(), new_offset, #entries,
+		table.concat(statements, "\n"))
+
+	local ok, exec_err = pcall(function()
+		-- Defensively clear any transaction a prior step (e.g. a torn foreign
+		-- data.sql sync) may have left open, so our BEGIN below can never fail with
+		-- "cannot start a transaction within a transaction" and abort this batch
+		-- (F-M3). Harmless no-op when no transaction is active.
+		pcall(function() db:exec("ROLLBACK;") end)
+		_exec_sqlite_or_error(db, "BEGIN TRANSACTION;", "cannot begin ingest transaction")
+		for _, sql in ipairs(statements) do
+			_exec_sqlite_or_error(db, sql, "cannot persist ingest event")
+		end
+		for _, item in ipairs(entries) do
+			local et = item.entry.type
+			if et == "typing" then
+				Aggregator.walk_typing(item.entry)
+			elseif et == "app_switch" then
+				Aggregator.walk_app_switch(item.entry)
+			elseif et == "window_switch" then
+				Aggregator.walk_window_switch(item.entry)
+			elseif et == "system_event" then
+				Aggregator.walk_system_event(item.entry)
+			end
+		end
+		local aggregates_flushed = Aggregator.flush()
+		if aggregates_flushed == false then
+			error("aggregate flush left pending rows")
+		end
+		_exec_sqlite_or_error(db, string.format(
+			"UPDATE meta SET value='%d' WHERE key='today_log_offset';", new_offset),
+			"cannot persist today.log offset")
+		_exec_sqlite_or_error(db, string.format(
+			"UPDATE meta SET value='%s' WHERE key='today_log_date';", Rotation.get_date() or ""),
+			"cannot persist today.log date")
+		if SqliteWriter.persist_next_event_id() ~= true then
+			error("cannot persist next event id", 0)
+		end
+		_exec_sqlite_or_error(db, Queries.render("meta.rev_bump", "native"),
+			"cannot increment metrics revision")
+		-- Serialise n-gram walking context so a crash mid-tick does not lose
+		-- the partial cur_word / p1..p6 / current_burst / streak state.
+		local ctx = Aggregator.get_ngram_ctx()
+		local ok_enc, enc = pcall(json.encode, ctx or {})
+		if not ok_enc then error("cannot encode n-gram context: " .. tostring(enc), 0) end
+		_exec_sqlite_or_error(db, string.format(
+			"UPDATE meta SET value=%s WHERE key='ngram_ctx_json';",
+			_sq(enc)), "cannot persist n-gram context")
+		-- Commit the canonical SQL batch alongside the cache changes.  If the
+		-- following append fails, this local durable outbox is replayed before
+		-- the next ingest instead of silently advancing past the source record.
+		_exec_sqlite_or_error(db, string.format(
+			"UPDATE meta SET value=%s WHERE key=%s;",
+			_sq(batch_text), _sq(DATA_SQL_OUTBOX_KEY)),
+			"cannot persist data.sql outbox")
+		trace.mark("apply")
+		_exec_sqlite_or_error(db, "COMMIT;", "cannot commit ingest transaction")
+		trace.mark("commit")
+	end)
+	if not ok then
+		Logger.error(LOG, "Ingest batch rolled back: %s.", tostring(exec_err))
+		_rollback_sqlite(db, "Ingest batch")
+		-- Undo the event-id allocations from the rolled-back build_inserts so the
+		-- next retry of this same (offset-unchanged) batch reuses identical ids.
+		SqliteWriter.set_next_event_id(saved_event_id)
+		Aggregator.reset_batch()
+		if saved_ngram_ctx_json then
+			local restored_ok, restored_ctx = pcall(json.decode, saved_ngram_ctx_json)
+			if restored_ok and type(restored_ctx) == "table" then
+				Aggregator.set_ngram_ctx(restored_ctx)
+			else
+				Aggregator.reset_ngram_ctx()
+			end
+		else
+			Aggregator.reset_ngram_ctx()
+		end
+		trace.finish()
+		return
+	end
+
+	-- SQLite transaction committed — now safe to append to data.sql (the
+	-- source-of-truth SQL log). Writing here rather than before the COMMIT
+	-- ensures data.sql never contains statements that were not persisted.
+	Rotation.set_offset(new_offset, Rotation.get_date())
+	-- L16: the append phase alone held 0.5 to 1.7 s on the Mac; its sub-stages
+	-- and the synchronous metadata forks of the journal publications name why.
+	local commands_before, command_ms_before = MetadataCommandStats.snapshot()
+	local appended = _flush_local_data_sql_outbox(db, trace.stages("append", LedgerAppend.FLUSH_STAGES))
+	local commands_after, command_ms_after = MetadataCommandStats.snapshot()
+	trace.count("metadata_commands", commands_after - commands_before)
+	trace.count("metadata_command_ms", math.floor(command_ms_after - command_ms_before))
+	if not appended then
+		trace.mark("append")
+		-- The in-memory cursor must still advance: the committed outbox owns this
+		-- exact batch, while replaying today.log here would allocate new ids and
+		-- duplicate metrics in the cache.
+		Logger.warn(LOG, "Ingest committed but data.sql append is pending retry.")
+		trace.finish()
+		return
+	end
+	trace.mark("append")
+	Logger.debug(LOG, "Ingest cycle: %d entry(ies), offset now %d.", #entries, new_offset)
+
+	-- Notify live-update listeners — dashboard UIs use this to invalidate
+	-- their caches immediately rather than waiting for the next JS poll.
+	_notify_ingest_listeners()
+	_advance_maintenance(db, false)
+	trace.finish()
+end
+
+
+--- Verifies one native ingest timer's observable running state. Real
+--- Hammerspoon timers expose running(); the boolean branch keeps the narrow
+--- pure-Lua timer doubles faithful without accepting an unreadable userdata.
+--- @param timer_handle table|userdata Native timer candidate.
+--- @param expected boolean Required running state.
+--- @return boolean matches True only when the observable state matches.
+--- @return string|nil detail Probe failure detail.
+local function _ingest_timer_running_matches(timer_handle, expected)
+	local member_ok, member_or_err = pcall(function() return timer_handle.running end)
+	if not member_ok then return false, tostring(member_or_err) end
+	if type(member_or_err) == "boolean" and type(timer_handle) == "table" then
+		if member_or_err == expected then return true end
+		return false, string.format("running state was %s", tostring(member_or_err))
+	end
+	if type(member_or_err) ~= "function" then return false, "running() unavailable" end
+	local probe_ok, running_or_err = xpcall(function()
+		return member_or_err(timer_handle)
+	end, debug.traceback)
+	if not probe_ok or type(running_or_err) ~= "boolean" then
+		return false, tostring(running_or_err)
+	end
+	if running_or_err ~= expected then
+		return false, string.format("running() returned %s", tostring(running_or_err))
+	end
+	return true
+end
+
+--- Fences and releases the exact recurring ingest timer. A truthy chainable
+--- stop result is not a native-state verdict; retain the handle until
+--- running() proves that it is stopped.
+--- @param timer_handle table|userdata Exact timer owned by this module.
+--- @param label string Cleanup context for the file logger.
+--- @return boolean stopped True only when native state is observably stopped.
+local function _stop_ingest_timer(timer_handle, label)
+	if not timer_handle then return true end
+	if _ingest_timer == timer_handle then _ingest_timer_committed = false end
+	local stop_ok, stopped_or_err = xpcall(function()
+		return timer_handle:stop()
+	end, debug.traceback)
+	local state_stopped, state_detail = _ingest_timer_running_matches(timer_handle, false)
+	if not stop_ok or stopped_or_err == false or not state_stopped then
+		pcall(Logger.error, LOG, "%s cleanup remains pending: %s.", label,
+			tostring(not stop_ok and stopped_or_err
+				or (stopped_or_err == false and "stop returned false")
+				or state_detail))
+		return false
+	end
+	if _ingest_timer == timer_handle then _ingest_timer = nil end
+	return true
+end
+
+--- Acquires and starts the one recurring ingest timer. Construction and start
+--- are one transaction: a handle whose start raises or explicitly refuses stays
+--- retained so M.stop() can retry its exact cleanup.
+--- @return boolean started True when one owned timer is committed.
+local function _start_ingest_timer()
+	if _ingest_timer then return _ingest_timer_committed end
+
+	local timer_candidate = nil
+	local create_ok, timer_or_err = xpcall(function()
+		timer_candidate = timer.new(INGEST_TICK_SEC, function()
+			-- Native timers can invoke a queued callback after stop() refused or
+			-- after start() raised despite activating the candidate. Publication is
+			-- therefore both identity- and commit-scoped, never handle-presence-only.
+			if _ingest_timer ~= timer_candidate or _ingest_timer_committed ~= true then
+				return
+			end
+			Logger.pcall(LOG, M.ingest_once)
+		end)
+		return timer_candidate
+	end, debug.traceback)
+	if not create_ok or timer_or_err == nil then
+		pcall(Logger.error, LOG, "Cannot create ingest timer: %s.",
+			tostring(timer_or_err or "hs.timer.new returned nil"))
+		return false
+	end
+
+	_ingest_timer = timer_or_err
+	local start_ok, started_or_err = xpcall(function()
+		return timer_or_err:start()
+	end, debug.traceback)
+	local state_started, state_detail = _ingest_timer_running_matches(timer_or_err, true)
+	if not start_ok or started_or_err == false or not state_started then
+		pcall(Logger.error, LOG,
+			"Cannot start ingest timer; exact cleanup remains owned: %s.",
+			tostring(not start_ok and started_or_err
+				or (started_or_err == false and "start returned false")
+				or state_detail))
+		return false
+	end
+	_ingest_timer_committed = true
+	return true
+end
+
+--- The reason day_rollover names when an aggregate recovery holds the ingest.
+M.ROLLOVER_WAITS_FOR_RECOVERY = "recovering"
+
+--- Day rollover handler. Drains remaining today.log then delegates to
+--- Rotation.rollover to reset the file and offset.
+--- @return boolean True when the drain fully completed and rollover ran; false
+--- when the drain stalled and today.log/state were deliberately preserved for
+--- retry on the next midnight tick.
+--- @return string|nil reason ROLLOVER_WAITS_FOR_RECOVERY when nothing was tried.
+function M.day_rollover()
+	if not _require_state("day_rollover") then return false end
+	if _recovery ~= nil then return false, M.ROLLOVER_WAITS_FOR_RECOVERY end
+	if _pending_rollover then return _resume_pending_rollover() end
+	if _local_ledger_replay_pending then return false, M.ROLLOVER_WAITS_FOR_RECOVERY end
+	-- Ingest waits for the recovery, so a drain could only report a stall. On a
+	-- months-old ledger on battery that lasted 33 min over midnight, with three
+	-- warnings at each tick (field report 2026-11-02); today.log loses nothing.
+
+	-- read_new_entries caps at INGEST_BATCH_LINES per call, so a single
+	-- ingest_once may leave data behind. Loop until empty or stalled to prevent
+	-- Rotation.rollover from deleting un-ingested lines.
+	local drained = false
+	local committed_eof = nil
+	local prev_offset = Rotation.get_offset()
+	for _ = 1, MAX_ROLLOVER_DRAIN_ITERS do
+		local pending, _, read_status = Rotation.read_new_entries()
+		if read_status == "failed" then
+			Logger.warn(LOG,
+				"day_rollover: tail read failed — preserving today.log.")
+			break
+		elseif #pending == 0 then
+			if read_status == "eof" then
+				drained = true
+				committed_eof = read_status
+			else
+				Logger.warn(LOG,
+					"day_rollover: tail read did not commit EOF — preserving today.log.")
+			end
+			break
+		end
+		local ingest_ok = Logger.callback(LOG, "Day-rollover ingest", M.ingest_once)
+		if not ingest_ok then break end
+		local new_offset = Rotation.get_offset()
+		if new_offset == prev_offset then
+			-- Offset unchanged after a batch with pending data: persistent SQL
+			-- error; preserve today.log so un-ingested lines survive the rollover.
+			Logger.warn(LOG,
+				"day_rollover: ingest stalled at offset %d — preserving today.log.",
+				prev_offset)
+			break
+		end
+		prev_offset = new_offset
+	end
+
+	if not drained then
+		-- The drain stalled: today.log, the ngram context, and the meta
+		-- bookmarks must all survive untouched so the next midnight tick can
+		-- retry from exactly where this attempt gave up (G1, G2).
+		Logger.warn(LOG, "day_rollover: today.log not fully drained — file preserved, rotation skipped.")
+		return false
+	end
+
+	-- The outbox lives in the disposable SQLite cache.  If its append-only
+	-- ledger write is still blocked, deleting today.log here would remove the
+	-- only durable source from which a fresh cache can recreate that batch.
+	-- Keep the old day intact and retry the append before a later rotation.
+	local db = SqliteWriter.get_db()
+	if not db or not _flush_local_data_sql_outbox(db) then
+		Logger.warn(LOG, "day_rollover: local data.sql outbox is not durable — preserving today.log.")
+		return false
+	end
+
+	_pending_rollover = true
+	if not _resume_pending_rollover(committed_eof) then
+		Logger.warn(LOG, "day_rollover: durable rollover remains pending; journal writer fenced.")
+		return false
+	end
+	return true
+end
+
+
+
+
+
+-- ============================
+-- ============================
+-- ======= 9/ Lifecycle =======
+-- ============================
+-- ============================
+
+--- Releases resources acquired by an initialization attempt. Timer handles are
+--- cleared only after their exact stop call completes, so a failed teardown can
+--- be retried without constructing a sibling owner.
+--- @return boolean complete True only when no initialization cleanup debt remains.
+local function _release_failed_init_resources()
+	local recovery_settled = _cancel_aggregate_recovery()
+	local complete = recovery_settled
+	local readers_ok, readers_closed = pcall(Export.cleanup)
+	if not readers_ok or readers_closed ~= true then
+		complete = false
+		pcall(Logger.error, LOG, "Foreign ledger verification cleanup remains pending.")
+	end
+
+	local ingest_timer = _ingest_timer
+	if ingest_timer then
+		if not _stop_ingest_timer(ingest_timer, "Failed-init ingest timer") then
+			complete = false
+		end
+	end
+
+	local deferred_timer = _deferred_log_timer
+	if deferred_timer then
+		local ok, result_or_err = xpcall(function()
+			return TimerScheduler.cancel(deferred_timer)
+		end,
+			debug.traceback)
+		if ok and result_or_err == true then
+			if _deferred_log_timer == deferred_timer then _deferred_log_timer = nil end
+		else
+			complete = false
+			pcall(Logger.error, LOG,
+				"Failed-init deferred timer cleanup remains pending: %s.",
+				tostring(result_or_err))
+		end
+	end
+
+	if LedgerAppend.cleanup() ~= true then
+		complete = false
+		pcall(Logger.error, LOG, "Canonical ledger native cleanup remains pending.")
+	end
+	if not recovery_settled then
+		Logger.error(LOG, "Failed-init database close waits for recovery cleanup.")
+		return false
+	end
+	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
+		debug.traceback)
+	if not db_ok or db_result_or_err == false then
+		complete = false
+		pcall(Logger.error, LOG,
+			"Failed-init database cleanup remains pending: %s.",
+			tostring(db_result_or_err))
+	end
+	return complete
+end
+
+--- Revokes all log-manager publication from a failed initialization and starts
+--- cleanup of any native resources that attempt acquired.
+--- @return boolean complete True only when every cleanup completed.
+local function _rollback_failed_init()
+	_state = nil
+	_device_obj = nil
+	_device_id = nil
+	_paths = {}
+	_init_cleanup_pending = true
+	local complete = _release_failed_init_resources()
+	_init_cleanup_pending = not complete
+	return complete
+end
+
+local function _settle_initial_publication()
+	local pending = _initial_publication_pending
+	if pending == nil then return true end
+	-- Keep the receipt before entering the owner: a thrown or post-publication
+	-- refusal must not become a successful present-entry shortcut on retry.
+	local created, status, detail = FileSystem.create_if_absent(pending.path, pending.body)
+	if detail == nil and ((created == true and status == "created")
+		or (created == false and status == "exists")) then
+		_initial_publication_pending = nil
+		return true
+	end
+	Logger.error(LOG, "M.init(): %s publication remains incomplete for '%s' — %s (%s).",
+		pending.kind, pending.path, tostring(detail or "invalid publication receipt"), tostring(status))
+	return false
+end
+
+local function _ensure_initial_file(path, body, kind)
+	-- A previous attempt may own staging cleanup even when its final file is
+	-- already present, including when the configured metrics root has changed.
+	if not _settle_initial_publication() then return false end
+	local status, detail = FileSystem.path_status(path)
+	if status == "present" then return true end
+	if status ~= "absent" then
+		Logger.error(LOG, "M.init(): cannot inspect %s '%s' — %s.", kind, path, tostring(detail))
+		return false
+	end
+	_initial_publication_pending = { path = path, body = body, kind = kind }
+	return _settle_initial_publication()
+end
+
+local function _ensure_metrics_gitignore(paths)
+	return _ensure_initial_file(paths.metrics_dir .. ".gitignore",
+		"# Local hot-path log — never commit, never sync. One writer per device.\n"
+			.. NativePath.basename(paths.today_log_path) .. "\n", "metrics Git exclusion")
+end
+
+local function _ensure_ledger_header(paths, device_id)
+	return _ensure_initial_file(paths.data_sql_path, string.format(
+		"-- ergopti metrics — device %s — schema_version 1\n"
+			.. "-- This file is APPEND-ONLY. Do not edit by hand.\n"
+			.. "-- The keystats replays its content into db.sqlite at startup.\n"
+			.. "PRAGMA foreign_keys = OFF;\n", device_id), "canonical ledger")
+end
+
+--- Initialize the log manager. Resolves the device, opens the SQLite cache,
+--- creates the filesystem layout. Idempotent; calling twice is a warning.
+--- @param core_state table The shared CoreState from metrics/engine/init.lua.
+local function _init(core_state)
+	if _state then
+		Logger.warn(LOG, "M.init() called twice — ignoring duplicate.")
+		return true
+	end
+	if type(core_state) ~= "table" or type(core_state.LOG_DIR) ~= "string"
+		or type(core_state.CACHE_DIR) ~= "string" then
+		Logger.error(LOG, "M.init(): invalid core_state — log manager non-functional.")
+		return false
+	end
+
+	Logger.start(LOG, "Initializing log manager…")
+
+	local device_obj, needs_publication = _resolve_device(core_state.LOG_DIR)
+	if not device_obj then
+		Logger.error(LOG, "M.init(): device identity could not be resolved — log manager disabled.")
+		return false
+	end
+	local device_id = device_obj.device_id
+	local paths = _resolve_paths(core_state.LOG_DIR, core_state.CACHE_DIR, device_id)
+
+	_mkdir_p(paths.metrics_dir)
+	_mkdir_p(paths.by_device_dir)
+	_mkdir_p(paths.cache_dir)
+
+	if not _ensure_metrics_gitignore(paths) then return false end
+
+	if needs_publication then
+		local identity_committed, published_device = _write_device_json(
+			device_obj,
+			paths.device_json_path
+		)
+		if not identity_committed then return false end
+		device_obj = published_device
+		device_id = device_obj.device_id
+		paths = _resolve_paths(core_state.LOG_DIR, core_state.CACHE_DIR, device_id)
+	end
+
+	-- A torn header would permanently block durable outbox publication. Admit
+	-- neither SQLite nor the journal until its create-only publication settles.
+	if not _ensure_ledger_header(paths, device_id) then return false end
+
+	-- Publish the shared state only after a new identity is durable (or an
+	-- existing identity was read and owned). Every public method remains behind
+	-- _require_state until this transaction commits.
+	_state = core_state
+	_device_obj = device_obj
+	_device_id = device_id
+	_paths = paths
+	_adopt_legacy_cache(_paths)
+	local cache_was_fresh = fs.attributes(_paths.sqlite_path) == nil
+
+	-- Initialise submodules.
+	SqliteWriter.init({ paths = _paths, device_obj = _device_obj, device_id = _device_id })
+	Aggregator.init({ device_id = _device_id })
+	Export.init({ paths = _paths, device_id = _device_id, get_db = SqliteWriter.get_db })
+
+	if not SqliteWriter.open_db() then
+		-- A pending retirement cannot admit a replacement writer without its reset.
+		if not LedgerAppend.recover(_paths.data_sql_path, "", _paths.today_log_path) then
+			error("pending canonical ledger recovery requires the SQLite cache", 0)
+		end
+		Logger.error(LOG, "Cannot open db.sqlite — log manager will only write JSONL.")
+	else
+		local db = SqliteWriter.get_db()
+		-- Repair only the exact journal-owned tail before any cache replay sees SQL.
+		if db and not LedgerAppend.recover(_paths.data_sql_path, _get_local_outbox(db),
+			_paths.today_log_path, _reset_rollover_cache) then
+			error("pending canonical ledger recovery was refused", 0)
+		end
+		-- A fresh cache replays the whole ledger: 320 MB after a reboot emptied
+		-- TMPDIR held the main thread 138 s when it ran here (L64). The replay is
+		-- now the recovery coroutine's first stage, in bounded steps, and its
+		-- persisted state makes an interrupted one resume at its last batch.
+		if cache_was_fresh and db and not _write_ledger_replay_state(db, LedgerReplay.new_state()) then
+			error("the fresh cache cannot record its pending ledger replay", 0)
+		end
+		local replay_state = db and _read_ledger_replay_state(db) or nil
+		_local_ledger_replay_pending = replay_state ~= nil
+		local recovery_due = db and (replay_state ~= nil or cache_was_fresh
+			or _aggregate_cache_revision(db) ~= AGGREGATE_CACHE_REVISION)
+		-- Restore persisted counters and n-gram context from meta.
+		if db then
+			local offset_val = 0
+			local date_val   = nil
+			for r in db:nrows("SELECT value FROM meta WHERE key='today_log_offset'") do
+				offset_val = tonumber(r.value) or 0
+			end
+			for r in db:nrows("SELECT value FROM meta WHERE key='today_log_date'") do
+				date_val = (type(r.value) == "string" and r.value ~= "") and r.value or nil
+			end
+			Rotation.init({ paths = _paths, state = _state, today_log_offset = offset_val, today_log_date = date_val,
+				recovery_turn_bytes = JOURNAL_RECOVERY_TURN_BYTES })
+			for r in db:nrows("SELECT value FROM meta WHERE key='ngram_ctx_json'") do
+				local ok, decoded = pcall(json.decode, r.value or "{}")
+				if ok and type(decoded) == "table" then
+					Aggregator.set_ngram_ctx(decoded)
+				end
+			end
+		end
+		-- Last: the live context above must not land in the middle of its walk.
+		-- It ran synchronously here and held the event taps for 22 s (issue #104).
+		if recovery_due then
+			-- A rebuild already under way has cleared rows: that is no older cache.
+			if not cache_was_fresh and _aggregate_cache_revision(db) == PRE_ENCODING_REVISION
+				and _read_recovery_progress(db) == nil then
+				_keep_pre_encoding_cache(db)
+			end
+			_start_aggregate_recovery(db, replay_state)
+		end
+	end
+
+	-- Rotation is normally initialised inside the SQLite branch above, which is
+	-- skipped entirely when db.sqlite cannot be opened. Without this fallback
+	-- Rotation._require_init rejects EVERY append_log, so not a single keystroke
+	-- reaches today.log — contradicting the JSONL-only contract logged above.
+	-- The previous probe (`not Rotation.get_offset`) was unreachable dead code:
+	-- the accessor is defined at require time and is always truthy, so the test
+	-- must interrogate the initialisation flag itself, never a function's existence.
+	if not Rotation.is_initialized() then
+		Logger.warn(LOG, "SQLite cache unavailable — initialising rotation for JSONL-only operation.")
+		Rotation.init({ paths = _paths, state = _state, recovery_turn_bytes = JOURNAL_RECOVERY_TURN_BYTES })
+	end
+
+	_state.today_idx = _state.today_idx or {}
+	_state.manifest  = _state.manifest  or {}
+
+	-- The first ingest waits for the first tick: run here it held the deferred
+	-- keystats start 260 to 390 ms on the Mac (L18). today.log keeps every event
+	-- meanwhile and the outbox is flushed at the start of that tick.
+	if not _ingest_timer then
+		if not _start_ingest_timer() then error("ingest timer acquisition failed") end
+	end
+
+	Logger.success(LOG, "Log manager initialized.")
+	return true
+end
+
+--- Runs initialization as a transaction. A dependency may raise after a native
+--- timer or database has already become live; contain that exception, revoke the
+--- prematurely published state, and retain any failed cleanup for exact retry.
+--- @param core_state table The shared CoreState from metrics/engine/init.lua.
+--- @return boolean initialized True only when the complete initialization commits.
+function M.init(core_state)
+	local physical_generation = _physical_sink_generation
+	if not _state and _init_cleanup_pending then
+		local cleanup_complete = _release_failed_init_resources()
+		_init_cleanup_pending = not cleanup_complete
+		if not cleanup_complete then
+			pcall(Logger.error, LOG,
+				"M.init() refused while prior initialization cleanup remains pending.")
+			return false
+		end
+	end
+
+	local state_was_committed = _state ~= nil
+	local ok, initialized_or_err = xpcall(_init, debug.traceback, core_state)
+	if ok then
+		if initialized_or_err == true and not state_was_committed
+			and _physical_sink_generation == physical_generation then _physical_sink_active = true end
+		return initialized_or_err
+	end
+
+	local cleanup_complete = true
+	if not state_was_committed then cleanup_complete = _rollback_failed_init() end
+	pcall(Logger.error, LOG,
+		"M.init() raised; initialization was rejected%s: %s.",
+		cleanup_complete and "" or " with cleanup still pending",
+		tostring(initialized_or_err))
+	return false
+end
+
+--- Re-creates the ingest timer if it was stopped by M.stop() without a
+--- full re-init. Idempotent when already running; before init it reports false
+--- and acquires nothing. Called unconditionally from keystats M.start() so the
+--- ingest loop survives toggle OFF/ON without a full re-initialization.
+--- @return boolean running True only when one timer owner is committed.
+function M.ensure_ingest_running()
+	local physical_generation = _physical_sink_generation
+	if not _state then return false end
+	-- A candidate may have become native-live before start() raised/refused. It is
+	-- cleanup debt, not an ingest owner; never reopen the database underneath it.
+	if _ingest_timer and not _ingest_timer_committed then return false end
+
+	-- Re-arm must be symmetric with M.stop(), which tears down BOTH the timer and
+	-- the SQLite cache. Restoring only the timer left the ingest tick running
+	-- against a closed database for the rest of the session, so toggling Metrics
+	-- OFF then ON permanently killed ingest and midnight rotation. keystats.start()
+	-- latches on its own _state and never calls M.init() again, so this is the only
+	-- place the cache can be re-acquired after that toggle.
+	-- Safe to re-enter: open_db() is a no-op when a handle is already live.
+	if not SqliteWriter.get_db() then
+		if SqliteWriter.open_db() then
+			Logger.done(LOG, "SQLite cache re-opened after stop/start cycle.")
+		else
+			Logger.error(LOG, "Cannot re-open the SQLite cache after a stop/start cycle — ingest stays offline.")
+		end
+	end
+
+	if _recovery and _recovery.cancelled then return false end
+	if _local_ledger_replay_pending and _recovery == nil then
+		local db = SqliteWriter.get_db()
+		if not db then return false end
+		local replay_state = _read_ledger_replay_state(db)
+		if replay_state == nil then
+			Logger.error(LOG, "Pending local replay has no durable resume state; ingest remains blocked.")
+			return false
+		end
+		_start_aggregate_recovery(db, replay_state)
+	end
+
+	if _ingest_timer then
+		if _physical_sink_generation == physical_generation then _physical_sink_active = true end
+		return true
+	end
+	if not _start_ingest_timer() then return false end
+	if _physical_sink_generation == physical_generation then _physical_sink_active = true end
+	Logger.done(LOG, "Ingest timer re-armed after stop/start cycle.")
+	return true
+end
+
+--- Stop every retained timer and close the SQLite cache cleanly.
+--- Native stop/close methods may explicitly refuse or raise after leaving their
+--- resource live. Retain the exact handle in that case so the lifecycle owner can
+--- retry instead of publishing a successor beside an orphan.
+--- At process exit or reload the final ingest is skipped: it syncs foreign
+--- ledgers, rebuilds aggregates and may encrypt every typing row through a
+--- subprocess, all on the main thread while Quit waits. Nothing is lost: today.log
+--- is appended durably before this point, the committed offset lives in the
+--- cache's meta table, and the next boot's initial ingest reads the tail.
+--- @param opts table|nil `{ process_exit = true }` for the process-lifecycle stop.
+--- @return boolean complete True only when every owned resource was released.
+function M.stop(opts)
+	_physical_sink_active = false
+	_physical_sink_generation = _physical_sink_generation + 1
+	local process_exit = type(opts) == "table" and opts.process_exit == true
+	local recovery_settled = _cancel_aggregate_recovery()
+	local complete = recovery_settled
+	local ingest_timer = _ingest_timer
+	if ingest_timer then
+		if not _stop_ingest_timer(ingest_timer, "Ingest timer") then
+			complete = false
+		end
+	end
+
+	local deferred_timer = _deferred_log_timer
+	if deferred_timer then
+		local ok, result_or_err = xpcall(function()
+			return TimerScheduler.cancel(deferred_timer)
+		end,
+			debug.traceback)
+		if ok and result_or_err == true then
+			if _deferred_log_timer == deferred_timer then _deferred_log_timer = nil end
+		else
+			complete = false
+			pcall(Logger.error, LOG,
+				"Deferred timer cleanup remains pending: %s.", tostring(result_or_err))
+		end
+	end
+
+	if _has_deferred_logs() then
+		local drain_ok, drained_or_err = xpcall(_drain_deferred_logs, debug.traceback)
+		if not drain_ok or drained_or_err == false then
+			complete = false
+			pcall(Logger.error, LOG,
+				"Deferred log cleanup remains pending: %s.", tostring(drained_or_err))
+		end
+	end
+	local cache_writes_allowed = recovery_settled and not _local_ledger_replay_pending
+	if process_exit then
+		if cache_writes_allowed then
+			-- Only publish an already-committed data.sql outbox batch: one bounded append.
+			-- A refusal keeps it in the cache, where the next boot's ingest retries it.
+			local db = SqliteWriter.get_db()
+			if db then
+				local flush_ok, flushed_or_err = xpcall(function()
+					return _flush_local_data_sql_outbox(db)
+				end, debug.traceback)
+				if not flush_ok or flushed_or_err ~= true then
+					pcall(Logger.warn, LOG,
+						"Pending data.sql outbox kept in the cache for the next boot: %s.",
+						tostring(flushed_or_err))
+				end
+			end
+		end
+	else
+		if cache_writes_allowed then
+			local ingest_ok, ingest_err = xpcall(M.ingest_once, debug.traceback)
+			if not ingest_ok then
+				complete = false
+				pcall(Logger.error, LOG,
+					"Final ingest cleanup remains pending: %s.", tostring(ingest_err))
+			end
+		end
+	end
+	local readers_ok, readers_closed = pcall(Export.cleanup)
+	if not readers_ok or readers_closed ~= true then
+		complete = false
+		pcall(Logger.error, LOG, "Foreign ledger verification cleanup remains pending.")
+	end
+	if LedgerAppend.cleanup() ~= true then
+		complete = false
+		pcall(Logger.error, LOG, "Canonical ledger native cleanup remains pending.")
+	end
+	if not recovery_settled then
+		Logger.error(LOG, "Database close waits for exact recovery cleanup.")
+		return false
+	end
+	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
+		debug.traceback)
+	if not db_ok or db_result_or_err == false then
+		complete = false
+		pcall(Logger.error, LOG,
+			"Database cleanup remains pending: %s.", tostring(db_result_or_err))
+	end
+	pcall(Logger.debug, LOG, complete and "Log manager stopped"
+		or "Log manager cleanup remains pending")
+	return complete
+end
+
+
+
+
+
+-- ============================================================
+-- ============================================================
+-- ======= 10/ Compatibility shims for the in-flight UI =======
+-- ============================================================
+-- ============================================================
+
+--- Legacy compatibility stubs — no-ops so loading the old UI does not crash.
+
+function M.aggregate_events(_events, _app_name, _date_str) return end
+function M.save_today_index() end
+function M.save_manifest() end
+function M.merge_day_to_db(_date_str, _idx, _manifest) end
+function M.merge_day_to_db_async(_date_str, _idx, _manifest, on_done)
+	if type(on_done) == "function" then
+		Logger.callback(LOG, "Merge-day completion", on_done, true)
+	end
+end
+function M.rebuild_today_from_raw_log() return false end
+function M.rebuild_today_from_raw_log_async(on_done)
+	if type(on_done) == "function" then
+		Logger.callback(LOG, "Rebuild-today completion", on_done, false)
+	end
+end
+function M.rebuild_index_if_needed() end
+function M.rebuild_index_if_needed_async(on_done)
+	if type(on_done) == "function" then
+		Logger.callback(LOG, "Rebuild-index completion", on_done, false)
+	end
+end
+function M.get_mac_serial() return "" end
+
+return M

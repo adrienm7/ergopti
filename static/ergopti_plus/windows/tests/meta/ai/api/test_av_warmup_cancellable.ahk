@@ -14,7 +14,7 @@
 ; their starter BoundFunc in a field). The fix stores the warm-up in KLAVState.warmup_fn,
 ; routes it through the GUARDED tick KL_AV_FastTick, and cancels it in KL_AV_Stop.
 ;
-; Meta-static because modules/keystats is not in the headless runner's include graph.
+; Meta-static because metrics/engine is not in the headless runner's include graph.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

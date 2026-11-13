@@ -11,8 +11,8 @@ local uv=require("luv")
 require("core.lifecycle.engine.compat.utf8").install()
 local Json=require("core.text.engine.json")
 local root=assert(uv.fs_mkdtemp("/tmp/ergopti-source-reader-XXXXXX"))
-local W=require("modules.keystats.sqlite_writer")
-local R=require("modules.keystats.sqlite_reader")
+local W=require("metrics.engine.journal.sqlite_writer")
+local R=require("metrics.engine.reader.sqlite_reader")
 local db=root.."/metrics.sqlite"
 assert(W.open_db(db) and W.is_available())
 local checks,failures=0,0

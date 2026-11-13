@@ -132,7 +132,7 @@ end)
 
 helpers.describe("dashboard bridges: no call to a function that is not there", function()
 
-	local Keystats = helpers.load_module("modules.keystats.keystats")
+	local Keystats = helpers.load_module("metrics.engine.keystats")
 
 	for _, bridge in ipairs({ { "the apps bridge", APPS_BRIDGE }, { "the typing bridge", TYPING_BRIDGE } }) do
 		helpers.it(bridge[1] .. " names only keystats functions that exist", function()
@@ -187,7 +187,7 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 	--- The bridge with recording deferral and push channels.
 	--- @return table bridge, table deferred, table pushed
 	local function bridge_with_seams()
-		local Bridge = helpers.load_module("ui.metrics_typing.bridge")
+		local Bridge = helpers.load_module("metrics.ui.metrics_typing.bridge")
 		Bridge._reset()
 		local deferred, pushed = {}, {}
 		Bridge._defer = function(fn, delay_ms)
@@ -294,7 +294,7 @@ end)
 
 helpers.describe("metrics apps bridge: every reply is dashboard data", function()
 	helpers.it("reports a refused metrics export without claiming success", function()
-		local Bridge = helpers.load_module("ui.metrics_apps.bridge")
+		local Bridge = helpers.load_module("metrics.ui.metrics_apps.bridge")
 		local state = { keystats = require("tests.fakes.metrics_keystats").synchronous({
 			get_dashboard_payload = function() return { metrics_manifest = {} } end,
 			export_json = function() return nil, "invalid UTF-8" end,
@@ -306,7 +306,7 @@ helpers.describe("metrics apps bridge: every reply is dashboard data", function(
 	end)
 
 	helpers.it("answers a category edit, the picker and a pause with the manifest", function()
-		local Bridge = helpers.load_module("ui.metrics_apps.bridge")
+		local Bridge = helpers.load_module("metrics.ui.metrics_apps.bridge")
 		Bridge._category_prompt = function(_, _, initial) return initial end
 		local state = { keystats = require("tests.fakes.metrics_keystats").synchronous({
 			get_dashboard_payload = function() return { metrics_manifest = { ["2026-09-24"] = {} } } end,

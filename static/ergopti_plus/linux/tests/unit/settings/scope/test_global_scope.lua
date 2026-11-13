@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 
 local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
-local OWNER_MODULES = { "infra.tap_hold_scope", "infra.shortcuts_scope", "ai.engine.scope", "infra.metrics_scope",
+local OWNER_MODULES = { "infra.tap_hold_scope", "infra.shortcuts_scope", "ai.engine.scope", "metrics.engine.scope",
 	"hotstrings.engine.catalogue.scope", "settings.engine.scope.script_scope" }
 
 --- A stub participant journaling into a shared trace.

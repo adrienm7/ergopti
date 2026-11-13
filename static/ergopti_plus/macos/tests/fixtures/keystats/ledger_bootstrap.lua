@@ -90,8 +90,8 @@ package.loaded["hs.timer"] = loop.api
 local errors, logger = {}, Helpers.make_logger_stub()
 logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
 package.loaded["core.logger.engine.logger"] = logger
-local Export = require("modules.keystats.export")
-package.loaded["modules.keystats.export"] = {
+local Export = require("metrics.engine.reader.export")
+package.loaded["metrics.engine.reader.export"] = {
 	init = function() return true end, cleanup = function() return true end,
 	sync_foreign_data_sql = function() return {} end, get_native_app_category = function() return nil end,
 	_last_complete_batch_offset = Export._last_complete_batch_offset,
@@ -107,8 +107,8 @@ require("tests.support.file_system_transaction_fixture").with_fixture(function(n
 	package.loaded["core.fs.adapters.ledger_append"] = nil
 	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["hs.sqlite3"], package.loaded["hs.json"], package.loaded["hs.timer"] = sqlite_port, json_port, loop.api
-	local Writer = require("modules.keystats.sqlite_writer")
-	local Manager = require("modules.keystats.log_manager")
+	local Writer = require("metrics.engine.journal.sqlite_writer")
+	local Manager = require("metrics.engine.journal.log_manager")
 	local paths = { sqlite_path = temporary .. "/cache.sqlite", today_log_path = temporary .. "/today.log",
 		data_sql_path = temporary .. "/data.sql", metrics_dir = temporary .. "/", by_device_dir = temporary .. "/",
 		tmpdir_dir = temporary .. "/", device_json_path = temporary .. "/device.json" }

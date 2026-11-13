@@ -31,8 +31,8 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 write(root .. "/config/ergopti/config.toml", "[metrics]\nenabled = true\n")
 
-local Writer = require("modules.keystats.sqlite_writer")
-local Bridge = require("ui.metrics_apps.bridge")
+local Writer = require("metrics.engine.journal.sqlite_writer")
+local Bridge = require("metrics.ui.metrics_apps.bridge")
 -- The edit confirms the category and the score in two native prompts, a desktop
 -- dialog this storage receipt does not drive: each answers the value the page
 -- sent, which is the prompt's own initial text.
@@ -63,10 +63,10 @@ end
 local function start(legacy_app)
 	case_index = case_index + 1
 	Writer.close_db()
-	local previous = package.loaded["modules.keystats.keystats"]
-	package.loaded["modules.keystats.keystats"] = nil
-	package.loaded["modules.keystats.app_category_file"] = nil
-	local keystats = require("modules.keystats.keystats")
+	local previous = package.loaded["metrics.engine.keystats"]
+	package.loaded["metrics.engine.keystats"] = nil
+	package.loaded["metrics.engine.apps.category_file"] = nil
+	local keystats = require("metrics.engine.keystats")
 	local path = root .. "/case-" .. case_index .. ".sqlite"
 	if legacy_app then
 		-- The previous store: a score in meta and the category on the day rows,

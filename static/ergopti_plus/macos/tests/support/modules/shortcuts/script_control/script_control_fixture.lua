@@ -56,12 +56,12 @@ package.loaded["ai.engine.local_servers.warmup_controller"] = {
 	stop = function() return true end,
 	schedule_warmup_with_retry = function() return true end,
 }
-package.loaded["ui.wpm.wpm_menubar"] = {
+package.loaded["metrics.ui.wpm.menubar"] = {
 	is_running = function() return false end,
 	stop = function() return true end,
 	resume_after_pause = function() return true end,
 }
-package.loaded["ui.wpm.wpm_widget"] = {
+package.loaded["metrics.ui.wpm.widget"] = {
 	is_running = function() return false end,
 	stop = function() return true end,
 	resume_after_pause = function() return true end,

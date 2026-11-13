@@ -109,7 +109,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		})
 		package.loaded["core.text.engine.utils"] = require("core.text.engine.utils_core")
 		package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
-		package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
+		package.loaded["metrics.engine.perf.hotpath_profiler"] = api({ now = function() return 0 end })
 		package.loaded["menu.engine.manifest_reader"] = {
 			default_for = function(key)
 				if key == "hotstrings.trigger_char" then return "\u{2605}" end
@@ -180,7 +180,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		})
 		package.loaded["core.text.engine.utils"] = require("core.text.engine.utils_core")
 		package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
-		package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
+		package.loaded["metrics.engine.perf.hotpath_profiler"] = api({ now = function() return 0 end })
 		package.loaded["menu.engine.manifest_reader"] = {
 			default_for = function(key)
 				if key == "hotstrings.trigger_char" then return "\u{2605}" end
@@ -215,7 +215,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 		reset_driver_modules()
 		local logs = logger_capture()
 		package.loaded["hotstrings.engine.expander.utils"] = { emit_text = function() error("must not emit") end }
-		package.loaded["modules.keystats"] = {}
+		package.loaded["metrics.engine"] = {}
 		package.loaded["platform.input.synthetic_input"] = api()
 
 		local rules = require("hotstrings.engine.dynamic.rules_engine")
@@ -267,7 +267,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 		package.loaded["hotstrings.engine.expander.utils"] = {
 			emit_text = function() error("forced fallback emitter failure") end,
 		}
-		package.loaded["modules.keystats"] = {}
+		package.loaded["metrics.engine"] = {}
 
 		local synthetic = require("platform.input.synthetic_input")
 		local rules = require("hotstrings.engine.dynamic.rules_engine")
@@ -314,7 +314,7 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 	helpers.it("passes the magic key through and does not log completion", function()
 		local hs_stub = reset_driver_modules()
 		local logs = logger_capture()
-		package.loaded["modules.keystats"] = {}
+		package.loaded["metrics.engine"] = {}
 		package.loaded["platform.input.synthetic_input"] = api()
 
 		local personal = require("hotstrings.engine.dynamic.personal_info")
@@ -361,7 +361,7 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 	helpers.it("cancels private fallback deletes when field construction throws", function()
 		reset_driver_modules()
 		logger_capture()
-		package.loaded["modules.keystats"] = {}
+		package.loaded["metrics.engine"] = {}
 
 		local synthetic = require("platform.input.synthetic_input")
 		local personal = require("hotstrings.engine.dynamic.personal_info")

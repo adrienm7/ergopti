@@ -144,8 +144,8 @@ local function with_fixed_controls_locale(locale, scenario)
 	if acquired then released = native.scope_release(owner) == true end
 	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
 	local cleanup_ok, cleanup_error = pcall(function()
-		fresh_bridge = fresh_bridge or package.loaded["modules.keystats.kc_bridge"]
-		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keystats.kc_bridge"]) then fresh_bridge.stop() end
+		fresh_bridge = fresh_bridge or package.loaded["metrics.adapters.kc_bridge"]
+		if fresh_bridge and not rawequal(fresh_bridge, previous["metrics.adapters.kc_bridge"]) then fresh_bridge.stop() end
 		local scheduler = package.loaded["core.events.timer_scheduler"]
 		if scheduler and not rawequal(scheduler, previous["core.events.timer_scheduler"]) then
 			helpers.assert_eq(scheduler.cancelAll(), true)

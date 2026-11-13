@@ -10,8 +10,8 @@ const path = require('path');
 
 const root = path.join(__dirname, '../..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
-const reader = read('static/ergopti_plus/linux/modules/keystats/sqlite_reader.lua');
-const bridge = read('static/ergopti_plus/linux/ui/metrics_typing/bridge.lua');
+const reader = read('static/ergopti_plus/linux/metrics/engine/reader/sqlite_reader.lua');
+const bridge = read('static/ergopti_plus/linux/metrics/ui/metrics_typing/bridge.lua');
 const data = read('static/ergopti_plus/_shared/ui/metrics_typing/data.js');
 const html = read('static/ergopti_plus/_shared/ui/metrics_typing/index.html');
 

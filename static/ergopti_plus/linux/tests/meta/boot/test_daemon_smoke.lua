@@ -653,7 +653,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("metrics_collector can be required", function()
-      local ok, mc = pcall(require, "modules.keystats.metrics_collector")
+      local ok, mc = pcall(require, "metrics.engine.collector")
       helpers.assert_true(ok, "metrics_collector module loads")
       if ok then
         helpers.assert_true(type(mc.init) == "function",

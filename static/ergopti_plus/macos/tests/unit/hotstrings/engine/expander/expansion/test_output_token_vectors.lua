@@ -85,7 +85,7 @@ end)
 local function load_expander(buffer)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
-			name:match("^hotstrings%.engine%.expander") or name == "modules.keystats"
+			name:match("^hotstrings%.engine%.expander") or name == "metrics.engine"
 			or name:match("^adapters%.") or name == "core.logger.engine.logger" or name == "core.timing.engine.timings"
 		) then
 			package.loaded[name] = nil
@@ -101,7 +101,7 @@ local function load_expander(buffer)
 		ms = function() return 5 end,
 		sec = function(_, key) return key == "clipboard_restore_ms" and 0.15 or 0.08 end,
 	}
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		notify_synthetic = function() end,
 		set_buffer = function() end,
 		log_hotstring = function() end,

@@ -235,7 +235,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			"ui.menu.menu_shortcuts",
 			"layouts.ui.menu.keyboard_layout",
 			"hotstrings.ui.menu.hotstrings",
-			"ui.menu.menu_metrics",
+			"metrics.ui.menu.metrics",
 			"ui.menu.menu_tap_holds",
 			"apps.ui.menu.apps",
 			"ui.menu.menu_about",
@@ -250,7 +250,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			end,
 		}
 		package.loaded["ai.engine"] = { set_backend = function() return true end }
-		package.loaded["modules.keystats"] = {}
+		package.loaded["metrics.engine"] = {}
 		package.loaded["modules.shortcuts"] = shortcuts
 		package.loaded["hotstrings.engine.dynamic"] = {}
 		package.loaded["gestures.engine"] = { SINGLE_SLOTS = {}, DEFAULT_GESTURES = {} }

@@ -341,15 +341,15 @@ function M.load_with_stubs(module_name, hs_overrides)
 	loaded[module_name] = nil
 	-- Foreign ledger readers retain the native hash API across ingest turns.
 	loaded["diagnostics.adapters.foreign_ledger_snapshot"] = nil
-	if module_name == "modules.keystats.export" or module_name == "diagnostics.adapters.foreign_ledger_snapshot" then
+	if module_name == "metrics.engine.reader.export" or module_name == "diagnostics.adapters.foreign_ledger_snapshot" then
 		loaded["core.timing.engine.paced_job"] = nil
 		loaded["core.events.timer_scheduler"] = nil
 	end
 	-- The keystats and its process-lifetime physical-source settlement port
 	-- form one ownership unit. A fresh fixture parent cannot inherit a child
 	-- bound to the preceding CoreState; the scoped proxy restores both caches.
-	if module_name == "modules.keystats" or module_name == "modules.keystats.init" then
-		loaded["modules.keystats.physical_accounting_mode"] = nil
+	if module_name == "metrics.engine" or module_name == "modules.keystats.init" then
+		loaded["metrics.engine.capture.physical_accounting_mode"] = nil
 	end
 	-- Expander and TerminatorReplay form one ownership unit: Expander.init now
 	-- consumes the replay module's exact commitment, and replay correctly refuses
@@ -745,8 +745,8 @@ end
 --- The module name a driver-relative source path is required by: dots for
 --- slashes, `.lua` dropped, and a package's `init` dropped. Whole-tree scans key
 --- their allowlists by this name, as the code names the module, never by path.
---- @param rel string Path under the driver root, e.g. "modules/keystats/init.lua".
---- @return string module_name e.g. "modules.keystats".
+--- @param rel string Path under the driver root, e.g. "metrics/engine/init.lua".
+--- @return string module_name e.g. "metrics.engine".
 function M.module_name_of(rel)
 	local name = rel:gsub("\\", "/"):gsub("^%./", ""):gsub("%.lua$", ""):gsub("/", ".")
 	return (name:gsub("%.init$", ""))

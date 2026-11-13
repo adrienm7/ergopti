@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local MetricsState = require("infra.metrics_state_keys")
+local MetricsState = require("metrics.engine.state_keys")
 
 -- id -> canonical disabled_when key array (order matches the manifest).
 -- The two windows are `readable_when_off` instead: they read stored history only.
@@ -131,7 +131,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 		helpers.assert_true(at ~= nil, "the Metrics menu must still declare the row that opens the typing metrics")
 		helpers.assert_eq(ids[at + 1], "show_apps", "the two rows that open a window form one group")
 		helpers.assert_eq(ids[at + 2], "---", "a separator closes that group")
-		local src = read_source("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
+		local src = read_source("\"dialog.metrics.security_warning_title\"") -- metrics/ui/menu/metrics.lua
 		helpers.assert_nil(src:find("rows_shortcut_", 1, true), "the menu builds no shortcut row")
 		helpers.assert_nil(src:find("shortcut_prompt", 1, true), "the menu opens no shortcut prompt")
 	end)
@@ -195,7 +195,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 	--- ============================================
 
 	helpers.it("every canonical item's greying is resolved by the shared resolver", function()
-		local src = read_source("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
+		local src = read_source("\"dialog.metrics.security_warning_title\"") -- metrics/ui/menu/metrics.lua
 		local manifest = load_manifest()
 		for _, c in ipairs(CANON) do
 			-- TWO ways to satisfy the invariant, and the invariant is what matters:
@@ -241,7 +241,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 	end)
 
 	helpers.it("the shared STATE_GETTERS table reads the correct Lua state", function()
-		local src = read_source("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
+		local src = read_source("\"dialog.metrics.security_warning_title\"") -- metrics/ui/menu/metrics.lua
 		helpers.assert_true(src:find("keystats_enabled%s*=%s*function%(%) return state%.keystats_enabled end") ~= nil,
 			"STATE_GETTERS must map keystats_enabled to state.keystats_enabled")
 		helpers.assert_true(src:find("wpm_widget_visible%s*=%s*function%(%) return state%.keystats_float_wpm end") ~= nil,
@@ -262,7 +262,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 		helpers.assert_true(named > 0, "the manifest must still name its metrics state")
 		for name in pairs(used) do
 			helpers.assert_true(declared[name] == true,
-				name .. " is read by the manifest but not declared in infra/metrics_state_keys.lua")
+				name .. " is read by the manifest but not declared in metrics/engine/state_keys.lua")
 		end
 		local Preferences = require("settings.engine.preferences.preferences")
 		local owned = {}

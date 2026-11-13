@@ -29,7 +29,7 @@
 
 local M = {}
 
-local PhaseStats  = require("infra.phase_stats")
+local PhaseStats  = require("metrics.engine.perf.phase_stats")
 local Logger      = require("core.logger.engine.logger")
 local Timer       = require("core.events.timer_scheduler")
 local BootJournal = require("core.logger.adapters.boot_journal")

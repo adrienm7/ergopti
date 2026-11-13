@@ -17,13 +17,13 @@ fh:close()
 --- Loads a fresh aggregator with the stubs the aggregation corpus uses.
 --- @return table agg
 local function fresh_aggregator()
-	for _, name in ipairs({ "modules.keystats.aggregator", "modules.keystats.aggregator.core",
-		"modules.keystats.aggregator.events", "modules.keystats.aggregator.sql",
-		"modules.keystats.aggregator.state" }) do
+	for _, name in ipairs({ "metrics.engine.aggregator.aggregator", "metrics.engine.aggregator.core",
+		"metrics.engine.aggregator.events", "metrics.engine.aggregator.sql",
+		"metrics.engine.aggregator.state" }) do
 		package.loaded[name] = nil
 	end
-	package.loaded["modules.keystats.sqlite_writer"] = { get_db = function() return nil end, init = function() end }
-	package.loaded["modules.keystats.export"] = { get_native_app_category = function() return "Development" end, init = function() end }
+	package.loaded["metrics.engine.journal.sqlite_writer"] = { get_db = function() return nil end, init = function() end }
+	package.loaded["metrics.engine.reader.export"] = { get_native_app_category = function() return "Development" end, init = function() end }
 	package.loaded["core.timing.engine.timings"] = {
 		ms = function(_section, key)
 			if key == "think_pause_ms" then return 2000 end
@@ -36,8 +36,8 @@ local function fresh_aggregator()
 		end,
 		sec = function() return 1.0 end,
 	}
-	local agg = helpers.load_with_stubs("modules.keystats.aggregator")
-	local S = require("modules.keystats.aggregator.state")
+	local agg = helpers.load_with_stubs("metrics.engine.aggregator.aggregator")
+	local S = require("metrics.engine.aggregator.state")
 	S.initialized, S.agg_batch, S.ngram_ctx, S.device_id = false, nil, nil, nil
 	agg.init({ device_id = "corpus-test-uuid" })
 	return agg
@@ -50,8 +50,8 @@ require("tests.lua.metrics.correction_erased_contract")(helpers, data, function(
 		for _, ev in ipairs(flush) do events[#events + 1] = { ev.char, ev.delay, ev.meta or {} } end
 		agg.walk_typing({ app = data.app, timestamp = data.timestamps[index], events = events })
 	end
-	local batch = require("modules.keystats.aggregator.state").agg_batch
-	local context = require("modules.keystats.aggregator.core").get_app_ctx(data.app)
+	local batch = require("metrics.engine.aggregator.state").agg_batch
+	local context = require("metrics.engine.aggregator.core").get_app_ctx(data.app)
 	local error_row = batch.errors[data.date .. "\1" .. data.app]
 	return batch.ngram, { bs_total = error_row.bs_total, cur_word = context.cur_word, word_err = context.word_err, hs_input_chars = (batch.app_day[data.date .. "\1" .. data.app] or {}).hs_input_chars or 0 }
 end, 11)

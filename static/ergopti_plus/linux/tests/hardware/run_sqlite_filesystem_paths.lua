@@ -38,11 +38,11 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 write(root .. "/config/ergopti/config.toml", "[metrics]\nenabled = true\n")
 
-local Writer = require("modules.keystats.sqlite_writer")
-local Reader = require("modules.keystats.sqlite_reader")
+local Writer = require("metrics.engine.journal.sqlite_writer")
+local Reader = require("metrics.engine.reader.sqlite_reader")
 -- Resolve and load production owners before entering the owned database cwd.
 require("core.fs.engine.paths")
-require("modules.keystats.keystats")
+require("metrics.engine.keystats")
 
 local function check(name, fn)
 	checks = checks + 1
@@ -96,8 +96,8 @@ for index, case in ipairs(cases) do
 	end)
 
 	check(case[1] .. " public keystats dashboard keeps the admitted file identity", function()
-		package.loaded["modules.keystats.keystats"] = nil
-		local Keystats = require("modules.keystats.keystats")
+		package.loaded["metrics.engine.keystats"] = nil
+		local Keystats = require("metrics.engine.keystats")
 		Keystats.init({ sqlite_path = case[2], log_dir = directory .. "/logs" })
 		assert(Keystats.is_enabled() and Writer.is_available(), "native public initialization refused the literal file")
 		assert(Writer.get_db_path() == case[2], "public diagnostic spelling changed")
@@ -154,8 +154,8 @@ seed(root .. "/file:public.sqlite", 3)
 seed(root .. "/public.sqlite", 7)
 local public_decoy_before = read(root .. "/public.sqlite")
 check("public software keystats events flush into the selected literal database", function()
-	package.loaded["modules.keystats.keystats"] = nil
-	local Keystats = require("modules.keystats.keystats")
+	package.loaded["metrics.engine.keystats"] = nil
+	local Keystats = require("metrics.engine.keystats")
 	Keystats.init({ sqlite_path = "file:public.sqlite", log_dir = root .. "/logs" })
 	assert(Writer.is_available())
 	local now = require("core.logger.engine.monotonic").now_ms()

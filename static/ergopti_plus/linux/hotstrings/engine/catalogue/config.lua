@@ -177,7 +177,7 @@ local function decode_choices(document)
 	end
 	local modules = hotstrings and hotstrings.modules
 	if modules ~= nil and type(modules) ~= "table" then
-		ConfigOutdated.report({ "hotstrings", "modules", "layouts" }, "section choices are not a table", Logger)
+		ConfigOutdated.report({ "hotstrings", "modules", "layouts", "metrics" }, "section choices are not a table", Logger)
 		modules = nil
 	end
 	for id, sections in pairs(modules or {}) do

@@ -67,11 +67,11 @@ local REGISTRY = {
 	{
 		key = "metrics_typing",
 		is_open = function()
-			local m = package.loaded["ui.metrics_typing"]
+			local m = package.loaded["metrics.ui.metrics_typing"]
 			return m ~= nil and m._wv ~= nil
 		end,
 		reopen = function()
-			local ok, m = pcall(require, "ui.metrics_typing")
+			local ok, m = pcall(require, "metrics.ui.metrics_typing")
 			if not ok or not m or type(m.show) ~= "function" then return false end
 			return m.show() == true
 		end,
@@ -80,11 +80,11 @@ local REGISTRY = {
 		key = "metrics_apps",
 		is_open = function()
 			local m = package.loaded["ui.metrics_apps.init"]
-				or package.loaded["ui.metrics_apps"]
+				or package.loaded["metrics.ui.metrics_apps"]
 			return m ~= nil and m._wv ~= nil
 		end,
 		reopen = function()
-			local ok, m = pcall(require, "ui.metrics_apps")
+			local ok, m = pcall(require, "metrics.ui.metrics_apps")
 			if not ok or not m or type(m.show) ~= "function" then return false end
 			return m.show() == true
 		end,

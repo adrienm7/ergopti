@@ -76,8 +76,8 @@ _TWTL_AllHosts() {
 	_TWTL_CheckSharedUpdaterModule()
 	_TWTL_SharedFolderIsFixed()
 	; Legacy per-launch hosts (interactive/long-lived) -- still sweep + delete.
-	_TWTL_CheckLegacyHost("modules/keystats/keystats_ui.ahk", "ergopti_metrics_edge_")
-	_TWTL_CheckLegacyHost("modules/keystats/keystats_webview.ahk", "ergopti_webview2_")
+	_TWTL_CheckLegacyHost("metrics/engine/view/ui.ahk", "ergopti_metrics_edge_")
+	_TWTL_CheckLegacyHost("metrics/engine/view/webview.ahk", "ergopti_webview2_")
 	_TWTL_CheckLegacyHost("ai/engine/ollama/webview.ahk", "ergopti_ollama_wv_")
 }
 
@@ -95,7 +95,7 @@ _TWTL_OllamaWVDeferredDelete() {
 }
 
 _TWTL_KeystatsWVDeferredDelete() {
-	Src := _TWTL_ReadSource("modules/keystats/keystats_webview.ahk")
+	Src := _TWTL_ReadSource("metrics/engine/view/webview.ahk")
 	Close := _DriverFuncBody("KLWV_Close")
 	Assert(Close != "", "KLWV_Close must exist")
 	Assert(InStr(Close, "WebView_RetireProfile(udir)") > 0,

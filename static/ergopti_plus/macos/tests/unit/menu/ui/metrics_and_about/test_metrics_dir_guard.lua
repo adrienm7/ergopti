@@ -1,6 +1,6 @@
 --- tests/unit/menu/ui/metrics_and_about/test_metrics_dir_guard.lua
 
---- Regression test for two defects in ui/menu/menu_metrics.lua.
+--- Regression test for two defects in metrics/ui/menu/metrics.lua.
 ---
 --- ui-menu-misc-3: the encrypt and decrypt toggle paths called
 --- `for file in fs.dir(log_dir)` without checking whether fs.dir returned a

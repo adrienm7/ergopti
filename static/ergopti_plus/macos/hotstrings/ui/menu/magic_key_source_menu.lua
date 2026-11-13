@@ -34,7 +34,7 @@ local Timer           = require("core.events.timer_scheduler")
 local EventProvenance = require("diagnostics.adapters.event_provenance")
 local Shared          = require("layouts.engine.layers.magic_key_source")
 local ManifestMenu    = require("menu.engine.manifest_menu")
-local PhaseStats      = require("infra.phase_stats")
+local PhaseStats      = require("metrics.engine.perf.phase_stats")
 local Source          = require("hotstrings.engine.expander.magic_key_source")
 local Geometry        = require("platform.input.keyboard_geometry")
 

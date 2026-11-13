@@ -27,7 +27,7 @@ M.FAMILIES = {
 }
 
 local OWNERS = {
-	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "core.timing.engine.paced_json",
+	"metrics.engine.reader.sqlite_reader", "metrics.ui.metrics_typing.projection", "core.timing.engine.paced_json",
 	"core.logger.engine.logger", "hs.sqlite3", "hs.json", "core.text.engine.json",
 }
 
@@ -135,7 +135,7 @@ function M.run(options, callback)
 		logger.error = function(_, template, ...) state.errors[#state.errors + 1] = string.format(template, ...) end
 		logger.warn = function(_, template, ...) state.warnings[#state.warnings + 1] = string.format(template, ...) end
 		package.loaded["core.logger.engine.logger"] = logger
-		local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = state.sqlite })
+		local reader = helpers.load_with_stubs("metrics.engine.reader.sqlite_reader", { sqlite3 = state.sqlite })
 		reader.history_fingerprint_exact = true -- The fixture owns all its rows and mutations.
 		local original_read = reader.read_ngrams
 		reader.read_ngrams = function(path, first, last, apps, pacer)
@@ -143,7 +143,7 @@ function M.run(options, callback)
 			state.histories[#state.histories + 1] = { first = first, last = last, complete = complete }
 			return data, complete
 		end
-		return callback(state, reader, require("ui.metrics_typing.projection"))
+		return callback(state, reader, require("metrics.ui.metrics_typing.projection"))
 	end)
 end
 

@@ -78,7 +78,7 @@ if (lua) {
 
 // ── The AutoHotkey copy must mirror every one of them ────────────────────────
 
-const ahk = read('windows/modules/keystats/keystats_text_cipher.ahk');
+const ahk = read('windows/metrics/engine/privacy/text_cipher.ahk');
 if (ahk && lua) {
 	/** Pulls `global KL_ENC_NAME := "value"` / `:= number` out of the AHK source. */
 	function ahkConst(name) {
@@ -133,8 +133,8 @@ if (ahk && lua) {
 // ── Both Lua ciphers must consume the shared codec, not re-type the format ────
 
 for (const rel of [
-	'linux/modules/keystats/text_cipher.lua',
-	'macos/modules/keystats/text_cipher.lua'
+	'linux/metrics/engine/privacy/text_cipher.lua',
+	'macos/metrics/engine/privacy/text_cipher.lua'
 ]) {
 	const src = read(rel);
 	if (src && !src.includes('metrics.engine.privacy.text_crypto')) {
@@ -150,7 +150,7 @@ for (const rel of [
 // under the same flag, or one driver's journal keeps typed text in clear.
 
 const seal = read('_shared/metrics/engine/journal/seal.lua');
-const journal = read('windows/modules/keystats/keystats_journal.ahk');
+const journal = read('windows/metrics/engine/journal/journal.ahk');
 if (seal && journal) {
 	const luaFields = (seal.match(/M\.FIELDS\s*=\s*\{([^}]*)\}/) || [])[1];
 	const ahkFields = (journal.match(/KL_JOURNAL_SEALED_FIELDS\s*:=\s*\[([^\]]*)\]/) || [])[1];
@@ -166,7 +166,7 @@ if (seal && journal) {
 	if (!luaMark || !journal.includes(`"${luaMark}"`)) {
 		errors.push(`journal sealing: keystats_journal.ahk does not use the shared flag "${luaMark}".`);
 	}
-	const rotation = read('macos/modules/keystats/rotation.lua');
+	const rotation = read('macos/metrics/engine/journal/rotation.lua');
 	if (
 		rotation &&
 		!(rotation.includes('JournalSeal.seal(') && rotation.includes('JournalSeal.unseal('))

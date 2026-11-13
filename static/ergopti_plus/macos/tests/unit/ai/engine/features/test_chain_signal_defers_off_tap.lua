@@ -81,7 +81,7 @@ package.loaded["core.ui.ui.tooltip"] = {
 	show_predictions      = function(...) end,
 	tint                  = function(_) return nil end,
 }
-package.loaded["modules.keystats"] = {
+package.loaded["metrics.engine"] = {
 	get_live_stats    = function() return { wpm_physical = 0 } end,
 	log_llm_dismissed = function(_, _preds) end,
 }

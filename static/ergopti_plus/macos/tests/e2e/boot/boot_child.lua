@@ -198,7 +198,7 @@ elseif ACTION == "type_for_wpm" then
 		idle(0.1)
 	end
 	idle(0.3)
-	local stats = require("modules.keystats").get_live_stats()
+	local stats = require("metrics.engine").get_live_stats()
 	World.record("FACT", "wpm_input_counted=" .. tostring(stats.wpm > 0))
 	local visible, recovered = 0, false
 	local config = require("core.text.engine.toml_codec").decode(require("tests.support.source_file").read(

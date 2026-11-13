@@ -9,6 +9,6 @@ Run the corresponding npm script to regenerate.
 
 `keycode_data.js` is generated from `_shared/layouts/data/keycodes/azerty.json` — the
 same canonical keycode→finger/hand/home map the macOS keystats aggregator
-(`macos/modules/keystats/aggregator/core.lua`) derives its own `KC_TO_FINGER`
+(`macos/metrics/engine/aggregator/core.lua`) derives its own `KC_TO_FINGER`
 table from. Both consumers read the shared JSON instead of hand-copying it, so
 a future layout correction only needs editing `azerty.json`.

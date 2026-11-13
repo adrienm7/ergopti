@@ -35,14 +35,14 @@ local Watch = require("platform.focus.atspi_focus_watch").new({
 })
 local uv = require("luv")
 local root = assert(arg[1], "private native fixture directory required")
-package.loaded["infra.metrics_preferences"] = require("tests.support.metrics_preferences_fixture").new({ initial = {
+package.loaded["metrics.engine.preferences"] = require("tests.support.metrics_preferences_fixture").new({ initial = {
 	["metrics.enabled"] = true, ["metrics.secure_filter_enabled"] = true, ["metrics.encrypt"] = false,
 } })
-local Keystats = require("modules.keystats.keystats")
+local Keystats = require("metrics.engine.keystats")
 assert(Keystats.init({ log_dir = root, sqlite_path = root .. "/metrics.sqlite3" }) ~= false)
 local engine = require("hotstrings.engine.engine").new()
 local resets, focus_changes = 0, 0
-local Guard = require("modules.keystats.focus_guard").new({
+local Guard = require("metrics.engine.focus_guard").new({
 	watch = Watch, detector = Detector, keystats = Keystats, now_ms = Clock.now_ms,
 	settle_ms = Timings.ms("privacy", "focus_settle_ms"),
 	reset_text = function() resets = resets + 1; engine:reset(false) end,

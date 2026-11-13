@@ -25,7 +25,7 @@ local Renderer = require("core.ui.ui.tooltip.renderer")
 local LlmLine = require("core.ui.engine.tooltip.llm_line")
 local KeyNames = require("platform.input.keycodes.key_names")
 local i18n = require("core.i18n.engine.i18n")
-local HotPath = require("infra.hotpath_profiler")
+local HotPath = require("metrics.engine.perf.hotpath_profiler")
 local TextUtils = require("core.text.engine.utils_core")
 
 local MAC_KEYCODES_NUMBERS = {

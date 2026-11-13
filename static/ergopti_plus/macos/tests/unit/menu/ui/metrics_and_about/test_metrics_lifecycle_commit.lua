@@ -25,7 +25,7 @@ local function load_menu(start_result)
 		keystats_float_colors = false, keystats_private_filter_enabled = true,
 		keystats_secure_filter_enabled = true, keystats_system_auth_filter_enabled = true,
 	}
-	package.loaded["modules.keystats"] = setmetatable({
+	package.loaded["metrics.engine"] = setmetatable({
 		DEFAULT_STATE = defaults,
 		start = function() return start_result end,
 		set_options = function() return true end,
@@ -58,16 +58,16 @@ local function load_menu(start_result)
 	renderer.build = capture
 	package.loaded["menu.engine.manifest_menu"] = renderer
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["ui.wpm.wpm_menubar"] = {
+	package.loaded["metrics.ui.wpm.menubar"] = {
 		start = function() ctx.menubar_starts = ctx.menubar_starts + 1 end,
 		stop = function() end, set_use_source_colors = function() end,
 	}
-	package.loaded["ui.wpm.wpm_widget"] = {
+	package.loaded["metrics.ui.wpm.widget"] = {
 		start = function() ctx.widget_starts = ctx.widget_starts + 1 end,
 		stop = function() end, set_use_source_colors = function() end,
 	}
-	package.loaded["ui.menu.menu_metrics"] = nil
-	local MenuMetrics = require("ui.menu.menu_metrics")
+	package.loaded["metrics.ui.menu.metrics"] = nil
+	local MenuMetrics = require("metrics.ui.menu.metrics")
 
 	ctx.state = {}
 	for key, value in pairs(defaults) do ctx.state[key] = value end
@@ -106,25 +106,25 @@ end)
 
 helpers.describe("menu_metrics: encryption refuses pending ROI work", function()
 	local function with_cipher_menu(body)
-		helpers.with_stub_scope({ "modules.keystats.text_cipher", "modules.keystats.log_manager",
-			"modules.keystats.init", "modules.keystats", "modules.keystats.text_migration" }, function()
-			package.loaded["modules.keystats.text_cipher"] = nil
-			package.loaded["modules.keystats.log_manager"] = nil
+		helpers.with_stub_scope({ "metrics.engine.privacy.text_cipher", "metrics.engine.journal.log_manager",
+			"modules.keystats.init", "metrics.engine", "metrics.engine.privacy.text_migration" }, function()
+			package.loaded["metrics.engine.privacy.text_cipher"] = nil
+			package.loaded["metrics.engine.journal.log_manager"] = nil
 			package.loaded["modules.keystats.init"] = nil
 			local ctx = load_menu(false)
 			local path = os.tmpname()
 			assert(os.remove(path))
 			local _, source_status = require("settings.engine.preferences.preferences").load(path)
 			helpers.assert_eq(source_status, "absent")
-			local cipher = require("modules.keystats.text_cipher")
+			local cipher = require("metrics.engine.privacy.text_cipher")
 			helpers.assert_true(cipher.set_enabled(false))
 			local ports = { settled = true, available = true, migrations = 0, retirements = 0 }
 			cipher.is_available = function() return ports.available end
-			package.loaded["modules.keystats.log_manager"] = { retire_roi_text = function()
+			package.loaded["metrics.engine.journal.log_manager"] = { retire_roi_text = function()
 				ports.retirements = ports.retirements + 1
 				return ports.settled
 			end }
-			package.loaded["modules.keystats.text_migration"] = { start_for_posture = function()
+			package.loaded["metrics.engine.privacy.text_migration"] = { start_for_posture = function()
 				ports.migrations = ports.migrations + 1
 			end }
 			body(ctx, cipher, ports)

@@ -33,7 +33,7 @@ local function load_fixture()
 	}
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.hotpath_profiler"] = {
+	package.loaded["metrics.engine.perf.hotpath_profiler"] = {
 		now = function() return 0 end,
 		log_if_slow = function() end,
 	}

@@ -38,9 +38,9 @@ const BASE = path.join(ROOT, 'static', 'ergopti_plus');
 // The keystats source trees of each driver. Tests are excluded: they quote SQL
 // to assert on it, and counting those quotes would double every statement.
 const DRIVERS = {
-	windows: { dirs: ['windows/modules/keystats'], ext: '.ahk' },
-	macos: { dirs: ['macos/modules/keystats'], ext: '.lua' },
-	linux: { dirs: ['linux/modules/keystats'], ext: '.lua' },
+	windows: { dirs: ['windows/metrics/engine'], ext: '.ahk' },
+	macos: { dirs: ['macos/metrics'], ext: '.lua' },
+	linux: { dirs: ['linux/metrics/engine'], ext: '.lua' },
 	shared: { dirs: ['_shared/metrics/engine', '_shared/core/fs/engine/sqlite'], ext: '.lua' }
 };
 

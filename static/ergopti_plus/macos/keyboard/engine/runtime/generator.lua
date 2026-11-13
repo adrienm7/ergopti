@@ -43,7 +43,7 @@ local NativePath = require("core.fs.engine.native_path")
 local Keycodes   = require("platform.input.keycodes")
 local FileSystem = require("core.fs.adapters.file_system")
 local TimerScheduler = require("core.events.timer_scheduler")
-local PhaseStats = require("infra.phase_stats")
+local PhaseStats = require("metrics.engine.perf.phase_stats")
 local MetadataCommandStats = require("diagnostics.adapters.metadata_command_stats")
 local JsonCodec  = require("core.fs.adapters.json_codec")
 local LeaseContract = require("keyboard.adapters.karabiner.lease_contract")
@@ -122,7 +122,7 @@ M.REQUIREMENT_FACADE_FEATURES = {
 	["gestures/engine/actions.lua"]        = { "gestures.*" },
 	["modules/shortcuts/script_control.lua"] = { "shortcuts.script_control.*" },
 	["keyboard/engine/runtime/watchers.lua"]         = { "shortcuts.caps_word.**" },
-	["modules/keystats/kc_bridge.lua"]      = { "metrics.**" },
+	["metrics/adapters/kc_bridge.lua"]      = { "metrics.**" },
 	["keyboard/engine/init.lua"]             = { why = "the remap engine that runs this generator; its feature inputs are the state fields above" },
 	["keyboard/engine/runtime/generator.lua"]        = { why = "this generator writes the physical key ledger rules; metrics reads them through kc_bridge" },
 }
@@ -213,7 +213,7 @@ local TAP_HOLD_MODIFIER_SENTINEL_NAME = require("platform.input.keycodes.core").
 -- Command under every chord of the layer (J gives Cmd+Left).
 local SWALLOWED_ON_LAYER = { left_command = { tap = "backspace" } }
 
--- Append-only log file consumed by modules/keystats/kc_bridge.lua.
+-- Append-only log file consumed by metrics/adapters/kc_bridge.lua.
 -- Each line written by the shell_command is: "<physical_key_code_name>\n"
 -- so Hammerspoon can map the name back to a numeric kc and record true
 -- physical key frequency — bypassing the Karabiner remap layer.

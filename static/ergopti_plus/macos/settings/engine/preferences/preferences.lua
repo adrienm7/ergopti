@@ -86,7 +86,7 @@ local RecordList = require("core.text.engine.toml_codec.record_list")
 local LOG       = "preferences"
 local OperationReporter = require("diagnostics.engine.operation_reporter")
 local ConfigKeys = require("settings.engine.keys")
-local MetricsState = require("infra.metrics_state_keys")
+local MetricsState = require("metrics.engine.state_keys")
 
 
 --- Top-level TOML section names in the order they appear on disk.
@@ -1229,7 +1229,7 @@ end
 local function set_roi_encryption_request(path, requested)
 	_roi_encryption_requests[path] = requested
 	if path == _active_source_path and requested ~= false then
-		local cipher = package.loaded["modules.keystats.text_cipher"]
+		local cipher = package.loaded["metrics.engine.privacy.text_cipher"]
 		if type(cipher) == "table" and type(cipher.prepare_roi_encryption) == "function" then
 			local called, settled = pcall(cipher.prepare_roi_encryption)
 			if not called or settled ~= true then

@@ -24,7 +24,7 @@ local function run_scenario()
 		"hotstrings.engine.catalogue.config",
 		"hotstrings.engine.expander.expander",
 		"hotstrings.engine.expander.utils",
-		"modules.keystats",
+		"metrics.engine",
 		"ai.engine",
 		"ai.engine.prediction.engine",
 		"core.ui.ui.tooltip",
@@ -99,7 +99,7 @@ local function run_scenario()
 		tokens_from_repl = function(value) return value end,
 		plain_text = function(value) return value end,
 	}
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		log_hotstring_suggested = function() end,
 		log_hotstring_dismissed = function() end,
 	}

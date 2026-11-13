@@ -285,11 +285,11 @@ local function install_script_control_dependencies(options)
 		pause_warmup = settled,
 		resume_warmup = settled,
 	}
-	package.loaded["ui.wpm.wpm_menubar"] = { is_running = function() return false end }
-	package.loaded["ui.wpm.wpm_widget"] = { is_running = function() return false end }
+	package.loaded["metrics.ui.wpm.menubar"] = { is_running = function() return false end }
+	package.loaded["metrics.ui.wpm.widget"] = { is_running = function() return false end }
 	package.loaded["keyboard.engine.runtime.onboarding"] = { stop = settled }
 	package.loaded["core.ui.ui.tooltip"] = { hide_forced = settled }
-	package.loaded["modules.keystats"] = { resync_context = settled }
+	package.loaded["metrics.engine"] = { resync_context = settled }
 end
 
 --- Initialises the real shared WarmupController without giving it a timer.

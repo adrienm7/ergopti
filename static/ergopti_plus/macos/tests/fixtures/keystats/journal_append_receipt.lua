@@ -53,7 +53,7 @@ for _,name in ipairs({'fs','timer','json','sqlite3'}) do package.loaded['hs.'..n
 local errors,logger={},Helpers.make_logger_stub()
 logger.error=function(_,fmt,...) errors[#errors+1]=string.format(fmt,...) end
 package.loaded['core.logger.engine.logger']=logger
-package.loaded['modules.keystats.export']={sync_foreign_data_sql=function()return{}end, get_native_app_category=function() return nil end}
+package.loaded['metrics.engine.reader.export']={sync_foreign_data_sql=function()return{}end, get_native_app_category=function() return nil end}
 -- This proof isolates raw-row ingest. SQL outbox publication writes real Lua bytes
 -- and acknowledges its actual cache clear, but does not qualify LedgerAppend recovery.
 -- The stage names stay the real module's, so the ingest trace receives the
@@ -63,11 +63,11 @@ package.loaded['core.fs.adapters.ledger_append']={FLUSH_STAGES=flush_stages,flus
  if batch~='' then local h=assert(io.open(path,'ab'));assert(h:write(batch));assert(h:close()) end
  return ack()
 end}
-local Writer=require('modules.keystats.sqlite_writer')
+local Writer=require('metrics.engine.journal.sqlite_writer')
 local paths={sqlite_path=temporary..'/cache.sqlite',today_log_path=temporary..'/today.log',data_sql_path=temporary..'/data.sql'}
 Writer.init({paths=paths,device_id='retry-proof',device_obj={device_id='retry-proof',name='Proof',os='darwin',host_signature='proof',created_at='2026-10-26 00:00:00.000'}})
 assert(Writer.open_db(),table.concat(errors,' | '))
-local Agg=require('modules.keystats.aggregator');Agg.init({device_id='retry-proof'})
+local Agg=require('metrics.engine.aggregator.aggregator');Agg.init({device_id='retry-proof'})
 local mode = assert(os.getenv('ERGOPTI_JOURNAL_APPEND_MODE'))
 assert(mode == 'portable' or mode == 'native', 'explicit journal failure mode required')
 local native_open, storage_refused, first_write, append_opens = io.open, true, true, 0
@@ -92,9 +92,9 @@ io.open = function(path, access)
   end,
  }
 end
-local Rotation=require('modules.keystats.rotation');Rotation.init({paths=paths,state={},recovery_turn_bytes=65536})
+local Rotation=require('metrics.engine.journal.rotation');Rotation.init({paths=paths,state={},recovery_turn_bytes=65536})
 assert(Rotation.is_initialized())
-local Manager=require('modules.keystats.log_manager')
+local Manager=require('metrics.engine.journal.log_manager')
 local function upvalue(fn,wanted,new)
  for i=1,math.huge do local name,value=debug.getupvalue(fn,i);assert(name,'missing upvalue '..wanted)
   if name==wanted then if new~=nil then debug.setupvalue(fn,i,new) end;return value end

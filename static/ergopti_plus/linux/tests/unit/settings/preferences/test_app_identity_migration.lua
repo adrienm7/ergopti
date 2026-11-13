@@ -39,11 +39,11 @@ local function migrate(lists, opts)
 			kind = kind,
 		}
 	end
-	local saved = { metrics = package.loaded["infra.metrics_preferences"], llm = package.loaded["ai.engine.preferences"] }
-	package.loaded["infra.metrics_preferences"] = owner("metrics")
+	local saved = { metrics = package.loaded["metrics.engine.preferences"], llm = package.loaded["ai.engine.preferences"] }
+	package.loaded["metrics.engine.preferences"] = owner("metrics")
 	package.loaded["ai.engine.preferences"] = owner("llm")
 	local ok, result = pcall(Migration.run, { storage = world.storage })
-	package.loaded["infra.metrics_preferences"] = saved.metrics
+	package.loaded["metrics.engine.preferences"] = saved.metrics
 	package.loaded["ai.engine.preferences"] = saved.llm
 	if not ok then error(result, 0) end
 	world.done = result

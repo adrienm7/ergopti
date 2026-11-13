@@ -1,0 +1,13 @@
+--- tests/unit/metrics/engine/storage/test_queries_contract.lua
+
+--- ==============================================================================
+--- MODULE: Keystats Named-Query Contract (Linux)
+--- DESCRIPTION:
+--- Runs the shared contract of the generated named-query renderer the Linux
+--- reader renders its SQL through. The macOS suite runs the same contract.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+require("tests.lua.metrics.queries_contract").register(helpers,
+	require("core.fs.engine.paths").shared("tests/corpus/keystats/write_query_vectors.json"))

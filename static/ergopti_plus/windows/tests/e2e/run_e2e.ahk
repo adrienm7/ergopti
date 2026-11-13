@@ -73,7 +73,7 @@ global TEST_RESULTS_FILE := _TestResultsPath(A_ScriptDir . "\test_results.txt")
 _TestResultsBeginRun()
 ; The shared app-context simulators publish into KLHook, just as the main
 ; runner does. Load the definition here so E2E never depends on ambient state.
-#Include ../../modules/keystats/keystats_hook.ahk
+#Include ../../metrics/engine/capture/hook.ahk
 #Include ../test_stubs.ahk
 ; The stubs place the roots for tests/; this harness runs one folder deeper.
 global _StaticDir := A_ScriptDir . "\..\..\..\.."
@@ -91,7 +91,7 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 #Include ../../settings/engine/migration/legacy_folder_migration.ahk
 #Include ../../core/logger/engine/wall_clock.ahk
 #Include ../../core/logger/engine/logger.ahk
-#Include ../../infra/hotpath_profiler.ahk
+#Include ../../metrics/engine/perf/hotpath_profiler.ahk
 
 #Include ../../core/ui/engine/window_utils.ahk
 #Include ../../core/text/engine/utils.ahk

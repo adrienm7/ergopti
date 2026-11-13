@@ -21,11 +21,11 @@ local OWNERS = {
 	"ai.engine.api.mlx",
 	"ai.engine.api.ollama",
 	"ai.engine.api.remote",
-	"ui.wpm.wpm_menubar",
-	"ui.wpm.wpm_widget",
+	"metrics.ui.wpm.menubar",
+	"metrics.ui.wpm.widget",
 	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
-	"modules.keystats",
+	"metrics.engine",
 	"diagnostics.adapters.event_provenance",
 	"core.events.timer_scheduler",
 }
@@ -176,12 +176,12 @@ local function load_context(options)
 	package.loaded["ai.engine.api.remote"] = {
 		stop_warmup = function() return true end,
 	}
-	package.loaded["ui.wpm.wpm_menubar"] = {
+	package.loaded["metrics.ui.wpm.menubar"] = {
 		is_running = function() return false end,
 		stop = function() return true end,
 		resume_after_pause = function() return true end,
 	}
-	package.loaded["ui.wpm.wpm_widget"] = {
+	package.loaded["metrics.ui.wpm.widget"] = {
 		is_running = function() return false end,
 		stop = function() return true end,
 		resume_after_pause = function() return true end,
@@ -190,7 +190,7 @@ local function load_context(options)
 		stop = function() return true end,
 	}
 	package.loaded["core.ui.ui.tooltip"] = { hide_forced = record("tooltip_hide") }
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		resync_context = record("keystats_resync"),
 		log_shortcut = function() end,
 	}

@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local Reader     = require("core.text.engine.toml_codec.reader")
-local PhaseStats = require("infra.phase_stats")
+local PhaseStats = require("metrics.engine.perf.phase_stats")
 
 -- Every function but parse is the shared reader's own; parse is timed so the
 -- phase summary counts config and hotstring reads and their cost.

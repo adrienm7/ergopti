@@ -44,7 +44,7 @@ local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 --- @return table The recorder table with a `calls` list.
 local function install_keystats_recorder()
 	local rec = { calls = {}, private_savings = {} }
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		log_hotstring = function(trigger, replacement)
 			table.insert(rec.calls, { trigger = trigger, replacement = replacement })
 		end,

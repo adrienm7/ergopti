@@ -17,7 +17,7 @@ local OWNED_MODULES = {
 	"core.timing.engine.timings", "core.text.engine.utils", "ai.engine.settings.profiles", "ai.engine.api.parser",
 	"ai.engine.api.common", "ai.engine.prediction.prompt_builder_core", "ai.engine.api.token_crypto",
 	"ai.engine.prediction.progressive_reveal", "modules.llm.remote_response_classifier",
-	"ai.engine.api.remote_formats", "modules.keystats", "core.fs.adapters.file_system", "core.network.engine.http_header_policy",
+	"ai.engine.api.remote_formats", "metrics.engine", "core.fs.adapters.file_system", "core.network.engine.http_header_policy",
 }
 
 --- Reads an existing declared backend seam, without production test hooks.
@@ -66,7 +66,7 @@ local function isolated(scenario)
 		-- scoped and none substitutes the detector, shared sweep or HTTP adapter.
 		for _, name in ipairs({ "core.text.engine.utils", "ai.engine.settings.profiles", "ai.engine.api.parser",
 			"ai.engine.prediction.prompt_builder_core", "ai.engine.api.token_crypto", "ai.engine.prediction.progressive_reveal",
-			"modules.llm.remote_response_classifier", "ai.engine.api.remote_formats", "modules.keystats" }) do
+			"modules.llm.remote_response_classifier", "ai.engine.api.remote_formats", "metrics.engine" }) do
 			package.loaded[name] = {}
 		end
 		package.loaded["core.timing.engine.timings"] = { ms = function() return 1000 end, sec = function() return 1 end }

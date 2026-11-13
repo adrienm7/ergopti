@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local session_name = "modules.keystats.physical_history_session"
+local session_name = "metrics.engine.capture.physical_history_session"
 
 local function read(selector)
 	local source_helpers = require("tests.helpers")
@@ -49,7 +49,7 @@ local function fixture(options)
 	end }, { __index = _G })
 	local scheduler = assert(load(read("function M.after(delaySec, fn)"), "@actual-timer-scheduler", "t", library_env))()
 	local transaction = assert(load(read("function M.run_with_finalizer(state, steps, finalizer)"), "@actual-teardown-transaction", "t", library_env))()
-	local loaded = { ["modules.keystats"] = { shutdown = function()
+	local loaded = { ["metrics.engine"] = { shutdown = function()
 		state.steps = state.steps + 1
 		return true
 	end } }

@@ -78,7 +78,7 @@ function M.register(helpers)
 		end)
 
 		helpers.it("clipboard-windows-parity: the AHK kinds and threshold are this module's", function()
-			local windows = Paths.shared("") .. "/../windows/modules/keystats/"
+			local windows = Paths.shared("") .. "/../windows/metrics/engine/"
 			local clip = read(windows .. "keystats_clipboard.ahk")
 			local threshold = clip:match("PASTE_BURST_THRESHOLD%s*:=%s*(%d+)")
 			helpers.assert_eq(tonumber(threshold), ClipboardEvents.PASTE_BURST_THRESHOLD)

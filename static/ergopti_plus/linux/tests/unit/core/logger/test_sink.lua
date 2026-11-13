@@ -1007,7 +1007,7 @@ helpers.describe("linux-logger-topical-fan-out", function()
 
 	helpers.it("linux-logger-topical-fan-out: keystats, llm and hotstrings lines reach their own files", function()
 		with_sink("route", function(_, Logger, dir)
-			Logger.info("modules.keystats.keystats", "marker-keystats")
+			Logger.info("metrics.engine.keystats", "marker-keystats")
 			Logger.info("ai.engine.local_servers.inference", "marker-llm")
 			Logger.info("hotstrings.engine.injector", "marker-hotstrings")
 			Logger.info("sink_test", "marker-unrouted")
@@ -1015,7 +1015,7 @@ helpers.describe("linux-logger-topical-fan-out", function()
 			local keystats_file
 			for _, entry in ipairs(require("_generated.logger_sub_files")) do
 				for _, pattern in ipairs(entry.patterns) do
-					if keystats_file == nil and ("[modules.keystats.keystats]"):find(pattern, 1, true) then
+					if keystats_file == nil and ("[metrics.engine.keystats]"):find(pattern, 1, true) then
 						keystats_file = entry.name
 					end
 				end

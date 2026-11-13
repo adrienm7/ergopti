@@ -18,7 +18,7 @@ local function run_window(module_name, scenario)
 	helpers.with_stub_scope({
 		"settings.ui.cleanup", "settings.engine.migration.cleanup_session", "config_cleanup", "ui.onboarding", "onboarding.engine.answers",
 		"ui.update_check", "updater.engine.check_session", "modules.updater", "adapters.update_launcher",
-		"ui.metrics_apps", "core.ui.engine.dialog_util", "core.text.engine.toml.writer", "core.text.engine.toml.codec", "menu.engine.manifest_reader",
+		"metrics.ui.metrics_apps", "core.ui.engine.dialog_util", "core.text.engine.toml.writer", "core.text.engine.toml.codec", "menu.engine.manifest_reader",
 		"tests.support.onboarding_shared_data", "core.fs.adapters.file_system", "hs.spaces",
 		"core.text.engine.toml_codec.writer", "settings.engine.migration.unused_keys", "diagnostics.engine.operation_reporter", "core.text.engine.toml_codec.record_list",
 		"settings.engine.migration.outdated", "core.fs.engine.module_source_identity", "core.text.engine.toml_codec.leaf_rows", "lfs", "core.fs.engine.module_source_directory",
@@ -34,7 +34,7 @@ local function run_window(module_name, scenario)
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
 		"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
-		"modules.keystats.log_manager", "tests.support.native_webview_close_fixture",
+		"metrics.engine.journal.log_manager", "tests.support.native_webview_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, script_refs = {}, controllers = {}, timers = {} }
 		local construct = require("tests.support.native_webview_close_fixture")(h)
@@ -50,7 +50,7 @@ local function run_window(module_name, scenario)
 		package.loaded["modules.updater"] = { current_version = function() return "v1.0.0" end }
 		package.loaded["adapters.update_launcher"] = {}
 		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return true end }
-		package.loaded["modules.keystats.log_manager"] = { on_ingest_done = function() return true end }
+		package.loaded["metrics.engine.journal.log_manager"] = { on_ingest_done = function() return true end }
 		local window = helpers.load_with_stubs(module_name, {
 			spaces = { activeSpaceOnScreen = function() return 1 end, moveWindowToSpace = function() return true end },
 			webview = { new = new_window, windowMasks = { titled = 1, closable = 2, resizable = 8 },

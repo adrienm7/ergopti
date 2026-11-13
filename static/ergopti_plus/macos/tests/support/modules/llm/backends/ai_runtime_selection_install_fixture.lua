@@ -205,7 +205,7 @@ local function load_api(state, daemon)
 	package.loaded["ai.engine.prediction.progressive_reveal"] = {}
 	package.loaded["ai.engine.prediction.engine"] = { on_ollama_daemon_exit = function() return true end }
 	-- This selection fixture has no keyboard inference consumer.
-	package.loaded["modules.keystats"] = {}
+	package.loaded["metrics.engine"] = {}
 	package.loaded["ai.adapters.managed_ollama_daemon"] = nil
 	package.loaded["ai.engine.api.ollama"] = nil
 	local api = helpers.load_with_stubs("ai.engine.api.ollama", {
@@ -292,7 +292,7 @@ local STUBBED_MODULES = {
 	"ai.engine.prediction.progressive_reveal", "ai.engine.prediction.engine",
 	"ai.ui.menu.models.manager_ollama", "ai.engine.api.common",
 	"ai.engine.ollama.endpoint", "core.fs.adapters.storage", "core.process.adapters.owned_program_runner",
-	"keyboard.adapters.karabiner.lease_helper", "modules.shortcuts.script_control", "modules.keystats",
+	"keyboard.adapters.karabiner.lease_helper", "modules.shortcuts.script_control", "metrics.engine",
 	"core.lifecycle.engine.core.ollama_runtime_choice", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "ai.engine.ollama.local_model_policy",
 }

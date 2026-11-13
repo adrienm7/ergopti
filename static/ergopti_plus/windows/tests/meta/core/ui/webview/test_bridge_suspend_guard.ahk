@@ -87,7 +87,7 @@ Test("changelog: _CLW_OnWebMessage guards captured pause provenance before fetch
 
 _WBSG_CheckKeystatsGuard() {
 	Body := _DriverFuncBody("KLWV_OnWebMessage")
-	Assert(Body != "", "KLWV_OnWebMessage must exist in modules/keystats/keystats_webview.ahk")
+	Assert(Body != "", "KLWV_OnWebMessage must exist in metrics/engine/view/webview.ahk")
 	SuspendPos := InStr(Body, "A_IsSuspended")
 	BuildPos := InStr(Body, "KLPF_RequestBuild(")
 	Assert(SuspendPos > 0 && BuildPos > SuspendPos,

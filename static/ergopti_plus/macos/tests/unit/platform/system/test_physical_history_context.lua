@@ -230,7 +230,7 @@ helpers.describe("accepted physical History context", function()
 	helpers.it("retains the accepted initial calendar across later calendar changes", function()
 		with_projection(function(f)
 			local Frames = require("tests.support.physical_stream_frames")
-			local Delivery = require("modules.keystats.physical_delivery")
+			local Delivery = require("metrics.engine.capture.physical_delivery")
 			local presses, releases = {}, {}
 			local frames = Frames.new("accepted-calendar", "8", { "41" })
 			local receiver = Delivery.new({ batch_limit = 4, admit = function() return "accepted-calendar/8" end,

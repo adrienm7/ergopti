@@ -255,11 +255,11 @@ local RepeatKey         = require("hotstrings.engine.repeat_key")
 local keyboard_shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 
 -- Battery, network, lock and suspend, for the metrics.
-local system_metrics = RuntimeGuard.optional_require("modules.keystats.system_metrics")
+local system_metrics = RuntimeGuard.optional_require("metrics.engine.system.metrics")
 
 -- The typing-speed pill (optional — needs a graphics renderer and a display).
-local wpm_widget = RuntimeGuard.optional_require("ui.wpm.widget")
-local wpm_tray_readout = RuntimeGuard.optional_require("ui.wpm.tray_readout")
+local wpm_widget = RuntimeGuard.optional_require("metrics.ui.wpm.widget")
+local wpm_tray_readout = RuntimeGuard.optional_require("metrics.ui.wpm.tray_readout")
 
 -- Desktop notifications (optional — needs notify-send and a session bus). The
 -- adapter degrades to a log line on a headless machine, so a missing one is not
@@ -272,7 +272,7 @@ local notifier = RuntimeGuard.optional_require("platform.focus.application_notif
 local tooltip_preview = RuntimeGuard.optional_require("core.ui.ui.tooltip.preview")
 local llm_overlay = RuntimeGuard.optional_require("core.ui.ui.tooltip.llm")
 local dev_finder        = require("hotstrings.engine.device_finder")
-local keystats         = require("modules.keystats.keystats")
+local keystats         = require("metrics.engine.keystats")
 local keyboard_hook     = require("platform.input.keyboard_hook")
 local InputEvent        = require("platform.input.event")
 local Monotonic         = require("core.logger.engine.monotonic")
@@ -281,7 +281,7 @@ local ScriptSettings    = require("settings.engine.scope.script_settings")
 local Timings           = require("core.timing.engine.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("diagnostics.engine.reports.crash_reporter")
-local FocusGuard        = require("modules.keystats.focus_guard")
+local FocusGuard        = require("metrics.engine.focus_guard")
 local privacy_owners = {}
 local BootProfiler      = require("core.logger.engine.boot_profiler")
 local DiagnosticSnapshot = require("diagnostics.engine.reports.snapshot")
@@ -538,7 +538,7 @@ local shutdown = ShutdownCoordinator.new({
 			-- Before the final flush, so an open capture interval ends in it, as on Windows.
 			name = "capture presence interval",
 			stop = function()
-				require("modules.keystats.topology_metrics").daemon_stop()
+				require("metrics.engine.system.topology_metrics").daemon_stop()
 				return true
 			end,
 		},
@@ -1492,7 +1492,7 @@ local function main()
 		-- and corrupting the output (the "abcd"→"acd" class of race bug).
 		if injector._is_injecting() then
 			injector._queue_char({ char = ch, scancode = scancode })
-			require("infra.typed_input_withheld").record("queued_during_injection")
+			require("metrics.engine.typed_input_withheld").record("queued_during_injection")
 			return
 		end
 		if script_actions.is_paused() then return end
@@ -1524,12 +1524,12 @@ local function main()
 		if admission and admission.code == scancode then
 			if not admission.allowed then
 				keystats.discard_roi()
-				require("infra.typed_input_withheld").record("press_not_admitted")
+				require("metrics.engine.typed_input_withheld").record("press_not_admitted")
 				return
 			end
 		elseif secure_focus_guard.blocks_text() then
 			keystats.discard_roi()
-			require("infra.typed_input_withheld").record("field_not_admitted")
+			require("metrics.engine.typed_input_withheld").record("field_not_admitted")
 			return
 		end
 
@@ -1853,7 +1853,7 @@ local function main()
 				end)
 				-- Its error type is recorded: a discarded raise left later triggers silent.
 				if not predicted then
-					require("infra.typed_input_withheld").record("prediction_refused", prediction_err)
+					require("metrics.engine.typed_input_withheld").record("prediction_refused", prediction_err)
 				end
 			end
 			-- Dynamic hotstrings: check if the trigger character just fired an
@@ -3384,7 +3384,7 @@ local function main()
 			Logger.warn(LOG, "Metrics: desktop changes are not measured in this session "
 				.. "(no X11 desktop and no workspace interface: %s).", tostring(desktop_reason))
 		end
-		require("modules.keystats.topology_metrics").bind_topology_source(sources.topology,
+		require("metrics.engine.system.topology_metrics").bind_topology_source(sources.topology,
 			not sources.topology and "platform_reason.window_topology_needs_x11" or nil)
 		if not sources.topology then
 			Logger.warn(LOG, "Metrics: window topology is not measured in this session "
@@ -3392,7 +3392,7 @@ local function main()
 		end
 		-- A touchpad tap-to-click never reaches evdev as a button: the metrics
 		-- count the touches libinput turns into one, under the desktop's setting.
-		require("modules.keystats.tap_click_sources").bind(keystats, Monotonic.now_ms)
+		require("metrics.engine.tap_click_sources").bind(keystats, Monotonic.now_ms)
 	end
 
 	if process_lifecycle then
@@ -3536,12 +3536,12 @@ local function main()
 		-- module owns its sampler (this loop is at LuaJIT's upvalue limit) and
 		-- decides which probe is due; reachability answers later through libuv.
 		RuntimeGuard.call("network metrics sampler", function()
-			require("modules.keystats.network_metrics").daemon_tick(keystats.record_network_event)
+			require("metrics.engine.system.network_metrics").daemon_tick(keystats.record_network_event)
 		end)
 		-- Window moves, resizes and monitor changes (X11, in process) and the
 		-- capture-program presence (procfs); the module paces both readings.
 		RuntimeGuard.call("topology metrics sampler", function()
-			require("modules.keystats.topology_metrics").daemon_tick(keystats.record_topology_event)
+			require("metrics.engine.system.topology_metrics").daemon_tick(keystats.record_topology_event)
 		end)
 
 		-- The WPM readouts' clock: the floating widget and the tray readout each
@@ -3721,7 +3721,7 @@ local function main()
 			end
 			-- The floating WPM widget owns its window's event delivery; it must not
 			-- depend on the tray having been started.
-			RuntimeGuard.call("WPM surface pump", require("adapters.wpm_surface").pump)
+			RuntimeGuard.call("WPM surface pump", require("metrics.adapters.wpm_surface").pump)
 			privacy_owners.watch.pump()
 			RuntimeGuard.call("metrics SQLite flush acknowledgement", keystats.pump_flush)
 			-- Consume owned results promptly; fresh dispatch/retry stays periodic.
@@ -3770,7 +3770,7 @@ local function main()
 	Logger.info(LOG, "Session ended: %d keystroke(s), ~%d word(s), %ds.",
 		stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
 	-- What the text callback kept from the engines this session, by reason.
-	Logger.info(LOG, "%s", require("infra.typed_input_withheld").summary())
+	Logger.info(LOG, "%s", require("metrics.engine.typed_input_withheld").summary())
 	-- Metrics persistence was acknowledged by the shutdown coordinator.
 	-- The last chance to emit the withheld counts of every open streak.
 	-- The interval since the last summary, which a short session never reached.

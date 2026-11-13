@@ -61,7 +61,7 @@ helpers.describe("M-13: coerce_mods helper present (source)", function()
 	-- helper for them. The rows left the menu on 2026-10-01, so the invariant is
 	-- now that the menu reads no stored .mods at all.
 	helpers.it("menu_metrics.lua reads no stored shortcut modifiers", function()
-		local src = read_src("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
+		local src = read_src("\"dialog.metrics.security_warning_title\"") -- metrics/ui/menu/metrics.lua
 		helpers.assert_true(src:find("%.mods") == nil,
 			"menu_metrics.lua draws no shortcut row, so it must not read a stored .mods")
 	end)
@@ -95,7 +95,7 @@ helpers.describe("M-13: no unguarded sc.mods usage remaining (source)", function
 	end)
 
 	helpers.it("menu_metrics.lua: no bare ipairs on .mods fields", function()
-		local src = read_src("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
+		local src = read_src("\"dialog.metrics.security_warning_title\"") -- metrics/ui/menu/metrics.lua
 		-- Check both known field names used in metrics
 		local bare1 = src:find("ipairs(state%.metrics_shortcut%.mods")
 		local bare2 = src:find("ipairs(state%.apps_time_shortcut%.mods")
@@ -104,7 +104,7 @@ helpers.describe("M-13: no unguarded sc.mods usage remaining (source)", function
 	end)
 
 	helpers.it("menu_metrics.lua: no bare table.concat on .mods fields", function()
-		local src = read_src("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
+		local src = read_src("\"dialog.metrics.security_warning_title\"") -- metrics/ui/menu/metrics.lua
 		local bare1 = src:find("table%.concat%(state%.metrics_shortcut%.mods")
 		local bare2 = src:find("table%.concat%(state%.apps_time_shortcut%.mods")
 		helpers.assert_true(bare1 == nil and bare2 == nil,

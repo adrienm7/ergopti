@@ -29,7 +29,7 @@ local Cascade = require("hotstrings.engine.matcher.cascade")
 local InjectionPlan = require("hotstrings.engine.matcher.injection_plan")
 local km_utils   = require("hotstrings.engine.expander.utils")
 local Logger     = require("core.logger.engine.logger")
-local HotPath    = require("infra.hotpath_profiler")
+local HotPath    = require("metrics.engine.perf.hotpath_profiler")
 local Timings    = require("core.timing.engine.timings")
 local CoreStateM = require("hotstrings.engine.expander.state")
 local LlmContext = require("ai.engine.api.context")
@@ -43,7 +43,7 @@ local ConfigKeys = require("settings.engine.keys")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
-local ok_kl, keystats = pcall(require, "modules.keystats")
+local ok_kl, keystats = pcall(require, "metrics.engine")
 if not ok_kl then keystats = nil end
 
 local _state    = nil  -- Shared CoreState injected via M.init().

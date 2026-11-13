@@ -8,9 +8,9 @@ require("tests.lua.dynamic_word_boundary_contract")(helpers)
 local MAGIC = "★"
 local function with_rules_engine(body, personal)
     helpers.with_stub_scope({ "hotstrings.engine.dynamic.rules_engine", "hotstrings.engine.dynamic.core",
-        "hotstrings.engine.dynamic.user_code", "modules.keystats", "modules.keystats.init" }, function()
+        "hotstrings.engine.dynamic.user_code", "metrics.engine", "modules.keystats.init" }, function()
         local closed_keystats = {}
-        package.loaded["modules.keystats"] = closed_keystats
+        package.loaded["metrics.engine"] = closed_keystats
         package.loaded["modules.keystats.init"] = closed_keystats
         local Rules = helpers.load_with_stubs("hotstrings.engine.dynamic.rules_engine")
         package.loaded["hotstrings.engine.dynamic.user_code"] = {

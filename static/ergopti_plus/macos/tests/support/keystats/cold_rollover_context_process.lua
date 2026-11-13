@@ -204,11 +204,11 @@ local function main()
 			end
 			local payload_path = assert(os.getenv("ERGOPTI_COLD_NGRAM_PAYLOAD"))
 			local payload = assert(Json.decode_lossless(read_file(payload_path)))
-			manager = require("modules.keystats.log_manager")
-			writer = require("modules.keystats.sqlite_writer")
-			rotation = require("modules.keystats.rotation")
+			manager = require("metrics.engine.journal.log_manager")
+			writer = require("metrics.engine.journal.sqlite_writer")
+			rotation = require("metrics.engine.journal.rotation")
 			scheduler = require("core.events.timer_scheduler")
-			assert(require("modules.keystats.text_cipher").is_enabled() == false,
+			assert(require("metrics.engine.privacy.text_cipher").is_enabled() == false,
 				"regression requires native default unencrypted typing rows")
 			local before_ingest
 			if phase ~= "seed" then
@@ -217,7 +217,7 @@ local function main()
 					if not before_ingest then
 						before_ingest = observations()
 						before_ingest.live_context = Json.decode_lossless(Json.encode(
-							require("modules.keystats.aggregator").get_ngram_ctx()))
+							require("metrics.engine.aggregator.aggregator").get_ngram_ctx()))
 					end
 					return ordinary_ingest(...)
 				end
@@ -252,7 +252,7 @@ local function main()
 				local context = assert(Json.decode_lossless(values.ngram_ctx_json))
 				assert(type(context) == "table" and next(context) == nil,
 					"healthy rollover did not commit the documented empty context")
-				local live = require("modules.keystats.aggregator").get_ngram_ctx()
+				local live = require("metrics.engine.aggregator.aggregator").get_ngram_ctx()
 				assert(type(live) == "table" and next(live) == nil, "healthy live context was not reset")
 				assert(manager.append_log(payload.new))
 				-- Public process_exit stop below drains FIFO without ingesting it.

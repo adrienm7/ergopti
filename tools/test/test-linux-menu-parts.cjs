@@ -117,7 +117,7 @@ const partOnlyCases = [
 	[
 		'two parts declare one name from different modules',
 		partOnly(
-			'linux/ui/menu/menu_metrics.lua',
+			'linux/metrics/ui/menu/metrics.lua',
 			'local TextPrompt = require("core.ui.ui.text_prompt")',
 			'local TextPrompt = require("ui.foreign_prompt")'
 		)

@@ -110,13 +110,13 @@ function M.run(callback)
 					if path == "/fixture/db.sqlite" then return { mode = "file" } end
 					return old_attributes(path, ...)
 				end
-				package.loaded["modules.keystats.log_manager"].get_sqlite_path = function()
+				package.loaded["metrics.engine.journal.log_manager"].get_sqlite_path = function()
 					return "/fixture/db.sqlite"
 				end
-				package.loaded["modules.keystats.sqlite_reader"] = nil
-				local reader = require("modules.keystats.sqlite_reader")
+				package.loaded["metrics.engine.reader.sqlite_reader"] = nil
+				local reader = require("metrics.engine.reader.sqlite_reader")
 				reader.history_fingerprint_exact = true -- The fixture owns every row and mutation, so its fingerprint is exact.
-				local projection = require("ui.metrics_typing.projection")
+				local projection = require("metrics.ui.metrics_typing.projection")
 				local encoder = require("core.timing.engine.paced_json").encode
 				state.reader, state.projection = reader, projection
 				dashboard._app_icon_cache.Editor = false
@@ -146,8 +146,8 @@ function M.run(callback)
 							local info = debug.getinfo(depth, "fS")
 							if not info then break end
 							if state.armed == "before-merge" and state.merges == 0
-								and info.source:gsub("\\", "/"):sub(-#"modules/keystats/sqlite_reader.lua")
-									== "modules/keystats/sqlite_reader.lua" then boundary = true end
+								and info.source:gsub("\\", "/"):sub(-#"metrics/engine/reader/sqlite_reader.lua")
+									== "metrics/engine/reader/sqlite_reader.lua" then boundary = true end
 							if info.func == encoder then
 								local name, value = debug.getlocal(depth, 1)
 								assert(name == "value", "The real encoder value parameter must be observable")

@@ -10,8 +10,8 @@ local helpers = require("tests.helpers")
 local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(cached, callback)
-	helpers.with_fresh_modules({ "core.fs.adapters.file_system", "modules.keystats.sqlite_reader",
-		"modules.keystats.context_tracker" }, function()
+	helpers.with_fresh_modules({ "core.fs.adapters.file_system", "metrics.engine.reader.sqlite_reader",
+		"metrics.engine.context_tracker" }, function()
 		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path)
 				if path:find("ergopti_metrics_apps_cache_v3.json", 1, true) then
@@ -21,9 +21,9 @@ local function with_delivery(cached, callback)
 				return "{}", "ok"
 			end,
 		}
-		package.loaded["modules.keystats.sqlite_reader"] = { read_manifest = function() return {}, true end }
-		package.loaded["modules.keystats.context_tracker"] = { get_active_app_snapshot = function() end }
-		with_window("ui.metrics_apps", function(dashboard, state)
+		package.loaded["metrics.engine.reader.sqlite_reader"] = { read_manifest = function() return {}, true end }
+		package.loaded["metrics.engine.context_tracker"] = { get_active_app_snapshot = function() end }
+		with_window("metrics.ui.metrics_apps", function(dashboard, state)
 			local pending, evaluations, errors, successes = {}, {}, {}, {}
 			local original_open = io.open
 			local ok, err = xpcall(function()
@@ -39,7 +39,7 @@ local function with_delivery(cached, callback)
 				package.loaded["hs.json"].decode = function(value)
 					return value == "cache" and { manifest = "{}" } or {}
 				end
-				local manager = package.loaded["modules.keystats.log_manager"]
+				local manager = package.loaded["metrics.engine.journal.log_manager"]
 				manager.get_sqlite_path = function() return "/virtual/db.sqlite" end
 				manager.get_db_rev = function() return 1 end
 				-- A refresh is cut into bounded slices, one zero-delay timer turn

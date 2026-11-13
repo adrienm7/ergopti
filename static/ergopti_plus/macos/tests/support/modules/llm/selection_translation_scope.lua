@@ -146,7 +146,7 @@ local OWNED = {
 	"gestures.engine.geometry",
 	"gestures.engine.sensitivity",
 	"gestures.engine.sticky_modifiers",
-	"modules.keystats",
+	"metrics.engine",
 	"hotstrings.engine.expander",
 	"hotstrings.engine.expander.control_sentinels",
 	"hotstrings.engine.expander.utils",
@@ -202,7 +202,7 @@ local OWNED = {
 	"core.lifecycle.engine.compat.base64",
 	"gestures.engine.direction",
 	"core.logger.engine.key_event_health",
-	"infra.phase_stats",
+	"metrics.engine.perf.phase_stats",
 	-- The phase counters' bookkeeping, shared with the Linux driver.
 	"metrics.engine.perf.phase_stats_core",
 	"ai.engine.policy.app_identity",

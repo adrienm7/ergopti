@@ -64,7 +64,7 @@ function M.new(dependencies)
 	dependencies = dependencies or {}
 	local Source = require("layouts.adapters.installed_physical_source")
 	local source = dependencies.source or Source.new()
-	local history = dependencies.history or require("modules.keystats.physical_history_session")
+	local history = dependencies.history or require("metrics.engine.capture.physical_history_session")
 	local manager, lost_observer, lost_reported, finalized = nil, nil, false, false
 	local stop_target
 

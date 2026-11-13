@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Installed Physical Source Task Port (Hammerspoon)
 --- DESCRIPTION:
---- Gives the physical capture owner (modules/keystats/physical_capture.lua) the
+--- Gives the physical capture owner (metrics/engine/capture/physical_capture.lua) the
 --- task port it spawns its three native steps through, over the signed native
 --- module `ergopti_installed_source_native` instead of the shell runner. The
 --- module's owner starts the launcher's `--installed-physical-source` role, and

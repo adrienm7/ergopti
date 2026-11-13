@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local it = require("tests.support.metrics_preferences_fixture").it
 
-local sw     = helpers.load_module("modules.keystats.sqlite_writer")
+local sw     = helpers.load_module("metrics.engine.journal.sqlite_writer")
 
 --- Recognizes the open's probe for raw tables lacking the UTC offset column
 --- (KMD-1), which an empty answer settles: none lacks it.
@@ -31,7 +31,7 @@ end
 --- Models native stdout and LuaJIT's ambiguous pclose without replacing the
 --- production builder or query logic. lines()/read() both mirror the real ABI.
 local function with_writer_read_receipts(body, status, test, startup_status)
-	local writer = helpers.load_module("modules.keystats.sqlite_writer")
+	local writer = helpers.load_module("metrics.engine.journal.sqlite_writer")
 	local previous_execute, previous_popen = os.execute, io.popen
 	local path = os.tmpname()
 	local file = assert(io.open(path, "w"))
@@ -74,7 +74,7 @@ end
 
 --- Models CLI exit receipts while retaining the production builder and writer.
 local function with_category_commands(refusal, test, retain_startup)
-	local writer = helpers.load_module("modules.keystats.sqlite_writer")
+	local writer = helpers.load_module("metrics.engine.journal.sqlite_writer")
 	local previous_execute, previous_popen = os.execute, io.popen
 	local path = os.tmpname()
 	local file = assert(io.open(path, "w"))
@@ -111,7 +111,7 @@ end
 
 --- Captures actual Writer SQL while simulating only the CLI exit receipt.
 local function with_ngram_sql(test)
-	local command = require("modules.keystats.sqlite_command")
+	local command = require("metrics.engine.journal.sqlite_command")
 	local previous_build, statements = command.build, {}
 	command.build = function(path, sql, options)
 		if sql:find("INSERT INTO ngram_", 1, true) then statements[#statements + 1] = sql end
@@ -127,7 +127,7 @@ end
 --- Models the native CLI's two scalar representations without replacing the
 --- production builder, checked receipt parser or shared JSON decoder.
 local function with_meta_value_output(value, status, test)
-	local writer = helpers.load_module("modules.keystats.sqlite_writer")
+	local writer = helpers.load_module("metrics.engine.journal.sqlite_writer")
 	local previous_execute, previous_popen = os.execute, io.popen
 	local path = os.tmpname()
 	local file = assert(io.open(path, "w"))
@@ -165,7 +165,7 @@ end
 --- Captures the production histogram statement while modeling only CLI receipts.
 --- The shared decoder independently checks the key bytes supplied to SQLite.
 local function with_burst_histogram_statement(row, test)
-	local command = require("modules.keystats.sqlite_command")
+	local command = require("metrics.engine.journal.sqlite_command")
 	local previous_build = command.build
 	local statement
 	command.build = function(path, sql, options)
@@ -190,7 +190,7 @@ end
 -- Date formatting and writer receipts below are declared unit doubles; the
 -- separate native fixture uses real libc and SQLite for the same public APIs.
 local function with_local_day_clock(body)
-	local calendar = require("modules.keystats.calendar")
+	local calendar = require("metrics.engine.calendar")
 	local previous_date, previous_capture = os.date, calendar.capture
 	-- One fixed UTC+01 observation: neither initialization nor producers may
 	-- combine these civil dates with the process's actual native wall clock.

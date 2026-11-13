@@ -7,7 +7,7 @@
 --- complete(): every closed stage with its milliseconds, the total and the heap.
 --- ==============================================================================
 
-local helpers = require("tests.support.logger_fixture").helpers({ "core.logger.engine.boot_profiler", "infra.phase_stats" })
+local helpers = require("tests.support.logger_fixture").helpers({ "core.logger.engine.boot_profiler", "metrics.engine.perf.phase_stats" })
 
 --- Loads a fresh profiler with the real logger capturing delivered lines.
 --- @return table profiler, table lines

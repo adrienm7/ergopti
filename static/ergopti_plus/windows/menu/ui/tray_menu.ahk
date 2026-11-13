@@ -16,10 +16,10 @@ global SubMenus := Map()
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include builder/engine.ahk
 #Include ../../gestures/ui/menu/gestures.ahk
-#Include ../../ui/menu/menu_metrics.ahk
+#Include ../../metrics/ui/menu/metrics.ahk
 #Include ../../layouts/ui/menu/layout.ahk
 #Include ../../hotstrings/ui/menu/hotstrings.ahk
-#Include ../../ui/menu/menu_metrics_actions.ahk
+#Include ../../metrics/ui/menu/actions.ahk
 
 ; Runs the auto-configure — success is already indicated by the green status label in the UI,
 ; so only failures surface a blocking dialog (the user must know something went wrong).

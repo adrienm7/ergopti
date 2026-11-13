@@ -100,7 +100,7 @@ if (/1 - /.test(luaBody))
 if (!model.includes('M.darken_hex(background, c.unit_strip_darken_factor)'))
 	errors.push("model.lua must darken the strip by the canon's [compact] factor");
 
-const ahk = read('static/ergopti_plus/windows/ui/wpm/wpm_widget.ahk');
+const ahk = read('static/ergopti_plus/windows/metrics/ui/wpm/widget.ahk');
 const ahkStart = ahk.indexOf('_WPMWidget_DarkenHex(hex) {');
 const ahkBody = ahkStart === -1 ? '' : ahk.slice(ahkStart, ahk.indexOf('\n}\n', ahkStart));
 if (!ahkBody) errors.push('wpm_widget.ahk has no _WPMWidget_DarkenHex');
@@ -110,7 +110,7 @@ if ((ahkBody.match(/Round\(Integer\("0x" \. SubStr\(hex, \d, 2\)\) \* f\)/g) || 
 	errors.push('_WPMWidget_DarkenHex must Round(channel * f) on each of the three channels');
 }
 if (
-	!read('static/ergopti_plus/windows/ui/wpm/wpm_config.ahk').includes(
+	!read('static/ergopti_plus/windows/metrics/ui/wpm/config.ahk').includes(
 		'_WPMWidget_Need(wpm_c, "compact", "unit_strip_darken_factor"'
 	)
 ) {
@@ -119,9 +119,9 @@ if (
 
 // ── No private copies left in the Lua readouts ───────────────────────────────
 for (const rel of [
-	'static/ergopti_plus/macos/ui/wpm/wpm_widget.lua',
-	'static/ergopti_plus/linux/ui/wpm/widget.lua',
-	'static/ergopti_plus/linux/adapters/wpm_surface.lua'
+	'static/ergopti_plus/macos/metrics/ui/wpm/widget.lua',
+	'static/ergopti_plus/linux/metrics/ui/wpm/widget.lua',
+	'static/ergopti_plus/linux/metrics/adapters/wpm_surface.lua'
 ]) {
 	if (/local function [_a-z]*darken/.test(read(rel)))
 		errors.push(`${rel} keeps a darkening of its own`);

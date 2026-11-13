@@ -10,7 +10,7 @@
 
 local uv = require("luv")
 local ffi = require("ffi")
-local Writer = require("modules.keystats.sqlite_writer")
+local Writer = require("metrics.engine.journal.sqlite_writer")
 ffi.cdef[[
 typedef struct sqlite3 sqlite3;
 int sqlite3_open_v2(const char *, sqlite3 **, int, const char *);
@@ -197,7 +197,7 @@ DROP TABLE devices_current;
 DELETE FROM meta WHERE key='ngram_token_encoding';
 COMMIT;]]))
 	Writer.close_db()
-	local k = require("modules.keystats.keystats")
+	local k = require("metrics.engine.keystats")
 	require("tests.support.metrics_preferences_fixture").with(function()
 		assert(k.init({ sqlite_path = path, log_dir = root }) == false)
 		assert(k.get_privacy_state().storage_blocked == true)
@@ -230,7 +230,7 @@ DROP TABLE devices_current;
 DELETE FROM meta WHERE key='ngram_token_encoding';
 COMMIT;]]))
 	Writer.close_db()
-	local k = require("modules.keystats.keystats")
+	local k = require("metrics.engine.keystats")
 	require("tests.support.metrics_preferences_fixture").with(function()
 		assert(k.init({ sqlite_path = path, log_dir = root }) == false)
 		assert(k.get_privacy_state().storage_blocked == true)

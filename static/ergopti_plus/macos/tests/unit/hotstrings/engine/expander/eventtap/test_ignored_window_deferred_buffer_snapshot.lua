@@ -48,7 +48,7 @@ local function install_collaborators(effects)
 		has_pending_work    = function() return false end,
 		is_visible = function() return false end,
 	}
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		log_hotstring_suggested = function() effects.keystats_calls = effects.keystats_calls + 1 end,
 		log_hotstring_dismissed = function() effects.keystats_calls = effects.keystats_calls + 1 end,
 		log_llm_accepted = function() effects.keystats_calls = effects.keystats_calls + 1 end,

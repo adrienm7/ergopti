@@ -25,7 +25,7 @@ local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
 local TextCrypto = require("metrics.engine.privacy.text_crypto")
 local uv = require("luv")
-local cipher = require("modules.keystats.text_cipher")
+local cipher = require("metrics.engine.privacy.text_cipher")
 local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-migration-consumer-XXXXXX"))
 local path, machine_id = directory .. "/metrics.sqlite", directory .. "/machine-id"
 local machine = assert(io.open(machine_id, "wb"))
@@ -36,11 +36,11 @@ local Logger = require("core.logger.engine.shim")
 local original_error, failures = Logger.error, 0
 local original_success, completions = Logger.success, 0
 Logger.success = function(tag, ...)
-	if tag == "modules.keystats.text_migration" then completions = completions + 1 end
+	if tag == "metrics.engine.privacy.text_migration" then completions = completions + 1 end
 	return original_success(tag, ...)
 end
 Logger.error = function(tag, ...)
-	if tag == "modules.keystats.text_migration" then failures = failures + 1 end
+	if tag == "metrics.engine.privacy.text_migration" then failures = failures + 1 end
 	return original_error(tag, ...)
 end
 local ok, failure = xpcall(function()
@@ -48,7 +48,7 @@ local ok, failure = xpcall(function()
 		Fixture.with(function(k)
 			k.init({ sqlite_path = path })
 			require("tests.support.metrics_consent_fixture").enable(k)
-			local writer = require("modules.keystats.sqlite_writer")
+			local writer = require("metrics.engine.journal.sqlite_writer")
 			assert(require("core.network.engine.openssl_cipher").available, "This public-consumer proof requires native AES")
 			assert(cipher.is_available(), "The owned machine identity must derive a real encryption key")
 			local device = assert(writer.query_rows("SELECT device_id FROM devices LIMIT 1;"))[1]
@@ -84,7 +84,7 @@ local ok, failure = xpcall(function()
 			-- migration must also survive stopping before the first periodic slice.
 			assert(k.set_encrypt_enabled(false) == false and not k.is_encrypt_enabled())
 			assert(writer.get_meta(key) == "decrypt:0")
-			local migration = require("modules.keystats.text_migration")
+			local migration = require("metrics.engine.privacy.text_migration")
 			migration._set_backend(nil)
 			assert(migration.resume("decrypt", device))
 			for _ = 1, #rows + 1 do if not migration.is_running() then break end; k.pump_migration() end

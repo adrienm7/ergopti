@@ -118,7 +118,7 @@ local function with_fixture(callback)
 		"platform.input.synthetic_input",
 		"core.events.timer_scheduler",
 		"core.fs.adapters.storage",
-		"infra.hotpath_profiler",
+		"metrics.engine.perf.hotpath_profiler",
 		"core.logger.engine.logger",
 	}, function()
 		local restore_context = function() end
@@ -147,7 +147,7 @@ local function with_fixture(callback)
 				package.loaded["platform.input.synthetic_input"] = nil
 				package.loaded["core.events.timer_scheduler"] = nil
 				package.loaded["core.fs.adapters.storage"] = nil
-				package.loaded["infra.hotpath_profiler"] = nil
+				package.loaded["metrics.engine.perf.hotpath_profiler"] = nil
 
 				local renderer
 				renderer = {

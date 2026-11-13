@@ -89,7 +89,7 @@ local function fresh_expander()
 		"core.text.engine.utils",
 		"hotstrings.engine.expander.utils",
 		"core.logger.engine.logger",
-		"modules.keystats",
+		"metrics.engine",
 		"core.ui.ui.tooltip",
 	}
 	for _, name in ipairs(to_wipe) do

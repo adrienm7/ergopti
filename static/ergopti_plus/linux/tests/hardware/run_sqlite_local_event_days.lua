@@ -22,11 +22,11 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local Keystats = require("modules.keystats.keystats")
-local Writer = require("modules.keystats.sqlite_writer")
-local Reader = require("modules.keystats.sqlite_reader")
+local Keystats = require("metrics.engine.keystats")
+local Writer = require("metrics.engine.journal.sqlite_writer")
+local Reader = require("metrics.engine.reader.sqlite_reader")
 local Json = require("core.text.engine.json")
-local Calendar = require("modules.keystats.calendar")
+local Calendar = require("metrics.engine.calendar")
 local Monotonic = require("core.logger.engine.monotonic")
 local native_capture = Calendar.capture
 local checks, failures = 0, 0
@@ -58,7 +58,7 @@ local fixtures = {
 -- Each fixture jumps to an unrelated instant and timezone. The collector keeps
 -- its last calendar observation and refuses a day change without a midnight,
 -- so every fixture gets fresh owners after the previous ones retire.
-local OWNERS = { "modules.keystats.keystats", "modules.keystats.metrics_collector", "modules.keystats.sqlite_writer" }
+local OWNERS = { "metrics.engine.keystats", "metrics.engine.collector", "metrics.engine.journal.sqlite_writer" }
 local function fresh_owners()
 	local deadline = uv.hrtime() + 10 * 1e9
 	local settled = Keystats.stop()
@@ -67,8 +67,8 @@ local function fresh_owners()
 	end
 	assert(settled, "the previous fixture's collector must retire")
 	for _, name in ipairs(OWNERS) do package.loaded[name] = nil end
-	Keystats = require("modules.keystats.keystats")
-	Writer = require("modules.keystats.sqlite_writer")
+	Keystats = require("metrics.engine.keystats")
+	Writer = require("metrics.engine.journal.sqlite_writer")
 end
 for index, fixture in ipairs(fixtures) do
 	if index > 1 then fresh_owners() end

@@ -23,7 +23,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local Paths = require("core.fs.engine.paths")
 local Corpus = require("tests.lua.metrics.aggregation_corpus")
-local Walker = helpers.load_module("modules.keystats.aggregate_walker")
+local Walker = helpers.load_module("metrics.engine.aggregate_walker")
 
 local corpus_path = assert(Paths.shared("tests/corpus/keystats/aggregation_vectors.json"))
 

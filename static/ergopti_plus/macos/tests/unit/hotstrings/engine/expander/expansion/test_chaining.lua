@@ -35,7 +35,7 @@ local SIGN = "\u{26A0}\u{FE0F}"
 --- @return table state, table expander
 local function fresh_engine(entries)
 	package.loaded["core.ui.ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		notify_synthetic = function() end,
 		set_buffer       = function() end,
 		log_hotstring    = function() end,

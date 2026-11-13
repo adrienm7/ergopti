@@ -32,7 +32,7 @@ local M = {}
 function M.with_sentinel(callback)
 	local names = {
 		"core.logger.engine.logger", "core.ui.engine.notifications", "platform.input.keycodes", "core.i18n.engine.i18n",
-		"gestures.engine.engine", "gestures.engine.actions", "modules.keystats",
+		"gestures.engine.engine", "gestures.engine.actions", "metrics.engine",
 		"diagnostics.adapters.event_provenance", "platform.input.synthetic_input",
 		"core.events.timer_scheduler", "platform.input.key_state",
 		"modules.shortcuts.script_control",
@@ -61,7 +61,7 @@ function M.with_sentinel(callback)
 			get_label = function(name) return name end,
 			execute_single = function() return false end,
 		}
-		package.loaded["modules.keystats"] = {log_shortcut = function() end}
+		package.loaded["metrics.engine"] = {log_shortcut = function() end}
 		package.loaded["diagnostics.adapters.event_provenance"] = {
 			STATUS_UNREADABLE = "unreadable",
 			classify_with_fence = function() return nil, "hardware", nil end,

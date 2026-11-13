@@ -21,8 +21,8 @@ local modules = nil
 --- @return string published Bytes the save published.
 local function save_once(source, mutate)
 	local published
-	helpers.with_fresh_modules({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "modules.keystats.kc_bridge" }, function()
-		package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
+	helpers.with_fresh_modules({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "metrics.adapters.kc_bridge" }, function()
+		package.loaded["metrics.adapters.kc_bridge"] = { init = function() return true end }
 		-- One load per process: the keymap refuses a second LLM-bridge init.
 		if not modules then
 			modules = {}

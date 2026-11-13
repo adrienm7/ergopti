@@ -16,8 +16,8 @@ local function now()
 	assert(ffi.C.clock_gettime(1, value) == 0)
 	return tonumber(value[0].tv_sec) * 1000 + tonumber(value[0].tv_nsec) / 1000000
 end
-local reader = require('modules.keystats.sqlite_reader')
-local bridge = require('ui.metrics_typing.bridge')
+local reader = require('metrics.engine.reader.sqlite_reader')
+local bridge = require('metrics.ui.metrics_typing.bridge')
 local json = require('core.text.engine.json')
 local phases, calls = {}, 0
 local native_popen = io.popen

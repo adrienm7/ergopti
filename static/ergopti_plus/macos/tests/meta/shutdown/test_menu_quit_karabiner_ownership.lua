@@ -146,9 +146,9 @@ local function load_menu_quit_action()
 
 	for _, module_name in ipairs({
 		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "layouts.ui.menu.keyboard_layout",
-		"hotstrings.ui.menu.hotstrings", "ai.ui.menu", "ui.menu.menu_metrics",
+		"hotstrings.ui.menu.hotstrings", "ai.ui.menu", "metrics.ui.menu.metrics",
 		"ui.menu.menu_tap_holds", "apps.ui.menu.apps", "ui.menu.menu_about",
-		"ai.engine", "modules.keystats", "hotstrings.engine.dynamic", "gestures.engine",
+		"ai.engine", "metrics.engine", "hotstrings.engine.dynamic", "gestures.engine",
 	}) do
 		package.loaded[module_name] = {}
 	end

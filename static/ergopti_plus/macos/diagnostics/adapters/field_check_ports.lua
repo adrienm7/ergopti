@@ -232,11 +232,11 @@ end
 
 --- Keystats facts, read from memory.
 local function keystats_facts()
-	local Accounting = require("modules.keystats.physical_accounting_mode")
-	local stats = require("modules.keystats.kc_bridge").get_stats()
+	local Accounting = require("metrics.engine.capture.physical_accounting_mode")
+	local stats = require("metrics.adapters.kc_bridge").get_stats()
 	return {
 		credit_source = Accounting.credit_source(),
-		capture_loaded = package.loaded["modules.keystats.physical_capture"] ~= nil,
+		capture_loaded = package.loaded["metrics.engine.capture.physical_capture"] ~= nil,
 		ledger_drained = stats.drained_total,
 	}
 end
@@ -346,7 +346,7 @@ end
 --- @param callback function fn(late_ms, phases) with the lateness in
 ---   milliseconds and `name=12.3 ms, …` (longest first), or nil when none ran.
 local function timer_probe(seconds, callback)
-	local PhaseStats = require("infra.phase_stats")
+	local PhaseStats = require("metrics.engine.perf.phase_stats")
 	local started = hs.timer.secondsSinceEpoch()
 	local started_ns = PhaseStats.now()
 	Timer.after(seconds, function()

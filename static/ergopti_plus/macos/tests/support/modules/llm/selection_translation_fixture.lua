@@ -211,7 +211,7 @@ local function build_world(selection, ui_locale, options)
 	}
 	require("tests.support.modules.llm.selection_translation_destination").attach(world)
 	package.loaded["modules.shortcuts.script_control"] = nil
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end,
 		log_llm_failed = function() end,

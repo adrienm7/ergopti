@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 --- @return table rows The submenu rows.
 --- @param taps table|nil Touchpad tap availability.
 local function metrics_rows(pointer, desktop, taps)
-	local System = require("modules.keystats.system_metrics")
+	local System = require("metrics.engine.system.metrics")
 	System._reset()
 	desktop(System)
 	local keystats = { is_enabled = function() return true end, get_privacy_state = function() return {} end,
@@ -66,7 +66,7 @@ helpers.describe("metrics menu: what this session cannot measure", function()
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.touchpad_taps"), { string.format(i18n.get("menu.metrics.not_measured"),
 			i18n.get("menu.metrics.touchpad_taps"), i18n.get(reason)) })
 		helpers.assert_true(i18n.get(reason) ~= reason, "the reason is a real string")
-		require("modules.keystats.system_metrics")._reset()
+		require("metrics.engine.system.metrics")._reset()
 	end)
 
 	helpers.it("linux-metrics-availability: lists nothing when both are measured", function()
@@ -75,6 +75,6 @@ helpers.describe("metrics menu: what this session cannot measure", function()
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.pointer_distance"), {})
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.space_changes"), {})
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.touchpad_taps"), {})
-		require("modules.keystats.system_metrics")._reset()
+		require("metrics.engine.system.metrics")._reset()
 	end)
 end)

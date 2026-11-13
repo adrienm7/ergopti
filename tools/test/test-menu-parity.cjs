@@ -5738,7 +5738,7 @@ for (const menuKey of MENU_KEYS) {
 //   39 → 37 on 2026-08-06 when the floating WPM widget and its colour toggle
 //        stopped being Windows-and-macOS-only. Same story a third time: the
 //        restriction was true when written — that driver had no floating widget
-//        at all — and stopped being true when linux/ui/wpm/widget.lua drew one on
+//        at all — and stopped being true when linux/metrics/ui/wpm/widget.lua drew one on
 //        the GTK surface the preview bubble already uses.
 //   37 → 36 on 2026-08-06 when wrap_symbols_menu stopped claiming to be
 //        Windows-only. macOS and Linux had both been drawing the picker the
@@ -7183,7 +7183,7 @@ function languageParentSource(source, driver) {
 		);
 	}
 	for (const [driver, file, signature] of [
-		['hs', 'macos/ui/menu/menu_metrics.lua', 'function M.build(ctx)'],
+		['hs', 'macos/metrics/ui/menu/metrics.lua', 'function M.build(ctx)'],
 		['linux', 'linux/menu/ui/builder/builder.lua', 'local function _build_metrics(ctx)']
 	]) {
 		const source = readSourceFile(path.join(base, file));

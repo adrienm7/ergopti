@@ -148,7 +148,7 @@ for _, module_name in ipairs({
 	"gestures.ui.menu.gestures",
 	"ui.menu.menu_shortcuts",
 	"hotstrings.ui.menu.hotstrings",
-	"ui.menu.menu_metrics",
+	"metrics.ui.menu.metrics",
 	"ui.menu.menu_tap_holds",
 	"ui.menu.menu_about",
 }) do
@@ -168,7 +168,7 @@ package.loaded["ui.menu.menu_tap_holds"] = {
 	prime = function() prime_counts.karabiner = prime_counts.karabiner + 1 end,
 }
 package.loaded["ai.engine"] = { set_backend = function() end }
-package.loaded["modules.keystats"] = {}
+package.loaded["metrics.engine"] = {}
 package.loaded["modules.shortcuts"] = shortcuts
 package.loaded["hotstrings.engine.dynamic"] = {}
 package.loaded["gestures.engine"] = {}

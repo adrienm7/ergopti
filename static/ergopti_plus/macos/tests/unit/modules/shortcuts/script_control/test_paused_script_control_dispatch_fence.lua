@@ -42,7 +42,7 @@ package.loaded["gestures.engine.actions"] = {
 		return true
 	end,
 }
-package.loaded["modules.keystats"] = { log_shortcut = function() end }
+package.loaded["metrics.engine"] = { log_shortcut = function() end }
 package.loaded["ai.engine.api.mlx"] = {
 	stop_warmup = function() return true end,
 	resume_warmup = function() return true end,
@@ -53,10 +53,10 @@ package.loaded["ai.engine.local_servers.warmup_controller"] = {
 	stop = function() return true end,
 	schedule_warmup_with_retry = function() return true end,
 }
-package.loaded["ui.wpm.wpm_menubar"] = {
+package.loaded["metrics.ui.wpm.menubar"] = {
 	is_running = function() return false end,
 }
-package.loaded["ui.wpm.wpm_widget"] = {
+package.loaded["metrics.ui.wpm.widget"] = {
 	is_running = function() return false end,
 }
 package.loaded["keyboard.engine.runtime.onboarding"] = { stop = function() return true end }

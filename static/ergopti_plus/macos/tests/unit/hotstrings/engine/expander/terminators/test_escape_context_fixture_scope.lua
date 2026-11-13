@@ -13,7 +13,7 @@ local Fixture = require("tests.support.escape_context_fixture")
 local OWNERS = {
 	"core.logger.engine.logger", "diagnostics.adapters.event_provenance", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "hotstrings.engine.expander.utils", "core.text.engine.utils",
-	"ai.engine", "platform.input.keycodes", "modules.keystats", "core.ui.ui.tooltip",
+	"ai.engine", "platform.input.keycodes", "metrics.engine", "core.ui.ui.tooltip",
 	"ai.engine.prediction.engine", "settings.engine.registry",
 	"hotstrings.engine.catalogue.config", "hotstrings.engine.expander.expander",
 	"menu.engine.manifest_reader", "ai.engine.bridge",

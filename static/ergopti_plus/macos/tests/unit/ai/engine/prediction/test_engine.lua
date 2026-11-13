@@ -199,7 +199,7 @@ package.loaded["core.ui.ui.tooltip"] = {
 
 -- Stub modules.keystats — get_live_stats() returns wpm_physical (the field the
 -- adaptive debounce reads); log_llm_dismissed() is called on reset.
-package.loaded["modules.keystats"] = {
+package.loaded["metrics.engine"] = {
 	get_live_stats      = function() return { wpm_physical = 0 } end,
 	log_llm_dismissed   = function(_, _preds) end,
 }
@@ -224,7 +224,7 @@ local function load_real_setting_bridge()
 			F16_LLM_CHAIN_SIGNAL = 106,
 			to_name = function() return "f16" end,
 		},
-		["modules.keystats"] = {},
+		["metrics.engine"] = {},
 		["core.ui.ui.tooltip"] = {},
 		["settings.engine.registry"] = {},
 		["hotstrings.engine.catalogue.config"] = {},
@@ -1010,7 +1010,7 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 	helpers.it("clears visible state synchronously but defers dismissal persistence", function()
 		local core = package.loaded["ai.engine"]
 		local streaming = package.loaded["ai.engine.api.streaming_handler"]
-		local keystats = package.loaded["modules.keystats"]
+		local keystats = package.loaded["metrics.engine"]
 		local scheduler = require("core.events.timer_scheduler")
 		local previous_fetch = core.fetch_llm_prediction
 		local previous_build = streaming.build_callbacks

@@ -150,7 +150,7 @@ local function load_fixture(options)
 		end,
 	}
 	package.loaded["core.ui.ui.tooltip"] = tooltip
-	package.loaded["modules.keystats"] = {
+	package.loaded["metrics.engine"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end,
 		log_llm_suggested = function()

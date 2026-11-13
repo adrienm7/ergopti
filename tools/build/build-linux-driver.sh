@@ -233,7 +233,7 @@ REQUIRED_FILES=(
 	"linux/hotstrings/engine/injector.lua"
 	"linux/hotstrings/engine/input_reader.lua"
 	"linux/hotstrings/engine/device_finder.lua"
-	"linux/modules/keystats/metrics_collector.lua"
+	"linux/metrics/engine/collector.lua"
 	"linux/core/network/adapters/http_client.lua"
 	"linux/tray/adapters/menu.lua"
 	"linux/core/i18n/engine/locale.lua"

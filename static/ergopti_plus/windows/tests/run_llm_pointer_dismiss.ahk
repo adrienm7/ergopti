@@ -17,7 +17,7 @@ SetWorkingDir(A_ScriptDir)
 ; ==============================================================================
 
 #Include test_framework.ahk
-#Include ../infra/hotpath_profiler.ahk
+#Include ../metrics/engine/perf/hotpath_profiler.ahk
 
 ; The actual public facade and lifecycle owner run in this isolated suite. Only
 ; detached graphics disposal and model cancellation cross controlled boundaries.

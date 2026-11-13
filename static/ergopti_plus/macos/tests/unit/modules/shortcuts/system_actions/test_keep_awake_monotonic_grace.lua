@@ -18,7 +18,7 @@ local OWNED_MODULES = {
 	"modules.shortcuts.actions.screenshot_save",
 	"modules.shortcuts.actions.text",
 	"gestures.engine",
-	"modules.keystats.log_manager",
+	"metrics.engine.journal.log_manager",
 	"core.ui.engine.notifications",
 	"core.logger.engine.key_event_health",
 	"core.logger.engine.logger",
@@ -129,7 +129,7 @@ local function with_awake(callback)
 				"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
 				"gestures.engine", "core.ui.engine.notifications", "core.logger.engine.key_event_health",
 				"core.text.engine.utils", "hotstrings.engine.expander.control_sentinels", "platform.input.key_state",
-				"platform.input.keyboard_geometry", "modules.keystats.log_manager",
+				"platform.input.keyboard_geometry", "metrics.engine.journal.log_manager",
 			}) do package.loaded[name] = {} end
 			local System = require("modules.shortcuts.actions.system")
 			local Scheduler = require("core.events.timer_scheduler")

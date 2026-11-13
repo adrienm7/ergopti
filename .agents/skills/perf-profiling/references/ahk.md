@@ -7,7 +7,7 @@ Resolve `LogsDirPath` in `%LOCALAPPDATA%\Ergopti\paths.toml`; empty means
 old `<ConfigDir>\autohotkey\logs\`. Derive the folder; do not treat an example
 as configuration.
 
-`static/ergopti_plus/windows/infra/hotpath_profiler.ahk` uses QPC and emits
+`static/ergopti_plus/windows/metrics/engine/perf/hotpath_profiler.ahk` uses QPC and emits
 `[HotPath] Slow <segment>: <ms> ms`. The default warning threshold is 5 ms, but
 `_HOTPATH_SLOW_MS_BY_SEGMENT` contains measured per-segment overrides. Read that
 map before interpreting missing lines or comparing counts. The log population

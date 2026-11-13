@@ -51,14 +51,14 @@ for (const { key, tokens } of vectors.keys) {
 	);
 }
 
-const hook = read('windows/modules/keystats/keystats_hook.ahk');
+const hook = read('windows/metrics/engine/capture/hook.ahk');
 const hookStart = hook.indexOf('global KLHOOK_SPECIAL');
 const hookTable = hook.slice(hookStart, hook.indexOf('\n)', hookStart));
 const hookMarkers = [...hookTable.matchAll(/"(\[[A-Z0-9]+\])"/g)].map((match) => match[1]);
 assert.ok(hookMarkers.length >= 12, 'the Windows hook table is found');
 for (const marker of hookMarkers) assert.ok(known.has(marker), `Windows emits ${marker}`);
 
-const macos = read('macos/modules/keystats/init.lua');
+const macos = read('macos/metrics/engine/init.lua');
 const macosStart = macos.indexOf('local F_KEY_CODES');
 const macosTables = macos.slice(macosStart, macos.indexOf('Default State', macosStart));
 const macosNames = [...macosTables.matchAll(/\]\s*= "([A-Z0-9]+)"/g)].map(

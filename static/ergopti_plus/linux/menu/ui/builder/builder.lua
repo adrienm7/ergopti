@@ -211,7 +211,7 @@ local _build_llm = require("ai.ui.menu.llm").build
 
 local _build_agent = require("ai.ui.menu.agent").build
 
-local _build_metrics = require("ui.menu.menu_metrics").build
+local _build_metrics = require("metrics.ui.menu.metrics").build
 
 local _build_shortcuts = require("ui.menu.menu_shortcuts").build
 

@@ -11,7 +11,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shar
 require("core.lifecycle.engine.compat.utf8").install()
 local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
-local Calendar = require("modules.keystats.calendar")
+local Calendar = require("metrics.engine.calendar")
 local Monotonic = require("core.logger.engine.monotonic")
 local helpers = require("tests.helpers")
 local uv = require("luv")
@@ -47,7 +47,7 @@ local function scenario(day, body)
 			Fixture.with(function(k)
 				k.init({ sqlite_path = path, log_dir = path .. ".logs" })
 				require("tests.support.metrics_consent_fixture").enable(k)
-				local writer = require("modules.keystats.sqlite_writer")
+				local writer = require("metrics.engine.journal.sqlite_writer")
 				local function advance(ms) elapsed = elapsed + ms end
 				local function rows(sql) return assert(writer.query_rows(sql)) end
 				body(k, writer, advance, rows, function(seconds) wall_shift = wall_shift + seconds end)
@@ -223,7 +223,7 @@ end)
 scenario({ month = 10, day = 25, sec = 0 }, function(k, _, advance, rows)
 	local shell = require("core.process.adapters.shell_runner")
 	local original_line, original_has = shell.exec_line, shell.has_command
-	local system = require("modules.keystats.system_metrics")
+	local system = require("metrics.engine.system.metrics")
 	local network = "network-one"
 	shell.has_command = function(name) return name == "nmcli" or name == "loginctl" or name == "pactl" end
 	shell.exec_line = function(command)
@@ -331,7 +331,7 @@ scenario({ month = 10, day = 25 }, function(k, writer)
 	local logger = require("core.logger.engine.shim")
 	local original, errors = logger.error, 0
 	logger.error = function(tag, message, ...)
-		if tag == "modules.keystats.keystats" and message == "Final SQLite history remains uncommitted; summary publication cannot acknowledge its source." then
+		if tag == "metrics.engine.keystats" and message == "Final SQLite history remains uncommitted; summary publication cannot acknowledge its source." then
 			errors = errors + 1
 		end
 		return original(tag, message, ...)

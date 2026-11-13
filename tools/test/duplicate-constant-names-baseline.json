@@ -5,10 +5,7 @@
 		"divergent": false
 	},
 	"CHUNK_BYTES": {
-		"files": [
-			"windows/modules/keystats/keystats_reader_db.ahk",
-			"windows/modules/keystats/keystats_reader_rebuild.ahk"
-		],
+		"files": ["windows/metrics/engine/reader/db.ahk", "windows/metrics/engine/reader/rebuild.ahk"],
 		"divergent": false
 	},
 	"COMMAND_TIMEOUT": {
@@ -53,15 +50,15 @@
 	"MAX_FRAME_BYTES": {
 		"files": [
 			"macos/ai/engine/api/opaque_network_admission.lua",
-			"windows/modules/keystats/keystats_reader_rebuild.ahk"
+			"windows/metrics/engine/reader/rebuild.ahk"
 		],
 		"divergent": false
 	},
 	"MICRO_IDLE_TIMEOUT_MS": {
 		"files": [
-			"macos/modules/keystats/init.lua",
-			"macos/modules/keystats/watchers.lua",
-			"windows/modules/keystats/keystats_watchers.ahk"
+			"macos/metrics/engine/init.lua",
+			"macos/metrics/engine/system/watchers.lua",
+			"windows/metrics/engine/system/watchers.ahk"
 		],
 		"divergent": false
 	},
@@ -79,7 +76,7 @@
 			"linux/core/logger/engine/monotonic.lua",
 			"macos/core/events/clock.lua",
 			"macos/core/logger/engine/boot_profiler.lua",
-			"macos/infra/hotpath_profiler.lua",
+			"macos/metrics/engine/perf/hotpath_profiler.lua",
 			"macos/core/logger/engine/key_event_health.lua",
 			"macos/core/logger/engine/keystroke_integrity.lua"
 		],
@@ -99,24 +96,24 @@
 	},
 	"SESSION_TIMEOUT_MS": {
 		"files": [
-			"linux/modules/keystats/metrics_collector.lua",
-			"macos/modules/keystats/init.lua",
-			"macos/modules/keystats/watchers.lua",
-			"windows/modules/keystats/keystats_watchers.ahk"
+			"linux/metrics/engine/collector.lua",
+			"macos/metrics/engine/init.lua",
+			"macos/metrics/engine/system/watchers.lua",
+			"windows/metrics/engine/system/watchers.ahk"
 		],
 		"divergent": false
 	},
 	"THINK_PAUSE_MS": {
 		"files": [
-			"windows/modules/keystats/keystats_constants.ahk",
-			"windows/modules/keystats/keystats_walker_core.ahk"
+			"windows/metrics/engine/constants.ahk",
+			"windows/metrics/engine/walker/walker_core.ahk"
 		],
 		"divergent": false
 	},
 	"UINT64_MAX": {
 		"files": [
-			"macos/modules/keystats/physical_clock.lua",
-			"macos/modules/keystats/physical_wire.lua"
+			"macos/metrics/engine/capture/physical_clock.lua",
+			"macos/metrics/engine/capture/physical_wire.lua"
 		],
 		"divergent": false
 	},
@@ -124,8 +121,8 @@
 		"files": [
 			"_shared/metrics/engine/aggregator/helpers.lua",
 			"_shared/ui/metrics_typing/state.js",
-			"macos/modules/keystats/aggregator/core.lua",
-			"windows/modules/keystats/keystats_walker_core.ahk"
+			"macos/metrics/engine/aggregator/core.lua",
+			"windows/metrics/engine/walker/walker_core.ahk"
 		],
 		"divergent": false
 	},
@@ -134,7 +131,10 @@
 		"divergent": false
 	},
 	"WINDOW_MS": {
-		"files": ["windows/core/process/adapters/shell_runner.ahk", "windows/ui/wpm/wpm_display.ahk"],
+		"files": [
+			"windows/core/process/adapters/shell_runner.ahk",
+			"windows/metrics/ui/wpm/display.ahk"
+		],
 		"divergent": false
 	}
 }

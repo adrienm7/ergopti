@@ -37,7 +37,7 @@ end
 --- @return number delay Seconds.
 local function armed_delay_at(wpm)
 	local fixture = Pipeline.load({})
-	package.loaded["modules.keystats"].get_live_stats = function() return { wpm_physical = wpm } end
+	package.loaded["metrics.engine"].get_live_stats = function() return { wpm_physical = wpm } end
 	helpers.assert_eq(fixture.engine.set_llm_debounce(CONFIGURED_SEC), true)
 	local timers = native_timers()
 	local before = #timers

@@ -80,7 +80,7 @@ function modelKeys(src) {
 const errors = [];
 const canon = tomlKeys(read('_shared/metrics/data/wpm_widget/constants.toml'));
 const model = modelKeys(read('_shared/metrics/engine/wpm_widget_model.lua'));
-const ahkConfig = read('windows/ui/wpm/wpm_config.ahk');
+const ahkConfig = read('windows/metrics/ui/wpm/config.ahk');
 const ahk = new Set(
 	[...ahkConfig.matchAll(/_WPMWidget_Need\(wpm_c, "([a-z_]+)", "([a-z_]+)"/g)].map(
 		(m) => `${m[1]}.${m[2]}`
@@ -107,11 +107,11 @@ if (/IniCacheGet\((wpm_c|tim_c),[^)]*,[^)]*,[^)]*\)/.test(ahkConfig)) {
 	errors.push('the AHK loader passes a default to a canon or timings read — a copy of the value');
 }
 for (const rel of [
-	'macos/ui/wpm/shared.lua',
-	'macos/ui/wpm/wpm_widget.lua',
-	'macos/ui/wpm/wpm_menubar.lua',
-	'linux/ui/wpm/widget.lua',
-	'linux/ui/wpm/tray_readout.lua'
+	'macos/metrics/ui/wpm/shared.lua',
+	'macos/metrics/ui/wpm/widget.lua',
+	'macos/metrics/ui/wpm/menubar.lua',
+	'linux/metrics/ui/wpm/widget.lua',
+	'linux/metrics/ui/wpm/tray_readout.lua'
 ]) {
 	const src = read(rel)
 		.split('\n')
@@ -131,12 +131,12 @@ for (const rel of [
 
 // 4. Refresh rates from the timings registry.
 const pins = [
-	['macos/ui/wpm/wpm_widget.lua', 'TimerScheduler.every(CONFIG.update_s'],
-	['macos/ui/wpm/wpm_menubar.lua', 'Timings.sec("ui", "wpm_menubar_update_ms")'],
-	['linux/ui/wpm/widget.lua', 'Timings.sec("ui", "wpm_widget_update_ms")'],
-	['linux/ui/wpm/tray_readout.lua', 'Timings.sec("ui", "wpm_menubar_update_ms")'],
-	['windows/ui/wpm/wpm_config.ahk', '_WPMWidget_NeedTiming("ui", "wpm_widget_update_ms"'],
-	['windows/ui/wpm/wpm_config.ahk', '_WPMWidget_NeedTiming("ui", "wpm_menubar_update_ms"']
+	['macos/metrics/ui/wpm/widget.lua', 'TimerScheduler.every(CONFIG.update_s'],
+	['macos/metrics/ui/wpm/menubar.lua', 'Timings.sec("ui", "wpm_menubar_update_ms")'],
+	['linux/metrics/ui/wpm/widget.lua', 'Timings.sec("ui", "wpm_widget_update_ms")'],
+	['linux/metrics/ui/wpm/tray_readout.lua', 'Timings.sec("ui", "wpm_menubar_update_ms")'],
+	['windows/metrics/ui/wpm/config.ahk', '_WPMWidget_NeedTiming("ui", "wpm_widget_update_ms"'],
+	['windows/metrics/ui/wpm/config.ahk', '_WPMWidget_NeedTiming("ui", "wpm_menubar_update_ms"']
 ];
 for (const [rel, needle] of pins) {
 	if (!read(rel).includes(needle))

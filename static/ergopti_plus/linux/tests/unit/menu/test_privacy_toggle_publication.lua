@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local uv = require("luv")
 local ConfigPaths = require("settings.engine.paths")
-local Preferences = require("infra.metrics_preferences")
+local Preferences = require("metrics.engine.preferences")
 local I18n = require("core.i18n.engine.i18n")
 
 local FILTERS = {
@@ -43,7 +43,7 @@ local function with_private_config(body)
 	local config = ConfigPaths.config
 	ConfigPaths.config = function(name) return directory .. "/" .. name end
 	local ok, err = xpcall(function()
-		local collector = helpers.fresh_module("modules.keystats.keystats")
+		local collector = helpers.fresh_module("metrics.engine.keystats")
 		-- A fresh builder does not reload its section modules, so they are reloaded here.
 		require("tests.support.menu_part_reload").forget_parts()
 		local menu = helpers.fresh_module("menu.ui.builder.builder")
