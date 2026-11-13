@@ -121,6 +121,18 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_eq(record.typed, { "ê", "e" }, "Backspace dropped the dead key")
 	end)
 
+	helpers.it("drops a pending dead key at a pause so it never composes after the resume (pause-drops-dead-key)", function()
+		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
+		M.reload()
+		helpers.assert_eq(M.drop_pending_dead_key(), false, "nothing pending, nothing dropped")
+		helpers.assert_true(press(M, KEY_BACKSLASH), "the dead key is consumed")
+		record.paused = true
+		helpers.assert_eq(M.drop_pending_dead_key(), true, "the pause drops the pending dead key")
+		record.paused = false
+		helpers.assert_true(press(M, KEY_D), "then e")
+		helpers.assert_eq(record.typed, { "e" }, "the resumed key types alone, no stale circumflex")
+	end)
+
 	helpers.it("presses the Command-level key of a shortcut chord", function()
 		local M, record = fixture({ emulated_layout = "ergopti", ergopti_base = true })
 		M.reload()

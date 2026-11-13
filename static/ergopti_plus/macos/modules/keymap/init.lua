@@ -757,6 +757,8 @@ end
 function M.pause_processing()
 	_user_hotstring_lifecycle = {}
 	CoreState.processing_paused = true
+	-- A dead key pending in the emulation must not compose after the resume.
+	LayoutEmulation.drop_pending_dead_key()
 	discard_paused_text_context()
 	if pause_observed_context_reconcile() ~= true then
 		Logger.error(LOG, "Processing pause retained an exact context-reconcile timer.")
