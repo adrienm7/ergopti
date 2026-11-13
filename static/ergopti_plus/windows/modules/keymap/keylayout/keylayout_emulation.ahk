@@ -811,6 +811,14 @@ _KLE_OnAltGr(Sc, *) {
 	Shift := KS_ShiftIsHeld()
 	Mods := _KLE_AltGrShortcutMods(_KLE_RealCtrlHeld(), Shift)
 	if (Mods != "") {
+		; SCD-3: a Ctrl slot of the logical key runs its action, as Linux does.
+		Slot := IsSet(KeyboardShortcutAssignments) && IsCategoryGated("Shortcuts")
+			? _KLE_AltGrSlotFor(KeylayoutEmulation_ShortcutChar(Sc, Mods), Mods, KeyboardShortcutAssignments) : ""
+		if (Slot != "") {
+			KeylayoutEmulation_ResetDeadKey()
+			RunKeyboardShortcutAction(Slot)
+			return
+		}
 		_KLE_OnShortcut(Sc, Mods)
 		return
 	}
@@ -827,6 +835,20 @@ _KLE_AltGrShortcutMods(CtrlHeld, Shift) {
 	if !CtrlHeld
 		return ""
 	return Shift ? "^+" : "^"
+}
+
+; The keyboard slot a Ctrl+AltGr press runs (SCD-3, decided by the maintainer on
+; 2026-11-11: AltGr is suspended under Ctrl, so a Ctrl slot fires for
+; Ctrl+AltGr+key as Linux does), or "" when no slot of that chord is assigned.
+; @param Char {String} The logical key the chord names ("" when none).
+; @param Mods {String} "^" or "^+", from _KLE_AltGrShortcutMods.
+; @param Assignments {Map} Slot -> action (KeyboardShortcutAssignments).
+; @returns {String}
+_KLE_AltGrSlotFor(Char, Mods, Assignments) {
+	if (Char == "" || StrLen(Char) != 1 || !(Assignments is Map))
+		return ""
+	Slot := (Mods == "^+" ? "primary_shift_" : "primary_") . StrLower(Char)
+	return (Assignments.Has(Slot) && Assignments[Slot] != "none") ? Slot : ""
 }
 
 ; Whether a Ctrl other than AltGr's own is physically held: the right Ctrl, or a

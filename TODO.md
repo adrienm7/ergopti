@@ -422,7 +422,7 @@ between workers) green alone. All live checks pass, typed by the harness.
       (`_Updater_QuiesceSelfUpdateForSuspend`, `infra/lifecycle.ahk`), the staging monitor
       (`_Updater_CancelSelfUpdateForSuspend`), the staging completion (« Update staging completion discarded while
       suspended ») and the swap handshake (« the driver was suspended before the swap handshake completed »).
-- [ ] **ILD-2, SCD-2 and SCD-3 on AHK (decided by the maintainer on 2026-11-11).** Ctrl+AltGr+key sends Ctrl and the
+- [x] **ILD-2, SCD-2 and SCD-3 on AHK (decided by the maintainer on 2026-11-11).** Ctrl+AltGr+key sends Ctrl and the
       logical key, AltGr suspended. `modules/keymap/keylayout/keylayout_emulation.ahk` `_KLE_OnAltGr`: with a Ctrl other
       than AltGr's own physically held, `_KLE_OnShortcut(Sc, "^")` (`"^+"` with Shift) instead of `_KLE_Emit`;
       `test_keylayout_emulation.ahk` `_KLT_OptionsDecide` routes `ctrl altgr` presses the same way, so the shared vector
@@ -431,6 +431,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       `modules/shortcuts/utils.ahk` `AddShortcut` for a `^` slot: also `<^>!^` + scan code to the same callback, guarded by
       the physical Ctrl (SCD-3, a `ctrl_x` slot fires for Ctrl+AltGr+x). Tests beside each.
       ILD-2 and SCD-2 done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 7163ba50 and ee18e2d9: `_KLE_AltGrShortcutMods` with `_KLE_RealCtrlHeld`, the `<^<!` and `<^<!+` chords). Left: SCD-3. `AddShortcut` in `modules/shortcuts/utils.ahk` has no production caller, so the `<^>!^` registration belongs where the `ctrl_x` slots are really registered; find that registrar first, then add the hotkey guarded by `_KLE_RealCtrlHeld()` and test Ctrl+AltGr+x running the `ctrl_x` action.
+      SCD-3 done 2026-11-13 by worker E: the Ctrl slots are bound by `KeyboardShortcutsBindAll`
+      (`infra/config_io.ahk`), and Ctrl+AltGr already reaches `_KLE_OnAltGr` with a real Ctrl (ILD-2), so the slot is
+      run there: `_KLE_AltGrSlotFor` names the `primary_`/`primary_shift_` slot of the logical key, which runs
+      through `RunKeyboardShortcutAction` (Shortcuts gate kept); without one the chord goes on as Ctrl and the key.
+      Test `SCD-3` in `test_keylayout_emulation.ahk`; the press on a PC is in TODO-tests-windows.md.
 - [ ] **EDD-1 on AHK (decided by the maintainer on 2026-11-12: a pause stops typing, not configuration).** Remove the
       `A_IsSuspended` page-message gates that drop or refuse a configuration write while suspended, in
       `ui/prompt_editor/init.ahk` (`_PromptEdWeb_OnWebMessage` and `_PromptEdWeb_Save`), `ui/paths_editor`,
