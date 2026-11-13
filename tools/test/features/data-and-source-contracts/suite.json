@@ -761,6 +761,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-folder-gain-lists.cjs"],
 			"repro": "npm run test:structure-folder-gain-lists"
+		},
+		{
+			"id": "js-0522",
+			"ordinal": 641,
+			"name": "structure plan reads a Lua tool's requires against the driver whose modules only it has",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-tool-lua-roots.cjs"],
+			"repro": "npm run test:structure-tool-lua-roots"
 		}
 	]
 }
