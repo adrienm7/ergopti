@@ -1,0 +1,183 @@
+{
+	"schema_version": 1,
+	"description": "Physical shortcut collision vectors for _shared/shortcuts/engine/physical_conflicts.lua and its AutoHotkey port (windows/ui/physical_shortcuts/delivery.ahk). expect is true (collision, with the binding), false (free) or null (malformed or unproven input, refused).",
+	"vectors": [
+		{
+			"name": "free key",
+			"request": {
+				"slot": "physical_ctrl_KeyQ",
+				"action": "copy",
+				"code": 16,
+				"mods": { "ctrl": true },
+				"aliases": { "a": true }
+			},
+			"claims": [
+				{ "kind": "chord", "binding": "keyboard__physical_none_KeyQ", "code": 16, "mods": {} }
+			],
+			"expect": false
+		},
+		{
+			"name": "same position and modifiers",
+			"request": {
+				"slot": "physical_ctrl_KeyQ",
+				"action": "copy",
+				"code": 16,
+				"mods": { "ctrl": true },
+				"aliases": {}
+			},
+			"claims": [
+				{
+					"kind": "chord",
+					"binding": "keyboard__physical_ctrl_alt_KeyQ",
+					"code": 16,
+					"mods": { "ctrl": true }
+				}
+			],
+			"expect": true,
+			"binding": "keyboard__physical_ctrl_alt_KeyQ"
+		},
+		{
+			"name": "the slot's own claim is not a collision",
+			"request": {
+				"slot": "physical_ctrl_KeyQ",
+				"action": "copy",
+				"code": 16,
+				"mods": { "ctrl": true },
+				"aliases": {}
+			},
+			"claims": [
+				{
+					"kind": "chord",
+					"binding": "keyboard__physical_ctrl_KeyQ",
+					"code": 16,
+					"mods": { "ctrl": true }
+				}
+			],
+			"expect": false
+		},
+		{
+			"name": "a removal never collides",
+			"request": {
+				"slot": "physical_ctrl_KeyQ",
+				"action": "none",
+				"code": 16,
+				"mods": { "ctrl": true },
+				"aliases": {}
+			},
+			"claims": [
+				{ "kind": "chord", "binding": "keyboard__other", "code": 16, "mods": { "ctrl": true } }
+			],
+			"expect": false
+		},
+		{
+			"name": "a logical chord typed by that key",
+			"request": {
+				"slot": "physical_ctrl_KeyQ",
+				"action": "copy",
+				"code": 16,
+				"mods": { "ctrl": true },
+				"aliases": { "a": true }
+			},
+			"claims": [
+				{ "kind": "logical", "binding": "keyboard__ctrl_a", "key": "a", "mods": { "ctrl": true } }
+			],
+			"expect": true,
+			"binding": "keyboard__ctrl_a"
+		},
+		{
+			"name": "a logical chord under other modifiers",
+			"request": {
+				"slot": "physical_ctrl_KeyQ",
+				"action": "copy",
+				"code": 16,
+				"mods": { "ctrl": true },
+				"aliases": { "a": true }
+			},
+			"claims": [
+				{
+					"kind": "logical",
+					"binding": "keyboard__ctrl_shift_a",
+					"key": "a",
+					"mods": { "ctrl": true, "shift": true }
+				}
+			],
+			"expect": false
+		},
+		{
+			"name": "a plain-key prefix owns the unmodified key",
+			"request": {
+				"slot": "physical_none_CapsLock",
+				"action": "copy",
+				"code": 58,
+				"mods": {},
+				"aliases": {}
+			},
+			"claims": [
+				{
+					"kind": "prefix",
+					"binding": "combination__caps_tab",
+					"codes": [58, 15],
+					"unmodified_only": true
+				}
+			],
+			"expect": true,
+			"binding": "combination__caps_tab"
+		},
+		{
+			"name": "a plain-key prefix leaves a modified key unproven",
+			"request": {
+				"slot": "physical_shift_CapsLock",
+				"action": "copy",
+				"code": 58,
+				"mods": { "shift": true },
+				"aliases": {}
+			},
+			"claims": [
+				{
+					"kind": "prefix",
+					"binding": "combination__caps_tab",
+					"codes": [58, 15],
+					"unmodified_only": true
+				}
+			],
+			"expect": null
+		},
+		{
+			"name": "a remapped key owns it under every modifier",
+			"request": {
+				"slot": "physical_alt_KeyE",
+				"action": "copy",
+				"code": 18,
+				"mods": { "alt": true },
+				"aliases": {}
+			},
+			"claims": [{ "kind": "prefix", "binding": "layout__KeyE", "codes": [18] }],
+			"expect": true,
+			"binding": "layout__KeyE"
+		},
+		{
+			"name": "an unknown claim kind is refused",
+			"request": {
+				"slot": "physical_ctrl_KeyQ",
+				"action": "copy",
+				"code": 16,
+				"mods": { "ctrl": true },
+				"aliases": {}
+			},
+			"claims": [{ "kind": "mystery", "binding": "x" }],
+			"expect": null
+		},
+		{
+			"name": "a claim with no binding is refused",
+			"request": {
+				"slot": "physical_ctrl_KeyQ",
+				"action": "copy",
+				"code": 16,
+				"mods": { "ctrl": true },
+				"aliases": {}
+			},
+			"claims": [{ "kind": "chord", "code": 16, "mods": {} }],
+			"expect": null
+		}
+	]
+}

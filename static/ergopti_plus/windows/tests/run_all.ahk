@@ -563,6 +563,7 @@ InstallSendNoOps()
 #Include unit/modules/hotstrings/personal/test_personal_toml_editor.ahk
 #Include unit/ui/menu/test_menu_helpers.ahk
 #Include unit/ui/physical_shortcuts/test_physical_shortcut_host.ahk
+#Include unit/ui/physical_shortcuts/test_physical_shortcut_delivery.ahk
 #Include unit/ui/menu/test_manifest_menu_resolve_disabled_when_failclosed.ahk
 #Include unit/ui/menu/test_manifest_menu_declarations_are_read.ahk
 #Include unit/ui/menu/test_manifest_menu_declared_groups.ahk

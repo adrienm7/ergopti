@@ -119,9 +119,8 @@ class PhysicalShortcutsScope {
 		this.Model := this.Options.Has("model") ? this.Options["model"] : PhysicalSlots.Load()
 		this.Read := this.Options.Get("read", _PhysicalShortcutsReadSource)
 		this.Delivery := this.Options.Get("delivery", PhysicalShortcutDeliveryAvailable)
-		; Windows has no collision owner yet (Linux: physical_collisions); a
-		; mapping is refused until one is qualified.
-		this.Collisions := this.Options.Get("collisions", 0)
+		; The Windows collision owner (delivery.ahk), as Linux's physical_collisions.
+		this.Collisions := this.Options.Get("collisions", PhysicalShortcutCollisions())
 		this.Publish := this.Options.Get("publish", _PhysicalShortcutsPublishRows)
 	}
 
@@ -213,7 +212,7 @@ class PhysicalShortcutsScope {
 				return Map("committed", false, "reason", "unavailable")
 			}
 			if (Free != true)
-				return Map("committed", false, "reason", Free == "source_changed" ? "source_changed" : "collision")
+				return Map("committed", false, "reason", (Free == "source_changed" || Free == "unavailable") ? Free : "collision")
 			if !this.PhysicalDeliveryAvailable()
 				return Map("committed", false, "reason", "unavailable")
 		}
