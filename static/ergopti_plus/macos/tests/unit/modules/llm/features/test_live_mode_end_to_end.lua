@@ -250,7 +250,7 @@ end
 --- @return boolean
 local function notice_is(notice, key)
 	if type(notice) ~= "string" then return false end
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local text = i18n.get(key):gsub("{1}.*$", "")
 	return notice:find(text, 1, true) == 1
 end
@@ -316,8 +316,8 @@ helpers.describe("live mode end to end (llm-live-mode)", function()
 
 		-- The harness's i18n stub echoes keys: point it at the real locale core so
 		-- the notice shows its {1} filled with the prompt's menu label
-		local i18n = package.loaded["infra.i18n"]
-		local Locale = require("infra.locale")
+		local i18n = package.loaded["core.i18n.engine.i18n"]
+		local Locale = require("core.i18n.engine.locale")
 		local saved_get, saved_format = i18n.get, i18n.format
 		i18n.get = function(key) return Locale.get(key) or key end
 		i18n.format = function(key, ...)
@@ -586,7 +586,7 @@ helpers.describe("retained live shortcut stop", function()
 
 	helpers.it("uses all actual stop notices and preserves refused action bridge state", function()
 		local world = build_world()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local saved_get, spec = i18n.get, corpus()
 		local keymap, calls = package.loaded["modules.keymap"], 0
 		local ok, err = xpcall(function()
@@ -637,10 +637,10 @@ local function with_live_boundary_owner(scenario)
 	local world, native, owner, receipt, acquired
 	local ok, detail = xpcall(function()
 		world = build_world()
-		for _, name in ipairs({ "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu",
+		for _, name in ipairs({ "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
 			"ui.menu.menu_llm.profile_label" }) do package.loaded[name] = nil end
-		native = require("infra.i18n")
-		local backend = require("infra.locale")
+		native = require("core.i18n.engine.i18n")
+		local backend = require("core.i18n.engine.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end)
 		native.init()
 		owner = { pending = function() return false end }

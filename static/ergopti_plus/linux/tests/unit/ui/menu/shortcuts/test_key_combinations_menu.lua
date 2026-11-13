@@ -31,7 +31,7 @@ local function with_menu(body)
 				if receipt.guard()~=true then return false end
 				state.edits[#state.edits+1]=rows;return true
 			end,set_enabled=function() return true end}
-		package.loaded["infra.i18n"]={get=t,section=t,get_locale=function() return "en" end}
+		package.loaded["core.i18n.engine.i18n"]={get=t,section=t,get_locale=function() return "en" end}
 		package.loaded["infra.manifest_menu"]=nil
 		local renderer=require("infra.manifest_menu")
 		package.loaded["ui.menu.key_combinations"]=nil
@@ -190,7 +190,7 @@ local function with_canonical_locale_menu(callback)
 			retry_locale = function() return true end,
 			edit_locale = function(value)
 				if package.loaded["core.fs.adapters.storage"].set("locale", value) ~= true then return false end
-				local native = require("infra.i18n")
+				local native = require("core.i18n.engine.i18n")
 				local token = { pending = function() return false end }
 				assert(native.scope_acquire(token))
 				local receipt = assert(native.scope_capture(token))
@@ -200,10 +200,10 @@ local function with_canonical_locale_menu(callback)
 				return applied
 			end,
 		}
-		for _, name in ipairs({ "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }) do
+		for _, name in ipairs({ "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }) do
 			package.loaded[name] = nil
 		end
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		i18n.init()
 		local renderer = require("infra.manifest_menu")
 		local provider = require("ui.menu.key_combinations")
@@ -229,7 +229,7 @@ local function with_canonical_locale_menu(callback)
 		}
 		function state.build(code)
 			assert(i18n.set_locale(code) == true)
-			assert(i18n.get_locale() == code and require("infra.locale").current_locale() == code)
+			assert(i18n.get_locale() == code and require("core.i18n.engine.locale").current_locale() == code)
 			return provider.build(context, ui)
 		end
 		function state.pair_rows(rows)

@@ -36,7 +36,7 @@ local function with_changelog(callback)
 			"adapters.http_client",
 			"core.events.timer_scheduler",
 			"infra.deferred_work",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"core.fs.engine.paths",
 			"modules.shortcuts.script_control",
@@ -126,7 +126,7 @@ local function with_changelog(callback)
 					return true
 				end,
 			}
-			package.loaded["infra.i18n"] = {
+			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 			}
 			package.loaded["infra.logger"] = helpers.make_logger_stub()

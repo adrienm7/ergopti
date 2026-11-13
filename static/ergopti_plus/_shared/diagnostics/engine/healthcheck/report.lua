@@ -148,7 +148,7 @@ function M.new(ports)
 				local with_log = action.day_log == true
 				if with_log and action.action == "copy" then error("the day log is saved with the report, never copied") end
 				local document = Share.document(snapshot, documents.schema,
-					require("infra.i18n").get(documents.schema.share_policy.notice_key), with_log)
+					require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key), with_log)
 				assert(action.text == document.text, "Diagnostic sharing preview is stale or invalid")
 				action = { action = action.action, text = document.text, fields = document.fields, notes = document.notes, name = document.name,
 					day_log_file = with_log and require("diagnostics.engine.healthcheck.day_log").file(snapshot, documents, document.snapshot) or nil }
@@ -217,7 +217,7 @@ function M.new(ports)
 			if not current() then return end
 			slot.request = nil
 			if result.ok ~= true then
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				effects.notify(i18n.get("menu.debug." .. id), i18n.get("notify.github_report_failed"), "error")
 			end
 			if current() and type(complete) == "function" then complete(result.ok == true) end

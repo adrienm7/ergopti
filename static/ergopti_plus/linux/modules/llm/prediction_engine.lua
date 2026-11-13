@@ -50,7 +50,7 @@ local NavigationSettings = require("modules.llm.navigation_settings")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Inference = require("modules.llm.inference")
 local Monotonic = require("infra.monotonic")
-local i18n = require("infra.i18n")
+local i18n = require("core.i18n.engine.i18n")
 local Base64 = require("core.lifecycle.engine.compat.base64")
 local Json = require("core.text.engine.json")
 local EvdevCodes = require("infra.evdev_codes")
@@ -522,7 +522,7 @@ local function binding_profile(prompt)
 	if prompt.translation_target == nil then return ProfileSettings.resolve_id(prompt.profile_id) end
 	local data = Translation.data()
 	if not data then return nil end
-	return Translate.prediction_profile(prompt.translation_target, data.config, data.names, require("infra.i18n").get_locale())
+	return Translate.prediction_profile(prompt.translation_target, data.config, data.names, require("core.i18n.engine.i18n").get_locale())
 end
 
 local function live_override()
@@ -845,7 +845,7 @@ local UNLIMITED_WORDS = "unlimited"
 --- the interface's, as on macOS, not always French.
 --- @return string
 local function prompt_language()
-	local ok, I18n = pcall(require, "infra.i18n")
+	local ok, I18n = pcall(require, "core.i18n.engine.i18n")
 	local locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
 	if type(locale) == "string" and locale ~= "" then return locale end
 	return require("infra.manifest_reader").default_for(require("settings.engine.keys").KEY.SCRIPT_LOCALE)
@@ -861,7 +861,7 @@ local function profile_display_name(profile)
 	if (profile.id == "translate" or tostring(profile.id):match("^user_")) and type(profile.label) == "string" and profile.label ~= "" then
 		return profile.label
 	end
-	local ok, I18n = pcall(require, "infra.i18n")
+	local ok, I18n = pcall(require, "core.i18n.engine.i18n")
 	local key = "llm.profile." .. tostring(profile.id) .. ".label"
 	-- Probed: a profile id without a catalogue label shows its id, not a miss.
 	local label = ok and type(I18n.has) == "function" and I18n.has(key) and I18n.get(key) or nil
@@ -3795,7 +3795,7 @@ function M.enable(on_changed)
 			local Servers = require("modules.llm.local_servers")
 			local Entries = require("modules.llm.api_entries")
 			local Discovery = require("ai.engine.local_servers.discovery")
-			local I18n = require("infra.i18n")
+			local I18n = require("core.i18n.engine.i18n")
 			local replacements = {}
 			local function current_cached()
 				return not cleanup_only and current() and not Servers.is_stale() and not Servers.is_sweeping()

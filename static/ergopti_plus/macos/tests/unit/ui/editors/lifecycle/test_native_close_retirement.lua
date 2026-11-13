@@ -33,7 +33,7 @@ local function with_window(module_name, scenario)
 			"adapters.webview_result", "ui.ui_builder", "ui.webview_close_owner", "core.events.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
 			"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "infra.launcher_environment", "adapters.log_transport",
-			"core.fs.engine.app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
+			"core.fs.engine.app_dirs", "infra.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
 			"tests.support.native_webview_close_fixture",
 		}, function()
 			local h = { windows = {}, retained = {}, deferred = {}, script_refs = {}, timers = {}, bridges = {}, errors = {} }
@@ -94,7 +94,7 @@ local function with_window(module_name, scenario)
 					return { frame = function() return { x = 0, y = 0, w = 1400, h = 900 } end }
 				end },
 			})
-			local translations = package.loaded["infra.i18n"]
+			local translations = package.loaded["core.i18n.engine.i18n"]
 			local translated = translations.get
 			translations.get = function(key, ...)
 				if key == "menu.paths.window_title" then return "Folders" end

@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
 	"core.fs.engine.file_watchers", "infra.ui_restore", "infra.git_status", "core.fs.engine.dir",
-	"infra.logger", "infra.i18n", "infra.notifications", "core.lifecycle.engine.reload.gate",
+	"infra.logger", "core.i18n.engine.i18n", "infra.notifications", "core.lifecycle.engine.reload.gate",
 	"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "core.fs.adapters.file_system",
 }
 
@@ -35,7 +35,7 @@ function M.with_watchers(body, options)
 			local defer_calls = 0
 			for _, name in ipairs(OWNERS) do package.loaded[name] = nil end
 			package.loaded["infra.logger"] = options.logger or helpers.make_logger_stub()
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.notifications"] = { notify = function() return true end }
 			package.loaded["infra.ui_restore"] = {
 				defer_reload = function(fn)

@@ -24,7 +24,7 @@ local AZURE = {
 
 local MODULES = {
 	"modules.llm",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.dialog_util",
 	"infra.notifications",
@@ -79,7 +79,7 @@ local function run_add_fixture(provider, prompt_result)
 				if type(callback) == "function" then callback(true, nil, true) end
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.logger"] = {
 			debug = function() end,
 			info = function() end,
@@ -104,7 +104,7 @@ local function run_add_fixture(provider, prompt_result)
 			manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 			json_decode = require("core.fs.adapters.json_codec").decode,
 			i18n = {
-			get = package.loaded["infra.i18n"].get,
+			get = package.loaded["core.i18n.engine.i18n"].get,
 			-- These command rows never request a translated section.
 			section = function() return {} end,
 		},

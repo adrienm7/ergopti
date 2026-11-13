@@ -23,7 +23,7 @@ local MODULES = {
 	"keyboard.engine.chord",
 	"infra.app_picker",
 	"infra.dialog_util",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.manifest_menu",
 	"infra.notifications",
@@ -431,7 +431,7 @@ local function with_delete_fixture(options, body)
 				return "button.cancel"
 			end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
@@ -439,7 +439,7 @@ local function with_delete_fixture(options, body)
 			platform = "hs",
 			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 			json_decode = json.decode,
-			i18n = package.loaded["infra.i18n"],
+			i18n = package.loaded["core.i18n.engine.i18n"],
 			logger = package.loaded["infra.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {

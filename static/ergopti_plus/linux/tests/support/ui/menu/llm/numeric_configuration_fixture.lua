@@ -82,7 +82,7 @@ function M.with_configuration(body)
 		end
 		package.loaded["ui.webview_manager"] = host
 		package.loaded["adapters.notifier"] = { send = function(message) notifications[#notifications + 1] = message; return true end }
-		local i18n = require("infra.i18n"); i18n.init()
+		local i18n = require("core.i18n.engine.i18n"); i18n.init()
 		local prompt = require("ui.numeric_prompt.bridge")
 		local builder = require("ui.menu.builder")
 		local function find(rows, predicate)

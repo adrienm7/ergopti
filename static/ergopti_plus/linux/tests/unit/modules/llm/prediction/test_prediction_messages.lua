@@ -150,7 +150,7 @@ helpers.describe("prediction messages: the word limits and language the prompt s
 	end)
 
 	helpers.it("falls back to the interface language, not always French", function()
-		local I18n = require("infra.i18n")
+		local I18n = require("core.i18n.engine.i18n")
 		local previous = I18n.get_locale
 		I18n.get_locale = function() return "de" end
 		local sent = messages_for(builtin("basic"), "Hallo zusammen")

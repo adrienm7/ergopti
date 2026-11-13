@@ -302,7 +302,7 @@ helpers.describe("LLM user profiles: tray reachability", function()
 			"the registered model-browser bridge needs a production menu caller")
 		helpers.assert_eq(browse.fn(), true)
 		helpers.assert_eq(opened_window, "model_browser")
-		local create = find(menu, require("infra.i18n").get("menu.profiles.create_profile"))
+		local create = find(menu, require("core.i18n.engine.i18n").get("menu.profiles.create_profile"))
 		helpers.assert_not_nil(create,
 			"the shared editor needs a production caller, not only a registered bridge")
 		helpers.assert_eq(type(create.fn), "function")
@@ -338,7 +338,7 @@ helpers.describe("LLM user profiles: tray reachability", function()
 		menu = menu_builder.build(context)
 		local custom = find(menu, "Menu custom")
 		helpers.assert_not_nil(custom)
-		local edit = find(custom.menu, require("infra.i18n").get("menu.profiles.edit_profile"))
+		local edit = find(custom.menu, require("core.i18n.engine.i18n").get("menu.profiles.edit_profile"))
 		helpers.assert_not_nil(edit)
 		helpers.assert_eq(edit.fn(), true)
 		helpers.assert_eq(opened.existing.id, created_id)
@@ -359,12 +359,12 @@ helpers.describe("LLM user profiles: tray reachability", function()
 			platform = "linux",
 			manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 			json_decode = function() return document end,
-			i18n = require("infra.i18n"),
+			i18n = require("core.i18n.engine.i18n"),
 			logger = require("core.logger.engine.shim"),
 		}))
 		replace("infra.manifest_menu", renderer)
 		menu_builder = helpers.load_module("ui.menu.builder")
-		local changed = find(menu_builder.build(context), require("infra.i18n").get("button.cancel"))
+		local changed = find(menu_builder.build(context), require("core.i18n.engine.i18n").get("button.cancel"))
 		helpers.assert_not_nil(changed, "the actual Create provider follows its changed declaration")
 		editor_accepted = false
 		helpers.assert_eq(changed.fn(), false)
@@ -414,7 +414,7 @@ helpers.describe("LLM profile settings: a prompt named by a binding", function()
 
 	helpers.it("labels a profile as the menu lists it, filling only the placeholders it has", function()
 		local settings = load_settings()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local basic = settings.resolve_id("basic")
 		helpers.assert_eq(settings.menu_label(basic, 3), i18n.get("llm.profile.basic.label"),
 			"a label without {n} gets no count appended")
@@ -447,7 +447,7 @@ helpers.describe("LLM profile settings: a prompt named by a binding", function()
 						if nested then return nested end
 					end
 				end
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local rewrite = find(menu, i18n.get("llm.profile.rewrite.label"))
 				helpers.assert_not_nil(rewrite, "the rewrite prompt has its row")
 				helpers.assert_not_nil(find(menu, i18n.get("llm.profile.basic.label")),
@@ -500,7 +500,7 @@ helpers.describe("shared Clone Profile command", function()
 				end
 				return nil
 			end
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local builder = helpers.load_module("ui.menu.builder")
 			local row = find(builder.build(context), i18n.get("menu.profiles.clone_builtin"))
 			helpers.assert_not_nil(row)
@@ -610,7 +610,7 @@ helpers.describe("Linux automatic profile toggle: actual menu owner", function()
 			replace("ui.menu.builder", nil)
 			local builder = helpers.load_module("ui.menu.builder")
 			local menu = builder.build(context)
-			local row = find(menu, require("infra.i18n").get("menu.profiles.auto_detect"))
+			local row = find(menu, require("core.i18n.engine.i18n").get("menu.profiles.auto_detect"))
 			helpers.assert_not_nil(row, "the actual profile provider exposes its checkbox")
 			helpers.assert_type(row.fn, "function")
 			body({

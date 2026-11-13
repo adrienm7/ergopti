@@ -254,7 +254,7 @@ local function build_world(selection, ui_locale, options)
 
 	-- The i18n stub of load_with_stubs, fresh for every world: its locale is
 	-- the interface language "ui" follows
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.get_locale = function() return ui_locale or "fr" end
 	world.i18n = i18n
 

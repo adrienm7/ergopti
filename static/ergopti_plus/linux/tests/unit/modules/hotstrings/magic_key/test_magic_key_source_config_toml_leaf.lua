@@ -256,7 +256,7 @@ helpers.describe("magic key source: the keyboard-layout menu", function()
 	helpers.it("(magic-key-source) the tray lists the key in effect under the keyboard layout", function()
 		with_source("[hotstrings]\nmagic_key_source = \"KeyJ\"\n", function(Source)
 			wire(Source, { active = true, replace = true, typed_ok = true })
-			local I18n = require("infra.i18n")
+			local I18n = require("core.i18n.engine.i18n")
 			local builder = helpers.load_module("ui.menu.builder")
 			local ok, items = pcall(builder.build, { on_quit = function() end, magic_key_source = Source })
 			Source._reset_for_test()
@@ -440,7 +440,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 				local _, committed = Config.load_all()
 				helpers.assert_eq(committed, true, "the fixture catalogue must initialize")
 				local Builder = helpers.load_module(names[3])
-				local I18n = require("infra.i18n")
+				local I18n = require("core.i18n.engine.i18n")
 				local function row()
 					local items = Builder.build({ config = Config, on_quit = function() end,
 						paused = state.paused, is_paused = function() return state.paused end,
@@ -541,7 +541,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 				state.source = Source
 				local item, _, layout = row()
 				helpers.assert_type(item, "table", "replacement is in its extension")
-				local I18n = require("infra.i18n")
+				local I18n = require("core.i18n.engine.i18n")
 				local physical
 				for _, child in ipairs(layout.menu or {}) do
 					helpers.assert_true(child.title ~= I18n.get("menu.layout.replace"), "the old duplicate is removed")

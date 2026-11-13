@@ -132,7 +132,7 @@ module.exports = function (sources, manifest, menuSources) {
 	];
 	// The actual removal caption captures remain owned by their current native receiver.
 	const removalCaptureBlock =
-		'local uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")\nlocal uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")\nlocal uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")';
+		'local uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")\nlocal uninstall_caption_i18n = rawget(separator_modules, "core.i18n.engine.i18n")\nlocal uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")';
 	const removalCaptureLines = removalCaptureBlock.split('\n');
 	cases.push([
 		removalCaptureBlock,
@@ -147,7 +147,7 @@ module.exports = function (sources, manifest, menuSources) {
 		],
 		[
 			'uninstall_caption_i18n',
-			'rawget(separator_modules, "infra.i18n")',
+			'rawget(separator_modules, "core.i18n.engine.i18n")',
 			'rawget(Foreign, "infra.i18n")'
 		],
 		[

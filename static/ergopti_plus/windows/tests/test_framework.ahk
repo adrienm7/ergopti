@@ -782,7 +782,7 @@ global TEST_MODULE_GROUPS := [
 	; Per-feature configuration scope: hotstrings, tap-hold, personal files.
 	["config-scope-features", "^unit/infra/config/scope/"],
 	; Configuration storage, TOML and the updater.
-	["config-updater", "^unit/infra/(config|toml)/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
+	["config-updater", "^unit/(config|toml)/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
 	; Hotstrings, dynamic hotstrings and shortcuts.
 	["hotstrings-shortcuts", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
 	; Keyboard remapping, layouts and gestures.

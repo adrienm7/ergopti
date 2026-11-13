@@ -127,7 +127,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 
 	helpers.it("(mlx-startup-waiter-failure) (mlx-native-callback-protection) notifies every joined caller when the shared startup fails", function()
 		local module_names = {
-			"infra.notifications", "infra.logger", "infra.i18n", "infra.config_paths",
+			"infra.notifications", "infra.logger", "core.i18n.engine.i18n", "infra.config_paths",
 			"modules.llm.api_common", "adapters.task_lifecycle",
 			"modules.llm.api_mlx", "ui.menu.menu_llm.models_manager_mlx_server",
 		}
@@ -153,7 +153,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 				return xpcall(callback, debug.traceback, ...)
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		local active_model_path = "/Users/fixture/Config Dir/active-model.txt"
 		package.loaded["infra.config_paths"] = {
 			get = function(key)

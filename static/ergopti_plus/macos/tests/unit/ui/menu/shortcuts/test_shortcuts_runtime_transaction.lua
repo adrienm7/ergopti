@@ -29,7 +29,7 @@ local function load_menu_fixture(shortcuts, enabled, options)
 		WRAP_GROUPS = {},
 		build_active_wrap_pairs = function() return {} end,
 	}
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 		section = function(key) return key end,
 		decorate_section = function(value) return value end,
@@ -361,7 +361,7 @@ end)
 -- or physical input acknowledgement is inferred from that Boolean receipt.
 local function with_chord_fixture(mode, body)
 	return helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger",
-		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "core.fs.engine.dir", "infra.notifications",
+		"infra.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "core.fs.engine.dir", "infra.notifications",
 		"ui.menu.menu_shortcuts", "ui.menu.script_chords_transaction", "ui.menu.preferences_transaction",
 		"ui.menu.global_actions_transaction", "ui.menu.menu_state", "modules.shortcuts",
 		"modules.shortcuts.actions.text", "ui.menu.menu_utils", "ui.menu.shortcut_utils",
@@ -454,7 +454,7 @@ local function with_chord_fixture(mode, body)
 				local function raw_save() calls.saves = calls.saves + 1; return save() end
 				owner = Chords.new({ state = state, script_control = facade, admission = global.run_exclusive,
 					paused = function() return paused end, save_prefs = raw_save })
-				package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end, decorate_section = function(value) return value end }
+				package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end, decorate_section = function(value) return value end }
 				package.loaded["modules.shortcuts"] = { DEFAULT_STATE = { shortcuts = true, chatgpt_url = "https://example.test" } }
 				package.loaded["modules.shortcuts.actions.text"] = { WRAP_GROUPS = {}, build_active_wrap_pairs = function() return {} end }
 				package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
@@ -465,7 +465,7 @@ local function with_chord_fixture(mode, body)
 				package.loaded["ui.menu.menu_tap_keys"] = { provide_rows = function() return {} end }
 				local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
 					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
-					json_decode = require("core.fs.adapters.json_codec").decode, i18n = package.loaded["infra.i18n"], logger = require("infra.logger") }))
+					json_decode = require("core.fs.adapters.json_codec").decode, i18n = package.loaded["core.i18n.engine.i18n"], logger = require("infra.logger") }))
 				package.loaded["infra.manifest_menu"] = renderer
 				local context = { state = state, shortcuts = {}, script_control = facade, paused = false,
 					commit_script_chords = owner.toggle, save_prefs = function() return global.run_exclusive("Legacy chord save", raw_save) end,

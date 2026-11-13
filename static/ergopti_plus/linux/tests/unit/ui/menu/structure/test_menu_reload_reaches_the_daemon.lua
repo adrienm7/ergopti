@@ -223,7 +223,7 @@ local function with_lifecycle_declarations(callback)
 end
 
 local function lifecycle_declared_row(items, key)
-	local label = require("infra.i18n").get(key)
+	local label = require("core.i18n.engine.i18n").get(key)
 	for _, item in ipairs(items) do
 		if item.title == label then return item end
 	end
@@ -264,8 +264,8 @@ helpers.describe("shared lifecycle commands (Linux)", function()
 				outcome = "throw"; reload.fn()
 				outcome = "pending"; reload.fn()
 				outcome = "success"; reload.fn()
-				local expected = { text = require("infra.i18n").get("init.reload_refused_body"),
-					title = require("infra.i18n").get("init.reload_refused_title"), level = "error" }
+				local expected = { text = require("core.i18n.engine.i18n").get("init.reload_refused_body"),
+					title = require("core.i18n.engine.i18n").get("init.reload_refused_title"), level = "error" }
 				helpers.assert_eq(sent, { expected, expected })
 			end)
 			package.loaded["adapters.notifier"] = original
@@ -286,7 +286,7 @@ helpers.describe("shared lifecycle commands (Linux)", function()
 					on_quit = function() index = index + 1; return answers[index] end })
 				local quit = lifecycle_declared_row(items, "button.ok")
 				quit.fn()
-				helpers.assert_eq(sent, { { text = require("infra.i18n").get("notify.quit_refused"), level = "error" } })
+				helpers.assert_eq(sent, { { text = require("core.i18n.engine.i18n").get("notify.quit_refused"), level = "error" } })
 				quit.fn(); quit.fn()
 				helpers.assert_eq(#sent, 1, "an accepted or unanswered quit shows no refusal")
 			end)

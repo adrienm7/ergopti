@@ -17,7 +17,7 @@ local function fixture(body)
 		package.loaded["ui.action_picker"] = nil
 		package.loaded["ui.webview_controller_pool"] = nil
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/controlled/shared" end }
 		package.loaded["infra.timings"] = Timings
 		package.loaded["adapters.program_providers"] = { create = function()
@@ -65,7 +65,7 @@ local function fixture(body)
 		package.loaded["modules.gestures.actions_aux_owner"] = { program_available = function() return true end }
 		f.native = require("adapters.apple_shortcuts_native")
 		f.utils = require("ui.menu.shortcut_utils")
-		f.locale = package.loaded["infra.i18n"]
+		f.locale = package.loaded["core.i18n.engine.i18n"]
 		f.native_tasks = 0
 		_G.hs.task = { new = function() f.native_tasks = f.native_tasks + 1; error("native task forbidden") end }
 		f.picker = require("ui.action_picker")

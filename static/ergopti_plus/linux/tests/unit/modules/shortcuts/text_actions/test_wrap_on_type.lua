@@ -349,7 +349,7 @@ helpers.describe("wrap on type (linux): the tray row", function()
 		shortcuts.init({ enabled = true, persist = false })
 		local mb = helpers.load_module("ui.menu.builder")
 		local items = mb.build({ _version = "0.0.0-dev.12", shortcuts = shortcuts, on_quit = function() end })
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local title = i18n.get("menu.shortcuts.title")
 		local label = i18n.get("shortcuts.label_wrap_text")
 		local row = nil
@@ -406,7 +406,7 @@ local function with_wrap_feature(body)
 						on_quit = function() end,
 						on_menu_changed = function() observed.changed = observed.changed + 1 end,
 					})
-					local label = require("infra.i18n").get("shortcuts.label_wrap_text")
+					local label = require("core.i18n.engine.i18n").get("shortcuts.label_wrap_text")
 					for _, item in ipairs(rows) do
 						for _, child in ipairs(item.menu or {}) do
 							if child.title == label then return child end

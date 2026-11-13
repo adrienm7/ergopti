@@ -90,7 +90,7 @@ guarded(function()
 		probe.errors[#probe.errors + 1] = string.format(tostring(format), ...)
 	end
 	package.loaded["infra.logger"] = logger
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	-- SyntheticInput reserves a global tag block at require-time. This probe never
 	-- emits input; preserve the real user's high-water rather than rolling it back.
 	local reservation

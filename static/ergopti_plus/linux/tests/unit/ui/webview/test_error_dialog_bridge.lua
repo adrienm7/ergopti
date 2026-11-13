@@ -121,7 +121,7 @@ local function load_bridge(controls)
 		["infra.manifest_reader"] = {
 			default_for = function(path) return path == "script.show_error_dialog" and true or nil end,
 		},
-		["infra.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end },
+		["core.i18n.engine.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end },
 		["adapters.application_notifier"] = {
 			send = function(message, opts) context.notified[#context.notified + 1] = { message = message, opts = opts } end,
 		},

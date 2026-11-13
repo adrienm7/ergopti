@@ -26,7 +26,7 @@ helpers.describe("API panel test request", function()
 	helpers.it("dispatches the shared probe to the active entry", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"infra.dialog_util",
 			"infra.notifications",
@@ -64,7 +64,7 @@ helpers.describe("API panel test request", function()
 	helpers.it("notifies reply excerpt and latency on success", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"infra.dialog_util",
 			"infra.notifications",
@@ -107,7 +107,7 @@ helpers.describe("API panel test request", function()
 	helpers.it("notifies failure without the token", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"infra.dialog_util",
 			"infra.notifications",
@@ -143,7 +143,7 @@ helpers.describe("API panel test request", function()
 	helpers.it("appends the server verdict to the failure notification", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"infra.dialog_util",
 			"infra.notifications",
@@ -181,7 +181,7 @@ helpers.describe("API panel test request", function()
 	helpers.it("reports the active API entry display name", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"infra.dialog_util",
 			"infra.notifications",
@@ -220,7 +220,7 @@ helpers.describe("API panel test request", function()
 	helpers.it("lists Add before the separator", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"infra.dialog_util",
 			"infra.notifications",
@@ -259,7 +259,7 @@ helpers.describe("API panel test request", function()
 	helpers.it("lists Test before Remove, Delete last", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"infra.dialog_util",
 			"infra.notifications",
@@ -300,7 +300,7 @@ helpers.describe("API panel test request", function()
 	helpers.it("discards a stale completion after entry switch", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"infra.dialog_util",
 			"infra.notifications",
@@ -346,7 +346,7 @@ helpers.describe("API panel test request", function()
 	helpers.it("names every entry after its provider and model (api-entry-auto-name)", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"infra.dialog_util",
 			"infra.notifications",
@@ -383,7 +383,7 @@ helpers.describe("API panel test request", function()
 	helpers.it("disables the row with no active entry and refuses without a spec", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"infra.dialog_util",
 			"infra.notifications",
@@ -426,7 +426,7 @@ helpers.describe("API panel test request", function()
 end)
 
 helpers.describe("Active API commands: canonical labels and retained owner", function()
-	local owned = { "modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
+	local owned = { "modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
 		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	for _, locale in ipairs({ "ar", "da", "de", "en", "es", "cs", "fr", "he", "hi", "it",
 		"ja", "ko", "no", "nl", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
@@ -474,7 +474,7 @@ helpers.describe("Active API commands: canonical labels and retained owner", fun
 end)
 
 helpers.describe("Active API commands: strict native pause receipt", function()
-	local owned = { "modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
+	local owned = { "modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
 		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	for _, fault in ipairs({ "missing", "nil", "number", "table", "throw" }) do
 		helpers.it("refuses a retained request after the native pause reader becomes " .. fault, function()

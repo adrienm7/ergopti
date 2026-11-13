@@ -24,7 +24,7 @@ local WebviewResult = require("adapters.webview_result")
 local hs     = hs
 local Logger = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
-local i18n   = require("infra.i18n")
+local i18n   = require("core.i18n.engine.i18n")
 local Paths  = require("core.fs.engine.paths")
 
 local LOG   = "personal_info_editor"

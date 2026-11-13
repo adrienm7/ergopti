@@ -506,7 +506,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- at require-time (terminators, conflicts, actions, profiles …) never crash
 	-- with "attempt to call a nil value (field 'get')". The real lib.i18n depends
 	-- on hs.settings and locale JSON files unavailable in headless unit tests.
-	-- Tests that need a richer stub should override loaded["infra.i18n"]
+	-- Tests that need a richer stub should override loaded["core.i18n.engine.i18n"]
 	-- AFTER calling load_with_stubs (this baseline is always restored here).
 	-- decorate_section / section mirror the real i18n: menu builders (via
 	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
@@ -515,7 +515,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- A caption that takes several getters (caption_getters) refuses a format without its
 	-- placeholders, so the keys the AI menu builds that way carry their English format.
 	local PLACEHOLDER_FORMATS = M.I18N_PLACEHOLDER_FORMATS
-	loaded["infra.i18n"] = {
+	loaded["core.i18n.engine.i18n"] = {
 		get             = function(key) return PLACEHOLDER_FORMATS[key] or key end,
 		-- get answers a key it cannot translate with the key itself, so only a
 		-- key with a format resolves.

@@ -9,7 +9,7 @@
 
 local M = {}
 local Dialog = require("infra.dialog_util")
-local I18n = require("infra.i18n")
+local I18n = require("core.i18n.engine.i18n")
 local Storage = require("core.fs.adapters.storage")
 local Deferred = require("infra.deferred_work")
 local Shell = require("adapters.shell_runner")

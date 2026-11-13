@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local uv = require("luv")
 local ConfigPaths = require("infra.config_paths")
 local Preferences = require("infra.metrics_preferences")
-local I18n = require("infra.i18n")
+local I18n = require("core.i18n.engine.i18n")
 
 local FILTERS = {
 	{ id = "filter_private", path = "private_filter_enabled", setter = "set_private_filter_enabled" },

@@ -71,7 +71,7 @@ helpers.describe("Builder.generate: tail calls (download item, canvas badge) are
 		package.loaded["infra.logger"] = logger_stub
 
 		local builder = helpers.load_with_stubs("ui.menu.builder")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		i18n.get = function(k) return k end
 		i18n.build_language_menu_items = function() return {} end
 
@@ -116,7 +116,7 @@ helpers.describe("Builder.generate: tail calls (download item, canvas badge) are
 		package.loaded["ui.menu.builder"] = nil
 		builder = require("ui.menu.builder")
 
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		i18n.get = function(k) return k end
 		i18n.build_language_menu_items = function() return {} end
 
@@ -142,7 +142,7 @@ end)
 --- @param body function Receives a genuine build closure, root, i18n and actions.
 local function with_lifecycle_root(body)
 	return helpers.with_stub_scope({ "ui.menu.builder", "ui.menu.canvas_badge", "infra.manifest_menu",
-		"menu.engine.renderer", "infra.i18n", "core.fs.engine.paths", "infra.logger" }, function()
+		"menu.engine.renderer", "core.i18n.engine.i18n", "core.fs.engine.paths", "infra.logger" }, function()
 		local logger = make_error_capturing_logger()
 		package.loaded["infra.logger"] = logger
 		helpers.load_with_stubs("ui.menu.builder")
@@ -160,7 +160,7 @@ local function with_lifecycle_root(body)
 		local builder = require("ui.menu.builder")
 		local actions = make_actions()
 		local context = { config = { log_level = 2 } }
-		body(function() return builder.generate(context, {}, actions) end, root, require("infra.i18n"), actions)
+		body(function() return builder.generate(context, {}, actions) end, root, require("core.i18n.engine.i18n"), actions)
 	end)
 end
 

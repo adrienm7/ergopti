@@ -51,7 +51,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 	helpers.it("(ergopti-extension-selection) persists the actual replacement gate, reloads it and rolls back refusals", function()
 		helpers.with_stub_scope({ "modules.keymap", "modules.keymap.init", "modules.keymap.state",
 			"modules.keymap.utils", "modules.keymap.expander", "modules.keymap.llm_bridge",
-			"infra.extension_packs", "infra.preferences", "infra.i18n", "core.fs.adapters.storage", "core.fs.adapters.file_system" }, function()
+			"infra.extension_packs", "infra.preferences", "core.i18n.engine.i18n", "core.fs.adapters.storage", "core.fs.adapters.file_system" }, function()
 			package.loaded["modules.keymap.utils"] = setmetatable({
 				is_ignored_window = function() return false, 0 end,
 				is_secure_field = function() return false end,
@@ -69,8 +69,8 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				return tap
 			end
 			local Keymap = helpers.load_with_stubs("modules.keymap", { eventtap = eventtap })
-			package.loaded["infra.i18n"] = setmetatable({ build_language_menu_items = function() return {} end },
-				{ __index = require("infra.i18n") })
+			package.loaded["core.i18n.engine.i18n"] = setmetatable({ build_language_menu_items = function() return {} end },
+				{ __index = require("core.i18n.engine.i18n") })
 			local FixtureFiles = require("tests.support.file_system_write_stub")
 			package.loaded["core.fs.adapters.file_system"] = setmetatable({
 				read = function(path) return FixtureFiles.read_with_status(path) end,
@@ -89,7 +89,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 			local suffix_path = Packs.route("french_distancesreduction", nil)
 			helpers.assert_true(Keymap.load_toml("french_distancesreduction", suffix_path))
 			helpers.assert_true(Keymap.set_magic_key_source("KeyJ"))
-			CaptionFixture.install(require("infra.i18n"))
+			CaptionFixture.install(require("core.i18n.engine.i18n"))
 			package.loaded["ui.menu.builder"] = nil
 			local Registry = require("modules.keymap.registry")
 			local Hotstrings = require("ui.menu.menu_hotstrings")
@@ -126,7 +126,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				helpers.assert_type(initial, "table", "the metadata-only feature draws an actual extension row")
 				local tree = require("ui.menu.builder").generate(ctx, { hotstrings = Hotstrings },
 					setmetatable({}, { __index = function() return function() end end }))
-				local extension_title = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
+				local extension_title = string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
 				local function find(rows, title)
 					for _, candidate in ipairs(rows or {}) do
 						if candidate.title == title then return candidate end
@@ -147,7 +147,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				helpers.assert_type(extension, "table", "the actual native renderer shows the shipped extension")
 				helpers.assert_type(find(extension.menu, initial.label), "table", "the localized replacement is inside Ergopti")
 				local suffix = Keymap.get_sections("french_distancesreduction")[1]
-				local locale = require("infra.i18n").get_locale()
+				local locale = require("core.i18n.engine.i18n").get_locale()
 				local suffix_title = suffix.description[locale] or suffix.description.en
 				helpers.assert_type(find(extension.menu, suffix_title .. " (24)"), "table",
 					"all suffixes are visible in the extension's actual category subtree")

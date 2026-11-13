@@ -20,7 +20,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local I18n = require("infra.i18n")
+local I18n = require("core.i18n.engine.i18n")
 local Engine = require("infra.field_check")
 
 local LOG = "ui.field_check"

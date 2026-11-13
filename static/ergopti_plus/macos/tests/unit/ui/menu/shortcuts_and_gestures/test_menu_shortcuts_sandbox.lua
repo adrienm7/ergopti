@@ -35,7 +35,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				"infra.dialog_util",
 				"modules.shortcuts",
 				"modules.shortcuts.actions.text",
-				"infra.i18n",
+				"core.i18n.engine.i18n",
 				"ui.menu.menu_utils",
 				"infra.manifest_menu",
 				"menu.engine.renderer",
@@ -74,7 +74,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 					WRAP_GROUPS = {},
 					build_active_wrap_pairs = function() return {} end,
 				}
-				package.loaded["infra.i18n"] = {
+				package.loaded["core.i18n.engine.i18n"] = {
 					get = function(key) return key end,
 					section = function(key) return key end,
 					decorate_section = function(value) return value end,
@@ -85,7 +85,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 					platform = "hs",
 					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 					json_decode = require("core.fs.adapters.json_codec").decode,
-					i18n = package.loaded["infra.i18n"],
+					i18n = package.loaded["core.i18n.engine.i18n"],
 					logger = package.loaded["infra.logger"],
 				}))
 				package.loaded["infra.manifest_menu"] = {
@@ -182,7 +182,7 @@ local function with_extension_boundary(callback)
 	local names = {
 		"ui.menu.menu_shortcuts", "infra.logger", "infra.deferred_work", "core.fs.engine.dir",
 		"infra.dialog_util", "modules.shortcuts", "modules.shortcuts.actions.text",
-		"infra.i18n", "infra.locale", "core.i18n.engine.core", "core.fs.engine.paths", "core.fs.adapters.json_codec",
+		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths", "core.fs.adapters.json_codec",
 		"core.fs.adapters.storage", "core.events.timer_scheduler", "menu.engine.renderer", "ui.menu.menu_utils",
 		"infra.manifest_menu", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots",
 		"ui.menu.menu_tap_keys", "infra.manifest_reader", "hs", "tests.stubs.hs",
@@ -226,8 +226,8 @@ local function with_extension_boundary(callback)
 			package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
 			package.loaded["ui.menu.menu_tap_keys"] = { provide_rows = function() return {} end }
 			package.loaded["infra.manifest_reader"] = { default_for = function() return "star" end }
-			local native_i18n = require("infra.i18n")
-			local locale = require("infra.locale")
+			local native_i18n = require("core.i18n.engine.i18n")
+			local locale = require("core.i18n.engine.locale")
 			native_i18n.set_locale_injector(function(code) locale.set_locale(code) end)
 			native_i18n.init()
 			local locale_owner = { pending = function() return false end }
@@ -358,7 +358,7 @@ helpers.describe("Shortcut extension presentation boundary", function()
 	end)
 
 	helpers.it("the native locale and module owners restore exactly after success and construction failure (extension-boundary)", function()
-		local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.menu.menu_shortcuts", "menu.engine.renderer" }
+		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.menu.menu_shortcuts", "menu.engine.renderer" }
 		local before = {}
 		for index, name in ipairs(names) do before[index] = package.loaded[name] end
 		local function assert_restored()

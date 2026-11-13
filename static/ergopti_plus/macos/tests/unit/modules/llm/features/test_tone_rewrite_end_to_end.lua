@@ -414,7 +414,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		helpers.assert_eq(swipe(world, "llm_tone_more_formal"), true)
 		helpers.assert_eq(#world.posts, 2, "the top of the ladder sends nothing")
 		helpers.assert_eq(#world.notices, 1)
-		helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.tone.most_formal"))
+		helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.tone.most_formal"))
 		helpers.assert_eq(world.clipboard, USER_CLIPBOARD)
 
 		helpers.assert_eq(swipe(world, "llm_tone_more_formal_cycle"), true)
@@ -429,7 +429,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		answer(world, world.posts[1], "REWRITE: Merci pour ton aide !")
 		swipe(world, "llm_tone_more_familiar")
 		helpers.assert_eq(#world.posts, 1)
-		helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.tone.most_familiar"))
+		helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.tone.most_familiar"))
 		swipe(world, "llm_tone_more_familiar_cycle")
 		assert_request(world, world.posts[2], "tone_very_formal", "Merci pour votre aide.")
 	end)
@@ -459,7 +459,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		swipe(world, "llm_tone_more_formal")
 		helpers.assert_eq(#world.posts, 0, "no request")
 		helpers.assert_eq(#world.notices, 1)
-		helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
+		helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.disabled"))
 	end)
 
 	case("types nothing when the focus moved before the answer", function()

@@ -195,7 +195,7 @@ end
 --- @param id string
 --- @return string
 local function menu_name(id)
-	return (require("infra.i18n").get("llm.profile." .. id .. ".label"):gsub("%s+\226\128\148.*$", ""))
+	return (require("core.i18n.engine.i18n").get("llm.profile." .. id .. ".label"):gsub("%s+\226\128\148.*$", ""))
 end
 
 --- Asserts the menu's profile and count were left exactly as they were.
@@ -383,7 +383,7 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 			helpers.assert_eq(world.handlers.llm_prompt_prediction("tap_3", "user_deleted|2"), false)
 			helpers.assert_eq(#world.posts, 0, "nothing is sent, not even with another prompt")
 			helpers.assert_eq(#world.notices, 1, "the user is told")
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.prompt_prediction.unknown_prompt"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.prompt_prediction.unknown_prompt"))
 			assert_menu_untouched(world)
 		end)
 	end)
@@ -391,7 +391,7 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 	helpers.it("refuses like the manual prediction while the AI is off", function()
 		scenario({ buffer = "Bonjour Marc", disabled = true }, function(world)
 			helpers.assert_eq(world.handlers.llm_predict_rewrite("tap_3", nil), false)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.disabled"))
 			helpers.assert_eq(#world.posts, 0)
 		end)
 	end)
@@ -404,7 +404,7 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 		} }, function(world)
 			helpers.assert_eq(world.handlers.llm_prompt_prediction("keyboard__primary_p", "user_formal|2"), false)
 			helpers.assert_eq(#world.posts, 0)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.disabled"))
 			assert_menu_untouched(world)
 		end)
 	end)
@@ -433,7 +433,7 @@ helpers.describe("prompt prediction: what a rewrite sends", function()
 		scenario({ buffer = "\n  " }, function(world)
 			helpers.assert_eq(world.handlers.llm_prompt_prediction("tap_3", "rewrite"), false)
 			helpers.assert_eq(#world.posts, 0, "there is nothing to rewrite")
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.empty_context"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.empty_context"))
 		end)
 	end)
 

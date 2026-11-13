@@ -60,8 +60,8 @@ local function with_generator(existing, json_codec, run, locale_code, layout_id)
 		"platform.remap.config",
 		"platform.remap.generator",
 		"modules.keymap.layout_registry",
-		"infra.i18n",
-		"infra.locale",
+		"core.i18n.engine.i18n",
+		"core.i18n.engine.locale",
 		"core.i18n.engine.core",
 		"core.text.engine.toml_codec",
 	}, function()
@@ -107,15 +107,15 @@ local function with_generator(existing, json_codec, run, locale_code, layout_id)
 			layout_id or "ergopti", layout_id == "ergol" and "ansi" or "iso")
 
 		local Config    = helpers.load_with_stubs("platform.remap.config")
-		local config_i18n = require("infra.i18n")
+		local config_i18n = require("core.i18n.engine.i18n")
 		local Generator = helpers.load_with_stubs("platform.remap.generator")
 		if locale_code then
 			-- Exercise the same lazy locale owner as the standalone native probe,
 			-- rather than the baseline helper's unresolved-key i18n double.
-			package.loaded["infra.i18n"] = nil
-			package.loaded["infra.locale"] = nil
-			local actual_i18n = require("infra.i18n")
-			require("infra.locale").set_locale(locale_code)
+			package.loaded["core.i18n.engine.i18n"] = nil
+			package.loaded["core.i18n.engine.locale"] = nil
+			local actual_i18n = require("core.i18n.engine.i18n")
+			require("core.i18n.engine.locale").set_locale(locale_code)
 			config_i18n.get = actual_i18n.get
 			config_i18n.has = actual_i18n.has
 		end

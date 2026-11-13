@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"modules.updater.auto_check", "modules.updater", "infra.logger", "core.fs.engine.paths", "infra.timings",
 	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "adapters.update_launcher",
-	"infra.notifications", "infra.i18n", "core.text.engine.json", "updater.engine.channels", "updater.engine.schedule",
+	"infra.notifications", "core.i18n.engine.i18n", "core.text.engine.json", "updater.engine.channels", "updater.engine.schedule",
 	"updater.engine.release_parser", "updater.engine.check_result", "updater.engine.rate_limit", "updater.engine.version_core",
 }
 
@@ -40,7 +40,7 @@ local function with_owner(run)
 		package.loaded["modules.updater"] = { channels = function() return registry end }
 		package.loaded["adapters.update_launcher"] = {}
 		package.loaded["infra.notifications"] = {}
-		package.loaded["infra.i18n"] = {}
+		package.loaded["core.i18n.engine.i18n"] = {}
 		local AutoCheck = require("modules.updater.auto_check")
 		local state_key, list_key = defaults.check_state.storage_key, defaults.check_state.list_storage_key
 		local env = {

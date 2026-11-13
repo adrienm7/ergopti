@@ -121,7 +121,7 @@ local OWNED = {
 	"infra.emergency_exit",
 	"infra.field_run_selftest",
 	"core.fs.engine.dir",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.keycodes",
 	"infra.llm_context_limit",
 	"infra.launcher_environment",

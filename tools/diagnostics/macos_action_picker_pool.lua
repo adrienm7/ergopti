@@ -44,7 +44,7 @@ function M.run(config, done)
 	local UI = require("ui.ui_builder")
 	local Pool = require("ui.webview_controller_pool")
 	local Scheduler = require("core.events.timer_scheduler")
-	local I18n = require("infra.i18n")
+	local I18n = require("core.i18n.engine.i18n")
 	I18n.init()
 	for fn, suffix in pairs({ [Picker.open] = "/macos/ui/action_picker/init.lua",
 		[Pool.new] = "/macos/ui/webview_controller_pool.lua", [UI.show_webview] = "/macos/ui/ui_builder.lua",

@@ -33,7 +33,7 @@ local LAUNCHER_ENV = {
 }
 
 local OWNED = {
-	"infra.logger", "infra.i18n", "infra.locale", "core.i18n.engine.core",
+	"infra.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
 	"infra.dialog_util", "infra.notifications", "infra.deferred_work",
 	"adapters.shell_runner", "adapters.task_lifecycle", "core.events.timer_scheduler",
 	"ui.download_window", "modules.llm.pty_process_group", "modules.llm.ollama_binary",
@@ -159,14 +159,14 @@ end
 --- Answers keys from the real locale files.
 --- @param locale string Locale code.
 local function speak(locale)
-	local Locale = require("infra.locale")
+	local Locale = require("core.i18n.engine.locale")
 	Locale.set_locale(locale)
 	local function get(key)
 		local text = Locale.get(key)
 		if text == nil or text == "" then return key end
 		return text
 	end
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = get,
 		format = function(key, ...)
 			local text = get(key)
@@ -937,11 +937,11 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		helpers.assert_eq(#world.dialogs, 2)
 		local failed = world.dialogs[2]
 		helpers.assert_eq(failed.title, "L’installation de MLX a échoué")
-		helpers.assert_true(failed.body:find(package.loaded["infra.i18n"].get("network.failure.unknown"), 1, true) ~= nil, failed.body)
+		helpers.assert_true(failed.body:find(package.loaded["core.i18n.engine.i18n"].get("network.failure.unknown"), 1, true) ~= nil, failed.body)
 		helpers.assert_true(failed.body:find("Could not resolve host: astral.sh", 1, true) ~= nil,
 			"the dialog quotes the line that proves the cause")
 		helpers.assert_eq(failed.primary, "Réessayer")
-		helpers.assert_eq(failed.secondary, package.loaded["infra.i18n"].get("error_dialog.open_log"))
+		helpers.assert_eq(failed.secondary, package.loaded["core.i18n.engine.i18n"].get("error_dialog.open_log"))
 		helpers.assert_eq(#world.tasks, 2, "the repair button retries at once")
 		helpers.assert_true(world.tasks[2].command() ~= "", "retry owns a real native command")
 		helpers.assert_true(world.tasks[2].command():find("ERGOPTI_MLX_REPAIR=1", 1, true) == nil,
@@ -954,7 +954,7 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		drain(world)
 		helpers.assert_eq(#world.dialogs, 3)
 		helpers.assert_eq(world.dialogs[3].primary, "Réessayer")
-		helpers.assert_true(world.dialogs[3].body:find(package.loaded["infra.i18n"].get("network.failure.unknown"), 1, true) ~= nil,
+		helpers.assert_true(world.dialogs[3].body:find(package.loaded["core.i18n.engine.i18n"].get("network.failure.unknown"), 1, true) ~= nil,
 			world.dialogs[3].body)
 		helpers.assert_eq(#world.tasks, 2, "« Plus tard » starts nothing")
 	end))
@@ -1112,7 +1112,7 @@ helpers.describe("A network failure names its class and its fixes (mlx-bootstrap
 		local dialog = world.dialogs[#world.dialogs]
 		helpers.assert_eq(dialog.choices[1], "Réessayer")
 		helpers.assert_eq(dialog.choices[2], "Ouvrir les réglages du proxy")
-		helpers.assert_true(dialog.body:find(package.loaded["infra.i18n"].get("network.failure.proxy"), 1, true) ~= nil, dialog.body)
+		helpers.assert_true(dialog.body:find(package.loaded["core.i18n.engine.i18n"].get("network.failure.proxy"), 1, true) ~= nil, dialog.body)
 		local spawn = world.spawns[#world.spawns]
 		helpers.assert_eq(spawn.executable, "/usr/bin/open")
 		helpers.assert_eq(spawn.args[1], "x-apple.systempreferences:com.apple.Network-Settings.extension")
@@ -1191,7 +1191,7 @@ helpers.describe("Managed network failure actions retain their native revision",
 		helpers.assert_true(offer.offer(first))
 		drain(world)
 		helpers.assert_eq(#world.dialogs, 1)
-		helpers.assert_eq(world.dialogs[1].primary, package.loaded["infra.i18n"].get("network.action.retry"))
+		helpers.assert_eq(world.dialogs[1].primary, package.loaded["core.i18n.engine.i18n"].get("network.action.retry"))
 		helpers.assert_eq(#world.tasks, 1, "normal retry reuses valid Python and fingerprint, rather than launching repair")
 		helpers.assert_true(world.files[MLX_VENV .. "/bin/python"])
 		helpers.assert_true(world.files[MLX_VENV .. "/.last_sync_hash"])
@@ -1209,7 +1209,7 @@ helpers.describe("Managed network failure actions retain their native revision",
 		world.answers = { "primary" }
 		helpers.assert_true(offer.offer(first))
 		drain(world)
-		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["infra.i18n"].get("network.action.retry"))
+		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["core.i18n.engine.i18n"].get("network.action.retry"))
 		helpers.assert_eq(#world.tasks, 1, "typed download file failure never forces a valid runtime rebuild")
 		helpers.assert_eq(checker.get_state(), "ready")
 		helpers.assert_true(world.files[MLX_VENV .. "/bin/python"])
@@ -1223,7 +1223,7 @@ helpers.describe("Managed network failure actions retain their native revision",
 		world.answers = { "primary" }
 		helpers.assert_true(offer.offer(first))
 		drain(world)
-		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["infra.i18n"].get("network.action.retry"))
+		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["core.i18n.engine.i18n"].get("network.action.retry"))
 		helpers.assert_eq(#world.tasks, 1, "typed download disk failure never forces a valid runtime rebuild")
 		helpers.assert_eq(checker.get_state(), "ready")
 		helpers.assert_true(world.files[MLX_VENV .. "/bin/python"])
@@ -1302,7 +1302,7 @@ helpers.describe("Managed network failure actions retain their native revision",
 		world.answers = { "secondary" }
 		helpers.assert_true(offer.offer(first))
 		drain(world)
-		helpers.assert_eq(world.dialogs[1].choices[2], package.loaded["infra.i18n"].get("mlx.use_ollama"))
+		helpers.assert_eq(world.dialogs[1].choices[2], package.loaded["core.i18n.engine.i18n"].get("mlx.use_ollama"))
 		helpers.assert_eq(world.alternatives, 0, "a stale alternate choice cannot borrow the successor failure revision")
 		helpers.assert_eq(#world.tasks, 2)
 		helpers.assert_true(checker.get_failure_cause().failure_revision > first.failure_revision)
@@ -1315,7 +1315,7 @@ helpers.describe("Managed network failure actions retain their native revision",
 		world.answers = { "later" }
 		helpers.assert_true(offer.offer(first))
 		drain(world)
-		local labels = package.loaded["infra.i18n"]
+		local labels = package.loaded["core.i18n.engine.i18n"]
 		helpers.assert_eq(#world.dialogs[1].choices, 3)
 		helpers.assert_eq(world.dialogs[1].choices[1], labels.get("network.action.retry"))
 		helpers.assert_eq(world.dialogs[1].choices[2], labels.get("network.action.open_proxy_settings"))
@@ -1330,7 +1330,7 @@ helpers.describe("Managed network failure actions retain their native revision",
 		helpers.assert_true(offer.offer(first))
 		drain(world)
 		helpers.assert_eq(#world.dialogs[1].choices, 1)
-		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["infra.i18n"].get("network.action.retry"))
+		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["core.i18n.engine.i18n"].get("network.action.retry"))
 		helpers.assert_eq(#world.spawns, 0)
 	end))
 end)

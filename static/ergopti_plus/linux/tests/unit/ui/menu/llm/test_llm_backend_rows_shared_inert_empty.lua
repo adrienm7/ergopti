@@ -153,7 +153,7 @@ helpers.describe("Real API Add publication (api-add-real-publication)", function
 					helpers.assert_eq(state.backends, 0)
 					helpers.assert_eq(#state.requests, 0)
 					helpers.assert_eq(#state.errors, 1, "the actual failed persistence is visible to the user")
-					local message = require("infra.i18n").get("dialog.bulk_toggle.save_failed")
+					local message = require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")
 					helpers.assert_type(message, "string")
 					helpers.assert_true(message ~= "" and message ~= "dialog.bulk_toggle.save_failed")
 					helpers.assert_eq(state.errors[1], message)
