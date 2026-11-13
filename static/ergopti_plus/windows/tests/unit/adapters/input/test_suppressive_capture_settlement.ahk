@@ -8,7 +8,7 @@ _SICS_ChildSource() {
 		AssertTrue(Owner != "", "the real capture dependency must have one owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys"] {
+	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "DeadKey", "OneShotShift", "OneShotShiftFix", "TapHoldOneShotHookTimeoutOption", "TapHoldValidOneShotTimeoutMs", "TapHoldOneShotTimeoutMs", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the genuine capture function must exist: " . Name)
 		if Name == "DeadKey" || Name == "OneShotShift" {
@@ -102,7 +102,7 @@ _SICU_ChildSource() {
 		AssertTrue(Owner != "", "the native capture dependency requires its real owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_LLM_TerminalOutputSendInputNative",
+	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "DeadKey", "OneShotShift", "OneShotShiftFix", "TapHoldOneShotHookTimeoutOption", "TapHoldValidOneShotTimeoutMs", "TapHoldOneShotTimeoutMs", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_LLM_TerminalOutputSendInputNative",
 		"MagicKeyEditor", "_MagicKeyEditorClose", "_MagicKeyEditorStopOwned"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the native capture function requires its genuine body: " . Name)
@@ -348,7 +348,7 @@ _SNR_ChildSource() {
 		AssertTrue(Owner != "", "The genuine scalar capture dependency must exist: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "DeadKey", "OneShotShift", "OneShotShiftFix",
+	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "DeadKey", "OneShotShift", "OneShotShiftFix", "TapHoldOneShotHookTimeoutOption", "TapHoldValidOneShotTimeoutMs", "TapHoldOneShotTimeoutMs",
 		"_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "The unchanged scalar producer must exist: " . Name)
@@ -429,7 +429,7 @@ _OSPC_ChildSource() {
 		AssertTrue(Owner != "", "The real one-shot/control dependency must exist: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable",
+	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "OneShotShift", "OneShotShiftFix", "TapHoldOneShotHookTimeoutOption", "TapHoldValidOneShotTimeoutMs", "TapHoldOneShotTimeoutMs", "_TapHoldOneShotTable",
 		"TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_SendVerdictSucceeded", "_EmitReachedScreen", "_TextSenderAtSendLevel",
 		"KS_AltGrKeyName", "KS_AltGrSendKey", "KS_IsMenuModifier", "TapHoldSyntheticKeyDown", "TapHoldSyntheticKeyUp", "TapHoldReleaseSyntheticKeys", "TapCopyCheckStop", "_TH_MaskMenuModifierRelease", "_TH_SyntheticKeyList", "_TH_SyntheticKeyLabel", "_TH_UserHoldsDeliveredKey", "_TH_SyntheticReleaseStaysWithUser", "_TH_ForgetSyntheticKeyForUser", "_TH_MarkSyntheticKeyReleasePending", "_TH_RetrySyntheticKeyRelease", "TextPressKey", "TextSendMenuMask", "_TextSenderNormalizeModifierKey", "_TextSenderModifierPrefix", "_TextSenderModifierWords", "_TextSenderKeystroke", "_TextSenderSustainedKey", "_TextSenderSendInput"] {
 		Definition := _DriverFuncBody(Name)

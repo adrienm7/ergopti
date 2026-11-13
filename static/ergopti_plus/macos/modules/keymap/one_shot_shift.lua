@@ -32,11 +32,11 @@ end
 
 --- Arms or refreshes the deadline without inventing a timeout default.
 --- @param now number Monotonic seconds.
---- @param timeout number User-configured seconds.
+--- @param timeout number User-configured seconds; 0 is no time limit.
 function Owner:arm(now, timeout)
-	assert(type(now) == "number" and type(timeout) == "number" and timeout > 0,
+	assert(type(now) == "number" and type(timeout) == "number" and timeout >= 0 and timeout < math.huge,
 		"one-shot Shift requires a valid configured timeout")
-	self.deadline = now + timeout
+	self.deadline = require("tap_hold.engine.one_shot_timeout").deadline(now, timeout)
 end
 
 --- Cancels activation while retaining release debt for transformed keys.

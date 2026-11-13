@@ -65,7 +65,7 @@ _SNA_NativeChildSource() {
 	Owner := _DriverProductionFileForSymbol("SIHO_StartOwned")
 	AssertTrue(Owner != "", "The actual SIHO registry must have a canonical owner.")
 	Code .= "#Include " . Owner . "`n"
-	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "KS_AltGrKeyName", "KS_AltGrSendKey"] {
+	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "TapHoldOneShotHookTimeoutOption", "TapHoldValidOneShotTimeoutMs", "TapHoldOneShotTimeoutMs", "KS_AltGrKeyName", "KS_AltGrSendKey"] {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "The complete actual sticky owner must exist: " . Name)
 		Code .= Body . "`n"
@@ -143,7 +143,7 @@ _SSM_ChildSource() {
 		AssertTrue(Owner != "", "The real transaction dependency must exist: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "KS_AltGrKeyName", "KS_AltGrSendKey", "TextPressKey", "_TextSenderNormalizeModifierKey",
+	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "TapHoldOneShotHookTimeoutOption", "TapHoldValidOneShotTimeoutMs", "TapHoldOneShotTimeoutMs", "KS_AltGrKeyName", "KS_AltGrSendKey", "TextPressKey", "_TextSenderNormalizeModifierKey",
 		"_TextSenderModifierPrefix", "_TextSenderKeystroke", "_TextSenderModifierWords", "_TextSenderSustainedKey",
 		"_TextSenderSendInput", "_TextSenderAtSendLevel", "_SendVerdictSucceeded", "HSE_WordResetFlagCurrent",
 		"_PrefixHasIncompleteFragment", "TapHoldOwnsShortcut", "TapHoldTapInDispatch",
