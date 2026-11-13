@@ -924,7 +924,7 @@ local function _execute_action(action_name, go_next, binding)
 			run_background = function(command) return BackgroundCommands.run(command, action_name, true) end,
 			clipboard = require("adapters.clipboard"),
 			emit_combo = require("modules.gestures.combo_emitter").press,
-			sleep_ms = require("adapters.event_loop").sleep_ms,
+			sleep_ms = require("core.events.loop").sleep_ms,
 		})
 		if not ok then Logger.error(LOG, "Action '%s' failed: %s.", action_name, tostring(err)) end
 		return

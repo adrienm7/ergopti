@@ -709,7 +709,7 @@ behind queued output and replays it after. A key-up is held back only while
 its own key-down still waits unposted in that FIFO: holding the release of a
 key whose press already reached the application kept it down for the length of
 the expansion (the press-and-hold popup on a plain tap). A physical event whose
-callback is `STALE_PHYSICAL_EVENT_MS` late (`adapters/event_clock.lua`
+callback is `STALE_PHYSICAL_EVENT_MS` late (`core/events/clock.lua`
 lateness: age minus the smallest age of the last 32 events, so a constant clock
 offset cancels) is never consumed, replayed or answered: macOS stops waiting
 for a tap that holds an event too long and delivers it without the tap, and a

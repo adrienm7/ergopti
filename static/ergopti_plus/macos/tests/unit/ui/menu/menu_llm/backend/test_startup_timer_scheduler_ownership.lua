@@ -3,7 +3,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.logger",
 	"modules.llm",
 	"ui.menu.menu_llm.prediction_lock_registry",

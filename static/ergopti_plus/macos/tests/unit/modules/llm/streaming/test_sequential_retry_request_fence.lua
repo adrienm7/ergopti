@@ -98,7 +98,7 @@ helpers.describe("sequential callbacks revalidate request ownership", function()
 			helpers.with_stub_scope({
 				case.module_name, "modules.llm.api_common", "modules.llm.profiles",
 				"modules.llm.progressive_reveal", "adapters.http_client",
-				"adapters.timer_scheduler", "adapters.shell_runner",
+				"core.events.timer_scheduler", "adapters.shell_runner",
 			}, function()
 				local module = helpers.load_with_stubs(case.module_name)
 				local fetch = module.fetch_sequential
@@ -153,7 +153,7 @@ helpers.describe("sequential callbacks revalidate request ownership", function()
 			helpers.with_stub_scope({
 				case.module_name, "modules.llm.api_common", "modules.llm.profiles",
 				"modules.llm.progressive_reveal", "adapters.http_client",
-				"adapters.timer_scheduler", "adapters.shell_runner",
+				"core.events.timer_scheduler", "adapters.shell_runner",
 			}, function()
 				local module = helpers.load_with_stubs(case.module_name)
 				local fetch = module.fetch_sequential
@@ -187,7 +187,7 @@ helpers.describe("sequential callbacks revalidate request ownership", function()
 				helpers.with_stub_scope({
 					case.module_name, "modules.llm.api_common", "modules.llm.profiles",
 					"modules.llm.progressive_reveal", "adapters.http_client",
-					"adapters.timer_scheduler", "adapters.shell_runner",
+					"core.events.timer_scheduler", "adapters.shell_runner",
 				}, function()
 					local module = helpers.load_with_stubs(case.module_name)
 					local fetch = module.fetch_sequential
@@ -219,7 +219,7 @@ helpers.describe("sequential callbacks revalidate request ownership", function()
 				helpers.with_stub_scope({
 					case.module_name, "modules.llm.api_common", "modules.llm.profiles",
 					"modules.llm.progressive_reveal", "adapters.http_client",
-					"adapters.timer_scheduler", "adapters.shell_runner",
+					"core.events.timer_scheduler", "adapters.shell_runner",
 				}, function()
 					local module = helpers.load_with_stubs(case.module_name)
 					local fetch = module.fetch_sequential

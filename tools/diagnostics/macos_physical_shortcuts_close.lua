@@ -17,9 +17,9 @@ function M.run(config, done)
  Logger.initialize_privacy(policy_bytes)
  local Host = require('ui.physical_shortcuts')
  local UI = require('ui.ui_builder')
- local Scheduler = require('adapters.timer_scheduler')
+ local Scheduler = require('core.events.timer_scheduler')
  for fn, suffix in pairs({ [Host.open] = '/macos/ui/physical_shortcuts/init.lua',
-  [UI.show_webview] = '/macos/ui/ui_builder.lua', [Scheduler.after] = '/macos/adapters/timer_scheduler.lua' }) do
+  [UI.show_webview] = '/macos/ui/ui_builder.lua', [Scheduler.after] = '/macos/core/events/timer_scheduler.lua' }) do
   assert(debug.getinfo(fn, 'S').source == '@' .. root .. suffix, 'foreign production owner')
  end
  assert(package.loaded['modules.keystats.physical_capture'] == nil, 'capture owner already present')

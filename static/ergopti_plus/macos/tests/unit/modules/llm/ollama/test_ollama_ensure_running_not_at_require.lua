@@ -29,7 +29,7 @@ helpers.describe("api_ollama: no require-time Ollama start", function()
 		-- module level. Every scheduling call api_ollama's own code makes while
 		-- the module loads is recorded; dependencies it requires (the keystats
 		-- watchers) keep the real adapter, and so does reading the clock.
-		local Real = require("adapters.timer_scheduler")
+		local Real = require("core.events.timer_scheduler")
 		local scheduled = {}
 		-- The file the loader itself resolves for the module, never a typed path.
 		local own_source = "@" .. assert(package.searchpath("modules.llm.api_ollama", package.path))
@@ -44,10 +44,10 @@ helpers.describe("api_ollama: no require-time Ollama start", function()
 				scheduled[#scheduled + 1] = "every(" .. tostring(interval) .. ")"
 			end,
 		}, { __index = Real })
-		local saved = package.loaded["adapters.timer_scheduler"]
-		package.loaded["adapters.timer_scheduler"] = recorder
+		local saved = package.loaded["core.events.timer_scheduler"]
+		package.loaded["core.events.timer_scheduler"] = recorder
 		local ok, loaded = pcall(helpers.load_with_stubs, "modules.llm.api_ollama")
-		package.loaded["adapters.timer_scheduler"] = saved
+		package.loaded["core.events.timer_scheduler"] = saved
 		helpers.assert_true(ok, tostring(loaded))
 		helpers.assert_eq(0, #scheduled,
 			"api_ollama must not schedule anything at require-time: " .. table.concat(scheduled, ", "))

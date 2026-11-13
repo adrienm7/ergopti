@@ -31,8 +31,8 @@ local OWNED_MODULES = {
 	"adapters.keyboard_geometry",
 	"adapters.synthetic_input",
 	"adapters.event_provenance",
-	"adapters.event_clock",
-	"adapters.timer_scheduler",
+	"core.events.clock",
+	"core.events.timer_scheduler",
 	"adapters.storage",
 	"diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy",
@@ -132,7 +132,7 @@ local function with_awake(callback)
 				"adapters.keyboard_geometry", "modules.keystats.log_manager",
 			}) do package.loaded[name] = {} end
 			local System = require("modules.shortcuts.actions.system")
-			local Scheduler = require("adapters.timer_scheduler")
+			local Scheduler = require("core.events.timer_scheduler")
 			helpers.assert_eq(System.toggle_awake(), true, "a healthy native watcher and tick must activate")
 			helpers.assert_eq(System.is_awake_active(), true)
 			helpers.assert_eq(#world.taps, 1)

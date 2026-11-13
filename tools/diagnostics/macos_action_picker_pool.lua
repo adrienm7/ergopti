@@ -43,12 +43,12 @@ function M.run(config, done)
 	local Picker = require("ui.action_picker")
 	local UI = require("ui.ui_builder")
 	local Pool = require("ui.webview_controller_pool")
-	local Scheduler = require("adapters.timer_scheduler")
+	local Scheduler = require("core.events.timer_scheduler")
 	local I18n = require("infra.i18n")
 	I18n.init()
 	for fn, suffix in pairs({ [Picker.open] = "/macos/ui/action_picker/init.lua",
 		[Pool.new] = "/macos/ui/webview_controller_pool.lua", [UI.show_webview] = "/macos/ui/ui_builder.lua",
-		[Scheduler.activeCount] = "/macos/adapters/timer_scheduler.lua" }) do
+		[Scheduler.activeCount] = "/macos/core/events/timer_scheduler.lua" }) do
 		assert(debug.getinfo(fn, "S").source == "@" .. root .. suffix, "foreign production owner")
 	end
 	local Json = require("core.text.engine.json")

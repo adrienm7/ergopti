@@ -80,7 +80,7 @@ local function load_dashboard(options)
 		decode = function() return {} end,
 		encode = function() return "{}" end,
 	}
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.paths"] = { shared = function() return "/shared" end }
 	package.loaded["infra.dialog_util"] = {}
@@ -235,9 +235,9 @@ helpers.describe("metrics_apps: lifecycle transaction", function()
 		helpers.assert_eq(dashboard.show(), true)
 		local first_handle = context.timers[1].handle
 		context.timer_by_handle[first_handle] = context.timers[1]
-		local original_cancel = package.loaded["adapters.timer_scheduler"].cancel
+		local original_cancel = package.loaded["core.events.timer_scheduler"].cancel
 		local refused = false
-		package.loaded["adapters.timer_scheduler"].cancel = function(handle)
+		package.loaded["core.events.timer_scheduler"].cancel = function(handle)
 			if handle == first_handle and not refused then
 				refused = true
 				context.cancel_calls[handle] = (context.cancel_calls[handle] or 0) + 1

@@ -30,11 +30,11 @@ local MESSAGES = { { role = "system", content = "S" }, { role = "user", content 
 --- @param body function body(remote, calls, clock)
 local function with_remote(body)
 	local names = { "adapters.http_client", "modules.llm.api_remote", "infra.monotonic", "core.logger.engine.shim",
-		"adapters.timer_scheduler" }
+		"core.events.timer_scheduler" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local calls, clock = {}, { now = 1000, ticks = {} }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_, fn)
 			if clock.throw_schedule then clock.ticks[#clock.ticks + 1] = fn; error("scheduler unavailable") end
 			clock.ticks[#clock.ticks + 1] = fn

@@ -46,7 +46,7 @@ local function load_watcher(localised)
 		end,
 		_active_tasks = {},
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_, callback) return { callback = callback, fired = false }, true end,
 		cancel = function() return true end,
 	}
@@ -103,7 +103,7 @@ end
 --- Restores the real adapters for later test files.
 local function restore_adapters()
 	package.loaded["adapters.shell_runner"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.input_source_broker"] = nil
 	package.loaded["platform.remap.watchers"] = nil
 end

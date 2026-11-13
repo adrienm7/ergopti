@@ -417,8 +417,8 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 
 	helpers.it("a menu session wires the production ports and a wake watcher", function()
 		local native = { started = 0, stopped = 0 }
-		for _, name in ipairs({ "adapters.wake_watcher", "adapters.http_client", "adapters.storage",
-			"adapters.timer_scheduler" }) do
+		for _, name in ipairs({ "core.events.wake_watcher", "adapters.http_client", "adapters.storage",
+			"core.events.timer_scheduler" }) do
 			package.loaded[name] = nil
 		end
 		local AutoCheck = helpers.load_with_stubs("modules.updater.auto_check", {
@@ -455,14 +455,14 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		local old_new, old_config = AutoCheck.new, AutoCheck.load_config
 		local created, first_stops = 0, 0
 		local ok, err = pcall(function()
-			helpers.with_stub_scope({ "adapters.wake_watcher", "adapters.http_client", "adapters.storage",
-				"adapters.timer_scheduler" }, function()
-				package.loaded["adapters.wake_watcher"] = { new = function() return {
+			helpers.with_stub_scope({ "core.events.wake_watcher", "adapters.http_client", "adapters.storage",
+				"core.events.timer_scheduler" }, function()
+				package.loaded["core.events.wake_watcher"] = { new = function() return {
 					start = function() return true end, stop = function() return true end,
 				} end }
 				package.loaded["adapters.http_client"] = { new = function() return {} end }
 				package.loaded["adapters.storage"] = {}
-				package.loaded["adapters.timer_scheduler"] = {}
+				package.loaded["core.events.timer_scheduler"] = {}
 				AutoCheck.load_config = function() return { timeout_sec = 1 } end
 				AutoCheck.new = function()
 					created = created + 1

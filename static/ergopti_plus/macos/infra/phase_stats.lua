@@ -78,7 +78,7 @@ function M.start(interval_sec)
 	end
 	local interval = interval_sec or M.DEFAULT_INTERVAL_SEC
 	Logger.start(LOG, "Starting the phase summary timer (every %d s)…", interval)
-	local handle, committed = require("adapters.timer_scheduler").every(interval, function()
+	local handle, committed = require("core.events.timer_scheduler").every(interval, function()
 		M.flush(interval)
 	end)
 	if committed ~= true then
@@ -97,7 +97,7 @@ function M.stop_reporting()
 	local Logger = require("infra.logger")
 	Logger.start(LOG, "Stopping the phase summary timer…")
 	M.flush()
-	local settled = require("adapters.timer_scheduler").cancel(_handle)
+	local settled = require("core.events.timer_scheduler").cancel(_handle)
 	if settled ~= true then
 		Logger.error(LOG, "The phase summary timer could not be stopped.")
 		return false

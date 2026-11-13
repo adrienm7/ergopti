@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local scoped_helpers = helpers
 local OWNED = {
 	"adapters.secure_field_detector", "adapters.storage", "adapters.synthetic_input",
-	"adapters.text_sender", "adapters.timer_scheduler", "adapters.tooltip_renderer",
+	"adapters.text_sender", "core.events.timer_scheduler", "adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
 	"hs", "infra.capsword_output", "infra.deferred_work",
 	"infra.hotstring_engine", "infra.keystroke_integrity", "infra.logger",
@@ -136,7 +136,7 @@ local function load_fixture(options)
 	local synthetic = require("adapters.synthetic_input")
 	local scheduled = {}
 	local awake_time = 0
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		awake_time = function() return awake_time end,
 		-- The expansion's hot-path segment reads the scheduler's monotonic clock.
 		now_ns = function() return awake_time * 1e9 end,

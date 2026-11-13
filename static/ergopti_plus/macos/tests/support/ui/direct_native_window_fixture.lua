@@ -19,7 +19,7 @@ local function with_window(domain, scenario)
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot", "diagnostics.engine.healthcheck.cleanup", "diagnostics.engine.healthcheck.actions",
 		"ui.error_dialog", "diagnostics.engine.reports.error_policy", "diagnostics.engine.reports.error_report", "diagnostics.engine.reports.issue_report", "diagnostics.engine.reports.redact",
 		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
-		"adapters.timer_scheduler", "adapters.storage", "ui.healthcheck.report", "hs", "tests.stubs.hs",
+		"core.events.timer_scheduler", "adapters.storage", "ui.healthcheck.report", "hs", "tests.stubs.hs",
 		"tests.support.webview_recursive_close_fixture", "core.text.engine.json", "adapters.json_codec",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, errors = {}, notification_depth = 0,

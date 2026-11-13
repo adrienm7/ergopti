@@ -27,7 +27,7 @@ local NetworkAdmission = require("modules.llm.opaque_network_admission")
 local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local ShellRunner = require("adapters.shell_runner")
 local TaskLifecycle = require("adapters.task_lifecycle")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local HttpClient = require("adapters.http_client")
 local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
 

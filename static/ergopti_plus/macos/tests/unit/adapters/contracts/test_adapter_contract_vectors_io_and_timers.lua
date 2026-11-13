@@ -222,7 +222,7 @@ end)
 --- Loads HttpClient with the TimerScheduler bound to the same fresh hs stub.
 --- @return table HttpClient adapter.
 local function load_http_client()
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	return helpers.load_with_stubs("adapters.http_client")
 end
 
@@ -418,7 +418,7 @@ end)
 -- ==========================================
 
 helpers.describe("Adapter contract vectors: TimerScheduler", function()
-	local adapter = helpers.load_with_stubs("adapters.timer_scheduler")
+	local adapter = helpers.load_with_stubs("core.events.timer_scheduler")
 
 	helpers.it("after schedules a timer (fires when stub fires it)", function()
 		hs.timer.__timers[1] = nil  -- start from clean state

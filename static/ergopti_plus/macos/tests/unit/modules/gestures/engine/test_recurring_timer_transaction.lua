@@ -30,7 +30,7 @@ local helpers = require("tests.helpers")
 -- ===========================================
 
 local MODULE_NAMES = {
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"hs",
 	"hs._asm.undocumented.touchdevice",
 	"hs.caffeinate.watcher",
@@ -103,7 +103,7 @@ local function with_fixture(options, scenario)
 		handle.active = false
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 
 	local primer_start_results = options.primer_start_results or {}
 	hs_stub.eventtap.new = function(types, callback)

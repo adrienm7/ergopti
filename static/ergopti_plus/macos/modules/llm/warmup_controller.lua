@@ -25,7 +25,7 @@ local M = {}
 
 local Logger         = require("infra.logger")
 local Timings        = require("infra.timings")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG = "llm.warmup_controller"
 

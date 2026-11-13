@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.dialog_util",
 	"infra.i18n",
 	"infra.logger",
@@ -398,7 +398,7 @@ local function with_fixture(options, body)
 		deps.set_llm_profile = switcher.set_llm_profile
 		deps.settle_llm_switcher_recovery = switcher.settle_recovery_debts
 
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
 		local manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
 		runtime_calls = {}

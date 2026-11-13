@@ -15,7 +15,7 @@ require("core.logger.engine")
 local function with_destination(callback, real_detector)
 	helpers.with_stub_scope({
 		"modules.keymap.utils", "layouts.engine.utils", "infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
-		"infra.logger", "core.logger.engine.shim", "infra.timings", "adapters.timer_scheduler",
+		"infra.logger", "core.logger.engine.shim", "infra.timings", "core.events.timer_scheduler",
 		"adapters.synthetic_input", "adapters.secure_field_detector",
 	}, function()
 		local f = { now = 100, window = 42, element = {}, secure = false, title = "Editor",

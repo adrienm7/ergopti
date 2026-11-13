@@ -56,7 +56,7 @@ const AHK_DIR_PIN_RE = /_DriverDirConcat\(\s*["']([^"'\n]+)["']/g;
 
 // Windows file pins — a driver-relative .ahk path written as a string literal.
 const AHK_FILE_PIN_RE =
-	/["']((?:lib|modules|ui|adapters|infra|platform|_generated|data)[\\/][A-Za-z0-9_\\/.-]+\.ahk)["']/g;
+	/["']((?:lib|modules|ui|adapters|infra|platform|_generated|data|core)[\\/][A-Za-z0-9_\\/.-]+\.ahk)["']/g;
 
 /**
  * Paths a test names precisely BECAUSE they must not exist. Each entry carries

@@ -9,7 +9,7 @@ local helpers = require("tests.helpers")
 --- @param position table|nil Persisted coordinates keyed by storage setting.
 local function with_widget(callback, position)
 	helpers.with_stub_scope({ "ui.wpm.wpm_widget", "ui.wpm.shared", "ui.tooltip",
-		"modules.keystats", "infra.logger", "infra.paths", "infra.timings", "adapters.timer_scheduler",
+		"modules.keystats", "infra.logger", "infra.paths", "infra.timings", "core.events.timer_scheduler",
 		"adapters.graphics_renderer", "adapters.storage" }, function()
 		local state = { timers = {}, taps = {}, canvases = {}, logs = {}, now = 1, last_input = 1, preview = false }
 		local function phase(name)
@@ -34,7 +34,7 @@ local function with_widget(callback, position)
 		package.loaded["ui.wpm.shared"] = { get_active_source = function() return "manual" end,
 			resolve_group_hex = function() return nil end, unit_label = function() return "WPM" end }
 		package.loaded["ui.tooltip"] = { is_visible = function() phase("tooltip"); return state.preview end }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			every = function(_, run)
 				local handle = { run = run, active = true }
 				state.timers[#state.timers + 1] = handle

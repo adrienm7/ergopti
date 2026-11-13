@@ -7,7 +7,7 @@ local root = assert(source:match("^(.*)/tests/fixtures/native_process_allocation
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
-local Process, Timers = require("adapters.process_runner"), require("adapters.timer_scheduler")
+local Process, Timers = require("adapters.process_runner"), require("core.events.timer_scheduler")
 local foreign = Timers.every(10, function() error("foreign timer unexpectedly fired") end)
 assert(foreign.armed); uv.unref(foreign.timer)
 local originals = { new_pipe = uv.new_pipe, new_timer = uv.new_timer, spawn = uv.spawn }

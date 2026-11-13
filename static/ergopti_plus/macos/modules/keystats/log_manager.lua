@@ -52,7 +52,7 @@ local i18n    = require("infra.i18n")  -- kept for MAC_CATEGORIES_FR still used 
 local FileSystem = require("adapters.file_system")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
 local LedgerAppend = require("adapters.ledger_append")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local PowerSource = require("adapters.power_source")
 local LOG     = "keystats.log_manager"
 

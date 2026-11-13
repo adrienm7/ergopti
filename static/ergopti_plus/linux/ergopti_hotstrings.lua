@@ -290,7 +290,7 @@ local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
 local tray_menu = RuntimeGuard.optional_require("adapters.tray_menu")
 
 -- Event loop adapter (luv when available, pump fallback otherwise).
-local event_loop = require("adapters.event_loop")
+local event_loop = require("core.events.loop")
 
 -- Menu builder (builds rich submenus from daemon state).
 local menu_builder = RuntimeGuard.optional_require("ui.menu.builder")
@@ -343,7 +343,7 @@ local file_watchers = RuntimeGuard.optional_require("infra.file_watchers")
 -- Every owner below may keep a luv handle referenced. They must stop BEFORE
 -- event_loop.stop(), otherwise luv.run() waits for the very cleanup that the
 -- daemon used to perform only after run() returned.
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local ShutdownCoordinator = require("infra.shutdown_coordinator")
 local shutdown_runtime = prediction_engine and prediction_engine.shutdown_runtime
 local shutdown_webviews = webview_manager and webview_manager.shutdown
@@ -2098,7 +2098,7 @@ local function main()
 		-- as on Windows and macOS. The engine schedules the chain when the AI starts,
 		-- resumes or changes model, and stops it with its runtime.
 		if require("modules.llm.warmup").init({
-			scheduler = require("adapters.timer_scheduler"),
+			scheduler = require("core.events.timer_scheduler"),
 			target = prediction_engine.warmup_target,
 			request = prediction_engine.warmup_request,
 			busy = prediction_engine.is_predicting,

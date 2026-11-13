@@ -17,7 +17,7 @@ local function load_runner()
 	local clock = { now_ns = 0 }
 	local queue = {}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_, fn)
 			local handle = { timer = {} }
 			queue[#queue + 1] = { handle = handle, fn = fn }
@@ -38,7 +38,7 @@ local function load_runner()
 end
 
 helpers.describe("infra.paced_job", function()
-	local owners = { "infra.paced_job", "infra.logger", "adapters.timer_scheduler" }
+	local owners = { "infra.paced_job", "infra.logger", "core.events.timer_scheduler" }
 
 	helpers.it("rejects non-finite budgets and gaps before arming a timer", function()
 		helpers.with_fresh_modules(owners, function()
@@ -114,7 +114,7 @@ helpers.describe("infra.paced_job", function()
 				on_done = function() done_calls = done_calls + 1 end,
 			})
 			local exact_timer = queue[1].handle
-			package.loaded["adapters.timer_scheduler"].cancel = function(handle)
+			package.loaded["core.events.timer_scheduler"].cancel = function(handle)
 				helpers.assert_true(rawequal(handle, exact_timer), "retry must stop the exact retained timer")
 				stops = stops + 1
 				if stops == 1 then return false end
@@ -139,7 +139,7 @@ helpers.describe("infra.paced_job", function()
 	helpers.it("retains every delivered slice timer after completion (paced-job-delivered-cleanup)", function()
 		helpers.with_stub_scope(owners, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 			local natives, completions, steps = {}, 0, 0
 			local clock, allow_stop = 0, false
 			local runner = helpers.load_with_stubs("infra.paced_job", {

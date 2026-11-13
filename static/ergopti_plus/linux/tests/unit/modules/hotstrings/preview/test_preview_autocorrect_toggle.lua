@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
 
 local saved = {}
-local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "infra.hotstring_preferences",
+local names = { "adapters.graphics_renderer", "core.events.timer_scheduler", "infra.hotstring_preferences",
 	"modules.hotstrings.preview_settings", "ui.tooltip.preview" }
 for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 
@@ -24,7 +24,7 @@ package.loaded["adapters.graphics_renderer"] = {
 	is_visible = function() return shown > 0 end,
 	destroy = function() end,
 }
-package.loaded["adapters.timer_scheduler"] = Fakes.timer_scheduler()
+package.loaded["core.events.timer_scheduler"] = Fakes.timer_scheduler()
 local stored = {}
 package.loaded["infra.hotstring_preferences"] = {
 	get = function(path)

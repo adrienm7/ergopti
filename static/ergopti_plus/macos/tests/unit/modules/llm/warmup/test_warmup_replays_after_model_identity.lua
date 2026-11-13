@@ -28,7 +28,7 @@ local helpers = require("tests.helpers")
 -- ===========================================
 
 local MODULE_NAMES = {
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.logger",
 	"infra.timings",
 	"modules.llm.warmup_controller",
@@ -67,7 +67,7 @@ local function with_fixture(scenario)
 	end
 
 	local function noop() end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["infra.timings"] = { sec = function() return 1 end }
 

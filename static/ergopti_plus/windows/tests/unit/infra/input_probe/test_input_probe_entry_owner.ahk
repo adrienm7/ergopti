@@ -51,7 +51,7 @@ _IPET_ChildSource() {
 	Owner := _DriverProductionFileForSymbol("InputProbe_RunHookOrder")
 	Source := FSReadStrict(Owner)
 	; The copy lives elsewhere; its relative adapter includes are the owners above.
-	Source := RegExReplace(Source, "m)^#Include\s+\.\./adapters/\S+\R", "")
+	Source := RegExReplace(Source, "m)^#Include\s+\.\./\S+\R", "")
 	for Symbol in ["InputProbe_RunHookOrder", "_IP_Admission", "_IP_OpenTarget", "_IP_HookInject", "_IP_HookProc"]
 		AssertTrue(IsObject(_DriverFindFunctionDefinition(&Source, Symbol)), "The complete native probe route must exist: " . Symbol)
 	Observed := _IPET_Overlay(Source, &Count)

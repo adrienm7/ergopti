@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 --- @return table fixture Observable engine, timers, and telemetry counters.
 local function load_fixture()
 	helpers.load_with_stubs("infra.logger")
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.llm.prediction_engine"] = nil
 
 	local fixture = {

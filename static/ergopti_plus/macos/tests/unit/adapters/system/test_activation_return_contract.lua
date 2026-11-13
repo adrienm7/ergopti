@@ -114,7 +114,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 		local slots = {
 			"adapters.window_manager",
 			"adapters.app_launcher",
-			"adapters.timer_scheduler",
+			"core.events.timer_scheduler",
 			"adapters.clipboard",
 			"infra.config_paths",
 			"infra.dialog_util",
@@ -133,7 +133,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			package.loaded["adapters.app_launcher"] = {
 				launch = function() return false end,
 			}
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function() return true end,
 			}
 			package.loaded["adapters.clipboard"] = {

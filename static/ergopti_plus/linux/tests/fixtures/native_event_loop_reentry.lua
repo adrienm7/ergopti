@@ -16,8 +16,8 @@ local uv = require("luv")
 local checks, failures = 0, 0
 
 local function fresh_loop()
-	package.loaded["adapters.event_loop"] = nil
-	return require("adapters.event_loop")
+	package.loaded["core.events.loop"] = nil
+	return require("core.events.loop")
 end
 
 local function handle_count()

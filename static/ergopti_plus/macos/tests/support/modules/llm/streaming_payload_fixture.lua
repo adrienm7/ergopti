@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"modules.llm.api_mlx_inference", "modules.llm.api_ollama", "modules.llm.api_common",
 	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
-	"adapters.shell_runner", "adapters.timer_scheduler", "adapters.http_client", "adapters.file_system",
+	"adapters.shell_runner", "core.events.timer_scheduler", "adapters.http_client", "adapters.file_system",
 	"infra.logger", "infra.notifications", "infra.timings", "infra.text_utils",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
 	"adapters.json_codec", "adapters.storage", "core.lifecycle.engine.compat.utf8", "infra.toml.reader", "core.text.engine.json",
@@ -48,7 +48,7 @@ local function with_stream(backend, callback)
 			local content = file:read("*a"); assert(file:close()); return content
 		end }
 		package.loaded["adapters.shell_runner"] = {}
-		package.loaded["adapters.timer_scheduler"] = { now = function() return 0 end }
+		package.loaded["core.events.timer_scheduler"] = { now = function() return 0 end }
 		package.loaded["infra.logger"] = {
 			debug = function() end, info = function() end, warn = function() end, error = function() end, done = function() end,
 			callback = function(_, _, fn, ...) return pcall(fn, ...) end,

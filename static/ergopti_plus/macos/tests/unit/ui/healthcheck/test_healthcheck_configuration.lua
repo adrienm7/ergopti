@@ -192,7 +192,7 @@ end)
 local PROBE_MODULES = {
 	"tests.stubs.hs", "infra.logger", "ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes",
 	"adapters.system_info", "adapters.key_state", "adapters.network_info", "adapters.accessibility_permission",
-	"adapters.screen_capture", "adapters.timer_scheduler", "diagnostics.engine.healthcheck.configuration",
+	"adapters.screen_capture", "core.events.timer_scheduler", "diagnostics.engine.healthcheck.configuration",
 }
 
 --- Runs a case under the stubbed Hammerspoon runtime.
@@ -281,7 +281,7 @@ helpers.describe("diagnostics configuration is collected by a probe, not by phas
 	--- @return table published, table timers, table run
 	local function start_local(clock_step, extra)
 		local published, timers = {}, {}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(seconds, fn)
 				local handle = { seconds = seconds, fn = fn }
 				timers[#timers + 1] = handle
