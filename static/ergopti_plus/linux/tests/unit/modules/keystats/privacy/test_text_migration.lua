@@ -134,6 +134,7 @@ local function make_store(rows)
 			end
 			return true
 		end,
+		clear_rich_text = function() return true end,
 		get_cursor = function() return store.cursor end,
 		set_cursor = function(value) store.cursor = value; return true end,
 	}

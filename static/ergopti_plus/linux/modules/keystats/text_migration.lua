@@ -96,6 +96,12 @@ function RealBackend.apply(device_id, updates)
 	return SqliteWriter.exec_sql("BEGIN;\n" .. table.concat(statements, "\n") .. "\nCOMMIT;\n")
 end
 
+--- Empties the formatted copy of the typed text. Linux never stores it, so
+--- this is a no-op kept for the shared runner's single backend contract.
+function RealBackend.clear_rich_text(device_id)
+	return SqliteWriter.exec_sql(Plan.clear_rich_text_sql(device_id)) == true
+end
+
 function RealBackend.get_cursor()
 	return SqliteWriter.get_meta(Runner.CURSOR_META_KEY)
 end
