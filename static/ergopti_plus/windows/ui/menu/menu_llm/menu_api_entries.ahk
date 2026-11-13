@@ -2384,8 +2384,10 @@ _LLM_Menu_ApiEntryPageRows(Rows, Models, Listings := 0) {
 		Id := _LLM_MenuApiEntryGet(Entry, "Id", "")
 		ProviderId := _LLM_MenuApiEntryGet(Entry, "Provider", "")
 		; The same token rule as the request path: an entry its endpoint
-		; would refuse is greyed and offers only the edit that sets the key.
-		KeyMissing := !LocalServerAuthEntryTokenAllowed(ProviderId,
+		; would refuse, or whose restored key DPAPI cannot decrypt here, is
+		; greyed and offers only the edit that sets the key.
+		KeyMissing := LLM_ApiToken_Unusable(_LLM_MenuApiEntryGet(Entry, "Token", ""))
+			|| !LocalServerAuthEntryTokenAllowed(ProviderId,
 			_LLM_MenuApiEntryGet(Entry, "Token", ""), _LLM_MenuApiEntryGet(Entry, "BaseUrl", ""),
 			LLM_LOCAL_API_SERVERS)
 		Configured := _LLM_Menu_ResolveApiEntry(Entry)["model"]

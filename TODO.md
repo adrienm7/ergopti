@@ -494,8 +494,11 @@ between workers) green alone. All live checks pass, typed by the harness.
 - [ ] **Hotstring header rows outlive their expiry** in the « both » stack of `llm.trigger.while_hotstring_tooltip`
       until the next render.
 
-- [ ] **Restored API entry without a usable key.** DPAPI keeps the key inside the backup: check whether a restore under
+- [x] **Restored API entry without a usable key.** DPAPI keeps the key inside the backup: check whether a restore under
       another user or machine yields an unusable key, and give it the « API key… » re-enter row as macOS and Linux do.
+      Done 2026-11-13 by worker E: it does (`LLM_ApiToken_Decrypt` keeps the envelope, which was then sent as the
+      key). `LLM_ApiToken_Unusable` makes the menu row offer only the key edit, skips the model listing and refuses
+      the request (test `api-entry-restored-key`); a real restore under a second account is in TODO-tests-windows.md.
 
 ### macOS
 
