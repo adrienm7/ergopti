@@ -412,10 +412,10 @@ local _displaced = {}
 local function with_storage(initial, body)
 	_displaced.storage = package.loaded["core.fs.adapters.storage"]
 	-- The previews other suites leave up would keep the readouts shown.
-	_displaced.preview = package.loaded["ui.tooltip.preview"]
-	_displaced.llm = package.loaded["ui.tooltip.llm"]
-	package.loaded["ui.tooltip.preview"] = { is_visible = function() return false end }
-	package.loaded["ui.tooltip.llm"] = { is_showing = function() return false end }
+	_displaced.preview = package.loaded["core.ui.ui.tooltip.preview"]
+	_displaced.llm = package.loaded["core.ui.ui.tooltip.llm"]
+	package.loaded["core.ui.ui.tooltip.preview"] = { is_visible = function() return false end }
+	package.loaded["core.ui.ui.tooltip.llm"] = { is_showing = function() return false end }
 	local store = Fakes.storage({ initial = initial or {} })
 	-- This fixture models the mandatory all-or-none position batch, including deletions.
 	function store.set_many(updates, deletions)
@@ -432,8 +432,8 @@ local function with_storage(initial, body)
 		end, { initial = initial })
 	end)
 	package.loaded["core.fs.adapters.storage"] = _displaced.storage
-	package.loaded["ui.tooltip.preview"] = _displaced.preview
-	package.loaded["ui.tooltip.llm"] = _displaced.llm
+	package.loaded["core.ui.ui.tooltip.preview"] = _displaced.preview
+	package.loaded["core.ui.ui.tooltip.llm"] = _displaced.llm
 	package.loaded["ui.wpm.widget"] = nil
 	package.loaded["ui.wpm.tray_readout"] = nil
 	if not ok then error(err, 0) end
@@ -530,10 +530,10 @@ helpers.describe("wpm readouts: the floating widget", function()
 			Widget.observe_pointer("motion", 1, 10.5)
 			Widget.tick(stats(42, "llm", "llm", 10), 10.5)
 			helpers.assert_true(not surface.visible)
-			package.loaded["ui.tooltip.preview"].is_visible = function() return true end
+			package.loaded["core.ui.ui.tooltip.preview"].is_visible = function() return true end
 			Widget.tick(stats(42, "llm", "llm", 10), 10.8)
 			helpers.assert_true(surface.visible)
-			package.loaded["ui.tooltip.preview"].is_visible = function() return false end
+			package.loaded["core.ui.ui.tooltip.preview"].is_visible = function() return false end
 			Widget.tick(stats(42, "llm", "llm", 10), 11.1)
 			helpers.assert_true(not surface.visible)
 			Widget.observe_pointer("motion", 1, 11.3)
@@ -752,7 +752,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 
 	helpers.it("hides its own window on stop, never the preview bubble", function()
 		with_storage({}, function()
-			local Renderer = require("adapters.graphics_renderer")
+			local Renderer = require("core.ui.adapters.graphics_renderer")
 			local preview_hidden = false
 			local real_hide = Renderer.hide
 			Renderer.hide = function() preview_hidden = true end

@@ -43,7 +43,7 @@ for name, path in (
     expected = (
         "9cef4f9256f3604ac07d710d77c95424718012f23c6a8b472f9e5936253ac094"
         if name == "keyboard_geometry_xctest_receipt"
-        else "09fb51e8163a0a5dc46c570034e1caec892170f7703a56d0b93638b0ec0509c9"
+        else "c37533761992d4e427d918123951fe3d7791931d9efb98a12c208fad1531fda9"
     )
     data = path.read_bytes()
     if path.is_symlink() or not path.is_file() or hashlib.sha256(data).hexdigest() != expected:

@@ -19,10 +19,10 @@ local M = {}
 local MODULE_NAMES = {
 	"core.fs.adapters.file_system",
 	"core.timing.engine.deferred_work",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.fs.engine.paths",
 	"core.text.engine.utils",
 	"core.text.engine.toml.codec",
@@ -188,7 +188,7 @@ function M.with_finish(opts, scenario)
 			return true
 		end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function() state.notifications = state.notifications + 1; return true end,
 	}
 	package.loaded["core.timing.engine.deferred_work"] = {
@@ -206,7 +206,7 @@ function M.with_finish(opts, scenario)
 			return opts.reload ~= "refused"
 		end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(title, body, button)
 			state.alerts[#state.alerts + 1] = { title = title, body = body, button = button }
 			return true

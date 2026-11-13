@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 require("core.lifecycle.engine.compat.utf8").install()
-local DisplayServer = require("infra.display_server")
+local DisplayServer = require("core.ui.engine.display_server")
 assert(DisplayServer.is_x11(), "the file manager folder receipt needs an X11 display")
 
 local Folder = require("core.fs.adapters.file_manager_folder")

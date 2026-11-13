@@ -18,7 +18,7 @@ local PAD = { path = "/dev/input/event7", name = "SYNA8004:00 06CB:CD8B Touchpad
 --- @param session table { kind, desktop, env, tools, answers = { [needle] = output|false } }
 --- @param body function (Setting, commands)
 local function in_session(session, body)
-	local Display = require("infra.display_server")
+	local Display = require("core.ui.engine.display_server")
 	local Shell = require("core.process.adapters.shell_runner")
 	local commands, real_getenv = {}, os.getenv
 	Display._set_for_test(session.kind, session.desktop or "")

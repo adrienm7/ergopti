@@ -169,7 +169,7 @@ local function load_fixture(loading_result, options)
 			return resolve_result(options.tint_result, nil)
 		end,
 	}
-	package.loaded["ui.tooltip"] = PortFakes.complete_tooltip(tooltip)
+	package.loaded["core.ui.ui.tooltip"] = PortFakes.complete_tooltip(tooltip)
 
 	package.loaded["modules.llm.prediction_engine"] = nil
 	local Engine = require("modules.llm.prediction_engine")

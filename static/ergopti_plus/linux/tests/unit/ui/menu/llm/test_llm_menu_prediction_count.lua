@@ -110,7 +110,7 @@ local NumericCorpus = NumericJson.decode(numeric_read(NumericRoot .. "tests/corp
 --- @param exercise function Actual rendered-owner assertions.
 local function with_numeric_menu(options, exercise)
 	options = options or {}
-	local prompt_preload = package.preload["ui.numeric_prompt.bridge"]
+	local prompt_preload = package.preload["core.ui.ui.numeric_prompt"]
 	local loaded = {}
 	for key, value in pairs(package.loaded) do loaded[key] = value end
 	local path = os.tmpname()
@@ -138,12 +138,12 @@ local function with_numeric_menu(options, exercise)
 		local log = { prompts = {}, changed = 0, notices = 0, notice_texts = {}, reports = 0 }
 		if options.case_twin then writer.set_case_twin_reporter(function() log.reports = log.reports + 1 end) end
 		package.loaded["adapters.notifier"] = { send = function(text) log.notices = log.notices + 1; log.notice_texts[#log.notice_texts + 1] = text; return true end }
-		package.loaded["ui.numeric_prompt.bridge"] = { ask = function(spec, webview)
+		package.loaded["core.ui.ui.numeric_prompt"] = { ask = function(spec, webview)
 			log.prompts[#log.prompts + 1] = { spec = spec, webview = webview }
 		end }
 		if options.prompt_missing then
-			package.loaded["ui.numeric_prompt.bridge"] = nil
-			package.preload["ui.numeric_prompt.bridge"] = function() error("independent missing native dialog owner") end
+			package.loaded["core.ui.ui.numeric_prompt"] = nil
+			package.preload["core.ui.ui.numeric_prompt"] = function() error("independent missing native dialog owner") end
 		end
 		local webview = { show = function() return false end }
 		local paused = options.paused == true
@@ -160,7 +160,7 @@ local function with_numeric_menu(options, exercise)
 			set_paused = function(value) paused = value; ctx.paused = value end,
 			rebuild = function() return mb.build(ctx) end })
 	end, debug.traceback)
-	package.preload["ui.numeric_prompt.bridge"] = prompt_preload
+	package.preload["core.ui.ui.numeric_prompt"] = prompt_preload
 	os.remove(path)
 	os.remove(path .. ".bak")
 	os.remove(path .. ".tmp")

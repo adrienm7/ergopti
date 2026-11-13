@@ -99,7 +99,7 @@ update_menubar_body = function(generation)
 	local active_source = WPMShared.get_active_source(stats, COLOR_HOLD_S, now)
 	if not is_current(generation) then return false end
 	
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	local tooltip_visible = false
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.is_visible) == "function" then
 		tooltip_visible = tooltip.is_visible()

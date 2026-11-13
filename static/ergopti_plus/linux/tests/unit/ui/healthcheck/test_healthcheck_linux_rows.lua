@@ -69,7 +69,7 @@ helpers.describe("healthcheck (linux): the window title", function()
 		I18n.init()
 		local expected = I18n.get("menu.debug.healthcheck")
 		helpers.assert_true(expected ~= "menu.debug.healthcheck", "the locale must be loaded")
-		helpers.assert_eq(helpers.load_module("ui.webview_manager")._app_title("healthcheck"), expected)
+		helpers.assert_eq(helpers.load_module("core.ui.ui.webview_manager")._app_title("healthcheck"), expected)
 	end)
 end)
 

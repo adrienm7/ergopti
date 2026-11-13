@@ -82,7 +82,7 @@ This communicates "this option exists but is not active" without hiding it.
 
 The canonical algorithm is implemented in `tint.js:mixTint()`. Every driver
 MUST use this exact formula. Test coverage is provided via
-`macos/tests/unit/ui/tooltip/test_tooltip_tint_contract.lua` on the Hammerspoon side;
+`macos/tests/unit/core/ui/tooltip/test_tint_contract.lua` on the Hammerspoon side;
 the reference vectors live in `tint.js:tintTestVectors()`.
 
 ### Algorithm
@@ -411,6 +411,6 @@ A driver is considered compliant with this spec when:
 - AHK implementation: [`lib/tooltip.ahk`](../../windows/lib/tooltip.ahk),
   [`ui/tooltip_llm.ahk`](../../windows/ui/tooltip_llm.ahk),
   [`lib/ui_style.ahk`](../../windows/lib/ui_style.ahk)
-- HS implementation: [`ui/tooltip/renderer.lua`](../../macos/ui/tooltip/renderer.lua),
-  [`ui/tooltip/config.lua`](../../macos/ui/tooltip/config.lua),
-  [`ui/tooltip/tooltip_llm.lua`](../../macos/ui/tooltip/tooltip_llm.lua)
+- HS implementation: [`ui/tooltip/renderer.lua`](../../macos/core/ui/ui/tooltip/renderer.lua),
+  [`ui/tooltip/config.lua`](../../macos/core/ui/ui/tooltip/config.lua),
+  [`ui/tooltip/tooltip_llm.lua`](../../macos/core/ui/ui/tooltip/llm.lua)

@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Linux Menu Dialogs
 --- DESCRIPTION:
---- The native dialogs (Ergopti's own, ui/native_dialog.lua), prompts and
+--- The native dialogs (Ergopti's own, core/ui/ui/native_dialog.lua), prompts and
 --- binding helpers the tray's section builders share: placeholder filling, shell quoting, exit-status normalisation, text
 --- prompts, error and information messages, the yes/no question, and the action
 --- picker and slot-binding rows.
@@ -13,9 +13,9 @@ local M = {}
 
 local WindowTitles = require("core.ui.engine.window_titles")
 local Logger = require("core.logger.engine.shim")
-local Modal = require("ui.modal")
-local NativeDialog = require("ui.native_dialog")
-local TextPrompt = require("ui.text_prompt")
+local Modal = require("core.ui.ui.modal")
+local NativeDialog = require("core.ui.ui.native_dialog")
+local TextPrompt = require("core.ui.ui.text_prompt")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
@@ -53,7 +53,7 @@ local function succeeded(status)
 	return status == true or status == 0
 end
 
---- Asks the user for a line of text (ui/text_prompt.lua, shared with the AI
+--- Asks the user for a line of text (core/ui/ui/text_prompt.lua, shared with the AI
 --- agent's command dialog).
 ---
 --- Declared here, above every closure that calls it: a `local` declared after a

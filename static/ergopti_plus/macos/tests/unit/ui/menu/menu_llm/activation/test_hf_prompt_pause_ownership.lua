@@ -9,9 +9,9 @@ local MODULES = {
 	"core.text.engine.number_policy", "adapters.running_application", "ui.menu.menu_llm.models_manager_mlx_repo",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.fs.engine.paths", "core.timing.engine.timings",
-	"ui.ui_builder",
+	"core.ui.ui.builder",
 	"ui.menu.menu_llm.models_manager_mlx_hf",
 }
 
@@ -151,7 +151,7 @@ local function with_fixture(options, callback)
 
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function()
 				fixture.notifications = fixture.notifications + 1
 				if fixture.pause_on_notify == true then
@@ -172,7 +172,7 @@ local function with_fixture(options, callback)
 			end,
 		}
 		fixture.title_receipt = {}
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			prepare_app_window_title = function(app_id, presentation_id)
 				fixture.title_request = { app_id, presentation_id }
 				return fixture.title_receipt

@@ -366,7 +366,7 @@ helpers.describe("MLX import probe failure names a working action (mlx-runtime-b
 		local record = { notices = {}, invalidations = 0, causes = {}, offers = {} }
 		with_fixture(function(native)
 			install_subject_stubs(native)
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function(title, body, kind)
 					record.notices[#record.notices + 1] = { title = title, body = body, kind = kind }
 					return true
@@ -475,7 +475,7 @@ helpers.describe("A partial MLX venv is detected from its probe's own error (mlx
 		local record = { notices = {}, invalidations = 0, causes = {}, offers = {} }
 		with_fixture(function(native)
 			install_subject_stubs(native)
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function(title, body, kind)
 					record.notices[#record.notices + 1] = { title = title, body = body, kind = kind }
 					return true

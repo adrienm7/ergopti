@@ -73,7 +73,7 @@ end
 
 local function with_switch_frame(callback, labels, configure)
 	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "core.i18n.engine.i18n",
-		"infra.notifications", "modules.keymap.input_sources", "modules.keymap.layout_install", "modules.keymap.layout_registry"}, function()
+		"core.ui.engine.notifications", "modules.keymap.input_sources", "modules.keymap.layout_install", "modules.keymap.layout_registry"}, function()
 		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local installer = require("modules.keymap.layout_install")
 		local fixture = {records = {{id = "French", name = "French", selected = false}}, saves = 0, updates = 0, effects = 0}

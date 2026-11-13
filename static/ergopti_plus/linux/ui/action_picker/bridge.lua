@@ -135,7 +135,7 @@ local function close_session(session, context)
 	if type(context) == "table" and type(context.close_owned_window) == "function" then
 		closed = context.close_owned_window() == true
 	else
-		local ok_manager, Manager = pcall(require, "ui.webview_manager")
+		local ok_manager, Manager = pcall(require, "core.ui.ui.webview_manager")
 		closed = ok_manager and type(Manager.hide) == "function"
 			and Manager.hide("action_picker") == true
 	end
@@ -164,7 +164,7 @@ function M.open(opts, on_confirm, on_cancel)
 		Logger.error(LOG, "Action picker requires a confirmation callback.")
 		return false
 	end
-	local ok_manager, Manager = pcall(require, "ui.webview_manager")
+	local ok_manager, Manager = pcall(require, "core.ui.ui.webview_manager")
 	if not ok_manager or type(Manager.show) ~= "function"
 		or type(Manager.hide) ~= "function" then
 		Logger.error(LOG, "Action picker cannot open: webview manager is unavailable.")
@@ -183,7 +183,7 @@ function M.open(opts, on_confirm, on_cancel)
 		local show, eval_js = rawget(Manager, "show"), rawget(Manager, "eval_js")
 		local function owners_live()
 			return getmetatable(source_opts) == nil and getmetatable(Manager) == nil
-				and rawget(package.loaded, "ui.webview_manager") == Manager
+				and rawget(package.loaded, "core.ui.ui.webview_manager") == Manager
 				and rawget(source_opts, "presentation_id") == presentation_id
 				and rawget(source_opts, "presentation_suffix") == suffix
 				and rawget(source_opts, "title") == nil and rawget(source_opts, "label") == nil
@@ -308,7 +308,7 @@ local function _push_init()
 		return false
 	end
 
-	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
+	local ok_mgr, Manager = pcall(require, "core.ui.ui.webview_manager")
 	if not ok_mgr or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "Cannot push init(): webview_manager.eval_js is unavailable.")
 		return false
@@ -353,7 +353,7 @@ local function _handle_table(data, state, context)
 			end
 			if not admitted then
 				session.settling = false
-				local ok_manager, manager = pcall(require, "ui.webview_manager")
+				local ok_manager, manager = pcall(require, "core.ui.ui.webview_manager")
 				if ok_manager and type(manager.eval_js) == "function" and _active_session == session then
 					manager.eval_js("action_picker", "programProviderRefused()")
 				end

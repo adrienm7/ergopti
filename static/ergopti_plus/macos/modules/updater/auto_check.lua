@@ -54,7 +54,7 @@ local RateLimit = require("updater.engine.rate_limit")
 local ReleaseSources = require("updater.engine.release_sources")
 local Updater   = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local i18n      = require("core.i18n.engine.i18n")
 
 local LOG = "updater.auto_check"

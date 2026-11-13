@@ -334,7 +334,7 @@ helpers.describe("programmable native Linux runtime", function()
 	end
 	helpers.it("(user-hotstrings-native) rechecks actual clipboard settle before paste and restores its original bytes", function()
 		with_runtime(function(f)
-			local Shell, Display = require("core.process.adapters.shell_runner"), require("infra.display_server")
+			local Shell, Display = require("core.process.adapters.shell_runner"), require("core.ui.engine.display_server")
 			local old = { has = Shell.has_command, read = Shell.exec_checked, stdin = Shell.with_exact_stdin,
 				run = Shell.run, wayland = Display.is_wayland, x11 = Display.is_x11 }
 			local writes = {}
@@ -765,7 +765,7 @@ helpers.describe("programmable native Linux runtime", function()
 	for _, failure in ipairs({ "false", "throw" }) do
 		helpers.it("(user-menu-publication-inverse) restores actual Linux source timing after " .. failure .. " publication", function()
 			with_runtime(function(f)
-				local names = { "infra.hotstring_preferences", "ui.menu.programmatic_hotstrings", "ui.text_prompt", "ui.modal" }
+				local names = { "infra.hotstring_preferences", "ui.menu.programmatic_hotstrings", "core.ui.ui.text_prompt", "core.ui.ui.modal" }
 				local previous = {}
 				for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 				local writes, updates = 0, 0
@@ -778,8 +778,8 @@ helpers.describe("programmable native Linux runtime", function()
 							return false
 						end,
 					}
-					package.loaded["ui.text_prompt"] = { ask = function() return "125" end }
-					package.loaded["ui.modal"] = { run = function() error("a refused publication opens no dialog") end }
+					package.loaded["core.ui.ui.text_prompt"] = { ask = function() return "125" end }
+					package.loaded["core.ui.ui.modal"] = { run = function() error("a refused publication opens no dialog") end }
 					local facade = {
 						is_enabled = function() return f.enabled end,
 						set_user_code_time_activation = f.User.set_time_activation,

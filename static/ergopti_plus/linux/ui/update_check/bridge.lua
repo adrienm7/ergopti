@@ -76,7 +76,7 @@ local function push(message)
 		Logger.error(LOG, "An update-check message could not be encoded: %s.", tostring(json))
 		return false
 	end
-	return require("ui.webview_manager").eval_js(APP,
+	return require("core.ui.ui.webview_manager").eval_js(APP,
 		"if(window.receiveUpdateCheck)window.receiveUpdateCheck(" .. json .. ")")
 end
 
@@ -252,7 +252,7 @@ end
 --- @param updater table modules.updater.manager
 --- @return table session
 local function new_session(updater)
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	local session
 	session = CheckSession.new({
 		push = push,
@@ -361,7 +361,7 @@ function M.open(ctx)
 	-- Windows. Starting a check would replace the pending answer with a failure
 	if _session ~= nil and _session.result() == nil then
 		_ctx = ctx
-		if require("ui.webview_manager").show(APP) ~= true then
+		if require("core.ui.ui.webview_manager").show(APP) ~= true then
 			Logger.error(LOG, "The update-check window could not be shown again.")
 			return false
 		end
@@ -385,7 +385,7 @@ function M.open(ctx)
 	_ctx = ctx
 	local session = new_session(ctx.updater)
 	_session = session
-	if require("ui.webview_manager").show(APP) ~= true then
+	if require("core.ui.ui.webview_manager").show(APP) ~= true then
 		if _session == session then _session = nil end
 		session.retire()
 		Logger.error(LOG, "The update-check window could not open.")

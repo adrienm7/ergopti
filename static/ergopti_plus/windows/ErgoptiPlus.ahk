@@ -426,16 +426,16 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/network/adapters/info.ahk
 #Include adapters/keyboard_hook.ahk
 #Include adapters/llm_nav_event_owner.ahk
-#Include adapters/terminal_output_preview.ahk
-#Include adapters/terminal_output_custody.ahk
-#Include adapters/terminal_output_sendinput.ahk
+#Include core/ui/adapters/terminal_output_preview.ahk
+#Include core/ui/adapters/terminal_output_custody.ahk
+#Include core/ui/adapters/terminal_output_sendinput.ahk
 #Include adapters/llm_automation.ahk
 #Include adapters/mouse_control.ahk
 #Include adapters/window_manager.ahk
 #Include adapters/system_control.ahk
-#Include adapters/graphics_renderer.ahk
+#Include core/ui/adapters/graphics_renderer.ahk
 #Include adapters/notify_icon.ahk
-#Include adapters/tooltip_renderer.ahk
+#Include core/ui/adapters/tooltip_renderer.ahk
 #Include core/process/adapters/shell_runner.ahk
 #Include ../_shared/shortcuts/data/actions/brightness.ahk
 #Include adapters/screen_brightness.ahk
@@ -462,14 +462,14 @@ if UIASW_IsWorkerInvocation()
 
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps``.
-#Include infra/window_utils.ahk
+#Include core/ui/engine/window_utils.ahk
 #Include core/network/engine/external_url_policy.ahk
 #Include core/text/engine/utils.ahk
 #Include infra/text_case.ahk
 #Include infra/wrap_pair.ahk
 #Include infra/open_target.ahk
 #Include infra/send_input_parameter.ahk
-#Include ui/spotlight/init.ahk
+#Include core/ui/ui/spotlight/init.ahk
 #Include infra/nav_layer_helpers.ahk
 #Include infra/capsword_state.ahk
 
@@ -555,9 +555,9 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include ui/prompt_editor/init.ahk
 #Include infra/wrap_symbols_config.ahk
 #Include _generated/window_titles.ahk
-#Include infra/native_dialogs.ahk
-#Include infra/ui_style.ahk
-#Include ui/tooltip/init.ahk
+#Include core/ui/engine/native_dialogs.ahk
+#Include core/ui/engine/style.ahk
+#Include core/ui/ui/tooltip/init.ahk
 #Include infra/hotstrings/hotstring_prefix_watcher.ahk
 ; Self-healing hotstring cache for the bundled TOMLs. Replaces the old ~1 MB of
 ; committed generated_*.ahk (tokenised at boot, before the tray icon could appear)
@@ -595,7 +595,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include vendor/Promise.ahk
 #Include vendor/WebView2.ahk
 BootProfile_Stamp("WebView and metrics UI state initialised")
-#Include infra/webview_utils.ahk
+#Include core/ui/engine/webview/utils.ahk
 #Include core/network/adapters/failure_host.ahk
 #Include ui/download_window/session.ahk
 #Include ui/download_window/init.ahk
@@ -697,7 +697,7 @@ BootProfile_Stamp("LLM defaults loaded")
 #Include modules/llm/ollama_webview.ahk
 #Include modules/llm/ollama_install_files_port.ahk
 #Include modules/llm/ollama_deps_checker.ahk
-#Include ui/tooltip/tooltip_llm.ahk
+#Include core/ui/ui/tooltip/tooltip_llm.ahk
 #Include ui/menu/menu_llm/_index.ahk
 #Include ui/model_browser/init.ahk
 ; Closes the include graph: every module's top-level initialiser has now run.
@@ -1411,7 +1411,7 @@ BootProfile_Mark("Metrics/keystats started")
 
 
 
-#Include ui/editors.ahk
+#Include core/ui/ui/editors.ahk
 
 
 

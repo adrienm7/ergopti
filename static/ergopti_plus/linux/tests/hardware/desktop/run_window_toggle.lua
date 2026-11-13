@@ -100,7 +100,7 @@ local function open_cover()
 	return typed and pid or nil, pid
 end
 
-local Manager = require("ui.webview_manager")
+local Manager = require("core.ui.ui.webview_manager")
 local Gestures = require("modules.gestures.manager")
 
 local function run()

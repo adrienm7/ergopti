@@ -16,7 +16,7 @@ local text_owner = require("tests.support.text_owner_fixture")
 function M.with(body)
 	text_owner.with(function(guard, field)
 		local names = { "adapters.selection_transaction", "adapters.atspi_focus", "modules.hotstrings.injector",
-			"adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
+			"adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
 			"adapters.keyboard_hook", "core.logger.engine.shim", "modules.hotstrings.selected_output", "core.logger.engine.monotonic" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -67,7 +67,7 @@ function M.with(body)
 				return true
 			end,
 		}
-		package.loaded["infra.display_server"] = {
+		package.loaded["core.ui.engine.display_server"] = {
 			is_wayland = function() return false end, is_x11 = function() return true end,
 			kind = function() return "x11" end,
 		}

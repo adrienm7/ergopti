@@ -27,7 +27,7 @@ local OWNERS = {
 	-- The renderer asks it which applications answer Accessibility; it
 	-- captures hs at require time, so each scenario loads it afresh.
 	"adapters.accessibility_permission",
-	"core.network.engine.vscode_bridge", "core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.llm_line", "core.ui.engine.tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
+	"core.network.engine.vscode_bridge", "core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.llm_line", "core.ui.engine.tooltip.tint", "core.ui.ui.tooltip.config", "core.ui.ui.tooltip.renderer",
 	-- The configuration names the shortcut column's modifiers through the key
 	-- name table, which it loads with its data and sorting helper.
 	"platform.input.keycodes.key_names", "platform.input.keycodes.key_names_data", "core.text.engine.table_util",
@@ -48,11 +48,11 @@ function M.load()
 		errors[#errors + 1] = ok and message or tostring(fmt)
 	end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["ui.tooltip.config"] = nil
+	package.loaded["core.ui.ui.tooltip.config"] = nil
 	package.loaded["core.text.engine.toml_codec.reader"] = nil
 	package.loaded["core.text.engine.toml.reader"] = nil
 	package.loaded["adapters.accessibility_permission"] = nil
-	return helpers.load_with_stubs("ui.tooltip.renderer"), errors
+	return helpers.load_with_stubs("core.ui.ui.tooltip.renderer"), errors
 end
 
 --- Registers a complete renderer scenario with exact predecessor restoration.

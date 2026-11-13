@@ -20,7 +20,7 @@ local function fresh_screenshot()
 		"adapters.screen_capture",
 		"modules.shortcuts.actions.screen_capture_flow",
 		"core.logger.engine.logger",
-		"infra.notifications",
+		"core.ui.engine.notifications",
 		"core.i18n.engine.i18n",
 	}) do package.loaded[name] = nil end
 
@@ -137,7 +137,7 @@ local function fresh_screenshot()
 		end,
 	}
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, _, kind)
 			fixture.notifications[#fixture.notifications + 1] = {
 				message = message,

@@ -237,13 +237,13 @@ local function observe_add_command(mode)
 	local result
 	with_settings(SOURCE, function(Settings, path, sandbox, Terminators)
 		assert(Settings.load())
-		local prior_prompt = package.loaded["ui.text_prompt"]
+		local prior_prompt = package.loaded["core.ui.ui.text_prompt"]
 		local prior_execute = os.execute
 		local Writer = require("core.text.engine.toml_codec.writer")
 		local prior_writer = Writer.batch_write
 		local context, effects
 		local observed = { prompts = 0, questions = 0, errors = 0, writes = 0 }
-		package.loaded["ui.text_prompt"] = { ask = function()
+		package.loaded["core.ui.ui.text_prompt"] = { ask = function()
 			observed.prompts = observed.prompts + 1
 			if mode == "pause_after_prompt" then context.paused = true end
 			if mode == "input_cancel" then return nil end
@@ -285,10 +285,10 @@ local function observe_add_command(mode)
 			observed.redraws = effects.redraws
 			observed.records = require("core.text.engine.toml_codec").decode(observed.source)
 		end)
-		package.loaded["ui.text_prompt"] = prior_prompt
+		package.loaded["core.ui.ui.text_prompt"] = prior_prompt
 		os.execute = prior_execute
 		Writer.batch_write = prior_writer
-		observed.prompt_restored = package.loaded["ui.text_prompt"] == prior_prompt
+		observed.prompt_restored = package.loaded["core.ui.ui.text_prompt"] == prior_prompt
 		observed.execute_restored = os.execute == prior_execute
 		observed.writer_restored = Writer.batch_write == prior_writer
 		if not passed then error(failure, 0) end

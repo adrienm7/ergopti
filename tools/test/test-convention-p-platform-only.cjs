@@ -22,7 +22,7 @@
  * manifests, and their names are not ours to choose. WebView2Loader.dll is
  * called that by Microsoft.
  *
- * WHY THIS IS A RATCHET AND NOT AN ASSERTION OF ZERO: linux/ui/webkit_host.lua
+ * WHY THIS IS A RATCHET AND NOT AN ASSERTION OF ZERO: linux/core/ui/ui/webkit_host.lua
  * is a genuine violation that needs a placement decision rather than a
  * mechanical move. A gate that fails today teaches people to disable it; one
  * that freezes the number they cannot yet fix keeps counting while they decide.
@@ -56,7 +56,7 @@ const EXEMPT = /[/\\](platform|adapters|vendor|tests|docs|core)[/\\]/;
 // History: 3 (2026-08-02, first measurement, immediately after the platform/remap
 //             extraction removed modules/karabiner, modules/kanata and
 //             modules/tap_holds. The three that remain each need a placement
-//             decision: linux/ui/webkit_host.lua is the Linux webview mechanism
+//             decision: linux/core/ui/ui/webkit_host.lua is the Linux webview mechanism
 //             and is OS-unique, so it belongs under platform/ once the other two
 //             drivers have a platform/webview/ to be symmetrical with;
 //             _shared/tap_hold/engine/kanata_generator.lua and its golden fixture

@@ -29,7 +29,7 @@ function M.request(action, changed, deps)
 	local logger = deps.logger or require("core.logger.engine.logger")
 	local function alert(text_key, style)
 		local i18n = deps.i18n or require("core.i18n.engine.i18n")
-		local dialog = deps.dialog or require("infra.dialog_util")
+		local dialog = deps.dialog or require("core.ui.engine.dialog_util")
 		local shown, err = pcall(function()
 			dialog.block_alert(i18n.get("menu.global.start_at_login"),
 				i18n.get(text_key), i18n.get("button.ok"), nil, style)

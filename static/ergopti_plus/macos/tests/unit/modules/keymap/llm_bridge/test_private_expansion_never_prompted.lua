@@ -101,7 +101,7 @@ local function build_world()
 	}
 	-- Every other tooltip operation succeeds: a reset that could not hide would abort the request.
 	local noop = function() return true end
-	package.loaded["ui.tooltip"] = setmetatable({
+	package.loaded["core.ui.ui.tooltip"] = setmetatable({
 		show_loading = function() return true end,
 		show = function() return true end,
 		show_predictions = function() return true end,
@@ -114,7 +114,7 @@ local function build_world()
 		is_hotstring_visible = function() return false end,
 		tint = function() return {} end,
 	}, { __index = function() return noop end })
-	package.loaded["adapters.tooltip_renderer"] = setmetatable({}, { __index = function() return noop end })
+	package.loaded["core.ui.adapters.tooltip_renderer"] = setmetatable({}, { __index = function() return noop end })
 
 	local State = helpers.load_with_stubs("modules.keymap.state")
 	local Registry = require("modules.keymap.registry")

@@ -22,7 +22,7 @@
  *      and the retired timings/constants.toml copies stay gone.
  *   2. Neither dequeue engine declares a default, and both refuse a call that
  *      omits the values (the JS one is executed here, the Lua one in
- *      macos/tests/unit/ui/tooltip/test_tooltip_dequeue_contract.lua).
+ *      macos/tests/unit/core/ui/tooltip/test_dequeue_contract.lua).
  *   3. The cross-driver vectors, replayed through dequeue.js with the TOML
  *      values, produce the expiries they promise, so the corpus is tied to the
  *      declaration rather than to a number typed beside it.
@@ -92,7 +92,7 @@ for (const file of tomlFiles(path.join(SP, '_shared'))) {
 const DEFAULT_ASSIGNMENT = /\b\w*TIMEOUT_(?:DECREMENT|FLOOR)_SEC\s*=\s*[\d.]+/;
 for (const relative of [
 	'_shared/core/ui/data/tooltip/dequeue.js',
-	'macos/ui/tooltip/dequeue.lua'
+	'macos/core/ui/ui/tooltip/dequeue.lua'
 ]) {
 	const source = read(relative);
 	const match = DEFAULT_ASSIGNMENT.exec(source);
@@ -169,8 +169,8 @@ for (const vector of dequeue.dequeueTestVectors()) {
 assert.ok(replayed > 0, 'at least one vector has steps to replay');
 
 // 4. The drivers read the declaration.
-const uiStyle = read('windows/infra/ui_style.ahk');
-const tooltipConfig = read('macos/ui/tooltip/config.lua');
+const uiStyle = read('windows/core/ui/engine/style.ahk');
+const tooltipConfig = read('macos/core/ui/ui/tooltip/config.lua');
 for (const key of KEYS) {
 	assert.ok(
 		uiStyle.includes(`_UiStyleRequire(c, "timing", "${key}")`),
@@ -181,19 +181,22 @@ for (const key of KEYS) {
 		`macOS ui/tooltip/config.lua reads [timing] ${key}`
 	);
 	assert.match(
-		read('macos/ui/tooltip/tooltip_hotstring.lua'),
+		read('macos/core/ui/ui/tooltip/hotstring.lua'),
 		new RegExp(`\\b${key}\\s*=\\s*Config\\.timing\\.${key}\\b`),
 		`macOS tooltip_hotstring.lua hands Config.timing.${key} to its dequeue engine`
 	);
 }
-for (const relative of ['windows/infra/ui_style.ahk', 'windows/ui/tooltip/core.ahk']) {
+for (const relative of [
+	'windows/core/ui/engine/style.ahk',
+	'windows/core/ui/ui/tooltip/core.ahk'
+]) {
 	for (const match of read(relative).matchAll(
 		/\b(?:UI|_TOOLTIP)_TIMEOUT_(?:DECREMENT|FLOOR)_SEC\s*:=\s*([\d.]+)/g
 	)) {
 		assert.equal(Number(match[1]), 0, `${relative}: ${match[0]} starts at the 0 sentinel`);
 	}
 }
-const contract = read('windows/tests/unit/ui/tooltip/test_tooltip_dequeue_contract.ahk');
+const contract = read('windows/tests/unit/core/ui/tooltip/test_dequeue_contract.ahk');
 const mirror = /Max\(([\d.]+),\s*CallerDurationSec\s*-\s*([\d.]+)\)/.exec(contract);
 assert.ok(mirror, 'the Windows dequeue contract test keeps its effective-duration mirror');
 assert.deepEqual(

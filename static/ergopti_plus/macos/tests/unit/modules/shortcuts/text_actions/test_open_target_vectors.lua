@@ -41,7 +41,7 @@ end
 --- recording port never reaches the next test file the runner loads.
 local OWNED_MODULES = {
 	"modules.shortcuts.actions.apps", "adapters.window_info", "core.process.adapters.shell_runner",
-	"core.fs.adapters.file_system", "infra.notifications", "core.logger.engine.logger",
+	"core.fs.adapters.file_system", "core.ui.engine.notifications", "core.logger.engine.logger",
 }
 
 --- Runs a case against the apps actions with recording ports.
@@ -52,7 +52,7 @@ local function with_apps(existing, body)
 		local world = { urls = {}, opened = {}, notices = {} }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.window_info"] = { getFocused = function() return { appId = "TextEdit" } end }
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(message) world.notices[#world.notices + 1] = message; return true end,
 		}
 		package.loaded["core.fs.adapters.file_system"] = {

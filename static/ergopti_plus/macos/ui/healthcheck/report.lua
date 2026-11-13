@@ -199,7 +199,7 @@ local DEFAULT_EFFECTS = {
 	reveal = function(path, done, current) return open_with({ "-R", path }, done, current) end,
 	open = function(target, done, current) return open_with({ target }, done, current) end,
 	open_url = function(url, done)
-		done({ ok = require("ui.ui_builder").open_http_url(url) == true })
+		done({ ok = require("core.ui.ui.builder").open_http_url(url) == true })
 		return { cancel = function() end }
 	end,
 	notify = function(title, body, kind)

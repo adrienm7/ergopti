@@ -24,7 +24,7 @@ function M.new(root, production, options)
 	for _, name in ipairs({ "debug", "warn", "info", "success" }) do logger[name] = function() end end
 	modules["core.logger.engine.logger"] = logger
 	modules["core.text.engine.utils"] = text_utils
-	modules["infra.notifications"] = { notify = function() return true end }
+	modules["core.ui.engine.notifications"] = { notify = function() return true end }
 	modules["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	modules["modules.llm.parser"], modules["modules.llm.profiles"] = {}, {}
 	modules["modules.llm.progressive_reveal"], modules["ai.engine.ollama.local_model_policy"] = {}, {}

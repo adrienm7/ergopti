@@ -140,7 +140,7 @@ end)
 helpers.describe("onboarding commit() honours the retarget", function()
 	helpers.it("(onboarding-retarget-behavior) finish writes to the newly persisted resolver destination", function()
 		helpers.with_fresh_modules({ "core.text.engine.toml.writer", "core.fs.adapters.file_system", "ui.menu.menu_paths",
-			"infra.notifications" }, function()
+			"core.ui.engine.notifications" }, function()
 			return require("tests.support.onboarding_finish_fixture").with_migration_reader(function()
 			local destination, persisted, writes, notified = OLD_CONFIG_PATH, 0, {}, 0
 			package.loaded["ui.menu.menu_paths"] = {
@@ -165,7 +165,7 @@ helpers.describe("onboarding commit() honours the retarget", function()
 					return true
 				end,
 			}
-			package.loaded["infra.notifications"] = { notify = function() notified = notified + 1; return true end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function() notified = notified + 1; return true end }
 			require("tests.support.dashboard_window_fixture")("ui.onboarding", function(onboarding, state)
 				require("tests.support.onboarding_shared_data").install()
 				package.loaded["core.i18n.engine.i18n"].persist_locale = function() return true end

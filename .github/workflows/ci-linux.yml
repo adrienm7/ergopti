@@ -3307,7 +3307,7 @@ jobs:
           fi
         timeout-minutes: 20
 
-      # Every tray dialog is Ergopti's own GTK window (linux/ui/dialog_host.lua),
+      # Every tray dialog is Ergopti's own GTK window (linux/core/ui/ui/dialog_host.lua),
       # never the host's zenity or kdialog. The live profile runs the real public
       # consumers (text prompt, application and folder choosers, the menu's error
       # dialog) under five caption policies, reads each mapped window's caption

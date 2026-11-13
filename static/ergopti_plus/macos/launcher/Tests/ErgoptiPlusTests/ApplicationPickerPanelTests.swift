@@ -19,7 +19,7 @@ final class ApplicationPickerPanelTests: XCTestCase {
 	/// Interpolates only original template slots, so inserted percent signs stay data.
 	private func constructionScript(title: String, message: String) throws -> String {
 		let source = try String(contentsOf: Self.repositoryURL.appendingPathComponent(
-			"static/ergopti_plus/macos/infra/dialog_util.lua"), encoding: .utf8)
+			"static/ergopti_plus/macos/core/ui/engine/dialog_util.lua"), encoding: .utf8)
 		let owner = try XCTUnwrap(source.range(of: "function M.application_picker_script(message, title)"))
 		let body = source[owner.upperBound...]
 		let start = try XCTUnwrap(body.range(of: "text_utils.applescript_format([["))

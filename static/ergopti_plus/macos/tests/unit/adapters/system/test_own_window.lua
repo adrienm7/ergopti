@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OwnWindow = require("adapters.own_window")
+local OwnWindow = require("core.ui.adapters.own_window")
 
 local OWN_PID = 4242
 

@@ -22,7 +22,7 @@ local SUBJECT_MODULES = {
 	"core.fs.adapters.file_system",
 	"adapters.screen_capture",
 	"core.process.adapters.shell_runner",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.logger.engine.logger",
 	"modules.shortcuts.actions.system_pixel",
 	"modules.shortcuts.actions.screen_capture_flow",
@@ -91,7 +91,7 @@ local function with_pixel(options, scenario)
 				return { mode = "file", size = f.files[path] }, "ok"
 			end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, kind, on_click)
 				f.notifications[#f.notifications + 1] = { title = title, body = body, kind = kind,
 					on_click = on_click }

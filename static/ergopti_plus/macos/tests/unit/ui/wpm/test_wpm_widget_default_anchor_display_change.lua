@@ -19,7 +19,7 @@ helpers.describe("wpm_widget: default anchor is recomputed after a display shrin
 		package.loaded["modules.keystats"] = {
 			get_live_stats = function() return { wpm = 42, last_input_time = hs.timer.absoluteTime() / 1000000000 } end,
 		}
-		package.loaded["adapters.graphics_renderer"] = nil
+		package.loaded["core.ui.adapters.graphics_renderer"] = nil
 		return helpers.load_with_stubs("ui.wpm.wpm_widget", {
 			screen = {
 				mainScreen = function()

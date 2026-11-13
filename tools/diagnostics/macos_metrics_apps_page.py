@@ -21,11 +21,11 @@ FILTER_SCOPE = (
     "category rename and DOM filter with non-null selection; Host.show and persistence unmeasured"
 )
 DEPENDENCIES = (
-    "static/ergopti_plus/macos/ui/ui_builder.lua",
-    "static/ergopti_plus/macos/ui/webview_close_owner.lua",
+    "static/ergopti_plus/macos/core/ui/ui/builder.lua",
+    "static/ergopti_plus/macos/core/ui/ui/webview_close_owner.lua",
     "static/ergopti_plus/macos/core/events/timer_scheduler.lua",
     "static/ergopti_plus/macos/core/timing/engine/deferred_work.lua",
-    "static/ergopti_plus/macos/adapters/webview_result.lua",
+    "static/ergopti_plus/macos/core/ui/adapters/webview_result.lua",
     "static/ergopti_plus/macos/ui/metrics_apps/init.lua",
     "static/ergopti_plus/_shared/core/ui/engine/webview/i18n_seed.lua",
     "static/ergopti_plus/_shared/core/i18n/data/locales/fr.json",

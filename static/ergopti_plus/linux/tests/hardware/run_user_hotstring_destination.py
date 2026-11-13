@@ -32,7 +32,7 @@ if direct.role == 40 then assert(capture == nil, "password field cannot own user
 else assert(capture and Destination.current(capture), "normal exact destination must be owned") end
 -- Exercise unsupported-compositor routing over real GTK/AT-SPI ownership.
 -- This qualifies the native accessibility path, not a GNOME/KDE compositor.
-require("infra.display_server")._set_for_test("wayland", "gnome")
+require("core.ui.engine.display_server")._set_for_test("wayland", "gnome")
 local identity = require("adapters.window_info").focused_identity()
 if direct.role == 40 then assert(identity == nil, "password fields cannot own AI output")
 else

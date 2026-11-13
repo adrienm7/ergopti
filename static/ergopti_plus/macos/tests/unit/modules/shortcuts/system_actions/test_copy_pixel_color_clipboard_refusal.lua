@@ -40,7 +40,7 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 			start = function(task) return task:start() and true or false end,
 		}
 		package.loaded["core.process.adapters.task_lifecycle"] = task_lifecycle
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(message, _, level)
 				notifications[#notifications + 1] = { message = message, level = level }
 			end,
@@ -89,7 +89,7 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 			end,
 			start = function(task) return task.start() == true end,
 		}
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		install_temp_file_stub()

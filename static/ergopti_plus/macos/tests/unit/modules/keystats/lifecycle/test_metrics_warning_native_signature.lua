@@ -26,7 +26,7 @@ local OWNERS = {
 	"core.text.engine.toml_codec.record_scanner",
 	"core.text.engine.toml_codec.source_open",
 	"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock", "hs", "tests.stubs.hs", "core.logger.engine.logger", "infra.manifest_reader", "infra.config_paths",
-	"infra.dialog_util", "core.lifecycle.engine.shutdown.teardown_transaction", "modules.keystats.init",
+	"core.ui.engine.dialog_util", "core.lifecycle.engine.shutdown.teardown_transaction", "modules.keystats.init",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 	"modules.keystats.kc_bridge", "modules.keystats.watchers", "modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode", "adapters.synthetic_input", "adapters.event_provenance", "core.process.adapters.lifecycle",
@@ -50,7 +50,7 @@ helpers.describe("typing metrics warning native signature", function()
 	helpers.it("presents the unavailable metrics warning without a native signature error", function()
 		helpers.with_stub_scope(OWNERS, function()
 			local fixture = Fixture.load_keystats()
-			local warnings = WarningContract.attach(package.loaded["infra.dialog_util"])
+			local warnings = WarningContract.attach(package.loaded["core.ui.engine.dialog_util"])
 			local prior_loader = package.preload["ui.metrics_typing"]
 			package.loaded["ui.metrics_typing"] = nil
 			package.preload["ui.metrics_typing"] = function() error("controlled metrics module unavailable", 0) end

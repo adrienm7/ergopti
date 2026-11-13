@@ -129,7 +129,7 @@ helpers.describe("shortcuts menu: this driver's own rows", function()
 		assert(find_row(wrap(), i18n.get("menu.shortcuts.wrap_symbols_check_all"))).fn()
 		helpers.assert_eq(log.wrap_states["("], true)
 		local answers = { "§", "" }
-		local TextPrompt = require("ui.text_prompt")
+		local TextPrompt = require("core.ui.ui.text_prompt")
 		local original = TextPrompt.ask
 		TextPrompt.ask = function() return table.remove(answers, 1) end
 		local ok, detail = pcall(function()
@@ -328,7 +328,7 @@ helpers.describe("shortcuts menu: master publication receipt", function()
 	--- @return table notices
 	--- @return integer releases
 	local function observe(action)
-		local execute, modal = os.execute, require("ui.modal")
+		local execute, modal = os.execute, require("core.ui.ui.modal")
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)
@@ -436,7 +436,7 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 	--- @return table notices
 	--- @return integer releases
 	local function observe(action)
-		local execute, modal = os.execute, require("ui.modal")
+		local execute, modal = os.execute, require("core.ui.ui.modal")
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)

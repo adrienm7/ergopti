@@ -50,7 +50,7 @@ local function load_fixture()
 			name:match("^modules%.keymap")
 			or name:match("^modules%.llm")
 			or name:match("^modules%.keystats")
-			or name:match("^ui%.tooltip")
+			or name:match("^core%.ui%.ui%.tooltip")
 			or name:match("^adapters%.")
 			or name:match("^infra%.")
 		) then

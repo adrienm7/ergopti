@@ -16,7 +16,7 @@ local MODULE_NAMES = {
 	"core.process.adapters.shell_runner",
 	"core.events.timer_scheduler",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.llm.api_mlx",
 	"modules.llm.api_mlx_discovery",
 	"modules.llm.api_mlx_fetch",
@@ -198,7 +198,7 @@ local function with_real_mlx_stack(fn)
 		tasks = {},
 	}
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 	package.loaded["modules.shortcuts.script_control"] = {
 		is_paused = function() return state.script_paused end,
 		get_pause_epoch = function() return state.pause_epoch end,
@@ -288,7 +288,7 @@ local function install_script_control_dependencies(options)
 	package.loaded["ui.wpm.wpm_menubar"] = { is_running = function() return false end }
 	package.loaded["ui.wpm.wpm_widget"] = { is_running = function() return false end }
 	package.loaded["platform.remap.onboarding"] = { stop = settled }
-	package.loaded["ui.tooltip"] = { hide_forced = settled }
+	package.loaded["core.ui.ui.tooltip"] = { hide_forced = settled }
 	package.loaded["modules.keystats"] = { resync_context = settled }
 end
 

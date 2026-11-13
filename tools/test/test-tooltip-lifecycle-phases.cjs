@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * `_shared/core/ui/data/tooltip/lifecycle.js` declares the four-phase surface
  * lifecycle — teardown, suspend, prepare, reveal — and five contract rules about
- * their ordering. `windows/ui/tooltip/helpers.ahk` names it in its header as the
+ * their ordering. `windows/core/ui/ui/tooltip/helpers.ahk` names it in its header as the
  * canonical list it implements.
  *
  * That was the whole enforcement: a sentence. The mirror was a claim, not a gate,
@@ -41,7 +41,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const LIFECYCLE = path.join(ROOT, 'static/ergopti_plus/_shared/core/ui/data/tooltip/lifecycle.js');
-const AHK_RENDERER = path.join(ROOT, 'static/ergopti_plus/windows/ui/tooltip/helpers.ahk');
+const AHK_RENDERER = path.join(ROOT, 'static/ergopti_plus/windows/core/ui/ui/tooltip/helpers.ahk');
 
 const errors = [];
 

@@ -1357,7 +1357,7 @@ do
 	require("core.text.engine.toml_codec.writer").set_sparse_defaults(
 		config_paths.get("ConfigTomlPath"), require("infra.manifest_reader"))
 	require("core.text.engine.toml_codec.writer").set_case_twin_reporter(function(message)
-		local sent, notice_error = require("infra.notifications").notify(i18n.get("paths_editor.save_failed_title"), message, "error")
+		local sent, notice_error = require("core.ui.engine.notifications").notify(i18n.get("paths_editor.save_failed_title"), message, "error")
 		if not sent then error(tostring(notice_error)) end
 	end)
 	local catalogue_ok, action_catalogue = pcall(require, "_generated.action_catalogue")
@@ -1397,7 +1397,7 @@ do
 	-- session: say so, or every change the user makes silently fails to stick.
 	local notice = ConfigMigrate.read_only_notice_key(migration)
 	if notice then
-		local sent, notice_error = require("infra.notifications").notify(i18n.get(notice), nil, "warning")
+		local sent, notice_error = require("core.ui.engine.notifications").notify(i18n.get(notice), nil, "warning")
 		if not sent then
 			Logger.error(LOG, "The newer-configuration notice was not shown: %s.", tostring(notice_error))
 		end
@@ -2456,7 +2456,7 @@ Boot.stage("Boot complete (post-init deferrals scheduled)")
 -- not penalised by the framework load (~1-2 s).  Deferred so it never
 -- blocks the boot critical path.
 hs.timer.doAfter(require("core.timing.engine.timings").sec("ui", "webkit_warmup_delay_ms"), function()
-	pcall(function() require("ui.ui_builder").warmup_webkit() end)
+	pcall(function() require("core.ui.ui.builder").warmup_webkit() end)
 end)
 
 -- Name once each config.toml entry no reader of this build uses, as the

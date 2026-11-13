@@ -177,7 +177,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			"modules.llm",
 			"modules.llm.prediction_engine",
 			"modules.keystats",
-			"ui.tooltip",
+			"core.ui.ui.tooltip",
 			"modules.keymap.llm_bridge",
 		}
 		local previous = {}
@@ -227,7 +227,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			reset = function() reset_count = reset_count + 1; return true end,
 		}
 		package.loaded["modules.keystats"] = {}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			set_runtime_guard = function() end,
 			set_accept_callback = function() end,
 			set_cancel_callback = function() end,

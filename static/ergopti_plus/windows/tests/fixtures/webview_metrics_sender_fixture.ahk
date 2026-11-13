@@ -23,8 +23,8 @@
 #Include ../../infra/hotpath_profiler.ahk
 #Include ../../core/fs/adapters/file_system.ahk
 #Include ../../core/crypto/crypto.ahk
-#Include ../../adapters/webview_profiles.ahk
-#Include ../../infra/webview_utils.ahk
+#Include ../../core/ui/adapters/webview_profiles.ahk
+#Include ../../core/ui/engine/webview/utils.ahk
 #Include ../../infra/config_transition.ahk
 #Include ../../infra/config_transition_runtime.ahk
 #Include ../../core/lifecycle/engine/reload/terminal_handoff.ahk

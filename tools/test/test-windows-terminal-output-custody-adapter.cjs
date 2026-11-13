@@ -178,7 +178,10 @@ function validateNaturalZeroCustody(source, tests) {
 		);
 }
 
-const source = fs.readFileSync(path.join(DRIVER, 'adapters/terminal_output_custody.ahk'), 'utf8');
+const source = fs.readFileSync(
+	path.join(DRIVER, 'core/ui/adapters/terminal_output_custody.ahk'),
+	'utf8'
+);
 const tests = fs.readFileSync(
 	path.join(DRIVER, 'tests/unit/modules/llm/nav_event_owner/test_terminal_output_custody.ahk'),
 	'utf8'
@@ -940,7 +943,7 @@ process.stdout.write(
 
 // Explicit SendInput is one caller-selected primitive, never a backend policy.
 const explicitSender = fs.readFileSync(
-	path.join(DRIVER, 'adapters/terminal_output_sendinput.ahk'),
+	path.join(DRIVER, 'core/ui/adapters/terminal_output_sendinput.ahk'),
 	'utf8'
 );
 function validateExplicitSender(sender, receivingTests) {

@@ -39,7 +39,7 @@ helpers.describe("Gesture actions fixture ownership", function()
 					local sentinel
 					if initial == "false" then sentinel = false end
 					if initial == "existing" then sentinel = {} end
-					for _, name in ipairs({ "modules.gestures.actions", "infra.notifications",
+					for _, name in ipairs({ "modules.gestures.actions", "core.ui.engine.notifications",
 						"core.events.timer_scheduler", "_generated.gesture_emit_actions",
 						"_generated.action_catalogue", "settings.engine.publication.binding_identity", "tap_hold.engine.key_combinations", "settings.engine.publication.binding_publication", "settings.engine.publication.keyboard_publication", "core.text.engine.identifiers", "hs", "hs.timer",
 						"ai.engine.prediction.translate", "menu.engine.manifest_reader_core", "core.timing.engine.timings_core", "core.text.engine.toml_codec.record_scanner", "ui.menu.gesture_fixture_unrelated" }) do
@@ -130,7 +130,7 @@ helpers.describe("Gesture actions fixture ownership", function()
 				for attempt = 1, 2 do
 					local _, calls = fresh()
 					local timer = require("core.events.timer_scheduler")
-					local notifications = require("infra.notifications")
+					local notifications = require("core.ui.engine.notifications")
 					local clock_reads, notification_creations = 0, 0
 					calls.hs.timer.secondsSinceEpoch = function()
 						clock_reads = clock_reads + 1

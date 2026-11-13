@@ -15,7 +15,7 @@ local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Stub modules required at top-level by script_control.lua so that load_with_stubs
 -- can fully execute the module and expose pause_all/resume_all etc on the returned table.
-package.loaded["infra.notifications"] = { notify = function() end }
+package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 package.loaded["infra.keycodes"] = {
 	F13_KARABINER_RETURN = 0x6A,
 	F14_KARABINER_BACKSPACE = 0x6B,
@@ -43,7 +43,7 @@ package.loaded["modules.gestures.actions"] = {
 -- Pause requires tooltip teardown to commit. Keep the generic state-machine
 -- tests independent from the real canvas-backed tooltip, which cannot own a
 -- surface under the headless hs stub.
-package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 -- The fixed HS-012 inventory lazy-loads every owner. These broad ScriptControl
 -- API tests must not depend on a real owner cached by an earlier test module.
 package.loaded["modules.llm.api_mlx"] = {

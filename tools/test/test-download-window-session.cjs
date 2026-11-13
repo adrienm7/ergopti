@@ -124,7 +124,7 @@ package.loaded['core.timing.engine.deferred_work'] = { after = function() return
 package.loaded['core.process.adapters.shell_runner'] = { applescript = function()
 	error('a stale terminal action must not launch a process')
 end }
-package.loaded['ui.ui_builder'] = {
+package.loaded['core.ui.ui.builder'] = {
 	get_app_geometry = function() return { width = 460, height = 380 } end,
 	show_webview = function(opts)
 		created = created + 1

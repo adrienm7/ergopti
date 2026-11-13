@@ -20,7 +20,7 @@ helpers.describe("Karabiner ownership comes only from the exact lease generation
 				}
 			end,
 		}
-		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["platform.remap.ke_lifecycle"] = nil
 

@@ -181,7 +181,7 @@ function M.run(options)
 	}
 
 	local tooltip_accept_callback = nil
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		hide = noop,
 		show_stacked = noop,
 		set_timeout = noop,
@@ -194,7 +194,7 @@ function M.run(options)
 		set_on_show_callback = noop,
 		set_runtime_guard = noop,
 	}
-	package.loaded["adapters.tooltip_renderer"] = { hide = noop }
+	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = noop }
 	package.loaded["modules.keymap.registry"] = {
 		init = function() return true end,
 		mappings_for_tail = function() return nil end,

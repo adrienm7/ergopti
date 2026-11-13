@@ -27,7 +27,7 @@ local _contract = nil
 local KINDS = { ollama_model = true, app_update = true }
 
 local function manager()
-	local ok, module = pcall(require, "ui.webview_manager")
+	local ok, module = pcall(require, "core.ui.ui.webview_manager")
 	return ok and type(module) == "table" and module or nil
 end
 

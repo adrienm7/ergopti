@@ -57,7 +57,7 @@ local MODULE_NAMES = {
 	"modules.llm.mlx_deps_checker",
 	"modules.llm.ollama_deps_checker",
 	"modules.llm.backend_detector",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"ui.error_dialog",
 	"infra.ui_restore",
 	"ui.onboarding",
@@ -384,7 +384,7 @@ local function run_isolated(options, assertions)
 			["modules.llm.mlx_deps_checker"] = {},
 			["modules.llm.ollama_deps_checker"] = {},
 			["modules.llm.backend_detector"] = {},
-			["infra.notifications"] = { notify = function() return true end },
+			["core.ui.engine.notifications"] = { notify = function() return true end },
 			["ui.error_dialog"] = {
 				init = function()
 					state.error_dialog_inits = state.error_dialog_inits + 1

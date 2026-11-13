@@ -42,7 +42,7 @@ local task_api = Fixture.task_api
 helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 	local function load_offer(choice_key, record)
 		local i18n = require("core.i18n.engine.i18n")
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function(...)
 				record.dialogs = record.dialogs + 1
 				record.dialog_args = table.pack(...)
@@ -50,7 +50,7 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 				return i18n.get(choice_key)
 			end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, kind, on_click)
 				record.notices[#record.notices + 1] = { title = title, body = body, kind = kind, on_click = on_click }
 				return true

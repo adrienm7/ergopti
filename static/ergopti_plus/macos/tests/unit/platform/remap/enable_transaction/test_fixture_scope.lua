@@ -27,7 +27,7 @@ local OWNED_MODULES = {
 	"platform.remap",
 	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.text.engine.utils",
 	"platform.remap.ke_paths",
 	"core.process.adapters.task_lifecycle",
@@ -40,7 +40,7 @@ local OWNED_MODULES = {
 	"modules.llm.api_remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
 	"adapters.synthetic_input",
 	"modules.shortcuts.script_control",
@@ -66,7 +66,7 @@ helpers.describe("remap transaction fixture scope", function()
 				for index, name in ipairs(OWNED_MODULES) do
 					local value = { name = name }
 					if name == "platform.remap.ke_variables" then value = nil end
-					if name == "infra.notifications" then value = false end
+					if name == "core.ui.engine.notifications" then value = false end
 					before[index] = value
 					package.loaded[name] = value
 				end

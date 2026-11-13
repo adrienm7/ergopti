@@ -17,7 +17,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../../../../../ui/editors.ahk
+#Include ../../../../../core/ui/ui/editors.ahk
 
 
 

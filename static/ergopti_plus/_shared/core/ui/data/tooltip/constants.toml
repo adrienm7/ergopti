@@ -353,7 +353,7 @@ footer_combined_separator = "|"
 # name on Windows and Linux (« Ctrl+Maj+3 »), joined by the OS's joiner and
 # then to the digit. No modifier means the bare digit. Vectors:
 # _shared/tests/corpus/tooltip/llm_shortcut_vectors.json; rule:
-# _shared/core/ui/engine/tooltip/llm_line.lua (ported in windows/ui/tooltip/llm.ahk).
+# _shared/core/ui/engine/tooltip/llm_line.lua (ported in windows/core/ui/ui/tooltip/llm.ahk).
 shortcut_modifier_order = "ctrl,alt,shift,cmd"
 shortcut_joiner_ahk = "+"
 shortcut_joiner_hs = ""
@@ -404,7 +404,7 @@ safety_timeout_sec = 3.0
 # disappears slightly before the expansion window closes. This [timing] section
 # is the only declaration of these values: Windows (infra/ui_style.ahk) and
 # macOS (ui/tooltip/config.lua) read it, and the dequeue engines
-# (_shared/core/ui/data/tooltip/dequeue.js, macos/ui/tooltip/dequeue.lua) take it from
+# (_shared/core/ui/data/tooltip/dequeue.js, macos/core/ui/ui/tooltip/dequeue.lua) take it from
 # their caller and keep no default (test-tooltip-timing-single-source.cjs).
 timeout_decrement_sec = 0.2
 

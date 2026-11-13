@@ -33,7 +33,7 @@ local function run_case(case)
 	helpers.with_stub_scope({ "modules.llm.api_ollama", "modules.llm",
 		"modules.keystats", "modules.llm.api_common", "modules.llm.profiles",
 		"modules.llm.ollama_endpoint", "modules.llm.progressive_reveal",
-		"core.fs.adapters.storage", "core.fs.adapters.file_system", "infra.notifications",
+		"core.fs.adapters.storage", "core.fs.adapters.file_system", "core.ui.engine.notifications",
 		"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"modules.llm.parser", "core.logger.engine.logger" }, function()
 		-- The parser only reads the core's defaults. Keep that data port truthful

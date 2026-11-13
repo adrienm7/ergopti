@@ -398,7 +398,7 @@ helpers.describe("gesture scope menu composition", function()
 	helpers.it("wires exact scope modes and the shared fence, with no question for either mode", function()
 		with_menu_fixture({}, function(observations)
 			local received, selected, dialog_args
-			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(...)
 				dialog_args = { ... }
 				return selected
 			end }
@@ -432,7 +432,7 @@ helpers.describe("layout scope menu composition", function()
 	helpers.it("wires exact scope modes and the shared fence, with no question for either mode", function()
 		with_menu_fixture({}, function(observations)
 			local received, selected, dialog_args
-			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(...)
 				dialog_args = { ... }
 				return selected
 			end }
@@ -468,7 +468,7 @@ helpers.describe("metrics scope menu composition", function()
 	helpers.it("wires exact scope modes and the shared fence, with no question for either mode", function()
 		with_menu_fixture({}, function(observations)
 			local received, selected, dialog_args
-			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(...)
 				dialog_args = { ... }
 				return selected
 			end }
@@ -505,7 +505,7 @@ helpers.describe("hotstrings scope menu composition", function()
 	helpers.it("wires the running keymap, both files and the shared fence, with no question for either mode", function()
 		with_menu_fixture({}, function(observations)
 			local received, selected, dialog_args
-			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(...)
 				dialog_args = { ... }
 				return selected
 			end }

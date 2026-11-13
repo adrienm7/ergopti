@@ -184,8 +184,8 @@ helpers.describe("Linux system actions", function()
 	-- The window and its process are read before the question: once the
 	-- dialog's own window is gone, the one the window manager focuses may be another
 	-- application's, and a window closed meanwhile has no process to resolve.
-	-- The owned dialog host's command words (ui/native_dialog.lua).
-	local DIALOG = require("ui.native_dialog").command()
+	-- The owned dialog host's command words (core/ui/ui/native_dialog.lua).
+	local DIALOG = require("core.ui.ui.native_dialog").command()
 	local FORCE_QUIT_KILL = '[ "$(xdotool getwindowpid "$win" 2>/dev/null)" = "$pid" ] && kill -KILL "$pid"'
 
 	helpers.it("force_quit_frontmost kills only behind the owned question, window read first (force-quit-confirm)",

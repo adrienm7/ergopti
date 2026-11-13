@@ -119,7 +119,7 @@ function assertFolderAdapterOwnership(sources) {
 	);
 	assert.match(
 		code('infra'),
-		/^#Include %A_LineFile%\\\.\.\\\.\.\\adapters\\native_folder_picker\.ahk$/m,
+		/^#Include %A_LineFile%\\\.\.\\\.\.\\core\\ui\\adapters\\native_folder_picker\.ahk$/m,
 		'the folder owner includes its adapter for both production and private children'
 	);
 	assert.match(
@@ -319,7 +319,7 @@ const nativePolicySource = [
 ]
 	.map((file) =>
 		fs.readFileSync(
-			path.join(repository, 'static/ergopti_plus/windows/tests/unit/ui/windows', file),
+			path.join(repository, 'static/ergopti_plus/windows/tests/unit/core/ui/windows', file),
 			'utf8'
 		)
 	)
@@ -852,28 +852,28 @@ const cases = [
 		'Ui_FileSelect(Options := "", RootDir := "", Title := "", Filter := "") {\nreturn FileSelect(Options, RootDir, WindowTitle(Title), Filter)\n}',
 		0,
 		'actual file picker delegate owns the third argument',
-		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
 	],
 	[
 		'windows',
 		'Ui_FileSelect(Options, RootDir, Title, Filter) {\nreturn FileSelect(Options, RootDir, Title, Filter)\n}',
 		1,
 		'file picker owner cannot drop policy',
-		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
 	],
 	[
 		'windows',
 		'Ui_FileSelect(Options, RootDir, Title, Filter) {\nreturn FileSelect(Options, WindowTitle(Title), Title, Filter)\n}',
 		1,
 		'file picker policy on the root path does not own the caption',
-		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
 	],
 	[
 		'windows',
 		'Other(Options, RootDir, Title, Filter) {\nreturn FileSelect(Options, RootDir, WindowTitle(Title), Filter)\n}',
 		1,
 		'another file picker function cannot duplicate the native owner',
-		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
 	],
 	['windows', 'MsgBox("Body", "Tools")', 1, 'raw message box has no caption owner'],
 	[
@@ -947,28 +947,28 @@ const cases = [
 		'Ui_MsgBox(Text := "", Title := "", Options := "") {\nreturn MsgBox(Text, WindowTitle(Title), Options)\n}',
 		0,
 		'actual native message delegate owns its caption',
-		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
 	],
 	[
 		'windows',
 		'Ui_InputBox(Prompt := "", Title := "", Options := "", Default := "") {\nreturn InputBox(Prompt, WindowTitle(Title), Options, Default)\n}',
 		0,
 		'actual native input delegate owns its caption',
-		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
 	],
 	[
 		'windows',
 		'Ui_MsgBox(Text, Title, Options) {\nreturn MsgBox(Text, Title, Options)\n}',
 		1,
 		'central delegate itself cannot drop policy',
-		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
 	],
 	[
 		'windows',
 		'Other(Text, Title, Options) {\nreturn MsgBox(Text, WindowTitle(Title), Options)\n}',
 		1,
 		'other function in owner file cannot bypass central delegate',
-		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
 	],
 	[
 		'windows',
@@ -1178,28 +1178,28 @@ const cases = [
 		'Ui_DirSelect(RootDir, Options, Prompt, Title, OwnerHwnd) {\nreturn _Ui_FolderSelect(RootDir, Options, Prompt, WindowTitle(Title), OwnerHwnd)\n}',
 		0,
 		'folder wrapper owns exactly the fourth caption argument',
-		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
 	],
 	[
 		'windows',
 		'Ui_DirSelect(RootDir, Options, Prompt, Title, OwnerHwnd) {\nreturn _Ui_FolderSelect(RootDir, Options, WindowTitle(Prompt), Title, OwnerHwnd)\n}',
 		1,
 		'composing the folder body cannot substitute for caption policy',
-		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
 	],
 	[
 		'windows',
 		'Ui_DirSelect(RootDir, Options, Prompt, Title, OwnerHwnd) {\nreturn DirSelect(RootDir, Options, WindowTitle(Title))\n}',
 		1,
 		'the builtin folder dialog does not expose a chrome caption argument',
-		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
 	],
 	[
 		'windows',
 		'Other(Title) {\nreturn _Ui_FolderSelect("", 3, "Select folder", WindowTitle(Title), 0)\n}',
 		1,
 		'a differently owned native folder call cannot bypass the caption wrapper',
-		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
 	],
 	[
 		'windows',

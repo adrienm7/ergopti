@@ -63,7 +63,7 @@ end)
 local OWNED = {
 	"modules.gestures.user_actions", "modules.gestures.apple_shortcut_action",
 	"adapters.apple_shortcuts_cli", "adapters.apple_shortcuts", "core.logger.engine.logger", "core.i18n.engine.i18n",
-	"infra.notifications", "modules.gestures.actions_aux_owner", "core.fs.adapters.file_system", "adapters.clipboard",
+	"core.ui.engine.notifications", "modules.gestures.actions_aux_owner", "core.fs.adapters.file_system", "adapters.clipboard",
 	"adapters.synthetic_input", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
 	"adapters.apple_shortcuts_native", "modules.shortcuts.actions.text",
 }
@@ -90,7 +90,7 @@ local function with_world(body)
 				return table.concat(parts, "|")
 			end,
 		}
-		package.loaded["infra.notifications"] = { notify = function(text)
+		package.loaded["core.ui.engine.notifications"] = { notify = function(text)
 			world.notices[#world.notices + 1] = text
 			return true
 		end }

@@ -1,7 +1,7 @@
 ﻿; tests/unit/adapters/crash_report/test_screenshot_layered_native.ahk
 ; Isolated screenshot of private native surfaces; no clipboard or physical input.
 #Requires AutoHotkey v2.0
-#Include ../../ui/webview/test_model_browser_close_pause_owner.ahk
+#Include ../../core/ui/webview/test_model_browser_close_pause_owner.ahk
 _SCLP_Source(Directory) {
 	global _DriverDir
 	Source := _MBPT_ChildSource(Directory)

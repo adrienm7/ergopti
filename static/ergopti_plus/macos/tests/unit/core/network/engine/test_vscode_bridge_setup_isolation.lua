@@ -47,12 +47,12 @@ local function load_bridge_with_throwing_notice()
 
 	-- Both plausible notification channels raise, so the test does not encode
 	-- WHICH one the fix chooses — only that neither can stop the server.
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		alert = function() error("dialog raised", 0) end,
 		block_alert = function() error("dialog raised", 0) end,
 	}
 	local notice_count = 0
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function()
 			notice_count = notice_count + 1
 			error("notify raised", 0)
@@ -143,8 +143,8 @@ helpers.describe("vscode_bridge: setup() isolates the cosmetic step from the ser
 		-- Without this case the assertion above would pass against a setup() that
 		-- starts the server twice, or against a stub that counts a call nobody made.
 		package.loaded["core.network.engine.vscode_bridge"] = nil
-		package.loaded["infra.dialog_util"] = { alert = function() end, block_alert = function() end }
-		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["core.ui.engine.dialog_util"] = { alert = function() end, block_alert = function() end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end }
 
 		local started = { count = 0 }

@@ -1636,7 +1636,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 			cancel = function() state.cancellations = state.cancellations + 1 end,
 		} or nil
 		modules["core.lifecycle.engine.runtime_guard"] = { optional_require = function(name)
-			if name == "ui.webview_manager" then return manager end
+			if name == "core.ui.ui.webview_manager" then return manager end
 			if name == "modules.llm.prediction_engine" then return runtime end
 		end }
 		modules["core.lifecycle.engine.shutdown.coordinator"] = { new = function(options)

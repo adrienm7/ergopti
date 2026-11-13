@@ -134,7 +134,7 @@ function M.build_world(options)
 			return true
 		end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function(title, message, default, ok_label, cancel_label)
 			world.dialogs[#world.dialogs + 1] = { title = title, message = message, default = default,
 				ok = ok_label, cancel = cancel_label }
@@ -147,7 +147,7 @@ function M.build_world(options)
 			return world.alert_answer == "first" and first or second
 		end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, kind, on_click)
 			world.notifications[#world.notifications + 1] = { title = title, body = body, kind = kind,
 				on_click = on_click }
@@ -169,7 +169,7 @@ function M.build_world(options)
 			return true
 		end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		set_llm_timeout = function() end,

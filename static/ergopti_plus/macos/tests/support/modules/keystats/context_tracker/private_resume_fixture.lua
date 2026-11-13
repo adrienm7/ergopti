@@ -17,7 +17,7 @@ local OWNERS = {
 	"core.logger.engine.logger",
 	"infra.manifest_reader",
 	"infra.config_paths",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.lifecycle.engine.shutdown.teardown_transaction",
 	"modules.keystats.init",
 	"modules.keystats.log_manager",
@@ -47,7 +47,7 @@ local OWNERS = {
 	"metrics.engine.capture.physical_configuration_observation",
 	"metrics.engine.capture.physical_subscription_lifetime",
 	"modules.shortcuts.script_control",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
 	"adapters.key_state",
@@ -60,7 +60,7 @@ local OWNERS = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"core.text.engine.toml.reader",
 	"core.text.engine.toml_codec.reader",
 	"core.text.engine.toml_codec.bom",
@@ -79,7 +79,7 @@ local OWNERS = {
 	"core.process.adapters.shell_runner",
 	"core.process.adapters.task_environment",
 	"adapters.text_sender",
-	"adapters.tooltip_renderer",
+	"core.ui.adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8",
 	"core.lifecycle.engine.core.ollama_runtime_choice",
 	"diagnostics.engine.operation_reporter",
@@ -292,7 +292,7 @@ function M.with_runtime(callback)
 				return true
 			end
 			local notices = {}
-			package.loaded["infra.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
 			package.loaded["modules.gestures.engine"] = {}
 			package.loaded["modules.gestures.actions"] = { SG_NAMES = {}, get_label = function(value) return value end }
 			package.loaded["adapters.key_state"] = {}
@@ -312,7 +312,7 @@ function M.with_runtime(callback)
 			remote.prewarm_active_entry_decrypt = function() return true end
 			for _, name in ipairs({ "ui.wpm.wpm_menubar", "ui.wpm.wpm_widget" }) do package.loaded[name] = { is_running = function() return false end } end
 			package.loaded["platform.remap.onboarding"] = { stop = yes }
-			package.loaded["ui.tooltip"] = { hide_forced = yes }
+			package.loaded["core.ui.ui.tooltip"] = { hide_forced = yes }
 			local control_path = driver .. "/modules/shortcuts/script_control.lua"
 			control = assert(loadfile(control_path))()
 			package.loaded["modules.shortcuts.script_control"] = control

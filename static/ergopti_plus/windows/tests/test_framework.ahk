@@ -680,7 +680,7 @@ _DriverExtractDefinedBody(&Src, Definition) {
 
 ; Reads every .ahk under a windows/-relative directory (recursive), concatenated
 ; into one string. Use for source-introspection tests that scan a specific
-; module's files (e.g. "ui/tooltip") regardless of how that module is internally
+; module's files (e.g. "core/ui/ui/tooltip") regardless of how that module is internally
 ; split into sub-files. RelDir uses forward slashes.
 ;
 ; THROWS when any selected file is unreadable or the directory holds no .ahk
@@ -790,7 +790,7 @@ global TEST_MODULE_GROUPS := [
 	; Keystats capture, storage and metrics.
 	["keystats", "^unit/modules/keystats/"],
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
-	["ui", "^unit/ui/"],
+	["ui", "^unit/"],
 	; Adapters, platform services, shared infrastructure and the test runner.
 	["core", "^unit/(adapters|platform|infra|suite|core)/"]
 ]

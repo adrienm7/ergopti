@@ -190,7 +190,7 @@ function M.run(options)
 				record("signals.stop"); observed.signal_stops = observed.signal_stops + 1
 				observed.signals_active = false; return true
 			end }
-		elseif name == "infra.gui_stack" then
+		elseif name == "core.ui.engine.gui_stack" then
 			-- The desktop toolkit is present: its refusal has its own cases
 			-- (tests/unit/core/lifecycle/test_gui_stack.lua).
 			return { check_at_start = function() record("gui_stack"); return nil end }

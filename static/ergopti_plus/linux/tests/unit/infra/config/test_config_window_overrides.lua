@@ -253,12 +253,12 @@ helpers.describe("config window: with no config module", function()
 		local handler = helpers.load_module("ui.hotstrings_config_window.bridge")
 
 		local pushed = {}
-		local manager = package.loaded["ui.webview_manager"]
-		package.loaded["ui.webview_manager"] = {
+		local manager = package.loaded["core.ui.ui.webview_manager"]
+		package.loaded["core.ui.ui.webview_manager"] = {
 			eval_js = function(app, js) pushed[#pushed + 1] = { app = app, js = js }; return true end,
 		}
 		handler.on_message({ action = "set_delay", category = "rolls", ms = 1000 }, {})
-		package.loaded["ui.webview_manager"] = manager
+		package.loaded["core.ui.ui.webview_manager"] = manager
 
 		helpers.assert_eq(#pushed, 1,
 			"the window is redrawn by a push, and it must still happen when the "
@@ -271,12 +271,12 @@ helpers.describe("config window: with no config module", function()
 
 		-- The same for every other action that redraws: none of them may throw with
 		-- no config module, and each must still reach the page.
-		package.loaded["ui.webview_manager"] = {
+		package.loaded["core.ui.ui.webview_manager"] = {
 			eval_js = function(app, js) pushed[#pushed + 1] = { app = app, js = js }; return true end,
 		}
 		handler.on_message({ action = "set_tooltip", category = "rolls", show_tooltip = true }, {})
 		handler.on_message({ action = "reset_all" }, {})
-		package.loaded["ui.webview_manager"] = manager
+		package.loaded["core.ui.ui.webview_manager"] = manager
 
 		helpers.assert_eq(#pushed, 3, "every redrawing action pushes, none of them silently")
 	end)

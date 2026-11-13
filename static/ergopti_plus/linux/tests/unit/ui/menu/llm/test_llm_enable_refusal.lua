@@ -162,7 +162,7 @@ helpers.describe("AI refusal notice", function()
 			helpers.assert_true(shown)
 			helpers.assert_true(retry)
 			helpers.assert_eq(#world.commands, 1)
-			local dialog = require("ui.native_dialog").command() .. " --question "
+			local dialog = require("core.ui.ui.native_dialog").command() .. " --question "
 			helpers.assert_eq(world.commands[1]:sub(1, #dialog), dialog)
 			helpers.assert_eq(#world.notifications, 0)
 		end)

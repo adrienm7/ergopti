@@ -46,7 +46,7 @@ EventLoop.add_idle_handler = function(handler)
 	idle_registrations = idle_registrations + 1
 	return register_idle(handler)
 end
-local Manager = require("ui.webview_manager")
+local Manager = require("core.ui.ui.webview_manager")
 
 -- The day and app the page must end up holding: only the daemon knows them.
 local DAY, APP, CHARS = "2026-09-24", "Firefox", 4242

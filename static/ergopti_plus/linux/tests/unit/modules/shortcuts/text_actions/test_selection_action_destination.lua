@@ -39,7 +39,7 @@ end
 --- @param body function Receives the observations after dispatch.
 local function with_action(session, action, change, body)
 	local names = {
-		"core.process.adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
+		"core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
 		"adapters.keyboard_hook", "adapters.modifier_broker", "adapters.uinput_writer",
 		"core.events.loop", "modules.hotstrings.injector", "adapters.clipboard",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
@@ -86,7 +86,7 @@ local function with_action(session, action, change, body)
 					return true
 				end,
 			}
-			package.loaded["infra.display_server"] = {
+			package.loaded["core.ui.engine.display_server"] = {
 				UNKNOWN = "unknown", kind = function() return session end,
 				is_x11 = function() return session == "x11" end,
 				is_wayland = function() return session == "wayland" end,
@@ -242,7 +242,7 @@ end)
 --- @param change string Controlled destination retirement or native refusal.
 --- @return table world Independently recorded output and handler result.
 local function observe_compound_action(action, change)
-	local names = { "core.process.adapters.shell_runner", "infra.display_server", "adapters.keyboard_hook",
+	local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_hook",
 		"adapters.modifier_broker", "adapters.uinput_writer", "core.events.loop",
 		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
@@ -264,7 +264,7 @@ local function observe_compound_action(action, change)
 				quote = function(v) return "'" .. v .. "'" end,
 				has_command = function() return false end,
 			}
-			package.loaded["infra.display_server"] = {
+			package.loaded["core.ui.engine.display_server"] = {
 				UNKNOWN = "unknown", kind = function() return "x11" end,
 				is_x11 = function() return true end, is_wayland = function() return false end,
 			}
@@ -374,7 +374,7 @@ end)
 --- @param change string The desktop boundary which retires the original field.
 --- @return table observations Independent output, clipboard and owner receipts.
 local function observe_configured_insertion(session, action, route, change)
-	local names = { "core.process.adapters.shell_runner", "infra.display_server", "adapters.keyboard_hook",
+	local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_hook",
 		"adapters.modifier_broker", "adapters.uinput_writer", "core.events.loop",
 		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter" }
@@ -414,7 +414,7 @@ local function observe_configured_insertion(session, action, route, change)
 					return true
 				end,
 			}
-			package.loaded["infra.display_server"] = {
+			package.loaded["core.ui.engine.display_server"] = {
 				UNKNOWN = "unknown", kind = function() return session end,
 				is_x11 = function() return session == "x11" end,
 				is_wayland = function() return session == "wayland" end,

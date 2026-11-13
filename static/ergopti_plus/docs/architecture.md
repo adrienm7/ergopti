@@ -51,7 +51,6 @@ graph TD
         LINUX_desktop_opener["DesktopOpener.lua"]
         LINUX_desktop_opener_worker["DesktopOpenerWorker.lua"]
         LINUX_evdev_reader["EvdevReader.lua"]
-        LINUX_graphics_renderer["GraphicsRenderer.lua"]
         LINUX_input_source_group_worker["InputSourceGroupWorker.lua"]
         LINUX_input_source_switch["InputSourceSwitch.lua"]
         LINUX_keyboard_hook["KeyboardHook.lua"]
@@ -61,7 +60,6 @@ graph TD
         LINUX_screen_capture["ScreenCapture.lua"]
         LINUX_secure_field_detector["SecureFieldDetector.lua"]
         LINUX_selection_transaction["SelectionTransaction.lua"]
-        LINUX_spotlight_overlay["SpotlightOverlay.lua"]
         LINUX_tap_to_click_setting["TapToClickSetting.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
@@ -92,7 +90,6 @@ graph TD
         MACOS_field_probe_ports["FieldProbePorts.lua"]
         MACOS_field_run_ports["FieldRunPorts.lua"]
         MACOS_foreign_ledger_snapshot["ForeignLedgerSnapshot.lua"]
-        MACOS_graphics_renderer["GraphicsRenderer.lua"]
         MACOS_hotkey_registrar["HotkeyRegistrar.lua"]
         MACOS_input_source_broker["InputSourceBroker.lua"]
         MACOS_input_source_selector["InputSourceSelector.lua"]
@@ -114,7 +111,6 @@ graph TD
         MACOS_native_python_probe["NativePythonProbe.lua"]
         MACOS_notifier["Notifier.lua"]
         MACOS_one_shot_shift["OneShotShift.lua"]
-        MACOS_own_window["OwnWindow.lua"]
         MACOS_physical_context_probe["PhysicalContextProbe.lua"]
         MACOS_physical_history_context["PhysicalHistoryContext.lua"]
         MACOS_physical_lifecycle_event["PhysicalLifecycleEvent.lua"]
@@ -138,11 +134,9 @@ graph TD
         MACOS_system_switcher_sampler["SystemSwitcherSampler.lua"]
         MACOS_tcc_grant["TccGrant.lua"]
         MACOS_text_sender["TextSender.lua"]
-        MACOS_tooltip_renderer["TooltipRenderer.lua"]
         MACOS_tray_menu["TrayMenu.lua"]
         MACOS_unicode_carrier["UnicodeCarrier.lua"]
         MACOS_update_launcher["UpdateLauncher.lua"]
-        MACOS_webview_result["WebviewResult.lua"]
         MACOS_window_info["WindowInfo.lua"]
         MACOS_window_manager["WindowManager.lua"]
     end
@@ -155,7 +149,6 @@ graph TD
         WINDOWS_crash_report_worker["CrashReportWorker.ahk"]
         WINDOWS_diagnostics_control["DiagnosticsControl.ahk"]
         WINDOWS_editor_replace["EditorReplace.ahk"]
-        WINDOWS_graphics_renderer["GraphicsRenderer.ahk"]
         WINDOWS_hotkey_registrar["HotkeyRegistrar.ahk"]
         WINDOWS_input_probe_native["InputProbeNative.ahk"]
         WINDOWS_key_state["KeyState.ahk"]
@@ -165,9 +158,6 @@ graph TD
         WINDOWS_llm_automation["LlmAutomation.ahk"]
         WINDOWS_llm_nav_event_owner["LlmNavEventOwner.ahk"]
         WINDOWS_mouse_control["MouseControl.ahk"]
-        WINDOWS_native_folder_picker["NativeFolderPicker.ahk"]
-        WINDOWS_native_number["NativeNumber.ahk"]
-        WINDOWS_native_text["NativeText.ahk"]
         WINDOWS_notifier["Notifier.ahk"]
         WINDOWS_notify_icon["NotifyIcon.ahk"]
         WINDOWS_ollama_identity["OllamaIdentity.ahk"]
@@ -179,17 +169,12 @@ graph TD
         WINDOWS_system_control["SystemControl.ahk"]
         WINDOWS_system_locale["SystemLocale.ahk"]
         WINDOWS_system_time_zone["SystemTimeZone.ahk"]
-        WINDOWS_terminal_output_custody["TerminalOutputCustody.ahk"]
-        WINDOWS_terminal_output_preview["TerminalOutputPreview.ahk"]
-        WINDOWS_terminal_output_sendinput["TerminalOutputSendinput.ahk"]
         WINDOWS_text_sender["TextSender.ahk"]
-        WINDOWS_tooltip_renderer["TooltipRenderer.ahk"]
         WINDOWS_tray_menu["TrayMenu.ahk"]
         WINDOWS_tray_startup_click["TrayStartupClick.ahk"]
         WINDOWS_tray_startup_commands["TrayStartupCommands.ahk"]
         WINDOWS_updater_curl_capture["UpdaterCurlCapture.ahk"]
         WINDOWS_user_hotstrings_native["UserHotstringsNative.ahk"]
-        WINDOWS_webview_profiles["WebviewProfiles.ahk"]
         WINDOWS_window_info["WindowInfo.ahk"]
         WINDOWS_window_manager["WindowManager.ahk"]
     end
@@ -204,7 +189,6 @@ graph TD
 
     %% Port implementations: Linux (Lua)
     P_Clipboard -->|implements| LINUX_clipboard
-    P_GraphicsRenderer -->|implements| LINUX_graphics_renderer
     P_KeyboardHook -->|implements| LINUX_keyboard_hook
     P_Notifier -->|implements| LINUX_notifier
     P_SecureFieldDetector -->|implements| LINUX_secure_field_detector
@@ -214,7 +198,6 @@ graph TD
     %% Port implementations: macOS (Hammerspoon)
     P_AppLauncher -->|implements| MACOS_app_launcher
     P_Clipboard -->|implements| MACOS_clipboard
-    P_GraphicsRenderer -->|implements| MACOS_graphics_renderer
     P_HotkeyRegistrar -->|implements| MACOS_hotkey_registrar
     P_KeyState -->|implements| MACOS_key_state
     P_KeyboardHook -->|implements| MACOS_keyboard_hook
@@ -222,7 +205,6 @@ graph TD
     P_Notifier -->|implements| MACOS_notifier
     P_SecureFieldDetector -->|implements| MACOS_secure_field_detector
     P_TextSender -->|implements| MACOS_text_sender
-    P_TooltipRenderer -->|implements| MACOS_tooltip_renderer
     P_TrayMenu -->|implements| MACOS_tray_menu
     P_WindowInfo -->|implements| MACOS_window_info
     P_WindowManager -->|implements| MACOS_window_manager
@@ -230,7 +212,6 @@ graph TD
     %% Port implementations: Windows (AutoHotkey)
     P_AppLauncher -->|implements| WINDOWS_app_launcher
     P_Clipboard -->|implements| WINDOWS_clipboard
-    P_GraphicsRenderer -->|implements| WINDOWS_graphics_renderer
     P_HotkeyRegistrar -->|implements| WINDOWS_hotkey_registrar
     P_KeyState -->|implements| WINDOWS_key_state
     P_KeyboardHook -->|implements| WINDOWS_keyboard_hook
@@ -238,7 +219,6 @@ graph TD
     P_Notifier -->|implements| WINDOWS_notifier
     P_SecureFieldDetector -->|implements| WINDOWS_secure_field_detector
     P_TextSender -->|implements| WINDOWS_text_sender
-    P_TooltipRenderer -->|implements| WINDOWS_tooltip_renderer
     P_TrayMenu -->|implements| WINDOWS_tray_menu
     P_WindowInfo -->|implements| WINDOWS_window_info
     P_WindowManager -->|implements| WINDOWS_window_manager

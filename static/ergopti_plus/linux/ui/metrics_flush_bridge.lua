@@ -30,7 +30,7 @@ end
 
 local function manager_for(state)
 	if state.webview_manager ~= nil then return state.webview_manager end
-	return require("ui.webview_manager")
+	return require("core.ui.ui.webview_manager")
 end
 
 local function page_current(app, state, context)

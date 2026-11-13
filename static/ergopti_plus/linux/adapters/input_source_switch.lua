@@ -640,7 +640,7 @@ end
 --- command an owned asynchronous child bounded by the shared deadline.
 --- @return table port
 function M.native_port()
-	local DisplayServer = require("infra.display_server")
+	local DisplayServer = require("core.ui.engine.display_server")
 	local OwnedProcess = require("core.process.adapters.owned_process")
 	local Timings = require("core.timing.engine.timings")
 	local timeout_ms = Timings.ms("ui", "input_source_operation_timeout_ms")

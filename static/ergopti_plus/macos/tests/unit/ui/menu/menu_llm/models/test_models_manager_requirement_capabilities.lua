@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"core.logger.engine.logger",
 	"ui.menu.menu_llm.requirement_operation_registry",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.fs.engine.paths",
 	"modules.llm",
@@ -77,7 +77,7 @@ local function with_fixture(callback)
 		end
 
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return false end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.paths"] = {
 			shared_llm_path = function() return "/fixture/models.json" end,

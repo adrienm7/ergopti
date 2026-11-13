@@ -14,10 +14,10 @@ local OWNED_MODULES = {
 	"hs",
 	"tests.stubs.hs",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"core.fs.engine.dir",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"infra.keycodes",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
@@ -39,7 +39,7 @@ local OWNED_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"ui.menu.menu_llm.requirement_operation_registry",
@@ -145,10 +145,10 @@ end
 --- @param native table Native-state record receiving server starts.
 local function install_subject_stubs(native)
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = { notify = function() return true end }
+	package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
-	package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
+	package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return false end }
 	package.loaded["infra.keycodes"] = {
 		F13_KARABINER_RETURN = 106,
 		F14_KARABINER_BACKSPACE = 107,
@@ -307,7 +307,7 @@ local function install_subject_stubs(native)
 	package.loaded["platform.remap.onboarding"] = {
 		stop = function() return true end,
 	}
-	package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+	package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 	package.loaded["modules.keystats"] = {
 		resync_context = function() return true end,
 		log_shortcut = function() return true end,

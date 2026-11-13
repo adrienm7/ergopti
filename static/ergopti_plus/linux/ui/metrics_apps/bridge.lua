@@ -18,7 +18,7 @@ local LOG = "bridge.metrics_apps"
 local Flush = require("ui.metrics_flush_bridge")
 
 local function native_category_prompt(title, text, initial)
-	return require("ui.text_prompt").ask(title, require("ui.native_dialog").plain_markup(text), initial)
+	return require("core.ui.ui.text_prompt").ask(title, require("core.ui.ui.native_dialog").plain_markup(text), initial)
 end
 M._category_prompt = native_category_prompt
 

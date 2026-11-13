@@ -23,7 +23,7 @@
 ; missed the wrapper layer would therefore produce a completely silent
 ; regression: no TTLT in the info bar, no error, no log line. The stub harness
 ; cannot see it either (tests/test_stubs.ahk stubs the Show wrapper, and
-; ui/tooltip/init.ahk does not include tooltip_llm.ahk at all), so a behavioural
+; core/ui/ui/tooltip/init.ahk does not include tooltip_llm.ahk at all), so a behavioural
 ; test here would assert nothing.
 ; ==============================================================================
 

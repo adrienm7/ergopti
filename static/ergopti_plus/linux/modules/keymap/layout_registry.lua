@@ -1070,7 +1070,7 @@ function M.live_path(deps)
 	local session = (deps.session_type or session_type)()
 	if session == "x11" then return "x11", session end
 	if session == "wayland" then
-		local desktop_is = deps.desktop_is or require("infra.display_server").desktop_is
+		local desktop_is = deps.desktop_is or require("core.ui.engine.display_server").desktop_is
 		if desktop_is("gnome") or desktop_is("kde") then return "wayland", session end
 	end
 	return nil, session

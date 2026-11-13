@@ -46,7 +46,7 @@ local JsonCodec        = require("core.fs.adapters.json_codec")
 local Paths            = require("core.fs.engine.paths")
 local i18n             = require("core.i18n.engine.i18n")
 local Keycodes         = require("infra.keycodes")
-local tooltip          = require("ui.tooltip")
+local tooltip          = require("core.ui.ui.tooltip")
 local keystats        = require("modules.keystats")
 local ConfigKeys = require("settings.engine.keys")
 

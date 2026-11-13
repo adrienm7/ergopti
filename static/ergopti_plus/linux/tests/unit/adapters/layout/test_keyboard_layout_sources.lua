@@ -70,7 +70,7 @@ local function load_with(kind, answers, env, group, native_dump)
 		end
 		return ""
 	end)
-	local DisplayServer = helpers.load_module("infra.display_server")
+	local DisplayServer = helpers.load_module("core.ui.engine.display_server")
 	DisplayServer._set_for_test(kind, "")
 	package.loaded["infra.xkb_rmlvo"] = nil
 	local layout = helpers.load_module("adapters.keyboard_layout")

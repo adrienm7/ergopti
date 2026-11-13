@@ -71,9 +71,9 @@ local function install_doubles(args)
 		warn = function() end,
 		error = function() end,
 	}
-	package.loaded["infra.dialog_util"] = {}
+	package.loaded["core.ui.engine.dialog_util"] = {}
 	local notifications = {}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, level)
 			notifications[#notifications + 1] = {
 				title = title, body = body, level = level,

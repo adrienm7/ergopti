@@ -128,7 +128,7 @@ local OWNED = {
 	"core.logger.engine.log_folders",
 	"core.logger.engine.logger",
 	"infra.manifest_reader",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.fs.engine.paths",
 	"infra.script_chord_catalogue",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
@@ -192,7 +192,7 @@ local OWNED = {
 	-- Translation now owns one canonical AI-off subscription per module lifetime.
 	"modules.shortcuts.ai_actions",
 	"tests.support.modules.llm.selection_translation_destination",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 
 	-- Shared owners the real pipeline loads since the integrated catalogue,
 	-- key-event health, per-application profile and storage-ownership work.

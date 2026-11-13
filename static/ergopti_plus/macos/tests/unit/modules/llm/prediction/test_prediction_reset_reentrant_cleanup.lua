@@ -42,7 +42,7 @@ helpers.describe("prediction reset cleanup ownership", function()
 				end })
 			fixture.engine.perform_check(true)
 			local stale_final = fixture.on_success
-			local tooltip = package.loaded["ui.tooltip"]
+			local tooltip = package.loaded["core.ui.ui.tooltip"]
 			local core = package.loaded["modules.llm"]
 			local cancelled_fetches = {}
 			local original_cancel = core.cancel_streaming
@@ -94,7 +94,7 @@ helpers.describe("prediction reset cleanup ownership", function()
 		fixture.engine.perform_check(true)
 		local stale_final = fixture.on_success
 		local reentered = false
-		package.loaded["ui.tooltip"].mark_chain_complete = function()
+		package.loaded["core.ui.ui.tooltip"].mark_chain_complete = function()
 			if reentered then return end
 			reentered = true
 			deliver(stale_final)

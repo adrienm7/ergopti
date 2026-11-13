@@ -23,7 +23,7 @@ local RESET_MODULES = {
 	"adapters.keyboard_hook", "adapters.event_provenance",
 	"adapters.synthetic_input", "adapters.input_source_broker",
 	"core.logger.engine.logger", "core.timing.engine.timings",
-	"infra.manifest_reader", "core.i18n.engine.i18n", "infra.dialog_util",
+	"infra.manifest_reader", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
 	"metrics.engine.metrics", "modules.keymap",
 }
 
@@ -275,7 +275,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 	}
 	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.dialog_util"] = { alert = noop }
+	package.loaded["core.ui.engine.dialog_util"] = { alert = noop }
 
 	local keystats = require("modules.keystats.init")
 	start_and_settle_context(keystats, { is_paused = function() return false end })
@@ -443,7 +443,7 @@ local function load_fixture()
 	}
 	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.dialog_util"] = { alert = noop }
+	package.loaded["core.ui.engine.dialog_util"] = { alert = noop }
 	package.loaded["metrics.engine.metrics"] = {
 		compute_wpm_from_events = function() return 0 end,
 	}

@@ -21,8 +21,8 @@ SetWorkingDir(A_ScriptDir)
 
 ; The actual public facade and lifecycle owner run in this isolated suite. Only
 ; detached graphics disposal and model cancellation cross controlled boundaries.
-#Include ../ui/tooltip/llm.ahk
-#Include ../ui/tooltip/tooltip_llm.ahk
+#Include ../core/ui/ui/tooltip/llm.ahk
+#Include ../core/ui/ui/tooltip/tooltip_llm.ahk
 
 global _MMP_HideHits := 0
 global _MMP_StopHits := 0

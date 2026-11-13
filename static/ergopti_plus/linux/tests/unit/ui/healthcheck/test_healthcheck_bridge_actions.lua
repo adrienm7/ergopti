@@ -31,7 +31,7 @@ local HOME = "/home/jdoe"
 local function load_bridge(controls)
 	controls = controls or {}
 	local replaced = { "ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes",
-		"ui.webview_manager", "adapters.clipboard", "infra.config_paths",
+		"core.ui.ui.webview_manager", "adapters.clipboard", "infra.config_paths",
 		"adapters.keyboard_hook" }
 	local loaded = {}
 	for _, name in ipairs(replaced) do loaded[name] = package.loaded[name] end
@@ -50,7 +50,7 @@ local function load_bridge(controls)
 			return { cancel = function() context.cancels = context.cancels + 1 end }
 		end,
 	}
-	package.loaded["ui.webview_manager"] = {
+	package.loaded["core.ui.ui.webview_manager"] = {
 		current_epoch = function() return context.epoch end,
 		eval_js = function(_, js)
 			context.pushed[#context.pushed + 1] = js
@@ -275,7 +275,7 @@ helpers.describe("diagnostics bridge (linux): the page's messages", function()
 
 	helpers.it("replaces an open window", function()
 		with_bridge(nil, function(bridge, context)
-			local manager = package.loaded["ui.webview_manager"]
+			local manager = package.loaded["core.ui.ui.webview_manager"]
 			local hidden, shown = {}, {}
 			manager.hide = function(app, epoch) hidden[#hidden + 1] = app .. "#" .. tostring(epoch); return true end
 			manager.show = function(app) shown[#shown + 1] = app; return true end
@@ -554,7 +554,7 @@ helpers.describe("diagnostics bridge fixture ownership", function()
 	helpers.it("restores exact collaborators and warm preference paths after a body failure", function()
 		local paths = require("infra.config_paths")
 		local preferences = require("infra.metrics_preferences")
-		local names = { "infra.config_paths", "infra.metrics_preferences", "ui.webview_manager", "adapters.clipboard",
+		local names = { "infra.config_paths", "infra.metrics_preferences", "core.ui.ui.webview_manager", "adapters.clipboard",
 			"ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes" }
 		local before = {}
 		for _, name in ipairs(names) do before[name] = package.loaded[name] end

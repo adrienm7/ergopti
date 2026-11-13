@@ -39,7 +39,7 @@ local STUB_MODULES = {
 	"core.events.timer_scheduler",
 	"adapters.system_info",
 	"platform.remap.deploy_pacing",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
 	"modules.shortcuts",
@@ -724,7 +724,7 @@ local function with_remap(options, body)
 	package.loaded["platform.remap.deploy_pacing"] = nil
 	-- Recorded, never sent: a real notice would arm its own retention timer on
 	-- the scheduler above and read as a recovery delay.
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, detail, kind, on_click)
 			calls.notices[#calls.notices + 1] = {
 				message = message, detail = detail, kind = kind, on_click = on_click,

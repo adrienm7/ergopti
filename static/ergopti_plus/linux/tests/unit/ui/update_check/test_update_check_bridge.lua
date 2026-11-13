@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
 local STUBBED = {
-	"ui.webview_manager", "ui.download_window.bridge", "ui.error_dialog.bridge", "ui.changelog.bridge",
+	"core.ui.ui.webview_manager", "ui.download_window.bridge", "ui.error_dialog.bridge", "ui.changelog.bridge",
 }
 
 --- Loads the real bridge with controlled collaborators.
@@ -44,7 +44,7 @@ local function load_bridge(answer)
 	context.real_is_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return context.source_run end
 	package.loaded["ui.update_check.bridge"] = nil
-	package.loaded["ui.webview_manager"] = {
+	package.loaded["core.ui.ui.webview_manager"] = {
 		show = function(app)
 			context.shown[#context.shown + 1] = app
 			if context.on_show then return context.on_show(app) end

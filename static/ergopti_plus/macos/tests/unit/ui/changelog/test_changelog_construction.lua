@@ -43,7 +43,7 @@ helpers.describe("changelog construction transactions", function()
 
 	helpers.it("failed rollback retains the candidate until exact deletion commits (changelog-construction)", function()
 		with_changelog(function(changelog, state)
-			local builder = package.loaded["ui.ui_builder"]
+			local builder = package.loaded["core.ui.ui.builder"]
 			local factory = builder.show_webview
 			builder.show_webview = function(options)
 				factory(options)
@@ -67,7 +67,7 @@ helpers.describe("changelog construction transactions", function()
 	for _, mode in ipairs({ "constructor", "registration", "geometry", "html", "factory entry", "factory allocated" }) do
 		helpers.it("rolls back " .. mode .. " failure (changelog-construction)", function()
 			with_changelog(function(changelog, state)
-				local logger, builder = package.loaded["core.logger.engine.logger"], package.loaded["ui.ui_builder"]
+				local logger, builder = package.loaded["core.logger.engine.logger"], package.loaded["core.ui.ui.builder"]
 				local errors, successes, releases = {}, 0, 0
 				logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 				logger.success = function() successes = successes + 1 end
@@ -110,7 +110,7 @@ helpers.describe("changelog construction transactions", function()
 
 	helpers.it("retains bridge-only cleanup debt until exact release succeeds (changelog-construction)", function()
 		with_changelog(function(changelog, state)
-			local builder = package.loaded["ui.ui_builder"]
+			local builder = package.loaded["core.ui.ui.builder"]
 			local geometry = builder.get_app_geometry
 			builder.get_app_geometry = function() return nil end
 			local original_new = hs.webview.usercontent.new

@@ -41,7 +41,7 @@ helpers.describe("dialog_util: the deferred raise is scoped to the non-blocking 
 
 	helpers.it("the source is locatable", function()
 		helpers.assert_true(src ~= nil,
-			"infra/dialog_util.lua must be locatable — every assertion below reads it")
+			"core/ui/engine/dialog_util.lua must be locatable — every assertion below reads it")
 	end)
 
 	--- Returns the body of a wrapper function, up to its `end`.

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Regression guard for the documented "bare try with no catch" anti-pattern
 ; (docs/memory's project-ahk-invariant-incomplete-application).
-; AltTabMonitor (infra/window_utils.ahk) enumerates every top-level window and
+; AltTabMonitor (core/ui/engine/window_utils.ahk) enumerates every top-level window and
 ; calls several WinGet* functions per window with NO try/catch at all — a
 ; window closing mid-enumeration (a routine race, not a bug) threw
 ; TargetError uncaught, which for the two tap-hold hotkey call sites
@@ -15,7 +15,7 @@
 ; modules/gestures/window_cycle.ahk) was correctly hardened for the identical
 ; race (commit 7b701020d); this file was never touched by that campaign.
 ;
-; SCOPE: source introspection of infra/window_utils.ahk. The cyclers themselves
+; SCOPE: source introspection of core/ui/engine/window_utils.ahk. The cyclers themselves
 ; are not unit-testable without a live desktop (see tests/unit/adapters/test_window_utils.ahk).
 ;
 ; MOVED, NOT WEAKENED — 2026-08-03. The enumeration and its guards now live in
@@ -41,7 +41,7 @@
 
 _ATMC_CheckCatchPresentAndContinues() {
 	Body := _DriverFuncBody("_AltTabCycle")
-	Assert(Body != "", "_AltTabCycle must exist in infra/window_utils.ahk — it carries the enumeration both public cyclers share")
+	Assert(Body != "", "_AltTabCycle must exist in core/ui/engine/window_utils.ahk — it carries the enumeration both public cyclers share")
 
 	TryPos := InStr(Body, "try {")
 	Assert(TryPos > 0, "_AltTabCycle must wrap the per-window enumeration body in a try")
@@ -67,7 +67,7 @@ Test("window_utils: AltTabMonitor's per-window try has a catch that logs and con
 ; documented "invariant applied per-site, one sibling missed" shape.
 _ATMC_ActivationIsGuardedToo() {
 	Body := _DriverFuncBody("_AltTabCycle")
-	Assert(Body != "", "_AltTabCycle must exist in infra/window_utils.ahk — it carries the enumeration both public cyclers share")
+	Assert(Body != "", "_AltTabCycle must exist in core/ui/engine/window_utils.ahk — it carries the enumeration both public cyclers share")
 
 	ActPos := InStr(Body, "WinActivate(")
 	Assert(ActPos > 0, "_AltTabCycle must still activate a window")
@@ -110,7 +110,7 @@ Test("window_utils: AltTabMonitor guards the activation as well as the enumerati
 _ATMC_PublicCyclersDelegate() {
 	for _, Name in ["AltTabMonitor", "AltTabAll"] {
 		Body := _DriverFuncBody(Name)
-		Assert(Body != "", Name . " must exist in infra/window_utils.ahk")
+		Assert(Body != "", Name . " must exist in core/ui/engine/window_utils.ahk")
 		Assert(InStr(Body, "_AltTabCycle(") > 0,
 			Name . " must delegate to _AltTabCycle — it is the only enumeration that carries the "
 			. "mid-cycle-close guards, and a cycler with its own loop is the sibling this file exists to catch")
@@ -128,7 +128,7 @@ Test("window_utils: both public cyclers delegate to the single guarded enumerati
 ; the fallback is a switch they then have to undo, which is worse than nothing.
 _ATMC_MonitorCyclerDoesNotFallBack() {
 	Body := _DriverFuncBody("AltTabMonitor")
-	Assert(Body != "", "AltTabMonitor must exist in infra/window_utils.ahk")
+	Assert(Body != "", "AltTabMonitor must exist in core/ui/engine/window_utils.ahk")
 	Assert(InStr(Body, "AltTabAll(") = 0,
 		"AltTabMonitor must not call AltTabAll: with the cursor off every monitor, cycling anywhere "
 		. "instead of nowhere focuses a window on the wrong screen, which the user has to undo")

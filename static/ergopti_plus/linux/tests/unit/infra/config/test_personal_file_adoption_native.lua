@@ -255,11 +255,11 @@ helpers.describe("native adopted personal file gates", function()
 	helpers.it("102 native requires an acknowledged rendered page owner before metadata publication", function()
 		fixture('', function(f)
 			helpers.assert_eq(select(2, f.config.load_all()), true)
-			local names = { "ui.webview_manager", "ui.hotstrings_config_window.bridge" }
+			local names = { "core.ui.ui.webview_manager", "ui.hotstrings_config_window.bridge" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 			local epoch, accepted = 41, false
-			package.loaded["ui.webview_manager"] = { current_epoch = function() return epoch end,
+			package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return epoch end,
 				eval_js = function() return accepted end }
 			local ok, detail = pcall(function()
 				local Bridge = require("ui.hotstrings_config_window.bridge")
@@ -291,10 +291,10 @@ helpers.describe("native adopted personal file gates", function()
 	helpers.it("102 native refuses metadata from a rendered window after its source catalogue changes", function()
 		fixture('', function(f)
 			helpers.assert_eq(select(2, f.config.load_all()), true)
-			local names = { "ui.webview_manager", "ui.hotstrings_config_window.bridge" }
+			local names = { "core.ui.ui.webview_manager", "ui.hotstrings_config_window.bridge" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
-			package.loaded["ui.webview_manager"] = { current_epoch = function() return 41 end, eval_js = function() return true end }
+			package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return 41 end, eval_js = function() return true end }
 			local ok, detail = pcall(function()
 				local Bridge = require("ui.hotstrings_config_window.bridge")
 				local state = { config = f.config }

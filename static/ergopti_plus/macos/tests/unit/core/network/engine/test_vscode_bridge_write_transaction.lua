@@ -89,7 +89,7 @@ local function load_fixture(behavior)
 	--- @return table bridge Fresh production module.
 	local function load_bridge_module()
 		package.loaded["core.logger.engine.logger"] = logger
-		package.loaded["infra.notifications"] = notification_module
+		package.loaded["core.ui.engine.notifications"] = notification_module
 		return helpers.load_with_stubs("core.network.engine.vscode_bridge")
 	end
 

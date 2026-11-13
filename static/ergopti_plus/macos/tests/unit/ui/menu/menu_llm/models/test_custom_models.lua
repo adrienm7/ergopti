@@ -12,12 +12,12 @@
 
 local helpers = require("tests.helpers")
 
-local OWNED = { "ui.menu.menu_llm.custom_models", "infra.dialog_util" }
+local OWNED = { "ui.menu.menu_llm.custom_models", "core.ui.engine.dialog_util" }
 
 --- Runs one case with the real module and a scripted confirmation.
 local function with_models(opts, body)
 	helpers.with_fresh_modules(OWNED, function()
-		package.loaded["infra.dialog_util"] = { block_alert = function()
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function()
 			if opts.confirm == "throw" then error("dialog", 0) end
 			return opts.confirm == "cancel" and "Cancel" or require("core.i18n.engine.i18n").get("button.remove")
 		end }

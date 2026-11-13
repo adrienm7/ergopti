@@ -493,7 +493,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 			with_replace(SOURCE, function(Config, path, state, row)
 				local item = row()
 				helpers.assert_type(item, "table")
-				local Writer, Modal = require("core.text.engine.toml_codec.writer"), require("ui.modal")
+				local Writer, Modal = require("core.text.engine.toml_codec.writer"), require("core.ui.ui.modal")
 				local previous_write, previous_modal = Writer.batch_write, Modal.run
 				local writes, notices = 0, 0
 				Writer.batch_write = function(...)

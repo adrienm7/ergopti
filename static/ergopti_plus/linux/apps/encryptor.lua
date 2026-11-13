@@ -72,7 +72,7 @@ function M.main(argv)
 	local openssl = require("infra.owned_programs").resolve("openssl")
 	local quote = require("core.text.engine.utils_core").shell_quote
 	local probe = openssl:sub(1, 1) == "/" and ("test -x " .. quote(openssl)) or ("command -v " .. quote(openssl) .. " >/dev/null")
-	if require("ui.native_dialog").exit_code(os.execute(probe)) ~= 0 then
+	if require("core.ui.ui.native_dialog").exit_code(os.execute(probe)) ~= 0 then
 		dialogs.message("error", t("apps.encryptor.title_encrypt"), t("apps.encryptor.err_cipher_unavailable"))
 		return 69
 	end

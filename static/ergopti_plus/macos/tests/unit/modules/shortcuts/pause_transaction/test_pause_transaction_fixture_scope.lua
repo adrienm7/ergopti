@@ -11,7 +11,7 @@ local Fixture = require("tests.support.pause_transaction_fixture")
 local OWNERS = {
 	"modules.shortcuts.script_control",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"infra.keycodes",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
@@ -24,7 +24,7 @@ local OWNERS = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
 	"adapters.event_provenance",
 	"core.events.timer_scheduler",

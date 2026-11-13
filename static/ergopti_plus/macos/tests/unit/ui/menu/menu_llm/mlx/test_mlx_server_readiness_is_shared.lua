@@ -127,7 +127,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 
 	helpers.it("(mlx-startup-waiter-failure) (mlx-native-callback-protection) notifies every joined caller when the shared startup fails", function()
 		local module_names = {
-			"infra.notifications", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.config_paths",
+			"core.ui.engine.notifications", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.config_paths",
 			"modules.llm.api_common", "core.process.adapters.task_lifecycle",
 			"modules.llm.api_mlx", "ui.menu.menu_llm.models_manager_mlx_server",
 		}
@@ -144,7 +144,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 		local reject_probe_task = false
 		local retry_timer_result = "handle"
 
-		package.loaded["infra.notifications"] = { notify = noop }
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
 		package.loaded["core.logger.engine.logger"] = {
 			today_log_path = function() return "/tmp/ergopti-test.log" end,
 			debug = noop, info = noop, warn = noop,

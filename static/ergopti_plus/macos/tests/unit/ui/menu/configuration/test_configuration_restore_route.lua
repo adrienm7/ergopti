@@ -80,7 +80,7 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 	-- The composition used to refuse in silence on macOS: the menu refreshed and
 	-- only the log said nothing had been restored.
 	helpers.it("shows the typed reset failure of a refused restore or clear", function()
-		local saved_scope, saved_dialog = package.loaded["ui.menu.global_scope"], package.loaded["infra.dialog_util"]
+		local saved_scope, saved_dialog = package.loaded["ui.menu.global_scope"], package.loaded["core.ui.engine.dialog_util"]
 		local alerts, requested = {}, {}
 		local ok, err = pcall(function()
 			local fixture = boot()
@@ -89,7 +89,7 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 				requested.options = options
 				return { apply = function() return true end }
 			end }
-			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(...)
 				alerts[#alerts + 1] = { ... }
 				return "ok"
 			end }
@@ -107,7 +107,7 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 				"[button.ok|{1}|{2}]", nil, "critical" })
 		end)
 		package.loaded["ui.menu.global_scope"] = saved_scope
-		package.loaded["infra.dialog_util"] = saved_dialog
+		package.loaded["core.ui.engine.dialog_util"] = saved_dialog
 		if not ok then error(err, 0) end
 	end)
 end)

@@ -174,7 +174,7 @@ Test("ownership predicate: a real prediction owns the surface for the whole disp
 ; ============================================================
 
 _TestGrace_TooltipCentralGuard() {
-	Body := _DriverDirConcat("ui/tooltip")
+	Body := _DriverDirConcat("core/ui/ui/tooltip")
 	Commit := _StripFullLineComments(
 		_DriverFuncBody("_LLM_TooltipCommitSurfaceState"))
 	; While a real prediction owns the surface, the hotstring lifecycle cannot tear
@@ -217,7 +217,7 @@ Test("grace contract: TooltipHide + TooltipShow guards + ownership/grace predica
 
 
 _TestGrace_HideResetsStamp() {
-	Body := _DriverDirConcat("ui/tooltip")
+	Body := _DriverDirConcat("core/ui/ui/tooltip")
 	; Hiding detaches the entire owner; loading installs a distinct zero-stamped
 	; record. No stale timestamp survives in a parallel global.
 	Assert(InStr(Body, "_TooltipActiveSurface := 0") > 0

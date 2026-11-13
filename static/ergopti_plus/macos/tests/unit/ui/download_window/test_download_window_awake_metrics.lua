@@ -6,10 +6,10 @@ local helpers = require("tests.helpers")
 
 local OWNED = {
 	"ui.download_window", "ui.download_window.javascript",
-	"ui.download_window.pending_queue", "adapters.webview_result",
+	"ui.download_window.pending_queue", "core.ui.adapters.webview_result",
 	"core.timing.engine.deferred_work", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings", "core.i18n.engine.i18n", "core.text.engine.utils",
-	"core.process.adapters.shell_runner", "adapters.own_window", "ui.ui_builder",
+	"core.process.adapters.shell_runner", "core.ui.adapters.own_window", "core.ui.ui.builder",
 }
 
 --- Composes real presentation/queue/scheduler owners over independent clocks.
@@ -28,7 +28,7 @@ local function with_window(scenario)
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.text.engine.utils"] = {}
 		package.loaded["core.process.adapters.shell_runner"] = {}
-		package.loaded["adapters.own_window"] = {}
+		package.loaded["core.ui.adapters.own_window"] = {}
 		_G.hs = {
 			timer = {
 				absoluteTime = function() return w.awake * 1e9 end,
@@ -54,7 +54,7 @@ local function with_window(scenario)
 				return bridge
 			end } },
 		}
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 460, height = 380 } end,
 			show_webview = function(options)
 				w.creates = w.creates + 1

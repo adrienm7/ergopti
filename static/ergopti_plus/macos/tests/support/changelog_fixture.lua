@@ -30,7 +30,7 @@ local function with_changelog(callback)
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
 			"ui.changelog",
-			"ui.ui_builder",
+			"core.ui.ui.builder",
 			"core.fs.adapters.file_system",
 			"core.fs.adapters.json_codec",
 			"core.network.adapters.http_client",
@@ -158,7 +158,7 @@ local function with_changelog(callback)
 					return "/shared/" .. tostring(relative)
 				end,
 			}
-			package.loaded["ui.ui_builder"] = {
+			package.loaded["core.ui.ui.builder"] = {
 				build_injected_html = function() return "<html><head></head></html>" end,
 				force_focus = function()
 					state.focuses = state.focuses + 1

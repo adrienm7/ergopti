@@ -12,7 +12,7 @@ WORKER = r"""
 require("core.lifecycle.engine.compat.utf8").install()
 local role, root = os.getenv("UI_ASSET_ROLE"), os.getenv("UI_ASSET_ROOT")
 local regular = os.getenv("UI_ASSET_REGULAR") == "1"
-local host = require("ui.webkit_host")
+local host = require("core.ui.ui.webkit_host")
 if role == "root" then
     assert((host.resolve_ui_root(root .. "/driver") ~= "") == regular)
 elseif role == "locale" then

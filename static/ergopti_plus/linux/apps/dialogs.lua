@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The few native dialogs the bundled apps ask through: a hidden or visible
 --- text entry, a question, a message and a file chooser. Each runs Ergopti's own
---- GTK host (ui/native_dialog.lua), never the host's zenity.
+--- GTK host (core/ui/ui/native_dialog.lua), never the host's zenity.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The apps are separate processes, so a dialog blocks only the app: the
@@ -18,7 +18,7 @@
 
 local M = {}
 
-local NativeDialog = require("ui.native_dialog")
+local NativeDialog = require("core.ui.ui.native_dialog")
 local TextUtils = require("core.text.engine.utils_core")
 local WindowTitles = require("core.ui.engine.window_titles")
 

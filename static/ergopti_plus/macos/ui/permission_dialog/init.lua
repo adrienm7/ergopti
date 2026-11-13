@@ -41,8 +41,8 @@ local M = {}
 local hs         = hs
 local Logger     = require("core.logger.engine.logger")
 local i18n       = require("core.i18n.engine.i18n")
-local ui_builder = require("ui.ui_builder")
-local ControllerPool = require("ui.webview_controller_pool").new(function(name)
+local ui_builder = require("core.ui.ui.builder")
+local ControllerPool = require("core.ui.ui.webview_controller_pool").new(function(name)
 	return hs.webview.usercontent.new(name)
 end, Logger)
 

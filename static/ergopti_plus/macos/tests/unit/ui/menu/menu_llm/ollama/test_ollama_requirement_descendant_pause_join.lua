@@ -40,7 +40,7 @@ local OWNED_MODULES = {
 	"hs",
 	"tests.stubs.hs",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"core.text.engine.utils",
 	"infra.keycodes",
@@ -65,7 +65,7 @@ local OWNED_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"ui.download_window",
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_ollama",
@@ -108,7 +108,7 @@ local function with_fixture(callback)
 			}
 
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function() return true end,
 			}
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
@@ -404,7 +404,7 @@ local function with_fixture(callback)
 				}
 			end
 			package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
-			package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+			package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 			package.loaded["modules.keystats"] = {
 				resync_context = function() return true end,
 				log_shortcut = function() return true end,

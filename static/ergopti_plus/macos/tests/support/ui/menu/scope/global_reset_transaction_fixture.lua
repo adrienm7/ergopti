@@ -17,9 +17,9 @@ local MODULE_KEYS = {
 	"ui.menu.global_scope",
 	"ui.menu.scoped_preferences",
 	"ui.menu.gesture_scope",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"ui.hotstring_editor",
 	"core.text.engine.utils",
 	"core.i18n.engine.i18n",
@@ -295,7 +295,7 @@ local function with_menu_fixture(options, callback)
 	end
 
 	package.loaded["core.logger.engine.logger"] = logger_stub()
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(label, _, level)
 			if observations.reload_finalized then
 				observations.post_reload_effects = observations.post_reload_effects + 1

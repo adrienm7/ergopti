@@ -20,11 +20,11 @@ local MODULE_NAMES = {
 	-- The task lifecycle adapter formats raised errors through the shared owner.
 	"diagnostics.engine.reports.error_description",
 	"hs",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.lifecycle.engine.launcher_environment",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.text.engine.utils",
 	-- The remap onboarding resolves its own folder, joins a label to its value
 	-- and the scheduler admits delays through these pure owners.
@@ -306,7 +306,7 @@ local function run_fixture(options, scenario)
 	package.loaded["core.events.timer_scheduler"] = timer_scheduler
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
-	package.loaded["infra.notifications"] = { notify = noop }
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
 	package.loaded["core.text.engine.utils"] = {
 		applescript_format = function(format, value) return string.format(format, value) end,
 		escape_gsub_replacement = function(value) return value end,

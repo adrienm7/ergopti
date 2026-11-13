@@ -269,8 +269,8 @@ local notifier = RuntimeGuard.optional_require("adapters.application_notifier")
 -- Preview tooltip (optional — needs lgi and a display; the daemon expands
 -- hotstrings perfectly well without one, and a driver whose expansions work
 -- must not stop working because it cannot draw a hint about them).
-local tooltip_preview = RuntimeGuard.optional_require("ui.tooltip.preview")
-local llm_overlay = RuntimeGuard.optional_require("ui.tooltip.llm")
+local tooltip_preview = RuntimeGuard.optional_require("core.ui.ui.tooltip.preview")
+local llm_overlay = RuntimeGuard.optional_require("core.ui.ui.tooltip.llm")
 local dev_finder        = require("modules.hotstrings.device_finder")
 local keystats         = require("modules.keystats.keystats")
 local keyboard_hook     = require("adapters.keyboard_hook")
@@ -323,7 +323,7 @@ local secure_field_detector = RuntimeGuard.optional_require("adapters.secure_fie
 
 -- WebView manager (optional — GTK/WebKit2GTK window creation for UI apps).
 -- Auto-inits on load (probes lgi); windows are created on demand via show().
-local webview_manager = RuntimeGuard.optional_require("ui.webview_manager")
+local webview_manager = RuntimeGuard.optional_require("core.ui.ui.webview_manager")
 local input_capture_gate = nil
 
 -- The error window: a logged ERROR can open it (the shared policy decides); a
@@ -1769,7 +1769,7 @@ local function main()
 
 		-- The preview bubble, which nothing drew until 2026-08-05.
 		--
-		-- ui/tooltip/preview.lua was complete — it gates on the four toggles,
+		-- core/ui/ui/tooltip/preview.lua was complete — it gates on the four toggles,
 		-- resolves the accent, builds the rows and calls the renderer — and
 		-- `M.show` had no caller anywhere in the driver. So the whole preview
 		-- surface was inert on every desktop and in every configuration, even with
@@ -2048,7 +2048,7 @@ local function main()
 			-- llm_agent_command asks for the command in a native entry.
 			ask_text = function(title, prompt)
 				if opts.dry_run then return nil end
-				return require("ui.text_prompt").ask(title, prompt, "")
+				return require("core.ui.ui.text_prompt").ask(title, prompt, "")
 			end,
 			-- The screen actions capture to a private file with the screenshot
 			-- actions' tools; the engine reads and deletes it.
@@ -2791,7 +2791,7 @@ local function main()
 		-- GTK, libayatana-appindicator, lgi and WebKitGTK are the host's (owned
 		-- runtimes, SYS): a missing one is named here rather than leaving an
 		-- invisible daemon or windows that never open.
-		local refusal = require("infra.gui_stack").check_at_start({ i18n = ok_i18n and i18n_mod or nil, notifier = notifier })
+		local refusal = require("core.ui.engine.gui_stack").check_at_start({ i18n = ok_i18n and i18n_mod or nil, notifier = notifier })
 		if refusal then os.exit(refusal) end
 		tray_menu.setIcon({ title = "Ergopti" })
 		if not privacy_owners.startup_checkpoint() then return end
@@ -3069,15 +3069,15 @@ local function main()
 	-- is an ordinary machine that simply gets no preview.
 	if tooltip_preview then
 		local ok_style, style = pcall(function()
-			return require("ui.tooltip.config").load()
+			return require("core.ui.ui.tooltip.config").load()
 		end)
 		if ok_style then
 			tooltip_preview.init({
 				style = style,
 				config = hotstrings_config,
 				on_render_failed = function()
-					if rawequal(package.loaded["ui.tooltip.preview"], tooltip_preview)
-						and rawequal(package.loaded["ui.tooltip.llm"], llm_overlay)
+					if rawequal(package.loaded["core.ui.ui.tooltip.preview"], tooltip_preview)
+						and rawequal(package.loaded["core.ui.ui.tooltip.llm"], llm_overlay)
 						and llm_overlay and type(llm_overlay.revoke_presentation) == "function" then
 						llm_overlay.revoke_presentation()
 					end
@@ -3094,7 +3094,7 @@ local function main()
 				-- suggestion in the same turn.
 				on_hidden = function()
 					TimerScheduler.after(0, function()
-						if rawequal(package.loaded["ui.tooltip.preview"], tooltip_preview)
+						if rawequal(package.loaded["core.ui.ui.tooltip.preview"], tooltip_preview)
 							and llm_overlay and type(llm_overlay.redraw_if_preview_hidden) == "function" then
 							llm_overlay.redraw_if_preview_hidden()
 						end
@@ -3123,7 +3123,7 @@ local function main()
 				},
 			}) then llm_overlay = nil end
 			Logger.info(LOG, "Preview tooltip initialised (renderer available: %s).",
-				tostring(require("adapters.graphics_renderer").is_available()))
+				tostring(require("core.ui.adapters.graphics_renderer").is_available()))
 		else
 			Logger.error(LOG, "Tooltip style unreadable — no preview. %s", tostring(style))
 			tooltip_preview = nil

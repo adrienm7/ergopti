@@ -90,7 +90,7 @@ local function fresh_expander()
 		"modules.keymap.utils",
 		"core.logger.engine.logger",
 		"modules.keystats",
-		"ui.tooltip",
+		"core.ui.ui.tooltip",
 	}
 	for _, name in ipairs(to_wipe) do
 		package.loaded[name] = nil

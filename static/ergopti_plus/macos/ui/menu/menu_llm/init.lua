@@ -17,7 +17,7 @@ local hs            = hs
 local llm_mod       = require("modules.llm")
 local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("core.logger.engine.logger")
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local i18n          = require("core.i18n.engine.i18n")
 local LabelValue = require("core.i18n.engine.label_value")
 local KeyNames = require("platform.input.keycodes.key_names")
@@ -2167,7 +2167,7 @@ local function create_menu(deps)
 		-- registered at creation so the shortcut works before the AI menu was
 		-- ever opened: the first open builds the AI item once, which binds the
 		-- page to this session's context.
-		require("ui.window_toggle").set_opener("model_browser", function()
+		require("core.ui.ui.window_toggle").set_opener("model_browser", function()
 				if not ModelSelectorPage.is_bound() then build_item() end
 				return ModelSelectorPage.open()
 		end)

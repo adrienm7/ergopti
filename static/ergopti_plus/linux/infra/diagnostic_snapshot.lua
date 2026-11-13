@@ -26,7 +26,7 @@ local Version       = require("infra.version")
 local ConfigPaths   = require("infra.config_paths")
 local LoggerSink    = require("core.logger.engine.sink")
 local Paths         = require("core.fs.engine.paths")
-local DisplayServer = require("infra.display_server")
+local DisplayServer = require("core.ui.engine.display_server")
 local FileSystem    = require("core.fs.adapters.file_system")
 local ConfigKeys = require("settings.engine.keys")
 

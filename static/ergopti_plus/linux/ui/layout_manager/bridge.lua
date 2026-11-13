@@ -61,7 +61,7 @@ end
 --- @param state table
 --- @return table
 local function controller(state, context)
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	local epoch = type(context) == "table" and context.epoch or nil
 	if epoch ~= nil and (type(epoch) ~= "number" or context.app_name ~= APP_NAME) then return nil end
 	local native_current = manager and manager.page_current

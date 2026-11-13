@@ -6592,7 +6592,9 @@ console.log(
 				`${rel}: foreign receiver or missing renderer port cannot borrow the shared family`
 			);
 	}
-	const native = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/editors.ahk'));
+	const native = readSourceFile(
+		resolve(REPO_ROOT, 'static/ergopti_plus/windows/core/ui/ui/editors.ahk')
+	);
 	function physicalFamily(source) {
 		const tokens = scriptTokens(source, '.ahk');
 		const bodies = [];

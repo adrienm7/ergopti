@@ -19,7 +19,7 @@ local SUBJECT_MODULES = {
 	"modules.shortcuts.actions.screen_capture_flow",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.shortcuts.actions.screenshot_save",
 }
 
@@ -76,7 +76,7 @@ local function with_subject(options, scenario)
 			fixture.errors[#fixture.errors + 1] = string.format(tostring(message), ...)
 		end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, body, kind)
 			if type(fixture.notify_hook) == "function" then fixture.notify_hook() end
 			fixture.notifications[#fixture.notifications + 1] = {

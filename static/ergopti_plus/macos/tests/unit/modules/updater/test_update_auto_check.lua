@@ -495,10 +495,10 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 	helpers.it("announces a release with a click that asks Sparkle for it", function()
 		local sent, checks = {}, {}
 		local previous = {
-			notifications = package.loaded["infra.notifications"],
+			notifications = package.loaded["core.ui.engine.notifications"],
 			launcher = package.loaded["adapters.update_launcher"],
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, kind, on_click)
 				sent[#sent + 1] = { title = title, body = body, kind = kind, on_click = on_click }
 				return true
@@ -518,7 +518,7 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 			sent[1].on_click()
 			helpers.assert_eq(checks, { "dev" }, "the click asks Sparkle for the release's channel")
 		end)
-		package.loaded["infra.notifications"] = previous.notifications
+		package.loaded["core.ui.engine.notifications"] = previous.notifications
 		package.loaded["adapters.update_launcher"] = previous.launcher
 		package.loaded["modules.updater.auto_check"] = nil
 		if not ok then error(err, 0) end

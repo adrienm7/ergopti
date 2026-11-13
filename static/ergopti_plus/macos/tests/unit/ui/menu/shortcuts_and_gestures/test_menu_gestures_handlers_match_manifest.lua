@@ -118,7 +118,7 @@ end)
 -- actual native menu owner and renderer; only the host/runtime ports are controlled.
 local mode_fixture_modules = {
 	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger",
-	"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
+	"modules.gestures", "ui.menu.menu_utils", "core.ui.engine.dialog_util", "ui.action_picker",
 	"ui.menu.shortcut_utils", "core.timing.engine.deferred_work", "ui.menu.menu_gestures",
 }
 local function mode_json(path)
@@ -171,9 +171,9 @@ local function with_mode_fixture(options, callback)
 		package.loaded["core.i18n.engine.i18n"] = i18n
 		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true } }
-		for _, name in ipairs({ "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
+		for _, name in ipairs({ "ui.menu.menu_utils", "core.ui.engine.dialog_util", "ui.action_picker",
 			"ui.menu.shortcut_utils", "core.timing.engine.deferred_work" }) do package.loaded[name] = {} end
-		if options.dialog then package.loaded["infra.dialog_util"] = options.dialog end
+		if options.dialog then package.loaded["core.ui.engine.dialog_util"] = options.dialog end
 		local owner = require("ui.menu.menu_gestures")
 		function fixture.build()
 			return owner.build({

@@ -40,8 +40,8 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 		or (selected_key and "menu.hotstrings.tooltip_magic" or "menu.hotstrings.tooltip_colored")
 	local section = presence and "preview_presence_controls" or (selected_key and "preview_magic_control" or "preview_colored_control")
 	return helpers.with_stub_scope({
-		"infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "infra.dialog_util",
-		"core.i18n.engine.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
+		"infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "core.ui.engine.notifications", "ui.menu.menu_hotstrings_management",
 		"modules.hotstrings.hotstrings_config",
 		"ui.menu.preview_transaction", "ui.menu.preferences_transaction", "ui.menu.global_actions_transaction",
 	}, function()

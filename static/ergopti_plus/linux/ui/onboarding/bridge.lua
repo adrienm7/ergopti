@@ -58,7 +58,7 @@ local function dependency(state, field, module_name)
 end
 
 local function webview(state)
-	return dependency(state, "webview_manager", "ui.webview_manager")
+	return dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 end
 
 local function push(state, function_name, payload, current)

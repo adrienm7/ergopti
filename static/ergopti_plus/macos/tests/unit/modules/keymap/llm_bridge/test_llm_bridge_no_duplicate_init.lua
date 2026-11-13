@@ -35,7 +35,7 @@ local STUB_MODULES = {
 	"modules.llm",
 	"infra.keycodes",
 	"modules.keystats",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.llm.prediction_engine",
 	"modules.keymap.registry",
 	"modules.hotstrings.hotstrings_config",
@@ -104,7 +104,7 @@ package.loaded["modules.keystats"] = {
 }
 
 -- ui.tooltip: no-op stub; the bridge wires callbacks at load time.
-package.loaded["ui.tooltip"] = {
+package.loaded["core.ui.ui.tooltip"] = {
 	show_stacked          = function() end,
 	hide                  = function() end,
 	set_timeout           = function() end,

@@ -37,7 +37,7 @@ local VersionLabel = require("updater.engine.version_label")
 local ManifestMenu = require("infra.manifest_menu")
 local UpdateLauncher = require("adapters.update_launcher")
 local CheckNotice = require("updater.engine.check_notice")
-local Notifications = require("infra.notifications")
+local Notifications = require("core.ui.engine.notifications")
 local LOG       = "menu_about"
 
 

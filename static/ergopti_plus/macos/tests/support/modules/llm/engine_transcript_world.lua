@@ -98,7 +98,7 @@ function M.with_world(config, body)
 		log_llm_suggested = function() end, log_llm_dismissed = function() end,
 	}
 	-- The TooltipRenderer port: only a render that is not a loading placeholder is recorded.
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end, set_enter_validates = function() end,
 		set_llm_timeout = function() end, set_chain_start = function() return true end,
 		show_loading = function() return true end,

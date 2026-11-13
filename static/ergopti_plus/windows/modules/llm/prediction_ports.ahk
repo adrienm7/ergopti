@@ -121,7 +121,7 @@ class LLMEngineRemoteHttp {
 	}
 }
 
-; The prediction tooltip of ui/tooltip/tooltip_llm.ahk.
+; The prediction tooltip of core/ui/ui/tooltip/tooltip_llm.ahk.
 class LLMEngineTooltip {
 	SetDisplayOpts(Opts) {
 		return LLM_Tooltip_SetDisplayOpts(Opts)

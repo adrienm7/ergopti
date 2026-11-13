@@ -277,7 +277,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/ui/tooltip/tooltip_llm.lua",
+			"source": "static/ergopti_plus/macos/core/ui/ui/tooltip/llm.lua",
 			"template": "TTFT captured: %.0f ms.",
 			"line": "2026-10-30 10:00:00:123 [DEBUG] [tooltip_llm] TTFT captured: 1484 ms.",
 			"expect": {

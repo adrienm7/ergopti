@@ -38,9 +38,9 @@ helpers.describe("menu keymap lifecycle: strict start commitment", function()
 	end)
 
 	helpers.it("rejects false, nil, throw, and a missing start without retaining stale state", function()
-		local previous_notifications = package.loaded["infra.notifications"]
+		local previous_notifications = package.loaded["core.ui.engine.notifications"]
 		local notices = 0
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(_title, _body, kind)
 				helpers.assert_eq(kind, "error")
 				notices = notices + 1
@@ -65,7 +65,7 @@ helpers.describe("menu keymap lifecycle: strict start commitment", function()
 				"every rejected click must surface a user-visible error")
 		end, debug.traceback)
 		package.loaded["ui.menu.keymap_lifecycle"] = nil
-		package.loaded["infra.notifications"] = previous_notifications
+		package.loaded["core.ui.engine.notifications"] = previous_notifications
 		if not ok then error(err, 0) end
 	end)
 

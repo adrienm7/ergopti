@@ -84,8 +84,8 @@ helpers.describe("hs.canvas stub: frame snapshots", function()
 	end)
 
 	helpers.it("keeps a GraphicsRenderer drawing callback's frame edits behind the explicit setter", function()
-		helpers.with_stub_scope({ "adapters.graphics_renderer" }, function()
-			local renderer = helpers.load_with_stubs("adapters.graphics_renderer")
+		helpers.with_stub_scope({ "core.ui.adapters.graphics_renderer" }, function()
+			local renderer = helpers.load_with_stubs("core.ui.adapters.graphics_renderer")
 			local canvas = renderer.createWindow({ x = 1, y = 2, w = 30, h = 40 })
 			helpers.assert_true(canvas ~= 0, "the real adapter must allocate its native surface")
 			local observations = { callbacks = 0 }

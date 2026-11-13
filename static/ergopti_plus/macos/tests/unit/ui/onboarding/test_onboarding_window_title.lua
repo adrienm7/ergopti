@@ -131,7 +131,7 @@ end)
 
 helpers.describe("ui_builder window title", function()
 	helpers.it("(shared-window-titles) layout and navigation captions use every shipped translation", function()
-		local ui_builder = helpers.load_with_stubs("ui.ui_builder", {})
+		local ui_builder = helpers.load_with_stubs("core.ui.ui.builder", {})
 		local Json = require("core.text.engine.json")
 		local file = assert(io.open(helpers.shared("core/i18n/data/locale_order.json"), "r"))
 		local locales = Json.decode(file:read("*a")).order
@@ -151,7 +151,7 @@ helpers.describe("ui_builder window title", function()
 	end)
 
 	helpers.it("(onboarding-window-title) the product name is prefixed exactly once", function()
-		local ui_builder = helpers.load_with_stubs("ui.ui_builder", {})
+		local ui_builder = helpers.load_with_stubs("core.ui.ui.builder", {})
 		local title = ui_builder.window_title("Setup")
 		helpers.assert_eq(title, "ErgoptiPlus — Setup")
 		local _, count = title:gsub("ErgoptiPlus", "")
@@ -161,7 +161,7 @@ helpers.describe("ui_builder window title", function()
 	end)
 
 	helpers.it("(onboarding-window-title) set_window_title applies the composed title", function()
-		local ui_builder = helpers.load_with_stubs("ui.ui_builder", {})
+		local ui_builder = helpers.load_with_stubs("core.ui.ui.builder", {})
 		local applied
 		local view = { windowTitle = function(_, value) applied = value end }
 		helpers.assert_true(ui_builder.set_window_title(view, "Configuration"))

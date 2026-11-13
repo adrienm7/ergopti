@@ -75,7 +75,7 @@ local function render_provider_row(provider_result)
 		"adapters.synthetic_input", "core.events.timer_scheduler", "core.logger.engine.logger",
 		"infra.manifest_reader", "modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander", "modules.keystats", "modules.llm",
-		"modules.llm.prediction_engine", "ui.tooltip", "modules.keymap.llm_bridge",
+		"modules.llm.prediction_engine", "core.ui.ui.tooltip", "modules.keymap.llm_bridge",
 	}, function()
 		local scheduled = {}
 		local action_epoch = {}
@@ -111,7 +111,7 @@ local function render_provider_row(provider_result)
 			get_llm_enabled = function() return false end,
 			reset = function() return true end,
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			set_runtime_guard = function() end,
 			set_accept_callback = function() end,
 			set_cancel_callback = function() end,

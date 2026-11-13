@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"core.logger.engine.logger", "core.logger.engine", "diagnostics.engine.reports.redact", "core.text.engine.json", "core.fs.engine.app_dirs",
 	"core.logger.engine.log_folders", "_generated.logger_sub_files", "core.logger.adapters.log_transport",
-	"core.lifecycle.engine.launcher_environment", "infra.notifications", "core.i18n.engine.i18n",
+	"core.lifecycle.engine.launcher_environment", "core.ui.engine.notifications", "core.i18n.engine.i18n",
 	"infra.config_paths", "core.text.engine.utils", "modules.llm.api_common",
 	"core.process.adapters.task_lifecycle", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
 	"core.fs.adapters.json_codec", "modules.llm.api_mlx",
@@ -51,7 +51,7 @@ local function with_adoption(scenario)
 				state.cleanup[#state.cleanup + 1] = command
 				return true, "exit", 0
 			end
-			package.loaded["infra.notifications"] = { notify = noop }
+			package.loaded["core.ui.engine.notifications"] = { notify = noop }
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.config_paths"] = { get = function() return "/fixture/model.txt" end }
 			package.loaded["core.text.engine.utils"] = { shell_quote = function(value) return "'" .. value .. "'" end }

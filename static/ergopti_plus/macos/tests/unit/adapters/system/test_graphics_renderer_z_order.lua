@@ -47,7 +47,7 @@ local function load_fixture()
 		return canvas
 	end
 
-	local adapter = helpers.load_with_stubs("adapters.graphics_renderer", {
+	local adapter = helpers.load_with_stubs("core.ui.adapters.graphics_renderer", {
 		canvas = canvas_port,
 	})
 	return adapter, canvases

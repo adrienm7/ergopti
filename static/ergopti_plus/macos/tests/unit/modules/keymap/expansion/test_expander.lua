@@ -298,8 +298,8 @@ end)
 helpers.describe("keymap.expander: perform_text_replacement", function()
 	helpers.it("calls the tooltip renderer with forced hiding on expansion", function()
 		local tt_hidden_forced = false
-		local old_renderer = package.loaded["adapters.tooltip_renderer"]
-		package.loaded["adapters.tooltip_renderer"] = {
+		local old_renderer = package.loaded["core.ui.adapters.tooltip_renderer"]
+		package.loaded["core.ui.adapters.tooltip_renderer"] = {
 			hide = function(opts) tt_hidden_forced = type(opts) == "table" and opts.forced == true end,
 		}
 		local E = helpers.load_with_stubs("modules.keymap.expander")
@@ -307,7 +307,7 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 		E.init(s, make_registry({}, {}), make_llm())
 		E.perform_text_replacement(1, function() end, function() end, false, false, "star", nil)
 		helpers.assert_eq(tt_hidden_forced, true)
-		package.loaded["adapters.tooltip_renderer"] = old_renderer
+		package.loaded["core.ui.adapters.tooltip_renderer"] = old_renderer
 	end)
 
 	for _, failure in ipairs({ "edit", "private-mark" }) do

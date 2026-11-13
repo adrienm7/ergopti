@@ -87,7 +87,7 @@ assert.ok(
 	'the parts bind the dialogs they use, not the root'
 );
 for (const statement of [
-	'local TextPrompt = require("ui.text_prompt")',
+	'local TextPrompt = require("core.ui.ui.text_prompt")',
 	'local WindowTitles = require("core.ui.engine.window_titles")',
 	'local uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")'
 ])
@@ -118,7 +118,7 @@ const partOnlyCases = [
 		'two parts declare one name from different modules',
 		partOnly(
 			'linux/ui/menu/menu_metrics.lua',
-			'local TextPrompt = require("ui.text_prompt")',
+			'local TextPrompt = require("core.ui.ui.text_prompt")',
 			'local TextPrompt = require("ui.foreign_prompt")'
 		)
 	],

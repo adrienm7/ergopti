@@ -43,7 +43,7 @@ local ENGINE_OWNERSHIP = {
 	"modules.keymap.utils",
 	"core.text.engine.utils",
 	"core.text.engine.utils_core",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
 }
 
@@ -188,7 +188,7 @@ end)
 -- so perform_text_replacement's side-effects never touch real UI/OS code.
 local function fresh_engine()
 	return helpers.with_fresh_modules(ENGINE_OWNERSHIP, function()
-		package.loaded["ui.tooltip"] = { hide = function() end, hide_forced = function() end }
+		package.loaded["core.ui.ui.tooltip"] = { hide = function() end, hide_forced = function() end }
 		package.loaded["modules.keystats"] = {
 			notify_synthetic = function() end,
 			set_buffer       = function() end,

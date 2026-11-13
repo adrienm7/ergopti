@@ -120,10 +120,10 @@ print("=== registered bridges are keyed by a page name ===")
 -- Parsed out of the source rather than required: webview_manager pulls in GTK
 -- and the whole daemon state at load time, and this assertion is about a literal
 -- table in a file.
-local manager_source = assert(helpers.read_module_source("ui.webview_manager"))
+local manager_source = assert(helpers.read_module_source("core.ui.ui.webview_manager"))
 local block = manager_source:match("local BRIDGE_MODULES = {(.-)\n}")
 helpers.assert_true(block ~= nil,
-	"could not find the BRIDGE_MODULES table in ui/webview_manager.lua — this test cannot check what it cannot read")
+	"could not find the BRIDGE_MODULES table in core/ui/ui/webview_manager.lua — this test cannot check what it cannot read")
 
 local bridge_count = 0
 for key in block:gmatch("([%a_][%w_]*)%s*=%s*\"ui%.") do

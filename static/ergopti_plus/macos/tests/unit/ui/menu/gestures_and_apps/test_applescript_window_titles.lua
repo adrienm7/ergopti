@@ -84,7 +84,7 @@ end
 --- @param composer function|nil Private policy delegate, otherwise the real module.
 --- @param callback function Receives (Dialogs, Menu, Context, world).
 local function with_world(strings, composer, callback)
-	helpers.with_stub_scope({ "infra.dialog_util", "ui.menu.menu_tap_holds", "core.i18n.engine.i18n", "core.ui.engine.window_titles" }, function()
+	helpers.with_stub_scope({ "core.ui.engine.dialog_util", "ui.menu.menu_tap_holds", "core.i18n.engine.i18n", "core.ui.engine.window_titles" }, function()
 		if composer then package.loaded["core.ui.engine.window_titles"] = { compose = composer } end
 		local world = { scripts = {}, focuses = 0, writes = 0 }
 		local native = {
@@ -96,7 +96,7 @@ local function with_world(strings, composer, callback)
 			end },
 		}
 		local Menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", native)
-		local Dialogs = require("infra.dialog_util")
+		local Dialogs = require("core.ui.engine.dialog_util")
 		local i18n = package.loaded["core.i18n.engine.i18n"]
 		i18n.get = function(key)
 			if TITLE_KEYS[key] or key == "button.ok" or key == "button.cancel" then return strings[key] end

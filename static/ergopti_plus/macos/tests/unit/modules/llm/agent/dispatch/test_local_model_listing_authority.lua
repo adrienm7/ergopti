@@ -15,7 +15,7 @@ require("core.logger.engine")
 local OWNED = {
 	"modules.llm.agent_runner", "modules.llm.agent_learning", "modules.llm.agent_connectors",
 	"ai.engine.agent.agent", "llm.agent_learning", "adapters.system_info", "core.i18n.engine.locale",
-	"infra.dialog_util", "modules.llm.local_model_offer", "core.i18n.engine.core", "modules.shortcuts.script_control",
+	"core.ui.engine.dialog_util", "modules.llm.local_model_offer", "core.i18n.engine.core", "modules.shortcuts.script_control",
 }
 
 --- Keeps real requester callbacks and their native HTTP ports within one owner.

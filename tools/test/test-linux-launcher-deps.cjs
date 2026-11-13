@@ -642,7 +642,7 @@ try {
 		for (const owned of privateRuntimePackages[format] || [])
 			if (actual.includes(owned))
 				errors.push(`${format} depends on the host ${owned} instead of its private runtime`);
-		// Every dialog is Ergopti's own GTK window (linux/ui/dialog_host.lua):
+		// Every dialog is Ergopti's own GTK window (linux/core/ui/ui/dialog_host.lua):
 		// no package may pull the host's dialog programs back in.
 		for (const dialog of ['zenity', 'kdialog'])
 			if (actual.includes(dialog))

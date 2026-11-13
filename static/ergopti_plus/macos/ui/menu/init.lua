@@ -14,7 +14,7 @@
 local M = {}
 
 local hs               = hs
-local notifications    = require("infra.notifications")
+local notifications    = require("core.ui.engine.notifications")
 local FeatureNotice    = require("menu.engine.feature_notice")
 local hotstring_editor = require("ui.hotstring_editor")
 local Logger           = require("core.logger.engine.logger")
@@ -487,7 +487,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local function close_loaded_dashboard(module_name, label)
 		local dashboard = package.loaded[module_name]
 		if not dashboard or not dashboard._wv then return nil end
-		if not require("ui.ui_builder").is_window_focused(dashboard._wv) then return nil end
+		if not require("core.ui.ui.builder").is_window_focused(dashboard._wv) then return nil end
 		if type(dashboard.close) ~= "function" then
 			Logger.error(LOG, "%s close transaction is unavailable; exact owner retained.", label)
 			return false
@@ -1516,7 +1516,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	--- @param report table Refused composition report.
 	local function show_reset_failure(report)
 		local title, message = require("settings.engine.publication.reset_failure").message(report, i18n.get)
-		local shown, err = pcall(require("infra.dialog_util").block_alert, title, message,
+		local shown, err = pcall(require("core.ui.engine.dialog_util").block_alert, title, message,
 			i18n.get("button.ok"), nil, "critical")
 		if not shown then
 			Logger.error(LOG, "Reset failure dialog could not be shown (%s): %s.", tostring(err), message)
@@ -1644,7 +1644,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- The window toggles (ui/window_toggle) open these pages with the same
 	-- session context as their menu rows: the remap facade, the update channel
 	-- owner and the menu state exist only here.
-	local WindowToggle = require("ui.window_toggle")
+	local WindowToggle = require("core.ui.ui.window_toggle")
 	WindowToggle.set_opener("layer_editor", function()
 		return require("ui.layer_editor").open({ karabiner = karabiner })
 	end)

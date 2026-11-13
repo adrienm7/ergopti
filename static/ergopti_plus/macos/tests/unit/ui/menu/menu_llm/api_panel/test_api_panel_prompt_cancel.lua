@@ -14,8 +14,8 @@ local MODULES = {
 	"modules.llm",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.dialog_util",
-	"infra.notifications",
+	"core.ui.engine.dialog_util",
+	"core.ui.engine.notifications",
 	"infra.manifest_menu",
 	"ui.menu.menu_llm.api_panel",
 }
@@ -78,7 +78,7 @@ local function run_add_fixture(prompt_result, confirm_choice, seed_entries)
 			warn = function() end,
 			error = function() end,
 		}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function()
 				prompt_calls = prompt_calls + 1
 				return prompt_result(prompt_calls)
@@ -87,7 +87,7 @@ local function run_add_fixture(prompt_result, confirm_choice, seed_entries)
 				return confirm_choice
 			end,
 		}
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		local command_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
 			manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,

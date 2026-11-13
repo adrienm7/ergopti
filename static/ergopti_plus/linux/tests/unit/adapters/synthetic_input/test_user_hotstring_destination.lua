@@ -35,10 +35,10 @@ end
 --- Native accessibility still uses the bounded helper owned above.
 --- @return table WindowInfo
 local function unsupported_wayland()
-	local names = { "adapters.window_info", "core.process.adapters.shell_runner", "infra.display_server" }
+	local names = { "adapters.window_info", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	package.loaded["infra.display_server"] = {
+	package.loaded["core.ui.engine.display_server"] = {
 		is_wayland = function() return true end, is_x11 = function() return false end,
 		desktop = function() return "GNOME" end,
 	}

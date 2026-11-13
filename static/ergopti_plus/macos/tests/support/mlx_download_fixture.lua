@@ -15,16 +15,16 @@ local MODULES = {
 	"core.process.adapters.shell_runner",
 	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.llm",
 	"modules.llm.network_env",
 	"modules.llm.opaque_network_admission",
 	"ui.download_window",
 	"ui.download_window.javascript",
-	"ui.ui_builder",
+	"core.ui.ui.builder",
 	"core.fs.engine.paths",
 	"core.timing.engine.deferred_work",
 	"ui.menu.menu_llm.model_switcher",
@@ -482,10 +482,10 @@ local function with_fixture(plan, callback)
 				get = function(key) return key end,
 				format = function(key, value) return key .. ":" .. tostring(value) end,
 			}
-			package.loaded["infra.dialog_util"] = {
+			package.loaded["core.ui.engine.dialog_util"] = {
 				block_alert = function() return "button.cancel" end,
 			}
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function(...)
 					records.notifications[#records.notifications + 1] = table.pack(...)
 					return true
@@ -519,7 +519,7 @@ local function with_fixture(plan, callback)
 					return helpers.driver_root() .. "../_shared"
 				end }
 				package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
-				package.loaded["ui.ui_builder"] = {
+				package.loaded["core.ui.ui.builder"] = {
 					get_app_geometry = function() return { width = 460, height = 380 } end,
 					show_webview = function(options)
 						local native = { options = options }

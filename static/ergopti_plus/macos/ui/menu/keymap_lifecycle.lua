@@ -13,7 +13,7 @@ local M = {}
 local SaveFailure = require("settings.engine.publication.save_failure")
 local Logger        = require("core.logger.engine.logger")
 local I18n          = require("core.i18n.engine.i18n")
-local Notifications = require("infra.notifications")
+local Notifications = require("core.ui.engine.notifications")
 local LOG = "menu.keymap_lifecycle"
 
 

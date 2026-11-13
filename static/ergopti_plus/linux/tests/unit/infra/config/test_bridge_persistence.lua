@@ -72,9 +72,9 @@ local function with_writer_spy(module_name, invoke)
 		end,
 	}
 	local saved = package.loaded["core.text.engine.toml_codec.writer"]
-	local previous_manager = package.loaded["ui.webview_manager"]
+	local previous_manager = package.loaded["core.ui.ui.webview_manager"]
 	if module_name == "ui.hotstring_editor.bridge" then
-		package.loaded["ui.webview_manager"] = { current_epoch = function() return 73 end, eval_js = function() return true end }
+		package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return 73 end, eval_js = function() return true end }
 	end
 	package.loaded["core.text.engine.toml_codec.writer"] = fake
 	local ok, err = pcall(function()
@@ -83,7 +83,7 @@ local function with_writer_spy(module_name, invoke)
 	end)
 	-- Restore the real cache before asserting so a failure cannot leak the fake.
 	package.loaded["core.text.engine.toml_codec.writer"] = saved
-	package.loaded["ui.webview_manager"] = previous_manager
+	package.loaded["core.ui.ui.webview_manager"] = previous_manager
 	if not ok then error(err, 0) end
 	return captured
 end
@@ -275,8 +275,8 @@ helpers.describe("bridge handler TOML persistence", function()
 		} }
 		-- The real writer: its owned committed payload is what lets each save
 		-- reach its reload, and the second save starts from the first one's file.
-		local previous_manager = package.loaded["ui.webview_manager"]
-		package.loaded["ui.webview_manager"] = { current_epoch = function() return 73 end, eval_js = function() return true end }
+		local previous_manager = package.loaded["core.ui.ui.webview_manager"]
+		package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return 73 end, eval_js = function() return true end }
 		local ok, err = pcall(function()
 			local handler = helpers.load_module("ui.hotstring_editor.bridge")
 			local context = open_personal_view(handler, state)
@@ -295,7 +295,7 @@ helpers.describe("bridge handler TOML persistence", function()
 				},
 			} }, state, context)
 		end)
-		package.loaded["ui.webview_manager"] = previous_manager
+		package.loaded["core.ui.ui.webview_manager"] = previous_manager
 		package.loaded["ui.hotstring_editor.bridge"] = nil
 		-- The writer may leave its backup beside the file.
 		local listing = io.popen('ls -A "' .. dir .. '"')
@@ -409,7 +409,7 @@ helpers.describe("hotstring editor classified source admission", function()
 		local NativeWriter = require("core.fs.engine.regular_file_writer")
 		local native_stage = NativeWriter.open
 		local old_bridge = package.loaded["ui.hotstring_editor.bridge"]
-		local old_manager = package.loaded["ui.webview_manager"]
+		local old_manager = package.loaded["core.ui.ui.webview_manager"]
 		local writer = require("core.text.engine.toml_codec.writer")
 		local reader = require("core.text.engine.toml_codec.reader")
 		local old_writer, old_reader = package.loaded["core.text.engine.toml_codec.writer"], package.loaded["core.text.engine.toml_codec.reader"]
@@ -420,7 +420,7 @@ helpers.describe("hotstring editor classified source admission", function()
 		if initial then put(initial) end
 		local context = { app_name = "hotstring_editor", epoch = 73 }
 		local state = { config = { get_config_dir = function() return root end, reload = function() obs.reloads = obs.reloads + 1; return 10 end } }
-		package.loaded["ui.webview_manager"] = { current_epoch = function() obs.epochs = obs.epochs + 1; return 73 end, eval_js = function() return true end }
+		package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() obs.epochs = obs.epochs + 1; return 73 end, eval_js = function() return true end }
 		local release_source = helpers.route_source_through_stdio(path)
 		local ok, problem = pcall(function()
 			io.open = function(target, access)
@@ -490,7 +490,7 @@ helpers.describe("hotstring editor classified source admission", function()
 		release_source()
 		io.open, os.rename, NativeWriter.open = native_open, native_rename, native_stage
 		package.loaded["ui.hotstring_editor.bridge"] = old_bridge
-		package.loaded["ui.webview_manager"] = old_manager
+		package.loaded["core.ui.ui.webview_manager"] = old_manager
 		package.loaded["core.text.engine.toml_codec.writer"], package.loaded["core.text.engine.toml_codec.reader"] = old_writer, old_reader
 		local fh = native_open(path, "r"); obs.bytes = fh and fh:read("*a") or nil; if fh then fh:close() end
 		local stage = native_open(helpers.stage_path(path), "r"); obs.stage_left = stage ~= nil; if stage then stage:close() end
@@ -499,7 +499,7 @@ helpers.describe("hotstring editor classified source admission", function()
 		obs.restored = io.open == native_open and os.rename == native_rename and NativeWriter.open == native_stage
 			and package.loaded["ui.hotstring_editor.bridge"] == old_bridge
 			and package.loaded["core.text.engine.toml_codec.writer"] == old_writer and package.loaded["core.text.engine.toml_codec.reader"] == old_reader
-			and package.loaded["ui.webview_manager"] == old_manager
+			and package.loaded["core.ui.ui.webview_manager"] == old_manager
 		return obs
 	end
 	for _, mode in ipairs({ "malformed", "open_false", "open_throw", "read_nil", "close_nil", "close_false", "parse_false", "parse_nil", "parse_truthy", "parse_throw", "missing_parse", "missing_classified", "stale", "appeared", "rename_false", "rename_nil", "rename_throw", "write_truthy" }) do

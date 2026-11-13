@@ -236,7 +236,7 @@ function M.run(callback)
 					if job then assert(job.state == "cancelled" and job.timer == nil) end
 					return job
 				end
-				local builder = package.loaded["ui.ui_builder"]
+				local builder = package.loaded["core.ui.ui.builder"]
 				local original_show = builder.show_webview
 				builder.show_webview = function(options)
 					local prototype = original_show(options)

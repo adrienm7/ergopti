@@ -65,14 +65,14 @@ local function bundle_labels(opts)
 		"modules.keymap.layout_install",
 		"ui.menu.menu_keyboard_layout",
 		"infra.manifest_menu",
-		"infra.notifications",
+		"core.ui.engine.notifications",
 		"core.i18n.engine.i18n",
 	}, function()
 		local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local install = require("modules.keymap.layout_install")
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return LABELS[key] or key end }
 		package.loaded["core.i18n.engine.i18n"].section = function(key) return LABELS[key] or key end
-		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 		install.bundle_variants = function()
 			return { { name = "Ergopti_v2_2_2_plus", tis_id = "com.apple.keyboardlayout.ergopti.plus",
 				keylayout = "/b/Ergopti_v2_2_2_plus.keylayout" } }
@@ -282,7 +282,7 @@ end)
 --- Filesystem/TIS mutation ports remain controlled and must not run during builds.
 local function with_no_bundle_status(body, labels)
 	helpers.with_stub_scope({"modules.keymap.input_sources", "modules.keymap.layout_install",
-		"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "core.i18n.engine.i18n", "infra.notifications"}, function()
+		"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "core.i18n.engine.i18n", "core.ui.engine.notifications"}, function()
 		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local installer = require("modules.keymap.layout_install")
 		local session = {latest = nil, effects = 0}
@@ -297,7 +297,7 @@ local function with_no_bundle_status(body, labels)
 		installer.install_system = forbid_effect
 		sources.upgrade_active_list_async = forbid_effect
 		sources.set_input_source_async = forbid_effect
-		package.loaded["infra.notifications"] = {notify = forbid_effect}
+		package.loaded["core.ui.engine.notifications"] = {notify = forbid_effect}
 		local translator = require("core.i18n.engine.i18n")
 		if labels then translator.get = function(key) return labels[key] or key end
 		else install_legacy_layout_formats(translator) end

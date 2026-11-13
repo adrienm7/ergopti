@@ -217,12 +217,12 @@ end)
 
 helpers.describe("linux-native-focus-identity", function()
 	helpers.it("(linux-focus-coherent-poll) queries one native snapshot per unchanged lifecycle tick", function()
-		local names = { "core.process.adapters.shell_runner", "infra.display_server", "adapters.window_info", "core.process.adapters.lifecycle" }
+		local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.window_info", "core.process.adapters.lifecycle" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local ok, failure = pcall(function()
 			local shell = helpers.load_module("core.process.adapters.shell_runner")
-			local display = helpers.load_module("infra.display_server")
+			local display = helpers.load_module("core.ui.engine.display_server")
 			display._set_for_test(display.X11, "focus poll fixture")
 			local probes = 0
 			shell._set_runner(function(command)

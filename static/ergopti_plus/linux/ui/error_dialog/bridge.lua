@@ -155,7 +155,7 @@ local function build_report(record)
 	local Health = require("ui.healthcheck.bridge")
 	local HealthReport = require("ui.healthcheck.report")
 	local documents = Health.config()
-	local snapshot = Health.build_snapshot(require("ui.webview_manager").get_daemon_state(), false)
+	local snapshot = Health.build_snapshot(require("core.ui.ui.webview_manager").get_daemon_state(), false)
 	local composed = DialogCore.compose(record, snapshot, Health.DRIVER)
 	return {
 		report    = composed.report,
@@ -236,7 +236,7 @@ end
 --- @return boolean opened
 local function open_window()
 	Logger.start(LOG, "Opening the error window…")
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	local record = _pending
 	local epoch = manager.current_epoch(APP)
 	-- A window left open (its close box raced this one) is replaced; its close
@@ -287,7 +287,7 @@ end
 --- @param message table
 --- @return boolean pushed
 local function push(message, expected)
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	if expected and (_session ~= expected or manager.current_epoch(APP) ~= expected.epoch) then return false end
 	local ok, json = pcall(require("core.text.engine.json").encode, message)
 	if not ok then
@@ -335,7 +335,7 @@ local function perform(name, context)
 	local inline, answer, completed = true, nil, false
 	local function current()
 		return _session == session and session.action_token == token and session.snapshot == token.snapshot
-			and _scope.generation() == token.generation and require("ui.webview_manager").current_epoch(APP) == session.epoch
+			and _scope.generation() == token.generation and require("core.ui.ui.webview_manager").current_epoch(APP) == session.epoch
 	end
 	local request = require("ui.healthcheck.report").perform(action, session.paths, session.documents, session.context, nil, session.snapshot, {
 		current = current,
@@ -367,7 +367,7 @@ function M.on_message(payload, _state, context)
 		local epoch = type(context) == "table" and context.epoch or nil
 		local function current()
 			return _pending == record and _session == previous
-				and (epoch == nil or require("ui.webview_manager").current_epoch(APP) == epoch)
+				and (epoch == nil or require("core.ui.ui.webview_manager").current_epoch(APP) == epoch)
 		end
 		local ok, fields = pcall(build_report, record)
 		if not current() then return nil end
@@ -403,7 +403,7 @@ end
 --- Frees the policy when the user closes the window with its close box.
 --- @param epoch number|nil
 function M.on_window_closed(epoch)
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	if epoch ~= nil and manager.current_epoch(APP) ~= nil and manager.current_epoch(APP) ~= epoch then return end
 	settle()
 end

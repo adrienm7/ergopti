@@ -41,7 +41,7 @@ end
 --- @param deps table
 --- @return integer|nil status, table lines, table sent
 local function run(deps)
-	local Stack = helpers.load_module("infra.gui_stack")
+	local Stack = helpers.load_module("core.ui.engine.gui_stack")
 	local lines, sent = {}, {}
 	deps.i18n = I18N
 	deps.print = function(line) lines[#lines + 1] = line end
@@ -107,7 +107,7 @@ helpers.describe("gui_stack: the desktop toolkit is checked at start", function(
 		local fh = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
 		local source = fh:read("*a")
 		fh:close()
-		local check = source:find('require("infra.gui_stack").check_at_start(', 1, true)
+		local check = source:find('require("core.ui.engine.gui_stack").check_at_start(', 1, true)
 		local icon = source:find('tray_menu.setIcon({ title = "Ergopti" })', 1, true)
 		helpers.assert_true(check ~= nil and icon ~= nil and check < icon, "the start check precedes the tray icon")
 	end)

@@ -60,7 +60,7 @@ for (const file of htmlFiles) {
 }
 
 const host = fs.readFileSync(
-	path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'ui', 'webkit_host.lua'),
+	path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'core', 'ui', 'ui', 'webkit_host.lua'),
 	'utf8'
 );
 // The document policy is shared with macOS; Linux must publish it, not its own.
@@ -99,7 +99,7 @@ if (/https:\/\/api\.github\.com/.test(host) || /connect-src[^;]*https?:/.test(do
 }
 
 const manager = fs.readFileSync(
-	path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'ui', 'webview_manager.lua'),
+	path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'core', 'ui', 'ui', 'webview_manager.lua'),
 	'utf8'
 );
 // A native retirement must unregister its exact bridge. Count complete method

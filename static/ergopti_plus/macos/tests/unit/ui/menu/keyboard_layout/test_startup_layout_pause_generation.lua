@@ -80,7 +80,7 @@ local state = {
 }
 
 package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-package.loaded["infra.notifications"] = { notify = function() end }
+package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 package.loaded["ui.hotstring_editor"] = { set_update_menu = function() end }
 package.loaded["core.text.engine.utils"] = {
 	escape_gsub_replacement = function(value) return value end,

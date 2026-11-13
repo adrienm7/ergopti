@@ -268,7 +268,7 @@ helpers.describe("healthcheck debug menu reports (linux)", function()
 		if adjust then adjust(overrides) end
 		local window_opened = false
 		local previous_bridge = package.loaded["ui.healthcheck.bridge"]
-		local previous_manager = package.loaded["ui.webview_manager"]
+		local previous_manager = package.loaded["core.ui.ui.webview_manager"]
 		package.loaded["ui.healthcheck.bridge"] = { DRIVER = "linux", config = documents,
 			open = function() window_opened = true; return true end,
 			build_snapshot = function()
@@ -276,14 +276,14 @@ helpers.describe("healthcheck debug menu reports (linux)", function()
 				snapshot.sections.paths = { diagnostics_dir = LOGS_DIR .. "/diagnostics" }
 				return snapshot
 			end }
-		package.loaded["ui.webview_manager"] = { get_daemon_state = function() return {} end }
+		package.loaded["core.ui.ui.webview_manager"] = { get_daemon_state = function() return {} end }
 		local ok, result = pcall(function()
 			local outcome
 			Report.report_bug(overrides, function(value) outcome = value end)
 			return outcome
 		end)
 		package.loaded["ui.healthcheck.bridge"] = previous_bridge
-		package.loaded["ui.webview_manager"] = previous_manager
+		package.loaded["core.ui.ui.webview_manager"] = previous_manager
 		helpers.assert_true(ok, tostring(result))
 		return result, calls, window_opened
 	end
@@ -321,17 +321,17 @@ helpers.describe("healthcheck debug menu reports (linux)", function()
 		local Report = helpers.load_module("ui.healthcheck.report")
 		local calls = {}
 		local previous_bridge = package.loaded["ui.healthcheck.bridge"]
-		local previous_manager = package.loaded["ui.webview_manager"]
+		local previous_manager = package.loaded["core.ui.ui.webview_manager"]
 		package.loaded["ui.healthcheck.bridge"] = { DRIVER = "linux", config = documents,
 			build_snapshot = function() return host_snapshot(false) end }
-		package.loaded["ui.webview_manager"] = { get_daemon_state = function() return {} end }
+		package.loaded["core.ui.ui.webview_manager"] = { get_daemon_state = function() return {} end }
 		local ok, result = pcall(function()
 			local outcome
 			Report.suggest_feature(recording(calls), function(value) outcome = value end)
 			return outcome
 		end)
 		package.loaded["ui.healthcheck.bridge"] = previous_bridge
-		package.loaded["ui.webview_manager"] = previous_manager
+		package.loaded["core.ui.ui.webview_manager"] = previous_manager
 		helpers.assert_true(ok, tostring(result))
 		helpers.assert_eq(result, true)
 		local repo = documents().repository
@@ -691,9 +691,9 @@ end)
 helpers.describe("feature opener cancellation ownership", function()
 	helpers.it("(feature-opener-cancel) a nested request survives cancellation of its predecessor", function()
 		local Report = helpers.load_module("ui.healthcheck.report")
-		local old_bridge, old_manager = package.loaded["ui.healthcheck.bridge"], package.loaded["ui.webview_manager"]
+		local old_bridge, old_manager = package.loaded["ui.healthcheck.bridge"], package.loaded["core.ui.ui.webview_manager"]
 		package.loaded["ui.healthcheck.bridge"] = { config = documents, build_snapshot = function() return host_snapshot(false) end }
-		package.loaded["ui.webview_manager"] = { get_daemon_state = function() return {} end }
+		package.loaded["core.ui.ui.webview_manager"] = { get_daemon_state = function() return {} end }
 		local calls, outcomes, cancellations, reenter = {}, {}, 0, true
 		local effects = recording({})
 		effects.open_url = function(_, done)
@@ -711,7 +711,7 @@ helpers.describe("feature opener cancellation ownership", function()
 			calls[2]({ ok = false, code = 23, error = "private opener refused" })
 			helpers.assert_eq(outcomes, { false })
 		end, debug.traceback)
-		package.loaded["ui.healthcheck.bridge"], package.loaded["ui.webview_manager"] = old_bridge, old_manager
+		package.loaded["ui.healthcheck.bridge"], package.loaded["core.ui.ui.webview_manager"] = old_bridge, old_manager
 		if not ok then error(detail, 0) end
 	end)
 end)

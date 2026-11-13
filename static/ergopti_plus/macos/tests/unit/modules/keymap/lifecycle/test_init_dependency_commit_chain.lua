@@ -180,7 +180,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 			["modules.keymap.state"] = {},
 			["adapters.text_sender"] = {},
 			["adapters.synthetic_input"] = {},
-			["adapters.tooltip_renderer"] = {},
+			["core.ui.adapters.tooltip_renderer"] = {},
 			["modules.keymap.terminator_replay"] = {
 				init = function()
 					replay_calls = replay_calls + 1
@@ -212,7 +212,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 			["core.logger.engine.logger"] = LOGGER_STUB,
 			["infra.keycodes"] = { ESCAPE = 53, RETURN = 36, F16_LLM_CHAIN_SIGNAL = 106 },
 			["modules.keystats"] = {},
-			["ui.tooltip"] = {
+			["core.ui.ui.tooltip"] = {
 				set_runtime_guard = function() tooltip_guard_calls = tooltip_guard_calls + 1 end,
 			},
 			["modules.llm.prediction_engine"] = {
@@ -348,7 +348,7 @@ local function with_prediction_results(warmup_result, streaming_result, callback
 		["core.events.timer_scheduler"] = PortFakes.timer_scheduler(),
 		["core.i18n.engine.i18n"] = {},
 		["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 },
-		["ui.tooltip"] = PortFakes.complete_tooltip({
+		["core.ui.ui.tooltip"] = PortFakes.complete_tooltip({
 			set_navigate_callback = noop,
 			set_enter_validates = noop,
 		}),

@@ -60,7 +60,7 @@ local OWNERS = {
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"infra.manifest_reader",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.fs.engine.paths",
 	"core.lifecycle.engine.startup_transaction",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
@@ -131,7 +131,7 @@ local function fresh_actions(options)
 	"adapters.system_switcher_sampler",
 	"adapters.system_switcher_runtime",
 
-		"infra.notifications",
+		"core.ui.engine.notifications",
 		"core.events.timer_scheduler",
 		"modules.gestures.actions_aux_owner",
 		"modules.gestures.actions_click",

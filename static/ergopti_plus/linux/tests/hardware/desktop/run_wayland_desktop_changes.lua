@@ -21,7 +21,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
-local Display = require("infra.display_server")
+local Display = require("core.ui.engine.display_server")
 local Monotonic = require("core.logger.engine.monotonic")
 local Navigation = require("keyboard.engine.desktop_navigation")
 local Switcher = require("modules.gestures.workspace_switcher")

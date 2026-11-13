@@ -93,7 +93,7 @@ local function with_priority(body, no_engine)
 		state.config_dir = directory .. "/unused"
 		assert(Config.init(not no_engine and engine or nil, state.config_dir))
 		if not no_engine then assert(select(2, Config.load_all())) end
-		package.loaded["ui.webview_manager"] = { current_epoch = function() return 1 end,
+		package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return 1 end,
 			eval_js = function(_, js) state.pushes[#state.pushes + 1] = js; return true end }
 		package.loaded["ui.hotstrings_config_window.bridge"] = nil
 		local Bridge = require("ui.hotstrings_config_window.bridge")

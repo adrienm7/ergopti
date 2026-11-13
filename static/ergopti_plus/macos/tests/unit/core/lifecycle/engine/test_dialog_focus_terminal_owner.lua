@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OWNERS = { "hs", "tests.stubs.hs", "infra.dialog_util", "core.logger.engine.logger",
+local OWNERS = { "hs", "tests.stubs.hs", "core.ui.engine.dialog_util", "core.logger.engine.logger",
 	"core.events.timer_scheduler", "core.process.adapters.shell_runner", "adapters.running_application",
 	"core.text.engine.utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "core.ui.engine.window_titles",
 	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "modules.gestures.action_confirm",
@@ -80,7 +80,7 @@ local function with_dialog(callback)
 				fixture.spawns[#fixture.spawns + 1] = process
 				return process
 			end }
-			fixture.subject = helpers.load_with_stubs("infra.dialog_util", overrides)
+			fixture.subject = helpers.load_with_stubs("core.ui.engine.dialog_util", overrides)
 			fixture.scheduler = assert(package.loaded["core.events.timer_scheduler"])
 			return callback(fixture)
 		end, debug.traceback))
@@ -196,7 +196,7 @@ helpers.describe("dialog focus: terminal alert ownership", function()
 	end)
 
 	helpers.it("drains native timers and restores the runtime after a body failure", function()
-		local incoming_hs, incoming_dialog = rawget(_G, "hs"), package.loaded["infra.dialog_util"]
+		local incoming_hs, incoming_dialog = rawget(_G, "hs"), package.loaded["core.ui.engine.dialog_util"]
 		local observed
 		local ok, detail = pcall(with_dialog, function(fixture)
 			fixture.open(); observed = fixture
@@ -205,7 +205,7 @@ helpers.describe("dialog focus: terminal alert ownership", function()
 		helpers.assert_eq(ok, false)
 		helpers.assert_true(tostring(detail):find("controlled dialog fixture body failure", 1, true) ~= nil)
 		helpers.assert_true(rawequal(rawget(_G, "hs"), incoming_hs))
-		helpers.assert_true(rawequal(package.loaded["infra.dialog_util"], incoming_dialog))
+		helpers.assert_true(rawequal(package.loaded["core.ui.engine.dialog_util"], incoming_dialog))
 		for _, timer in ipairs(observed.timers) do helpers.assert_eq(timer.enabled, false) end
 	end)
 end)
@@ -247,7 +247,7 @@ helpers.describe("dialog alert: a call without hs.dialog.alert's shape fails fas
 		-- Every production caller reaches the wrapper under its own alias; the
 		-- confirmation calls it through xpcall(Dialog.alert, …).
 		with_dialog(function(fixture)
-			package.loaded["infra.dialog_util"] = fixture.subject
+			package.loaded["core.ui.engine.dialog_util"] = fixture.subject
 			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 				format = function(key, value) return key .. ":" .. tostring(value) end,

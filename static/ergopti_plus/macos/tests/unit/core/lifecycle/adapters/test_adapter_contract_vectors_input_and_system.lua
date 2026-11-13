@@ -131,7 +131,7 @@ end)
 -- ==============================================
 
 helpers.describe("Adapter contract vectors: TooltipRenderer", function()
-	local adapter = helpers.load_with_stubs("adapters.tooltip_renderer")
+	local adapter = helpers.load_with_stubs("core.ui.adapters.tooltip_renderer")
 
 	-- isVisible() is what these calls move, and only one case looked at it. A
 	-- pcall status cannot tell a rendered tooltip from a show() that returned

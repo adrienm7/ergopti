@@ -119,7 +119,7 @@ function record(label, ok, details = []) {
 // window added next to it. The entries that are not overlays say so.
 const ALLOWLIST = [
 	{
-		file: 'macos/ui/tooltip/renderer.lua',
+		file: 'macos/core/ui/ui/tooltip/renderer.lua',
 		kinds: { 'mac.level': 2 },
 		reason: 'hotstring preview and LLM prediction tooltip canvases at the caret'
 	},
@@ -129,7 +129,7 @@ const ALLOWLIST = [
 		reason: 'WPM widget: a click-through HUD canvas, never focused'
 	},
 	{
-		file: 'macos/adapters/graphics_renderer.lua',
+		file: 'macos/core/ui/adapters/graphics_renderer.lua',
 		kinds: { 'mac.level': 1, 'overlay.adapter': 1 },
 		reason: 'overlay canvas adapter behind the WPM widget and feedback overlays'
 	},
@@ -139,7 +139,7 @@ const ALLOWLIST = [
 		reason: 'not an overlay: names the overlay adapter in its health probe, creates nothing'
 	},
 	{
-		file: 'macos/ui/ui_builder.lua',
+		file: 'macos/core/ui/ui/builder.lua',
 		kinds: { 'mac.level': 2 },
 		reason:
 			'not an overlay: the window chrome applies windowLevels.normal, refusing anything else, ' +
@@ -152,13 +152,13 @@ const ALLOWLIST = [
 		reason: 'mouse spotlight: a transient locator overlay dismissed on mouse move'
 	},
 	{
-		file: 'windows/ui/tooltip/helpers.ahk',
+		file: 'windows/core/ui/ui/tooltip/helpers.ahk',
 		kinds: { 'win.alwaysOnTop': 2, 'win.topmost': 1 },
 		reason:
 			'hotstring preview tooltip surfaces (content and border), revealed topmost, never activated'
 	},
 	{
-		file: 'windows/ui/tooltip/llm.ahk',
+		file: 'windows/core/ui/ui/tooltip/llm.ahk',
 		kinds: { 'win.alwaysOnTop': 1 },
 		reason: 'LLM prediction panel, click-through and never activated'
 	},
@@ -168,27 +168,27 @@ const ALLOWLIST = [
 		reason: 'WPM widget and its graph: layered HUD windows, never focused'
 	},
 	{
-		file: 'windows/adapters/graphics_renderer.ahk',
+		file: 'windows/core/ui/adapters/graphics_renderer.ahk',
 		kinds: { 'win.alwaysOnTop': 4, 'win.exTopmost': 1, 'overlay.adapter': 2 },
 		reason: 'layered overlay adapter (spotlight and feedback overlays)'
 	},
 	{
-		file: 'windows/infra/ui_style.ahk',
+		file: 'windows/core/ui/engine/style.ahk',
 		kinds: { 'win.alwaysOnTop': 1 },
 		reason: 'not an overlay: Gui_Create names AlwaysOnTop only to refuse it for every window'
 	},
 	{
-		file: 'windows/ui/spotlight/init.ahk',
+		file: 'windows/core/ui/ui/spotlight/init.ahk',
 		kinds: { 'win.alwaysOnTop': 1 },
 		reason: 'mouse spotlight: a click-through locator overlay dismissed on mouse move'
 	},
 	{
-		file: 'windows/ui/spotlight/ownership.ahk',
+		file: 'windows/core/ui/ui/spotlight/ownership.ahk',
 		kinds: { 'overlay.adapter': 1 },
 		reason: 'mouse spotlight: creates its locator overlay through the overlay adapter'
 	},
 	{
-		file: 'linux/adapters/graphics_renderer.lua',
+		file: 'linux/core/ui/adapters/graphics_renderer.lua',
 		kinds: { 'linux.keepAbove': 1, 'linux.popup': 3, 'overlay.adapter': 1 },
 		reason: 'hotstring preview tooltip: an undecorated click-through popup'
 	},
@@ -203,17 +203,17 @@ const ALLOWLIST = [
 		reason: 'WPM widget drawn on the WPM overlay surface'
 	},
 	{
-		file: 'linux/ui/tooltip/llm.lua',
+		file: 'linux/core/ui/ui/tooltip/llm.lua',
 		kinds: { 'overlay.adapter': 1 },
 		reason: 'LLM prediction panel drawn through the overlay adapter'
 	},
 	{
-		file: 'linux/ui/tooltip/preview.lua',
+		file: 'linux/core/ui/ui/tooltip/preview.lua',
 		kinds: { 'overlay.adapter': 1 },
 		reason: 'hotstring preview tooltip drawn through the overlay adapter'
 	},
 	{
-		file: 'linux/adapters/spotlight_overlay.lua',
+		file: 'linux/core/ui/adapters/spotlight_overlay.lua',
 		kinds: { 'linux.keepAbove': 1, 'linux.popup': 3 },
 		reason: 'mouse spotlight: click-through, focus-free locator popups dismissed on mouse move'
 	},
@@ -704,7 +704,7 @@ const FIXTURES = [
 	['macos', 'wv["bringToFront"](wv, true)', 'mac.bringToFront'],
 	['macos', 'hs.consoleOnTop(true)', 'mac.consoleOnTop'],
 	['macos', 'view:level(3)', 'mac.level'],
-	['macos', 'local R = require("adapters.graphics_renderer")', 'overlay.adapter'],
+	['macos', 'local R = require("core.ui.adapters.graphics_renderer")', 'overlay.adapter'],
 	['swift', 'panel.level = .floating', 'mac.level'],
 	['swift', 'alert.window.level = .modalPanel', 'mac.level'],
 	[
@@ -769,7 +769,7 @@ const FIXTURES = [
 	['linux', 'local w = Gtk.Window({ type = "POPUP" })', 'linux.popup'],
 	['linux', 'local w = C.gtk_window_new(1)', 'linux.popup'],
 	['linux', 'local s = require("adapters.wpm_surface")', 'overlay.adapter'],
-	['linux', 'package.loaded["adapters.graphics_renderer"].show()', 'overlay.adapter']
+	['linux', 'package.loaded["core.ui.adapters.graphics_renderer"].show()', 'overlay.adapter']
 ];
 for (const [driver, snippet, kind] of FIXTURES) {
 	const kinds = detect(driver, stripFor(driver, snippet)).map((f) => f.kind);
@@ -780,8 +780,9 @@ for (const [driver, snippet, kind] of FIXTURES) {
 	);
 }
 
-const rendererImport = 'local R = require("adapters.graphics_renderer")';
-const rendererOwnerCheck = 'rawequal(package.loaded["adapters.graphics_renderer"], debt.renderer)';
+const rendererImport = 'local R = require("core.ui.adapters.graphics_renderer")';
+const rendererOwnerCheck =
+	'rawequal(package.loaded["core.ui.adapters.graphics_renderer"], debt.renderer)';
 record(
 	'overlay inventory ignores only the ownership comparison, while counting each import',
 	detect('linux', rendererImport + '\n' + rendererOwnerCheck + '\n' + rendererImport).filter(
@@ -790,7 +791,7 @@ record(
 );
 
 const CLEAN_FIXTURES = [
-	['linux', 'rawequal(package.loaded["adapters.graphics_renderer"], debt.renderer)'],
+	['linux', 'rawequal(package.loaded["core.ui.adapters.graphics_renderer"], debt.renderer)'],
 	['macos', 'wv:level(hs.drawing.windowLevels.normal)'],
 	['macos', 'local level = wv:level()'],
 	['macos', '-- wv:bringToFront(true) used to pin the window'],
@@ -903,7 +904,7 @@ function read(rel) {
 	return fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
 }
 
-const builder = stripLuaComments(read('static/ergopti_plus/macos/ui/ui_builder.lua'));
+const builder = stripLuaComments(read('static/ergopti_plus/macos/core/ui/ui/builder.lua'));
 record(
 	'UI Builder: focus retry mechanism (try_focus)',
 	/local function try_focus\(\)/.test(builder)
@@ -922,7 +923,7 @@ record(
 );
 record(
 	'Dialog Util: use hs.focus(true) with force flag',
-	/hs\.focus\(true\)/.test(read('static/ergopti_plus/macos/infra/dialog_util.lua'))
+	/hs\.focus\(true\)/.test(read('static/ergopti_plus/macos/core/ui/engine/dialog_util.lua'))
 );
 
 const metricsTyping = read('static/ergopti_plus/macos/ui/metrics_typing/init.lua');

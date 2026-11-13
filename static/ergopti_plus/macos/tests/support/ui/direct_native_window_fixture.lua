@@ -18,7 +18,7 @@ local function with_window(domain, scenario)
 	return helpers.with_stub_scope({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot", "diagnostics.engine.healthcheck.cleanup", "diagnostics.engine.healthcheck.actions",
 		"ui.error_dialog", "diagnostics.engine.reports.error_policy", "diagnostics.engine.reports.error_report", "diagnostics.engine.reports.issue_report", "diagnostics.engine.reports.redact",
-		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder", "ui.webview_close_owner", "core.timing.engine.deferred_work",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work",
 		"core.events.timer_scheduler", "core.fs.adapters.storage", "ui.healthcheck.report", "hs", "tests.stubs.hs",
 		"tests.support.webview_recursive_close_fixture", "core.text.engine.json", "core.fs.adapters.json_codec",
 	}, function()
@@ -36,7 +36,7 @@ local function with_window(domain, scenario)
 		package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.adapters.storage"] = { get = function() return true end, set = function() return true end }
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			window_title = function(value) return "ErgoptiPlus — " .. tostring(value) end,
 			get_app_geometry = function() return { width = 700, height = 600 } end,
 			build_injected_html = function() return "<html></html>" end,

@@ -73,7 +73,7 @@ local function load_commit_staged_backend(kind, options)
 		get_pause_epoch = function() return 0 end,
 	}
 	local notifications = 0
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function() notifications = notifications + 1 end,
 	}
 	local decrypt_callbacks = {}

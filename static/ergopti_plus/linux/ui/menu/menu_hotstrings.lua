@@ -858,7 +858,7 @@ local function _manifest_hotstring_rows(ctx, config)
 						local _, reason = Terminators.validate_custom_terminator("custom_" .. char, char, char, consume)
 						if reason == "character_collision" or reason == "key_collision" then
 							local message = string.format(i18n_safe("editor.hotstrings.err_id_exists"), char)
-							show_error(require("ui.native_dialog").plain_markup(message), i18n_safe("dialog.hotstrings.invalid_title"))
+							show_error(require("core.ui.ui.native_dialog").plain_markup(message), i18n_safe("dialog.hotstrings.invalid_title"))
 						elseif reason == "invalid_character" then
 							show_error(i18n_safe("dialog.hotstrings.invalid_body"), i18n_safe("dialog.hotstrings.invalid_title"))
 						else
@@ -1486,7 +1486,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		["magic_key_config"] = params_handlers["magic_key_config"],
 		["delays_colors"] = params_handlers["delays_colors"],
 		-- The four toggles the manifest has declared for this driver all along and
-		-- that nothing could reach: ui/tooltip/preview.lua honoured them on the hot
+		-- that nothing could reach: core/ui/ui/tooltip/preview.lua honoured them on the hot
 		-- path while its set_enabled() had no caller, so they were fixed at their
 		-- load-time value. PreviewSettings owns them now; this menu is the way in.
 		--

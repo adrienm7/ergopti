@@ -215,7 +215,7 @@ local function build_world(selection)
 		log_llm_suggested = function() end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		set_llm_timeout = function() end,

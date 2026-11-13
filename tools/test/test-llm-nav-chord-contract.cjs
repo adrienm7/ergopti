@@ -174,7 +174,7 @@ const luaTable = (source, name) =>
 	}
 	expectSteps('macOS ARROW_NAVIGATION_DELTA', contract.arrows, steps);
 
-	const watcher = read('macos/ui/tooltip/tooltip_llm.lua');
+	const watcher = read('macos/core/ui/ui/tooltip/llm.lua');
 	check(
 		/if keycode >= Keycodes\.LEFT_ARROW and keycode <= Keycodes\.UP_ARROW then/.test(watcher) &&
 			/\(keycode == Keycodes\.LEFT_ARROW or keycode == Keycodes\.UP_ARROW\) and -1 or 1/.test(
@@ -284,7 +284,7 @@ const luaTable = (source, name) =>
 		),
 		'Windows: a tap-hold Tab under one Shift must be offered to the Shift+Tab chord'
 	);
-	const footer = read('windows/ui/tooltip/llm.ahk');
+	const footer = read('windows/core/ui/ui/tooltip/llm.ahk');
 	check(
 		/hintLeft := _LLM_HintEither\(hintLeft, chord \. UI_LLM_HINT_ARROW_LEFT\)/.test(footer) &&
 			/chord := navStr == "" \? "" : navStr \. " \+ "/.test(footer),

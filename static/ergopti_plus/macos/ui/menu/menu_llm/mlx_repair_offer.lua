@@ -49,8 +49,8 @@ local function checker() return require("modules.llm.mlx_deps_checker") end
 local function i18n() return require("core.i18n.engine.i18n") end
 local function router() return require("ui.menu.menu_llm.runtime_install_offer") end
 local function menu_llm() return require("ui.menu.menu_llm") end
-local function dialogs() return require("infra.dialog_util") end
-local function notifications() return require("infra.notifications") end
+local function dialogs() return require("core.ui.engine.dialog_util") end
+local function notifications() return require("core.ui.engine.notifications") end
 local function deferred() return require("core.timing.engine.deferred_work") end
 
 -- fn() -> boolean: selects the Ollama backend, as its menu row does

@@ -18,8 +18,8 @@ local function with_browser(callback)
 	local names = { "ui.menu.builder", "ui.menu.llm_backend_rows", "infra.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
 		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
-		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal",
-		"ui.text_prompt", "ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation",
+		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "core.ui.ui.modal",
+		"core.ui.ui.text_prompt", "ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation",
 		"updater.engine.version_label", "updater.engine.schedule", "ui.model_browser.bridge" }
 	local saved = {}
 	for _, name in ipairs(names) do
@@ -31,7 +31,7 @@ local function with_browser(callback)
 		local controls = { shows = 0, result = true }
 		package.loaded["ui.model_browser.bridge"] = { bind = function(options) controls.bound = options end }
 		local source = debug.getinfo(1, "S").source:gsub("^@", "")
-		local driver = assert(source:match("^(.*)/tests/unit/ui/"))
+		local driver = assert(source:match("^(.*)/tests/unit/"))
 		-- The Delete question's dialog command reads the driver root from here.
 		package.loaded["core.fs.engine.paths"] = {
 			shared = function(relative) return driver .. "/../_shared/" .. relative end,
@@ -186,7 +186,7 @@ helpers.describe("the page removes an installed model as on Windows and macOS", 
 	--- @return table deletes
 	local function installed(f)
 		-- The fixture's blank dialog owners: the question runs inline, titled as given.
-		package.loaded["ui.modal"].run = function(fn) return fn() end
+		package.loaded["core.ui.ui.modal"].run = function(fn) return fn() end
 		package.loaded["core.ui.engine.window_titles"].compose = function(title) return title end
 		local deletes = {}
 		f.ctx.llm.is_enabled = function() return true end

@@ -69,19 +69,19 @@ local function bind_action_owners(items, source_run)
 				local Installation = require("core.lifecycle.engine.installation")
 				local original_owner = Installation.is_source_run
 				local original_progress = package.loaded["ui.download_window.bridge"]
-				local original_webview = package.loaded["ui.webview_manager"]
+				local original_webview = package.loaded["core.ui.ui.webview_manager"]
 				local arguments = packed(...)
 				Installation.is_source_run = function() return source_run == true end
 				package.loaded["ui.download_window.bridge"] = { show = function() return nil end }
 				local result = packed(pcall(function()
 					-- Keep the real consent/window path, with this click's native SDK
 					-- explicitly unavailable instead of inheriting an earlier GTK owner.
-					helpers.load_module_with_dependency("ui.webview_manager", "lgi", false)
+					helpers.load_module_with_dependency("core.ui.ui.webview_manager", "lgi", false)
 					return action(unpack_results(arguments, 1, arguments.n))
 				end))
 				Installation.is_source_run = original_owner
 				package.loaded["ui.download_window.bridge"] = original_progress
-				package.loaded["ui.webview_manager"] = original_webview
+				package.loaded["core.ui.ui.webview_manager"] = original_webview
 				if not result[1] then error(result[2], 0) end
 				return unpack_results(result, 2, result.n)
 			end
@@ -118,11 +118,11 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		local Installation = require("core.lifecycle.engine.installation")
 		local original_owner = Installation.is_source_run
 		local original_progress = package.loaded["ui.download_window.bridge"]
-		local original_webview = package.loaded["ui.webview_manager"]
+		local original_webview = package.loaded["core.ui.ui.webview_manager"]
 		local original_lgi = package.loaded["lgi"]
 		local original_preload = package.preload["lgi"]
 		local rows = bind_action_owners({ { fn = function()
-			local Webview = require("ui.webview_manager")
+			local Webview = require("core.ui.ui.webview_manager")
 			helpers.assert_true(Webview ~= original_webview, "the click must own a fresh actual page manager")
 			helpers.assert_eq(Webview._create_gtk_window("update_check", "unused", nil), false,
 				"the click must refuse the exact unavailable native acquisition")
@@ -133,7 +133,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		helpers.assert_eq(err, "Controlled tray action refusal", "preserve the action failure")
 		helpers.assert_eq(Installation.is_source_run, original_owner, "restore the exact installation owner")
 		helpers.assert_eq(package.loaded["ui.download_window.bridge"], original_progress, "restore the exact progress owner")
-		helpers.assert_eq(package.loaded["ui.webview_manager"], original_webview, "restore the exact page owner")
+		helpers.assert_eq(package.loaded["core.ui.ui.webview_manager"], original_webview, "restore the exact page owner")
 		helpers.assert_eq(package.loaded["lgi"], original_lgi, "restore the exact native SDK cache")
 		helpers.assert_eq(package.preload["lgi"], original_preload, "restore the exact native SDK loader")
 	end)
@@ -756,7 +756,7 @@ local function with_source_command(alternative, callback)
 	local names = { "ui.menu.builder", "infra.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
 		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
-		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal", "ui.text_prompt",
+		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "core.ui.ui.modal", "core.ui.ui.text_prompt",
 		"ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation", "ui.menu.start_at_login" }
 	local saved, restore_source = {}, nil
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = {} end
@@ -769,7 +769,7 @@ local function with_source_command(alternative, callback)
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return labels[key] or key end,
 			section = function(key) return labels[key] or key end }
 		local source = debug.getinfo(1, "S").source:gsub("^@", "")
-		local driver = assert(source:match("^(.*)/tests/unit/ui/"))
+		local driver = assert(source:match("^(.*)/tests/unit/"))
 		-- Supply only the unrelated header prerequisite from the shipped English catalogue.
 		local header_file = assert(io.open(driver .. "/../_shared/core/i18n/data/locales/en.json", "rb"))
 		local header_raw = header_file:read("*a")

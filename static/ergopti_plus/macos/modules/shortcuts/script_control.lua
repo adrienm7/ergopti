@@ -30,7 +30,7 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("core.events.timer_scheduler")
@@ -693,7 +693,7 @@ local function pause_all()
 	)
 	if not ok_step then return false, step_reason end
 
-	local tt, tt_reason = require_pause_module("ui.tooltip")
+	local tt, tt_reason = require_pause_module("core.ui.ui.tooltip")
 	if tt_reason then return false, tt_reason end
 	if tt then
 		ok_step, step_reason = add_required_step(

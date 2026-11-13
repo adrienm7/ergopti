@@ -29,7 +29,7 @@ end
 --- @param route string Desktop clipboard executable.
 --- @param body function Receives clipboard and the private process state.
 local function with_backend(route, body)
-	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server" }
+	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-clipboard-bound-XXXXXX"))
@@ -61,7 +61,7 @@ local function with_backend(route, body)
 					.. " sh -c " .. Shell.quote(selected))
 			end,
 		}
-		package.loaded["infra.display_server"] = {
+		package.loaded["core.ui.engine.display_server"] = {
 			is_wayland = function() return route == "wl-copy" end,
 			is_x11 = function() return route ~= "wl-copy" end,
 		}

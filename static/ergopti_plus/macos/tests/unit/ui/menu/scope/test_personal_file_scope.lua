@@ -17,7 +17,7 @@ local TextUtils = require("core.text.engine.utils")
 local function with_fixture(collision, body)
 	return helpers.with_stub_scope({
 		"infra.preferences", "core.fs.adapters.file_system", "core.fs.adapters.storage", "infra.config_paths",
-		"infra.notifications", "ui.menu.keymap_lifecycle", "modules.keymap.registry", "modules.keymap.registry_index",
+		"core.ui.engine.notifications", "ui.menu.keymap_lifecycle", "modules.keymap.registry", "modules.keymap.registry_index",
 		"modules.keymap.registry_groups", "ui.menu.menu_hotstrings_custom", "infra.personal_file_scope",
 		"infra.personal_hotstrings",
 		"core.i18n.engine.i18n", "infra.manifest_menu", "core.i18n.engine.locale", "core.i18n.engine.core",
@@ -88,7 +88,7 @@ local function with_fixture(collision, body)
 			if key == "PersonalHotstringsDir" then return controls.root or root end
 			if key == "ConfigTomlPath" then return config end
 		end }
-		package.loaded["infra.notifications"] = { notify = function(...)
+		package.loaded["core.ui.engine.notifications"] = { notify = function(...)
 			observations.notices[#observations.notices + 1] = { ... }
 		end }
 		local R = helpers.load_with_stubs("modules.keymap.registry")

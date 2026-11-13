@@ -53,7 +53,7 @@ helpers.describe("paths JavaScript delivery", function()
 					if mode == "throw" then error("PRIVATE_PATH") end
 					return false
 				end
-				local builder = package.loaded["ui.ui_builder"]
+				local builder = package.loaded["core.ui.ui.builder"]
 				local create = builder.show_webview
 				builder.show_webview = function(options)
 					local view = create(options)
@@ -143,7 +143,7 @@ helpers.describe("paths JavaScript delivery", function()
 	helpers.it("(paths-js-delivery) deferred navigation survives normal construction", function()
 		with_editor(function(editor, calls, _, evaluations, pending)
 			calls.bridge_callback({ body = { action = "cancel" } })
-			local builder = package.loaded["ui.ui_builder"]
+			local builder = package.loaded["core.ui.ui.builder"]
 			local create = builder.show_webview
 			builder.show_webview = function(options)
 				local view = create(options)

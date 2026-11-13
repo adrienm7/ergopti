@@ -22,13 +22,13 @@
 local M = {}
 
 local hs         = hs
-local ui_builder = require("ui.ui_builder")
+local ui_builder = require("core.ui.ui.builder")
 local Logger     = require("core.logger.engine.logger")
 local i18n       = require("core.i18n.engine.i18n")
 local Paths      = require("core.fs.engine.paths")
 local Json       = require("core.text.engine.json")
-local WebviewResult = require("adapters.webview_result")
-local ControllerPool = require("ui.webview_controller_pool").new(function(name)
+local WebviewResult = require("core.ui.adapters.webview_result")
+local ControllerPool = require("core.ui.ui.webview_controller_pool").new(function(name)
 	return hs.webview.usercontent.new(name)
 end, Logger)
 local ProgramProviderPicker = require("apps.engine.program_provider_picker")
@@ -135,7 +135,7 @@ function M.open(opts, on_confirm)
 			return getmetatable(opts) == nil and rawget(opts, "presentation_id") == presentation_id
 				and rawget(opts, "title") == nil and rawget(opts, "label") == nil
 				and rawget(opts, "presentation_suffix") == presentation_suffix
-				and getmetatable(ui_builder) == nil and rawget(package.loaded, "ui.ui_builder") == ui_builder
+				and getmetatable(ui_builder) == nil and rawget(package.loaded, "core.ui.ui.builder") == ui_builder
 				and rawget(ui_builder, "prepare_app_presentation") == PresentationPrepareOwner
 				and (presentation_suffix == nil or (type(PresentationContextPrepareOwner) == "function"
 					and rawget(ui_builder, "prepare_app_contextual_title") == PresentationContextPrepareOwner))

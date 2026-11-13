@@ -282,10 +282,10 @@ end
 -- engine, which the demo configuration loads: its cancel path runs on every
 -- Backspace and once wiped the hotstring buffer.
 local WITH_LLM = os.getenv("ERGOPTI_E2E_LLM") == "1"
-for _, name in ipairs(MENU_ROWS_FILE and {} or { "ui.tooltip.preview", "ui.tooltip.llm", "adapters.tray_menu",
+for _, name in ipairs(MENU_ROWS_FILE and {} or { "core.ui.ui.tooltip.preview", "core.ui.ui.tooltip.llm", "adapters.tray_menu",
 	"ui.menu.builder", "modules.updater.manager",
 	"modules.gestures.manager", "adapters.window_info", "core.process.adapters.lifecycle",
-	"ui.webview_manager",
+	"core.ui.ui.webview_manager",
 	"core.fs.engine.file_watchers", "ui.wpm.widget", "modules.keystats.system_metrics", "adapters.notifier" }) do
 	package.preload[name] = function() error("disabled for the daemon key scenarios") end
 end

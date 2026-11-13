@@ -104,7 +104,7 @@ local function with_dialog_fixture(timer_mode, cancel_result, scenario)
 	local previous_logger = package.loaded["core.logger.engine.logger"]
 	local previous_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	local previous_scheduler = package.loaded["core.events.timer_scheduler"]
-	local previous_dialog = package.loaded["infra.dialog_util"]
+	local previous_dialog = package.loaded["core.ui.engine.dialog_util"]
 	local previous_hs_module = package.loaded["hs"]
 	local previous_hs_stub = package.loaded["tests.stubs.hs"]
 	local previous_global_hs = _G.hs
@@ -147,15 +147,15 @@ local function with_dialog_fixture(timer_mode, cancel_result, scenario)
 			textPrompt = function() return "prompted", "text" end,
 		},
 	}
-	package.loaded["infra.dialog_util"] = nil
-	local Dialog = helpers.load_with_stubs("infra.dialog_util", hs_stub)
+	package.loaded["core.ui.engine.dialog_util"] = nil
+	local Dialog = helpers.load_with_stubs("core.ui.engine.dialog_util", hs_stub)
 	local ok, err = xpcall(function()
 		scenario(Dialog, calls, function() return candidate end)
 	end, debug.traceback)
 	package.loaded["core.logger.engine.logger"] = previous_logger
 	package.loaded["core.process.adapters.shell_runner"] = previous_shell_runner
 	package.loaded["core.events.timer_scheduler"] = previous_scheduler
-	package.loaded["infra.dialog_util"] = previous_dialog
+	package.loaded["core.ui.engine.dialog_util"] = previous_dialog
 	package.loaded["hs"] = previous_hs_module
 	package.loaded["tests.stubs.hs"] = previous_hs_stub
 	_G.hs = previous_global_hs

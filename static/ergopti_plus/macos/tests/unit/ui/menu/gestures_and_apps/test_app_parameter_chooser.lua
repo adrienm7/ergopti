@@ -37,7 +37,7 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 	helpers.it("the chooser's application is stored against the binding", function()
 		package.loaded["ui.menu.shortcut_utils"] = nil
 		local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
-		local dialog = package.loaded["infra.dialog_util"]
+		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		local asked = {}
 		local titles = {}
 		dialog.choose_application = function(message, title)
@@ -57,7 +57,7 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 	helpers.it("choose_application opens /Applications on application bundles only", function()
 		local calls, focuses = {}, 0
 		local answer = "/Applications/Notes.app"
-		local Dialog = helpers.load_with_stubs("infra.dialog_util", {
+		local Dialog = helpers.load_with_stubs("core.ui.engine.dialog_util", {
 			focus = function() focuses = focuses + 1; return true end,
 			osascript = { applescript = function(script)
 				calls[#calls + 1] = script
@@ -88,7 +88,7 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 	helpers.it("a cancelled chooser stores nothing", function()
 		package.loaded["ui.menu.shortcut_utils"] = nil
 		local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
-		package.loaded["infra.dialog_util"].choose_application = function() return nil end
+		package.loaded["core.ui.engine.dialog_util"].choose_application = function() return nil end
 
 		local stored = {}
 		helpers.assert_eq(SU.prompt_action_parameter(facade(stored), "tap_3", "open_app", "app"), false)
@@ -104,9 +104,9 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 			local template = strings["dialog.gestures.param_title"]
 			local first = assert(template:find("{1}", 1, true))
 			local expected = template:sub(1, first - 1) .. label .. template:sub(first + 3)
-			helpers.with_stub_scope({ "ui.menu.shortcut_utils", "infra.dialog_util", "core.i18n.engine.i18n", "core.ui.engine.window_titles" }, function()
+			helpers.with_stub_scope({ "ui.menu.shortcut_utils", "core.ui.engine.dialog_util", "core.i18n.engine.i18n", "core.ui.engine.window_titles" }, function()
 				local scripts = {}
-				helpers.load_with_stubs("infra.dialog_util", { osascript = { applescript = function(script)
+				helpers.load_with_stubs("core.ui.engine.dialog_util", { osascript = { applescript = function(script)
 					scripts[#scripts + 1] = script
 					return true, nil, ""
 				end } })
@@ -127,13 +127,13 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 
 	helpers.it("uses the shared caption policy before escaping or removing the prefix", function()
 		for _, policy in ipairs({ 'Other "product" C:\\', "" }) do
-			helpers.with_stub_scope({ "infra.dialog_util", "core.ui.engine.window_titles" }, function()
+			helpers.with_stub_scope({ "core.ui.engine.dialog_util", "core.ui.engine.window_titles" }, function()
 				local observed = {}
 				package.loaded["core.ui.engine.window_titles"] = { compose = function(title)
 					observed[#observed + 1] = title
 					return policy .. title
 				end }
-				local Dialog = helpers.load_with_stubs("infra.dialog_util")
+				local Dialog = helpers.load_with_stubs("core.ui.engine.dialog_util")
 				local script = Dialog.application_picker_script('Body "quoted" %s', 'App "quoted" %s')
 				local expected = policy == "" and [[App \"quoted\" %s]] or [[Other \"product\" C:\\App \"quoted\" %s]]
 				helpers.assert_eq(observed, { 'App "quoted" %s' }, "the policy receives the untranslated bare title once")
@@ -145,7 +145,7 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 
 	helpers.it("refuses native execution failure instead of claiming cancellation or storing", function()
 		local calls = 0
-		local Dialog = helpers.load_with_stubs("infra.dialog_util", { osascript = { applescript = function()
+		local Dialog = helpers.load_with_stubs("core.ui.engine.dialog_util", { osascript = { applescript = function()
 			calls = calls + 1
 			return false, nil, "private native failure payload"
 		end } })
@@ -157,18 +157,18 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 	end)
 
 	helpers.it("opens one layout source or .keylayout for the layout editor and reports native failure", function()
-		local Dialog = helpers.load_with_stubs("infra.dialog_util")
+		local Dialog = helpers.load_with_stubs("core.ui.engine.dialog_util")
 		local script = Dialog.layout_source_picker_script("Choose a file", "Open a layout")
 		helpers.assert_true(script:find([[setAllowedFileTypes:{"toml", "keylayout"}]], 1, true) ~= nil, script)
 		helpers.assert_true(script:find("setCanChooseDirectories:false", 1, true) ~= nil, script)
 		helpers.assert_true(script:find("setAllowsMultipleSelection:false", 1, true) ~= nil, script)
-		local failing = helpers.load_with_stubs("infra.dialog_util", { osascript = { applescript = function()
+		local failing = helpers.load_with_stubs("core.ui.engine.dialog_util", { osascript = { applescript = function()
 			return false, nil, "private native failure payload"
 		end } })
 		local ok, err = pcall(failing.choose_layout_source, "Choose a file", "Open a layout")
 		helpers.assert_eq(ok, false)
 		helpers.assert_true(tostring(err):find("the native open panel failed", 1, true) ~= nil)
-		local cancelled = helpers.load_with_stubs("infra.dialog_util", { osascript = { applescript = function()
+		local cancelled = helpers.load_with_stubs("core.ui.engine.dialog_util", { osascript = { applescript = function()
 			return true, nil, ""
 		end } })
 		helpers.assert_nil(cancelled.choose_layout_source("Choose a file", "Open a layout"), "a cancel opens nothing")

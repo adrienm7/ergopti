@@ -12,11 +12,11 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"core.events.timer_scheduler",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"infra.manifest_menu",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.llm",
 	"ui.menu.menu_llm.model_switcher",
 	"ui.menu.menu_llm.profile_label",
@@ -135,7 +135,7 @@ local function with_fixture(options, body)
 			return builtins[1]
 		end
 
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function()
 				delete_dialog_count = delete_dialog_count + 1
 				return options.delete_choice or "button.cancel"
@@ -171,7 +171,7 @@ local function with_fixture(options, body)
 			command_row = renderer.command_row,
 			template_rows = renderer.template_rows,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function()
 				notification_count = notification_count + 1
 				return true

@@ -13,7 +13,7 @@
 local helpers    = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
 
-local MODULES = { "ui.legacy_rules_cleanup", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.dialog_util",
+local MODULES = { "ui.legacy_rules_cleanup", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
 	"core.timing.engine.deferred_work" }
 
 --- Installs recording doubles and loads the dialog module.
@@ -28,7 +28,7 @@ local function load_cleanup(h)
 		end
 	end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(message, informative, first, second, style)
 			h.alerts[#h.alerts + 1] = { message = message, informative = informative, first = first,
 				second = second, style = style, during_remap_callback = h.in_remap_callback == true }

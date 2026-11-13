@@ -277,7 +277,7 @@ local function load_fixture(options)
 
 	local control
 	if options.real_script_control == true then
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		package.loaded["infra.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
@@ -329,7 +329,7 @@ local function load_fixture(options)
 		package.loaded["platform.remap.onboarding"] = {
 			stop = function() return true end,
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			hide_forced = function() return true end,
 		}
 		package.loaded["modules.keystats"] = {

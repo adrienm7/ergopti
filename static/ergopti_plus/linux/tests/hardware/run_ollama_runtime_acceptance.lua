@@ -177,7 +177,7 @@ local Config = require("infra.config_paths").config("config.toml")
 local Writer = require("core.text.engine.toml_codec.writer")
 -- Control only WebKit presentation: actual bridge retains session ownership.
 local window_calls = { show = 0, hide = 0, evaluate = 0 }
-package.loaded["ui.webview_manager"] = {
+package.loaded["core.ui.ui.webview_manager"] = {
 	show = function() window_calls.show = window_calls.show + 1; return true end,
 	hide = function() window_calls.hide = window_calls.hide + 1; return true end,
 	eval_js = function() window_calls.evaluate = window_calls.evaluate + 1; return true end,

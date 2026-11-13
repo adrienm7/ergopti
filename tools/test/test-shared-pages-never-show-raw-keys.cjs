@@ -279,7 +279,7 @@ function linuxBootDeliversCatalogue() {
 package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
 local Json = require("core.text.engine.json")
-local Host = require("ui.webkit_host")
+local Host = require("core.ui.ui.webkit_host")
 local fixtures = assert(Json.decode([==[${fixtures}]==]))
 local scripts = {}
 for index, case in ipairs(fixtures.cases) do
@@ -335,12 +335,12 @@ io.write(Json.encode(scripts))
 const BUILDERS = [
 	{
 		driver: 'macOS',
-		rel: 'static/ergopti_plus/macos/ui/ui_builder.lua',
+		rel: 'static/ergopti_plus/macos/core/ui/ui/builder.lua',
 		seed: /window\._i18n_locale="%s";%s<\/script>'[\s\S]{0,120}strings_seed\(/
 	},
 	{
 		driver: 'Linux',
-		rel: 'static/ergopti_plus/linux/ui/webkit_host.lua',
+		rel: 'static/ergopti_plus/linux/core/ui/ui/webkit_host.lua',
 		delivers: linuxBootDeliversCatalogue
 	}
 ];
@@ -355,7 +355,7 @@ for (const builder of BUILDERS) {
 	if (source && !source.includes('core.ui.engine.webview.i18n_seed'))
 		fail(`${builder.driver}: ${builder.rel} must build its seed through webview/i18n_seed.lua`);
 }
-const linuxShow = read('static/ergopti_plus/linux/ui/webview_manager.lua');
+const linuxShow = read('static/ergopti_plus/linux/core/ui/ui/webview_manager.lua');
 if (linuxShow && !/build_app_html\([^)]*catalogue\)/.test(linuxShow))
 	fail('Linux: webview_manager.show() no longer hands build_app_html the locale catalogue');
 

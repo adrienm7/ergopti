@@ -96,7 +96,7 @@ const REQUIRED_OFFERS = [
 // must match a detected dialog or notice: `file` and one of its keys.
 const EXCEPTIONS = [
 	{
-		file: 'windows/infra/ui_style.ahk',
+		file: 'windows/core/ui/engine/style.ahk',
 		key: 'dialog.fatal_error.toml_key_missing',
 		why: 'a shipped style file lacks a key: the installation itself is damaged and only a reinstall fixes it'
 	},

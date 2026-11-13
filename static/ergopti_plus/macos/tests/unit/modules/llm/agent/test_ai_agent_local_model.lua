@@ -78,7 +78,7 @@ helpers.describe("AI agent local model (ai-agent-local-model)", function()
 	helpers.it("(local-model-requester) refuses an agent Download after its run is reset or superseded in the modal", function()
 		for _, change in ipairs({ "reset", "supersede" }) do
 			with_consent_world(function(world)
-				local dialog = require("infra.dialog_util")
+				local dialog = require("core.ui.engine.dialog_util")
 				local previous = dialog.block_alert
 				dialog.block_alert = function(...)
 					if change == "reset" then world.runner.reset() else trigger(world, "llm_agent_selection") end
@@ -100,7 +100,7 @@ helpers.describe("AI agent local model (ai-agent-local-model)", function()
 	helpers.it("(local-model-requester) refuses an agent Download after System2 or its mode withdraws the run", function()
 		for _, change in ipairs({ "off", "remote", "aba", "mode_off" }) do
 			with_consent_world(function(world)
-				local dialog = require("infra.dialog_util")
+				local dialog = require("core.ui.engine.dialog_util")
 				local previous = dialog.block_alert
 				dialog.block_alert = function(...)
 					if change == "mode_off" then world.runner.set_mode("off")
@@ -184,7 +184,7 @@ helpers.describe("AI agent local model (ai-agent-local-model)", function()
 			local forgot = 0
 			api.forget_local_models = function() forgot = forgot + 1 end
 			offer.set_installer(function(_, callback, predicate) done, current = callback, predicate; return true end)
-			local dialog = require("infra.dialog_util")
+			local dialog = require("core.ui.engine.dialog_util")
 			local previous = dialog.block_alert
 			dialog.block_alert = function(...) options.current = function() return false end; return previous(...) end
 			helpers.assert_true(offer.offer(DEFAULT_MODEL, options))
@@ -198,7 +198,7 @@ helpers.describe("AI agent local model (ai-agent-local-model)", function()
 
 	helpers.it("(local-model-consent-affinity) refuses a held Download after the actual configured endpoint changes", function()
 		with_consent_world(function(world, offer, _, port)
-			local dialog = require("infra.dialog_util")
+			local dialog = require("core.ui.engine.dialog_util")
 			local previous = dialog.block_alert
 			dialog.block_alert = function(...)
 				port(11471)
@@ -218,7 +218,7 @@ helpers.describe("AI agent local model (ai-agent-local-model)", function()
 				local old_calls, new_calls = 0, 0
 				local original = function() old_calls = old_calls + 1; return true end
 				offer.set_installer(original)
-				local dialog = require("infra.dialog_util")
+				local dialog = require("core.ui.engine.dialog_util")
 				local previous = dialog.block_alert
 				dialog.block_alert = function(...)
 					if reset then offer.reset(); offer.set_installer(original)
@@ -268,7 +268,7 @@ helpers.describe("AI agent local model (ai-agent-local-model)", function()
 	helpers.it("(local-model-notice-admission) refuses retained clicks from unacknowledged notifications", function()
 		for _, response in ipairs({ false, "accepted", "throw", true }) do
 			with_consent_world(function(world, offer)
-				local notify = require("infra.notifications")
+				local notify = require("core.ui.engine.notifications")
 				local retained
 				notify.notify = function(_, _, _, on_click)
 					retained = on_click

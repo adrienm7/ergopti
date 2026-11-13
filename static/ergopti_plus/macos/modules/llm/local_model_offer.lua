@@ -23,8 +23,8 @@ local M = {}
 
 local Logger        = require("core.logger.engine.logger")
 local i18n          = require("core.i18n.engine.i18n")
-local Dialog        = require("infra.dialog_util")
-local Notifications = require("infra.notifications")
+local Dialog        = require("core.ui.engine.dialog_util")
+local Notifications = require("core.ui.engine.notifications")
 
 local LOG = "llm.local_model_offer"
 
@@ -59,7 +59,7 @@ end
 --- Shows a tooltip notice.
 --- @param text string
 local function show_notice(text)
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	local ok_show, shown = false, nil
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.show) == "function" then
 		ok_show, shown = pcall(tooltip.show, text, true, true)

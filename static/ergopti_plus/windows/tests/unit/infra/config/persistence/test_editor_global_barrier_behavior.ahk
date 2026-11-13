@@ -11,7 +11,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../../../../../ui/editors.ahk
+#Include ../../../../../core/ui/ui/editors.ahk
 global _EGB20260813_WriteCalls := 0
 global _EGB20260813_NotifyCalls := 0
 global _EGB20260813_ReloadCalls := 0

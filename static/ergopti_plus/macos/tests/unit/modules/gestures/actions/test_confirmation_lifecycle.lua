@@ -13,7 +13,7 @@ local Gesture = require("tests.support.gesture_actions_fixture")
 local OWNED = {
 	"core.ui.engine.native_app_switcher_owner",
 	"modules.gestures.action_confirm", "modules.gestures.system_actions",
-	"infra.dialog_util", "adapters.mouse_control", "adapters.window_info",
+	"core.ui.engine.dialog_util", "adapters.mouse_control", "adapters.window_info",
 	"adapters.window_manager", "adapters.running_application", "adapters.tcc_grant",
 	"core.process.adapters.shell_runner", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
 	"core.timing.engine.deferred_work", "diagnostics.engine.runtime_log", "core.fs.engine.file_selection", "core.ui.engine.window_titles",
@@ -83,7 +83,7 @@ local function with_world(callback)
 			-- Replace the central fixture's Aux facade before constructing Actions:
 			-- both the aggregate and SystemActions must share the real same owner.
 			package.loaded["core.process.adapters.shell_runner"] = nil
-			package.loaded["infra.dialog_util"] = nil
+			package.loaded["core.ui.engine.dialog_util"] = nil
 			package.loaded["modules.gestures.system_actions"] = nil
 			package.loaded["modules.gestures.action_confirm"] = nil
 			package.loaded["modules.gestures.actions_aux_owner"] = nil

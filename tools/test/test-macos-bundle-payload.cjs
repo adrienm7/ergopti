@@ -98,7 +98,7 @@ const CURATED_READS = [
 		why: 'the menu bar icon joins one of four logo names to the logo folder'
 	},
 	{
-		reader: 'ergopti_plus/macos/infra/notifications.lua',
+		reader: 'ergopti_plus/macos/core/ui/engine/notifications.lua',
 		needles: ['_base .. "../../../img/logo/logo_simple.png"'],
 		targets: ['img/logo/logo_simple.png'],
 		why: 'notifications carry the logo'

@@ -56,7 +56,7 @@ while [ "$#" -gt 0 ]; do
 	esac
 done
 
-# The failure is shown in Ergopti's own dialog (ui/dialog_host.lua), run by the
+# The failure is shown in Ergopti's own dialog (core/ui/ui/dialog_host.lua), run by the
 # private runtime's LuaJIT when the package carries one, else the source
 # install's. The report runs after recovery, so the driver tree is back. When
 # the dialog cannot open the failure must still reach the user, so the last

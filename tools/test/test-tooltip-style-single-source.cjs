@@ -33,8 +33,11 @@ const TOML = fs.readFileSync(
 	path.join(SP, '_shared', 'core', 'ui', 'data', 'tooltip', 'constants.toml'),
 	'utf8'
 );
-const AHK = fs.readFileSync(path.join(SP, 'windows', 'infra', 'ui_style.ahk'), 'utf8');
-const LUA = fs.readFileSync(path.join(SP, 'macos', 'ui', 'tooltip', 'config.lua'), 'utf8');
+const AHK = fs.readFileSync(path.join(SP, 'windows', 'core', 'ui', 'engine', 'style.ahk'), 'utf8');
+const LUA = fs.readFileSync(
+	path.join(SP, 'macos', 'core', 'ui', 'ui', 'tooltip', 'config.lua'),
+	'utf8'
+);
 
 const errors = [];
 
@@ -211,8 +214,14 @@ for (const name of STYLE_GLOBALS) {
 }
 
 // The Windows renderers must not carry their own margin or colour literals.
-const HELPERS = fs.readFileSync(path.join(SP, 'windows', 'ui', 'tooltip', 'helpers.ahk'), 'utf8');
-const LLM = fs.readFileSync(path.join(SP, 'windows', 'ui', 'tooltip', 'llm.ahk'), 'utf8');
+const HELPERS = fs.readFileSync(
+	path.join(SP, 'windows', 'core', 'ui', 'ui', 'tooltip', 'helpers.ahk'),
+	'utf8'
+);
+const LLM = fs.readFileSync(
+	path.join(SP, 'windows', 'core', 'ui', 'ui', 'tooltip', 'llm.ahk'),
+	'utf8'
+);
 if (/static\s+MARGIN\s*:=/.test(HELPERS)) {
 	errors.push('ui/tooltip/helpers.ahk declares its own MARGIN; read [layout].screen_margin');
 }

@@ -107,7 +107,7 @@ local function load_bridge_with_recording_keystats()
 	-- surface, and the second version of this file guessed five methods and missed
 	-- set_navigate_callback, which prediction_engine calls. What is under test is
 	-- the sink, not the canvas.
-	local tooltip = require("ui.tooltip")
+	local tooltip = require("core.ui.ui.tooltip")
 	local real_show_stacked = tooltip.show_stacked
 	tooltip.show_stacked = function() end
 

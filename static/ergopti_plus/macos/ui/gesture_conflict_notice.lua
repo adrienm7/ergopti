@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local Dialog = require("infra.dialog_util")
+local Dialog = require("core.ui.engine.dialog_util")
 local I18n = require("core.i18n.engine.i18n")
 local Storage = require("core.fs.adapters.storage")
 local Deferred = require("core.timing.engine.deferred_work")

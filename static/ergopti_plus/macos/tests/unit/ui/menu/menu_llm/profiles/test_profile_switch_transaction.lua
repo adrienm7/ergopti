@@ -12,8 +12,8 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
-	"infra.dialog_util",
-	"infra.notifications",
+	"core.ui.engine.dialog_util",
+	"core.ui.engine.notifications",
 	"ui.menu.menu_llm.profile_label",
 	"modules.llm",
 	"ui.menu.menu_llm.model_switcher",
@@ -51,7 +51,7 @@ local function with_fixture(spec, body)
 		end
 		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function()
 				dialog_call_count = dialog_call_count + 1
 				local choice = type(spec.dialog_choices) == "table"
@@ -61,7 +61,7 @@ local function with_fixture(spec, body)
 				return choice or "button.cancel"
 			end,
 		}
-		package.loaded["infra.notifications"] = {notify = function()
+		package.loaded["core.ui.engine.notifications"] = {notify = function()
 			notification_call_count = notification_call_count + 1
 			if spec.notification_mode == "throw" then
 				error("notification injected failure")

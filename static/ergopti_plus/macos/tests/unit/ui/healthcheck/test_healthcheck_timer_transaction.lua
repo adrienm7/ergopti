@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local function load_healthcheck(scheduler, title_label)
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
-		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder", "ui.webview_close_owner", "core.timing.engine.deferred_work",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work",
 	}) do package.loaded[name] = nil end
 
 	package.loaded["tests.stubs.hs"] = nil
@@ -78,12 +78,12 @@ local function load_healthcheck(scheduler, title_label)
 	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["ui.healthcheck.helpers"] = {}
 	package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
-	local compose_title = require("ui.ui_builder").window_title
+	local compose_title = require("core.ui.ui.builder").window_title
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared" end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 		return key == "menu.debug.healthcheck" and title_label or key
 	end }
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		build_injected_html = function() return "<html></html>" end,
 		window_chrome_steps = function() return {} end,
 		get_app_geometry = function() return { width = 860, height = 720 } end,
@@ -132,7 +132,7 @@ helpers.describe("healthcheck window focus ownership", function()
 		local healthcheck, context = load_healthcheck({ cancel = function() return true end })
 		local view = hs.webview.new()
 		local presented = {}
-		package.loaded["ui.ui_builder"].force_focus = function(target, is_new, lifecycle)
+		package.loaded["core.ui.ui.builder"].force_focus = function(target, is_new, lifecycle)
 			presented[#presented + 1] = { target = target, is_new = is_new, lifecycle = lifecycle }
 			return true
 		end

@@ -48,8 +48,8 @@ end
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
 		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger", "infra.preferences",
-		"infra.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "infra.manifest_reader",
-		"infra.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
+		"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "infra.manifest_reader",
+		"core.ui.engine.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_state", "ui.menu.menu_hotstrings_management",
 		"ui.menu.preferences_transaction",
 	}, function()
@@ -58,7 +58,7 @@ local function with_fixture(callback)
 		local Terminators = require("layouts.engine.layers.terminators")
 		local calls = { writes = 0, updates = 0 }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end }
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(_, _, _, accept_label) return accept_label, "☂" end,
 			block_alert = function(_, body)
 				return body == "dialog.hotstrings.consume_body" and "dialog.hotstrings.consume_no" or "button.delete"
@@ -83,7 +83,7 @@ local function with_fixture(callback)
 			end,
 		}
 		package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
-		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 		package.loaded["modules.hotstrings.hotstrings_config"] = {
 			resolve = function() return { delay = 0.1, has_override = false } end,
 		}

@@ -69,7 +69,7 @@ local function load_api_mlx()
 		get_completions_endpoint = function() return nil end,
 		get_chat_endpoint      = function() return nil end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, kind)
 			table.insert(ctl.notifications, { title = title, body = body, kind = kind })
 		end,

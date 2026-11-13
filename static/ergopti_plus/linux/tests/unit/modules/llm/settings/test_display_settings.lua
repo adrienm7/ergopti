@@ -71,8 +71,8 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 				if name == "show_info_bar" then return true end
 			end,
 		})
-		package.loaded["ui.tooltip.llm"] = nil
-		local overlay = require("ui.tooltip.llm")
+		package.loaded["core.ui.ui.tooltip.llm"] = nil
+		local overlay = require("core.ui.ui.tooltip.llm")
 		local rows = overlay.build_rows({
 			{ to_type = "first" },
 			{ to_type = "second" },
@@ -81,7 +81,7 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 			profile = "batch_advanced",
 			validation_modifiers = { "alt" },
 		})
-		local chrome = require("ui.tooltip.config").llm_line()
+		local chrome = require("core.ui.ui.tooltip.config").llm_line()
 		helpers.assert_eq(rows[1].segments[1].text, "first")
 		helpers.assert_eq(rows[1].label, "Alt+1")
 		helpers.assert_eq(rows[1].selected, false)
@@ -103,8 +103,8 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 				if name == "show_info_bar" then return true end
 			end,
 		})
-		package.loaded["ui.tooltip.llm"] = nil
-		local overlay = require("ui.tooltip.llm")
+		package.loaded["core.ui.ui.tooltip.llm"] = nil
+		local overlay = require("core.ui.ui.tooltip.llm")
 		local rows = overlay.build_rows({ { to_type = "a" }, { to_type = "b" } }, 1, {
 			model = "qwen:4b", profile = "Mon profil  —  texte long", validation_modifiers = { "alt" },
 		})
@@ -117,8 +117,8 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 		replace("modules.llm.display_settings", {
 			get = function(name) return name == "pred_indent" and 0 or false end,
 		})
-		package.loaded["ui.tooltip.llm"] = nil
-		local overlay = require("ui.tooltip.llm")
+		package.loaded["core.ui.ui.tooltip.llm"] = nil
+		local overlay = require("core.ui.ui.tooltip.llm")
 		local frames = {}
 		local renderer = {
 			show = function(rows) frames[#frames + 1] = rows; return true end,

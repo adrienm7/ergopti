@@ -55,7 +55,7 @@ local PREVIEW_FIELD_SEPARATOR = " \226\135\165 "
 
 -- The category a personal-information preview row resolves its colour, delay and
 -- "show the bubble" toggle through. These rows carry the user's own data, so they
--- wear the personal colour on all three drivers — ui/tooltip/preview.lua keys its
+-- wear the personal colour on all three drivers — core/ui/ui/tooltip/preview.lua keys its
 -- PERSONAL_CATEGORY tint on exactly this string.
 local PERSONAL_PREVIEW_GROUP = "personal"
 

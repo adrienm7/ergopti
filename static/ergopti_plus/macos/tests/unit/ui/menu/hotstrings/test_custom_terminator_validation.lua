@@ -31,11 +31,11 @@ end
 --- @return table fixture
 local function run_action(mode, outcome, language)
 	local module_names = {
-		"infra.dialog_util",
+		"core.ui.engine.dialog_util",
 		"core.i18n.engine.i18n",
 		"infra.manifest_menu",
 		"infra.manifest_reader",
-		"infra.notifications",
+		"core.ui.engine.notifications",
 		"modules.hotstrings.hotstrings_config",
 		"ui.menu.keymap_lifecycle",
 		"ui.menu.menu_hotstrings_management",
@@ -82,7 +82,7 @@ local function run_action(mode, outcome, language)
 		end,
 		section = function(key) return key end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function(_, _, _, accept_label)
 			prompt_calls = prompt_calls + 1
 			if mode == "duplicate" then
@@ -139,7 +139,7 @@ local function run_action(mode, outcome, language)
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return "★" end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function() effects.notifications = effects.notifications + 1 end,
 	}
 	package.loaded["modules.hotstrings.hotstrings_config"] = {

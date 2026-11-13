@@ -88,7 +88,7 @@ local function build_world()
 		log_llm_suggested = function() end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		set_llm_timeout = function() end,
@@ -121,7 +121,7 @@ local function build_world()
 			return true
 		end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(title, message, first, second)
 			world.alerts[#world.alerts + 1] = { title = title, message = message, buttons = { first, second } }
 			return first

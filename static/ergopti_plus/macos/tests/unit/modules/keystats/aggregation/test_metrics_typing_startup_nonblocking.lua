@@ -27,8 +27,8 @@ helpers.describe("metrics_typing: vendor scripts do not block first paint", func
 		helpers.assert_true(html:find('<script src="main.js"></script>', 1, true) ~= nil,
 			"the local main.js export remains available to the macOS injector")
 
-		package.loaded["ui.ui_builder"] = nil
-		local builder = require("ui.ui_builder")
+		package.loaded["core.ui.ui.builder"] = nil
+		local builder = require("core.ui.ui.builder")
 		local built = builder.build_injected_html(helpers.shared("ui/metrics_typing/"))
 		helpers.assert_true(built:find("Chart.js v4.4.9", 1, true) ~= nil,
 			"the macOS inline builder must embed attribute-bearing vendor scripts")

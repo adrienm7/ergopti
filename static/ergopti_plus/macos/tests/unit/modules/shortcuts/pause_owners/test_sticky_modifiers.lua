@@ -81,7 +81,7 @@ local function load_real_sticky_pause_owner()
 			__index = function() return function() return true end end,
 		})
 	end
-	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 	package.loaded["core.fs.engine.paths"] = { shared = function(path) return "missing/" .. path end }
 	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.2 end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }

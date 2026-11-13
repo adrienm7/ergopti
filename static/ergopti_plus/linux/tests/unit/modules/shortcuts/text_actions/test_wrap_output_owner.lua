@@ -37,7 +37,7 @@ local function with_wrap(options, body)
 	require("core.text.engine.toml_codec.writer")
 	require("settings.engine.migration.file_inverse")
 	Fixture.with(function(guard, focus, _, _, watch)
-		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
+		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
 			"modules.hotstrings.injector", "adapters.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type",
 			"modules.gestures.user_actions", "core.logger.engine.shim" }
 		local saved = {}
@@ -94,7 +94,7 @@ local function with_wrap(options, body)
 				return false
 			end,
 		}
-		package.loaded["infra.display_server"] = { is_wayland = function() return false end,
+		package.loaded["core.ui.engine.display_server"] = { is_wayland = function() return false end,
 			is_x11 = function() return true end, kind = function() return "x11" end }
 		package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,

@@ -31,7 +31,7 @@ local function with_host(controls, run)
 			return session
 		end },
 	}
-	stubs["ui.ui_builder"] = {
+	stubs["core.ui.ui.builder"] = {
 		get_app_geometry = function() return { width = 720, height = 560 } end,
 		force_focus = function() context.focused = true; return true end,
 		show_webview = function(options)

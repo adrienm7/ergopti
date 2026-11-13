@@ -28,7 +28,7 @@ helpers.describe("download_window: setModel() routes through js_str() (F-LOW-16)
 		--     of the fresh one this test installs below — so the returned
 		--     webview object silently lacks evaluateJavaScript entirely.
 		package.loaded["core.logger.engine.logger"]  = nil
-		package.loaded["ui.ui_builder"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
 
 		local overrides, get_evaluated, fire_navigation = make_webview_overrides()
 		local DownloadWindow = helpers.load_with_stubs("ui.download_window", overrides)
@@ -67,7 +67,7 @@ end)
 helpers.describe("download-window-control-character-escaping", function()
 	helpers.it("escapes CRLF errors and control bytes in every text presentation path", function()
 		package.loaded["core.logger.engine.logger"] = nil
-		package.loaded["ui.ui_builder"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
 		local overrides, get_evaluated, fire_navigation = make_webview_overrides()
 		local window = helpers.load_with_stubs("ui.download_window", overrides)
 		helpers.assert_true(window.show({ kind = "mlx_install" }))

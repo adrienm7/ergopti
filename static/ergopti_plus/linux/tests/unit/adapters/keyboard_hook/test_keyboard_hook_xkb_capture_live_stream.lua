@@ -810,12 +810,12 @@ helpers.describe("Original Hook physical editor position observation", function(
 	end)
 	helpers.it("joins the original Reader occurrence to the actual host and shared editor without writes", function()
 		with_position_capture(nil, function(s)
-			local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "modules.gestures.manager",
+			local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "modules.gestures.manager",
 				"core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 			local previous = {}; for _, name in ipairs(names) do previous[name] = { package.loaded[name] } end
 			local host, receipt, epoch, sends, writes, paused = nil, {}, 0, {}, 0, false
 			local called, detail = pcall(function()
-				package.loaded["ui.webview_manager"] = { native_available = function() return true end,
+				package.loaded["core.ui.ui.webview_manager"] = { native_available = function() return true end,
 					current_epoch = function() return epoch > 0 and epoch or nil end,
 					page_current = function(_, exact) return epoch > 0 and epoch == exact end,
 					show = function() epoch = 53; return host.on_window_acquiring(epoch) end,

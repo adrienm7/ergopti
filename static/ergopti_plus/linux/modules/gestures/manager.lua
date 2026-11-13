@@ -473,7 +473,7 @@ local MEDIA_ACTIONS = {
 
 --- The webview window each `open_*` action toggles, by action id: closed
 --- opens it, covered brings it to the front, frontmost closes it
---- (ui/webview_manager.lua toggle()).
+--- (core/ui/ui/webview_manager.lua toggle()).
 ---
 --- Data rather than branches so the set can be compared against the shared
 --- catalogue by a gate: a table has a length, a chain of `elseif` does not.
@@ -780,7 +780,7 @@ local function _execute_action(action_name, go_next, binding)
 	local function _open_driver_surface(name)
 		local window = OPEN_WINDOW[name]
 		if window then
-			local ok, Webview = pcall(require, "ui.webview_manager")
+			local ok, Webview = pcall(require, "core.ui.ui.webview_manager")
 			if not ok or type(Webview.toggle) ~= "function" then
 				-- Loud, because the user asked for a window and none appeared. A
 				-- headless daemon (no GTK, no display) is the ordinary reason and it
@@ -1084,7 +1084,7 @@ local function requirement_holds(token)
 		return false, hint
 	end
 	if token == "session:x11" then
-		local ok, Display = pcall(require, "infra.display_server")
+		local ok, Display = pcall(require, "core.ui.engine.display_server")
 		if not ok or type(Display.kind) ~= "function" then return nil, nil end
 		local kind = Display.kind()
 		if kind == Display.X11 then return true, nil end

@@ -24,7 +24,7 @@ local RESET_MODULES = {
 	"modules.keymap.llm_bridge", "modules.keymap.registry",
 	"modules.keymap.state", "modules.keymap.terminator_replay",
 	"modules.keymap.utils", "modules.llm", "modules.llm.prediction_engine",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 }
 
 

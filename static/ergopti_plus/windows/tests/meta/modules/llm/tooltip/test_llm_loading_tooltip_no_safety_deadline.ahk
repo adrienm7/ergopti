@@ -41,7 +41,7 @@
 
 _LLTS_SpinnerOptsOutExplicitly() {
 	Body := _DriverFuncBody("LLM_TooltipShowLoading")
-	Assert(Body != "", "LLM_TooltipShowLoading must exist in ui/tooltip/llm.ahk")
+	Assert(Body != "", "LLM_TooltipShowLoading must exist in core/ui/ui/tooltip/llm.ahk")
 
 	Assert(InStr(Body, "SetTimer(_TooltipTimerFn, 0)") = 0,
 		"LLM_TooltipShowLoading must NOT cancel _TooltipTimerFn inline — TooltipShow defers rendering by TOOLTIP_RENDER_DEBOUNCE_MS, so the safety timer is armed AFTER this call returns and the cancel is a silent no-op that lets the spinner vanish mid-inference")
@@ -70,7 +70,7 @@ Test("llm-tooltip: the loading spinner opts out of the safety deadline by argume
 ; deferred path hardcoded `true`, so the opt-out could never reach it.
 _LLTS_ArmSafetyIsThreaded() {
 	Show := _DriverFuncBody("TooltipShow")
-	Assert(Show != "", "TooltipShow must exist in ui/tooltip/core.ahk")
+	Assert(Show != "", "TooltipShow must exist in core/ui/ui/tooltip/core.ahk")
 	Assert(InStr(Show, "ArmSafety") > 0,
 		"TooltipShow must accept an ArmSafety parameter so a caller can opt out of the auto-hide deadline")
 	Assert(InStr(Show, "ArmSafety: ArmSafety") > 0

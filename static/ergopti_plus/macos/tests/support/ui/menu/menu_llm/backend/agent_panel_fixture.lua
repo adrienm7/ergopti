@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local OWNED = {
 	"ui.menu.menu_llm.agent_panel", "modules.llm.agent_runner", "modules.llm.agent_connectors",
-	"infra.dialog_util", "ui.tooltip", "infra.app_picker", "infra.manifest_menu", "modules.llm.api_remote",
+	"core.ui.engine.dialog_util", "core.ui.ui.tooltip", "infra.app_picker", "infra.manifest_menu", "modules.llm.api_remote",
 	"core.logger.engine.logger", "core.i18n.engine.locale", "modules.llm.api_ollama", "modules.llm.local_model_offer",
 	"modules.llm.local_servers", "ui.menu.menu_llm.local_server_panel",
 }
@@ -27,7 +27,7 @@ local function with_panel(state, scenario, language)
 			-- verifications asked for, the alerts and the downloads
 			listed = nil, refreshes = 0, verifications = {}, alerts = {}, alert_answer = nil, installs = {},
 			listing_done = nil, menu_updates = 0 }
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(title, message, default, ok_label, cancel_label)
 				world.dialogs[#world.dialogs + 1] = { title = title, message = message, default = default }
 				return world.dialog_answer[1] == "OK" and ok_label or cancel_label, world.dialog_answer[2]
@@ -54,7 +54,7 @@ local function with_panel(state, scenario, language)
 			end,
 			forget_local_models = function() end,
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			show = function(text) world.notices[#world.notices + 1] = text; return true end,
 		}
 		package.loaded["infra.app_picker"] = {

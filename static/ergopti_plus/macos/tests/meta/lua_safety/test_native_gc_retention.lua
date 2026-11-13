@@ -179,14 +179,14 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 				count = 1,
 				patterns = { "_debounce_timer%s*=%s*timer" },
 			},
-			[module_source("ui.tooltip.tooltip_hotstring")] = {
+			[module_source("core.ui.ui.tooltip.hotstring")] = {
 				count = 2,
 				patterns = {
 					"_idle_timer%s*=%s*timer_or_err",
 					"_dequeue_timer%s*=%s*timer_or_err",
 				},
 			},
-			[module_source("ui.tooltip.tooltip_llm")] = {
+			[module_source("core.ui.ui.tooltip.llm")] = {
 				count = 1,
 				patterns = { "_idle_timer%s*=%s*timer_or_err" },
 			},
@@ -353,7 +353,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 	helpers.it("retains a clickable notification and releases it after activation", function()
 		helpers.with_fresh_modules({
 			"core.events.timer_scheduler",
-			"infra.notifications",
+			"core.ui.engine.notifications",
 		}, function()
 			local weak_timers, restore_timers = install_weak_timers()
 			local previous_notify = hs.notify
@@ -380,7 +380,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 				with_package_stubs({
 				["core.logger.engine.logger"] = helpers.make_logger_stub(),
 				}, function()
-				local Notifications = require("infra.notifications")
+				local Notifications = require("core.ui.engine.notifications")
 				local dispatched, detail = Notifications.notify("Click me")
 				helpers.assert_true(dispatched, tostring(detail))
 				collect_twice()

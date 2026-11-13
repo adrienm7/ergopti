@@ -239,7 +239,7 @@ end
 --- Builds the rows of the `magic_key_source` list: one row naming the key in
 --- effect, whose submenu captures a key, restores the automatic key or lists
 --- every candidate with the one in effect ticked. Windows draws the same rows
---- (windows/ui/editors.ahk MagicKeySourceMenuRows).
+--- (windows/core/ui/ui/editors.ahk MagicKeySourceMenuRows).
 --- @param resolver table From M.new.
 --- @param opts table {
 ---   t        fn(key) -> string        Translator.

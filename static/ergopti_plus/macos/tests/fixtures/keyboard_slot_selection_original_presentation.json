@@ -5,7 +5,7 @@
 		"original_menu_sha256": "8887506bd54de6d5ef5293bdd175077861f6bdb5228f72ca7ab1dee696fc1990",
 		"original_picker_path": "static/ergopti_plus/macos/ui/action_picker/init.lua",
 		"original_picker_sha256": "d0d55d12918e464a00a88e2bab668e9e525701d4679a58cedd0102f9a4126886",
-		"original_factory_path": "static/ergopti_plus/macos/ui/ui_builder.lua",
+		"original_factory_path": "static/ergopti_plus/macos/core/ui/ui/builder.lua",
 		"original_factory_sha256": "bb1c740707e700bee2660b82f4752f7ad50c6d8732451f3dbd06f9043aa7d4eb",
 		"captured_before_candidate_authoring": true,
 		"runtime_executed": false,

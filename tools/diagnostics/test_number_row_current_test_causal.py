@@ -128,7 +128,7 @@ class CurrentFixtureControls(unittest.TestCase):
         received = {
             "schema": 1,
             "role": "independently-reviewed-complete-current-carbon-local-inputs",
-            "roster_sha256": "9b9b9f8e2022bbd47d003c9a74d7c82720fec80ee5a73e08cc7359f067866010",
+            "roster_sha256": "d6540918c193101fb94c295684638f0bd36bc4e8bf6e0bd4adc83e36191c54f1",
             "published_source_commit": "c" * 40,
             "source_review_sha256": "e" * 64,
             "test_source_approval_sha256": test_sha,

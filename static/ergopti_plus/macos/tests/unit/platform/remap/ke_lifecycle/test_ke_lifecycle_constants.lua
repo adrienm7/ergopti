@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 package.loaded["platform.remap.lease_controller"] = {
 	status = function() return "idle", { phase = "idle" } end,
 }
-package.loaded["infra.notifications"] = { notify = function() end }
+package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 local KE = helpers.load_with_stubs("platform.remap.ke_lifecycle")
 

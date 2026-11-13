@@ -27,7 +27,7 @@ local OWNED_MODULES = {
 	"platform.remap",
 	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.text.engine.utils",
 	"platform.remap.ke_paths",
 	"core.process.adapters.task_lifecycle",
@@ -40,7 +40,7 @@ local OWNED_MODULES = {
 	"modules.llm.api_remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
 	"adapters.synthetic_input",
 	"modules.shortcuts.script_control",
@@ -628,7 +628,7 @@ return function(run, dependencies)
 			local isolated_module_names = {
 				"core.logger.engine.logger",
 				"core.i18n.engine.i18n",
-				"infra.notifications",
+				"core.ui.engine.notifications",
 				"core.text.engine.utils",
 				"platform.remap.ke_paths",
 				"core.events.timer_scheduler",
@@ -685,7 +685,7 @@ return function(run, dependencies)
 			_G.hs = hs_stub
 			package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, has = function() return false end }
-			package.loaded["infra.notifications"] = { notify = noop }
+			package.loaded["core.ui.engine.notifications"] = { notify = noop }
 			package.loaded["core.text.engine.utils"] = {
 				applescript_format = function(format, value) return string.format(format, value) end,
 				escape_gsub_replacement = function(value) return value end,
@@ -772,7 +772,7 @@ return function(run, dependencies)
 				end
 			end
 
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function(title, body, kind)
 					effects.notifications[#effects.notifications + 1] = {
 						title = title,
@@ -822,7 +822,7 @@ return function(run, dependencies)
 					return true
 				end,
 			}
-			package.loaded["ui.tooltip"] = { hide_forced = record("tooltip_hide") }
+			package.loaded["core.ui.ui.tooltip"] = { hide_forced = record("tooltip_hide") }
 			package.loaded["modules.keystats"] = {
 				resync_context = record("keystats_resync"),
 				log_shortcut = function() end,

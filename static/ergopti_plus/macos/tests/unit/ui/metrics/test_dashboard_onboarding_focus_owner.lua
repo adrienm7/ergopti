@@ -111,7 +111,7 @@ end)
 local function with_onboarding_reuse(callback)
 	with_window("ui.onboarding", function(onboarding, state)
 		require("tests.support.onboarding_shared_data").install()
-		local builder = package.loaded["ui.ui_builder"]
+		local builder = package.loaded["core.ui.ui.builder"]
 		local show = builder.show_webview
 		local owners = {}
 		state.acquisitions, state.focus_calls = 0, 0

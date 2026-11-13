@@ -11,10 +11,10 @@ local SyntheticStack = require("tests.support.synthetic_input_stack")
 
 local OWNED = {
 	"modules.keymap", "modules.keymap.state", "modules.keymap.expander", "modules.keymap.llm_bridge",
-	"modules.keystats", "modules.llm", "modules.llm.prediction_engine", "ui.tooltip",
+	"modules.keystats", "modules.llm", "modules.llm.prediction_engine", "core.ui.ui.tooltip",
 	"modules.dynamic_hotstrings.user_code", "modules.dynamic_hotstrings.rules_engine",
 	"modules.dynamic_hotstrings", "modules.dynamic_hotstrings.personal_info",
-	"ui.menu.programmatic_hotstrings", "infra.dialog_util", "core.process.adapters.shell_runner",
+	"ui.menu.programmatic_hotstrings", "core.ui.engine.dialog_util", "core.process.adapters.shell_runner",
 	"infra.preferences",
 	"adapters.application_notifier", "core.fs.adapters.file_system", "infra.config_paths", "core.i18n.engine.i18n",
 	"adapters.secure_field_detector",
@@ -69,7 +69,7 @@ local function with_native(body)
 			init = function() return true end, get_llm_enabled = function() return false end,
 			reset = function() return true end, is_visible = function() return false end,
 		}, { __index = function() return function() end end })
-		package.loaded["ui.tooltip"] = setmetatable({
+		package.loaded["core.ui.ui.tooltip"] = setmetatable({
 			hide = function() return true end, hide_forced = function() return true end,
 			hide_forced_silent = function() return true end, is_visible = function() return false end,
 			is_hotstring_visible = function() return false end, tint = function() return {} end,
@@ -806,7 +806,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 	for _, refusal in ipairs({ "time-port", "save-throw", "save-refuse" }) do
 		helpers.it("(user-menu-publication-inverse) restores exact native timing after " .. refusal, function()
 			with_native(function(f)
-				package.loaded["infra.dialog_util"] = {
+				package.loaded["core.ui.engine.dialog_util"] = {
 					text_prompt = function() return require("core.i18n.engine.i18n").get("common.ok"), "125" end,
 					block_alert = function() error("a refused publication opens no dialog") end,
 				}
@@ -847,7 +847,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 	end
 	helpers.it("(user-menu-live-pause) fences retained controls after the real pause owner closes", function()
 		with_native(function(f)
-			package.loaded["infra.dialog_util"] = {
+			package.loaded["core.ui.engine.dialog_util"] = {
 				block_alert = function() error("a refused control opens no dialog") end,
 			}
 			local paused, saves, updates = false, 0, 0

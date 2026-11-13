@@ -24,7 +24,7 @@ local helpers = require("tests.helpers")
 local function with_toggle_fixture(previous, options, body)
 	options = options or {}
 	local names = {
-		"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util",
+		"modules.gestures", "ui.menu.menu_utils", "core.ui.engine.dialog_util",
 		"core.i18n.engine.i18n", "infra.manifest_menu", "ui.action_picker",
 		"ui.menu.shortcut_utils", "core.logger.engine.logger", "ui.menu.menu_gestures",
 	}
@@ -60,7 +60,7 @@ local function with_toggle_fixture(previous, options, body)
 		disable_all = function() return lifecycle("disable", false) end,
 	}
 	package.loaded["ui.menu.menu_utils"] = {}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function() return "button.activate" end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end }

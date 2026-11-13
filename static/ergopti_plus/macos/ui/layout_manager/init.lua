@@ -28,7 +28,7 @@ local Paths         = require("core.fs.engine.paths")
 local FileSystem    = require("core.fs.adapters.file_system")
 local Json          = require("core.text.engine.json")
 local ManagerBridge = require("layouts.engine.manager_bridge")
-local ControllerPool = require("ui.webview_controller_pool").new(function(name)
+local ControllerPool = require("core.ui.ui.webview_controller_pool").new(function(name)
 	return hs.webview.usercontent.new(name)
 end, Logger)
 
@@ -160,7 +160,7 @@ end
 --- @param on_done function on_done({filename, text} | {} | {code, detail})
 local function pick_source(on_done)
 	local SourceStore = require("layouts.engine.composer.source_store")
-	local DialogUtil = require("infra.dialog_util")
+	local DialogUtil = require("core.ui.engine.dialog_util")
 	local ok_defaults, defaults = pcall(Json.decode, FileSystem.read(Paths.shared("layouts/data/defaults.json")) or "")
 	local settings, settings_err = SourceStore.settings(ok_defaults and defaults or nil)
 	if not settings then
@@ -188,7 +188,7 @@ local function controller_for(view)
 		push = function(function_name, payload) return push_to(view, function_name, payload) end,
 		strings = page_strings,
 		open_url = function(url)
-			local ok, ui_builder = pcall(require, "ui.ui_builder")
+			local ok, ui_builder = pcall(require, "core.ui.ui.builder")
 			if ok then ui_builder.open_http_url(url) end
 		end,
 		close = function()
@@ -251,7 +251,7 @@ end
 function M.open()
 	if _opening_window then return false end
 	if settle_retired_window() ~= true then return false end
-	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	local ok_ui, ui_builder = pcall(require, "core.ui.ui.builder")
 	if not ok_ui then
 		Logger.error(LOG, "The layout manager cannot open: ui_builder is unavailable.")
 		return false

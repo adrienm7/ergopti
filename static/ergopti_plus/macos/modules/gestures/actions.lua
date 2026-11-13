@@ -13,7 +13,7 @@ local KeyboardPublication = require("settings.engine.publication.keyboard_public
 local BindingPublication = require("settings.engine.publication.binding_publication")
 
 local hs            = hs
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local Logger        = require("core.logger.engine.logger")
 local Paths         = require("core.fs.engine.paths")
 local Timings       = require("core.timing.engine.timings")
@@ -1575,7 +1575,7 @@ local WINDOW_ACTIONS = {
 }
 M.WINDOW_ACTIONS = WINDOW_ACTIONS
 for action_id, page in pairs(WINDOW_ACTIONS) do
-	sg(action_id, function() return require("ui.window_toggle").toggle(page) end)
+	sg(action_id, function() return require("core.ui.ui.window_toggle").toggle(page) end)
 end
 sg("open_script_source",               function()
 	return AuxOwner.open(hs.configdir, "open script source", nil, current_action_parent())
@@ -2367,7 +2367,7 @@ sg("script_quit",                         function()
 			-- The same notice as the menubar Quit and Windows' quit admission: a
 			-- refused shortcut or gesture Quit must not look like nothing (NUI-001).
 			local told, notice_err = pcall(function()
-				local notifications = require("infra.notifications")
+				local notifications = require("core.ui.engine.notifications")
 				require("menu.engine.feature_notice").quit_refused({
 					send = function(text, level) return notifications.notify(text, nil, level) end,
 					info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,

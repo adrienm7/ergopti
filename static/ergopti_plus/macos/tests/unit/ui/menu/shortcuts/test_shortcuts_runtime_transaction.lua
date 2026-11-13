@@ -21,7 +21,7 @@ local function load_menu_fixture(shortcuts, enabled, options)
 	helpers.load_with_stubs("core.logger.engine.logger")
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
-	package.loaded["infra.dialog_util"] = {}
+	package.loaded["core.ui.engine.dialog_util"] = {}
 	package.loaded["modules.shortcuts"] = {
 		DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 	}
@@ -361,7 +361,7 @@ end)
 -- or physical input acknowledgement is inferred from that Boolean receipt.
 local function with_chord_fixture(mode, body)
 	return helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger",
-		"infra.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "core.fs.engine.dir", "infra.notifications",
+		"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "core.fs.engine.dir", "core.ui.engine.notifications",
 		"ui.menu.menu_shortcuts", "ui.menu.script_chords_transaction", "ui.menu.preferences_transaction",
 		"ui.menu.global_actions_transaction", "ui.menu.menu_state", "modules.shortcuts",
 		"modules.shortcuts.actions.text", "ui.menu.menu_utils", "ui.menu.shortcut_utils",
@@ -458,7 +458,7 @@ local function with_chord_fixture(mode, body)
 				package.loaded["modules.shortcuts"] = { DEFAULT_STATE = { shortcuts = true, chatgpt_url = "https://example.test" } }
 				package.loaded["modules.shortcuts.actions.text"] = { WRAP_GROUPS = {}, build_active_wrap_pairs = function() return {} end }
 				package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
-				package.loaded["infra.dialog_util"] = {}
+				package.loaded["core.ui.engine.dialog_util"] = {}
 				package.loaded["ui.menu.menu_utils"] = {}
 				package.loaded["ui.menu.shortcut_utils"] = {}
 				package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }

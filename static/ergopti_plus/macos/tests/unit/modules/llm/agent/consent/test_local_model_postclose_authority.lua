@@ -16,7 +16,7 @@ require("core.logger.engine")
 local OWNED = {
 	"modules.llm.agent_runner", "modules.llm.agent_learning", "modules.llm.agent_connectors",
 	"ai.engine.agent.agent", "llm.agent_learning", "adapters.system_info", "core.i18n.engine.locale",
-	"infra.dialog_util", "modules.llm.local_model_offer", "core.i18n.engine.core", "modules.shortcuts.script_control",
+	"core.ui.engine.dialog_util", "modules.llm.local_model_offer", "core.i18n.engine.core", "modules.shortcuts.script_control",
 }
 
 --- Keeps the complete real requester and every native callback in one scope.
@@ -54,7 +54,7 @@ helpers.describe("agent repair consent retains its post-close owner", function()
 		with_agent(function(world)
 			start_lookup(world)
 			local request_revision = world.engine.current_request_revision()
-			local dialog = require("infra.dialog_util")
+			local dialog = require("core.ui.engine.dialog_util")
 			local native_alert = dialog.block_alert
 			dialog.block_alert = function(...)
 				helpers.assert_true(world.engine.current_request_revision() ~= request_revision,
@@ -73,7 +73,7 @@ helpers.describe("agent repair consent retains its post-close owner", function()
 		helpers.it("refuses Download after prediction " .. change .. " during the native dialog", function()
 			with_agent(function(world)
 				start_lookup(world)
-				local dialog = require("infra.dialog_util")
+				local dialog = require("core.ui.engine.dialog_util")
 				local native_alert = dialog.block_alert
 				dialog.block_alert = function(...)
 					revoke_surface(world, change)
@@ -102,7 +102,7 @@ helpers.describe("agent repair consent retains its post-close owner", function()
 			start_lookup(world)
 			local hides = 0
 			local function refused() hides = hides + 1; return false end
-			local tooltip = require("ui.tooltip")
+			local tooltip = require("core.ui.ui.tooltip")
 			tooltip.hide_forced_silent, tooltip.hide_forced, tooltip.hide = refused, refused, refused
 			World.list_local_models(world, {})
 			helpers.assert_true(hides > 0, "the real reset must attempt native surface cleanup")
@@ -115,7 +115,7 @@ helpers.describe("agent repair consent retains its post-close owner", function()
 		with_agent(function(world)
 			start_lookup(world)
 			local successor
-			local tooltip = require("ui.tooltip")
+			local tooltip = require("core.ui.ui.tooltip")
 			tooltip.hide_forced_silent = function()
 				successor = world.engine.open_answer_surface("reentrant successor")
 				helpers.assert_type(successor, "number")

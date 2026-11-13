@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local names = { "modules.hotstrings.injector", "adapters.clipboard", "modules.hotstrings.output_transaction",
-	"adapters.keyboard_layout", "adapters.xkb_capture", "core.process.adapters.shell_runner", "infra.display_server",
+	"adapters.keyboard_layout", "adapters.xkb_capture", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
 	"core.logger.engine.shim", "adapters.keyboard_hook", "adapters.modifier_broker", "platform.input.modifier_custody", "adapters.uinput_writer" }
 
 local function fixture(options, callback)
@@ -23,7 +23,7 @@ local function fixture(options, callback)
 	local function record(value) world.calls[#world.calls + 1] = value end
 	local function retire() world.destination = {} end
 	package.loaded["core.logger.engine.shim"] = setmetatable({}, { __index = function() return function() end end })
-	package.loaded["infra.display_server"] = { is_wayland = function() return false end, is_x11 = function() return true end }
+	package.loaded["core.ui.engine.display_server"] = { is_wayland = function() return false end, is_x11 = function() return true end }
 	package.loaded["adapters.keyboard_layout"] = {
 		is_ready = function() return false end, plan = function() error("the controlled layout cannot type the payload") end,
 		plan_current = function() return false end, plan_view = function() return nil end,

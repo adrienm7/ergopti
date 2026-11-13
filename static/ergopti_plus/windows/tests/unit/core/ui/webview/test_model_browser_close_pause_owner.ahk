@@ -1,0 +1,373 @@
+﻿; tests/unit/core/ui/webview/test_model_browser_close_pause_owner.ahk
+
+; ==============================================================================
+; MODULE: Model Browser Native Close Pause Tests
+; DESCRIPTION:
+; Runs the genuine SDK selection, native deferred apply and actual native Gui
+; destruction in a private child with boot-admitted configuration and the full
+; central collector/writer. Browser COM and tray repaint are explicit boundaries.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+_MBPT_Complete(State, Code, Output, ErrorText) {
+	State.Code := Code, State.Output := Output, State.ErrorText := ErrorText
+	State.Calls += 1
+}
+
+_MBPT_Quote(Text) {
+	return Chr(34) . StrReplace(StrReplace(Text, Chr(96), Chr(96) . Chr(96)), Chr(34), Chr(96) . Chr(34)) . Chr(34)
+}
+
+; Generated data is intentionally outside the authored-source resolver. Find
+; its one complete function owner in the canonical generated export directory.
+_MBPT_GeneratedOwner(Symbol) {
+	global _DriverDir
+	Owners := Map()
+	Loop Files, _DriverDir . "\_generated\*.ahk", "F" {
+		Owner := A_LoopFileFullPath
+		Text := FSReadStrict(Owner), OwnerCode := _DriverMaskNonCode(&Text)
+		Count := _DriverTopLevelDefinitionCount(&OwnerCode, Symbol)
+		if Count {
+			AssertEqual(1, Count, "The real generated owner must declare its requested data function once")
+			Owners[Owner] := true
+		}
+	}
+	AssertEqual(1, Owners.Count, "The canonical generated exports must contain one data owner for " . Symbol)
+	for Owner in Owners
+		return Owner
+}
+
+; Resolve the actual include identity before redirecting its private copy. The
+; authored-source resolver deliberately rejects lexical tests/../ paths.
+_MBPT_AbsoluteFile(Path) {
+	BufferPath := Buffer(65536, 0)
+	Length := DllCall("kernel32\GetFullPathNameW", "Str", Path, "UInt", 32768,
+		"Ptr", BufferPath.Ptr, "Ptr", 0, "UInt")
+	AssertTrue(Length > 0 && Length < 32768,
+		"The diagnostic dependency must have a complete canonical path")
+	Canonical := StrGet(BufferPath)
+	AssertTrue(FileExist(Canonical) != "", "The diagnostic dependency must have an actual canonical file")
+	return Canonical
+}
+
+; Keep the real writer and its caught exception. Only a private whole owner
+; gains one diagnostic call; inverse reconstruction authenticates every edit.
+_MBPT_WriterDiagnosticOwner(Directory) {
+	global _DriverDir
+	Owner := _DriverProductionFileForSymbol("_ConfigInvokeCommitWriter", _DriverDir)
+	AssertTrue(Owner != "", "The actual configuration writer owner must exist")
+	Original := FSReadStrict(Owner), Masked := _DriverMaskNonCode(&Original)
+	AssertEqual(1, _DriverTopLevelDefinitionCount(&Masked, "_ConfigInvokeCommitWriter"))
+	Definition := _DriverFindFunctionDefinition(&Original, "_ConfigInvokeCommitWriter")
+	AssertTrue(IsObject(Definition), "The real writer definition must be locatable in RAW source")
+	Depth := 1, Cursor := Definition.OpenPos + 1
+	while Cursor <= StrLen(Masked) && Depth {
+		Character := SubStr(Masked, Cursor, 1)
+		if Character == "{"
+			Depth += 1
+		else if Character == "}"
+			Depth -= 1
+		Cursor += 1
+	}
+	AssertEqual(0, Depth, "The actual RAW writer body must close exactly")
+	RawFunction := SubStr(Original, Definition.Idx, Cursor - Definition.Idx)
+	RegExReplace(RawFunction, "m)^`t} catch as Err \{", "", &Catches)
+	AssertEqual(1, Catches, "The actual writer must retain its one original caught exception")
+	; The catch now settles a durable outcome before appending its detail.
+	; Observe its unchanged entry, independently of that first business statement.
+	Anchor := "`t} catch as Err {`n"
+	Insertion := Anchor . "`t`t_MBWD_Caught(Err, Stage)`n"
+	ChangedFunction := StrReplace(RawFunction, Anchor, Insertion, true, &Insertions)
+	AssertEqual(1, Insertions, "Only the actual writer catch may gain diagnostic observation")
+	Changed := SubStr(Original, 1, Definition.Idx - 1) . ChangedFunction . SubStr(Original, Cursor)
+	SplitPath(Owner, , &OwnerDir)
+	Rewrites := [], Private := "", SawRefusalOwner := false
+	for Index, Line in StrSplit(Changed, "`n") {
+		OriginalLine := Line
+		if RegExMatch(Line, "^#Include\s+(.+)$", &Include) {
+			; A_LineFile belongs to the real production owner, not to the private
+			; diagnostic file which will contain these rewritten include lines.
+			Target := StrReplace(Include[1], "%A_LineFile%", Owner, true, &Expanded)
+			AssertTrue(Expanded <= 1, "Each production include has at most one exact owner macro")
+			if Expanded == 0
+				Target := OwnerDir . "\" . Target
+			CanonicalInclude := _MBPT_AbsoluteFile(Target)
+			if InStr(Include[1], "toml_refusals.ahk")
+				SawRefusalOwner := true
+			Line := "#Include " . CanonicalInclude
+			Rewrites.Push({ Original: OriginalLine, Private: Line })
+		}
+		Private .= (Index > 1 ? "`n" : "") . Line
+	}
+	AssertEqual(5, Rewrites.Length, "The real configuration owner has exactly five sibling imports")
+	AssertTrue(SawRefusalOwner, "The private custom-writer subject must retain the genuine session-refusal owner")
+	Inverse := Private
+	for Rewrite in Rewrites {
+		Inverse := StrReplace(Inverse, Rewrite.Private, Rewrite.Original, true, &Count)
+		AssertEqual(1, Count, "Each private include must reverse to its original directive once")
+	}
+	Inverse := StrReplace(Inverse, Insertion, Anchor, true, &Undone)
+	AssertEqual(1, Undone)
+	AssertEqual(0, StrCompare(Original, Inverse, true), "The diagnostic insertion must be exactly reversible")
+	RawHash := CryptoSha256Bytes(FSReadBytesStrict(Owner))
+	AssertTrue(RawHash != "")
+	AssertEqual(RawHash, CryptoSha256(Chr(0xFEFF) . Inverse), "Inverse reconstruction must preserve the complete RAW owner")
+	Target := Directory . "\writer_diagnostic_config_io.ahk"
+	AssertTrue(FSWriteCreateDurable(Target, Chr(0xFEFF) . Private) != 0)
+	PrivateHash := CryptoSha256Bytes(FSReadBytesStrict(Target))
+	AssertTrue(PrivateHash != "")
+	Helper := _DriverDir . "\tests\fixtures\model_browser_writer_exception_diagnostics.ahk"
+	HelperHash := CryptoSha256Bytes(FSReadBytesStrict(Helper))
+	AssertTrue(HelperHash != "")
+	_TestPrint("# model-browser-writer-diagnostic source_owner=" . Owner . " original_raw_sha256=" . RawHash
+		. " private_raw_sha256=" . PrivateHash . " helper_raw_sha256=" . HelperHash
+		. " raw_function_sha256=" . CryptoSha256(RawFunction)
+		. " insertions=" . Insertions . " include_rewrites=" . Rewrites.Length)
+	return { Original: _MBPT_AbsoluteFile(Owner), Private: Target, Helper: Helper }
+}
+
+_MBPT_ChildSource(Directory) {
+	global _DriverDir, _SharedDir
+	Diagnostic := _MBPT_WriterDiagnosticOwner(Directory)
+	Support := _DriverDir . "\tests\support\feature_state_boot_smoke.ahk"
+	Source := FSReadStrict(Support)
+	Boundary := InStr(Source, "`ntry {`n    if (A_Args.Length", true)
+	AssertTrue(Boundary > 0, "The genuine boot support must expose its pre-execution graph")
+	Prefix := SubStr(Source, 1, Boundary - 1)
+	for Name, Expression in Map("_ConfigDir", 'A_Args[2] . "\config\"',
+		"_DriverDir", _MBPT_Quote(_DriverDir), "_SharedDir", 'A_Args[2] . "\shared"') {
+		Prefix := RegExReplace(Prefix, "m)^global " . Name . " :=[^`n]+", "global " . Name . " := " . Expression, &Count)
+		AssertEqual(1, Count, "Only this private boot declaration may change: " . Name)
+	}
+	SplitPath(Support, , &SupportDir)
+	; The real registry reader must never consult another process's parse cache.
+	Code := 'EnvSet("LOCALAPPDATA", A_Args[2] . "\local-app-data")' . "`n"
+	Code .= "#Include " . Diagnostic.Helper . "`n"
+	Routes := 0
+	for Line in StrSplit(Prefix, "`n") {
+		if RegExMatch(Line, "^#Include\s+(.+)$", &Include) {
+			Path := _MBPT_AbsoluteFile(SupportDir . "\" . Include[1])
+			if StrCompare(Path, Diagnostic.Original, false) == 0 {
+				Path := Diagnostic.Private
+				Routes += 1
+			}
+			Line := "#Include " . Path
+		}
+		Code .= Line . "`n"
+	}
+	AssertEqual(1, Routes, "Only the genuine support prefix may redirect the actual writer owner")
+	_TestPrint("# model-browser-writer-diagnostic subject_routes=" . Routes . " kind=PrivateChildCatchInstrumentation")
+	for GeneratedSymbol in ["LocaleTableData", "UpdateChannelRegistryData", "UpdateScheduleData", "WindowTitle"]
+		Code .= "#Include " . _MBPT_GeneratedOwner(GeneratedSymbol) . "`n"
+	Owners := Map()
+	for Symbol in ["HotPath_Now", "t", "I18nGetLocale", "LLM_GetModelIndex", "LLM_Defaults_Load",
+		"LLM_DisplayIndentValues", "LLM_Option_TryNormalize", "_TrayRootErrorIsSilent",
+		"LLM_Menu_ApplySharedDefaults", "LLM_Engine_Init", "HotstringsLanguageCategories", "ReadTomlFile", "MagicEditorPhysicalCatalogue", "NotifierSend", "MasterGateDesiredFeatures",
+		"MetricsFiltersApplyManifestDefaults", "MS_SaveBuiltToIni", "WPMWidget_Show",
+		"AppPicker_SelectionsEqual", "UpdateChannels_Ids", "UpdateSchedule_Timing",
+		"Updater_LoadChannel", "LLM_ModelBrowser_Show", "LLM_AuxInvalidate", "OllamaWV_Close", "LLM_Deps_Cancel",
+		"WMHandleExists", "WPMTrayReadout_LoadConfig", "TimerSetCallback"] {
+		Root := Symbol == "LLM_DisplayIndentValues" ? _DriverDir . "\..\_shared" : _DriverDir
+		Owner := _DriverProductionFileForSymbol(Symbol, Root)
+		AssertTrue(Owner != "", "The model-selection child requires its whole genuine owner: " . Symbol)
+		AssertFalse(Owners.Has(Owner), "Each explicit component owner must be distinct")
+		Owners[Owner] := true
+		Code .= "#Include " . Owner . "`n"
+		if Symbol == "LLM_Defaults_Load"
+			Code .= "LLM_Defaults_Load()`n"
+	}
+	AssertEqual(29, Owners.Count, "All native, data, configuration, menu and runtime owners must be included")
+	; Dependency cancellation restores this genuine entry-point constant. Borrow
+	; its unchanged declaration without executing the driver's auto-start graph.
+	EntrySource := _DriverSourceConcat()
+	RegExReplace(EntrySource, "m)^global DRIVER_BASELINE_PRIORITY_CLASS :=[^`r`n]+", "", &PriorityDeclarations)
+	AssertEqual(1, PriorityDeclarations, "The native child requires the one real driver priority baseline")
+	AssertTrue(RegExMatch(EntrySource, "m)^global DRIVER_BASELINE_PRIORITY_CLASS :=[^`r`n]+", &PriorityDeclaration))
+	Code .= PriorityDeclaration[0] . "`n"
+	NativeGui := _DriverFuncBody("Gui_Create")
+	AssertTrue(NativeGui != "", "The native model browser requires its genuine GUI factory")
+	Code .= NativeGui . "`n"
+	Fixture := _DriverDir . "\tests\fixtures\model_browser_close_pause_owner_body.ahk"
+	AssertTrue(FileExist(Fixture))
+	return Code . "#Include " . Fixture . "`n"
+}
+
+; Exclusive native creation needs each parent before its children. The folders
+; come from the staged files themselves, so they follow wherever the data lives.
+_MBPT_CreateParents(Base, Relatives) {
+	Made := Map()
+	for Relative in Relatives {
+		Parts := StrSplit(Relative, "\"), Folder := Base
+		Loop Parts.Length - 1 {
+			Folder .= "\" . Parts[A_Index]
+			if !Made.Has(Folder) {
+				FSCreateDirectoryExclusiveStrict(Folder)
+				Made[Folder] := true
+			}
+		}
+	}
+}
+
+; Keep even error-reporting locale-cache writes inside this exact private root.
+; These are byte-verified copies of the shipped data, never synthetic defaults.
+_MBPT_StageAssets(Directory) {
+	global _SharedDir
+	FSCreateDirectoryExclusiveStrict(Directory . "\shared")
+	FSCreateDirectoryExclusiveStrict(Directory . "\local-app-data")
+	; Stage the complete shipped schema pack for the genuine boot owner, plus
+	; canonical presentation/privacy policies for diagnostics. The component
+	; does not claim every reserved policy is read on its successful cold path.
+	Assets := ["ai\data\defaults.json", "ai\data\models.json", "hotstrings\data\catalogue\_index.toml", "core\i18n\data\locales\fr.json", "core\i18n\data\locales\en.json",
+		"ai\data\backends.json", "menu\data\menu_manifest.json", "diagnostics\data\redaction.json", "layouts\data\keycodes\physical_keys.json",
+		"settings\data\config_schema\migrations.toml", "settings\data\config_schema\config.schema.json",
+		"settings\data\config_schema\tap_hold.schema.json", "settings\data\config_schema\SCHEMA.md",
+		"settings\data\config_schema\examples\hs_tap_hold.example.toml", "settings\data\config_schema\examples\personal_info.example.toml",
+		"settings\data\config_schema\examples\hs_config.example.toml", "settings\data\config_schema\examples\ahk_config.example.toml",
+		"settings\data\config_schema\examples\hotstrings_config.example.toml", "settings\data\config_schema\examples\ahk_tap_hold.example.toml"]
+	_MBPT_CreateParents(Directory . "\shared", Assets)
+	for Relative in Assets {
+		Source := _SharedDir . "\" . Relative, Target := Directory . "\shared\" . Relative
+		Before := FSReadBytesStrict(Source), Expected := CryptoSha256Bytes(Before)
+		AssertTrue(Expected != "" && !FileExist(Target), "Only an exclusive private target may receive authentic data")
+		FileCopy(Source, Target, false)
+		After := FSReadBytesStrict(Target)
+		AssertEqual(Before.Size, After.Size, "The private asset must preserve the complete source byte count")
+		AssertEqual(Expected, CryptoSha256Bytes(After), "The private asset must preserve the complete source RAW image")
+	}
+}
+
+_MBPT_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unsettled earlier model browser child must retire first")
+	Directory := A_Temp . "\ergopti_model_browser_close_pause_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue((Creation is Integer) && Creation == 1, "Only an exclusively acquired child root may be recursively removed")
+	Script := Directory . "\subject.ahk"
+	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0, VisibilityTrace := ""
+	PreviousCritical := Critical("Off")
+	try {
+		_MBPT_StageAssets(Directory)
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _MBPT_ChildSource(Directory)) != 0)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _MBPT_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The genuine public model browser child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		; A forced terminal callback may populate captures during cleanup. Keep
+		; the original deadline observation so termination can never turn it green.
+		AtDeadline := { Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText }
+		if State.Calls == 0
+			Primary := Error("The exact model browser child did not settle within 15000 ms; calls at deadline: 0.")
+	} catch as Failure {
+		Primary := Failure
+	} finally {
+		try {
+			if IsObject(Handle) && State.Calls == 0
+				Handle.requestTerminate()
+			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Receipt is Integer) && Receipt == 1
+			if Retired {
+				PhasePath := Directory . "\visibility-phases.txt"
+				if Mode == "native-hide-reopen-close" && FileExist(PhasePath) {
+					try VisibilityTrace := FSReadStrict(PhasePath)
+					catch as TraceFailure {
+						if !IsObject(ExportFailure)
+							ExportFailure := TraceFailure
+					}
+				}
+				DirDelete(Directory, true)
+			}
+		} catch as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if IsObject(Handle) && !Retired
+				RetirementDebt := { Handle: Handle, Directory: Directory }
+			Critical(PreviousCritical)
+		}
+	}
+	; The native adapter merges its child's stdout/stderr into Output. ErrorText
+	; is a completion diagnostic, not an independently measured stderr stream.
+	try {
+		if Retired {
+			if Mode == "native-hide-reopen-close" {
+				for Line in StrSplit(VisibilityTrace, "`n", "`r")
+					if Line != ""
+						_TestPrint("# model-browser-third-order-phase " . Line)
+				if VisibilityTrace == ""
+					_TestPrint("# model-browser-third-order-phase UNKNOWN")
+			}
+			_TestPrint("# model-browser-close-pause-owner terminal calls=" . State.Calls . " code=" . State.Code
+				. " deadline_calls=" . (IsObject(AtDeadline) ? AtDeadline.Calls : -1)
+				. " capture_delivered=" . (State.Calls == 1))
+			if State.Calls == 1 {
+				for Line in StrSplit(State.Output, "`n", "`r")
+					if Line != ""
+						_TestPrint("# model-browser-close-pause-owner combined_native_capture " . Line)
+				for Line in StrSplit(State.ErrorText, "`n", "`r")
+					if Line != ""
+						_TestPrint("# model-browser-close-pause-owner completion_error " . Line)
+			} else
+				_TestPrint("# model-browser-close-pause-owner combined_native_capture UNKNOWN")
+		}
+	} catch as Failure {
+		ExportFailure := Failure
+	}
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The exact child must retire before its private source is removed")
+	AssertEqual(1, AtDeadline.Calls, "The exact model browser child must settle once: " . State.ErrorText . State.Output)
+	AssertEqual("", AtDeadline.ErrorText, "Parser/runtime diagnostics cannot qualify as cancellation: " . State.Output)
+	AssertEqual(0, AtDeadline.Code, "The real model browser violated startup ownership: " . State.Output)
+	AssertContains(AtDeadline.Output, "PASS model-browser-close-pause-owner " . Mode)
+	; A capture-export refusal cannot hide an earlier timeout/business failure,
+	; nor can a successful child silently turn that refusal into a passing test.
+	if IsObject(ExportFailure)
+		throw ExportFailure
+}
+
+for _MBPT_Mode in ["current", "during-close", "paused-entry", "native-refused", "native-paused", "native-sort"]
+	Test("Model browser selection: " . _MBPT_Mode . " preserves native pause ownership (model-browser-close-pause-owner)",
+		_MBPT_Case.Bind(_MBPT_Mode))
+
+for _MBBK_Mode in ["native-backend-current", "native-backend-api"]
+	Test("Native model browser activation: " . _MBBK_Mode . " activates the selected Ollama catalogue model (model-browser-native-backend)",
+		_MBPT_Case.Bind(_MBBK_Mode))
+
+for _MBBK_AdmissionMode in ["native-backend-second-refused", "native-backend-replaced", "native-backend-pause-resume"]
+	Test("Native model backend admission: " . _MBBK_AdmissionMode . " preserves acknowledged and current ownership (model-browser-native-backend-admission)",
+		_MBPT_Case.Bind(_MBBK_AdmissionMode))
+
+Test("Native model backend admission: a newer public model setter supersedes the pending row (model-browser-native-backend-superseded)",
+	_MBPT_Case.Bind("native-backend-superseded"))
+
+Test("Native model backend admission: pause/resume at the second schema entry cannot adopt new authority (model-browser-native-backend-second-admission)",
+	_MBPT_Case.Bind("native-backend-second-schema-pause"))
+
+Test("Native model backend admission: replacement at the real second writer entry cannot publish (model-browser-native-backend-writer-owner)",
+	_MBPT_Case.Bind("native-backend-second-writer-replaced"))
+
+for _MBBK_VisibilityMode in ["native-hide-current", "native-hide-reopen"]
+	Test("Native model visibility: " . _MBBK_VisibilityMode . " observes real Show during Hide (model-browser-native-show-hide-owner)",
+		_MBPT_Case.Bind(_MBBK_VisibilityMode))
+
+for _MBBK_ConstructorMode in ["native-ctor-current", "native-ctor-malformed"]
+	Test("Native model constructor: " . _MBBK_ConstructorMode . " retires its exact window and callbacks (model-browser-native-constructor-failure)",
+		_MBPT_Case.Bind(_MBBK_ConstructorMode))
+
+for _MBBK_ReentryMode in ["native-show-current", "native-show-close", "native-hide-reopen-close"]
+	Test("Native model visibility ordering: " . _MBBK_ReentryMode . " uses real native requests (model-browser-native-visibility-order-owner)",
+		_MBPT_Case.Bind(_MBBK_ReentryMode))
+
+for _MBBK_CloseVisibilityMode in ["native-hide-native-current", "native-hide-native-reopen"]
+	Test("Native model Close event: " . _MBBK_CloseVisibilityMode . " retains latest visibility (model-browser-native-close-visibility-owner)",
+		_MBPT_Case.Bind(_MBBK_CloseVisibilityMode))
+
+for _MBBK_CtorRetirementMode in ["native-ctor-retire-pre", "native-ctor-retire-post"]
+	Test("Native failed constructor retirement: " . _MBBK_CtorRetirementMode . " preserves primary and exact debt (model-browser-native-failed-constructor-retirement)",
+		_MBPT_Case.Bind(_MBBK_CtorRetirementMode))

@@ -443,7 +443,7 @@ describe("Corpus: tooltip/{layout,dequeue}_vectors.json", function()
 	-- carrying its own copy would pass while the driver drew somewhere else.
 	local ok_layout, Layout = pcall(require, "core.ui.engine.tooltip.layout")
 	local ok_style, Style = pcall(function()
-		return require("ui.tooltip.config").load()
+		return require("core.ui.ui.tooltip.config").load()
 	end)
 
 	it("the shared layout module and the style canon both load", function()

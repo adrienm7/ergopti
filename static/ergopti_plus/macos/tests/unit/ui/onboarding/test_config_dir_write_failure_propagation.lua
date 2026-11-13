@@ -33,14 +33,14 @@ local function load_refusing_editor()
 		get_default_config_dir = function() return "/default/" end,
 		set_config_dir = function() return false, "permission denied" end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function() calls.dialogs = calls.dialogs + 1 end,
 	}
 	local webview = {
 		delete = function() calls.deletes = calls.deletes + 1 end,
 		evaluateJavaScript = function() return true end,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		get_app_geometry = function() return { width = 620, height = 480 } end,
 		get_centered_frame = function() return { x = 0, y = 0, w = 620, h = 300 } end,
 		show_webview = function(opts)

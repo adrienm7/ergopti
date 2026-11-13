@@ -7,7 +7,7 @@
 --- whether they are tinted with their category's colour.
 ---
 --- WHY THIS EXISTS:
---- `ui/tooltip/preview.lua` has had the four switches since it was written —
+--- `core/ui/ui/tooltip/preview.lua` has had the four switches since it was written —
 --- `M.set_enabled("star"|"autocorrect"|"ai"|"colored", …)`, read by `M.show` and
 --- by `accent_for` — and nothing ever called it. The table was initialised to
 --- four `true`s at load and stayed that way for the life of the process, so the
@@ -187,7 +187,7 @@ end
 
 --- Pushes every current value into the preview module.
 ---
---- Called at boot and after each change, because `ui/tooltip/preview.lua` keeps
+--- Called at boot and after each change, because `core/ui/ui/tooltip/preview.lua` keeps
 --- its own copy for the hot path — `M.show` runs on the keystroke that could
 --- fire a hotstring, and reading storage there would put a file read in it.
 --- @param preview table The ui.tooltip.preview module.

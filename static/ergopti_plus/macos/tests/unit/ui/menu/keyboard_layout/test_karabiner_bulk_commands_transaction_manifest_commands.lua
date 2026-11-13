@@ -137,9 +137,9 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 	end)
 
 	helpers.it("announces a bulk edit saved until the guardian is ready (guardian-bulk-settle)", function()
-		local saved_notifications = package.loaded["infra.notifications"]
+		local saved_notifications = package.loaded["core.ui.engine.notifications"]
 		local notices = {}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(message, detail, kind, on_click)
 				notices[#notices + 1] = { message = message, detail = detail, kind = kind, on_click = on_click }
 				return true
@@ -169,15 +169,15 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 			helpers.assert_eq(count_logs(observations, "success"), 2)
 			helpers.assert_eq(#notices, 1, "an exact deploy needs no notice")
 		end)
-		package.loaded["infra.notifications"] = saved_notifications
+		package.loaded["core.ui.engine.notifications"] = saved_notifications
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("tells to reopen ErgoptiPlus when the saved edit waits on an unregistered helper"
 		.. " (saved-notice-unavailable)", function()
-		local saved_notifications = package.loaded["infra.notifications"]
+		local saved_notifications = package.loaded["core.ui.engine.notifications"]
 		local notices = {}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(message, _, _, on_click)
 				notices[#notices + 1] = { message = message, on_click = on_click }
 				return true
@@ -201,15 +201,15 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 			helpers.assert_true(notices[1].on_click())
 			helpers.assert_eq(opened, 1, "the notice still opens Login Items")
 		end)
-		package.loaded["infra.notifications"] = saved_notifications
+		package.loaded["core.ui.engine.notifications"] = saved_notifications
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("says once, localized, that the saved notice's Login Items did not open"
 		.. " (login-items-open-failed)", function()
-		local saved_notifications = package.loaded["infra.notifications"]
+		local saved_notifications = package.loaded["core.ui.engine.notifications"]
 		local notices = {}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(message, _, kind, on_click)
 				notices[#notices + 1] = { message = message, kind = kind, on_click = on_click }
 				return true
@@ -230,15 +230,15 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 			helpers.assert_eq(count_logs(observations, "error"), 0,
 				"no raw developer error on top of the localized notice")
 		end)
-		package.loaded["infra.notifications"] = saved_notifications
+		package.loaded["core.ui.engine.notifications"] = saved_notifications
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("sends no one to Login Items when the helper only failed to answer"
 		.. " (saved-notice-probe-failed)", function()
-		local saved_notifications = package.loaded["infra.notifications"]
+		local saved_notifications = package.loaded["core.ui.engine.notifications"]
 		local notices = {}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(message, _, _, on_click)
 				notices[#notices + 1] = { message = message, on_click = on_click }
 				return true
@@ -259,15 +259,15 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 			end
 			helpers.assert_eq(#notices, 2)
 		end)
-		package.loaded["infra.notifications"] = saved_notifications
+		package.loaded["core.ui.engine.notifications"] = saved_notifications
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("names no single submenu in the saved notice a combo command shows (saved-notice-wording)",
 		function()
-			local saved_notifications = package.loaded["infra.notifications"]
+			local saved_notifications = package.loaded["core.ui.engine.notifications"]
 			local notices = {}
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function(message)
 					notices[#notices + 1] = message
 					return true
@@ -285,7 +285,7 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 				helpers.assert_nil(text:lower():find("tap%-hold"),
 					"key-combination commands announce it too: " .. text)
 			end)
-			package.loaded["infra.notifications"] = saved_notifications
+			package.loaded["core.ui.engine.notifications"] = saved_notifications
 			if not ok then error(err, 0) end
 		end)
 
@@ -468,9 +468,9 @@ helpers.describe("the Tap-Hold submenu says when the remap guardian holds its ru
 		end)
 
 	helpers.it("says once, localized, that Login Items did not open (login-items-open-failed)", function()
-		local saved_notifications = package.loaded["infra.notifications"]
+		local saved_notifications = package.loaded["core.ui.engine.notifications"]
 		local notices = {}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(message, _, kind)
 				notices[#notices + 1] = { message = message, kind = kind }
 				return true
@@ -490,7 +490,7 @@ helpers.describe("the Tap-Hold submenu says when the remap guardian holds its ru
 					"no raw developer error on top of the localized notice")
 			end
 		end)
-		package.loaded["infra.notifications"] = saved_notifications
+		package.loaded["core.ui.engine.notifications"] = saved_notifications
 		if not ok then error(err, 0) end
 	end)
 

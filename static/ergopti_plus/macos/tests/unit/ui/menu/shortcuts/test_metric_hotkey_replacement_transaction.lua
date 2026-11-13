@@ -48,7 +48,7 @@ local function load_fixture(legacy)
 	}
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = { notify = noop }
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
 	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
 	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,

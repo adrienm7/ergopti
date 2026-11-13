@@ -23,7 +23,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 		{ name = "truthy", value = "accepted" }, { name = "throw", throws = true } }) do
 		helpers.it("refuses " .. receipt.name .. " and retries the retained native owner (tap-hold-key-delay)", function()
 			local section, Manager = build({}, {})
-			local TextPrompt = require("ui.text_prompt")
+			local TextPrompt = require("core.ui.ui.text_prompt")
 			local original_ask, original_execute = TextPrompt.ask, os.execute
 			local i18n = require("core.i18n.engine.i18n")
 			local calls, notices = {}, 0
@@ -57,7 +57,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 	helpers.it("(tap-hold-invalid-markup) escapes invalid text before showing the error", function()
 		local calls = {}
 		local section, Manager = build(calls, {})
-		local TextPrompt = require("ui.text_prompt")
+		local TextPrompt = require("core.ui.ui.text_prompt")
 		local original_ask, original_execute = TextPrompt.ask, os.execute
 		local command
 		local ok, err = pcall(function()
@@ -77,7 +77,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 		helpers.it("refuses invalid " .. value .. " before the native threshold writer (tap-hold-key-delay)", function()
 			local calls = {}
 			local section, Manager = build(calls, {})
-			local TextPrompt = require("ui.text_prompt")
+			local TextPrompt = require("core.ui.ui.text_prompt")
 			local original_ask, original_execute = TextPrompt.ask, os.execute
 			local ok, err = pcall(function()
 				TextPrompt.ask = function() return value end

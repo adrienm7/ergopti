@@ -48,7 +48,7 @@ local function native()
 		notify = function(title, body, kind)
 			return require("adapters.application_notifier").send(title, { body = body, kind = kind })
 		end,
-		alert = function(...) return require("infra.dialog_util").block_alert(...) end,
+		alert = function(...) return require("core.ui.engine.dialog_util").block_alert(...) end,
 		copy = function(text) return hs.pasteboard.setContents(text) end,
 		after = function(seconds, fn) return require("core.events.timer_scheduler").after(seconds, fn) end,
 	}

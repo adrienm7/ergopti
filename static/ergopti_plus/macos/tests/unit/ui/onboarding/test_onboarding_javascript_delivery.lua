@@ -287,7 +287,7 @@ helpers.describe("onboarding initialization scheduling", function()
 	helpers.it("(onboarding-init-retry) early native navigation binds the accepted view after construction", function()
 		with_delivery(function(_, state, _, _, evaluations, open)
 			state.view.options.on_close()
-			local builder = package.loaded["ui.ui_builder"]
+			local builder = package.loaded["core.ui.ui.builder"]
 			local original_show = builder.show_webview
 			builder.show_webview = function(options)
 				options.on_navigation("didFinishNavigation")

@@ -195,7 +195,7 @@ helpers.describe("keystats parent requires KC bridge commitment", function()
 		}
 		package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.dialog_util"] = {}
+		package.loaded["core.ui.engine.dialog_util"] = {}
 		package.loaded["core.lifecycle.engine.shutdown.teardown_transaction"] = {}
 		package.loaded["infra.config_paths"] = { get_config_dir = function() return "." end, metrics_dir = function() return "./metrics" end,
 	metrics_cache_dir = function() return "./metrics_cache" end }

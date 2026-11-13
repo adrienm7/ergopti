@@ -59,7 +59,7 @@ local function with_wrap_controls(options, callback)
 	options = options or {}
 	return helpers.with_stub_scope({
 		"ui.menu.menu_shortcuts", "menu.engine.wrap_mutation", "infra.manifest_menu", "core.i18n.engine.i18n", "core.fs.engine.paths",
-		"core.logger.engine.logger", "infra.dialog_util", "modules.shortcuts.actions.text",
+		"core.logger.engine.logger", "core.ui.engine.dialog_util", "modules.shortcuts.actions.text",
 		"ui.menu.menu_utils", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
 		"ui.menu.menu_tap_keys", "infra.manifest_reader",
 	}, function()
@@ -69,7 +69,7 @@ local function with_wrap_controls(options, callback)
 		package.loaded["core.i18n.engine.i18n"].get = function(key) return translations[key] or key end
 		local calls = { saves = 0, updates = 0, prompts = 0 }
 		local responses = options.responses or {}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function()
 				calls.prompts = calls.prompts + 1
 				local response = assert(responses[calls.prompts], "unexpected native prompt")
@@ -580,7 +580,7 @@ local function with_shortcut_presentation(language, scenario)
 		"ui.menu.menu_shortcuts", "infra.manifest_menu", "ui.menu.menu_utils",
 		"ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils", "ui.menu.menu_tap_keys",
 		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.renderer", "core.logger.engine.logger",
-		"infra.dialog_util", "core.fs.engine.paths", "modules.shortcuts", "menu.engine.row_dialect",
+		"core.ui.engine.dialog_util", "core.fs.engine.paths", "modules.shortcuts", "menu.engine.row_dialect",
 	}
 	return helpers.with_fresh_modules(names, function()
 		helpers.load_with_stubs("infra.manifest_menu")
@@ -598,7 +598,7 @@ local function with_shortcut_presentation(language, scenario)
 		package.loaded["infra.manifest_menu"] = nil
 		local renderer = require("infra.manifest_menu")
 		local effects = { saves = 0, updates = 0, prompts = 0, urls = {}, catalogue_wires = 0 }
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function()
 				effects.prompts = effects.prompts + 1
 				return native_i18n.get("button.ok"), "https://hand.changed/"
