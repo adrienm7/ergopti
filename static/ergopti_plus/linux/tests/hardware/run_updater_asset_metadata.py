@@ -62,16 +62,19 @@ def main():
         for index, label in enumerate(
             (None, "} x64", None, "[x64] {build}", 'quoted " ] } \\ metadata', None, None, None), 1
         ):
+            # The updater admits an asset only under the release page's own /download/<tag>/ path (UPX-002).
             assets = [
                 {
                     "name": "ergopti-plus-linux.tar.gz",
                     "label": label,
-                    "browser_download_url": origin + "/never-requested-bundle",
+                    "browser_download_url": origin
+                    + "/releases/download/v1.2.0/ergopti-plus-linux.tar.gz",
                 },
                 {
                     "name": "ergopti-plus-linux.tar.gz.sha256",
                     "label": None,
-                    "browser_download_url": origin + "/never-requested-checksum",
+                    "browser_download_url": origin
+                    + "/releases/download/v1.2.0/ergopti-plus-linux.tar.gz.sha256",
                 },
             ]
             if index == 3:
@@ -80,7 +83,8 @@ def main():
                 assets[0] = {
                     "name": "ergopti-plus-linux.tar.gz",
                     "uploader": {"browser_download_url": origin + "/never-requested-wrong"},
-                    "browser_download_url": origin + "/never-requested-bundle",
+                    "browser_download_url": origin
+                    + "/releases/download/v1.2.0/ergopti-plus-linux.tar.gz",
                 }
             elif index == 7:
                 assets.insert(

@@ -60,16 +60,26 @@ def main():
         origin = "https://127.0.0.1:" + str(listener.getsockname()[1])
         responses = []
         for index in range(1, 9):
-            assets = [
-                {
-                    "name": "ergopti-plus-linux.tar.gz",
-                    "browser_download_url": origin + "/never-requested-bundle",
-                },
-                {
-                    "name": "ergopti-plus-linux.tar.gz.sha256",
-                    "browser_download_url": origin + "/never-requested-checksum",
-                },
-            ]
+
+            def assets_for(tag):
+                # The updater admits an asset only under the release page's own /download/<tag>/ path (UPX-002).
+                return [
+                    {
+                        "name": "ergopti-plus-linux.tar.gz",
+                        "browser_download_url": origin
+                        + "/releases/download/"
+                        + tag
+                        + "/ergopti-plus-linux.tar.gz",
+                    },
+                    {
+                        "name": "ergopti-plus-linux.tar.gz.sha256",
+                        "browser_download_url": origin
+                        + "/releases/download/"
+                        + tag
+                        + "/ergopti-plus-linux.tar.gz.sha256",
+                    },
+                ]
+
             channel = "dev" if index in (2, 3) else "main"
             tag = "v0.0.0-dev.2" if channel == "dev" else "v1.2.0"
             release = {}
@@ -82,7 +92,7 @@ def main():
                     "draft": False,
                     "prerelease": channel == "dev",
                     "published_at": "2026-10-01T00:00:00Z",
-                    "assets": assets,
+                    "assets": assets_for(tag),
                 }
             )
             if index == 5:
