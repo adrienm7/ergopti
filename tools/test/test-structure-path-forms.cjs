@@ -844,8 +844,10 @@ function run() {
 		// text, or the file itself moved with it.
 		if (!fs.existsSync(path.join(repo, e.file))) continue;
 		const text = fs.readFileSync(path.join(repo, e.file), 'utf8');
-		if (!fs.existsSync(path.join(repo, P, e.moves || e.empties)) && !text.includes(e.from))
-			continue;
+		// An edit that appends to its own text (to starts with from) still
+		// holds from once applied: its to text is the proof it landed.
+		const landed = !text.includes(e.from) || (e.to.includes(e.from) && text.includes(e.to));
+		if (!fs.existsSync(path.join(repo, P, e.moves || e.empties)) && landed) continue;
 		const kinds = Plan.scanFile(e.file, text, fullCtx)
 			.filter((r) => r.old === e.from)
 			.map((r) => r.kind);
