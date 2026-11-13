@@ -51,8 +51,7 @@ local function exercise(kind, dry_run, options)
 	local previous = {}
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	for name in pairs(previous) do
-		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-			or name:match("^platform%.") or name == "core.logger.engine.shim"
+		if h.is_driver_module(name) or name == "core.logger.engine.shim"
 			or name == "hotstrings.engine.dynamic.core" or name:match("^dynamic_hotstrings%.") then package.loaded[name] = nil end
 	end
 	local directory = os.tmpname()
