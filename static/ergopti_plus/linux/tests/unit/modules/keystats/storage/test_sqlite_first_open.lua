@@ -323,6 +323,93 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		if not ok then error(failure, 0) end
 	end)
 
+	-- Each sqlite3 call is a shell and a process, about 4 ms of every boot. The
+	-- open read the registry and the raw tables' UTC column in two of them and
+	-- created the existing folder through a third (keystats-open-processes).
+	helpers.it("keystats-open-processes: reopens a current store with one probe, one schema write and no mkdir", function()
+		local writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local path = dir .. "/metrics.sqlite"
+		local opened = writer.open_db(path)
+		if not HAS_SQLITE then
+			helpers.assert_eq(opened, false, "without sqlite3 opening must be refused")
+			return
+		end
+		local real_popen, real_execute = io.popen, os.execute
+		local sqlite_processes, shell_commands = 0, 0
+		local ok, failure = xpcall(function()
+			helpers.assert_true(opened, "native schema must bootstrap")
+			writer.close_db()
+			io.popen = function(command, mode)
+				sqlite_processes = sqlite_processes + 1
+				return real_popen(command, mode)
+			end
+			os.execute = function(command)
+				shell_commands = shell_commands + 1
+				return real_execute(command)
+			end
+			local reopened = writer.open_db(path)
+			io.popen, os.execute = real_popen, real_execute
+			helpers.assert_true(reopened, "the current store must reopen")
+			helpers.assert_eq(sqlite_processes, 2, "one read probes the registry and the UTC column, one writes the media schema")
+			helpers.assert_eq(shell_commands, 0, "an existing folder needs no shell mkdir")
+		end, debug.traceback)
+		io.popen, os.execute = real_popen, real_execute
+		writer.close_db()
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(failure, 0) end
+	end)
+
+	-- The shared probe returns the raw tables lacking the column before the
+	-- registry's multiline DDL; both upgrades must still see their own part.
+	helpers.it("keystats-open-processes: one probe upgrades a legacy registry and a raw table without the UTC column", function()
+		local writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local path = dir .. "/nested/metrics.sqlite"
+		local opened = writer.open_db(path)
+		if not HAS_SQLITE then
+			helpers.assert_eq(opened, false, "without sqlite3 opening must be refused")
+			return
+		end
+		local UtcOffsetColumn = require("metrics.engine.utc_offset_column")
+		local ok, failure = xpcall(function()
+			helpers.assert_true(opened, "a store in a folder that does not exist yet must bootstrap")
+			local drops = {}
+			for _, trigger in ipairs(UtcOffsetColumn.purge_triggers()) do
+				drops[#drops + 1] = "DROP TRIGGER IF EXISTS " .. trigger .. ";"
+			end
+			helpers.assert_true(writer.exec_sql(table.concat(drops, "\n") .. [[
+
+ALTER TABLE events_roi DROP COLUMN utc_offset_min;
+ALTER TABLE events_clipboard DROP COLUMN utc_offset_min;
+DROP TABLE devices;
+CREATE TABLE devices (
+ device_id TEXT PRIMARY KEY, name TEXT NOT NULL,
+ os TEXT NOT NULL CHECK(os IN ('darwin','windows')), os_version TEXT,
+ host_signature TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ imported_data_sql_size INTEGER NOT NULL DEFAULT 0, imported_data_sql_sha256 TEXT
+);]]), "the legacy fixture must apply")
+			writer.close_db()
+			helpers.assert_true(writer.open_db(path), "the legacy store must upgrade on open")
+			for _, name in ipairs({ "events_roi", "events_clipboard" }) do
+				local rows = assert(writer.query_rows("SELECT count(*) FROM pragma_table_info('" .. name
+					.. "') WHERE name='utc_offset_min';"))
+				helpers.assert_eq(rows[1], "1", name .. " must regain the UTC offset column")
+			end
+			local registry = assert(writer.query_rows("SELECT sql FROM sqlite_master WHERE type='table' AND name='devices';"))
+			helpers.assert_true(table.concat(registry, "\n"):find("'linux'", 1, true) ~= nil, "the registry must accept Linux")
+			helpers.assert_true(writer.register_device("linux-probe", "probe", "linux", "", "probe"))
+			local triggers = assert(writer.query_rows("SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name='"
+				.. UtcOffsetColumn.purge_triggers()[1] .. "';"))
+			helpers.assert_eq(triggers[1], "1", "the purge triggers must be recreated after both upgrades")
+		end, debug.traceback)
+		writer.close_db()
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(failure, 0) end
+	end)
+
 	helpers.it("native event ID reservations retain batches across independent writer instances", function()
 		local first = helpers.load_module("modules.keystats.sqlite_writer")
 		local second = helpers.load_module("modules.keystats.sqlite_writer")
