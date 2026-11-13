@@ -211,6 +211,15 @@
 			"args": ["tools/test/test-linux-legacy-update-probes.cjs"],
 			"repro": "node tools/test/test-linux-legacy-update-probes.cjs",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-linux-literal-shared-root",
+			"ordinal": 638,
+			"name": "Linux literal shared roots name the shared module root",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-literal-shared-root.cjs"],
+			"repro": "node tools/test/test-linux-literal-shared-root.cjs",
+			"platforms": ["linux"]
 		}
 	]
 }

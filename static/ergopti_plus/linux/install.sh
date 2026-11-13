@@ -304,7 +304,7 @@ DEST_SHARED="${LIB_DIR}/_shared"
 case "$SRC_DRIVER$SRC_SHARED${ERGOPTI_RUNTIME_PREFIX:-}" in
 	*[\;\?]*)
 		export ERGOPTI_LITERAL_DRIVER_ROOT="$SRC_DRIVER"
-		export ERGOPTI_LITERAL_SHARED_ROOT="$SRC_SHARED/lua" ;;
+		export ERGOPTI_LITERAL_SHARED_ROOT="$SRC_SHARED" ;;
 esac
 
 # Tar replaces an incumbent symlink with a payload entry (and a linked root
