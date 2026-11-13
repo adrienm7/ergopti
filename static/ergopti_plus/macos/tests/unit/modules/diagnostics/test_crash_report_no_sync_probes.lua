@@ -46,7 +46,7 @@ local function load_reporter()
 				system    = { os = "macOS 15.1", locale = "fr_FR", uptime = 42 },
 				versions  = { runtime = "Hammerspoon 1.1.1" },
 				hardware  = { displays = { "1440×900 @2x (main)" } },
-				developer = { modules_ok = { "adapters.clipboard" }, modules_failed = { "adapters.crypto (load failed)" } },
+				developer = { modules_ok = { "adapters.clipboard" }, modules_failed = { "core.crypto.crypto (load failed)" } },
 				issues    = { warn_count = 3, err_count = 1 },
 			} }
 		end,
@@ -100,7 +100,7 @@ helpers.describe("crash reports do not fork system probes on the run loop", func
 		helpers.assert_eq(report.locale, "fr_FR")
 		helpers.assert_eq(report.uptime_sec, "42")
 		helpers.assert_eq(report.adapters_ok, "adapters.clipboard")
-		helpers.assert_eq(report.adapters_failed, "adapters.crypto (load failed)")
+		helpers.assert_eq(report.adapters_failed, "core.crypto.crypto (load failed)")
 		helpers.assert_eq(report.session_warnings, "3")
 		helpers.assert_eq(report.session_errors, "1")
 	end)

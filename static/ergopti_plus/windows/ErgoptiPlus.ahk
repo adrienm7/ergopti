@@ -399,7 +399,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 ; Port adapters — thin OS wrappers that isolate every DllCall, Send*, and
 ; WinGet* from the domain modules. Loaded before any infra/ or module/ file
 ; that references adapter functions (e.g. NI_GetSsidHash in keystats_network).
-#Include adapters/crypto.ahk
+#Include core/crypto/crypto.ahk
 #Include adapters/clipboard.ahk
 #Include adapters/timer_scheduler.ahk
 #Include adapters/file_system.ahk

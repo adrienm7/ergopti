@@ -1,4 +1,4 @@
-﻿; tests/meta/adapters/test_crypto_djb2_fallback_logged.ahk
+﻿; tests/meta/core/crypto/test_djb2_fallback_logged.ahk
 
 ; ==============================================================================
 ; MODULE: CryptoSha256 Failure Sentinel Guard

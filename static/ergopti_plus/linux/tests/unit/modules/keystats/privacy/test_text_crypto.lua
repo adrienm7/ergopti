@@ -69,7 +69,7 @@ end
 
 --- Loads fresh state; only the explicitly supplied EVP and shell ports are fake.
 local function fresh_cipher(provider)
-	helpers.load_module("adapters.crypto")
+	helpers.load_module("core.crypto.crypto")
 	local cipher = load_cipher(provider)
 	cipher._set_machine_id_path(write_machine_id())
 	return cipher

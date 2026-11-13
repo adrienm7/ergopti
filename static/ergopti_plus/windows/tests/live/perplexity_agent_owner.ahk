@@ -30,7 +30,7 @@ t(Key) => Key
 
 #Include ..\..\infra\tick_count.ahk
 #Include ..\..\infra\json.ahk
-#Include ..\..\adapters\crypto.ahk
+#Include ..\..\core\crypto\crypto.ahk
 #Include ..\..\adapters\file_system.ahk
 #Include ..\..\adapters\process_lifecycle.ahk
 #Include ..\..\adapters\shell_runner.ahk
