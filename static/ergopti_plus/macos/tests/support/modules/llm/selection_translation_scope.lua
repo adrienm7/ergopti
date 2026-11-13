@@ -232,8 +232,7 @@ function M.run(scenario)
 	end
 	for _, name in ipairs(OWNED) do own(name) end
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:match("^modules%.") or name:match("^adapters%.")
-			or name:match("^infra%.") or name:match("^ui%.")) then own(name) end
+		if type(name) == "string" and helpers.is_driver_module(name) then own(name) end
 	end
 	-- Fresh native modules must initialize their own maps, not mutate a prior
 	-- world's retained device/watchers or LuaFileSystem's published table.

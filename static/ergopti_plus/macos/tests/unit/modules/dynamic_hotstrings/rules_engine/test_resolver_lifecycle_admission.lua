@@ -34,8 +34,7 @@ local function with_stack(scenario)
 	local km, rules
 	local ok, err = xpcall(function()
 		for name in pairs(package.loaded) do
-			if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-				or name:match("^ui%.") or name:match("^logger%.") or name == "dynamic_hotstrings" then
+			if helpers.is_driver_module(name) or name:match("^logger%.") or name == "dynamic_hotstrings" then
 				package.loaded[name] = nil
 			end
 		end

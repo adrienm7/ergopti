@@ -71,7 +71,7 @@ end
 local function fresh_runtime(effects, magic_key)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
-			name:match("^modules%.keymap") or name:match("^adapters%.")
+			helpers.is_driver_module(name)
 		) then
 			package.loaded[name] = nil
 		end
