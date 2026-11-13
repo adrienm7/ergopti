@@ -11,7 +11,7 @@
 --- WHAT IS STILL MISSING:
 --- No trace from a physical touchpad is in the tree yet: that needs a Linux
 --- machine (HARDWARE.md, "Record a touchpad trace"). The kernel round trip
---- (tests/hardware/run_gesture_roundtrip.lua) replays its own capture through
+--- (tests/hardware/gestures/run_roundtrip.lua) replays its own capture through
 --- this reader, so the format is checked against what a kernel delivers.
 --- ==============================================================================
 

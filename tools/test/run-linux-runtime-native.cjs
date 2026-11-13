@@ -129,7 +129,7 @@ function run({
 	for (const abi of ABIS) {
 		for (const [script, count, witness] of PROBES)
 			execute(
-				[path.join(hardware, 'run_native_subreaper.py'), abi, path.join(hardware, script)],
+				[path.join(hardware, 'core/run_native_subreaper.py'), abi, path.join(hardware, script)],
 				witness,
 				count,
 				true
@@ -137,7 +137,7 @@ function run({
 		// The unchanged builder invokes that same subreaper internally. Wrapping
 		// it here again would create a competing physical cleanup owner.
 		execute(
-			[path.join(hardware, 'run_ollama_install_files_native.py'), driver, '--lua', abi],
+			[path.join(hardware, 'ai/run_ollama_install_files_native.py'), driver, '--lua', abi],
 			'Install native filesystem receipts: 11 passed, 0 failed.',
 			11,
 			true
@@ -158,7 +158,7 @@ function run({
 		);
 	}
 	execute(
-		[path.join(hardware, 'run_native_subreaper_teardown.py')],
+		[path.join(hardware, 'core/run_native_subreaper_teardown.py')],
 		'Native wrapper failure teardown: 2 passed, 0 failed',
 		2,
 		false

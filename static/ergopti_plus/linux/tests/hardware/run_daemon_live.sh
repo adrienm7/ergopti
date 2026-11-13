@@ -3,8 +3,8 @@
 #
 # A desktop for run_daemon_live.lua: an X server, a session bus, the
 # accessibility bus, a window manager, a focused GTK text field (the fail-closed
-# privacy gate lets nothing expand without one), sni_host.py standing in for
-# the panel, and fake_llm_server.py standing in for a hosted AI API. Then the
+# privacy gate lets nothing expand without one), menu/sni_host.py standing in for
+# the panel, and core/fake_llm_server.py standing in for a hosted AI API. Then the
 # real daemon, a real trigger, a real prediction, and the tray it shows.
 #
 # Needs root (uinput and the grab), Xvfb, dbus-launch, at-spi2-core, openbox,
@@ -28,10 +28,10 @@ for tool in Xvfb dbus-launch openbox python3 luajit xkbcomp xclip; do
 done
 [ -n "${BUS_LAUNCHER}" ] || { echo "ENVIRONMENT: at-spi-bus-launcher is missing" >&2; exit 2; }
 luajit -e 'require("lgi")' >/dev/null 2>&1 || { echo "ENVIRONMENT: lgi is unreachable from LuaJIT (lua-lgi)" >&2; exit 2; }
-python3 tests/hardware/test_atspi_fixture_lifetime.py || exit 1
-python3 tests/hardware/test_llm_selection_focus_state.py || exit 1
+python3 tests/hardware/core/test_atspi_fixture_lifetime.py || exit 1
+python3 tests/hardware/ai/test_llm_selection_focus_state.py || exit 1
 # Keep the new race regressions on the native lane, beyond recorder-based units.
-for probe in run_window_focus_identity.py run_llm_prediction_acceptance.py run_llm_selection_focus.py run_user_hotstring_destination.py run_secure_focus_watch.py; do
+for probe in core/run_window_focus_identity.py ai/run_llm_prediction_acceptance.py ai/run_llm_selection_focus.py hotstrings/run_user_hotstring_destination.py core/run_secure_focus_watch.py; do
 	python3 "tests/hardware/${probe}" || exit 1
 done
 
@@ -64,7 +64,7 @@ CUSTODY=$?
 # The existing subreaper retains its exact 40-second deadline and owned cleanup;
 # unavailable devices, missing bootstrap admission and any native failure refuse.
 if [ "${CUSTODY}" = "0" ]; then
-	python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_input_owner_real.lua
+	python3 tests/hardware/core/run_native_subreaper.py luajit tests/hardware/core/run_input_owner_real.lua
 	CUSTODY=$?
 fi
 # Saved simultaneous configuration crosses the original Manager and publisher.
@@ -88,7 +88,7 @@ if [ "${CUSTODY}" = "0" ]; then
 	elif [ "$mode" = deferred ]; then
 		echo '[DEFERRED] linux-simultaneous-native: qualified=false; saved-configuration supplement not executed.'
 	elif [ "$mode" = full ]; then
-		python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_simultaneous_configuration_real.lua
+		python3 tests/hardware/core/run_native_subreaper.py luajit tests/hardware/run_simultaneous_configuration_real.lua
 		CUSTODY=$?
 	else
 		CUSTODY=2
@@ -113,7 +113,7 @@ fi
 
 # NumLock must survive genuine source changes with fresh native LED feedback.
 for mode in add remove; do
-	if ! python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_numlock_hotplug.lua "$mode"; then
+	if ! python3 tests/hardware/core/run_native_subreaper.py luajit tests/hardware/run_numlock_hotplug.lua "$mode"; then
 		# shellcheck disable=SC2086
 		kill ${PIDS} 2>/dev/null
 		exit 1
@@ -123,7 +123,7 @@ done
 # The kernel prerequisites need XKB but no focused editor. Starting the bounded
 # editor before them let its 30-second lifetime expire before daemon admission.
 # This host's lifetime covers the tray host's 60-second budget and startup.
-python3 tests/hardware/atspi_fixture_app.py editor --lifetime-seconds 120 >/dev/null 2>&1 &
+python3 tests/hardware/core/atspi_fixture_app.py editor --lifetime-seconds 120 >/dev/null 2>&1 &
 EDITOR_PID=$!
 PIDS="${PIDS} ${EDITOR_PID}"
 sleep 2
@@ -133,7 +133,7 @@ export ERGOPTI_LIVE_LLM_LOG="$(mktemp)"
 export ERGOPTI_LIVE_LLM_REPLY=" que tout le monde va bien"
 # What a model answers the rewrite prompt, which Super+Space runs in the probe.
 export ERGOPTI_LIVE_LLM_REWRITE_REPLY="REWRITE: Ok pour jeudi"
-python3 tests/hardware/fake_llm_server.py --port "${ERGOPTI_LIVE_LLM_PORT}" --log "${ERGOPTI_LIVE_LLM_LOG}" \
+python3 tests/hardware/core/fake_llm_server.py --port "${ERGOPTI_LIVE_LLM_PORT}" --log "${ERGOPTI_LIVE_LLM_LOG}" \
 	--reply "${ERGOPTI_LIVE_LLM_REPLY}" --rewrite-reply "${ERGOPTI_LIVE_LLM_REWRITE_REPLY}" \
 	--ready-file "${LLM_READY}" &
 PIDS="${PIDS} $!"
@@ -142,7 +142,7 @@ for _ in $(seq 1 40); do [ -f "${LLM_READY}" ] && break; sleep 0.25; done
 
 READY="$(mktemp -u)"
 REPORT="$(mktemp)"
-python3 tests/hardware/sni_host.py --ready-file "${READY}" --timeout 60 --settle 3 \
+python3 tests/hardware/menu/sni_host.py --ready-file "${READY}" --timeout 60 --settle 3 \
 	--expect-icon-file --min-labels 5 --forbid-raw-keys --expect-label "Tap-Holds" > "${REPORT}" &
 HOST=$!
 for _ in $(seq 1 40); do [ -f "${READY}" ] && break; sleep 0.25; done

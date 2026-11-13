@@ -66,7 +66,7 @@ local ok, failure = pcall(function()
 	assert(Reader.use_ffi_backend(), "native evdev backend unavailable")
 	for index = 1, 2 do
 		Names.VIRTUAL_KEYBOARD = "Ergopti Custody Test " .. index
-		local keyboard = require("tests.hardware.keyboard_source_writer").load(Names.VIRTUAL_KEYBOARD)
+		local keyboard = require("tests.hardware.layouts.keyboard_source_writer").load(Names.VIRTUAL_KEYBOARD)
 		keyboards[index] = keyboard
 		assert(keyboard.open(), "cannot create source keyboard")
 		paths[index] = await_node(Names.VIRTUAL_KEYBOARD)

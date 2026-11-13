@@ -15,7 +15,7 @@
 local helpers = require("tests.helpers")
 local Emulation = require("tests.support.input_core_emulation")
 
-local HARNESS = require("core.fs.engine.paths").driver_root() .. "/tests/hardware/run_gesture_roundtrip.lua"
+local HARNESS = require("core.fs.engine.paths").driver_root() .. "/tests/hardware/gestures/run_roundtrip.lua"
 
 --- Joins printed lines for a failure message.
 --- @param lines string[]

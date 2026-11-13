@@ -106,7 +106,7 @@ async function run({
 			'tools/test/test-linux-updater-archive-snapshot.py',
 			'tools/test/prepare-linux-updater-archive-snapshot.py',
 			'tools/test/fixtures/linux-connect-terminal-protocol.py',
-			'static/ergopti_plus/linux/tests/hardware/run_managed_http_native.py'
+			'static/ergopti_plus/linux/tests/hardware/core/run_managed_http_native.py'
 		];
 		const identities = new Map();
 		for (const relative of inputs) {
@@ -148,7 +148,7 @@ async function run({
 			[
 				'connect',
 				'tools/test/fixtures/linux-connect-terminal-protocol.py',
-				'static/ergopti_plus/linux/tests/hardware/run_managed_http_native.py'
+				'static/ergopti_plus/linux/tests/hardware/core/run_managed_http_native.py'
 			]
 		];
 		for (const [kind, control, source] of phases) {
@@ -165,7 +165,7 @@ async function run({
 			if (kind === 'connect') {
 				if (
 					identities.get(source) !==
-					'774516e7e1bad4746910af1b4559cf44fa2c06e20eebdff64899207a355f85c5'
+					'3c8a88352b1b0c382c4497cfd86069e42be4524ad1e8c61f8248903522a3aee7'
 				)
 					throw new Error('CONNECT fixture identity refused');
 				args = [

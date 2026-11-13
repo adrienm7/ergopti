@@ -143,7 +143,7 @@ panel() {
 	local name="$1"
 	shift
 	rm -f "${S}/${name}.ready"
-	"${PY}" "${DRIVER}/tests/hardware/sni_host.py" --ready-file "${S}/${name}.ready" --timeout 60 --settle 3 \
+	"${PY}" "${DRIVER}/tests/hardware/menu/sni_host.py" --ready-file "${S}/${name}.ready" --timeout 60 --settle 3 \
 		--expect-icon-file "$@" > "${S}/${name}.json" 2>&1 &
 	PANEL=$!
 	wait_for 10 '[ -f "${S}/${name}.ready" ]' || { echo "ENVIRONMENT: the StatusNotifier host never started" >&2; exit 2; }

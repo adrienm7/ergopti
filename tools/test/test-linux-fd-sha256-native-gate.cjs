@@ -242,7 +242,7 @@ for (const source of [
 	'static/ergopti_plus/linux/core/network/engine/managed_http_deadline.lua',
 	'static/ergopti_plus/linux/core/timing/engine/native_timer.lua',
 	'static/ergopti_plus/linux/core/logger/engine/monotonic.lua',
-	'static/ergopti_plus/linux/tests/hardware/run_native_subreaper.py',
+	'static/ergopti_plus/linux/tests/hardware/core/run_native_subreaper.py',
 	'.github/workflows/ci-linux.yml',
 	'.github/linux-ci-coverage.json'
 ])

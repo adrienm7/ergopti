@@ -243,7 +243,7 @@ function qualifyStandalonePaths() {
 				copyLuaTree(path.join(ROOT, relative), path.join(root, relative), inventory, relative);
 			for (const relative of [
 				'static/ergopti_plus/linux/tests/runner_root.lua',
-				'static/ergopti_plus/linux/tests/hardware/run_native_subreaper.py',
+				'static/ergopti_plus/linux/tests/hardware/core/run_native_subreaper.py',
 				'static/ergopti_plus/linux/tests/hardware/run_fd_sha256_native.lua'
 			])
 				copySourceFile(path.join(ROOT, relative), path.join(root, relative), inventory, relative);
@@ -251,7 +251,7 @@ function qualifyStandalonePaths() {
 			const result = execute(
 				process.env.PYTHON || PYTHON_PROGRAM,
 				[
-					path.join(hardware, 'run_native_subreaper.py'),
+					path.join(hardware, 'core/run_native_subreaper.py'),
 					'luajit',
 					path.join(hardware, 'run_fd_sha256_native.lua')
 				],
@@ -326,7 +326,7 @@ function run({
 		result = executeChild(
 			environment.PYTHON || PYTHON_PROGRAM,
 			[
-				path.join(hardware, 'run_native_subreaper.py'),
+				path.join(hardware, 'core/run_native_subreaper.py'),
 				'luajit',
 				path.join(hardware, 'run_fd_sha256_native.lua')
 			],

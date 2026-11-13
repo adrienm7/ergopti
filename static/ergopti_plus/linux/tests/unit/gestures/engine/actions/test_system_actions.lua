@@ -282,7 +282,7 @@ helpers.describe("Linux system actions", function()
 		end)
 	end)
 
-	-- Measured on Ubuntu 24.04 (tests/hardware/run_desktop_actions_live.lua):
+	-- Measured on Ubuntu 24.04 (tests/hardware/core/run_desktop_actions_live.lua):
 	-- without GVfs, `gio trash --empty` exits 0 and leaves the trash full, so
 	-- the action reported success for nothing. It now fails unless the home
 	-- trash (XDG trash specification) is empty afterwards.

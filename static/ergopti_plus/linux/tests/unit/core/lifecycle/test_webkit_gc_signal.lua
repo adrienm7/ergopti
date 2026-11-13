@@ -6,7 +6,7 @@
 --- JavaScriptCore suspends threads for its collector with SIGUSR1 unless
 --- JSC_SIGNAL_FOR_GC names another signal, and it installs its handler over the
 --- daemon's. The reload request rings SIGUSR1, so a daemon with a WebView open
---- died with SIGSEGV (tests/hardware/phys_live_guest.sh, reproduced by
+--- died with SIGSEGV (tests/hardware/layouts/phys_live_guest.sh, reproduced by
 --- tests/hardware/run_webkit_gc_signal.lua). The daemon reserves another signal
 --- before anything can load WebKit.
 --- ==============================================================================

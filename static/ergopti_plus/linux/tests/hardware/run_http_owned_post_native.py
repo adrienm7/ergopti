@@ -18,7 +18,7 @@ args = parser.parse_args()
 driver = args.driver_root.resolve()
 shared = args.shared_lua.resolve() if args.shared_lua else driver.parent / "_shared"
 hardware = driver / "tests/hardware"
-helper = hardware / "run_native_subreaper.py"
+helper = hardware / "core/run_native_subreaper.py"
 if args.child_command:
     spec = importlib.util.spec_from_file_location("owned_post_subreaper", helper)
     owner = importlib.util.module_from_spec(spec)

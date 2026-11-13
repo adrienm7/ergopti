@@ -87,7 +87,7 @@ const NATIVE_LUA_EOL = process.platform === 'win32' ? '\r\n' : '\n';
 // accepted: these children deliberately stop at the first release-check refusal.
 const updaterProbe = path.join(
 	ROOT,
-	'static/ergopti_plus/linux/tests/hardware/run_updater_live.lua'
+	'static/ergopti_plus/linux/tests/hardware/updater/run_live.lua'
 );
 const updaterDriver = path.join(ROOT, 'static/ergopti_plus/linux');
 // The live probe now loads the real Linux pause owner before any check.
@@ -1128,7 +1128,7 @@ end
 	// the stand-in luajit answers the runner's registry query with it.
 	const logsRelative = AppDirs.segments('logs.linux', 'linux').join('/');
 	const runnerFixture = path.join(updaterScratch, 'runner');
-	const runnerRelative = 'static/ergopti_plus/linux/tests/hardware/run_updater_live.sh';
+	const runnerRelative = 'static/ergopti_plus/linux/tests/hardware/updater/run_updater_live.sh';
 	const runner = path.join(runnerFixture, runnerRelative);
 	fs.mkdirSync(path.dirname(runner), { recursive: true });
 	fs.copyFileSync(path.join(ROOT, runnerRelative), runner);
@@ -2122,7 +2122,7 @@ function assertUpdaterAuthentication(step) {
 	assert.strictEqual(pipeline.stepField(step, 'if'), UPDATER_IF);
 	assert.match(
 		step,
-		/^ {8}run: bash static\/ergopti_plus\/linux\/tests\/hardware\/run_updater_live\.sh$/m
+		/^ {8}run: bash static\/ergopti_plus\/linux\/tests\/hardware\/updater\/run_updater_live\.sh$/m
 	);
 }
 assertUpdaterAuthentication(updaterStep);

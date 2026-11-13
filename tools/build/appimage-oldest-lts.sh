@@ -149,7 +149,7 @@ user_smoke() {
 	[ -S "$bus" ] || { echo "ENVIRONMENT: the session bus never started" >&2; return 2; }
 
 	ready="$work/sni-ready"
-	python3 static/ergopti_plus/linux/tests/hardware/sni_host.py --ready-file "$ready" \
+	python3 static/ergopti_plus/linux/tests/hardware/menu/sni_host.py --ready-file "$ready" \
 		--timeout 60 --settle 3 --min-labels 2 --expect-icon-file > "$work/sni.json" &
 	host=$!
 	for _ in $(seq 1 40); do [ -f "$ready" ] && break; sleep 0.25; done

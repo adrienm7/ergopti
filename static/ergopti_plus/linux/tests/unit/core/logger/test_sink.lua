@@ -134,7 +134,7 @@ helpers.describe("linux-logger-probe-receipts", function()
 			"native logger probe receipts require Python, LuaJIT and the real mktemp")
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
-		local fixture = helpers.driver_root() .. "/tests/hardware/test_logger_probe_exit.py"
+		local fixture = helpers.driver_root() .. "/tests/hardware/core/test_logger_probe_exit.py"
 		local status = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime))
 		helpers.assert_true(status == true or status == 0, "failed native allocation cannot authorize file mutation")
 	end)

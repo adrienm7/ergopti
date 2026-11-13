@@ -34,7 +34,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	helpers.it("sqlite-private-identities: preserves unit spacing across native ABI boundaries", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
-		local fixture = root .. "/tests/hardware/run_sqlite_private_identities.lua"
+		local fixture = root .. "/tests/hardware/core/run_sqlite_private_identities.lua"
 		local status = os.execute(native_fixture_command(runtime, true) .. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "private inode identity precision failed in " .. runtime)
 	end)
@@ -45,7 +45,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		-- The child removes lfs together with luv. Absolute loader coordinates
 		-- preserve canonical constructor admission without a native cwd module.
 		if root:sub(1, 1) ~= "/" then root = assert(require("core.fs.engine.paths").current_directory()) .. "/" .. root end
-		local fixture = root .. "/tests/hardware/run_sqlite_private_no_luv.lua"
+		local fixture = root .. "/tests/hardware/core/run_sqlite_private_no_luv.lua"
 		local status = os.execute("env -u LUA_PATH " .. quote(runtime) .. " " .. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "public SQLite descriptor contract failed in " .. runtime)
 	end)
@@ -53,7 +53,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	helpers.it("sqlite-private-native-files: retains private bytes under both ambient masks", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
-		local fixture = root .. "/tests/hardware/run_sqlite_private_files.lua"
+		local fixture = root .. "/tests/hardware/core/run_sqlite_private_files.lua"
 		-- Default Integration sessions may omit TMPDIR; libuv owns temp resolution.
 		for _, mask in ipairs({ "022", "077" }) do
 			local command = "umask " .. mask .. "; exec " .. native_fixture_command(runtime, true) .. quote(fixture) .. " " .. quote(root)
@@ -67,7 +67,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	helpers.it("system-unbound-native-recovery: retains actual samples across first successful database binding", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
-		local fixture = root .. "/tests/hardware/run_system_bind_recovery.lua"
+		local fixture = root .. "/tests/hardware/core/run_system_bind_recovery.lua"
 		local native_runtime = rawget(_G, "jit") and runtime or "luajit"
 		local status = os.execute(native_fixture_command(native_runtime, rawget(_G, "jit") ~= nil)
 			.. quote(fixture) .. " " .. quote(root))
@@ -76,7 +76,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 
 
 	helpers.it("refuses special native startup sources without blocking (sqlite-native-file-admission)", function()
-		local fixture = helpers.driver_root() .. "/tests/hardware/test_sqlite_file_admission.py"
+		local fixture = helpers.driver_root() .. "/tests/hardware/core/test_sqlite_file_admission.py"
 		local quote = require("core.text.engine.utils_core").shell_quote
 		-- Lend this provider only to the exact interpreter that admitted it.
 		local status = os.execute("python3 " .. quote(fixture) .. " " .. quote("--runtime=" .. runtime)
@@ -235,7 +235,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	helpers.it("keeps published encryption posture while refusing historical work (migration-public-consumer)", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
-		local fixture = root .. "/tests/hardware/run_text_migration_consumer.lua"
+		local fixture = root .. "/tests/hardware/core/run_text_migration_consumer.lua"
 		-- Reuse admitted JIT providers; a stock-Lua parent cannot export its ABI.
 		local status = os.execute(native_fixture_command(rawget(_G, "jit") and runtime or "luajit", rawget(_G, "jit") ~= nil) .. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "native settings posture and migration acceptance must remain distinct")
@@ -244,7 +244,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	helpers.it("retains capture days through native receipts and DST (sqlite-capture-calendar)", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
-		local fixture = root .. "/tests/hardware/run_keystats_calendar.lua"
+		local fixture = root .. "/tests/hardware/metrics/run_calendar.lua"
 		local status = os.execute("TZ=Europe/Paris " .. native_fixture_command(rawget(_G, "jit") and runtime or "luajit", rawget(_G, "jit") ~= nil) .. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "native calendar sources must survive delayed persistence")
 	end)
@@ -252,7 +252,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	helpers.it("admits raw system transitions at capture time (system-event-capture-policy)", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
-		local fixture = root .. "/tests/hardware/run_system_event_capture.lua"
+		local fixture = root .. "/tests/hardware/core/run_system_event_capture.lua"
 		local receipt = os.tmpname()
 		local status = os.execute(native_fixture_command(rawget(_G, "jit") and runtime or "luajit", rawget(_G, "jit") ~= nil) .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
 		os.remove(receipt)
@@ -262,7 +262,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	helpers.it("system-capture-integer-origin: fractional raw clocks preserve canonical native aggregates", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
-		local fixture = root .. "/tests/hardware/run_system_event_capture_origin.lua"
+		local fixture = root .. "/tests/hardware/core/run_system_event_capture_origin.lua"
 		local receipt = os.tmpname()
 		local status = os.execute(native_fixture_command(rawget(_G, "jit") and runtime or "luajit", rawget(_G, "jit") ~= nil)
 			.. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
@@ -274,7 +274,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	helpers.it("retains the actual physical family at input capture (layout-capture-context)", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
-		local fixture = root .. "/tests/hardware/run_keystats_layout_capture.lua"
+		local fixture = root .. "/tests/hardware/metrics/run_layout_capture.lua"
 		local receipt = os.tmpname()
 		local status = os.execute(native_fixture_command(rawget(_G, "jit") and runtime or "luajit", rawget(_G, "jit") ~= nil) .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
 		os.remove(receipt)

@@ -388,7 +388,7 @@ function observeUpdaterArchive(block, prefix, refusal, relativeWork = false) {
 	}
 }
 const updaterArchive = updaterArchiveRegion(
-	fs.readFileSync(path.join(DRIVER, 'tests/hardware/run_updater_live.sh'), 'utf8')
+	fs.readFileSync(path.join(DRIVER, 'tests/hardware/updater/run_updater_live.sh'), 'utf8')
 );
 for (const prefix of process.platform === 'win32'
 	? ['path with spaces']

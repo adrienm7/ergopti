@@ -7,7 +7,7 @@
 --- actual evdev/uinput. Virtual-source classification is CONTROLLED explicitly;
 --- production physical discovery/readiness is UNPROVEN. Independent literal
 --- KEY/SYN and kernel bitmap expectations never come from the new implementation.
---- Run through the existing run_native_subreaper.py with its unchanged 40s bound.
+--- Run through the existing core/run_native_subreaper.py with its unchanged 40s bound.
 --- ==============================================================================
 
 local ffi = require("ffi")
@@ -195,7 +195,7 @@ local function run()
 	assert(Files.write(tap_path, '[tap_hold]\nenabled = false\ninherit_defaults = false\n'))
 	assert(Writer.use_ffi_backend() and Reader.use_ffi_backend(), "original native transport is mandatory")
 	assert(node_for(source_name) == nil and node_for(Names.VIRTUAL_KEYBOARD) == nil, "owned virtual names must be absent")
-	local source_writer = require("tests.hardware.keyboard_source_writer").load(source_name)
+	local source_writer = require("tests.hardware.layouts.keyboard_source_writer").load(source_name)
 	source = {writer=source_writer}
 	assert(source.writer.use_ffi_backend() and source.writer.open())
 	source.cap = assert(source.writer.capture_output())

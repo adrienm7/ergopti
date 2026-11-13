@@ -6,7 +6,7 @@
 --- Enables the AI through the production prediction engine, enable admission,
 --- runtime repair, runtime composition, managed proxy stage and owned process
 --- port, as the AI menu does, with an installed managed runtime whose binary is
---- the Ollama stand-in (fake_ollama_server.py). Only the refusal dialog's choice
+--- the Ollama stand-in (core/fake_ollama_server.py). Only the refusal dialog's choice
 --- (« Start Ollama ») and the WebKit presentation of the download window are
 --- scripted. When ERGOPTI_PROOF_PULL_TAG names a model, the production model
 --- download then pulls it through the started daemon.

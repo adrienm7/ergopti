@@ -306,12 +306,12 @@ export DBUS_SESSION_BUS_ADDRESS
 Xvfb :77 -screen 0 1024x768x24 >/dev/null 2>&1 &
 XVFB=\$!
 export DISPLAY=:77
-python3 '${SRC}/static/ergopti_plus/linux/tests/hardware/sni_host.py' --ready-file '${READY}' \
+python3 '${SRC}/static/ergopti_plus/linux/tests/hardware/menu/sni_host.py' --ready-file '${READY}' \
 	--timeout 30 --expect-label 'Ergopti+ tray probe' --expect-icon-file > '${SNI_REPORT}' &
 HOST=\$!
 for _ in \$(seq 1 60); do [ -f '${READY}' ] && break; sleep 0.25; done
 cd '${LIB_ROOT}/linux'
-luajit '${SRC}/static/ergopti_plus/linux/tests/hardware/run_tray_icon.lua' 10
+luajit '${SRC}/static/ergopti_plus/linux/tests/hardware/menu/run_tray_icon.lua' 10
 PROBE=\$?
 wait \$HOST; STATUS=\$?
 kill \$XVFB 2>/dev/null

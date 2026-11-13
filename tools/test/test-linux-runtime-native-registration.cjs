@@ -50,10 +50,10 @@ const SOURCES = [
 	'static/ergopti_plus/linux/tests/hardware/run_finite_process_port_native.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_service_process_port_native.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_service_running_native.lua',
-	'static/ergopti_plus/linux/tests/hardware/run_ollama_install_files_native.lua',
-	'static/ergopti_plus/linux/tests/hardware/run_ollama_install_files_native.py',
-	'static/ergopti_plus/linux/tests/hardware/run_native_subreaper.py',
-	'static/ergopti_plus/linux/tests/hardware/run_native_subreaper_teardown.py',
+	'static/ergopti_plus/linux/tests/hardware/ai/run_ollama_install_files_native.lua',
+	'static/ergopti_plus/linux/tests/hardware/ai/run_ollama_install_files_native.py',
+	'static/ergopti_plus/linux/tests/hardware/core/run_native_subreaper.py',
+	'static/ergopti_plus/linux/tests/hardware/core/run_native_subreaper_teardown.py',
 	'static/ergopti_plus/linux/core/network/adapters/http_client.lua',
 	'static/ergopti_plus/linux/core/network/adapters/curl_http_client.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_http_owned_post_native.lua',
@@ -69,8 +69,8 @@ const MANUAL_IF =
 	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.shard == 'network-ai' }}";
 const MANUAL_EVIDENCE_IF = MANUAL_IF;
 const MANUAL_FIXTURES = [
-	'static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.lua',
-	'static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py'
+	'static/ergopti_plus/linux/tests/hardware/ai/run_ollama_runtime_acceptance.lua',
+	'static/ergopti_plus/linux/tests/hardware/ai/run_ollama_runtime_acceptance.py'
 ];
 
 const LIVE_STEP = 'AI predictions against a real Ollama';
@@ -148,7 +148,7 @@ function validateManual(root) {
 	assert.match(run, /set -euo pipefail/);
 	assert.match(
 		run,
-		/python3 static\/ergopti_plus\/linux\/tests\/hardware\/run_ollama_runtime_acceptance\.py/
+		/python3 static\/ergopti_plus\/linux\/tests\/hardware\/ai\/run_ollama_runtime_acceptance\.py/
 	);
 	assert.match(run, /--repository "\$GITHUB_WORKSPACE"/);
 	assert.match(run, /--evidence "\$RUNNER_TEMP\/ollama-runtime-acceptance"/);

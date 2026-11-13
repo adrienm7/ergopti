@@ -83,7 +83,7 @@ assert.equal(GATE_COMMANDS['linux-xkb-source'].npm, 'test:linux:xkb-source');
 for (const file of [
 	'static/ergopti_plus/linux/layouts/adapters/xkb_source_probe.lua',
 	'static/ergopti_plus/linux/hotstrings/engine/magic_key_source.lua',
-	'static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua',
+	'static/ergopti_plus/linux/tests/hardware/layouts/run_xkb_source_qualification.lua',
 	'static/ergopti_plus/_shared/shortcuts/engine/magic_editor_core.lua'
 ])
 	assert(
@@ -140,10 +140,10 @@ for (const file of [
 	'static/ergopti_plus/linux/tests/hardware/run_finite_process_port_native.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_service_process_port_native.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_service_running_native.lua',
-	'static/ergopti_plus/linux/tests/hardware/run_ollama_install_files_native.lua',
-	'static/ergopti_plus/linux/tests/hardware/run_ollama_install_files_native.py',
-	'static/ergopti_plus/linux/tests/hardware/run_native_subreaper.py',
-	'static/ergopti_plus/linux/tests/hardware/run_native_subreaper_teardown.py',
+	'static/ergopti_plus/linux/tests/hardware/ai/run_ollama_install_files_native.lua',
+	'static/ergopti_plus/linux/tests/hardware/ai/run_ollama_install_files_native.py',
+	'static/ergopti_plus/linux/tests/hardware/core/run_native_subreaper.py',
+	'static/ergopti_plus/linux/tests/hardware/core/run_native_subreaper_teardown.py',
 	'tools/test/run-linux-runtime-native.cjs',
 	'.github/workflows/ci-linux.yml'
 ])

@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Emulated Linux Input Core For The Gesture Round Trip
 --- DESCRIPTION:
---- Runs tests/hardware/run_gesture_roundtrip.lua unchanged on a host without
+--- Runs tests/hardware/gestures/run_roundtrip.lua unchanged on a host without
 --- /dev/uinput. The FFI that harness writes through is replaced by a model of
 --- the kernel's input core: an event type or MSC code the device did not
 --- advertise is dropped, an MT axis or key whose value did not change is

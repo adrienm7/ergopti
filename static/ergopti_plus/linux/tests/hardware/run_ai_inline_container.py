@@ -4,7 +4,7 @@
 
 Closes the "AI inline auto-type" check on a container (maintainer decision of
 2026-11-10). The real daemon runs over the kernel model, with the AI enabled
-on the API backend (tests/hardware/fake_llm_server.py, an OpenAI-compatible
+on the API backend (tests/hardware/core/fake_llm_server.py, an OpenAI-compatible
 API on loopback) and the trigger menu's inline switch on, as a user leaves it.
 
 1. In mousepad on Xvfb, "bonjour" then a pause asks for a prediction; the
@@ -91,7 +91,7 @@ def proof():
         session.spawn(
             [
                 sys.executable,
-                str(cs.HERE / "fake_llm_server.py"),
+                str(cs.HERE / "core/fake_llm_server.py"),
                 "--port",
                 str(PORT),
                 "--log",
@@ -170,7 +170,7 @@ def proof():
         session.spawn(
             [
                 sys.executable,
-                str(cs.HERE / "atspi_fixture_app.py"),
+                str(cs.HERE / "core/atspi_fixture_app.py"),
                 "Proof password",
                 "password",
                 "--lifetime-seconds",

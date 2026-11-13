@@ -104,7 +104,7 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 			"native XKB data admission requires Python and the actual LuaJIT FFI runtime")
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
-		local fixture = helpers.driver_root() .. "/tests/hardware/test_xkb_native_data.py"
+		local fixture = helpers.driver_root() .. "/tests/hardware/layouts/test_xkb_native_data.py"
 		local status = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime))
 		helpers.assert_true(status == true or status == 0, "native capture must admit both declared data dependencies")
 	end)
@@ -115,7 +115,7 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 			"native session keymap receipts require Python and the actual LuaJIT FFI runtime")
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
-		local fixture = helpers.driver_root() .. "/tests/hardware/test_xkb_session_exit.py"
+		local fixture = helpers.driver_root() .. "/tests/hardware/layouts/test_xkb_session_exit.py"
 		local status = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime))
 		helpers.assert_true(status == true or status == 0, "failed actual metadata must not select native compilation")
 	end)
@@ -126,7 +126,7 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 			"native keymap source receipts require Python and the actual LuaJIT FFI runtime")
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
-		local fixture = helpers.driver_root() .. "/tests/hardware/test_xkb_source_exit.py"
+		local fixture = helpers.driver_root() .. "/tests/hardware/layouts/test_xkb_source_exit.py"
 		local status = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime))
 		helpers.assert_true(status == true or status == 0, "failed actual keymap acquisition must refuse native publication")
 	end)

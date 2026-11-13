@@ -46,8 +46,8 @@ const sources = {
 		'tools/test/run-linux-updater-archive-native.cjs',
 		'tools/test/prepare-linux-updater-archive-snapshot.py',
 		'tools/test/run-linux-managed-http-phase.py',
-		'static/ergopti_plus/linux/tests/hardware/run_updater_archive_pipeline.lua',
-		'static/ergopti_plus/linux/tests/hardware/run_updater_archive_pipeline.py',
+		'static/ergopti_plus/linux/tests/hardware/updater/run_archive_pipeline.lua',
+		'static/ergopti_plus/linux/tests/hardware/updater/run_updater_archive_pipeline.py',
 		'static/ergopti_plus/linux/updater/engine/manager.lua',
 		'static/ergopti_plus/linux/updater/engine/installer.lua',
 		'static/ergopti_plus/linux/updater/engine/archive_transfer.lua',
@@ -379,7 +379,7 @@ function validateFollowup(catalogue, planner, text) {
 		'tools/test/test-linux-updater-archive-snapshot.py',
 		'tools/test/prepare-linux-updater-archive-snapshot.py',
 		'tools/test/fixtures/linux-connect-terminal-protocol.py',
-		'static/ergopti_plus/linux/tests/hardware/run_managed_http_native.py'
+		'static/ergopti_plus/linux/tests/hardware/core/run_managed_http_native.py'
 	])
 		assert.ok(planner.selectGates([source]).has('linux-archive-source-controls'), source);
 	const jobs = Pipeline.jobsOfText(text, '.github/workflows/ci-linux.yml').filter(
@@ -489,10 +489,10 @@ function rollbackControl(name, body) {
 	rollbackControls++;
 }
 const rollbackPython = read(
-	'static/ergopti_plus/linux/tests/hardware/run_updater_archive_pipeline.py'
+	'static/ergopti_plus/linux/tests/hardware/updater/run_updater_archive_pipeline.py'
 );
 const rollbackLua = read(
-	'static/ergopti_plus/linux/tests/hardware/run_updater_archive_pipeline.lua'
+	'static/ergopti_plus/linux/tests/hardware/updater/run_archive_pipeline.lua'
 );
 rollbackControl('exact three unique modes', () =>
 	assert.match(rollbackPython, /MODES = \("happy", "wrong_digest", "smoke_rollback"\)/)

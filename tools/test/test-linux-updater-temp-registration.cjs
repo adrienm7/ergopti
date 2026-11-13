@@ -41,8 +41,8 @@ const inputs = [
 	'tools/build/stage-linux-network-runtime.py',
 	'tools/build/build-linux-native-output.sh',
 	'tools/lib/git-bash.cjs',
-	'static/ergopti_plus/linux/tests/hardware/run_updater_temp_ownership_receipts.py',
-	'static/ergopti_plus/linux/tests/hardware/run_updater_temp_allocation_receipts.py',
+	'static/ergopti_plus/linux/tests/hardware/updater/run_updater_temp_ownership_receipts.py',
+	'static/ergopti_plus/linux/tests/hardware/updater/run_updater_temp_allocation_receipts.py',
 	'static/ergopti_plus/linux/updater/engine/manager.lua',
 	'static/ergopti_plus/linux/updater/engine/archive_transfer.lua',
 	'static/ergopti_plus/linux/updater/engine/archive_output.lua',
@@ -309,7 +309,7 @@ console.log(
 // Additional independent mandatory direct-C subject; original 43 controls stay intact.
 const launcher = read('tools/test/run-linux-updater-temp-native.cjs');
 const namespaceFixture =
-	'static/ergopti_plus/linux/tests/hardware/run_native_artifact_cleanup_retry.py';
+	'static/ergopti_plus/linux/tests/hardware/core/run_native_artifact_cleanup_retry.py';
 function namespaceRegistration(floors, planner, text, producer) {
 	assert.equal(floors.jobs['e2e-linux'].subjects['updater-native-namespace-cleanup'], 5);
 	assert.ok(planner.selectGates([namespaceFixture]).has('linux-updater-temp-native'));
@@ -773,7 +773,7 @@ console.log(
 // Extra genuine C4 is a private prerequisite, never extra public CI native credit.
 const Capture = require('./run-linux-updater-temp-native.cjs');
 const captureFixture =
-	'static/ergopti_plus/linux/tests/hardware/run_native_artifact_capture_completion.c';
+	'static/ergopti_plus/linux/tests/hardware/core/run_native_artifact_capture_completion.c';
 const captureLines = [
 	'PASS invalid literal component refuses before any native owner acquisition',
 	'PASS missing component retains then closes exact acquired descriptors',

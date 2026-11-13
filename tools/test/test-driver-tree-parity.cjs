@@ -309,7 +309,7 @@ const testsShared = [...testsUnion]
 // never the other way to make a change pass.
 const BASELINE_TESTS_SHARED = 23;
 // 62 -> 63 on 2026-11-11: the Linux container desktop proofs (tests/hardware/desktop).
-const BASELINE_TESTS_UNION = 92;
+const BASELINE_TESTS_UNION = 102;
 
 if (testsShared.length < BASELINE_TESTS_SHARED) {
 	errors.push(

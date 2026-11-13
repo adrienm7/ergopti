@@ -533,7 +533,7 @@ assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics 
 		Fake.uninstall()
 	end)
 
-	-- Measured on a real gnome-keyring (tests/hardware/run_keyring_receipts.sh):
+	-- Measured on a real gnome-keyring (tests/hardware/core/run_keyring_receipts.sh):
 	-- a lookup whose unlock prompt is dismissed and a clear on a locked keyring
 	-- both exit 1 with nothing on stderr, as an absent item does, and the clear
 	-- removes nothing. `search` without --unlock prompts for nothing and still

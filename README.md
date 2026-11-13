@@ -371,7 +371,7 @@ everything CI cannot answer — capture under X11 and Wayland, the keymap dump, 
 grab, the tray — and most of it is scripted:
 
 ```bash
-bash static/ergopti_plus/linux/tests/hardware/validate.sh
+bash static/ergopti_plus/linux/tests/hardware/core/validate.sh
 ```
 
 ### Tests and quality gates

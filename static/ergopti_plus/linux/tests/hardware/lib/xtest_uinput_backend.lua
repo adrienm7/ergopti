@@ -12,7 +12,7 @@
 --- exactly as it maps a key from a uinput device on a real desktop.
 ---
 --- WHY: Xvfb has no evdev backend, so a real uinput device never reaches it
---- (tests/hardware/run_keysym_roundtrip.sh). XTest is the one input path a
+--- (tests/hardware/core/run_keysym_roundtrip.sh). XTest is the one input path a
 --- headless server exposes, and it enters the same core keyboard, keymap and
 --- client delivery as a hardware key.
 ---

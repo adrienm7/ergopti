@@ -8,7 +8,7 @@
 --- unless JSC_SIGNAL_FOR_GC names another signal, and it installs its handler
 --- over the daemon's ("Overriding existing handler for signal 10"). With a
 --- WebView open (the first-run onboarding window), a reload request crashed the
---- daemon with SIGSEGV; found by tests/hardware/phys_live_guest.sh.
+--- daemon with SIGSEGV; found by tests/hardware/layouts/phys_live_guest.sh.
 ---
 --- This host installs the daemon's own signal owner (infra.signal_handlers,
 --- through the same start order as the daemon: the WebKit GC signal reserved

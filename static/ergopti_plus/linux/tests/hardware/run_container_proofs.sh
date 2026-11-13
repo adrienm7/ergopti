@@ -3,7 +3,7 @@
 #
 # The Linux "To confirm on Linux" checks a container can close (maintainer
 # decision of 2026-11-10): the real daemon over the kernel model
-# (virtual_kernel_preload.c), a real X server or Wayland compositor, real
+# (core/virtual_kernel_preload.c), a real X server or Wayland compositor, real
 # editors read back through AT-SPI or the clipboard. Each proof runs in a
 # private mount namespace, where the model's nodes replace /dev/input and its
 # device list replaces /proc/bus/input/devices.
@@ -29,8 +29,8 @@ done
 "${PYTHON}" -c 'import gi; gi.require_version("Gtk", "3.0"); gi.require_version("Atspi", "2.0")' 2>/dev/null \
 	|| { echo "ENVIRONMENT: ${PYTHON} has no Gtk 3 / Atspi bindings" >&2; exit 2; }
 status=0
-for proof in run_nav_pointer_container.py run_tap_copy_container.py run_ai_inline_container.py \
-	run_physical_shortcut_container.py run_perf_budget_container.py \
+for proof in run_nav_pointer_container.py keyboard/run_tap_copy_container.py run_ai_inline_container.py \
+	layouts/run_physical_shortcut_container.py run_perf_budget_container.py \
 	run_bytecode_installed_tree.py; do
 	echo "=== ${proof} ==="
 	unshare --mount --propagation private "${PYTHON}" "${proof}"

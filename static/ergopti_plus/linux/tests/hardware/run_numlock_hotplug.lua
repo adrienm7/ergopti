@@ -50,7 +50,7 @@ local function node(name)
 end
 local function create(index)
 	names[index]='Ergopti Native NumLock '..mode..' '..index
-	keyboards[index]=require('tests.hardware.led_source_keyboard').create(names[index])
+	keyboards[index]=require('tests.hardware.layouts.led_source_keyboard').create(names[index])
 	caps[index]=assert(keyboards[index].capture_output())
 	paths[index]=assert(await(function() return node(names[index]) end,5000))
 end

@@ -7,7 +7,7 @@ Everything CI cannot check, with the command to run and the answer to expect.
 Keep this boundary current. A checklist that re-asks for something CI now
 answers gets skipped as busywork, and the skipping does not stop at that item.
 
-- **One real kernel path.** `tests/hardware/run_uinput_roundtrip.lua` creates a
+- **One real kernel path.** `tests/hardware/core/run_uinput_roundtrip.lua` creates a
   virtual keyboard, grabs it, writes events and reads them back — pinning the
   ioctl numbers, the struct layout and the capability bits.
 - **The unit suite on five distributions' own LuaJIT**, in containers: Debian,
@@ -32,7 +32,7 @@ Work top to bottom: a failure early on makes the later results meaningless.
 **Run the checklist rather than reading it:**
 
 ```bash
-bash static/ergopti_plus/linux/tests/hardware/validate.sh
+bash static/ergopti_plus/linux/tests/hardware/core/validate.sh
 ```
 
 It answers everything a machine can answer — permissions, groups, `/dev/uinput`,
@@ -129,7 +129,7 @@ Then run the one check here that you do not have to judge — you start it and r
 the exit code:
 
 ```bash
-bash tests/hardware/run_keysym_roundtrip.sh
+bash tests/hardware/core/run_keysym_roundtrip.sh
 ```
 
 It presses exactly what the driver's layout table says produces each character

@@ -16,7 +16,7 @@ package.loaded["tests.support.adapters.synthetic_input.uinput_writer_fixture"] =
 local Fixture = require("tests.support.adapters.synthetic_input.uinput_writer_fixture")
 local helpers, recorder = Fixture.helpers, Fixture.recorder
 local Finder = require("hotstrings.engine.device_finder")
-local KeyboardSource = require("tests.hardware.keyboard_source_writer")
+local KeyboardSource = require("tests.hardware.layouts.keyboard_source_writer")
 
 -- Resolved as require resolves it, so the writer can move without this test pinning its path.
 local WRITER_PATH = assert(package.searchpath("platform.input.uinput_writer", package.path))
@@ -70,7 +70,7 @@ helpers.describe("keyboard-only fixture sources", function()
 			local file = assert(io.open(helpers.driver_root() .. "/tests/hardware/" .. name, "rb"))
 			local text = file:read("*a")
 			file:close()
-			helpers.assert_true(text:find('require("tests.hardware.keyboard_source_writer").load(', 1, true) ~= nil,
+			helpers.assert_true(text:find('require("tests.hardware.layouts.keyboard_source_writer").load(', 1, true) ~= nil,
 				name .. " must create keyboard-only sources")
 			helpers.assert_true(text:find('loadfile("platform/input/uinput_writer.lua")', 1, true) == nil
 				and text:find('package.loaded["platform.input.uinput_writer"] = nil', 1, true) == nil,

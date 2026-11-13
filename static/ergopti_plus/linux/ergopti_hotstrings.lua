@@ -179,7 +179,7 @@ end
 
 -- `--help` asks nothing of the session: no logger, no privacy identity. It stays
 -- behind the launcher's lock check above, which refuses a corrupt lock marker
--- whatever the arguments are (tests/hardware/test_session_lock.py).
+-- whatever the arguments are (tests/hardware/core/test_session_lock.py).
 -- It used to run after all three, so a start without $USER (a container, `env -i`)
 -- refused to even print its usage.
 for _, argument in ipairs(arg or {}) do

@@ -21,7 +21,7 @@
 --- Every test of the push asserts the SHAPE of the JavaScript string handed to
 --- eval_js, which was correct throughout. Only asking a real page whether it had
 --- the function could find this, which is what
---- tests/hardware/run_webview_push.lua does and how it was found.
+--- tests/hardware/core/run_webview_push.lua does and how it was found.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

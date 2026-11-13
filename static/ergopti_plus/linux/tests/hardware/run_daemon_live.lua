@@ -14,14 +14,14 @@
 --- touches real — the grab, uinput in both directions, the X keymap, the
 --- accessibility bus (a fail-closed privacy gate: nothing expands unless the
 --- focused field is known not to be a password), and the tray's D-Bus menu,
---- checked by tests/hardware/sni_host.py in the calling script.
+--- checked by tests/hardware/menu/sni_host.py in the calling script.
 ---
 --- Then the tap-holds, which the daemon runs itself on the grabbed keyboard:
 --- CapsLock held is Ctrl and tapped is Enter, left Alt held is the navigation
 --- layer, Shift tapped copies — and no key the daemon pressed stays down.
 ---
 --- Then the AI: with the API backend selected and an entry pointing at
---- tests/hardware/fake_llm_server.py (a Cerebras-style OpenAI-compatible API),
+--- tests/hardware/core/fake_llm_server.py (a Cerebras-style OpenAI-compatible API),
 --- "//" asks for a prediction and a bare 1 accepts it. The check reads what the
 --- server received (the key, the endpoint) and what the desktop received.
 ---
@@ -129,7 +129,7 @@ end
 -- finder rightly skips uinput devices as synthetic.
 -- Keyboard-only: the production device also carries the navigation wheel's
 -- relative axes, which the daemon's grab policy refuses on a source.
-local Keyboard = require("tests.hardware.keyboard_source_writer").load(TEST_KEYBOARD)
+local Keyboard = require("tests.hardware.layouts.keyboard_source_writer").load(TEST_KEYBOARD)
 
 if not Keyboard.is_available() then abort("/dev/uinput is not writable") end
 Keyboard.use_ffi_backend()

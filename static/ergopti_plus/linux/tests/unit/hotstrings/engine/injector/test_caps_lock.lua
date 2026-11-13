@@ -10,7 +10,7 @@
 --- typed replacement and restores it, including when an emit fails.
 ---
 --- What a real libxkbcommon state makes of these events is proven in
---- tests/hardware/run_layout_resolution.lua; here, the event sequence.
+--- tests/hardware/layouts/run_resolution.lua; here, the event sequence.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

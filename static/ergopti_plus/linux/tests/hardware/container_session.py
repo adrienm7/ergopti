@@ -4,7 +4,7 @@
 
 The proofs close the "To confirm on Linux" checks a cloud container can run
 (maintainer decision of 2026-11-10): the real daemon runs unchanged over
-tests/hardware/virtual_kernel_preload.c, which stands in for evdev and uinput; the
+tests/hardware/core/virtual_kernel_preload.c, which stands in for evdev and uinput; the
 desktop is a real X server (Xvfb, openbox, the accessibility bus) or a real
 Wayland compositor (sway headless); the editor is a real application read back
 through AT-SPI or the clipboard.
@@ -625,7 +625,7 @@ def build_preload(root):
             "-O1",
             "-shared",
             "-fPIC",
-            str(HERE / "virtual_kernel_preload.c"),
+            str(HERE / "core/virtual_kernel_preload.c"),
             "-o",
             str(library),
             "-ldl",
@@ -648,7 +648,7 @@ def config_folder(env):
 
 
 def build_wayland_bridge(root):
-    """Compiles wayland_key_bridge.c against its protocol, into `root`."""
+    """Compiles core/wayland_key_bridge.c against its protocol, into `root`."""
     protocol = HERE / "fixtures" / "wayland" / "virtual-keyboard-unstable-v1.xml"
     header = root / "virtual-keyboard-unstable-v1-client-protocol.h"
     code = root / "virtual-keyboard-unstable-v1-protocol.c"
@@ -667,7 +667,7 @@ def build_wayland_bridge(root):
             "-O1",
             "-I",
             str(root),
-            str(HERE / "wayland_key_bridge.c"),
+            str(HERE / "core/wayland_key_bridge.c"),
             str(code),
             "-o",
             str(binary),

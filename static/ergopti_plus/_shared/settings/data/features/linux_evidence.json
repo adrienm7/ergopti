@@ -462,7 +462,7 @@
 				"static/ergopti_plus/linux/tests/unit/metrics/engine/privacy/test_filters.lua",
 				"static/ergopti_plus/linux/tests/unit/metrics/engine/core/test_toggles_persist.lua",
 				"static/ergopti_plus/linux/tests/unit/metrics/ui/test_wpm_readouts.lua",
-				"static/ergopti_plus/linux/tests/hardware/run_wpm_readouts_live.lua"
+				"static/ergopti_plus/linux/tests/hardware/metrics/run_wpm_readouts_live.lua"
 			]
 		},
 		"ordered_key_combinations": {
@@ -1097,7 +1097,7 @@
 				"static/ergopti_plus/linux/layouts/adapters/xkb_source_probe.lua",
 				"static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_magic_editor_policy.lua",
 				"static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_which_slots_exist.lua",
-				"static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua"
+				"static/ergopti_plus/linux/tests/hardware/layouts/run_xkb_source_qualification.lua"
 			]
 		},
 		"layout.direct_access_digits": {

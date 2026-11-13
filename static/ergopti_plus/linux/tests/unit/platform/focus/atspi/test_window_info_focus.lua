@@ -356,7 +356,7 @@ helpers.describe("window_info: Wayland", function()
 		helpers.it("(linux-focus-command-exit) rejects failed " .. backend .. " client output", function()
 			local executable = assert(arg and arg[-1], "the current interpreter must be identifiable")
 			local quote = require("core.text.engine.utils_core").shell_quote
-			local fixture = helpers.driver_root() .. "/tests/hardware/run_wayland_query_exit.lua"
+			local fixture = helpers.driver_root() .. "/tests/hardware/core/run_wayland_query_exit.lua"
 			local status = os.execute(quote(executable) .. " " .. quote(fixture) .. " " .. quote(helpers.driver_root()) .. " " .. quote(backend))
 			helpers.assert_true(status == true or status == 0,
 				"actual compositor status must authorize metadata while preserving successful fallback")

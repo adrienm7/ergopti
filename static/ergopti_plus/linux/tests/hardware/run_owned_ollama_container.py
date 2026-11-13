@@ -8,7 +8,7 @@ logs the WARNING and then succeeds direct. TODO « Linux PAC lists through
 GIO »: a PAC whose first relay is dead walks on to DIRECT or to a live relay.
 
 The pinned Ollama release cannot be downloaded here, so the managed runtime
-tree holds the protocol-faithful stand-in (fake_ollama_server.py) as its
+tree holds the protocol-faithful stand-in (core/fake_ollama_server.py) as its
 binary; a second stand-in plays the user's system Ollama on the stock port,
 and an `ollama` first on PATH plays its executable. Everything else is the
 production driver: prediction engine, enable admission, runtime repair and
@@ -44,7 +44,7 @@ HERE = Path(__file__).resolve().parent
 DRIVER = HERE.parent.parent
 SHARED = DRIVER.parent / "_shared"
 CONTROL = "linux/tests/hardware/run_owned_ollama_container.lua"
-STAND_IN = HERE / "fake_ollama_server.py"
+STAND_IN = HERE / "core/fake_ollama_server.py"
 DEFAULTS = json.loads((SHARED / "ai/data/defaults.json").read_text())
 OWNED, STOCK = DEFAULTS["llm_ollama_owned_port"], DEFAULTS["llm_ollama_port"]
 MODEL = "qwen3:0.6b"
@@ -103,7 +103,7 @@ class OwnedOllamaContainer(unittest.TestCase):
         cls.root = cls.home / "tree"
         shutil.copytree(DRIVER, cls.root / "linux", ignore=ignore)
         shutil.copytree(SHARED, cls.root / "_shared", ignore=ignore)
-        cls.stand_in = cls.home / "fake_ollama_server.py"
+        cls.stand_in = cls.home / "core/fake_ollama_server.py"
         shutil.copy(STAND_IN, cls.stand_in)
         # A system Ollama: its executable first on PATH and its daemon on 11434.
         cls.system_bin = cls.home / "system-bin"

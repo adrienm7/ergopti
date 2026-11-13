@@ -75,7 +75,7 @@ end
 --- @return table input
 local function create_source(name)
 	assert(node_for(name) == nil, "fixture source already exists")
-	local source = require("tests.hardware.keyboard_source_writer").load(name)
+	local source = require("tests.hardware.layouts.keyboard_source_writer").load(name)
 	local entry = { name = name, writer = source }
 	inputs[#inputs + 1] = entry
 	assert(source.use_ffi_backend(), "source FFI backend")

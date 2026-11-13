@@ -9,7 +9,7 @@ helpers.describe("shared UI catalogue sources", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
 		local root = helpers.driver_root()
-		local fixture = root .. "/tests/hardware/run_ui_catalogue_sources.py"
+		local fixture = root .. "/tests/hardware/core/run_ui_catalogue_sources.py"
 		local result = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime) .. " --driver " .. quote(root))
 		helpers.assert_true(result == true or result == 0, "native source classification must finish with real FIFOs")
 	end)
@@ -20,7 +20,7 @@ helpers.describe("shared UI catalogue sources", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
 		local root = helpers.driver_root()
-		local fixture = root .. "/tests/hardware/run_webview_asset_sources.py"
+		local fixture = root .. "/tests/hardware/core/run_webview_asset_sources.py"
 		local result = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime) .. " --driver " .. quote(root))
 		helpers.assert_true(result == true or result == 0, "native WebView asset classification must not block")
 	end)

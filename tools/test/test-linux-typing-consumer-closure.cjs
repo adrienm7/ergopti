@@ -41,7 +41,7 @@ assert.equal(consumer.element('apps_table_container').innerHTML, '');
 // This catches missing imports outside the Typing consumer as well.
 const fixture = path.join(
 	root,
-	'static/ergopti_plus/linux/tests/hardware/run_sqlite_kc_hold_consumers.cjs'
+	'static/ergopti_plus/linux/tests/hardware/core/run_sqlite_kc_hold_consumers.cjs'
 );
 const proof = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-consumer-closure-'));
 const nativeManifest = {

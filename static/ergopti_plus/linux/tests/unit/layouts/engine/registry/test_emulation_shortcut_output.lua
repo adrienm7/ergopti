@@ -9,7 +9,7 @@
 --- go through the broker, which owns every write on the virtual keyboard: a
 --- write beside it moves the writer's epoch under the broker, which then
 --- refuses every later output — the next emulated key, every expansion and the
---- grab's own pass-through. Found by tests/hardware/run_layout_typing_live.lua
+--- grab's own pass-through. Found by tests/hardware/layouts/run_typing_live.lua
 --- (Ctrl + Ergopti c copied, then nothing typed again).
 --- ==============================================================================
 

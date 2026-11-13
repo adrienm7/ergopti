@@ -5,9 +5,9 @@
 Two checks, each able to fail on the code before the 2026-11-11 performance
 pass:
 
-1. Under Xvfb, run_xkb_source_read_cost.lua (a layout proof of an unchanged
+1. Under Xvfb, layouts/run_xkb_source_read_cost.lua (a layout proof of an unchanged
    keymap no longer downloads it, and setxkbmap still invalidates what it
-   reuses) and run_keymap_native_dump.lua (a resolve serializes the keymap in
+   reuses) and layouts/run_keymap_native_dump.lua (a resolve serializes the keymap in
    process instead of forking xkbcomp, parsed alike on five layouts).
 2. tools/bench/linux-session-bench.py --budgets, reduced: spawn to ready, key
    press to output, tap-hold release to tap, typing per replacement character,
@@ -41,9 +41,12 @@ def source_read_cost():
         if not ready:
             raise RuntimeError("ENVIRONMENT: Xvfb did not start")
         for probe, claim in (
-            ("run_xkb_source_read_cost.lua", "an unchanged keymap is proven without its download"),
             (
-                "run_keymap_native_dump.lua",
+                "layouts/run_xkb_source_read_cost.lua",
+                "an unchanged keymap is proven without its download",
+            ),
+            (
+                "layouts/run_keymap_native_dump.lua",
                 "a resolve serializes the keymap without forking xkbcomp",
             ),
         ):

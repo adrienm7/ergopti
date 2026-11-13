@@ -60,7 +60,7 @@ const SOURCES = [
 	'static/ergopti_plus/linux/tests/unit/core/network/adapters/test_http_client_curl_native_private_managed.lua',
 	'static/ergopti_plus/linux/tests/unit/core/network/adapters/test_http_client_curl_asynchronous_ownership.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_http_stream_receipts.lua',
-	'static/ergopti_plus/linux/tests/hardware/run_local_api_auth.lua',
+	'static/ergopti_plus/linux/tests/hardware/core/run_local_api_auth.lua',
 	'static/ergopti_plus/linux/ai/engine/api/api_remote.lua',
 	'static/ergopti_plus/linux/ai/engine/settings/api_entries.lua',
 	'static/ergopti_plus/linux/ai/engine/local_servers/catalogue.lua',

@@ -49,7 +49,7 @@ helpers.describe("Graphical session lock ownership", function()
 	end)
 
 	helpers.it("releases the actual lock after daemon exit with a live child (session-lock-native)", function()
-		local fixture = helpers.driver_root() .. "/tests/hardware/test_session_lock.py"
+		local fixture = helpers.driver_root() .. "/tests/hardware/core/test_session_lock.py"
 		local status = os.execute("python3 " .. shell_quote(fixture))
 		helpers.assert_true(status == 0 or status == true, "Native session lock regression failed")
 	end)

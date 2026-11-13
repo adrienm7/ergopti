@@ -434,7 +434,7 @@ helpers.describe("healthcheck native source admission", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
 		local root = helpers.driver_root()
-		local fixture = root .. "/tests/hardware/run_healthcheck_sources.py"
+		local fixture = root .. "/tests/hardware/core/run_healthcheck_sources.py"
 		local result = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime) .. " --driver " .. quote(root))
 		helpers.assert_true(result == true or result == 0, "native healthcheck reads must not wait on special files")
 	end)

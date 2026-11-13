@@ -57,13 +57,13 @@ const SOURCES = [
 	'static/ergopti_plus/_shared/shortcuts/engine/actions/catalogue.lua',
 	'static/ergopti_plus/_shared/shortcuts/engine/actions/catalogue_data.lua',
 	'static/ergopti_plus/linux/_generated/action_emit.lua',
-	'static/ergopti_plus/linux/tests/hardware/run_window_switch_receipts.py',
-	'static/ergopti_plus/linux/tests/hardware/run_window_switch_operation.lua',
+	'static/ergopti_plus/linux/tests/hardware/core/run_window_switch_receipts.py',
+	'static/ergopti_plus/linux/tests/hardware/core/run_window_switch_operation.lua',
 	NATIVE,
 	'.github/workflows/ci-linux.yml',
 	'.github/linux-ci-coverage.json',
-	'static/ergopti_plus/linux/tests/hardware/native_fixture_family.py',
-	'static/ergopti_plus/linux/tests/hardware/run_native_fixture_family_receipts.py'
+	'static/ergopti_plus/linux/tests/hardware/core/native_fixture_family.py',
+	'static/ergopti_plus/linux/tests/hardware/core/run_native_fixture_family_receipts.py'
 ];
 const COUNT_LINE =
 	'window_switch_assertions=$(sed -n \'s/^Native window receipts: \\([0-9][0-9]*\\) passed, 0 failed, 0 skipped$/\\1/p\' "$RUNNER_TEMP/linux-window-switch.log" | tail -1)';
@@ -540,8 +540,8 @@ async function main() {
 	const calls = invocations.slice(first);
 	assert.equal(calls.length, 2, 'family cleanup control and actual X11 fixture are mandatory');
 	assert.equal(calls[0][0], 'python3');
-	assert(calls[0][1].includes('tests/hardware/run_native_fixture_family_receipts.py'));
-	assert(calls[1][1].includes('tests/hardware/run_window_switch_receipts.py'));
+	assert(calls[0][1].includes('tests/hardware/core/run_native_fixture_family_receipts.py'));
+	assert(calls[1][1].includes('tests/hardware/core/run_window_switch_receipts.py'));
 	assert(calls[1][1].includes('--require-routing'));
 	assert(calls.every((call) => call[1][0] === 'tests/hardware/native_fixture_family.py'));
 	assert.equal(calls[1][2].cwd, path.join(ROOT, 'static/ergopti_plus/linux'));
@@ -606,7 +606,10 @@ async function main() {
 	assert(
 		/"Xvfb",\s+"-noreset",/.test(
 			fs.readFileSync(
-				path.join(ROOT, 'static/ergopti_plus/linux/tests/hardware/run_window_switch_receipts.py'),
+				path.join(
+					ROOT,
+					'static/ergopti_plus/linux/tests/hardware/core/run_window_switch_receipts.py'
+				),
 				'utf8'
 			)
 		),
@@ -789,7 +792,7 @@ function portableDiagnosticControls() {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-window-diagnostic-controls-'));
 	const source = path.join(
 		ROOT,
-		'static/ergopti_plus/linux/tests/hardware/run_window_switch_receipts.py'
+		'static/ergopti_plus/linux/tests/hardware/core/run_window_switch_receipts.py'
 	);
 	const sourceHash = () =>
 		crypto.createHash('sha256').update(fs.readFileSync(source)).digest('hex');

@@ -508,7 +508,7 @@ local function default_deps(settings)
 end
 
 --- The production managed Python for probes only: the live hardware probe
---- (tests/hardware/run_managed_python_live.lua) injects its consent; nil keeps
+--- (tests/hardware/core/run_managed_python_live.lua) injects its consent; nil keeps
 --- the owned consent dialog (the native caption inventory).
 --- @param confirm function|nil confirm(bytes) -> boolean
 --- @return function python(callback)

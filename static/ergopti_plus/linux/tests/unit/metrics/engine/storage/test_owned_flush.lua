@@ -1410,7 +1410,7 @@ helpers.describe("native sampled reset acknowledgement", function()
 	it("reset-sampled-native-ack: consumes the exact committed reset source once", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
-		local fixture = root .. "/tests/hardware/run_keystats_reset_ack.lua"
+		local fixture = root .. "/tests/hardware/metrics/run_reset_ack.lua"
 		local runtime, provider = "luajit", ""
 		if rawget(_G, "jit") then
 			-- Distribution suites compile real luv outside the default C search path.

@@ -732,7 +732,7 @@ end
 
 --- Reports whether native source, all-owner collisions and output custody are joined.
 --- Turned on by the maintainer on 2026-11-11 (LIN-004): the kernel-model proof
---- (tests/hardware/run_physical_shortcut_container.py) suppresses a bound key
+--- (tests/hardware/layouts/run_physical_shortcut_container.py) suppresses a bound key
 --- once, reaches the focused window and keeps one owner against hotstrings,
 --- tap-hold, the layer and the magic key. Each dispatch still passes the source,
 --- collision and output refusals of physical_match and physical_admitted.

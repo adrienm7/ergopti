@@ -206,7 +206,7 @@ helpers.describe("xkb_capture: the injection table comes from the loaded keymap"
 	helpers.it("asks the backend that holds the loaded keymap", function()
 		-- The real enumeration presses chords on libxkbcommon states and is
 		-- proven against compiled fr and Ergopti keymaps by
-		-- tests/hardware/run_layout_resolution.lua; here, only the wiring.
+		-- tests/hardware/layouts/run_resolution.lua; here, only the wiring.
 		local Capture = helpers.load_module("layouts.adapters.xkb_capture")
 		local backend = oracle_backend()
 		local seen = nil

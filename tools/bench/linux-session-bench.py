@@ -3,7 +3,7 @@
 """Latency of the Linux daemon in a real desktop session, as medians and p95.
 
 The real daemon runs unchanged over the container kernel model
-(static/ergopti_plus/linux/tests/hardware/virtual_kernel_preload.c) in an X
+(static/ergopti_plus/linux/tests/hardware/core/virtual_kernel_preload.c) in an X
 session (Xvfb, openbox, the accessibility bus, a focused GTK field) with a
 StatusNotifier host standing in for the panel. Every path is timed from
 outside the daemon, at the boundary a user feels:
