@@ -77,6 +77,17 @@ function run() {
 		guardOut
 	);
 
+	// A driver module escaped in a tool's regular expression: the config
+	// surface ratchet's /require\("adapters\.file_system"\)/ kept its name
+	// after S04, and the ratchet lost the secondary owner it checks.
+	const RX = 'tools/test/zz_probe_ratchet.cjs';
+	const rx =
+		"const src = read(path.join(DRIVERS_DIR, 'macos', 'x.lua'));\n" +
+		'const ok = /require\\("adapters\\.file_system"\\)/.test(src);\n';
+	const rxRows = Plan.scanFile(RX, rx, Plan.referenceContext(jsMap));
+	const rxOut = Apply.rewriteText(rx, rxRows, new Map(), RX);
+	assert.ok(rxOut.includes('/require\\("core\\.fs\\.adapters\\.file_system"\\)/'), rxOut);
+
 	console.log('[OK] a Lua tool that requires a module only one driver has loads that driver.');
 }
 
