@@ -50,33 +50,24 @@ end
 
 local CONTRACTS = load_contracts()
 
---- Converts a snake_case adapter file name to its PascalCase port name
---- (e.g. "keyboard_hook" -> "KeyboardHook", "http_client" -> "HttpClient").
---- @param snake string
---- @return string
-local function snake_to_pascal(snake)
-	local out = {}
-	for part in snake:gmatch("[^_]+") do
-		out[#out + 1] = part:sub(1, 1):upper() .. part:sub(2)
-	end
-	return table.concat(out)
-end
 
 -- The adapters this headless harness can load under the hs stub. (KeyboardHook,
 -- TextSender, … — the OS-light surface.) The remaining ports are exercised by
 -- the AHK parity test and the contracts freshness gate; expanding this list to
 -- all 20 is tracked separately so a newly-stubbable adapter can be added here.
+-- Each adapter by its full module name and the port it implements: the name
+-- follows the module wherever it lives, and the port stays the contract's.
 local ADAPTERS_UNDER_TEST = {
-	"keyboard_hook",
-	"text_sender",
-	"tooltip_renderer",
-	"http_client",
-	"timer_scheduler",
-	"notifier",
-	"hotkey_registrar",
-	"tray_menu",
-	"file_system",
-	"window_info",
+	{ module = "adapters.keyboard_hook", port = "KeyboardHook" },
+	{ module = "adapters.text_sender", port = "TextSender" },
+	{ module = "adapters.tooltip_renderer", port = "TooltipRenderer" },
+	{ module = "adapters.http_client", port = "HttpClient" },
+	{ module = "adapters.timer_scheduler", port = "TimerScheduler" },
+	{ module = "adapters.notifier", port = "Notifier" },
+	{ module = "adapters.hotkey_registrar", port = "HotkeyRegistrar" },
+	{ module = "adapters.tray_menu", port = "TrayMenu" },
+	{ module = "adapters.file_system", port = "FileSystem" },
+	{ module = "adapters.window_info", port = "WindowInfo" },
 }
 
 
@@ -88,9 +79,9 @@ local ADAPTERS_UNDER_TEST = {
 -- ====================================================
 -- ====================================================
 
-for _, adapter_name in ipairs(ADAPTERS_UNDER_TEST) do
-	local name      = adapter_name
-	local port_name = snake_to_pascal(adapter_name)
+for _, entry in ipairs(ADAPTERS_UNDER_TEST) do
+	local name      = entry.module:match("([^.]+)$")
+	local port_name = entry.port
 
 	helpers.describe(string.format("Adapter compliance: %s (%s)", name, port_name), function()
 		local port = CONTRACTS.ports[port_name]
@@ -104,7 +95,7 @@ for _, adapter_name in ipairs(ADAPTERS_UNDER_TEST) do
 
 		if type(port) ~= "table" or type(port.methods) ~= "table" then return end
 
-		local module_name = "adapters." .. name
+		local module_name = entry.module
 		local adapter = helpers.load_with_stubs(module_name)
 
 		helpers.it("module loads without error", function()
