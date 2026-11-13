@@ -51,7 +51,8 @@ const FAKE = [
 	'_shared/zz_inward/x.lua',
 	'_shared/zz_inward/y.lua',
 	'linux/zz_scatter/x.lua',
-	'linux/zz_scatter/y.lua'
+	'linux/zz_scatter/y.lua',
+	'_shared/zz_pyold/x.py'
 ];
 const MAP = new Map([
 	['_shared/zz_probe_data/locales/en.json', '_shared/core/zz_probe_i18n/data/locales/en.json'],
@@ -67,7 +68,8 @@ const MAP = new Map([
 	['_shared/zz_inward/x.lua', '_shared/zz_inward/b/x.lua'],
 	['_shared/zz_inward/y.lua', '_shared/zz_inward/c/y.lua'],
 	['linux/zz_scatter/x.lua', 'linux/zz_scatter/x.lua'],
-	['linux/zz_scatter/y.lua', 'linux/zz_core/y/y.lua']
+	['linux/zz_scatter/y.lua', 'linux/zz_core/y/y.lua'],
+	['_shared/zz_pyold/x.py', '_shared/zz_pynew/deep/x.py']
 ]);
 
 function withFakes(fn) {
@@ -146,6 +148,22 @@ function run() {
 		const goImport =
 			'import "github.com/adrienm7/ergopti/static/ergopti_plus/_shared/zz_probe_mod/hotstrings"';
 		assert.equal(rewrite(`${P}_shared/zz_probe_mod/x.go`, goImport), goImport);
+		// A Python path anchored on its own file: the climb follows the file's
+		// new place (S01 moved the proxy policy reader two folders deeper).
+		assert.equal(
+			rewrite(
+				`${P}_shared/zz_pyold/x.py`,
+				'p = Path(__file__).parent.parent / "zz_probe_mod/other.json"\n'
+			),
+			'p = Path(__file__).parent.parent.parent / "zz_other/data/other.json"\n'
+		);
+		assert.equal(
+			rewrite(
+				`${P}_shared/zz_pyold/x.py`,
+				'p = Path(__file__).resolve().parents[1] / "zz_probe_mod/other.json"\n'
+			),
+			'p = Path(__file__).resolve().parents[2] / "zz_other/data/other.json"\n'
+		);
 		// A shell exclusion of a bare _shared path, unquoted.
 		assert.equal(
 			rewrite(
