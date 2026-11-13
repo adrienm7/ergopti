@@ -40,6 +40,27 @@ the paused-custody regression asserts.
 and the Windows agent deletes it with its `A_IsSuspended` gates (choice B,
 2026-11-12).
 
+## Third pass (2026-11-13, worker H)
+
+| Sequence                                                       | Before                                                                | Regression                                                                                     |
+| -------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Pause, then switch Gestures on or off (macOS)                  | Refused; the slot rows greyed                                         | `test_menu_gestures_pause_gate`, `test_switch_under_suspension` (`edd1-paused-writes`)         |
+| Pause, then restore or clear gestures (Linux)                  | `gestures.apply_scope` refused « gesture configuration is paused »    | `test_gesture_scope` (the real menu's clear while paused, the switch while paused stays inert) |
+| Pause, then edit a tap-hold key's tap or delay (Linux)         | `capture_configuration_edit` and the menu's guard refused             | `test_tap_hold_edit_owner` (committed while paused, installed on resume)                       |
+| Pause, then the programmable hotstrings switch, delay, example | The shared policy refused through its `paused` port (macOS and Linux) | shared `user_hotstring_menu_contract`, macOS `test_user_code_native` (`edd1-paused-writes`)    |
+
+macOS records the Gestures switch with `gestures.set_enabled_under_suspension`: OFF
+releases the native runtime at once, ON publishes only the flag and the start
+intent, and `resume()` starts the runtime. On Linux the reader may run under a
+pause and the dispatch keeps every gesture but the script-control ones inert, so
+the switch and the scope commit at once. A Linux tap-hold edit made while paused
+reloads an engine the paused hook does not install (`_apply`), and resume
+installs it; a pause or resume transition still retires an editor captured
+before it, through the manager's generation. The programmable source loads at
+once when switched on while paused; its hotstrings stay inert because the
+paused driver types nothing (decided by the agent on 2026-11-13, to review by
+the maintainer).
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
@@ -48,11 +69,6 @@ source proofs reworked first:
 
 - macOS Shortcuts: the switch, each shortcut's toggle, the slot rows and the
   wrap rows bind or unbind OS hotkeys at once.
-- macOS and Linux Gestures switch: it starts the gesture engine at once.
-- Linux tap-holds: `tap_hold_manager.capture_configuration_edit` refuses while
-  paused; the edit path needs a pause-safe reload first.
-- Programmable hotstrings switch (shared policy): enabling loads the user's
-  code at once.
 - macOS and Linux AI menus: the parent row, the enable switch and the
   privacy and trigger rows read the pause through shared policies.
 - The personal hotstrings editor row and the word expander rows on macOS and
