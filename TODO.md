@@ -49,8 +49,7 @@ wants the whole list done without them. Follow [AGENTS.md](AGENTS.md) and the sk
 
 ### Reds `dev` already has (2026-11-12 evening), the baseline a change is compared with
 
-Windows Unit tests (meta, `desktop-ci-evidence`); Linux E2E
-desktop-webview, updater, platform-metrics, input-display; Common Shared ui (App Cloner generated literals); Common
+Linux E2E desktop-webview, updater, platform-metrics, input-display; Common Shared ui (App Cloner generated literals); Common
 Packaging and boot (Linux uninstall EX_UNAVAILABLE, Arch desktop entry); macOS release Darwin receiver. Known
 flakes: macOS Intel Managed Ollama Go test `TestCancellationAndConcurrentClosePhysicallyRetirePeer` (passes on
 rerun); a macOS cold-bootstrap job whose runner is lost (no log).
@@ -360,6 +359,9 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       Same landing: Windows Integration Driver startup, red on `dev` since run 43306862276 (realistic-hotstrings
       `toml.flat_values` 1212/1201), follows its new owners: every boot reads the shared tap-hold `shared_file.toml`
       (Mac thumb positions, macOS-only modifiers), the schema v22 migration step and `tap_hold.max_activation_ms`.
+      The Windows Unit tests meta red (`desktop-ci-evidence`, « a delay between attempts » 0/2, run 43275487956) was
+      already fixed by 6082c02f46 (the SwiftPM resolve fakes run ahead of Git Bash's own `sleep`): meta is green on
+      `dev` runs 43306862276 and 43457158223, so it left the baseline list.
 - [ ] **Linux hardware test still passes the removed pause argument (found 2026-11-12).**
       `linux/tests/hardware/run_simultaneous_configuration_real.lua` still passes `script.is_paused` to `Scope.edit`
       and `Scope.copy_taps_to_chords`, which take `expected_source` there since the EDD-1 pause-argument removal,
