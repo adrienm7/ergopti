@@ -753,6 +753,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-shared-driver-paths.cjs"],
 			"repro": "npm run test:structure-shared-driver-paths"
+		},
+		{
+			"id": "js-0521",
+			"ordinal": 640,
+			"name": "structure plan adds the gained folder to a per-line list of a driver's sibling folders",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-folder-gain-lists.cjs"],
+			"repro": "npm run test:structure-folder-gain-lists"
 		}
 	]
 }
