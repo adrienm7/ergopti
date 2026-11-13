@@ -32,6 +32,8 @@ local DEFAULT_BINDING_PAUSE_CLAIM = "feature_toggle"
 local REBIND_RECOVERY_CLAIM = "layout_rebind_recovery"
 local binding_pause_claims = {}
 local binding_lifecycle_epoch = 0
+-- The user switched the layer ON during a ScriptControl pause: resume starts it.
+local binding_resume_intent = false
 local binding_start_attempt = nil
 
 --- Invalidates every in-flight aggregate start/resume transaction.
@@ -355,6 +357,47 @@ function M.release_bindings_pause_claim(parent)
 		invalidate_binding_lifecycle()
 	end
 	return true
+end
+
+--- Records the feature switch while another owner (the ScriptControl pause)
+--- fences the layer. A pause stops typing, not configuration (EDD-1): OFF
+--- publishes the feature claim, ON drops it and records the intent that
+--- resume_bindings_after_pause() starts the layer; nothing binds under the fence.
+--- @param enabled boolean Requested feature posture.
+--- @return boolean committed
+function M.set_feature_intent_under_pause(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Shortcut switch under pause refused: the posture must be a boolean.")
+		return false
+	end
+	local fenced = false
+	for claim in pairs(binding_pause_claims) do
+		if claim ~= REBIND_RECOVERY_CLAIM and claim ~= DEFAULT_BINDING_PAUSE_CLAIM then fenced = true end
+	end
+	if not fenced then
+		Logger.error(LOG, "Shortcut switch under pause refused: no pause fences the layer.")
+		return false
+	end
+	if enabled then
+		binding_resume_intent = true
+		return M.release_bindings_pause_claim(DEFAULT_BINDING_PAUSE_CLAIM)
+	end
+	binding_resume_intent = false
+	return M.pause_bindings(DEFAULT_BINDING_PAUSE_CLAIM)
+end
+
+--- ScriptControl's resume inverse when its PAUSE snapshot found the layer OFF:
+--- releases the parent's claim, and starts the layer only when the user
+--- switched it ON during the pause and no feature claim came back since.
+--- @param parent string|nil Stable pause parent.
+--- @return boolean committed
+function M.resume_bindings_after_pause(parent)
+	local intent = binding_resume_intent
+	binding_resume_intent = false
+	if intent and binding_pause_claims[DEFAULT_BINDING_PAUSE_CLAIM] ~= true then
+		return M.resume_bindings(parent)
+	end
+	return M.release_bindings_pause_claim(parent)
 end
 
 --- Restores user-facing bindings after a pause. Symmetric to pause_bindings().

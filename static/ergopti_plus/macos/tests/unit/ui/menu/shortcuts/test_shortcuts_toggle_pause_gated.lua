@@ -1,7 +1,7 @@
 --- tests/unit/ui/menu/shortcuts/test_shortcuts_toggle_pause_gated.lua
 
 --- ==============================================================================
---- MODULE: Regression — the Shortcuts master toggle must be pause-gated
+--- MODULE: Regression — the Shortcuts master toggle under a pause
 --- DESCRIPTION:
 --- Toggling « Raccourcis » while the script was paused either did nothing that
 --- survived, or bound every hotkey during a pause.
@@ -20,6 +20,11 @@
 --- fired its notification — every visible signal reported success. Only the
 --- resume, seconds or minutes later, quietly undid it.
 ---
+--- EDD-1 (maintainer decision 2026-11-12, a pause stops typing, not
+--- configuration) replaced the refusal: under a pause the switch records its
+--- intent through shortcuts.set_feature_intent_under_pause(), which binds
+--- nothing, and never calls pause_bindings/resume_bindings itself.
+---
 --- The switch is the command registered for the manifest's `shortcuts_toggle`
 --- row since the parent row stopped carrying it (a row that opens a submenu is
 --- never clicked). So this builds the real menu module over doubles and calls
@@ -32,10 +37,14 @@ local helpers = require("tests.helpers")
 --- Builds the Shortcuts submenu for a paused script and returns what matters.
 --- @return table item, function|nil toggle, table state, table calls
 local function build_paused()
-	local calls = { pause = 0, resume = 0 }
+	local calls = { pause = 0, resume = 0, intents = {} }
 	local shortcuts = {
 		pause_bindings = function() calls.pause = calls.pause + 1; return true end,
 		resume_bindings = function() calls.resume = calls.resume + 1; return true end,
+		set_feature_intent_under_pause = function(enabled)
+			calls.intents[#calls.intents + 1] = enabled
+			return true
+		end,
 	}
 	local render_ctx = nil
 	helpers.load_with_stubs("infra.logger")
@@ -85,7 +94,7 @@ local function build_paused()
 	return item, toggle, state, calls
 end
 
-helpers.describe("the Shortcuts master toggle is pause-gated like its siblings", function()
+helpers.describe("the Shortcuts master toggle under a pause", function()
 	-- A pause stops typing, not configuration (EDD-1, maintainer decision
 	-- 2026-11-12): the submenu opens; the switch itself still refuses below.
 	helpers.it("keeps the parent row reachable while paused (edd1-paused-writes)", function()
@@ -94,14 +103,17 @@ helpers.describe("the Shortcuts master toggle is pause-gated like its siblings",
 		helpers.assert_nil(item.action, "the parent opens a submenu and carries no action")
 	end)
 
-	helpers.it("refuses to run the switch while paused", function()
+	helpers.it("records the switch while paused without binding anything (edd1-paused-writes)", function()
 		local _, toggle, state, calls = build_paused()
 		helpers.assert_type(toggle, "function", "the switch must be registered even while paused")
-		helpers.assert_eq(toggle(), false, "the switch must refuse while paused")
-		helpers.assert_eq(state.shortcuts, true, "the stored preference must not move")
+		helpers.assert_eq(toggle(), true, "the switch commits while paused")
+		helpers.assert_eq(state.shortcuts, false, "the stored preference follows the click")
+		helpers.assert_eq(calls.intents, { false }, "only the pause-safe recorder runs")
 		helpers.assert_eq(calls.pause + calls.resume, 0,
-			"enabling the feature mid-pause would bind every hotkey while the script is supposed to "
-			.. "be entirely off (« pause = tout éteint »)")
+			"the switch never binds or unbinds hotkeys itself under a pause")
+		helpers.assert_eq(toggle(), true)
+		helpers.assert_eq(state.shortcuts, true)
+		helpers.assert_eq(calls.intents, { false, true })
 	end)
 
 	helpers.it("leaves `checked` reporting the stored preference", function()

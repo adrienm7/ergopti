@@ -505,18 +505,27 @@ function M.build(ctx)
 	--- never sends for an item that opens a submenu, so Shortcuts could not be
 	--- switched on from the menu bar at all.
 	---
-	--- Refused while the script is paused. Pause owns the bindings axis until
-	--- resume: pause_all() snapshots is_bindings_started() and resume_all()
-	--- restores from that snapshot, so a toggle made mid-pause is silently
-	--- discarded at resume — and enabling would bind every hotkey while « tout est
-	--- éteint ».
+	--- While the script is paused the switch records the user's choice under
+	--- ScriptControl's claim, and resume applies it (EDD-1: a pause stops typing,
+	--- not configuration): shortcuts.set_feature_intent_under_pause() binds
+	--- nothing, and ScriptControl's resume inverse starts a layer switched ON.
 	--- @return boolean committed
 	local function toggle_shortcuts()
-		if paused then
-			Logger.warn(LOG, "Shortcuts switch refused: the script is paused.")
+		local under_pause = paused == true
+			or (type(ctx.script_control) == "table" and type(ctx.script_control.is_paused) == "function"
+				and ctx.script_control.is_paused() == true)
+		if under_pause and type(shortcuts.set_feature_intent_under_pause) ~= "function" then
+			Logger.error(LOG, "Shortcuts switch refused: the pause contract is incomplete.")
 			return false
 		end
-		if settle_shortcut_toggle_debt() ~= true then return false end
+		local function apply(enabled, label)
+			if not under_pause then return apply_shortcut_posture(enabled, label) end
+			local ok, result = xpcall(shortcuts.set_feature_intent_under_pause, debug.traceback, enabled)
+			if ok and result == true then return true end
+			Logger.error(LOG, "Shortcut switch under pause %s did not commit: %s.", tostring(label), tostring(result))
+			return false
+		end
+		if not under_pause and settle_shortcut_toggle_debt() ~= true then return false end
 		local previous = state.shortcuts == true
 		local desired = not previous
 		-- Toggle ONLY the user-facing bindings + keyboard shortcuts. We must NOT
@@ -525,12 +534,21 @@ function M.build(ctx)
 		-- Bindings-only proxy that never revives it, so the feature toggle would
 		-- permanently kill the panic shortcuts. resume_bindings/pause_bindings are
 		-- the symmetric pair that leave the script-control tap untouched.
-		if commit_shortcuts_runtime(desired, previous) ~= true then return false end
+		if under_pause then
+			if apply(desired, "toggle") ~= true then
+				if apply(previous, "rollback") ~= true then
+					Logger.error(LOG, "Shortcut switch under pause left its previous posture unrestored.")
+				end
+				return false
+			end
+		elseif commit_shortcuts_runtime(desired, previous) ~= true then
+			return false
+		end
 		state.shortcuts = desired
 		local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
 		if not save_ok or save_result ~= true then
 			state.shortcuts = previous
-			if apply_shortcut_posture(previous, "preference rollback") ~= true then
+			if apply(previous, "preference rollback") ~= true and not under_pause then
 				shortcut_toggle_debt = { restore_enabled = previous }
 			end
 			Logger.error(LOG, "Shortcut preference publication did not commit: %s.",
@@ -542,8 +560,8 @@ function M.build(ctx)
 		return true
 	end
 
-	-- The parent carries the stored preference as its tick and is greyed while
-	-- paused; it has no action, since a row that opens a submenu is never clicked.
+	-- The parent carries the stored preference as its tick and stays reachable
+	-- while paused; it has no action, since a row that opens a submenu is never clicked.
 
 
 	-- ==============================================

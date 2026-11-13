@@ -504,6 +504,13 @@ local function pause_all()
 				return _shortcuts.resume_bindings(SCRIPT_CONTROL_SHORTCUT_CLAIM)
 			end or nil
 			shortcut_resume_label = "shortcuts.resume_bindings"
+		elseif type(_shortcuts.resume_bindings_after_pause) == "function" then
+			-- OFF at pause time: the switch may still turn the layer ON during
+			-- the pause (EDD-1), and this inverse then starts it on resume.
+			shortcut_rollback = function()
+				return _shortcuts.resume_bindings_after_pause(SCRIPT_CONTROL_SHORTCUT_CLAIM)
+			end
+			shortcut_resume_label = "shortcuts.resume_bindings_after_pause"
 		else
 			shortcut_rollback = type(_shortcuts.release_bindings_pause_claim) == "function"
 				and function()

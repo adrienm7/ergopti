@@ -213,6 +213,37 @@ helpers.describe("shortcuts feature toggle keeps the script-control tap alive", 
 		cleanup()
 	end)
 
+	-- A pause stops typing, not configuration (EDD-1): the switch records its
+	-- intent under the global claim, and resume applies it.
+	helpers.it("records ON under a global PAUSE and starts it on resume (edd1-paused-writes)", function()
+		local Shortcuts, calls = load_with_counting_submodules()
+		helpers.assert_eq(Shortcuts.pause_bindings("feature_toggle"), true)
+		helpers.assert_eq(Shortcuts.pause_bindings("script_control"), true)
+		local resumes_before = calls.bindings_resume
+		helpers.assert_eq(Shortcuts.set_feature_intent_under_pause(true), true)
+		helpers.assert_eq(calls.bindings_resume, resumes_before, "nothing binds under the pause")
+		helpers.assert_eq(calls.bindings_live, false)
+		helpers.assert_eq(Shortcuts.resume_bindings_after_pause("script_control"), true)
+		helpers.assert_eq(calls.bindings_resume, resumes_before + 1, "resume starts the recorded ON")
+		helpers.assert_eq(calls.bindings_live, true)
+		cleanup()
+	end)
+
+	helpers.it("records OFF under a global PAUSE and keeps it off on resume (edd1-paused-writes)", function()
+		local Shortcuts, calls = load_with_counting_submodules()
+		helpers.assert_eq(Shortcuts.pause_bindings("feature_toggle"), true)
+		helpers.assert_eq(Shortcuts.pause_bindings("script_control"), true)
+		helpers.assert_eq(Shortcuts.set_feature_intent_under_pause(true), true)
+		helpers.assert_eq(Shortcuts.set_feature_intent_under_pause(false), true)
+		local resumes_before = calls.bindings_resume
+		helpers.assert_eq(Shortcuts.resume_bindings_after_pause("script_control"), true)
+		helpers.assert_eq(calls.bindings_resume, resumes_before, "an OFF switched back stays off")
+		helpers.assert_eq(calls.bindings_live, false)
+		helpers.assert_eq(Shortcuts.set_feature_intent_under_pause(true), false,
+			"without a pause the switch goes through resume_bindings")
+		cleanup()
+	end)
+
 	helpers.it("keeps nested claims admission-authoritative across start and stop", function()
 		local Shortcuts, calls = load_with_counting_submodules()
 		helpers.assert_eq(Shortcuts.pause_bindings("feature_toggle"), true)
