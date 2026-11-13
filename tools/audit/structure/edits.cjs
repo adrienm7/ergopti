@@ -80,6 +80,21 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: 'assert(json_path == shared_lua .. "/core/text/engine/json.lua"'
 	},
 	{
+		// The resolver's synthetic source, spelled one separator at a time:
+		// S04 moves the resolver to core/fs/engine, so its source path does too.
+		file: 'static/ergopti_plus/linux/tests/unit/infra/config/test_paths_shared_root_layouts.lua',
+		moves: 'linux/infra/paths.lua',
+		from: '\t\t\tlocal source = "@" .. case.prefix .. separator .. "linux" .. separator .. "infra" .. separator .. "paths.lua"',
+		to: '\t\t\tlocal source = "@" .. case.prefix .. separator .. "linux" .. separator .. "core" .. separator .. "fs"\n\t\t\t\t.. separator .. "engine" .. separator .. "paths.lua"'
+	},
+	{
+		// The comment naming the resolver's relative load path.
+		file: 'static/ergopti_plus/linux/tests/unit/infra/config/test_paths_shared_root_layouts.lua',
+		moves: 'linux/infra/paths.lua',
+		from: '\t\t-- both load infra/paths.lua as "./infra/paths.lua". The root it derived',
+		to: '\t\t-- both load core/fs/engine/paths.lua as "./core/fs/engine/paths.lua". The root it derived'
+	},
+	{
 		// The config migration's adapter identity vectors: synthetic sources
 		// (a cwd of /r/linux, package roots under /usr/lib/ergopti) whose driver
 		// adapter S04 moves to core/fs/adapters, inputs and answers alike.
