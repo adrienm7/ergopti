@@ -19,7 +19,9 @@ local paths = require('infra.paths')
 local original = paths.shared
 paths.shared = function(name)
   if name == 'data/locales' then return catalog end
-  if name == 'data' and mode:match('^order%-') then return catalog .. '/..' end
+  if name == 'data/locale_order.json' and mode:match('^order%-') then
+    return catalog .. '/../locale_order.json'
+  end
   return original(name)
 end
 local i18n = require('infra.i18n')
