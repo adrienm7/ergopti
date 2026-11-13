@@ -65,6 +65,73 @@ const DECLARED_ABSENT = {
 	macos: {}
 };
 
+// Where each shipped adapter lives, by repository path: the structure plan
+// moves adapters out of adapters/ into the feature they serve, often under
+// another name, and these paths follow each move.
+const ADAPTER_FILES = {
+	windows: {
+		AppLauncher: 'static/ergopti_plus/windows/adapters/app_launcher.ahk',
+		Clipboard: 'static/ergopti_plus/windows/adapters/clipboard.ahk',
+		Crypto: 'static/ergopti_plus/windows/adapters/crypto.ahk',
+		FileSystem: 'static/ergopti_plus/windows/adapters/file_system.ahk',
+		GraphicsRenderer: 'static/ergopti_plus/windows/adapters/graphics_renderer.ahk',
+		HotkeyRegistrar: 'static/ergopti_plus/windows/adapters/hotkey_registrar.ahk',
+		HttpClient: 'static/ergopti_plus/windows/adapters/http_client.ahk',
+		KeyState: 'static/ergopti_plus/windows/adapters/key_state.ahk',
+		KeyboardHook: 'static/ergopti_plus/windows/adapters/keyboard_hook.ahk',
+		MouseControl: 'static/ergopti_plus/windows/adapters/mouse_control.ahk',
+		NetworkInfo: 'static/ergopti_plus/windows/adapters/network_info.ahk',
+		Notifier: 'static/ergopti_plus/windows/adapters/notifier.ahk',
+		ProcessLifecycle: 'static/ergopti_plus/windows/adapters/process_lifecycle.ahk',
+		SecureFieldDetector: 'static/ergopti_plus/windows/adapters/secure_field_detector.ahk',
+		Storage: 'static/ergopti_plus/windows/adapters/storage.ahk',
+		TextSender: 'static/ergopti_plus/windows/adapters/text_sender.ahk',
+		TimerScheduler: 'static/ergopti_plus/windows/adapters/timer_scheduler.ahk',
+		TooltipRenderer: 'static/ergopti_plus/windows/adapters/tooltip_renderer.ahk',
+		TrayMenu: 'static/ergopti_plus/windows/adapters/tray_menu.ahk',
+		WindowInfo: 'static/ergopti_plus/windows/adapters/window_info.ahk',
+		WindowManager: 'static/ergopti_plus/windows/adapters/window_manager.ahk'
+	},
+	macos: {
+		AppLauncher: 'static/ergopti_plus/macos/adapters/app_launcher.lua',
+		Clipboard: 'static/ergopti_plus/macos/adapters/clipboard.lua',
+		Crypto: 'static/ergopti_plus/macos/adapters/crypto.lua',
+		FileSystem: 'static/ergopti_plus/macos/adapters/file_system.lua',
+		GraphicsRenderer: 'static/ergopti_plus/macos/adapters/graphics_renderer.lua',
+		HotkeyRegistrar: 'static/ergopti_plus/macos/adapters/hotkey_registrar.lua',
+		HttpClient: 'static/ergopti_plus/macos/adapters/http_client.lua',
+		KeyState: 'static/ergopti_plus/macos/adapters/key_state.lua',
+		KeyboardHook: 'static/ergopti_plus/macos/adapters/keyboard_hook.lua',
+		MouseControl: 'static/ergopti_plus/macos/adapters/mouse_control.lua',
+		NetworkInfo: 'static/ergopti_plus/macos/adapters/network_info.lua',
+		Notifier: 'static/ergopti_plus/macos/adapters/notifier.lua',
+		ProcessLifecycle: 'static/ergopti_plus/macos/adapters/process_lifecycle.lua',
+		SecureFieldDetector: 'static/ergopti_plus/macos/adapters/secure_field_detector.lua',
+		Storage: 'static/ergopti_plus/macos/adapters/storage.lua',
+		TextSender: 'static/ergopti_plus/macos/adapters/text_sender.lua',
+		TimerScheduler: 'static/ergopti_plus/macos/adapters/timer_scheduler.lua',
+		TooltipRenderer: 'static/ergopti_plus/macos/adapters/tooltip_renderer.lua',
+		TrayMenu: 'static/ergopti_plus/macos/adapters/tray_menu.lua',
+		WindowInfo: 'static/ergopti_plus/macos/adapters/window_info.lua',
+		WindowManager: 'static/ergopti_plus/macos/adapters/window_manager.lua'
+	},
+	linux: {
+		Clipboard: 'static/ergopti_plus/linux/adapters/clipboard.lua',
+		Crypto: 'static/ergopti_plus/linux/adapters/crypto.lua',
+		FileSystem: 'static/ergopti_plus/linux/adapters/file_system.lua',
+		GraphicsRenderer: 'static/ergopti_plus/linux/adapters/graphics_renderer.lua',
+		HttpClient: 'static/ergopti_plus/linux/adapters/http_client.lua',
+		KeyboardHook: 'static/ergopti_plus/linux/adapters/keyboard_hook.lua',
+		Notifier: 'static/ergopti_plus/linux/adapters/notifier.lua',
+		ProcessLifecycle: 'static/ergopti_plus/linux/adapters/process_lifecycle.lua',
+		SecureFieldDetector: 'static/ergopti_plus/linux/adapters/secure_field_detector.lua',
+		Storage: 'static/ergopti_plus/linux/adapters/storage.lua',
+		TimerScheduler: 'static/ergopti_plus/linux/adapters/timer_scheduler.lua',
+		TrayMenu: 'static/ergopti_plus/linux/adapters/tray_menu.lua',
+		WindowInfo: 'static/ergopti_plus/linux/adapters/window_info.lua'
+	}
+};
+
 const errors = [];
 
 /** PascalCase port name → the adapter file stem. */
@@ -95,19 +162,29 @@ if (ports.length < 15) {
 const present = {};
 for (const driver of Object.keys(EXT)) {
 	present[driver] = new Set();
-	const dir = path.join(DRIVERS, driver, 'adapters');
-	if (!fs.existsSync(dir)) {
-		errors.push(
-			`${driver}/adapters/ does not exist — the tree moved and this gate measures nothing`
-		);
-		continue;
+	for (const [port, file] of Object.entries(ADAPTER_FILES[driver])) {
+		if (!ports.includes(port)) {
+			errors.push(
+				`${driver} lists an adapter for "${port}", which is not a port in contracts.json`
+			);
+			continue;
+		}
+		if (!fs.existsSync(path.join(ROOT, file))) {
+			errors.push(
+				`${driver}'s ${port} adapter ${file} does not exist — a move left the table behind`
+			);
+			continue;
+		}
+		present[driver].add(port);
 	}
-	for (const port of ports) {
-		if (fs.existsSync(path.join(dir, stemOf(port) + EXT[driver]))) present[driver].add(port);
-	}
+	// A new adapter in the legacy folder counts too, while that folder exists:
+	// an absence recorded above would otherwise go stale unseen.
+	const legacy = path.join(DRIVERS, driver, 'adapters');
+	for (const port of ports)
+		if (fs.existsSync(path.join(legacy, stemOf(port) + EXT[driver]))) present[driver].add(port);
 	if (present[driver].size === 0) {
 		errors.push(
-			`${driver} ships an adapter for none of the ${ports.length} ports — the stem mapping drifted`
+			`${driver} ships an adapter for none of the ${ports.length} ports — the table drifted`
 		);
 	}
 }
