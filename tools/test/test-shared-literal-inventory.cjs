@@ -76,6 +76,25 @@ function main() {
 
 	if (process.argv.includes('--update-baseline')) {
 		const rising = failures.filter((f) => / rose to |has no baseline/.test(f));
+		// The structure phase 2 runner only: a step that brings two drivers'
+		// copies of one function to the same spelling exposes a duplicate the
+		// tree already had. The rise moves the baseline and is named in the
+		// step's commit, one [RISE] line each, never taken silently.
+		if (
+			rising.length > 0 &&
+			process.argv.includes('--allow-rise') &&
+			process.env.ERGOPTI_STRUCTURE_PHASE === '2'
+		) {
+			fs.writeFileSync(
+				BASELINE_FILE,
+				JSON.stringify({ _comment: baseline._comment, ...measured }, null, '\t') + '\n',
+				'utf8'
+			);
+			for (const [key, value] of Object.entries(measured))
+				if (baseline[key] === undefined || value > baseline[key])
+					console.log(`[RISE] Rule A ${key} rose to ${value} (baseline ${baseline[key] ?? 0})`);
+			return;
+		}
 		if (rising.length > 0) {
 			console.error(
 				'[ERROR] refusing to raise the shared literal baseline:\n    - ' + rising.join('\n    - ')
