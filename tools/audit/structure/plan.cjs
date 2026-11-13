@@ -2067,7 +2067,7 @@ function scanFile(file, text, ctx) {
 				hit.form === 'repo'
 					? hit.newRepo
 					: hit.form === 'shared'
-						? hit.newRepo.slice(`${PREFIX}_shared/`.length)
+						? path.posix.relative(`${PREFIX}_shared`, hit.newRepo)
 						: hit.newRepo.slice(PREFIX.length);
 			add('path-regex', m[0], spelled.replace(/\./g, '\\.').replace(/\//g, '\\/'), hit);
 		}
