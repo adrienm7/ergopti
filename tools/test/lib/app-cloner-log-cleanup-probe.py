@@ -105,6 +105,23 @@ def prefix(source, boundary):
     return source[: source.index(boundary) + len(boundary)]
 
 
+def closed_pipe_status():
+    """How /bin/cat reports a closed reading end, observed outside the CLI.
+
+    BSD and GNU cat die of SIGPIPE; uutils cat (Ubuntu 26.04) ignores it and
+    exits 1 on EPIPE. Either is a reported failure of the final receipt.
+    """
+    read_end, write_end = os.pipe()
+    os.close(read_end)
+    try:
+        status = subprocess.run(
+            ["/bin/cat"], input=b"x", stdout=write_end, stderr=subprocess.DEVNULL, check=False
+        ).returncode
+    finally:
+        os.close(write_end)
+    return 1 if status == 1 else 128 + signal.SIGPIPE
+
+
 def receipt_boundary(mode):
     """Refuse the actual final writer through an owned descriptor or pipe."""
     if mode == "result-closed-fd":
@@ -507,11 +524,12 @@ def main():
         for mode in modes:
             cases.append(observation(args.resources, args.shell, args.fixture, caller, mode, color))
     failures = []
+    closed_pipe = closed_pipe_status()
     for row in cases:
         expected = (
             1
             if row["mode"] == "result-closed-fd"
-            else 128 + signal.SIGPIPE
+            else closed_pipe
             if row["mode"] == "result-closed-pipe"
             else 0
             if row["mode"]
