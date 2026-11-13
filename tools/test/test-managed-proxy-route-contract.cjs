@@ -484,6 +484,23 @@ try {
 		assert.notEqual(unknown.status, 0, 'an unknown client is refused');
 	});
 
+	check(
+		'every inventory origin is a dotted host the system bypass rule cannot skip (NET-005)',
+		() => {
+			// macOS reads ExcludeSimpleHostnames only for the fingerprint: NO_PROXY has
+			// no spelling for every single-label host, so a dot-free origin would go
+			// through the relay where the system (and Windows' <local>) sends it
+			// direct. No opaque child targets one; a new origin must keep it that way
+			// or give the prelude a route-plan step for it first.
+			for (const [client, list] of Object.entries(origins.clients)) {
+				for (const origin of list) {
+					const host = new URL(origin).hostname;
+					assert.ok(host.includes('.'), `${client}: ${origin} is a single-label host`);
+				}
+			}
+		}
+	);
+
 	check('the Ollama inventory names the registry the daemon pulls from', () => {
 		// The registry module derives its URL from the shared identifiers file.
 		assert.match(
