@@ -42,7 +42,9 @@ during the wizard read it the same way, and Finish switches and persists it.
 
 ## Left
 
-- Linux shows its host dialogs during the wizard in the running language,
-  not the previewed one (the page itself follows the preview). Low impact;
-  not changed.
+- Done 2026-11-13 (worker H): Linux showed its host dialogs during the
+  wizard in the running language. The bridge now records the language chosen
+  on the first step and translates the folder picker's title and the failure
+  notices through it, as Windows and macOS do; a fresh page starts in the
+  running language. Regression `(onboarding-host-dialog-locale)`.
 - Native WebView receiving is unqualified.
