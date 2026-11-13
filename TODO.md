@@ -49,7 +49,9 @@ wants the whole list done without them. Follow [AGENTS.md](AGENTS.md) and the sk
 
 ### Reds `dev` already has (2026-11-12 evening), the baseline a change is compared with
 
-Windows Unit tests (meta, `desktop-ci-evidence`); Windows Build (AV-surface ceilings, item below); Linux E2E
+Windows Unit tests (meta, `desktop-ci-evidence`); Windows Build (AV-surface ceilings, item below); Windows
+Integration Driver startup (`toml.flat_values` over its ceiling on the realistic fixture, red since run
+43306862276; worker I fixes it); Linux E2E
 desktop-webview, updater, platform-metrics, input-display; Common Shared ui (App Cloner generated literals); Common
 Packaging and boot (Linux uninstall EX_UNAVAILABLE, Arch desktop entry); macOS release Darwin receiver. Known
 flakes: macOS Intel Managed Ollama Go test `TestCancellationAndConcurrentClosePhysicallyRetirePeer` (passes on
