@@ -91,7 +91,7 @@ global _BundleDir := ""
 ; CNG constants must be initialized before the first compiled asset check.
 ; Bootstrap errors use OutputDebug because the central logger is not ready yet.
 #Include %A_LineFile%\..\..\_generated\identifiers.ahk
-#Include ../adapters/crypto.ahk
+#Include ../core/crypto/crypto.ahk
 #Include ../adapters/file_system.ahk
 #Include ../adapters/process_lifecycle.ahk
 #Include *i ../build/bundle_inventory.ahk

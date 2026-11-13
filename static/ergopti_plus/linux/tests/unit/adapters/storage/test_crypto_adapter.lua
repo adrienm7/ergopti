@@ -8,17 +8,17 @@
 ---   openssl (available on all Linux distros)
 
 local helpers = require("tests.helpers")
-local crypto  = helpers.load_module("adapters.crypto")
+local crypto  = helpers.load_module("core.crypto.crypto")
 
 --- Loads one adapter against the native digest provider's actual interface.
 local function fresh_crypto(provider)
 	local previous_provider = package.loaded["infra.openssl_digest"]
-	local previous_crypto = package.loaded["adapters.crypto"]
+	local previous_crypto = package.loaded["core.crypto.crypto"]
 	package.loaded["infra.openssl_digest"] = provider
-	package.loaded["adapters.crypto"] = nil
-	local subject = require("adapters.crypto")
+	package.loaded["core.crypto.crypto"] = nil
+	local subject = require("core.crypto.crypto")
 	package.loaded["infra.openssl_digest"] = previous_provider
-	package.loaded["adapters.crypto"] = previous_crypto
+	package.loaded["core.crypto.crypto"] = previous_crypto
 	return subject
 end
 
