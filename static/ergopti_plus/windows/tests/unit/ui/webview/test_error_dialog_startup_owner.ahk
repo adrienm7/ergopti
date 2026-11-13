@@ -87,15 +87,32 @@ _EDOT_Source(Root, LogOpeners := false) {
 		. (LogOpeners ? "log_openers_buffered_owner_body.ahk" : "error_dialog_startup_owner_body.ahk") . "`n"
 }
 
+; Exclusive native creation needs each parent before its children. The folders
+; come from the staged files themselves, so they follow wherever the data lives.
+_EDOT_CreateParents(Base, Relatives) {
+	Made := Map()
+	for Relative in Relatives {
+		Parts := StrSplit(Relative, "\"), Folder := Base
+		Loop Parts.Length - 1 {
+			Folder .= "\" . Parts[A_Index]
+			if !Made.Has(Folder) {
+				FSCreateDirectoryExclusiveStrict(Folder)
+				Made[Folder] := true
+			}
+		}
+	}
+}
+
 _EDOT_Assets(Root) {
 	global _SharedDir
 	; Exclusive native creation requires each parent before its children.
-	for Subdir in ["config", "logs", "vendor", "vendor\64bit", "shared", "shared\modules",
-		"shared\modules\diagnostics", "shared\modules\updater", "shared\data", "shared\data\locales"]
+	for Subdir in ["config", "logs", "vendor", "vendor\64bit", "shared"]
 		FSCreateDirectoryExclusiveStrict(Root . "\" . Subdir)
-	for Relative in ["modules\diagnostics\schema.json", "modules\diagnostics\redaction.json", "modules\diagnostics\issue_templates.json",
+	Inputs := ["modules\diagnostics\schema.json", "modules\diagnostics\redaction.json", "modules\diagnostics\issue_templates.json",
 		"modules\diagnostics\error_policy.json", "modules\diagnostics\recent_issues.json", "modules\diagnostics\day_log.json",
-		"modules\updater\defaults.json", "data\locales\en.json", "data\locales\fr.json"] {
+		"modules\updater\defaults.json", "data\locales\en.json", "data\locales\fr.json"]
+	_EDOT_CreateParents(Root . "\shared", Inputs)
+	for Relative in Inputs {
 		Original := _SharedDir . "\" . Relative, Copy := Root . "\shared\" . Relative
 		FileCopy(Original, Copy, false)
 		AssertEqual(CryptoSha256Bytes(FSReadBytesStrict(Original)), CryptoSha256Bytes(FSReadBytesStrict(Copy)),
