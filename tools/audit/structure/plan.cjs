@@ -2232,6 +2232,25 @@ function scanFile(file, text, ctx) {
 						: hit.newRepo.slice(PREFIX.length);
 			add('path-regex', m[0], spelled.replace(/\./g, '\\.').replace(/\//g, '\\/'), hit);
 		}
+	// A_ScriptDir . "\..\adapters\x.ahk" in a test run_all.ahk includes: the
+	// script is run_all.ahk, so the climb starts at windows/tests, not at the
+	// test's own folder (a standalone fixture's own folder is the file reading).
+	if (/^static\/ergopti_plus\/windows\/tests\/(?:unit|meta|support)\/.*\.ahk$/.test(file)) {
+		const base = `${PREFIX}windows/tests`;
+		for (const m of text.matchAll(/A_ScriptDir\s*\.\s*(["'])(\\\.\.\\[^"'\n]*)\1/g)) {
+			const plain = m[2].replace(/\\/g, '/');
+			const dir = plain.endsWith('/');
+			const abs = path.posix.normalize(`${base}/${plain}`).replace(/\/$/, '');
+			const target = dir ? byRepoDir.get(abs) : byRepoPath.get(abs);
+			if (target === undefined || target === abs) continue;
+			if (target === SPLIT || target === PREFIX || !target) {
+				add('dir-split', m[0], '(split)', { oldRepo: abs });
+				continue;
+			}
+			const rel = path.posix.relative(base, target).replace(/\//g, '\\') + (dir ? '\\' : '');
+			add('ahk-scriptdir', m[0], m[0].replace(m[2], `\\${rel}`), { oldRepo: abs, newRepo: target });
+		}
+	}
 	if (/\.(c?js|mjs|lua|py)$/.test(file))
 		for (const j of joinedPaths(text)) {
 			const hit =

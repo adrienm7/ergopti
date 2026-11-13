@@ -777,6 +777,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-mkdir-ladder.cjs"],
 			"repro": "npm run test:structure-mkdir-ladder"
+		},
+		{
+			"id": "js-0524",
+			"ordinal": 643,
+			"name": "structure plan follows an included AutoHotkey test's A_ScriptDir climb from windows/tests",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-ahk-scriptdir.cjs"],
+			"repro": "npm run test:structure-ahk-scriptdir"
 		}
 	]
 }
