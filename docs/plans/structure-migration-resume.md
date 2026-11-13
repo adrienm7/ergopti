@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 06:00)
+## Where things stand (2026-11-13, 05:40)
 
 - Branch: `claude/ergopti-todo-structure-phase2`, fast-forward only. Base:
   dev `520bb24c`, merged in `ee1aa96f`.
@@ -12,20 +12,18 @@ same commit as each step or checkpoint. Times are Paris time.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
   Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
   input-display, platform-metrics; Windows Integration Driver startup (and
-  the verdicts). Windows unit core/meta/config-scope-global, Linux
-  integration native and macOS Launcher XCTest are green there, so any red of
-  theirs on a proof is the step's.
-- S01 proof 3 (`c4cec48e`, run 43347126427): 19 failing jobs, down from 28.
-  Fixed since on the branch: dev runner clone (`1d58f217`), tap-hold and
-  onboarding staging (`ba67b25d`), the control CLI's PowerShell Join-Path
-  (`2cf27190`), the boot-order include regex (`964062d1`), the repin test on
-  a stepped tree (`a4d8fcd6`, `4c145c12`). Not yet explained: Linux
-  integration native, macOS Launcher XCTest and Archive update controls,
-  Common Ai and network.
-- Proof 4 (S01 + S02 together, from `964062d1`) is being built in
-  `/home/user/wt-proof`; next: push it to
-  `claude/ergopti-todo-structure-phase2-proof-4` and dispatch `ci.yml`
-  (`os_lanes=all`).
+  the verdicts). Any other red on a proof is the steps'.
+- Proof 4 (S01+S02, run 43354609303): 16 red jobs. Fixed since: AHK port
+  coverage table (`4dd77319`), HCW and loader staging (`fb508ac9`),
+  PowerShell `[IO.Path]::Combine` (`49fcf313`). Unexplained so far: Common
+  Ai and network, Linux integration native, macOS Launcher XCTest and Archive
+  update controls.
+- **Proof 5** (S01 `920a42bd` + S02 `39f10697`, from `49fcf313`) on
+  `claude/ergopti-todo-structure-phase2-proof-5`, dispatched at 05:40.
+- Locally (`/home/user/wt-seq`, disposable, built on proof 4): S03 to S27
+  apply and pass the runner's gates; S28 (`keyboard`) needed the data-home
+  rule (`bbacde62`) and the remap banner edits (`01cce82a`) and is re-running
+  toward S38 (log `scratchpad/s28b-run.log`). None of S03+ has a CI run.
 - S02 (`core/crypto`) needed: derived pins found where S01 left them
   (`a4d8fcd6`, `4c145c12`), the committed step numbers kept (`4e04dd96`), the
   folder gain rule (`ffe92aff`, `1e98ba49`), one adapter path table
