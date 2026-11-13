@@ -133,6 +133,16 @@
 			"title": "Layout editor in its own window",
 			"checks": [],
 			"not_testable": "Opening, refocusing and closing a WebKitGTK window needs a person at the desktop: open « Create or edit a layout… » and the manager's « Layout editor », check one window comes back to the front with its unsaved work, then « Close »."
+		},
+		{
+			"id": "direct_xkb_levels",
+			"title": "Direct XKB compiler: a sided-modifier layer on XKB's fifth level",
+			"checks": [
+				{
+					"step": "linux_direct_xkb_levels"
+				}
+			],
+			"condition": "A repository checkout with Node and Lua 5.4 on a real desktop (X11 or Wayland)."
 		}
 	]
 }

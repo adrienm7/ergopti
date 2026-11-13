@@ -153,3 +153,8 @@ Account and tester actions (maintainer, from the PC):
       nothing runs while paused, after quit, with AltGr held or for the key sent by another program (SendInput);
       binding a position a tap-hold, a tap key, a key combination, a script shortcut or the layout emulation already
       holds is refused with `collision`. Only then may the production getter turn true.
+- [ ] KLC with Kana and Roya columns (2026-11-13, direct KLC compiler): the `export-klc` of
+      `static/ergopti_plus/_shared/tests/corpus/layouts/source/direct_levels.toml` (`npm run layout-source`) writes
+      shift states 8, 9, 16 and 17 with F12 on `VK_KANA` and Caps Lock on `VK_OEM_FJ_ROYA`. Check that MSKLC's
+      `kbdutool` builds it, and that with the DLL installed F12+B types « ka » and Caps Lock+A types ←. The
+      repository KLC reader reads it back (`tools/test/test-layout-source-compiler.cjs`); MSKLC itself was not run.
