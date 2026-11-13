@@ -27,7 +27,7 @@ local function run_scenario()
 		"modules.keystats",
 		"ai.engine",
 		"ai.engine.prediction.engine",
-		"modules.diagnostics.hid_diagnostic_mailbox",
+		"diagnostics.engine.hid_diagnostic_mailbox",
 		"core.ui.ui.tooltip",
 		"ai.engine.bridge",
 	}
@@ -118,7 +118,7 @@ local function run_scenario()
 
 	local ok, err = xpcall(function()
 		local Bridge = helpers.load_with_stubs("ai.engine.bridge")
-		local Mailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
+		local Mailbox = require("diagnostics.engine.hid_diagnostic_mailbox")
 		helpers.assert_true(Mailbox.start())
 		local state = {
 			buffer = "abc",
@@ -180,8 +180,8 @@ local function run_scenario()
 		helpers.assert_true(Mailbox.stop())
 	end, debug.traceback)
 
-	if package.loaded["modules.diagnostics.hid_diagnostic_mailbox"] then
-		pcall(package.loaded["modules.diagnostics.hid_diagnostic_mailbox"].stop)
+	if package.loaded["diagnostics.engine.hid_diagnostic_mailbox"] then
+		pcall(package.loaded["diagnostics.engine.hid_diagnostic_mailbox"].stop)
 	end
 	for _, name in ipairs(dependency_names) do package.loaded[name] = previous[name] end
 	if not ok then error(err, 0) end

@@ -42,7 +42,7 @@ local PAGES = {
 	layer_editor             = { module = "ui.layer_editor" },
 	model_browser            = { module = "ai.ui.model_browser" },
 	changelog                = { module = "ui.changelog" },
-	healthcheck              = { module = "ui.healthcheck", close = "close_window" },
+	healthcheck              = { module = "diagnostics.ui.healthcheck", close = "close_window" },
 }
 M.PAGES = PAGES
 

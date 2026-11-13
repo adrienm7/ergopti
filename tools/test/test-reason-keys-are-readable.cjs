@@ -79,18 +79,21 @@ const READERS = [
 		token: 'unavailable'
 	},
 	{
-		file: path.join(SP, 'macos', 'ui', 'healthcheck', 'helpers.lua'),
+		file: path.join(SP, 'macos', 'diagnostics', 'ui', 'healthcheck', 'helpers.lua'),
 		token: 'healthcheck.unavailable'
 	},
 	{
-		file: path.join(SP, 'linux', 'ui', 'healthcheck', 'bridge.lua'),
+		file: path.join(SP, 'linux', 'diagnostics', 'ui', 'healthcheck', 'bridge.lua'),
 		token: 'healthcheck.unavailable'
 	},
 	{
 		file: path.join(SP, '_shared', 'diagnostics', 'engine', 'healthcheck', 'unavailable.lua'),
 		token: 'coverage_gaps'
 	},
-	{ file: path.join(SP, 'macos', 'ui', 'healthcheck', 'core.lua'), token: 'platform_coverage' }
+	{
+		file: path.join(SP, 'macos', 'diagnostics', 'ui', 'healthcheck', 'core.lua'),
+		token: 'platform_coverage'
+	}
 ];
 
 const errors = [];

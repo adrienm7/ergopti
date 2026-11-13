@@ -50,7 +50,7 @@ TIMEOUT = 20.0
 IDLE_TIMEOUT = 10.0
 
 # Seconds for the verified download after the HEAD. With TIMEOUT it stays
-# under the 40 s the field run gives this helper (adapters/field_check_ports.lua).
+# under the 40 s the field run gives this helper (diagnostics/adapters/field_check_ports.lua).
 DIGEST_TIMEOUT = 15.0
 
 # Seconds for one host's HEAD in --hosts mode; the field run bounds the sum.

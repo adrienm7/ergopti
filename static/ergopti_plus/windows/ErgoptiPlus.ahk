@@ -277,7 +277,7 @@ global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 ; parse-time #HotIf and throw with no net at all. error_net.ahk has no dependency
 ; that prevents loading it this early — its Logger calls are try-wrapped and function
 ; definitions are hoisted across the whole #Include graph before auto-execute runs.
-#Include infra/error_net.ahk
+#Include diagnostics/engine/reports/error_net.ahk
 if _DriverIsDetachedWorker
 	OnError(DetachedWorkerErrorHandler)
 else
@@ -379,13 +379,13 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 #Include core/logger/engine/wall_clock.ahk
 #Include core/logger/engine/logger.ahk
 #Include core/logger/engine/boot_profiler.ahk
-#Include infra/startup_smoke.ahk
-#Include infra/diagnostic_snapshot.ahk
-#Include infra/issue_link.ahk
-#Include infra/redact.ahk
-#Include infra/issue_report.ahk
-#Include infra/error_policy.ahk
-#Include infra/error_report.ahk
+#Include diagnostics/engine/field_run/startup_smoke.ahk
+#Include diagnostics/engine/reports/snapshot.ahk
+#Include diagnostics/engine/reports/issue_link.ahk
+#Include diagnostics/engine/reports/redact.ahk
+#Include diagnostics/engine/reports/issue_report.ahk
+#Include diagnostics/engine/reports/error_policy.ahk
+#Include diagnostics/engine/reports/error_report.ahk
 #Include infra/hotpath_profiler.ahk
 #Include core/logger/engine/perf_budget.ahk
 #Include settings/engine/registry.ahk
@@ -439,7 +439,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/process/adapters/shell_runner.ahk
 #Include ../_shared/shortcuts/data/actions/brightness.ahk
 #Include adapters/screen_brightness.ahk
-#Include adapters/crash_report_worker.ahk
+#Include diagnostics/adapters/crash_report_worker.ahk
 #Include modules/keymap/uia_selection_worker.ahk
 BootProfile_Stamp("Adapters initialised")
 SFD_ConfigureUiaWorker(
@@ -528,12 +528,12 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include core/lifecycle/engine/shutdown/uninstall.ahk
 #Include infra/start_at_login.ahk
 #Include ui/changelog/init.ahk
-#Include ui/healthcheck/init.ahk
-#Include infra/input_probe.ahk
+#Include diagnostics/ui/healthcheck/init.ahk
+#Include diagnostics/engine/field_run/input_probe.ahk
 #Include core/lifecycle/engine/driver_control.ahk
-#Include ui/error_dialog/init.ahk
+#Include diagnostics/ui/error_dialog.ahk
 #Include ui/update_check/init.ahk
-#Include modules/diagnostics/crash_reporter.ahk
+#Include diagnostics/engine/reports/crash_reporter.ahk
 #Include core/text/engine/json.ahk
 #Include settings/engine/program_parameter.ahk
 #Include core/process/adapters/program_providers.ahk
@@ -599,7 +599,7 @@ BootProfile_Stamp("WebView and metrics UI state initialised")
 #Include core/network/adapters/failure_host.ahk
 #Include ui/download_window/session.ahk
 #Include ui/download_window/init.ahk
-#Include ui/console_window.ahk
+#Include diagnostics/ui/console_window.ahk
 #Include modules/keystats/keystats_app_categories.ahk
 #Include modules/keystats/keystats.ahk
 #Include modules/keystats/keystats_hotstring_log.ahk
@@ -721,7 +721,7 @@ BootProfile_Stamp("Module includes initialised")
 #Include core/lifecycle/engine/reload/suspend_handoff.ahk
 ; Before boot.ahk: a developer run reads the installed build's paths.toml.
 #Include core/lifecycle/engine/dev_source.ahk
-#Include infra/field_run.ahk
+#Include diagnostics/engine/field_run/field_run.ahk
 #Include core/lifecycle/engine/boot.ahk
 BootProfile_Stamp("Paths and shared configuration loaded")
 #Include settings/engine/preferences/feature_state.ahk
@@ -1423,7 +1423,7 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/layout_manager/composer.ahk
 #Include ui/layout_manager/composer_check.ahk
 #Include ui/layout_manager/source_store.ahk
-#Include ui/field_check/network_check.ahk
+#Include diagnostics/ui/field_check/network_check.ahk
 #Include core/network/proxy_override.ahk
 #Include ui/personal_info_editor/init.ahk
 #Include ui/layer_editor/init.ahk
@@ -1568,7 +1568,7 @@ try {
 		LoggerInfo("ErgoptiPlus", "Developer source mode; the driver runs from {1} (clone root from {2}).",
 			_DriverDir, DevSource_Resolution()["origin"])
 		DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)
-		; The collector's field run (infra/field_run.ahk) is optional too: the
+		; The collector's field run (diagnostics/engine/field_run/field_run.ahk) is optional too: the
 		; driver keeps running without it.
 		try FieldRun_Start(DevSource_Root())
 		catch as _FieldRunErr

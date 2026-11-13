@@ -529,7 +529,7 @@ function init(page, detailed) {
 
 {
 	const host = fs.readFileSync(
-		path.join(SHARED, '..', 'windows', 'ui', 'healthcheck', 'core.ahk'),
+		path.join(SHARED, '..', 'windows', 'diagnostics', 'ui', 'healthcheck', 'core.ahk'),
 		'utf8'
 	);
 	if (/\bWebView_ShouldUseNativeFallback\s*\(/.test(host))

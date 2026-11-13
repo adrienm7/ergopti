@@ -19,7 +19,7 @@ local ALIAS_NAMES = {
 local NATIVE_OWNERS = {
 	[ConfigKeys.KEY.SCRIPT_LOCALE] = "core.i18n.engine.i18n",
 	[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = "core.logger.engine.logger",
-	[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = "ui.error_dialog",
+	[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = "diagnostics.ui.error_dialog",
 }
 
 --- Binds actual legacy native aliases without copying canonical value policy.

@@ -56,7 +56,7 @@ local function load_tooltip(faults)
 	restore_context = TooltipContext.install()
 	Config.settings.llm_timeout_sec = IDLE_TIMEOUT_SEC
 
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 	package.loaded["platform.input.synthetic_input"] = nil
 
 	local renderer
@@ -103,7 +103,7 @@ local function load_tooltip(faults)
 	-- the package cache prevents this test's capture sink from leaking into later
 	-- modules while preserving the live fixture's dependency graph
 	package.loaded["core.logger.engine.logger"] = real_logger
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 	package.loaded["platform.input.synthetic_input"] = nil
 
 	return {

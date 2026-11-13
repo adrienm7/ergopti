@@ -280,11 +280,11 @@ local ManifestReader    = require("menu.engine.manifest_reader")
 local ScriptSettings    = require("settings.engine.scope.script_settings")
 local Timings           = require("core.timing.engine.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
-local CrashReporter     = require("modules.diagnostics.crash_reporter")
+local CrashReporter     = require("diagnostics.engine.reports.crash_reporter")
 local FocusGuard        = require("modules.keystats.focus_guard")
 local privacy_owners = {}
 local BootProfiler      = require("core.logger.engine.boot_profiler")
-local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
+local DiagnosticSnapshot = require("diagnostics.engine.reports.snapshot")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
 local tray_menu = RuntimeGuard.optional_require("tray.adapters.menu")
@@ -332,7 +332,7 @@ local input_capture_gate = nil
 -- config.toml's [script] rows (locale, log level, error window) win over the
 -- saved values at start, as on Windows: adopted before any of them is read.
 require("settings.engine.scope.script_scope").adopt_configured()
-local ErrorDialog = RuntimeGuard.optional_require("ui.error_dialog.bridge")
+local ErrorDialog = RuntimeGuard.optional_require("diagnostics.ui.error_dialog")
 if ErrorDialog and ErrorDialog.init() then Logger.set_error_observer(ErrorDialog.on_error) end
 
 -- File watchers (optional — inotify-based TOML/.lua hot reload).
@@ -2803,7 +2803,7 @@ local function main()
 		local function _build_menu_ctx()
 			-- Required here rather than at file scope: main() sits at LuaJIT's
 			-- upvalue limit, and only the three log rows below use them.
-			local LogOpeners = require("ui.log_openers")
+			local LogOpeners = require("diagnostics.ui.log_openers")
 			--- Hands one log path to xdg-open in the background.
 			--- @param target string Absolute folder or file.
 			--- @return boolean started
@@ -2971,10 +2971,10 @@ local function main()
 				return LogOpeners.open_today_errors(xdg_open_log_target)
 			end,
 			-- The bridge opens its window: it replaces an open one and resets its mode
-			on_healthcheck = function() require("ui.healthcheck.bridge").open() end,
+			on_healthcheck = function() require("diagnostics.ui.healthcheck.bridge").open() end,
 			-- The composer check installs the shipped check composition, verifies it and
 			-- removes it again; it reports in a dialog and in one evidence record
-			on_composer_check = function() require("ui.field_check.composer_check").run() end,
+			on_composer_check = function() require("diagnostics.ui.field_check.composer_check").run() end,
 			on_show_setup_wizard = function()
 				if webview_manager then
 					webview_manager.show("onboarding")
@@ -3685,9 +3685,9 @@ local function main()
 			return false, "refused"
 		end })
 	if not privacy_owners.startup_checkpoint() then return end
-	-- Optional too: the field report collector's no-click checks (infra/field_run.lua).
+	-- Optional too: the field report collector's no-click checks (diagnostics/engine/field_run/field_run.lua).
 	-- A timed reload step resumes here, in the successor, with the reload just measured.
-	privacy_owners.field_run = require("infra.field_run").start({ pid = require("luv").os_getpid(),
+	privacy_owners.field_run = require("diagnostics.engine.field_run.field_run").start({ pid = require("luv").os_getpid(),
 		reload = perform_reload, reload_ms = reload_ms })
 	if not privacy_owners.startup_checkpoint() then return end
 	privacy_owners.finish_startup()
@@ -3780,7 +3780,7 @@ local function main()
 end
 
 -- The daemon runs under the crash reporter, which until now had no caller at
--- all: modules/diagnostics/crash_reporter.lua was written, tested, and reachable
+-- all: diagnostics/engine/reports/crash_reporter.lua was written, tested, and reachable
 -- only from its own test file. A driver that runs for weeks in the background
 -- and dies at 3 a.m. leaves the user with a tray icon that is simply gone and
 -- nothing on disk saying why — the log's last line is whatever it was doing, not

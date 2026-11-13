@@ -5,7 +5,7 @@
 # MODULE: Linux field run request
 # DESCRIPTION:
 # Asks the running Linux daemon to run its Debug field checks with no window
-# (static/ergopti_plus/linux/infra/field_run.lua, on the shared protocol
+# (static/ergopti_plus/linux/diagnostics/engine/field_run/field_run.lua, on the shared protocol
 # static/ergopti_plus/_shared/diagnostics/data/field_run_protocol.json and the Linux steps
 # file it names): it writes the request into the folder of the daemon that is
 # ready, waits for the done marker or a refusal, copies the
@@ -32,7 +32,7 @@ field_run_layout() {
 	# luajit -e takes no script arguments: the roots travel in the environment.
 	FIELD_RUN_CLONE_ROOT="$1" FIELD_RUN_DRIVER_ROOT="$driver_root" FIELD_RUN_SHARED_ROOT="$shared" \
 	LUA_PATH="$driver_root/?.lua;$driver_root/?/init.lua;$shared/lua/?.lua;$shared/lua/?/init.lua;;" luajit -e '
-		local FieldRun = require("infra.field_run")
+		local FieldRun = require("diagnostics.engine.field_run.field_run")
 		local spec = FieldRun.load(os.getenv("FIELD_RUN_SHARED_ROOT"), os.getenv("FIELD_RUN_DRIVER_ROOT"))
 		print(FieldRun.folder(spec, os.getenv, os.getenv("FIELD_RUN_CLONE_ROOT")))
 		print(FieldRun.folder(spec, os.getenv, nil) or "")

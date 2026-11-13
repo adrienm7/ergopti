@@ -71,7 +71,7 @@ struct EmbeddedFatalReport: Equatable {
 		self.unrecognizedKind = unrecognizedKind
 	}
 
-	/// Parses the single-line fields written by `adapters/boot_fatal.lua`.
+	/// Parses the single-line fields written by `diagnostics/adapters/boot_fatal.lua`.
 	/// Unknown keys are ignored. A report is shown whatever its kind says: an
 	/// unrecognised kind is presented as a boot failure and named in the
 	/// diagnostic, because hiding a fatal report is worse than mislabelling it.

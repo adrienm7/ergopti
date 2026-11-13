@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 local DEPENDENCIES = {
 	"core.logger.engine.logger",
 	"core.timing.engine.timings",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"diagnostics.engine.reports.error_description",
@@ -217,7 +217,7 @@ local function with_fixture(config, body)
 	package.loaded["core.timing.engine.timings"] = { count = require("tests.support.registry_count"), sec = function()
 		return config.click_cooldown_sec or 0.25
 	end }
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function()
 			return nil, "foreign", { events = {} }

@@ -53,7 +53,7 @@ local function load_openers(state)
 		if state.existing[path] then return "present", { mode = "file" } end
 		return "absent"
 	end }
-	local openers = helpers.load_with_stubs("ui.log_openers", {
+	local openers = helpers.load_with_stubs("diagnostics.ui.log_openers", {
 		fs = {
 			attributes = function(path)
 				if state.existing[path] then return { mode = "file" } end
@@ -78,7 +78,7 @@ end
 helpers.describe("log openers (log-openers)", function()
 	helpers.it("opens today's log as the logger names it at the moment of the click", function()
 		local state = { day = "2099-01-01", existing = {} }
-		helpers.with_stub_scope({ "ui.log_openers", "core.logger.engine.logger", "settings.engine.paths", "core.ui.engine.notifications", "core.fs.adapters.file_system" }, function()
+		helpers.with_stub_scope({ "diagnostics.ui.log_openers", "core.logger.engine.logger", "settings.engine.paths", "core.ui.engine.notifications", "core.fs.adapters.file_system" }, function()
 			local openers = load_openers(state)
 			local open_fn, targets = recording_opener()
 			helpers.assert_true(openers.open_today_log(open_fn))
@@ -93,7 +93,7 @@ helpers.describe("log openers (log-openers)", function()
 	helpers.it("opens today's errors file when it exists", function()
 		local state = { day = "2099-01-03", existing = {} }
 		state.existing["/fixture/logs/ergopti_plus/errors-2099-01-03.log"] = true
-		helpers.with_stub_scope({ "ui.log_openers", "core.logger.engine.logger", "settings.engine.paths", "core.ui.engine.notifications", "core.fs.adapters.file_system" }, function()
+		helpers.with_stub_scope({ "diagnostics.ui.log_openers", "core.logger.engine.logger", "settings.engine.paths", "core.ui.engine.notifications", "core.fs.adapters.file_system" }, function()
 			local openers, observed = load_openers(state)
 			local open_fn, targets = recording_opener()
 			helpers.assert_true(openers.open_today_errors(open_fn))
@@ -104,7 +104,7 @@ helpers.describe("log openers (log-openers)", function()
 
 	helpers.it("says there was no warning today instead of opening a missing errors file", function()
 		local state = { day = "2099-01-04", existing = {} }
-		helpers.with_stub_scope({ "ui.log_openers", "core.logger.engine.logger", "settings.engine.paths", "core.ui.engine.notifications", "core.fs.adapters.file_system" }, function()
+		helpers.with_stub_scope({ "diagnostics.ui.log_openers", "core.logger.engine.logger", "settings.engine.paths", "core.ui.engine.notifications", "core.fs.adapters.file_system" }, function()
 			local openers, observed = load_openers(state)
 			local open_fn, targets = recording_opener()
 			helpers.assert_true(openers.open_today_errors(open_fn),
@@ -117,7 +117,7 @@ helpers.describe("log openers (log-openers)", function()
 
 	helpers.it("creates the logs folder before opening it", function()
 		local state = { day = "2099-01-05", existing = {} }
-		helpers.with_stub_scope({ "ui.log_openers", "core.logger.engine.logger", "settings.engine.paths", "core.ui.engine.notifications", "core.fs.adapters.file_system" }, function()
+		helpers.with_stub_scope({ "diagnostics.ui.log_openers", "core.logger.engine.logger", "settings.engine.paths", "core.ui.engine.notifications", "core.fs.adapters.file_system" }, function()
 			local openers, observed = load_openers(state)
 			local open_fn, targets = recording_opener()
 			helpers.assert_true(openers.open_logs_folder(open_fn))
@@ -128,7 +128,7 @@ helpers.describe("log openers (log-openers)", function()
 
 	helpers.it("reports a folder it could not create instead of opening nothing", function()
 		local state = { day = "2099-01-06", existing = {}, can_create = false }
-		helpers.with_stub_scope({ "ui.log_openers", "core.logger.engine.logger", "settings.engine.paths", "core.ui.engine.notifications", "core.fs.adapters.file_system" }, function()
+		helpers.with_stub_scope({ "diagnostics.ui.log_openers", "core.logger.engine.logger", "settings.engine.paths", "core.ui.engine.notifications", "core.fs.adapters.file_system" }, function()
 			local openers = load_openers(state)
 			local open_fn, targets = recording_opener()
 			helpers.assert_true(openers.open_logs_folder(open_fn) == false)
@@ -138,7 +138,7 @@ helpers.describe("log openers (log-openers)", function()
 
 	helpers.it("rejects a missing opener", function()
 		local state = { day = "2099-01-07", existing = {} }
-		helpers.with_stub_scope({ "ui.log_openers", "core.logger.engine.logger", "settings.engine.paths", "core.ui.engine.notifications", "core.fs.adapters.file_system" }, function()
+		helpers.with_stub_scope({ "diagnostics.ui.log_openers", "core.logger.engine.logger", "settings.engine.paths", "core.ui.engine.notifications", "core.fs.adapters.file_system" }, function()
 			local openers = load_openers(state)
 			helpers.assert_throws(function() openers.open_today_log(nil) end)
 		end)

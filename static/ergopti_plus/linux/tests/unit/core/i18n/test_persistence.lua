@@ -304,7 +304,7 @@ end)
 
 helpers.describe("i18n explicit wizard persistence", function()
 	local function with_owned_store(options, body)
-		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.fs.adapters.storage", "settings.engine.paths", "settings.engine.scope.script_settings", "ui.error_dialog.bridge" }
+		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.fs.adapters.storage", "settings.engine.paths", "settings.engine.scope.script_settings", "diagnostics.ui.error_dialog" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local root = os.tmpname()
@@ -335,7 +335,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 			package.loaded["core.i18n.engine.locale"] = nil
 			package.loaded["core.fs.adapters.storage"] = nil
 			package.loaded["settings.engine.scope.script_settings"] = nil
-			package.loaded["ui.error_dialog.bridge"] = nil
+			package.loaded["diagnostics.ui.error_dialog"] = nil
 			package.loaded["core.i18n.engine.i18n"] = nil
 			local i18n = require("core.i18n.engine.i18n")
 			i18n.init()
@@ -374,7 +374,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 	helpers.it("(error-dialog-atomic) keeps source and state on storage refusal", function()
 		local initial = '[script]\nshow_error_dialog = true\n'
 		local observed = with_owned_store({ config = initial, rename = "false" }, function(_, path)
-			local dialog = require("ui.error_dialog.bridge")
+			local dialog = require("diagnostics.ui.error_dialog")
 			local before = dialog.is_enabled()
 			local accepted = dialog.set_enabled(false)
 			return { accepted = accepted, before = before, active = dialog.is_enabled(),
@@ -385,7 +385,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 
 	helpers.it("(error-dialog-atomic) disables an already scheduled report", function()
 		local observed = with_owned_store({}, function()
-			local dialog = require("ui.error_dialog.bridge")
+			local dialog = require("diagnostics.ui.error_dialog")
 			local scheduled
 			dialog.defer = function(fn) scheduled = fn; return true end
 			assert(dialog.init())
@@ -408,7 +408,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 			local cf = assert(io.open(config, "wb")); assert(cf:write(initial .. "# concurrent\n")); assert(cf:close())
 			local sf = assert(io.open(path, "wb")); assert(sf:write('{"script.show_error_dialog":true}')); assert(sf:close())
 		end }, function(_, path)
-			local dialog = require("ui.error_dialog.bridge")
+			local dialog = require("diagnostics.ui.error_dialog")
 			local accepted = dialog.set_enabled(false)
 			local pending = require("settings.engine.scope.registry").pending()
 			local config = read(require("settings.engine.paths").config("config.toml"))
@@ -424,7 +424,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 	helpers.it("(error-dialog-atomic) publishes configured and stored state together", function()
 		local initial = '[script]\nshow_error_dialog = true\n'
 		local observed = with_owned_store({ config = initial }, function(_, path)
-			local dialog = require("ui.error_dialog.bridge")
+			local dialog = require("diagnostics.ui.error_dialog")
 			local accepted = dialog.set_enabled(false)
 			return { accepted = accepted, active = dialog.is_enabled(),
 				config = read(require("settings.engine.paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.show_error_dialog"] }

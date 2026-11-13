@@ -20,7 +20,7 @@ local RESET_MODULES = {
 	"modules.keystats.timestamp",
 	"modules.keystats.context_tracker", "modules.keystats.kc_bridge",
 	"modules.keystats.watchers", "core.process.adapters.lifecycle",
-	"platform.input.keyboard_hook", "adapters.event_provenance",
+	"platform.input.keyboard_hook", "diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input", "adapters.input_source_broker",
 	"core.logger.engine.logger", "core.timing.engine.timings",
 	"menu.engine.manifest_reader", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
@@ -213,7 +213,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 		end,
 	}
 	package.loaded["platform.input.synthetic_input"] = synthetic_stub
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",
@@ -354,7 +354,7 @@ local function load_fixture()
 		end,
 	}
 	package.loaded["platform.input.synthetic_input"] = synthetic_stub
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",

@@ -7,7 +7,7 @@
  * The Debug menu's « Test network (PAC, proxy, download) » exists on every
  * driver: macOS and Linux run the shared Lua steps
  * (_shared/core/network/engine/field_check_network.lua), Windows runs the same steps in
- * AutoHotkey (windows/ui/field_check/network_check.ahk). This gate pins what
+ * AutoHotkey (windows/diagnostics/ui/field_check/network_check.ahk). This gate pins what
  * keeps the three reports comparable when a maintainer pastes one back:
  * 1. the Lua and AutoHotkey step lists are the same identities in the same order
  *    (macOS and Linux then report the PLAN_STEPS the Windows check does not have yet);
@@ -43,7 +43,7 @@ const check = (label, action) => {
 };
 
 const luaSource = read('_shared', 'core', 'network', 'engine', 'field_check_network.lua');
-const ahkSource = read('windows', 'ui', 'field_check', 'network_check.ahk');
+const ahkSource = read('windows', 'diagnostics', 'ui', 'field_check', 'network_check.ahk');
 
 /** The quoted identities of a Lua `{ "a", "b" }` or AutoHotkey `["a", "b"]` list. */
 const identities = (list) => [...list.matchAll(/"([a-z_]+)"/g)].map((match) => match[1]);
@@ -109,7 +109,7 @@ check('the menu row is declared once, for every platform, without a platform rea
 
 check('each driver routes the row to its check', () => {
 	assert.match(
-		read('macos', 'ui', 'field_check', 'init.lua'),
+		read('macos', 'diagnostics', 'ui', 'field_check', 'init.lua'),
 		/field_check_network = \{ check = "network"/
 	);
 	assert.match(
@@ -142,7 +142,7 @@ check('the check files spell no address of their own', () => {
 		luaSource,
 		ahkSource,
 		read('linux', 'core', 'network', 'adapters', 'check_ports.lua'),
-		read('linux', 'ui', 'field_check', 'network_check.lua')
+		read('linux', 'diagnostics', 'ui', 'field_check', 'network_check.lua')
 	];
 	for (const source of files) {
 		const addresses = source.match(/https?:\/\/[^\s"')]+/g) ?? [];

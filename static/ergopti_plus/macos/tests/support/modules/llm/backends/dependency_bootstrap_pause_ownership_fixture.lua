@@ -286,7 +286,7 @@ local function load_fixture(options)
 			RETURN = 36,
 			ESCAPE = 53,
 		}
-		package.loaded["adapters.event_provenance"] = {}
+		package.loaded["diagnostics.adapters.event_provenance"] = {}
 		local admission_fence = nil
 		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback) callback(); return true end,

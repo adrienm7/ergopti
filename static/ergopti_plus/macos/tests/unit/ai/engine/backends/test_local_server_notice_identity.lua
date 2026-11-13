@@ -18,7 +18,7 @@ local OWNED_MODULES = {
 	"_generated.logger_sub_files",
 	"core.crypto.crypto",
 	"core.events.clock",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"core.fs.adapters.file_system",
 	"core.network.adapters.http_client",
 	"adapters.input_source_broker",

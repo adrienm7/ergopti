@@ -786,7 +786,7 @@ function M.generate(ctx, menu_mods, actions)
 			for level, severity in pairs(Logger.LEVELS) do
 				if Logger.current_level == severity then active_level_name = level; break end
 			end
-			local healthcheck = require("ui.healthcheck")
+			local healthcheck = require("diagnostics.ui.healthcheck")
 			local dbg_ctx = {}
 			for key, value in pairs(ctx or {}) do dbg_ctx[key] = value end
 			dbg_ctx.commands = {
@@ -796,22 +796,22 @@ function M.generate(ctx, menu_mods, actions)
 				[require("settings.engine.keys").COMMAND.OPEN_TODAY_LOG] = actions.open_today_log,
 				[require("settings.engine.keys").COMMAND.OPEN_ERROR_LOG] = actions.open_error_log,
 				["healthcheck"]    = function() healthcheck.show_window({ state = ctx.state }) end,
-				[COMMAND.FIELD_CHECK_LEASE] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LEASE) end,
-				[COMMAND.FIELD_CHECK_OWNED_RUNTIME] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_OWNED_RUNTIME) end,
-				[COMMAND.FIELD_CHECK_NETWORK] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_NETWORK) end,
-				[COMMAND.FIELD_CHECK_TOOLCHAIN] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_TOOLCHAIN) end,
-				[COMMAND.FIELD_CHECK_LOGIN_ITEMS] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LOGIN_ITEMS) end,
-				[COMMAND.FIELD_CHECK_KEY_ACCOUNTING] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_KEY_ACCOUNTING) end,
-				[COMMAND.COMPOSER_CHECK] = function() require("ui.field_check").run(COMMAND.COMPOSER_CHECK) end,
-				[require("settings.engine.keys").COMMAND.REPORT_BUG]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
-				[require("settings.engine.keys").COMMAND.SUGGEST_FEATURE] = function() require("ui.healthcheck.report").suggest_feature() end,
+				[COMMAND.FIELD_CHECK_LEASE] = function() require("diagnostics.ui.field_check").run(COMMAND.FIELD_CHECK_LEASE) end,
+				[COMMAND.FIELD_CHECK_OWNED_RUNTIME] = function() require("diagnostics.ui.field_check").run(COMMAND.FIELD_CHECK_OWNED_RUNTIME) end,
+				[COMMAND.FIELD_CHECK_NETWORK] = function() require("diagnostics.ui.field_check").run(COMMAND.FIELD_CHECK_NETWORK) end,
+				[COMMAND.FIELD_CHECK_TOOLCHAIN] = function() require("diagnostics.ui.field_check").run(COMMAND.FIELD_CHECK_TOOLCHAIN) end,
+				[COMMAND.FIELD_CHECK_LOGIN_ITEMS] = function() require("diagnostics.ui.field_check").run(COMMAND.FIELD_CHECK_LOGIN_ITEMS) end,
+				[COMMAND.FIELD_CHECK_KEY_ACCOUNTING] = function() require("diagnostics.ui.field_check").run(COMMAND.FIELD_CHECK_KEY_ACCOUNTING) end,
+				[COMMAND.COMPOSER_CHECK] = function() require("diagnostics.ui.field_check").run(COMMAND.COMPOSER_CHECK) end,
+				[require("settings.engine.keys").COMMAND.REPORT_BUG]      = function() require("diagnostics.ui.healthcheck.report").report_bug({ state = ctx.state }) end,
+				[require("settings.engine.keys").COMMAND.SUGGEST_FEATURE] = function() require("diagnostics.ui.healthcheck.report").suggest_feature() end,
 				[require("settings.engine.keys").LEAF.SHOW_ERROR_DIALOG] = actions.toggle_error_dialog,
 			}
 			dbg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do dbg_ctx.state_getters[key] = value end
 			dbg_ctx.state_getters[require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL] = function() return active_level_name end
 			dbg_ctx.state_getters["error_dialog_enabled"] = function()
-				return require("ui.error_dialog").is_enabled()
+				return require("diagnostics.ui.error_dialog").is_enabled()
 			end
 			-- The checks and probes hang in the « Tests » group, from the same
 			-- context; no Tests row is drawn when none of them is for macOS.

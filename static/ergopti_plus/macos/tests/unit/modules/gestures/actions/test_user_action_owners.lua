@@ -224,7 +224,7 @@ helpers.describe("the user action editors store one canonical value (macOS)", fu
 end)
 
 helpers.describe("the field run checks the Apple Shortcuts action (macOS)", function()
-	local Check = require("infra.field_check_apple_shortcuts")
+	local Check = require("diagnostics.engine.field_check.apple_shortcuts")
 
 	--- Runs the check against a fake action.
 	--- @param rows table|nil The library the fake lists.
@@ -281,6 +281,6 @@ helpers.describe("the field run checks the Apple Shortcuts action (macOS)", func
 	end)
 
 	helpers.it("is one of the field run's checks", function()
-		helpers.assert_eq(require("infra.field_check_checks").checks.apple_shortcuts, Check.apple_shortcuts)
+		helpers.assert_eq(require("diagnostics.engine.field_check.checks").checks.apple_shortcuts, Check.apple_shortcuts)
 	end)
 end)

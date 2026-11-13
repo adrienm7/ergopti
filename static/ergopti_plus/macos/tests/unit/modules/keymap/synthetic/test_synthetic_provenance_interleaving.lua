@@ -77,7 +77,7 @@ local function load_fixture()
 			or name:match("^modules%.keystats")
 			or name:match("^core%.ui%.ui%.tooltip")
 			or name == "platform.input.synthetic_input"
-			or name == "adapters.event_provenance"
+			or name == "diagnostics.adapters.event_provenance"
 		) then
 			package.loaded[name] = nil
 		end
@@ -431,14 +431,14 @@ end
 --- @param world table { dev, focused, publish }
 --- @return table fixture
 local function selftest_fixture(world)
-	package.loaded["infra.field_run_selftest"] = nil
+	package.loaded["diagnostics.engine.field_run.selftest"] = nil
 	local fixture = load_fixture()
 	local Gate = require("modules.keymap.selftest_gate")
 	Gate._ports = {
 		field_run_running = function() return world.running end,
 		focused_own_window_id = function() return world.focused end,
 	}
-	if world.publish then require("infra.field_run_selftest").publish(world.publish) end
+	if world.publish then require("diagnostics.engine.field_run.selftest").publish(world.publish) end
 	return fixture
 end
 

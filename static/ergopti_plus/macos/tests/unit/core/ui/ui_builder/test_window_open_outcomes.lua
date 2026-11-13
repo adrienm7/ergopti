@@ -131,7 +131,7 @@ end
 local function with_healthcheck(controls, callback)
 	controls = controls or {}
 	helpers.with_fresh_modules({
-		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
+		"diagnostics.ui.healthcheck.core", "diagnostics.ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
 		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work",
 		"core.ui.engine.dialog_util", "core.events.timer_scheduler", "hs", "tests.stubs.hs",
 	}, function()
@@ -145,7 +145,7 @@ local function with_healthcheck(controls, callback)
 			webviews_created = 0,
 		}
 		package.loaded["core.logger.engine.logger"] = logger_spy(state)
-		package.loaded["ui.healthcheck.helpers"] = {}
+		package.loaded["diagnostics.ui.healthcheck.helpers"] = {}
 		package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared" end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
@@ -207,7 +207,7 @@ local function with_healthcheck(controls, callback)
 		end
 		hs_stub.json.encode = function() return "{}" end
 
-		local healthcheck = require("ui.healthcheck.core")
+		local healthcheck = require("diagnostics.ui.healthcheck.core")
 		healthcheck.run = function() return {} end
 		callback(healthcheck, state)
 	end)

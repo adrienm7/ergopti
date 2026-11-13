@@ -19,7 +19,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 const ENTRY = path.join(WINDOWS, 'ErgoptiPlus.ahk');
 const CONFIG_IO = path.join(WINDOWS, 'settings', 'engine', 'io.ahk');
-const ERROR_NET = path.join(WINDOWS, 'infra', 'error_net.ahk');
+const ERROR_NET = path.join(WINDOWS, 'diagnostics', 'engine', 'reports', 'error_net.ahk');
 const LIFECYCLE = path.join(WINDOWS, 'core', 'lifecycle', 'engine', 'lifecycle.ahk');
 const SUSPEND_HANDOFF = path.join(
 	WINDOWS,

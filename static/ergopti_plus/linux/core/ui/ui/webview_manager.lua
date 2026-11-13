@@ -342,8 +342,8 @@ local BRIDGE_MODULES = {
 	physical_shortcuts     = "ui.physical_shortcuts.bridge",
 	changelog             = "ui.changelog.bridge",
 	download_window       = "ui.download_window.bridge",
-	error_dialog          = "ui.error_dialog.bridge",
-	healthcheck           = "ui.healthcheck.bridge",
+	error_dialog          = "diagnostics.ui.error_dialog",
+	healthcheck           = "diagnostics.ui.healthcheck.bridge",
 	hotstring_editor      = "ui.hotstring_editor.bridge",
 	-- Keyed by the DIRECTORY name. It read "hotstrings_config" until 2026-08-05,
 	-- which gave that name a working bridge and no page: resolve_app_dir() looks

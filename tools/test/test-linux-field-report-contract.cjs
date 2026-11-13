@@ -54,10 +54,10 @@ const REPORT_REDACT = 'tools/dev/field-report-redact.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 // The collector's guided and probe steps, and the per-TODO-point summary.
 const GUIDED = 'tools/dev/field-guided.py';
-const GUIDED_STEPS = 'static/ergopti_plus/linux/data/field_guided_steps.json';
+const GUIDED_STEPS = 'static/ergopti_plus/linux/diagnostics/data/field_guided_steps.json';
 const TODO_SUMMARY = 'tools/dev/field-todo-summary.py';
-const TODO_COVERAGE = 'static/ergopti_plus/linux/data/field_todo_coverage.json';
-const RUN_STEPS = 'static/ergopti_plus/linux/data/field_run_steps.json';
+const TODO_COVERAGE = 'static/ergopti_plus/linux/diagnostics/data/field_todo_coverage.json';
+const RUN_STEPS = 'static/ergopti_plus/linux/diagnostics/data/field_run_steps.json';
 const SHELL_CHECKS = 'tools/dev/linux-field-shell-checks.sh';
 const FIELD_RUN = 'tools/dev/linux-field-run.sh';
 const SERVICE = 'static/ergopti_plus/linux/ergopti-hotstrings.service';

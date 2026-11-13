@@ -21,7 +21,7 @@ local KEYCODE_C = 8
 
 local RESET_MODULES = {
 	"modules.keystats.physical_accounting_mode",
-	"adapters.event_provenance", "platform.input.synthetic_input",
+	"diagnostics.adapters.event_provenance", "platform.input.synthetic_input",
 	"core.logger.engine.logger", "core.text.engine.utils",
 	"modules.hotstrings.hotstrings_config", "modules.keystats",
 	"modules.keymap", "modules.keymap.init", "modules.keymap.expander",

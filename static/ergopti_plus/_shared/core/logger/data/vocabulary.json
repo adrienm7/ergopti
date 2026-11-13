@@ -527,11 +527,11 @@
 			"function": "M.format_log_line"
 		},
 		{
-			"file": "static/ergopti_plus/windows/infra/input_probe.ahk",
+			"file": "static/ergopti_plus/windows/diagnostics/engine/field_run/input_probe.ahk",
 			"function": "InputProbe_RowRecord"
 		},
 		{
-			"file": "static/ergopti_plus/windows/infra/input_probe.ahk",
+			"file": "static/ergopti_plus/windows/diagnostics/engine/field_run/input_probe.ahk",
 			"function": "InputProbe_HookRecord"
 		},
 		{

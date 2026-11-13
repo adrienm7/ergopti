@@ -43,7 +43,7 @@ local OWNED_MODULES = {
 	"ai.engine.api.backend_detector",
 	"core.events.timer_scheduler",
 	"ai.ui.menu.activation_pause_owner",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"platform.input.keycodes",
 	"modules.gestures.engine",
@@ -576,7 +576,7 @@ local function build_fixture(backend, save_results, options)
 	local script_control
 	if options.real_script_control then
 		local admission_fence = nil
-		package.loaded["adapters.event_provenance"] = {
+		package.loaded["diagnostics.adapters.event_provenance"] = {
 			mark = function() return true end,
 			is_synthetic = function() return false end,
 		}

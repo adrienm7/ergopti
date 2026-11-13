@@ -30,7 +30,7 @@ local OWNED_MODULES = {
 	"platform.input.key_state",
 	"platform.input.keyboard_geometry",
 	"platform.input.synthetic_input",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"core.events.clock",
 	"core.events.timer_scheduler",
 	"core.fs.adapters.storage",

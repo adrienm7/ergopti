@@ -28,7 +28,7 @@ local function fresh_fixture()
 	for _, name in ipairs({
 		"modules.shortcuts.actions.text", "clipboard.adapters.clipboard",
 		"platform.input.synthetic_input",
-		"adapters.event_provenance",
+		"diagnostics.adapters.event_provenance",
 		"core.events.timer_scheduler",
 		"core.logger.engine.logger",
 		"core.fs.engine.paths",

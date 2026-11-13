@@ -14,7 +14,7 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 require("core.logger.engine")
 
 local function with_loopback(callback, options, prepare)
-	helpers.with_stub_scope({ "platform.input.synthetic_input", "adapters.event_provenance", "core.fs.adapters.storage",
+	helpers.with_stub_scope({ "platform.input.synthetic_input", "diagnostics.adapters.event_provenance", "core.fs.adapters.storage",
 		"core.events.timer_scheduler", "core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 		"core.text.engine.toml.reader", "core.text.engine.json", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path",
 		"core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner", "platform.input.synthetic_input_loopback_owner" }, function()

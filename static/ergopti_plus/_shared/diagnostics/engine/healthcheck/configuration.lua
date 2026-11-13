@@ -13,7 +13,7 @@
 --- 2. Every other string is reduced to its length in characters, and every
 ---    array to its item count: a path or a sentence typed into a text setting
 ---    cannot leave the machine through this section.
---- 3. The AHK port (windows/ui/healthcheck/configuration.ahk) replays the same
+--- 3. The AHK port (windows/diagnostics/ui/healthcheck/configuration.ahk) replays the same
 ---    vectors (_shared/tests/corpus/healthcheck/configuration_vectors.json).
 --- 4. read_files and collect report the state of each configuration file in
 ---    the order they apply: ok, missing, unreadable or invalid. A file that

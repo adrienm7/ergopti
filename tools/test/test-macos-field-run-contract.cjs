@@ -5,8 +5,8 @@
  * MODULE: macOS Field Run Contract Tests
  * DESCRIPTION:
  * Pins the contract between tools/dev/collect-macos-field-report.sh and the
- * developer app's field run (static/ergopti_plus/macos/infra/field_run.lua),
- * both of which read static/ergopti_plus/macos/data/field_run.json:
+ * developer app's field run (static/ergopti_plus/macos/diagnostics/engine/field_run/field_run.lua),
+ * both of which read static/ergopti_plus/macos/diagnostics/data/field_run.json:
  * 1. the declaration: a step for every Debug field check, the person verdicts,
  *    progress-aware AI downloads, and a request deadline that covers every
  *    step at its bound and ends before the collector stops waiting;
@@ -35,8 +35,8 @@ const appDirs = require('./lib/app-dirs.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/collect-macos-field-report.sh';
-const SPEC_PATH = 'static/ergopti_plus/macos/data/field_run.json';
-const CHECKS_PATH = 'static/ergopti_plus/macos/infra/field_check_checks.lua';
+const SPEC_PATH = 'static/ergopti_plus/macos/diagnostics/data/field_run.json';
+const CHECKS_PATH = 'static/ergopti_plus/macos/diagnostics/engine/field_check/checks.lua';
 const IDENTIFIERS = 'static/ergopti_plus/_shared/core/text/data/identifiers.sh';
 const SHELL_CHECKS = 'tools/dev/macos-field-shell-checks.sh';
 const PRIVACY_PANES = 'static/ergopti_plus/macos/data/privacy_panes.json';
@@ -47,7 +47,7 @@ const REPORT_REDACT = 'tools/dev/field-report-redact.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 // The per-TODO-point summary and the coverage table it reads.
 const TODO_SUMMARY = 'tools/dev/field-todo-summary.py';
-const TODO_COVERAGE = 'static/ergopti_plus/macos/data/field_todo_coverage.json';
+const TODO_COVERAGE = 'static/ergopti_plus/macos/diagnostics/data/field_todo_coverage.json';
 // The app's own crash reports are summarized without paths or user data.
 const IPS_SUMMARY = 'tools/dev/field-ips-summary.py';
 // The analyser and the declarations it reads its budgets from.

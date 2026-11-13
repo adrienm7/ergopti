@@ -340,8 +340,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- such a submodule re-read must clear it itself.
 	loaded[module_name] = nil
 	-- Foreign ledger readers retain the native hash API across ingest turns.
-	loaded["adapters.foreign_ledger_snapshot"] = nil
-	if module_name == "modules.keystats.export" or module_name == "adapters.foreign_ledger_snapshot" then
+	loaded["diagnostics.adapters.foreign_ledger_snapshot"] = nil
+	if module_name == "modules.keystats.export" or module_name == "diagnostics.adapters.foreign_ledger_snapshot" then
 		loaded["core.timing.engine.paced_job"] = nil
 		loaded["core.events.timer_scheduler"] = nil
 	end
@@ -468,7 +468,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	loaded["modules.keymap.input_sources"]  = nil
 	loaded["adapters.one_shot_shift"] = nil
 	-- The console owner captures the native API and must follow the current stub.
-	loaded["ui.console_window"] = nil
+	loaded["diagnostics.ui.console_window"] = nil
 	-- The Accessibility adapter remembers which application left a read
 	-- unanswered and captures hs: each test starts with no cooldown.
 	loaded["adapters.accessibility_permission"] = nil

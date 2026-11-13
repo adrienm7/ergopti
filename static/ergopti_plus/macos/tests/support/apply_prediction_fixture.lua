@@ -309,8 +309,8 @@ function M.run(options)
 		end
 	end
 
-	package.loaded["adapters.event_provenance"] = nil
-	local provenance = require("adapters.event_provenance")
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
+	local provenance = require("diagnostics.adapters.event_provenance")
 	local function fire_next_timer()
 		local selected = nil
 		for _, timer in ipairs(hs_stub.timer.__timers) do

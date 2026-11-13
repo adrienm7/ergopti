@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
 local STUBBED = {
-	"core.ui.ui.webview_manager", "ui.download_window.bridge", "ui.error_dialog.bridge", "ui.changelog.bridge",
+	"core.ui.ui.webview_manager", "ui.download_window.bridge", "diagnostics.ui.error_dialog", "ui.changelog.bridge",
 }
 
 --- Loads the real bridge with controlled collaborators.
@@ -66,7 +66,7 @@ local function load_bridge(answer)
 		show = function(opts) context.windows[#context.windows + 1] = opts; return 7 end,
 		complete = function(id, ok, message) context.completed[#context.completed + 1] = { id, ok, message } end,
 	}
-	package.loaded["ui.error_dialog.bridge"] = {
+	package.loaded["diagnostics.ui.error_dialog"] = {
 		report = function(record, complete)
 			context.reports[#context.reports + 1] = record
 			if context.on_report then return context.on_report() end

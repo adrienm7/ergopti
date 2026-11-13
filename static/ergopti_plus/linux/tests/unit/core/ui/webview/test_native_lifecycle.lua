@@ -139,10 +139,10 @@ local run_contract = function(helpers,load_manager,load_host)
    helpers.it('(native-push-admission) asynchronous diagnostics probe cannot push into '..mode,function()
     fixture(function(m,c)
      local completed
-     package.loaded['ui.healthcheck.probes']={start=function(_,_,_,callback)completed=callback;return{cancel=function()end}end}
-     package.loaded['ui.healthcheck.report']={redaction_context=function()return{}end}
-     package.loaded['ui.healthcheck.bridge']=nil
-     local diagnostics=require('ui.healthcheck.bridge')
+     package.loaded['diagnostics.ui.healthcheck.probes']={start=function(_,_,_,callback)completed=callback;return{cancel=function()end}end}
+     package.loaded['diagnostics.ui.healthcheck.report']={redaction_context=function()return{}end}
+     package.loaded['diagnostics.ui.healthcheck.bridge']=nil
+     local diagnostics=require('diagnostics.ui.healthcheck.bridge')
      diagnostics.config=function()return{schema={probes={}},redaction={}}end
      diagnostics.build_snapshot=function()return{sections={paths={}},probes={}}end
      helpers.assert_eq(m.show('healthcheck','en'),true);local old=m.current_epoch('healthcheck')
@@ -175,10 +175,10 @@ local run_contract = function(helpers,load_manager,load_host)
    helpers.it('(native-push-admission) synchronous diagnostics ready preserves only live acquisition: '..tostring(cancelled),function()
     fixture(function(m,c)
      local completed
-     package.loaded['ui.healthcheck.probes']={start=function(_,_,_,callback)completed=callback;return{cancel=function()end}end}
-     package.loaded['ui.healthcheck.report']={redaction_context=function()return{}end}
-     package.loaded['ui.healthcheck.bridge']=nil
-     local diagnostics=require('ui.healthcheck.bridge')
+     package.loaded['diagnostics.ui.healthcheck.probes']={start=function(_,_,_,callback)completed=callback;return{cancel=function()end}end}
+     package.loaded['diagnostics.ui.healthcheck.report']={redaction_context=function()return{}end}
+     package.loaded['diagnostics.ui.healthcheck.bridge']=nil
+     local diagnostics=require('diagnostics.ui.healthcheck.bridge')
      diagnostics.config=function()return{schema={probes={}},redaction={}}end
      diagnostics.build_snapshot=function()return{sections={paths={}},probes={}}end
      local observed={}

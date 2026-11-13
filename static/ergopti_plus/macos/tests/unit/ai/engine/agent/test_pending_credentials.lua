@@ -17,7 +17,7 @@ local OWNED = {
 	"ai.engine.agent.runner", "ai.engine.agent.learning", "ai.engine.agent.connectors",
 	"ai.engine.agent.agent", "llm.agent_learning", "platform.system.info", "core.i18n.engine.locale",
 	"core.ui.engine.dialog_util", "ai.engine.ollama.local_model_offer", "ai.engine.prediction.translate",
-	"adapters.event_provenance", "core.lifecycle.engine.compat.utf8", "core.i18n.engine.core", "modules.shortcuts.script_control",
+	"diagnostics.adapters.event_provenance", "core.lifecycle.engine.compat.utf8", "core.i18n.engine.core", "modules.shortcuts.script_control",
 }
 
 local function with_agent(options, scenario)

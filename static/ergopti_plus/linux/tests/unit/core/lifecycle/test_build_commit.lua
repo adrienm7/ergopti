@@ -162,7 +162,7 @@ end)
 -- =====================================
 
 describe("Build commit: the Linux snapshot resolves and logs", function()
-	local Collector = helpers.load_module("infra.diagnostic_snapshot")
+	local Collector = helpers.load_module("diagnostics.engine.reports.snapshot")
 
 	it("the snapshot's commit field is the package stamp", function()
 		local values = Collector.collect({
@@ -207,9 +207,9 @@ describe("Build commit: the healthcheck reports the commit and the real config d
 	it("sends the resolved commit, its source, the config dir and the script dir", function()
 		local ConfigPaths = require("settings.engine.paths")
 		local Paths = require("core.fs.engine.paths")
-		local handler = helpers.load_module("ui.healthcheck.bridge")
+		local handler = helpers.load_module("diagnostics.ui.healthcheck.bridge")
 		local result
-		with_module("infra.diagnostic_snapshot", {
+		with_module("diagnostics.engine.reports.snapshot", {
 			resolve_commit = function() return SHORT, Snapshot.COMMIT_SOURCE_BUILD end,
 			system_facts = function() return {} end,
 		}, function()
@@ -230,8 +230,8 @@ describe("Build commit: the crash dump names the build and the config dir", func
 	it("writes the resolved commit and the configuration directory", function()
 		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
 			local ConfigPaths = require("settings.engine.paths")
-			local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
-			with_module("infra.diagnostic_snapshot", {
+			local Reporter = helpers.load_module("diagnostics.engine.reports.crash_reporter")
+			with_module("diagnostics.engine.reports.snapshot", {
 				resolve_commit = function() return SHORT, Snapshot.COMMIT_SOURCE_BUILD end,
 			}, function()
 				local ok, err = pcall(Reporter.dump, "engine", "boom")
@@ -248,8 +248,8 @@ describe("Build commit: the crash dump names the build and the config dir", func
 
 	it("a resolver failure is written as its reason and the dump survives", function()
 		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
-			local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
-			with_module("infra.diagnostic_snapshot", {
+			local Reporter = helpers.load_module("diagnostics.engine.reports.crash_reporter")
+			with_module("diagnostics.engine.reports.snapshot", {
 				resolve_commit = function() error("stamp read exploded") end,
 			}, function()
 				local ok, err = pcall(Reporter.dump, "engine", "boom")

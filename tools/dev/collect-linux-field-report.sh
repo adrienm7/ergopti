@@ -34,10 +34,10 @@
 # reads the session (uinput, evdev, autostart, polkit, the focus reporter) and
 # prompts the gestures of TODO « To confirm on Linux » in this terminal; the
 # report ends with todo_summary.md, one verdict per TODO point
-# (static/ergopti_plus/linux/data/field_todo_coverage.json).
+# (static/ergopti_plus/linux/diagnostics/data/field_todo_coverage.json).
 #
 # The field run: tools/dev/linux-field-run.sh asks the running daemon to run its
-# Debug field checks with no window (linux/infra/field_run.lua, the macOS field
+# Debug field checks with no window (linux/diagnostics/engine/field_run/field_run.lua, the macOS field
 # run's protocol), copies one result per step into field_run/ and prints their
 # marks; no click is needed.
 #
@@ -341,7 +341,7 @@ printf '%-28s exit=%s\n' "field_python" "${PIPESTATUS[0]}" >> "${steps}"
 log "Field run: asking the daemon to run its field checks…"
 field_linux_run "${REPO_ROOT}" "${out}" 2>&1 | tee "${out}/field_run.txt" | sed 's/^/[field-report] /'
 printf '%-28s exit=%s\n' "field_run" "${PIPESTATUS[0]}" >> "${steps}"
-# The collector's own steps (static/ergopti_plus/linux/data/field_guided_steps.json):
+# The collector's own steps (static/ergopti_plus/linux/diagnostics/data/field_guided_steps.json):
 # probes read the session once (uinput, evdev, autostart, polkit, the focus
 # reporter), guided steps print a gesture and count what it left in today's
 # day log or the Metrics database, attested steps take y, n or s. Only counts

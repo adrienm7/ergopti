@@ -24,7 +24,7 @@
 --- 5. The opt-in day log: day_log {enabled} prepares or drops it, and only save,
 ---    report and export_snapshot may carry day_log = true; copy never does.
 --- 6. A refusal returns a stable reason code for the host to log. The AHK port
----    (windows/ui/healthcheck/actions.ahk) replays the same vectors
+---    (windows/diagnostics/ui/healthcheck/actions.ahk) replays the same vectors
 ---    (_shared/tests/corpus/healthcheck/action_vectors.json).
 --- ==============================================================================
 

@@ -248,9 +248,11 @@ for (const [index, family] of families.entries()) {
 // be an expression, never a literal, and its file must reach the resolver.
 const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/modules',
+	'static/ergopti_plus/macos/diagnostics/engine',
 	'static/ergopti_plus/macos/ai/engine',
 	'static/ergopti_plus/macos/settings/engine',
 	'static/ergopti_plus/macos/ui',
+	'static/ergopti_plus/macos/diagnostics/ui',
 	'static/ergopti_plus/macos/apps/ui',
 	'static/ergopti_plus/macos/ai/ui',
 	'static/ergopti_plus/macos/menu/ui',
@@ -258,6 +260,7 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/core/ui/ui',
 	'static/ergopti_plus/macos/core/network',
 	'static/ergopti_plus/linux/modules',
+	'static/ergopti_plus/linux/diagnostics/engine/reports',
 	'static/ergopti_plus/linux/ai/engine/agent',
 	'static/ergopti_plus/linux/ai/engine/api',
 	'static/ergopti_plus/linux/ai/engine/local_servers',
@@ -265,6 +268,8 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/linux/ai/engine/prediction',
 	'static/ergopti_plus/linux/ai/engine/settings',
 	'static/ergopti_plus/linux/infra',
+	'static/ergopti_plus/linux/diagnostics/engine/field_run',
+	'static/ergopti_plus/linux/diagnostics/engine/reports',
 	'static/ergopti_plus/linux/ai/engine',
 	'static/ergopti_plus/linux/menu/engine',
 	'static/ergopti_plus/linux/settings/engine',

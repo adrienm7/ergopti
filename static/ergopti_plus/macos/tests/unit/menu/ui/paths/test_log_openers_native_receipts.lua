@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local lfs = require("lfs")
 local shell_quote = require("core.text.engine.utils_core").shell_quote
-local OWNERS = { "ui.log_openers", "core.logger.engine.logger", "settings.engine.paths",
+local OWNERS = { "diagnostics.ui.log_openers", "core.logger.engine.logger", "settings.engine.paths",
 	"core.ui.engine.notifications", "core.fs.adapters.file_system", "core.fs.engine.dir" }
 
 --- Uses real filesystem outcomes and always reopens its private fixture for cleanup.
@@ -56,7 +56,7 @@ local function with_entry(kind, check)
 				observed.notified[#observed.notified + 1] = message
 				return observed.notify_ok ~= false
 			end }
-			local subject = helpers.load_with_stubs("ui.log_openers", { fs = {
+			local subject = helpers.load_with_stubs("diagnostics.ui.log_openers", { fs = {
 				attributes = lfs.attributes,
 				symlinkAttributes = lfs.symlinkattributes,
 				dir = lfs.dir,

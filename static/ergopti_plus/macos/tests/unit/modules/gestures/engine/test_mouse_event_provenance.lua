@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 
 local function clear_mouse_stack()
 	for _, name in ipairs({
-		"adapters.event_provenance",
+		"diagnostics.adapters.event_provenance",
 		"platform.input.synthetic_input",
 		"core.events.timer_scheduler",
 		"modules.gestures.actions",
@@ -48,7 +48,7 @@ local function load_lookup_fixture()
 		actions = actions,
 		posted = posted,
 		synthetic = require("platform.input.synthetic_input"),
-		provenance = require("adapters.event_provenance"),
+		provenance = require("diagnostics.adapters.event_provenance"),
 		new_mouse_event = new_mouse_event,
 		event_types = eventtap.event.types,
 	}
@@ -116,7 +116,7 @@ local function load_click_fixture(options)
 		eventtap = eventtap,
 		timer = require("tests.stubs.hs").timer,
 		synthetic = require("platform.input.synthetic_input"),
-		provenance = require("adapters.event_provenance"),
+		provenance = require("diagnostics.adapters.event_provenance"),
 		event_types = eventtap.event.types,
 		options = options,
 	}

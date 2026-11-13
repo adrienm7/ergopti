@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"core.fs.engine.file_watchers", "menu.ui.builder.watchers", "menu.engine.ui_restore", "infra.git_status", "core.fs.engine.dir",
+	"core.fs.engine.file_watchers", "menu.ui.builder.watchers", "menu.engine.ui_restore", "diagnostics.engine.reports.git_status", "core.fs.engine.dir",
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.lifecycle.engine.reload.gate", "core.fs.engine.native_path",
 	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.fs.adapters.storage", "core.timing.engine.timings", "core.fs.adapters.file_system",

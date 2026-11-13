@@ -43,7 +43,7 @@ local function load_bridge(controls)
 		deferred = {}, shown = 0, hidden = 0, pushed = {}, performed = {}, stored = {}, warnings = {},
 		notified = {}, epoch = nil, now = 0,
 	}
-	for _, name in ipairs({ "ui.error_dialog.bridge", "ui.healthcheck.bridge", "ui.healthcheck.report" }) do
+	for _, name in ipairs({ "diagnostics.ui.error_dialog", "diagnostics.ui.healthcheck.bridge", "diagnostics.ui.healthcheck.report" }) do
 		package.loaded[name] = nil
 	end
 	local stubs = {
@@ -66,7 +66,7 @@ local function load_bridge(controls)
 			eval_js = function(_, js) context.pushed[#context.pushed + 1] = js; return true end,
 			get_daemon_state = function() return {} end,
 		},
-		["ui.healthcheck.bridge"] = {
+		["diagnostics.ui.healthcheck.bridge"] = {
 			DRIVER = "linux",
 			config = function()
 				return { redaction = context.redaction, templates = shared_document("diagnostics/data/issue_templates.json"), repository = shared_document("updater/data/defaults.json").github, schema = sharing_schema }
@@ -86,7 +86,7 @@ local function load_bridge(controls)
 				}
 			end,
 		},
-		["ui.healthcheck.report"] = {
+		["diagnostics.ui.healthcheck.report"] = {
 			redaction_context = function() return { home = HOME, user = "jdoe", case_insensitive = false } end,
 			perform = function(action, paths, _, _, _, _, owner)
 				context.performed[#context.performed + 1] = { action = action, paths = paths }
@@ -109,7 +109,7 @@ local function load_bridge(controls)
 			retry_edit = function() return true end,
 			edit_setting = function(key, value)
 				context.stored[key] = value
-				local bridge = require("ui.error_dialog.bridge")
+				local bridge = require("diagnostics.ui.error_dialog")
 				local token = { pending = function() return false end, edit_key = key }
 				assert(bridge.scope_acquire(token))
 				local receipt = assert(bridge.scope_capture(token))
@@ -137,9 +137,9 @@ local function load_bridge(controls)
 
 
 	if controls.real_report then
-		package.loaded["ui.healthcheck.report"] = nil
-		local actual = require("ui.healthcheck.report")
-		package.loaded["ui.healthcheck.report"] = {
+		package.loaded["diagnostics.ui.healthcheck.report"] = nil
+		local actual = require("diagnostics.ui.healthcheck.report")
+		package.loaded["diagnostics.ui.healthcheck.report"] = {
 			redaction_context = function() return actual.redaction_context({ identity = function() return { home = HOME, user = "synthetic" } end }) end,
 			perform = function(action, paths, documents, context_value, _, snapshot, owner)
 				return actual.perform(action, paths, documents, context_value, {
@@ -158,7 +158,7 @@ local function load_bridge(controls)
 		}
 	end
 
-	local bridge = helpers.load_module("ui.error_dialog.bridge")
+	local bridge = helpers.load_module("diagnostics.ui.error_dialog")
 	bridge.defer = function(fn, delay_ms)
 		context.deferred[#context.deferred + 1] = { fn = fn, delay = delay_ms }
 		return true
@@ -170,7 +170,7 @@ local function load_bridge(controls)
 	context.restore = function()
 		logger.warn = warn
 		for name in pairs(stubs) do package.loaded[name] = saved[name] end
-		package.loaded["ui.error_dialog.bridge"] = nil
+		package.loaded["diagnostics.ui.error_dialog"] = nil
 	end
 	return bridge, context
 end

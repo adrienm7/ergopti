@@ -21,7 +21,7 @@ python3 -B tools/diagnostics/test_number_row_current_network_companion.py \
   --receiving "$number_row_control_receiving" -v
 ```
 
-Expected count is31 with no skips. Preserve the command exit status before any cleanup. The original test finalizer removes its own nested temporary fixtures. No missing input is silently skipped or replaced. Required existing core SHA256 is c37533761992d4e427d918123951fe3d7791931d9efb98a12c208fad1531fda9; positive receiver SHA256 is9cef4f9256f3604ac07d710d77c95424718012f23c6a8b472f9e5936253ac094. The immutable recipe and original Remap approval are already in the existing number-row-native-causal fixture directory.
+Expected count is31 with no skips. Preserve the command exit status before any cleanup. The original test finalizer removes its own nested temporary fixtures. No missing input is silently skipped or replaced. Required existing core SHA256 is 6a2669088d2a66f9bb7adb9ab0e01d0669982b8aa5ae490336d881fa1230e34b; positive receiver SHA256 is9cef4f9256f3604ac07d710d77c95424718012f23c6a8b472f9e5936253ac094. The immutable recipe and original Remap approval are already in the existing number-row-native-causal fixture directory.
 
 ## Evidence scope and recovery
 

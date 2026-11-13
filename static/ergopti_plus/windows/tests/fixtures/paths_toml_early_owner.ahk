@@ -21,7 +21,7 @@ global _DriverBootPhase := "starting"
 ; included here and the handler calls it under try.
 global _DriverStartupSmokeDir := ""
 
-#Include ../../infra/error_net.ahk
+#Include ../../diagnostics/engine/reports/error_net.ahk
 OnError(ErgoptiGlobalErrorHandler)
 OnExit(_PathsEarlyObserveExit)
 #Include ../../infra/hotpath_profiler.ahk

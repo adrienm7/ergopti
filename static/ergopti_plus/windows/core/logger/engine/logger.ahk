@@ -115,7 +115,7 @@ global _LOGGER_PATH_DATE := ""
 ; number macOS and Linux read too. The sentinel 0 means "not loaded yet": a purge
 ; is skipped rather than run with a guessed window, because _LoggerPurgeOldLogs
 ; with 0 days treats every dated file as expired. Only the fatal-path LoggerInit
-; of infra/error_net.ahk can run that early.
+; of diagnostics/engine/reports/error_net.ahk can run that early.
 global LOGGER_RETENTION_DAYS := 0
 
 ; Fixed-name diagnostic files used by detached helpers cannot participate in

@@ -111,5 +111,5 @@ global _DYNAMIC_HOTSTRINGS_ORDER := _MR_DynamicHotstringsOrder()
 #Include ../../apps/ui/menu/apps.ahk
 #Include builder/menu_init.ahk
 #Include builder/actions.ahk
-#Include ../../ui/log_openers.ahk
+#Include ../../diagnostics/ui/log_openers.ahk
 #Include builder/rebuild.ahk

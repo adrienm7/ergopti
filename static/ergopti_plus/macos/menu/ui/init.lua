@@ -46,10 +46,10 @@ local ProgramParameterTransaction = require("menu.ui.transactions.program_parame
 local GlobalActionsTransaction = require("menu.ui.transactions.global_actions_transaction")
 local RecoverableFileMoves = require("menu.ui.transactions.recoverable_file_moves")
 local FactoryResetJournal = require("settings.engine.factory_reset_journal")
-local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
+local DiagnosticSnapshot = require("diagnostics.engine.reports.snapshot")
 local BootProfiler = require("core.logger.engine.boot_profiler")
 local ConfigPaths = require("settings.engine.paths")
-local LogOpeners = require("ui.log_openers")
+local LogOpeners = require("diagnostics.ui.log_openers")
 local ShellRunner = require("core.process.adapters.shell_runner")
 
 local LOG = "menu"
@@ -149,7 +149,7 @@ M._active_tasks = {}
 local _timed_rebuild = nil
 
 --- Rebuilds the menu tree now, as a state change does, and times it: the
---- developer field run's menu step (infra/field_check_probes.lua).
+--- developer field run's menu step (diagnostics/engine/field_check/probes.lua).
 --- @return table|nil outcome { ok, ms, items, slowest = { { id, ms } } }, nil
 ---   before the menu exists.
 function M.timed_rebuild()
@@ -1170,7 +1170,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return state == "waiting" or started
 		end,
 		open_logs                 = function() return LogOpeners.open_logs_folder(open_async) end,
-		open_console              = function() return require("ui.console_window").open() end,
+		open_console              = function() return require("diagnostics.ui.console_window").open() end,
 		open_paths_editor         = function()
 			return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths_editor")
 		end,
@@ -1227,7 +1227,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return true
 		end,
 		toggle_error_dialog       = function()
-			local ErrorDialog = require("ui.error_dialog")
+			local ErrorDialog = require("diagnostics.ui.error_dialog")
 			if not ErrorDialog.set_enabled(not ErrorDialog.is_enabled()) then return end
 			-- The tick is part of the cached tree, like the log level's
 			_menu_dirty = true
@@ -1682,7 +1682,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return require("ui.changelog").open({ channel_owner = channel_owner })
 	end)
 	WindowToggle.set_opener("healthcheck", function()
-		return require("ui.healthcheck").show_window({ state = state })
+		return require("diagnostics.ui.healthcheck").show_window({ state = state })
 	end)
 
 	-- updateMenu refreshes the menubar icon and re-wires script_control extras,

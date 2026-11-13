@@ -1073,7 +1073,7 @@ The diagnostics window can save a redacted copy of today's complete log beside
 the report, only when the user ticks "Also save a redacted copy of today's
 complete log" (unticked at every snapshot; Copy and the Debug menu's Report a
 bug never carry it). The collector is `_shared/diagnostics/engine/day_log.lua`
-with its AHK port `windows/ui/healthcheck/day_log.ahk`, both replaying
+with its AHK port `windows/diagnostics/ui/healthcheck/day_log.ahk`, both replaying
 `day_log_vectors.json`; limits (the refusal cap, the preview size, the file
 name) live in `_shared/diagnostics/data/day_log.json`. The host keeps the
 redacted text per snapshot (`healthcheck/day_log.lua` on macOS and Linux); the

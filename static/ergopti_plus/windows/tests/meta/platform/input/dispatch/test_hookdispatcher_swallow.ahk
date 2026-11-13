@@ -72,7 +72,7 @@ _THS_Check() {
 _THS_CheckModifierRelease() {
 	Src := _DriverDirConcat("infra")
 	; Case-sensitive: assert the CALL ``ErgoptiGlobalErrorHandler(e, ...)`` exists,
-	; not merely the definition ``(Exc, Mode)`` now living in infra/error_net.ahk.
+	; not merely the definition ``(Exc, Mode)`` now living in diagnostics/engine/reports/error_net.ahk.
 	Assert(InStr(Src, "ErgoptiGlobalErrorHandler(e", true) > 0,
 		"HookDispatcher catch must call ErgoptiGlobalErrorHandler(e, ...) to release stuck modifiers")
 }
@@ -87,7 +87,7 @@ _THS_EscalationIsThrottled() {
 	; must contain ErgoptiGlobalErrorHandler before the next unindented block closes.
 	; Case-sensitive on the call signature so we match HookDispatcher's CALL
 	; ``ErgoptiGlobalErrorHandler(e, ...)`` (lowercase e) and NOT the function
-	; DEFINITION ``ErgoptiGlobalErrorHandler(Exc, Mode)`` in infra/error_net.ahk,
+	; DEFINITION ``ErgoptiGlobalErrorHandler(Exc, Mode)`` in diagnostics/engine/reports/error_net.ahk,
 	; which would otherwise sort earlier in the infra/ concat and break the ordering.
 	CacheAssignIdx := InStr(Src, "_err_cache[sig] := now")
 	EscalateIdx    := InStr(Src, "ErgoptiGlobalErrorHandler(e", true)

@@ -15,7 +15,7 @@ local RESET_MODULES = {
 	"modules.keymap", "modules.keymap.init", "settings.engine.registry",
 	"modules.keymap.expander", "ai.engine.bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
-	"platform.input.synthetic_input", "adapters.event_provenance",
+	"platform.input.synthetic_input", "diagnostics.adapters.event_provenance",
 	"core.logger.engine.logger", "core.logger.engine.perf",
 	"infra.hotpath_profiler", "menu.engine.manifest_reader", "platform.input.keycodes",
 }
@@ -94,7 +94,7 @@ local function load_fixture()
 		end,
 	}
 	package.loaded["platform.input.synthetic_input"] = synthetic_stub
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",
@@ -200,7 +200,7 @@ local function load_fixture()
 		is_secure_field = function() return false, 1 end,
 	})
 	local mailbox_running = false
-	package.loaded["modules.diagnostics.hid_diagnostic_mailbox"] = {
+	package.loaded["diagnostics.engine.hid_diagnostic_mailbox"] = {
 		start = function() mailbox_running = true; return true end,
 		stop = function() mailbox_running = false; return true end,
 		is_running = function() return mailbox_running end,

@@ -143,7 +143,7 @@ helpers.describe("one-shot native boundary", function()
 		helpers.assert_eq(flags(), SHIFT)
 	end)
 	helpers.it("keeps native translation probes private to the synthetic adapter (one-shot-probe)", function()
-		helpers.with_stub_scope({ "platform.input.synthetic_input", "adapters.event_provenance", "tests.stubs.hs" }, function()
+		helpers.with_stub_scope({ "platform.input.synthetic_input", "diagnostics.adapters.event_provenance", "tests.stubs.hs" }, function()
 			package.loaded["platform.input.synthetic_input"] = nil
 			package.loaded["tests.stubs.hs"] = nil
 			local eventtap = require("tests.stubs.hs").eventtap

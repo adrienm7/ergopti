@@ -71,7 +71,8 @@ const DRIVER_SUBDIRS = [
 	'tray',
 	'ai',
 	'apps',
-	'clipboard'
+	'clipboard',
+	'diagnostics'
 ];
 
 /** Supported target languages. */

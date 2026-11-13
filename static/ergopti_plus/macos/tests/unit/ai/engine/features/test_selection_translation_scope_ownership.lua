@@ -102,11 +102,11 @@ local function check_scope(cold, forced)
 		end
 		-- These are fixture preconditions, not a whole-cache rollback. The inner
 		-- scope itself must restore its cold dependency and a pre-existing owner.
-		helpers.with_fresh_modules({ "ai.engine.settings.profiles", "ai.engine.local_servers.mlx_stream_retirement", "adapters.event_provenance",
+		helpers.with_fresh_modules({ "ai.engine.settings.profiles", "ai.engine.local_servers.mlx_stream_retirement", "diagnostics.adapters.event_provenance",
 			"core.text.engine.json", "ai.engine.prediction.translate", "core.lifecycle.engine.compat.utf8", "tests.support.modules.llm.selection_translation_destination" }, function()
 			local profile = {}
 			package.loaded["ai.engine.settings.profiles"] = profile
-			for _, name in ipairs({ "ai.engine.local_servers.mlx_stream_retirement", "adapters.event_provenance",
+			for _, name in ipairs({ "ai.engine.local_servers.mlx_stream_retirement", "diagnostics.adapters.event_provenance",
 				"core.text.engine.json", "ai.engine.prediction.translate", "core.lifecycle.engine.compat.utf8", "tests.support.modules.llm.selection_translation_destination" }) do
 				helpers.assert_nil(package.loaded[name], "the transitive fixture owner must start cold: " .. name)
 			end

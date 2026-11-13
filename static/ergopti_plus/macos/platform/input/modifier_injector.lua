@@ -26,7 +26,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("core.logger.engine.logger")
-local EventProvenance = require("adapters.event_provenance")
+local EventProvenance = require("diagnostics.adapters.event_provenance")
 local SyntheticInput = require("platform.input.synthetic_input")
 local KeyEventHealth = require("core.logger.engine.key_event_health")
 local ControlSentinels = require("modules.keymap.control_sentinels")

@@ -12,7 +12,10 @@
 		"divergent": false
 	},
 	"COMMAND_TIMEOUT": {
-		"files": ["macos/adapters/runtime_owner_ports.lua", "macos/infra/field_check_checks.lua"],
+		"files": [
+			"macos/diagnostics/adapters/runtime_owner_ports.lua",
+			"macos/diagnostics/engine/field_check/checks.lua"
+		],
 		"divergent": false
 	},
 	"COPY_SETTLE_SEC": {

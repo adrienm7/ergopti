@@ -26,7 +26,7 @@ local OWNERS = {
 	"platform.remap.onboarding",
 	"core.ui.ui.tooltip",
 	"modules.keystats",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"core.events.timer_scheduler",
 }
 

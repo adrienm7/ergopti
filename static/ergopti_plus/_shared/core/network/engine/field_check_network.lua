@@ -12,7 +12,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One definition for macOS and Linux. The Windows driver runs the same
----    steps in AutoHotkey (windows/ui/field_check/network_check.ahk) and a
+---    steps in AutoHotkey (windows/diagnostics/ui/field_check/network_check.ahk) and a
 ---    corpus test pins that both spell the same step identities in the same
 ---    order.
 --- 2. Ports, not platform calls. The driver supplies how it reads its proxy

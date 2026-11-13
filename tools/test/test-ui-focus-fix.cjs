@@ -134,7 +134,7 @@ const ALLOWLIST = [
 		reason: 'overlay canvas adapter behind the WPM widget and feedback overlays'
 	},
 	{
-		file: 'macos/ui/healthcheck/core.lua',
+		file: 'macos/diagnostics/ui/healthcheck/core.lua',
 		kinds: { 'overlay.adapter': 1 },
 		reason: 'not an overlay: names the overlay adapter in its health probe, creates nothing'
 	},
@@ -938,8 +938,8 @@ record(
 
 for (const rel of [
 	'static/ergopti_plus/macos/ui/onboarding/init.lua',
-	'static/ergopti_plus/macos/ui/healthcheck/core.lua',
-	'static/ergopti_plus/macos/modules/diagnostics/crash_reporter.lua',
+	'static/ergopti_plus/macos/diagnostics/ui/healthcheck/core.lua',
+	'static/ergopti_plus/macos/diagnostics/engine/reports/crash_reporter.lua',
 	'static/ergopti_plus/macos/platform/remap/onboarding.lua'
 ]) {
 	record(

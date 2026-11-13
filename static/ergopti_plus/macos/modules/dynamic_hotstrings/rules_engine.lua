@@ -26,7 +26,7 @@ if not ok_kl then keystats = nil end
 local SharedEngine = require("hotstrings.engine.dynamic.core")
 local Terminators = require("layouts.engine.layers.terminators")
 local SyntheticInput = require("platform.input.synthetic_input")
-local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
+local HidDiagnosticMailbox = require("diagnostics.engine.hid_diagnostic_mailbox")
 
 local Logger = require("core.logger.engine.logger")
 local text_utils = require("core.text.engine.utils")

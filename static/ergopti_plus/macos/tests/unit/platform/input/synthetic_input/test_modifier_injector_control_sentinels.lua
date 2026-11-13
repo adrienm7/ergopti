@@ -16,7 +16,7 @@ local OWNED_MODULES = {
 	"platform.input.modifier_injector",
 	"modules.keymap.control_sentinels",
 	"layouts.engine.layers.control_signals",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.logger.engine.key_event_health",
 	"core.events.clock",

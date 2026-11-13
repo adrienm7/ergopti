@@ -45,7 +45,7 @@ const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 const ANALYSER = 'tools/dev/field-log-analyse.py';
 // The field run protocol every driver shares, and the Windows steps.
 const FIELD_RUN_PROTOCOL = 'static/ergopti_plus/_shared/diagnostics/data/field_run_protocol.json';
-const FIELD_RUN_STEPS = 'static/ergopti_plus/windows/data/field_run_steps.json';
+const FIELD_RUN_STEPS = 'static/ergopti_plus/windows/diagnostics/data/field_run_steps.json';
 const BUNDLED_SAMPLE =
 	'static/ergopti_plus/_shared/hotstrings/data/catalogue/french/autocorrection.toml';
 const GUARD =

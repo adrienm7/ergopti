@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Pins tools/dev/field-guided.py, the collector-side probe and guided steps of
  * a field report (the Linux collector runs
- * static/ergopti_plus/linux/data/field_guided_steps.json):
+ * static/ergopti_plus/linux/diagnostics/data/field_guided_steps.json):
  * 1. a probe step passes when each probe meets its expectation and fails by
  *    name otherwise (a missing command, a node not writable);
  * 2. an observed step passes once each counted log line or Metrics row rose
@@ -28,7 +28,10 @@ const { spawn, spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '../..');
 const TOOL = path.join(ROOT, 'tools/dev/field-guided.py');
-const LINUX_STEPS = path.join(ROOT, 'static/ergopti_plus/linux/data/field_guided_steps.json');
+const LINUX_STEPS = path.join(
+	ROOT,
+	'static/ergopti_plus/linux/diagnostics/data/field_guided_steps.json'
+);
 let checks = 0;
 
 /** Runs one named check. */

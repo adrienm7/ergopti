@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 
 local STUBBED_MODULES = {
 	"core.logger.engine.logger",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"modules.keymap.utils",
@@ -25,7 +25,7 @@ local STUBBED_MODULES = {
 	"modules.keymap.expander",
 	"menu.engine.manifest_reader",
 	"ai.engine.bridge",
-	"modules.diagnostics.hid_diagnostic_mailbox",
+	"diagnostics.engine.hid_diagnostic_mailbox",
 }
 
 local function load_fixture(options, lifetime)
@@ -40,7 +40,7 @@ local function load_fixture(options, lifetime)
 	local hides = 0
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "physical", nil end,
 	}

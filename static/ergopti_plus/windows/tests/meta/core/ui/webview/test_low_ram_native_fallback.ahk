@@ -37,7 +37,7 @@ Test("webview-lowram: gate helper + threshold defined in webview_utils", _TWLR_G
 
 ; Diagnostics must attempt the shared page; RAM alone is no browser failure.
 _TWLR_HealthcheckAttempted() {
-	Src := _DriverDirConcat("ui/healthcheck")
+	Src := _DriverDirConcat("diagnostics/ui/healthcheck")
 	Assert(Src != "", "healthcheck source must exist")
 	Assert(InStr(Src, "WebView_ShouldUseNativeFallback") = 0,
 		"diagnostics must attempt the installed browser even under memory pressure")

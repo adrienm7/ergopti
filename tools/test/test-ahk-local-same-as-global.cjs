@@ -301,7 +301,7 @@ for (const expected of [
 	'windows/vendor/WebView2.ahk',
 	'windows/vendor/Promise.ahk',
 	'windows/core/ui/engine/webview/browser_warmup.ahk',
-	'windows/ui/healthcheck/core.ahk',
+	'windows/diagnostics/ui/healthcheck/core.ahk',
 	'windows/tests/fixtures/error_dialog_startup_owner_body.ahk'
 ])
 	check(errorClosure.has(expected), `the error-startup child must resolve to ${expected}`);

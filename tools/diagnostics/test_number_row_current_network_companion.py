@@ -36,18 +36,18 @@ if args.receiving.is_symlink() or not args.receiving.is_dir():
     raise ValueError("explicit owned receiving directory required")
 images = {}
 for name, path, expected in (
-    ("subject", args.receiver, "5a804b0a1502dc9fc2da9c898236e8e8c2ad52d365ac9b6c77709464d2877c25"),
+    ("subject", args.receiver, "5441383d478b7c6028df1708be9149039b0bdf3dad1911580bdc699e2a42428c"),
     (
         "core",
         args.core_receiver,
-        "c37533761992d4e427d918123951fe3d7791931d9efb98a12c208fad1531fda9",
+        "6a2669088d2a66f9bb7adb9ab0e01d0669982b8aa5ae490336d881fa1230e34b",
     ),
     (
         "positive",
         args.positive_receiver,
         "9cef4f9256f3604ac07d710d77c95424718012f23c6a8b472f9e5936253ac094",
     ),
-    ("recipe", args.recipe, "6ae620b17f7c7a9ce0ba378cc978c68bf6529bdc5532c3741b293a59861a9165"),
+    ("recipe", args.recipe, "42fe4c4fdd03b586eeffca19a36cd4665b8511f1d2ab9356482ff1d748b9aff2"),
     (
         "base",
         args.base_approval,
@@ -351,7 +351,7 @@ class CurrentNetworkControls(unittest.TestCase):
             "--head",
             "a" * 40,
             "--companion-sha256",
-            "5a804b0a1502dc9fc2da9c898236e8e8c2ad52d365ac9b6c77709464d2877c25",
+            "5441383d478b7c6028df1708be9149039b0bdf3dad1911580bdc699e2a42428c",
             mode,
             "--recipe",
             str(args.recipe),

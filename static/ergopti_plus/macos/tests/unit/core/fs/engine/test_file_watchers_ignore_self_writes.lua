@@ -99,9 +99,9 @@ end)
 
 helpers.describe("file_watchers: a field run and non-source files never reload", function()
 	helpers.it("holds a source reload while a field run runs, then reloads once it ends", function()
-		local previous = package.loaded["infra.field_run"]
+		local previous = package.loaded["diagnostics.engine.field_run.field_run"]
 		local running = true
-		package.loaded["infra.field_run"] = { holds_reload = function() return running end }
+		package.loaded["diagnostics.engine.field_run.field_run"] = { holds_reload = function() return running end }
 		local ok, err = pcall(Fixture.with_watchers, function(w)
 			w.fire("/fake/base/modules/edited.lua")
 			w.settle()
@@ -111,7 +111,7 @@ helpers.describe("file_watchers: a field run and non-source files never reload",
 			w.settle()
 			helpers.assert_eq(w.reloads(), 1, "the held burst reloads once the run ends")
 		end)
-		package.loaded["infra.field_run"] = previous
+		package.loaded["diagnostics.engine.field_run.field_run"] = previous
 		if not ok then error(err, 0) end
 	end)
 

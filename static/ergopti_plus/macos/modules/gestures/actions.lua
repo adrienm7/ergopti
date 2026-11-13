@@ -1619,13 +1619,13 @@ local function gesture_opener(label)
 	return function(target) return AuxOwner.open(target, label, nil, parent) end
 end
 sg("open_logs_folder",                function()
-	return require("ui.log_openers").open_logs_folder(gesture_opener("open logs folder"))
+	return require("diagnostics.ui.log_openers").open_logs_folder(gesture_opener("open logs folder"))
 end)
 sg(ConfigKeys.COMMAND.OPEN_TODAY_LOG,                   function()
-	return require("ui.log_openers").open_today_log(gesture_opener("open today's log"))
+	return require("diagnostics.ui.log_openers").open_today_log(gesture_opener("open today's log"))
 end)
 sg(ConfigKeys.COMMAND.OPEN_ERROR_LOG,                   function()
-	return require("ui.log_openers").open_today_errors(gesture_opener("open error log"))
+	return require("diagnostics.ui.log_openers").open_today_errors(gesture_opener("open error log"))
 end)
 
 -- Parameterized actions read their value from the binding that invoked them.
@@ -2389,7 +2389,7 @@ sg("script_quit",                         function()
 end)
 
 -- Debug
-sg("open_console",                        function() return require("ui.console_window").open() end)
+sg("open_console",                        function() return require("diagnostics.ui.console_window").open() end)
 
 
 

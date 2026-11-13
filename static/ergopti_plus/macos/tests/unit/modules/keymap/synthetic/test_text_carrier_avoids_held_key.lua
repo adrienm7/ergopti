@@ -29,7 +29,7 @@ local function load_fixture()
 			or name:match("^modules%.keystats")
 			or name:match("^core%.ui%.ui%.tooltip")
 			or name == "platform.input.synthetic_input"
-			or name == "adapters.event_provenance"
+			or name == "diagnostics.adapters.event_provenance"
 			or name == "core.events.clock"
 			or name == "clipboard.adapters.unicode_carrier"
 			or name == "core.logger.engine.key_event_health"

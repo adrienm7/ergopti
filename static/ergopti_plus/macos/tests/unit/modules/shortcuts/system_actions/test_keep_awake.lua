@@ -160,7 +160,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		package.loaded["modules.shortcuts.actions.system"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["platform.input.synthetic_input"] = nil
-		package.loaded["adapters.event_provenance"] = nil
+		package.loaded["diagnostics.adapters.event_provenance"] = nil
 		local sys = load_system()
 		local hs  = _G.hs
 
@@ -254,7 +254,7 @@ local function fake_activity_event()
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 			package.loaded["platform.input.synthetic_input"] = nil
-			package.loaded["adapters.event_provenance"] = nil
+			package.loaded["diagnostics.adapters.event_provenance"] = nil
 
 			-- Drive the production adapter all the way through its deferred Quartz
 			-- pump. Looking only at a mocked emit_key_stroke call would stay green if
@@ -288,7 +288,7 @@ local function fake_activity_event()
 			local hs = _G.hs
 
 			local synthetic = require("platform.input.synthetic_input")
-			local provenance = require("adapters.event_provenance")
+			local provenance = require("diagnostics.adapters.event_provenance")
 			local epoch_before = synthetic.current_action_epoch()
 
 			sys._emit_activity_keystroke()
@@ -340,7 +340,7 @@ local function fake_activity_event()
 			-- Do not leak an adapter captured against this test's hs table into later
 			-- system-action fixtures, which intentionally install partial hs overrides.
 			package.loaded["platform.input.synthetic_input"] = nil
-			package.loaded["adapters.event_provenance"] = nil
+			package.loaded["diagnostics.adapters.event_provenance"] = nil
 		end)
 	end)
 

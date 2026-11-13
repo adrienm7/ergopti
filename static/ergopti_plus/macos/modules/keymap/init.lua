@@ -21,7 +21,7 @@ local eventtap   = hs.eventtap
 local text_utils = require("core.text.engine.utils")
 local ComposedText = require("infra.composed_text")
 local LlmContext = require("ai.engine.api.context")
-local EventProvenance = require("adapters.event_provenance")
+local EventProvenance = require("diagnostics.adapters.event_provenance")
 local KeyboardGeometry = require("platform.input.keyboard_geometry")
 local ControlSentinels = require("modules.keymap.control_sentinels")
 local SelftestGate = require("modules.keymap.selftest_gate")
@@ -50,7 +50,7 @@ local KeyEventHealth = require("core.logger.engine.key_event_health")
 local UnicodeCarrier = require("clipboard.adapters.unicode_carrier")
 local EventClock = require("core.events.clock")
 local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
-local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
+local HidDiagnosticMailbox = require("diagnostics.engine.hid_diagnostic_mailbox")
 local ConfigKeys = require("settings.engine.keys")
 
 local M   = {}
@@ -2855,7 +2855,7 @@ local function taps_are_enabled()
 end
 
 --- The native state of each keymap event tap, read without changing any, for
---- the field run's event tap check (infra/field_check_probes.lua).
+--- the field run's event tap check (diagnostics/engine/field_check/probes.lua).
 --- @return table states { started, watchdog, taps = { { name, state } } } where
 ---   state is "enabled", "disabled", "absent" or "unreadable", in a fixed order.
 function M.tap_states()
@@ -2972,7 +2972,7 @@ local function build_tap_copy()
 end
 
 --- The tap-hold copy watch's statistics since the keymap started, for the field
---- run (infra/field_check_tap_copy.lua).
+--- run (diagnostics/engine/field_check/tap_copy.lua).
 --- @return table|nil stats nil before the keymap started.
 function M.tap_copy_statistics()
 	return _tap_copy and _tap_copy:statistics() or nil

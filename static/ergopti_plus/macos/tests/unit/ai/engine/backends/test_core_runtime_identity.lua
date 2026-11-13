@@ -22,7 +22,7 @@ local function with_runtime(scenario)
 		end
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.keystats"] = {}
-		local healthcheck = helpers.load_with_stubs("ui.healthcheck.helpers")
+		local healthcheck = helpers.load_with_stubs("diagnostics.ui.healthcheck.helpers")
 		local live = helpers.load_with_stubs("ai.engine")
 		-- The alternate import must stay absent: creating it would give a
 		-- diagnostic or configuration reader an independent default-only core

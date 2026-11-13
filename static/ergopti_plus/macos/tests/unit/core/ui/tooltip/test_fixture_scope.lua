@@ -12,7 +12,7 @@ local TooltipContext = require("tests.support.tooltip_context_watchers")
 local OWNERS = {
 	"hs", "tests.stubs.hs", "core.ui.ui.tooltip.config", "core.ui.ui.tooltip.renderer",
 	"core.ui.ui.tooltip.llm", "core.ui.ui.tooltip.hotstring", "core.ui.ui.tooltip", "ui.tooltip.init",
-	"adapters.event_provenance", "platform.input.key_state", "platform.input.synthetic_input",
+	"diagnostics.adapters.event_provenance", "platform.input.key_state", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "core.fs.adapters.storage", "infra.hotpath_profiler", "core.logger.engine.logger",
 }
 

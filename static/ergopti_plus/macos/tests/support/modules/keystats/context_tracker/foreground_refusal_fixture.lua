@@ -27,7 +27,7 @@ local OWNERS = {
 	"modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode",
 	"platform.input.synthetic_input",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"core.process.adapters.lifecycle",
 	"platform.input.keyboard_hook",
 	"adapters.input_source_broker",

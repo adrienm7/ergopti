@@ -216,7 +216,7 @@ function M.run(options)
 		elseif name == "core.timing.engine.reload_timing" then
 			-- The Reload this boot completes is reported once the boot is complete.
 			return { complete = function() record("reload.complete"); return nil end }
-		elseif name == "infra.field_run" then
+		elseif name == "diagnostics.engine.field_run.field_run" then
 			-- The collector's no-click field run starts beside the reload control.
 			return { start = function(field_options)
 				observed.field_run = field_options

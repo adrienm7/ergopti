@@ -128,7 +128,7 @@ end)
 -- =======================================
 
 describe("linux-diagnostic-read-admission", function()
-	local Collector = require("infra.diagnostic_snapshot")
+	local Collector = require("diagnostics.engine.reports.snapshot")
 	local FileSystem = require("core.fs.adapters.file_system")
 	local sha = "123456789" .. string.rep("0", 31)
 	local root = "/native-diagnostic-fixture"
@@ -176,7 +176,7 @@ describe("linux-diagnostic-read-admission", function()
 end)
 
 describe("Diagnostic snapshot: Linux collector", function()
-	local Collector = require("infra.diagnostic_snapshot")
+	local Collector = require("diagnostics.engine.reports.snapshot")
 	it("linux-system-locale-precedence: respects LC_MESSAGES between LC_ALL and LANG", function()
 		local original = os.getenv
 		local env = { LC_ALL = "", LC_MESSAGES = "fr_FR.UTF-8", LANG = "en_US.UTF-8" }
@@ -309,7 +309,7 @@ end)
 --- Captures only snapshot log output while preserving the real collector.
 --- @param body function Receives the collector and emitted formatted lines.
 local function with_prepared_snapshot(body)
-	local Collector, Logger = require("infra.diagnostic_snapshot"), require("core.logger.engine.shim")
+	local Collector, Logger = require("diagnostics.engine.reports.snapshot"), require("core.logger.engine.shim")
 	local original, lines = Logger.info, {}
 	Logger.info = function(tag, _, message)
 		if tag == Snapshot.MODULE then lines[#lines + 1] = message end

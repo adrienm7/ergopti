@@ -7,7 +7,7 @@
 --- completed. The field list and the rendering rules are the cross-driver
 --- contract in _shared/core/logger/data/diagnostic_snapshot.json; this module is
 --- the Lua implementation used by both the macOS and the Linux drivers, and
---- windows/infra/diagnostic_snapshot.ahk is the AutoHotkey one.
+--- windows/diagnostics/engine/reports/snapshot.ahk is the AutoHotkey one.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One line, identical field names everywhere: a user log from any of the

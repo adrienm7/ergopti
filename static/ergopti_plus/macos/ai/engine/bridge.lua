@@ -26,7 +26,7 @@ local M = {}
 
 local hs        = hs
 local km_utils         = require("modules.keymap.utils")
-local EventProvenance  = require("adapters.event_provenance")
+local EventProvenance  = require("diagnostics.adapters.event_provenance")
 local SyntheticInput   = require("platform.input.synthetic_input")
 local text_utils       = require("core.text.engine.utils")
 local core_llm         = require("ai.engine")
@@ -45,7 +45,7 @@ local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local expander         = require("modules.keymap.expander")
 local TimerScheduler   = require("core.events.timer_scheduler")
 local ManifestReader = require("menu.engine.manifest_reader")
-local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
+local HidDiagnosticMailbox = require("diagnostics.engine.hid_diagnostic_mailbox")
 local Timings          = require("core.timing.engine.timings")
 local ConfigKeys = require("settings.engine.keys")
 local LlmContext       = require("ai.engine.api.context")

@@ -19,7 +19,7 @@ local OWNED_MODULES = {
 	"core.fs.engine.dir",
 	"core.ui.engine.dialog_util",
 	"platform.input.keycodes",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"platform.input.key_state",
@@ -208,7 +208,7 @@ local function install_subject_stubs(native)
 	}
 
 	local admission_fence = nil
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "physical", nil end,
 	}

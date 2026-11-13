@@ -31,7 +31,7 @@ local function with_fixture(callback)
 		"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
 		"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
 		"modules.gestures", "platform.input.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
-		"adapters.event_provenance", "core.fs.adapters.file_system", "platform.input.key_state",
+		"diagnostics.adapters.event_provenance", "core.fs.adapters.file_system", "platform.input.key_state",
 		"core.process.adapters.shell_runner", "platform.input.synthetic_input", "core.events.timer_scheduler",
 		"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
 		"core.timing.engine.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
@@ -172,7 +172,7 @@ local function make_sys_screenshot_spies(window_override)
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["platform.input.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	-- lib.notifications uses hs.notify under the hood — stub it so the deferred

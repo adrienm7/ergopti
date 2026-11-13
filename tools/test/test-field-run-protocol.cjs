@@ -9,7 +9,7 @@
  * 1. the declaration is well formed: closed names, patterns that compile,
  *    one document key list per file, a steps file and a folder per driver
  *    under that driver's root of _shared/core/fs/data/paths/app_dirs.toml;
- * 2. the macOS field run (macos/data/field_run.json, the first implementation)
+ * 2. the macOS field run (macos/diagnostics/data/field_run.json, the first implementation)
  *    keeps every protocol key equal to the shared one, and its folder is the
  *    clone folder;
  * 3. every driver steps file that exists declares steps the protocol accepts:
@@ -20,7 +20,7 @@
  *    here) reads every name from the declarations, has a runner for every
  *    declared check, writes only declared verdicts and refusal reasons, starts
  *    in developer source mode only and stops with the driver;
- * 5. the Linux field run (linux/infra/field_run.lua) has its steps file and
+ * 5. the Linux field run (linux/diagnostics/engine/field_run/field_run.lua) has its steps file and
  *    repeats no protocol key in it: it reads the protocol from this file;
  * 6. every driver that declares a reload step writes the resume document with
  *    each key the declaration lists for it, before it asks for the reload.
@@ -37,7 +37,7 @@ const AppDirs = require('./lib/app-dirs.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const PROTOCOL = 'static/ergopti_plus/_shared/diagnostics/data/field_run_protocol.json';
-const MACOS = 'static/ergopti_plus/macos/data/field_run.json';
+const MACOS = 'static/ergopti_plus/macos/diagnostics/data/field_run.json';
 // The keys the macOS declaration carries for the protocol, beside its steps.
 const SHARED_KEYS = [
 	'schema',
@@ -154,7 +154,10 @@ check('every driver steps file declares steps the protocol accepts', () => {
 
 check('the Windows driver implements the protocol from the declarations', () => {
 	const WINDOWS = 'static/ergopti_plus/windows/';
-	const source = fs.readFileSync(path.join(ROOT, WINDOWS, 'infra/field_run.ahk'), 'utf8');
+	const source = fs.readFileSync(
+		path.join(ROOT, WINDOWS, 'diagnostics/engine/field_run/field_run.ahk'),
+		'utf8'
+	);
 	const code = source
 		.split('\n')
 		.filter((line) => !/^\s*;/.test(line))
@@ -210,8 +213,8 @@ check('the Linux field run declares its steps and repeats no protocol key', () =
 
 check('every reload step writes the declared resume document', () => {
 	const sources = {
-		macos: 'static/ergopti_plus/macos/infra/field_run.lua',
-		linux: 'static/ergopti_plus/linux/infra/field_run.lua'
+		macos: 'static/ergopti_plus/macos/diagnostics/engine/field_run/field_run.lua',
+		linux: 'static/ergopti_plus/linux/diagnostics/engine/field_run/field_run.lua'
 	};
 	let drivers = 0;
 	for (const [os, relative] of Object.entries(protocol.steps_file)) {

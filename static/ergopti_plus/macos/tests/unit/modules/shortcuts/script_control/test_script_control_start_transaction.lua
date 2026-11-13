@@ -34,7 +34,7 @@ local function install_dependency_stubs()
 		get_label = function(name) return name end,
 		execute_single = function() return true end,
 	}
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "hardware", nil end,
 	}

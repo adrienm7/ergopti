@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Adapter Wiring Reachability Meta-Test
 --- DESCRIPTION:
---- Regression test for audit F-HIGH-10: ui/healthcheck/core.lua's ADAPTER_SPECS
+--- Regression test for audit F-HIGH-10: diagnostics/ui/healthcheck/core.lua's ADAPTER_SPECS
 --- validated only that an adapter's contract methods exist — it never checked
 --- whether any real feature actually calls the adapter. Before the fix, 14 of
 --- the 23 adapters under adapters/ were never require()'d by production code
@@ -15,7 +15,7 @@
 ---    non-test, non-healthcheck production Lua file for a
 ---    require("adapters.<name>") call site. This is the same signal a human
 ---    auditor used to produce the F-HIGH-10 finding.
---- 2. Contract check: every ADAPTER_SPECS entry in ui/healthcheck/core.lua must
+--- 2. Contract check: every ADAPTER_SPECS entry in diagnostics/ui/healthcheck/core.lua must
 ---    carry an explicit `wired` boolean field so the healthcheck report can never
 ---    silently imply full reachability again (no field == old misleading behaviour).
 --- 3. Agreement check: the spec's `wired` flag must match the grep-derived ground
@@ -29,7 +29,7 @@ local CommandLines = require("tests.support.command_lines")
 
 local DRIVER_ROOT = helpers.driver_root()
 -- The healthcheck owns the adapter specs; named as the code requires it.
-local HEALTHCHECK_CORE = "ui.healthcheck.core"
+local HEALTHCHECK_CORE = "diagnostics.ui.healthcheck.core"
 
 
 
@@ -119,19 +119,19 @@ helpers.describe("meta: adapter wiring reachability (F-HIGH-10)", function()
 	end)
 
 	-- Load the real healthcheck core to read its ADAPTER_SPECS ground truth.
-	package.loaded["ui.healthcheck.core"] = nil
-	package.loaded["ui.healthcheck.helpers"] = nil
-	local ok_core, Core = pcall(require, "ui.healthcheck.core")
-	helpers.it("ui.healthcheck.core loads", function()
+	package.loaded["diagnostics.ui.healthcheck.core"] = nil
+	package.loaded["diagnostics.ui.healthcheck.helpers"] = nil
+	local ok_core, Core = pcall(require, "diagnostics.ui.healthcheck.core")
+	helpers.it("diagnostics.ui.healthcheck.core loads", function()
 		helpers.assert_true(ok_core and type(Core) == "table",
-			"require('ui.healthcheck.core') must succeed: " .. tostring(Core))
+			"require('diagnostics.ui.healthcheck.core') must succeed: " .. tostring(Core))
 	end)
 
 	-- ADAPTER_SPECS is module-local (not exported); re-derive the same table by
 	-- re-reading the source file's spec block rather than reaching into module
 	-- internals, so this test does not force core.lua to export test-only state.
 	local core_src = helpers.read_module_source(HEALTHCHECK_CORE)
-	helpers.it("ui/healthcheck/core.lua is readable", function()
+	helpers.it("diagnostics/ui/healthcheck/core.lua is readable", function()
 		helpers.assert_true(type(core_src) == "string", "cannot read the module " .. HEALTHCHECK_CORE)
 	end)
 

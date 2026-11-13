@@ -5228,7 +5228,7 @@ end
 --- incompatible VirtualHIDDevice.
 --- @return string|nil version Nil when the manifest pins none.
 function M.owned_virtual_hid_version()
-	return require("adapters.runtime_owner_ports").virtual_hid_version()
+	return require("diagnostics.adapters.runtime_owner_ports").virtual_hid_version()
 end
 
 --- Replaces an incompatible VirtualHIDDevice with the pinned driver after the
@@ -5245,7 +5245,7 @@ function M.update_virtual_hid_driver(on_done)
 		Logger.error(LOG, "VirtualHIDDevice update refused: no incompatible driver blocks the owned runtime.")
 		return false
 	end
-	require("adapters.runtime_owner_ports").update_virtual_hid(on_done)
+	require("diagnostics.adapters.runtime_owner_ports").update_virtual_hid(on_done)
 	return true
 end
 
@@ -5276,7 +5276,7 @@ function M.install_owned_runtime(on_done)
 		Logger.error(LOG, "Owned runtime install refused: the runtime is not blocked by a missing install.")
 		return false
 	end
-	require("adapters.runtime_owner_ports").install_runtime(on_done)
+	require("diagnostics.adapters.runtime_owner_ports").install_runtime(on_done)
 	return true
 end
 
@@ -5293,7 +5293,7 @@ function M.repair_owned_runtime(on_done)
 		Logger.error(LOG, "Owned runtime service repair refused: the runtime is not blocked by a stopped service.")
 		return false
 	end
-	require("adapters.runtime_owner_ports").repair_runtime(on_done)
+	require("diagnostics.adapters.runtime_owner_ports").repair_runtime(on_done)
 	return true
 end
 
@@ -5302,7 +5302,7 @@ end
 --- @return boolean closed
 function M.user_karabiner_closed()
 	if not M._owned.selected() then return false end
-	return require("adapters.runtime_owner_ports").marker().get() == true
+	return require("diagnostics.adapters.runtime_owner_ports").marker().get() == true
 end
 
 --- The user's consent to closing their own Karabiner while Ergopti runs.
@@ -6983,7 +6983,7 @@ function M._owned.bind()
 	if M._owned.activation then return M._owned.activation end
 	local Owner = require("platform.remap.runtime_owner")
 	Logger.start(LOG, "Binding the owned Karabiner runtime…")
-	local OwnerPorts = require("adapters.runtime_owner_ports")
+	local OwnerPorts = require("diagnostics.adapters.runtime_owner_ports")
 	local ports_ok, ports = pcall(OwnerPorts.new)
 	if not ports_ok then
 		Logger.error(LOG, "Owned Karabiner runtime ports could not be built: %s.", tostring(ports))

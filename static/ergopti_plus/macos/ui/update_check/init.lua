@@ -164,7 +164,7 @@ end
 --- @return boolean opened
 local function open_today_log()
 	local ShellRunner = require("core.process.adapters.shell_runner")
-	return require("ui.log_openers").open_today_log(function(target) return (ShellRunner.open(target)) end)
+	return require("diagnostics.ui.log_openers").open_today_log(function(target) return (ShellRunner.open(target)) end)
 end
 
 --- The session of one window, bound to that exact window and the menu's owners.
@@ -203,7 +203,7 @@ local function session_for(view, ctx)
 		end,
 		report = function(result, on_complete, is_current)
 			if not is_current() then return end
-			return require("ui.error_dialog").report({
+			return require("diagnostics.ui.error_dialog").report({
 				kind = "error",
 				module = "updater",
 				message = string.format("Update check failed on channel %s: %s", tostring(result.channel),

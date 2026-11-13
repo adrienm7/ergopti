@@ -11,13 +11,13 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.escape_context_fixture")
 
 local OWNERS = {
-	"core.logger.engine.logger", "adapters.event_provenance", "platform.input.synthetic_input",
+	"core.logger.engine.logger", "diagnostics.adapters.event_provenance", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "modules.keymap.utils", "core.text.engine.utils",
 	"ai.engine", "platform.input.keycodes", "modules.keystats", "core.ui.ui.tooltip",
 	"ai.engine.prediction.engine", "settings.engine.registry",
 	"modules.hotstrings.hotstrings_config", "modules.keymap.expander",
 	"menu.engine.manifest_reader", "ai.engine.bridge",
-	"modules.diagnostics.hid_diagnostic_mailbox",
+	"diagnostics.engine.hid_diagnostic_mailbox",
 }
 
 helpers.describe("Escape context fixture isolation", function()

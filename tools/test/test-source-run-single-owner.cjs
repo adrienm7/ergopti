@@ -146,7 +146,9 @@ expect(fullSavePublisher !== '', 'the native full-save publisher must exist');
 expect(startupIdentity !== '', 'both startup receipts must have a native runtime identity owner');
 expect(
 	startupIdentity.split('A_IsCompiled').length === 2 &&
-		code('windows', 'infra/startup_smoke.ahk', ahkComment).split('A_IsCompiled').length === 2 &&
+		code('windows', 'diagnostics', 'engine', 'field_run', 'startup_smoke.ahk', ahkComment).split(
+			'A_IsCompiled'
+		).length === 2 &&
 		/Compiled := A_IsCompiled/.test(startupIdentity) &&
 		/SystemControl\(\)\.OwnPid\(\)/.test(startupIdentity) &&
 		/executable: Compiled \? A_ScriptFullPath : A_AhkPath, compiled: Compiled/.test(

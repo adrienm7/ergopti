@@ -58,7 +58,7 @@ local function load_keystats(options)
 
 	package.loaded["modules.keystats.init"] = nil
 	package.loaded["platform.input.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 	package.loaded["modules.keymap"] = {}
 
 	local logger = helpers.make_logger_stub()

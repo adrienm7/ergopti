@@ -308,7 +308,7 @@ h.describe("one-click check report caption (linux-native-titles)", function()
 	h.it("(linux-native-titles) the check report brands its caption and keeps the body plain text", function()
 		scenario(function(observed)
 			observed.status = 1
-			local runner = require("ui.field_check.window").new({
+			local runner = require("diagnostics.ui.field_check.window").new({
 				label = "Owned check", log = "owned_check", check_id = "owned", title_key = "Native 'check'",
 				steps = function(_, _, finish) finish() end, env = function() return {} end,
 				unusable_step = "owned_env",
@@ -343,7 +343,7 @@ h.describe("native caption consumer inventory", function()
 			-- The enable refusal tests prove the policy-owned native caption and modal receipts.
 			["ai.ui.enable_refusal"] = 1,
 			-- The one-click check runner owns the caption of every check report.
-			["ui.field_check.window"] = 1,
+			["diagnostics.ui.field_check.window"] = 1,
 			-- The list prompt's caption is proven by the choice prompt case.
 			["core.ui.ui.choice_prompt"] = 1,
 			-- The bundled apps' entry, question, message and file dialogs compose

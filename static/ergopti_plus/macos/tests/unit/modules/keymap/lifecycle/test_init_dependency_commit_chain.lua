@@ -203,7 +203,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 		local tooltip_guard_calls = 0
 		with_stubbed_module("ai.engine.bridge", {
 			["modules.keymap.utils"] = {},
-			["adapters.event_provenance"] = {},
+			["diagnostics.adapters.event_provenance"] = {},
 			["platform.input.synthetic_input"] = {
 				current_action_epoch = function() return 0 end,
 			},
@@ -227,7 +227,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 			["modules.keymap.expander"] = {},
 			["core.events.timer_scheduler"] = {},
 			["menu.engine.manifest_reader"] = { default_for = function() return "★" end },
-			["modules.diagnostics.hid_diagnostic_mailbox"] = {},
+			["diagnostics.engine.hid_diagnostic_mailbox"] = {},
 		}, function(bridge)
 			helpers.assert_eq(bridge.init({ buffer = "", mappings = {}, llm_context_text = "", llm_context_mark = "" }, {}), false)
 			helpers.assert_eq(engine_calls, 1)

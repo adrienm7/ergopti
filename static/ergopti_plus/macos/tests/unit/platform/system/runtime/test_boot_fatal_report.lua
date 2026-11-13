@@ -24,8 +24,8 @@ local helpers = require("tests.helpers")
 local AppDirs = require("core.fs.engine.app_dirs")
 
 helpers.admit_logger_privacy(require("core.logger.engine.logger"))
-package.loaded["adapters.boot_fatal"] = nil
-local BootFatal = require("adapters.boot_fatal")
+package.loaded["diagnostics.adapters.boot_fatal"] = nil
+local BootFatal = require("diagnostics.adapters.boot_fatal")
 
 local SCRATCH = helpers.temp_dir() .. "/ergopti_boot_fatal_test"
 
@@ -237,8 +237,8 @@ helpers.describe("fatal report canonical privacy", function()
 	end)
 
 	helpers.it("mac-fatal-privacy: only the exact closed admission failure is writable before privacy initialization", function()
-		helpers.with_stub_scope({ "core.logger.engine.logger", "core.logger.engine", "core.logger.adapters.boot_journal", "adapters.boot_fatal" }, function()
-			local Fresh = require("adapters.boot_fatal")
+		helpers.with_stub_scope({ "core.logger.engine.logger", "core.logger.engine", "core.logger.adapters.boot_journal", "diagnostics.adapters.boot_fatal" }, function()
+			local Fresh = require("diagnostics.adapters.boot_fatal")
 			local opens = 0
 			local deps = { fallback_path = "/owned/boot", getenv = function() return "/owned/report" end,
 				open = function()

@@ -686,8 +686,8 @@ do
 			put("core.lifecycle.engine.shutdown.session_lock", { protect = yes, acquire = yes })
 			put("settings.engine.scope.script_settings", { apply = yes, current = function() return "ERROR" end })
 			put("core.logger.engine.boot_profiler", { begin = noop, stage = noop, stage_done = noop, complete = function() return 0 end })
-			put("infra.diagnostic_snapshot", { pid = function() return "controlled" end, prepare = function() return noop end })
-			put("modules.diagnostics.crash_reporter", { remove_legacy_dumps = function() return 0 end, protect = function(_, body)
+			put("diagnostics.engine.reports.snapshot", { pid = function() return "controlled" end, prepare = function() return noop end })
+			put("diagnostics.engine.reports.crash_reporter", { remove_legacy_dumps = function() return 0 end, protect = function(_, body)
 			  local ok, result = xpcall(body, debug.traceback)
 			  if not ok then io.stderr:write("MAIN_SETUP_FAILURE " .. tostring(result) .. "\n") end
 			  return ok, result

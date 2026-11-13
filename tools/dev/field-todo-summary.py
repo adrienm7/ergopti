@@ -44,17 +44,17 @@ REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file
 TARGETS = {
     "macos": {
         "section": "To confirm on the Mac",
-        "coverage": "static/ergopti_plus/macos/data/field_todo_coverage.json",
-        "specs": ["static/ergopti_plus/macos/data/field_run.json"],
+        "coverage": "static/ergopti_plus/macos/diagnostics/data/field_todo_coverage.json",
+        "specs": ["static/ergopti_plus/macos/diagnostics/data/field_run.json"],
         "results": ["field_run"],
         "doc": "docs/tooling/macos-field-report-coverage.md",
     },
     "linux": {
         "section": "To confirm on Linux",
-        "coverage": "static/ergopti_plus/linux/data/field_todo_coverage.json",
+        "coverage": "static/ergopti_plus/linux/diagnostics/data/field_todo_coverage.json",
         "specs": [
-            "static/ergopti_plus/linux/data/field_run_steps.json",
-            "static/ergopti_plus/linux/data/field_guided_steps.json",
+            "static/ergopti_plus/linux/diagnostics/data/field_run_steps.json",
+            "static/ergopti_plus/linux/diagnostics/data/field_guided_steps.json",
         ],
         "results": ["field_run", "field_guided"],
         "doc": "docs/tooling/linux-field-report-coverage.md",

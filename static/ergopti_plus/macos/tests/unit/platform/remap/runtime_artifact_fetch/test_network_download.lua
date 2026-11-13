@@ -68,7 +68,7 @@ helpers.describe("remap download network route (net-001-remap-route)", function(
 	end)
 
 	helpers.it("wires the artifact fetch and the VirtualHIDDevice update to the route", function()
-		local source = assert(helpers.read_module_source("adapters.runtime_owner_ports"))
+		local source = assert(helpers.read_module_source("diagnostics.adapters.runtime_owner_ports"))
 		for _, tag in ipairs({ "REMAP-RUNTIME", "VIRTUAL-HID" }) do
 			helpers.assert_contains(source, 'require("platform.remap.network_download").command("' .. tag .. '", curl_args)',
 				"the production port runs the " .. tag .. " download behind the network route")

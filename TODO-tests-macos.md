@@ -33,7 +33,7 @@ Check out `dev` (or the branch to test), set Debug > Log level > DEBUG, then run
 `bash tools/dev/collect-macos-field-report.sh`: it creates `field/mac-<today>-<branch>`, runs the field checks in
 the developer app, writes the report under `docs/field-reports/`, commits and pushes. Needs Go, the Xcode Command
 Line Tools and python3 3.11.4 or newer; `swift test` needs full Xcode.app (install once from the App Store). Read a
-red step with its `proves` line in `static/ergopti_plus/macos/data/field_run.json` and
+red step with its `proves` line in `static/ergopti_plus/macos/diagnostics/data/field_run.json` and
 [project-macos-field-run-step-details](docs/memory/macos-hammerspoon.md). Report each line as pass, fail or not run.
 
 Field run, no person needed (read the next report):

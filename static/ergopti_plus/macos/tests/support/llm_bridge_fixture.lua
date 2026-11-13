@@ -159,7 +159,7 @@ local function with_bridge_fixture(callback, options)
 		package.loaded["core.ui.ui.tooltip"] = fixture.tooltip
 		package.loaded["ai.engine.prediction.engine"] = fixture.engine
 		package.loaded["core.logger.engine.logger"] = nil
-		package.loaded["adapters.event_provenance"] = options.event_provenance
+		package.loaded["diagnostics.adapters.event_provenance"] = options.event_provenance
 		fixture.bridge = helpers.load_with_stubs("ai.engine.bridge")
 		fixture.hs = rawget(_G, "hs")
 		fixture.logger = package.loaded["core.logger.engine.logger"]

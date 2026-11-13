@@ -18,7 +18,7 @@ local OWNED = {
 	"settings.engine.preferences.preferences",
 	"platform.focus.application_notifier", "core.fs.adapters.file_system", "settings.engine.paths", "core.i18n.engine.i18n",
 	"platform.focus.secure_field_detector",
-	"modules.diagnostics.hid_diagnostic_mailbox",
+	"diagnostics.engine.hid_diagnostic_mailbox",
 }
 
 local function physical(char, code)

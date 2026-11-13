@@ -25,7 +25,7 @@
  *    caller passes it only for the field that holds the complete report.
  * 5. One algorithm, three languages: the Lua port
  *    (_shared/diagnostics/engine/reports/issue_link.lua) and the AHK port
- *    (windows/infra/issue_link.ahk) replay the same vectors
+ *    (windows/diagnostics/engine/reports/issue_link.ahk) replay the same vectors
  *    (_shared/tests/corpus/diagnostics/issue_link_vectors.json).
  * ==============================================================================
  */

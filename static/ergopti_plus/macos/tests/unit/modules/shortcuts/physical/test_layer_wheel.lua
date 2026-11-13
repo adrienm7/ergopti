@@ -42,7 +42,7 @@ local function make_ctx(slots)
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["platform.input.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 
 	local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
 	local hs  = _G.hs

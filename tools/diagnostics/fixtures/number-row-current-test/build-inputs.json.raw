@@ -285,11 +285,11 @@
       "git_blob": "07628514b44fee118c667c812a3d393e17d04113",
       "historical_git_blob": "07628514b44fee118c667c812a3d393e17d04113",
       "historical_roster_member": true,
-      "historical_sha256": "607cdabf2221fc1366081686ba5833d98d8a3cd4fccac2ac624e436671ca403d",
+      "historical_sha256": "00e83a8272a32847bd3e0dfdc344d8d27785b9f256e671c96c48c09badb23955",
       "input_kind": "target-input",
       "mode": "100644",
       "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/EmbeddedFatalReport.swift",
-      "sha256": "607cdabf2221fc1366081686ba5833d98d8a3cd4fccac2ac624e436671ca403d"
+      "sha256": "00e83a8272a32847bd3e0dfdc344d8d27785b9f256e671c96c48c09badb23955"
     },
     {
       "git_blob": "f67c98bdd8b5346f52ebd863bbc6e84849b3b444",

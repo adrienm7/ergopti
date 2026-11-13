@@ -21,7 +21,7 @@ local function load_gate(options)
 	package.loaded["hs"] = hs_stub
 
 	for _, name in ipairs({
-		"core.events.timer_scheduler", "platform.input.synthetic_input", "adapters.event_provenance",
+		"core.events.timer_scheduler", "platform.input.synthetic_input", "diagnostics.adapters.event_provenance",
 		"modules.keymap.terminator_replay",
 	}) do
 		package.loaded[name] = nil
@@ -965,5 +965,5 @@ end)
 package.loaded["platform.input.text_sender"] = nil
 package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["platform.input.synthetic_input"] = nil
-package.loaded["adapters.event_provenance"] = nil
+package.loaded["diagnostics.adapters.event_provenance"] = nil
 package.loaded["modules.keymap.terminator_replay"] = nil

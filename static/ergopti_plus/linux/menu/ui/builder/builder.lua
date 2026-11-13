@@ -234,7 +234,7 @@ local _build_reload = require("menu.ui.builder.reload").build
 
 local _build_quit = require("menu.ui.builder.quit").build
 
-local _build_debug = require("ui.menu.menu_debug").build
+local _build_debug = require("diagnostics.ui.menu_debug").build
 
 
 -- =========================================

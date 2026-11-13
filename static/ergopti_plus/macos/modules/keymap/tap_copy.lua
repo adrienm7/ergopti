@@ -86,7 +86,7 @@ end
 -- How many press durations the statistics keep, the most recent ones.
 M.HELD_SAMPLES = 20
 
---- Fresh session statistics for the field run (infra/field_check_tap_copy.lua):
+--- Fresh session statistics for the field run (diagnostics/engine/field_check/tap_copy.lua):
 --- the watched copy taps since the driver started, how each ended, and the
 --- press durations, so a report from a real Mac says why copies were missing.
 --- @return table stats

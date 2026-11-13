@@ -1996,7 +1996,7 @@ fatal dialog.
 `tools/dev/collect-macos-field-report.sh` asks a developer ErgoptiPlus.app to
 run every Debug field check, the diagnostics snapshot and the Ollama and MLX
 flows through `infra/field_run.lua`: a request file in the clone folder that
-`static/ergopti_plus/macos/data/field_run.json` names, one JSON result per
+`static/ergopti_plus/macos/diagnostics/data/field_run.json` names, one JSON result per
 step, then a done marker. It starts only behind `infra/dev_source.lua`; a
 packaged runtime never loads it. Runtime installs go through
 `runtime_install_offer` (the only grantor), never the checkers' install

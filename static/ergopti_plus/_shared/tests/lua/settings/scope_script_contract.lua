@@ -8,7 +8,7 @@ return function(helpers, driver)
 		local saved = {}
 		for name, value in pairs(package.loaded) do saved[name] = value end
 		local names = { "core.fs.adapters.storage", "settings.engine.scope.script_scope", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
-			"settings.engine.scope.script_settings", "core.logger.engine.logger", "settings.engine.preferences.preferences", "ui.error_dialog", "ui.error_dialog.bridge",
+			"settings.engine.scope.script_settings", "core.logger.engine.logger", "settings.engine.preferences.preferences", "diagnostics.ui.error_dialog", "diagnostics.ui.error_dialog",
 			"settings.engine.scope.script_scope_runtime", "core.text.engine.toml_codec.writer", "settings.engine.migration.migrate", "settings.engine.scope.transaction", "settings.ui.menu.scoped_preferences",
 			"settings.ui.menu.preferences_transaction" }
 		for _, name in ipairs(names) do package.loaded[name] = nil end
@@ -58,7 +58,7 @@ return function(helpers, driver)
 			i18n.init()
 			local logger = require(driver == "linux" and "settings.engine.scope.script_settings" or "core.logger.engine.logger")
 			if driver == "linux" then assert(logger.apply()) else logger.set_level("DEBUG") end
-			local dialog = require(driver == "linux" and "ui.error_dialog.bridge" or "ui.error_dialog")
+			local dialog = require(driver == "linux" and "diagnostics.ui.error_dialog" or "diagnostics.ui.error_dialog")
 			local function create(overrides)
 				local options = { path = path, files = files,
 					backup_path = path .. ".bak", storage_backup_path = path .. ".settings.bak" }
@@ -128,7 +128,7 @@ return function(helpers, driver)
 				helpers.assert_eq(owner.apply("clear"), true)
 				helpers.assert_eq(owner.release(), true)
 				local locale_name, log_name = "core.i18n.engine.i18n", driver == "linux" and "settings.engine.scope.script_settings" or "core.logger.engine.logger"
-				local dialog_name = driver == "linux" and "ui.error_dialog.bridge" or "ui.error_dialog"
+				local dialog_name = driver == "linux" and "diagnostics.ui.error_dialog" or "diagnostics.ui.error_dialog"
 				package.loaded[locale_name], package.loaded[log_name], package.loaded[dialog_name] = nil, nil, nil
 				local locale, logger, dialog = require(locale_name), require(log_name), require(dialog_name)
 				if driver == "macos" then locale.set_locale_injector(ctx.backend.set_locale) end

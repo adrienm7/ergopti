@@ -104,7 +104,7 @@ do
 	end)
 	if not admitted then
 		pcall(function()
-			require("adapters.boot_fatal").report("logger_privacy", "Canonical log privacy admission refused.", nil)
+			require("diagnostics.adapters.boot_fatal").report("logger_privacy", "Canonical log privacy admission refused.", nil)
 		end)
 		pcall(print, "[logger] Privacy initialization refused; bootstrap not continued.")
 		os.exit(1)
@@ -242,7 +242,7 @@ end
 -- total in the boot log, making a slow startup self-diagnosing (no profiler attach).
 local Boot               = require("core.logger.engine.boot_profiler")
 local BootJournal        = require("core.logger.adapters.boot_journal")
-local ReloadBreadcrumb   = require("adapters.reload_breadcrumb")
+local ReloadBreadcrumb   = require("diagnostics.adapters.reload_breadcrumb")
 -- A controlled reload's trail ends with this line when a boot followed it
 -- (field run 2026-10-30 21:06: the reload lost the app and no boot followed).
 ReloadBreadcrumb.record_boot()
@@ -275,13 +275,13 @@ Boot.stage("Core module requires")
 
 local i18n               = require("core.i18n.engine.i18n")
 local locale_mod         = require("core.i18n.engine.locale")
-local crash_reporter     = require("modules.diagnostics.crash_reporter")
+local crash_reporter     = require("diagnostics.engine.reports.crash_reporter")
 local reload_guard       = require("core.lifecycle.engine.reload.guard")
 local EmergencyExit      = require("core.lifecycle.engine.shutdown.emergency_exit")
 local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 local TeardownTransaction = require("core.lifecycle.engine.shutdown.teardown_transaction")
 local StartupTransaction = require("core.lifecycle.engine.startup_transaction")
-local BootFatal          = require("adapters.boot_fatal")
+local BootFatal          = require("diagnostics.adapters.boot_fatal")
 
 -- Tell a reload apart from a real quit. The coordinator marks the sentinel only
 -- after the old exact Karabiner token is fenced and immediately before the real
@@ -1021,7 +1021,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 	steps[#steps + 1] = {
 		name = "field-run",
 		run = function()
-			local module = package.loaded["infra.field_run"]
+			local module = package.loaded["diagnostics.engine.field_run.field_run"]
 			if module == nil then return true end
 			-- A run this teardown cuts short is closed with what cut it short
 			return module.stop({ kind = TerminationCoordinator.pending_kind(),
@@ -1257,7 +1257,7 @@ local menu               = require("menu.ui")
 local mlx_deps_checker    = require("ai.engine.local_servers.mlx_deps_checker")
 local ollama_deps_checker = require("ai.engine.ollama.deps_checker")
 local backend_detector    = require("ai.engine.api.backend_detector")
-local ErrorDialog         = require("ui.error_dialog")
+local ErrorDialog         = require("diagnostics.ui.error_dialog")
 local ui_restore         = require("menu.engine.ui_restore")
 
 do
@@ -1334,7 +1334,7 @@ do
 	end
 end
 
--- Wire Logger.error → the error window (ui/error_dialog), so an ERROR reaches
+-- Wire Logger.error → the error window (diagnostics/ui), so an ERROR reaches
 -- the user without any module calling it directly: the shared policy decides
 -- which ERROR opens it, and it opens later, on a timer, without the keyboard.
 -- It replaces the system notification every ERROR used to raise. Registered
@@ -2524,7 +2524,7 @@ require("core.lifecycle.engine.driver_control").start({
 local field_run_root = require("core.lifecycle.engine.dev_source").is_active() and require("core.lifecycle.engine.dev_source").root()
 	or os.getenv(require("core.text.engine.identifiers").field_report.environment)
 if type(field_run_root) == "string" and field_run_root ~= "" then
-	require("infra.field_run").start({
+	require("diagnostics.engine.field_run.field_run").start({
 		root = field_run_root,
 		pid = assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable"),
 	})

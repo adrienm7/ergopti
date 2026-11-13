@@ -21,7 +21,7 @@ local FIXTURE_MODULES = {
 	"core.fs.engine.paths",
 	"core.fs.adapters.storage",
 	"core.ui.adapters.graphics_renderer",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"platform.input.key_state",
@@ -213,7 +213,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			-- canvas, so its release callback can never settle the module-level lease.
 			canvases[1].mouse_callback(canvases[1], "mouseDown", 1, 0, 0)
 
-			package.loaded["adapters.event_provenance"] = {}
+			package.loaded["diagnostics.adapters.event_provenance"] = {}
 			package.loaded["platform.input.key_state"] = {
 				is_right_altgr_held = function() return false end,
 				describe_held_modifiers = function() return "(none)" end,

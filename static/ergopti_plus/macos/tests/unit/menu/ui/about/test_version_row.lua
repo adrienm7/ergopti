@@ -31,7 +31,7 @@ local APP_SOURCE = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergo
 -- The modules a case replaces or reloads; restored after each case.
 local FIXTURE_MODULES = {
 	"core.logger.engine.logger",
-	"infra.diagnostic_snapshot",
+	"diagnostics.engine.reports.snapshot",
 	"modules.updater",
 	"ui.menu.menu_about",
 }
@@ -114,7 +114,7 @@ local function load_updater(is_local, version)
 	end
 	helpers.load_with_stubs("core.logger.engine.logger")
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.diagnostic_snapshot"] = nil
+	package.loaded["diagnostics.engine.reports.snapshot"] = nil
 	package.loaded["modules.updater"] = nil
 	local Updater = require("modules.updater")
 	Updater.is_local_source = function() return is_local end
@@ -195,7 +195,7 @@ helpers.describe("menu_about: the version row names the build and its commit", f
 	helpers.it("a resolver that raises is logged as an ERROR and reads as an unknown commit", function()
 		helpers.with_stub_scope(FIXTURE_MODULES, function()
 			local Updater, _, errors = load_updater(false, "1.2.3")
-			package.loaded["infra.diagnostic_snapshot"] = {
+			package.loaded["diagnostics.engine.reports.snapshot"] = {
 				resolve_commit = function() error("stamp read exploded", 0) end,
 			}
 			local identity = Updater.resolve_build_identity()
@@ -214,7 +214,7 @@ helpers.describe("menu_about: the version row names the build and its commit", f
 		helpers.with_stub_scope(FIXTURE_MODULES, function()
 			local Updater = load_updater(true, "local")
 			local calls = 0
-			package.loaded["infra.diagnostic_snapshot"] = {
+			package.loaded["diagnostics.engine.reports.snapshot"] = {
 				resolve_commit = function()
 					calls = calls + 1
 					return SHORT, Snapshot.COMMIT_SOURCE_GIT

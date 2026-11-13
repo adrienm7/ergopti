@@ -347,7 +347,7 @@ helpers.describe("window_info and the diagnostic snapshot: the open applications
 
 	helpers.it("(linux-open-apps) the snapshot lists one entry per open application on X11, with details only", function()
 		local display, _, shell = session("x11", STATE(), COMM)
-		local Bridge = helpers.load_module("ui.healthcheck.bridge")
+		local Bridge = helpers.load_module("diagnostics.ui.healthcheck.bridge")
 		helpers.assert_nil(Bridge.build_snapshot({}, false).sections.system.running_apps,
 			"the open applications are opt-in")
 		helpers.assert_eq(Bridge.build_snapshot({}, true).sections.system.running_apps, { "editor", "term" })
@@ -357,7 +357,7 @@ helpers.describe("window_info and the diagnostic snapshot: the open applications
 
 	helpers.it("(linux-open-apps) the snapshot omits the field on Wayland instead of reporting an empty list", function()
 		local display, _, shell = session("wayland", STATE(), COMM)
-		local Bridge = helpers.load_module("ui.healthcheck.bridge")
+		local Bridge = helpers.load_module("diagnostics.ui.healthcheck.bridge")
 		helpers.assert_nil(Bridge.build_snapshot({}, true).sections.system.running_apps)
 		shell._reset_runner()
 		display._set_for_test(display.X11, "restored")

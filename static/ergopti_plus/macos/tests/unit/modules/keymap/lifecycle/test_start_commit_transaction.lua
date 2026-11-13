@@ -17,8 +17,8 @@ local RESET_MODULES = {
 	"modules.keymap", "modules.keymap.init", "settings.engine.registry",
 	"modules.keymap.expander", "ai.engine.bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
-	"modules.diagnostics.hid_diagnostic_mailbox",
-	"platform.input.synthetic_input", "adapters.event_provenance",
+	"diagnostics.engine.hid_diagnostic_mailbox",
+	"platform.input.synthetic_input", "diagnostics.adapters.event_provenance",
 	"core.events.timer_scheduler",
 	"core.logger.engine.logger", "core.logger.engine.perf", "infra.hotpath_profiler",
 	"menu.engine.manifest_reader", "platform.input.keycodes", "layouts.engine.layers.terminators",
@@ -145,7 +145,7 @@ local function load_fixture(prepare_input)
 			return true
 		end,
 	})
-	package.loaded["adapters.event_provenance"] = api({
+	package.loaded["diagnostics.adapters.event_provenance"] = api({
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",
@@ -221,7 +221,7 @@ local function load_fixture(prepare_input)
 	})
 	local mailbox_running = false
 	local mailbox_start_calls, mailbox_stop_calls = 0, 0
-	package.loaded["modules.diagnostics.hid_diagnostic_mailbox"] = {
+	package.loaded["diagnostics.engine.hid_diagnostic_mailbox"] = {
 		start = function()
 			mailbox_start_calls = mailbox_start_calls + 1
 			if controls.mailbox_start_mode == "throw" then error("MAILBOX_START_FAILURE") end
@@ -324,7 +324,7 @@ helpers.describe("keymap start: exact native commitment", function()
 			local fixture = load_fixture()
 			local admission_open = true
 			package.loaded["platform.input.synthetic_input"].admission_open = function() return admission_open end
-			package.loaded["adapters.event_provenance"].classify_with_fence = function() return nil, "foreign" end
+			package.loaded["diagnostics.adapters.event_provenance"].classify_with_fence = function() return nil, "foreign" end
 			helpers.assert_true(fixture.keymap.start())
 			local event = { getKeyCode = function() return 56 end, getFlags = function() return { shift = true } end }
 			fixture.taps[3].callback(event)
@@ -466,7 +466,7 @@ helpers.describe("keymap start: exact native commitment", function()
 	helpers.it("keeps an already committed keymap live on a duplicate start (keymap-partial-start-fence)", function()
 		local fixture = load_fixture()
 		local synthetic = package.loaded["platform.input.synthetic_input"]
-		local provenance = package.loaded["adapters.event_provenance"]
+		local provenance = package.loaded["diagnostics.adapters.event_provenance"]
 		local entered = 0
 		synthetic.admission_open = function() return true end
 		synthetic.enter_callback = function() entered = entered + 1 end
@@ -487,7 +487,7 @@ helpers.describe("keymap start: exact native commitment", function()
 		fixture.controls.tap_failure_mode = "disabled"
 		fixture.controls.replay_pending = true
 		local synthetic = package.loaded["platform.input.synthetic_input"]
-		local provenance = package.loaded["adapters.event_provenance"]
+		local provenance = package.loaded["diagnostics.adapters.event_provenance"]
 		local entered = 0
 		synthetic.admission_open = function() return true end
 		synthetic.enter_callback = function() entered = entered + 1 end
@@ -854,7 +854,7 @@ local function with_input_fixture(callback)
 			synthetic.enter_callback = function() return true end
 			synthetic.leave_callback = function(consume) return consume end
 			synthetic.abort_callback = function() return true, false end
-			package.loaded["adapters.event_provenance"].classify_with_fence = function()
+			package.loaded["diagnostics.adapters.event_provenance"].classify_with_fence = function()
 				return nil, "foreign", nil, controls.physical_replay == true
 			end
 			package.loaded["core.logger.engine.logger"].error = function(_, message)

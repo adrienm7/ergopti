@@ -156,9 +156,9 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 	end)
 
 	helpers.it("holds the reload while a developer field run runs", function()
-		local previous = package.loaded["infra.field_run"]
+		local previous = package.loaded["diagnostics.engine.field_run.field_run"]
 		local running = true
-		package.loaded["infra.field_run"] = { holds_reload = function() return running end }
+		package.loaded["diagnostics.engine.field_run.field_run"] = { holds_reload = function() return running end }
 		local ok, err = pcall(Fixture.with_watcher, function(w)
 			w.fire({ "/fake/base/modules/foo.lua" })
 			w.set_clock(1001)
@@ -169,7 +169,7 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 			w.poll()
 			helpers.assert_eq(w.reloads(), 1, "the held burst reloads once the run ends")
 		end)
-		package.loaded["infra.field_run"] = previous
+		package.loaded["diagnostics.engine.field_run.field_run"] = previous
 		if not ok then error(err, 0) end
 	end)
 end)

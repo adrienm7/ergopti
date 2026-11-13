@@ -14,9 +14,9 @@ reassertion" below.
 Both rows are in the shared Debug menu (`menu.debug_menu` in
 `_shared/settings/data/features/manifest.toml`), declared for `ahk` only with the
 reason `platform_reason.input_probe_is_autohotkey_specific` (no other driver has
-SendInput or an AutoHotkey hook). Code: `windows/infra/input_probe.ahk`; pure
+SendInput or an AutoHotkey hook). Code: `windows/diagnostics/engine/field_run/input_probe.ahk`; pure
 cores and menu declaration are pinned by
-`windows/tests/unit/infra/input_probe/test_input_probe.ahk`.
+`windows/tests/unit/diagnostics/engine/input_probe/test_input_probe.ahk`.
 
 Each click asks for a confirmation, opens a small window the check owns, types
 only into it, shows pass or fail with one line per step (all text through i18n,

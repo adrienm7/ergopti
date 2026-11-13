@@ -301,8 +301,8 @@ helpers.describe("logger repeat collapsing: evidence records (spec 4.3)", functi
 
 	helpers.it("the field check engine writes its result record as evidence, run after run", function()
 		with_driven_logger(function(set_time, lines)
-			helpers.with_stub_scope({ "infra.field_check", "infra.field_check_checks" }, function()
-				package.loaded["infra.field_check_checks"] = {
+			helpers.with_stub_scope({ "diagnostics.engine.field_check.field_check", "diagnostics.engine.field_check.checks" }, function()
+				package.loaded["diagnostics.engine.field_check.checks"] = {
 					checks = {
 						demo = function(_, report, finish)
 							report.step("a", "pass", 1)
@@ -310,8 +310,8 @@ helpers.describe("logger repeat collapsing: evidence records (spec 4.3)", functi
 						end,
 					},
 				}
-				package.loaded["infra.field_check"] = nil
-				local Engine = require("infra.field_check")
+				package.loaded["diagnostics.engine.field_check.field_check"] = nil
+				local Engine = require("diagnostics.engine.field_check.field_check")
 				Logger.enable_repeat_collapsing(fake_scheduler())
 				for _, at in ipairs({ 0, 5, 10 }) do
 					set_time(at)

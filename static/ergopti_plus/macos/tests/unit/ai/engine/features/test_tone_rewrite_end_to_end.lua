@@ -375,7 +375,7 @@ end
 local function case(name, scenario)
 	helpers.it(name, function()
 		return helpers.with_fresh_modules({
-			"ai.engine.prediction.tone_rewrite", "adapters.event_provenance", "ai.engine.prediction.translate",
+			"ai.engine.prediction.tone_rewrite", "diagnostics.adapters.event_provenance", "ai.engine.prediction.translate",
 			"tests.support.modules.llm.selection_translation_destination",
 		}, function()
 			return Scope.run(scenario)

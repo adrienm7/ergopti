@@ -144,7 +144,7 @@ end
 --- The bug form, prefilled with nothing the daemon would need to collect.
 --- @return string
 local function bug_form_url()
-	local documents = require("ui.healthcheck.bridge").config()
+	local documents = require("diagnostics.ui.healthcheck.bridge").config()
 	return require("diagnostics.engine.reports.issue_link").build_url(documents.templates, documents.repository, "bug", {})
 end
 

@@ -18,7 +18,7 @@
 local helpers = require("tests.helpers")
 
 local RESET_MODULES = {
-	"core.logger.engine.logger", "core.logger.adapters.log_transport", "adapters.event_provenance",
+	"core.logger.engine.logger", "core.logger.adapters.log_transport", "diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.fs.engine.paths", "core.timing.engine.timings",
 	"ai.engine", "ai.engine.prediction.engine", "modules.keystats",
@@ -253,7 +253,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 		helpers.assert_true(boundary_calls.json_encode > 0 and boundary_calls.json_decode > 0,
 			"the codec tripwires must observe the authenticated configure exchange")
 
-		package.loaded["adapters.event_provenance"] = {
+		package.loaded["diagnostics.adapters.event_provenance"] = {
 			STATUS_UNREADABLE = "unreadable",
 			classify_with_fence = function()
 				return nil, "physical", { events = {} }

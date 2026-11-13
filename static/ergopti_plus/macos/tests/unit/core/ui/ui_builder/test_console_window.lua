@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 --- Runs the console owner against a stateful native window and deferred queue.
 --- @param run function Receives the owner and observable native state.
 local function with_console(run)
-	helpers.with_fresh_modules({ "ui.console_window", "core.timing.engine.deferred_work", "core.logger.engine.logger", "core.fs.engine.paths" }, function()
+	helpers.with_fresh_modules({ "diagnostics.ui.console_window", "core.timing.engine.deferred_work", "core.logger.engine.logger", "core.fs.engine.paths" }, function()
 		local state = {
 			frame = { x = 10, y = 20, w = 300, h = 200 },
 			screen = { x = 100, y = 50, w = 1000, h = 800 },
@@ -36,7 +36,7 @@ local function with_console(run)
 				return self
 			end,
 		}
-		local owner = helpers.load_with_stubs("ui.console_window", {
+		local owner = helpers.load_with_stubs("diagnostics.ui.console_window", {
 			openConsole = function(front)
 				helpers.assert_eq(front, true)
 				if state.refuse_open then error("native opening failed") end

@@ -91,7 +91,7 @@ function M.resolve_identity(opts)
 	local version = opts.version or M.VERSION
 	-- Required here, not at load: infra.diagnostic_snapshot reads M.VERSION.
 	local ok, commit, commit_source = pcall(function()
-		return require("infra.diagnostic_snapshot").resolve_commit(opts.commit_opts)
+		return require("diagnostics.engine.reports.snapshot").resolve_commit(opts.commit_opts)
 	end)
 	if not ok then
 		Logger.error(LOG, "Build commit resolution raised: %s.", tostring(commit))

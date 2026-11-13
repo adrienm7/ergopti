@@ -60,7 +60,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../core/process/adapters/shell_runner.ahk
 #Include ../platform/input/key_state.ahk
 #Include ../platform/input/text_sender.ahk
-#Include ../ui/console_window.ahk
+#Include ../diagnostics/ui/console_window.ahk
 #Include ../infra/key_combinations.ahk
 #Include ../core/text/engine/toml/helpers.ahk
 #Include ../platform/remap/tap_hold_loader.ahk
@@ -74,7 +74,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../platform/remap/altgr_criteria.ahk
 
 ; Both complete test modules retain their original registrations and callbacks.
-#Include unit/adapters/test_console_window.ahk
+#Include unit/diagnostics/adapters/test_console_window.ahk
 #Include unit/platform/remap/key_combinations/test_key_combinations.ahk
 
 RunTests()

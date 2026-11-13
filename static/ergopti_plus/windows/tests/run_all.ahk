@@ -159,9 +159,9 @@ OnError(_FatalErrorHandler)
 #Include ../core/logger/engine/tick_count.ahk
 #Include ../vendor/Promise.ahk
 #Include ../core/ui/engine/webview/utils.ahk
-#Include ../ui/console_window.ahk
+#Include ../diagnostics/ui/console_window.ahk
 #Include ../core/logger/engine/wall_clock.ahk
-#Include ../infra/field_run.ahk
+#Include ../diagnostics/engine/field_run/field_run.ahk
 ; Compiled-mode bundle bootstrapper — included this early (matching its real
 ; position right after app_state.ahk in ErgoptiPlus.ahk) so its functions are
 ; actually exercised by meta/core/lifecycle/engine/test_bundle_resolve_dir_local_appdata.ahk instead
@@ -189,15 +189,15 @@ OnError(_FatalErrorHandler)
 global _LogsDir := A_Temp . "\ergopti_test_logs\" . AppDirsFolderName() . "\"
 global _DefaultLogsDir := _LogsDir
 ; Boot stage profiler and the cross-driver diagnostic snapshot: definitions and
-; two counters only, exercised by unit/ui/healthcheck/test_diagnostic_logging.ahk.
+; two counters only, exercised by unit/diagnostics/ui/healthcheck/test_logging.ahk.
 #Include ../core/logger/engine/boot_profiler.ahk
-#Include ../infra/startup_smoke.ahk
-#Include ../infra/diagnostic_snapshot.ahk
-#Include ../infra/issue_link.ahk
-#Include ../infra/redact.ahk
-#Include ../infra/issue_report.ahk
-#Include ../infra/error_policy.ahk
-#Include ../infra/error_report.ahk
+#Include ../diagnostics/engine/field_run/startup_smoke.ahk
+#Include ../diagnostics/engine/reports/snapshot.ahk
+#Include ../diagnostics/engine/reports/issue_link.ahk
+#Include ../diagnostics/engine/reports/redact.ahk
+#Include ../diagnostics/engine/reports/issue_report.ahk
+#Include ../diagnostics/engine/reports/error_policy.ahk
+#Include ../diagnostics/engine/reports/error_report.ahk
 #Include ../core/text/engine/toml/helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet) — needs
 ; ParseTomlFile above; exercised by test_timings_config.ahk.
@@ -371,7 +371,7 @@ InstallHotstringHooks()
 #Include ../core/network/adapters/http_client.ahk
 #Include ../platform/focus/secure_field_detector.ahk
 #Include ../clipboard/adapters/clipboard.ahk
-#Include ../infra/input_probe.ahk
+#Include ../diagnostics/engine/field_run/input_probe.ahk
 #Include ../core/fs/adapters/storage.ahk
 #Include ../core/process/adapters/lifecycle.ahk
 #Include ../platform/input/key_state.ahk
@@ -394,9 +394,9 @@ InstallHotstringHooks()
 #Include ../core/process/adapters/shell_runner.ahk
 #Include ../../_shared/shortcuts/data/actions/brightness.ahk
 #Include ../adapters/screen_brightness.ahk
-#Include ../adapters/crash_report_worker.ahk
-#Include ../modules/diagnostics/crash_reporter.ahk
-#Include ../infra/error_net.ahk
+#Include ../diagnostics/adapters/crash_report_worker.ahk
+#Include ../diagnostics/engine/reports/crash_reporter.ahk
+#Include ../diagnostics/engine/reports/error_net.ahk
 #Include ../modules/keymap/uia_selection_worker.ahk
 ; Contract tests must not launch a provider against the user's foreground app.
 ; Worker behavior is covered separately with explicit owned-process fixtures.
@@ -441,7 +441,7 @@ InstallSendNoOps()
 #Include unit/core/ui/windows/test_native_file_filter_behavior.ahk
 #Include unit/core/ui/windows/test_native_folder_orchestration.ahk
 #Include unit/core/ui/windows/test_native_file_filter_diagnostics.ahk
-#Include unit/adapters/test_console_window.ahk
+#Include unit/diagnostics/adapters/test_console_window.ahk
 #Include unit/adapters/test_keyboard_layout_switch.ahk
 #Include unit/apps/test_launcher_native_targets.ahk
 #Include unit/core/ui/windows/test_spotlight_ownership.ahk
@@ -465,27 +465,27 @@ InstallSendNoOps()
 #Include unit/core/network/adapters/test_promise_timeout_budget.ahk
 #Include unit/core/logger/test_format_failure_is_visible.ahk
 #Include unit/core/logger/test_contract.ahk
-#Include unit/ui/healthcheck/test_diagnostic_logging.ahk
+#Include unit/diagnostics/ui/healthcheck/test_logging.ahk
 #Include unit/core/lifecycle/engine/test_build_commit.ahk
 #Include unit/modules/updater/test_version_display_strips_build_metadata.ahk
 #Include unit/core/logger/test_daily_rotation.ahk
 #Include unit/core/logger/test_volume.ahk
 ; The logs-folder resolver and the Debug menu log openers built on it
 ; (logs-dir-resolver). log_openers.ahk is definitions only.
-#Include ../ui/log_openers.ahk
+#Include ../diagnostics/ui/log_openers.ahk
 #Include unit/core/logger/test_logs_dir_resolver.ahk
 #Include meta/core/logger/test_logs_dir_single_resolver.ahk
 ; The folders editor host: definitions only until a window is opened; its
 ; initData builder and logs-folder save are exercised headlessly.
 #Include ../settings/ui/paths_editor/init.ahk
 #Include unit/core/ui/windows/test_paths_editor_logs_dir.ahk
-#Include unit/ui/healthcheck/test_healthcheck_core.ahk
-#Include unit/ui/healthcheck/test_healthcheck_configuration.ahk
-#Include unit/ui/healthcheck/test_diagnostics_collection.ahk
-#Include unit/ui/healthcheck/test_archive_failure_observation.ahk
-#Include unit/ui/healthcheck/test_diagnostics_window_control.ahk
-#Include unit/ui/healthcheck/test_healthcheck_owner_snapshots.ahk
-#Include unit/infra/input_probe/test_input_probe.ahk
+#Include unit/diagnostics/ui/healthcheck/test_healthcheck_core.ahk
+#Include unit/diagnostics/ui/healthcheck/test_configuration.ahk
+#Include unit/diagnostics/ui/healthcheck/test_collection.ahk
+#Include unit/diagnostics/ui/healthcheck/test_archive_failure_observation.ahk
+#Include unit/diagnostics/ui/healthcheck/test_window_control.ahk
+#Include unit/diagnostics/ui/healthcheck/test_owner_snapshots.ahk
+#Include unit/diagnostics/engine/input_probe/test_input_probe.ahk
 #Include unit/core/ui/tooltip/test_tint_contract.ahk
 #Include unit/core/ui/tooltip/test_border_alpha.ahk
 #Include unit/core/ui/tooltip/test_border_pool.ahk
@@ -867,7 +867,7 @@ _LLM_Deps_State := "ready"
 #Include ../ui/layout_manager/composer_check.ahk
 #Include ../ui/layout_manager/source_store.ahk
 #Include ../ui/layout_manager/kbd_register_core.ahk
-#Include ../ui/field_check/network_check.ahk
+#Include ../diagnostics/ui/field_check/network_check.ahk
 #Include ../core/network/proxy_override.ahk
 #Include ../ui/menu/menu_layout.ahk
 #Include unit/modules/keymap/test_layout_manager_host.ahk
@@ -878,7 +878,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/keymap/test_layout_composer_source.ahk
 #Include unit/modules/keymap/test_kbd_register.ahk
 #Include unit/modules/keymap/test_layout_source_emulation.ahk
-#Include unit/ui/field_check/test_network_check.ahk
+#Include unit/diagnostics/ui/test_network_check.ahk
 #Include unit/modules/keymap/test_ergopti_keylayout_tables.ahk
 #Include unit/modules/keymap/test_layout_supersession.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
@@ -1016,8 +1016,8 @@ _LogBootProgress("loading gestures modules")
 #Include ../ui/onboarding/answers.ahk
 #Include ../ui/onboarding/finish.ahk
 #Include ../ui/onboarding/webview.ahk
-#Include unit/adapters/crash_report/test_screenshot_worker_ownership.ahk
-#Include unit/adapters/crash_report/test_screenshot_layered_native.ahk
+#Include unit/diagnostics/adapters/crash_report/test_screenshot_worker_ownership.ahk
+#Include unit/diagnostics/adapters/crash_report/test_screenshot_layered_native.ahk
 #Include unit/ui/onboarding/test_onboarding_finish_payload.ahk
 #Include unit/ui/onboarding/test_onboarding_answers.ahk
 #Include unit/ui/onboarding/test_onboarding_metrics_path.ahk
@@ -1441,7 +1441,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/core/network/adapters/test_managed_winhttp_proxy.ahk
 #Include meta/ai/servers/test_remote_connect_timeout_bounded.ahk
 #Include meta/modules/keystats/test_keystats_json_64bit_decode.ahk
-#Include meta/adapters/crash_report/test_crash_build_offthread.ahk
+#Include meta/diagnostics/adapters/test_crash_build_offthread.ahk
 #Include meta/suite/test_assertions_are_case_sensitive.ahk
 #Include meta/suite/test_adapter_contract_exception_delivery.ahk
 #Include meta/suite/test_adapter_contract_boolean_types.ahk
@@ -1528,7 +1528,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/input/dispatch/test_hookdispatcher_swallow.ahk
 #Include meta/ai/api/test_json_parser_silent_fail.ahk
 #Include meta/core/text/test_json_unicode_escape.ahk
-#Include meta/ui/healthcheck/test_healthcheck_recordwarn_called.ahk
+#Include meta/diagnostics/ui/test_healthcheck_recordwarn_called.ahk
 #Include meta/modules/shortcuts/test_wrap_symbol_disabled_state.ahk
 #Include meta/modules/gestures/test_screenshot_region_clipwait_clobber.ahk
 #Include meta/modules/keystats/context/test_av_mute_heuristic.ahk
@@ -1807,16 +1807,16 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_driver_block_comment_extraction.ahk
 #Include meta/suite/test_driver_symbol_case.ahk
 #Include meta/suite/test_driver_quoted_definitions.ahk
-#Include meta/adapters/crash_report/test_error_handler_heavy_diagnostics.ahk
+#Include meta/diagnostics/adapters/test_error_handler_heavy_diagnostics.ahk
 #Include meta/modules/hotstrings/catalogue/test_ext_builder_fn_dynamic_call_swallow.ahk
 #Include meta/modules/gestures/test_gesturepickcolor_clipboard_clobber.ahk
 #Include meta/modules/shortcuts/test_getselection_blocks_and_eats_keys.ahk
-#Include meta/adapters/crash_report/test_global_error_handler_sendevent_storm.ahk
+#Include meta/diagnostics/adapters/test_global_error_handler_sendevent_storm.ahk
 #Include meta/modules/hotstrings/engine/test_output_host_resolver_single_owner.ahk
 #Include meta/modules/gestures/test_gesture_modifier_release_class.ahk
-#Include meta/ui/healthcheck/test_health_probe_timer_suspend_guard.ahk
-#Include meta/ui/healthcheck/test_healthcheck_init_dead_reference.ahk
-#Include meta/ui/healthcheck/test_healthcheck_webview_handler.ahk
+#Include meta/diagnostics/ui/test_health_probe_timer_suspend_guard.ahk
+#Include meta/diagnostics/ui/test_healthcheck_init_dead_reference.ahk
+#Include meta/diagnostics/ui/test_healthcheck_webview_handler.ahk
 #Include meta/modules/hotstrings/engine/test_hse_disable_group_atomic.ahk
 #Include meta/menu/test_insert_id_discovery_label_collision.ahk
 #Include meta/settings/persistence/test_isrepeat_section_name_mismatch_latent_divergence.ahk
@@ -2001,7 +2001,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/logger/test_error_net_smoke_fatal_stderr.ahk
 #Include unit/core/logger/test_error_report_dedup_ownership.ahk
 #Include meta/core/logger/test_error_net_uia_orphan_suppress.ahk
-#Include meta/adapters/crash_report/test_deferred_crash_report_catch.ahk
+#Include meta/diagnostics/adapters/test_deferred_crash_report_catch.ahk
 #Include meta/modules/keystats/test_keystats_webview_bridge_and_i18n.ahk
 #Include meta/modules/keystats/test_keystats_webview_range_bridge.ahk
 #Include meta/modules/keystats/test_keystats_flush_atomic.ahk
@@ -2076,7 +2076,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/text/test_toml_batchwrite_cache_coherence.ahk
 #Include meta/modules/keystats/context/test_topology_debounce_settled_geometry.ahk
 #Include meta/modules/keystats/context/test_topology_single_append.ahk
-#Include meta/adapters/crash_report/test_crash_report_unique_filename.ahk
+#Include meta/diagnostics/adapters/test_crash_report_unique_filename.ahk
 #Include meta/modules/gestures/test_gesture_paste_plain_busy_guard.ahk
 #Include unit/ai/api/test_deadline_wrap.ahk
 #Include meta/core/ui/windows/test_gr_drawbitmap_type_guard.ahk
@@ -2153,13 +2153,13 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/gestures/test_color_picker_hotkey_nonblocking.ahk
 #Include meta/modules/hotstrings/magic_key/test_magic_key_no_regex_inject.ahk
 #Include meta/core/logger/test_fanout_batched.ahk
-#Include meta/adapters/crash_report/test_crash_reporter_slash_precedence.ahk
+#Include meta/diagnostics/adapters/test_crash_reporter_slash_precedence.ahk
 #Include meta/core/logger/test_flush_on_error.ahk
 #Include meta/platform/system/test_atomic_write_unique_scratch.ahk
 #Include unit/platform/system/test_atomic_temp_owner.ahk
 #Include meta/suite/test_byref_call_sites.ahk
 #Include meta/platform/focus/uia/test_probe_bounded.ahk
-#Include meta/ui/healthcheck/test_healthcheck_collectors_guarded.ahk
+#Include meta/diagnostics/ui/test_healthcheck_collectors_guarded.ahk
 #Include meta/modules/gestures/test_gestures_init_lifecycle_pair.ahk
 #Include meta/settings/persistence/test_paths_file_single_writer.ahk
 #Include meta/modules/updater/test_changelog_fetch_status_logged.ahk
@@ -2173,7 +2173,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/test_sql_replay_is_idempotent.ahk
 #Include meta/platform/remap/key_combinations/test_keyboard_shortcut_slots_roundtrip.ahk
 #Include meta/settings/persistence/test_failures_are_surfaced.ahk
-#Include meta/adapters/crash_report/test_crash_report_not_suppressed.ahk
+#Include meta/diagnostics/adapters/test_crash_report_not_suppressed.ahk
 #Include meta/menu/test_submenu_survives_publish.ahk
 #Include meta/platform/remap/layers/test_keymap_hotpath_guards.ahk
 #Include meta/platform/remap/layers/test_keymap_deadkey_emit_serialized.ahk
@@ -2192,7 +2192,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ai/navigation/test_profile_hotkey_stable_pred.ahk
 #Include meta/modules/updater/test_updater_download_timeout.ahk
 #Include meta/modules/gestures/test_mouse_control_physical_cursor.ahk
-#Include meta/adapters/crash_report/test_crash_prompt_blocking_msgbox.ahk
+#Include meta/diagnostics/adapters/test_crash_prompt_blocking_msgbox.ahk
 #Include meta/platform/remap/key_combinations/test_keyboard_shortcut_groups_register_dispatch.ahk
 #Include meta/modules/updater/test_changelog_fetch_async.ahk
 #Include meta/core/network/test_curl_response_size_bound.ahk
@@ -2211,7 +2211,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/updater/test_updater_download_resilience.ahk
 #Include meta/platform/input/test_key_state_dllcall_guards.ahk
 #Include meta/modules/updater/test_updater_loadchannel_try_wrap.ahk
-#Include meta/adapters/crash_report/test_crash_report_sysinfo_dedup.ahk
+#Include meta/diagnostics/adapters/test_crash_report_sysinfo_dedup.ahk
 #Include meta/core/logger/test_dedup_exit_flush.ahk
 #Include meta/core/logger/test_repeat_collapsing.ahk
 #Include meta/core/process/shell_runner/test_boot_crash_and_quoting.ahk
@@ -2225,7 +2225,7 @@ _LogBootProgress("keystats modules + tests included")
 ;    comment tripping a substring guard), not real code regressions — fixed. --
 #Include meta/platform/input/dispatch/test_bypass_dispatch_arity.ahk
 #Include meta/modules/hotstrings/catalogue/test_hcw_reset_all_teardown.ahk
-#Include meta/ui/healthcheck/test_healthcheck_sysinfo_git_nonblocking.ahk
+#Include meta/diagnostics/ui/test_healthcheck_sysinfo_git_nonblocking.ahk
 #Include meta/modules/keystats/test_keystats_pause_metrics.ahk
 #Include meta/core/process/test_processentry32w_size.ahk
 #Include meta/platform/remap/altgr/test_script_altgr_hotkeys.ahk
@@ -2237,22 +2237,22 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/system/test_dpapi_blob_size.ahk
 ; The diagnostics window's sources are headless-safe: function definitions and
 ; their globals only, no top-level side effects.
-#Include ../ui/healthcheck/core.ahk
+#Include ../diagnostics/ui/healthcheck/core.ahk
 ; The local reload control rides the Diagnostics endpoint owner above.
 #Include ../core/lifecycle/engine/driver_control.ahk
-#Include unit/infra/control/test_driver_control.ahk
-#Include unit/infra/control/test_driver_control_cli.ahk
-#Include ../ui/healthcheck/collection.ahk
+#Include unit/diagnostics/engine/control/test_driver_control.ahk
+#Include unit/diagnostics/engine/control/test_driver_control_cli.ahk
+#Include ../diagnostics/ui/healthcheck/collection.ahk
 #Include unit/core/ui/webview/test_warm_hosts.ahk
-#Include ../ui/healthcheck/helpers.ahk
-#Include ../ui/healthcheck/probes.ahk
-#Include ../ui/healthcheck/report.ahk
-#Include ../ui/healthcheck/actions.ahk
-#Include ../ui/healthcheck/configuration.ahk
+#Include ../diagnostics/ui/healthcheck/helpers.ahk
+#Include ../diagnostics/ui/healthcheck/probes.ahk
+#Include ../diagnostics/ui/healthcheck/report.ahk
+#Include ../diagnostics/ui/healthcheck/actions.ahk
+#Include ../diagnostics/ui/healthcheck/configuration.ahk
 #Include unit/platform/remap/altgr/test_kana_altgr_readers.ahk
 #Include unit/platform/remap/altgr/test_kana_altgr_lift_respects_owner.ahk
 #Include unit/platform/remap/altgr/test_kana_altgr_ctrl_chords.ahk
-#Include ../ui/error_dialog/init.ahk
+#Include ../diagnostics/ui/error_dialog.ahk
 #Include unit/core/ui/windows/test_error_dialog.ahk
 #Include unit/core/ui/windows/test_hcw_palette_generated.ahk
 #Include unit/core/ui/webview/test_onboarding_open_generation.ahk
@@ -2262,9 +2262,9 @@ _LogBootProgress("keystats modules + tests included")
 #Include ../ui/update_check/init.ahk
 #Include unit/modules/updater/test_updater_result_dialog_states.ahk
 #Include meta/modules/updater/test_updater_manual_check_uses_dialog.ahk
-#Include unit/ui/healthcheck/test_healthcheck_os_name_windows11.ahk
-#Include unit/ui/healthcheck/test_healthcheck_issues_from_errors_file.ahk
-#Include unit/ui/healthcheck/test_healthcheck_report_issue.ahk
+#Include unit/diagnostics/ui/healthcheck/test_os_name_windows11.ahk
+#Include unit/diagnostics/ui/healthcheck/test_issues_from_errors_file.ahk
+#Include unit/diagnostics/ui/healthcheck/test_report_issue.ahk
 #Include meta/corpus/test_corpus_diagnostics.ahk
 
 ; Guards the _HsEdWeb_Reset() idempotency fix for the live-log access-violation
@@ -2351,7 +2351,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/updater/test_changelog_ready_not_stranded.ahk
 #Include meta/modules/hotstrings/catalogue/test_hcw_bulk_writers_republish.ahk
 #Include meta/modules/hotstrings/catalogue/test_hcw_patch_toml_meta_refuses_unread_file.ahk
-#Include meta/ui/healthcheck/test_healthcheck_singleton_destroys_window.ahk
+#Include meta/diagnostics/ui/test_healthcheck_singleton_destroys_window.ahk
 #Include meta/modules/keystats/test_ingest_offset_respects_batch_limit.ahk
 #Include meta/modules/keystats/test_kl_payload_privacy_filter.ahk
 #Include meta/modules/keystats/test_kl_stop_shutdown_ingest_forced.ahk
@@ -2458,14 +2458,14 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/core/process/shell_runner/test_completion_pause.ahk
 #Include unit/core/process/shell_runner/test_deferred_completion.ahk
 #Include unit/core/process/shell_runner/test_tree_deferred_completion.ahk
-#Include unit/adapters/crash_report/test_crash_report_worker_transport.ahk
-#Include unit/adapters/crash_report/test_crash_report_shared_document.ahk
-#Include unit/adapters/crash_report/test_crash_mapping_drain_reentry.ahk
-#Include unit/adapters/crash_report/test_crash_mapping_payload_bounds.ahk
-#Include unit/adapters/crash_report/test_crash_worker_git_exit.ahk
-#Include unit/adapters/crash_report/test_crash_worker_fixture_cleanup.ahk
-#Include unit/adapters/crash_report/test_crash_worker_attempt_ownership.ahk
-#Include unit/adapters/crash_report/test_crash_worker_deadline.ahk
+#Include unit/diagnostics/adapters/crash_report/test_worker_transport.ahk
+#Include unit/diagnostics/adapters/crash_report/test_shared_document.ahk
+#Include unit/diagnostics/adapters/crash_report/test_crash_mapping_drain_reentry.ahk
+#Include unit/diagnostics/adapters/crash_report/test_crash_mapping_payload_bounds.ahk
+#Include unit/diagnostics/adapters/crash_report/test_crash_worker_git_exit.ahk
+#Include unit/diagnostics/adapters/crash_report/test_crash_worker_fixture_cleanup.ahk
+#Include unit/diagnostics/adapters/crash_report/test_crash_worker_attempt_ownership.ahk
+#Include unit/diagnostics/adapters/crash_report/test_crash_worker_deadline.ahk
 #Include unit/platform/remap/tap_hold/test_taphold_inherit_defaults_roundtrip.ahk
 #Include unit/platform/remap/tap_hold/test_taphold_synthetic_refcount_combo.ahk
 #Include unit/platform/remap/tap_hold/test_taphold_synthetic_user_held.ahk

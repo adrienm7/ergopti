@@ -420,13 +420,13 @@ other owner, and prove a new file manager with
 ### project-linux-field-report-answers-its-todo-section
 
 `tools/dev/collect-linux-field-report.sh` runs, after the daemon's field run,
-the collector-side steps of `linux/data/field_guided_steps.json` through
+the collector-side steps of `linux/diagnostics/data/field_guided_steps.json` through
 `tools/dev/field-guided.py`: probes (uinput, evdev, the user unit, a polkit
 agent, the focus reporter's log line), observed gestures (Metrics rows by kind,
 day-log line counts) and attested ones (y, n, s). It ends with
 `field-todo-summary.py --os linux`: one verdict per point of TODO « To confirm
 on Linux », whose open lines carry `field-point` tags
-(`linux/data/field_todo_coverage.json`,
+(`linux/diagnostics/data/field_todo_coverage.json`,
 docs/tooling/linux-field-report-coverage.md). Action: a new open line needs its
 tag and coverage entry, or `test_field_todo_coverage.lua` fails; a probe reads
 counts or exit codes only, never a line of the log.
