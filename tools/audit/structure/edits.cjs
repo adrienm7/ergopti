@@ -151,6 +151,15 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 			'\t\t) || path.join(AHK_ADAPTERS_DIRS[0], `${adapterName}.ahk`);'
 	},
 	{
+		// The package setup fixture makes the folder it copies the identifiers
+		// into; _shared/data scatters, and its nearest home (_shared) is not
+		// where the identifiers land.
+		file: 'tools/test/test-linux-package-setup.cjs',
+		moves: '_shared/data/identifiers.sh',
+		from: "fs.mkdirSync(path.join(bundle, '_shared/data'), { recursive: true });",
+		to: "fs.mkdirSync(path.join(bundle, '_shared/core/text/data'), { recursive: true });"
+	},
+	{
 		// The locale is found relative to the page under test, a variable
 		// the scan cannot evaluate.
 		file: 'tools/test/support/metrics-apps-page.cjs',
