@@ -1913,6 +1913,19 @@ function scanFile(file, text, ctx) {
 				}
 			);
 		}
+	// "im)^#Include\s+\.\./_shared/modules/x\.ahk\s*$" in an AutoHotkey meta
+	// test: a regular expression over an #Include the driver's entry spells
+	// from its own root. It follows the file, escaped the same way.
+	if (file.endsWith('.ahk') && inTree && Census.DRIVERS.includes(inTree))
+		for (const m of text.matchAll(/((?:\\\.\\\.\/)+)((?:[\w-]+\/)+[\w-]+)\\\.(\w+)/g)) {
+			const climb = m[1].split('/').length - 1;
+			const base = `${PREFIX}${inTree}`;
+			const old = path.posix.normalize(`${base}/${'../'.repeat(climb)}${m[2]}.${m[3]}`);
+			const target = byRepoPath.get(old);
+			if (!target || target === PREFIX || target === old) continue;
+			const rel = path.posix.relative(base, target);
+			add('path-regex', m[0], rel.replace(/\./g, '\\.'), { oldRepo: old, newRepo: target });
+		}
 	// /\\modules\\llm\\x\.json"/ in a tool: an AutoHotkey path, joined onto
 	// _SharedDir (or the driver's own folder), checked with a regular expression.
 	if (/^tools\/.*\.(c?js|mjs)$/.test(file))
