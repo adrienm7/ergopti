@@ -14,7 +14,7 @@ local function with_editor(callback)
 		helpers.with_fresh_modules({
 			"ui.prompt_editor", "ui.ui_builder", "infra.logger", "infra.paths", "infra.i18n",
 			"hs", "tests.stubs.hs",
-			"infra.deferred_work",
+			"infra.deferred_work", "infra.dialog_util",
 		}, function()
 			local hs_stub = require("tests.stubs.hs")
 			hs_stub.__reset()
@@ -163,6 +163,37 @@ helpers.describe("prompt editor native boundaries", function()
 			helpers.assert_eq(#state.views, 1)
 		end)
 	end)
+
+	-- A refused save is told, as on Windows and Linux; the editor stays open.
+	for _, outcome in ipairs({ "false", "throw" }) do
+		helpers.it("(prompt-editor-save-failure) tells a refused save (" .. outcome .. ")", function()
+			with_editor(function(editor, state, hs_stub)
+				local deferred, alerts = {}, {}
+				package.loaded["infra.deferred_work"] = { after = function(_, callback)
+					deferred[#deferred + 1] = callback
+					return true
+				end }
+				package.loaded["infra.dialog_util"] = { block_alert = function(title, message)
+					alerts[#alerts + 1] = { title, message }
+				end }
+				helpers.assert_true(editor.open({ id = "A" }, function()
+					if outcome == "throw" then error("profile write refused") end
+					return false
+				end))
+				local view = state.views[1]
+				view.options.on_navigation("didFinishNavigation")
+				local context = hs_stub.json.decode(view.scripts[1]:match("^init%((.*)%)$"))
+				state.bridges[1].callback({ body = {
+					action = "save", edit_id = context.edit_id, epoch = context.epoch,
+					name = "Mine", prompt = "Prompt",
+				} })
+				helpers.assert_eq(#alerts, 0, "the alert never runs inside the page's callback")
+				for _, callback in ipairs(deferred) do callback() end
+				helpers.assert_eq(alerts, { { "common.error_title", "prompt_editor.save_failed" } })
+				helpers.assert_eq(state.deletes, 0, "a refused save keeps the editor open")
+			end)
+		end)
+	end
 
 	helpers.it("(prompt-editor-cleanup-owner) retires bridge and presentation before a failed close", function()
 		with_editor(function(editor, state, hs_stub)

@@ -191,6 +191,20 @@ end
 
 --- Opens the Prompt Editor window.
 --- @param existing table|nil An existing profile to edit, or nil for a new one.
+--- Tells the user a save was refused, as Windows and Linux do: the editor stays
+--- open with the prompt. The alert runs as deferred work, never inside the
+--- page's message callback.
+local function report_save_failure()
+	local scheduled = require("infra.deferred_work").after(0, function()
+		local shown, err = pcall(function()
+			require("infra.dialog_util").block_alert(i18n.get("common.error_title"),
+				i18n.get("prompt_editor.save_failed"), i18n.get("button.ok"), nil, "critical")
+		end)
+		if not shown then Logger.error(LOG, "The save failure could not be shown: %s.", tostring(err)) end
+	end, "prompt_editor.save_failed")
+	if scheduled ~= true then Logger.error(LOG, "The save failure notice could not be scheduled.") end
+end
+
 --- @param on_save function Callback invoked when the user clicks "Save". An
 ---   explicit false return refuses settlement and keeps the editor retryable.
 --- @return boolean opened
@@ -275,9 +289,9 @@ function M.open(existing, on_save)
 					raw_prompt = type(body.prompt) == "string" and body.prompt or "",
 				})
 			active.saving = false
-			if not callback_ok then return end
-			if callback_result == false then
+			if not callback_ok or callback_result == false then
 				Logger.warn(LOG, "Prompt editor save was refused; keeping the editor open.")
+				report_save_failure()
 				return
 			end
 			active.settled = true
