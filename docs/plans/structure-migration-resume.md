@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 22:40)
+## Where things stand (2026-11-13, 23:05)
 
 - Branch: `claude/ergopti-todo-structure-phase2-night`, fast-forward only,
   rebased on dev `42f8c1327`. Never merge dev into a branch: rebase it, so
@@ -39,8 +39,9 @@ same commit as each step or checkpoint. Times are Paris time.
     mirrors its include layout at any depth (`cc1bae45`);
   - the shared literal baseline moves with a step, named in its commit
     (`84cebf24`).
-- Open: a Linux logger corpus order leak in a single-process full run only
-  (passes alone and in its CI shard). Windows AHK changes are unverified
+- Proof 19 (S03–S05 on the tip): both Lua suites match the baseline
+  exactly (the logger order leak is gone); proof 21 = proof 20 rebased on dev
+  `ed5adcad`, on CI. Windows AHK changes are unverified
   locally (no AutoHotkey here); CI is their proof.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
   Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
@@ -173,6 +174,20 @@ A red outside this list is the step's (the coordinator, 2026-11-12 22:00).
   once its CI shows only baseline reds. A flaky-looking red is reported with
   both run ids; the coordinator judges flake or real.
 
+- 2026-11-13, approved: the navigation owner fingerprint is a derived pin
+  (`93ffa01c`); the DLL byte-identity check is tracked in
+  TODO-tests-windows.md.
+- 2026-11-13, 22:06: I land my own green blocks on dev (rebase linear, tree
+  check, no merges, no trailers, gates, `git push origin HEAD:refs/heads/dev`)
+  and send the coordinator one line (range, CI run). Dev moves often: rebase
+  onto origin/dev before each proof and re-run a step where its moves meet
+  new files.
+- Worker G owns the Linux updater's shared-root probe
+  (`infra/paths.lua` SHARED_PROBE_FILE, `install/ownership_schema.sh`
+  OWNERSHIP_SHARED_SENTINEL, `_shared/data/locales/en.json` kept in the
+  tarball): never change those here; if a step moves them, rebase over G's
+  landing and keep G's behavior.
+
 ### Decisions to review by the maintainer
 
 - The OS-purity ratchets exempt adapters/ by folder; S02 and S03 put three
@@ -205,12 +220,6 @@ A red outside this list is the step's (the coordinator, 2026-11-12 22:00).
   narrow scanners too (the OS-purity lists, the platform-only convention).
 - The runner moves the I1 tree parity records (`57869cd5`) to the measured
   values at each step, named in the commit with the folder bounds.
-- The navigation owner manifest fingerprint is re-derived when a step moves
-  its sources (`93ffa01c`). Each Windows lane recompiles and tests the moved
-  sources, but byte identity with the tracked DLL is not rebuilt with the
-  pinned toolset (no MSVC here): the comments-only changes and `/Brepro`
-  without debug records argue it holds; a run of the builder with
-  `-UpdateTracked` on the pinned toolset would prove it.
 
 ## Next commands
 
