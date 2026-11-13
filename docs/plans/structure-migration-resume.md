@@ -4,12 +4,16 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 16:55)
+## Where things stand (2026-11-13, 17:15)
 
-- Branch: `claude/ergopti-todo-structure-phase2`, fast-forward only. Base:
-  dev `520bb24c`, merged in `ee1aa96f`. Tip: `6992c426`.
-- Steps landed on dev: none. The coordinator lands each green block of steps
-  on dev; the first block is S01+S02.
+- Branch: `claude/ergopti-todo-structure-phase2-night`, fast-forward only,
+  rebased on dev `42f8c1327`. Never merge dev into a branch: rebase it, so
+  each block lands linear (dev refuses merge commits). The old branch
+  `claude/ergopti-todo-structure-phase2` is frozen; nothing more is pushed
+  there.
+- Steps landed on dev: S01+S02 (dev `520bb24c8..42f8c1327`, landed by the
+  coordinator, its two flaky reds accepted). Next block: S03–S05, built on
+  the night branch.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
   Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
   input-display, platform-metrics; Windows Integration Driver startup (and
