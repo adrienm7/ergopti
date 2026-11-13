@@ -168,19 +168,22 @@ helpers.describe("TapHold deferred configuration owner", function()
 			end)
 		end)
 	end
+	-- A pause stops typing, not configuration (EDD-1): an editor opened while
+	-- paused saves, the engine stays out of the hook, and resume installs it.
 	for _, route in ipairs({ "tap", "delay" }) do
-		helpers.it("rechecks " .. route .. " after a reentrant pause getter", function()
+		helpers.it("commits " .. route .. " while paused and installs it on resume (edd1-paused-writes)", function()
 			with_editor(function(s)
-				local armed = false
-				s.context.is_paused = function()
-					if armed then armed = false; s.pause(true); s.pause(false) end
-					return false
-				end
-				local before = read(s.path)
+				s.pause(true)
 				local accepted
-				if route == "tap" then s.tap(); armed = true; accepted = s.confirm("backspace")
-				else s.prompt(function() armed = true end); accepted = s.delay() end
-				helpers.assert_eq(accepted, false); helpers.assert_eq(read(s.path), before)
+				if route == "tap" then s.tap(); accepted = s.confirm("backspace")
+				else s.prompt(function() end); accepted = s.delay() end
+				helpers.assert_eq(accepted, true); helpers.assert_eq(s.notices, 0)
+				local fields = s.manager.keys().caps_lock
+				helpers.assert_eq(route == "tap" and fields.tap_action or fields.time_activation_seconds,
+					route == "tap" and "backspace" or 0.45)
+				helpers.assert_eq(s.manager.is_active(), false, "a paused script remaps nothing")
+				s.pause(false)
+				helpers.assert_eq(s.manager.is_active(), true, "resume installs the edited engine")
 			end)
 		end)
 	end
