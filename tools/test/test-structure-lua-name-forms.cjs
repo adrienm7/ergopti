@@ -67,6 +67,24 @@ function run() {
 		'only tests/lua is a module root'
 	);
 
+	// Ruby's require "json", written by a Python tool that never names Lua,
+	// is no Lua load site (S01 respelled it core.text.engine.json).
+	{
+		const py = 'tools/diagnostics/z_probe.py';
+		const src =
+			'probe = root / "brew-paths.rb"\nprobe.write_text(\'require "json"\\nrequire "tap"\\n\')\n';
+		const rows = Plan.scanFile(py, src, Plan.referenceContext(MAP));
+		assert.deepEqual(
+			rows.filter((r) => r.kind === 'lua-module'),
+			[],
+			'a Ruby load stays'
+		);
+		const lua = "x = 'a.rb'\nrun(['luajit', '-e', 'local J = require \"json\"'])\n";
+		assert.ok(
+			Plan.scanFile(py, lua, Plan.referenceContext(MAP)).some((r) => r.kind === 'lua-module'),
+			'a Lua load inside a tool that runs Lua still follows'
+		);
+	}
 	const cases = [
 		// An init.lua named with its stem keeps the stem where it lands in an
 		// init.lua, and loses it where it does not (S26 left these unrewritten).
