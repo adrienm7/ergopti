@@ -729,6 +729,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-repin.cjs"],
 			"repro": "npm run test:structure-repin"
+		},
+		{
+			"id": "js-0518",
+			"ordinal": 637,
+			"name": "structure plan follows a Lua module-prefix sweep only when its modules move together, and refuses a scattering step",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-lua-prefix-sweeps.cjs"],
+			"repro": "npm run test:structure-lua-prefix-sweeps"
 		}
 	]
 }
