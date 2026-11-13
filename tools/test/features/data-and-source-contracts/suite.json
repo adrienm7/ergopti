@@ -729,6 +729,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-repin.cjs"],
 			"repro": "npm run test:structure-repin"
+		},
+		{
+			"id": "js-0518",
+			"ordinal": 637,
+			"name": "user value schema: one declaration per setting, shared check vectors, locales and generated Windows data agree",
+			"cmd": "node",
+			"args": ["tools/test/test-value-schema.cjs"],
+			"repro": "npm run test:value-schema"
 		}
 	]
 }

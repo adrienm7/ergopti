@@ -203,6 +203,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/windows/_generated/update_schedule.ahk']
 	},
 	{
+		script: 'codegen/codegen-value-schema.cjs',
+		outputs: ['static/ergopti_plus/windows/_generated/value_schema.ahk']
+	},
+	{
 		script: 'codegen/codegen-touchpad-registry.cjs',
 		outputs: ['static/ergopti_plus/windows/_generated/touchpad_registry.ahk']
 	},
