@@ -159,6 +159,7 @@
 		"test:structure-folder-gain-lists": "node ./tools/test/test-structure-folder-gain-lists.cjs",
 		"test:structure-tool-lua-roots": "node ./tools/test/test-structure-tool-lua-roots.cjs",
 		"test:structure-mkdir-ladder": "node ./tools/test/test-structure-mkdir-ladder.cjs",
+		"test:structure-ahk-scriptdir": "node ./tools/test/test-structure-ahk-scriptdir.cjs",
 		"test:shared-literal-inventory": "node ./tools/test/test-shared-literal-inventory.cjs",
 		"test:stub-interception": "node ./tools/test/test-stubs-intercept-something.cjs",
 		"test:action-emit-per-os": "node ./tools/test/test-action-emit-is-per-os.cjs",
