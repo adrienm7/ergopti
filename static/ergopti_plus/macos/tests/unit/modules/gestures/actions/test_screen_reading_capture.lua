@@ -21,7 +21,7 @@ local TEMP = "/tmp/lua_screen_reading"
 
 local SUBJECT_MODULES = {
 	"core.fs.adapters.file_system",
-	"adapters.screen_capture",
+	"platform.system.screen_capture",
 	"core.process.adapters.shell_runner",
 	"modules.shortcuts.actions.screen_capture_flow",
 	"core.i18n.engine.i18n",
@@ -74,7 +74,7 @@ local function with_subject(scenario)
 			return true
 		end,
 	}
-	package.loaded["adapters.screen_capture"] = {
+	package.loaded["platform.system.screen_capture"] = {
 		permission_state = function() return true end,
 		request_permission = function() return true end,
 		open_permission_settings = function() return true end,

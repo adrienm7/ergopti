@@ -17,8 +17,8 @@ local helpers = require("tests.helpers")
 -- Reloaded under the counted runtime and restored after the case
 local FIXTURE_MODULES = {
 	"tests.stubs.hs", "core.logger.engine.logger", "ui.healthcheck.core", "ui.healthcheck.helpers",
-	"adapters.system_info", "platform.input.key_state", "core.network.adapters.info",
-	"adapters.accessibility_permission", "adapters.screen_capture",
+	"platform.system.info", "platform.input.key_state", "core.network.adapters.info",
+	"adapters.accessibility_permission", "platform.system.screen_capture",
 }
 
 -- The machine the stubbed runtime describes

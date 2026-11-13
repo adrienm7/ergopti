@@ -50,7 +50,7 @@ local DEFAULT_DEPS = {
 	open = function(target, on_done) return require("adapters.desktop_opener").open(target, on_done) end,
 	exists = function(path) return require("core.fs.adapters.file_system").exists(path) end,
 	path_status = function(path) return require("core.fs.adapters.file_system").path_status(path) end,
-	notify = function(message) return require("adapters.notifier").send(message, { level = "error" }) end,
+	notify = function(message) return require("platform.system.notifier").send(message, { level = "error" }) end,
 	message = function(key) return require("core.i18n.engine.i18n").get(key) end,
 	getenv = os.getenv,
 	focused_app = function() return require("platform.focus.window_info").getFocused().appId end,
@@ -81,7 +81,7 @@ local DEFAULT_DEPS = {
 	end,
 	write_clipboard = function(text) return require("adapters.clipboard").write(text) end,
 	notify_success = function(message)
-		return require("adapters.notifier").send(message, { level = "success" })
+		return require("platform.system.notifier").send(message, { level = "success" })
 	end,
 }
 local deps = DEFAULT_DEPS

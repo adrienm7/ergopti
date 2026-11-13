@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Screen = require("adapters.screen_capture")
+local Screen = require("platform.system.screen_capture")
 assert(uv.getuid() ~= 0, "permission receipts require an ordinary user")
 assert(os.getenv("DISPLAY"), "an owned virtual X11 display is required")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-screen-path-XXXXXX"))

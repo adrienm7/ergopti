@@ -617,7 +617,7 @@ WIGetAll() {
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
-; (tests/unit/adapters/test_adapter_compliance.ahk) to verify every required method exists
+; (tests/unit/platform/system/test_adapter_compliance.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_WINDOW_INFO := Map(
     "getFocused", WIGetFocused,

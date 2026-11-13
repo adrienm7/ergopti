@@ -6,7 +6,7 @@
 ; Turns a Windows Precision Touchpad's HID input reports into contact frames
 ; and the live travel of a swipe, for the incremental tracker. Everything that
 ; needs the device (raw input, the preparsed descriptor, the HidP_* readers)
-; lives in adapters/raw_input.ahk; this file holds what can be wrong in ways a
+; lives in platform/system/raw_input.ahk; this file holds what can be wrong in ways a
 ; real touchpad would not reveal quickly, so synthetic reports can pin it.
 ;
 ; FEATURES & RATIONALE:

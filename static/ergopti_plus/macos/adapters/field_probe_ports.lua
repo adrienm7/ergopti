@@ -43,7 +43,7 @@ local function permission_facts()
 	local eventtap = type(hs.eventtap) == "table" and hs.eventtap or {}
 	return {
 		accessibility = (require("adapters.accessibility_permission").is_trusted()),
-		screen_recording = (require("adapters.screen_capture").permission_state()),
+		screen_recording = (require("platform.system.screen_capture").permission_state()),
 		-- Only some Hammerspoon builds can ask without prompting; nil otherwise
 		input_monitoring = optional_query(eventtap.checkKeyboardEventAccess, false),
 		secure_input = optional_query(eventtap.isSecureInputEnabled),

@@ -7,7 +7,7 @@
 --- (_shared/core/logger/data/diagnostic_snapshot.json) and logs them as one INFO
 --- line once per session, after boot. Formatting is shared with Linux through
 --- _shared/diagnostics/engine/snapshot.lua; the OS probes live in
---- adapters/system_info.lua.
+--- platform/system/info.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Emitted once per Lua state. A second emission would make "which snapshot
@@ -109,7 +109,7 @@ end
 --- @return table Field name to raw value.
 function M.collect(ctx, system)
 	ctx = ctx or {}
-	system = system or require("adapters.system_info")
+	system = system or require("platform.system.info")
 	local scale = system.main_screen_scale()
 	local enabled, total = count_features(ctx.state)
 	local commit = M.resolve_commit({

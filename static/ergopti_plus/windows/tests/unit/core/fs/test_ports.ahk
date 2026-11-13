@@ -184,4 +184,4 @@ _TFSP_AdmissionChangesSource(Path) {
 Test("file system ports: final admission cannot overwrite a concurrent edit (fs-admission-source-change)",
 	() => _TFSP_InTemp(_TFSP_AdmissionChangesSource))
 
-#Include ../../adapters/test_classified_publisher_stage_custody.ahk
+#Include ../../platform/system/test_classified_publisher_stage_custody.ahk

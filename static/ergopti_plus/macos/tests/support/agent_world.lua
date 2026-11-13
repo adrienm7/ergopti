@@ -119,7 +119,7 @@ function M.build_world(options)
 		end,
 		getAll = function() return {} end,
 	}
-	package.loaded["adapters.system_info"] = { time_zone = function() return "Europe/Paris" end }
+	package.loaded["platform.system.info"] = { time_zone = function() return "Europe/Paris" end }
 	package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return false end }
 	package.loaded["modules.shortcuts.script_control"] = nil
 	package.loaded["modules.keystats"] = {

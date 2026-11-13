@@ -41,7 +41,7 @@ local function notify_lost()
 	-- A notification, not a menu row: named first so the menu-row census of
 	-- ui/menu/ does not read `title = I18n.get(...)` as a row built here.
 	local title = I18n.get("menu.reload_replay.lost_title")
-	return require("adapters.notifier").send(I18n.get("menu.reload_replay.lost"), {
+	return require("platform.system.notifier").send(I18n.get("menu.reload_replay.lost"), {
 		title = title, level = "warning",
 	})
 end

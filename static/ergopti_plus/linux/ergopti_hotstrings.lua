@@ -441,7 +441,7 @@ local shutdown = ShutdownCoordinator.new({
 			name = "screen capture cleanup",
 			wait_for_ack = true,
 			stop = function()
-				local owner = package.loaded["adapters.screen_capture"]
+				local owner = package.loaded["platform.system.screen_capture"]
 				return not owner or owner.shutdown() == true
 			end,
 		},
@@ -999,7 +999,7 @@ local function main()
 	require("core.text.engine.toml_codec.writer").set_sparse_defaults(
 		require("infra.config_paths").config("config.toml"), require("infra.manifest_reader"))
 	require("core.text.engine.toml_codec.writer").set_case_twin_reporter(function(message, admission)
-		local notifier = require("adapters.notifier")
+		local notifier = require("platform.system.notifier")
 		if admission ~= nil then
 			local called, current = pcall(admission)
 			if not called or current ~= true then return false end
@@ -2054,7 +2054,7 @@ local function main()
 			-- actions' tools; the engine reads and deletes it.
 			capture_screen = function(mode, max_edge, on_done)
 				if opts.dry_run then return nil, "dry run" end
-				return require("adapters.screen_capture").capture(mode, max_edge, on_done)
+				return require("platform.system.screen_capture").capture(mode, max_edge, on_done)
 			end,
 			-- The tray's live submenu checks the live prompt: redrawn when a
 			-- binding turns live mode on or off.

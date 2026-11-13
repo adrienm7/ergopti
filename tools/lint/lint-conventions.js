@@ -737,6 +737,7 @@ console.log('lint-conventions: scanning…');
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/platform/system'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/platform/input'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/platform/focus'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/ui/adapters'),
@@ -784,6 +785,7 @@ const ahkAll = [
 // file count and passes.
 const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/platform/system'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/platform/input'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/platform/focus'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/ui/adapters'),
@@ -809,6 +811,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/network'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tests'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/platform/system'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/platform/input'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/platform/focus'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/ui/adapters'),

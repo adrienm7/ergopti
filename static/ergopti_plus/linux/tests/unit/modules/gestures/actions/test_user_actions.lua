@@ -350,7 +350,7 @@ end)
 helpers.describe("private user-action notification fallback", function()
 	for _, mode in ipairs({ "unavailable", "refused" }) do
 		helpers.it("does not log command stderr when notifier is " .. mode, function()
-			local names = { "core.logger.engine.shim", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "adapters.notifier",
+			local names = { "core.logger.engine.shim", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "platform.system.notifier",
 				"platform.focus.application_notifier", "modules.gestures.user_actions" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local logs = {}
@@ -364,7 +364,7 @@ helpers.describe("private user-action notification fallback", function()
 				run = function() return false end,
 				run_async = function() return nil, "controlled spawn refusal" end,
 			}
-			package.loaded["adapters.notifier"] = nil
+			package.loaded["platform.system.notifier"] = nil
 			package.loaded["platform.focus.application_notifier"] = nil
 			package.loaded["modules.gestures.user_actions"] = nil
 			local ok, err = xpcall(function()

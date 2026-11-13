@@ -412,7 +412,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include platform/input/hotkey_registrar.ahk
 #Include ../_shared/shortcuts/data/magic_editor.ahk
 #Include infra/magic_editor.ahk
-#Include adapters/notifier.ahk
+#Include platform/system/notifier.ahk
 #Include adapters/tray_menu.ahk
 #Include platform/input/text_sender.ahk
 #Include ../_shared/core/network/data/failure.ahk
@@ -432,7 +432,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/llm_automation.ahk
 #Include adapters/mouse_control.ahk
 #Include platform/focus/window_manager.ahk
-#Include adapters/system_control.ahk
+#Include platform/system/control.ahk
 #Include core/ui/adapters/graphics_renderer.ahk
 #Include adapters/notify_icon.ahk
 #Include core/ui/adapters/tooltip_renderer.ahk

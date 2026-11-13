@@ -13,7 +13,7 @@
 local uv = require("luv")
 local lgi = require("lgi")
 local Gio, GLib = lgi.Gio, lgi.GLib
-local Notifier = require("adapters.notifier")
+local Notifier = require("platform.system.notifier")
 assert(os.getenv("ERGOPTI_TEST_PRIVATE_DBUS") == "1", "an explicitly owned test bus is required")
 assert(os.getenv("DBUS_SESSION_BUS_ADDRESS") and os.getenv("DISPLAY"), "private D-Bus and virtual X11 are required")
 local connection = assert(Gio.bus_get_sync(Gio.BusType.SESSION))

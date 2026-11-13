@@ -171,7 +171,7 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ; core/process/adapters/lifecycle.ahk; read from this counter at modules+lib 248
 ; (DllCall=157 COM=2 FileIO=89) and entry 7 (DllCall=6 FileIO=1), tightened.
 ; 2026-11-12: the layout registry watch and the metrics time zone conversions
-; moved into adapters/registry_notify.ahk and adapters/system_time_zone.ahk;
+; moved into adapters/registry_notify.ahk and platform/system/time_zone.ahk;
 ; read from this counter at modules+lib 247, tightened.
 _AOPR_BASELINE_CORE  := 247
 _AOPR_BASELINE_UI    := 125

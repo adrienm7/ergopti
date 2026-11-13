@@ -175,7 +175,7 @@ helpers.describe("repeat key menu persistence", function()
 		local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 		local closure = assert(source:match('set_case_twin_reporter%((function%(message, admission%)[%s%S]-end)%)'), "bootstrap reporter must exist")
 		local reporter = assert(loadstring("return " .. closure))()
-		local notifier = require("adapters.notifier")
+		local notifier = require("platform.system.notifier")
 		local previous = notifier.send
 		local ok, err = pcall(function()
 			for _, result in ipairs({ false, true }) do

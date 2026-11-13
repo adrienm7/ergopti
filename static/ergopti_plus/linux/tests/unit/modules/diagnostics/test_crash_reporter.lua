@@ -268,8 +268,8 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 
 	helpers.it("tells the user where the report landed, and says so when it cannot be saved", function()
 		local sent = {}
-		local saved = { package.loaded["adapters.notifier"], package.loaded["core.i18n.engine.i18n"] }
-		package.loaded["adapters.notifier"] = { send = function(text, opts) sent[#sent + 1] = { text = text, opts = opts }; return true end }
+		local saved = { package.loaded["platform.system.notifier"], package.loaded["core.i18n.engine.i18n"] }
+		package.loaded["platform.system.notifier"] = { send = function(text, opts) sent[#sent + 1] = { text = text, opts = opts }; return true end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return "T:" .. key end }
 		local ok, err = pcall(function()
 			local cap = with_sandbox(nil, function() cr.dump("engine", "notice me") end)
@@ -284,7 +284,7 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 			helpers.assert_nil(failed.path)
 			helpers.assert_eq(sent[2], { text = "T:crash.report.save_failed", opts = { level = "error" } })
 		end)
-		package.loaded["adapters.notifier"], package.loaded["core.i18n.engine.i18n"] = saved[1], saved[2]
+		package.loaded["platform.system.notifier"], package.loaded["core.i18n.engine.i18n"] = saved[1], saved[2]
 		if not ok then error(err, 0) end
 	end)
 

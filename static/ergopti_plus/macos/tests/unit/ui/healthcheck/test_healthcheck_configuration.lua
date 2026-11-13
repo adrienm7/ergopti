@@ -191,8 +191,8 @@ end)
 -- Reloaded under the stubbed runtime and restored after the case
 local PROBE_MODULES = {
 	"tests.stubs.hs", "core.logger.engine.logger", "ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes",
-	"adapters.system_info", "platform.input.key_state", "core.network.adapters.info", "adapters.accessibility_permission",
-	"adapters.screen_capture", "core.events.timer_scheduler", "diagnostics.engine.healthcheck.configuration",
+	"platform.system.info", "platform.input.key_state", "core.network.adapters.info", "adapters.accessibility_permission",
+	"platform.system.screen_capture", "core.events.timer_scheduler", "diagnostics.engine.healthcheck.configuration",
 }
 
 --- Runs a case under the stubbed Hammerspoon runtime.

@@ -360,7 +360,7 @@ _LogBootProgress("i18n included (t() available)")
 InstallHotstringHooks()
 
 ; ── Adapter contract: include all port adapters so contract vector tests can call them ──
-#Include ../adapters/notifier.ahk
+#Include ../platform/system/notifier.ahk
 #Include ../core/lifecycle/engine/shutdown/quit_admission.ahk
 #Include ../core/events/timer_scheduler.ahk
 #Include ../core/fs/adapters/file_system.ahk
@@ -386,7 +386,7 @@ InstallHotstringHooks()
 #Include ../apps/bundled_apps.ahk
 #Include ../core/network/adapters/info.ahk
 #Include ../platform/focus/window_manager.ahk
-#Include ../adapters/system_control.ahk
+#Include ../platform/system/control.ahk
 #Include ../adapters/mouse_control.ahk
 #Include ../core/ui/adapters/graphics_renderer.ahk
 #Include ../adapters/notify_icon.ahk
@@ -420,13 +420,13 @@ SFD_ConfigureUiaWorker(
 InstallSendNoOps()
 
 ; ── Per-module test files (each registers Test() cases) ──
-#Include unit/adapters/test_adapter_compliance.ahk
+#Include unit/platform/system/test_adapter_compliance.ahk
 #Include unit/core/fs/test_ports.ahk
 #Include unit/infra/config/persistence/test_feature_io_locator.ahk
 #Include meta/infra/config/persistence/test_feature_io_impl_no_global.ahk
 #Include meta/suite/test_isset_no_property_arg.ahk
-#Include unit/adapters/test_adapter_contract_vectors.ahk
-#Include unit/adapters/test_adapter_contract_vectors_system.ahk
+#Include unit/platform/system/test_adapter_contract_vectors.ahk
+#Include unit/platform/system/test_adapter_contract_vectors_system.ahk
 #Include unit/platform/input/test_clipboard_paste_transaction_ownership.ahk
 #Include unit/platform/input/test_selection_capture_receiving.ahk
 #Include unit/platform/input/test_suppressive_inputhook_ownership.ahk
@@ -777,8 +777,8 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/servers/test_local_server_queue_timer.ahk
 #Include unit/modules/llm/servers/test_llm_crash_orphan_cleanup.ahk
 #Include unit/modules/llm/servers/test_llm_temp_artifact_terminal_ownership.ahk
-#Include unit/adapters/test_filesystem_native_write.ahk
-#Include unit/adapters/test_filesystem_nul_paths.ahk
+#Include unit/platform/system/test_filesystem_native_write.ahk
+#Include unit/platform/system/test_filesystem_nul_paths.ahk
 #Include unit/core/process/test_lifecycle_app_events.ahk
 #Include unit/core/logger/test_native_write.ahk
 #Include unit/modules/keystats/test_keystats_sql_native_write.ahk
@@ -1373,7 +1373,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/test_keystats_app_category_projection.ahk
 #Include unit/modules/keystats/test_keystats_password_fail_closed.ahk
 #Include unit/core/lifecycle/test_single_instance_gate.ahk
-#Include unit/adapters/test_worker_tray_icon_hidden.ahk
+#Include unit/platform/system/test_worker_tray_icon_hidden.ahk
 #Include unit/adapters/test_notify_icon.ahk
 #Include unit/modules/keystats/test_keystats_network_transitions.ahk
 #Include ../infra/menu_command_origin.ahk
@@ -1461,7 +1461,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_require_state_pattern.ahk
 #Include meta/modules/keystats/test_keystats_pause_guard.ahk
 #Include meta/modules/updater/test_changelog_http_timeout.ahk
-#Include meta/adapters/test_dpapi_decrypt_safe.ahk
+#Include meta/platform/system/test_dpapi_decrypt_safe.ahk
 #Include meta/ui/menu/test_menu_dispatcher_critical.ahk
 #Include meta/ui/menu/test_menu_dispatch_epoch.ahk
 #Include meta/modules/llm/api/test_llm_setbackend_propagates_to_engine.ahk
@@ -1674,7 +1674,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ui/menu/test_list_providers_touch_no_menu.ahk
 #Include meta/modules/keystats/metrics/test_menu_metrics_disabled_when.ahk
 #Include unit/modules/keystats/metrics/test_metrics_widget_menu_parity.ahk
-#Include meta/adapters/test_port_adapter_coverage.ahk
+#Include meta/platform/system/test_port_adapter_coverage.ahk
 #Include meta/suite/test_no_class_global_conflict.ahk
 #Include meta/core/i18n/test_json_valid.ahk
 #Include meta/modules/shortcuts/test_wrap_symbols_gate.ahk
@@ -1865,7 +1865,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/input/dispatch/test_pointer_watch_timer_bypasses_suspend.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_index_rebuild_no_suspend_guard.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_onkeydown_tab_llm_feed_gap.ahk
-#Include meta/adapters/test_reg_keyexists_value_only.ahk
+#Include meta/platform/system/test_reg_keyexists_value_only.ahk
 #Include meta/adapters/test_registry_oserror_number_not_extra.ahk
 #Include meta/platform/remap/layers/test_remap_emit_critical_uneven.ahk
 #Include meta/modules/llm/servers/test_remote_api_validate_async.ahk
@@ -1941,7 +1941,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/input/test_clipboard_saveall_sentinel.ahk
 #Include meta/platform/input/test_textsend_callback_wired.ahk
 #Include meta/infra/config/persistence/test_is_category_all_enabled_loop.ahk
-#Include meta/adapters/test_regread_no_type_arg.ahk
+#Include meta/platform/system/test_regread_no_type_arg.ahk
 #Include meta/core/logger/test_dedup_tick.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_watcher_magic_suffix.ahk
 #Include meta/modules/hotstrings/magic_key/test_deadkey_uses_dynamic_magic_key.ahk
@@ -2032,7 +2032,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/infra/config/persistence/test_savefullconfig_no_delete.ahk
 #Include meta/modules/keystats/test_keystats_scan_max_id_tail.ahk
 #Include meta/modules/gestures/test_gesture_screenshot_no_tempfile.ahk
-#Include meta/adapters/test_wmexists_is_not_a_handle.ahk
+#Include meta/platform/system/test_wmexists_is_not_a_handle.ahk
 #Include meta/platform/remap/tap_hold/test_taphold_scancodes_are_the_real_keys.ahk
 #Include unit/core/crypto/test_sha256_is_real.ahk
 #Include meta/platform/remap/keys/test_capslock_led_does_not_latch.ahk
@@ -2155,15 +2155,15 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/logger/test_fanout_batched.ahk
 #Include meta/adapters/crash_report/test_crash_reporter_slash_precedence.ahk
 #Include meta/core/logger/test_flush_on_error.ahk
-#Include meta/adapters/test_atomic_write_unique_scratch.ahk
-#Include unit/adapters/test_atomic_temp_owner.ahk
+#Include meta/platform/system/test_atomic_write_unique_scratch.ahk
+#Include unit/platform/system/test_atomic_temp_owner.ahk
 #Include meta/suite/test_byref_call_sites.ahk
 #Include meta/platform/focus/uia/test_probe_bounded.ahk
 #Include meta/ui/healthcheck/test_healthcheck_collectors_guarded.ahk
 #Include meta/modules/gestures/test_gestures_init_lifecycle_pair.ahk
 #Include meta/infra/config/persistence/test_paths_file_single_writer.ahk
 #Include meta/modules/updater/test_changelog_fetch_status_logged.ahk
-#Include meta/adapters/test_mutex_yield_is_recorded.ahk
+#Include meta/platform/system/test_mutex_yield_is_recorded.ahk
 #Include meta/core/lifecycle/engine/reload/test_suspend_deferral_bounded.ahk
 #Include meta/core/lifecycle/engine/shutdown/test_veto_bounded.ahk
 #Include meta/core/lifecycle/engine/reload/test_suspend_lifecycle_logged.ahk
@@ -2234,7 +2234,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/llm/api/test_warmup_backoff_preserved.ahk
 ; These three were orphaned with their own (duplicate or pure-scan) includes;
 ; the duplicate test_framework.ahk includes were stripped so they integrate.
-#Include meta/adapters/test_dpapi_blob_size.ahk
+#Include meta/platform/system/test_dpapi_blob_size.ahk
 ; The diagnostics window's sources are headless-safe: function definitions and
 ; their globals only, no top-level side effects.
 #Include ../ui/healthcheck/core.ahk
@@ -2297,7 +2297,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/metrics/test_metrics_app_time_accuracy.ahk
 #Include meta/infra/config/persistence/test_toggle_category_all_features_atomic.ahk
 #Include meta/core/crypto/test_djb2_fallback_logged.ahk
-#Include meta/adapters/test_adapter_callback_swallow_logged.ahk
+#Include meta/platform/system/test_adapter_callback_swallow_logged.ahk
 #Include meta/modules/llm/prediction/test_llm_callbacks_never_swallowed.ahk
 #Include meta/modules/llm/prediction/test_llm_inflight_hygiene.ahk
 #Include meta/modules/llm/api/test_llm_semantic_config_class.ahk

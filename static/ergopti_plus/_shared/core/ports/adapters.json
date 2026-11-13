@@ -52,9 +52,9 @@
 			"macos": "static/ergopti_plus/macos/core/network/adapters/info.lua"
 		},
 		"Notifier": {
-			"windows": "static/ergopti_plus/windows/adapters/notifier.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/notifier.lua",
-			"linux": "static/ergopti_plus/linux/adapters/notifier.lua"
+			"windows": "static/ergopti_plus/windows/platform/system/notifier.ahk",
+			"macos": "static/ergopti_plus/macos/platform/system/notifier.lua",
+			"linux": "static/ergopti_plus/linux/platform/system/notifier.lua"
 		},
 		"ProcessLifecycle": {
 			"windows": "static/ergopti_plus/windows/core/process/adapters/lifecycle.ahk",

@@ -18,7 +18,7 @@ import sys
 import tempfile
 import types
 
-OLD = "e5aee88a3c240c97e78b11cbd132314c6b5dfa67c9855e96ee0438fd25521ac6"
+OLD = "b4e2da5f7acfdbae0f3ba849d580944224d6c2b2a2d0477d9eda565163628684"
 HELPER = "3e13e82b3129557edfbe04cc7c7f1a7d51a8bfc5dcc4ccbd736dc15463c8fada"
 CHILD = "dc40081e96f631447d71678a7def720b19f34986ba7a57d759e25cdd6df87aec"
 CONTROL = "7adf645a1a2b79b9358d7e793dd12ccb0b113f25d49b50ef991a37079b4a470a"

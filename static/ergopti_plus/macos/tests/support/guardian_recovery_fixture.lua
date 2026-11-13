@@ -37,7 +37,7 @@ local STUB_MODULES = {
 	"platform.remap.watchers",
 	"platform.input.hotkey_registrar",
 	"core.events.timer_scheduler",
-	"adapters.system_info",
+	"platform.system.info",
 	"platform.remap.deploy_pacing",
 	"core.ui.engine.notifications",
 	"modules.keystats.kc_bridge",
@@ -717,7 +717,7 @@ local function with_remap(options, body)
 	package.loaded["core.events.timer_scheduler"] = timer_scheduler
 	-- Unknown input idle never delays a deploy; a case sets calls.input_idle_seconds.
 	calls.input_idle_seconds = options.input_idle_seconds
-	package.loaded["adapters.system_info"] = {
+	package.loaded["platform.system.info"] = {
 		input_idle_seconds = function() return calls.input_idle_seconds end,
 	}
 	-- The pacing owner captures its probe at require time.

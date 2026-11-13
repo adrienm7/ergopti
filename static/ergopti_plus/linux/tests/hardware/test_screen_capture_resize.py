@@ -12,7 +12,7 @@ assert os.access("/usr/bin/convert", os.X_OK), "ImageMagick convert is required"
 assert_luajit = shutil.which("luajit")
 assert assert_luajit, "LuaJIT is required"
 script = subprocess.check_output(
-    [assert_luajit, "-e", "io.write(require('adapters.screen_capture').SCRIPT)"], env=env
+    [assert_luajit, "-e", "io.write(require('platform.system.screen_capture').SCRIPT)"], env=env
 ).decode()
 with tempfile.TemporaryDirectory(prefix="ergopti-resize-native-") as temp:
 

@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Recording Notifier (Linux tests)
 --- DESCRIPTION:
---- Every test case resolves require("adapters.notifier") to a recording
+--- Every test case resolves require("platform.system.notifier") to a recording
 --- notifier: the real adapter, loaded once against a shell double that records
 --- the notify-send argv instead of spawning it. Production code reaches the
 --- notifier through a call-time require, so a fixture that never stubs it still
@@ -24,7 +24,7 @@
 
 local M = {}
 
-local NOTIFIER = "adapters.notifier"
+local NOTIFIER = "platform.system.notifier"
 local SHELL = "core.process.adapters.shell_runner"
 
 -- The recording notifier, built by install().
@@ -80,7 +80,7 @@ end
 
 --- A chunk for `luajit -e` that makes a child driver process resolve its
 --- notifier to the recording one, for fixtures that launch the daemon itself.
---- The child loads it on its first require("adapters.notifier"), once its own
+--- The child loads it on its first require("platform.system.notifier"), once its own
 --- package.path is in place, and keeps the dependencies it loaded.
 --- @param driver_root string Absolute path of the Linux driver.
 --- @return string chunk

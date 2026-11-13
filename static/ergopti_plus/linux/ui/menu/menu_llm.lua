@@ -71,7 +71,7 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 	local function refused(page_current, invalid)
 		Logger.error(LOG, "Numeric setting '%s' refused: its opening configuration is no longer current.", name)
 		if page_current and page_current() ~= true then return false end
-		local okay, notifier = pcall(require, "adapters.notifier")
+		local okay, notifier = pcall(require, "platform.system.notifier")
 		if okay and type(notifier.send) == "function" and (not page_current or page_current() == true) then
 			local message = i18n_safe(invalid and "menu.llm.word_limits_incompatible" or "dialog.personal_info.save_failed_title")
 			if not page_current or page_current() == true then pcall(notifier.send, message, { level = "error" }) end
@@ -173,11 +173,11 @@ local function commit_choice(owner, name, value, source, prefix, expected, origi
 		local reread, _, after = pcall(read, { prefix .. name })
 		if not reread or type(after) ~= "table" or after.status ~= observed.status or after.content ~= observed.content
 			or not current() then return false end
-		local okay, notifier = pcall(require, "adapters.notifier")
+		local okay, notifier = pcall(require, "platform.system.notifier")
 		if okay and type(notifier.send) == "function" and current() then
 			local send = notifier.send
 			local message = i18n_safe(reason == "invalid" and "menu.llm.word_limits_incompatible" or "dialog.personal_info.save_failed_title")
-			if current() and package.loaded["adapters.notifier"] == notifier and notifier.send == send then
+			if current() and package.loaded["platform.system.notifier"] == notifier and notifier.send == send then
 				pcall(send, message, { level = "error" })
 			end
 		end

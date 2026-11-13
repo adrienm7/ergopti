@@ -113,7 +113,7 @@ local _tone_generation = 0
 local _tone_memory = nil
 
 -- Injected by init() for the screen actions: how the screen is captured
--- (adapters/screen_capture.lua in the daemon).
+-- (platform/system/screen_capture.lua in the daemon).
 local _capture_screen = nil
 
 -- The screen actions' state. The generation drops a stale capture or reading:
@@ -3901,7 +3901,7 @@ function M.enable(on_changed)
 					if type(result) ~= "table" or result.ok ~= false or result.error == "runtime_cancelled" then return end
 					Logger.error(LOG, "Local Ollama repair refused; its native cleanup owner remains retained until acknowledgment: %s.", tostring(result.error))
 					if owner.source.diagnostic_current(handle) then
-						local delivered = require("adapters.notifier").send(I18n.get("ollama.runtime_repair_failed"), {
+						local delivered = require("platform.system.notifier").send(I18n.get("ollama.runtime_repair_failed"), {
 							title = I18n.get("ollama.fail_title"), level = "error",
 						})
 						if delivered ~= true then Logger.warn(LOG, "The local Ollama failure notice was not delivered.") end

@@ -53,7 +53,7 @@ local FileSystem = require("core.fs.adapters.file_system")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
 local LedgerAppend = require("core.fs.adapters.ledger_append")
 local TimerScheduler = require("core.events.timer_scheduler")
-local PowerSource = require("adapters.power_source")
+local PowerSource = require("platform.system.power_source")
 local LOG     = "keystats.log_manager"
 
 local TextCipher = require("modules.keystats.text_cipher")

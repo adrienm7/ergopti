@@ -44,10 +44,7 @@ graph TD
         LINUX_input_source_group_worker["InputSourceGroupWorker.lua"]
         LINUX_input_source_switch["InputSourceSwitch.lua"]
         LINUX_keyboard_layout["KeyboardLayout.lua"]
-        LINUX_notifier["Notifier.lua"]
-        LINUX_screen_capture["ScreenCapture.lua"]
         LINUX_selection_transaction["SelectionTransaction.lua"]
-        LINUX_tap_to_click_setting["TapToClickSetting.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_user_hotstring_destination["UserHotstringDestination.lua"]
         LINUX_wayland_selection_counter["WaylandSelectionCounter.lua"]
@@ -87,22 +84,18 @@ graph TD
         MACOS_mouse_control["MouseControl.lua"]
         MACOS_native_bootstrap_pty["NativeBootstrapPty.lua"]
         MACOS_native_python_probe["NativePythonProbe.lua"]
-        MACOS_notifier["Notifier.lua"]
         MACOS_one_shot_shift["OneShotShift.lua"]
         MACOS_physical_context_probe["PhysicalContextProbe.lua"]
         MACOS_physical_history_context["PhysicalHistoryContext.lua"]
         MACOS_physical_lifecycle_event["PhysicalLifecycleEvent.lua"]
         MACOS_physical_observation_clock["PhysicalObservationClock.lua"]
         MACOS_physical_shortcut_hook["PhysicalShortcutHook.lua"]
-        MACOS_power_source["PowerSource.lua"]
         MACOS_prediction_tooltip_port["PredictionTooltipPort.lua"]
         MACOS_privacy_settings["PrivacySettings.lua"]
         MACOS_python_interpreter["PythonInterpreter.lua"]
         MACOS_reload_breadcrumb["ReloadBreadcrumb.lua"]
         MACOS_runtime_capture_port["RuntimeCapturePort.lua"]
         MACOS_runtime_owner_ports["RuntimeOwnerPorts.lua"]
-        MACOS_screen_capture["ScreenCapture.lua"]
-        MACOS_system_info["SystemInfo.lua"]
         MACOS_system_switcher_input["SystemSwitcherInput.lua"]
         MACOS_system_switcher_runtime["SystemSwitcherRuntime.lua"]
         MACOS_system_switcher_sampler["SystemSwitcherSampler.lua"]
@@ -125,16 +118,10 @@ graph TD
         WINDOWS_llm_automation["LlmAutomation.ahk"]
         WINDOWS_llm_nav_event_owner["LlmNavEventOwner.ahk"]
         WINDOWS_mouse_control["MouseControl.ahk"]
-        WINDOWS_notifier["Notifier.ahk"]
         WINDOWS_notify_icon["NotifyIcon.ahk"]
         WINDOWS_ollama_identity["OllamaIdentity.ahk"]
-        WINDOWS_raw_input["RawInput.ahk"]
         WINDOWS_registry_notify["RegistryNotify.ahk"]
         WINDOWS_screen_brightness["ScreenBrightness.ahk"]
-        WINDOWS_screen_capture["ScreenCapture.ahk"]
-        WINDOWS_system_control["SystemControl.ahk"]
-        WINDOWS_system_locale["SystemLocale.ahk"]
-        WINDOWS_system_time_zone["SystemTimeZone.ahk"]
         WINDOWS_tray_menu["TrayMenu.ahk"]
         WINDOWS_tray_startup_click["TrayStartupClick.ahk"]
         WINDOWS_tray_startup_commands["TrayStartupCommands.ahk"]
@@ -152,21 +139,18 @@ graph TD
 
     %% Port implementations: Linux (Lua)
     P_Clipboard -->|implements| LINUX_clipboard
-    P_Notifier -->|implements| LINUX_notifier
     P_TrayMenu -->|implements| LINUX_tray_menu
 
     %% Port implementations: macOS (Hammerspoon)
     P_AppLauncher -->|implements| MACOS_app_launcher
     P_Clipboard -->|implements| MACOS_clipboard
     P_MouseControl -->|implements| MACOS_mouse_control
-    P_Notifier -->|implements| MACOS_notifier
     P_TrayMenu -->|implements| MACOS_tray_menu
 
     %% Port implementations: Windows (AutoHotkey)
     P_AppLauncher -->|implements| WINDOWS_app_launcher
     P_Clipboard -->|implements| WINDOWS_clipboard
     P_MouseControl -->|implements| WINDOWS_mouse_control
-    P_Notifier -->|implements| WINDOWS_notifier
     P_TrayMenu -->|implements| WINDOWS_tray_menu
 
     %% Key domain relationships

@@ -34,7 +34,7 @@ local CONTRACT = {
 	{ mod = "infra.diagnostic_snapshot",        fns = { "resolve_commit" } },
 	{ mod = "modules.diagnostics.crash_reporter", fns = { "reports_dir" } },
 	{ mod = "adapters.boot_fatal",              constants = { "LAUNCHER_LOG_ENV" } },
-	{ mod = "adapters.system_info",             fns = { "runtime_version", "arch", "os_version", "keyboard_layout",
+	{ mod = "platform.system.info",             fns = { "runtime_version", "arch", "os_version", "keyboard_layout",
 		"elevated" } },
 	{ mod = "modules.updater",                  fns = { "current_version", "installed_channel" } },
 	{ mod = "platform.remap.ke_paths",          constants = { "CLI" } },
@@ -47,12 +47,12 @@ local CONTRACT = {
 	{ mod = "modules.llm.api_ollama",           fns = { "get_base_url" } },
 	{ mod = "modules.llm.api_mlx",              fns = { "get_base_url" } },
 	{ mod = "adapters.accessibility_permission", fns = { "is_trusted" } },
-	{ mod = "adapters.screen_capture",          fns = { "permission_state" } },
+	{ mod = "platform.system.screen_capture",          fns = { "permission_state" } },
 	{ mod = "core.network.adapters.http_client",             fns = { "new" } },
 	{ mod = "core.process.adapters.shell_runner",            fns = { "spawn" } },
 	{ mod = "core.fs.adapters.json_codec",              fns = { "decode" } },
 	{ mod = "adapters.clipboard",               fns = { "write" } },
-	{ mod = "adapters.notifier",                fns = { "send" } },
+	{ mod = "platform.system.notifier",                fns = { "send" } },
 	{ mod = "core.i18n.engine.locale",                     fns = { "all" } },
 	{ mod = "infra.manifest_reader",            fns = { "coverage_gaps" } },
 	{ mod = "core.network.adapters.info",            fns = { "getSignalStrength" } },
@@ -63,7 +63,7 @@ local CONTRACT = {
 -- The adapters that capture the hs global when they load: reloaded inside
 -- the fixture so they read its answers
 local HS_READERS = {
-	"platform.input.key_state", "adapters.accessibility_permission", "adapters.screen_capture", "adapters.system_info",
+	"platform.input.key_state", "adapters.accessibility_permission", "platform.system.screen_capture", "platform.system.info",
 }
 
 --- Answers the Hammerspoon queries the collectors make, as a Mac would.

@@ -17,7 +17,7 @@ local function fresh_screenshot()
 		"modules.shortcuts.actions.screenshot_save",
 		"core.process.adapters.shell_runner",
 		"core.fs.adapters.file_system",
-		"adapters.screen_capture",
+		"platform.system.screen_capture",
 		"modules.shortcuts.actions.screen_capture_flow",
 		"core.logger.engine.logger",
 		"core.ui.engine.notifications",
@@ -124,7 +124,7 @@ local function fresh_screenshot()
 			return "\137PNG\r\n\26\n" .. string.rep("\0", 4) .. "IHDR" .. string.pack(">I4I4", 10, 10), "ok"
 		end,
 	}
-	package.loaded["adapters.screen_capture"] = {
+	package.loaded["platform.system.screen_capture"] = {
 		permission_state = function() return true end,
 		request_permission = function() return true end,
 		open_permission_settings = function() return true end,

@@ -62,7 +62,7 @@ end)
 helpers.describe("opening selected content notifier privacy", function()
 	for _, mode in ipairs({ "unavailable", "refused" }) do
 		helpers.it("keeps the selected path out of the real notifier fallback when " .. mode, function()
-			local names = { "core.logger.engine.shim", "modules.shortcuts.open_selection", "adapters.notifier", "core.process.adapters.shell_runner" }
+			local names = { "core.logger.engine.shim", "modules.shortcuts.open_selection", "platform.system.notifier", "core.process.adapters.shell_runner" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local logs = {}
 			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
@@ -74,7 +74,7 @@ helpers.describe("opening selected content notifier privacy", function()
 				run = function() return false end,
 				run_async = function() return nil, "controlled spawn refusal" end,
 			}
-			package.loaded["adapters.notifier"] = nil
+			package.loaded["platform.system.notifier"] = nil
 			package.loaded["modules.shortcuts.open_selection"] = nil
 			local ok, err = xpcall(function()
 				local subject = require("modules.shortcuts.open_selection")
@@ -94,7 +94,7 @@ end)
 helpers.describe("copied path notifier privacy", function()
 	for _, mode in ipairs({ "unavailable", "refused" }) do
 		helpers.it("keeps copied file paths out of the real notifier fallback when " .. mode, function()
-			local names = { "core.logger.engine.shim", "modules.shortcuts.open_selection", "adapters.notifier", "core.process.adapters.shell_runner" }
+			local names = { "core.logger.engine.shim", "modules.shortcuts.open_selection", "platform.system.notifier", "core.process.adapters.shell_runner" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local logs, written = {}, nil
 			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
@@ -106,7 +106,7 @@ helpers.describe("copied path notifier privacy", function()
 				run = function() return false end,
 				run_async = function() return nil, "controlled spawn refusal" end,
 			}
-			package.loaded["adapters.notifier"] = nil
+			package.loaded["platform.system.notifier"] = nil
 			package.loaded["modules.shortcuts.open_selection"] = nil
 			local ok, err = xpcall(function()
 				local subject = require("modules.shortcuts.open_selection")

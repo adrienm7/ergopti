@@ -116,7 +116,7 @@ end
 --- The versions a bug report is triaged by.
 --- @return table
 function H.collect_versions()
-	local SystemInfo = require("adapters.system_info")
+	local SystemInfo = require("platform.system.info")
 	local commit, source = require("infra.diagnostic_snapshot").resolve_commit()
 	local runtime = SystemInfo.runtime_version()
 	return {
@@ -171,7 +171,7 @@ end
 --- The hardware section, without the facts only sysctl knows (a probe).
 --- @return table
 function H.collect_hardware()
-	local SystemInfo = require("adapters.system_info")
+	local SystemInfo = require("platform.system.info")
 	local stat = vm_stat()
 	local displays = read("the displays", function()
 		local main = hs.screen.mainScreen()
@@ -211,7 +211,7 @@ end
 --- @param uptime_sec number Seconds since the driver started.
 --- @return table
 function H.collect_system(detailed, uptime_sec)
-	local SystemInfo = require("adapters.system_info")
+	local SystemInfo = require("platform.system.info")
 	local stat = vm_stat()
 	local version = SystemInfo.os_version()
 	local ram_free = nil
@@ -418,7 +418,7 @@ local PERMISSION_READERS = {
 		return permission_state("accessibility", require("adapters.accessibility_permission").is_trusted())
 	end,
 	screen_recording = function()
-		return permission_state("screen_recording", require("adapters.screen_capture").permission_state())
+		return permission_state("screen_recording", require("platform.system.screen_capture").permission_state())
 	end,
 	-- Hammerspoon has no query for Input Monitoring that does not prompt, and
 	-- the grant belongs to the Karabiner grabber rather than to this process

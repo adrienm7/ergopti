@@ -359,7 +359,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.power_source",
+		id       = "platform.system.power_source",
 		contract = { "on_battery" },
 		-- Read by the keystats aggregate recovery, which paces its slices by it.
 		wired    = true,
@@ -438,7 +438,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.screen_capture",
+		id       = "platform.system.screen_capture",
 		contract = { "permission_state", "request_permission", "open_permission_settings",
 			"clipboard_change_count", "clipboard_has_image", "copy_image_file_to_clipboard" },
 		wired    = true,
@@ -556,7 +556,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.system_info",
+		id       = "platform.system.info",
 		contract = { "os_version", "runtime_version", "arch", "monitor_count",
 			"main_screen_scale", "keyboard_layout", "elevated", "home" },
 		wired    = true,
@@ -617,7 +617,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.notifier",
+		id       = "platform.system.notifier",
 		contract = { "send" },
 		wired    = true,
 	},
@@ -906,7 +906,7 @@ local function collect_developer()
 		modules_disabled    = {},
 		log_level           = level_name(),
 		ring_lines          = #(Logger.ring_buffer_snapshot() or {}),
-		event_tap_telemetry = M.event_tap_telemetry(require("adapters.system_info").runtime_version()).summary,
+		event_tap_telemetry = M.event_tap_telemetry(require("platform.system.info").runtime_version()).summary,
 	}
 end
 

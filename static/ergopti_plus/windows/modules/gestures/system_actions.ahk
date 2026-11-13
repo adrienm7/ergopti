@@ -13,7 +13,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Every native effect goes through a SystemControl adapter
-;    (adapters/system_control.ahk) passed in as `Sys`, so the suite pins the
+;    (platform/system/control.ahk) passed in as `Sys`, so the suite pins the
 ;    exact command line, window message and path with a recording double.
 ; 2. Registered deferred: the hotkey or gesture thread only schedules the
 ;    action (Sys.Defer) and returns; COM, broadcasts and Explorer queries run

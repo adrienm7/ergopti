@@ -159,13 +159,13 @@ end)
 --- Runs a body with the desktop notifier replaced by a recorder.
 --- @param body function Receives the list of { text, level } sent.
 local function with_recording_notifier(body)
-	local original, sent = package.loaded["adapters.notifier"], {}
-	package.loaded["adapters.notifier"] = { send = function(text, opts)
+	local original, sent = package.loaded["platform.system.notifier"], {}
+	package.loaded["platform.system.notifier"] = { send = function(text, opts)
 		sent[#sent + 1] = { text = text, level = opts and opts.level }
 		return true
 	end }
 	local ok, err = pcall(body, sent)
-	package.loaded["adapters.notifier"] = original
+	package.loaded["platform.system.notifier"] = original
 	if not ok then error(err, 0) end
 end
 
