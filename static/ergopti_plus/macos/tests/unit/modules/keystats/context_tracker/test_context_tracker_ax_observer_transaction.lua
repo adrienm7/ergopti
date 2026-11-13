@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 -- Own the real tracker dependency caches across construction, callbacks and teardown.
 local function scoped_tracker_case(callback)
 	return function()
-		return helpers.with_stub_scope({ "modules.keystats.context_tracker", "adapters.secure_field_detector", "core.fs.engine.native_path", "diagnostics.engine.reports.error_description" }, callback)
+		return helpers.with_stub_scope({ "modules.keystats.context_tracker", "platform.focus.secure_field_detector", "core.fs.engine.native_path", "diagnostics.engine.reports.error_description" }, callback)
 	end
 end
 

@@ -263,7 +263,7 @@ end
 --- @param level string|nil "error" for a failure, as Windows' Iconx notices and
 ---   user_actions show the same keys (NUI-007); "info" otherwise.
 local function notify(key, value, level)
-	local ok, Notifier = pcall(require, "adapters.application_notifier")
+	local ok, Notifier = pcall(require, "platform.focus.application_notifier")
 	if not ok or type(Notifier.send) ~= "function" then
 		Logger.warn(LOG, "No notifier to show '%s'.", key)
 		return

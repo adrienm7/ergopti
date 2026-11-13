@@ -140,7 +140,7 @@ local function exercise(kind, dry_run, options)
 					window_info = { getFocused = function() return { appId = "owned-editor", windowTitle = "Document" } end },
 					keystats = policy, replay_input = function(queued) h.assert_eq(#queued, 0); return true end,
 				})
-				atspi = require("adapters.atspi_focus")
+				atspi = require("platform.focus.atspi_focus")
 				atspi._publish_resident_snapshot({ bus = state.bus, path = state.path, role = state.role })
 				atspi._set_command_runner_for_test(function()
 					return true, "FOCUS:" .. require("core.text.engine.json").encode({ role = state.role, name = "Document", attributes = {},

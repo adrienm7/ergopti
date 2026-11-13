@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Compositor Focus Worker On A Real Session Bus
 --- DESCRIPTION:
---- Runs adapters/compositor_focus_worker.lua against a real dbus-daemon, with
+--- Runs platform/focus/compositor_focus_worker.lua against a real dbus-daemon, with
 --- this process standing in for GNOME Shell (it owns org.gnome.Shell) and
 --- calling the worker exactly as the Ergopti extension does. Pins what no fake
 --- can: the name is owned, the (ssss) call is admitted from the desktop's
@@ -19,7 +19,7 @@ package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" ..
 
 local ffi = require("ffi")
 local Json = require("core.text.engine.json")
-local Focus = require("adapters.compositor_focus")
+local Focus = require("platform.focus.compositor_focus")
 
 if (os.getenv("DBUS_SESSION_BUS_ADDRESS") or "") == "" then
 	io.stderr:write("ENVIRONMENT: no session bus (run under dbus-run-session)\n")
@@ -95,7 +95,7 @@ local shell = connect()
 check(call(shell, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "RequestName",
 	{ Focus.SERVICES.gnome }, 4), "the stand-in Shell owns org.gnome.Shell")
 
-local worker_command = "exec luajit adapters/compositor_focus_worker.lua " .. Focus.SERVICES.gnome .. " "
+local worker_command = "exec luajit platform/focus/compositor_focus_worker.lua " .. Focus.SERVICES.gnome .. " "
 	.. tostring(ffi.C.getpid()) .. " ../_shared"
 local worker = assert(io.popen(worker_command, "r"))
 local function next_record()

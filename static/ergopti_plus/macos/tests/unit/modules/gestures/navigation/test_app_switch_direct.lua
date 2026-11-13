@@ -192,7 +192,7 @@ helpers.describe("previous application switches directly (app-switch-direct)", f
 
 	it("(app-switch-direct) window cycling refuses an unknown driver identity", function(fresh_actions)
 		with_desk(app_windows_desk(52), function(focused)
-			package.loaded["adapters.window_manager"].own_pid = function() return nil end
+			package.loaded["platform.focus.window_manager"].own_pid = function() return nil end
 			tap(fresh_actions, "win_app_next")
 			helpers.assert_eq(focused, {}, "the runtime must be excluded before cycling")
 		end)

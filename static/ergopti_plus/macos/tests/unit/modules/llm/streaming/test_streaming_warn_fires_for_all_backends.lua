@@ -36,8 +36,8 @@ local FAILED_REQUESTS = 5
 --- @return table outcome { warnings, notifications }
 local function fail_requests(backend)
 	local notifications = 0
-	local saved_notifier = package.loaded["adapters.application_notifier"]
-	package.loaded["adapters.application_notifier"] = {
+	local saved_notifier = package.loaded["platform.focus.application_notifier"]
+	package.loaded["platform.focus.application_notifier"] = {
 		new = function()
 			return { send = function() notifications = notifications + 1; return true end }
 		end,
@@ -58,7 +58,7 @@ local function fail_requests(backend)
 		end
 		return { warnings = warnings, notifications = notifications }
 	end, debug.traceback)
-	package.loaded["adapters.application_notifier"] = saved_notifier
+	package.loaded["platform.focus.application_notifier"] = saved_notifier
 	if not ok then error(outcome, 0) end
 	return outcome
 end

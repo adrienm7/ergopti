@@ -157,13 +157,13 @@ end)
 --- Captures the notices the removal sends instead of showing desktop notifications.
 --- @return table notices, function restore
 local function scripted_notices()
-	local previous = package.loaded["adapters.application_notifier"]
+	local previous = package.loaded["platform.focus.application_notifier"]
 	local notices = {}
-	package.loaded["adapters.application_notifier"] = { send = function(body, opts)
+	package.loaded["platform.focus.application_notifier"] = { send = function(body, opts)
 		notices[#notices + 1] = { body = body, title = opts.title, level = opts.level }
 		return true
 	end }
-	return notices, function() package.loaded["adapters.application_notifier"] = previous end
+	return notices, function() package.loaded["platform.focus.application_notifier"] = previous end
 end
 
 --- Answers the native question with the given exit, recording the commands it ran.

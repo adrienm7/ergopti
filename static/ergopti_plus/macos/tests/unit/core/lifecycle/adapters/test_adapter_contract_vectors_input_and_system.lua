@@ -313,7 +313,7 @@ end)
 -- SecureFieldDetector vectors (SecureFieldDetector.spec.js). Read-only — the
 -- detector inspects the focused field/app and never mutates OS state.
 helpers.describe("Adapter contract vectors: SecureFieldDetector", function()
-	local adapter = helpers.load_with_stubs("adapters.secure_field_detector")
+	local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector")
 
 	helpers.it("isSecureField returns a boolean and never throws (isSecureField_returns_boolean)", function()
 		local ok, out = pcall(function() return adapter.isSecureField() end)
@@ -534,7 +534,7 @@ end)
 -- nonexistent window handle (no-op -> false), so no real window is activated or
 -- killed; the rest are read-only queries.
 helpers.describe("Adapter contract vectors: WindowManager", function()
-	local adapter = helpers.load_with_stubs("adapters.window_manager")
+	local adapter = helpers.load_with_stubs("platform.focus.window_manager")
 	local NONE = 999999999 -- a window handle that cannot exist
 
 	helpers.it("activate returns false for a missing window (activate_missing_returns_false)", function()

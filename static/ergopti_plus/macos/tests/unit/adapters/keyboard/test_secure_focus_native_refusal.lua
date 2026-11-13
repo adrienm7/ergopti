@@ -2,7 +2,7 @@
 --- Preserve public adapter contracts while retaining confirmed native AX refusal.
 local helpers = require("tests.helpers")
 local function with_detector(callback)
- return helpers.with_stub_scope({ "adapters.secure_field_detector", "core.logger.engine.logger", "hs", "tests.stubs.hs" }, function()
+ return helpers.with_stub_scope({ "platform.focus.secure_field_detector", "core.logger.engine.logger", "hs", "tests.stubs.hs" }, function()
   package.loaded["core.logger.engine.logger"] = { debug = function() end }
   local control = { mode = "ordinary", queries = {} }
   local focused = { attributeValue = function(_, key)
@@ -11,7 +11,7 @@ local function with_detector(callback)
    if key == "AXSubrole" and control.mode == "secure" then return "AXSecureTextField" end
   end }
   local app = { pid = function() control.queries[#control.queries + 1] = "pid"; return 4242 end }
-  local detector = helpers.load_with_stubs("adapters.secure_field_detector", {
+  local detector = helpers.load_with_stubs("platform.focus.secure_field_detector", {
    application = { frontmostApplication = function() control.queries[#control.queries + 1] = "frontmost"; return app end },
    axuielement = { applicationElementForPID = function()
     control.queries[#control.queries + 1] = "ax_app"

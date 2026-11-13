@@ -284,7 +284,7 @@ end
 local WITH_LLM = os.getenv("ERGOPTI_E2E_LLM") == "1"
 for _, name in ipairs(MENU_ROWS_FILE and {} or { "core.ui.ui.tooltip.preview", "core.ui.ui.tooltip.llm", "adapters.tray_menu",
 	"ui.menu.builder", "modules.updater.manager",
-	"modules.gestures.manager", "adapters.window_info", "core.process.adapters.lifecycle",
+	"modules.gestures.manager", "platform.focus.window_info", "core.process.adapters.lifecycle",
 	"core.ui.ui.webview_manager",
 	"core.fs.engine.file_watchers", "ui.wpm.widget", "modules.keystats.system_metrics", "adapters.notifier" }) do
 	package.preload[name] = function() error("disabled for the daemon key scenarios") end
@@ -295,7 +295,7 @@ end
 if not MENU_ROWS_FILE then
 	-- All scripted key scenarios declare an ordinary owned application/window.
 	-- The same source owns privacy context and the exact AI output target.
-	package.preload["adapters.window_info"] = function()
+	package.preload["platform.focus.window_info"] = function()
 		local function info()
 			return { appId = "owned-editor", windowTitle = "owned-field", bundleId = "", executablePath = "" }
 		end
@@ -428,10 +428,10 @@ if MAGIC_REPEAT ~= "none" then
 end
 
 -- A focused ordinary text field, conclusively.
-package.preload["adapters.atspi_focus_watch"] = function()
+package.preload["platform.focus.atspi_focus_watch"] = function()
 	return require("tests.support.focus_watch_fixture")
 end
-package.preload["adapters.secure_field_detector"] = function()
+package.preload["platform.focus.secure_field_detector"] = function()
 	return {
 		invalidateFocus = function() return 1 end,
 		publishFocus = function() return true end,

@@ -202,7 +202,7 @@ local function build_world(selection, ui_locale, options)
 		package.loaded[name] = nil
 	end
 	package.loaded["adapters.synthetic_input"] = make_synthetic(world)
-	package.loaded["adapters.window_info"] = {
+	package.loaded["platform.focus.window_info"] = {
 		focused_identity = function() return world.focus end,
 		getFocused = function()
 			return { appId = "TranslateApp", windowTitle = "Draft", bundleId = "test.translate", executablePath = "" }

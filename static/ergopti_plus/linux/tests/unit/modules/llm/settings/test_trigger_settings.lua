@@ -144,8 +144,8 @@ local function with_url_request(options, body)
 		["llm.trigger.url_bar_filter_enabled"] = true,
 	} }))
 	replace("modules.llm.trigger_settings", nil)
-	replace("adapters.atspi_focus", nil)
-	local atspi = require("adapters.atspi_focus")
+	replace("platform.focus.atspi_focus", nil)
+	local atspi = require("platform.focus.atspi_focus")
 	atspi._set_command_runner_for_test(function()
 		observed.probes = observed.probes + 1
 		if options.probe_throw then error("controlled accessibility failure") end
@@ -155,8 +155,8 @@ local function with_url_request(options, body)
 			attributes = {}, active_scope = true, native_bus_name = ":1.42",
 			native_object_path = "/org/a11y/atspi/accessible/7" })
 	end)
-	replace("adapters.secure_field_detector", options.detector)
-	replace("adapters.window_info", { focused_snapshot = function()
+	replace("platform.focus.secure_field_detector", options.detector)
+	replace("platform.focus.window_info", { focused_snapshot = function()
 		observed.windows = observed.windows + 1
 		if options.window_throw then error("controlled native window failure") end
 		return { appId = options.app, windowTitle = "Owned document", bundleId = "", executablePath = "" }, "x11:123:42"

@@ -161,7 +161,7 @@ if (winEngine) {
 const linuxEngine = read('static/ergopti_plus/linux/modules/llm/prediction_engine.lua');
 if (linuxEngine) {
 	const stripped = stripLua(linuxEngine);
-	if (!stripped.includes('adapters.secure_field_detector')) {
+	if (!stripped.includes('platform.focus.secure_field_detector')) {
 		errors.push(
 			'linux/modules/llm/prediction_engine.lua: must consult ' +
 				'adapters.secure_field_detector before predicting. Linux had no gate at all: the ' +

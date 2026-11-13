@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: COSMIC Toplevel Worker Against a Protocol Fake
 --- DESCRIPTION:
---- Proves adapters/cosmic_toplevel_worker.lua through the real
+--- Proves platform/focus/cosmic_toplevel_worker.lua through the real
 --- libwayland-client: this script is a Wayland server of its own (the wire
 --- protocol over a Unix socket, in LuaJIT FFI) that offers
 --- `zcosmic_toplevel_info_v1` version 1 the way cosmic-comp does, announces
@@ -45,7 +45,7 @@ ffi.cdef([[
 local AF_UNIX, SOCK_STREAM = 1, 1
 local POLLIN = 1
 local WNOHANG = 1
-local Worker = dofile("adapters/cosmic_toplevel_worker.lua")
+local Worker = dofile("platform/focus/cosmic_toplevel_worker.lua")
 
 local function fail(message)
 	io.stderr:write("FAIL: " .. message .. "\n")
@@ -123,7 +123,7 @@ local errors_path = runtime .. "/worker.err"
 ffi.C.setenv("XDG_RUNTIME_DIR", runtime, 1)
 ffi.C.setenv("WAYLAND_DISPLAY", socket_name, 1)
 local parent = ffi.C.getpid()
-local argv_strings = { "luajit", "adapters/cosmic_toplevel_worker.lua", "libwayland-client.so.0", tostring(parent),
+local argv_strings = { "luajit", "platform/focus/cosmic_toplevel_worker.lua", "libwayland-client.so.0", tostring(parent),
 	"../_shared" }
 local argv = ffi.new("char *[?]", #argv_strings + 1)
 local anchor = {}

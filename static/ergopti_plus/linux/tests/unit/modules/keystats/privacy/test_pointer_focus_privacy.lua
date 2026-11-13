@@ -17,10 +17,10 @@ local Engine = require("modules.hotstrings.engine")
 --- @param initial_role number Initial native role.
 --- @return table state
 local function fixture(initial_role)
-	local previous = package.loaded["adapters.secure_field_detector"]
-	package.loaded["adapters.secure_field_detector"] = nil
-	local detector = require("adapters.secure_field_detector")
-	package.loaded["adapters.secure_field_detector"] = previous
+	local previous = package.loaded["platform.focus.secure_field_detector"]
+	package.loaded["platform.focus.secure_field_detector"] = nil
+	local detector = require("platform.focus.secure_field_detector")
+	package.loaded["platform.focus.secure_field_detector"] = previous
 	local now, role, primary, reads = 1000, initial_role, "", 0
 	local listener, secure, discards = nil, true, 0
 	local watch = {

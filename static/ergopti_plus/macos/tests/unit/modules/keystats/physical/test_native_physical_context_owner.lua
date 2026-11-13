@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 
 local function scope(callback)
 	helpers.with_stub_scope({ "hs", "modules.keystats.timestamp", "core.process.adapters.lifecycle",
-		"adapters.secure_field_detector" }, function()
+		"platform.focus.secure_field_detector" }, function()
 		local state = { now = 10, secure = false, stop_refused = false, watch_refused = false, lifecycle_stops = 0 }
 		local observers, callbacks, observations, errors = {}, {}, {}, {}
 		local app = { name = function() return "ObservedApp" end, pid = function() return 42 end,
@@ -23,7 +23,7 @@ local function scope(callback)
 			start = function() return true end,
 			stop = function() state.lifecycle_stops = state.lifecycle_stops + 1; return true end,
 		}
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			inspectFocusedElement = function() return state.secure, "missing focused element" end,
 			isSecureApp = function() return false end,
 			watchFocusedElementChanges = function(_, fn)

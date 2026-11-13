@@ -15,7 +15,7 @@ M.FRONT, M.OTHER, M.THIRD, M.OWN = 101, 202, 303, 909
 M.LEFT_SCREEN, M.RIGHT_SCREEN = 1, 2
 
 local INJECTED = {
-	"adapters.window_manager",
+	"platform.focus.window_manager",
 	"adapters.mouse_control",
 	"modules.gestures.app_switch",
 }
@@ -42,7 +42,7 @@ function M.with_desk(desk, body)
 		end
 		return copy
 	end
-	package.loaded["adapters.window_manager"] = {
+	package.loaded["platform.focus.window_manager"] = {
 		-- Minimised windows stay listed: the switch must pass over them itself.
 		ordered_windows = function()
 			return copy_where(function() return true end)

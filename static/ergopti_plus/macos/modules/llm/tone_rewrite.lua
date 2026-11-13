@@ -29,7 +29,7 @@ local M = {}
 local Tone       = require("ai.engine.prediction.tone")
 local Logger     = require("core.logger.engine.logger")
 local i18n       = require("core.i18n.engine.i18n")
-local WindowInfo = require("adapters.window_info")
+local WindowInfo = require("platform.focus.window_info")
 local SelectionPublication = require("modules.llm.selection_publication")
 
 local LOG = "llm.tone_rewrite"

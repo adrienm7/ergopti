@@ -112,7 +112,7 @@ function M.build_world(options)
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["adapters.window_info"] = {
+	package.loaded["platform.focus.window_info"] = {
 		focused_identity = function() return "7:101" end,
 		getFocused = function()
 			return { appId = "Notes", windowTitle = "Réunion devis", bundleId = "com.apple.Notes", executablePath = "" }

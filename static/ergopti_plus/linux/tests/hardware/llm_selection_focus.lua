@@ -24,9 +24,9 @@ file:close()
 local seam = assert(source:match("focus_id = (.-),\n%s*%-%-"), "the daemon focus callback must be present")
 local compile = loadstring or load
 local focus_factory = assert(compile("return function(window_info, secure_focus_guard) return " .. seam .. " end"))()
-local Window = require("adapters.window_info")
-local Detector = require("adapters.secure_field_detector")
-local Atspi = require("adapters.atspi_focus")
+local Window = require("platform.focus.window_info")
+local Detector = require("platform.focus.secure_field_detector")
+local Atspi = require("platform.focus.atspi_focus")
 local uv = require("luv")
 local Clock = require("core.logger.engine.monotonic")
 local Timings = require("core.timing.engine.timings")
@@ -51,7 +51,7 @@ local CLIPBOARD_SEED = "ERGOPTI-NATIVE-SELECTION-CLIPBOARD"
 assert(Clipboard.write(CLIPBOARD_SEED), "native clipboard control must be seeded")
 local clipboard_read_ok, clipboard_content = Clipboard.read_checked()
 assert(clipboard_read_ok and clipboard_content == CLIPBOARD_SEED, "native clipboard control must be readable")
-local Watch = require("adapters.atspi_focus_watch").new()
+local Watch = require("platform.focus.atspi_focus_watch").new()
 package.loaded["infra.llm_preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = {
 	["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
 	["llm.trigger.secure_filter_enabled"] = true, ["llm.trigger.url_bar_filter_enabled"] = true,

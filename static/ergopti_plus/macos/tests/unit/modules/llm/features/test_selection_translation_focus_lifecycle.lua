@@ -61,10 +61,10 @@ helpers.describe("selection translation retains its original focus", function()
 
 	helpers.it("refuses an unidentifiable native window before copying", function()
 		Fixture.with_world(SOURCE, "fr", function(world)
-			local retained = package.loaded["adapters.window_info"]
-			package.loaded["adapters.window_info"] = nil
-			local real = require("adapters.window_info")
-			package.loaded["adapters.window_info"] = retained
+			local retained = package.loaded["platform.focus.window_info"]
+			package.loaded["platform.focus.window_info"] = nil
+			local real = require("platform.focus.window_info")
+			package.loaded["platform.focus.window_info"] = retained
 			retained.focused_identity = real.focused_identity
 			-- Hammerspoon emits id 0 when _AXUIElementGetWindow failed.
 			world.native_destination.change_focus("7:0")

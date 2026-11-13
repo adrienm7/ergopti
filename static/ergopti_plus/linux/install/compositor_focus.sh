@@ -31,7 +31,7 @@
 set -uo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
 
-# Pinned by tests/unit/adapters/compositor_focus/test_compositor_focus_assets.lua
+# Pinned by tests/unit/platform/focus/compositor_focus/test_assets.lua
 # against platform/desktop_focus/gnome/metadata.json and platform/desktop_focus/kwin/metadata.json.
 GNOME_FOCUS_UUID="focus@ergopti.fr"
 KWIN_FOCUS_ID="ergopti-focus"

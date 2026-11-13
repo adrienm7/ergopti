@@ -13,17 +13,17 @@ require("core.lifecycle.engine.compat.utf8").install()
 local Json = require("core.text.engine.json")
 local Clock = require("core.logger.engine.monotonic")
 local Timings = require("core.timing.engine.timings")
-local Window = require("adapters.window_info")
+local Window = require("platform.focus.window_info")
 local Lifecycle = require("core.process.adapters.lifecycle")
-local Detector = require("adapters.secure_field_detector")
+local Detector = require("platform.focus.secure_field_detector")
 local jit = require("jit")
 local parent_jit = jit.status()
 assert(parent_jit, "the native probe must retain its enabled parent JIT")
-require("adapters.atspi_focus_watch_worker")
+require("platform.focus.atspi_focus_watch_worker")
 assert(jit.status() == parent_jit, "importing the worker may not disable the parent JIT")
 local OwnedProcess = require("core.process.adapters.owned_process")
 local watch_operation = nil
-local Watch = require("adapters.atspi_focus_watch").new({
+local Watch = require("platform.focus.atspi_focus_watch").new({
 	start_process = function(executable, arguments, options, callback)
 		-- Exercise callback delivery after an aggressively compiled native call.
 		-- The original worker must isolate its own JIT policy even with CLI flags.

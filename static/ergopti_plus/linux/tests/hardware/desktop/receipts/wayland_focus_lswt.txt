@@ -8,7 +8,7 @@ SUBSTITUTE: `lswt` on the PATH is tests/hardware/desktop/foreign_toplevel_probe.
 lswt 2.x's JSON shape from the compositor's own protocol events (the activated flag
 is labwc's answer) and asks labwc to activate a window. lswt is not packaged by
 Ubuntu 24.04 and git.sr.ht is refused by the container proxy (403).
-Path: adapters/window_info.lua (wlr_toplevel branch) -> process_lifecycle.onFocusChange,
+Path: platform/focus/window_info.lua (wlr_toplevel branch) -> process_lifecycle.onFocusChange,
 the per-application rules' input.
 
 SESSION mode=kde desktop=kde

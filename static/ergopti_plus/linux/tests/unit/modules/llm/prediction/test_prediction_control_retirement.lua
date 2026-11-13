@@ -58,7 +58,7 @@ local function scenario(options, body)
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
 		end
-		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "adapters.secure_field_detector",
+		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
 			"modules.hotstrings.word_reset", "infra.hotstring_preferences", "adapters.keyboard_layout",
 			"modules.hotstrings.injector", "adapters.clipboard" }) do package.loaded[name] = nil end
 		local state = { text = "", caret = 0, wire = {}, held = {}, requests = {}, submissions = {},
@@ -98,7 +98,7 @@ local function scenario(options, body)
 			invalidate = function() snapshot = nil; listener(nil) end }
 		local scheduler = require("tests.fakes").timer_scheduler()
 		guard = require("modules.keystats.focus_guard").new({ watch = watch,
-			detector = require("adapters.secure_field_detector"), keystats = policy, prediction = prediction,
+			detector = require("platform.focus.secure_field_detector"), keystats = policy, prediction = prediction,
 			now_ms = function() return 1000 + scheduler.now * 1000 end,
 			capture_context = function() return { app_id = "owned-editor", title = "owned-field", native_identity = "owned-window" } end,
 			publish_context = function(context) return true, policy.is_context_protected(context.app_id, context.title) end,
@@ -654,7 +654,7 @@ do
 					or name:match("^modules%.hotstrings%.") or name:match("^modules%.shortcuts%.") then package.loaded[name] = nil end
 			end
 			for _, name in ipairs({ "adapters.keyboard_hook", "adapters.evdev_reader", "adapters.modifier_broker",
-				"adapters.keyboard_layout", "adapters.secure_field_detector", "adapters.clipboard", "core.events.timer_scheduler",
+				"adapters.keyboard_layout", "platform.focus.secure_field_detector", "adapters.clipboard", "core.events.timer_scheduler",
 				"infra.hotstring_preferences", "infra.llm_preferences", "infra.metrics_preferences", "core.logger.engine.monotonic",
 				"infra.config_paths", "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer",
 				-- Main initialises these owners once; an earlier suite may have loaded them.
@@ -745,7 +745,7 @@ do
 			local original_barrier, original_snapshot = watch.barrier, watch.snapshot
 			watch.barrier = function() local receipt = original_barrier(); receipt.role = role; return receipt end
 			watch.snapshot = function() local receipt = original_snapshot(); receipt.role = role; return receipt end
-			put("adapters.atspi_focus_watch", { new = function() return watch end })
+			put("platform.focus.atspi_focus_watch", { new = function() return watch end })
 			-- Main binds the metrics sources at boot; none is granted, as on Wayland.
 			local window = { getFocused = function() return { appId = app, windowTitle = "owned ordinary field" } end,
 			  metrics_sources = function() return {} end,
@@ -780,7 +780,7 @@ do
 			hook.start = function(options) state.callbacks = options; coroutine.yield("actual Hook.start callback capture"); return true end
 			hook.isRunning, hook.get_mode = yes, function() return "intercept" end
 			local optional = { ["modules.llm.prediction_engine"] = prediction, ["core.ui.ui.tooltip.llm"] = overlay,
-			  ["adapters.window_info"] = window, ["adapters.secure_field_detector"] = require("adapters.secure_field_detector") }
+			  ["platform.focus.window_info"] = window, ["platform.focus.secure_field_detector"] = require("platform.focus.secure_field_detector") }
 			put("core.lifecycle.engine.runtime_guard", { optional_require = function(name) return optional[name] end,
 			  call = function(_, callback) return true, callback() end })
 			put("core.events.loop", { run = function() error("probe must remain before actual event-loop launch") end, stop = yes, defer = function(fn) state.deferred = state.deferred or {}; state.deferred[#state.deferred + 1] = fn; return true end })

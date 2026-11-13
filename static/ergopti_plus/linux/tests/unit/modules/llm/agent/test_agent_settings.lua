@@ -1174,7 +1174,7 @@ helpers.describe("Linux Agent complete excluded-applications frame (agent-disabl
 
 	helpers.it("keeps native dialog arguments, choices, cancellation, trimming and redraw (agent-disabled-apps-frame)", function()
 		with_system_model_locale("en", function()
-			local name = "adapters.window_info"
+			local name = "platform.focus.window_info"
 			local previous = package.loaded[name]
 			package.loaded[name] = { getAll = function() return {
 				{ appId = "z" }, { appId = "editor" }, { appId = "a" }, { appId = "z" }, {},

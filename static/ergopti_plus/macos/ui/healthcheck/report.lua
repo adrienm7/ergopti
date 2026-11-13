@@ -203,7 +203,7 @@ local DEFAULT_EFFECTS = {
 		return { cancel = function() end }
 	end,
 	notify = function(title, body, kind)
-		return require("adapters.application_notifier").send(title, { body = body, kind = kind })
+		return require("platform.focus.application_notifier").send(title, { body = body, kind = kind })
 	end,
 	identity = function()
 		local ConfigPaths = require("infra.config_paths")

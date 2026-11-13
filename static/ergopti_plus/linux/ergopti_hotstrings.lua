@@ -264,7 +264,7 @@ local wpm_tray_readout = RuntimeGuard.optional_require("ui.wpm.tray_readout")
 -- Desktop notifications (optional — needs notify-send and a session bus). The
 -- adapter degrades to a log line on a headless machine, so a missing one is not
 -- a reason to refuse to start.
-local notifier = RuntimeGuard.optional_require("adapters.application_notifier")
+local notifier = RuntimeGuard.optional_require("platform.focus.application_notifier")
 
 -- Preview tooltip (optional — needs lgi and a display; the daemon expands
 -- hotstrings perfectly well without one, and a driver whose expansions work
@@ -312,14 +312,14 @@ local gestures = RuntimeGuard.optional_require("modules.gestures.manager")
 local shortcuts = RuntimeGuard.optional_require("modules.shortcuts.manager")
 
 -- Window info tracker (optional — provides app_id for keystats per-app stats).
-local window_info = RuntimeGuard.optional_require("adapters.window_info")
+local window_info = RuntimeGuard.optional_require("platform.focus.window_info")
 
 -- Process lifecycle tracker (optional — drives focus-change events on Linux).
 local process_lifecycle = RuntimeGuard.optional_require("core.process.adapters.lifecycle")
 
 -- Optional probe, mandatory posture: when AT-SPI cannot load, FocusGuard keeps
 -- metrics and text automation closed instead of treating absence as permission.
-local secure_field_detector = RuntimeGuard.optional_require("adapters.secure_field_detector")
+local secure_field_detector = RuntimeGuard.optional_require("platform.focus.secure_field_detector")
 
 -- WebView manager (optional — GTK/WebKit2GTK window creation for UI apps).
 -- Auto-inits on load (probes lgi); windows are created on demand via show().
@@ -1377,7 +1377,7 @@ local function main()
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
 	-- the periodic loop probes only after the desktop has consumed the event.
-	privacy_owners.watch = require("adapters.atspi_focus_watch").new()
+	privacy_owners.watch = require("platform.focus.atspi_focus_watch").new()
 	local secure_focus_guard = FocusGuard.new({
 		watch      = privacy_owners.watch,
 		detector   = secure_field_detector,

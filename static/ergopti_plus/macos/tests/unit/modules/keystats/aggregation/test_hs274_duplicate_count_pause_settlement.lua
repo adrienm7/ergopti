@@ -252,7 +252,7 @@ helpers.describe("HS-274 held modifier actual secure callback (wp3)", function()
 		Accounting.run(function(scenario)
 			local startup_tracker = package.loaded["modules.keystats.context_tracker"]
 			local original_startup_init = startup_tracker.init
-			helpers.with_fresh_modules({ "modules.keystats.context_tracker", "adapters.secure_field_detector" }, function()
+			helpers.with_fresh_modules({ "modules.keystats.context_tracker", "platform.focus.secure_field_detector" }, function()
 				-- Reuse the consumer's existing hs table. load_with_stubs here would
 				-- manufacture another hs image after the consumer captured its own.
 				local native = _G.hs

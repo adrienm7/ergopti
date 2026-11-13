@@ -25,7 +25,7 @@ local function load_subject(open_url, alert)
 	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = alert or function(...) dialogs[#dialogs + 1] = { ... }; return "OK" end,
 	}
-	package.loaded["adapters.application_notifier"] = {
+	package.loaded["platform.focus.application_notifier"] = {
 		send = function(...) notifications[#notifications + 1] = { ... }; return true end,
 	}
 	local subject = helpers.load_with_stubs("adapters.update_launcher", {
@@ -142,7 +142,7 @@ helpers.describe("update_launcher: exact native updater command", function()
 	helpers.it("contains a failed fallback notification", function()
 		for _, failure in ipairs({ "throw", "refuse" }) do
 			local subject, errors = load_subject(function() return false end, function() error("dialog unavailable") end)
-			package.loaded["adapters.application_notifier"].send = function()
+			package.loaded["platform.focus.application_notifier"].send = function()
 				if failure == "throw" then error("notification unavailable") end
 				return false
 			end

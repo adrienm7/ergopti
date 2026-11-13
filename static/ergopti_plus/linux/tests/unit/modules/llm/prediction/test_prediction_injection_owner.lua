@@ -21,7 +21,7 @@ local function scenario(action, phase, body)
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
 		end
-		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "adapters.secure_field_detector",
+		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
 			"adapters.clipboard", "adapters.keyboard_layout", "modules.hotstrings.injector" }) do package.loaded[name] = nil end
 		local state = { logs = {}, bus = ":1.23", path = "/field/original", role = 61, now = 1000,
 			rows = {}, held = {}, writes = {}, requests = {}, errors = {}, stopped = 0, resets = 0, output = 0, paused = false,
@@ -61,7 +61,7 @@ local function scenario(action, phase, body)
 			invalidate = function() receipt = nil; listener(nil) end,
 		}
 		guard = require("modules.keystats.focus_guard").new({ watch = watch,
-			detector = require("adapters.secure_field_detector"), keystats = policy, prediction = engine,
+			detector = require("platform.focus.secure_field_detector"), keystats = policy, prediction = engine,
 			now_ms = function() return state.now end,
 			capture_context = function() return { app_id = "owned-editor", title = "owned-field", native_identity = "owned-window" } end,
 			publish_context = function(context) return true, policy.is_context_protected(context.app_id, context.title) end,

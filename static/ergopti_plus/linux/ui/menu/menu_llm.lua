@@ -867,7 +867,7 @@ local function _build_llm(ctx)
 	--- @param tag string
 	--- @param reason string|nil
 	local function deletion_notice(succeeded, tag, reason)
-		local Notifier = require("adapters.application_notifier")
+		local Notifier = require("platform.focus.application_notifier")
 		-- A notification caption, not a menu row: it never reaches the renderer.
 		local delivered
 		if succeeded then

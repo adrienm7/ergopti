@@ -53,12 +53,12 @@ local DEFAULT_DEPS = {
 	notify = function(message) return require("adapters.notifier").send(message, { level = "error" }) end,
 	message = function(key) return require("core.i18n.engine.i18n").get(key) end,
 	getenv = os.getenv,
-	focused_app = function() return require("adapters.window_info").getFocused().appId end,
+	focused_app = function() return require("platform.focus.window_info").getFocused().appId end,
 	focused_context = function()
-		local info, identity = require("adapters.window_info").focused_snapshot()
+		local info, identity = require("platform.focus.window_info").focused_snapshot()
 		local app = info and type(info.appId) == "string" and info.appId ~= "" and info.appId or nil
 		if app and type(identity) == "string" and identity ~= "" then return app, identity end
-		local snapshot, conclusive = require("adapters.atspi_focus").get_context_snapshot()
+		local snapshot, conclusive = require("platform.focus.atspi_focus").get_context_snapshot()
 		if conclusive == true and snapshot and type(snapshot.window_bus_name) == "string"
 			and type(snapshot.window_object_path) == "string" then
 			if app and snapshot.app_id ~= app then return app, nil end
@@ -68,7 +68,7 @@ local DEFAULT_DEPS = {
 	end,
 	-- Bounded helper process with a hard deadline; needs a desktop session.
 	active_frame_app = function()
-		local snapshot = require("adapters.atspi_focus").get_context_snapshot()
+		local snapshot = require("platform.focus.atspi_focus").get_context_snapshot()
 		return snapshot and snapshot.app_id or nil
 	end,
 	read_uri_list = function(admitted)

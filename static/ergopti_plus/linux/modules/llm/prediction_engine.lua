@@ -328,7 +328,7 @@ local function get_profiles()
 end
 
 local function get_secure_field_detector()
-	local ok, module = pcall(require, "adapters.secure_field_detector")
+	local ok, module = pcall(require, "platform.focus.secure_field_detector")
 	return ok and module or nil
 end
 

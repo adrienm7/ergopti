@@ -29,7 +29,7 @@ local OWNED = {
 	"adapters.mouse_control",
 	"core.fs.adapters.file_system",
 	"adapters.tcc_grant",
-	"adapters.window_info",
+	"platform.focus.window_info",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
@@ -87,7 +87,7 @@ local function with_system(body, options)
 		}
 		package.loaded["adapters.tcc_grant"] = { bundle_id = function() return OWN_BUNDLE end }
 		local running = options.running or {}
-		package.loaded["adapters.window_info"] = {
+		package.loaded["platform.focus.window_info"] = {
 			application_bundle_id = function(pid) return running[pid] end,
 		}
 		local System = require("modules.gestures.system_actions")

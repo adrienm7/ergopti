@@ -15,7 +15,7 @@
 --- Spotlight hint (emitted inside find() just before the window fallback) and
 --- froze for 13.4 s. The event taps were disabled, the logger stalled and the
 --- Karabiner lease worker fenced after 17.5 s without a heartbeat (issue #99).
---- Every production lookup goes through adapters/running_application.lua, which
+--- Every production lookup goes through platform/focus/running_application.lua, which
 --- stays on the process list. This ratchet admits no new direct call.
 ---
 --- ROOT CAUSE ENCODED (webview-window-no-global-scan):
@@ -48,8 +48,8 @@ local WINDOW_LOOKUP_OWNER = "core.ui.adapters.own_window"
 -- lifecycle); none runs when a window opens.
 local WINDOW_SCAN_BASELINE = {
 	["core.process.adapters.lifecycle"] = 2,
-	["adapters.window_info"] = 1,
-	["adapters.window_manager"] = 5,
+	["platform.focus.window_info"] = 1,
+	["platform.focus.window_manager"] = 5,
 	["platform.remap.watchers"] = 1,
 }
 
@@ -186,7 +186,7 @@ helpers.describe("application lookups never scan windows (app-lookup-no-window-s
 		end
 		table.sort(drift)
 		helpers.assert_eq(#drift, 0,
-			"resolve running applications through adapters.running_application instead:\n"
+			"resolve running applications through platform.focus.running_application instead:\n"
 			.. table.concat(drift, "\n"))
 	end)
 end)

@@ -17,7 +17,7 @@ import time
 
 WORKER = r"""
 package.path = assert(os.getenv("ERGOPTI_ATSPI_PACKAGE_PATH"))
-local A = require("adapters.atspi_focus")
+local A = require("platform.focus.atspi_focus")
 local expected = tonumber(os.getenv("ERGOPTI_ATSPI_EXPECTED_ROLE"))
 local direct, conclusive = A._get_native_snapshot()
 assert(conclusive and direct.role == expected, "actual focused GTK field was not available")

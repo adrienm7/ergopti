@@ -129,9 +129,9 @@ helpers.describe("linux-process-reentrant-stop", function()
 		end)
 	end)
 	helpers.it("linux-process-reentrant-stop: stopping during focus notification prevents later listeners", function()
-		local original = package.loaded["adapters.window_info"]
+		local original = package.loaded["platform.focus.window_info"]
 		local app, delivered = "old", 0
-		package.loaded["adapters.window_info"] = { focused_snapshot = function() return { appId = app, windowTitle = "" }, "x11:1" end }
+		package.loaded["platform.focus.window_info"] = { focused_snapshot = function() return { appId = app, windowTitle = "" }, "x11:1" end }
 		local ok, failure = pcall(function()
 			with_proc(AB, function(lifecycle)
 				lifecycle.onFocusChange(function() lifecycle.stop() end)
@@ -140,7 +140,7 @@ helpers.describe("linux-process-reentrant-stop", function()
 				helpers.assert_eq(delivered, 0, "a stopped poll must not deliver to later listeners")
 			end)
 		end)
-		package.loaded["adapters.window_info"] = original
+		package.loaded["platform.focus.window_info"] = original
 		if not ok then error(failure, 0) end
 	end)
 
@@ -159,10 +159,10 @@ end)
 
 helpers.describe("linux-process-poll-demand", function()
 	local function with_demand(body)
-		local names = { "adapters.window_info", "core.fs.engine.native_directory", "core.process.adapters.lifecycle" }
+		local names = { "platform.focus.window_info", "core.fs.engine.native_directory", "core.process.adapters.lifecycle" }
 		local saved, queries, listing = {}, 0, { "existing" }
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-		package.loaded["adapters.window_info"] = {
+		package.loaded["platform.focus.window_info"] = {
 			focused_snapshot = function() return { appId = "editor", windowTitle = "stable" }, "x11:1" end,
 		}
 		local proc = fake_proc()
@@ -217,7 +217,7 @@ end)
 
 helpers.describe("linux-native-focus-identity", function()
 	helpers.it("(linux-focus-coherent-poll) queries one native snapshot per unchanged lifecycle tick", function()
-		local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.window_info", "core.process.adapters.lifecycle" }
+		local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "platform.focus.window_info", "core.process.adapters.lifecycle" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local ok, failure = pcall(function()
@@ -233,7 +233,7 @@ helpers.describe("linux-native-focus-identity", function()
 				if command:find("/proc/1337/comm", 1, true) then return "editor\n" end
 				return ""
 			end)
-			helpers.load_module("adapters.window_info")
+			helpers.load_module("platform.focus.window_info")
 			local lifecycle = helpers.load_module("core.process.adapters.lifecycle")
 			lifecycle.start()
 			probes = 0
@@ -247,9 +247,9 @@ helpers.describe("linux-native-focus-identity", function()
 	end)
 
 	helpers.it("(linux-focus-separator-collision) distinguishes control bytes inside native metadata", function()
-		local original = package.loaded["adapters.window_info"]
+		local original = package.loaded["platform.focus.window_info"]
 		local app, title = "editor\1child", "private"
-		package.loaded["adapters.window_info"] = {
+		package.loaded["platform.focus.window_info"] = {
 			focused_snapshot = function() return { appId = app, windowTitle = title }, "x11:1" end,
 		}
 		local events = {}
@@ -262,14 +262,14 @@ helpers.describe("linux-native-focus-identity", function()
 				helpers.assert_eq(events, { { app, title } }, "distinct metadata must invalidate the focus context")
 			end)
 		end)
-		package.loaded["adapters.window_info"] = original
+		package.loaded["platform.focus.window_info"] = original
 		helpers.assert_true(ok, tostring(failure))
 	end)
 
 	helpers.it("(linux-native-focus-identity) emits focus changes between identical metadata windows", function()
-		local original = package.loaded["adapters.window_info"]
+		local original = package.loaded["platform.focus.window_info"]
 		local identity, title = "x11:1337:1", "Untitled"
-		package.loaded["adapters.window_info"] = {
+		package.loaded["platform.focus.window_info"] = {
 			focused_snapshot = function() return { appId = "editor", windowTitle = title }, identity end,
 		}
 		local events = {}
@@ -287,7 +287,7 @@ helpers.describe("linux-native-focus-identity", function()
 				helpers.assert_eq(events[2], { "editor", "Private window" }, "title changes still invalidate privacy context")
 			end)
 		end)
-		package.loaded["adapters.window_info"] = original
+		package.loaded["platform.focus.window_info"] = original
 		helpers.assert_true(ok, tostring(failure))
 	end)
 end)
@@ -295,8 +295,8 @@ end)
 helpers.describe("linux-process-table-receipts", function()
 	helpers.it("linux-process-table-receipts: snapshots fork no program", function()
 		-- Focus is answered by a stub, so any fork left is the process snapshot's.
-		local original = package.loaded["adapters.window_info"]
-		package.loaded["adapters.window_info"] = {
+		local original = package.loaded["platform.focus.window_info"]
+		package.loaded["platform.focus.window_info"] = {
 			focused_snapshot = function() return { appId = "editor", windowTitle = "stable" }, "x11:1" end,
 		}
 		local forked = {}
@@ -310,7 +310,7 @@ helpers.describe("linux-process-table-receipts", function()
 			helpers.assert_eq(launched, { "d" }, "the in-process read still observes a launch")
 		end)
 		io.popen, os.execute = real_popen, real_execute
-		package.loaded["adapters.window_info"] = original
+		package.loaded["platform.focus.window_info"] = original
 		helpers.assert_true(ok, tostring(failure))
 		helpers.assert_eq(forked, {}, "minimal images ship no ps: the table is read from /proc")
 	end)

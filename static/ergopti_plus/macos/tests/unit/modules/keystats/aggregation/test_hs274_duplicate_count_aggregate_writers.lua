@@ -50,7 +50,7 @@ local function with_current_auth_policy_callback(vector, body)
 			"capture_frontmost_app", "resync_context" }
 		local previous_ports = {}
 		for _, name in ipairs(ports) do previous_ports[name] = startup_tracker[name] end
-		helpers.with_fresh_modules({ "modules.keystats.context_tracker", "adapters.secure_field_detector" }, function()
+		helpers.with_fresh_modules({ "modules.keystats.context_tracker", "platform.focus.secure_field_detector" }, function()
 			local native = _G.hs
 			local previous_app, previous_window = native.application, native.window
 			local previous_ax, previous_caffeinate = native.axuielement, native.caffeinate

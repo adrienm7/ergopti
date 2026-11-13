@@ -21,7 +21,7 @@ local M = {}
 local OWNED_MODULES = {
 	"lfs", "core.fs.engine.native_path", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "core.text.engine.toml_codec.source_open",
 	"core.network.adapters.http_client", "adapters.managed_ollama_daemon",
-	"core.process.adapters.owned_program_runner", "adapters.running_application",
+	"core.process.adapters.owned_program_runner", "platform.focus.running_application",
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.ui.engine.notifications",
 	"ai.engine.ollama.local_model_policy", "modules.llm.api_mlx_fetch",
 	"modules.llm.api_mlx_inference", "modules.llm.api_ollama",

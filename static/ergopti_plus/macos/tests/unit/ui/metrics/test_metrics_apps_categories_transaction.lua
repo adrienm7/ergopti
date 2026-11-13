@@ -25,7 +25,7 @@ local CATEGORY_OWNERS = {
 	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
 	"core.ui.adapters.webview_result",
-	"adapters.running_application",
+	"platform.focus.running_application",
 	"core.ui.adapters.own_window",
 	"core.fs.engine.native_path",
 }

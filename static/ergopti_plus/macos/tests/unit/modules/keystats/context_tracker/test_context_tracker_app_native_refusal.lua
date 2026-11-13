@@ -29,14 +29,14 @@ local NOT_PAUSED = function() return false end
 --- @return table snapshot Observable transaction results.
 local function drive_refusal(failing_reader)
 	local saved_logger = package.loaded["core.logger.engine.logger"]
-	local saved_detector = package.loaded["adapters.secure_field_detector"]
+	local saved_detector = package.loaded["platform.focus.secure_field_detector"]
 	local warnings = {}
 	local logger = helpers.make_logger_stub()
 	logger.warn = function(_module, message, ...)
 		warnings[#warnings + 1] = string.format(message, ...)
 	end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["adapters.secure_field_detector"] = nil
+	package.loaded["platform.focus.secure_field_detector"] = nil
 
 	local snapshot
 	local ok, err = xpcall(function()
@@ -129,7 +129,7 @@ local function drive_refusal(failing_reader)
 	end, debug.traceback)
 
 	package.loaded["modules.keystats.context_tracker"] = nil
-	package.loaded["adapters.secure_field_detector"] = saved_detector
+	package.loaded["platform.focus.secure_field_detector"] = saved_detector
 	package.loaded["core.logger.engine.logger"] = saved_logger
 	if not ok then error(err, 0) end
 	return snapshot

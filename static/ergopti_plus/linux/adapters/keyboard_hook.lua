@@ -2645,7 +2645,7 @@ end
 -- =========================================
 
 local function _read_context()
-	local ok, window_info = pcall(require, "adapters.window_info")
+	local ok, window_info = pcall(require, "platform.focus.window_info")
 	if not ok then return end
 	local ok2, info = pcall(window_info.getFocused)
 	if ok2 and type(info) == "table" then

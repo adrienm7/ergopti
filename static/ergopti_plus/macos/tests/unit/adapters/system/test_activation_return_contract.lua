@@ -23,7 +23,7 @@ local helpers = require("tests.helpers")
 helpers.describe("activation adapters: false native results remain failures", function()
 	helpers.it("WindowManager.exists refuses an empty window search without scanning", function()
 		local scans = 0
-		local adapter = helpers.load_with_stubs("adapters.window_manager", {
+		local adapter = helpers.load_with_stubs("platform.focus.window_manager", {
 			window = { allWindows = function()
 				scans = scans + 1
 				return { { title = function() return "Any window" end } }
@@ -39,7 +39,7 @@ helpers.describe("activation adapters: false native results remain failures", fu
 			kill = function() graceful = graceful + 1 end,
 			kill9 = function() forceful = forceful + 1 end,
 		}
-		local adapter = helpers.load_with_stubs("adapters.window_manager", {
+		local adapter = helpers.load_with_stubs("platform.focus.window_manager", {
 			application = { applicationsForBundleID = function() return { app } end },
 		})
 		helpers.assert_eq(adapter.kill("com.example.app"), true)
@@ -48,7 +48,7 @@ helpers.describe("activation adapters: false native results remain failures", fu
 	end)
 
 	helpers.it("WindowManager.activate propagates application false", function()
-		local adapter = helpers.load_with_stubs("adapters.window_manager", {
+		local adapter = helpers.load_with_stubs("platform.focus.window_manager", {
 			application = {
 				applicationsForBundleID = function() return {} end,
 				runningApplications = function()
@@ -66,7 +66,7 @@ helpers.describe("activation adapters: false native results remain failures", fu
 
 	helpers.it("WindowManager.activate propagates window false", function()
 		local focus_calls = 0
-		local adapter = helpers.load_with_stubs("adapters.window_manager", {
+		local adapter = helpers.load_with_stubs("platform.focus.window_manager", {
 			window = {
 				get = function()
 					return {
@@ -82,7 +82,7 @@ helpers.describe("activation adapters: false native results remain failures", fu
 	end)
 
 	helpers.it("WindowManager.activate accepts the documented window-object focus result", function()
-		local manager = helpers.load_with_stubs("adapters.window_manager", {
+		local manager = helpers.load_with_stubs("platform.focus.window_manager", {
 			window = {
 				get = function()
 					local win = {}
@@ -112,7 +112,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 		local shell_opens = 0
 		local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 		local slots = {
-			"adapters.window_manager",
+			"platform.focus.window_manager",
 			"adapters.app_launcher",
 			"core.events.timer_scheduler",
 			"adapters.clipboard",
@@ -127,7 +127,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			package.loaded["core.process.adapters.shell_runner"] = {
 				open = function() shell_opens = shell_opens + 1; return true end,
 			}
-			package.loaded["adapters.window_manager"] = {
+			package.loaded["platform.focus.window_manager"] = {
 				activate = function() return false end,
 			}
 			package.loaded["adapters.app_launcher"] = {

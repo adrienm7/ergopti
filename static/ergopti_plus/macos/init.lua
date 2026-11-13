@@ -133,7 +133,7 @@ do
 	local decision = InstanceAdmission.decide(admission_mode, packaged_runtime)
 	if decision ~= InstanceAdmission.ADMIT then
 		local launcher_ok, launcher_app = pcall(function()
-			return require("adapters.running_application").by_bundle_id(InstanceAdmission.LAUNCHER_BUNDLE_ID)
+			return require("platform.focus.running_application").by_bundle_id(InstanceAdmission.LAUNCHER_BUNDLE_ID)
 		end)
 		local identity = InstanceAdmission.describe({
 			pid = process_info.processID,

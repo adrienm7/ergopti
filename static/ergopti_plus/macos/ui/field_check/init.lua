@@ -46,7 +46,7 @@ local function native()
 	return {
 		ports = function() return require("adapters.field_check_ports").new() end,
 		notify = function(title, body, kind)
-			return require("adapters.application_notifier").send(title, { body = body, kind = kind })
+			return require("platform.focus.application_notifier").send(title, { body = body, kind = kind })
 		end,
 		alert = function(...) return require("core.ui.engine.dialog_util").block_alert(...) end,
 		copy = function(text) return hs.pasteboard.setContents(text) end,

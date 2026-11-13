@@ -35,7 +35,7 @@ local Queries = require("metrics.engine.queries")
 local Literal = require("core.fs.engine.sqlite.literal")
 local i18n   = require("core.i18n.engine.i18n")
 local FsDir  = require("core.fs.engine.dir")
-local RunningApplication = require("adapters.running_application")
+local RunningApplication = require("platform.focus.running_application")
 local ForeignLedgerSnapshot = require("adapters.foreign_ledger_snapshot")
 local LOG    = "keystats.export"
 

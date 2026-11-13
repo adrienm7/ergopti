@@ -23,8 +23,8 @@ local function offering(count, apply_ok)
 	local Navigation = helpers.load_module("modules.llm.navigation_settings")
 	Navigation._reset()
 	Navigation.get()
-	state.previous_focus = package.loaded["adapters.secure_field_detector"]
-	package.loaded["adapters.secure_field_detector"] = {
+	state.previous_focus = package.loaded["platform.focus.secure_field_detector"]
+	package.loaded["platform.focus.secure_field_detector"] = {
 		isSecureField = function() return false end,
 		isSecureApp = function() return false end,
 	}
@@ -62,7 +62,7 @@ local function offering(count, apply_ok)
 	engine.predict("Bonjour //", { app_id = "editor", input_chars = 2 })
 	function state.restore()
 		package.loaded["infra.llm_preferences"] = previous_storage
-		package.loaded["adapters.secure_field_detector"] = state.previous_focus
+		package.loaded["platform.focus.secure_field_detector"] = state.previous_focus
 		package.loaded["modules.llm.api_ollama"] = nil
 		package.loaded["modules.llm.profiles"] = nil
 		helpers.load_module("modules.llm.navigation_settings")._reset()

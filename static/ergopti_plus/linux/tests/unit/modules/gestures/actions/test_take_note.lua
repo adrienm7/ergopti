@@ -20,10 +20,10 @@ local function fixture(body, handler)
 	local folder = os.tmpname()
 	os.remove(folder)
 	assert(Shell.run("mkdir -p -- " .. Shell.quote(folder)))
-	local saved_data, saved_notifier = Paths.data, package.loaded["adapters.application_notifier"]
+	local saved_data, saved_notifier = Paths.data, package.loaded["platform.focus.application_notifier"]
 	local launches, notices = {}, {}
 	Paths.data = function(rel) helpers.assert_eq(rel, "notes"); return folder end
-	package.loaded["adapters.application_notifier"] = {
+	package.loaded["platform.focus.application_notifier"] = {
 		send = function(text) notices[#notices + 1] = text; return true end,
 	}
 	Shell._set_runner(function(command)
@@ -37,7 +37,7 @@ local function fixture(body, handler)
 	local function launch(command) launches[#launches + 1] = command; return true end
 	local ok, err = pcall(body, path, launches, notices, launch)
 	Shell._reset_runner()
-	Paths.data, package.loaded["adapters.application_notifier"] = saved_data, saved_notifier
+	Paths.data, package.loaded["platform.focus.application_notifier"] = saved_data, saved_notifier
 	os.remove(path)
 	assert(Shell.run("rmdir -- " .. Shell.quote(folder)))
 	if not ok then error(err, 0) end

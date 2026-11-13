@@ -12,7 +12,7 @@
 local uv = require('luv')
 require('core.lifecycle.engine.compat.utf8').install()
 local origin = assert(os.getenv('ERGOPTI_ACCEPT_ORIGIN'))
-package.loaded['adapters.secure_field_detector'] = { isSecureField = function() return false end, isUrlBar = function() return false end }
+package.loaded['platform.focus.secure_field_detector'] = { isSecureField = function() return false end, isUrlBar = function() return false end }
 package.loaded['infra.llm_preferences'] = require('tests.support.llm_preferences_fixture').new({initial = {
 	['llm.models.selected'] = 'ollama', ['llm.display.streaming'] = true,
 }})

@@ -591,7 +591,7 @@ end)
 -- =====================================
 
 helpers.describe("Adapter contract vectors: WindowInfo", function()
-	local adapter = helpers.load_with_stubs("adapters.window_info")
+	local adapter = helpers.load_with_stubs("platform.focus.window_info")
 
 	helpers.it("getFocused_returns_object — always returns a table, never nil", function()
 		local result = adapter.getFocused()

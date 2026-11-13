@@ -7,7 +7,7 @@
 --- Window labels cannot substitute for a unique bus name and object path.
 --- ==============================================================================
 local M = {}
-local AtspiFocus = require("adapters.atspi_focus")
+local AtspiFocus = require("platform.focus.atspi_focus")
 
 --- Validates native D-Bus identity and active-window coverage from the helper.
 --- @param snapshot table|nil Bounded native helper response.

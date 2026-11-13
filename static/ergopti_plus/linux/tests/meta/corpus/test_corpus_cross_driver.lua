@@ -286,8 +286,8 @@ describe("Corpus: security/keystats_no_persist_vectors.json", function()
 		-- Required directly, not through pcall: a failed require throws and fails
 		-- this test with the real error, where asserting on a pcall status would
 		-- prove only that require returned.
-		local sfd = require("adapters.secure_field_detector")
-		assert_true(type(sfd) == "table", "adapters.secure_field_detector must return a module table")
+		local sfd = require("platform.focus.secure_field_detector")
+		assert_true(type(sfd) == "table", "platform.focus.secure_field_detector must return a module table")
 		assert_true(type(sfd.isSecureApp) == "function", "it must expose isSecureApp")
 		assert_true(sfd.isSecureApp("") == false,
 			"an empty app id must answer false rather than throw — the vectors above are skipped because they are macOS/AHK-specific, NOT because Linux lacks a detector")

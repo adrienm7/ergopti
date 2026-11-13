@@ -364,12 +364,12 @@ InstallHotstringHooks()
 #Include ../core/lifecycle/engine/shutdown/quit_admission.ahk
 #Include ../core/events/timer_scheduler.ahk
 #Include ../core/fs/adapters/file_system.ahk
-#Include ../adapters/window_info.ahk
+#Include ../platform/focus/window_info.ahk
 #Include ../core/process/adapters/uia_worker.ahk
 #Include ../adapters/tray_menu.ahk
 #Include ../adapters/text_sender.ahk
 #Include ../core/network/adapters/http_client.ahk
-#Include ../adapters/secure_field_detector.ahk
+#Include ../platform/focus/secure_field_detector.ahk
 #Include ../adapters/clipboard.ahk
 #Include ../infra/input_probe.ahk
 #Include ../core/fs/adapters/storage.ahk
@@ -385,7 +385,7 @@ InstallHotstringHooks()
 #Include ../apps/app_cloner_core.ahk
 #Include ../apps/bundled_apps.ahk
 #Include ../core/network/adapters/info.ahk
-#Include ../adapters/window_manager.ahk
+#Include ../platform/focus/window_manager.ahk
 #Include ../adapters/system_control.ahk
 #Include ../adapters/mouse_control.ahk
 #Include ../core/ui/adapters/graphics_renderer.ahk
@@ -572,11 +572,11 @@ InstallSendNoOps()
 #Include unit/ui/menu/test_manifest_menu_checked_when.ahk
 #Include unit/modules/keymap/test_layout_tables.ahk
 #Include unit/modules/shortcuts/test_uia_selection_worker_deadline.ahk
-#Include unit/adapters/uia/test_uia_worker_cleanup_debt.ahk
-#Include unit/adapters/uia/test_uia_worker_exit_reentry.ahk
-#Include unit/adapters/uia/test_secure_field_worker_context.ahk
-#Include unit/adapters/uia/test_secure_field_native_style_change.ahk
-#Include unit/adapters/uia/test_secure_field_native_style_cache.ahk
+#Include unit/platform/focus/uia/test_worker_cleanup_debt.ahk
+#Include unit/platform/focus/uia/test_worker_exit_reentry.ahk
+#Include unit/platform/focus/uia/test_secure_field_worker_context.ahk
+#Include unit/platform/focus/uia/test_secure_field_native_style_change.ahk
+#Include unit/platform/focus/uia/test_secure_field_native_style_cache.ahk
 
 #Include unit/infra/config/persistence/test_config.ahk
 #Include unit/infra/config/persistence/test_feature_state_boot.ahk
@@ -626,7 +626,7 @@ InstallSendNoOps()
 #Include unit/platform/remap/tap_hold/test_tap_hold_overlay_and_modifiers.ahk
 #Include unit/core/i18n/test_i18n.ahk
 #Include unit/core/i18n/test_probe_is_silent.ahk
-#Include unit/adapters/test_window_utils.ahk
+#Include unit/platform/focus/test_window_utils.ahk
 #Include unit/core/network/test_external_url_policy.ahk
 #Include unit/core/text/test_utils.ahk
 #Include unit/adapters/test_registry.ahk
@@ -1579,7 +1579,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ui/wpm/test_wpm_boot_show_respects_disable.ahk
 #Include meta/ui/wpm/test_wpm_graph_upload_acknowledgement.ahk
 #Include meta/modules/shortcuts/test_wrap_remap_uses_saved_custom_pair.ahk
-#Include meta/adapters/uia/test_uia_selection_withholds_capped_text.ahk
+#Include meta/platform/focus/uia/test_selection_withholds_capped_text.ahk
 #Include meta/modules/hotstrings/catalogue/test_text_expansion_critical_path.ahk
 #Include meta/adapters/input/test_text_sender_clipboard_failure.ahk
 #Include meta/adapters/input/test_text_sender_clipboard_sequence_ownership.ahk
@@ -1606,7 +1606,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/hotstrings/engine/test_hse_physical_suppression_provenance.ahk
 #Include meta/modules/hotstrings/engine/test_hse_endchar_index_bound.ahk
 #Include meta/modules/hotstrings/engine/test_hse_physical_input_provenance.ahk
-#Include meta/adapters/uia/test_uia_wrap_suppress_latch.ahk
+#Include meta/platform/focus/uia/test_wrap_suppress_latch.ahk
 #Include meta/modules/keystats/ergonomics/test_near_miss_scan_bounded.ahk
 #Include meta/modules/gestures/test_gesture_cycle_winevent_fence.ahk
 #Include meta/modules/gestures/test_gesture_cycling_flag_critical.ahk
@@ -1895,7 +1895,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/remap/tap_hold/test_tap_hold_menu_register_dispatch.ahk
 #Include meta/ui/menu/test_menu_dispatch_error_propagation.ahk
 #Include meta/core/ui/windows/test_launch_error_msgbox_on_timer_thread.ahk
-#Include meta/adapters/uia/test_uia_error_logged.ahk
+#Include meta/platform/focus/uia/test_error_logged.ahk
 #Include meta/modules/updater/test_updater_focus_poll_suspend_guard.ahk
 #Include meta/modules/updater/test_updater_setchannel_cancels_async.ahk
 #Include meta/modules/updater/test_updater_setchannel_blocks_during_download.ahk
@@ -2091,7 +2091,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/process/shell_runner/test_legacy_claims.ahk
 #Include meta/modules/gestures/test_screenshot_tree_owned_default.ahk
 #Include meta/core/process/shell_runner/test_isolated_logger.ahk
-#Include meta/adapters/uia/test_disable_password_fields_gate.ahk
+#Include meta/platform/focus/uia/test_disable_password_fields_gate.ahk
 #Include meta/modules/dynamic_hotstrings/test_menu_dynamic_hotstrings_category_gate.ahk
 #Include meta/ui/menu/test_menu_master_category_cache.ahk
 #Include unit/core/fs/test_storage_st_delete_contract.ahk
@@ -2158,7 +2158,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/adapters/test_atomic_write_unique_scratch.ahk
 #Include unit/adapters/test_atomic_temp_owner.ahk
 #Include meta/suite/test_byref_call_sites.ahk
-#Include meta/adapters/uia/test_uia_probe_bounded.ahk
+#Include meta/platform/focus/uia/test_probe_bounded.ahk
 #Include meta/ui/healthcheck/test_healthcheck_collectors_guarded.ahk
 #Include meta/modules/gestures/test_gestures_init_lifecycle_pair.ahk
 #Include meta/infra/config/persistence/test_paths_file_single_writer.ahk
@@ -2284,7 +2284,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/ui/tooltip/test_renderer_error_logging.ahk
 ; WMGetList/WIGetAll bare-try-no-catch fix (F33) — sibling of the
 ; GestureGetCyclableWindows TOCTOU guard (commit 7b701020d).
-#Include meta/adapters/test_window_adapters_catch.ahk
+#Include meta/platform/focus/test_window_adapters_catch.ahk
 #Include meta/ui/onboarding/test_onbweb_singleton_guard.ahk
 #Include meta/infra/config/persistence/test_reset_config_writes_meta_placeholder.ahk
 #Include meta/core/ui/webview/test_shared_env_reentrancy_guard.ahk
@@ -2368,10 +2368,10 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/hotstrings/personal/test_personal_info_save_surfaces_failure.ahk
 #Include meta/modules/llm/servers/test_remote_curl_forwards_usage_meta.ahk
 #Include meta/modules/llm/servers/test_remote_token_not_on_argv.ahk
-#Include meta/adapters/uia/test_secure_field_native_detect_conclusive_order.ahk
-#Include meta/adapters/uia/test_secure_field_probes_focused_element.ahk
-#Include meta/adapters/uia/test_secure_field_stale_verdict_fails_closed.ahk
-#Include meta/adapters/uia/test_secure_field_uia_probe_guards.ahk
+#Include meta/platform/focus/uia/test_secure_field_native_detect_conclusive_order.ahk
+#Include meta/platform/focus/uia/test_secure_field_probes_focused_element.ahk
+#Include meta/platform/focus/uia/test_secure_field_stale_verdict_fails_closed.ahk
+#Include meta/platform/focus/uia/test_secure_field_uia_probe_guards.ahk
 #Include meta/modules/keystats/ergonomics/test_today_bucket_slots_all_fed.ahk
 #Include meta/core/ui/tooltip/test_expiry_anchored_at_request.ahk
 #Include meta/core/ui/tooltip/test_expiry_timers_keep_preview.ahk
@@ -2494,8 +2494,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/ui/tooltip/test_border_ring_region.ahk
 #Include meta/core/ui/tooltip/test_render_accounting.ahk
 #Include meta/ui/menu/test_tray_suspend_checkmark_survives_rebuild.ahk
-#Include meta/adapters/uia/test_uia_clamp_every_probe_site.ahk
-#Include meta/adapters/uia/test_uia_poll_segment_bounded.ahk
+#Include meta/platform/focus/uia/test_clamp_every_probe_site.ahk
+#Include meta/platform/focus/uia/test_poll_segment_bounded.ahk
 #Include meta/modules/hotstrings/catalogue/test_hcw_reset_all_republishes.ahk
 #Include meta/modules/llm/navigation/test_llm_inline_autotype_staleness.ahk
 #Include meta/modules/keystats/ergonomics/test_walker_batch_has_an_inprocess_drain.ahk

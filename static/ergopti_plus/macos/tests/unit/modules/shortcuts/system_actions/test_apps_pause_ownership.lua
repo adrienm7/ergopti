@@ -27,8 +27,8 @@ local function fresh_apps()
 		"core.events.timer_scheduler",
 		"core.process.adapters.shell_runner",
 		"adapters.app_launcher",
-		"adapters.window_info",
-		"adapters.window_manager",
+		"platform.focus.window_info",
+		"platform.focus.window_manager",
 		"adapters.synthetic_input",
 		"adapters.clipboard",
 		"core.logger.engine.logger",
@@ -258,8 +258,8 @@ local function fresh_apps()
 			return fixture.launch_result
 		end,
 	}
-	package.loaded["adapters.window_manager"] = { activate = function() return false end }
-	package.loaded["adapters.window_info"] = {
+	package.loaded["platform.focus.window_manager"] = { activate = function() return false end }
+	package.loaded["platform.focus.window_info"] = {
 		getFocused = function() return { appId = fixture.focused_app_id } end,
 	}
 	local function complete(tx, status)

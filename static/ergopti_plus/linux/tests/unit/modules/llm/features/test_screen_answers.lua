@@ -48,7 +48,7 @@ local RELOADED = {
 	"modules.llm.api_remote", "modules.llm.vision_request", "modules.llm.local_model_probe", "modules.llm.local_model_offer",
 }
 local FAKED = {
-	"adapters.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
+	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -90,7 +90,7 @@ local function scenario(opts, body)
 		local world = { posts = {}, probes = {}, model_offers = {}, model_installs = {}, ollama = {}, notices = {}, captures = {}, shown = nil, typed = {},
 			cancelled_owners = {} }
 		local entries = opts.entries or { CEREBRAS, OPENAI }
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return false end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,

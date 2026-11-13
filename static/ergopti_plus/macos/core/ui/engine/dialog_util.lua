@@ -27,7 +27,7 @@ local hs = hs
 local Logger         = require("core.logger.engine.logger")
 local ShellRunner    = require("core.process.adapters.shell_runner")
 local TimerScheduler = require("core.events.timer_scheduler")
-local RunningApplication = require("adapters.running_application")
+local RunningApplication = require("platform.focus.running_application")
 local text_utils     = require("core.text.engine.utils")
 local WindowTitles   = require("core.ui.engine.window_titles")
 

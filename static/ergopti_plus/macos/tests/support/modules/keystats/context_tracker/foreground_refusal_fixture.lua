@@ -40,7 +40,7 @@ local OWNERS = {
 	"ui.metrics_typing.init",
 	"modules.keystats",
 	"modules.keystats.privacy_context",
-	"adapters.secure_field_detector",
+	"platform.focus.secure_field_detector",
 	"metrics.engine.view.private_window",
 	"metrics.engine.metrics",
 	"metrics.engine.capture.physical_context_observation",
@@ -212,7 +212,7 @@ function M.with_runtime(callback)
 				return { attributeValue = function(_, key) if key == "AXFocusedUIElement" then return field end end }
 			end
 			hs.axuielement.observer = { new = function() return nil end }
-			package.loaded["adapters.secure_field_detector"] = nil
+			package.loaded["platform.focus.secure_field_detector"] = nil
 			local tracker_path = driver .. "/modules/keystats/context_tracker.lua"
 			tracker = assert(loadfile(tracker_path))()
 			local tracker_port = assert(package.loaded["modules.keystats.context_tracker"])

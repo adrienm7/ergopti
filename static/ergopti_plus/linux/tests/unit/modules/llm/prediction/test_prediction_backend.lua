@@ -21,7 +21,7 @@ local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", to
 --- @return table engine, table calls, table scheduler, function restore
 local function load(backend, entry, stored_settings, without_local_model, asynchronous, privacy)
 	local names = {
-		"adapters.secure_field_detector", "modules.llm.api_ollama", "modules.llm.api_remote",
+		"platform.focus.secure_field_detector", "modules.llm.api_ollama", "modules.llm.api_remote",
 		"modules.llm.api_entries", "modules.llm.profiles", "modules.llm.profile_settings", "core.fs.adapters.storage",
 		"infra.llm_preferences", "modules.llm.trigger_settings", "modules.llm.display_settings",
 	}
@@ -29,7 +29,7 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local calls = { ollama = {}, remote = {}, notices = {}, outputs = {}, generations = {}, cancelled = 0, applied = 0,
 		resets = 0, focus = "x11:fixture:1" }
-	package.loaded["adapters.secure_field_detector"] = {
+	package.loaded["platform.focus.secure_field_detector"] = {
 		isSecureField = function() return false end,
 		isSecureApp = function() return false end,
 		isUrlBar = function() return false end,

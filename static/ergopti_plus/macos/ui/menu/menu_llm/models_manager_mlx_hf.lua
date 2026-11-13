@@ -22,7 +22,7 @@
 local M = {}
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
 local Identifiers = require("core.text.engine.identifiers")
-local RunningApplication = require("adapters.running_application")
+local RunningApplication = require("platform.focus.running_application")
 
 local hs            = hs
 local notifications = require("core.ui.engine.notifications")

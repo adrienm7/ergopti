@@ -15,7 +15,7 @@ local text_owner = require("tests.support.text_owner_fixture")
 --- @param body function Receives the state and its real selection owner.
 function M.with(body)
 	text_owner.with(function(guard, field)
-		local names = { "adapters.selection_transaction", "adapters.atspi_focus", "modules.hotstrings.injector",
+		local names = { "adapters.selection_transaction", "platform.focus.atspi_focus", "modules.hotstrings.injector",
 			"adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
 			"adapters.keyboard_hook", "core.logger.engine.shim", "modules.hotstrings.selected_output", "core.logger.engine.monotonic" }
 		local saved = {}
@@ -49,7 +49,7 @@ function M.with(body)
 			end
 			return operation
 		end
-		package.loaded["adapters.atspi_focus"], package.loaded["adapters.selection_transaction"] = native, nil
+		package.loaded["platform.focus.atspi_focus"], package.loaded["adapters.selection_transaction"] = native, nil
 		local pending
 		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function() return true end,

@@ -459,7 +459,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.running_application",
+		id       = "platform.focus.running_application",
 		contract = { "by_name", "by_bundle_id", "current" },
 		-- Every application lookup goes through it; none scans windows.
 		wired    = true,
@@ -612,7 +612,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.application_notifier",
+		id       = "platform.focus.application_notifier",
 		contract = { "send", "new" },
 		wired    = true,
 	},
@@ -632,7 +632,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.secure_field_detector",
+		id       = "platform.focus.secure_field_detector",
 		contract = { "isSecureField", "isSecureApp", "refresh" },
 		wired    = true,
 	},
@@ -737,12 +737,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.window_info",
+		id       = "platform.focus.window_info",
 		contract = { "getFocused", "getAll" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.window_manager",
+		id       = "platform.focus.window_manager",
 		contract = { "activate", "exists", "kill", "getList" },
 		wired    = true,
 	},

@@ -97,7 +97,7 @@ end
 -- ===============================================
 
 helpers.describe("SecureFieldDetector: isSecureApp", function()
-	local adapter = helpers.load_with_stubs("adapters.secure_field_detector")
+	local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector")
 
 	helpers.it("returns true for a known password-manager app", function()
 		helpers.assert_true(adapter.isSecureApp("1Password") == true,
@@ -163,14 +163,14 @@ end)
 helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 
 	helpers.it("isSecureField returns false before any refresh()", function()
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector")
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector")
 		helpers.assert_eq(false, adapter.isSecureField(),
 			"before refresh(), isSecureField must be false")
 	end)
 
 	helpers.it("isSecureField returns true after refresh detects AXSecureTextField", function()
 		local adapter = helpers.load_with_stubs(
-			"adapters.secure_field_detector",
+			"platform.focus.secure_field_detector",
 			make_ax_stub("AXSecureTextField"))
 
 		adapter.refresh()
@@ -184,7 +184,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 	-- form failed OPEN and the keystats recorded the user's password characters.
 	helpers.it("isSecureField returns true for the Chromium shape (AXSubrole = AXSecureTextField)", function()
 		local adapter = helpers.load_with_stubs(
-			"adapters.secure_field_detector",
+			"platform.focus.secure_field_detector",
 			make_ax_role_subrole_stub("AXTextField", "AXSecureTextField"))
 
 		adapter.refresh()
@@ -194,7 +194,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 
 	helpers.it("isSecureField stays false for a non-secure subrole (no false positives)", function()
 		local adapter = helpers.load_with_stubs(
-			"adapters.secure_field_detector",
+			"platform.focus.secure_field_detector",
 			make_ax_role_subrole_stub("AXTextField", "AXSearchField"))
 
 		adapter.refresh()
@@ -204,7 +204,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 
 	helpers.it("isSecureField returns true for the native shape when no subrole is exposed", function()
 		local adapter = helpers.load_with_stubs(
-			"adapters.secure_field_detector",
+			"platform.focus.secure_field_detector",
 			make_ax_role_subrole_stub("AXSecureTextField", nil))
 
 		adapter.refresh()
@@ -221,7 +221,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 		}
 		local call_count = 0
 
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			axuielement = {
 				applicationElementForPID = function(_)
 					call_count = call_count + 1
@@ -256,7 +256,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 
 	helpers.it("isSecureField returns false when role is AXTextField (plain text)", function()
 		local adapter = helpers.load_with_stubs(
-			"adapters.secure_field_detector",
+			"platform.focus.secure_field_detector",
 			make_ax_stub("AXTextField"))
 
 		adapter.refresh()
@@ -266,7 +266,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 
 	helpers.it("refresh when frontmost app is nil — isSecureField stays false", function()
 		local adapter = helpers.load_with_stubs(
-			"adapters.secure_field_detector",
+			"platform.focus.secure_field_detector",
 			{ application = make_app_stub({ frontmostApplication = function() return nil end }) })
 
 		adapter.refresh()
@@ -276,7 +276,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 
 	helpers.it("refresh when AXFocusedUIElement is nil — isSecureField stays false", function()
 		local adapter = helpers.load_with_stubs(
-			"adapters.secure_field_detector",
+			"platform.focus.secure_field_detector",
 			make_ax_stub(nil))
 
 		adapter.refresh()
@@ -285,7 +285,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 	end)
 
 	helpers.it("refresh when axuielement.applicationElementForPID is missing — graceful", function()
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			axuielement = {},
 			application = make_app_stub(),
 		})
@@ -299,7 +299,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 	end)
 
 	helpers.it("refresh when axuielement is nil entirely — graceful", function()
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			axuielement = nil,
 			application = make_app_stub(),
 		})
@@ -312,7 +312,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 	end)
 
 	helpers.it("refresh catches and absorbs exceptions inside the pcall", function()
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			axuielement = {
 				applicationElementForPID = function(_)
 					error("simulated AX API crash during refresh")
@@ -330,7 +330,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 	end)
 
 	helpers.it("refresh when applicationElementForPID returns nil — graceful", function()
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			axuielement = {
 				applicationElementForPID = function(_) return nil end,
 			},
@@ -346,7 +346,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 		local roles = { "AXSecureTextField", "AXTextField" }
 		local call_count = 0
 
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			axuielement = {
 				applicationElementForPID = function(_)
 					call_count = call_count + 1
@@ -394,7 +394,7 @@ end)
 helpers.describe("SecureFieldDetector: SECURE_APP_IDS constant", function()
 
 	helpers.it("contains the canonical set of password-manager apps", function()
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector")
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector")
 		local required_apps = {
 			"1Password 7 - Password Manager",
 			"1Password",
@@ -414,7 +414,7 @@ helpers.describe("SecureFieldDetector: SECURE_APP_IDS constant", function()
 	end)
 
 	helpers.it("secure app list has the expected minimum size", function()
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector")
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector")
 		local canonical = {
 			"1Password 7 - Password Manager",
 			"1Password",
@@ -446,7 +446,7 @@ end)
 helpers.describe("SecureFieldDetector: port contract surface", function()
 
 	helpers.it("all three port methods exist and are callable", function()
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector")
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector")
 		helpers.assert_true(type(adapter.refresh) == "function",
 			"refresh must be a function")
 		helpers.assert_true(type(adapter.isSecureField) == "function",
@@ -457,7 +457,7 @@ helpers.describe("SecureFieldDetector: port contract surface", function()
 
 	helpers.it("refresh and isSecureField are separate concerns", function()
 		local adapter = helpers.load_with_stubs(
-			"adapters.secure_field_detector",
+			"platform.focus.secure_field_detector",
 			make_ax_stub(nil))
 
 		local result = adapter.refresh()
@@ -479,7 +479,7 @@ end)
 helpers.describe("SecureFieldDetector: exact focused-element ownership", function()
 	helpers.it("inspects the requested application instead of the ambient frontmost app", function()
 		local requested_pids = {}
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			axuielement = {
 				applicationElementForPID = function(pid)
 					requested_pids[#requested_pids + 1] = pid
@@ -507,7 +507,7 @@ helpers.describe("SecureFieldDetector: exact focused-element ownership", functio
 	end)
 
 	helpers.it("returns unknown when the exact focused element cannot be read", function()
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			axuielement = {
 				applicationElementForPID = function()
 					return { attributeValue = function() return nil end }
@@ -539,7 +539,7 @@ helpers.describe("SecureFieldDetector: exact focused-element ownership", functio
 			isRunning = function(self) return self.running == true end,
 		}
 		local app_element = {}
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			axuielement = {
 				applicationElementForPID = function(pid)
 					helpers.assert_eq(pid, 4242)
@@ -577,7 +577,7 @@ helpers.describe("SecureFieldDetector: exact focused-element ownership", functio
 			stop = function(self) stop_calls = stop_calls + 1; return self end,
 			isRunning = function() return false end,
 		}
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			axuielement = {
 				applicationElementForPID = function() return {} end,
 				observer = { new = function() return observer end },
@@ -609,7 +609,7 @@ helpers.describe("SecureFieldDetector: exact focused-element ownership", functio
 			end,
 			isRunning = function(self) return self.running == true end,
 		}
-		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			axuielement = {
 				applicationElementForPID = function() return {} end,
 				observer = { new = function() return observer end },

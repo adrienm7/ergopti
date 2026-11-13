@@ -36,18 +36,9 @@ graph TD
     end
 
     subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
-        LINUX_application_notifier["ApplicationNotifier.lua"]
-        LINUX_atspi_context_worker["AtspiContextWorker.lua"]
-        LINUX_atspi_focus["AtspiFocus.lua"]
-        LINUX_atspi_focus_watch["AtspiFocusWatch.lua"]
-        LINUX_atspi_focus_watch_worker["AtspiFocusWatchWorker.lua"]
-        LINUX_atspi_native_identity["AtspiNativeIdentity.lua"]
         LINUX_clipboard["Clipboard.lua"]
         LINUX_clipboard_owner["ClipboardOwner.lua"]
         LINUX_clipboard_owner_worker["ClipboardOwnerWorker.lua"]
-        LINUX_compositor_focus["CompositorFocus.lua"]
-        LINUX_compositor_focus_worker["CompositorFocusWorker.lua"]
-        LINUX_cosmic_toplevel_worker["CosmicToplevelWorker.lua"]
         LINUX_desktop_opener["DesktopOpener.lua"]
         LINUX_desktop_opener_worker["DesktopOpenerWorker.lua"]
         LINUX_evdev_reader["EvdevReader.lua"]
@@ -58,17 +49,14 @@ graph TD
         LINUX_modifier_broker["ModifierBroker.lua"]
         LINUX_notifier["Notifier.lua"]
         LINUX_screen_capture["ScreenCapture.lua"]
-        LINUX_secure_field_detector["SecureFieldDetector.lua"]
         LINUX_selection_transaction["SelectionTransaction.lua"]
         LINUX_tap_to_click_setting["TapToClickSetting.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
         LINUX_user_hotstring_destination["UserHotstringDestination.lua"]
         LINUX_wayland_selection_counter["WaylandSelectionCounter.lua"]
-        LINUX_window_info["WindowInfo.lua"]
         LINUX_window_switch["WindowSwitch.lua"]
         LINUX_wpm_surface["WpmSurface.lua"]
-        LINUX_x11_focus["X11Focus.lua"]
         LINUX_x11_keymap_watch_worker["X11KeymapWatchWorker.lua"]
         LINUX_x11_selection_stamp["X11SelectionStamp.lua"]
         LINUX_xkb_capture["XkbCapture.lua"]
@@ -82,7 +70,6 @@ graph TD
         MACOS_apple_shortcuts["AppleShortcuts.lua"]
         MACOS_apple_shortcuts_cli["AppleShortcutsCli.lua"]
         MACOS_apple_shortcuts_native["AppleShortcutsNative.lua"]
-        MACOS_application_notifier["ApplicationNotifier.lua"]
         MACOS_boot_fatal["BootFatal.lua"]
         MACOS_clipboard["Clipboard.lua"]
         MACOS_event_provenance["EventProvenance.lua"]
@@ -121,11 +108,9 @@ graph TD
         MACOS_privacy_settings["PrivacySettings.lua"]
         MACOS_python_interpreter["PythonInterpreter.lua"]
         MACOS_reload_breadcrumb["ReloadBreadcrumb.lua"]
-        MACOS_running_application["RunningApplication.lua"]
         MACOS_runtime_capture_port["RuntimeCapturePort.lua"]
         MACOS_runtime_owner_ports["RuntimeOwnerPorts.lua"]
         MACOS_screen_capture["ScreenCapture.lua"]
-        MACOS_secure_field_detector["SecureFieldDetector.lua"]
         MACOS_synthetic_input["SyntheticInput.lua"]
         MACOS_synthetic_input_loopback_owner["SyntheticInputLoopbackOwner.lua"]
         MACOS_system_info["SystemInfo.lua"]
@@ -137,8 +122,6 @@ graph TD
         MACOS_tray_menu["TrayMenu.lua"]
         MACOS_unicode_carrier["UnicodeCarrier.lua"]
         MACOS_update_launcher["UpdateLauncher.lua"]
-        MACOS_window_info["WindowInfo.lua"]
-        MACOS_window_manager["WindowManager.lua"]
     end
 
     subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
@@ -165,7 +148,6 @@ graph TD
         WINDOWS_registry_notify["RegistryNotify.ahk"]
         WINDOWS_screen_brightness["ScreenBrightness.ahk"]
         WINDOWS_screen_capture["ScreenCapture.ahk"]
-        WINDOWS_secure_field_detector["SecureFieldDetector.ahk"]
         WINDOWS_system_control["SystemControl.ahk"]
         WINDOWS_system_locale["SystemLocale.ahk"]
         WINDOWS_system_time_zone["SystemTimeZone.ahk"]
@@ -175,8 +157,6 @@ graph TD
         WINDOWS_tray_startup_commands["TrayStartupCommands.ahk"]
         WINDOWS_updater_curl_capture["UpdaterCurlCapture.ahk"]
         WINDOWS_user_hotstrings_native["UserHotstringsNative.ahk"]
-        WINDOWS_window_info["WindowInfo.ahk"]
-        WINDOWS_window_manager["WindowManager.ahk"]
     end
 
     subgraph Domain["Domain — shared business logic"]
@@ -191,9 +171,7 @@ graph TD
     P_Clipboard -->|implements| LINUX_clipboard
     P_KeyboardHook -->|implements| LINUX_keyboard_hook
     P_Notifier -->|implements| LINUX_notifier
-    P_SecureFieldDetector -->|implements| LINUX_secure_field_detector
     P_TrayMenu -->|implements| LINUX_tray_menu
-    P_WindowInfo -->|implements| LINUX_window_info
 
     %% Port implementations: macOS (Hammerspoon)
     P_AppLauncher -->|implements| MACOS_app_launcher
@@ -203,11 +181,8 @@ graph TD
     P_KeyboardHook -->|implements| MACOS_keyboard_hook
     P_MouseControl -->|implements| MACOS_mouse_control
     P_Notifier -->|implements| MACOS_notifier
-    P_SecureFieldDetector -->|implements| MACOS_secure_field_detector
     P_TextSender -->|implements| MACOS_text_sender
     P_TrayMenu -->|implements| MACOS_tray_menu
-    P_WindowInfo -->|implements| MACOS_window_info
-    P_WindowManager -->|implements| MACOS_window_manager
 
     %% Port implementations: Windows (AutoHotkey)
     P_AppLauncher -->|implements| WINDOWS_app_launcher
@@ -217,11 +192,8 @@ graph TD
     P_KeyboardHook -->|implements| WINDOWS_keyboard_hook
     P_MouseControl -->|implements| WINDOWS_mouse_control
     P_Notifier -->|implements| WINDOWS_notifier
-    P_SecureFieldDetector -->|implements| WINDOWS_secure_field_detector
     P_TextSender -->|implements| WINDOWS_text_sender
     P_TrayMenu -->|implements| WINDOWS_tray_menu
-    P_WindowInfo -->|implements| WINDOWS_window_info
-    P_WindowManager -->|implements| WINDOWS_window_manager
 
     %% Key domain relationships
     D_Expander -->|uses| D_Registry

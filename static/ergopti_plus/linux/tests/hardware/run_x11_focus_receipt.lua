@@ -20,7 +20,7 @@ local ffi = require("ffi")
 local luv = require("luv")
 local DisplayServer = require("core.ui.engine.display_server")
 assert(DisplayServer.is_x11(), "the focus receipt needs an X11 display")
-local Focus = require("adapters.x11_focus")
+local Focus = require("platform.focus.x11_focus")
 local bound, reason = Focus.use_xcb()
 assert(bound, "libxcb transport unavailable: " .. tostring(reason))
 

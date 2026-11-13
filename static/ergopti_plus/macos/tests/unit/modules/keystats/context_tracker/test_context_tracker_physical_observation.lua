@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 local Privacy = require("modules.keystats.privacy_context")
 
 local function with_fixture(callback)
-	return helpers.with_stub_scope({ "modules.keystats.context_tracker", "adapters.secure_field_detector",
+	return helpers.with_stub_scope({ "modules.keystats.context_tracker", "platform.focus.secure_field_detector",
 		"adapters.physical_observation_clock", "metrics.engine.capture.physical_context_observation",
 		"core.fs.engine.native_path", "diagnostics.engine.reports.error_description" }, function()
 		local controls = { paused = false, no_window = false, no_focus = false, no_frontmost = false,
@@ -290,7 +290,7 @@ end)
 helpers.describe("actual secure detector refresh completeness", function()
 	helpers.it("preserves default refresh return and exact existing query inventory", function()
 		with_fixture(function(_, _, c)
-			local detector = require("adapters.secure_field_detector")
+			local detector = require("platform.focus.secure_field_detector")
 			helpers.assert_eq(detector.refresh(), nil)
 			helpers.assert_eq(c.queries, { "frontmost", "pid", "ax_app", "AXFocusedUIElement", "AXRole", "AXSubrole" })
 			helpers.assert_eq(detector.isSecureField(), false)
@@ -303,7 +303,7 @@ helpers.describe("actual secure detector refresh completeness", function()
 
 	helpers.it("distinguishes unavailable focus from a conclusive nonsecure classification without extra queries", function()
 		with_fixture(function(_, _, c)
-			local detector = require("adapters.secure_field_detector"); c.no_focus = true
+			local detector = require("platform.focus.secure_field_detector"); c.no_focus = true
 			local complete; detector.refresh(function(known) complete = known end)
 			helpers.assert_eq(complete, false); helpers.assert_eq(detector.isSecureField(), false)
 			helpers.assert_eq(c.queries, { "frontmost", "pid", "ax_app", "AXFocusedUIElement" })
@@ -312,7 +312,7 @@ helpers.describe("actual secure detector refresh completeness", function()
 
 	helpers.it("distinguishes refused AX reads while preserving the conservative legacy true cache", function()
 		with_fixture(function(_, _, c)
-			local detector = require("adapters.secure_field_detector"); c.throw_property = "AXSubrole"
+			local detector = require("platform.focus.secure_field_detector"); c.throw_property = "AXSubrole"
 			local complete; detector.refresh(function(known) complete = known end)
 			helpers.assert_eq(complete, false); helpers.assert_eq(detector.isSecureField(), true)
 		end)
@@ -348,7 +348,7 @@ helpers.describe("context writer incomplete evidence and callback retirement", f
 
 	helpers.it("preserves the legacy cache even when its optional outer completeness observer throws", function()
 		with_fixture(function(_, _, c)
-			local detector = require("adapters.secure_field_detector")
+			local detector = require("platform.focus.secure_field_detector")
 			c.role = "AXSecureTextField"
 			local callbacks, complete, pid = 0, nil, nil
 			local ok, reason = pcall(detector.refresh, function(known, inspected)

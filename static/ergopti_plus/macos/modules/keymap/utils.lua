@@ -29,7 +29,7 @@ local Clipboard = require("adapters.clipboard")
 local ClipboardBorrowers = require("infra.clipboard_borrowers")
 local TimerScheduler = require("core.events.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
-local SecureFieldDetector = require("adapters.secure_field_detector")
+local SecureFieldDetector = require("platform.focus.secure_field_detector")
 local AccessibilityPermission = require("adapters.accessibility_permission")
 local FieldRunSelftest = require("infra.field_run_selftest")
 

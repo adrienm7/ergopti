@@ -121,7 +121,7 @@ red locally.
 
 - Side task approved by the maintainer: COSMIC `zcosmic_toplevel_info` v2+
   (ext-foreign-toplevel-list announcement) in
-  `linux/adapters/cosmic_toplevel_worker.lua`, keeping v1 when only v1 is
+  `linux/platform/focus/cosmic_toplevel_worker.lua`, keeping v1 when only v1 is
   offered. The LuaJIT fake `tests/hardware/run_cosmic_toplevel_fake.lua`
   needs to cover v2+; update the TODO line and `maintainer-decisions.md`.
 

@@ -43,7 +43,7 @@ local function with_action(session, action, change, body)
 		"adapters.keyboard_hook", "adapters.modifier_broker", "adapters.uinput_writer",
 		"core.events.loop", "modules.hotstrings.injector", "adapters.clipboard",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
-		"adapters.window_info", "core.logger.engine.shim",
+		"platform.focus.window_info", "core.logger.engine.shim",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -118,7 +118,7 @@ local function with_action(session, action, change, body)
 				error("explicit selection actions must retain the clipboard transaction")
 			end }
 			if action == "paste_plain" then
-				package.loaded["adapters.window_info"] = { focused_app_id = function()
+				package.loaded["platform.focus.window_info"] = { focused_app_id = function()
 					retire("metrics"); return "owned-editor"
 				end }
 				local layout = helpers.load_module("adapters.keyboard_layout")
@@ -246,7 +246,7 @@ local function observe_compound_action(action, change)
 		"adapters.modifier_broker", "adapters.uinput_writer", "core.events.loop",
 		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
-		"adapters.window_info" }
+		"platform.focus.window_info" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local world = { events = {}, held = {}, downs = {}, changed = false }
 	local injector
@@ -271,7 +271,7 @@ local function observe_compound_action(action, change)
 			package.loaded["adapters.keyboard_hook"] = {}
 			package.loaded["adapters.modifier_broker"] = { for_channel = function() return nil end }
 			package.loaded["core.events.loop"] = { sleep_ms = function() return true end }
-			package.loaded["adapters.window_info"] = { focused_app_id = function()
+			package.loaded["platform.focus.window_info"] = { focused_app_id = function()
 				retire("metrics"); return "owned-editor"
 			end }
 			local first_navigation = action == "select_word" and 106 or 102

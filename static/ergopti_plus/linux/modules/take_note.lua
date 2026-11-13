@@ -27,7 +27,7 @@ local LOG = "modules.take_note"
 --- Reports a refused note action without exposing its private path.
 --- @param key string Localized explanation.
 local function refuse(key)
-	require("adapters.application_notifier").send(i18n.get(key), { level = "error" })
+	require("platform.focus.application_notifier").send(i18n.get(key), { level = "error" })
 	return false
 end
 

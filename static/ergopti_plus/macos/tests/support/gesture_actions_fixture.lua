@@ -23,7 +23,7 @@ local OWNERS = {
 	"core.fs.engine.native_path",
 	"core.text.engine.number_policy",
 	-- The real notifications owner focuses the clicked application through this adapter.
-	"adapters.running_application",
+	"platform.focus.running_application",
 	"settings.engine.program_parameter", "shortcuts.engine.user_action_parameter",
 	"shortcuts.engine.actions.assignable",
 	-- The chord and sticky labels name their keys through the key name table,

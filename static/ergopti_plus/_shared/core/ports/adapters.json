@@ -62,9 +62,9 @@
 			"linux": "static/ergopti_plus/linux/core/process/adapters/lifecycle.lua"
 		},
 		"SecureFieldDetector": {
-			"windows": "static/ergopti_plus/windows/adapters/secure_field_detector.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/secure_field_detector.lua",
-			"linux": "static/ergopti_plus/linux/adapters/secure_field_detector.lua"
+			"windows": "static/ergopti_plus/windows/platform/focus/secure_field_detector.ahk",
+			"macos": "static/ergopti_plus/macos/platform/focus/secure_field_detector.lua",
+			"linux": "static/ergopti_plus/linux/platform/focus/secure_field_detector.lua"
 		},
 		"Storage": {
 			"windows": "static/ergopti_plus/windows/core/fs/adapters/storage.ahk",
@@ -90,13 +90,13 @@
 			"linux": "static/ergopti_plus/linux/adapters/tray_menu.lua"
 		},
 		"WindowInfo": {
-			"windows": "static/ergopti_plus/windows/adapters/window_info.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/window_info.lua",
-			"linux": "static/ergopti_plus/linux/adapters/window_info.lua"
+			"windows": "static/ergopti_plus/windows/platform/focus/window_info.ahk",
+			"macos": "static/ergopti_plus/macos/platform/focus/window_info.lua",
+			"linux": "static/ergopti_plus/linux/platform/focus/window_info.lua"
 		},
 		"WindowManager": {
-			"windows": "static/ergopti_plus/windows/adapters/window_manager.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/window_manager.lua"
+			"windows": "static/ergopti_plus/windows/platform/focus/window_manager.ahk",
+			"macos": "static/ergopti_plus/macos/platform/focus/window_manager.lua"
 		}
 	}
 }

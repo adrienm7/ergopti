@@ -350,7 +350,7 @@ helpers.describe("Linux system actions", function()
 		}
 		with_modules({
 			["core.fs.adapters.file_manager_folder"] = folder_port,
-			["adapters.application_notifier"] = { send = function(message) notices[#notices + 1] = message; return true end },
+			["platform.focus.application_notifier"] = { send = function(message) notices[#notices + 1] = message; return true end },
 		}, function() body(notices) end)
 	end
 
@@ -393,7 +393,7 @@ helpers.describe("Linux system actions", function()
 				read_active_folder = function() return { path = "/nonexistent/ergopti-nui-007", bus = ":1.9" } end,
 				reveal_command = function() return "reveal" end,
 			},
-			["adapters.application_notifier"] = { send = function(message, opts)
+			["platform.focus.application_notifier"] = { send = function(message, opts)
 				levels[#levels + 1] = { message = message, level = opts and opts.level }
 				return true
 			end },
@@ -544,7 +544,7 @@ helpers.describe("Linux system actions", function()
 				},
 				["modules.gestures.combo_emitter"] = { press = function() return true end },
 				["core.events.loop"] = { sleep_ms = function() return true end },
-				["adapters.application_notifier"] = { send = function() return true end },
+				["platform.focus.application_notifier"] = { send = function() return true end },
 			}, function()
 				with_recorded_shell(function(commands)
 					Gestures.execute_action("make_executable_selection", "tap_3")

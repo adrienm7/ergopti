@@ -553,7 +553,7 @@ function declaredLinuxNativeCaptionOwner(unit) {
 	const signature = 'local function notify(key, level)';
 	const notify = body(provider, signature);
 	const expected = `local function notify(key, level)
- local ok_notifier, Notifier = pcall(require, "adapters.application_notifier")
+ local ok_notifier, Notifier = pcall(require, "platform.focus.application_notifier")
  if ok_notifier then
   local body = i18n_safe(key)
   local receipt = PrepareNativePresentation("magic_key_source_notice", "notification")

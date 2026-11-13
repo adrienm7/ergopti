@@ -240,7 +240,7 @@ local function running_apps()
 		return nil
 	end
 	local list, seen = {}, {}
-	for _, info in ipairs(require("adapters.window_info").getAll()) do
+	for _, info in ipairs(require("platform.focus.window_info").getAll()) do
 		local app = type(info) == "table" and info.appId or nil
 		if type(app) == "string" and app ~= "" and info.windowTitle ~= "" and not seen[app] then
 			seen[app] = true

@@ -63,7 +63,7 @@ end
 local function construct(callback, properties)
     local before = {}; for key, value in pairs(properties) do before[key] = value end
     local previous = #receipts
-    local ok, note = pcall(require("adapters.application_notifier").new, callback, properties)
+    local ok, note = pcall(require("platform.focus.application_notifier").new, callback, properties)
     capture_owned_tags()
     input_unchanged = input_unchanged and same_properties(properties, before)
     check(ok and #receipts == previous + 1)

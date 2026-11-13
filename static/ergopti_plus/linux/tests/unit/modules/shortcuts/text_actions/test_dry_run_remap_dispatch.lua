@@ -97,7 +97,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				}
 				package.loaded["core.ui.engine.display_server"] = { UNKNOWN = "unknown", kind = function() return "x11" end,
 					is_x11 = function() return true end, is_wayland = function() return false end }
-				package.loaded["adapters.window_info"] = { focused_app_id = function() return "owned-editor" end }
+				package.loaded["platform.focus.window_info"] = { focused_app_id = function() return "owned-editor" end }
 				local layout = require("adapters.keyboard_layout")
 				layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
 				injector = require("modules.hotstrings.injector")

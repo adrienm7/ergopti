@@ -44,7 +44,7 @@ end)
 --- No native window, desktop command, notification delivery or click is observed.
 --- @param body function Receives recording ports and actual notice owners.
 local function with_owned_notice(body)
-	local names = { "adapters.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
+	local names = { "platform.focus.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
 		"core.ui.engine.window_titles", "core.process.adapters.shell_runner", "core.logger.engine.shim", "core.i18n.engine.i18n", "core.i18n.engine.locale" }
 	local saved, native = {}, nil
 	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
@@ -81,16 +81,16 @@ local function with_owned_notice(body)
 			return { cancel = function() return true end, on_settled = function() return true end }
 		end,
 	}
-	package.loaded["adapters.application_notifier"], package.loaded["adapters.notifier"] = nil, nil
+	package.loaded["platform.focus.application_notifier"], package.loaded["adapters.notifier"] = nil, nil
 	local ok, detail = xpcall(function()
 		local generic = require("adapters.notifier")
-		local application = require("adapters.application_notifier")
+		local application = require("platform.focus.application_notifier")
 		local function manager()
 			native = require("tests.support.document_fixture").new("changelog", {
 				bridge_name = "changelog_bridge", on_message = function() end,
 			}, {})
 			-- Rejoin the actual dispatchers after the scoped document caller mock.
-			package.loaded["adapters.notifier"], package.loaded["adapters.application_notifier"] = generic, application
+			package.loaded["adapters.notifier"], package.loaded["platform.focus.application_notifier"] = generic, application
 			native.start_load()
 			return native
 		end
@@ -182,7 +182,7 @@ helpers.describe("owned application notifications", function()
 		end)
 	end)
 	helpers.it("restores the exact scoped dependency owners after a fixture-body refusal", function()
-		local names = { "adapters.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
+		local names = { "platform.focus.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
 			"core.ui.engine.window_titles", "core.process.adapters.shell_runner", "core.logger.engine.shim", "core.i18n.engine.i18n", "core.i18n.engine.locale",
 			"lgi", "core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline", "core.events.loop",
 			"core.ui.ui.webkit_host", "core.ui.ui.webview_manager", "ui.changelog.bridge" }

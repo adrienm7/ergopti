@@ -40,9 +40,9 @@ local function with_applications(apps, front, body)
 		frontmostApplication = function() return front and app_for(front) end,
 		applicationForPID = function(pid) return app_for(pid) end,
 	}
-	local ok, err = pcall(helpers.with_fresh_modules, { "adapters.window_info", "core.logger.engine.logger" }, function()
+	local ok, err = pcall(helpers.with_fresh_modules, { "platform.focus.window_info", "core.logger.engine.logger" }, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		body(require("adapters.window_info"), reads)
+		body(require("platform.focus.window_info"), reads)
 	end)
 	hs.application, hs.window = saved_application, saved_window
 	if not ok then error(err, 0) end

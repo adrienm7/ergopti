@@ -45,7 +45,7 @@ local RELOADED = {
 	"modules.llm.api_remote", "modules.hotstrings.injector", "modules.hotstrings.selected_output", "adapters.keyboard_layout", "adapters.xkb_capture",
 }
 local FAKED = {
-	"adapters.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
+	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -100,7 +100,7 @@ local function scenario(opts, body)
 		world.active_entry = ENTRY
 		world.alternate_entry = { id = "cerebras-2", provider = "cerebras", label = "Cerebras",
 			token = "k", model = "replacement-model", base_url = "" }
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return opts.secure == true end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,

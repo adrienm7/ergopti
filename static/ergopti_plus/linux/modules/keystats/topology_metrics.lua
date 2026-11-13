@@ -12,7 +12,7 @@
 --- 1. One reducer for every driver: the classification and debounce live in
 ---    _shared/metrics/engine/system/window_topology.lua and capture_presence.lua.
 --- 2. No fork on the poll. Topology is read from the X server in this process
----    (adapters/x11_focus.lua, libxcb) at the shared [keystats] topo_tick_ms;
+---    (platform/focus/x11_focus.lua, libxcb) at the shared [keystats] topo_tick_ms;
 ---    the program list is /proc/<pid>/comm, read every av_state_slow_tick_ms
 ---    and bounded at MAX_PROCESSES entries.
 --- 3. Wayland grants a client no other window's geometry: topology is then not
