@@ -23,7 +23,7 @@ local LOG = "bridge.layout_manager"
 -- The two windows: the app (a directory of _shared/ui), its bridge, the strings
 -- its page declares and whether it is the layout editor's own window.
 local MANAGER_SPEC = {
-	app_name = "layout_manager",
+	app_name = require("settings.engine.keys").COMMAND.LAYOUT_MANAGER,
 	bridge_name = "layout_manager_bridge",
 	strings_file = "ui/layout_manager/strings.json",
 	editor_window = false,

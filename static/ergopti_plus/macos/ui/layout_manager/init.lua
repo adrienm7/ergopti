@@ -42,7 +42,7 @@ local LOG = "layout_manager"
 -- declares next to it, its usercontent role (ui/webview_controller_pool) and
 -- its geometry entry (_shared/ui/apps.manifest.json).
 local MANAGER_SPEC = {
-	app = "layout_manager",
+	app = require("settings.engine.keys").COMMAND.LAYOUT_MANAGER,
 	label = "layout manager",
 	title_key = "layout_manager.window_title",
 	strings_file = "ui/layout_manager/strings.json",

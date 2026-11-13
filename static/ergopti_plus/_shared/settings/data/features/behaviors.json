@@ -71,7 +71,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 			"symbol": "KeylayoutEmulation_PressNative",
-			"sha256": "b3114baba7853fde30c416bf9445512ca3822a1180144c51ffce5706b60dea57"
+			"sha256": "2109d8d065441e32601ff7a02309dacf66b5d89f0949f25a259c4c075c2e9ddf"
 		},
 		{
 			"id": "macos-dead-native",
@@ -99,7 +99,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 			"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
-			"sha256": "b3114baba7853fde30c416bf9445512ca3822a1180144c51ffce5706b60dea57"
+			"sha256": "2109d8d065441e32601ff7a02309dacf66b5d89f0949f25a259c4c075c2e9ddf"
 		},
 		{
 			"id": "macos-layout-emulation",
