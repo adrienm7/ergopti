@@ -174,6 +174,18 @@ function M.load()
 	return style
 end
 
+--- A preview's visible lifetime for its trigger delay: the shared decrement
+--- hides the bubble just before the trigger window closes, never below the
+--- shared floor, as on Windows and macOS. A delay of 0 or less is no expiry.
+--- @param delay number Trigger delay in seconds.
+--- @return number seconds 0 when the preview never expires.
+function M.effective_delay(delay)
+	if type(delay) ~= "number" or delay ~= delay or delay <= 0 then return 0 end
+	local decrement = require_key("timing", "timeout_decrement_sec")
+	local floor = require_key("timing", "timeout_floor_sec")
+	return math.max(floor, delay - decrement)
+end
+
 --- The chrome of an AI prediction line, read once.
 local _llm_line = nil
 

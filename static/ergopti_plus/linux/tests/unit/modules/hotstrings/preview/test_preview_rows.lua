@@ -143,3 +143,49 @@ helpers.describe("preview rows: what each row says", function()
 	end)
 
 end)
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 2/ Expiry ===============================================
+-- =================================================================
+-- =================================================================
+
+-- The bubble hides just before the trigger window closes: the shared decrement
+-- and floor, as on Windows and macOS (preview-expiry-decrement).
+helpers.describe("preview expiry follows the shared decrement and floor", function()
+	helpers.it("(preview-expiry-decrement) arms the trigger delay minus the decrement", function()
+		local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "ui.tooltip.preview" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local delays = {}
+		local ok, err = pcall(function()
+			package.loaded["adapters.graphics_renderer"] = {
+				is_available = function() return true end,
+				show = function() return true end,
+				hide = function() return true end,
+			}
+			package.loaded["adapters.timer_scheduler"] = {
+				after = function(delay) delays[#delays + 1] = delay; return { armed = true } end,
+				cancel = function() return true end,
+			}
+			package.loaded["ui.tooltip.preview"] = nil
+			local P = require("ui.tooltip.preview")
+			P.init({ style = { positioning = { window_bottom_inset = 0 } }, config = fake_config() })
+			P.resolve_anchor = function() return { x = 0, y = 0 } end
+			P.screen_frame = function() return { x = 0, y = 0, w = 100, h = 100 } end
+			helpers.assert_true(P.show(CANDIDATES, "star"))
+			local Config = require("ui.tooltip.config")
+			helpers.assert_eq(#delays, 1)
+			helpers.assert_true(math.abs(delays[1] - Config.effective_delay(0.75)) < 1e-9)
+			helpers.assert_true(delays[1] < 0.75, "the bubble hides before the trigger window closes")
+			helpers.assert_eq(Config.effective_delay(0), 0, "no expiry stays no expiry")
+			helpers.assert_true(Config.effective_delay(0.1) > 0, "the shared floor keeps a short delay positive")
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
+	end)
+end)

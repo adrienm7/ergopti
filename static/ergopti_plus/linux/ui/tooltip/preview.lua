@@ -349,6 +349,8 @@ local function arm_expiry(group, section, revision)
 	if not ok or type(resolved) ~= "table" then return true end
 	local delay = tonumber(resolved.delay)
 	if not delay or delay <= 0 then return true end
+	-- Hidden just before the trigger window closes (shared decrement and floor).
+	delay = require("ui.tooltip.config").effective_delay(delay)
 
 	local token = {}
 	_expiry_token = token
