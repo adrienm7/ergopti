@@ -255,7 +255,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### Qualification and policy follow-up
 
-- [ ] **[NATIVE]** Exercise the retained runtime/editor/diagnostics receiving boundaries on Windows and macOS, and the Linux live GTK/session flows. Replay refused writes, native timer admission, stale epochs and physical cleanup; the private models do not certify these boundaries. Linux, partly (2026-11-11): a live installed session with an in-process WebView (the first-run onboarding window) now receives the reload request instead of crashing (44b2e10f, `tests/hardware/run_webkit_gc_signal.lua` in the desktop-webview CI shard); the runtime/editor/diagnostics flows themselves remain.
+- [ ] **[NATIVE]** (claimed by worker F, 2026-11-13) Exercise the retained runtime/editor/diagnostics receiving boundaries on Windows and macOS, and the Linux live GTK/session flows. Replay refused writes, native timer admission, stale epochs and physical cleanup; the private models do not certify these boundaries. Linux, partly (2026-11-11): a live installed session with an in-process WebView (the first-run onboarding window) now receives the reload request instead of crashing (44b2e10f, `tests/hardware/run_webkit_gc_signal.lua` in the desktop-webview CI shard); the runtime/editor/diagnostics flows themselves remain. 2026-11-13 (worker F): every remaining part needs a native host, none is code: the Mac part is the field point `native_ui_receiving` in TODO-tests-macos.md; the Windows part is for the Windows PC session; the Linux live GTK/session flows need a real desktop session.
 
 ## Migration and update parity follow-up
 
@@ -288,7 +288,7 @@ Audited source and immutable evidence: [18-scope review](docs/audits/platform-pa
 
 Released as v1.0.9; these requests of 1-2 November are still open.
 
-- [ ] **Slowness, every driver.** Windows boot 7 s, `menu.rebuild` 1.7 s: lazy submenus, single-toggle update, one
+- [ ] **Slowness, every driver.** (claimed by worker F, 2026-11-13: the macOS timings are the field points `rerun_2026_11_02` and `main_thread_holds` of TODO-tests-macos.md, Linux is done, the Windows measurements need the Windows PC) Windows boot 7 s, `menu.rebuild` 1.7 s: lazy submenus, single-toggle update, one
       registry proof, full save after ready, disk caches; a toggle must not rebuild 1000 rows.
       Resume here (branch `wip/windows-boot-time`): parse fixes, the smoke operation caps, keyboard before tray root
       and the queued early tray click are committed (keyboard registered at 4.5 s instead of 5.1 s on the smoke
@@ -343,7 +343,7 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       row) and the bundle's Info.plist and variant stats twice; one per-build snapshot now feeds every reader
       (2 listings, 1 plist read; `test_layout_bundle_external_refresh`, `test_input_sources_version_gt`). Not timed
       on a Mac: the next field report's `menu_keyboard_layout.sources` phase says whether the spikes are gone.
-- [ ] **Before publishing.** Whole AHK suite on a quiet machine with no resident driver, `npm run test:ahk-tray-rows-read-as-text`,
+- [ ] **Before publishing.** (checked by worker F, 2026-11-13: a release gate for the maintainer, no code step) Whole AHK suite on a quiet machine with no resident driver, `npm run test:ahk-tray-rows-read-as-text`,
       all live checks including `quit-over-a-log-flush`, JS, macOS and Linux suites, Windows field report with a driver.
       PC run 2026-11-11: the whole AHK suite ran natively on the maintainer's PC (20,286 tests, reds fixed or reported not executed except TakeNote different-folder) and `e2e/run_e2e.ahk` 90/90; the live checks were 21 pass / 7 fail.
 
