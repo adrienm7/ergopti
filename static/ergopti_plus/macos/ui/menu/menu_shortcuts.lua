@@ -193,9 +193,10 @@ end
 --- @return table hs.menubar-compatible item table.
 local function make_shortcut_item(s, shortcuts, ctx)
 	local state  = ctx.state
-	local paused = ctx.paused
 	-- The checkmark is the preference: with the layer off or paused no hotkey is
-	-- bound, and a binding-based mark hid which shortcuts will come back.
+	-- bound, and a binding-based mark hid which shortcuts will come back. The row
+	-- runs while paused (EDD-1): behind the pause fence `enable` records only the
+	-- preference, and the hotkey binds on resume.
 	local is_on  = s.enabled == true
 	local desc   = ctx.applyTriggerChar(TextUtils.trim(s.label or ""))
 	local pk     = pretty_key(s.id, state)
@@ -209,8 +210,8 @@ local function make_shortcut_item(s, shortcuts, ctx)
 	return {
 		label    = desc ~= "" and LabelValue.compose(i18n.get, pk, desc) or pk,
 		checked  = is_on or nil,
-		disabled = not state.shortcuts or paused or nil,
-		action   = (state.shortcuts and not paused) and (function(id)
+		disabled = not state.shortcuts or nil,
+		action   = state.shortcuts and (function(id)
 			return function()
 				if settle_shortcut_row_debt(shortcuts, id) ~= true then return false end
 				local previous = read_shortcut_posture(shortcuts, id, s.enabled)

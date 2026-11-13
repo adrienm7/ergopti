@@ -19,8 +19,9 @@ local DISABLED_ID = "cmd_star"
 --- the named Cmd rows, the only ones the stubbed renderer hands back.
 --- @param bindings table Real Bindings module.
 --- @param state_shortcuts boolean Shortcuts master switch.
+--- @param paused boolean|nil Whether the script is paused.
 --- @return table rows Menu rows.
-local function build_cmd_rows(bindings, state_shortcuts)
+local function build_cmd_rows(bindings, state_shortcuts, paused)
 	return helpers.with_fresh_modules({
 		"ui.menu.menu_shortcuts", "infra.deferred_work", "infra.fs_dir",
 		"infra.dialog_util", "modules.shortcuts", "ui.menu.menu_utils",
@@ -63,7 +64,7 @@ local function build_cmd_rows(bindings, state_shortcuts)
 				wrap_symbol_states = {},
 				custom_wrap_symbols = {},
 			},
-			paused = false,
+			paused = paused == true,
 			applyTriggerChar = function(value) return value end,
 			save_prefs = function() return true end,
 			notify_feature = function() end,
@@ -113,6 +114,25 @@ helpers.describe("menu_shortcuts: row checkmarks show the preference (shortcut-p
 			assert_checkmarks(bindings, build_cmd_rows(bindings, true), "running")
 			helpers.assert_eq(bindings.pause(), true)
 			assert_checkmarks(bindings, build_cmd_rows(bindings, false), "layer off")
+		end)
+	end)
+
+	-- A pause stops typing, not configuration (EDD-1): behind the pause fence a
+	-- row records its preference and binds nothing until resume.
+	helpers.it("switches a shortcut row while paused without binding it (edd1-paused-writes)", function()
+		Fixture.with_recommended_bindings(function(bindings)
+			helpers.assert_eq(bindings.start(), true)
+			helpers.assert_eq(bindings.disable(DISABLED_ID), true)
+			helpers.assert_eq(bindings.pause(), true)
+			local rows = build_cmd_rows(bindings, true, true)
+			local target
+			for _, row in ipairs(rows) do if row.checked ~= true then target = row end end
+			helpers.assert_true(type(target) == "table" and target.disabled ~= true)
+			helpers.assert_eq((target.fn or target.action)(), true, "the row commits while paused")
+			for _, entry in ipairs(bindings.list_shortcuts()) do
+				if entry.id == DISABLED_ID then helpers.assert_eq(entry.enabled, true) end
+			end
+			helpers.assert_eq(bindings.is_started(), false, "nothing binds behind the pause fence")
 		end)
 	end)
 end)
