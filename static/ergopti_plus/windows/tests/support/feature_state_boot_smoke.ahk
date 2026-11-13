@@ -68,7 +68,7 @@ TapKeyAssignments["feature_state_include_once_probe"] := "none"
 ; registry, even when the authored file contains only script preferences.
 #Include ..\..\core\text\engine\toml\loader.ahk
 #Include ..\..\core\lifecycle\engine\master_gates.ahk
-#Include ..\..\infra\hotstrings\hotstrings_cache.ahk
+#Include ..\..\hotstrings\engine\catalogue\cache.ahk
 
 try {
     if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate")

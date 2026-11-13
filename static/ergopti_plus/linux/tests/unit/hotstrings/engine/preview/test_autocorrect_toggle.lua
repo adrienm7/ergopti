@@ -1,0 +1,72 @@
+--- tests/unit/hotstrings/engine/preview/test_autocorrect_toggle.lua
+
+--- ==============================================================================
+--- MODULE: Preview Autocorrect Toggle
+--- DESCRIPTION:
+--- Drives hotstrings.preview_autocorrect_enabled from the stored preference
+--- through preview_settings.apply into the preview gate: off hides only the
+--- autocorrection bubble, the ★ bubble keeps showing, and on restores it.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local Fakes = helpers.load_module("tests.fakes")
+
+local saved = {}
+local names = { "core.ui.adapters.graphics_renderer", "core.events.timer_scheduler", "hotstrings.engine.matcher.preferences",
+	"hotstrings.engine.preview_settings", "core.ui.ui.tooltip.preview" }
+for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
+
+local shown = 0
+package.loaded["core.ui.adapters.graphics_renderer"] = {
+	is_available = function() return true end,
+	show = function() shown = shown + 1; return true end,
+	hide = function() return true end,
+	is_visible = function() return shown > 0 end,
+	destroy = function() end,
+}
+package.loaded["core.events.timer_scheduler"] = Fakes.timer_scheduler()
+local stored = {}
+package.loaded["hotstrings.engine.matcher.preferences"] = {
+	get = function(path)
+		if stored[path] ~= nil then return stored[path] end
+		return require("menu.engine.manifest_reader").default_for(path)
+	end,
+	set = function(path, value) stored[path] = value; return true end,
+	is_explicit = function(path) return stored[path] ~= nil end,
+}
+package.loaded["hotstrings.engine.preview_settings"] = nil
+package.loaded["core.ui.ui.tooltip.preview"] = nil
+local Settings = require("hotstrings.engine.preview_settings")
+local Preview = require("core.ui.ui.tooltip.preview")
+
+local CANDIDATES = { { trigger = "btw", replacement = "by the way", group = "rolls", fires = true } }
+Preview.init({
+	style = { positioning = { window_bottom_inset = 0 } },
+	config = { resolve = function() return { show_tooltip = true, delay = 0.5, color = "#1e88e5" } end },
+})
+
+helpers.describe("preview_autocorrect_enabled reaches the preview gate (linux-preview-autocorrect)", function()
+	helpers.it("the shipped default shows the autocorrection bubble", function()
+		helpers.assert_eq(Settings.default("autocorrect"), true)
+		Settings.apply(Preview)
+		helpers.assert_eq(Preview.show(CANDIDATES, "autocorrect"), true)
+	end)
+
+	helpers.it("off hides only the autocorrection bubble", function()
+		helpers.assert_eq(Settings.set("autocorrect", false), true)
+		helpers.assert_eq(stored["hotstrings.preview_autocorrect_enabled"], false)
+		Settings.apply(Preview)
+		shown = 0
+		helpers.assert_eq(Preview.show(CANDIDATES, "autocorrect"), false)
+		helpers.assert_eq(shown, 0)
+		helpers.assert_eq(Preview.show(CANDIDATES, "star"), true, "the ★ toggle is independent")
+	end)
+
+	helpers.it("on restores the autocorrection bubble", function()
+		helpers.assert_eq(Settings.toggle("autocorrect"), true)
+		Settings.apply(Preview)
+		helpers.assert_eq(Preview.show(CANDIDATES, "autocorrect"), true)
+	end)
+end)
+
+for _, name in ipairs(names) do package.loaded[name] = saved[name].value end

@@ -70,7 +70,7 @@ lua tests\run.lua
 ### One file or one shard
 
 ```bash
-lua tests/run.lua --only tests/unit/modules/keymap/registry/test_registry.lua
+lua tests/run.lua --only tests/unit/hotstrings/engine/expander/registry/test_registry.lua
 lua tests/run.lua --module=menu_llm
 ```
 

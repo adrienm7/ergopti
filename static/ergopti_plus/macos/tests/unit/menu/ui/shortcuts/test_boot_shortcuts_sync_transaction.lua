@@ -47,7 +47,7 @@ local function load_fixture(opts)
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.ui.engine.notifications"] = { notify = noop }
-	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
+	package.loaded["hotstrings.ui.hotstring_editor"] = { set_update_menu = noop }
 	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
@@ -75,7 +75,7 @@ local function load_fixture(opts)
 		get_last_item_timings = function() return {} end,
 		invalidate_cache = noop,
 	}
-	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = noop }
+	package.loaded["hotstrings.ui.menu.counter"] = { invalidate_cache = noop }
 	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
 		get = function() return "/virtual/config.toml" end,
@@ -127,7 +127,7 @@ local function load_fixture(opts)
 
 	for _, module_name in ipairs({
 		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
-		"ui.menu.menu_hotstrings", "ui.menu.menu_metrics", "ui.menu.menu_tap_holds",
+		"hotstrings.ui.menu.hotstrings", "ui.menu.menu_metrics", "ui.menu.menu_tap_holds",
 		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
 		package.loaded[module_name] = {}
@@ -154,7 +154,7 @@ local function load_fixture(opts)
 		end,
 	}
 	package.loaded["modules.shortcuts"] = shortcuts
-	package.loaded["modules.dynamic_hotstrings"] = {}
+	package.loaded["hotstrings.engine.dynamic"] = {}
 	package.loaded["gestures.engine"] = { SINGLE_SLOTS = { "swipe_left" } }
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
 	package.loaded["menu.ui.builder.state"] = {

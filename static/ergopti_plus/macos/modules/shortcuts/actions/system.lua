@@ -67,7 +67,7 @@ local text_acts = require("modules.shortcuts.actions.text")
 -- ====================================
 
 local Keycodes               = require("platform.input.keycodes")
-local ControlSentinels       = require("modules.keymap.control_sentinels")
+local ControlSentinels       = require("hotstrings.engine.expander.control_sentinels")
 local ConfigKeys = require("settings.engine.keys")
 
 -- The control-sentinel listener slot the wheel bindings track the layer with.

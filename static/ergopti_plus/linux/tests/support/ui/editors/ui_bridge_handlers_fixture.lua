@@ -35,7 +35,7 @@ local function with_opening_file(callback)
 		local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close()); return bytes
 	end
 	put(OPENING_SOURCE)
-	local manager, previous = package.loaded["core.ui.ui.webview_manager"], package.loaded["ui.hotstring_editor.bridge"]
+	local manager, previous = package.loaded["core.ui.ui.webview_manager"], package.loaded["hotstrings.ui.hotstring_editor.bridge"]
 	local writer_previous = package.loaded["core.text.engine.toml_codec.writer"]
 	local seen = { epoch = 51, deliveries = {}, alerts = {}, reloads = 0, writes = 0 }
 	local publisher = {}
@@ -60,8 +60,8 @@ local function with_opening_file(callback)
 			seen.alerts[#seen.alerts + 1] = js; return true
 		end,
 	}
-	package.loaded["ui.hotstring_editor.bridge"] = nil
-	local handler = require("ui.hotstring_editor.bridge")
+	package.loaded["hotstrings.ui.hotstring_editor.bridge"] = nil
+	local handler = require("hotstrings.ui.hotstring_editor.bridge")
 	local context = { app_name = "hotstring_editor", epoch = 51 }
 	local state = { config = { get_config_dir = function() return directory end,
 		reload = function() seen.reloads = seen.reloads + 1; if seen.reload_throw then error("inert reload refusal") end; return true end } }
@@ -70,7 +70,7 @@ local function with_opening_file(callback)
 	f.ready = function() return handler.push_init(state, context) end
 	f.save = function(output, selected) return handler.on_message({ action = "save", data = opening_model(output) }, state, selected or context) end
 	local ok, err = pcall(callback, f)
-	package.loaded["core.ui.ui.webview_manager"], package.loaded["ui.hotstring_editor.bridge"], package.loaded["core.text.engine.toml_codec.writer"] = manager, previous, writer_previous
+	package.loaded["core.ui.ui.webview_manager"], package.loaded["hotstrings.ui.hotstring_editor.bridge"], package.loaded["core.text.engine.toml_codec.writer"] = manager, previous, writer_previous
 	assert(Shell.run("rm -rf " .. Shell.quote(directory)) == true)
 	if not ok then error(err, 0) end
 end
@@ -219,7 +219,7 @@ local function with_opened_spies(reader, writer, state, fn)
     return RealWriter.write(...)
   end
   local ok, err = pcall(function()
-    with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+    with_spies("hotstrings.ui.hotstring_editor.bridge", reader, writer, function(h)
       assert(h.push_init(state, context) == true, "The original save case requires an accepted opening")
       fn(h, context)
     end)

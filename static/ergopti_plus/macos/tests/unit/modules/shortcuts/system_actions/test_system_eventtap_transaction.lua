@@ -300,7 +300,7 @@ helpers.describe("layer-wheel eventtap acquisition leaves nothing behind", funct
 			{ start_result = false, enable_on_start = true },
 		})
 		-- The same module table system.lua holds, so the spy sees its calls.
-		local Sentinels = require("modules.keymap.control_sentinels")
+		local Sentinels = require("hotstrings.engine.expander.control_sentinels")
 		local real_set_listener = Sentinels.set_listener
 		local listener_calls = {}
 		Sentinels.set_listener = function(name, callback)

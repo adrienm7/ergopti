@@ -30,8 +30,8 @@ _HNRT_Source() {
 		Code .= Line . "`n"
 	}
 	for Relative in ["_generated\terminators.ahk", "_generated\window_titles.ahk",
-		"infra\hotstrings\hotstrings_config.ahk", "ui\hotstrings_config_window\init.ahk",
-		"infra\hotstrings\personal_file_controls.ahk", "platform\remap\tap_hold_writer.ahk", "vendor\WebView2.ahk"] {
+		"hotstrings\engine\catalogue\config.ahk", "hotstrings\ui\hotstrings_config_window\init.ahk",
+		"hotstrings\engine\catalogue\personal_file_controls.ahk", "platform\remap\tap_hold_writer.ahk", "vendor\WebView2.ahk"] {
 		Path := _DriverDir . "\" . Relative
 		AssertTrue(FileExist(Path), "The component includes its actual complete production owner")
 		Code .= "#Include " . Path . "`n"

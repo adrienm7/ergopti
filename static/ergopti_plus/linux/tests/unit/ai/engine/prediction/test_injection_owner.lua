@@ -22,7 +22,7 @@ local function scenario(action, phase, body)
 			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
 		end
 		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
-			"clipboard.adapters.clipboard", "adapters.keyboard_layout", "modules.hotstrings.injector" }) do package.loaded[name] = nil end
+			"clipboard.adapters.clipboard", "adapters.keyboard_layout", "hotstrings.engine.injector" }) do package.loaded[name] = nil end
 		local state = { logs = {}, bus = ":1.23", path = "/field/original", role = 61, now = 1000,
 			rows = {}, held = {}, writes = {}, requests = {}, errors = {}, stopped = 0, resets = 0, output = 0, paused = false,
 			owner_captures = 0, apply_admissions = 0, clipboard_reads = 0 }
@@ -124,7 +124,7 @@ local function scenario(action, phase, body)
 		layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} }, [" "] = { keycode = 57, mods = {} } })
 		local shortcut = layout.shortcut_keycode
 		layout.shortcut_keycode = function(...) transition("lookup"); return shortcut(...) end
-		injector = require("modules.hotstrings.injector")
+		injector = require("hotstrings.engine.injector")
 		injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
 			state.rows[#state.rows + 1] = code .. ":" .. value; state.held[code] = value == 1 or nil; return true
 		end })

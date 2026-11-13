@@ -61,7 +61,7 @@ function M.participants(ctx)
 		registry.gestures = ctx.gestures.scope_participant()
 	end
 	if ctx.config then
-		registry.hotstrings = require("infra.hotstrings_scope").participant(
+		registry.hotstrings = require("hotstrings.engine.catalogue.scope").participant(
 			{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
 	end
 	-- The layout rows, acknowledged once the session holds the layout that carries them.

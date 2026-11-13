@@ -22,10 +22,7 @@ const ORIGINAL_SECTION_ROW = `
 				}`;
 
 module.exports = function verifyPersonalSectionOwner(base, manifest) {
-	const source = fs.readFileSync(
-		path.join(base, 'macos/ui/menu/menu_hotstrings_custom.lua'),
-		'utf8'
-	);
+	const source = fs.readFileSync(path.join(base, 'macos/hotstrings/ui/menu/custom.lua'), 'utf8');
 	const admits = (candidate = source, data = manifest, platform = 'hs') =>
 		personalSectionChoicePublication(candidate, platform, data);
 	assert.deepEqual(manifest.hotstring_personal_section_choice, [
@@ -301,7 +298,7 @@ module.exports = function verifyPersonalSectionOwner(base, manifest) {
 	const original = source.slice(0, at) + ORIGINAL_SECTION_ROW + source.slice(last + end.length);
 	assert.equal(
 		createHash('sha256').update(original).digest('hex'),
-		'c7ae0b8e6c63e6499da363ed694f95a81b6069ce5efa11dffdee6b0a2e6628bb',
+		'bbac4a53c2fa8dbd05e7fe8d012dab03a74d7651b0259b4aaf5f902683ea516c',
 		'independent captured current V2 original producer, not a regenerated oracle'
 	);
 	assert.equal(

@@ -90,7 +90,7 @@ const XKB_KEYS = ['keysym_overrides', 'base_level_only'];
 
 // The rules the extension scanners apply to a manifest's historical hotstring
 // bindings and declared magic key (_shared/hotstrings/engine/extensions.lua and
-// windows/infra/hotstrings/extension_packs.ahk). A published manifest that
+// windows/hotstrings/engine/catalogue/extension_packs.ahk). A published manifest that
 // breaks them would make every driver refuse its whole extension catalogue, so
 // the build refuses it first; all three replay the same shared vectors.
 const BINDING_FIELDS = ['category', 'feature_section', 'sections', 'source'];

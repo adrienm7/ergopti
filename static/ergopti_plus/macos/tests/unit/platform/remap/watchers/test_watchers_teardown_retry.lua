@@ -28,7 +28,7 @@ local function fresh_harness()
 	package.loaded["platform.remap.watchers"] = nil
 	-- The control owner needs only its deferred diagnostic port in these native
 	-- watcher doubles; callbacks never post synthetic keyboard input here.
-	package.loaded["modules.keymap.control_sentinels"] = nil
+	package.loaded["hotstrings.engine.expander.control_sentinels"] = nil
 	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
@@ -878,7 +878,7 @@ end)
 helpers.describe("watchers app-switch teardown is exact and retryable", function()
 	helpers.it("(same-name-app-history) tracks distinct bundle identities with the same display name", function()
 		helpers.with_stub_scope({
-			"tests.stubs.hs", "platform.remap.watchers", "modules.keymap.control_sentinels",
+			"tests.stubs.hs", "platform.remap.watchers", "hotstrings.engine.expander.control_sentinels",
 			"platform.input.synthetic_input", "adapters.input_source_broker", "core.logger.engine.logger",
 			"core.events.timer_scheduler", "core.process.adapters.shell_runner", "platform.input.hotkey_registrar",
 			"platform.input.key_state", "adapters.mouse_control", "core.process.adapters.task_lifecycle",

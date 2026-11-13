@@ -67,7 +67,7 @@ local function load_menu_quit_action()
 			}
 		end,
 	}
-	package.loaded["ui.hotstring_editor"] = {}
+	package.loaded["hotstrings.ui.hotstring_editor"] = {}
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.text.engine.utils"] = {
 		shell_quote = function(value) return tostring(value) end,
@@ -90,7 +90,7 @@ local function load_menu_quit_action()
 		save = function() return true end,
 	}
 	package.loaded["menu.ui.builder.builder"] = { generate = function() return {} end }
-	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = function() end }
+	package.loaded["hotstrings.ui.menu.counter"] = { invalidate_cache = function() end }
 	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
 		get = function() return "/virtual/config.toml" end,
@@ -128,7 +128,7 @@ local function load_menu_quit_action()
 		adopt = function() end,
 		setMenu = function() return true end,
 	}
-	package.loaded["modules.hotstrings.hotstrings_config"] = {
+	package.loaded["hotstrings.engine.catalogue.config"] = {
 		publication_pending = function() return stock_calls.publication_blocked == true end,
 		terminal_admission_blocked = function() return stock_calls.publication_blocked == true end,
 	}
@@ -146,9 +146,9 @@ local function load_menu_quit_action()
 
 	for _, module_name in ipairs({
 		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
-		"ui.menu.menu_hotstrings", "ai.ui.menu", "ui.menu.menu_metrics",
+		"hotstrings.ui.menu.hotstrings", "ai.ui.menu", "ui.menu.menu_metrics",
 		"ui.menu.menu_tap_holds", "apps.ui.menu.apps", "ui.menu.menu_about",
-		"ai.engine", "modules.keystats", "modules.dynamic_hotstrings", "gestures.engine",
+		"ai.engine", "modules.keystats", "hotstrings.engine.dynamic", "gestures.engine",
 	}) do
 		package.loaded[module_name] = {}
 	end

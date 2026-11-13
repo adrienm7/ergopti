@@ -29,7 +29,7 @@ local Logger        = require("core.logger.engine.logger")
 local EventProvenance = require("diagnostics.adapters.event_provenance")
 local SyntheticInput = require("platform.input.synthetic_input")
 local KeyEventHealth = require("core.logger.engine.key_event_health")
-local ControlSentinels = require("modules.keymap.control_sentinels")
+local ControlSentinels = require("hotstrings.engine.expander.control_sentinels")
 
 local LOG = "platform.input.modifier_injector"
 

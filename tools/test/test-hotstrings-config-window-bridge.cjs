@@ -39,7 +39,7 @@ const FRONT_DIR = 'static/ergopti_plus/_shared/ui/hotstrings_config_window';
 const SCRIPT = `${FRONT_DIR}/script.js`;
 const INDEX = `${FRONT_DIR}/index.html`;
 const HOST_BRIDGE = 'static/ergopti_plus/_shared/ui/host_bridge.js';
-const WIN_HOST = 'static/ergopti_plus/windows/ui/hotstrings_config_window/webview.ahk';
+const WIN_HOST = 'static/ergopti_plus/windows/hotstrings/ui/hotstrings_config_window/webview.ahk';
 
 let total_pass = 0;
 let total_fail = 0;

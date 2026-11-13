@@ -30,7 +30,7 @@ local ok, failure = xpcall(function()
     elseif mode == "terminators" then
         helpers.set_only_filter("replays independent personal preservation vectors")
         require("tests.lua.hotstrings.terminator_scope_contract")(helpers,
-            require("modules.hotstrings.terminator_settings").builtin_state_leaves)
+            require("hotstrings.engine.matcher.terminator_settings").builtin_state_leaves)
     elseif mode == "migration_records" then
         helpers.set_only_filter("occupied: lf")
         require("tests.lua.settings.migrate_records_contract").register(helpers, { driver = "linux" })

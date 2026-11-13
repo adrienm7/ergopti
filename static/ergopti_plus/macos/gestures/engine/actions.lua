@@ -987,7 +987,7 @@ local function set_nav_layer(active)
 			Logger.debug(LOG, "Navigation layer write was superseded.")
 			return
 		end
-		local sentinels_ok, Sentinels = pcall(require, "modules.keymap.control_sentinels")
+		local sentinels_ok, Sentinels = pcall(require, "hotstrings.engine.expander.control_sentinels")
 		if not sentinels_ok or type(Sentinels) ~= "table"
 			or type(Sentinels.publish_nav_layer) ~= "function" then
 			Logger.error(LOG, "Navigation layer wheel cannot follow the layer: %s.", tostring(Sentinels))
@@ -1058,7 +1058,7 @@ sg("capsword", function()
 end)
 
 sg("sticky_shift", function()
-	local keymap = require("modules.keymap")
+	local keymap = require("hotstrings.engine.expander")
 	return keymap.arm_one_shot_shift()
 end)
 sg("sticky_ctrl",              function() arm_sticky({ "ctrl" }) end)
@@ -1271,7 +1271,7 @@ sg("send_shortcut", function(binding) return send_input_action("send_shortcut", 
 -- backend not ready, nothing typed). Required at dispatch: the keymap loads
 -- after this registry.
 sg("llm_generate_prediction", function()
-	local ok_keymap, keymap = pcall(require, "modules.keymap")
+	local ok_keymap, keymap = pcall(require, "hotstrings.engine.expander")
 	if not ok_keymap or type(keymap) ~= "table"
 		or type(keymap.request_manual_prediction) ~= "function" then
 		Logger.error(LOG, "llm_generate_prediction: the keymap bridge is unavailable: %s.",
@@ -1288,7 +1288,7 @@ end)
 --- @param value string "<profile_id>" or "<profile_id>|<count>".
 --- @return boolean True when the request was sent.
 local function request_prompt_prediction(action, value)
-	local ok_keymap, keymap = pcall(require, "modules.keymap")
+	local ok_keymap, keymap = pcall(require, "hotstrings.engine.expander")
 	if not ok_keymap or type(keymap) ~= "table"
 		or type(keymap.request_prompt_prediction) ~= "function" then
 		Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", action, tostring(keymap))
@@ -1311,7 +1311,7 @@ end)
 -- mode off, and the engine refuses an invalid prompt only when turning it on.
 sg("llm_live_prompt_toggle", function(binding)
 	local value = M.get_action_parameter(binding, "llm_live_prompt_toggle")
-	local ok_keymap, keymap = pcall(require, "modules.keymap")
+	local ok_keymap, keymap = pcall(require, "hotstrings.engine.expander")
 	if not ok_keymap or type(keymap) ~= "table" or type(keymap.toggle_live_prompt) ~= "function" then
 		Logger.error(LOG, "llm_live_prompt_toggle: the keymap bridge is unavailable: %s.", tostring(keymap))
 		return false
@@ -1342,7 +1342,7 @@ local TONE_ACTIONS = {
 for _, tone_action in ipairs(TONE_ACTIONS) do
 	local spec = tone_action
 	sg(spec.id, function()
-		local ok_keymap, keymap = pcall(require, "modules.keymap")
+		local ok_keymap, keymap = pcall(require, "hotstrings.engine.expander")
 		if not ok_keymap or type(keymap) ~= "table" or type(keymap.request_tone_step) ~= "function" then
 			Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", spec.id, tostring(keymap))
 			return false
@@ -1367,7 +1367,7 @@ for _, screen_action in ipairs(SCREEN_ANSWER_ACTIONS) do
 				spec.id, tostring(binding), tostring(value))
 			return false
 		end
-		local ok_keymap, keymap = pcall(require, "modules.keymap")
+		local ok_keymap, keymap = pcall(require, "hotstrings.engine.expander")
 		if not ok_keymap or type(keymap) ~= "table" or type(keymap.request_screen_answers) ~= "function" then
 			Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", spec.id, tostring(keymap))
 			return false
@@ -1391,7 +1391,7 @@ sg("llm_translate_selection", function(binding)
 			tostring(binding), tostring(value))
 		return false
 	end
-	local ok_keymap, keymap = pcall(require, "modules.keymap")
+	local ok_keymap, keymap = pcall(require, "hotstrings.engine.expander")
 	if not ok_keymap or type(keymap) ~= "table" or type(keymap.request_selection_translation) ~= "function" then
 		Logger.error(LOG, "llm_translate_selection: the keymap bridge is unavailable: %s.", tostring(keymap))
 		return false
@@ -1410,7 +1410,7 @@ local AGENT_ACTIONS = {
 for _, agent_action in ipairs(AGENT_ACTIONS) do
 	local spec = agent_action
 	sg(spec.id, function()
-		local ok_keymap, keymap = pcall(require, "modules.keymap")
+		local ok_keymap, keymap = pcall(require, "hotstrings.engine.expander")
 		if not ok_keymap or type(keymap) ~= "table" or type(keymap[spec.bridge]) ~= "function" then
 			Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", spec.id, tostring(keymap))
 			return false

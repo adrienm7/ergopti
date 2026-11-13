@@ -7,7 +7,7 @@
 ; « Windows host »): the layout manager's new actions and initData flags, the
 ; composer's source form of composer_save (store, stage, elevate, switch) and
 ; composer_emulate, and the menu row. The elevated helper runs against the fake
-; machine of test_kbd_register.ahk, on the files the composer really staged: no
+; machine of ../../hotstrings/engine/expander/test_kbd_register.ahk, on the files the composer really staged: no
 ; UAC prompt, no registry write, no system file.
 ; ==============================================================================
 

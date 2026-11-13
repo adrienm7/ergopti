@@ -59,8 +59,8 @@ local function scenario(options, body)
 			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
 		end
 		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
-			"modules.hotstrings.word_reset", "infra.hotstring_preferences", "adapters.keyboard_layout",
-			"modules.hotstrings.injector", "clipboard.adapters.clipboard" }) do package.loaded[name] = nil end
+			"hotstrings.engine.word_reset", "hotstrings.engine.matcher.preferences", "adapters.keyboard_layout",
+			"hotstrings.engine.injector", "clipboard.adapters.clipboard" }) do package.loaded[name] = nil end
 		local state = { text = "", caret = 0, wire = {}, held = {}, requests = {}, submissions = {},
 			cancelled = 0, offers = {}, overlay_showing = false, controls = 0, moves = 0, outputs = 0 }
 		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
@@ -125,7 +125,7 @@ local function scenario(options, body)
 			state.text = state.text:sub(1, start) .. text .. state.text:sub(state.caret + 1)
 			state.caret = start + #text
 		end
-		injector = require("modules.hotstrings.injector")
+		injector = require("hotstrings.engine.injector")
 		injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
 			state.wire[#state.wire + 1] = { code = code, value = value, caret = state.caret }
 			state.held[code] = value == 1 or nil
@@ -135,16 +135,16 @@ local function scenario(options, body)
 			return true
 		end })
 		injector._set_nanosleep_for_test(function() end)
-		local matcher = require("modules.hotstrings.engine").new()
+		local matcher = require("hotstrings.engine.engine").new()
 		matcher:attach_ai_context(require("ai.engine.api.context").new({ is_active = function() return prediction.is_enabled() end }))
-		local WordReset = require("modules.hotstrings.word_reset")
+		local WordReset = require("hotstrings.engine.word_reset")
 		local settings = WordReset.snapshot(); settings.idle_seconds = 0
 		settings.arrow_resets_word = options.arrow_resets_word ~= false
 		if options.shortcut_resets_word ~= nil then settings.shortcut_resets_word = options.shortcut_resets_word end
 		assert(WordReset.restore_configuration(settings)); WordReset.forget_last_key()
 		local gate = require("platform.input.capture_gate").new()
 		local keyboard_identity = require("modules.shortcuts.keyboard_shortcuts").collision_identity
-		local environment = setmetatable({ engine = matcher, engine_mod = require("modules.hotstrings.engine"),
+		local environment = setmetatable({ engine = matcher, engine_mod = require("hotstrings.engine.engine"),
 			TapHold = { observe_copy_activity = function() end },
 			prediction_engine = prediction, injector = injector, secure_focus_guard = guard,
 			shortcuts = options.restart_prediction and { is_enabled = function() return true end,
@@ -655,7 +655,7 @@ do
 			end
 			for _, name in ipairs({ "platform.input.keyboard_hook", "platform.input.evdev_reader", "platform.input.modifier_broker",
 				"adapters.keyboard_layout", "platform.focus.secure_field_detector", "clipboard.adapters.clipboard", "core.events.timer_scheduler",
-				"infra.hotstring_preferences", "ai.engine.preferences", "infra.metrics_preferences", "core.logger.engine.monotonic",
+				"hotstrings.engine.matcher.preferences", "ai.engine.preferences", "infra.metrics_preferences", "core.logger.engine.monotonic",
 				"settings.engine.paths", "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer",
 				-- Main initialises these owners once; an earlier suite may have loaded them.
 				"modules.keymap.pause_layout_switch", "modules.keymap.layout_emulation" }) do package.loaded[name] = nil end
@@ -695,23 +695,23 @@ do
 			put("platform.input.access", { is_denied = no, missing_program = function() return nil end, report = function() error("unexpected input access") end })
 			put("core.lifecycle.engine.shutdown.signal_handlers", { start = yes, stop = yes, is_settled = yes, reserve_webkit_gc_signal = yes })
 			put("core.lifecycle.engine.reload.restart_pause", { restore = yes })
-			put("infra.legacy_hotstring_storage", { import = yes })
+			put("hotstrings.engine.legacy_hotstring_storage", { import = yes })
 			local config = { init = noop, migrate_legacy_delays = yes, set_magic_key = yes, load_all = function() return 0, true, nil, { complete = true } end,
 			  parse_error_count = function() return 0 end, get_categories = function() return {} end }
-			put("modules.hotstrings.hotstrings_config", config)
+			put("hotstrings.engine.catalogue.config", config)
 			put("platform.remap.tap_hold_manager", { init = yes, observe_copy_activity = function() end, user_path = function() return marker .. ".tap_hold.toml" end, config_path = function() return marker .. ".config.toml" end,
 			  reload = yes, is_tap_action = no, canonical_hold = function() return "none" end, is_active = no, keys = function() return {} end, set_paused = yes })
 			put("platform.remap.tap_hold_writer", { FILE_NAME = "tap_hold.toml", init = noop, migrate_file = noop })
 			-- Gesture/action sources have no configured bindings in this scope.
-			put("modules.hotstrings.magic_key_source", { init = noop, on_key = no, cancel_capture = yes })
-			put("modules.hotstrings.repeat_key", { is_enabled = no })
+			put("hotstrings.engine.magic_key_source", { init = noop, on_key = no, cancel_capture = yes })
+			put("hotstrings.engine.repeat_key", { is_enabled = no })
 			put("modules.shortcuts.wrap_on_type", { new = function() return { on_key = no, end_selection_window = yes, on_pointer_down = noop } end })
 			put("clipboard.adapters.selection_transaction", { new = function() return { cancel = yes, stop = yes } end })
 			put("clipboard.adapters.clipboard", { read_primary = function() error("no selection read is permitted") end })
 			put("core.ui.engine.display_server", { is_x11 = yes, is_wayland = no, kind = function() return "x11" end })
 			local layout = put("adapters.keyboard_layout", require("tests.support.layout_cohort_fixture").layout(function() return 30 end))
 			layout.refresh, layout.is_ready, layout.publish_current_capture = yes, yes, yes
-			local injector = put("modules.hotstrings.injector", {
+			local injector = put("hotstrings.engine.injector", {
 			  _is_injecting = no, _queue_char = function() error("unexpected queued text") end,
 			  open_fast_channel = yes, close_fast_channel = yes, output_broker = function() return {} end, emit_key = yes, set_output_observer = yes, set_erase_pacing = yes,
 			  inject = function(deletes, text, _, _, publication)
@@ -757,7 +757,7 @@ do
 			local focus_module = require("modules.keystats.focus_guard")
 			local original_focus_new = focus_module.new
 			focus_module.new = function(options) state.guard = original_focus_new(options); return state.guard end
-			local engine_module = require("modules.hotstrings.engine")
+			local engine_module = require("hotstrings.engine.engine")
 			local original_engine_new = engine_module.new
 			-- The driver engine inherits the shared API through its metatable, so
 			-- the wrapper inherits it too instead of copying only its own fields.
@@ -774,7 +774,7 @@ do
 				end
 				return state.matcher
 			end
-			put("modules.hotstrings.engine", main_engine)
+			put("hotstrings.engine.engine", main_engine)
 			local prediction = require("ai.engine.prediction.engine"); fixture_prediction = prediction
 			local hook = require("platform.input.keyboard_hook")
 			hook.start = function(options) state.callbacks = options; coroutine.yield("actual Hook.start callback capture"); return true end
@@ -824,7 +824,7 @@ do
 			assert(guard.blocks_text() == false and guard.focused_text_identity(), "actual Main focus guard must admit this ordinary field")
 			local original_focus = guard.focused_text_identity()
 			assert(policy.is_context_protected(app, "owned ordinary field") == false)
-			local WordReset = require("modules.hotstrings.word_reset")
+			local WordReset = require("hotstrings.engine.word_reset")
 			assert(WordReset.is_terminal_app(app) == terminal, "production classifier owns terminal scope")
 			local settings = WordReset.snapshot(); settings.idle_seconds = 0; settings.shortcut_resets_word = options.reset == true
 			assert(WordReset.restore_configuration(settings)); WordReset.forget_last_key()

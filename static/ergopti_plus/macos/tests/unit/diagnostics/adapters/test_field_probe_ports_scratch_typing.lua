@@ -14,8 +14,8 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"core.logger.engine.logger", "diagnostics.adapters.field_probe_ports", "core.events.timer_scheduler", "core.ui.adapters.own_window",
-	"platform.input.synthetic_input", "core.ui.ui.builder", "modules.keymap", "diagnostics.engine.field_run.selftest",
-	"modules.keymap.utils",
+	"platform.input.synthetic_input", "core.ui.ui.builder", "hotstrings.engine.expander", "diagnostics.engine.field_run.selftest",
+	"hotstrings.engine.expander.utils",
 }
 
 local OWN_PID = 1234
@@ -58,7 +58,7 @@ local function run(world, keys, options)
 				return {}
 			end,
 		}
-		package.loaded["modules.keymap"] = {
+		package.loaded["hotstrings.engine.expander"] = {
 			tap_states = function()
 				return { started = true, taps = { { name = "keyDown", state = world.taps }, { name = "loopbackKeyUp", state = world.taps } } }
 			end,
@@ -69,7 +69,7 @@ local function run(world, keys, options)
 		-- The keymap's classification of the published window, when the world scripts one
 		if world.context then
 			world.polls = 0
-			package.loaded["modules.keymap.utils"] = {
+			package.loaded["hotstrings.engine.expander.utils"] = {
 				selftest_window_context = function()
 					world.polls = world.polls + 1
 					world.published_at_poll = world.published_at_poll or Selftest.window_id()

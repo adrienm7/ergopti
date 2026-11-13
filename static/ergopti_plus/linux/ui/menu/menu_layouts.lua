@@ -102,7 +102,7 @@ local function _build_layouts(ctx)
 			return rows
 		end,
 		["base_layouts"] = function()
-			local ok_reader, reader = pcall(require, "modules.hotstrings.input_reader")
+			local ok_reader, reader = pcall(require, "hotstrings.engine.input_reader")
 			if not ok_reader or type(reader.get_layouts) ~= "function" then
 				Logger.error(LOG, "The input reader exposes no layout table — no layout can be offered.")
 				return {}
@@ -180,7 +180,7 @@ local function _build_layouts(ctx)
 	end
 
 	-- The physical magic key: the key typing the magic key, chosen by pressing it
-	-- or from the candidates (modules/hotstrings/magic_key_source.lua); the rows
+	-- or from the candidates (hotstrings/engine/magic_key_source.lua); the rows
 	-- are the shared ones macOS draws too.
 	providers[require("settings.engine.keys").LEAF.MAGIC_KEY_SOURCE] = function()
 		local Source = ctx.magic_key_source

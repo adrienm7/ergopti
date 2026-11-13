@@ -50,9 +50,9 @@ function check(condition, message) {
 // tests/, because both e2e rules exclude that directory on purpose: editing a
 // harness does not require re-running the behaviour it drives.
 const REPRESENTATIVE_SOURCE = {
-	windows: 'static/ergopti_plus/windows/modules/hotstrings.ahk',
-	macos: 'static/ergopti_plus/macos/modules/keymap/expander.lua',
-	linux: 'static/ergopti_plus/linux/modules/hotstrings/injector.lua'
+	windows: 'static/ergopti_plus/windows/hotstrings/hotstrings.ahk',
+	macos: 'static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua',
+	linux: 'static/ergopti_plus/linux/hotstrings/engine/injector.lua'
 };
 
 /**

@@ -267,7 +267,7 @@ seq_counter             = 0,
 					-- non-star trigger expanded the moment it was complete and rewrote the
 					-- user's word as they typed it.
 					local state = register_vector(v)
-					local Expander = helpers.load_with_stubs("modules.keymap.expander")
+					local Expander = helpers.load_with_stubs("hotstrings.engine.expander.expander")
 					local Registry = helpers.load_with_stubs("settings.engine.registry")
 					Expander.init(state, Registry, {})
 					state.buffer = v.buffer or v.trigger
@@ -287,7 +287,7 @@ seq_counter             = 0,
 					-- which silently blocks every is_word trigger sitting at the start of
 					-- the buffer — one vector's worth of false red, and it would have been
 					-- false GREEN for a vector expecting no match.
-					local Expander = helpers.load_with_stubs("modules.keymap.expander")
+					local Expander = helpers.load_with_stubs("hotstrings.engine.expander.expander")
 					local Registry = helpers.load_with_stubs("settings.engine.registry")
 					-- The LLM bridge is a hard requirement of init(), and would_fire never
 					-- touches it; an empty table satisfies the guard without stubbing a
@@ -376,7 +376,7 @@ end)
 --- @return table The registry module reference.
 local function fresh_collision_registry()
 	package.loaded["settings.engine.registry"] = nil
-	package.loaded["modules.keymap.terminators"] = nil
+	package.loaded["hotstrings.engine.expander.terminators"] = nil
 	package.loaded["core.logger.engine.logger"] = nil
 	helpers.load_with_stubs("core.logger.engine.logger")
 	local R = helpers.load_with_stubs("settings.engine.registry")

@@ -508,7 +508,7 @@ Test("ApplyConfigToml: a second hotstrings.personal.<user-chosen-name> section i
 TestFMv2_PersonalEditorPreferencesKeepTheirOwner() {
 	global _LLM_Menu
 	; [personal_editor] (ahk. prefix already stripped) holds flat UI-preference
-	; keys written by ui/personal_toml_editor.ahk (_EditorPrefSet/_EditorPrefGet)
+	; keys written by hotstrings/ui/personal_toml_editor.ahk (_EditorPrefSet/_EditorPrefGet)
 	; via the legacy flat TOML_Write/TOML_Read path -- it is never part of the
 	; manifest-built Features tree, so it must not be flagged as unknown either.
 	OldFeatures := _FM_BeginIsolated()

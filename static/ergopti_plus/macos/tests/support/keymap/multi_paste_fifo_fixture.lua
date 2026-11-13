@@ -24,13 +24,13 @@ local OWNED = {
 	"hs.settings", "hs.spaces", "hs.sqlite3",
 	"hs.styledtext", "hs.task", "hs.timer",
 	"hs.urlevent", "hs.webview", "hs.window",
-	"infra.capsword_output", "infra.hotstring_engine", "core.i18n.engine.i18n",
+	"infra.capsword_output", "hotstrings.engine.matcher.engine", "core.i18n.engine.i18n",
 	"core.logger.engine.logger", "core.fs.engine.paths", "core.text.engine.utils",
 	"core.timing.engine.timings", "core.text.engine.toml.reader", "core.text.engine.json",
 	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",
-	"core.logger.engine.shim", "modules.keystats", "modules.keymap.expander",
-	"modules.keymap.state", "modules.keymap.terminator_replay", "modules.keymap.terminators",
-	"modules.keymap.utils", "tests.stubs.hs", "core.text.engine.utils_core",
+	"core.logger.engine.shim", "modules.keystats", "hotstrings.engine.expander.expander",
+	"hotstrings.engine.expander.state", "hotstrings.engine.expander.terminator_replay", "hotstrings.engine.expander.terminators",
+	"hotstrings.engine.expander.utils", "tests.stubs.hs", "core.text.engine.utils_core",
 	"core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path",
 	"core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 }
@@ -82,10 +82,10 @@ function M.with_world(options, scenario)
 			end
 			f.key_observer = observe
 			package.loaded["modules.keystats"] = {}
-			local utils = require("modules.keymap.utils")
+			local utils = require("hotstrings.engine.expander.utils")
 			local sender = require("platform.input.text_sender")
 			helpers.assert_eq(sender.terminalInputTarget() ~= nil, options.terminal == true)
-			local expander = require("modules.keymap.expander")
+			local expander = require("hotstrings.engine.expander.expander")
 			local scheduler = require("core.events.timer_scheduler")
 			local state = { buffer = "abcdefghijkl", magic_key = "star" }
 			helpers.assert_true(expander.init(state, {}, { get_llm_enabled = function() return false end }))

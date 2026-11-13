@@ -18,7 +18,7 @@
 ; has assigned both before this file executes.
 ; The preview-switch readers the loader publishes to. The engine includes the same
 ; file; an already included file is skipped.
-#Include ../../../infra/hotstrings/preview_switches.ahk
+#Include ../../../hotstrings/engine/matcher/preview_switches.ahk
 ; The generated key vocabulary (a dedupe-safe include: menu_manifest.ahk names it too).
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 

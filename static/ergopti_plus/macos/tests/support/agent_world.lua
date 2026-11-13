@@ -120,7 +120,7 @@ function M.build_world(options)
 		getAll = function() return {} end,
 	}
 	package.loaded["platform.system.info"] = { time_zone = function() return "Europe/Paris" end }
-	package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return false end }
+	package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return false end }
 	package.loaded["modules.shortcuts.script_control"] = nil
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
@@ -259,7 +259,7 @@ function M.build_world(options)
 	helpers.assert_eq(runner.set_system2(options.system2 == nil and "cerebras" or options.system2), true)
 	if options.system1 then helpers.assert_eq(runner.set_system1(options.system1), true) end
 	world.timer_baseline = #hs_stub.timer.__timers
-	package.loaded["modules.keymap"] = {
+	package.loaded["hotstrings.engine.expander"] = {
 		request_agent_selection = function(parent) return runner.run_selection(parent) end,
 		request_agent_command = function() return runner.run_command() end,
 		toggle_agent_auto = function() return runner.toggle_auto() end,

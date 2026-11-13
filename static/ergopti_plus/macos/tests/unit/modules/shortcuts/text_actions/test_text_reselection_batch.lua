@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local previous_destination = package.loaded["modules.keymap.utils"]
+local previous_destination = package.loaded["hotstrings.engine.expander.utils"]
 local Destination = require("tests.support.text_destination_receipt")
 
 
@@ -145,4 +145,4 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 	end)
 end)
 
-package.loaded["modules.keymap.utils"] = previous_destination
+package.loaded["hotstrings.engine.expander.utils"] = previous_destination

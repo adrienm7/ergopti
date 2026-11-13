@@ -76,7 +76,7 @@ local function with_personal_frame(body, options)
 			updateMenu = function() calls.updates = calls.updates + 1 end,
 		}
 		if options.empty then context.state.custom_default_section = false end
-		local menu_owner = require("ui.menu.menu_hotstrings_custom")
+		local menu_owner = require("hotstrings.ui.menu.custom")
 		fresh_bridge = package.loaded["modules.keystats.kc_bridge"]
 		return body({ build = function() return menu_owner.build_custom(context, { group_counts = { personal = 5 } }) end,
 			root = renderer.get_root(), renderer = renderer, context = context, calls = calls,
@@ -208,11 +208,11 @@ helpers.describe("personal hotstrings complete shared frames", function()
 		end, { locale = "fr" })
 	end)
 	helpers.it("restores genuine source and caption owners after a scenario raises", function()
-		local renderer, source = rawget(package.loaded, "menu.engine.manifest_menu"), rawget(package.loaded, "infra.personal_hotstrings")
+		local renderer, source = rawget(package.loaded, "menu.engine.manifest_menu"), rawget(package.loaded, "hotstrings.engine.catalogue.personal_hotstrings")
 		local ok, detail = pcall(with_personal_frame, function() error("personal frame scenario sentinel") end)
 		helpers.assert_eq(ok, false); helpers.assert_true(detail:find("personal frame scenario sentinel", 1, true) ~= nil)
 		helpers.assert_true(rawequal(rawget(package.loaded, "menu.engine.manifest_menu"), renderer))
-		helpers.assert_true(rawequal(rawget(package.loaded, "infra.personal_hotstrings"), source))
+		helpers.assert_true(rawequal(rawget(package.loaded, "hotstrings.engine.catalogue.personal_hotstrings"), source))
 	end)
 
 end)
@@ -306,10 +306,10 @@ local function with_registered_personal_sections(frame, scenario, posture)
 	local failed, primary
 	local cleanup = {}; frame.section_fixture_cleanup = cleanup
 	local scoped, scope_error = pcall(helpers.with_stub_scope, {
-		"modules.keymap", "modules.keymap.init", "modules.keymap.state",
-		"settings.engine.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-		"modules.keymap.utils", "modules.keymap.expander", "ai.engine.bridge",
-		"modules.keymap.terminator_replay", "infra.personal_hotstrings", "settings.engine.preferences.personal_file_controls",
+		"hotstrings.engine.expander", "modules.keymap.init", "hotstrings.engine.expander.state",
+		"settings.engine.registry", "hotstrings.engine.expander.registry_groups", "hotstrings.engine.expander.registry_index",
+		"hotstrings.engine.expander.utils", "hotstrings.engine.expander.expander", "ai.engine.bridge",
+		"hotstrings.engine.expander.terminator_replay", "hotstrings.engine.catalogue.personal_hotstrings", "settings.engine.preferences.personal_file_controls",
 	}, function()
 		local lfs = require("lfs")
 		local paths = require("settings.engine.paths")
@@ -343,7 +343,7 @@ local function with_registered_personal_sections(frame, scenario, posture)
 				return original_get(key)
 			end
 			local registry = require("settings.engine.registry")
-			state_module = require("modules.keymap.state")
+			state_module = require("hotstrings.engine.expander.state")
 			original_new = state_module.new
 			local state, received_defaults, received_delays
 			-- Observe the genuine first boot allocation; never construct a competing state.
@@ -353,7 +353,7 @@ local function with_registered_personal_sections(frame, scenario, posture)
 				state, received_defaults, received_delays = actual, defaults, delays
 				return actual
 			end
-			local loaded, value = pcall(require, "modules.keymap")
+			local loaded, value = pcall(require, "hotstrings.engine.expander")
 			state_module.new = original_new
 			if not loaded then error(value, 0) end
 			native_keymap = value

@@ -208,7 +208,9 @@ try {
 		const scanRoot = path.join(
 			sourceRoot,
 			driver,
-			...(driver === 'windows' ? [] : ['ui', 'menu', 'ai', 'apps', 'diagnostics', 'gestures'])
+			...(driver === 'windows'
+				? []
+				: ['ui', 'menu', 'ai', 'apps', 'diagnostics', 'gestures', 'hotstrings'])
 		);
 		reset();
 		fs.renameSync(scanRoot, scanRoot + '-wrong');

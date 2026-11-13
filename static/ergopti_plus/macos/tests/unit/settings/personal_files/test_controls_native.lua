@@ -34,14 +34,14 @@ local function fixture(body, options)
 	options = options or {}
 	return helpers.with_stub_scope({
 		"core.fs.adapters.file_system", "core.fs.adapters.storage", "settings.engine.paths", "core.fs.engine.dir", "core.text.engine.toml.reader",
-		"infra.personal_hotstrings", "settings.engine.preferences.personal_file_adoption", "settings.engine.preferences.personal_file_controls",
-		"modules.hotstrings.hotstrings_config", "modules.keymap", "modules.keymap.state",
-		"settings.engine.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-		"modules.keymap.expander", "ai.engine.bridge", "modules.keymap.utils",
+		"hotstrings.engine.catalogue.personal_hotstrings", "settings.engine.preferences.personal_file_adoption", "settings.engine.preferences.personal_file_controls",
+		"hotstrings.engine.catalogue.config", "hotstrings.engine.expander", "hotstrings.engine.expander.state",
+		"settings.engine.registry", "hotstrings.engine.expander.registry_groups", "hotstrings.engine.expander.registry_index",
+		"hotstrings.engine.expander.expander", "ai.engine.bridge", "hotstrings.engine.expander.utils",
 		"ai.engine.prediction.engine", "ai.engine.local_servers.warmup_controller", "ai.engine.api.streaming_handler",
-		"modules.keymap.terminators", "modules.keymap.terminator_replay", "ui.hotstring_editor",
-		"settings.engine.preferences.preferences", "settings.engine.scope.personal_file_scope", "ui.menu.menu_hotstrings_custom", "menu.ui.keyboard.keymap_lifecycle",
-		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "ui.hotstrings_config_window",
+		"hotstrings.engine.expander.terminators", "hotstrings.engine.expander.terminator_replay", "hotstrings.ui.hotstring_editor",
+		"settings.engine.preferences.preferences", "settings.engine.scope.personal_file_scope", "hotstrings.ui.menu.custom", "menu.ui.keyboard.keymap_lifecycle",
+		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "hotstrings.ui.hotstrings_config_window",
 	}, function()
 		local root = os.tmpname(); os.remove(root); assert(lfs.mkdir(root))
 		local primary, alpha, beta = root .. "/personal_hotstrings.toml", root .. "/alpha.toml", root .. "/beta.toml"
@@ -107,7 +107,7 @@ future = "keep every neighbor"
 			observations.enumerations[#observations.enumerations + 1] = path
 			local names = {}; for name in lfs.dir(path) do names[#names + 1] = name end; return names
 		end }
-		package.loaded["ui.hotstring_editor"] = { init = function() return true end }
+		package.loaded["hotstrings.ui.hotstring_editor"] = { init = function() return true end }
 		local adapter = {
 			exists = function(path) return lfs.attributes(path) ~= nil end,
 			path_status = function(path)
@@ -160,30 +160,30 @@ future = "keep every neighbor"
 			end }
 		end
 		package.loaded["core.fs.adapters.file_system"] = adapter
-		local native_state, state = require("modules.keymap.state")
-		package.loaded["modules.keymap.state"] = setmetatable({ new = function(...)
+		local native_state, state = require("hotstrings.engine.expander.state")
+		package.loaded["hotstrings.engine.expander.state"] = setmetatable({ new = function(...)
 			state = native_state.new(...); return state
 		end }, { __index = native_state })
 		local old_attributes = hs.fs.attributes
 		hs.fs.attributes = function(path) return lfs.attributes(path) end
-		local native_utils = require("modules.keymap.utils")
-		package.loaded["modules.keymap.utils"] = setmetatable({
+		local native_utils = require("hotstrings.engine.expander.utils")
+		package.loaded["hotstrings.engine.expander.utils"] = setmetatable({
 			is_ignored_window = function() return false, 0 end,
 			is_secure_field = function() return false end,
 			start_ignored_win_tracking = function() return 1 end,
 		}, { __index = native_utils })
 		local ok, detail = pcall(function()
-			local Keymap = helpers.load_with_stubs("modules.keymap")
+			local Keymap = helpers.load_with_stubs("hotstrings.engine.expander")
 			hs.fs.attributes = function(path) return lfs.attributes(path) end
 			local Registry = require("settings.engine.registry")
-			local Config = require("modules.hotstrings.hotstrings_config")
+			local Config = require("hotstrings.engine.catalogue.config")
 			helpers.assert_true(Config.init({ override_path = overrides, delay_transaction = Keymap.with_hotstring_delays,
 				toml_resolver = function(id)
 					if id == "personal" then return primary end
 					local components = Files.components(id)
 					return components and root .. "/" .. table.concat(components, "/") or helpers.shared("hotstrings/data/catalogue/" .. id .. ".toml")
 				end }))
-			local Loader = require("infra.personal_hotstrings")
+			local Loader = require("hotstrings.engine.catalogue.personal_hotstrings")
 			local Preferences = require("settings.engine.preferences.preferences")
 			local saved = { hotstrings = { personal_ext_alpha = true, personal_ext_beta = true } }
 			if options.preferences then
@@ -208,7 +208,7 @@ future = "keep every neighbor"
 			local function winner()
 				for _, mapping in ipairs(Registry.mappings_for_tail("n") or {}) do
 					if mapping.trigger == "collision" then
-						return require("modules.keymap.expander").would_fire(mapping, "collision"), mapping
+						return require("hotstrings.engine.expander.expander").would_fire(mapping, "collision"), mapping
 					end
 				end
 			end
@@ -235,7 +235,7 @@ end
 --- mutations still traverse the real controller, registry and conditional writer.
 local function personal_menu(f)
 	package.loaded["core.i18n.engine.i18n"], package.loaded["core.i18n.engine.locale"], package.loaded["core.i18n.engine.core"] = nil, nil, nil
-	package.loaded["menu.engine.manifest_menu"], package.loaded["ui.menu.menu_hotstrings_custom"] = nil, nil
+	package.loaded["menu.engine.manifest_menu"], package.loaded["hotstrings.ui.menu.custom"] = nil, nil
 	local i18n = require("core.i18n.engine.i18n"); i18n.init()
 	local locale = require("core.i18n.engine.locale"); locale.set_locale("en")
 	local projected = f.Preferences.project_hotstring_preferences(f.saved, f.Registry.list_groups(), f.Registry.get_sections)
@@ -251,10 +251,10 @@ local function personal_menu(f)
 	ctx.updateMenu = function() observations.refreshes = observations.refreshes + 1 end
 	local names = {}; for _, record in ipairs(f.loaded) do names[#names + 1] = record.name end
 	ctx.save_prefs = function() return f.Preferences.save(f.preferences, ctx.state, names, { keymap = f.Keymap }) end
-	package.loaded["ui.hotstrings_config_window"] = { open = function()
+	package.loaded["hotstrings.ui.hotstrings_config_window"] = { open = function()
 		observations.edits = observations.edits + 1; return true
 	end }
-	local Custom = require("ui.menu.menu_hotstrings_custom")
+	local Custom = require("hotstrings.ui.menu.custom")
 	local Manifest = require("menu.engine.manifest_menu")
 	local function find(rows, predicate)
 		for _, row in ipairs(rows or {}) do
@@ -684,7 +684,7 @@ helpers.describe("source-owned personal controls native publication", function()
 				local names = {}; for _, file in ipairs(f.loaded) do names[#names + 1] = file.name end
 				ctx.save_prefs = function() return f.Preferences.save(f.preferences, ctx.state, names, { keymap = f.Keymap }) end
 				local original_source, original_overrides = read(f.alpha), read(f.overrides)
-				local menu = require("ui.menu.menu_hotstrings_custom")
+				local menu = require("hotstrings.ui.menu.custom")
 				helpers.assert_true(menu.category_scope_fn(ctx, { f.alpha_id }, true)())
 				helpers.assert_eq(f.Registry.is_group_enabled(f.alpha_id), true)
 				local encoded = assert(read(f.preferences))

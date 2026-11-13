@@ -40,7 +40,7 @@ helpers.describe("Hotstrings menu: extension submenus", function()
 		CaptionFixture.install(require("core.i18n.engine.i18n"))
 		package.loaded["menu.ui.builder.builder"] = nil
 		local Builder = require("menu.ui.builder.builder")
-		local Hotstrings = require("ui.menu.menu_hotstrings")
+		local Hotstrings = require("hotstrings.ui.menu.hotstrings")
 		local ctx = context({ "sfbsreduction", "rolls" }, { ERGOPTI })
 		ctx.config, ctx.base_dir = { log_level = 2 }, helpers.driver_root()
 		ctx.state = { keymap = false, hotstrings = {}, sections_order_overrides = {} }
@@ -74,7 +74,7 @@ helpers.describe("Hotstrings menu: extension submenus", function()
 			group_counts = { rolls = 7, sfbsreduction = 5 },
 			ext_details = { { id = "demo", name = "Demo", total = 3, groups = { "ext:demo:phrases" } } },
 		}
-		local Hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local Hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		local bound_sections = Hotstrings.bound_sections(ctx)
 		helpers.assert_eq(Builder.extension_menus(ctx, counts, by_extension, bound_sections), {
 			{ id = "demo", name = "Demo", groups = { "ext:demo:phrases" }, sections = {}, total = 3 },
@@ -93,7 +93,7 @@ helpers.describe("Hotstrings menu: extension submenus", function()
 	end)
 
 	helpers.it("(ergopti-hotstrings-ext) moves the repeat corrections from the magic key into the Ergopti submenu", function()
-		local Hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local Hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		local toggled = {}
 		local sections = {
 			magickey = {
@@ -141,7 +141,7 @@ end)
 local function with_extension_frame(body, paused)
 	local translator = ExtensionTranslator
 	return helpers.with_stub_scope({ "core.logger.engine.logger", "menu.engine.manifest_menu", "menu.ui.builder.builder",
-		"ui.menu.menu_hotstrings", "ui.menu.hotstring_counter" }, function()
+		"hotstrings.ui.menu.hotstrings", "hotstrings.ui.menu.counter" }, function()
 		helpers.load_with_stubs("core.logger.engine.logger")
 		package.loaded["core.i18n.engine.i18n"] = translator
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
@@ -149,7 +149,7 @@ local function with_extension_frame(body, paused)
 			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator, logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["menu.engine.manifest_menu"] = renderer
-		local Hotstrings = require("ui.menu.menu_hotstrings")
+		local Hotstrings = require("hotstrings.ui.menu.hotstrings")
 		local Builder = require("menu.ui.builder.builder")
 		local ctx = context({ "magickey", "rolls", "sfbsreduction" }, { ERGOPTI })
 		ctx.paused = paused == true
@@ -228,7 +228,7 @@ helpers.describe("complete installed extension shared frames (macOS)", function(
 	end)
 	helpers.it("(shared-extension-frame) restores genuine owners after a raised native-provider scenario", function()
 		local names = { "core.i18n.engine.i18n", "menu.engine.manifest_menu", "core.fs.engine.paths", "menu.ui.builder.builder",
-			"ui.menu.menu_hotstrings", "ui.menu.hotstring_counter" }
+			"hotstrings.ui.menu.hotstrings", "hotstrings.ui.menu.counter" }
 		local before = {}; for _, name in ipairs(names) do before[name] = package.loaded[name] end
 		local previous_hs = rawget(_G, "hs")
 		local ok, err = pcall(function()

@@ -23,7 +23,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("core.logger.engine.logger")
-local km_utils = require("modules.keymap.utils")
+local km_utils = require("hotstrings.engine.expander.utils")
 local TextUtils = require("core.text.engine.utils_core")
 local SecureFieldDetector = require("platform.focus.secure_field_detector")
 

@@ -492,7 +492,7 @@ function isCanonicalParameterWrite(
 // leaves and macOS now keeps any `[__global__]` table as foreign bytes, so no
 // exemption exists: a macOS source that writes the row again must be declared.
 const secondarySource = fs.readFileSync(
-	path.join(DRIVERS_DIR, 'macos', 'modules/hotstrings/hotstrings_config.lua'),
+	path.join(DRIVERS_DIR, 'macos', 'hotstrings', 'engine', 'catalogue', 'config.lua'),
 	'utf8'
 );
 assert.equal(

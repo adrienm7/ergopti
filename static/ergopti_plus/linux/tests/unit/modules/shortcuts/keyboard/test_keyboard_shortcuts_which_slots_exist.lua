@@ -535,19 +535,19 @@ end)
 
 helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", function()
 	local function with_editor(initial, body, writes_fail)
-		local saved_source = package.loaded["modules.hotstrings.magic_key_source"]
-		local saved_magic = package.loaded["modules.hotstrings.magic_key"]
+		local saved_source = package.loaded["hotstrings.engine.magic_key_source"]
+		local saved_magic = package.loaded["hotstrings.engine.magic_key"]
 		local saved_builder = package.loaded["menu.ui.builder.builder"]
 		local gestures = require("gestures.engine.manager")
 		local saved_execute = gestures.execute_action
 		local state = { trigger = "★", generation = 1, master = true, paused = false, inhibited = false,
 			rows = { { code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false } },
 			queue = {}, fired = {} }
-		package.loaded["modules.hotstrings.magic_key_source"] = {
+		package.loaded["hotstrings.engine.magic_key_source"] = {
 			editor_source = function() return { generation = state.generation, status = "ready", candidates = state.rows } end,
 			known_codes = function() return { KeyJ = true, KeyC = true, Quote = true, Semicolon = true } end,
 		}
-		package.loaded["modules.hotstrings.magic_key"] = { get = function() return state.trigger end, is_customised = function() return false end }
+		package.loaded["hotstrings.engine.magic_key"] = { get = function() return state.trigger end, is_customised = function() return false end }
 		gestures.execute_action = function(action, binding) state.fired[#state.fired + 1] = { action, binding } return true end
 		local ok, err = pcall(function()
 			local shortcuts, config = load_over_config(initial, writes_fail)
@@ -559,8 +559,8 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 			body(shortcuts, config, state)
 		end)
 		gestures.execute_action = saved_execute
-		package.loaded["modules.hotstrings.magic_key_source"] = saved_source
-		package.loaded["modules.hotstrings.magic_key"] = saved_magic
+		package.loaded["hotstrings.engine.magic_key_source"] = saved_source
+		package.loaded["hotstrings.engine.magic_key"] = saved_magic
 		package.loaded["menu.ui.builder.builder"] = saved_builder
 		drop_config()
 		if not ok then error(err, 0) end
@@ -758,7 +758,7 @@ for _, case in ipairs({
 		invoke = function(owner) return owner.available_slots("ctrl_") end, empty = true },
 	{ name = "physical keys", module = "modules.shortcuts.keyboard_shortcuts", path = "layouts/data/keycodes/physical_keys.json",
 		invoke = function(owner) return owner.physical_slot_descriptor("physical_ctrl_KeyA") end },
-	{ name = "hotstring keys", module = "modules.hotstrings.output_tokens", path = "shortcuts/data/actions/send_keys.json",
+	{ name = "hotstring keys", module = "hotstrings.engine.output_tokens", path = "shortcuts/data/actions/send_keys.json",
 		invoke = function(owner) return owner.parse("{Enter}") end },
 }) do
 	helpers.it("shortcut catalogue refuses FIFO: " .. case.name, function()

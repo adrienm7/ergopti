@@ -999,13 +999,13 @@ end)
 
 helpers.describe("shutdown coordinator: final native output acknowledgement", function()
 	local function with_output(mode, check)
-		local names = { "platform.input.uinput_writer", "platform.input.modifier_broker", "modules.hotstrings.injector" }
+		local names = { "platform.input.uinput_writer", "platform.input.modifier_broker", "hotstrings.engine.injector" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, why = pcall(function()
 			local writer = require("platform.input.uinput_writer")
 			local broker = require("platform.input.modifier_broker")
-			local injector = require("modules.hotstrings.injector")
+			local injector = require("hotstrings.engine.injector")
 			local calls = { destroy = 0, close = 0, success = 0, writes = 0 }
 			writer._set_backend({
 				open = function() return 47 end,
@@ -1602,10 +1602,10 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		local function record(event) state.events[#state.events + 1] = event end
 		local noop = function() end
 		local modules = {}
-		for _, name in ipairs({ "infra.version", "modules.hotstrings.engine", "modules.hotstrings.hotstrings_config",
-			"modules.hotstrings.injector", "adapters.keyboard_layout", "modules.hotstrings.magic_key",
-			"modules.hotstrings.magic_key_source", "modules.hotstrings.repeat_key", "modules.shortcuts.keyboard_shortcuts",
-			"modules.hotstrings.device_finder", "platform.input.event", "core.logger.engine.monotonic", "menu.engine.manifest_reader",
+		for _, name in ipairs({ "infra.version", "hotstrings.engine.engine", "hotstrings.engine.catalogue.config",
+			"hotstrings.engine.injector", "adapters.keyboard_layout", "hotstrings.engine.magic_key",
+			"hotstrings.engine.magic_key_source", "hotstrings.engine.repeat_key", "modules.shortcuts.keyboard_shortcuts",
+			"hotstrings.engine.device_finder", "platform.input.event", "core.logger.engine.monotonic", "menu.engine.manifest_reader",
 			"settings.engine.scope.script_settings", "core.timing.engine.timings", "modules.shortcuts.script_actions", "diagnostics.engine.reports.crash_reporter",
 			"modules.keystats.focus_guard", "platform.input.capture_gate", "core.logger.engine.boot_profiler", "diagnostics.engine.reports.snapshot" }) do
 			modules[name] = {}

@@ -43,13 +43,13 @@ local Constants = require("infra.wpm_constants")
 local Timings = require("core.timing.engine.timings")
 local Widget = require("ui.wpm.widget")
 local Preview = require("core.ui.ui.tooltip.preview")
-local Hotstrings = require("modules.hotstrings.hotstrings_config")
+local Hotstrings = require("hotstrings.engine.catalogue.config")
 local canon = assert(Constants.load(), "the shared canon must load")
 local UPDATE_MS = Timings.ms("ui", "wpm_widget_update_ms")
 local HOLD_MS = Timings.ms("ui", "wpm_color_hold_ms")
 
 -- The hotstring groups resolve their colours through the real catalogue.
-assert(Hotstrings.init(require("modules.hotstrings.engine").new(), nil, function() end))
+assert(Hotstrings.init(require("hotstrings.engine.engine").new(), nil, function() end))
 assert(select(2, Hotstrings.load_all(nil, true)) == true, "the bundled catalogue must load")
 
 local failures = {}

@@ -267,7 +267,7 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("personal_info_editor_bridge", function()
-    local handler = helpers.load_module("ui.personal_info_editor.bridge")
+    local handler = helpers.load_module("hotstrings.ui.personal_info_editor.bridge")
 
 		helpers.it("(personal-save-private-error) never logs a persistence exception containing a field", function()
 			local logger, lines = require("core.logger.engine.shim"), {}
@@ -475,7 +475,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 	for _, count in ipairs({ 0, 7 }) do
 		helpers.it("admits a canonical successful reload count " .. count, function()
 			local state, context, seen = state_for(function() return count, true end)
-			local result = helpers.load_module("ui.personal_info_editor.bridge").on_message(
+			local result = helpers.load_module("hotstrings.ui.personal_info_editor.bridge").on_message(
 				{ action = "save", values = { first_name = "independent" } }, state, context)
 			helpers.assert_eq(result, { saved = true, reloaded = true, closed = true })
 			helpers.assert_eq(seen, { saves = 1, closes = 1, refreshes = 1 })
@@ -492,7 +492,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 			end
 			if outcome == "missing" then reload = nil end
 			local state, context, seen = state_for(reload)
-			local result = helpers.load_module("ui.personal_info_editor.bridge").on_message(
+			local result = helpers.load_module("hotstrings.ui.personal_info_editor.bridge").on_message(
 				{ action = "save", values = { first_name = "independent" } }, state, context)
 			helpers.assert_eq(result, { saved = true, reloaded = false, closed = false })
 			helpers.assert_eq(seen, { saves = 1, closes = 0, refreshes = 0 })
@@ -514,13 +514,13 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 		write(path, original);write(choices, '[future]\nlabel = "unchanged"\n');write(empty, '# deliberately empty valid hotstring catalogue\n[raw]\n')
 		local prior = {};for name, value in pairs(package.loaded) do prior[name] = value end
 		local called, failure = pcall(function()
-			for _, name in ipairs({ "modules.dynamic_hotstrings.manager", "hotstrings.engine.dynamic.core", "infra.hotstring_preferences",
-				"modules.hotstrings.hotstrings_config" }) do package.loaded[name] = nil end
-			local preferences = require("infra.hotstring_preferences")
+			for _, name in ipairs({ "hotstrings.engine.dynamic.manager", "hotstrings.engine.dynamic.core", "hotstrings.engine.matcher.preferences",
+				"hotstrings.engine.catalogue.config" }) do package.loaded[name] = nil end
+			local preferences = require("hotstrings.engine.matcher.preferences")
 			assert(preferences._set_file_for_test(choices))
-			local dynamic = require("modules.dynamic_hotstrings.manager")
+			local dynamic = require("hotstrings.engine.dynamic.manager")
 			assert(dynamic.init({ personal_info_path = path, trigger_char = "★" }))
-			local config = require("modules.hotstrings.hotstrings_config")
+			local config = require("hotstrings.engine.catalogue.config")
 			assert(config._set_config_file_for_test(choices))
 			assert(config._set_override_config_dir_for_test(directory))
 			body({ dynamic = dynamic, config = config, path = path, choices = choices, empty = empty,
@@ -535,7 +535,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 	end
 	helpers.it("(personal-save-owner) refuses cancellation during a real save", function()
 		with_native_owners(function(c)
-			local handler = helpers.load_module("ui.personal_info_editor.bridge")
+			local handler = helpers.load_module("hotstrings.ui.personal_info_editor.bridge")
 			local epoch, closes, cancelled, duplicate = 41, 0, nil, nil
 			local document = {}
 			local host = { current_epoch = function() return epoch end,
@@ -567,7 +567,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 	for _, scenario in ipairs({ "positive", "external", "recovery", "root", "page", "publication", "generation", "ready-refused", "retained", "retained-foreign", "forged", "push-reentry", "final-page", "postwrite-external", "state-refresh" }) do
 		helpers.it("personal-source-receipt: preserves the displayed file through " .. scenario, function()
 			with_native_owners(function(c)
-				local handler = helpers.load_module("ui.personal_info_editor.bridge")
+				local handler = helpers.load_module("hotstrings.ui.personal_info_editor.bridge")
 				local epoch, closes, notices = 41, 0, 0
 				local document = {}
 				local host = {
@@ -705,7 +705,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 					receipt = { count = count, committed = committed }
 					return count, committed, reason
 				end
-				local handler = helpers.load_module("ui.personal_info_editor.bridge")
+				local handler = helpers.load_module("hotstrings.ui.personal_info_editor.bridge")
 				local called, result = pcall(handler.on_message, { action = "save", values = { first_name = "Grace" } },
 					{ dyn_hotstrings = c.dynamic, config = c.config,
 						on_config_changed = function() refreshes = refreshes + 1 end },

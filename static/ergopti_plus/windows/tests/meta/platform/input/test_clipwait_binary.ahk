@@ -4,7 +4,7 @@
 ; MODULE: ClipWait Binary Data Meta Test
 ; DESCRIPTION:
 ; Static source guard for the "getselection-clipwait-binary-freeze" audit
-; finding in infra/hotstrings/hotstring_engine.ahk.
+; finding in hotstrings/engine/matcher/engine.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The asynchronous selection poll must accept binary clipboard formats. If it

@@ -16,7 +16,7 @@ local Shell = require("core.process.adapters.shell_runner")
 --- @param stream table Read and close operations with Lua file receipt shapes.
 --- @param body function Receives the loader and captured error lines.
 local function with_stream(stream, body)
-	local names = { "infra.personal_info_fields", "core.fs.engine.paths", "core.fs.engine.regular_file_reader", "core.logger.engine.shim" }
+	local names = { "hotstrings.engine.catalogue.personal_info_fields", "core.fs.engine.paths", "core.fs.engine.regular_file_reader", "core.logger.engine.shim" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local original_open = io.open
@@ -27,12 +27,12 @@ local function with_stream(stream, body)
 	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["core.fs.engine.paths"] = { shared = function() return policy_path end }
 	package.loaded["core.fs.engine.regular_file_reader"] = { open_source = function() return stream end }
-	package.loaded["infra.personal_info_fields"] = nil
+	package.loaded["hotstrings.engine.catalogue.personal_info_fields"] = nil
 	io.open = function(path, ...)
 		if path == policy_path then return stream end
 		return original_open(path, ...)
 	end
-	local ok, detail = pcall(function() body(require("infra.personal_info_fields"), errors) end)
+	local ok, detail = pcall(function() body(require("hotstrings.engine.catalogue.personal_info_fields"), errors) end)
 	io.open = original_open
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	if not ok then error(detail, 0) end
@@ -45,15 +45,15 @@ local function with_native_declaration(contents, body)
 	local path = os.tmpname()
 	local file = assert(io.open(path, "w"))
 	assert(file:write(contents)); assert(file:close())
-	local names = { "infra.personal_info_fields", "core.fs.engine.paths", "core.logger.engine.shim" }
+	local names = { "hotstrings.engine.catalogue.personal_info_fields", "core.fs.engine.paths", "core.logger.engine.shim" }
 	local saved, errors = {}, {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, text) errors[#errors + 1] = text end
 	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["core.fs.engine.paths"] = { shared = function() return path end }
-	package.loaded["infra.personal_info_fields"] = nil
-	local ok, detail = pcall(function() body(require("infra.personal_info_fields"), errors) end)
+	package.loaded["hotstrings.engine.catalogue.personal_info_fields"] = nil
+	local ok, detail = pcall(function() body(require("hotstrings.engine.catalogue.personal_info_fields"), errors) end)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	os.remove(path)
 	if not ok then error(detail, 0) end
@@ -66,7 +66,7 @@ helpers.describe("personal-info-policy-read", function()
 		assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
 		local code = string.format([[package.path = %q
 package.loaded["core.fs.engine.paths"] = { shared = function() return %q end }
-local fields = require("infra.personal_info_fields")
+local fields = require("hotstrings.engine.catalogue.personal_info_fields")
 assert(fields.is_masked("phone_number") == true, "an unreadable policy must mask even public fields")
 assert(fields.for_preview("0750399576", "phone_number") ~= "0750399576", "the preview must fail closed")
 ]], package.path, path)

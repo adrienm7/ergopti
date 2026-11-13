@@ -42,7 +42,7 @@ local corpus_path  = shared_root .. "/tests/corpus/hotstrings/vectors.json"
 package.path = table.concat({
 	driver_root .. "/?.lua",
 	driver_root .. "/?/init.lua",
-	driver_root .. "/modules/hotstrings/?.lua",
+	driver_root .. "/hotstrings/engine/?.lua",
 	shared_lua  .. "/?.lua",
 	shared_lua  .. "/?/init.lua",
 	driver_root .. "/tests/?.lua",
@@ -111,7 +111,7 @@ local function make_vkb(trigger, replacement, opts)
 	opts = opts or {}
 
 	-- Fresh engine instance — no cross-test leakage.
-	local engine_mod = require("modules.hotstrings.engine")
+	local engine_mod = require("hotstrings.engine.engine")
 	local engine     = engine_mod.new()
 
 	-- Every per-entry flag, driven off a list. Naming a subset is what broke this
@@ -418,7 +418,7 @@ end
 --- @return string screen What the application shows.
 --- @return number fired Expansions that fired.
 local function type_sequence(mappings, text)
-	local engine = require("modules.hotstrings.engine").new()
+	local engine = require("hotstrings.engine.engine").new()
 	local list = {}
 	for _, m in ipairs(mappings) do
 		local mapping = { trigger = m.trigger, replacement = m.replacement }

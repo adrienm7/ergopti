@@ -54,7 +54,7 @@ end
 --- @param payload table
 --- @return table log
 local function send(payload)
-	local handler = helpers.load_module("ui.hotstrings_config_window.bridge")
+	local handler = helpers.load_module("hotstrings.ui.hotstrings_config_window.bridge")
 	local config, log = recording_config()
 	handler.on_message(payload, { config = config })
 	return log
@@ -250,7 +250,7 @@ helpers.describe("config window: with no config module", function()
 		-- makeHostBridge is fire-and-forget, and only two of the fourteen shared
 		-- pages define window.__hostBridgeResponse at all. What must survive a
 		-- missing config module is the PUSH not throwing.
-		local handler = helpers.load_module("ui.hotstrings_config_window.bridge")
+		local handler = helpers.load_module("hotstrings.ui.hotstrings_config_window.bridge")
 
 		local pushed = {}
 		local manager = package.loaded["core.ui.ui.webview_manager"]

@@ -45,7 +45,7 @@ local RESET_MODULES = {
 	"modules.keystats.init", "modules.keystats.kc_bridge",
 	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.timestamp",
-	"modules.keystats.watchers", "modules.keymap", "tests.stubs.hs",
+	"modules.keystats.watchers", "hotstrings.engine.expander", "tests.stubs.hs",
 	"ui.metrics_typing",
 }
 
@@ -238,7 +238,7 @@ local function load_fixture(options)
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "foreign", nil end,
 	}
-	package.loaded["modules.keymap"] = { get_shift_side = function() return options.shift_side or "none" end }
+	package.loaded["hotstrings.engine.expander"] = { get_shift_side = function() return options.shift_side or "none" end }
 	package.loaded["menu.engine.manifest_reader"] = { default_for = function() return true end }
 	package.loaded["settings.engine.paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_eventtap_deferred" end,

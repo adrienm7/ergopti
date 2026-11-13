@@ -4,7 +4,7 @@
 ; MODULE: TOML Loader
 ; DESCRIPTION:
 ; Lightweight TOML reader used by ErgoptiPlus to load hotstring payloads and
-; feature metadata from ``..\..\..\..\infra\hotstrings\*.toml`` files, making the TOML the
+; feature metadata from ``..\..\..\..\hotstrings\engine\*.toml`` files, making the TOML the
 ; single source of truth for hotstrings, menu titles and submenu ordering.
 ;
 ; FEATURES & RATIONALE:
@@ -20,7 +20,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\..\..\_generated\config_keys.ahk
-#Include ../../../../infra/hotstrings/common_autocorrection_migration.ahk
+#Include ../../../../hotstrings/engine/catalogue/common_autocorrection_migration.ahk
 
 ; Holds the raw UTF-8 content of every TOML file that has been read this
 ; session, keyed by absolute file path. Large category files (autocorrection.toml,
@@ -55,7 +55,7 @@ global _HOTSTRING_SIMPLE_ENTRY_PATTERN :=
 ; `[[snippets]]` are both valid and both register hotstrings.
 ;
 ; Named and shared because the extension-pack PREVIEW indexer
-; (infra/hotstrings/hotstring_registry.ahk) parses the same files and used to
+; (hotstrings/engine/matcher/registry.ahk) parses the same files and used to
 ; accept double brackets only, resetting its current section on anything else.
 ; A pack written with single-bracket headers therefore expanded — the engine
 ; accepted it here — while never being indexed for the tooltip, so it could never
@@ -514,7 +514,7 @@ _HotstringsSectionAdmit(CategoryName, SectionName, FeatureConfig) {
 		}
 
 		; Fast path — bundled categories served from the self-healing .tsv cache.
-		; HotstringsCacheEnsure (infra/hotstrings/hotstrings_cache.ahk) loads the cache
+		; HotstringsCacheEnsure (hotstrings/engine/catalogue/cache.ahk) loads the cache
 		; once and populates _GENERATED_HOTSTRINGS with a registrar per cached section;
 		; a cache miss leaves the map empty so we fall through to the TOML parse below.
 		HotstringsCacheEnsure()
@@ -532,7 +532,7 @@ _HotstringsSectionAdmit(CategoryName, SectionName, FeatureConfig) {
 }
 
 ; Register every hotstring of a given [[section]] defined inside a TOML file
-; located under ..\..\..\..\infra\hotstrings\<CategoryName>.toml (relative to the script).
+; located under ..\..\..\..\hotstrings\engine\<CategoryName>.toml (relative to the script).
 ; Hotstrings flagged as commented-out in TOML (line starting with "#") are
 ; skipped, mirroring AHK source lines starting with ";".
 LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {

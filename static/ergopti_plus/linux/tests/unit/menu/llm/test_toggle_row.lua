@@ -171,16 +171,16 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 	--- This fixture owns that dependency rather than inheriting another test's
 	--- initialized physical-source owner or its expired private config path.
 	local function with_unavailable_source(body)
-		local saved_source = package.loaded["modules.hotstrings.magic_key_source"]
-		local saved_magic = package.loaded["modules.hotstrings.magic_key"]
-		package.loaded["modules.hotstrings.magic_key_source"] = {
+		local saved_source = package.loaded["hotstrings.engine.magic_key_source"]
+		local saved_magic = package.loaded["hotstrings.engine.magic_key"]
+		package.loaded["hotstrings.engine.magic_key_source"] = {
 			editor_source = function() return { generation = 1, status = "unavailable", candidates = {} } end,
 			known_codes = function() return {} end,
 		}
-		package.loaded["modules.hotstrings.magic_key"] = { get = function() return "★" end, is_customised = function() return false end }
+		package.loaded["hotstrings.engine.magic_key"] = { get = function() return "★" end, is_customised = function() return false end }
 		local ok, err = pcall(body)
-		package.loaded["modules.hotstrings.magic_key_source"] = saved_source
-		package.loaded["modules.hotstrings.magic_key"] = saved_magic
+		package.loaded["hotstrings.engine.magic_key_source"] = saved_source
+		package.loaded["hotstrings.engine.magic_key"] = saved_magic
 		if not ok then error(err, 0) end
 	end
 

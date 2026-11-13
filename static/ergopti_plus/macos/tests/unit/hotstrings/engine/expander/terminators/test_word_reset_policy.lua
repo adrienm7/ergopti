@@ -1,0 +1,364 @@
+--- tests/unit/hotstrings/engine/expander/terminators/test_word_reset_policy.lua
+
+--- ==============================================================================
+--- MODULE: Word Reset After A Pause Or A Click
+--- DESCRIPTION:
+--- After a pause without typing, the keymap kept the previous word: its timeout
+--- was derived from the largest expansion delay and was "never" as soon as one
+--- delay was 0, which every shipped configuration has. The first key after the
+--- pause was read as the middle of that word, so word-start hotstrings stayed
+--- silent. A mouse click emptied the buffer but declared the new run mid-word,
+--- with the same effect. Both now follow hotstrings.idle_reset_seconds (default
+--- 3 s, 0 = never) and hotstrings.click_resets_word (default true), driven here
+--- through the real keyDown and mouse taps.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local Manifest = require("menu.engine.manifest_reader")
+local HotstringCore = require("hotstrings.engine.matcher.engine")
+
+--- Loads the real keymap with its taps captured and its LLM bridge inert.
+--- @return table fixture
+local function load_keymap()
+	for name in pairs(package.loaded) do
+		if type(name) == "string" and (name:match("^hotstrings%.engine%.expander") or name:match("^ai%.engine")
+			or name == "platform.input.synthetic_input" or name == "diagnostics.adapters.event_provenance") then
+			package.loaded[name] = nil
+		end
+	end
+	package.loaded["ai.engine.bridge"] = setmetatable({
+		init = function() return true end,
+		handle_llm_keys = function() return false end,
+		check_escape_reset = function() return false end,
+		get_llm_enabled = function() return false end,
+		is_runtime_available = function() return true end,
+		reset_for_action_epoch = function() return true end,
+	}, { __index = function() return function() end end })
+
+	local scheduler = require("core.events.timer_scheduler")
+	local scheduler_hs = hs
+	local original_awake = scheduler.hotstring_time
+	scheduler.hotstring_time = function() return original_awake() + 10000 end
+	local state = nil
+	local RealState = require("hotstrings.engine.expander.state")
+	package.loaded["hotstrings.engine.expander.state"] = setmetatable({
+		new = function(...)
+			state = RealState.new(...)
+			return state
+		end,
+	}, { __index = RealState })
+
+	package.loaded["tests.stubs.hs"] = nil
+	local base_hs = require("tests.stubs.hs")
+	local taps = {}
+	local eventtap = {}
+	for key, value in pairs(base_hs.eventtap) do eventtap[key] = value end
+	eventtap.new = function(types, callback)
+		local tap = {
+			types = types, callback = callback, enabled = true,
+			start = function(self) self.enabled = true; return self end,
+			stop = function(self) self.enabled = false; return self end,
+			isEnabled = function(self) return self.enabled end,
+		}
+		taps[#taps + 1] = tap
+		return tap
+	end
+	local keymap = helpers.load_with_stubs("hotstrings.engine.expander", { eventtap = eventtap })
+	local Utils = require("hotstrings.engine.expander.utils")
+	Utils.is_ignored_window = function() return false, 1 end
+	Utils.is_secure_field = function() return false, 1 end
+	local hs_stub = require("hs")
+	local types = hs_stub.eventtap.event.types
+	local keydown, mouse = nil, nil
+	for _, tap in ipairs(taps) do
+		if #tap.types == 1 and tap.types[1] == types.keyDown then keydown = tap.callback end
+		if tap.types[1] == types.leftMouseDown then mouse = tap.callback end
+	end
+	helpers.assert_not_nil(keydown, "the production keyDown tap must be created")
+	helpers.assert_not_nil(mouse, "the production mouse tap must be created")
+	helpers.assert_not_nil(state, "the keymap must build its state through the state module")
+
+	local function event(event_type, keycode, chars)
+		local properties = hs_stub.eventtap.event.properties
+		return {
+			getType = function() return event_type end,
+			getKeyCode = function() return keycode end,
+			getFlags = function() return {} end,
+			getCharacters = function() return chars or "" end,
+			getProperty = function(_self, property)
+				if property == properties.eventSourceUserData then return 0 end
+				return hs_stub.processInfo.processID
+			end,
+		}
+	end
+	return {
+		keymap = keymap,
+		state = state,
+		clock_hs = scheduler_hs,
+		now = function() return scheduler.hotstring_time() end,
+		type_char = function(chars) return keydown(event(types.keyDown, 0, chars)) end,
+		backspace = function() return keydown(event(types.keyDown, 51, "")) end,
+		click = function() return mouse(event(types.leftMouseDown, 0)) end,
+		cleanup = function()
+			scheduler.hotstring_time = original_awake
+			for name in pairs(package.loaded) do
+				if type(name) == "string" and name:match("^hotstrings%.engine%.expander") then package.loaded[name] = nil end
+			end
+		end,
+	}
+end
+
+--- Runs a body against a fresh keymap and always unloads it.
+--- @param body function Receives the fixture.
+local function with_keymap(body)
+	local fixture = load_keymap()
+	-- The first key binds the window context, which itself starts a new run;
+	-- type it before the scenario so only the pause or the click is observed.
+	local ok, err = pcall(fixture.type_char, "x")
+	if ok then ok, err = pcall(body, fixture) end
+	fixture.cleanup()
+	if not ok then error(err, 0) end
+end
+
+--- Leaves the buffer mid-word, as if "abc" had been typed `pause` seconds ago.
+--- @param fixture table
+--- @param pause number Seconds since the previous key.
+local function mid_word(fixture, pause)
+	fixture.state.buffer = "abc"
+	fixture.state.start_is_word_boundary = false
+	fixture.state.last_key_time = fixture.now() - pause
+end
+
+helpers.describe("hotstring backspace with composed characters (hotstring-grapheme-backspace)", function()
+	helpers.it("does not retain a fragment of a deleted combining sequence", function()
+		with_keymap(function(f)
+			for _, text in ipairs({
+				"ze" .. utf8.char(0x0301), "z👍🏽", "z👨‍👩‍👧", "z🇫🇷", "z❤️", "zé", "za",
+			}) do
+				f.state.buffer = text
+				f.state.start_is_word_boundary = true
+				f.backspace()
+				helpers.assert_eq(f.state.buffer, "z", "Backspace removes exactly the final composed character")
+			end
+			f.state.buffer = "e" .. utf8.char(0x0301)
+			f.backspace()
+			helpers.assert_eq(f.state.buffer, "", "the app deletes the composed character, not just its mark")
+			f.state.buffer = "z" .. string.char(0xFF)
+			f.state.start_is_word_boundary = true
+			f.backspace()
+			helpers.assert_eq(f.state.buffer, "")
+			helpers.assert_eq(f.state.start_is_word_boundary, false, "invalid UTF-8 cannot prove a word boundary")
+		end)
+	end)
+end)
+
+helpers.describe("hotstring Unicode buffer cap (hotstring-buffer-codepoints)", function()
+	helpers.it("keeps at most 500 codepoints without dropping shorter multibyte text", function()
+		with_keymap(function(f)
+			f.state.buffer = ""
+			f.type_char(string.rep("a", 501))
+			helpers.assert_eq(f.state.buffer, string.rep("a", 500), "ASCII is capped by characters, not bytes")
+			helpers.assert_eq(f.state.start_is_word_boundary, false)
+			f.state.buffer, f.state.start_is_word_boundary = "", true
+			f.type_char(string.rep("é", 300))
+			helpers.assert_eq(f.state.buffer, string.rep("é", 300), "300 multibyte characters fit")
+			helpers.assert_eq(f.state.start_is_word_boundary, true, "an untrimmed boundary remains valid")
+			f.state.buffer = ""
+			f.type_char(string.rep("😀", 501))
+			helpers.assert_eq(f.state.buffer, string.rep("😀", 500), "emoji count as codepoints")
+		end)
+	end)
+end)
+
+helpers.describe("hotstrings.idle_reset_seconds: a pause starts a new word", function()
+	helpers.it("ships 3 s and a click that starts a word, from the manifest", function()
+		helpers.assert_eq(Manifest.default_for("hotstrings.idle_reset_seconds"), 3)
+		helpers.assert_eq(Manifest.default_for("hotstrings.click_resets_word"), true)
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.get_idle_reset_seconds(), 3)
+			helpers.assert_eq(f.state.WORD_TIMEOUT_SEC, 3,
+				"the delays must no longer turn the shipped pause into never")
+			helpers.assert_eq(f.keymap.is_click_resets_word_enabled(), true)
+		end)
+	end)
+
+	helpers.it("expires suppression after wall-clock rollback on the real key tap (hotstring-clock-regression)", function()
+		with_keymap(function(f)
+			local scheduler = require("core.events.timer_scheduler")
+			local old_awake, old_wall = scheduler.hotstring_time, hs.timer.secondsSinceEpoch
+			local awake, wall = 1000, 1000
+			scheduler.hotstring_time = function() return awake end
+			hs.timer.secondsSinceEpoch = function() return wall end
+			local ok, err = pcall(function()
+				f.state.suppress_rescan(0.5)
+				awake, wall = 1001, 941
+				f.type_char("d")
+				helpers.assert_eq(f.state.buffer, "d", "a civil clock rollback must not extend suppression")
+			end)
+			scheduler.hotstring_time, hs.timer.secondsSinceEpoch = old_awake, old_wall
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("expires suppression after sleep on the real key tap (hotstring-clock-wake)", function()
+		with_keymap(function(f)
+			local scheduler = require("core.events.timer_scheduler")
+			local old_awake, old_wall = scheduler.awake_time, f.clock_hs.timer.secondsSinceEpoch
+			local awake, wall = 20000, 50000
+			scheduler.awake_time = function() return awake end
+			f.clock_hs.timer.secondsSinceEpoch = function() return wall end
+			local ok, err = pcall(function()
+				f.state.suppress_rescan(0.5)
+				awake, wall = 20000.1, 50060.1
+				f.type_char("d")
+				helpers.assert_eq(f.state.buffer, "d", "sleep must consume the suppression window")
+			end)
+			scheduler.awake_time, f.clock_hs.timer.secondsSinceEpoch = old_awake, old_wall
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("a pause of the configured length restarts the buffer at a word start", function()
+		with_keymap(function(f)
+			mid_word(f, 3)
+			helpers.assert_eq(f.type_char("d"), false, "the letter is typed")
+			helpers.assert_eq(f.state.buffer, "d", "the previous word is forgotten")
+			helpers.assert_eq(f.state.start_is_word_boundary, true,
+				"a word-start hotstring may fire on the new run")
+		end)
+	end)
+
+	helpers.it("a shorter pause keeps the word in progress", function()
+		with_keymap(function(f)
+			mid_word(f, 2)
+			f.type_char("d")
+			helpers.assert_eq(f.state.buffer, "abcd")
+			helpers.assert_eq(f.state.start_is_word_boundary, false)
+		end)
+	end)
+
+	helpers.it("0 disables the reset whatever the pause", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.set_idle_reset_seconds(0), true)
+			mid_word(f, 3600)
+			f.type_char("d")
+			helpers.assert_eq(f.state.buffer, "abcd")
+			helpers.assert_eq(f.state.start_is_word_boundary, false)
+		end)
+	end)
+
+	helpers.it("a custom delay is applied live", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.set_idle_reset_seconds(7.5), true)
+			mid_word(f, 5)
+			f.type_char("d")
+			helpers.assert_eq(f.state.buffer, "abcd", "5 s is no pause under a 7.5 s setting")
+			mid_word(f, 8)
+			f.type_char("d")
+			helpers.assert_eq(f.state.buffer, "d")
+		end)
+	end)
+
+	helpers.it("the first key ever is never a pause", function()
+		with_keymap(function(f)
+			f.state.buffer = "abc"
+			f.state.start_is_word_boundary = false
+			f.state.last_key_time = 0
+			f.type_char("d")
+			helpers.assert_eq(f.state.buffer, "abcd")
+		end)
+	end)
+
+	for _, invalid in ipairs({ -1, 0 / 0, math.huge, "3", true }) do
+		helpers.it("refuses the idle value " .. tostring(invalid), function()
+			with_keymap(function(f)
+				helpers.assert_eq(f.keymap.set_idle_reset_seconds(invalid), false)
+				helpers.assert_eq(f.keymap.get_idle_reset_seconds(), 3)
+			end)
+		end)
+	end
+end)
+
+helpers.describe("hotstrings.cascade_max_arrows: how many expansions a chain may hold", function()
+	helpers.it("ships at three arrows, the manifest default", function()
+		helpers.assert_eq(Manifest.default_for("hotstrings.cascade_max_arrows"), 3)
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.get_cascade_max_arrows(), 3)
+			helpers.assert_eq(f.state.CASCADE_MAX_ARROWS, 3, "the expander reads the state field")
+		end)
+	end)
+
+	helpers.it("is applied live and read back", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.set_cascade_max_arrows(2), true)
+			helpers.assert_eq(f.keymap.get_cascade_max_arrows(), 2)
+			helpers.assert_eq(f.state.CASCADE_MAX_ARROWS, 2)
+			helpers.assert_eq(f.keymap.set_cascade_max_arrows(1), true)
+			helpers.assert_eq(f.state.CASCADE_MAX_ARROWS, 1)
+		end)
+	end)
+
+	for _, invalid in ipairs({ 0, 11, -1, 1.5, 0 / 0, math.huge, "2", true }) do
+		helpers.it("refuses the cascade arrow count " .. tostring(invalid), function()
+			with_keymap(function(f)
+				helpers.assert_eq(f.keymap.set_cascade_max_arrows(1), true)
+				helpers.assert_eq(f.keymap.set_cascade_max_arrows(invalid), false)
+				helpers.assert_eq(f.keymap.get_cascade_max_arrows(), 1, "a refused arrow count leaves the live one")
+			end)
+		end)
+	end
+end)
+
+helpers.describe("hotstrings.click_resets_word: a click starts a new word", function()
+	helpers.it("on, the run after a click starts a word", function()
+		with_keymap(function(f)
+			mid_word(f, 0)
+			f.click()
+			helpers.assert_eq(f.state.buffer, "")
+			helpers.assert_eq(f.state.start_is_word_boundary, true)
+		end)
+	end)
+
+	helpers.it("off, the click still empties the buffer but the run is mid-word", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.set_click_resets_word(false), true)
+			mid_word(f, 0)
+			f.click()
+			helpers.assert_eq(f.state.buffer, "")
+			helpers.assert_eq(f.state.start_is_word_boundary, false)
+		end)
+	end)
+
+	helpers.it("refuses a non-boolean", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.set_click_resets_word("yes"), false)
+			helpers.assert_eq(f.keymap.is_click_resets_word_enabled(), true)
+		end)
+	end)
+end)
+
+helpers.describe("shared idle-reset rule as the macOS driver uses it", function()
+	helpers.it("resets at the delay, not before, and never when disabled", function()
+		helpers.assert_eq(HotstringCore.idle_resets_word(1000, 4000, 3, 0), true)
+		helpers.assert_eq(HotstringCore.idle_resets_word(1000, 3999, 3, 0), false)
+		helpers.assert_eq(HotstringCore.idle_resets_word(nil, 999999, 3, 0), false)
+		helpers.assert_eq(HotstringCore.idle_resets_word(0, 999999, 0, 0), false)
+		helpers.assert_eq(HotstringCore.idle_resets_word(1000, 4000, 3, 1000), false,
+			"a gap no wider than the clock resolution plus the delay is no proven pause")
+	end)
+
+	helpers.it("validates the stored value", function()
+		helpers.assert_eq(HotstringCore.valid_idle_reset_seconds(0), true)
+		helpers.assert_eq(HotstringCore.valid_idle_reset_seconds(2.5), true)
+		for _, invalid in ipairs({ -0.5, 0 / 0, math.huge, "3", nil }) do
+			helpers.assert_eq(HotstringCore.valid_idle_reset_seconds(invalid), false)
+		end
+		local ok, err = pcall(HotstringCore.idle_resets_word, 0, 1, -1, 0)
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("idle delay", 1, true) ~= nil, "the refusal names the idle delay")
+	end)
+end)
+
+require("tests.lua.hotstrings.idle_clock_contract").register(helpers)
+
+return true

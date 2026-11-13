@@ -342,7 +342,7 @@ local _test_capture_event = nil
 
 local function _get_input_reader()
 	if _input_reader then return _input_reader end
-	local ok, mod = pcall(require, "modules.hotstrings.input_reader")
+	local ok, mod = pcall(require, "hotstrings.engine.input_reader")
 	if ok then
 		_input_reader = mod
 	else
@@ -705,7 +705,7 @@ local function _input_runtime_current(ctx, active)
 			or rawget(M, name) ~= port then return false end
 	end
 	if type(ctx.finder) ~= "table" or type(ctx.classify_source) ~= "function"
-		or package.loaded["modules.hotstrings.device_finder"] ~= ctx.finder
+		or package.loaded["hotstrings.engine.device_finder"] ~= ctx.finder
 		or rawget(ctx.finder, "physical_sources") ~= ctx.classify_source then return false end
 	local output = ctx.output_issuer
 	if not output or output ~= _input_output_owner or output.broker ~= ctx.broker
@@ -766,7 +766,7 @@ do
 		if not view or view.origin ~= "native-evdev" or view.source ~= source or view.code ~= code or view.value ~= 1
 			or not down or down.origin ~= origin or not _remapper_input_owner then return nil end
 		local hook_ports = {}; for _,name in ipairs(INPUT_HOOK_PORT_NAMES) do hook_ports[name] = rawget(M,name) end
-		local finder = package.loaded["modules.hotstrings.device_finder"]
+		local finder = package.loaded["hotstrings.engine.device_finder"]
 		local record = {engine=engine,generation=_remapper_generation,issuer=_remapper_input_owner,origin=origin,
 			engine_release_all=rawget(engine,"release_all"),engine_ack_retirement=rawget(engine,"ack_retirement"),
 			view=view,source=source,stamp=stamp,down=down,at_ms=at_ms,hook_ports=hook_ports,
@@ -1537,7 +1537,7 @@ function _number_row.binding(record)
 	return output.writer.capture_kernel_source == record.kernel_capture
 		and output.writer.kernel_source_ports == record.kernel_ports
 		and XkbCapture.capture_receiving_rows == record.capture_rows and XkbCapture.receiving_row_ports == record.row_ports
-		and package.loaded["modules.hotstrings.device_finder"] == record.finder
+		and package.loaded["hotstrings.engine.device_finder"] == record.finder
 		and rawget(record.finder, "physical_sources") == record.source_inventory
 end
 function _number_row.input_allowed(record, source)
@@ -1625,7 +1625,7 @@ function _number_row.construct()
 		or not _input_exports_current() or _source_reconciliation then return false end
 	local output, options = _input_output_owner, _capture_options
 	local writer = output.writer
-	local finder = require("modules.hotstrings.device_finder")
+	local finder = require("hotstrings.engine.device_finder")
 	local source_inventory = rawget(finder, "physical_sources")
 	if type(source_inventory) ~= "function" then return false end
 	local writer_name = require("platform.input.device_names").VIRTUAL_KEYBOARD
@@ -2011,7 +2011,7 @@ local function _run_owned_tap_frame(frame, tap, binding, exact, original_generat
 				"begin_delivery", "end_delivery", "release_all", "ack_retirement", "take_custody", "output_holder" }) do
 				engine_ports[name] = rawget(exact, name)
 			end
-			local finder = package.loaded["modules.hotstrings.device_finder"]
+			local finder = package.loaded["hotstrings.engine.device_finder"]
 			_live_input_context = { engine = exact, generation = original_generation,
 				hook_ports = hook_ports, engine_ports = engine_ports, finder = finder, classify_source = type(finder) == "table" and rawget(finder, "physical_sources") or nil,
 				issuer = _remapper_input_owner, origin = origin, source = source,
@@ -2151,7 +2151,7 @@ local function position_runtime(record)
 		or not _input_exports_current()
 		or not rawequal(package.loaded["adapters.xkb_capture"], XkbCapture)
 		or rawget(XkbCapture, "source_generation") ~= position_capture.source
-		or not rawequal(package.loaded["modules.hotstrings.device_finder"], record.finder)
+		or not rawequal(package.loaded["hotstrings.engine.device_finder"], record.finder)
 		or type(record.finder) ~= "table" or type(record.classify) ~= "function"
 		or rawget(record.finder, "physical_sources") ~= record.classify then return false end
 	for name, port in pairs(position_capture.exports) do
@@ -2183,7 +2183,7 @@ function M.position_capture_available()
 	if position_capture.busy or position_capture.pending or type(position_capture.source) ~= "function" then return false end
 	local info = debug.getinfo(position_capture.source, "S")
 	if not info or not HookModuleSource.same(info.source, position_capture.source_file, hook_directory) then return false end
-	local finder = package.loaded["modules.hotstrings.device_finder"]
+	local finder = package.loaded["hotstrings.engine.device_finder"]
 	if type(finder) ~= "table" then return false end
 	return position_runtime({ session = _capture_session, options = _capture_options,
 		sources = _input_source_owners, observers = _input_source_observers, origin = _origin_generation,
@@ -2199,7 +2199,7 @@ function M.capture_position(current, receive)
 		or type(receive) ~= "function" or position_capture.exports.position_capture_available() ~= true then return nil end
 	local info = debug.getinfo(position_capture.source, "S")
 	if not info or not HookModuleSource.same(info.source, position_capture.source_file, hook_directory) then return nil end
-	local finder = package.loaded["modules.hotstrings.device_finder"]
+	local finder = package.loaded["hotstrings.engine.device_finder"]
 	if type(finder) ~= "table" or type(rawget(finder, "physical_sources")) ~= "function" then return nil end
 	local token = {}
 	local record = { current = current, receive = receive, token = token, session = _capture_session,
@@ -3343,7 +3343,7 @@ end
 --- Rechecks the existing capture owner's kernel origin without a new watcher.
 --- @return table receipt Physical-source generation and admission.
 function M.physical_source_receipt()
-	local ok, Finder = pcall(require, "modules.hotstrings.device_finder")
+	local ok, Finder = pcall(require, "hotstrings.engine.device_finder")
 	local sources = ok and type(Finder.physical_sources) == "function" and Finder.physical_sources(_devices) or {}
 	local ready = _running and _intercept and #_devices > 0 and #sources == #_devices
 	local signature, physical = { tostring(ready) }, {}
@@ -3364,7 +3364,7 @@ end
 --- Resolves every device the daemon should be reading right now.
 --- @return table keyboards, table pointers
 local function _best_devices()
-	local ok_df, df = pcall(require, "modules.hotstrings.device_finder")
+	local ok_df, df = pcall(require, "hotstrings.engine.device_finder")
 	if not ok_df then return {}, {} end
 	if type(df.find_devices) == "function" then
 		local ok_find, keyboards, pointers = pcall(df.find_devices)
@@ -3378,7 +3378,7 @@ local function _best_devices()
 end
 
 local function _best_pointers()
-	local ok_df, df = pcall(require, "modules.hotstrings.device_finder")
+	local ok_df, df = pcall(require, "hotstrings.engine.device_finder")
 	if not ok_df then return {} end
 	if type(df.find_pointers) == "function" then
 		local ok_find, pointers = pcall(df.find_pointers)
@@ -3786,7 +3786,7 @@ local function _acquire(paths, force_path, tx)
 				-- Discovery is a pathname snapshot. Only the opened fd identifies
 				-- the complete stream this grab would take from the desktop.
 				local query = _input_reader_ports.event_capabilities
-				local finder = package.loaded["modules.hotstrings.device_finder"]
+				local finder = package.loaded["hotstrings.engine.device_finder"]
 				local policy = type(finder) == "table" and rawget(finder, "is_interceptable_event_mask")
 				local called, mask = false, nil
 				if type(query) == "function" and rawget(EvdevReader, "event_capabilities") == query then
@@ -3795,7 +3795,7 @@ local function _acquire(paths, force_path, tx)
 				local checked, allowed = false, false
 				if called and mask ~= nil and type(policy) == "function" then checked, allowed = pcall(policy, mask) end
 				if not checked or allowed ~= true or rawget(EvdevReader, "event_capabilities") ~= query
-					or package.loaded["modules.hotstrings.device_finder"] ~= finder
+					or package.loaded["hotstrings.engine.device_finder"] ~= finder
 					or rawget(finder, "is_interceptable_event_mask") ~= policy
 					or tx and not _source_transaction_current(tx) then
 					_close_paths(opened, keyboard_slot, tx)
@@ -4075,7 +4075,7 @@ function M.check_device()
 			-- reuses eventN numbers across hotplug: the exact path may now name a
 			-- mouse or another non-keyboard node. start() refuses those, so the
 			-- watchdog must not adopt one behind its back and grab it as a keyboard.
-			local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
+			local ok_finder, Finder = pcall(require, "hotstrings.engine.device_finder")
 			local validate = ok_finder and Finder.is_key_device
 			if ok_finder and _intercept then validate = Finder.is_interceptable_key_device end
 			if type(validate) ~= "function" then
@@ -4425,7 +4425,7 @@ function M.start(opts)
 	-- Required through pcall like the other two uses in this file: the finder reads
 	-- /proc, and a runtime without it must fail HERE with a reason rather than at
 	-- the first keystroke that never comes.
-	local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
+	local ok_finder, Finder = pcall(require, "hotstrings.engine.device_finder")
 	local validate = ok_finder and Finder.is_key_device
 	if ok_finder and _intercept then validate = Finder.is_interceptable_key_device end
 	if type(validate) ~= "function" then
@@ -4509,7 +4509,7 @@ function M.valid_layout(layout)
 		Logger.error(LOG, "set_layout(): a layout name is required — layout unchanged.")
 		return false
 	end
-	local reader = require("modules.hotstrings.input_reader")
+	local reader = require("hotstrings.engine.input_reader")
 	local known = type(reader.get_layouts) == "function" and reader.get_layouts() or nil
 	if known and not known[layout] then
 		-- Named but unknown is worse than refused: `LAYOUTS[layout] or

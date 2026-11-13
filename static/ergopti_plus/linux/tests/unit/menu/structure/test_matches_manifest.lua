@@ -230,14 +230,14 @@ end
 --- Native editing is not exercised by this menu-shape fixture.
 local function build_fixture_menu(context)
 	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations",
-		"core.fs.adapters.storage", "ui.hotstring_editor.bridge", "gestures.ui.conflicts",
+		"core.fs.adapters.storage", "hotstrings.ui.hotstring_editor.bridge", "gestures.ui.conflicts",
 		"core.i18n.engine.i18n", "menu.engine.manifest_menu"}
 	local magic_path, editor_directory, editor_source, editor_fs
 	local original_getenv, original_i18n_safe = os.getenv, rawget(_G, "i18n_safe")
 	local all_previous = {}; for name, value in pairs(package.loaded) do all_previous[name] = value end
 	if context.magic_key_source == nil then
-		names[#names + 1] = "modules.hotstrings.magic_key_source"
-		names[#names + 1] = "infra.hotstring_preferences"
+		names[#names + 1] = "hotstrings.engine.magic_key_source"
+		names[#names + 1] = "hotstrings.engine.matcher.preferences"
 	end
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local ok, rows = pcall(function()
@@ -251,16 +251,16 @@ local function build_fixture_menu(context)
 			if name == "XDG_CONFIG_HOME" then return editor_directory end
 			return original_getenv(name)
 		end
-		rawset(package.loaded, "core.fs.adapters.storage", nil); rawset(package.loaded, "ui.hotstring_editor.bridge", nil)
-		helpers.assert_eq(require("ui.hotstring_editor.bridge").get_pref("default_section"), "",
+		rawset(package.loaded, "core.fs.adapters.storage", nil); rawset(package.loaded, "hotstrings.ui.hotstring_editor.bridge", nil)
+		helpers.assert_eq(require("hotstrings.ui.hotstring_editor.bridge").get_pref("default_section"), "",
 			"the real editor reads the independent neutral default-section source")
 		if context.magic_key_source == nil then
 			magic_path = os.tmpname()
 			local source = assert(io.open(magic_path, "wb"))
 			assert(source:write('[hotstrings]\nmagic_key_source = "auto"\n')); assert(source:close())
-			local preferences = helpers.load_module("infra.hotstring_preferences")
+			local preferences = helpers.load_module("hotstrings.engine.matcher.preferences")
 			assert(preferences._set_file_for_test(magic_path))
-			context.magic_key_source = helpers.load_module("modules.hotstrings.magic_key_source")
+			context.magic_key_source = helpers.load_module("hotstrings.engine.magic_key_source")
 			helpers.assert_eq(context.magic_key_source.get(), "auto", "whole-tray fixture owns the actual automatic source")
 		end
 		local Paths = require("core.fs.engine.paths")
@@ -1242,15 +1242,15 @@ require("tests.lua.menu.native_child_rows").run(helpers, require("menu.engine.ma
 
 helpers.describe("magic key source: actual complete tray provider", function()
 	helpers.it("(magic-key-source-family) native candidate rows preserve file-backed choices and declaration withdrawal", function()
-		local names = { "modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }
+		local names = { "hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb")); assert(file:write('[hotstrings]\nmagic_key_source = "KeyJ"\nfuture_setting = "retain"\n')); assert(file:close())
 		local declaration = ManifestMenu.get_root()
 		local child = declaration.magic_key_source_children
 		local ok, err = pcall(function()
-			local preferences = require("infra.hotstring_preferences"); assert(preferences._set_file_for_test(path))
-			local Source = require("modules.hotstrings.magic_key_source")
+			local preferences = require("hotstrings.engine.matcher.preferences"); assert(preferences._set_file_for_test(path))
+			local Source = require("hotstrings.engine.magic_key_source")
 			local changes, deferred = 0, {}
 			Source.init({ is_active = function() return true end, replace_on = function() return true end,
 				magic_key = function() return "★" end, can_type = function() return true end,

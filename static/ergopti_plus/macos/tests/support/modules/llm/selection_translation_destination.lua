@@ -71,9 +71,9 @@ function M.attach(world, application)
 		end,
 		observer = { new = function() return watcher(function() end) end },
 	}
-	package.loaded["modules.keymap.utils"] = nil
+	package.loaded["hotstrings.engine.expander.utils"] = nil
 	package.loaded["platform.focus.secure_field_detector"] = nil
-	native.utils = require("modules.keymap.utils")
+	native.utils = require("hotstrings.engine.expander.utils")
 	native.utils.start_ignored_win_tracking({}, {})
 	-- A normal asynchronous classification, rather than a fabricated receipt.
 	native.utils.is_ignored_window({}, {})

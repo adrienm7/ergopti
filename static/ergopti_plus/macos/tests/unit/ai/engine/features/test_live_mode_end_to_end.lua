@@ -106,7 +106,7 @@ local function build_world()
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return false end }
+	package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return false end }
 	package.loaded["modules.shortcuts.script_control"] = {
 		is_paused = function() return world.paused end,
 	}
@@ -194,7 +194,7 @@ local function build_world()
 	engine.set_llm_sequential_mode(false)
 	engine.set_llm_debounce(MENU_DEBOUNCE_SEC)
 	engine.set_llm_min_words(MENU_MIN_WORDS)
-	package.loaded["modules.keymap"] = {
+	package.loaded["hotstrings.engine.expander"] = {
 		request_prompt_prediction = engine.request_prompt_prediction,
 		request_manual_prediction = engine.request_manual_prediction,
 		toggle_live_prompt = engine.toggle_live_prompt,
@@ -572,12 +572,12 @@ helpers.describe("retained live shortcut stop", function()
 		local world = build_world()
 		helpers.assert_true(toggle(world, "translate_en"))
 		local before = world.engine.get_live_prompt()
-		local keymap = package.loaded["modules.keymap"]
-		package.loaded["modules.keymap"] = {}
+		local keymap = package.loaded["hotstrings.engine.expander"]
+		package.loaded["hotstrings.engine.expander"] = {}
 		local result = toggle(world, "translate_en")
 		helpers.assert_true(result, "the registered action keeps dispatch ownership without a guessed bridge")
 		helpers.assert_eq(world.engine.get_live_prompt(), before)
-		package.loaded["modules.keymap"] = keymap
+		package.loaded["hotstrings.engine.expander"] = keymap
 		helpers.assert_true(toggle(world, "translate_en"))
 		helpers.assert_nil(world.engine.get_live_prompt())
 		helpers.assert_true(notice_is(world.notices[#world.notices], "llm.live.off"))
@@ -588,7 +588,7 @@ helpers.describe("retained live shortcut stop", function()
 		local world = build_world()
 		local i18n = require("core.i18n.engine.i18n")
 		local saved_get, spec = i18n.get, corpus()
-		local keymap, calls = package.loaded["modules.keymap"], 0
+		local keymap, calls = package.loaded["hotstrings.engine.expander"], 0
 		local ok, err = xpcall(function()
 			for _, code in ipairs(spec.locales) do
 				local file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. code .. ".json"), "r"))
@@ -603,7 +603,7 @@ helpers.describe("retained live shortcut stop", function()
 			helpers.assert_true(toggle(world, "translate_en"))
 			local before = world.engine.get_live_prompt()
 			for _, refusal in ipairs(spec.refusals) do
-				package.loaded["modules.keymap"] = { toggle_live_prompt = function(value)
+				package.loaded["hotstrings.engine.expander"] = { toggle_live_prompt = function(value)
 					calls = calls + 1; helpers.assert_eq(value, "translate_en")
 					if refusal == "throw" then error("owned live refusal") end
 					if refusal == "number" then return 2 end
@@ -617,7 +617,7 @@ helpers.describe("retained live shortcut stop", function()
 				helpers.assert_eq(world.engine.get_live_prompt(), before)
 			end
 		end, debug.traceback)
-		i18n.get = saved_get; package.loaded["modules.keymap"] = keymap
+		i18n.get = saved_get; package.loaded["hotstrings.engine.expander"] = keymap
 		helpers.assert_true(ok, err); helpers.assert_eq(calls, #spec.refusals)
 		assert_menu_untouched(world)
 	end)

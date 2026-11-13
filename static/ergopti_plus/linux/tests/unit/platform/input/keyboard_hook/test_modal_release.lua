@@ -150,9 +150,9 @@ helpers.describe("keyboard_hook.while_released: native refusal never blocks a gr
 		local Reader = helpers.load_module("platform.input.evdev_reader")
 		local paths = { os.tmpname(), os.tmpname() }
 		for _, path in ipairs(paths) do local file = assert(io.open(path, "w")); file:close() end
-		local saved_finder = package.loaded["modules.hotstrings.device_finder"]
+		local saved_finder = package.loaded["hotstrings.engine.device_finder"]
 		local saved_xkb = package.loaded["adapters.xkb_capture"]
-		package.loaded["modules.hotstrings.device_finder"] = {
+		package.loaded["hotstrings.engine.device_finder"] = {
 			find_devices = function() return paths, {} end,
 			is_key_device = function() return true end,
 			-- Controlled keyboard sources have no REL/ABS axes.
@@ -189,7 +189,7 @@ helpers.describe("keyboard_hook.while_released: native refusal never blocks a gr
 		end)
 		Reader.grab = original_grab
 		pcall(Hook.stop); Reader._reset_backend()
-		package.loaded["modules.hotstrings.device_finder"] = saved_finder
+		package.loaded["hotstrings.engine.device_finder"] = saved_finder
 		package.loaded["adapters.xkb_capture"] = saved_xkb
 		for _, path in ipairs(paths) do os.remove(path) end
 		if not ok then error(failure, 0) end
@@ -226,7 +226,7 @@ helpers.describe("keyboard_hook.while_released: running observe dialogs", functi
 	local function with_observe(options, check)
 		local InputEvent = require("platform.input.event")
 		local Reader
-		local names = { "modules.hotstrings.device_finder", "adapters.xkb_capture",
+		local names = { "hotstrings.engine.device_finder", "adapters.xkb_capture",
 			"platform.focus.window_info", "platform.input.keyboard_hook", "platform.input.evdev_reader" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end

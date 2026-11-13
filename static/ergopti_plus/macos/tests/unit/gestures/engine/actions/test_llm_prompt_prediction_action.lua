@@ -22,16 +22,16 @@ local it = Fixture.it
 --- Runs a callback with a keymap bridge that records prompt requests.
 --- @param callback function Receives the request list.
 local function with_bridge(callback)
-	local saved = package.loaded["modules.keymap"]
+	local saved = package.loaded["hotstrings.engine.expander"]
 	local requests = {}
-	package.loaded["modules.keymap"] = {
+	package.loaded["hotstrings.engine.expander"] = {
 		request_prompt_prediction = function(value)
 			requests[#requests + 1] = value
 			return true
 		end,
 	}
 	local ok, err = pcall(callback, requests)
-	package.loaded["modules.keymap"] = saved
+	package.loaded["hotstrings.engine.expander"] = saved
 	if not ok then error(err, 0) end
 end
 

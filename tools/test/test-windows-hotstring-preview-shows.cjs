@@ -94,10 +94,10 @@ const driverSources = (dir) => {
 
 // 1. Every character the engine is fed carries a timestamp for the time gate.
 const OWNER = 'AppState_TouchLastSentKey';
-const OWNER_FILE = path.join(WIN, 'infra', 'hotstrings', 'hotstring_send.ahk');
+const OWNER_FILE = path.join(WIN, 'hotstrings', 'engine', 'matcher', 'send.ahk');
 
 const dispatch = stripComments(
-	read(path.join(WIN, 'infra', 'hotstrings', 'hotstring_dispatch.ahk'))
+	read(path.join(WIN, 'hotstrings', 'engine', 'matcher', 'dispatch.ahk'))
 );
 const prepare = bodyOf(dispatch, '_HSE_PrepareDispatchDecision').text;
 const gate = bodyOf(dispatch, '_HSE_EvaluateTimeGate').text;
@@ -135,7 +135,7 @@ check(
 );
 
 const watcher = stripComments(
-	read(path.join(WIN, 'infra', 'hotstrings', 'hotstring_inputhook.ahk'))
+	read(path.join(WIN, 'hotstrings', 'engine', 'matcher', 'inputhook.ahk'))
 );
 const onChar = bodyOf(watcher, '_OnPrefixChar').text;
 const STAMP = '_PrefixStampCompletedInput';

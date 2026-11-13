@@ -42,7 +42,7 @@ local RESERVED_CODES = { [42] = true, [54] = true, [29] = true, [97] = true, [56
 local RELOADED = {
 	"ai.engine.prediction.engine", "ai.engine.settings.settings", "ai.engine.settings.profile_settings",
 	"ai.engine.settings.display_settings", "ai.engine.settings.trigger_settings", "ai.engine.settings.navigation_settings",
-	"ai.engine.api.api_remote", "modules.hotstrings.injector", "modules.hotstrings.selected_output", "adapters.keyboard_layout", "adapters.xkb_capture",
+	"ai.engine.api.api_remote", "hotstrings.engine.injector", "hotstrings.engine.selected_output", "adapters.keyboard_layout", "adapters.xkb_capture",
 }
 local FAKED = {
 	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "ai.engine.settings.api_entries",
@@ -157,7 +157,7 @@ local function scenario(opts, body)
 			end,
 			sync = function() return true end,
 		}
-		local injector = require("modules.hotstrings.injector")
+		local injector = require("hotstrings.engine.injector")
 		injector._set_uinput(channel)
 		injector._set_nanosleep_for_test(function() end)
 		world.char_of = char_of
@@ -585,7 +585,7 @@ end)
 helpers.describe("injector: one Left arrow per user-perceived character", function()
 
 	helpers.it("counts a character, not a byte or a code point", function()
-		local Injector = require("modules.hotstrings.injector")
+		local Injector = require("hotstrings.engine.injector")
 		local cases = {
 			{ "Merci", 5 },
 			{ "\195\169t\195\169", 3 },                                   -- "été", precomposed

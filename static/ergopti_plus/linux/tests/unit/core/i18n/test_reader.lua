@@ -55,14 +55,14 @@ end)
 helpers.describe("Linux keycode JSON admission", function()
 	helpers.it("input reader refuses a missing JSON decoder before loading keycodes", function()
 		local saved_json, saved_preload = package.loaded["core.text.engine.json"], package.preload["core.text.engine.json"]
-		local saved_reader, saved_evdev = package.loaded["modules.hotstrings.input_reader"], package.loaded["platform.input.keycodes.evdev"]
+		local saved_reader, saved_evdev = package.loaded["hotstrings.engine.input_reader"], package.loaded["platform.input.keycodes.evdev"]
 		local calls = 0
-		package.loaded["core.text.engine.json"], package.loaded["modules.hotstrings.input_reader"] = nil, nil
+		package.loaded["core.text.engine.json"], package.loaded["hotstrings.engine.input_reader"] = nil, nil
 		package.preload["core.text.engine.json"] = function() error("controlled missing decoder") end
 		package.loaded["platform.input.keycodes.evdev"] = { load = function() calls = calls + 1; return {} end }
-		local ok = pcall(require, "modules.hotstrings.input_reader")
+		local ok = pcall(require, "hotstrings.engine.input_reader")
 		package.loaded["core.text.engine.json"], package.preload["core.text.engine.json"] = saved_json, saved_preload
-		package.loaded["modules.hotstrings.input_reader"], package.loaded["platform.input.keycodes.evdev"] = saved_reader, saved_evdev
+		package.loaded["hotstrings.engine.input_reader"], package.loaded["platform.input.keycodes.evdev"] = saved_reader, saved_evdev
 		helpers.assert_eq(ok, false, "missing JSON must refuse keycode admission")
 		helpers.assert_eq(calls, 0, "no keycode data is read with an executable fallback")
 	end)

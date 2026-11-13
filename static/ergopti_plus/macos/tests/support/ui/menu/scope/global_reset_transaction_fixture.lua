@@ -12,21 +12,21 @@ local helpers = require("tests.helpers")
 
 local MODULE_KEYS = {
 	"ui.menu.metrics_scope",
-	"ui.menu.hotstrings_scope",
-	"modules.hotstrings.hotstrings_config",
+	"hotstrings.ui.menu.scope",
+	"hotstrings.engine.catalogue.config",
 	"menu.ui.transactions.global_scope",
 	"settings.ui.menu.scoped_preferences",
 	"gestures.ui.menu.scope",
 	"core.ui.engine.dialog_util",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
-	"ui.hotstring_editor",
+	"hotstrings.ui.hotstring_editor",
 	"core.text.engine.utils",
 	"core.i18n.engine.i18n",
 	"menu.engine.ui_restore",
 	"settings.engine.preferences.preferences",
 	"menu.ui.builder.builder",
-	"ui.menu.hotstring_counter",
+	"hotstrings.ui.menu.counter",
 	"settings.ui.menu.paths",
 	"menu.ui.builder.state",
 	"menu.ui.keyboard.keymap_lifecycle",
@@ -44,7 +44,7 @@ local MODULE_KEYS = {
 	"gestures.ui.menu.gestures",
 	"ui.menu.menu_shortcuts",
 	"ui.menu.menu_keyboard_layout",
-	"ui.menu.menu_hotstrings",
+	"hotstrings.ui.menu.hotstrings",
 	"ui.menu.menu_metrics",
 	"ui.menu.menu_tap_holds",
 	"apps.ui.menu.apps",
@@ -53,7 +53,7 @@ local MODULE_KEYS = {
 	"ai.engine",
 	"modules.keystats",
 	"modules.shortcuts",
-	"modules.dynamic_hotstrings",
+	"hotstrings.engine.dynamic",
 	"gestures.engine",
 	"infra.personal_shortcuts",
 	"settings.ui.menu.preferences_transaction",
@@ -307,7 +307,7 @@ local function with_menu_fixture(options, callback)
 			return true
 		end,
 	}
-	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
+	package.loaded["hotstrings.ui.hotstring_editor"] = { set_update_menu = noop }
 	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
@@ -349,7 +349,7 @@ local function with_menu_fixture(options, callback)
 		end,
 		invalidate_cache = noop,
 	}
-	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = noop }
+	package.loaded["hotstrings.ui.menu.counter"] = { invalidate_cache = noop }
 	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
 		get = function(key)
@@ -525,7 +525,7 @@ local function with_menu_fixture(options, callback)
 
 	for _, module_name in ipairs({
 		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
-		"ui.menu.menu_hotstrings", "ui.menu.menu_metrics", "ui.menu.menu_tap_holds",
+		"hotstrings.ui.menu.hotstrings", "ui.menu.menu_metrics", "ui.menu.menu_tap_holds",
 		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
 		package.loaded[module_name] = {}
@@ -533,7 +533,7 @@ local function with_menu_fixture(options, callback)
 	package.loaded["ai.ui.menu"] = { create = function() return {} end }
 	package.loaded["ai.engine"] = { set_backend = noop }
 	package.loaded["modules.keystats"] = {}
-	package.loaded["modules.dynamic_hotstrings"] = {}
+	package.loaded["hotstrings.engine.dynamic"] = {}
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
 	package.loaded["gestures.engine"] = {
 		SINGLE_SLOTS = { "swipe_left", "swipe_right" },

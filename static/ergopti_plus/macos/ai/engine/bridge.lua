@@ -25,7 +25,7 @@
 local M = {}
 
 local hs        = hs
-local km_utils         = require("modules.keymap.utils")
+local km_utils         = require("hotstrings.engine.expander.utils")
 local EventProvenance  = require("diagnostics.adapters.event_provenance")
 local SyntheticInput   = require("platform.input.synthetic_input")
 local text_utils       = require("core.text.engine.utils")
@@ -41,8 +41,8 @@ local ScreenAnswer     = require("ai.engine.prediction.screen_answer")
 local SelectionTranslation = require("ai.engine.prediction.selection_translation")
 local AgentRunner      = require("ai.engine.agent.runner")
 local Registry         = require("settings.engine.registry")
-local hotstrings_config = require("modules.hotstrings.hotstrings_config")
-local expander         = require("modules.keymap.expander")
+local hotstrings_config = require("hotstrings.engine.catalogue.config")
+local expander         = require("hotstrings.engine.expander.expander")
 local TimerScheduler   = require("core.events.timer_scheduler")
 local ManifestReader = require("menu.engine.manifest_reader")
 local HidDiagnosticMailbox = require("diagnostics.engine.hid_diagnostic_mailbox")
@@ -745,7 +745,7 @@ local function masked_for_preview(m)
 	local value = m.plain_repl
 	if type(value) ~= "string" or m.field == nil then return value end
 
-	local ok, Fields = pcall(require, "infra.personal_info_fields")
+	local ok, Fields = pcall(require, "hotstrings.engine.catalogue.personal_info_fields")
 	if not ok or type(Fields) ~= "table" or type(Fields.for_preview) ~= "function" then
 		-- Fail closed. A match that declared itself a personal-info value and a
 		-- classifier that cannot be reached is the one combination where showing

@@ -27,7 +27,7 @@ end
 local function with_personal_frame(scenario, options)
 	options = options or {}
 	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu",
-		"menu.ui.builder.builder", "core.fs.adapters.storage", "ui.hotstring_editor.bridge" }
+		"menu.ui.builder.builder", "core.fs.adapters.storage", "hotstrings.ui.hotstring_editor.bridge" }
 	local previous, saved_getenv = {}, os.getenv
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	local scratch, native, owner, receipt, acquired, store
@@ -50,7 +50,7 @@ local function with_personal_frame(scenario, options)
 		receipt = assert(native.scope_capture(owner))
 		assert(native.scope_apply(owner, receipt, options.locale or "en"))
 		local renderer = require("menu.engine.manifest_menu")
-		local bridge = require("ui.hotstring_editor.bridge")
+		local bridge = require("hotstrings.ui.hotstring_editor.bridge")
 		local builder = require("menu.ui.builder.builder")
 		local build_hotstrings = upvalue(builder.build, "_build_hotstrings")
 		local files = require("core.fs.engine.paths")
@@ -215,12 +215,12 @@ helpers.describe("complete personal hotstring shared frames (Linux)", function()
 			local model = assert(require("core.text.engine.json").decode(bytes))
 			helpers.assert_eq(model.future.keep, "bytes")
 			local old_storage = package.loaded["core.fs.adapters.storage"]
-			local old_bridge = package.loaded["ui.hotstring_editor.bridge"]
-			package.loaded["core.fs.adapters.storage"], package.loaded["ui.hotstring_editor.bridge"] = nil, nil
-			local reload = require("ui.hotstring_editor.bridge")
+			local old_bridge = package.loaded["hotstrings.ui.hotstring_editor.bridge"]
+			package.loaded["core.fs.adapters.storage"], package.loaded["hotstrings.ui.hotstring_editor.bridge"] = nil, nil
+			local reload = require("hotstrings.ui.hotstring_editor.bridge")
 			helpers.assert_eq(reload.get_pref("default_section"), "")
 			helpers.assert_eq(reload.get_pref("auto_close"), true)
-			package.loaded["core.fs.adapters.storage"], package.loaded["ui.hotstring_editor.bridge"] = old_storage, old_bridge
+			package.loaded["core.fs.adapters.storage"], package.loaded["hotstrings.ui.hotstring_editor.bridge"] = old_storage, old_bridge
 		end)
 	end)
 	helpers.it("refuses missing whole declarations and held commands without native effects", function()
@@ -244,11 +244,11 @@ helpers.describe("complete personal hotstring shared frames (Linux)", function()
 		end)
 	end)
 	helpers.it("restores the exact module owners and locale after a scenario raises", function()
-		local renderer, bridge = rawget(package.loaded, "menu.engine.manifest_menu"), rawget(package.loaded, "ui.hotstring_editor.bridge")
+		local renderer, bridge = rawget(package.loaded, "menu.engine.manifest_menu"), rawget(package.loaded, "hotstrings.ui.hotstring_editor.bridge")
 		local ok, detail = pcall(with_personal_frame, function() error("personal frame scenario sentinel") end)
 		helpers.assert_eq(ok, false); helpers.assert_true(detail:find("personal frame scenario sentinel", 1, true) ~= nil)
 		helpers.assert_true(rawequal(rawget(package.loaded, "menu.engine.manifest_menu"), renderer))
-		helpers.assert_true(rawequal(rawget(package.loaded, "ui.hotstring_editor.bridge"), bridge))
+		helpers.assert_true(rawequal(rawget(package.loaded, "hotstrings.ui.hotstring_editor.bridge"), bridge))
 	end)
 	helpers.it("uses literal French hand captions from the genuine current renderer", function()
 		with_personal_frame(function(f)

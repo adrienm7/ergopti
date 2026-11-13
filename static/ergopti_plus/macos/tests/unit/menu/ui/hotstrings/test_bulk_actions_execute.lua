@@ -93,7 +93,7 @@ helpers.describe("hotstring bulk commands: no whole-tree row, language actions r
 	end))
 
 	helpers.it("the language checkbox updates every applicable section exactly once", function()
-		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		local enabled_sections = {}
 		local disabled_sections = {}
 		local enabled_groups = {}
@@ -165,7 +165,7 @@ helpers.describe("hotstring bulk commands: no whole-tree row, language actions r
 	end)
 
 	helpers.it("publishes no hotstring mutation when keymap start is refused", function()
-		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		local starts, mutations, saves, rebuilds = 0, 0, 0, 0
 		local state = { hotstrings = {}, keymap = false }
 		local ctx = {

@@ -94,7 +94,7 @@ local function build_world(buffer)
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return false end }
+	package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return false end }
 	package.loaded["modules.shortcuts.script_control"] = nil
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
@@ -172,7 +172,7 @@ local function build_world(buffer)
 	engine.set_llm_sequential_mode(false)
 	-- The keymap bridge only gates on an in-flight synthetic action, covered by
 	-- the bridge's own tests; here it hands the value straight to the engine
-	package.loaded["modules.keymap"] = {
+	package.loaded["hotstrings.engine.expander"] = {
 		request_prompt_prediction = engine.request_prompt_prediction,
 		request_manual_prediction = engine.request_manual_prediction,
 	}

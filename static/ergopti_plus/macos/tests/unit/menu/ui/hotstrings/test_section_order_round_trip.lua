@@ -95,7 +95,7 @@ local function start_session()
 	helpers.assert_eq(status, "ok")
 	local state = { hotstrings = {}, keymap = true,
 		sections_order_overrides = values.sections_order_overrides or {} }
-	local menu = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+	local menu = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 	return context(state, preferences), menu, preferences
 end
 

@@ -57,7 +57,7 @@ end
 --- @param group string
 --- @return string|nil
 function M.resolve_group_hex(group)
-	local ok, hs_cfg = pcall(require, "modules.hotstrings.hotstrings_config")
+	local ok, hs_cfg = pcall(require, "hotstrings.engine.catalogue.config")
 	if not ok or not hs_cfg or type(hs_cfg.resolve) ~= "function" then return nil end
 	local resolved = hs_cfg.resolve(group, nil)
 	return resolved and resolved.color or nil

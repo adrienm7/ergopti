@@ -74,7 +74,7 @@ local function with_manager(route, body)
 			s.rows = {}
 			function s.withdraw_binding() write(config_path, text:gsub('"script_reload"', '"none"')) end
 			function s.select(ids)
-				package.loaded["modules.hotstrings.device_finder"].find_devices = function()
+				package.loaded["hotstrings.engine.device_finder"].find_devices = function()
 					local selected = {}; for _, id in ipairs(ids) do selected[#selected + 1] = s.paths[id] end
 					return selected, {}
 				end

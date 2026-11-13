@@ -54,16 +54,16 @@ local function with_scope(body, initial)
 		(os.getenv("TMPDIR") or "/tmp"):gsub("/+$", ""), os.time(), math.random(100000, 999999))
 	assert(os.execute("mkdir -p '" .. directory .. "'"))
 	local ok, err = pcall(function()
-		for _, name in ipairs({ "infra.hotstring_preferences", "infra.dynamic_hotstrings_scope",
-			"modules.hotstrings.hotstrings_config", "modules.dynamic_hotstrings.manager",
-			"modules.dynamic_hotstrings.prefix_rules", "hotstrings.engine.dynamic.core" }) do package.loaded[name] = nil end
+		for _, name in ipairs({ "hotstrings.engine.matcher.preferences", "hotstrings.engine.dynamic.scope",
+			"hotstrings.engine.catalogue.config", "hotstrings.engine.dynamic.manager",
+			"hotstrings.engine.dynamic.prefix_rules", "hotstrings.engine.dynamic.core" }) do package.loaded[name] = nil end
 		local paths = {}
 		for key, value in pairs(require("settings.engine.paths")) do paths[key] = value end
 		paths.config = function(rel) return rel and (directory .. "/" .. rel) or directory end
 		paths.home = function() return directory end
 		package.loaded["settings.engine.paths"] = paths
-		package.loaded["modules.hotstrings.loader"] = {
-			find_toml_files = require("modules.hotstrings.loader").find_toml_files,
+		package.loaded["hotstrings.engine.loader"] = {
+			find_toml_files = require("hotstrings.engine.loader").find_toml_files,
 			list_subdirs = function() return {} end,
 			read_file = function() return nil end,
 			load_catalogue = function()
@@ -78,11 +78,11 @@ local function with_scope(body, initial)
 		write(c.path, c.source)
 		write(c.overrides, OVERRIDES)
 		write(c.personal, PERSONAL)
-		c.Preferences = require("infra.hotstring_preferences")
+		c.Preferences = require("hotstrings.engine.matcher.preferences")
 		assert(c.Preferences.refresh())
-		c.Dynamic = require("modules.dynamic_hotstrings.manager")
+		c.Dynamic = require("hotstrings.engine.dynamic.manager")
 		assert(c.Dynamic.init({ trigger_char = "\\", personal_info_path = c.personal }))
-		c.Config = require("modules.hotstrings.hotstrings_config")
+		c.Config = require("hotstrings.engine.catalogue.config")
 		c.engine = require("hotstrings.engine.matcher").new()
 		assert(c.Config.init(c.engine, "virtual.toml"))
 		c.Config.set_extra_mappings_provider(function() return c.Dynamic.prefix_mappings() end)
@@ -99,7 +99,7 @@ local function with_scope(body, initial)
 			end,
 		}
 		function c.new_scope(backup)
-			return require("infra.dynamic_hotstrings_scope").new({ path = c.path, backup_path = backup or c.backup,
+			return require("hotstrings.engine.dynamic.scope").new({ path = c.path, backup_path = backup or c.backup,
 				files = c.files, config = c.Config, preferences = c.Preferences, dynamic = c.Dynamic })
 		end
 		c.scope = c.new_scope()
@@ -174,8 +174,8 @@ helpers.describe("dynamic hotstring bulk transaction", function()
 				helpers.assert_eq(c.Preferences.is_acquired(), false)
 				-- Cold readers consume the committed cohort, rather than the menu cache.
 				helpers.assert_true(c.Preferences.refresh())
-				package.loaded["modules.dynamic_hotstrings.manager"] = nil
-				c.Dynamic = require("modules.dynamic_hotstrings.manager")
+				package.loaded["hotstrings.engine.dynamic.manager"] = nil
+				c.Dynamic = require("hotstrings.engine.dynamic.manager")
 				helpers.assert_true(c.Dynamic.init({ trigger_char = "\\", personal_info_path = c.personal }))
 				local _, reloaded = c.Config.reload()
 				helpers.assert_true(reloaded)
@@ -303,8 +303,8 @@ helpers.describe("dynamic hotstring bulk transaction", function()
 
 	helpers.it("dynamic bulk: unavailable rules refuse enable and restore the previously disabled runtime", function()
 		with_scope(function(c)
-			package.loaded["modules.dynamic_hotstrings.manager"] = nil
-			c.Dynamic = require("modules.dynamic_hotstrings.manager") -- No native rules were initialized.
+			package.loaded["hotstrings.engine.dynamic.manager"] = nil
+			c.Dynamic = require("hotstrings.engine.dynamic.manager") -- No native rules were initialized.
 			local _, reloaded = c.Config.reload()
 			helpers.assert_true(reloaded)
 			helpers.assert_eq(c.Dynamic.is_enabled(), false)

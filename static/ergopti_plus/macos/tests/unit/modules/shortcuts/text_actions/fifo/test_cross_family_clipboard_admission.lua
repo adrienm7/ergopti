@@ -7,7 +7,7 @@ local Destination = require("tests.support.text_destination_receipt")
 
 --- Runs one scenario with the actual Text owner composed into the Apps world.
 local function with_text_and_apps(body)
-	helpers.with_fresh_modules({ "modules.shortcuts.actions.text", "modules.keymap.utils" }, function()
+	helpers.with_fresh_modules({ "modules.shortcuts.actions.text", "hotstrings.engine.expander.utils" }, function()
 		World.with_world({}, function(w)
 			Destination.install()
 			local board = hs.pasteboard

@@ -189,13 +189,13 @@ assert(os.execute("mkdir -p '" .. scratch .. "/toml_cache'"), "cannot create the
 --- Builds a fresh registry whose every section is enabled.
 --- @return table registry
 local function fresh_registry()
-	for _, name in ipairs({ "core.fs.adapters.storage", "settings.engine.registry", "modules.keymap.registry_groups",
-		"modules.keymap.registry_index", "modules.keymap.terminators" }) do
+	for _, name in ipairs({ "core.fs.adapters.storage", "settings.engine.registry", "hotstrings.engine.expander.registry_groups",
+		"hotstrings.engine.expander.registry_index", "hotstrings.engine.expander.terminators" }) do
 		package.loaded[name] = nil
 	end
 	local registry = require("settings.engine.registry")
 	registry.is_section_enabled = function() return true end
-	local State = require("modules.keymap.state")
+	local State = require("hotstrings.engine.expander.state")
 	assert(registry.init(State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })))
 	return registry
 end

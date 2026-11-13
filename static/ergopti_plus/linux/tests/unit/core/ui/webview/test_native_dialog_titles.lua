@@ -19,7 +19,7 @@ local function scenario(body)
 	local names = { "core.ui.ui.text_prompt", "apps.ui.chooser", "settings.ui.dir_picker", "gestures.ui.conflicts",
 		"gestures.engine.system_actions", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "core.ui.ui.modal",
 		"core.fs.adapters.storage", "core.events.loop", "platform.input.keyboard_hook",
-		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "menu.engine.manifest_menu" }
+		"hotstrings.ui.menu.programmatic_hotstrings", "hotstrings.engine.matcher.preferences", "menu.engine.manifest_menu" }
 	local saved, observed = {}, { commands = {}, modals = 0, queued = {}, writes = {} }
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local original_popen = io.popen
@@ -270,7 +270,7 @@ h.describe("programmable source problems open no dialog", function()
 				}
 				local ctx = { dyn_hotstrings = native, paused = false, is_paused = function() return false end,
 					on_menu_changed = function() calls.changed = calls.changed + 1 end }
-				package.loaded["infra.hotstring_preferences"] = { get = function(key)
+				package.loaded["hotstrings.engine.matcher.preferences"] = { get = function(key)
 					if key == "hotstrings.dynamic.user_code.enabled" then return true end
 					h.assert_eq(key, "hotstrings.dynamic.user_code.time_activation_seconds")
 					return 0.5
@@ -282,7 +282,7 @@ h.describe("programmable source problems open no dialog", function()
 					observed.commands[#observed.commands + 1] = command
 					return false
 				end
-				local rows = require("ui.menu.programmatic_hotstrings").build(ctx)
+				local rows = require("hotstrings.ui.menu.programmatic_hotstrings").build(ctx)
 				h.assert_eq(#rows, 4, "the actual manifest renderer must expose all declared source controls")
 				local title = rows[1].title
 				if problem then

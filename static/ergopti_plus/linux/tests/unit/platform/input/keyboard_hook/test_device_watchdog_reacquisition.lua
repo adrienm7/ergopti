@@ -27,7 +27,7 @@
 -- The cases replace these entries; the module end puts them back.
 local prior_writer, prior_broker = package.loaded["platform.input.uinput_writer"], package.loaded["platform.input.modifier_broker"]
 local restore_loaded = require("tests.helpers").keep_loaded({
-	"modules.hotstrings.device_finder", "platform.input.uinput_writer", "platform.input.modifier_broker",
+	"hotstrings.engine.device_finder", "platform.input.uinput_writer", "platform.input.modifier_broker",
 })
 package.loaded["tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture"] = nil
 local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture")
@@ -193,7 +193,7 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 		local node_a, node_b = fake_node("keep-a"), fake_node("keep-b")
 		local InputEvent = require("platform.input.event")
 		local devices = { { node_a }, {} }
-		package.loaded["modules.hotstrings.device_finder"] = {
+		package.loaded["hotstrings.engine.device_finder"] = {
 			find_devices = function() return devices[1], devices[2] end,
 			is_key_device = function() return true, nil end,
 			-- Controlled keyboard sources have no REL/ABS axes.
@@ -252,7 +252,7 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 	helpers.it("closes newly opened keyboards when a later keyboard cannot open", function()
 		local node_a, node_b, node_c = fake_node("partial-a"), fake_node("partial-b"), fake_node("partial-c")
 		local devices, closed = { { node_a }, {} }, {}
-		package.loaded["modules.hotstrings.device_finder"] = {
+		package.loaded["hotstrings.engine.device_finder"] = {
 			find_devices = function() return devices[1], devices[2] end,
 			is_key_device = function() return true end,
 			is_interceptable_key_device = function() return true end,
@@ -390,7 +390,7 @@ helpers.describe("keyboard_hook: an explicit device owns its watchdog policy", f
 		-- swallowed into a keyboard-only uinput device.
 		local pinned, preferred = fake_node("pinned"), fake_node("preferred")
 		local pinned_is_key = true
-		package.loaded["modules.hotstrings.device_finder"] = {
+		package.loaded["hotstrings.engine.device_finder"] = {
 			find_keyboard = function()
 				error("auto-detection must not participate in a pinned watchdog decision")
 			end,
@@ -474,7 +474,7 @@ helpers.describe("keyboard_hook: multi-device ownership", function()
 			[pointer_a] = { InputEvent.encode(InputEvent.EV_KEY, 0x110, InputEvent.VALUE_DOWN, nil, 100) },
 			[pointer_b] = { InputEvent.encode(InputEvent.EV_KEY, 0x111, InputEvent.VALUE_DOWN, nil, 101) },
 		}
-		package.loaded["modules.hotstrings.device_finder"] = {
+		package.loaded["hotstrings.engine.device_finder"] = {
 			find_devices = function()
 				return { keyboard_a, keyboard_b }, { pointer_a, pointer_b }
 			end,
@@ -658,7 +658,7 @@ helpers.describe("keyboard_hook: ordinary overlapping physical-source release", 
 			[a] = { InputEvent.encode(1, 42, 1, nil, 1), InputEvent.encode(1, 42, 0, nil, 3) },
 			[b] = { InputEvent.encode(1, 42, 1, nil, 2) },
 		}
-		package.loaded["modules.hotstrings.device_finder"] = {
+		package.loaded["hotstrings.engine.device_finder"] = {
 			find_devices = function() return { a, b }, {} end,
 			is_key_device = function() return true end,
 			-- Controlled keyboard sources have no REL/ABS axes.

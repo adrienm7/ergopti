@@ -11,7 +11,7 @@
 --- production wiring (M.start), the shared emulation engine, the registry's
 --- shipped .keylayout files, adapters/keyboard_layout.lua and
 --- adapters/xkb_capture.lua on the server's own keymap (libxkbcommon),
---- modules/hotstrings/injector.lua, platform/input/modifier_broker.lua,
+--- hotstrings/engine/injector.lua, platform/input/modifier_broker.lua,
 --- platform/input/uinput_writer.lua, modules/shortcuts/accented_shortcuts.lua,
 --- gestures/engine/combo_emitter.lua, and modules/keymap/layout_registry.lua
 --- with the real Python installer for the Bépo user-tree install.
@@ -263,7 +263,7 @@ Writer._set_path_for_test(fake_node)
 local runner_python = (capture("command -v python3 2>/dev/null"):gsub("%s+$", ""))
 package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
 
-local Injector = require("modules.hotstrings.injector")
+local Injector = require("hotstrings.engine.injector")
 local KeyboardLayout = require("adapters.keyboard_layout")
 local XkbCapture = require("adapters.xkb_capture")
 local Emulation = require("modules.keymap.layout_emulation")

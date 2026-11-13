@@ -182,15 +182,15 @@ local function with_paths_restart(mode, body)
         .. (id == "a" and "copy" or "none") .. "\"\n[hotstrings]\ngroups = { autocorrection = false }\n")
     end
     for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.manager",
-      "modules.shortcuts.keyboard_shortcuts", "modules.hotstrings.hotstrings_config", "core.lifecycle.engine.reload.restart_pause" }) do package.loaded[name] = nil end
+      "modules.shortcuts.keyboard_shortcuts", "hotstrings.engine.catalogue.config", "core.lifecycle.engine.reload.restart_pause" }) do package.loaded[name] = nil end
     local gestures = require("gestures.engine.manager")
     gestures.init({ persist = true, enabled = false })
     local shortcuts = require("modules.shortcuts.manager"); shortcuts.init({ persist = true })
     local keyboard = require("modules.shortcuts.keyboard_shortcuts")
     helpers.assert_eq(keyboard.get_action("primary_j"), "copy")
     helpers.assert_true(shortcuts.is_enabled())
-    local hotstrings = require("modules.hotstrings.hotstrings_config")
-    local engine = require("modules.hotstrings.engine").new()
+    local hotstrings = require("hotstrings.engine.catalogue.config")
+    local engine = require("hotstrings.engine.engine").new()
     helpers.assert_true(hotstrings.init(engine, f.dirs.a))
     local _, committed = hotstrings.load_all(nil, true)
     helpers.assert_true(committed, "real initial hotstring catalogue is acknowledged")
@@ -598,7 +598,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
   helpers.describe("dependency modules", function()
     helpers.it("engine can be required", function()
-      local ok, engine = pcall(require, "modules.hotstrings.engine")
+      local ok, engine = pcall(require, "hotstrings.engine.engine")
       helpers.assert_true(ok, "engine module loads")
       if ok then
         helpers.assert_true(type(engine.new) == "function", "engine.new is a function")
@@ -606,7 +606,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("loader can be required", function()
-      local ok, loader = pcall(require, "modules.hotstrings.loader")
+      local ok, loader = pcall(require, "hotstrings.engine.loader")
       helpers.assert_true(ok, "loader module loads")
       if ok then
         helpers.assert_true(type(loader.find_toml_files) == "function" or
@@ -616,7 +616,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("injector can be required", function()
-      local ok, inj = pcall(require, "modules.hotstrings.injector")
+      local ok, inj = pcall(require, "hotstrings.engine.injector")
       helpers.assert_true(ok, "injector module loads")
       if ok then
         helpers.assert_true(type(inj.inject) == "function", "injector.inject is a function")
@@ -624,7 +624,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("input_reader can be required", function()
-      local ok, ir = pcall(require, "modules.hotstrings.input_reader")
+      local ok, ir = pcall(require, "hotstrings.engine.input_reader")
       helpers.assert_true(ok, "input_reader module loads")
       if ok then
         -- resolve_char, not new(). The reader instance this used to name had no
@@ -644,7 +644,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("device_finder can be required", function()
-      local ok, df = pcall(require, "modules.hotstrings.device_finder")
+      local ok, df = pcall(require, "hotstrings.engine.device_finder")
       helpers.assert_true(ok, "device_finder module loads")
       if ok then
         helpers.assert_true(type(df.find_keyboard) == "function",

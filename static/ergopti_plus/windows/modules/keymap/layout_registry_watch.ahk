@@ -27,7 +27,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include %A_LineFile%\..\..\..\adapters\registry_notify.ahk
+#Include %A_LineFile%\..\..\..\hotstrings\adapters\registry_notify.ahk
 
 
 
@@ -218,7 +218,7 @@ _LayoutRegistryWatchTick(Watch) {
 ; ==============================
 
 ; The live registry, events and timer behind the watch
-; (adapters/registry_notify.ahk).
+; (hotstrings/adapters/registry_notify.ahk).
 _LayoutRegistryWatchNativePort() {
 	static Port := Map(
 		"open", RegistryNotifyOpenKey,

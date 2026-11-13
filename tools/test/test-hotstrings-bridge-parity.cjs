@@ -54,12 +54,12 @@ const SHARED_UI = path.join(SP, '_shared', 'ui');
 // compare. If it ever gains one, add it here — the vocabulary is shared.
 const WINDOWS = {
 	hotstring_editor: {
-		linux: 'linux/ui/hotstring_editor/bridge.lua',
-		macos: 'macos/ui/hotstring_editor/init.lua'
+		linux: 'linux/hotstrings/ui/hotstring_editor/bridge.lua',
+		macos: 'macos/hotstrings/ui/hotstring_editor/init.lua'
 	},
 	hotstrings_config_window: {
-		linux: 'linux/ui/hotstrings_config_window/bridge.lua',
-		macos: 'macos/ui/hotstrings_config_window/init.lua'
+		linux: 'linux/hotstrings/ui/hotstrings_config_window/bridge.lua',
+		macos: 'macos/hotstrings/ui/hotstrings_config_window/init.lua'
 	}
 };
 

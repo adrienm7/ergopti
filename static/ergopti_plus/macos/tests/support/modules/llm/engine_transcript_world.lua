@@ -90,7 +90,7 @@ function M.with_world(config, body)
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return false end }
+	package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return false end }
 	package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return world.paused end }
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
@@ -187,7 +187,7 @@ function M.with_world(config, body)
 	engine.set_llm_sequential_mode(false)
 	engine.set_llm_debounce(config.debounce_ms / 1000)
 	engine.set_llm_min_words(0)
-	package.loaded["modules.keymap"] = {
+	package.loaded["hotstrings.engine.expander"] = {
 		request_prompt_prediction = engine.request_prompt_prediction,
 		request_manual_prediction = engine.request_manual_prediction,
 		toggle_live_prompt = engine.toggle_live_prompt,

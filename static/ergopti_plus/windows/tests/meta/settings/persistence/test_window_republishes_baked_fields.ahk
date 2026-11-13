@@ -100,7 +100,7 @@ _CWRB_RepublishRebuildsAndContainsFailure() {
 ; Every field name the config window writes, taken from its own source rather
 ; than from this test's expectations.
 _CWRB_WrittenFields() {
-	Src := _StripFullLineComments(_DriverDirConcat("ui/hotstrings_config_window"))
+	Src := _StripFullLineComments(_DriverDirConcat("hotstrings/ui/hotstrings_config_window"))
 	Fields := Map()
 	Pos := 1
 	while (FoundPos := RegExMatch(Src,

@@ -16,7 +16,7 @@ local M = {}
 function M.capture_destination()
 	-- A tracker that has not already loaded cannot own a classified destination.
 	-- Never load its dependency graph on an input callback.
-	local utils = package.loaded["modules.keymap.utils"]
+	local utils = package.loaded["hotstrings.engine.expander.utils"]
 	if type(utils) ~= "table" or type(utils.capture_text_destination) ~= "function"
 		or type(utils.owns_text_destination) ~= "function" then return nil end
 	local receipt = utils.capture_text_destination()

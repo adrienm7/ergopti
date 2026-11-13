@@ -200,8 +200,8 @@ function M.run(options)
 		mappings_for_tail = function() return nil end,
 		mappings_for_star_tail = function() return nil end,
 	}
-	package.loaded["modules.hotstrings.hotstrings_config"] = {}
-	package.loaded["modules.keymap.terminator_replay"] = {
+	package.loaded["hotstrings.engine.catalogue.config"] = {}
+	package.loaded["hotstrings.engine.expander.terminator_replay"] = {
 		init = function() return true end,
 		flush_now = noop,
 	}
@@ -219,7 +219,7 @@ function M.run(options)
 	}
 
 	local synthetic = require("platform.input.synthetic_input")
-	local km_utils = require("modules.keymap.utils")
+	local km_utils = require("hotstrings.engine.expander.utils")
 	local terminal_target = options.terminal and { id = "terminal-app" } or nil
 	if terminal_target then
 		local text_sender = require("platform.input.text_sender")
@@ -237,15 +237,15 @@ function M.run(options)
 	local expander
 	if options.expander then
 		expander = options.expander
-		package.loaded["modules.keymap.expander"] = expander
+		package.loaded["hotstrings.engine.expander.expander"] = expander
 	elseif options.expander_failure then
 		expander = {
 			init = function() return true end,
 			perform_text_replacement = function() return false end,
 		}
-		package.loaded["modules.keymap.expander"] = expander
+		package.loaded["hotstrings.engine.expander.expander"] = expander
 	else
-		expander = require("modules.keymap.expander")
+		expander = require("hotstrings.engine.expander.expander")
 	end
 
 	local bridge = require("ai.engine.bridge")

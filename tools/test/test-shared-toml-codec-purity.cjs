@@ -11,7 +11,7 @@
  * `require("infra.i18n")` (macOS-driver-only packages) in reader.lua / writer.lua
  * silently broke that promise: those modules could not load off macOS, which is
  * why the Linux driver forked its own zero-dependency TOML parser
- * (linux/modules/hotstrings/loader.lua).
+ * (linux/hotstrings/engine/loader.lua).
  *
  * The fix resolves Logger / i18n SOFTLY (pcall, preferring the real macOS logger
  * when present, else the platform-neutral logger.shim / a key-passthrough i18n).

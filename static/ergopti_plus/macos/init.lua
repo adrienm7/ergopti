@@ -396,7 +396,7 @@ require("settings.engine.scope.script_scope").adopt_configured()
 i18n.adopt_saved_locale()
 -- Configuration consumers may perform reads during require; path ownership comes first.
 local gestures           = require("gestures.engine")
-local keymap             = require("modules.keymap")
+local keymap             = require("hotstrings.engine.expander")
 local ManifestReader     = require("menu.engine.manifest_reader")
 -- Wire keymap → locale so trigger-character substitutions (★) use the live char.
 -- Read from the manifest rather than from the `magic_key` local: that one is
@@ -409,10 +409,10 @@ locale_mod.set_trigger_provider(function()
 end)
 -- Expose keymap in the global table so the Hammerspoon console can call
 -- keymap.perf_report_all() / perf_enable() / perf_reset() without
--- having to type out require("modules.keymap") each time.
+-- having to type out require("hotstrings.engine.expander") each time.
 _G.keymap = keymap
 local shortcuts          = require("modules.shortcuts")
-local dynamic_hotstrings = require("modules.dynamic_hotstrings")
+local dynamic_hotstrings = require("hotstrings.engine.dynamic")
 
 boot_note("Config dir resolved: %s (%s).", tostring(config_paths.get_config_dir()),
 	BootJournal.describe_path(config_paths.get_config_dir()))
@@ -1264,7 +1264,7 @@ do
 	local init_ok, initialized_or_err = xpcall(function()
 		return TerminationCoordinator.init({
 			capture_publication_admission = function()
-				return require("modules.hotstrings.hotstrings_config").capture_terminal_admission()
+				return require("hotstrings.engine.catalogue.config").capture_terminal_admission()
 			end,
 			request_lease = request_exact_lease_revoke,
 			drain_input = function(callback)
@@ -1867,7 +1867,7 @@ end
 -- the override resolver, the loader and the menu read them, so all three
 -- describe the same packs. A pack, root or installed-layouts record that cannot
 -- be read is logged and left out: one optional folder never costs the keymap.
-local ExtensionPacks = require("infra.extension_packs")
+local ExtensionPacks = require("hotstrings.engine.catalogue.extension_packs")
 ExtensionPacks.discover()
 
 -- Initialise the hotstrings_config module so per-group delays and tooltip
@@ -1875,7 +1875,7 @@ ExtensionPacks.discover()
 -- file. The resolver routes the personal category through the (possibly
 -- relocated) personal_hotstrings.toml; everything else lives in `hotstrings_dir`.
 do
-	local hotstrings_config = require("modules.hotstrings.hotstrings_config")
+	local hotstrings_config = require("hotstrings.engine.catalogue.config")
 	local override_path = config_paths.get_config_dir()
 	override_path = require("core.fs.engine.native_path").with_trailing_separator(override_path) .. "hotstrings_config.toml"
 	local hotstring_config_ready = hotstrings_config.init({
@@ -1937,7 +1937,7 @@ do
 	keymap.on_base_delay_change(hotstrings_config.refresh_delays)
 
 	-- Wire the config window so it can discover personal + extension files.
-	local ok_cw, cw = pcall(require, "ui.hotstrings_config_window")
+	local ok_cw, cw = pcall(require, "hotstrings.ui.hotstrings_config_window")
 	if ok_cw and cw and type(cw.setup) == "function" then
 		local extensions_dir = base_dir .. "../extensions"
 		cw.setup({
@@ -2096,7 +2096,7 @@ Boot.stage("Hotstring groups registered (personal + dynamic + common)")
 -- The personal group + recursive extension scan live in infra/personal_hotstrings;
 -- it registers each group with keymap and returns them in load order so they keep
 -- the lowest group_order (= highest priority). Extracted from init.lua Section 5.1.
-personal_files = require("infra.personal_hotstrings").load({
+personal_files = require("hotstrings.engine.catalogue.personal_hotstrings").load({
 	bundled_hotstrings_dir = bundled_hotstrings_dir,
 	saved_preferences = boot_saved_prefs,
 })
@@ -2149,7 +2149,7 @@ Boot.sub("dynamic hotstrings")
 -- file: the bound rules keep the category and its common tier.
 Logger.debug(LOG, "Loading common TOML hotstring files…")
 local _toml_load_t0 = hs.timer.secondsSinceEpoch()
-local CommonHotstringsBoot = require("infra.common_hotstrings_boot")
+local CommonHotstringsBoot = require("hotstrings.engine.common_hotstrings_boot")
 local common_file_count = 0
 local carried_categories = {}
 -- Whether every bundled source loaded, and which categories list the build's own
@@ -2214,9 +2214,9 @@ end
 -- build shipped, once every bundled source loaded. A personal file, an extension
 -- pack or a dynamic group is never judged: its absence may be temporary.
 if bundled_complete then
-	local PersonalHotstrings = require("infra.personal_hotstrings")
+	local PersonalHotstrings = require("hotstrings.engine.catalogue.personal_hotstrings")
 	local Extensions = require("hotstrings.engine.extensions")
-	local published = require("infra.hotstring_choice_catalogue").publish(function(id)
+	local published = require("hotstrings.engine.matcher.choice_catalogue").publish(function(id)
 		if PersonalHotstrings.is_personal_group(id) or Extensions.parse_category_key(id) ~= nil
 			or id == "dynamichotstrings" then
 			return { unjudged = true }
@@ -2249,7 +2249,7 @@ Boot.sub("choice catalogue and cache stats")
 Boot.mark("Hotstring groups registered (personal + dynamic + common)")
 -- Read each category's TOML metadata on run-loop turns from now on, so the
 -- first preview of a category reads memory instead of its file on the keystroke
-if require("modules.hotstrings.hotstrings_config").prewarm_meta(keymap.list_toml_groups()) ~= true then
+if require("hotstrings.engine.catalogue.config").prewarm_meta(keymap.list_toml_groups()) ~= true then
 	Logger.error(LOG, "The hotstring category metadata is read on each category's first preview this session.")
 end
 Boot.stage("Final mapping sort + tail-index rebuild")
@@ -2263,7 +2263,7 @@ Boot.mark("Final mapping sort + tail-index rebuild")
 Boot.stage("Keymap engine started")
 
 -- Start the keymap eventtap engine after all TOML groups are loaded and sorted.
--- This call was previously auto-invoked at the end of modules/keymap/init.lua
+-- This call was previously auto-invoked at the end of hotstrings/engine/expander/init.lua
 -- (M-13 fix), which started the taps before Karabiner and hotstrings were ready.
 if keymap.migrate_legacy_section_settings() ~= true then
 	error("legacy hotstring section settings could not be migrated before eventtap startup")

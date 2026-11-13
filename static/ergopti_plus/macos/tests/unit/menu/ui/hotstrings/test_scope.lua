@@ -289,17 +289,17 @@ local function fixture(options)
 		end,
 	}
 	package.loaded["core.fs.adapters.file_system"] = adapter
-	package.loaded["ui.menu.hotstrings_scope"] = nil
+	package.loaded["hotstrings.ui.menu.scope"] = nil
 	package.loaded["settings.ui.menu.scoped_preferences"] = nil
 	local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 	prefs.load("config")
 	local km = fake_keymap(controls)
 	-- The new scalar owner is the actual programmable facade and manager. This
 	-- fixture's keymap remains a native port seam, as for every other scalar.
-	local previous_user = package.loaded["modules.dynamic_hotstrings.user_code"]
+	local previous_user = package.loaded["hotstrings.engine.dynamic.user_code"]
 	if previous_user then assert(previous_user.stop()) end
-	package.loaded["modules.dynamic_hotstrings.user_code"] = nil
-	local User = require("modules.dynamic_hotstrings.user_code")
+	package.loaded["hotstrings.engine.dynamic.user_code"] = nil
+	local User = require("hotstrings.engine.dynamic.user_code")
 	if options.programmable then
 		files[User.source_path()] = [[return function() return {{id="custom",suffix="@u",preview="Custom",
 			callback=function() return "scope-text" end}} end]]
@@ -317,8 +317,8 @@ local function fixture(options)
 		assert(type(family_choices[family]) == "boolean", "the fixture explicitly owns each family choice")
 		km.chosen["autocorrection/" .. family] = family_choices[family]
 	end
-	package.loaded["modules.hotstrings.hotstrings_config"] = nil
-	local Config = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
+	package.loaded["hotstrings.engine.catalogue.config"] = nil
+	local Config = helpers.load_with_stubs("hotstrings.engine.catalogue.config")
 	helpers.assert_eq(Config.init({ override_path = "overrides", delay_transaction = km.with_hotstring_delays,
 		toml_resolver = function(category)
 			if category == "autocorrection" or category == "rolls" then return corpus_path(category) end
@@ -359,7 +359,7 @@ local function fixture(options)
 	local engine = { started = true, starts = 0, stops = 0 }
 	local editor = { trigger = nil }
 	local generation = 0
-	local owner = require("ui.menu.hotstrings_scope").new({
+	local owner = require("hotstrings.ui.menu.scope").new({
 		path = "config", files = adapter, state = state, preferences = prefs, checkpoint = checkpoint,
 		demotions = require("menu.ui.transactions.session_demotions").new(),
 		capture_preferences = function() return prefs.snapshot(state, hotfiles, core) end,

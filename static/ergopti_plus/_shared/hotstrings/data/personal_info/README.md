@@ -93,11 +93,11 @@ every driver's suite.
 
 ## Windows applies the mask through its AutoHotkey twin
 
-Windows is wired to this declaration. `windows/infra/personal_info_mask.ahk`
+Windows is wired to this declaration. `windows/hotstrings/engine/catalogue/personal_info_mask.ahk`
 reads the policy (which fields are secrets, how much of one stays visible) from
 `fields.toml` at runtime and masks the frozen field/value snapshot of an
 engine decision for the preview bubble (`PersonalInfoMaskForPreview`,
-`windows/infra/personal_info_preview.ahk`) and for persisted metrics. The
+`windows/hotstrings/engine/catalogue/personal_info_preview.ahk`) and for persisted metrics. The
 direct-registered tags (`@iban★`, `@cb★`, `@ss★`) carry their field names in
 `PreviewFields`, so the same mask reaches them. The algorithm is pinned by
 `preview_vectors.toml`, replayed by every driver's suite.

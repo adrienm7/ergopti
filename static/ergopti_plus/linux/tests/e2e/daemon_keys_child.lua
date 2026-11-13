@@ -206,7 +206,7 @@ hook.start = function(options)
 		end
 	end
 	if CONFIG:match("[/\\]daemon_keys%.toml$") then
-		local config = require("modules.hotstrings.hotstrings_config")
+		local config = require("hotstrings.engine.catalogue.config")
 		assert(config.set_all_sections("daemon_keys", true), "the scripted catalogue must be explicitly selected")
 	end
 end
@@ -409,7 +409,7 @@ if MAGIC_REPEAT ~= "none" then
 		repeat_gate = make_gate(options)
 		return repeat_gate
 	end
-	local Source = require("modules.hotstrings.magic_key_source")
+	local Source = require("hotstrings.engine.magic_key_source")
 	local initialize = Source.init
 	Source.init = function(options)
 		local dispatch = options.dispatch_char
@@ -419,7 +419,7 @@ if MAGIC_REPEAT ~= "none" then
 		end
 		return initialize(options)
 	end
-	local Finder = require("modules.hotstrings.device_finder")
+	local Finder = require("hotstrings.engine.device_finder")
 	Finder.physical_sources = function(paths)
 		repeat_state.origins = repeat_state.origins + 1
 		return { { path = paths[1], physical = MAGIC_REPEAT ~= "untrusted",
@@ -471,10 +471,10 @@ package.preload["core.events.loop"] = function()
 		-- A settled async observation is published by the next actual daemon tick.
 		loop.onPeriodic()
 		if MAGIC_REPEAT ~= "none" then
-			local Source = require("modules.hotstrings.magic_key_source")
-			assert(require("modules.hotstrings.hotstrings_config").set_all_sections("magickey", true),
+			local Source = require("hotstrings.engine.magic_key_source")
+			assert(require("hotstrings.engine.catalogue.config").set_all_sections("magickey", true),
 				"the real magic-key category must acknowledge activation")
-			local Config = require("modules.hotstrings.hotstrings_config")
+			local Config = require("hotstrings.engine.catalogue.config")
 			if not Config.is_section_checked("magickey", "replace") then
 				assert(Config.toggle_section("magickey", "replace"),
 					"the real virtual replacement setting must acknowledge activation")
@@ -494,7 +494,7 @@ package.preload["core.events.loop"] = function()
 				if MAGIC_REPEAT ~= "tap-choice" and MAGIC_REPEAT ~= "tap-none" then
 					-- Model previously stored/hand-edited conflicting intent through the
 					-- actual preference publication owner, never a guessed live flag.
-					assert(require("infra.hotstring_preferences").set("hotstrings.magic_key_source", "Backquote"))
+					assert(require("hotstrings.engine.matcher.preferences").set("hotstrings.magic_key_source", "Backquote"))
 				end
 				if MAGIC_REPEAT == "tap-paused" then repeat_controller.toggle_pause() end
 			end
@@ -597,7 +597,7 @@ package.preload["core.events.loop"] = function()
 			local token = SCRIPT:match("^{(%u+)}", i)
 			if token == "ARROWRESETOFF" or token == "ARROWRESETON" then
 				i = i + #token + 2
-				assert(require("modules.hotstrings.word_reset").set_arrow_resets_word(token == "ARROWRESETON"),
+				assert(require("hotstrings.engine.word_reset").set_arrow_resets_word(token == "ARROWRESETON"),
 					"the real word-reset owner must acknowledge the arrow policy")
 			elseif token == "SELECT" then
 				i = i + #token + 2

@@ -15,9 +15,9 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-#Include ../../../../ui/hotstrings_config_window/hcw_helpers.ahk
-#Include ../../../../ui/hotstrings_config_window/hcw_mutations.ahk
-#Include ../../../../ui/hotstrings_config_window/webview.ahk
+#Include ../../../../hotstrings/ui/hotstrings_config_window/hcw_helpers.ahk
+#Include ../../../../hotstrings/ui/hotstrings_config_window/hcw_mutations.ahk
+#Include ../../../../hotstrings/ui/hotstrings_config_window/webview.ahk
 _PTME_PatchTomlMetaHasCatch() {
 	PatcherBody := _DriverFuncBody("_HCW_PatchTomlMeta")
 	Assert(InStr(PatcherBody, "_PersonalTomlCommitPatch(") > 0,

@@ -38,8 +38,8 @@ require("tests.lua.layouts.magic_key_source_contract")(helpers, Shared, {
 --- @param body function body(Source, Preferences, path)
 local function with_source(content, body)
 	local saved = {
-		preferences = package.loaded["infra.hotstring_preferences"],
-		source = package.loaded["modules.hotstrings.magic_key_source"],
+		preferences = package.loaded["hotstrings.engine.matcher.preferences"],
+		source = package.loaded["hotstrings.engine.magic_key_source"],
 	}
 	local path = string.format("%s/ergopti_magic_key_source_%d_%d.toml",
 		(os.getenv("TMPDIR") or "/tmp"):gsub("/+$", ""), os.time(), math.random(100000, 999999))
@@ -49,13 +49,13 @@ local function with_source(content, body)
 		handle:close()
 	end
 	local ok, err = pcall(function()
-		package.loaded["modules.hotstrings.magic_key_source"] = nil
-		local Preferences = helpers.load_module("infra.hotstring_preferences")
+		package.loaded["hotstrings.engine.magic_key_source"] = nil
+		local Preferences = helpers.load_module("hotstrings.engine.matcher.preferences")
 		assert(Preferences._set_file_for_test(path))
-		body(require("modules.hotstrings.magic_key_source"), Preferences, path)
+		body(require("hotstrings.engine.magic_key_source"), Preferences, path)
 	end)
-	package.loaded["infra.hotstring_preferences"] = saved.preferences
-	package.loaded["modules.hotstrings.magic_key_source"] = saved.source
+	package.loaded["hotstrings.engine.matcher.preferences"] = saved.preferences
+	package.loaded["hotstrings.engine.magic_key_source"] = saved.source
 	os.remove(path)
 	os.remove(path .. ".tmp")
 	if not ok then error(err, 0) end

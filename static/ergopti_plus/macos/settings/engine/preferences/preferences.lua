@@ -68,7 +68,7 @@ local Manifest = require("menu.engine.manifest_reader")
 local LEAF = require("settings.engine.keys").LEAF
 local HotstringLanguages = require("hotstrings.engine.languages")
 local ConfigOutdated = require("settings.engine.migration.outdated")
-local ChoiceCatalogue = require("infra.hotstring_choice_catalogue")
+local ChoiceCatalogue = require("hotstrings.engine.matcher.choice_catalogue")
 local BindingIdentity = require("settings.engine.publication.binding_identity")
 local BindingPublication = require("settings.engine.publication.binding_publication")
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
@@ -77,7 +77,7 @@ local Agent     = require("ai.engine.agent.agent")
 local AppProfileOverrides = require("ai.engine.policy.app_profile_overrides")
 local ProfileRegistry = require("ai.engine.settings.profile_registry_codec")
 local NEVER_MS = require("ai.engine.request_plan.debounce").NEVER_MS
-local HotstringCore = require("infra.hotstring_engine")
+local HotstringCore = require("hotstrings.engine.matcher.engine")
 local WrapPreferences = require("menu.engine.wrap_preferences")
 local UserModels = require("settings.engine.publication.user_models")
 local CapsWordPolicy = require("keyboard.engine.caps_word_auto_off")
@@ -336,7 +336,7 @@ end
 --- @return boolean known
 --- @return string|nil detail
 local function delay_fits(key, value)
-	local keymap = package.loaded["modules.keymap"]
+	local keymap = package.loaded["hotstrings.engine.expander"]
 	if type(keymap) ~= "table" or type(keymap.DELAYS_DEFAULT) ~= "table" then return true end
 	if keymap.DELAYS_DEFAULT[key] == nil then return false, "no hotstring delay of this build has this name" end
 	if tonumber(value) == nil then return false, "the value is not a number of seconds" end
@@ -858,11 +858,11 @@ local function sparse_updates(flat)
 				local canonical = PersonalFiles.preference_default(leaf) ~= nil
 				local path_parts = canonical and require("core.text.engine.toml_codec.key_path").parse(leaf, true)
 				local id = path_parts and path_parts[3]
-				local personal = canonical and require("infra.personal_hotstrings").adoption(id)
+				local personal = canonical and require("hotstrings.engine.catalogue.personal_hotstrings").adoption(id)
 				if canonical and (not personal or not personal.admitted) then
 					-- Unavailable sources own no disk preference leaves in this snapshot.
 				elseif personal and personal.admitted and personal.legacy_name and value == true then
-					assert(require("infra.personal_hotstrings").adoption_current(personal) == true,
+					assert(require("hotstrings.engine.catalogue.personal_hotstrings").adoption_current(personal) == true,
 						"personal legacy source changed before preferences publication")
 					updates[#updates + 1] = require("hotstrings.engine.catalogue.personal_adoption").preference_row(personal,
 						path_parts[2] == "modules" and path_parts[4] or nil, value)
@@ -1919,9 +1919,9 @@ function M.personal_choices_available(changes)
 		if PersonalFiles.components(choice.group) then
 			if type(choice.enabled) ~= "boolean" or choice.section ~= nil
 				and (type(choice.section) ~= "string" or choice.section == "") then return false end
-			local record = require("infra.personal_hotstrings").adoption(choice.group)
+			local record = require("hotstrings.engine.catalogue.personal_hotstrings").adoption(choice.group)
 			if not record or record.admitted ~= true
-				or require("infra.personal_hotstrings").adoption_current(record) ~= true then return false end
+				or require("hotstrings.engine.catalogue.personal_hotstrings").adoption_current(record) ~= true then return false end
 			rows[#rows + 1] = { section = require("core.text.engine.toml_codec.key_path").render(choice.section
 				and { "hotstrings", "modules", choice.group } or { "hotstrings", "groups" }),
 				key = choice.section or choice.group }
@@ -1971,7 +1971,7 @@ function M.project_hotstring_preferences(saved, groups, get_sections)
 		local enabled = saved.hotstrings and saved.hotstrings[name]
 		local personal_record, personal_sections
 		if PersonalFiles.components(name) then
-			personal_record = require("infra.personal_hotstrings").adoption(name)
+			personal_record = require("hotstrings.engine.catalogue.personal_hotstrings").adoption(name)
 			if personal_record then
 				enabled, personal_sections = PersonalAdoption.preferences(personal_record, saved)
 			else

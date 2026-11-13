@@ -79,7 +79,7 @@ local function build_world()
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return false end }
+	package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return false end }
 	package.loaded["modules.shortcuts.script_control"] = nil
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
@@ -200,7 +200,7 @@ local function build_world()
 	})
 	engine.set_llm_enabled(true)
 	world.flow = require("ai.engine.prediction.screen_answer")
-	package.loaded["modules.keymap"] = {
+	package.loaded["hotstrings.engine.expander"] = {
 		request_screen_answers = function(value, mode, parent, answers)
 			return world.flow.run(value, mode, parent, answers)
 		end,

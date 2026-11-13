@@ -496,8 +496,8 @@ helpers.with_stub_scope(MODULES, function()
 		helpers.it("unused keys: a retired hotstring delay is never saved back and is offered (config-outdated-delays)", function()
 			-- set_delay ignored it, the state kept it and every save wrote it back.
 			local source = "[hotstrings.delays]\nrolls = 0.4\nretired_delay = 0.1\nautocorrection = \"slow\"\n"
-			local saved = package.loaded["modules.keymap"]
-			package.loaded["modules.keymap"] = { DELAYS_DEFAULT = { rolls = 0.5, autocorrection = 1.0 } }
+			local saved = package.loaded["hotstrings.engine.expander"]
+			package.loaded["hotstrings.engine.expander"] = { DELAYS_DEFAULT = { rolls = 0.5, autocorrection = 1.0 } }
 			local ok, err = pcall(function()
 				local flat = Preferences.flatten_document(TomlCodec.decode(source))
 				helpers.assert_eq(flat.delays, { rolls = 0.4 })
@@ -508,7 +508,7 @@ helpers.with_stub_scope(MODULES, function()
 				table.sort(offered)
 				helpers.assert_eq(offered, { "hotstrings.delays.autocorrection", "hotstrings.delays.retired_delay" })
 			end)
-			package.loaded["modules.keymap"] = saved
+			package.loaded["hotstrings.engine.expander"] = saved
 			if not ok then error(err, 0) end
 		end)
 

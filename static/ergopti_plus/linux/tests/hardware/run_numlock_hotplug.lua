@@ -16,7 +16,7 @@ require('core.lifecycle.engine.compat.utf8').install()
 local Hook=require('platform.input.keyboard_hook')
 local Names=require('platform.input.device_names')
 local Reader=require('platform.input.evdev_reader')
-local Finder=require('modules.hotstrings.device_finder')
+local Finder=require('hotstrings.engine.device_finder')
 local Layout=require('adapters.keyboard_layout')
 local Clock=require('core.logger.engine.monotonic')
 local Json=require('core.text.engine.json')
@@ -87,7 +87,7 @@ local ok,failure=xpcall(function()
 	-- real EV_LED writes before Hook seeds capture, matching the fresh sink.
 	for index, keyboard in ipairs(keyboards) do keyboard.set_led(paths[index],0,0) end
 	selected={paths[1]};if paths[2] then selected[2]=paths[2] end
-	Injector=require('modules.hotstrings.injector');assert(Injector.open_fast_channel())
+	Injector=require('hotstrings.engine.injector');assert(Injector.open_fast_channel())
 	assert(Reader.open(assert(await(function() return node(oldname) end,5000)),'pass2-output'))
 	assert(Layout.refresh())
 	local mapping=assert(io.popen('xkbcomp -xkb "$DISPLAY" - 2>/dev/null','r'))

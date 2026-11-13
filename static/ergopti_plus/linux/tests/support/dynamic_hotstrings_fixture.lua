@@ -24,7 +24,7 @@ end
 --- @return function restore Removes the file and restores production routing.
 --- @return string path The private configuration file.
 function M.route()
-	local Preferences = require("infra.hotstring_preferences")
+	local Preferences = require("hotstrings.engine.matcher.preferences")
 	local uv = require("luv")
 	local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-dynamic-families-XXXXXX"))
 	local path = dir .. "/config.toml"
@@ -47,8 +47,8 @@ end
 function M.install()
 	local restore = M.route()
 	local ok, detail = pcall(function()
-		local Preferences = require("infra.hotstring_preferences")
-		for _, family in ipairs(require("modules.dynamic_hotstrings.manager").RULE_FAMILIES) do
+		local Preferences = require("hotstrings.engine.matcher.preferences")
+		for _, family in ipairs(require("hotstrings.engine.dynamic.manager").RULE_FAMILIES) do
 			if family.id then
 				assert(Preferences.set("hotstrings.dynamic." .. family.id .. ".enabled", true),
 					"fixture family must persist: " .. family.id)

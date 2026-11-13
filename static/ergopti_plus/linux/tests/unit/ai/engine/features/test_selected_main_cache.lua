@@ -28,7 +28,7 @@ helpers.describe("Main selected payload cache boundary", function()
 			local factory = assert(compile("return function(injector,privacy_owners,opts,engine,WordReset,Monotonic,Logger,script_actions,prediction_engine,secure_focus_guard,keystats) "
 				.. "local _undoable={trigger='old',replacement='OLD'}; local LOG='Main cache test'; "
 				.. control_source .. "; return " .. replace_source .. ",handle_control,function() return _undoable end end"))()
-			local engine = require("modules.hotstrings.engine").new()
+			local engine = require("hotstrings.engine.engine").new()
 			helpers.assert_true(engine:load_mappings({}))
 			for ch in ("btw"):gmatch(".") do engine:on_char(ch) end
 			helpers.assert_eq(engine:current_buffer(), "btw")

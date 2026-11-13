@@ -16,7 +16,7 @@ require("core.lifecycle.engine.compat.utf8").install()
 local Names = require("platform.input.device_names")
 local Input = require("platform.input.event")
 local Reader = require("platform.input.evdev_reader")
-local Finder = require("modules.hotstrings.device_finder")
+local Finder = require("hotstrings.engine.device_finder")
 local Layout = require("adapters.keyboard_layout")
 local Monotonic = require("core.logger.engine.monotonic")
 
@@ -72,7 +72,7 @@ local ok, failure = pcall(function()
 		paths[index] = await_node(Names.VIRTUAL_KEYBOARD)
 	end
 	Names.VIRTUAL_KEYBOARD = original_name
-	Injector = require("modules.hotstrings.injector")
+	Injector = require("hotstrings.engine.injector")
 	assert(Injector.open_fast_channel(), "cannot create production output")
 	assert(Reader.open(await_node(original_name), "custody-output"), "cannot observe output")
 	assert(Layout.refresh(), "cannot load the live XKB keymap")

@@ -114,7 +114,7 @@ package.loaded['core.logger.engine.shim']={info=function()end,error=function()en
 local state={dyn_hotstrings={get_info=function()return {['__proto__']='before',address='first\r\nsecond\rthird\nfourth'}end,
  get_letters=function()return {}end,get_trigger_char=function()return '★'end},
  webview_manager={eval_js=function(_,js)io.write(js);return true end},i18n={get=function(key)return key end}}
-assert(require('ui.personal_info_editor.bridge').on_message({action='ready'},state).pushed)
+assert(require('hotstrings.ui.personal_info_editor.bridge').on_message({action='ready'},state).pushed)
 `;
 			const result = spawnSync(process.env.PERSONAL_INFO_LUAJIT, ['-e', worker], {
 				cwd: driver,

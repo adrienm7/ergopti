@@ -267,7 +267,7 @@ local function build_world(selection)
 	world.tone = require("ai.engine.prediction.tone_rewrite")
 	-- Only the timers of the actions run: the backend's own stay untouched
 	world.timer_baseline = #hs_stub.timer.__timers
-	package.loaded["modules.keymap"] = {
+	package.loaded["hotstrings.engine.expander"] = {
 		request_tone_step = function(direction, cycle, parent)
 			return world.tone.step(direction, cycle, parent)
 		end,

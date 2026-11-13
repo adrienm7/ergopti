@@ -849,8 +849,8 @@ helpers.describe("ui.bridge_handlers", function()
 				local path = target .. "/config.toml"
 				local stored = nil
 				if candidate ~= "★" then stored = candidate end
-				local saved_preferences = package.loaded["infra.hotstring_preferences"]
-				local saved_magic = package.loaded["modules.hotstrings.magic_key"]
+				local saved_preferences = package.loaded["hotstrings.engine.matcher.preferences"]
+				local saved_magic = package.loaded["hotstrings.engine.magic_key"]
 				local ok, err = pcall(function()
 					helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
 					write_file(path, '[_meta]\nschema_version = 7\n[future]\nkeep = "independent"\n')
@@ -865,17 +865,17 @@ helpers.describe("ui.bridge_handlers", function()
 					helpers.assert_eq(decoded.future.keep, "independent", "a future neighbor is preserved")
 					helpers.assert_eq(decoded._meta.schema_version, 7)
 					helpers.assert_eq((decoded.hotstrings or {}).trigger_char, stored)
-					local preferences = helpers.load_module("infra.hotstring_preferences")
+					local preferences = helpers.load_module("hotstrings.engine.matcher.preferences")
 					preferences._set_file_for_test(path)
 					helpers.assert_true(preferences.refresh())
-					local magic = helpers.load_module("modules.hotstrings.magic_key")
+					local magic = helpers.load_module("hotstrings.engine.magic_key")
 					helpers.assert_eq(magic.get(), candidate, "a fresh runtime owner reads the wizard's choice")
 					local ready = handler.on_message({ action = "ready" }, state)
 					helpers.assert_eq(ready.data.current["hotstrings.trigger_char"], stored,
 						"a re-run shows the persisted custom value and leaves the default sparse")
 				end)
-				package.loaded["infra.hotstring_preferences"] = saved_preferences
-				package.loaded["modules.hotstrings.magic_key"] = saved_magic
+				package.loaded["hotstrings.engine.matcher.preferences"] = saved_preferences
+				package.loaded["hotstrings.engine.magic_key"] = saved_magic
 				os.remove(path); os.remove(helpers.stage_path(path)); os.remove(target)
 				if not ok then error(err, 0) end
 			end)

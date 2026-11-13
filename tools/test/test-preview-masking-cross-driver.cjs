@@ -140,10 +140,13 @@ for (const driver of DRIVERS) {
 // codepoint rather than pasted so the check cannot pass on a look-alike.
 const SEPARATOR = ' ' + String.fromCodePoint(0x21e5) + ' ';
 const SEPARATOR_PRODUCERS = [
-	{ label: 'linux', rel: 'static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua' },
+	{ label: 'linux', rel: 'static/ergopti_plus/linux/hotstrings/engine/dynamic/manager.lua' },
 	{ label: 'linux-bubble', rel: 'static/ergopti_plus/linux/core/ui/ui/tooltip/preview.lua' },
-	{ label: 'macos', rel: 'static/ergopti_plus/macos/modules/dynamic_hotstrings/personal_info.lua' },
-	{ label: 'windows', rel: 'static/ergopti_plus/windows/infra/personal_info_preview.ahk' }
+	{ label: 'macos', rel: 'static/ergopti_plus/macos/hotstrings/engine/dynamic/personal_info.lua' },
+	{
+		label: 'windows',
+		rel: 'static/ergopti_plus/windows/hotstrings/engine/catalogue/personal_info_preview.ahk'
+	}
 ];
 
 for (const producer of SEPARATOR_PRODUCERS) {

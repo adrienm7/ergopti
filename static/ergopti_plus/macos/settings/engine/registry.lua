@@ -24,12 +24,12 @@ local text_utils  = require("core.text.engine.utils")
 -- it existed in two Lua copies and one AutoHotkey copy, and the Linux driver had
 -- none, so the same pair of colliding entries elected different winners per OS.
 local HotstringPriority = require("hotstrings.engine.priority")
-local km_utils    = require("modules.keymap.utils")
+local km_utils    = require("hotstrings.engine.expander.utils")
 local Logger      = require("core.logger.engine.logger")
 local Paths       = require("core.fs.engine.paths")
-local Terminators = require("modules.keymap.terminators")
-local Groups      = require("modules.keymap.registry_groups")
-local RI          = require("modules.keymap.registry_index")
+local Terminators = require("hotstrings.engine.expander.terminators")
+local Groups      = require("hotstrings.engine.expander.registry_groups")
+local RI          = require("hotstrings.engine.expander.registry_index")
 
 -- Merge group-loader forwards and section-management surface into M at load time.
 -- RI.setup(core_state) is called from M.init() to wire up _state for the index functions.
@@ -235,7 +235,7 @@ end
 -- ==============================
 
 -- The catalogue, the O(1) lookup sets, and the enable/disable API all live in
--- modules/keymap/terminators.lua — see that module for the full implementation
+-- hotstrings/engine/expander/terminators.lua — see that module for the full implementation
 -- and the rationale behind the hot-path caches. Registry re-exports the public
 -- surface under its historical names so the menu and expander callers keep
 -- working unchanged.

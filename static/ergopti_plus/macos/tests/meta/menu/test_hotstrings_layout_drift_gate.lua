@@ -22,7 +22,7 @@
 --- migration lands, this test pins the manifest's current hs-filtered shape
 --- for both keys. Any edit to hotstrings_menu/layout_menu in
 --- menu_manifest.json now fails this test, forcing a human to consciously
---- check whether ui/menu/menu_hotstrings.lua, menu/ui/builder/builder.lua, or
+--- check whether hotstrings/ui/menu/hotstrings.lua, menu/ui/builder/builder.lua, or
 --- ui/menu/menu_keyboard_layout.lua still need updating — turning a
 --- previously silent desync into a loud one.
 ---
@@ -174,7 +174,7 @@ local CANONICAL_LAYOUT_MENU = {
 	-- Replacement is controlled by the shipped Ergopti hotstrings extension.
 	-- The physical key remains selectable here on every driver by pressing it
 	-- or choosing from the candidates
-	-- (ui/menu/magic_key_source_menu.lua).
+	-- (hotstrings/ui/menu/magic_key_source_menu.lua).
 	"list:magic_key_source",
 }
 

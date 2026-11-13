@@ -725,7 +725,7 @@ GestureDisplayMirrorToggle(Sys := 0) {
 }
 
 ; Case action id -> the pure transform it applies to the selection
-; (infra/text_case.ahk). The registry below and the shared-corpus replay
+; (hotstrings/engine/text_case.ahk). The registry below and the shared-corpus replay
 ; (tests/unit/modules/shortcuts/test_text_case_vectors.ahk) both read this map, so an id cannot be
 ; tested against one transform and run another.
 ; @returns {Map}

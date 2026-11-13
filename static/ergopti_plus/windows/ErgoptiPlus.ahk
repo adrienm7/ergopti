@@ -242,7 +242,7 @@ global LayerEnabled := False
 global TapHold := Map("keys", Map())
 ; Read in FIRST position by a parse-time #HotIf (platform/remap/altgr.ahk), which
 ; can be evaluated during Bundle_Init's message-pumping RunWait — long before
-; infra/hotstrings/hotstring_engine.ahk's include position. Seed it here so that #HotIf
+; hotstrings/engine/matcher/engine.ahk's include position. Seed it here so that #HotIf
 ; short-circuits to false instead of throwing; HotstringEngineInit() resolves the
 ; real value (auto-probe + TOML override) later in boot.
 global _ALTGR_KANA_FIXUP := False
@@ -440,7 +440,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include ../_shared/shortcuts/data/actions/brightness.ahk
 #Include adapters/screen_brightness.ahk
 #Include diagnostics/adapters/crash_report_worker.ahk
-#Include modules/keymap/uia_selection_worker.ahk
+#Include hotstrings/engine/expander/uia_selection_worker.ahk
 BootProfile_Stamp("Adapters initialised")
 SFD_ConfigureUiaWorker(
 	UIASW_RequestPassword, UIASW_Start, UIASW_ContextMatches)
@@ -465,7 +465,7 @@ if UIASW_IsWorkerInvocation()
 #Include core/ui/engine/window_utils.ahk
 #Include core/network/engine/external_url_policy.ahk
 #Include core/text/engine/utils.ahk
-#Include infra/text_case.ahk
+#Include hotstrings/engine/text_case.ahk
 #Include infra/wrap_pair.ahk
 #Include infra/open_target.ahk
 #Include settings/engine/send_input_parameter.ahk
@@ -477,26 +477,26 @@ if UIASW_IsWorkerInvocation()
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
 ; FoldAsciiLower) extracted into dedicated submodules so the main file
 ; stays focused on ErgoptiPlus-specific logic.
-#Include infra/hotstrings/hotstring_engine.ahk
+#Include hotstrings/engine/matcher/engine.ahk
 ; The AltGr family HotstringEngineInit decides at boot and that then follows
 ; the foreground window's layout (AltGrFamilyStartFollowing, below).
 #Include infra/altgr_family.ahk
-#Include infra/hotstrings/hotstring_engine_main.ahk
-#Include infra/hotstrings/hotstring_buffer_effects.ahk
-#Include infra/hotstrings/hotstring_live_toggle.ahk
-#Include infra/hotstrings/hotstring_count_policy.ahk
+#Include hotstrings/engine/matcher/engine_main.ahk
+#Include hotstrings/engine/matcher/buffer_effects.ahk
+#Include hotstrings/engine/matcher/live_toggle.ahk
+#Include hotstrings/engine/matcher/count_policy.ahk
 ; The programmable-hotstring owner's state must exist before the first tray
 ; render counts its rules and before a startup failure runs the shutdown
 ; preflight that invalidates it. Its globals initialise at this include
-; position; modules/hotstrings.ahk's later #Include of it is then a no-op.
-#Include modules/dynamic_hotstrings/user_code.ahk
+; position; hotstrings/hotstrings.ahk's later #Include of it is then a no-op.
+#Include hotstrings/engine/dynamic/user_code.ahk
 ; Generated terminator catalogue (single source of truth — shared with macOS via
 ; _shared/core/text/data/domain/Terminators.spec.js). Both the tray and config-window delimiter
 ; menus render this catalogue so the word-terminator list never drifts between
 ; drivers. Included before the menus and before HSE_Terminators is instantiated.
 #Include _generated/terminators.ahk
 #Include core/text/engine/toml/loader.ahk
-#Include infra/hotstrings/extension_packs.ahk
+#Include hotstrings/engine/catalogue/extension_packs.ahk
 #Include core/text/engine/toml/config_loader.ahk
 BootProfile_Stamp("Hotstring and TOML state initialised")
 ; The config.toml schema migration the boot runs before any reader or writer.
@@ -549,24 +549,24 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include core/i18n/engine/i18n.ahk
 #Include ui/onboarding/init.ahk
 BootProfile_Stamp("Manifest, updater and locale state initialised")
-#Include infra/hotstrings/hotstrings_config.ahk
-#Include ui/hotstrings_config_window/init.ahk
-#Include ui/hotstrings_config_window/webview.ahk
+#Include hotstrings/engine/catalogue/config.ahk
+#Include hotstrings/ui/hotstrings_config_window/init.ahk
+#Include hotstrings/ui/hotstrings_config_window/webview.ahk
 #Include ai/ui/prompt_editor/init.ahk
 #Include infra/wrap_symbols_config.ahk
 #Include _generated/window_titles.ahk
 #Include core/ui/engine/native_dialogs.ahk
 #Include core/ui/engine/style.ahk
 #Include core/ui/ui/tooltip/init.ahk
-#Include infra/hotstrings/hotstring_prefix_watcher.ahk
+#Include hotstrings/engine/matcher/prefix_watcher.ahk
 ; Self-healing hotstring cache for the bundled TOMLs. Replaces the old ~1 MB of
 ; committed generated_*.ahk (tokenised at boot, before the tray icon could appear)
 ; with a gitignored flat .tsv read at registration — the same pattern as the i18n
 ; locale cache. LoadHotstringsSection ensures + consults it, falling back to the
 ; runtime TOML parser on a cache miss. No generated CODE is kept in the repo.
-#Include infra/hotstrings/hotstrings_cache.ahk
-#Include ui/personal_toml_editor.ahk
-#Include ui/personal_toml_editor_webview.ahk
+#Include hotstrings/engine/catalogue/cache.ahk
+#Include hotstrings/ui/personal_toml_editor.ahk
+#Include hotstrings/ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include ../_shared/settings/data/features/number_row_policy.ahk
 #Include ../_shared/settings/data/features/layout_rows_policy.ahk
@@ -1254,7 +1254,7 @@ ReadKeyboardShortcutsConfig()
 #Include settings/engine/io.ahk
 #Include settings/engine/scope/scope.ahk
 #Include ../_shared/hotstrings/data/catalogue/scope_overrides.ahk
-#Include infra/hotstrings/hotstrings_scope.ahk
+#Include hotstrings/engine/catalogue/scope.ahk
 #Include settings/engine/scope/global_scope.ahk
 _BootMetricsCache := CS_Load()
 global _SaveFullConfigReady := true
@@ -1425,7 +1425,7 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/layout_manager/source_store.ahk
 #Include diagnostics/ui/field_check/network_check.ahk
 #Include core/network/proxy_override.ahk
-#Include ui/personal_info_editor/init.ahk
+#Include hotstrings/ui/personal_info_editor/init.ahk
 #Include ui/layer_editor/init.ahk
 #Include ui/physical_shortcuts/init.ahk
 
@@ -1470,7 +1470,7 @@ CapsWordAutoOffReadConfig(_IniCache)
 BootProfile_Mark("LAYOUT: shortcut modules registered")
 #Include platform/remap.ahk
 BootProfile_Mark("LAYOUT: tap-holds and navigation registered")
-#Include modules/hotstrings.ahk
+#Include hotstrings/hotstrings.ahk
 MagicEditorStart()
 ; The module now only DEFINES RegisterAllHotstrings(); invoke it here so the
 ; registration runs at the same boot point (and A_InputLevel) as before the

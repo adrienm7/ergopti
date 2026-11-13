@@ -203,7 +203,7 @@ y = 20
 	end)
 
 	it("dynamic_hotstrings preserves a '#' inside a quoted value (decode, not bespoke strip)", function()
-		local dh = helpers.load_module("modules.dynamic_hotstrings.manager")
+		local dh = helpers.load_module("hotstrings.engine.dynamic.manager")
 
 		-- A '#' inside a quoted string is data, not a comment. The bespoke
 		-- fallback parser strips everything after the first '#' (even inside

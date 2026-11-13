@@ -344,14 +344,14 @@ local BRIDGE_MODULES = {
 	download_window       = "ui.download_window.bridge",
 	error_dialog          = "diagnostics.ui.error_dialog",
 	healthcheck           = "diagnostics.ui.healthcheck.bridge",
-	hotstring_editor      = "ui.hotstring_editor.bridge",
+	hotstring_editor      = "hotstrings.ui.hotstring_editor.bridge",
 	-- Keyed by the DIRECTORY name. It read "hotstrings_config" until 2026-08-05,
 	-- which gave that name a working bridge and no page: resolve_app_dir() looks
 	-- for _shared/ui/<name>/index.html and there is no _shared/ui/hotstrings_config,
 	-- so every caller using it got a window rendering "Error: app not found" while
 	-- the bridge behind it was perfectly healthy. A half-registered name is worse
 	-- than an unregistered one — it looks supported at the only place anyone checks.
-	hotstrings_config_window = "ui.hotstrings_config_window.bridge",
+	hotstrings_config_window = "hotstrings.ui.hotstrings_config_window.bridge",
 	layer_editor          = "ui.layer_editor.bridge",
 	metrics_apps          = "ui.metrics_apps.bridge",
 	metrics_typing        = "ui.metrics_typing.bridge",
@@ -359,7 +359,7 @@ local BRIDGE_MODULES = {
 	onboarding            = "ui.onboarding.bridge",
 	layout_manager        = "ui.layout_manager.bridge",
 	paths_editor          = "settings.ui.paths_editor.bridge",
-	personal_info_editor  = "ui.personal_info_editor.bridge",
+	personal_info_editor  = "hotstrings.ui.personal_info_editor.bridge",
 	numeric_prompt        = "core.ui.ui.numeric_prompt",
 	prompt_editor         = "ai.ui.prompt_editor.bridge",
 	token_prompt          = "core.ui.ui.token_prompt",

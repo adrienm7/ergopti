@@ -19,14 +19,14 @@ helpers.describe("hotstring-section-order persistence", function()
 		local function read()
 			local file = assert(io.open(path, "rb")); local text = file:read("*a"); file:close(); return text
 		end
-		local before = package.loaded["infra.hotstring_preferences"]
+		local before = package.loaded["hotstrings.engine.matcher.preferences"]
 		local ok, detail = xpcall(function()
 			write(source)
-			local preferences = helpers.load_module("infra.hotstring_preferences")
+			local preferences = helpers.load_module("hotstrings.engine.matcher.preferences")
 			preferences._set_file_for_test(path)
 			test(preferences, read, write)
 		end, debug.traceback)
-		package.loaded["infra.hotstring_preferences"] = before
+		package.loaded["hotstrings.engine.matcher.preferences"] = before
 		os.remove(path)
 		assert(ok, detail)
 	end

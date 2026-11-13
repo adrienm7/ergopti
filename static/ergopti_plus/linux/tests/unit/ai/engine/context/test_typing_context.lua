@@ -38,13 +38,13 @@ local function scenario(options, body)
 	require("ai.engine.settings.settings")._reset()
 	local ok, failure = xpcall(function()
 		local ai = { on = options.ai_on ~= false }
-		local engine = helpers.load_module("modules.hotstrings.engine").new()
+		local engine = helpers.load_module("hotstrings.engine.engine").new()
 		local context = require("ai.engine.api.context").new({ is_active = function() return ai.on end })
 		engine:attach_ai_context(context)
 		assert(engine:load_mappings({
 			{ trigger = "btw", replacement = "by the way", auto_expand = true, is_word = false },
 		}))
-		local word_reset = helpers.load_module("modules.hotstrings.word_reset")
+		local word_reset = helpers.load_module("hotstrings.engine.word_reset")
 		local settings = word_reset.snapshot()
 		settings.idle_seconds = 0
 		settings.arrow_resets_word = options.arrow_resets_word ~= false

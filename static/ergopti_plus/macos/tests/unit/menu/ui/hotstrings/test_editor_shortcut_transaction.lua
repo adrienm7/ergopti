@@ -54,7 +54,7 @@ local function run_menu_action(raw, outcome)
 	local saved_dialog = package.loaded["core.ui.engine.dialog_util"]
 	local saved_notifications = package.loaded["core.ui.engine.notifications"]
 	local saved_lifecycle = package.loaded["menu.ui.keyboard.keymap_lifecycle"]
-	local saved_custom = package.loaded["ui.menu.menu_hotstrings_custom"]
+	local saved_custom = package.loaded["hotstrings.ui.menu.custom"]
 	local calls = { sets = 0, clears = 0, saves = 0, updates = 0, notices = 0 }
 	local state = {
 		keymap = true,
@@ -75,10 +75,10 @@ local function run_menu_action(raw, outcome)
 		end,
 	}
 	package.loaded["menu.ui.keyboard.keymap_lifecycle"] = nil
-	package.loaded["ui.menu.menu_hotstrings_custom"] = nil
+	package.loaded["hotstrings.ui.menu.custom"] = nil
 
 	local ok, fixture_or_err = xpcall(function()
-		local Custom = require("ui.menu.menu_hotstrings_custom")
+		local Custom = require("hotstrings.ui.menu.custom")
 		local shortcut_prefix = require("core.i18n.engine.i18n").get("menu.hotstrings.shortcut_prefix")
 		helpers.assert_true(type(shortcut_prefix) == "string" and shortcut_prefix ~= "",
 			"the localized shortcut prefix must be available")
@@ -113,7 +113,7 @@ local function run_menu_action(raw, outcome)
 	package.loaded["core.ui.engine.dialog_util"] = saved_dialog
 	package.loaded["core.ui.engine.notifications"] = saved_notifications
 	package.loaded["menu.ui.keyboard.keymap_lifecycle"] = saved_lifecycle
-	package.loaded["ui.menu.menu_hotstrings_custom"] = saved_custom
+	package.loaded["hotstrings.ui.menu.custom"] = saved_custom
 	if not ok then error(fixture_or_err, 0) end
 	return fixture_or_err
 end
@@ -125,7 +125,7 @@ end
 --- @param body function Callback receiving editor and registrar fixture.
 local function with_editor_registrar(body)
 	local saved_registrar = package.loaded["platform.input.hotkey_registrar"]
-	local saved_editor = package.loaded["ui.hotstring_editor"]
+	local saved_editor = package.loaded["hotstrings.ui.hotstring_editor"]
 	local calls = { bind = 0, unbind = 0, enable = 0, order = {} }
 	local handles = {}
 	local refuse_chord = nil
@@ -165,9 +165,9 @@ local function with_editor_registrar(body)
 	end
 
 	package.loaded["platform.input.hotkey_registrar"] = registrar
-	package.loaded["ui.hotstring_editor"] = nil
+	package.loaded["hotstrings.ui.hotstring_editor"] = nil
 	local ok, err = xpcall(function()
-		local Editor = helpers.load_with_stubs("ui.hotstring_editor")
+		local Editor = helpers.load_with_stubs("hotstrings.ui.hotstring_editor")
 		body(Editor, {
 			calls = calls,
 			handles = handles,
@@ -176,7 +176,7 @@ local function with_editor_registrar(body)
 		})
 	end, debug.traceback)
 	package.loaded["platform.input.hotkey_registrar"] = saved_registrar
-	package.loaded["ui.hotstring_editor"] = saved_editor
+	package.loaded["hotstrings.ui.hotstring_editor"] = saved_editor
 	if not ok then error(err, 0) end
 end
 
@@ -297,7 +297,7 @@ end)
 --- @param timer_result boolean|nil Actual scheduler receipt.
 --- @return table observation Recorded native admissions.
 local function editor_observation(vector, deferred_pause, timer_result, label_key)
-	return helpers.with_stub_scope({ "ui.menu.menu_hotstrings_custom", "core.timing.engine.deferred_work", "core.events.timer_scheduler", "menu.engine.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n" }, function()
+	return helpers.with_stub_scope({ "hotstrings.ui.menu.custom", "core.timing.engine.deferred_work", "core.events.timer_scheduler", "menu.engine.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n" }, function()
 		local calls, scheduled, callback = 0, 0, nil
 		local current = vector.initial_paused
 		package.loaded["core.events.timer_scheduler"] = {
@@ -309,8 +309,8 @@ local function editor_observation(vector, deferred_pause, timer_result, label_ke
 			end,
 		}
 		package.loaded["core.timing.engine.deferred_work"] = nil
-		package.loaded["ui.menu.menu_hotstrings_custom"] = nil
-		local Custom = require("ui.menu.menu_hotstrings_custom")
+		package.loaded["hotstrings.ui.menu.custom"] = nil
+		local Custom = require("hotstrings.ui.menu.custom")
 		local ctx = {
 			paused = false, state = { keymap = false, hotstrings = {}, trigger_char = "★" },
 			hotfiles = {}, hotstring_editor = {}, script_control = {},

@@ -17,15 +17,15 @@ local TextUtils = require("core.text.engine.utils")
 local function with_fixture(collision, body)
 	return helpers.with_stub_scope({
 		"settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.fs.adapters.storage", "settings.engine.paths",
-		"core.ui.engine.notifications", "menu.ui.keyboard.keymap_lifecycle", "settings.engine.registry", "modules.keymap.registry_index",
-		"modules.keymap.registry_groups", "ui.menu.menu_hotstrings_custom", "settings.engine.scope.personal_file_scope",
-		"infra.personal_hotstrings",
+		"core.ui.engine.notifications", "menu.ui.keyboard.keymap_lifecycle", "settings.engine.registry", "hotstrings.engine.expander.registry_index",
+		"hotstrings.engine.expander.registry_groups", "hotstrings.ui.menu.custom", "settings.engine.scope.personal_file_scope",
+		"hotstrings.engine.catalogue.personal_hotstrings",
 		"core.i18n.engine.i18n", "menu.engine.manifest_menu", "core.i18n.engine.locale", "core.i18n.engine.core",
 	}, function()
 		-- These fixtures own registered sources, not the boot scanner catalogue.
 		-- Keep only its empty diagnostics port scoped; the real registry and
 		-- conditional preference publisher remain the owners exercised below.
-		package.loaded["infra.personal_hotstrings"] = {
+		package.loaded["hotstrings.engine.catalogue.personal_hotstrings"] = {
 			unavailable_directories = function() return {} end,
 		}
 		local root = os.tmpname(); os.remove(root)
@@ -92,7 +92,7 @@ local function with_fixture(collision, body)
 			observations.notices[#observations.notices + 1] = { ... }
 		end }
 		local R = helpers.load_with_stubs("settings.engine.registry")
-		local state = require("modules.keymap.state").new({ trigger_char = "★", expansion_delay = 0.4 }, {})
+		local state = require("hotstrings.engine.expander.state").new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 		assert(R.init(state))
 		for _, entry in ipairs(definitions) do assert(R.load_toml(entry.name, entry.path, nil, entry.personal_source)) end
 		R.start = function() observations.starts = observations.starts + 1; return true end
@@ -108,7 +108,7 @@ local function with_fixture(collision, body)
 			hotstring_editor = { open = function() end }, notify_feature = function() end }
 		for _, entry in ipairs(definitions) do ctx.hotfile_paths[entry.name] = entry.path end
 		ctx.save_prefs = function() return Preferences.save(config, ctx.state, names, { keymap = R }) end
-		local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+		local Custom = helpers.load_with_stubs("hotstrings.ui.menu.custom")
 		-- Only the two newly declared affixes need a physical translated source.
 		-- Keep every existing identity-caption assertion on its original test port.
 		local NativeLocale = require("core.i18n.engine.locale")
@@ -297,7 +297,7 @@ end)
 helpers.describe("personal whole file and directory frame admission", function()
 	helpers.it("refuses missing file and directory declarations without source or registry effects", function()
 		with_fixture(false, function(f)
-			local custom = require("ui.menu.menu_hotstrings_custom")
+			local custom = require("hotstrings.ui.menu.custom")
 			local root = require("menu.engine.manifest_menu").get_root()
 			local before, first, second = f.content(), f.state.mappings[1], f.state.mappings[2]
 			helpers.assert_type(custom.build_custom(f.ctx, { group_counts = {} }), "table")
@@ -320,7 +320,7 @@ helpers.describe("personal whole file and directory frame admission", function()
 	end)
 	helpers.it("rejects malformed directory children and repairs the genuine physical file controls", function()
 		with_fixture(false, function(f)
-			local custom = require("ui.menu.menu_hotstrings_custom")
+			local custom = require("hotstrings.ui.menu.custom")
 			local root = require("menu.engine.manifest_menu").get_root()
 			local original = root.hotstring_personal_directory_frame
 			local before, first, second = f.content(), f.state.mappings[1], f.state.mappings[2]
@@ -344,7 +344,7 @@ end)
 helpers.describe("personal native legacy tree order", function()
 	helpers.it("retains duplicate legacy leaves and their distinct native file menus", function()
 		with_fixture(true, function(f)
-			local custom = require("ui.menu.menu_hotstrings_custom")
+			local custom = require("hotstrings.ui.menu.custom")
 			local rows = assert(custom.build_custom(f.ctx, { group_counts = {} })).submenu
 			local folder
 			local function stem(row) return row.title:gsub(" %(%d+%)$", "") end
@@ -383,7 +383,7 @@ helpers.describe("personal directory hand corpus drives the genuine native separ
 				end
 				return original(key,...)
 			end
-			local custom = require("ui.menu.menu_hotstrings_custom")
+			local custom = require("hotstrings.ui.menu.custom")
 			local ok, actual = pcall(custom.build_custom,f.ctx,{group_counts={}})
 			renderer.template_rows = original
 			helpers.assert_type(actual,"table");helpers.assert_true(ok)

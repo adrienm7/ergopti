@@ -307,13 +307,13 @@ aujourd'hui.
 
 **Cinq implémentations du matcher existent** ; trois tournent en production.
 
-| #   | Implémentation                                                               | Utilisée par                                                                                |
-| --- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| 1   | `_shared/hotstrings/engine/matcher/init.lua` (281 l)                         | **Linux uniquement** — malgré une docstring affirmant « partagée par tous les drivers Lua » |
-| 2   | `macos/modules/keymap/{registry*,expander}.lua` (2 302 l)                    | macOS                                                                                       |
-| 3   | `windows/infra/hotstrings/hotstring_match.ahk` + `hotstring_engine_main.ahk` | Windows                                                                                     |
-| 4   | un matcher **écrit dans un fichier de test AHK**                             | personne (fixture)                                                                          |
-| 5   | un algorithme de référence JS dans un script de mutation                     | personne                                                                                    |
+| #   | Implémentation                                                              | Utilisée par                                                                                |
+| --- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 1   | `_shared/hotstrings/engine/matcher/init.lua` (281 l)                        | **Linux uniquement** — malgré une docstring affirmant « partagée par tous les drivers Lua » |
+| 2   | `macos/modules/keymap/{registry*,expander}.lua` (2 302 l)                   | macOS                                                                                       |
+| 3   | `windows/hotstrings/engine/matcher/match.ahk` + `hotstring_engine_main.ahk` | Windows                                                                                     |
+| 4   | un matcher **écrit dans un fichier de test AHK**                            | personne (fixture)                                                                          |
+| 5   | un algorithme de référence JS dans un script de mutation                    | personne                                                                                    |
 
 **Données** : `_shared/hotstrings/data/catalogue/<catégorie>.toml`. La forme réelle d'une entrée :
 
@@ -850,20 +850,20 @@ l'autorise. Si votre fonctionnalité existe sur Linux, ajoutez-la — c'est le d
 
 **D'abord, identifiez la couche que vous changez** — c'est 90 % du travail :
 
-| Je veux changer…                                                | J'édite                                                                                  | Puis                                                                                                                                       |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Le texte ou les flags d'une hotstring                           | `_shared/hotstrings/data/catalogue/<catégorie>.toml`                                     | rien d'autre. Les trois drivers lisent ce fichier. Supprimer le cache `.tsv` si le côté Windows semble périmé (il s'auto-répare par mtime) |
-| Le délai / la couleur / l'infobulle par défaut d'une catégorie  | le bloc `[_meta]` / `[_meta.sections]` de ce TOML                                        | `npm run test:js`                                                                                                                          |
-| Le repli global de délai / couleur                              | `_shared/hotstrings/data/catalogue/defaults.toml`                                        | les deux drivers échouent bruyamment sur une clé manquante — lancer les deux suites                                                        |
-| Un rang de priorité de collision                                | `priority.json` **et** les constantes `HSE_PRIORITY_*` (AHK) **et** `PRIORITY_*` (macOS) | `npm run test:priority-parity` (scan de texte sur les trois)                                                                               |
-| Quels caractères terminent un mot                               | `_shared/core/text/data/domain/Terminators.spec.js`                                      | `npm run codegen:terminators`, puis les trois suites. **Ne jamais** éditer les deux fichiers générés                                       |
-| Le plafond de tampon                                            | 4 sites : le moteur partagé, deux fichiers AHK, et `macos/modules/keymap/init.lua`       | ⚠ la barrière de parité de plafond **ne vérifie pas le site macOS** (d'où la valeur 500 contre 256 ailleurs)                              |
-| **La logique de correspondance / frontière de mot / départage** | trois endroits non symétriques, voir ci-dessous                                          | corpus obligatoire                                                                                                                         |
+| Je veux changer…                                                | J'édite                                                                                        | Puis                                                                                                                                       |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Le texte ou les flags d'une hotstring                           | `_shared/hotstrings/data/catalogue/<catégorie>.toml`                                           | rien d'autre. Les trois drivers lisent ce fichier. Supprimer le cache `.tsv` si le côté Windows semble périmé (il s'auto-répare par mtime) |
+| Le délai / la couleur / l'infobulle par défaut d'une catégorie  | le bloc `[_meta]` / `[_meta.sections]` de ce TOML                                              | `npm run test:js`                                                                                                                          |
+| Le repli global de délai / couleur                              | `_shared/hotstrings/data/catalogue/defaults.toml`                                              | les deux drivers échouent bruyamment sur une clé manquante — lancer les deux suites                                                        |
+| Un rang de priorité de collision                                | `priority.json` **et** les constantes `HSE_PRIORITY_*` (AHK) **et** `PRIORITY_*` (macOS)       | `npm run test:priority-parity` (scan de texte sur les trois)                                                                               |
+| Quels caractères terminent un mot                               | `_shared/core/text/data/domain/Terminators.spec.js`                                            | `npm run codegen:terminators`, puis les trois suites. **Ne jamais** éditer les deux fichiers générés                                       |
+| Le plafond de tampon                                            | 4 sites : le moteur partagé, deux fichiers AHK, et `macos/hotstrings/engine/expander/init.lua` | ⚠ la barrière de parité de plafond **ne vérifie pas le site macOS** (d'où la valeur 500 contre 256 ailleurs)                              |
+| **La logique de correspondance / frontière de mot / départage** | trois endroits non symétriques, voir ci-dessous                                                | corpus obligatoire                                                                                                                         |
 
 **Changer la logique de correspondance** — les trois sites, avec ce qu'il faut savoir de
 chacun :
 
-1. **Windows** — `windows/infra/hotstrings/hotstring_match.ahk` : `_HSE_Beats` (départage),
+1. **Windows** — `windows/hotstrings/engine/matcher/match.ahk` : `_HSE_Beats` (départage),
    `_HSE_EndCharBeats` (étoile vs end-char), `HSE_FindMatchAtEnd` (les deux chemins de
    balayage), `_HSE_WordBoundaryAllows` et `_HSE_WordBoundarySet`. L'état du tampon est dans
    le fichier voisin `hotstring_engine_main.ahk`.
@@ -871,7 +871,7 @@ chacun :
    copie cachée est précisément ce qui a laissé le matcher et l'aperçu dériver.
    ⚠ `HSE_RebuildInProgress` fait répondre `""` au matcher **pour tout** — cela signifie
    « je ne peux pas répondre », pas « pas de correspondance ».
-2. **macOS** — `macos/modules/keymap/expander.lua` : `would_fire()` est **la** source de
+2. **macOS** — `macos/hotstrings/engine/expander/expander.lua` : `would_fire()` est **la** source de
    vérité de « est-ce que ça va se déclencher ? », et **l'aperçu infobulle l'appelle
    aussi**. Sa docstring documente que deux implémentations indépendantes avaient auparavant
    divergé sur quatre points. **N'ajoutez jamais un second prédicat.** L'ordre de tri est

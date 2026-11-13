@@ -79,7 +79,7 @@ helpers.with_fresh_modules({
 	"platform.remap.generator",
 	"modules.keymap.layout_registry",
 	"core.text.engine.toml_codec",
-	"modules.keymap.control_sentinels",
+	"hotstrings.engine.expander.control_sentinels",
 	"platform.input.synthetic_input",
 }, function()
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
@@ -130,7 +130,7 @@ helpers.with_fresh_modules({
 			return true
 		end,
 	}
-	local ControlOwner = require("modules.keymap.control_sentinels")
+	local ControlOwner = require("hotstrings.engine.expander.control_sentinels")
 	local NativeKeycodes = require("platform.input.keycodes.core")
 	local control_codes = {
 		key_90 = NativeKeycodes.F20_LAYER_NAV_ENTERED,

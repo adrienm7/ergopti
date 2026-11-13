@@ -9,7 +9,7 @@
 ; the rebuild may remove a previously injected custom entry, shifting all
 ; preset positions.
 ;
-; SCOPE: source introspection of ui/hotstrings_config_window/init.ahk.
+; SCOPE: source introspection of hotstrings/ui/hotstrings_config_window/init.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -27,8 +27,8 @@ _CDRI_CheckIndexAfterRebuild() {
 	; Move-resilient: scan the config-window folder via the framework helper
 	; instead of a pinned path. Both call names are unique to this window, so
 	; first-occurrence ordering still encodes the rebuild-then-index invariant
-	; regardless of how ui/hotstrings_config_window is internally split.
-	Src := _DriverDirConcat("ui/hotstrings_config_window")
+	; regardless of how hotstrings/ui/hotstrings_config_window is internally split.
+	Src := _DriverDirConcat("hotstrings/ui/hotstrings_config_window")
 
 	; Locate the color block — find the rebuild call then check that ColorIndexFor
 	; is called after (higher byte offset) not before.

@@ -355,13 +355,13 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- consumes the replay module's exact commitment, and replay correctly refuses
 	-- rebinding to a different CoreState. Reloading only the parent would therefore
 	-- create an impossible hybrid fixture (fresh parent, stale child).
-	if module_name == "modules.keymap.expander" then
-		loaded["modules.keymap.terminator_replay"] = nil
+	if module_name == "hotstrings.engine.expander.expander" then
+		loaded["hotstrings.engine.expander.terminator_replay"] = nil
 	end
 	-- The keymap applies the physical magic key its child owns: a fresh keymap
 	-- must not inherit a key the previous fixture chose.
-	if module_name == "modules.keymap" or module_name == "modules.keymap.init" then
-		loaded["modules.keymap.magic_key_source"] = nil
+	if module_name == "hotstrings.engine.expander" or module_name == "modules.keymap.init" then
+		loaded["hotstrings.engine.expander.magic_key_source"] = nil
 	end
 	-- The system-action facade now exposes three stateful child owners. Reloading
 	-- only the facade would retain their pause claims, exact native debt, and the
@@ -372,7 +372,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 		loaded["modules.shortcuts.actions.system_mouse"] = nil
 		loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	end
-	if module_name == "modules.shortcuts.actions.text" or module_name == "modules.keymap.utils" then
+	if module_name == "modules.shortcuts.actions.text" or module_name == "hotstrings.engine.expander.utils" then
 		loaded["clipboard.adapters.clipboard"] = nil
 	end
 	-- Every screen-capture owner shares the flow's once-per-process permission

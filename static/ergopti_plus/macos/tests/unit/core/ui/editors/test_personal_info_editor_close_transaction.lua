@@ -62,9 +62,9 @@ local function load_fixture()
 			return webview
 		end,
 	}
-	package.loaded["ui.personal_info_editor"] = nil
+	package.loaded["hotstrings.ui.personal_info_editor"] = nil
 	package.loaded["ui.personal_info_editor.init"] = nil
-	return require("ui.personal_info_editor"), runtime
+	return require("hotstrings.ui.personal_info_editor"), runtime
 end
 
 

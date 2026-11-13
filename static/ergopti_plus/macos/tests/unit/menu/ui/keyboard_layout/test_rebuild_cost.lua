@@ -33,10 +33,10 @@ helpers.describe("Keyboard layout row rebuild cost", function()
 	end)
 
 	helpers.it("(menu-rebuild-2026-10-31) labels the magic-key candidates from one owner table", function()
-		helpers.with_fresh_modules({ "ui.menu.magic_key_source_menu", "modules.keymap.magic_key_source" }, function()
+		helpers.with_fresh_modules({ "hotstrings.ui.menu.magic_key_source_menu", "hotstrings.engine.expander.magic_key_source" }, function()
 			local Geometry = require("platform.input.keyboard_geometry")
-			local Source = require("modules.keymap.magic_key_source")
-			local Menu = require("ui.menu.magic_key_source_menu")
+			local Source = require("hotstrings.engine.expander.magic_key_source")
+			local Menu = require("hotstrings.ui.menu.magic_key_source_menu")
 			local candidates = #Source.resolver().candidates()
 			helpers.assert_true(candidates > 1, "the manifest must declare several candidates")
 			local original, projections = Geometry.physical_code, 0
@@ -57,8 +57,8 @@ helpers.describe("Keyboard layout row rebuild cost", function()
 	end)
 
 	helpers.it("(menu-rebuild-2026-10-31) keeps the candidate owner code_for answers", function()
-		helpers.with_fresh_modules({ "modules.keymap.magic_key_source" }, function()
-			local Source = require("modules.keymap.magic_key_source")
+		helpers.with_fresh_modules({ "hotstrings.engine.expander.magic_key_source" }, function()
+			local Source = require("hotstrings.engine.expander.magic_key_source")
 			local resolver = Source.resolver()
 			local owners, owned = Source.candidates_by_code(nil), 0
 			for _, candidate in ipairs(resolver.candidates()) do

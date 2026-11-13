@@ -183,7 +183,7 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 	end)
 
 	helpers.it("every hotstring category carries its rendered sections and commands intact", function()
-		local Hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local Hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		local saves, refreshes = 0, 0
 		local ctx = {
 			hotfiles = { "alpha.toml" }, get_group_name = function() return "alpha" end,
@@ -266,7 +266,7 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 	end)
 
 	helpers.it("nested personal files retain their sorted native command subtrees", function()
-		helpers.with_stub_scope({ "settings.engine.scope.personal_file_scope", "ui.menu.menu_hotstrings_custom" }, function()
+		helpers.with_stub_scope({ "settings.engine.scope.personal_file_scope", "hotstrings.ui.menu.custom" }, function()
 			-- This projection fixture owns a synthetic acknowledged group. Actual
 			-- provenance, native route and refusal behavior have their own owner test.
 			local bindings = 0
@@ -274,7 +274,7 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 				bindings = bindings + 1
 				return function() return true end
 			end }
-			local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+			local Custom = helpers.load_with_stubs("hotstrings.ui.menu.custom")
 			local asked = {}
 			local ctx = {
 				paused = false,

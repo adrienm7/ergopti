@@ -205,7 +205,7 @@ end
 
 local _build_layouts = require("ui.menu.menu_layouts").build
 
-local _build_hotstrings = require("ui.menu.menu_hotstrings").build
+local _build_hotstrings = require("hotstrings.ui.menu.hotstrings").build
 
 local _build_llm = require("ai.ui.menu.llm").build
 

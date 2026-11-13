@@ -91,7 +91,7 @@ helpers.describe("AI agent settings (macOS)", function()
 	end)
 
 	helpers.it("sets and reads each setting through the real keymap bridge, refusing invalid values", function()
-		local keymap = helpers.load_with_stubs("modules.keymap")
+		local keymap = helpers.load_with_stubs("hotstrings.engine.expander")
 		require("ai.engine.agent.runner").reset()
 		local found, value = keymap.get_llm_runtime_setting("llm_agent_mode")
 		helpers.assert_eq(found, true)

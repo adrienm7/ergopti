@@ -13,7 +13,7 @@ local STUBBED_MODULES = {
 	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
-	"modules.keymap.utils",
+	"hotstrings.engine.expander.utils",
 	"core.text.engine.utils",
 	"ai.engine",
 	"platform.input.keycodes",
@@ -21,8 +21,8 @@ local STUBBED_MODULES = {
 	"core.ui.ui.tooltip",
 	"ai.engine.prediction.engine",
 	"settings.engine.registry",
-	"modules.hotstrings.hotstrings_config",
-	"modules.keymap.expander",
+	"hotstrings.engine.catalogue.config",
+	"hotstrings.engine.expander.expander",
 	"menu.engine.manifest_reader",
 	"ai.engine.bridge",
 	"diagnostics.engine.hid_diagnostic_mailbox",
@@ -59,7 +59,7 @@ local function load_fixture(options, lifetime)
 			return {}, true
 		end,
 	}
-	package.loaded["modules.keymap.utils"] = {
+	package.loaded["hotstrings.engine.expander.utils"] = {
 		plain_text = function(value) return tostring(value or "") end,
 		tokens_from_repl = function(value) return value end,
 		resolve_prediction_overlap = function(_buffer, deletes, text) return deletes, text end,
@@ -110,10 +110,10 @@ local function load_fixture(options, lifetime)
 		mappings_for_tail = function() return nil end,
 		mappings_for_star_tail = function() return nil end,
 	}
-	package.loaded["modules.hotstrings.hotstrings_config"] = {
+	package.loaded["hotstrings.engine.catalogue.config"] = {
 		resolve = function() return nil end,
 	}
-	package.loaded["modules.keymap.expander"] = {
+	package.loaded["hotstrings.engine.expander.expander"] = {
 		would_fire = function() return nil end,
 		resolve_magic_action = function() return nil end,
 		perform_text_replacement = function() return false end,

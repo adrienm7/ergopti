@@ -103,7 +103,7 @@ helpers.describe("hotstrings config window: the bridge calls the same functions 
 		-- nothing. Its own test could not see it: the mock took a leading `self`,
 		-- i.e. it was written to the buggy convention.
 		local enabled_args, override_args = {}, {}
-		local handler = helpers.load_module("ui.hotstrings_config_window.bridge")
+		local handler = helpers.load_module("hotstrings.ui.hotstrings_config_window.bridge")
 		local state = {
 			config = {
 				get_groups        = function() return { "code", "email" } end,

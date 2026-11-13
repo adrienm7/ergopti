@@ -79,10 +79,10 @@ const REDACTORS = [
 // skimmed. These directories are where a resolved @-tag can actually appear.
 const LUA_TREES = [
 	'_shared/hotstrings/engine/dynamic',
-	'linux/modules/dynamic_hotstrings',
-	'macos/modules/dynamic_hotstrings',
-	'linux/infra/personal_info_fields.lua',
-	'macos/infra/personal_info_fields.lua'
+	'linux/hotstrings/engine/dynamic',
+	'macos/hotstrings/engine/dynamic',
+	'linux/hotstrings/engine/catalogue/personal_info_fields.lua',
+	'macos/hotstrings/engine/catalogue/personal_info_fields.lua'
 ];
 
 const LUA_SINKS = [
@@ -399,22 +399,22 @@ if (luaSites.length === 0) {
 // real one, and cheaper than tuning the net until it misses something.
 const LUA_JUDGED = [
 	{
-		file: 'linux/modules/dynamic_hotstrings/manager.lua',
+		file: 'linux/hotstrings/engine/dynamic/manager.lua',
 		match: '(LOG, "Dynamic single-field expansion refused: no retained text destination.")',
 		why: 'The constant diagnostic interpolates no personal-info value; "expansion" appears only in prose.'
 	},
 	{
-		file: 'linux/modules/dynamic_hotstrings/manager.lua',
+		file: 'linux/hotstrings/engine/dynamic/manager.lua',
 		match: 'prefix_rules module unavailable',
 		why: 'no interpolation at all; "expansion" is in the prose.'
 	},
 	{
-		file: 'macos/modules/dynamic_hotstrings/personal_info.lua',
+		file: 'macos/hotstrings/engine/dynamic/personal_info.lua',
 		match: 'personal_info.toml not found',
 		why: 'no interpolation at all; "values" is in the prose.'
 	},
 	{
-		file: 'macos/modules/dynamic_hotstrings/rules_engine.lua',
+		file: 'macos/hotstrings/engine/dynamic/rules_engine.lua',
 		match: 'set_trigger_char: received an invalid value',
 		why: 'the "value" is the magic-key CHARACTER the caller passed, not a personal_info field.'
 	}

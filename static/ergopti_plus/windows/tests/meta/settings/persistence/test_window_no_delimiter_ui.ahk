@@ -8,7 +8,7 @@
 ; ROOT CAUSE ENCODED:
 ; The hotstrings config window (the _HCW_* namespace) grew a second, redundant
 ; "Word delimiters" editor — a checkbox grid plus reset button — even though the
-; tray Hotstrings submenu (_HS_BuildDelimiterSubMenu in ui/menu/menu_hotstrings.ahk)
+; tray Hotstrings submenu (_HS_BuildDelimiterSubMenu in hotstrings/ui/menu/hotstrings.ahk)
 ; already owns delimiter management end to end (toggle, add/remove custom, reset).
 ; Two editors for the same setting is a duplication trap: a future change to one
 ; silently drifts from the other. Delimiters belong to exactly ONE surface — the

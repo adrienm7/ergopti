@@ -100,7 +100,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				package.loaded["platform.focus.window_info"] = { focused_app_id = function() return "owned-editor" end }
 				local layout = require("adapters.keyboard_layout")
 				layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
-				injector = require("modules.hotstrings.injector")
+				injector = require("hotstrings.engine.injector")
 				injector._set_nanosleep_for_test(function() end)
 				injector._set_uinput(session.writer)
 				local function lifecycle() world.lifecycle = world.lifecycle + 1 end
@@ -114,7 +114,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				manager = helpers.load_module("platform.remap.tap_hold_manager")
 				environment.TapHold, environment.keyboard_hook = manager, session.hook
 				environment.action_catalogue = environment.gestures
-				environment.WordReset = require("modules.hotstrings.word_reset")
+				environment.WordReset = require("hotstrings.engine.word_reset")
 				environment.engine = { reset = function() world.resets = world.resets + 1 end }
 				evaluate(assert(source:match("return (TapHold%.init%b())")), environment)
 

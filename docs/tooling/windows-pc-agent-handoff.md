@@ -575,7 +575,7 @@ The cloud finished the Lua, JS, shell, tools and Swift parts of PAR-79 to PAR-83
 - PAR-79: the 36 AHK files (250 timer literals) of
   `tools/test/timer-literal-baseline.json`. Read `TimingsGet`/`TimingsGetSec`
   and shrink the baseline.
-- PAR-81: `windows/ui/hotstrings_config_window/hcw_mutations.ahk` and `webview.ahk` in
+- PAR-81: `windows/hotstrings/ui/hotstrings_config_window/hcw_mutations.ahk` and `webview.ahk` in
   `tools/lint/hex-literal-baseline.json` (shrink with
   `node tools/lint/lint-conventions.js --update-hex-baseline`), from the
   generated `windows/_generated/native_theme.ahk`. The 24 colours of

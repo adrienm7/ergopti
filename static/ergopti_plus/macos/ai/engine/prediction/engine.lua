@@ -3111,7 +3111,7 @@ end
 
 --- Initializes the engine by injecting the shared keymap core state.
 --- Must be called exactly once before any other engine function in this module.
---- @param core_state table The shared state object from modules/keymap/init.lua.
+--- @param core_state table The shared state object from hotstrings/engine/expander/init.lua.
 --- @param ports table|nil { TimerScheduler?, HttpClient? } replace the real owners; each is
 ---   checked against its contract in llm.request_plan.ports. The tooltip is checked as the
 ---   TooltipRenderer it is drawn through.

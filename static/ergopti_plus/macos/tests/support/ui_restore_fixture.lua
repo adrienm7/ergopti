@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local M = {}
 local MODULE_NAMES = {
 	"core.fs.adapters.storage", "core.events.timer_scheduler", "core.logger.engine.logger", "core.timing.engine.timings",
-	"menu.engine.ui_restore", "ui.hotstring_editor", "ui.metrics_typing", "ui.metrics_typing.init",
+	"menu.engine.ui_restore", "hotstrings.ui.hotstring_editor", "ui.metrics_typing", "ui.metrics_typing.init",
 	"ui.metrics_apps", "ui.metrics_apps.init",
 }
 
@@ -47,7 +47,7 @@ function M.with_fixture(options, scenario)
 			})
 			package.loaded["core.timing.engine.timings"] = { sec = function() return 1 end }
 
-			package.loaded["ui.hotstring_editor"] = {
+			package.loaded["hotstrings.ui.hotstring_editor"] = {
 				is_open = function() return ui_state.open end,
 				open = function()
 					ui_state.reopen_calls = ui_state.reopen_calls + 1

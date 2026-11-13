@@ -12,7 +12,7 @@
 ---   1. The reader loads the generated manifest (cwd-independent loadfile) and
 ---      exposes version / features / path lookup.
 ---   2. `default_for` is the single-source accessor and fails fast on a bad path.
----   3. A parity tripwire on the exact paths that `modules/keymap/init.lua`
+---   3. A parity tripwire on the exact paths that `hotstrings/engine/expander/init.lua`
 ---      `DEFAULT_STATE` is now wired to — so a drift in `manifest.toml` (which
 ---      would silently change keymap's runtime defaults) turns this red.
 --- ==============================================================================
@@ -25,7 +25,7 @@ local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local Manifest = require("menu.engine.manifest_reader")
 
--- The canonical values that modules/keymap/init.lua DEFAULT_STATE is wired to.
+-- The canonical values that hotstrings/engine/expander/init.lua DEFAULT_STATE is wired to.
 -- Mirror these in the AHK manifest too — they are the cross-driver canon.
 local STAR = "★" -- magic key trigger (UTF-8 literal, as used across the .lua sources)
 local KEYMAP_WIRED = {
@@ -100,7 +100,7 @@ end)
 --- ==============================================
 
 helpers.describe("manifest_reader: keymap DEFAULT_STATE wiring parity", function()
-	-- modules/keymap/init.lua DEFAULT_STATE is now `Manifest.default_for(<path>)`
+	-- hotstrings/engine/expander/init.lua DEFAULT_STATE is now `Manifest.default_for(<path>)`
 	-- for each of these. Asserting the manifest still yields the canonical value
 	-- pins the wired runtime defaults: if manifest.toml drifts, keymap's defaults
 	-- would change silently — this turns red first.

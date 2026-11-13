@@ -134,7 +134,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			update_check_interval_seconds = 3600,
 		}
 		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
-		package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
+		package.loaded["hotstrings.ui.hotstring_editor"] = { set_update_menu = noop }
 		package.loaded["core.text.engine.utils"] = {
 			escape_gsub_replacement = function(value) return value end,
 			shell_quote = function(value) return value end,
@@ -173,7 +173,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			generate = function() return {} end,
 			invalidate_cache = noop,
 		}
-		package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = noop }
+		package.loaded["hotstrings.ui.menu.counter"] = { invalidate_cache = noop }
 		package.loaded["settings.ui.menu.paths"] = {
 			is_initialized = function() return true end,
 			get = function() return "/virtual/config.toml" end,
@@ -234,7 +234,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			"gestures.ui.menu.gestures",
 			"ui.menu.menu_shortcuts",
 			"ui.menu.menu_keyboard_layout",
-			"ui.menu.menu_hotstrings",
+			"hotstrings.ui.menu.hotstrings",
 			"ui.menu.menu_metrics",
 			"ui.menu.menu_tap_holds",
 			"apps.ui.menu.apps",
@@ -252,7 +252,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		package.loaded["ai.engine"] = { set_backend = function() return true end }
 		package.loaded["modules.keystats"] = {}
 		package.loaded["modules.shortcuts"] = shortcuts
-		package.loaded["modules.dynamic_hotstrings"] = {}
+		package.loaded["hotstrings.engine.dynamic"] = {}
 		package.loaded["gestures.engine"] = { SINGLE_SLOTS = {}, DEFAULT_GESTURES = {} }
 		package.loaded["infra.personal_shortcuts"] = { load = noop }
 		package.loaded["ui.menu.init"] = nil

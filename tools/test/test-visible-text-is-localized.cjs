@@ -68,7 +68,7 @@ assert.deepEqual(
 
 // 2. macOS personal-information editor labels.
 const editor = fs.readFileSync(
-	path.join(DRIVERS, 'macos', 'ui', 'personal_info_editor', 'init.lua'),
+	path.join(DRIVERS, 'macos', 'hotstrings', 'ui', 'personal_info_editor', 'init.lua'),
 	'utf8'
 );
 const ACRONYMS = new Set(['IBAN', 'BIC']);

@@ -20,7 +20,7 @@
 ;      decrementing on false, never going below zero.
 ;
 ; SCOPE: source introspection of ai/engine/bridge.ahk and
-;        infra/hotstrings/hotstring_prefix_watcher.ahk.
+;        hotstrings/engine/matcher/prefix_watcher.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -39,7 +39,7 @@ _LASB_ReadLlmSrc() {
 }
 
 _LASB_ReadPwSrc() {
-	return _DriverDirConcat("infra/hotstrings")
+	return _DriverDirConcat("hotstrings/engine")
 }
 
 
@@ -96,7 +96,7 @@ Test("llm_bridge: atomic output is InputHook-invisible by construction (llm-acce
 
 _LASB_PrefixWatcherSuppressIsDepthCounter() {
 	Src := _LASB_ReadPwSrc()
-	Assert(Src != "", "infra/hotstrings/ source must be readable")
+	Assert(Src != "", "hotstrings/engine/ source must be readable")
 
 	Body := _DriverFuncBody("PrefixWatcherSuppress")
 	Assert(Body != "", "PrefixWatcherSuppress must be defined in the prefix-watcher module")

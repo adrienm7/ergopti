@@ -1030,7 +1030,7 @@ end)
 -- the logical replacement used for hotstring counters and its event row.
 local function with_replayed_hotstring(options, callback)
   local names = { "modules.keystats.keystats", "modules.keystats.sqlite_writer", "core.fs.adapters.storage",
-    "modules.hotstrings.injector", "platform.input.keyboard_hook", "adapters.keyboard_layout", "adapters.xkb_capture" }
+    "hotstrings.engine.injector", "platform.input.keyboard_hook", "adapters.keyboard_layout", "adapters.xkb_capture" }
   local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
   local Monotonic = require("core.logger.engine.monotonic")
   local previous_now, now = Monotonic.now_ms, 10000
@@ -1070,7 +1070,7 @@ local function with_replayed_hotstring(options, callback)
     local keys, text_of = {}, { [28] = "\n", [15] = "\t" }
     for char, code in pairs(codes) do keys[char] = { keycode = code, mods = {} }; text_of[code] = char end
     layout._set_table_for_test(keys)
-    injector = helpers.load_module("modules.hotstrings.injector")
+    injector = helpers.load_module("hotstrings.engine.injector")
     injector._set_nanosleep_for_test(function() end)
     injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
       world.wire[#world.wire + 1] = { code, value }

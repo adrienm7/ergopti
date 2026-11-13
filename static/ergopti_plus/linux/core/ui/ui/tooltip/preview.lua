@@ -276,7 +276,7 @@ local function masked_for_preview(candidate)
 	local value = candidate.replacement
 	-- The row shows what the output types, as on macOS: a {Left} is not text.
 	if candidate.has_key_tokens and type(value) == "string" then
-		value = require("modules.hotstrings.output_tokens").parse(value).text
+		value = require("hotstrings.engine.output_tokens").parse(value).text
 	end
 	-- A multi-field row (an @-combo) carries parallel `parts` and `fields` arrays
 	-- instead of one value and one field name. Each part must be masked against
@@ -288,7 +288,7 @@ local function masked_for_preview(candidate)
 
 	if not is_multi and (type(value) ~= "string" or candidate.field == nil) then return value end
 
-	local ok, Fields = pcall(require, "infra.personal_info_fields")
+	local ok, Fields = pcall(require, "hotstrings.engine.catalogue.personal_info_fields")
 	if not ok or type(Fields.for_preview) ~= "function" then
 		-- Fail closed. A candidate that declared itself a personal-info value and
 		-- a classifier that cannot be reached is the one combination where showing
@@ -400,7 +400,7 @@ function M.build_rows(candidates, opts)
 	-- The key that fires a ★ row, read once per bubble rather than per row: it
 	-- cannot change while one is being built, and reading it is a storage lookup.
 	local magic_key = TERMINATOR_LABEL
-	local ok_magic, MagicKey = pcall(require, "modules.hotstrings.magic_key")
+	local ok_magic, MagicKey = pcall(require, "hotstrings.engine.magic_key")
 	if ok_magic and type(MagicKey.get) == "function" then magic_key = MagicKey.get() end
 
 	for _, candidate in ipairs(candidates or {}) do

@@ -132,8 +132,8 @@ local function with_wizard(answer, scenario)
 	local index, page = wizard_page()
 	local categories, mappings = catalogue(page)
 	local rows = assert(Answers.rows(index, page_operations(page, answer), require("menu.engine.manifest_reader")))
-	local saved_loader = package.loaded["modules.hotstrings.loader"]
-	package.loaded["modules.hotstrings.loader"] = {
+	local saved_loader = package.loaded["hotstrings.engine.loader"]
+	package.loaded["hotstrings.engine.loader"] = {
 		find_toml_files = function() return {} end,
 		list_subdirs = function() return {} end,
 		read_file = function() return nil end,
@@ -142,7 +142,7 @@ local function with_wizard(answer, scenario)
 		end,
 	}
 	local ok, err = pcall(function()
-		local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+		local Config = helpers.load_module("hotstrings.engine.catalogue.config")
 		Choices.with_file(Config, nil, function(path)
 			if #rows > 0 then
 				helpers.assert_true(require("core.text.engine.toml_codec.writer").batch_write(path, rows) == true,
@@ -190,8 +190,8 @@ local function with_wizard(answer, scenario)
 			scenario(world)
 		end)
 	end)
-	package.loaded["modules.hotstrings.loader"] = saved_loader
-	package.loaded["modules.hotstrings.hotstrings_config"] = nil
+	package.loaded["hotstrings.engine.loader"] = saved_loader
+	package.loaded["hotstrings.engine.catalogue.config"] = nil
 	if not ok then error(err, 0) end
 end
 

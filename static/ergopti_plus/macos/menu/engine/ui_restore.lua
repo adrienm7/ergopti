@@ -92,14 +92,14 @@ local REGISTRY = {
 	{
 		key = "hotstring_editor",
 		is_open = function()
-			local m = package.loaded["ui.hotstring_editor"]
+			local m = package.loaded["hotstrings.ui.hotstring_editor"]
 			return m ~= nil
 				and type(m.is_open) == "function"
 				and m.is_open()
 		end,
 		-- The editor is already init()'d during normal boot; just call open()
 		reopen = function()
-			local m = package.loaded["ui.hotstring_editor"]
+			local m = package.loaded["hotstrings.ui.hotstring_editor"]
 			if not m or type(m.open) ~= "function" or type(m.is_open) ~= "function" then
 				return false
 			end

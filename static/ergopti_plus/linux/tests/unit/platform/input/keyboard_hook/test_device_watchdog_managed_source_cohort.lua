@@ -79,7 +79,7 @@ helpers.describe("managed source cohort pointer acquisition refusal", function()
 	helpers.it("does not drop an owned pointer cleanup cohort when a replacement open fails", function()
 		local options = { on_capture_reacquired = function() return true end }
 		require("tests.support.input_owner_fixture").with_session(options, function(s)
-			local finder = package.loaded["modules.hotstrings.device_finder"]
+			local finder = package.loaded["hotstrings.engine.device_finder"]
 			assert(s.hook.stop() ~= false)
 			finder.find_devices = function() return { s.paths.a }, { s.paths.b } end
 			assert(s.hook.start({ intercept = true, requireOutputBroker = true, onEmitRaw = s.writer.emit,

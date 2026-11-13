@@ -45,7 +45,7 @@ local function with_text(kind, callback)
 	helpers.with_stub_scope({
 		"modules.shortcuts.actions.text", "modules.shortcuts.actions.text_continuation",
 		"modules.shortcuts.actions.text_dispatch", "modules.shortcuts.actions.text_transform_grace",
-		"core.text.engine.unicode_case", "core.text.engine.unicode_case.data", "modules.keymap.utils",
+		"core.text.engine.unicode_case", "core.text.engine.unicode_case.data", "hotstrings.engine.expander.utils",
 	}, function()
 		with_sender(function(f)
 			Destination.install()

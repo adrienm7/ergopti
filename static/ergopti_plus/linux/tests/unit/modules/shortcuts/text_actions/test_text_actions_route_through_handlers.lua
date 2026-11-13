@@ -28,7 +28,7 @@ local function routed_gestures()
 		clipboard = "clipboard.adapters.clipboard",
 		event_loop = "core.events.loop",
 		combo = "gestures.engine.combo_emitter",
-		injector = "modules.hotstrings.injector",
+		injector = "hotstrings.engine.injector",
 		keystats = "modules.keystats.keystats",
 	}
 	local log = { presses = {}, injected = {}, transformed = {} }

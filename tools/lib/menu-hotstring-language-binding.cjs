@@ -59,13 +59,13 @@ const declarations = {
 const files = {
 	ahk: [
 		'windows/menu/ui/builder/submenus.ahk',
-		'windows/ui/menu/menu_hotstring_switches.ahk',
+		'windows/hotstrings/ui/menu/switches.ahk',
 		'windows/menu/ui/builder/menu_init.ahk'
 	],
 	hs: [
 		'macos/menu/ui/builder/builder.lua',
-		'macos/ui/menu/menu_hotstrings_custom.lua',
-		'macos/ui/menu/menu_hotstrings.lua'
+		'macos/hotstrings/ui/menu/custom.lua',
+		'macos/hotstrings/ui/menu/hotstrings.lua'
 	],
 	linux: ['linux/menu/ui/builder/builder.lua']
 };

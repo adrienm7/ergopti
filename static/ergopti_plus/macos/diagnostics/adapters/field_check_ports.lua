@@ -209,7 +209,7 @@ local function tap_copy_facts()
 	local rollover = require("platform.remap.defaults").rollover_keys
 	local facts = { window_ms = Remap.get_lone_modifier_tap_max_ms(), keys = {}, deployed = next(deployed) ~= nil,
 		change_count = (require("clipboard.adapters.clipboard")._change_count()),
-		stats = require("modules.keymap").tap_copy_statistics() }
+		stats = require("hotstrings.engine.expander").tap_copy_statistics() }
 	for _, key in ipairs(Remap.TAP_HOLD_KEYS or {}) do
 		if Remap.get_tap_action(key.id) == "copy" then
 			facts.keys[#facts.keys + 1] = { id = key.id, deployed_ms = deployed[key.id],

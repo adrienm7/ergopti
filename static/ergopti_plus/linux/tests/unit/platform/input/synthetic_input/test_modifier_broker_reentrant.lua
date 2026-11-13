@@ -5,7 +5,7 @@ local h = require("tests.helpers")
 local F = require("tests.support.modifier_broker_fixture")
 local function broker(s) return require("platform.input.modifier_broker").for_channel(s.writer) end
 local function output(s)
-	return h.load_module("modules.hotstrings.output_transaction").new(s.writer)
+	return h.load_module("hotstrings.engine.output_transaction").new(s.writer)
 end
 
 h.describe("original retirement inside acknowledged synthetic output", function()

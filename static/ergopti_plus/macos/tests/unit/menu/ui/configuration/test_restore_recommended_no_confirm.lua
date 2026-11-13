@@ -260,9 +260,9 @@ end
 helpers.describe("restore-recommended-no-confirm: the menu's scope wiring (macOS)", function()
 	helpers.it("no restore or clear row asks, and no owner is handed a question port", function()
 		local owners = { "gestures.ui.menu.scope", "ui.menu.shortcuts_scope", "ai.ui.menu.scope",
-			"ui.menu.metrics_scope", "ui.menu.hotstrings_scope", "settings.ui.menu.scoped_preferences",
+			"ui.menu.metrics_scope", "hotstrings.ui.menu.scope", "settings.ui.menu.scoped_preferences",
 			"menu.ui.transactions.global_scope" }
-		local names = { "core.ui.engine.dialog_util", "modules.hotstrings.hotstrings_config" }
+		local names = { "core.ui.engine.dialog_util", "hotstrings.engine.catalogue.config" }
 		for _, name in ipairs(owners) do names[#names + 1] = name end
 		helpers.with_fresh_modules(names, function()
 			local asked, captured, applied = {}, {}, {}
@@ -270,7 +270,7 @@ helpers.describe("restore-recommended-no-confirm: the menu's scope wiring (macOS
 				asked[#asked + 1] = { title, message, no, yes }
 				return no
 			end }
-			package.loaded["modules.hotstrings.hotstrings_config"] = {
+			package.loaded["hotstrings.engine.catalogue.config"] = {
 				get_override_path = function() return "/virtual/hotstrings_config.toml" end,
 			}
 			local fixture = require("tests.support.menu_boot_fixture").boot()

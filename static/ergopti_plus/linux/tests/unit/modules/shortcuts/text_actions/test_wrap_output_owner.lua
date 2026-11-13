@@ -38,7 +38,7 @@ local function with_wrap(options, body)
 	require("settings.engine.migration.file_inverse")
 	Fixture.with(function(guard, focus, _, _, watch)
 		local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
-			"modules.hotstrings.injector", "platform.input.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type",
+			"hotstrings.engine.injector", "platform.input.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type",
 			"gestures.engine.user_actions", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -108,7 +108,7 @@ local function with_wrap(options, body)
 			layout.shortcut_keycode = function(...) transition("paste-lookup"); return key_v(...) end
 			helpers.load_module("clipboard.adapters.clipboard")
 			helpers.load_module("modules.shortcuts.wrap_on_type")
-			injector = helpers.load_module("modules.hotstrings.injector")
+			injector = helpers.load_module("hotstrings.engine.injector")
 			injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
 				state.wire[#state.wire + 1] = code .. ":" .. value
 				if code == 29 and value == 1 then transition("ctrl-down") end

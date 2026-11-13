@@ -297,7 +297,7 @@ local function build_world(selection, ui_locale, options)
 	world.flow = require("ai.engine.prediction.selection_translation")
 	-- Only the timers of the actions run: the backend's own stay untouched
 	world.timer_baseline = #hs_stub.timer.__timers
-	package.loaded["modules.keymap"] = {
+	package.loaded["hotstrings.engine.expander"] = {
 		request_selection_translation = function(value, parent) return world.flow.run(value, parent) end,
 	}
 	return world

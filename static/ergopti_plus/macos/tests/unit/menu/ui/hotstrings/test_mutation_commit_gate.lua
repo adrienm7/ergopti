@@ -41,7 +41,7 @@ local function load_provider(calls)
 			calls.error_notices = calls.error_notices + 1
 		end,
 	}
-	local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+	local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 	return hotstrings, previous_notifications
 end
 
@@ -147,7 +147,7 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 					calls.error_notices = calls.error_notices + 1
 				end,
 			}
-			local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+			local Custom = helpers.load_with_stubs("hotstrings.ui.menu.custom")
 			local state = {
 				keymap = true,
 				hotstrings = { personal = true, custom = true },
@@ -264,7 +264,7 @@ helpers.describe("Personal menu native caption fixture isolation", function()
 	end
 
 	helpers.it("reads the real English source and restores exact caption and cache owners", function()
-		local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+		local Custom = helpers.load_with_stubs("hotstrings.ui.menu.custom")
 		local owner = captured_i18n(Custom)
 		local original_get = owner.get
 		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths" }
@@ -287,7 +287,7 @@ helpers.describe("Personal menu native caption fixture isolation", function()
 	end)
 
 	helpers.it("restores the actual captured caption reader when the body raises", function()
-		local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+		local Custom = helpers.load_with_stubs("hotstrings.ui.menu.custom")
 		local owner = captured_i18n(Custom)
 		local original_get = owner.get
 		local calls = 0

@@ -8,7 +8,7 @@
 ---
 --- The canonical matching algorithm is specified in HotstringMatcher.spec.js.
 --- The HS implementation is split between settings/engine/registry.lua
---- (tail-char bucketing, longest-first sort) and modules/keymap/expander.lua
+--- (tail-char bucketing, longest-first sort) and hotstrings/engine/expander/expander.lua
 --- (word-boundary check, backspace count, consume_terminator flag).
 ---
 --- COVERAGE:

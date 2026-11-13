@@ -127,7 +127,7 @@ Test("meta source-helpers: nested default signatures resolve (driver-source-help
 
 
 _DSHFL_RealDirectoryStillResolves() {
-	Src := _DriverDirConcat("infra/hotstrings")
+	Src := _DriverDirConcat("hotstrings/engine")
 	Assert(StrLen(Src) > 1000,
 		"_DriverDirConcat must still concatenate a directory that exists — a helper that throws on everything would otherwise pass section 1")
 }

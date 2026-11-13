@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local OWNED_MODULES = {
 	"hs", "core.logger.engine.logger", "core.fs.engine.paths", "menu.engine.manifest_reader",
 	"core.fs.adapters.file_system", "adapters.input_source_broker", "adapters.keyboard_source_probe",
-	"platform.input.hotkey_registrar", "modules.keymap.magic_key_source", "modules.shortcuts.magic_editor",
+	"platform.input.hotkey_registrar", "hotstrings.engine.expander.magic_key_source", "modules.shortcuts.magic_editor",
 	"platform.input.keyboard_geometry", "shortcuts.engine.magic_editor_core",
 }
 
@@ -36,7 +36,7 @@ local function with_fixture(callback)
 			replace_active = false, paused = false, inhibited = false, current = true,
 			requests = {}, actions = {}, cancel_refuses = false, projections = {}, remap_types = {},
 		}
-		package.loaded["modules.keymap.magic_key_source"] = {
+		package.loaded["hotstrings.engine.expander.magic_key_source"] = {
 			remaps = function(code, _, active, keyboard_type)
 				state.remap_types[#state.remap_types + 1] = { code = code, keyboard_type = keyboard_type }
 				return (state.remap_code == code or (state.remap_codes or {})[code] == true) and active() == true

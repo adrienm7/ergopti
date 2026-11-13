@@ -8,8 +8,8 @@
 --- ==============================================================================
 local M = {}
 local Files = require("hotstrings.engine.catalogue.personal_files")
-local Loader = require("infra.personal_hotstrings")
-local Config = require("modules.hotstrings.hotstrings_config")
+local Loader = require("hotstrings.engine.catalogue.personal_hotstrings")
+local Config = require("hotstrings.engine.catalogue.config")
 local FileSystem = require("core.fs.adapters.file_system")
 local Paths = require("settings.engine.paths")
 local pending
@@ -164,7 +164,7 @@ end
 function M.capture(id)
 	if pending or not Files.components(id) then return nil end
 	local record = Loader.adoption(id)
-	local keymap = require("modules.keymap")
+	local keymap = require("hotstrings.engine.expander")
 	local native = record and type(keymap.personal_file_scope_binding) == "function"
 		and keymap.personal_file_scope_binding(id)
 	if not record or record.admitted ~= true or type(native) ~= "table" or type(native.current) ~= "function"
@@ -194,7 +194,7 @@ function M.apply(binding, section, field, value)
 	if M.retry_cleanup() ~= true or not current(binding, true) then return false end
 	local owner = {}
 	if Config.acquire(owner) ~= true then return false end
-	local native_owner = require("modules.keymap").capture_publication_owner()
+	local native_owner = require("hotstrings.engine.expander").capture_publication_owner()
 	local scope_current = Config.capture_scope_owner(owner)
 	if not native_owner or not scope_current then Config.release(owner); return false end
 	local plan = Config.prepare_personal_metadata(owner, binding.record, section, field, value)
@@ -204,7 +204,7 @@ function M.apply(binding, section, field, value)
 	local ok, committed = pcall(function()
 		return native_owner.run(function()
 		return Config.adopt_scope_source(owner, plan.override_target, function()
-			return require("modules.keymap").replace_personal_source(binding.record.owner,
+			return require("hotstrings.engine.expander").replace_personal_source(binding.record.owner,
 				binding.record.path, plan.content, function()
 					if not current(binding, false) then return false end
 					if value ~= nil then

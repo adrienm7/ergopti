@@ -1030,12 +1030,12 @@ function checkWordExpanderControls() {
 	assert.equal(definition[4].id, 'word_expander_entries');
 	const native = [
 		[
-			'windows/ui/menu/menu_hotstrings.ahk',
+			'windows/hotstrings/ui/menu/hotstrings.ahk',
 			'_HS_WordExpanderRows(',
 			'; Toggle a whole catalogue entry'
 		],
 		[
-			'macos/ui/menu/menu_hotstrings_management.lua',
+			'macos/hotstrings/ui/menu/management.lua',
 			'local function bulk_set_terminators',
 			'local delay_menu'
 		],
@@ -1820,11 +1820,11 @@ checkPrivacyTriggerControls();
 	}
 	for (const [file, site] of [
 		[
-			'windows/ui/menu/menu_hotstrings.ahk',
+			'windows/hotstrings/ui/menu/hotstrings.ahk',
 			'PersonalRows.Push(_HS_PersonalEditorRow((*) => OpenPersonalEditor()))'
 		],
 		[
-			'macos/ui/menu/menu_hotstrings_custom.lua',
+			'macos/hotstrings/ui/menu/custom.lua',
 			'ManifestMenu.command_row("personal_hotstring_commands"'
 		],
 		['linux/menu/ui/builder/builder.lua', 'ManifestMenu.command_row("personal_hotstring_commands"']
@@ -1841,7 +1841,9 @@ checkPrivacyTriggerControls();
 			`${file}: the canonical row owns its label`
 		);
 	}
-	const personalSource = readSourceFile(resolve(SHARED, '../windows/ui/menu/menu_hotstrings.ahk'));
+	const personalSource = readSourceFile(
+		resolve(SHARED, '../windows/hotstrings/ui/menu/hotstrings.ahk')
+	);
 	const realBody = actualPersonalBody(personalSource);
 	assert(realBody, 'the genuine personal owner has a nonempty executable body');
 	assert(
@@ -2254,8 +2256,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	]);
 	assert.equal(menu.hotstring_category_menu[corpus.position - 1].id, corpus.provider);
 	for (const file of [
-		'windows/ui/menu/menu_hotstring_switches.ahk',
-		'macos/ui/menu/menu_hotstrings.lua',
+		'windows/hotstrings/ui/menu/switches.ahk',
+		'macos/hotstrings/ui/menu/hotstrings.lua',
 		'linux/menu/ui/builder/builder.lua'
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
@@ -6559,7 +6561,7 @@ console.log(
 			);
 	}
 	const sharedRoot = resolve(SHARED, '.');
-	const mac = 'macos/ui/menu/magic_key_source_menu.lua',
+	const mac = 'macos/hotstrings/ui/menu/magic_key_source_menu.lua',
 		linux = 'linux/menu/ui/builder/builder.lua';
 	for (const rel of [mac, linux]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', rel));
@@ -6829,12 +6831,8 @@ console.log(
 		assert.equal(Object.hasOwn(rows[0], 'action'), false);
 	}
 	const owners = [
-		['../windows/ui/menu/menu_hotstrings.ahk', '.ahk', ['word_expander', 'delays']],
-		[
-			'../macos/ui/menu/menu_hotstrings_management.lua',
-			'.lua',
-			['word_expander', 'preview', 'delays']
-		],
+		['../windows/hotstrings/ui/menu/hotstrings.ahk', '.ahk', ['word_expander', 'delays']],
+		['../macos/hotstrings/ui/menu/management.lua', '.lua', ['word_expander', 'preview', 'delays']],
 		['../linux/menu/ui/builder/builder.lua', '.lua', ['word_expander', 'preview', 'delays']]
 	];
 	for (const [file, extension, names] of owners) {
@@ -7034,8 +7032,8 @@ console.log(
 		}
 	}
 	const owners = [
-		['../windows/ui/menu/menu_hotstrings.ahk', '.ahk', ['content_frame', 'empty_file']],
-		['../macos/ui/menu/menu_hotstrings.lua', '.lua', ['bulk_controls']],
+		['../windows/hotstrings/ui/menu/hotstrings.ahk', '.ahk', ['content_frame', 'empty_file']],
+		['../macos/hotstrings/ui/menu/hotstrings.lua', '.lua', ['bulk_controls']],
 		['../macos/menu/ui/builder/builder.lua', '.lua', ['content_frame']],
 		['../linux/menu/ui/builder/builder.lua', '.lua', ['content_frame', 'bulk_controls']]
 	];
@@ -9803,7 +9801,7 @@ console.log(
 	}
 	for (const [relative, extension, signature, required] of [
 		[
-			'windows/ui/menu/menu_hotstrings.ahk',
+			'windows/hotstrings/ui/menu/hotstrings.ahk',
 			'.ahk',
 			'_HS_MagicKeyRows() {',
 			[
@@ -9813,7 +9811,7 @@ console.log(
 			]
 		],
 		[
-			'macos/ui/menu/menu_hotstrings_management.lua',
+			'macos/hotstrings/ui/menu/management.lua',
 			'.lua',
 			'function M.build_management(ctx)',
 			[
@@ -12278,7 +12276,7 @@ console.log(
 		'the genuine shared frame retains the existing caption and two leaf owners'
 	);
 	for (const [platform, file] of [
-		['hs', 'macos/ui/menu/menu_hotstrings.lua'],
+		['hs', 'macos/hotstrings/ui/menu/hotstrings.lua'],
 		['linux', 'linux/menu/ui/builder/builder.lua']
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', file));

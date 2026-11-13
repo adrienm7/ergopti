@@ -34,7 +34,7 @@ local function with_scope(body, source, chord_j_identity)
 				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "gestures.engine.manager",
 				"infra.shortcuts_scope", "menu.ui.builder.builder", "modules.shortcuts.key_combinations",
 				"platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
-				"modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }) do
+				"hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }) do
 				package.loaded[name] = nil
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0 }
@@ -112,9 +112,9 @@ local function with_scope(body, source, chord_j_identity)
 			package.loaded["core.fs.adapters.file_system"] = files
 			-- Keep this fixture's genuine pre-Magic-init phase while binding the
 			-- new observer to the same actual route, file ports and preference owner.
-			local magic_preferences = require("infra.hotstring_preferences")
+			local magic_preferences = require("hotstrings.engine.matcher.preferences")
 			assert(magic_preferences._set_file_for_test(path))
-			magic_owner = require("modules.hotstrings.magic_key_source")
+			magic_owner = require("hotstrings.engine.magic_key_source")
 			local apply_keyboard = keyboard.apply_configuration
 			keyboard.apply_configuration = function(token, state)
 				controls.runtime_calls = controls.runtime_calls + 1

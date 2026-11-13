@@ -11,7 +11,7 @@
 
 local Input = require("platform.input.event")
 local Names = require("platform.input.device_names")
-local Finder = require("modules.hotstrings.device_finder")
+local Finder = require("hotstrings.engine.device_finder")
 local Reader = require("platform.input.evdev_reader")
 local Writer = require("platform.input.uinput_writer")
 local Broker = require("platform.input.modifier_broker")
@@ -227,7 +227,7 @@ local function run()
 	ack_observer = function(code, value)
 		if code == 45 and value == 1 and not fired then fired = true; original(a, 42, 0) end
 	end
-	local tx = require("modules.hotstrings.output_transaction").new(Writer)
+	local tx = require("hotstrings.engine.output_transaction").new(Writer)
 	assert(tx.neutralize({ 42 }), "native original suspension")
 	assert(tx.emit(45, 1)); assert(tx.emit(45, 0))
 	local result = tx.finish(); ack_observer = nil

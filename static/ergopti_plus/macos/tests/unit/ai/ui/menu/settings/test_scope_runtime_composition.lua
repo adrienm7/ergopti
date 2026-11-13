@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("LLM scope runtime composition", function()
 	helpers.it("applies all real runtime fields and restores their prior values with AI OFF", function()
-		local keymap = helpers.load_with_stubs("modules.keymap")
+		local keymap = helpers.load_with_stubs("hotstrings.engine.expander")
 		local core = require("ai.engine")
 		local Preferences = require("settings.engine.preferences.preferences")
 		local Manifest = require("menu.engine.manifest_reader")

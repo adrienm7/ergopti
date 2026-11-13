@@ -17,8 +17,8 @@ local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
 --- @param callback function Actual menu transaction and its assertions.
 --- @return ... Callback results.
 local function with_menu_diagnostics(callback)
-	return helpers.with_stub_scope({ "infra.personal_hotstrings" }, function()
-		package.loaded["infra.personal_hotstrings"] = {
+	return helpers.with_stub_scope({ "hotstrings.engine.catalogue.personal_hotstrings" }, function()
+		package.loaded["hotstrings.engine.catalogue.personal_hotstrings"] = {
 			unavailable_directories = function() return {} end,
 		}
 		return callback()
@@ -32,8 +32,8 @@ end
 local function fresh_registry()
 	package.loaded["core.fs.adapters.storage"] = nil
 	local registry = helpers.load_with_stubs("settings.engine.registry")
-	package.loaded["modules.keymap.state"] = nil
-	local State = require("modules.keymap.state")
+	package.loaded["hotstrings.engine.expander.state"] = nil
+	local State = require("hotstrings.engine.expander.state")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 	registry.init(state)
 	return state, registry
@@ -54,11 +54,11 @@ end
 
 
 local function dynamic_personal_scope_fixture(enabled, outcome, absent)
-	local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+	local Custom = helpers.load_with_stubs("hotstrings.ui.menu.custom")
 	local registry_state, registry = fresh_registry()
-	package.loaded["modules.dynamic_hotstrings"] = nil
-	package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
-	local personal = require("modules.dynamic_hotstrings")
+	package.loaded["hotstrings.engine.dynamic"] = nil
+	package.loaded["hotstrings.engine.dynamic.personal_info"] = nil
+	local personal = require("hotstrings.engine.dynamic")
 	personal.set_enabled(not enabled)
 	local original_set = personal.set_enabled
 	local module_calls = {}
@@ -76,7 +76,7 @@ local function dynamic_personal_scope_fixture(enabled, outcome, absent)
 	add_group_mapping(registry, "spare", "untouched")
 	local spare_mapping = registry_state.mappings[1]
 	for _, name in ipairs(names) do
-		hs.settings.set("ergopti." .. require("modules.keymap.section_keys").current("dynamichotstrings", name), not enabled)
+		hs.settings.set("ergopti." .. require("hotstrings.engine.expander.section_keys").current("dynamichotstrings", name), not enabled)
 	end
 	registry.set_post_load_hook("dynamichotstrings", function()
 		for _, name in ipairs(names) do
@@ -133,7 +133,7 @@ local function assert_dynamic_personal_scope(f, desired)
 	helpers.assert_eq(f.personal.is_enabled(), desired, "the actual external module shares the selected target")
 	helpers.assert_eq(f.registry.is_group_enabled("dynamichotstrings"), desired)
 	for _, name in ipairs(f.names) do
-		helpers.assert_eq(hs.settings.get("ergopti." .. require("modules.keymap.section_keys").current("dynamichotstrings", name)), desired)
+		helpers.assert_eq(hs.settings.get("ergopti." .. require("hotstrings.engine.expander.section_keys").current("dynamichotstrings", name)), desired)
 	end
 	helpers.assert_eq(f.registry.is_group_enabled("spare"), true)
 	local retained = false

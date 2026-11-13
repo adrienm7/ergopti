@@ -136,7 +136,7 @@ global Features := Map(
             "number_row_right_2", "none",
         ),
     ),
-    ; modules/hotstrings.ahk + modules/keymap/layout.ahk read these gates
+    ; hotstrings/hotstrings.ahk + modules/keymap/layout.ahk read these gates
     ; for hotstring registration and AltGr rolls. Each entry is a Map with
     ; at least an "enabled" key; the production loader pulls extra props
     ; (time_activation_seconds, pattern_max_length) from the manifest, but
@@ -221,8 +221,8 @@ global Features := Map(
         ; Personal sub-Map — in production this is populated from the user's
         ; personal_hotstrings.toml [_meta.sections] block (via BootstrapPersonalFeatures
         ; + the reverse mirror); tests pre-seed a representative shape so the
-        ; v2 read sites in modules/hotstrings.ahk and
-        ; ui/personal_toml_editor.ahk find a configured Map.
+        ; v2 read sites in hotstrings/hotstrings.ahk and
+        ; hotstrings/ui/personal_toml_editor.ahk find a configured Map.
         "personal", Map(
             "autocorrection", Map("enabled", true, "time_activation_seconds", 0.75),
             "code",           Map("enabled", true, "time_activation_seconds", 0.75),
@@ -337,7 +337,7 @@ global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 ; tests seed it via _LSCResetFrom([...]) instead of touching it directly.
 global LastSentCharacterKeyTime := Map()
 ; Mirrors the pruning thresholds of core/lifecycle/engine/boot.ahk: AppState_TouchLastSentKey
-; (infra/hotstrings/hotstring_send.ahk) reads them on every timestamp write.
+; (hotstrings/engine/matcher/send.ahk) reads them on every timestamp write.
 global LAST_SENT_KEY_TIME_MAX_AGE_MS := 60000
 global LAST_SENT_KEY_TIME_PRUNE_AT := 150
 global RemappedList := Map()

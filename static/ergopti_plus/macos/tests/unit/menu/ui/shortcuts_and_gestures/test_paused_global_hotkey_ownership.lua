@@ -50,7 +50,7 @@ helpers.describe("audit pause fence: global hotkey ownership", function()
 		}
 
 		package.loaded["platform.input.hotkey_registrar"] = nil
-		local Editor = helpers.load_with_stubs("ui.hotstring_editor", {
+		local Editor = helpers.load_with_stubs("hotstrings.ui.hotstring_editor", {
 			hotkey = {
 				bind = function(_mods, _key, callback)
 					captured_callback = callback

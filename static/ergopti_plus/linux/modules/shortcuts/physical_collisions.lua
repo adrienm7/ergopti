@@ -9,7 +9,7 @@ local conflicts = Policy.conflicts
 
 --- Binds original owner ports; validation acquires no input/output or file lease.
 function M.new(keyboard, taps, combinations, manager, capture)
-	local magic = require("modules.hotstrings.magic_key_source")
+	local magic = require("hotstrings.engine.magic_key_source")
 	local wrapping = require("modules.shortcuts.manager")
 	local prediction = require("ai.engine.prediction.engine")
 	local owners = { [1] = keyboard, [2] = taps, [3] = combinations, [4] = manager, [5] = magic, [6] = wrapping, [7] = prediction }
@@ -36,7 +36,7 @@ function M.new(keyboard, taps, combinations, manager, capture)
 			and rawequal(package.loaded["modules.shortcuts.key_combinations"], combinations)
 			and rawequal(package.loaded["platform.remap.tap_hold_manager"], manager)
 			and rawequal(package.loaded["adapters.xkb_capture"], capture)
-			and rawequal(package.loaded["modules.hotstrings.magic_key_source"], magic)
+			and rawequal(package.loaded["hotstrings.engine.magic_key_source"], magic)
 			and rawequal(package.loaded["modules.shortcuts.manager"], wrapping)
 			and rawequal(package.loaded["ai.engine.prediction.engine"], prediction)
 	end

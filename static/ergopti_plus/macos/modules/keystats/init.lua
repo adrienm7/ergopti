@@ -2368,7 +2368,7 @@ function M.start(script_control)
 		if subscribed ~= true then error("input-source subscription failed") end
 	
 		-- Cache the keymap module reference once to avoid pcall(require, ...) per keystroke
-		local ok_km, km = pcall(require, "modules.keymap")
+		local ok_km, km = pcall(require, "hotstrings.engine.expander")
 		if ok_km and type(km) == "table" then
 			_keymap_mod = km
 			Logger.debug(LOG, "Keymap module cached for shift-side detection.")

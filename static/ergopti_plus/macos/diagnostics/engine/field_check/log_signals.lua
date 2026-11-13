@@ -53,7 +53,7 @@ M.ERROR_SIGNALS = {
 	{ step = "log_capture_stamp_errors", name = "capture_stamp" },
 	-- core/ui/ui/window_toggle.lua: a window-toggle action that could not act.
 	{ step = "log_window_toggle_errors", name = "window_toggle" },
-	-- modules/dynamic_hotstrings: a personal or dynamic start rolled back.
+	-- hotstrings/engine/dynamic: a personal or dynamic start rolled back.
 	{ step = "log_start_rollbacks", name = "start_rollback" },
 	-- modules/keystats: a day rollover that skipped or stalled its rotation.
 	{ step = "log_keystats_rotation_warnings", name = "rotation_warning" },
@@ -72,7 +72,7 @@ M.COUNT_SIGNALS = {
 	-- minimised one.
 	{ step = "log_window_toggle_opens", name = "toggle_open" },
 	{ step = "log_window_toggle_raises", name = "toggle_raise" },
-	-- modules/keymap/expander.lua: an auto or terminator expansion (DEBUG).
+	-- hotstrings/engine/expander/expander.lua: an auto or terminator expansion (DEBUG).
 	{ step = "log_hotstring_expansions", name = "expansion" },
 	-- core/logger/engine/boot_profiler.lua: one completed boot.
 	{ step = "log_boot_completions", name = "boot" },
@@ -83,7 +83,7 @@ M.COUNT_SIGNALS = {
 	{ step = "log_gesture_swipe_dispatches", name = "swipe_dispatch" },
 	-- menu/ui/init.lua and the shared global composition: a committed restore or clear.
 	{ step = "log_scope_commits", name = "scope_commit" },
-	-- modules/keymap/init.lua: Karabiner's tap-hold command marker that reset the word.
+	-- hotstrings/engine/expander/init.lua: Karabiner's tap-hold command marker that reset the word.
 	{ step = "log_tap_hold_word_resets", name = "tap_hold_reset" },
 	-- modules/keymap/layout_emulation.lua: an emulated layout turned on.
 	{ step = "log_layout_emulations_on", name = "emulation_on" },

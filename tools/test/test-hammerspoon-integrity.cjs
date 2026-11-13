@@ -82,18 +82,18 @@ check(
 
 check(
 	'Keymap: exposes get_trigger_char',
-	'static/ergopti_plus/macos/modules/keymap/init.lua',
+	'static/ergopti_plus/macos/hotstrings/engine/expander/init.lua',
 	/function M\.get_trigger_char\(\)/
 );
 
 // --- Resource Management Audit (M.stop) ---
 const modulesWithStop = [
 	'static/ergopti_plus/macos/gestures/engine/init.lua',
-	'static/ergopti_plus/macos/modules/keymap/init.lua',
+	'static/ergopti_plus/macos/hotstrings/engine/expander/init.lua',
 	'static/ergopti_plus/macos/modules/shortcuts/init.lua',
 	'static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua',
 	'static/ergopti_plus/macos/modules/shortcuts/script_control.lua',
-	'static/ergopti_plus/macos/modules/dynamic_hotstrings/init.lua'
+	'static/ergopti_plus/macos/hotstrings/engine/dynamic/init.lua'
 ];
 
 modulesWithStop.forEach((f) => {

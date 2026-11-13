@@ -17,7 +17,7 @@ local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_devi
 --- @param options table|nil Controlled transport and discovery options.
 local function with_device(mask, body, options)
 	options = options or {}
-	local names = { "modules.hotstrings.device_finder", "platform.input.keyboard_hook", "platform.input.evdev_reader",
+	local names = { "hotstrings.engine.device_finder", "platform.input.keyboard_hook", "platform.input.evdev_reader",
 		"adapters.xkb_capture", "adapters.keyboard_layout", "platform.input.uinput_writer" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
@@ -30,7 +30,7 @@ local function with_device(mask, body, options)
 		-- and restore both exact cache entries after this isolated transport ends.
 		helpers.load_module("adapters.xkb_capture")
 		helpers.load_module("adapters.keyboard_layout")
-		local actual = helpers.load_module("modules.hotstrings.device_finder")
+		local actual = helpers.load_module("hotstrings.engine.device_finder")
 		local function snapshot()
 			return actual.parse_devices(table.concat({
 				"I: Bus=0003 Vendor=0001 Product=0001 Version=0001",
@@ -62,7 +62,7 @@ local function with_device(mask, body, options)
 				return admitted, why
 			end,
 		}
-		package.loaded["modules.hotstrings.device_finder"] = finder
+		package.loaded["hotstrings.engine.device_finder"] = finder
 		reader = helpers.load_module("platform.input.evdev_reader")
 		local backend, log = Fixture.recorder()
 		log.capabilities = {}

@@ -8,7 +8,7 @@
 --- only retained RAM identity and the caller's generation at the final handoff.
 --- ==============================================================================
 
-local Utils = require("modules.keymap.utils")
+local Utils = require("hotstrings.engine.expander.utils")
 local WindowInfo = require("platform.focus.window_info")
 local M = {}
 

@@ -171,7 +171,7 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ; core/process/adapters/lifecycle.ahk; read from this counter at modules+lib 248
 ; (DllCall=157 COM=2 FileIO=89) and entry 7 (DllCall=6 FileIO=1), tightened.
 ; 2026-11-12: the layout registry watch and the metrics time zone conversions
-; moved into adapters/registry_notify.ahk and platform/system/time_zone.ahk;
+; moved into hotstrings/adapters/registry_notify.ahk and platform/system/time_zone.ahk;
 ; read from this counter at modules+lib 247, tightened.
 _AOPR_BASELINE_CORE  := 247
 _AOPR_BASELINE_UI    := 125
@@ -179,7 +179,7 @@ _AOPR_BASELINE_ENTRY := 7
 
 _AOPR_RatchetCore() {
 	global _AOPR_BASELINE_CORE
-	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures"]), _AOPR_BASELINE_CORE)
+	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings"]), _AOPR_BASELINE_CORE)
 }
 Test("meta: windows/ OS-call purity ratchet — modules + lib", _AOPR_RatchetCore)
 
@@ -323,7 +323,7 @@ _AOPR_FAMILY_BASELINE_ENTRY := 10
 
 _AOPR_FamilyRatchetCore() {
 	global _AOPR_FAMILY_BASELINE_CORE
-	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures"]), _AOPR_FAMILY_BASELINE_CORE)
+	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings"]), _AOPR_FAMILY_BASELINE_CORE)
 }
 Test("meta: windows/ platform-API family ratchet — modules + lib", _AOPR_FamilyRatchetCore)
 

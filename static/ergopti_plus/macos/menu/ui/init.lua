@@ -16,7 +16,7 @@ local M = {}
 local hs               = hs
 local notifications    = require("core.ui.engine.notifications")
 local FeatureNotice    = require("menu.engine.feature_notice")
-local hotstring_editor = require("ui.hotstring_editor")
+local hotstring_editor = require("hotstrings.ui.hotstring_editor")
 local Logger           = require("core.logger.engine.logger")
 local PhaseStats       = require("infra.phase_stats")
 local text_utils = require("core.text.engine.utils")
@@ -30,7 +30,7 @@ local ClickGate     = require("menu.ui.builder.click_gate")
 local RefreshScope  = require("menu.ui.transactions.refresh_scope")
 local BranchRows    = require("menu.ui.builder.branch_rows")
 local QuitAdmission = require("core.lifecycle.engine.shutdown.quit_admission")
-local HotCounter    = require("ui.menu.hotstring_counter")
+local HotCounter    = require("hotstrings.ui.menu.counter")
 local MenuPaths     = require("settings.ui.menu.paths")
 local MenuState     = require("menu.ui.builder.state")
 local WrapMutation  = require("menu.engine.wrap_mutation")
@@ -107,7 +107,7 @@ local menu_mods = _branch_rows.wrap({
 	gestures        = safe_require("gestures.ui.menu.gestures",        "gestures menu"),
 	shortcuts       = safe_require("ui.menu.menu_shortcuts",       "shortcuts menu"),
 	keyboard_layout = safe_require("ui.menu.menu_keyboard_layout", "keyboard layout menu"),
-	hotstrings      = safe_require("ui.menu.menu_hotstrings",      "hotstrings menu"),
+	hotstrings      = safe_require("hotstrings.ui.menu.hotstrings",      "hotstrings menu"),
 	llm             = safe_require("ai.ui.menu",             "AI menu"),
 	keystats       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
 	tap_holds       = safe_require("ui.menu.menu_tap_holds",    "tap-holds menu"),
@@ -120,7 +120,7 @@ local core_mods = {
 	llm           = safe_require("ai.engine", "AI engine"),
 	keystats     = safe_require("modules.keystats", "metrics engine"),
 	shortcuts_mod = safe_require("modules.shortcuts", "shortcuts engine"),
-	dyn_hot_mod   = safe_require("modules.dynamic_hotstrings", "dynamic hotstrings engine"),
+	dyn_hot_mod   = safe_require("hotstrings.engine.dynamic", "dynamic hotstrings engine"),
 	capsword_auto_off = safe_require("infra.capsword_auto_off", "CapsWord auto-off settings"),
 }
 
@@ -663,7 +663,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if type(secs) == "table" then
 				for _, sec in ipairs(secs) do
 					if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-						local keys = require("modules.keymap.section_keys")
+						local keys = require("hotstrings.engine.expander.section_keys")
 						keys.clear(Storage, name, sec.name)
 					end
 				end
@@ -1150,7 +1150,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 						reload_pending = kind == "reload",
 						writer_active = global_actions_owner ~= nil
 							and global_actions_owner.is_exclusive_blocked() == true,
-						publication_pending = require("modules.hotstrings.hotstrings_config")
+						publication_pending = require("hotstrings.engine.catalogue.config")
 							.publication_pending() == true,
 					}
 				end,
@@ -1175,7 +1175,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths_editor")
 		end,
 		open_hotstrings_editor    = function()
-			local ok, ed = pcall(require, "ui.hotstring_editor")
+			local ok, ed = pcall(require, "hotstrings.ui.hotstring_editor")
 			if ok and type(ed.open) == "function" then pcall(ed.open) end
 		end,
 		-- Both overlays expose show(), never toggle(): the toggle guard below
@@ -1382,10 +1382,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- delay inventory or scalar owner can acknowledge a candidate.
 			if read_only_reason ~= nil or type(keymap) ~= "table" then return nil end
 			if not hotstrings_scope then
-				local HotstringsConfig = require("modules.hotstrings.hotstrings_config")
+				local HotstringsConfig = require("hotstrings.engine.catalogue.config")
 				local FileSystem = require("core.fs.adapters.file_system")
 				local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
-				hotstrings_scope = require("ui.menu.hotstrings_scope").new({
+				hotstrings_scope = require("hotstrings.ui.menu.scope").new({
 					path = MenuPaths.get("ConfigTomlPath"), files = FileSystem,
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					demotions = session_demotions, keymap = keymap, config = HotstringsConfig,
@@ -1393,7 +1393,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					-- The magic-key row updates the editor with the keymap; the scope does too.
 					editor = hotstring_editor,
 					is_personal = function(name)
-						return require("infra.personal_hotstrings").is_personal_group(name)
+						return require("hotstrings.engine.catalogue.personal_hotstrings").is_personal_group(name)
 					end,
 					start_engine = function()
 						return KeymapLifecycle.ensure_started({ state = state, keymap = keymap }, "hotstrings scope")

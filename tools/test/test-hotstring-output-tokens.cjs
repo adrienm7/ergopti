@@ -156,9 +156,9 @@ for (const match of magic.matchAll(/output = "(\{U\+[0-9A-Fa-f]+\})"/g)) {
 
 // Each suite replays the corpus, and each replay is wired into its runner.
 const CONSUMERS = [
-	'macos/tests/unit/modules/keymap/expansion/test_output_token_vectors.lua',
-	'linux/tests/unit/modules/hotstrings/engine/test_output_token_vectors.lua',
-	'windows/tests/unit/modules/hotstrings/engine/test_hotstring_output_tokens.ahk'
+	'macos/tests/unit/hotstrings/engine/expander/expansion/test_output_token_vectors.lua',
+	'linux/tests/unit/hotstrings/engine/engine/test_output_token_vectors.lua',
+	'windows/tests/unit/hotstrings/engine/engine/test_output_tokens.ahk'
 ];
 for (const file of CONSUMERS) {
 	const abs = path.join(SP, file);

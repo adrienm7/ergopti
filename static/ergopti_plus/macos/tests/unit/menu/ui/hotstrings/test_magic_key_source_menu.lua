@@ -19,8 +19,8 @@ local KEYCODE_SPACE = 49
 local KEYCODE_ESCAPE = 53
 
 local MODULES = {
-	"ui.menu.magic_key_source_menu", "core.events.timer_scheduler", "core.ui.engine.notifications",
-	"modules.keymap.magic_key_source", "modules.shortcuts.tap_keys", "menu.engine.manifest_menu",
+	"hotstrings.ui.menu.magic_key_source_menu", "core.events.timer_scheduler", "core.ui.engine.notifications",
+	"hotstrings.engine.expander.magic_key_source", "modules.shortcuts.tap_keys", "menu.engine.manifest_menu",
 	"platform.input.keyboard_geometry", "diagnostics.adapters.event_provenance", "modules.shortcuts.script_control",
 }
 
@@ -105,7 +105,7 @@ local function with_menu(body, faults)
 		end
 		package.loaded["platform.input.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(eventtap.event.properties)
 		world.keycodes = { map = { [KEYCODE_J] = "j", [KEYCODE_SPACE] = "space" } }
-		local Menu = helpers.load_with_stubs("ui.menu.magic_key_source_menu",
+		local Menu = helpers.load_with_stubs("hotstrings.ui.menu.magic_key_source_menu",
 			{ eventtap = eventtap, keycodes = world.keycodes })
 		body(Menu, world)
 	end)
@@ -273,14 +273,14 @@ end)
 
 helpers.describe("magic key source: the actual declared native menu", function()
 	helpers.it("(magic-key-source) cold English and warm French use the real native renderer and retain capture and choice callbacks", function()
-		helpers.with_stub_scope({ "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "ui.menu.magic_key_source_menu" }, function()
+		helpers.with_stub_scope({ "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "hotstrings.ui.menu.magic_key_source_menu" }, function()
 			with_menu(function(_, world)
 				package.loaded["core.i18n.engine.i18n"], package.loaded["core.i18n.engine.locale"] = nil, nil
 				local translations = require("core.i18n.engine.i18n")
 				local locale = require("core.i18n.engine.locale")
-				package.loaded["menu.engine.manifest_menu"], package.loaded["ui.menu.magic_key_source_menu"] = nil, nil
-				local Menu = require("ui.menu.magic_key_source_menu")
-				local Source = require("modules.keymap.magic_key_source")
+				package.loaded["menu.engine.manifest_menu"], package.loaded["hotstrings.ui.menu.magic_key_source_menu"] = nil, nil
+				local Menu = require("hotstrings.ui.menu.magic_key_source_menu")
+				local Source = require("hotstrings.engine.expander.magic_key_source")
 				Source.set("KeyJ")
 				for _, language in ipairs({ "en", "fr" }) do
 					locale.set_locale(language)
@@ -365,7 +365,7 @@ helpers.describe("magic key source menu: physical labels without an event", func
 	helpers.it("does not label a swapped candidate using the opposite ANSI glyph", function()
 		with_menu(function(Menu, world)
 			world.keycodes.map[50], world.keycodes.map[10] = "@", "<"
-			require("modules.keymap.magic_key_source").set("Backquote")
+			require("hotstrings.engine.expander.magic_key_source").set("Backquote")
 			local rows = Menu.rows(context(true))
 			helpers.assert_eq(rows[1].label:sub(-#"Backquote"), "Backquote")
 			local labels = {}

@@ -94,15 +94,15 @@ local function with_scope(body, source)
 	local loaded = {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	-- The shared delimiter catalogue outlives every module cache reset.
-	local Terminators = require("modules.hotstrings.terminator_settings")
+	local Terminators = require("hotstrings.engine.matcher.terminator_settings")
 	local catalogue = Terminators.snapshot()
 	local directory = string.format("%s/ergopti_hotstrings_scope_%d_%d",
 		(os.getenv("TMPDIR") or "/tmp"):gsub("/+$", ""), os.time(), math.random(100000, 999999))
 	assert(os.execute("mkdir -p '" .. directory .. "'"))
 	local ok, err = pcall(function()
-		for _, name in ipairs({ "modules.hotstrings.hotstrings_config", "infra.hotstring_preferences",
-			"modules.hotstrings.repeat_key", "modules.hotstrings.word_reset", "modules.hotstrings.magic_key", "modules.hotstrings.preview_settings",
-			"modules.hotstrings.terminator_settings", "infra.hotstrings_scope" }) do
+		for _, name in ipairs({ "hotstrings.engine.catalogue.config", "hotstrings.engine.matcher.preferences",
+			"hotstrings.engine.repeat_key", "hotstrings.engine.word_reset", "hotstrings.engine.magic_key", "hotstrings.engine.preview_settings",
+			"hotstrings.engine.matcher.terminator_settings", "hotstrings.engine.catalogue.scope" }) do
 			package.loaded[name] = nil
 		end
 		-- The real path owner, with only the configuration folder moved.
@@ -111,8 +111,8 @@ local function with_scope(body, source)
 		paths.config = function(rel) return rel and (directory .. "/" .. rel) or directory end
 		paths.home = function() return directory end
 		package.loaded["settings.engine.paths"] = paths
-		package.loaded["modules.hotstrings.loader"] = {
-			find_toml_files = require("modules.hotstrings.loader").find_toml_files,
+		package.loaded["hotstrings.engine.loader"] = {
+			find_toml_files = require("hotstrings.engine.loader").find_toml_files,
 			list_subdirs = function() return {} end,
 			read_file = function() return nil end,
 			load_catalogue = function()
@@ -130,7 +130,7 @@ local function with_scope(body, source)
 		write(override_path, OVERRIDES)
 		local context = { config_path = config_path, override_path = override_path, directory = directory,
 			published = {}, dynamic_calls = {}, preview = {}, paused = false }
-		local Config = require("modules.hotstrings.hotstrings_config")
+		local Config = require("hotstrings.engine.catalogue.config")
 		local engine = require("hotstrings.engine.matcher").new()
 		local publish = engine.load_mappings
 		engine.load_mappings = function(self, mappings)
@@ -165,18 +165,18 @@ local function with_scope(body, source)
 		}
 		context.preview_port = { set_enabled = function(name, value) context.preview[name] = value end }
 		context.Config, context.engine = Config, engine
-		context.Preferences = require("infra.hotstring_preferences")
-		context.RepeatKey = require("modules.hotstrings.repeat_key")
-		context.WordReset = require("modules.hotstrings.word_reset")
-		context.MagicKey = require("modules.hotstrings.magic_key")
-		context.Terminators = require("modules.hotstrings.terminator_settings")
+		context.Preferences = require("hotstrings.engine.matcher.preferences")
+		context.RepeatKey = require("hotstrings.engine.repeat_key")
+		context.WordReset = require("hotstrings.engine.word_reset")
+		context.MagicKey = require("hotstrings.engine.magic_key")
+		context.Terminators = require("hotstrings.engine.matcher.terminator_settings")
 		assert(context.Terminators.load(), "the fixture delimiters must load")
 		context.suffix = ".hotstrings-test.bak"
-		context.scope = require("infra.hotstrings_scope").new({
+		context.scope = require("hotstrings.engine.catalogue.scope").new({
 			path = config_path, backup_suffix = context.suffix, files = context.files,
 			config = Config, preferences = context.Preferences, repeat_key = context.RepeatKey,
 			word_reset = context.WordReset,
-			magic_key = context.MagicKey, preview_settings = require("modules.hotstrings.preview_settings"),
+			magic_key = context.MagicKey, preview_settings = require("hotstrings.engine.preview_settings"),
 			terminators = context.Terminators, dynamic = context.dynamic, preview = context.preview_port,
 		})
 		body(context)
@@ -651,11 +651,11 @@ helpers.describe("hotstrings retained native release debt", function()
 				return accepted
 			end
 		end
-		local scope = require("infra.hotstrings_scope").new({ path = c.config_path, backup_suffix = c.suffix,
+		local scope = require("hotstrings.engine.catalogue.scope").new({ path = c.config_path, backup_suffix = c.suffix,
 			files = c.files,
 			config = c.Config, preferences = c.Preferences, repeat_key = c.RepeatKey, magic_key = c.MagicKey,
 			word_reset = c.WordReset,
-			preview_settings = require("modules.hotstrings.preview_settings"), terminators = c.Terminators,
+			preview_settings = require("hotstrings.engine.preview_settings"), terminators = c.Terminators,
 			dynamic = c.dynamic, preview = c.preview_port })
 		return scope, function(value) blocked = value == true end, live, faults
 	end

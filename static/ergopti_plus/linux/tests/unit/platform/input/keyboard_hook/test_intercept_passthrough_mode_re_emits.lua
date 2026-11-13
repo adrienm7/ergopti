@@ -468,7 +468,7 @@ helpers.describe("injector: emit_key puts a raw event back on the wire", functio
 	end
 
 	helpers.it("hands the channel the keycode and direction unchanged", function()
-		local injector = helpers.load_module("modules.hotstrings.injector")
+		local injector = helpers.load_module("hotstrings.engine.injector")
 		local channel, emitted = recorder()
 		injector._set_uinput(channel)
 		injector.emit_key(30, 1)
@@ -479,7 +479,7 @@ helpers.describe("injector: emit_key puts a raw event back on the wire", functio
 	end)
 
 	helpers.it("re-emits an autorepeat as an autorepeat", function()
-		local injector = helpers.load_module("modules.hotstrings.injector")
+		local injector = helpers.load_module("hotstrings.engine.injector")
 		local channel, emitted = recorder()
 		injector._set_uinput(channel)
 		injector.emit_key(30, 2)
@@ -492,7 +492,7 @@ helpers.describe("injector: emit_key puts a raw event back on the wire", functio
 	end)
 
 	helpers.it("emits nothing for a non-numeric event", function()
-		local injector = helpers.load_module("modules.hotstrings.injector")
+		local injector = helpers.load_module("hotstrings.engine.injector")
 		local channel, emitted = recorder()
 		injector._set_uinput(channel)
 		injector.emit_key("30", nil)

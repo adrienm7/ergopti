@@ -472,8 +472,8 @@ const OPENS_SUBMENU = {
 				}
 			},
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/custom.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -481,7 +481,7 @@ const OPENS_SUBMENU = {
 			menu: 'hotstring_personal_legacy_shortcut',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_hotstrings_custom.lua' }
+			native_sources: { hs: 'macos/hotstrings/ui/menu/custom.lua' }
 		},
 		'personal_hotstring_commands',
 		'personal_file_controls',
@@ -492,8 +492,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/custom.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -502,8 +502,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/custom.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -512,8 +512,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/custom.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -522,8 +522,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_custom.lua'
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/custom.lua'
 			}
 		},
 		{
@@ -531,8 +531,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_custom.lua'
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/custom.lua'
 			}
 		}
 	],
@@ -785,7 +785,7 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
 				hs: 'macos/menu/ui/builder/builder.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
@@ -795,7 +795,7 @@ const OPENS_SUBMENU = {
 			platforms: ['hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				hs: 'macos/ui/menu/menu_hotstrings.lua',
+				hs: 'macos/hotstrings/ui/menu/hotstrings.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -803,14 +803,14 @@ const OPENS_SUBMENU = {
 			menu: 'hotstring_extension_empty_file',
 			platforms: ['ahk'],
 			kind: 'compose',
-			native_sources: { ahk: 'windows/ui/menu/menu_hotstrings.ahk' }
+			native_sources: { ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk' }
 		},
 		{
 			menu: 'hotstrings_parameter_boundary',
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
 				hs: 'macos/menu/ui/builder/builder.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
@@ -824,8 +824,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/management.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -834,8 +834,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/management.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -844,8 +844,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/management.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		}
@@ -856,8 +856,8 @@ const OPENS_SUBMENU = {
 		platforms: ['ahk', 'hs', 'linux'],
 		kind: 'compose',
 		native_sources: {
-			ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-			hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+			ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+			hs: 'macos/hotstrings/ui/menu/management.lua',
 			linux: 'linux/menu/ui/builder/builder.lua'
 		}
 	},
@@ -875,8 +875,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/management.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -885,8 +885,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/management.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		}
@@ -898,8 +898,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/management.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -908,8 +908,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+				hs: 'macos/hotstrings/ui/menu/management.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -1391,8 +1391,8 @@ OPENS_SUBMENU.personal_default_choices = {
 	kind: 'compose',
 	personal_default_choice: true,
 	native_sources: {
-		ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-		hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
+		ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+		hs: 'macos/hotstrings/ui/menu/custom.lua',
 		linux: 'linux/menu/ui/builder/builder.lua'
 	}
 };
@@ -1403,7 +1403,7 @@ OPENS_SUBMENU.personal_main_sections = {
 	platforms: ['hs'],
 	kind: 'compose',
 	personal_section_choice: true,
-	native_sources: { hs: 'macos/ui/menu/menu_hotstrings_custom.lua' }
+	native_sources: { hs: 'macos/hotstrings/ui/menu/custom.lua' }
 };
 
 const PERSONAL_DEFAULT_GROUP_PROOF = OPENS_SUBMENU.hotstring_personal[0].selected_group.ahk;
@@ -1416,9 +1416,9 @@ const sectionOrderOwner = (menu, kind) => ({
 	kind,
 	hotstring_order_owner: true,
 	native_sources: {
-		ahk: 'windows/ui/menu/menu_hotstring_order.ahk',
-		hs: 'macos/ui/menu/menu_hotstrings.lua',
-		linux: 'linux/ui/menu/menu_hotstrings.lua'
+		ahk: 'windows/hotstrings/ui/menu/order.ahk',
+		hs: 'macos/hotstrings/ui/menu/hotstrings.lua',
+		linux: 'linux/hotstrings/ui/menu/hotstrings.lua'
 	}
 });
 OPENS_SUBMENU.hotstring_category_sections.push(
@@ -1586,8 +1586,8 @@ const manifest = JSON.parse(readSourceFile(MANIFEST));
 const MENU_KEYS = Object.keys(manifest).filter((k) => Array.isArray(manifest[k]));
 
 for (const [driver, relative] of [
-	['windows', 'windows/ui/menu/menu_hotstrings.ahk'],
-	['macos', 'macos/ui/menu/menu_hotstrings_custom.lua'],
+	['windows', 'windows/hotstrings/ui/menu/hotstrings.ahk'],
+	['macos', 'macos/hotstrings/ui/menu/custom.lua'],
 	['linux', 'linux/menu/ui/builder/builder.lua']
 ]) {
 	if (!personalCommandReference(readSourceFile(path.join(SP, relative)), driver))
@@ -2201,7 +2201,7 @@ const {
 // A selected row never grants authority to additional, unconsumed group siblings.
 {
 	const assert = require('node:assert/strict');
-	const source = readSourceFile(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'));
+	const source = readSourceFile(path.join(SP, 'windows/hotstrings/ui/menu/hotstrings.ahk'));
 	const key = 'hotstring_personal_default_parent',
 		rows = manifest[key];
 	const credits = (candidate, definition = rows) =>
@@ -2279,8 +2279,8 @@ const {
 		personalDefaultChoicePublication
 	} = require('../lib/menu-hotstring-language-binding.cjs');
 	const files = {
-		ahk: 'windows/ui/menu/menu_hotstrings.ahk',
-		hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
+		ahk: 'windows/hotstrings/ui/menu/hotstrings.ahk',
+		hs: 'macos/hotstrings/ui/menu/custom.lua',
 		linux: 'linux/menu/ui/builder/builder.lua'
 	};
 	const coordinates = {
@@ -2591,7 +2591,7 @@ const {
 		platforms: ['hs'],
 		kind: 'compose',
 		personal_section_choice: true,
-		native_sources: { hs: 'macos/ui/menu/menu_hotstrings_custom.lua' }
+		native_sources: { hs: 'macos/hotstrings/ui/menu/custom.lua' }
 	});
 	require('./fixtures/personal-section-owner-counterexamples.cjs')(SP, manifest);
 }
@@ -4740,7 +4740,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 // The editor is composed into existing category providers, not opened as a submenu.
 // This credits only the reviewed leaf and immediate transport, not a whole native parent.
 const personalInfoProviders = {
-	hs: { id: 'hotstring_categories_standard', file: 'macos/ui/menu/menu_hotstrings.lua' },
+	hs: { id: 'hotstring_categories_standard', file: 'macos/hotstrings/ui/menu/hotstrings.lua' },
 	linux: { id: 'hotstring_categories_dynamic', file: 'linux/menu/ui/builder/builder.lua' }
 };
 const personalInfoSources = Object.fromEntries(
@@ -7666,7 +7666,7 @@ function languageParentSource(source, driver) {
 // Native file IO composition stays retained; only its outer scalar policy moved.
 {
 	const assert = require('node:assert/strict');
-	const source = readSourceFile(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'));
+	const source = readSourceFile(path.join(SP, 'windows/hotstrings/ui/menu/hotstrings.ahk'));
 	const {
 		personalFileCaptionPublication: bound
 	} = require('../lib/menu-hotstring-language-binding.cjs');
@@ -7749,7 +7749,7 @@ function languageParentSource(source, driver) {
 // The retained native folder frame only changes admitted scalar projection.
 {
 	const assert = require('node:assert/strict');
-	const source = readSourceFile(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'));
+	const source = readSourceFile(path.join(SP, 'windows/hotstrings/ui/menu/hotstrings.ahk'));
 	const {
 		personalFolderCaptionPublication: bound
 	} = require('../lib/menu-hotstring-language-binding.cjs');

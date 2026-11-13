@@ -540,7 +540,7 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+			"source": "static/ergopti_plus/linux/hotstrings/engine/catalogue/config.lua",
 			"template": "Reload requested — re-scanning…",
 			"line": "2026-10-30 10:00:00:123 [INFO] [hotstrings_config] Reload requested — re-scanning…",
 			"expect": {

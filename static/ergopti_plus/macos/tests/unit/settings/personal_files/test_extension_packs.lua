@@ -15,7 +15,7 @@
 local helpers = require("tests.helpers")
 local Logger = require("core.logger.engine.logger")
 helpers.admit_logger_privacy(Logger)
-local Packs = require("infra.extension_packs")
+local Packs = require("hotstrings.engine.catalogue.extension_packs")
 
 --- Runs a callback while capturing the extension packs' error log lines.
 --- @param callback function Body.

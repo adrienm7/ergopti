@@ -388,7 +388,7 @@ package.preload["core.events.loop"] = function()
 			end
 		elseif ACTION == "delimiters_add" or ACTION == "delimiters_verify" then
 			local Terminators = require("layouts.engine.layers.terminators")
-			local Settings = require("modules.hotstrings.terminator_settings")
+			local Settings = require("hotstrings.engine.matcher.terminator_settings")
 			if ACTION == "delimiters_add" then
 				record("FACT", "delimiter_added=" .. tostring(Terminators.add_custom_terminator("custom_µ", "µ", "µ", false)))
 				record("FACT", "delimiter_committed=" .. tostring(Settings.persist()))

@@ -74,9 +74,9 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 		queues[target][#queues[target] + 1] = InputEvent.encode(ev[1], ev[2], ev[3], nil, ev[4])
 	end
 	local grabs = { [keyboard] = { on = 0, off = 0 }, [pointer] = { on = 0, off = 0 }, [second] = { on = 0, off = 0 } }
-	local doubled, saved = { "modules.hotstrings.device_finder", "adapters.xkb_capture" }, {}
+	local doubled, saved = { "hotstrings.engine.device_finder", "adapters.xkb_capture" }, {}
 	for _, name in ipairs(doubled) do saved[name] = package.loaded[name] end
-	package.loaded["modules.hotstrings.device_finder"] = {
+	package.loaded["hotstrings.engine.device_finder"] = {
 		find_devices = function() return { keyboard }, { pointer } end,
 		is_key_device = function() return true, nil end,
 		is_interceptable_key_device = function() return true, nil end,
@@ -678,7 +678,7 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		}, function(hook, keyboard)
 			if changed then return end
 			changed = true
-			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { keyboard }, {} end
+			package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { keyboard }, {} end
 			for _ = 1, hook.DEVICE_CHECK_TICKS do hook.check_device() end
 		end)
 		helpers.assert_true(changed)
@@ -693,7 +693,7 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		}, function(hook, keyboard, pointer, second)
 			if changed then return end
 			changed = true
-			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { keyboard }, { pointer, second } end
+			package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { keyboard }, { pointer, second } end
 			for _ = 1, hook.DEVICE_CHECK_TICKS do hook.check_device() end
 			running = hook.isRunning()
 		end)
@@ -712,7 +712,7 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		}, function(hook, keyboard, pointer, second)
 			if changed then return end
 			changed = true
-			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { keyboard }, { pointer, second } end
+			package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { keyboard }, { pointer, second } end
 			for _ = 1, hook.DEVICE_CHECK_TICKS do hook.check_device() end
 		end)
 		helpers.assert_eq(count(emitted, "key:" .. BTN_LEFT .. ":1"), 1)

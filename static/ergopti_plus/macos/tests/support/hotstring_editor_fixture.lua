@@ -80,8 +80,8 @@ local function with_editor(test)
 				return view
 			end,
 		}
-		package.loaded["ui.hotstring_editor"] = nil
-		local editor = require("ui.hotstring_editor")
+		package.loaded["hotstrings.ui.hotstring_editor"] = nil
+		local editor = require("hotstrings.ui.hotstring_editor")
 		editor.init("/virtual/source.toml", { reload_toml = function()
 			state.reloads = state.reloads + 1
 			return true

@@ -170,7 +170,7 @@ local function _run_tap(action, binding)
 	-- which locks CapsLock and ends on the [shortcuts.caps_word] settings.
 	if type(action) == "table" then
 		local ok, result = pcall(function()
-			return require("modules.hotstrings.injector").inject(0, action.type_text)
+			return require("hotstrings.engine.injector").inject(0, action.type_text)
 		end)
 		if not ok or type(result) ~= "table" or not result.ok then
 			Logger.error(LOG, "The one-shot Shift could not type its result: %s.",
@@ -302,7 +302,7 @@ end
 --- @param char string
 --- @return string|nil
 local function _one_shot_result(char)
-	if char == require("modules.hotstrings.magic_key").get() then return _one_shot.magic_key_result end
+	if char == require("hotstrings.engine.magic_key").get() then return _one_shot.magic_key_result end
 	return _one_shot.results[char]
 end
 

@@ -241,10 +241,10 @@ helpers.describe("keyboard hook + tap-hold engine: the pointer during a tap", fu
 			[pointer] = { InputEvent.encode(ev_type, code, value, nil, 2000) },
 		}
 		local saved = {}
-		for _, name in ipairs({ "modules.hotstrings.device_finder", "adapters.xkb_capture" }) do
+		for _, name in ipairs({ "hotstrings.engine.device_finder", "adapters.xkb_capture" }) do
 			saved[name] = package.loaded[name]
 		end
-		package.loaded["modules.hotstrings.device_finder"] = {
+		package.loaded["hotstrings.engine.device_finder"] = {
 			find_devices = function() return { keyboard }, { pointer } end,
 			is_key_device = function() return true, nil end,
 			-- Controlled keyboard sources have no REL/ABS axes.
@@ -495,10 +495,10 @@ helpers.describe("keyboard hook + tap-hold engine: a hold taken past the thresho
 			nodes[name], queues[path] = path, {}
 		end
 		local clock_ms = 0
-		local stubbed = { "modules.hotstrings.device_finder", "adapters.xkb_capture", "core.logger.engine.monotonic" }
+		local stubbed = { "hotstrings.engine.device_finder", "adapters.xkb_capture", "core.logger.engine.monotonic" }
 		local saved = {}
 		for _, name in ipairs(stubbed) do saved[name] = package.loaded[name] end
-		package.loaded["modules.hotstrings.device_finder"] = {
+		package.loaded["hotstrings.engine.device_finder"] = {
 			find_devices = function() return { nodes.keyboard }, { nodes.mouse } end,
 			is_key_device = function() return true, nil end,
 			-- Controlled keyboard sources have no REL/ABS axes.
@@ -678,9 +678,9 @@ end)
 
 helpers.describe("keyboard hook: physical-origin generation", function()
 	helpers.it("(magic-editor-origin) fences a captured device when its current kernel origin becomes unqualified", function()
-		local prior = package.loaded["modules.hotstrings.device_finder"]
+		local prior = package.loaded["hotstrings.engine.device_finder"]
 		local physical, observations = true, {}
-		package.loaded["modules.hotstrings.device_finder"] = {
+		package.loaded["hotstrings.engine.device_finder"] = {
 			physical_sources = function(paths)
 				local sources = {}
 				for _, path in ipairs(paths) do sources[#sources + 1] = { path = path, name = "fixture keyboard",
@@ -700,7 +700,7 @@ helpers.describe("keyboard hook: physical-origin generation", function()
 				end }
 			end)
 		end)
-		package.loaded["modules.hotstrings.device_finder"] = prior
+		package.loaded["hotstrings.engine.device_finder"] = prior
 		if not ok then error(err, 0) end
 		helpers.assert_eq(#observations, 2)
 		helpers.assert_true(observations[1].physical and observations[1].ready)

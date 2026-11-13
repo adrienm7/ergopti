@@ -49,10 +49,10 @@ end
 
 helpers.describe("Shipped Ergopti menu and physical replacement", function()
 	helpers.it("(ergopti-extension-selection) persists the actual replacement gate, reloads it and rolls back refusals", function()
-		helpers.with_stub_scope({ "modules.keymap", "modules.keymap.init", "modules.keymap.state",
-			"modules.keymap.utils", "modules.keymap.expander", "ai.engine.bridge",
-			"infra.extension_packs", "settings.engine.preferences.preferences", "core.i18n.engine.i18n", "core.fs.adapters.storage", "core.fs.adapters.file_system" }, function()
-			package.loaded["modules.keymap.utils"] = setmetatable({
+		helpers.with_stub_scope({ "hotstrings.engine.expander", "modules.keymap.init", "hotstrings.engine.expander.state",
+			"hotstrings.engine.expander.utils", "hotstrings.engine.expander.expander", "ai.engine.bridge",
+			"hotstrings.engine.catalogue.extension_packs", "settings.engine.preferences.preferences", "core.i18n.engine.i18n", "core.fs.adapters.storage", "core.fs.adapters.file_system" }, function()
+			package.loaded["hotstrings.engine.expander.utils"] = setmetatable({
 				is_ignored_window = function() return false, 0 end,
 				is_secure_field = function() return false end,
 				start_ignored_win_tracking = function() return 1 end,
@@ -68,18 +68,18 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				taps[#taps + 1] = tap
 				return tap
 			end
-			local Keymap = helpers.load_with_stubs("modules.keymap", { eventtap = eventtap })
+			local Keymap = helpers.load_with_stubs("hotstrings.engine.expander", { eventtap = eventtap })
 			package.loaded["core.i18n.engine.i18n"] = setmetatable({ build_language_menu_items = function() return {} end },
 				{ __index = require("core.i18n.engine.i18n") })
 			local FixtureFiles = require("tests.support.file_system_write_stub")
 			package.loaded["core.fs.adapters.file_system"] = setmetatable({
 				read = function(path) return FixtureFiles.read_with_status(path) end,
 			}, { __index = FixtureFiles })
-			package.loaded["modules.hotstrings.hotstrings_config"] = {
+			package.loaded["hotstrings.engine.catalogue.config"] = {
 				get_user_override = function() return nil end,
 				resolve = function() return { delay = 0.5, has_override = false } end,
 			}
-			local Packs = require("infra.extension_packs")
+			local Packs = require("hotstrings.engine.catalogue.extension_packs")
 			Packs._reset()
 			local found = Packs.discover({ { pack = helpers.driver_root() .. "../../layouts/registry/ergopti" } }, scanner_io())
 			helpers.assert_eq(#found, 1, "the shipped pack needs no installed-layout record")
@@ -92,7 +92,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 			CaptionFixture.install(require("core.i18n.engine.i18n"))
 			package.loaded["menu.ui.builder.builder"] = nil
 			local Registry = require("settings.engine.registry")
-			local Hotstrings = require("ui.menu.menu_hotstrings")
+			local Hotstrings = require("hotstrings.ui.menu.hotstrings")
 			local Preferences = require("settings.engine.preferences.preferences")
 			local neutral = Preferences.project_hotstring_preferences({}, Registry.list_groups(), Keymap.get_sections)
 			helpers.assert_eq(neutral.section_states.magickey.replace, false, "fresh canonical absence keeps native replacement opt-in")

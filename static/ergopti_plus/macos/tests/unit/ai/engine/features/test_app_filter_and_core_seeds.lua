@@ -29,7 +29,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("llm.app_filter — is_blocked empty-name guard", function()
 	local function load_filter(ignored_state)
-		package.loaded["modules.keymap.utils"] = {
+		package.loaded["hotstrings.engine.expander.utils"] = {
 			is_ignored_window = function() return ignored_state end,
 		}
 		return helpers.load_with_stubs("ai.engine.prediction.app_filter")

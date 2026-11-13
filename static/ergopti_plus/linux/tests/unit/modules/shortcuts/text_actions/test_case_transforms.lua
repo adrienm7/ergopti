@@ -16,7 +16,7 @@ local function with_manager(selected, body)
 		clipboard = "clipboard.adapters.clipboard",
 		event_loop = "core.events.loop",
 		combo = "gestures.engine.combo_emitter",
-		injector = "modules.hotstrings.injector",
+		injector = "hotstrings.engine.injector",
 		keystats = "modules.keystats.keystats",
 		hook = "platform.input.keyboard_hook",
 	}
@@ -517,7 +517,7 @@ local function with_helper_menu(body)
 			effects.reads = effects.reads + 1
 			return not effects.refuse_read, "été Straße Москва", "controlled read refusal"
 		end
-		package.loaded["modules.hotstrings.injector"].inject = function(count, text, consume)
+		package.loaded["hotstrings.engine.injector"].inject = function(count, text, consume)
 			effects.injections[#effects.injections + 1] = { count, text, consume }
 			return { ok = not effects.refuse_injection }
 		end

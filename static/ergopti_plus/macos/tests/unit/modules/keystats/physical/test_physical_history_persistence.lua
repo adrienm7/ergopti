@@ -176,7 +176,7 @@ shell.run(function(capture, observed, native)
 	package.loaded["core.process.adapters.lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
 	package.loaded["platform.input.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
-	package.loaded["modules.keymap"]={is_running=function() return false end}
+	package.loaded["hotstrings.engine.expander"]={is_running=function() return false end}
 	package.loaded["gestures.engine.engine"]={}
 	package.loaded["gestures.engine.actions"]={}
 	leaf.caffeinate={watcher={systemDidWake=1,screensDidWake=2,screensDidUnlock=3,systemWillSleep=4,screensDidSleep=5,screensDidLock=6,new=function(fn)
@@ -523,7 +523,7 @@ shell.run(function(capture, observed, native)
 	package.loaded["core.process.adapters.lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
 	package.loaded["platform.input.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
-	package.loaded["modules.keymap"]={is_running=function() return false end}
+	package.loaded["hotstrings.engine.expander"]={is_running=function() return false end}
 	package.loaded["gestures.engine.engine"]={}
 	package.loaded["gestures.engine.actions"]={}
 	leaf.caffeinate={watcher={systemDidWake=1,screensDidWake=2,screensDidUnlock=3,systemWillSleep=4,screensDidSleep=5,screensDidLock=6,new=function(fn)

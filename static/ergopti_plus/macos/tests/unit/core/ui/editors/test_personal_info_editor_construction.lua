@@ -96,8 +96,8 @@ local function with_editor(scenario)
 				return view
 			end,
 		}
-		package.loaded["ui.personal_info_editor"] = nil
-		scenario(require("ui.personal_info_editor"), records)
+		package.loaded["hotstrings.ui.personal_info_editor"] = nil
+		scenario(require("hotstrings.ui.personal_info_editor"), records)
 	end, debug.traceback)
 	for key in pairs(package.loaded) do if loaded[key] == nil then package.loaded[key] = nil end end
 	for key, value in pairs(loaded) do package.loaded[key] = value end

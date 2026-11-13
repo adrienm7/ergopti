@@ -178,7 +178,7 @@ end
 --- @param group string
 --- @return string|nil
 local function group_colour(group)
-	local ok, Config = pcall(require, "modules.hotstrings.hotstrings_config")
+	local ok, Config = pcall(require, "hotstrings.engine.catalogue.config")
 	if not ok or type(Config) ~= "table" or type(Config.resolve) ~= "function" then return nil end
 	local resolved = Config.resolve(group, nil)
 	return type(resolved) == "table" and resolved.color or nil

@@ -119,7 +119,7 @@ if literal_driver and literal_driver ~= "" then
 	assert(ffi.C.setenv("ERGOPTI_LITERAL_DAEMON", "1", 1) == 0, "cannot export daemon search order")
 else
 	package.path = SCRIPT_DIR .. "/?.lua;" ..
-	               SCRIPT_DIR .. "/modules/hotstrings/?.lua;" ..
+	               SCRIPT_DIR .. "/hotstrings/engine/?.lua;" ..
 	               SHARED_LUA_DIR .. "/?.lua;" ..
 	               SHARED_LUA_DIR .. "/?/init.lua;" ..
 	               package.path
@@ -241,13 +241,13 @@ local LOG = "ergopti_hotstrings"
 -- =========================================
 -- =========================================
 
-local engine_mod        = require("modules.hotstrings.engine")
-local hotstrings_config = require("modules.hotstrings.hotstrings_config")
-local injector          = require("modules.hotstrings.injector")
+local engine_mod        = require("hotstrings.engine.engine")
+local hotstrings_config = require("hotstrings.engine.catalogue.config")
+local injector          = require("hotstrings.engine.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
-local MagicKey          = require("modules.hotstrings.magic_key")
-local MagicKeySource    = require("modules.hotstrings.magic_key_source")
-local RepeatKey         = require("modules.hotstrings.repeat_key")
+local MagicKey          = require("hotstrings.engine.magic_key")
+local MagicKeySource    = require("hotstrings.engine.magic_key_source")
+local RepeatKey         = require("hotstrings.engine.repeat_key")
 
 -- The user's own modifier chords. Hard require rather than optional: the module
 -- has no external dependency, and a shortcut layer that silently fails to load
@@ -271,7 +271,7 @@ local notifier = RuntimeGuard.optional_require("platform.focus.application_notif
 -- must not stop working because it cannot draw a hint about them).
 local tooltip_preview = RuntimeGuard.optional_require("core.ui.ui.tooltip.preview")
 local llm_overlay = RuntimeGuard.optional_require("core.ui.ui.tooltip.llm")
-local dev_finder        = require("modules.hotstrings.device_finder")
+local dev_finder        = require("hotstrings.engine.device_finder")
 local keystats         = require("modules.keystats.keystats")
 local keyboard_hook     = require("platform.input.keyboard_hook")
 local InputEvent        = require("platform.input.event")
@@ -300,7 +300,7 @@ local prediction_engine = RuntimeGuard.optional_require("ai.engine.prediction.en
 
 -- Dynamic hotstrings engine (optional — loads personal_info.toml, registers
 -- @-tag letter shortcuts and date expansion rules).
-local dyn_hotstrings = RuntimeGuard.optional_require("modules.dynamic_hotstrings.manager")
+local dyn_hotstrings = RuntimeGuard.optional_require("hotstrings.engine.dynamic.manager")
 
 -- Updater engine (optional — checks GitHub releases, downloads and installs updates).
 local updater = RuntimeGuard.optional_require("modules.updater.manager")
@@ -945,9 +945,9 @@ end
 
 local function main()
 	-- Keep main within older LuaJIT's 60-upvalue budget; these dependencies remain mandatory.
-	local UserHotstringRuntime = require("infra.user_hotstring_runtime")
-	local PreviewSettings = require("modules.hotstrings.preview_settings")
-	local ExpansionDelay = require("modules.hotstrings.expansion_delay")
+	local UserHotstringRuntime = require("hotstrings.engine.user_hotstring_runtime")
+	local PreviewSettings = require("hotstrings.engine.preview_settings")
+	local ExpansionDelay = require("hotstrings.engine.expansion_delay")
 	local InputCaptureGate = require("platform.input.capture_gate")
 	-- How many candidates the preview asks the engine for. The panel itself caps
 	-- the rows it draws; this cap is about the WORK — the enumeration runs on
@@ -1040,7 +1040,7 @@ local function main()
 	-- Hotstring choices earlier builds kept in storage.json become config.toml
 	-- leaves once, before any hotstring owner reads them: the canonical readers
 	-- resolve absence to off, which would silence an updated install.
-	require("infra.legacy_hotstring_storage").import({
+	require("hotstrings.engine.legacy_hotstring_storage").import({
 		path     = require("settings.engine.paths").config("config.toml"),
 		storage  = require("core.fs.adapters.storage"),
 		families = dyn_hotstrings and dyn_hotstrings.RULE_FAMILIES or {},
@@ -1214,7 +1214,7 @@ local function main()
 	local TapHold = require("platform.remap.tap_hold_manager")
 	-- When the buffer forgets the current word: after a pause and on a click.
 	-- Required here for the same upvalue budget as TapHold.
-	local WordReset = require("modules.hotstrings.word_reset")
+	local WordReset = require("hotstrings.engine.word_reset")
 	-- The erase-to-text pause only where Windows and macOS pace it: a terminal,
 	-- or an application nobody could name (the focus is unknown).
 	injector.set_erase_pacing(function()
@@ -1473,7 +1473,7 @@ local function main()
 		if dyn_hotstrings.start_user_code(native) ~= true then
 			error("programmable hotstring native generation did not initialize")
 		end
-		local user_preferences = require("infra.hotstring_preferences")
+		local user_preferences = require("hotstrings.engine.matcher.preferences")
 		if dyn_hotstrings.set_user_code_time_activation(
 			user_preferences.get(require("settings.engine.keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS)) ~= true then
 			error("canonical programmable-hotstring interval did not commit before hook startup")
@@ -1552,7 +1552,7 @@ local function main()
 		local now_ms = math.floor(Monotonic.now_ms())
 
 		-- A Shift, Alt or AltGr keystroke is slower than a bare letter: the expansion
-		-- delay widens for it (modules/hotstrings/expansion_delay.lua, the shared
+		-- delay widens for it (hotstrings/engine/expansion_delay.lua, the shared
 		-- rule). The previous character keystroke is the delay's reference key.
 		local held_now = keyboard_hook.held_modifiers()
 		local key_is_complex = (held_now.shift or held_now.alt or held_now.altgr) and true or false
@@ -1701,7 +1701,7 @@ local function main()
 				-- An output that presses keys goes through its parsed tokens, and only
 				-- its typed text reaches the telemetry below.
 				local parsed_output = result.has_key_tokens
-					and require("modules.hotstrings.output_tokens").parse(result.replacement) or nil
+					and require("hotstrings.engine.output_tokens").parse(result.replacement) or nil
 				local ok_delivery, delivery = pcall(
 					parsed_output and injector.inject_tokens or injector.inject,
 					result.backspace_count,
@@ -2549,7 +2549,7 @@ local function main()
 	-- else". They are config.toml leaves (modules/hotstrings/terminator_settings),
 	-- carried over once from the storage.json keys earlier builds used (8.0), so
 	-- the hotstrings scope restores and clears them with the other settings.
-	local terminator_settings = require("modules.hotstrings.terminator_settings")
+	local terminator_settings = require("hotstrings.engine.matcher.terminator_settings")
 	terminator_settings.load()
 
 	-- 8.8) Start the keyboard hook adapter, in INTERCEPT mode by default.
@@ -3156,8 +3156,8 @@ local function main()
 	-- The scope publishes the preference only after both matchers accept it,
 	-- retaining a refused inverse under the same ownership as other hotstrings.
 	MagicKey.init(nil, function(new_char)
-		local committed = require("infra.hotstrings_scope").apply_magic(new_char, {
-			config = hotstrings_config, preferences = require("infra.hotstring_preferences"),
+		local committed = require("hotstrings.engine.catalogue.scope").apply_magic(new_char, {
+			config = hotstrings_config, preferences = require("hotstrings.engine.matcher.preferences"),
 			dynamic = dyn_hotstrings, magic_key = MagicKey,
 			reload = function() return reload_hotstrings("the magic key") end,
 			after_restore = function()

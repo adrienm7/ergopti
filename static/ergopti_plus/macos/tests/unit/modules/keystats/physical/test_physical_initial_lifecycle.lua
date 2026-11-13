@@ -227,7 +227,7 @@ local NAMES = {
 	"adapters.physical_observation_clock", "core.process.adapters.lifecycle", "platform.input.synthetic_input",
 	"settings.engine.paths", "core.ui.engine.dialog_util", "core.logger.engine.logger", "menu.engine.manifest_reader",
 	"metrics.engine.capture.physical_lifecycle_observation", "modules.keystats.context_tracker", "modules.keystats.init",
-	"modules.keystats.kc_bridge", "modules.keystats.log_manager", "modules.keystats.watchers", "modules.keymap",
+	"modules.keystats.kc_bridge", "modules.keystats.log_manager", "modules.keystats.watchers", "hotstrings.engine.expander",
 }
 local function actual(body)
 	return h.with_stub_scope(NAMES, function()

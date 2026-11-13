@@ -8,15 +8,15 @@ local OWNED = {
 	"ui.menu.init", "menu.ui.builder.state", "settings.ui.menu.preferences_transaction", "menu.ui.transactions.session_demotions",
 	"menu.ui.keyboard.keymap_lifecycle", "menu.ui.transactions.global_actions_transaction", "menu.ui.transactions.recoverable_file_moves",
 	"core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n", "menu.engine.ui_restore", "core.text.engine.utils",
-	"core.timing.engine.deferred_work", "settings.engine.preferences.preferences", "ui.hotstring_editor", "menu.ui.builder.builder", "ui.menu.hotstring_counter",
+	"core.timing.engine.deferred_work", "settings.engine.preferences.preferences", "hotstrings.ui.hotstring_editor", "menu.ui.builder.builder", "hotstrings.ui.menu.counter",
 	"settings.ui.menu.paths", "settings.engine.factory_reset_journal", "menu.ui.builder.watchers", "modules.updater",
 	"tray.adapters.menu", "platform.input.hotkey_registrar", "core.lifecycle.engine.shutdown.termination_coordinator", "gestures.ui.menu.gestures",
-	"ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout", "ui.menu.menu_hotstrings", "ui.menu.menu_metrics",
+	"ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout", "hotstrings.ui.menu.hotstrings", "ui.menu.menu_metrics",
 	"ui.menu.menu_tap_holds", "apps.ui.menu.apps", "ui.menu.menu_about", "ai.ui.menu", "infra.personal_shortcuts",
-	"modules.dynamic_hotstrings", "gestures.engine", "modules.keystats.text_cipher", "ai.engine",
+	"hotstrings.engine.dynamic", "gestures.engine", "modules.keystats.text_cipher", "ai.engine",
 	"modules.keystats", "modules.shortcuts", "modules.shortcuts.actions.text", "menu.engine.wrap_mutation",
-	"menu.ui.transactions.global_scope", "ui.menu.metrics_scope", "gestures.ui.menu.scope", "ui.menu.hotstrings_scope",
-	"settings.ui.menu.scoped_preferences", "modules.hotstrings.hotstrings_config",
+	"menu.ui.transactions.global_scope", "ui.menu.metrics_scope", "gestures.ui.menu.scope", "hotstrings.ui.menu.scope",
+	"settings.ui.menu.scoped_preferences", "hotstrings.engine.catalogue.config",
 }
 local function with_boot(saved, callback)
 	return helpers.with_stub_scope(OWNED, function()

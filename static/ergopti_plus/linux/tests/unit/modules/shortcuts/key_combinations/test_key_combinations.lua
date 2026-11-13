@@ -205,7 +205,7 @@ end
 helpers.describe("ordered pairs through actual native consumers", function()
 	helpers.it("dispatches the action between acknowledged lift and restore in the actual hook", function()
 		local state = make(); local emitted, observed = {}, false
-		protected_modules({ ["platform.input.keyboard_hook"] = false, ["modules.hotstrings.device_finder"] = { physical_sources = function(devices)
+		protected_modules({ ["platform.input.keyboard_hook"] = false, ["hotstrings.engine.device_finder"] = { physical_sources = function(devices)
 			local out = {}; for _, device in ipairs(devices) do out[#out + 1] = { path=device,sysfs="/controlled/physical",name="controlled",physical=true } end; return out
 		end } }, function()
 			local hook = helpers.load_module("platform.input.keyboard_hook")
@@ -280,7 +280,7 @@ end)
 helpers.describe("pair native receipt refusal boundaries",function()
 	helpers.it("never invokes action or modal after a refused real hook output port",function()
 		local state = make(); local actions, modal = 0,0
-		protected_modules({ ["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({ ["platform.input.keyboard_hook"]=false,["hotstrings.engine.device_finder"]={physical_sources=function(devices)
 			local out={};for _, device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end} },function()
 			local hook = require("platform.input.keyboard_hook")
@@ -352,7 +352,7 @@ end)
 helpers.describe("pair source and restoration refusals",function()
 	helpers.it("refuses malformed source after installation and forwards unrelated grabbed input",function()
 		local state=make();state.bytes='[shortcuts.key_combination_taps\n'
-		protected_modules({["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({["platform.input.keyboard_hook"]=false,["hotstrings.engine.device_finder"]={physical_sources=function(devices)
 			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end}},function()
 			local hook=require("platform.input.keyboard_hook");local emitted,actions={},0
@@ -445,7 +445,7 @@ helpers.describe("pair external-boundary ownership",function()
 	end)
 	helpers.it("resumes baseline letters after exact source-revocation retirement through the actual hook",function()
 		local state=make();local emitted,actions={},0
-		protected_modules({["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({["platform.input.keyboard_hook"]=false,["hotstrings.engine.device_finder"]={physical_sources=function(devices)
 			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end}},function()
 			local hook=require("platform.input.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
@@ -458,7 +458,7 @@ helpers.describe("pair external-boundary ownership",function()
 	end)
 	helpers.it("keeps baseline output acquisition owned during reentrant native retirement",function()
 		local state=make();local accepted,entered
-		protected_modules({["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({["platform.input.keyboard_hook"]=false,["hotstrings.engine.device_finder"]={physical_sources=function(devices)
 			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end}},function()
 			local hook=require("platform.input.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() error("stale action must not run") end))
@@ -726,7 +726,7 @@ helpers.describe("installed input-owner OneShot prerequisite (controlled ports)"
 				elseif replacement == "issuer" then require("platform.remap.key_combination_engine").input_owner_current = function() return true end
 				elseif replacement == "lease" then setmetatable(s.lease, {})
 				elseif replacement == "configuration" then s.paused = true
-				elseif replacement == "classification" then require("modules.hotstrings.device_finder").physical_sources = function() return {} end
+				elseif replacement == "classification" then require("hotstrings.engine.device_finder").physical_sources = function() return {} end
 				elseif replacement == "hook" then s.hook.arm_one_shot = function() return true end
 				else helpers.assert_true(s.engine:set_tap_holds_enabled(false)); helpers.assert_true(s.engine:set_tap_holds_enabled(true)) end
 				assert_false(s.hook.input_owner_current(s.lease))
@@ -1607,7 +1607,7 @@ helpers.describe("acknowledged buffered Reader cohort replacement (controlled tr
 		end},function(s)
 			s.edge("a",58,1,1000);s.edge("a",15,1,1010)
 			s.edge("a",58,0,1020);s.edge("a",15,0,1021)
-			local finder=require("modules.hotstrings.device_finder")
+			local finder=require("hotstrings.engine.device_finder")
 			local slot="keyboard:"..s.paths.a
 			local first=assert(s.reader.capture_source_owner(slot))
 			local function reconcile()

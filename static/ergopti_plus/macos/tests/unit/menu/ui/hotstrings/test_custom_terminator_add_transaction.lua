@@ -54,9 +54,9 @@ local function with_fixture(outcome, callback, locale)
 	return helpers.with_stub_scope({
 		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger", "settings.engine.preferences.preferences",
 		"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "menu.engine.manifest_menu", "menu.engine.manifest_reader",
-		"core.ui.engine.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
-		"menu.ui.keyboard.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "settings.ui.menu.preferences_transaction",
-		"ui.hotstrings_config_window",
+		"core.ui.engine.notifications", "hotstrings.engine.catalogue.config", "layouts.engine.layers.terminators",
+		"menu.ui.keyboard.keymap_lifecycle", "hotstrings.ui.menu.management", "settings.ui.menu.preferences_transaction",
+		"hotstrings.ui.hotstrings_config_window",
 	}, function()
 		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local FileSystem = require("core.fs.adapters.file_system")
@@ -133,10 +133,10 @@ local function with_fixture(outcome, callback, locale)
 		}
 		package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "★" end }
 		package.loaded["core.ui.engine.notifications"] = { notify = function() calls.notices = calls.notices + 1 end }
-		package.loaded["modules.hotstrings.hotstrings_config"] = {
+		package.loaded["hotstrings.engine.catalogue.config"] = {
 			resolve = function() return { delay = 0.1, has_override = false } end,
 		}
-		local Management = require("ui.menu.menu_hotstrings_management")
+		local Management = require("hotstrings.ui.menu.management")
 		return OutputFixture.with_output(function(path)
 			local handle = assert(io.open(path, "wb"))
 			assert(handle:write(SOURCE))
@@ -365,7 +365,7 @@ helpers.describe("declared delay configuration command: actual macOS provider", 
 			with_fixture(outcome, function(fixture)
 				local observations = { opens = 0 }
 				local window = { open = function() observations.opens = observations.opens + 1 end }
-				package.loaded["ui.hotstrings_config_window"] = window
+				package.loaded["hotstrings.ui.hotstrings_config_window"] = window
 				fixture.delay_rows[1].action()
 				helpers.assert_eq(observations.opens, 1)
 				helpers.assert_eq(fixture.calls.saves, 0, "opening the existing window writes no preferences")
@@ -386,7 +386,7 @@ helpers.describe("declared delay configuration command: actual macOS provider", 
 	helpers.it("preserves the existing paused disabled row without acquiring its window", function()
 		with_fixture("config_paused", function(fixture)
 			local observations = { opens = 0 }
-			package.loaded["ui.hotstrings_config_window"] = { open = function() observations.opens = observations.opens + 1 end }
+			package.loaded["hotstrings.ui.hotstrings_config_window"] = { open = function() observations.opens = observations.opens + 1 end }
 			helpers.assert_eq(fixture.delay_rows[1].disabled, true)
 			if fixture.delay_rows[1].action then fixture.delay_rows[1].action() end
 			helpers.assert_eq(observations.opens, 0)
@@ -396,7 +396,7 @@ helpers.describe("declared delay configuration command: actual macOS provider", 
 
 	helpers.it("contains an unavailable window owner and performs no save or redraw", function()
 		with_fixture("true", function(fixture)
-			package.loaded["ui.hotstrings_config_window"] = { open = false }
+			package.loaded["hotstrings.ui.hotstrings_config_window"] = { open = false }
 			fixture.delay_rows[1].action()
 			helpers.assert_eq(fixture.calls.saves, 0)
 			helpers.assert_eq(fixture.calls.updates, 0)

@@ -105,7 +105,7 @@ Home.it("Linux trigger ROI: native candidates respect context, edits, privacy an
 end)
 
 helpers.it("Linux trigger ROI: the real engine excludes strict Unicode triggers only after catalogue admission", function()
-	local engine = require("modules.hotstrings.engine").new()
+	local engine = require("hotstrings.engine.engine").new()
 	helpers.assert_nil(engine:is_known_trigger("école"))
 	helpers.assert_true(engine:load_mappings({ { trigger = "ÉCOLE", replacement = "class", is_case_sensitive_strict = true } }))
 	helpers.assert_true(engine:is_known_trigger("école"))
@@ -210,7 +210,7 @@ end)
 Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and interrupted physical fragments", function()
 	Native.with(function(collector)
 		local writer = start(collector)
-		local engine = require("modules.hotstrings.engine").new()
+		local engine = require("hotstrings.engine.engine").new()
 		assert(engine:load_mappings({ { trigger = "KNOWN", replacement = "expansion", is_case_sensitive_strict = true } }))
 		local stop, matched = {}, 0
 		engine.on_char = function() matched = matched + 1; error(stop) end

@@ -39,7 +39,7 @@ local function count_literal(source, needle)
 	end
 end
 
-helpers.describe("modules/keymap/utils.lua: clipboard preserves non-text data (audit-v6-bug3)", function()
+helpers.describe("hotstrings/engine/expander/utils.lua: clipboard preserves non-text data (audit-v6-bug3)", function()
 	helpers.it("clipboard save uses readAllData() instead of getContents()", function()
 		-- The paste path snapshots through the clipboard adapter's guarded owner,
 		-- which is the one place that reads every pasteboard type.

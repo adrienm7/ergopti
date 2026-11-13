@@ -35,7 +35,7 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../core/text/engine/toml/config_loader.ahk
 #Include ../menu/engine/manifest_reader.ahk
 #Include ../core/lifecycle/engine/master_gates.ahk
-#Include ../infra/hotstrings/hotstrings_cache.ahk
+#Include ../hotstrings/engine/catalogue/cache.ahk
 #Include ../settings/engine/migration/transition.ahk
 #Include ../settings/engine/migration/transition_runtime.ahk
 #Include ../settings/engine/migration/migrate.ahk

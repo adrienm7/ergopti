@@ -37,14 +37,14 @@ local MODULE_NAMES = {
 	"core.lifecycle.engine.startup_transaction",
 	"settings.engine.paths",
 	"core.fs.engine.paths",
-	"modules.hotstrings.hotstrings_config",
+	"hotstrings.engine.catalogue.config",
 	"settings.engine.factory_reset_journal",
 	"gestures.engine",
-	"modules.keymap",
+	"hotstrings.engine.expander",
 	"menu.engine.manifest_reader",
 	"core.text.engine.toml_codec.writer",
 	"modules.shortcuts",
-	"modules.dynamic_hotstrings",
+	"hotstrings.engine.dynamic",
 	"core.fs.adapters.toml_cache",
 	"core.text.engine.toml.reader",
 	"core.timing.engine.timings",
@@ -331,7 +331,7 @@ local function run_isolated(options, assertions)
 				stop = function() return true end,
 				restore_all_overrides = function() return true end,
 			},
-			["modules.keymap"] = {
+			["hotstrings.engine.expander"] = {
 				get_trigger_char = function() return "★" end,
 				stop = function() return true end,
 			},
@@ -349,7 +349,7 @@ local function run_isolated(options, assertions)
 				sparse_operation = function() error("no configuration write in shutdown fixture") end,
 			},
 			["modules.shortcuts"] = { stop = function() return true end },
-			["modules.dynamic_hotstrings"] = {},
+			["hotstrings.engine.dynamic"] = {},
 			["core.fs.adapters.toml_cache"] = { init = function() return true end },
 			["core.text.engine.toml.reader"] = {
 				set_cache_provider = function() end,
@@ -481,7 +481,7 @@ helpers.describe("init: controlled reload owns the native shutdown handoff", fun
 		run_isolated({ mlx_stop_mode = "deferred" }, function(state, hs_stub)
 			local accepted = hs_stub.reload("mlx-callback-pending")
 			helpers.assert_eq(accepted, true)
-			local Hotstrings = require("modules.hotstrings.hotstrings_config")
+			local Hotstrings = require("hotstrings.engine.catalogue.config")
 			helpers.assert_nil(Hotstrings.get_override_path(), "the real first-run controller is still uninitialized")
 			helpers.assert_nil(Hotstrings.capture_terminal_admission(), "root holds the exact cold admission during MLX cleanup")
 			helpers.assert_eq(Hotstrings.init({ override_path = "/virtual/hotstrings_config.toml",

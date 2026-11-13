@@ -7,7 +7,7 @@
 --- remains the real Finder implementation, with its exact cache restored.
 --- ==============================================================================
 
-local name = "modules.hotstrings.device_finder"
+local name = "hotstrings.engine.device_finder"
 local saved = package.loaded[name]
 package.loaded[name] = nil
 local finder = require(name)

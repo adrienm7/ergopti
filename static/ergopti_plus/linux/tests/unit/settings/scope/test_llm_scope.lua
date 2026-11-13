@@ -16,7 +16,7 @@ local function with_scope(body)
 		for name, value in pairs(package.loaded) do loaded_before[name] = value end
 		local names = { "settings.engine.paths", "ai.engine.preferences", "ai.engine.scope",
 			"core.network.adapters.http_client", "platform.focus.secure_field_detector", "core.ui.ui.tooltip.llm",
-			"core.fs.adapters.storage", "modules.hotstrings.magic_key" }
+			"core.fs.adapters.storage", "hotstrings.engine.magic_key" }
 		for _, name in ipairs({ "settings", "trigger_settings", "display_settings", "navigation_settings",
 			"profile_settings", "profiles", "prediction_engine", "api_ollama", "api_remote" }) do
 			names[#names + 1] = "modules.llm." .. name

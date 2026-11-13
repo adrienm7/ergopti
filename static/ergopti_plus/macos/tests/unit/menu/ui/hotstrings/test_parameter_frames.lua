@@ -14,7 +14,7 @@ local OutputFixture = require("tests.support.toml_output_fixture")
 local function with_frame(body, paused)
 	local translator = require("core.i18n.engine.i18n")
 	return helpers.with_stub_scope({ "core.logger.engine.logger", "menu.engine.manifest_menu",
-		"modules.hotstrings.hotstrings_config", "ui.menu.menu_hotstrings_management" }, function()
+		"hotstrings.engine.catalogue.config", "hotstrings.ui.menu.management" }, function()
 		helpers.load_with_stubs("core.logger.engine.logger")
 		package.loaded["core.i18n.engine.i18n"] = translator
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
@@ -28,7 +28,7 @@ local function with_frame(body, paused)
 			local file = assert(io.open(path, "wb")); assert(file:write(source)); assert(file:close())
 			return OutputFixture.with_output(function(override)
 				local empty = assert(io.open(override, "wb")); assert(empty:write("")); assert(empty:close())
-				local config = require("modules.hotstrings.hotstrings_config")
+				local config = require("hotstrings.engine.catalogue.config")
 				assert(config.init({ override_path = override, toml_resolver = function() return path end }) == true)
 				helpers.assert_eq(config.resolve("magickey", nil).delay, 0.25)
 				local calls = { writes = 0, redraws = 0, notices = 0 }
@@ -53,7 +53,7 @@ local function with_frame(body, paused)
 					updateMenu = function() calls.redraws = calls.redraws + 1 end,
 					notify_feature = function() calls.notices = calls.notices + 1 end,
 				}
-				local owner = require("ui.menu.menu_hotstrings_management")
+				local owner = require("hotstrings.ui.menu.management")
 				local ok, err = pcall(body, { build = function() return owner.build_management(context) end,
 					root = renderer.get_root(), context = context, captions = translator.get, calls = calls })
 				local read = assert(io.open(path, "rb")); local actual = read:read("*a"); assert(read:close())
@@ -156,8 +156,8 @@ helpers.describe("hotstrings parameter complete shared frames", function()
 		end)
 	end)
 	helpers.it("restores exact genuine owners after a raised scenario", function()
-		local names = { "core.i18n.engine.i18n", "menu.engine.manifest_menu", "modules.hotstrings.hotstrings_config",
-			"ui.menu.menu_hotstrings_management", "core.fs.engine.paths" }
+		local names = { "core.i18n.engine.i18n", "menu.engine.manifest_menu", "hotstrings.engine.catalogue.config",
+			"hotstrings.ui.menu.management", "core.fs.engine.paths" }
 		local before = {}; for _, name in ipairs(names) do before[name] = package.loaded[name] end
 		local ok, err = pcall(function()
 			with_frame(function(f) assert(f.build()); error("parameter frame scenario sentinel", 0) end)
@@ -192,10 +192,10 @@ helpers.describe("fixed feature parent: actual Mac Hotstrings (fixed-feature-par
 				helpers.it("keeps original count " .. contract.total .. "/" .. tostring(contract.present) .. " and master " .. tostring(state)
 					.. " paused " .. tostring(posture) .. " in actual native Hotstrings consumer (fixed-feature-parent-native)", function()
 					with_frame(function(f)
-						return helpers.with_stub_scope({"menu.ui.builder.builder", "ui.menu.hotstring_counter"}, function()
+						return helpers.with_stub_scope({"menu.ui.builder.builder", "hotstrings.ui.menu.counter"}, function()
 							local manifest = require("menu.engine.manifest_menu")
-							local management = require("ui.menu.menu_hotstrings_management")
-							local counter = require("ui.menu.hotstring_counter")
+							local management = require("hotstrings.ui.menu.management")
+							local counter = require("hotstrings.ui.menu.counter")
 							local actual_counter, actual_parent = counter.count_all, manifest.group_row
 							local reads, completed = 0, nil
 							counter.count_all = function(...) reads = reads + 1; return actual_counter(...) end
@@ -260,8 +260,8 @@ helpers.describe("fixed feature parent: actual Mac Hotstrings (fixed-feature-par
 		local case = mode
 		helpers.it("refuses " .. case .. " before the actual Mac counter and parameter producer (fixed-feature-parent-native)", function()
 			with_frame(function(f)
-				return helpers.with_stub_scope({"menu.ui.builder.builder", "ui.menu.hotstring_counter"}, function()
-					local counter, manifest = require("ui.menu.hotstring_counter"), require("menu.engine.manifest_menu")
+				return helpers.with_stub_scope({"menu.ui.builder.builder", "hotstrings.ui.menu.counter"}, function()
+					local counter, manifest = require("hotstrings.ui.menu.counter"), require("menu.engine.manifest_menu")
 					local actual = counter.count_all; local reads, produces = 0, 0
 					counter.count_all = function(...) reads = reads + 1; return actual(...) end
 					local selected
@@ -283,7 +283,7 @@ helpers.describe("fixed feature parent: actual Mac Hotstrings (fixed-feature-par
 							index = index + 1
 						end
 						assert(matches == 1 and type(owner) == "function")
-						local management = require("ui.menu.menu_hotstrings_management")
+						local management = require("hotstrings.ui.menu.management")
 						local modules = {hotstrings = {build_management = function(...)
 							produces = produces + 1; return management.build_management(...)
 						end}}
@@ -319,7 +319,7 @@ local function with_parameter_parent_consumer(f, body)
 			index = index + 1
 		end
 		assert(type(consumer) == "function", "the actual sole parameter-parent consumer must be registered")
-		local owner = require("ui.menu.menu_hotstrings_management")
+		local owner = require("hotstrings.ui.menu.management")
 		local completed, calls = nil, 0
 		local modules = { hotstrings = { build_management = function(context)
 			calls = calls + 1

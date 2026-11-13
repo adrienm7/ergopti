@@ -16,7 +16,7 @@
 local helpers = require("tests.helpers")
 local Report = require("diagnostics.engine.field_check.report")
 local Check = require("diagnostics.engine.field_check.tap_copy")
-local TapCopy = require("modules.keymap.tap_copy")
+local TapCopy = require("hotstrings.engine.expander.tap_copy")
 
 --- Runs the check over facts and returns the step map.
 local function run(facts)

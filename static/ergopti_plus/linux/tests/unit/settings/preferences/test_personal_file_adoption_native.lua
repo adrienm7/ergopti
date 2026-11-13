@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Shell = require("core.process.adapters.shell_runner")
-local Config = require("modules.hotstrings.hotstrings_config")
+local Config = require("hotstrings.engine.catalogue.config")
 local Choices = require("tests.support.hotstring_choices")
 
 --- Owns independent source, settings and override files for one native observation.
@@ -225,7 +225,7 @@ helpers.describe("native adopted personal file gates", function()
 			assert(Shell.run("mkdir " .. Shell.quote(target)))
 			local excluded = assert(io.open(target .. "/outside.toml", "w")); assert(excluded:write('[probe]\n"excluded" = "Excluded"\n')); assert(excluded:close())
 			assert(Shell.run("ln -s " .. Shell.quote(target) .. " " .. Shell.quote(linked)))
-			helpers.assert_eq(require("modules.hotstrings.loader").unavailable_directories(linked, limit), {
+			helpers.assert_eq(require("hotstrings.engine.loader").unavailable_directories(linked, limit), {
 				{ path = linked, label = "linked", reason = "linked-directory" },
 			}, "a linked scan root is itself skipped without following its target")
 			local parts = {}; for _ = 1, limit do parts[#parts + 1] = "deep" end
@@ -255,14 +255,14 @@ helpers.describe("native adopted personal file gates", function()
 	helpers.it("102 native requires an acknowledged rendered page owner before metadata publication", function()
 		fixture('', function(f)
 			helpers.assert_eq(select(2, f.config.load_all()), true)
-			local names = { "core.ui.ui.webview_manager", "ui.hotstrings_config_window.bridge" }
+			local names = { "core.ui.ui.webview_manager", "hotstrings.ui.hotstrings_config_window.bridge" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 			local epoch, accepted = 41, false
 			package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return epoch end,
 				eval_js = function() return accepted end }
 			local ok, detail = pcall(function()
-				local Bridge = require("ui.hotstrings_config_window.bridge")
+				local Bridge = require("hotstrings.ui.hotstrings_config_window.bridge")
 				local state, item = { config = f.config }, f.definitions[2]
 				local function source()
 					local file = assert(io.open(item.path)); local bytes = assert(file:read("*a")); assert(file:close()); return bytes
@@ -291,12 +291,12 @@ helpers.describe("native adopted personal file gates", function()
 	helpers.it("102 native refuses metadata from a rendered window after its source catalogue changes", function()
 		fixture('', function(f)
 			helpers.assert_eq(select(2, f.config.load_all()), true)
-			local names = { "core.ui.ui.webview_manager", "ui.hotstrings_config_window.bridge" }
+			local names = { "core.ui.ui.webview_manager", "hotstrings.ui.hotstrings_config_window.bridge" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 			package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return 41 end, eval_js = function() return true end }
 			local ok, detail = pcall(function()
-				local Bridge = require("ui.hotstrings_config_window.bridge")
+				local Bridge = require("hotstrings.ui.hotstrings_config_window.bridge")
 				local state = { config = f.config }
 				helpers.assert_eq(Bridge.on_message("ready", state, { app_name = "hotstrings_config_window", epoch = 41 }), true)
 				local item = f.definitions[2]
@@ -347,11 +347,11 @@ helpers.describe("native adopted personal file gates", function()
 	end)
 	helpers.it("102 native refuses to overwrite a foreign engine generation during a gate inverse", function()
 		local original = Config
-		local loaded = package.loaded["modules.hotstrings.hotstrings_config"]
+		local loaded = package.loaded["hotstrings.engine.catalogue.config"]
 		local ok, detail = pcall(function()
 			do
-				package.loaded["modules.hotstrings.hotstrings_config"] = nil
-				Config = require("modules.hotstrings.hotstrings_config")
+				package.loaded["hotstrings.engine.catalogue.config"] = nil
+				Config = require("hotstrings.engine.catalogue.config")
 				fixture('', function(f)
 					local item, before = f.definitions[2], f.read()
 					helpers.assert_eq(select(2, f.config.load_all()), true)
@@ -381,7 +381,7 @@ helpers.describe("native adopted personal file gates", function()
 			end
 		end)
 		Config = original
-		package.loaded["modules.hotstrings.hotstrings_config"] = loaded
+		package.loaded["hotstrings.engine.catalogue.config"] = loaded
 		if not ok then error(detail, 0) end
 	end)
 	helpers.it("102 native reserves a symlinked primary target against an additional regular hardlink", function()
@@ -561,9 +561,9 @@ helpers.describe("native adopted personal file gates", function()
 	end)
 	for _, acknowledgement in ipairs({ false, true }) do
 		helpers.it("102 native keeps a foreign metadata generation after publisher acknowledgement " .. tostring(acknowledgement), function()
-			local original, loaded = Config, package.loaded["modules.hotstrings.hotstrings_config"]
-			package.loaded["modules.hotstrings.hotstrings_config"] = nil
-			Config = require("modules.hotstrings.hotstrings_config")
+			local original, loaded = Config, package.loaded["hotstrings.engine.catalogue.config"]
+			package.loaded["hotstrings.engine.catalogue.config"] = nil
+			Config = require("hotstrings.engine.catalogue.config")
 			local tested, failure = pcall(function()
 				fixture('', function(f)
 					helpers.assert_eq(select(2, f.config.load_all()), true)
@@ -596,7 +596,7 @@ helpers.describe("native adopted personal file gates", function()
 					if not ok then error(detail, 0) end
 				end)
 			end)
-			Config, package.loaded["modules.hotstrings.hotstrings_config"] = original, loaded
+			Config, package.loaded["hotstrings.engine.catalogue.config"] = original, loaded
 			if not tested then error(failure, 0) end
 		end)
 	end
@@ -665,13 +665,13 @@ helpers.describe("native adopted personal file gates", function()
 			local selected = f.definitions[2]
 			helpers.assert_eq(f.config.set_override(selected.id, nil, "color", "#112233"), true)
 			local before, settings = Choices.read(selected.path), f.read()
-			local previous = package.loaded["ui.hotstrings_config_window.bridge"]
-			package.loaded["ui.hotstrings_config_window.bridge"] = nil
-			local bridge = require("ui.hotstrings_config_window.bridge")
+			local previous = package.loaded["hotstrings.ui.hotstrings_config_window.bridge"]
+			package.loaded["hotstrings.ui.hotstrings_config_window.bridge"] = nil
+			local bridge = require("hotstrings.ui.hotstrings_config_window.bridge")
 			local notices = {}
 			local ok, result = pcall(bridge.on_message, { action = "reset_all" },
 				{ config = f.config, notify_error = function(key) notices[#notices + 1] = key end })
-			package.loaded["ui.hotstrings_config_window.bridge"] = previous
+			package.loaded["hotstrings.ui.hotstrings_config_window.bridge"] = previous
 			helpers.assert_true(ok, tostring(result))
 			helpers.assert_eq(result, { reset = false })
 			helpers.assert_eq(notices, { "hs_config.reset_all_personal_unavailable" })
@@ -686,14 +686,14 @@ helpers.describe("native adopted personal file gates", function()
 			helpers.assert_eq(f.config.set_override("personal", nil, "color", "#123456"), true)
 			local path = f.root .. "/hotstrings_overrides.toml"
 			local before = Choices.read(path)
-			local previous = package.loaded["ui.hotstrings_config_window.bridge"]
-			package.loaded["ui.hotstrings_config_window.bridge"] = nil
-			local bridge = require("ui.hotstrings_config_window.bridge")
+			local previous = package.loaded["hotstrings.ui.hotstrings_config_window.bridge"]
+			package.loaded["hotstrings.ui.hotstrings_config_window.bridge"] = nil
+			local bridge = require("hotstrings.ui.hotstrings_config_window.bridge")
 			local ok, detail = pcall(function()
 				bridge.on_message({ action = "set_color", category = "personal", hex = "broken" }, { config = f.config })
 				bridge.on_message({ action = "set_priority", category = "personal", priority = 1.5 }, { config = f.config })
 			end)
-			package.loaded["ui.hotstrings_config_window.bridge"] = previous
+			package.loaded["hotstrings.ui.hotstrings_config_window.bridge"] = previous
 			helpers.assert_true(ok, tostring(detail))
 			helpers.assert_eq(Choices.read(path), before)
 		end)

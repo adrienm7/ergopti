@@ -4,7 +4,7 @@
 ; MODULE: Hotstring Engine SubStr(-1) Guard
 ; DESCRIPTION:
 ; Static source guard for the SubStr(-0) tail-char bug in the live custom
-; hotstring engine (infra/hotstrings/hotstring_engine_main.ahk).
+; hotstring engine (hotstrings/engine/matcher/engine_main.ahk).
 ;
 ; ROOT CAUSE ENCODED:
 ; SubStr(s, -0) is equivalent to SubStr(s, 0), which in AHK v2 returns the full

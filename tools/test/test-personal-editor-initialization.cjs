@@ -56,7 +56,10 @@ const context = vm.createContext({
 context.window = context;
 vm.runInContext(source, context);
 const lua = fs.readFileSync(
-	path.resolve(__dirname, '../../static/ergopti_plus/macos/ui/personal_info_editor/init.lua'),
+	path.resolve(
+		__dirname,
+		'../../static/ergopti_plus/macos/hotstrings/ui/personal_info_editor/init.lua'
+	),
 	'utf8'
 );
 const expression = lua.match(/evaluateJavaScript\("([^"\n]*)" \.\. json \.\. "([^"\n]*)"/);

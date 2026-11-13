@@ -76,7 +76,7 @@ local function with_case(spec, body)
 			-- previous missing-default fixture may have cached it against a stubbed
 			-- manifest; load this dependency against the restored production owner.
 			for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-				"modules.shortcuts.script_chords", "modules.hotstrings.magic_key", "settings.engine.preferences.program_binding_transaction" }) do package.loaded[name] = nil end
+				"modules.shortcuts.script_chords", "hotstrings.engine.magic_key", "settings.engine.preferences.program_binding_transaction" }) do package.loaded[name] = nil end
 			local controls = { changed = 0, backups = {}, logs = {}, publications = 0 }
 			local logger = {}
 			for _, level in ipairs({ "error", "warn", "info", "debug", "trace", "start", "success", "done" }) do
@@ -170,7 +170,7 @@ local function with_configuration_picker(body)
 			Sandbox.write_bytes(f.dirs[id] .. "/config.toml", f.bytes(id) .. suffix)
 		end
 		for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-			"modules.shortcuts.script_chords", "modules.hotstrings.magic_key", "settings.engine.preferences.program_binding_transaction",
+			"modules.shortcuts.script_chords", "hotstrings.engine.magic_key", "settings.engine.preferences.program_binding_transaction",
 			"ui.action_picker.bridge" }) do package.loaded[name] = nil end
 		local seen = { logs = {}, changed = 0 }
 		local logger = {}
@@ -763,10 +763,10 @@ helpers.describe("Linux tap key rows and the physical magic key", function()
 	local function magic_source(content)
 		local file = os.tmpname()
 		Sandbox.write_bytes(file, content)
-		package.loaded["modules.hotstrings.magic_key_source"] = nil
-		local Preferences = helpers.load_module("infra.hotstring_preferences")
+		package.loaded["hotstrings.engine.magic_key_source"] = nil
+		local Preferences = helpers.load_module("hotstrings.engine.matcher.preferences")
 		assert(Preferences._set_file_for_test(file))
-		return require("modules.hotstrings.magic_key_source"), file
+		return require("hotstrings.engine.magic_key_source"), file
 	end
 
 	--- Every rendered row title, depth first.

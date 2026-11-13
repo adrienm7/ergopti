@@ -95,12 +95,12 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 
 #Include ../../core/ui/engine/window_utils.ahk
 #Include ../../core/text/engine/utils.ahk
-#Include ../../infra/hotstrings/hotstring_engine.ahk
-#Include ../../infra/hotstrings/hotstring_engine_main.ahk
+#Include ../../hotstrings/engine/matcher/engine.ahk
+#Include ../../hotstrings/engine/matcher/engine_main.ahk
 ; Project the same shipped terminator catalogue that production boot loads.
 ; The bare engine's parser defaults omit the configurable magic terminator.
 #Include ../../_generated/terminators.ahk
-#Include ../../infra/hotstrings/hotstrings_catalogue.ahk
+#Include ../../hotstrings/engine/catalogue/catalogue.ahk
 global HSE_Terminators := Terminators()
 global HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
 global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()

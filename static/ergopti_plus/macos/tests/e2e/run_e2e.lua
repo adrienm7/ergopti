@@ -182,10 +182,10 @@ local function make_vkb(trigger, replacement, opts, others)
 	package.loaded["core.logger.engine.logger"]                 = nil
 	package.loaded["core.text.engine.utils"]             = nil
 	package.loaded["core.i18n.engine.i18n"]                   = nil
-	package.loaded["modules.keymap.terminators"] = nil
-	package.loaded["modules.keymap.utils"]       = nil
+	package.loaded["hotstrings.engine.expander.terminators"] = nil
+	package.loaded["hotstrings.engine.expander.utils"]       = nil
 	package.loaded["settings.engine.registry"]    = nil
-	package.loaded["modules.keymap.expander"]    = nil
+	package.loaded["hotstrings.engine.expander.expander"]    = nil
 	-- Expander delegates deletion to TextSender. It captures `hs` at module load
 	-- time too, so it must be reloaded alongside the keymap modules.
 	package.loaded["platform.input.text_sender"]        = nil
@@ -197,7 +197,7 @@ local function make_vkb(trigger, replacement, opts, others)
 	-- utils and text_sender do — a cached instance would keep the FIRST
 	-- scenario's CoreState and answer "has the replacement landed?" from a
 	-- transaction instance this scenario never created.
-	package.loaded["modules.keymap.terminator_replay"] = nil
+	package.loaded["hotstrings.engine.expander.terminator_replay"] = nil
 
 	-- Observe global FIFO posts before SyntheticInput captures newKeyEvent. A
 	-- reserved terminator is deliberately activated in the callback but posted on
@@ -220,14 +220,14 @@ local function make_vkb(trigger, replacement, opts, others)
 	-- One load_with_stubs call establishes the canonical hs stub for this
 	-- scenario; all dependencies cascade from the same require chain and share
 	-- the same SyntheticInput ledger.
-	local Expander, SyntheticInput = SyntheticStack.load("modules.keymap.expander", {
+	local Expander, SyntheticInput = SyntheticStack.load("hotstrings.engine.expander.expander", {
 		eventtap = event_hs.eventtap,
 	})
 	local Registry = require("settings.engine.registry")
 	local text_utils = require("core.text.engine.utils")
 	-- Required from the SAME load wave as Expander so the harness drives the very
 	-- instance the expander armed — a second instance would hold an empty slot.
-	local TerminatorReplay = require("modules.keymap.terminator_replay")
+	local TerminatorReplay = require("hotstrings.engine.expander.terminator_replay")
 
 	-- Magic key sentinel — same value as the live driver.
 	local MAGIC_KEY = "\xe2\x98\x85"
@@ -236,8 +236,8 @@ local function make_vkb(trigger, replacement, opts, others)
 	-- suppress-rescan preparation and commit. A hand-made table without
 	-- prepare_suppress_rescan made perform_text_replacement refuse every
 	-- final_result entry, which this harness then reported as "no expansion".
-	package.loaded["modules.keymap.state"] = nil
-	local state = require("modules.keymap.state").new({ trigger_char = MAGIC_KEY }, {})
+	package.loaded["hotstrings.engine.expander.state"] = nil
+	local state = require("hotstrings.engine.expander.state").new({ trigger_char = MAGIC_KEY }, {})
 	state.current_group = "e2e"
 	-- start-of-buffer is a word boundary, so is_word triggers fire when the
 	-- buffer is the trigger alone (word_boundary_blocks).

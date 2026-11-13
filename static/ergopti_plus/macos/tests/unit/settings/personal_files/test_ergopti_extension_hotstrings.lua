@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local Packs     = require("infra.extension_packs")
+local Packs     = require("hotstrings.engine.catalogue.extension_packs")
 local TomlCodec = require("core.text.engine.toml_codec.codec")
 local Json = require("core.text.engine.json")
 
@@ -167,8 +167,8 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		local magickey = static_dir() .. "/ergopti_plus/_shared/hotstrings/data/catalogue/magickey.toml"
 		package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 		local function sections_of(with_resolver)
-			package.loaded["modules.hotstrings.hotstrings_config"] = nil
-			local Config = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
+			package.loaded["hotstrings.engine.catalogue.config"] = nil
+			local Config = helpers.load_with_stubs("hotstrings.engine.catalogue.config")
 			local override = helpers.temp_dir() .. "/hcfg_ergopti_" .. tostring(with_resolver) .. ".toml"
 			os.remove(override)
 			Config.init({
@@ -267,11 +267,11 @@ helpers.describe("Ergopti extension distance reduction", function()
 
 	helpers.it("(ergopti-distance-ext) loads the reference through the registry and preserves disabled sections on reload", function()
 		helpers.with_stub_scope({
-			"settings.engine.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-			"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage",
-			"modules.hotstrings.hotstrings_config", "core.text.engine.toml.reader",
+			"settings.engine.registry", "hotstrings.engine.expander.registry_groups", "hotstrings.engine.expander.registry_index",
+			"hotstrings.engine.expander.state", "hotstrings.engine.expander.terminators", "core.fs.adapters.storage",
+			"hotstrings.engine.catalogue.config", "core.text.engine.toml.reader",
 		}, function()
-			local State = helpers.load_with_stubs("modules.keymap.state")
+			local State = helpers.load_with_stubs("hotstrings.engine.expander.state")
 			local Registry = helpers.load_with_stubs("settings.engine.registry")
 			local Storage = require("core.fs.adapters.storage")
 			local reference = distance_reference()
@@ -281,7 +281,7 @@ helpers.describe("Ergopti extension distance reduction", function()
 			Packs.discover(roots(true), real_io())
 			local path = Packs.route("distancesreduction", nil)
 			for section in pairs(reference.section_counts) do
-				helpers.assert_true(Storage.set(require("modules.keymap.section_keys").current("distancesreduction", section), true))
+				helpers.assert_true(Storage.set(require("hotstrings.engine.expander.section_keys").current("distancesreduction", section), true))
 			end
 			helpers.assert_true(Registry.load_toml("distancesreduction", path))
 			for _, row in ipairs(reference.entries) do
@@ -309,7 +309,7 @@ helpers.describe("Ergopti extension distance reduction", function()
 			for section, description in pairs(reference.meta.sections) do
 				helpers.assert_eq(metadata.sections[section].description, description, section .. " native description")
 			end
-			helpers.assert_true(Storage.set(require("modules.keymap.section_keys").current("distancesreduction", "comma_j"), false))
+			helpers.assert_true(Storage.set(require("hotstrings.engine.expander.section_keys").current("distancesreduction", "comma_j"), false))
 			helpers.assert_true(Registry.reload_toml("distancesreduction", path))
 			helpers.assert_eq(Registry.is_section_enabled("distancesreduction", "comma_j"), false)
 			for _, mapping in ipairs(state.mappings) do
@@ -328,12 +328,12 @@ end)
 helpers.describe("Ergopti suffix and native-feature relocation", function()
 	helpers.it("(ergopti-suffixes-ext) registers every suffix through the actual bound-source registry and supports live withdrawal", function()
 		helpers.with_stub_scope({
-			"settings.engine.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-			"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage",
-			"modules.hotstrings.hotstrings_config", "core.text.engine.toml.reader",
+			"settings.engine.registry", "hotstrings.engine.expander.registry_groups", "hotstrings.engine.expander.registry_index",
+			"hotstrings.engine.expander.state", "hotstrings.engine.expander.terminators", "core.fs.adapters.storage",
+			"hotstrings.engine.catalogue.config", "core.text.engine.toml.reader",
 		}, function()
-			package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = function() return nil end }
-			local State = helpers.load_with_stubs("modules.keymap.state")
+			package.loaded["hotstrings.engine.catalogue.config"] = { get_user_override = function() return nil end }
+			local State = helpers.load_with_stubs("hotstrings.engine.expander.state")
 			local Registry = helpers.load_with_stubs("settings.engine.registry")
 			local Storage = require("core.fs.adapters.storage")
 			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
@@ -343,7 +343,7 @@ helpers.describe("Ergopti suffix and native-feature relocation", function()
 			local path = Packs.route("french_distancesreduction", nil)
 			helpers.assert_true(type(path) == "string")
 			helpers.assert_true(path:find("/ergopti/hotstrings/suffixes_a.toml", 1, true) ~= nil)
-			helpers.assert_true(Storage.set(require("modules.keymap.section_keys").current("french_distancesreduction", "suffixes_a"), true))
+			helpers.assert_true(Storage.set(require("hotstrings.engine.expander.section_keys").current("french_distancesreduction", "suffixes_a"), true))
 			helpers.assert_true(Registry.load_toml("french_distancesreduction", path))
 			local expected = {
 	{ "à'", "ance" }, { "àa", "aire" }, { "àc", "ction" }, { "àd", "would" },
@@ -371,7 +371,7 @@ helpers.describe("Ergopti suffix and native-feature relocation", function()
 			end
 			helpers.assert_eq(state.groups.french_distancesreduction.delay_metadata.delay, 0.5)
 			helpers.assert_eq(state.groups.french_distancesreduction.delay_metadata.show_tooltip, false)
-			helpers.assert_true(Storage.set(require("modules.keymap.section_keys").current("french_distancesreduction", "suffixes_a"), false))
+			helpers.assert_true(Storage.set(require("hotstrings.engine.expander.section_keys").current("french_distancesreduction", "suffixes_a"), false))
 			helpers.assert_true(Registry.reload_toml("french_distancesreduction", path))
 			for _, mapping in ipairs(state.mappings) do helpers.assert_true(mapping.group ~= "french_distancesreduction") end
 			local common = static_dir() .. "/ergopti_plus/_shared/hotstrings/data/catalogue/magickey.toml"

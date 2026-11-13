@@ -1,0 +1,236 @@
+﻿; hotstrings/engine/dynamic/hotstrings.ahk
+
+; ==============================================================================
+; MODULE: Dynamic Hotstrings
+; DESCRIPTION:
+; Hotstrings whose replacement is computed at fire time rather than read from a
+; TOML: the three date formats, and the phone / SSN / IBAN prefix expansions
+; derived from the user's personal information.
+;
+; FEATURES & RATIONALE:
+; 1. Same folder name as the other two drivers. macOS and Linux both keep this
+;    behaviour in hotstrings/engine/dynamic/; on Windows it lived inside
+;    hotstrings/engine/catalogue/text_expansion.ahk, so the one subsystem the
+;    three drivers agree about the shape of had two names and one hiding place.
+; 2. Resolved at fire time, never registered as text: a date registered as a
+;    string is stale the next day, which is the whole reason these are not
+;    corpus entries.
+; 3. One activation-delay gate for every registration here, resolved once — the
+;    user's "dynamichotstrings" override when set, the shared default otherwise.
+;
+; ORDERING CONTRACT: _DynHS_RegisterAll() must be called from exactly where
+; section 5 used to sit in _HS_RegisterTextExpansionAndDynamic — after the
+; emoji/symbol sections and BEFORE the repeat-key registration. The engine's
+; collision tiebreak falls through to registration order, so moving the call
+; changes which of two equal-length triggers wins.
+; ==============================================================================
+
+#Requires Autohotkey v2.0+
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+
+
+
+
+; =====================================
+; =====================================
+; ======= 1/ Helpers ==================
+; =====================================
+; =====================================
+
+; Effective activation delay for the dynamic hotstrings: the user's
+; "dynamichotstrings" delay override when set, otherwise the shared default
+; DYN_HOTSTRINGS_DEFAULT_DELAY (defined in hotstrings/engine/catalogue/config.ahk,
+; the early-loaded layer the tray menu also reads). No category TOML backs this
+; key, so HotstringsResolve reports HasOverride=false until the user sets one
+; from the tray "Delays" submenu (mirrors the macOS dynamichotstrings delay item).
+_DynamicHotstringDelay() {
+	global DYN_HOTSTRINGS_DEFAULT_DELAY
+	R := HotstringsResolve("dynamichotstrings", "")
+	return R.HasOverride ? R.Delay : DYN_HOTSTRINGS_DEFAULT_DELAY
+}
+
+; Returns the shortest prefix of a spaced string that contains exactly RawCount
+; non-space characters. Used to build the "spaced" trigger for SSN and IBAN.
+SpacedPrefix(SpacedStr, RawCount) {
+	Seen := 0
+	Loop Parse, SpacedStr {
+		if !RegExMatch(A_LoopField, "^[\s" . Chr(0xA0) . Chr(0x202F) . "]$")
+			Seen++
+		if Seen >= RawCount
+			return SubStr(SpacedStr, 1, A_Index)
+	}
+	return SpacedStr  ; Fallback — fewer raw chars than requested
+}
+
+
+
+
+; =====================
+; ===== 1.1) Date =====
+; =====================
+
+; dt★, td★, date★ resolved at fire time — cannot be static TOML entries.
+; Bare triggers (no "@"), as on macOS and Linux (maintainer decision 2026-11-06).
+; No "?" flag: the shared word-start rule applies (HSE_IsWordChar), so "update★"
+; never fires "date" and a trigger needs a boundary or a buffer start before it.
+_DateShortFr(*) {
+	return FormatTime(, "dd/MM/yyyy")
+}
+_DateLongFr(*) {
+	return _DateLongFrWithClock(_DateLongFrNow)
+}
+_DateLongFrNow() {
+	return A_Now
+}
+_DateLongFrWithClock(ClockFn) {
+	instant := ClockFn.Call()
+	parts := StrSplit(FormatTime(instant, "d|M|yyyy"), "|")
+	day_num := parts[1] + 0
+	month_num := parts[2] + 0
+	year_num := parts[3] + 0
+	; Zeller's congruence produces 0=Saturday, 1=Sunday, ..., 6=Friday.
+	; Convert it to A_WDay's 1=Sunday, ..., 7=Saturday convention without
+	; consulting the live clock again.
+	zeller_month := month_num
+	zeller_year := year_num
+	if (zeller_month < 3) {
+		zeller_month += 12
+		zeller_year -= 1
+	}
+	weekday := Mod(day_num + (13 * (zeller_month + 1)) // 5
+		+ zeller_year + zeller_year // 4 - zeller_year // 100
+		+ zeller_year // 400, 7)
+	if (weekday = 0)
+		weekday := 7
+	; A_WDay: 1=Sunday, 2=Monday, …, 7=Saturday
+	days   := ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"]
+	months := ["janvier", "février", "mars", "avril", "mai", "juin",
+	           "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+	return days[weekday] . " " . day_num . " "
+		. months[month_num] . " " . year_num
+}
+_DateIso(*) {
+	return FormatTime(, "yyyy_MM_dd")
+}
+
+
+
+; ====================================
+; ===== 1.2) International phone =====
+; ====================================
+
+; The "+33" form of a French number. Only a leading national trunk "0" is
+; dropped, as on macOS and Linux: a number that does not start with 0 keeps
+; every digit (cutting whatever came first would corrupt it).
+; @param Phone {String} The stored phone number.
+; @returns {String}
+_DynHS_InternationalPhone(Phone) {
+	return "+33" . (SubStr(Phone, 1, 1) == "0" ? SubStr(Phone, 2) : Phone)
+}
+
+
+
+; ==========================================
+; ==========================================
+; ======= 2/ Registration ==================
+; ==========================================
+; ==========================================
+
+; Registers every dynamic hotstring. Reads the feature gates, the magic key and
+; PersonalInformation from the globals the driver has already populated by the
+; time hotstring registration runs.
+_DynHS_RegisterAll() {
+	MK := ScriptInformation["MagicKey"]
+	; The dynamic hotstrings (dates + phone/SSN/IBAN prefixes) share one activation
+	; delay gate so they fire only when the trigger was typed within the configured
+	; window. Resolve it once and reuse the options Map across the date registrations;
+	; section 2.1 builds a second Map that adds the privacy marker, because a date is
+	; not a secret and the user's IBAN is.
+	_DynOpts := Map("FinalResult", True, "TimeActivationSeconds", _DynamicHotstringDelay(),
+		"Category", "dynamichotstrings")
+	if Features["hotstrings"]["dynamic"][ConfigLeaf.DATE_FR]["enabled"] {
+		CreateHotstring("*", "dt" . MK, _DateShortFr, _DynOpts)
+	}
+	if Features["hotstrings"]["dynamic"][ConfigLeaf.DATE_LONG_FR]["enabled"] {
+		CreateHotstring("*", "date" . MK, _DateLongFr, _DynOpts)
+	}
+	if Features["hotstrings"]["dynamic"]["date"]["enabled"] {
+		CreateHotstring("*", "td" . MK, _DateIso, _DynOpts)
+	}
+
+
+
+
+	; ==================================================
+	; ===== 2.1) Phone, SSN and IBAN prefix expand =====
+	; ==================================================
+
+	; Prefix-based hotstrings derived from the user's personal data.
+	; Registered once at startup from PersonalInformation — same logic as HS rules_engine.
+	; Each trigger auto-expands without end-char (*) and is case-sensitive (C).
+	Phone  := PersonalInformation["phone_number"]        ; e.g. "0606060606"
+	FPhone := PersonalInformation["phone_number_clean"]   ; e.g. "06 06 06 06 06"
+	Ssn    := PersonalInformation["social_security_number"] ; e.g. "1 99 99 99 999 999 99"
+	Iban   := PersonalInformation["iban"]               ; e.g. "FR00 0000 0000 0000 0000 0000 000"
+
+	; Same activation gate as the dates above, plus the privacy marker. These
+	; registrations are the sibling class of the @-family leak and are worse in
+	; one respect: their REPLACEMENT is a callable, which the fire-log funnel
+	; already blanks, but their TRIGGER is literally the first digits of the
+	; phone number / SSN / IBAN. A row reading trigger="FR7630006" is the secret,
+	; in the field nobody thought to look at.
+	_DynPrivateOpts := Map("FinalResult", True, "TimeActivationSeconds", _DynamicHotstringDelay(),
+		"IsPrivate", True, "Category", "dynamichotstrings")
+
+	; Strip spaces for matching purposes (SSN / IBAN contain decorative spaces)
+	SsnRaw  := RegExReplace(Ssn, "[\s" . Chr(0xA0) . Chr(0x202F) . "]", "")
+	IbanRaw := RegExReplace(Iban, "[\s" . Chr(0xA0) . Chr(0x202F) . "]", "")
+
+	if Features["hotstrings"]["dynamic"][ConfigLeaf.PHONE_PREFIXES]["enabled"] {
+		IntlPhone := _DynHS_InternationalPhone(Phone)
+		; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
+		MK := ScriptInformation["MagicKey"]
+		if StrLen(Phone) >= 2 {
+			CreateHotstring("*C", SubStr(Phone, 1, 2) . MK, (*) => Phone, _DynPrivateOpts)
+			CreateHotstring("*C", "+33" . SubStr(Phone, 1, 2), (*) => IntlPhone, _DynPrivateOpts)
+		}
+		if StrLen(Phone) >= 4 {
+			CreateHotstring("*C", SubStr(Phone, 1, 4), (*) => Phone, _DynPrivateOpts)
+			CreateHotstring("*C", "+33" . SubStr(Phone, 2, 3), (*) => IntlPhone, _DynPrivateOpts)
+		}
+		if StrLen(Phone) >= 6 {
+			CreateHotstring("*C", SubStr(Phone, 2, 4), (*) => Phone, _DynPrivateOpts)
+		}
+		if StrLen(FPhone) >= 5 {
+			CreateHotstring("*C", SubStr(FPhone, 1, 5), (*) => FPhone, _DynPrivateOpts)
+		}
+	}
+
+	if Features["hotstrings"]["dynamic"][ConfigLeaf.SSN_PREFIXES]["enabled"] {
+		; No-space trigger → SSN without spaces; spaced trigger → SSN with spaces.
+		; Both use the first 5 raw digits as the distinguishing prefix.
+		if StrLen(SsnRaw) >= 5 {
+			SsnRawPrefix  := SubStr(SsnRaw, 1, 5)
+			SsnSpacedPfx  := SpacedPrefix(Ssn, 5)
+			CreateHotstring("*C", SsnRawPrefix,  (*) => SsnRaw, _DynPrivateOpts)
+			if SsnSpacedPfx != SsnRawPrefix {
+				CreateHotstring("*C", SsnSpacedPfx, (*) => Ssn, _DynPrivateOpts)
+			}
+		}
+	}
+
+	if Features["hotstrings"]["dynamic"][ConfigLeaf.IBAN_PREFIXES]["enabled"] {
+		; 6 raw chars (case-insensitive) → IBAN without spaces.
+		; 7 spaced chars (e.g. "FR76 XX") → IBAN with spaces.
+		; Both triggers fire at the 6th raw character typed.
+		if StrLen(IbanRaw) >= 6 {
+			IbanRawPrefix    := SubStr(IbanRaw, 1, 6)
+			IbanSpacedPfx    := SpacedPrefix(Iban, 6)
+			; No C flag = case-insensitive matching for the letter prefix (e.g. "fr76")
+			CreateHotstring("*", IbanRawPrefix,  (*) => IbanRaw, _DynPrivateOpts)
+			if IbanSpacedPfx != IbanRawPrefix {
+				CreateHotstring("*", IbanSpacedPfx, (*) => Iban, _DynPrivateOpts)
+			}
+		}
+	}
+}

@@ -219,7 +219,7 @@ helpers.describe("injector: a held modifier does not reach the replacement", fun
 		layout._set_table_for_test({ e = { keycode = 18, level = 1, mods = {} } })
 		package.loaded["adapters.keyboard_layout"] = layout
 
-		local injector = helpers.load_module("modules.hotstrings.injector")
+		local injector = helpers.load_module("hotstrings.engine.injector")
 		local events = {}
 		injector._set_uinput({
 			is_open = function() return true end,
@@ -295,7 +295,7 @@ helpers.describe("device_finder: choosing a pointer", function()
 	--- @param text string
 	--- @return string|nil
 	local function select_from(text)
-		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local finder = helpers.load_module("hotstrings.engine.device_finder")
 		return finder.select_pointer(finder.parse_devices(text))
 	end
 
@@ -310,7 +310,7 @@ helpers.describe("device_finder: choosing a pointer", function()
 	end)
 
 	helpers.it("returns every pointer so each caret-moving click is observed", function()
-		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local finder = helpers.load_module("hotstrings.engine.device_finder")
 		local pointers = finder.select_pointers(finder.parse_devices(MOUSE .. TOUCHPAD .. TRACKPOINT))
 		helpers.assert_eq(pointers,
 			{ "/dev/input/event5", "/dev/input/event7", "/dev/input/event8" },
