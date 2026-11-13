@@ -275,6 +275,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '\tlocal root = M.driver_root()\n\tlocal search = root .. "/?.lua;" .. root .. "/?/init.lua"\n\tlocal function read(path)\n\t\tlocal handle = assert(io.open(path, "rb"))\n\t\tlocal text = assert(handle:read("*a"))\n\t\tassert(handle:close())\n\t\treturn text\n\tend\n\t-- A part may bind another part (the dialogs), which the root no longer names.\n\t-- The sections live in their features\' folders: each is found by its module\n\t-- name; a menu module outside the driver (a shared one) is not a section.\n\tlocal texts, seen, index = { read(assert(package.searchpath("ui.menu.builder", search))) }, {}, 1\n\twhile texts[index] do\n\t\tfor name in texts[index]:gmatch(\'require%("([%w_%.]*menu[%w_%.]*)"%)\') do\n\t\t\tlocal path = not seen[name] and package.searchpath(name, search)\n\t\t\tseen[name] = true\n\t\t\tif path then texts[#texts + 1] = read(path) end\n\t\tend'
 	},
 	{
+		// The flush bridge test names each dashboard bridge by its app folder;
+		// S30 moves both under metrics/ui.
+		file: 'static/ergopti_plus/linux/tests/unit/ui/metrics/test_metrics_flush_bridge.lua',
+		moves: 'linux/ui/metrics_apps/bridge.lua',
+		from: 'H.load_module("ui." .. app .. ".bridge")',
+		to: 'H.load_module("metrics.ui." .. app .. ".bridge")'
+	},
+	{
 		// The XI2 receiver derives the shared Lua root from the logger shim's
 		// path; S01 moves the shim to core/logger/engine under _shared itself.
 		file: 'static/ergopti_plus/linux/tests/hardware/xi2_luajit_receiver.lua',
