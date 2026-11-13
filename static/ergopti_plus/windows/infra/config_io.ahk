@@ -2708,6 +2708,9 @@ KeyboardShortcutsBindAll() {
 						continue
 				if Action == "none"
 						continue
+				; A physical slot is the delivery owner's (ui/physical_shortcuts/delivery.ahk).
+				if PhysicalSlots.IsNamespace(Slot)
+						continue
 				IsWinSlot := SubStr(Slot, 1, 5) == "meta_"
 				Scan := IsWinSlot ? KeyboardSlotWinScan(Slot) : KeyboardSlotLayoutScan(Slot)
 				if Scan != "" && IsWinSlot && KeyboardSlotPhysicalScan("meta_" . Scan) != "" {
@@ -2742,6 +2745,7 @@ KeyboardShortcutsBindAll() {
 				Bound++
 		}
 		LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", Bound)
+		Bound += PhysicalShortcutDelivery.BindAll()
 		return Bound
 }
 

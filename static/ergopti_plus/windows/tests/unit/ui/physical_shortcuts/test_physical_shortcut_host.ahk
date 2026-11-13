@@ -117,11 +117,16 @@ Test("physical shortcuts: a mapping edit is refused before any source read or wr
 	AssertEqual(0, Published, "nothing is published")
 ))
 
-Test("physical shortcuts: delivery answered true still needs a Windows collision owner (physical-delivery-unqualified)", () => (
+Test("physical shortcuts: delivery answered true still asks the Windows collision owner (physical-collision-owner)", () => (
+	AssertTrue(PhysicalShortcutsScope(Map("model", _PSH_Model(), "path", "C:\unused\config.toml")).Collisions
+		is PhysicalShortcutCollisions, "the scope holds the Windows collision owner by default"),
 	Scope := PhysicalShortcutsScope(Map("model", _PSH_Model(), "path", "C:\unused\config.toml",
-		"read", _PSH_NoRead, "delivery", () => true, "publish", (*) => true)),
+		"read", _PSH_NoRead, "delivery", () => true, "collisions", (*) => "unavailable", "publish", (*) => true)),
 	Answer := Scope.Edit([{ Section: ConfigKey.SHORTCUTS_KEYBOARD, Key: "physical_ctrl_KeyA", Value: "copy" }], {}),
-	AssertEqual("unavailable", Answer["reason"], "no collision owner: refused")
+	AssertEqual("unavailable", Answer["reason"], "an unproven claim refuses the save"),
+	Scope.Collisions := (*) => "collision",
+	Answer := Scope.Edit([{ Section: ConfigKey.SHORTCUTS_KEYBOARD, Key: "physical_ctrl_KeyA", Value: "copy" }], {}),
+	AssertEqual("collision", Answer["reason"], "a collision refuses the save")
 ))
 
 
