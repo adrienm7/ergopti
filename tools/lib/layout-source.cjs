@@ -83,7 +83,8 @@ function loadLayoutSource() {
 		exportMacos: (source, format, icons) => compiler.exportMacos(source, tables, format, icons),
 		compileEmulation: (source, options) => compiler.compileEmulation(source, tables, options),
 		targetKeylayout: (source, platform) => compiler.targetKeylayout(source, tables, platform),
-		target: (source, platform) => targetCompiler.target(source, tables, platform)
+		target: (source, platform) => targetCompiler.target(source, tables, platform),
+		hostTarget: (source) => targetCompiler.hostTarget(source, tables)
 	};
 }
 

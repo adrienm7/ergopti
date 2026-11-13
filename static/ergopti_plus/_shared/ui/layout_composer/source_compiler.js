@@ -574,19 +574,25 @@ var LayoutSourceCompiler = (function () {
 	 * tokens it is exactly what reading compileKeylayout's text gives.
 	 * @param {object} source - A validated structured source (no imported_keylayout).
 	 * @param {object} tables - {macKeycodes, physicalKeys, hidUsages}.
-	 * @param {{platform: 'linux'|'windows', tokens: object, layerReason?: function, format?: string, variant?: 'iso'|'ansi'}} options
+	 * @param {{platform: 'linux'|'windows', tokens: object, layerReason?: function, format?: string, variant?: 'iso'|'ansi', strict?: boolean}} options
 	 *   tokens: modifier id -> canonical token (shift, caps, option, control, command
-	 *   or the target's own), null when the target has none.
+	 *   or the target's own), null when the target has none. strict: refuse what
+	 *   the conversion admission of a .keylayout refuses (an empty transition, or
+	 *   one with both an output and a next state), as the exports do; without it
+	 *   the form is what the plain .keylayout reader gives, as the hosts install.
 	 * @returns {{canonical: object, convention: 'iso', omitted: object[]}}
 	 */
 	function compileCanonical(source, tables, options) {
 		if (options.platform === 'macos') fail('source_platform', 'macos');
 		const model = compileModel(source, tables, options);
 		const stateOf = stateResolver(source);
-		// What the .keylayout reader refuses in a transition, refused alike.
+		// strict: what the .keylayout conversion admission refuses in a transition,
+		// refused alike (the exports); else the plain reader's reading (an install).
 		const transition = (when, path) => {
-			if (when.output === '' && when.next === '') fail('source_empty_transition', path);
-			if (when.output !== '' && when.next !== '') fail('source_output_and_next', path);
+			if (options.strict && when.output === '' && when.next === '')
+				fail('source_empty_transition', path);
+			if (options.strict && when.output !== '' && when.next !== '')
+				fail('source_output_and_next', path);
 			return Object.assign(
 				{ state: when.state },
 				when.output !== '' ? { output: when.output } : {},

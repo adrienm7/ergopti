@@ -507,6 +507,8 @@ function hostInstall(payload) {
 		const message = { source: payload.source, keylayout: payload.keylayout, use: true };
 		// The drivers perform the source's emulation table for what the .keylayout cannot hold.
 		if (payload.emulation !== undefined) message.emulation = payload.emulation;
+		// The Linux host writes the installed XKB from the source's converter target.
+		if (payload.target !== undefined) message.target = payload.target;
 		// The Windows host registers the layout DLL images the page wrote.
 		if (payload.dlls !== undefined) {
 			message.dll_name = payload.dll_name;

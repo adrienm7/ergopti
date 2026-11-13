@@ -202,6 +202,9 @@ function main(args) {
 			keylayout: source.targetKeylayout(document, platform).text,
 			emulation: JSON.stringify(source.compileEmulation(document, { platform }))
 		};
+		// The Linux host writes the installed XKB from this target (composer.lua check_target).
+		if (platform === 'linux' && !document.imported_keylayout)
+			payload.target = JSON.stringify(source.hostTarget(document));
 		fs.writeFileSync(output, `${JSON.stringify(payload)}\n`, { encoding: 'utf8', flag: 'wx' });
 		return;
 	}

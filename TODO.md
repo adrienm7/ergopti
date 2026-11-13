@@ -91,9 +91,11 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
       KLC the Kana/Roya/Loya shift states on a plain scan code; the rest is reported with a stable reason
       ([layout-source-format.md](docs/design/layout-source-format.md#direct-xkb-and-klc-compilation)). The registry
       layouts keep their XKB and KLC bytes; libxkbcommon and xkbcomp load the fifth level. Decided by the agent on
-      2026-11-13, to review by the maintainer: one fifth-level modifier (first in layer order), Kana keeps AltGr
-      in a KLC when its key is Right Alt. Left: the Linux composer host still installs the composed `.keylayout`
-      (its emulation table covers the rest); a real desktop check is in [TODO-tests-linux.md](TODO-tests-linux.md).
+      2026-11-13, to review by the maintainer: Kana keeps AltGr in a KLC when its key is Right Alt. One
+      fifth-level modifier, the first in layer order: confirmed by the maintainer on 2026-11-13 (relayed by the
+      coordinator). The Linux install writes its XKB from the same compilation (the page's `target`, checked by
+      `composer.lua` `check_target`, test `direct-xkb-install`); a real desktop check is in
+      [TODO-tests-linux.md](TODO-tests-linux.md).
 - [ ] **Layout editor in its own window on the three OS.** Move the unified editor out of the layout manager
       window into a separate window (macOS, Linux and Windows), and give the Windows WebView2 host
       `source_open`/`source_save`/`source_editor` so Windows also replaces the old composer.
