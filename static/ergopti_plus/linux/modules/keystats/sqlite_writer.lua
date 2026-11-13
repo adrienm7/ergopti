@@ -47,6 +47,7 @@ local NativePath    = require("core.fs.engine.native_path")
 local MediaStore    = require("metrics.engine.media.store")
 local AppCategoryStore = require("metrics.engine.apps.category_store")
 local RegularFileReader = require("infra.regular_file_reader")
+local FileSystem = require("adapters.file_system")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local Queries = require("metrics.engine.queries")
 local LocalTime = require("metrics.engine.local_time")
@@ -317,20 +318,40 @@ local function _read_media_resource(relative)
 	return body
 end
 
+--- Reads, in one sqlite3 process, the two facts an open checks before writing:
+--- the raw tables that lack utc_offset_min and the device registry's DDL. Each
+--- sqlite3 query is a shell and a process (about 4 ms of boot), and neither
+--- read depends on the other's upgrade: the registry rebuild touches devices
+--- alone, never a raw table. The missing tables come first, one known name
+--- per line, so the DDL is the exact remainder (multiline, as sqlite_master
+--- keeps it) and can never be mistaken for one of them.
+--- @return table|nil missing Raw table names without the column, nil when the read failed.
+--- @return string|nil devices_sql The registry DDL as the CLI prints it, "" when absent.
+local function _read_open_probe()
+	local UtcOffsetColumn = require("metrics.engine.utc_offset_column")
+	local output = _query_output(UtcOffsetColumn.missing_query()
+		.. "\nSELECT sql FROM sqlite_master WHERE type='table' AND name='devices';")
+	if output == nil then return nil, nil end
+	local known = {}
+	for _, name in ipairs(UtcOffsetColumn.TABLES) do known[name] = true end
+	local missing, position = {}, 1
+	while true do
+		local line, after = output:match("^([^\n]*)\n()", position)
+		if not line or not known[line] then break end
+		missing[#missing + 1] = line
+		position = after
+	end
+	return missing, output:sub(position)
+end
+
 --- Adds utc_offset_min to the raw tables of a store created before it (maintainer
 --- decision KMD-1 of 11 November 2026) and retires the purge triggers written
 --- before it, in one transaction; _ensure_media_schema, next in the same open,
 --- creates the current triggers. A fresh store has the column from schema.sql.
+--- @param missing table Raw table names without the column, from _read_open_probe.
 --- @return boolean True once every raw table has the column.
-local function _ensure_utc_offset_column()
+local function _ensure_utc_offset_column(missing)
 	local UtcOffsetColumn = require("metrics.engine.utc_offset_column")
-	local output = _query_output(UtcOffsetColumn.missing_query())
-	if output == nil then
-		Logger.error(LOG, "Cannot read which raw metrics tables lack the UTC offset column.")
-		return false
-	end
-	local missing = {}
-	for name in output:gmatch("[^\n]+") do missing[#missing + 1] = name end
 	local statements = UtcOffsetColumn.statements(missing)
 	if #statements == 0 then return true end
 	if not _exec_raw_batch(table.concat(statements, "\n")) then
@@ -391,15 +412,11 @@ local LEGACY_DEVICE_SCHEMAS = {
 --- Upgrades databases created before Linux was accepted by devices.os.
 --- The raw event tables deliberately have no foreign keys, but registration
 --- must still succeed so the database remains portable across all three OSes.
-local function _ensure_linux_device_schema()
+--- @param current_sql string The registry DDL read by _read_open_probe.
+local function _ensure_linux_device_schema(current_sql)
 	-- sqlite_master preserves multiline DDL. The scalar helper reads only its
 	-- first line, so it missed the existing Linux CHECK and rebuilt the current
 	-- registry on every start, dropping indexes and requiring a write lock.
-	local current_sql = _query_output("SELECT sql FROM sqlite_master WHERE type='table' AND name='devices';")
-	if current_sql == nil then
-		Logger.error(LOG, "Cannot inspect the existing device registry schema.")
-		return false
-	end
 	if current_sql:find("linux", 1, true) then return true end
 	if not LEGACY_DEVICE_SCHEMAS[current_sql] then
 		Logger.error(LOG, "Cannot safely upgrade an unrecognized legacy device registry schema.")
@@ -660,9 +677,12 @@ function M.open_db(db_path)
 
 	_db_path = db_path
 
-	-- Ensure the parent directory exists.
+	-- Ensure the parent directory exists. The metadata probe runs in process;
+	-- the shell and mkdir it spares were a process on every start.
 	local dir = NativePath.dirname(db_path) or "."
-	os.execute(string.format("mkdir -p %s 2>/dev/null", TextUtils.shell_quote(dir)))
+	if not FileSystem.exists(dir) then
+		os.execute(string.format("mkdir -p %s 2>/dev/null", TextUtils.shell_quote(dir)))
+	end
 
 	-- Typed records stay private even when the selected parent is shared.
 	PrivateSqlite = PrivateSqlite or require("infra.private_sqlite_file")
@@ -713,14 +733,21 @@ function M.open_db(db_path)
 			Logger.success(LOG, "Schema bootstrapped successfully.")
 		end
 	end
-	if not _ensure_linux_device_schema() then
+	local missing_utc, devices_sql = _read_open_probe()
+	if missing_utc == nil then
+		Logger.error(LOG, "Cannot inspect the device registry and the raw tables' UTC offset column.")
+		_bootstrapped = false
+		_db_path = nil
+		return false, "store_refused"
+	end
+	if not _ensure_linux_device_schema(devices_sql) then
 		Logger.error(LOG, "Unable to upgrade device registry for Linux support.")
 		_bootstrapped = false
 		_db_path = nil
 		return false, "store_refused"
 	end
 
-	if not _ensure_utc_offset_column() then
+	if not _ensure_utc_offset_column(missing_utc) then
 		_bootstrapped = false
 		_db_path = nil
 		return false, "store_refused"

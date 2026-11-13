@@ -169,3 +169,24 @@ dump-keymap-x11` (absent before libxkbcommon 1.8) and then `xkbcomp`.
    process start to the boot clock at 110-130 ms against 170-240 ms from
    source: `docs/design/linux-bytecode-package.md` sets out the staleness
    contract to decide.
+
+## Round 3 (2026-11-13): the metrics store open
+
+Measured on the writer alone (`open_db`, `register_device`, both migration
+checks, `read_open_walk` on a current store, root on the container, system
+sqlite3 3.45.1), the HEAD copy against the change, three sets of 21 warm boots:
+
+| Path                                | Before            | After             | Change |
+| ----------------------------------- | ----------------- | ----------------- | ------ |
+| Processes per store boot            | 8                 | 6                 | -2     |
+| `open_db` alone (median)            | 18.6-19.1 ms      | 10.5-11.1 ms      | -42 %  |
+| Store boot, median of medians (p95) | 37.6 ms (40.6 ms) | 29.5 ms (32.3 ms) | -22 %  |
+
+`open_db` reads the registry DDL and the raw tables without `utc_offset_min`
+in one sqlite3 process and skips the shell `mkdir` when the folder exists (an
+in-process metadata probe; luv stays out of the store, as its no-luv contract
+requires). Each remaining process is about 4 ms (a shell, then sqlite3):
+registration, the two migration checks and the open-walk read. Removing them
+needs the persistent sqlite3 child, a design left to the maintainer. macOS
+(`hs.sqlite3`) and Windows (`sqlite3.dll`) open the store in process and have
+no such cost.

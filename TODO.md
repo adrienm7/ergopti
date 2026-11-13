@@ -580,6 +580,8 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### Linux performance (2026-11-11, branch `claude/ergopti-todo-linux-perf`)
 
+Claimed by worker L on 2026-11-13 (branch `claude/ergopti-todo-linux-perf-2`), taken over from worker D.
+
 Measured with `tools/bench/linux-session-bench.py` (real daemon, Xvfb session over the kernel model; report in
 `docs/audits/performance/linux/2026_11_11/report.md`). Budgets and the reuse rules below were decided by the
 coordinator on 2026-11-11, to review by the maintainer.
@@ -591,8 +593,26 @@ coordinator on 2026-11-11, to review by the maintainer.
       millisecond-stamped kernel-to-output latency (`A_TickCount` against the hook's event time) as
       `input.latency`; a `load` phase before `BootProfiler` starts; the last interval summary at exit.
 
-- [ ] Keystats boot: `open_db`'s own spawns (mkdir, schema checks), device registration and the open-walk read still
+- [x] Keystats boot: `open_db`'s own spawns (mkdir, schema checks), device registration and the open-walk read still
       cost about 30 ms of sqlite3 processes.
+      Done 2026-11-13 (worker L): `open_db` reads the registry DDL and the raw tables lacking `utc_offset_min` in one
+      sqlite3 process (the missing names first, so the multiline DDL is the exact remainder) and runs the shell
+      `mkdir` only when the folder is absent (in-process metadata probe, no luv: the no-luv contract holds). A warm
+      open is 2 processes instead of 4, the whole keystats store boot (open, registration, both migration checks,
+      open walk) 6 instead of 8: median 37.6 → 29.5 ms over three sets of 21 boots (p95 40.6 → 32.3 ms), measured
+      on the writer alone against the HEAD copy. Regression: `keystats-open-processes` in
+      `test_sqlite_first_open.lua` (fails on the old writer with 3 processes and a mkdir). Worker D measured an
+      in-process mkdir through luv before (keystats stage 49 and 44 → 45 and 43 ms) and reverted it for the no-luv
+      contract (branch `claude/ergopti-todo-linux-desktop`, 59ea694c). Other OS: macOS (`hs.sqlite3`) and Windows
+      (`sqlite3.dll`) open the store in process, so no per-query process cost exists there; this cost is the Linux
+      driver's sqlite3 CLI design.
+- [ ] Keystats boot, the rest: registration, the two migration checks and the open walk are one sqlite3 process
+      each (about 4 ms: a shell, then sqlite3). Merging the reads would hand the public migration functions a value
+      read before the registration, which their tests drive one query at a time, so the remaining cut is a
+      persistent sqlite3 child for the synchronous writer (FFI pipes, no luv; `-bail` exit as the failure receipt).
+      A design for the maintainer (worker D and worker L agree, 2026-11-13). Bench note: the session bench's tray
+      panel needs the Python that has GObject (`/usr/bin/python3.12` on Ubuntu 24.04 when `python3` is a newer
+      build); run the Lua suite as an unprivileged user, root passes every EACCES probe.
 
 ## CI acceptance
 
