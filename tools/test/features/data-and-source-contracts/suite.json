@@ -777,6 +777,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-tool-lua-roots.cjs"],
 			"repro": "npm run test:structure-tool-lua-roots"
+		},
+		{
+			"id": "js-0524",
+			"ordinal": 643,
+			"name": "structure plan gives a fixture's mkdir ladder the folders of a path the step respelled under it",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-mkdir-ladder.cjs"],
+			"repro": "npm run test:structure-mkdir-ladder"
 		}
 	]
 }
