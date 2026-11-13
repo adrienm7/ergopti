@@ -1678,6 +1678,41 @@ function scanFile(file, text, ctx) {
 			add('lua-concat', m[0], m[0].replace(j.text, `${m[1]}${lead}${piece}${trail}${m[1]}`), hit);
 		}
 	}
+	// Path(__file__).parent.parent / "modules/network/x.json": a Python path
+	// anchored on the file's own place. When the file or its target moves,
+	// the climb and the literal are both respelled from the file's new place.
+	if (file.endsWith('.py') || /^#![^\n]*\bpython/.test(text))
+		for (const m of text.matchAll(
+			/Path\(__file__\)((?:\.resolve\(\)|\.absolute\(\))*)(?:((?:\.parent)+)|\.parents\[(\d+)\])(\s*\/\s*)(["'])([\w.\/-]+)\5/g
+		)) {
+			// .parent is the file's folder: n of them climb n - 1 above it, as
+			// .parents[n - 1] does.
+			const climbs = m[2] ? m[2].split('.parent').length - 2 : Number(m[3]);
+			const up = (dir, n) =>
+				dir
+					.split('/')
+					.slice(0, Math.max(0, dir.split('/').length - n))
+					.join('/');
+			const oldBase = up(path.posix.dirname(file), climbs);
+			const oldTarget = path.posix.normalize(`${oldBase}/${m[6]}`);
+			if (!EXISTING.has(oldTarget)) continue;
+			const movedTarget = byRepoPath.get(oldTarget) || byRepoDir.get(oldTarget);
+			if (movedTarget === SPLIT) continue;
+			const newTarget = movedTarget || oldTarget;
+			const newFile = byRepoPath.get(file) || file;
+			if (newTarget === oldTarget && newFile === file) continue;
+			let k = 0;
+			let base = path.posix.dirname(newFile);
+			while (base && !newTarget.startsWith(`${base}/`)) {
+				base = up(base, 1);
+				k++;
+			}
+			if (!base) continue;
+			const climb = m[2] ? '.parent'.repeat(k + 1) : `.parents[${k}]`;
+			const respelled = `Path(__file__)${m[1]}${climb}${m[4]}${m[5]}${newTarget.slice(base.length + 1)}${m[5]}`;
+			if (respelled !== m[0])
+				add('lua-module-quoted', m[0], respelled, { oldRepo: oldTarget, newRepo: newTarget });
+		}
 	// ROOT / "static" / "ergopti_plus" / "_shared" / "data" / "x.sql": a Python
 	// path joined with the / operator, read from the tree it passes through;
 	// os.path.join(root, "_shared", "data", "locales") the same with commas.
