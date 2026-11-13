@@ -11,7 +11,7 @@ local function fresh_runtime(effects)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
-			or name:match("^adapters%.")
+			or helpers.is_driver_module(name)
 			or name == "modules.keystats"
 			or name == "modules.llm"
 			or name == "modules.llm.prediction_engine"

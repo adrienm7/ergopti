@@ -48,7 +48,7 @@ local function load_fixture()
 
 	for name in pairs(package.loaded) do
 		if type(name) == "string"
-			and (name:match("^modules%.keymap") or name:match("^adapters%.")) then
+			and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
