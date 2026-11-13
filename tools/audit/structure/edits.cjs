@@ -201,6 +201,15 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: 'AssertTrue(SubStr(Neutral, -StrLen("\\catalogue\\autocorrection.toml")) == "\\catalogue\\autocorrection.toml",'
 	},
 	{
+		// The section order vectors name a bundled file by its tail under the
+		// shared hotstrings root, which S01 moves to hotstrings/data/catalogue.
+		// The folder alone would read as the driver's own modules/hotstrings.
+		file: 'static/ergopti_plus/windows/tests/unit/infra/config/scope/test_hotstring_category_scope.ahk',
+		moves: '_shared/modules/hotstrings/_index.toml',
+		from: 'Wanted := "\\modules\\hotstrings\\" . (Vector',
+		to: 'Wanted := "\\hotstrings\\data\\catalogue\\" . (Vector'
+	},
+	{
 		// The ledger's family contracts leave one folder for two, and lose the
 		// name prefixes that told them from their neighbours there.
 		file: 'tools/test/test-contract-vector-ledger.cjs',
