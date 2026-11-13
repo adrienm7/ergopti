@@ -112,6 +112,18 @@ function run() {
 		/S: npm run gen failed/
 	);
 	assert.ok(source.indexOf('runGenerators(key') < source.indexOf('settleCodegen(key'));
+	// S02 grew the union of driver directories past I1's record: the runner
+	// moves that ratchet with the step, named in the commit like the bounds.
+	assert.match(
+		source,
+		/'tools\/test\/test-driver-tree-parity\.cjs', '--update-baseline', '--allow-rise'/
+	);
+	const parityRefusal = spawnSync(
+		process.execPath,
+		[path.join(__dirname, 'test-driver-tree-parity.cjs'), '--update-baseline'],
+		{ encoding: 'utf8', env: { ...process.env, ERGOPTI_STRUCTURE_PHASE: '' } }
+	);
+	assert.equal(parityRefusal.status, 1, 'outside the runner, I1 records are never moved');
 	// On a tree S01 already rearranged, the next step is still S02: its commit
 	// named it S01, its rank among the steps left.
 	const Plan = require('../audit/structure/plan.cjs');
