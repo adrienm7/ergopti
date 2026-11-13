@@ -3249,11 +3249,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			assert.ok(body.includes('_WS_ControlRemoveCustom.Bind(Idx)'), 'bound custom index payload');
 		} else {
 			assert.ok(
-				hasCode(
-					body,
-					'wrap_symbols_ready = function() return not paused and not WrapMutation.pending(state) end'
-				),
-				'existing native pause eligibility'
+				hasCode(body, 'wrap_symbols_ready = function() return not WrapMutation.pending(state) end'),
+				'native eligibility follows only a pending mutation (EDD-1)'
 			);
 			assert.ok(
 				body.includes('items = del_sub'),
@@ -3362,7 +3359,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'OtherOwner.commit(state, mutate, ctx.save_prefs)',
 			/native exact save/
 		],
-		['WrapMutation.pending(state)', 'OtherOwner.pending(state)', /pause eligibility/],
+		['WrapMutation.pending(state)', 'OtherOwner.pending(state)', /pending mutation/],
 		['WrapMutation.view(state)', 'OtherOwner.view(state)', /acknowledged input/],
 		[
 			'return mutate_wrap(function(candidate)',
