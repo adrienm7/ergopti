@@ -194,11 +194,12 @@ helpers.describe("complete installed extension shared frames (macOS)", function(
 			helpers.assert_eq(rows[1].fn(), false, "a retained canonical checkbox refuses the live native pause")
 		end)
 	end)
-	helpers.it("(shared-extension-frame) preserves the paused checkbox's original absent native action", function()
+	-- A pause stops typing, not configuration (EDD-1).
+	helpers.it("(shared-extension-frame) keeps the paused checkbox's action (edd1-paused-writes)", function()
 		with_extension_frame(function(f)
 			local data = assert(f.owner.build_extension_bulk_actions(f.context, { "rolls" }, {}))
 			helpers.assert_eq(#data, 1); helpers.assert_eq(data[1].checked, true)
-			helpers.assert_eq(data[1].disabled, true); helpers.assert_eq(data[1].action, nil)
+			helpers.assert_true(data[1].disabled ~= true); helpers.assert_type(data[1].action, "function")
 		end, true)
 	end)
 	for _, section in ipairs({ "hotstring_extension_bulk_controls", "hotstring_extension_content_frame", "hotstrings_parameter_boundary" }) do

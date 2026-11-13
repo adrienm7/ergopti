@@ -92,14 +92,14 @@ function M.build_management(ctx)
 		end,
 	}, {
 		[require("settings.engine.keys").KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED] = function() return state.preview_star_enabled == true end,
-		["preview_magic_ready"] = function() return not ctx.paused end,
+		["preview_magic_ready"] = function() return true end,
 	})
 	if magic_row then table.insert(bubble_sub, magic_row) end
 
 	local preview_magic_rows = bubble_sub
 	bubble_sub = {}
 	local presence_commands = {}
-	local presence_getters = { preview_presence_ready = function() return not ctx.paused end }
+	local presence_getters = { preview_presence_ready = function() return true end }
 	for key, notify_key in pairs({
 		preview_autocorrect_enabled = "menu.hotstrings.notify_bubble_autocorrect",
 		preview_ai_enabled = "menu.hotstrings.notify_bubble_ai",
@@ -131,7 +131,7 @@ function M.build_management(ctx)
 		end,
 	}, {
 		[require("settings.engine.keys").KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS] = function() return state.preview_colored_tooltips == true end,
-		["preview_colored_ready"] = function() return not ctx.paused end,
+		["preview_colored_ready"] = function() return true end,
 	})
 	if colored_row then table.insert(bubble_sub, colored_row) end
 
@@ -141,8 +141,10 @@ function M.build_management(ctx)
 		["parameter_preview_colored"] = function() return bubble_sub end,
 	})
 	if not preview_rows then return nil end
+	-- The preview and delay rows run while paused: a pause stops typing, not
+	-- configuration (EDD-1). The word expanders follow their shared corpus.
 	local preview_parent = ManifestMenu.template_rows("hotstrings_preview_parent", {},
-		{ ["parameter_parent_ready"] = function() return not paused end },
+		{ ["parameter_parent_ready"] = function() return true end },
 		{ ["parameter_preview_children"] = preview_rows })
 	if not preview_parent then return nil end
 	bubble_item = preview_parent[1]
@@ -475,8 +477,7 @@ function M.build_management(ctx)
 			-- menu.settings.default_indicator (" (default)") is the surviving shared
 			-- key — its value already carries the leading space, so we don't add one.
 			label    = LabelValue.compose(i18n.get, title, display_ms) .. (cur_ms == def_ms and i18n.get("menu.settings.default_indicator") or ""),
-			disabled = paused or nil,
-			action       = not paused and function()
+			action       = function()
 				local ok_label = i18n.get("button.ok")
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
@@ -499,7 +500,7 @@ function M.build_management(ctx)
 				if not is_base and ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
 				if is_base then return true end
-			end or nil,
+			end,
 		}
 	end
 
@@ -524,8 +525,7 @@ function M.build_management(ctx)
 			-- menu.settings.default_indicator (" (default)") carries its own leading
 			-- space; show it while the user has set no override for this category.
 			label    = LabelValue.compose(i18n.get, title, display_ms) .. ((not has_over) and i18n.get("menu.settings.default_indicator") or ""),
-			disabled = paused or nil,
-			action       = not paused and function()
+			action       = function()
 				local ok_label = i18n.get("button.ok")
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
@@ -545,7 +545,7 @@ function M.build_management(ctx)
 				end
 				if ctx.keymap and type(ctx.keymap.set_delay) == "function" then pcall(ctx.keymap.set_delay, key, new_sec) end
 				ctx.updateMenu()
-			end or nil,
+			end,
 		}
 	end
 
@@ -582,7 +582,7 @@ function M.build_management(ctx)
 			end
 			pcall(win.open)
 		end,
-	}, { hotstrings_config_ready = function() return not paused end })
+	}, { hotstrings_config_ready = function() return true end })
 	local delay_providers = {
 		["parameter_delay_config"] = function() return settings_row and { settings_row } or {} end,
 		["parameter_delay_ai_acceptance"] = function()
@@ -605,7 +605,7 @@ function M.build_management(ctx)
 	delay_menu = ManifestMenu.template_rows("hotstrings_delays_frame", {}, {}, delay_providers)
 	if not delay_menu then return nil end
 	local delay_parent = ManifestMenu.template_rows("hotstrings_delays_parent", {},
-		{ ["parameter_parent_ready"] = function() return not paused end }, { ["parameter_delays_children"] = delay_menu })
+		{ ["parameter_parent_ready"] = function() return true end }, { ["parameter_delays_children"] = delay_menu })
 	if not delay_parent then return nil end
 	delays_item = delay_parent[1]
 

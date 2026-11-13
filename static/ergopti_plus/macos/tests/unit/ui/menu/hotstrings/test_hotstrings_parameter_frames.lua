@@ -109,18 +109,21 @@ helpers.describe("hotstrings parameter complete shared frames", function()
 			helpers.assert_eq(f.calls.writes, 0); helpers.assert_eq(f.calls.redraws, 0)
 		end)
 	end)
-	helpers.it("preserves disabled parents and inert paused preview deliveries", function()
+	-- A pause stops typing, not configuration (EDD-1): the preview and delay
+	-- parents stay reachable; the word expanders follow their shared corpus.
+	helpers.it("keeps preview and delay parents reachable while paused (edd1-paused-writes)", function()
 		with_frame(function(f)
 			local menu = assert(f.build())
 			for _, row in ipairs(menu.menu) do
 				if row.title == f.captions("menu.hotstrings.preview_bubbles")
-					or row.title == f.captions("menu.hotstrings.word_expanders")
-					or row.title == f.captions("menu.hotstrings.delays_colors") then helpers.assert_eq(row.disabled, true) end
+					or row.title == f.captions("menu.hotstrings.delays_colors") then
+					helpers.assert_true(row.disabled ~= true, row.title)
+				elseif row.title == f.captions("menu.hotstrings.word_expanders") then
+					helpers.assert_eq(row.disabled, true)
+				end
 			end
 			local preview = children(menu, f.captions("menu.hotstrings.preview_bubbles"))
-			helpers.assert_eq(preview[1].disabled, true)
-			helpers.assert_eq(preview[1].fn(), false)
-			helpers.assert_eq(f.calls.writes, 0); helpers.assert_eq(f.calls.redraws, 0)
+			helpers.assert_true(preview[1].disabled ~= true)
 		end, true)
 	end)
 	helpers.it("reads all five canonical caption fields instead of retained native labels", function()
@@ -357,7 +360,7 @@ helpers.describe("parameter parent is owned only by its existing shared consumer
 					helpers.assert_true(rawequal(parent.menu, completed.menu), "the actual consumer retains completed child identity")
 					helpers.assert_nil(parent.fn, "the rendered canonical group is not clickable")
 					local preview = children(completed, f.captions("menu.hotstrings.preview_bubbles"))
-					helpers.assert_eq(preview[1].disabled == true, paused, "the native paused child gate remains unchanged")
+					helpers.assert_eq(preview[1].disabled == true, false, "a pause does not grey the preview rows")
 					helpers.assert_eq(f.calls.writes, 0); helpers.assert_eq(f.calls.redraws, 0)
 				end)
 			end, paused)

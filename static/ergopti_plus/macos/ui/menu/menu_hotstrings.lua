@@ -25,13 +25,6 @@ local PersonalInfoSource = require("menu.engine.frames.personal_info_source")
 local Custom        = require("ui.menu.menu_hotstrings_custom")
 local LOG           = "menu_hotstrings"
 
---- Reject extension changes unless the live pause owner confirms they are safe.
-local function extension_paused(ctx)
-	if ctx.paused == true or type(ctx.is_paused) ~= "function" then return true end
-	local ok, paused = pcall(ctx.is_paused)
-	return not ok or paused ~= false
-end
-
 --- Resolves a description value that may be a plain string or a multilingual table.
 --- Falls back to the "fr" locale, then to an empty string.
 --- @param desc string|table|nil The raw description field.
@@ -350,13 +343,13 @@ function M.build_bound_section_rows(ctx, bound)
 				rows[#rows + 1] = {
 					label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
 					checked  = sec_on or nil,
-					action   = (enabled and not ctx.paused) and function()
-						if extension_paused(ctx)
-							or not groupEnabled(ctx, entry.group) then return false end
+					-- Runs while paused: a pause stops typing, not configuration (EDD-1).
+					action   = enabled and function()
+						if not groupEnabled(ctx, entry.group) then return false end
 						local enable = not ctx.keymap.is_section_enabled(entry.group, entry.section)
 						return M.commit_extension_selection(ctx, {}, { entry }, enable)
 					end or nil,
-					disabled = not enabled or ctx.paused or nil,
+					disabled = not enabled or nil,
 				}
 				if enabled and sec_on and sec.count ~= nil then total = total + tonumber(sec.count) end
 			end
@@ -374,7 +367,6 @@ end
 --- @param enabled boolean Explicit choice.
 --- @return boolean committed
 function M.commit_extension_selection(ctx, groups, bound, enabled)
-	if extension_paused(ctx) then return false end
 	local km = ctx.keymap
 	if not km or type(km.set_groups_sections_enabled) ~= "function" then return false end
 	local inventory = {}
@@ -439,11 +431,8 @@ function M.build_extension_bulk_actions(ctx, groups, bound)
 		end,
 	}, {
 		["extension_all_sections_enabled"] = function() return all_on end,
-		["extension_bulk_ready"] = function() return not ctx.paused end,
+		["extension_bulk_ready"] = function() return true end,
 	}, {})
-	if rows and ctx.paused then
-		for _, row in ipairs(rows) do row.action = nil end
-	end
 	return rows
 end
 
@@ -544,9 +533,8 @@ function M.build_groups(ctx, only, counts)
 						sec_menu[#sec_menu + 1] = {
 							label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
 							checked  = sec_on or nil,
-							action       = (enabled and not ctx.paused)
-									   and toggleSectionFn(ctx, name, sec.name, lbl) or nil,
-							disabled = not enabled or ctx.paused or nil,
+							action       = enabled and toggleSectionFn(ctx, name, sec.name, lbl) or nil,
+							disabled = not enabled or nil,
 						}
 						order_labels[sec.name] = sec_menu[#sec_menu].label
 						prev_was_sep = false
@@ -575,7 +563,7 @@ function M.build_groups(ctx, only, counts)
 				ctx.updateMenu()
 				return true
 			end, function()
-				return not extension_paused(ctx) and ctx.state.sections_order_overrides == saved_orders
+				return ctx.state.sections_order_overrides == saved_orders
 			end)
 			for _, row in ipairs(order_rows) do sec_menu[#sec_menu + 1] = row end
 			if name == "dynamichotstrings" then

@@ -481,7 +481,8 @@ helpers.describe("shared personal section leaf policy", function()
 					helpers.assert_eq(alpha.checked, true); helpers.assert_nil(beta.checked)
 					for _, row in ipairs({ alpha, beta }) do
 						helpers.assert_nil(row.menu, "section leaves remain commands rather than submenus")
-						if posture == "ready" then
+						-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+						if posture == "ready" or posture == "paused" then
 							helpers.assert_nil(row.disabled); helpers.assert_type(row.fn, "function")
 						else
 							helpers.assert_eq(row.disabled, true); helpers.assert_nil(row.fn)
