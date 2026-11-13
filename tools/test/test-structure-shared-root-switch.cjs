@@ -42,6 +42,7 @@ function run() {
 		['return shared and shared .. "/lua/" or nil', 'return shared and shared .. "/" or nil'],
 		['(shared / "lua").mkdir()', '(shared).mkdir()'],
 		["[SHARED_ROOT + '/lua', DRIVER_ROOT]", '[SHARED_ROOT, DRIVER_ROOT]'],
+		['`${macos}/?.lua;${shared}/lua/?.lua;`', '`${macos}/?.lua;${shared}/?.lua;`'],
 		['local root = Paths.shared("lua")', 'local root = Paths.shared_root()'],
 		['package.path = arg[1] .. "/lua/?.lua;" .. p', 'package.path = arg[1] .. "/?.lua;" .. p'],
 		["read(shared('lua', page.Lua.modulePath(name)))", 'read(shared(page.Lua.modulePath(name)))'],
@@ -57,7 +58,8 @@ function run() {
 		'y/_shared/lua.md',
 		'my_shared/lua',
 		'shared .. "/luac"',
-		"SHARED_ROOT + '/lua_extra'"
+		"SHARED_ROOT + '/lua_extra'",
+		'`${shared}/luac`'
 	])
 		assert.equal(Plan.sharedRootRewrite(keep), keep, `not the root: ${keep}`);
 

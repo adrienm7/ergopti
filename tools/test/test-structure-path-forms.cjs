@@ -164,6 +164,26 @@ function run() {
 			),
 			'p = Path(__file__).resolve().parents[2] / "zz_other/data/other.json"\n'
 		);
+		// A regex of the Go module line is the module path, escapes and all.
+		const goRegex =
+			'assert.match(m, /^module github\\.com\\/adrienm7\\/ergopti\\/static\\/ergopti_plus\\/_shared\\/zz_probe_mod\\/hotstrings$/m);';
+		assert.equal(rewrite('tools/x.cjs', goRegex), goRegex);
+		// Driver sections key paths of their driver, never the shared folder
+		// of the same name; a moved driver file follows on its own line.
+		const Edits = require('../audit/structure/edits.cjs');
+		const sections = `${P}_shared/zz_requirements.toml`;
+		Edits.DRIVER_SECTION_FILES.push({ file: sections, why: 'probe' });
+		try {
+			assert.equal(
+				rewrite(
+					sections,
+					'[detection.linux.x.owners]\n"zz_probe_mod/hotstrings/" = ["a"]\n"zz_scatter/y.lua" = ["b"]\n'
+				),
+				'[detection.linux.x.owners]\n"zz_probe_mod/hotstrings/" = ["a"]\n"zz_core/y/y.lua" = ["b"]\n'
+			);
+		} finally {
+			Edits.DRIVER_SECTION_FILES.pop();
+		}
 		// A shell exclusion of a bare _shared path, unquoted.
 		assert.equal(
 			rewrite(

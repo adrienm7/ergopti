@@ -1126,6 +1126,8 @@ const SHARED_ROOT_REWRITES = [
 	[new RegExp(`${SHARED_IDENT}(\\s*\\.\\.\\s*)(["'])(\\/?)lua\\/`, 'g'), '$1$2$3$4'],
 	// '_shared' .. sep .. 'lua': the root joined with a separator variable.
 	[/(["'])_shared\1(\s*\.\.\s*[A-Za-z_]\w*\s*\.\.\s*)(["'])lua\3/g, '$1_shared$1'],
+	// A template: `${shared}/lua/?.lua;`.
+	[new RegExp(`(\\$\\{\\s*${SHARED_IDENT}\\s*\\})\\/lua(?=[/'"\`;])`, 'g'), '$1'],
 	// JavaScript: SHARED_ROOT + '/lua'.
 	[new RegExp(`${SHARED_IDENT}\\s*\\+\\s*(["'])\\/?lua\\2`, 'g'), '$1'],
 	// Python: shared / "lua".
@@ -1434,6 +1436,11 @@ function scanFile(file, text, ctx) {
 	const add = (kind, oldToken, newToken, resolution = null) => {
 		const key = `${kind}|${oldToken}`;
 		if (seen.has(key)) return;
+		// A token with regular-expression escapes (static\/x\.json) is the
+		// regex-path rules' to respell, escapes kept; a plain path or folder
+		// rule would write it back unescaped.
+		if (['path', 'dir', 'dir-successor', 'dir-kept'].includes(kind) && /\\[/.]/.test(oldToken))
+			return;
 		seen.add(key);
 		rows.push({ file, category, kind, old: oldToken, new: newToken, resolution });
 	};
@@ -2202,6 +2209,71 @@ function scanFile(file, text, ctx) {
 			if (hit && hit[2])
 				add('lua-module-member', m[0], `'${hit[2]}.${m[2]}'`, { oldRepo: PREFIX + hit[0] });
 		}
+	// A file whose driver sections key paths relative to that driver (edits.cjs
+	// DRIVER_SECTION_FILES): a bare folder there is never the shared one, and
+	// each key line follows its own driver's moves.
+	if (Edits.DRIVER_SECTION_FILES.some((e) => e.file === file)) {
+		const keys = new Set();
+		{
+			let inDriver = false;
+			for (const line of text.split('\n')) {
+				const section = line.match(/^\[detection\.(\w+)\./);
+				if (section) inDriver = Census.DRIVERS.includes(section[1]);
+				else if (/^\[/.test(line)) inDriver = false;
+				const key = inDriver && line.match(/^\s*"([\w./-]+)"\s*=/);
+				if (key) keys.add(key[1].replace(/\/$/, ''));
+			}
+		}
+		// The plan's own readings of those keys resolve them against the
+		// shared tree; the key lines below resolve them against their driver.
+		const kept = rows.filter((r) => !keys.has(r.old.replace(/\/$/, '')));
+		rows.length = 0;
+		rows.push(...kept);
+		const respelled = new Map();
+		let driver = null;
+		for (const line of text.split('\n')) {
+			const section = line.match(/^\[detection\.(\w+)\./);
+			if (section) driver = Census.DRIVERS.includes(section[1]) ? section[1] : null;
+			else if (/^\[/.test(line)) driver = null;
+			const key = driver && line.match(/^(\s*")([\w./-]+)("\s*=)/);
+			if (!key) continue;
+			const prefix = `${PREFIX}${driver}/${key[2]}`;
+			const folder = key[2].endsWith('/');
+			const repo = folder ? prefix.slice(0, -1) : prefix;
+			const moved = folder ? byRepoDir.get(repo) : byRepoPath.get(repo);
+			let next = null;
+			if (moved === SPLIT) next = null;
+			else if (moved) next = `${moved.slice(`${PREFIX}${driver}/`.length)}${folder ? '/' : ''}`;
+			else if (!folder && !EXISTING.has(repo)) {
+				// A file-name prefix ("adapters/managed_ollama_"): it follows when
+				// every file it selects moves to one folder with its name kept.
+				const dir = path.posix.dirname(repo);
+				const base = path.posix.basename(repo);
+				const targets = new Set();
+				for (const p of EXISTING)
+					if (path.posix.dirname(p) === dir && path.posix.basename(p).startsWith(base)) {
+						const t = byRepoPath.get(p);
+						targets.add(
+							t ? `${path.posix.dirname(t)}|${path.posix.basename(t).startsWith(base)}` : 'stays'
+						);
+					}
+				if (targets.size === 1 && !targets.has('stays')) {
+					const [only] = targets;
+					const [newDir, sameName] = only.split('|');
+					if (sameName === 'true') next = `${newDir.slice(`${PREFIX}${driver}/`.length)}/${base}`;
+					else next = null;
+				} else if (targets.size > 1 || (targets.size === 1 && !targets.has('stays'))) next = null;
+				else continue;
+			} else continue;
+			const line2 = `${key[1]}${next}${key[3]}${line.slice(key[0].length)}`;
+			if (next === null || (respelled.has(line) && respelled.get(line) !== line2)) {
+				add('dir-split', key[2], '(split)', { oldRepo: repo });
+				continue;
+			}
+			respelled.set(line, line2);
+			if (line2 !== line) add('lua-module-quoted', line, line2, { oldRepo: repo });
+		}
+	}
 	// A file whose path literals are synthetic coordinates (edits.cjs
 	// SYNTHETIC_PATHS) keeps them: only its module names, its own header and
 	// the shared root follow the plan.
@@ -2563,8 +2635,11 @@ function attributeSteps(plan, refs) {
 }
 
 /** The kinds a step cannot apply mechanically: phase 2 refuses them. */
-/** A Go module path of this repository (go.mod `module` and its imports). */
-const GO_MODULE_PATH = /\bgithub\.com\/adrienm7\/ergopti\/[\w./-]*/g;
+/**
+ * A Go module path of this repository (go.mod `module` and its imports), also
+ * as a regular expression spells it (github\.com\/adrienm7\/…).
+ */
+const GO_MODULE_PATH = /\bgithub(?:\\?\.)com(?:\\?\/)adrienm7(?:\\?\/)ergopti(?:\\?\/)[\w./\\-]*/g;
 const REFUSED_KINDS = new Set(['dir-split', 'lua-prefix-split', 'join-split', 'folder-edit-stale']);
 /** The kinds the step applies but a reviewer reads. */
 const REVIEWED_KINDS = new Set([

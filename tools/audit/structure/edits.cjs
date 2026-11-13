@@ -392,7 +392,18 @@ const REQUALIFIED_PINS = [
 	}
 ];
 
+// Files whose [detection.<driver>.…] sections key paths relative to that
+// driver ("modules/llm/" = macos/modules/llm under [detection.macos.ollama]),
+// never to the shared tree the file lives in.
+const DRIVER_SECTION_FILES = [
+	{
+		file: 'static/ergopti_plus/_shared/modules/features/requirements.toml',
+		why: 'the owner and plumbing selectors of each driver are folders or file prefixes of that driver'
+	}
+];
+
 module.exports = {
+	DRIVER_SECTION_FILES,
 	REQUALIFIED_PINS,
 	FOLDER_EDITS,
 	SYNTHETIC_PATHS,
