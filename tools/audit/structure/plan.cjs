@@ -2156,7 +2156,11 @@ function scanFile(file, text, ctx) {
 			for (const m of rx[1].matchAll(/(?<![\w\\])[A-Za-z_]\w*(?:\\\.[A-Za-z_]\w*)+(?![\w])/g)) {
 				const name = m[0].replace(/\\\./g, '.');
 				if (configKeys().has(name) || localeKeys().has(name)) continue;
-				const hit = byLuaName.get(`_shared|${name}`);
+				// A shared module, or one module the file's drivers all move alike.
+				const own = namedDrivers.map((d) => byLuaName.get(`${d}|${name}`)).filter(Boolean);
+				const hit =
+					byLuaName.get(`_shared|${name}`) ||
+					(new Set(own.map((h) => h[2])).size === 1 ? own[0] : null);
 				if (hit && hit[2] && hit[2] !== name)
 					add('path-regex', m[0], hit[2].replace(/\./g, '\\.'), { oldRepo: PREFIX + hit[0] });
 			}
