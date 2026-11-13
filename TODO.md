@@ -52,7 +52,10 @@ wants the whole list done without them. Follow [AGENTS.md](AGENTS.md) and the sk
 Linux E2E desktop-webview, updater, platform-metrics, input-display; Common Shared ui (App Cloner generated literals); Common
 Packaging and boot (Linux uninstall EX_UNAVAILABLE, Arch desktop entry); macOS release Darwin receiver. Known
 flakes: macOS Intel Managed Ollama Go test `TestCancellationAndConcurrentClosePhysicallyRetirePeer` (passes on
-rerun); a macOS cold-bootstrap job whose runner is lost (no log).
+rerun); a macOS cold-bootstrap job whose runner is lost (no log); Windows Unit tests in the native step « Native
+editor receiver matrix failed » (`editor_replace_test.c`, 45/48, one shard of 14 on the same tree in run 43509959681;
+probably the worker's 100 ms message or 250 ms visibility window on a loaded runner, case not named; naming it changes
+the DLL manifest fingerprint, so it waits for a Windows rebuild of `ergopti_nav_owner.dll`).
 
 ### Maintainer decisions of 2026-11-13, to implement
 
