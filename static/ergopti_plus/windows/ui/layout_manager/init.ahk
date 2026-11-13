@@ -19,11 +19,13 @@
 ; 3. Singleton window; every WebView2 callback is fenced by a session epoch,
 ;    so a late callback of a closed window never writes into its successor.
 ; 4. The unified layout editor (docs/design/layout-editor.md « Windows host »)
-;    mounts in the same page: source_open and source_save go to source_store.ahk,
-;    composer_save with a source and composer_emulate to composer.ahk, nav_save
-;    to the navigation layer editor's own save. initData says so with
-;    source_editor, emulate and nav_apply; WebView2's own file chooser opens
-;    files, so source_pick is refused here.
+;    has its own window (editor_window.ahk): the page's « Layout editor » button
+;    posts open_editor and the menu's « Create or edit a layout… » opens it
+;    directly. LayoutManager_HandleEditorAction answers the editor's actions:
+;    source_open and source_save go to source_store.ahk, composer_save with a
+;    source and composer_emulate to composer.ahk, nav_save to the navigation
+;    layer editor's own save; WebView2's own file chooser opens files, so
+;    source_pick is refused here.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -62,11 +64,11 @@ global LAYMGR_VHOST := "ergopti.layoutmanager"
 global LAYMGR_HOST_ACCESS_ALLOW := 1
 
 ; The only actions the page may send (the page and the Lua hosts declare the
-; same list; tools/test/test-layout-manager-page.cjs pins the three).
+; same list; tools/test/test-layout-manager-page.cjs pins the three). The
+; layout editor's own window has its list in editor_window.ahk.
 global LAYMGR_ACTIONS := Map("ready", true, "refresh", true, "install", true, "update", true,
 	"uninstall", true, "select", true, "open_homepage", true, "close", true,
-	"composer_open", true, "composer_save", true, "composer_remove", true, "composer_emulate", true,
-	"source_open", true, "source_save", true, "source_pick", true, "nav_save", true)
+	"composer_open", true, "composer_save", true, "composer_remove", true, "open_editor", true)
 
 ; The actions that change the installed or selected layout, refused while a
 ; runtime refresh is pending.
@@ -93,9 +95,6 @@ LayMgrJsonBool_Of(Value) {
 	global LAYMGR_JSON_TRUE, LAYMGR_JSON_FALSE
 	return Value ? LAYMGR_JSON_TRUE : LAYMGR_JSON_FALSE
 }
-
-; The menu asked for the editor: the next ready answers as source_open does.
-global _LayMgrWeb_EditorWanted := false
 
 
 
@@ -261,58 +260,26 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 	Deps := Deps.Clone()
 	Deps["session_epoch"] := SessionEpoch
 	_LayMgrWeb_PresentationDeps := Deps
-	global LAYMGR_MUTATIONS, _LayMgrWeb_EditorWanted
+	global LAYMGR_MUTATIONS
 	if (_LayMgrWeb_RuntimeRefresh is Map) && LAYMGR_MUTATIONS.Has(Action) {
 		LoggerWarn("LayoutManager", "Refused a layout mutation while runtime refresh is pending.")
 		return false
 	}
 	if (Action == "ready") {
 		_LayMgrWeb_Result := 0
-		; The page mounts the layout editor only for a host that stores its files.
+		; The page offers the layout editor's window only for a host that stores its files.
 		Initial := Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"]),
-			"source_editor", LayMgrJsonBool_Of(true), "source_pick", LayMgrJsonBool_Of(false),
-			"nav_apply", LayMgrJsonBool_Of(true), "emulate", LayMgrJsonBool_Of(true))
+			"source_editor", LayMgrJsonBool_Of(true))
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
 		_LayMgrWeb_PushPayload(Deps, "initData", Initial)
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
 		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
-		if _LayMgrWeb_EditorWanted {
-			_LayMgrWeb_EditorWanted := false
-			_LayMgrWeb_SourceOpen(Deps)
-		}
 		return true
 	}
-	if (Action == "source_open") {
-		_LayMgrWeb_SourceOpen(Deps)
-		return true
-	}
-	if (Action == "source_save") {
-		if !(Payload.Get("filename", 0) is String) || !(Payload.Get("text", 0) is String) {
-			LoggerWarn("LayoutManager", "Refused a layout editor save without its file name and text.")
-			return false
-		}
-		Result := SourceStore_Save(SourceStore_SharedSettings(), _LayMgrWeb_ConfigDir(Deps),
-			Map("filename", Payload["filename"], "text", Payload["text"]), Deps.Get("source_ports", 0))
-		Result["ok"] := LayMgrJsonBool_Of(Result["ok"])
-		_LayMgrWeb_PushPayload(Deps, "sourceResult", Result)
-		return true
-	}
-	if (Action == "source_pick") {
-		LoggerWarn("LayoutManager", "Refused a layout editor file pick: this host lets the page pick files.")
-		return false
-	}
-	if (Action == "nav_save") {
-		if !(Payload.Get("text", 0) is String) {
-			LoggerWarn("LayoutManager", "Refused a navigation layer save without its layers.toml text.")
-			return false
-		}
-		Result := Deps.Get("apply_nav", _LayMgrWeb_ApplyNav).Call(Payload["text"])
-		_LayMgrWeb_PushPayload(Deps, "navResult", Map("saved", LayMgrJsonBool_Of(Result.Get("saved", false)),
-			"applied", LayMgrJsonBool_Of(Result.Get("applied", false)), "errors", Result.Get("errors", [])))
-		return true
-	}
+	if (Action == "open_editor")
+		return Deps.Get("open_editor", LayoutEditorWindow_Open).Call()
 	if (Action == "refresh") {
 		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
 		return true
@@ -321,8 +288,7 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		Deps["close"].Call()
 		return true
 	}
-	if (Action == "composer_open" || Action == "composer_save" || Action == "composer_remove"
-			|| Action == "composer_emulate")
+	if (Action == "composer_open" || Action == "composer_save" || Action == "composer_remove")
 		return LayoutComposer_Handle(Action, Payload, Deps)
 	Id := Payload.Has("id") ? Payload["id"] : ""
 	if !LayoutRegistry_IsValidId(Id) {
@@ -514,23 +480,63 @@ _LayMgrWeb_ApplyNav(Text) {
 }
 
 /**
- * Opens the layout manager straight on the layout editor (the menu's « Create
- * or edit a layout… »): the page receives sourceData as if its « Editor »
- * button had asked, once it is ready.
+ * Answers one action of the layout editor (its own window, editor_window.ahk):
+ * source_open, source_save, source_pick, nav_save, composer_open,
+ * composer_save and composer_emulate. The caller checked its allowlist.
+ * @param {String} Action - The page's action.
+ * @param {Map} Payload - Decoded message.
+ * @param {Map} Deps - "push" (FunctionName, Payload), "local_dir", and the
+ *   optional "config_dir", "source_ports", "apply_nav" and composer ports.
+ * @returns {Boolean} Whether the action was accepted.
+ */
+LayoutManager_HandleEditorAction(Action, Payload, Deps) {
+	global LAYMGR_MUTATIONS, _LayMgrWeb_RuntimeRefresh
+	if (_LayMgrWeb_RuntimeRefresh is Map) && LAYMGR_MUTATIONS.Has(Action) {
+		LoggerWarn("LayoutManager", "Refused a layout editor change while runtime refresh is pending.")
+		return false
+	}
+	if (Action == "source_open") {
+		_LayMgrWeb_SourceOpen(Deps)
+		return true
+	}
+	if (Action == "source_save") {
+		if !(Payload.Get("filename", 0) is String) || !(Payload.Get("text", 0) is String) {
+			LoggerWarn("LayoutManager", "Refused a layout editor save without its file name and text.")
+			return false
+		}
+		Result := SourceStore_Save(SourceStore_SharedSettings(), _LayMgrWeb_ConfigDir(Deps),
+			Map("filename", Payload["filename"], "text", Payload["text"]), Deps.Get("source_ports", 0))
+		Result["ok"] := LayMgrJsonBool_Of(Result["ok"])
+		_LayMgrWeb_PushPayload(Deps, "sourceResult", Result)
+		return true
+	}
+	if (Action == "source_pick") {
+		LoggerWarn("LayoutManager", "Refused a layout editor file pick: this host lets the page pick files.")
+		return false
+	}
+	if (Action == "nav_save") {
+		if !(Payload.Get("text", 0) is String) {
+			LoggerWarn("LayoutManager", "Refused a navigation layer save without its layers.toml text.")
+			return false
+		}
+		Result := Deps.Get("apply_nav", _LayMgrWeb_ApplyNav).Call(Payload["text"])
+		_LayMgrWeb_PushPayload(Deps, "navResult", Map("saved", LayMgrJsonBool_Of(Result.Get("saved", false)),
+			"applied", LayMgrJsonBool_Of(Result.Get("applied", false)), "errors", Result.Get("errors", [])))
+		return true
+	}
+	if (Action == "composer_open" || Action == "composer_save" || Action == "composer_emulate")
+		return LayoutComposer_Handle(Action, Payload, Deps)
+	LoggerWarn("LayoutManager", "Refused the layout editor action '{1}'.", Action)
+	return false
+}
+
+/**
+ * The menu's « Create or edit a layout… »: opens the layout editor in its own
+ * window (editor_window.ahk), or brings the open one to the front.
  * @returns {Boolean} Whether the window is shown.
  */
 LayoutManager_OpenEditor(*) {
-	global _LayMgrWeb_EditorWanted, _LayMgrWeb_Gui, _LayMgrWeb_ReadyEpoch, _LayMgrWeb_SessionEpoch
-	; An open, ready page answers now; a new one answers on its ready.
-	Ready := _LayMgrWeb_Gui != 0 && _LayMgrWeb_ReadyEpoch == _LayMgrWeb_SessionEpoch
-	_LayMgrWeb_EditorWanted := !Ready
-	if !LayoutManager_Open() {
-		_LayMgrWeb_EditorWanted := false
-		return false
-	}
-	if Ready
-		LayoutManager_HandleMessage(Map("action", "source_open"))
-	return true
+	return LayoutEditorWindow_Open()
 }
 
 /**

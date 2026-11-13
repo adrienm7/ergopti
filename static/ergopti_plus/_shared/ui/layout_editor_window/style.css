@@ -1,0 +1,30 @@
+/* _shared/ui/layout_editor_window/style.css */
+
+/* =========================================================================== */
+/* Layout Editor Window — the unified layout editor alone in its own window:   */
+/* the page is the editor, the editor's own styles do the rest.               */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Reset & Base ======= */
+/* =============================== */
+/* =============================== */
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	background: var(--theme-page-background);
+	color: var(--theme-grey-333);
+	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+	font-size: 13px;
+	margin: 0;
+	padding: 12px 16px;
+}

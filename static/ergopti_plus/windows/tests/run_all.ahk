@@ -863,6 +863,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/keymap/test_layout_extension_refresh.ahk
 #Include unit/modules/hotstrings/catalogue/test_ergopti_extension_hotstrings.ahk
 #Include ../ui/layout_manager/init.ahk
+#Include ../ui/layout_manager/editor_window.ahk
 #Include ../ui/layout_manager/composer.ahk
 #Include ../ui/layout_manager/composer_check.ahk
 #Include ../ui/layout_manager/source_store.ahk

@@ -208,30 +208,41 @@ helpers.describe("layout manager bridge (Linux)", function()
 		helpers.assert_eq(#state.stored, 0)
 	end)
 
-	helpers.it("opens the editor from the menu once the page is ready (layout-editor-menu)", function()
+	helpers.it("the editor window answers its ready with the last saved source (layout-editor-own-window)", function()
 		local Bridge, state, daemon_state = emulating_bridge()
-		helpers.assert_true(Bridge.open_editor(), "asked before the page is ready")
-		helpers.assert_eq(#state.pushes, 0, "nothing is pushed into a page still loading")
-		Bridge.on_message({ action = "ready" }, daemon_state)
-		local opened = state.pushes[#state.pushes].js
-		helpers.assert_contains(opened, "window.sourceData(")
-		helpers.assert_contains(opened, '"filename":"mine.toml"')
-		local count = #state.pushes
-		helpers.assert_true(Bridge.open_editor(), "asked again while the page is open")
-		helpers.assert_eq(#state.pushes, count + 1)
+		local Editor = Bridge.editor
+		Editor._reset()
+		helpers.assert_eq(Editor.bridge_name, "layout_editor_window_bridge")
+		local calls = #state.calls
+		helpers.assert_true(Editor.on_message({ action = "ready" }, daemon_state).handled)
+		helpers.assert_eq(state.pushes[1].app, "layout_editor_window", "the editor window receives its own pushes")
+		helpers.assert_contains(state.pushes[1].js, "window.initData(")
+		helpers.assert_contains(state.pushes[1].js, '"layout_editor.title":"translated:layout_editor.title"')
 		helpers.assert_contains(state.pushes[#state.pushes].js, "window.sourceData(")
-		Bridge.on_message({ action = "refresh" }, daemon_state)
-		helpers.assert_true(not state.pushes[#state.pushes].js:find("window.sourceData(", 1, true),
-			"a request is answered once")
+		helpers.assert_contains(state.pushes[#state.pushes].js, '"filename":"mine.toml"')
+		helpers.assert_eq(#state.calls, calls, "the editor window fetches no catalogue")
+		Editor._reset()
+	end)
+
+	helpers.it("the manager's « Layout editor » shows the editor window (layout-editor-own-window)", function()
+		local Bridge, state, daemon_state = emulating_bridge()
+		local shown = {}
+		daemon_state.webview_manager.show = function(app) shown[#shown + 1] = app; return true end
+		Bridge.on_message({ action = "ready" }, daemon_state)
+		helpers.assert_true(Bridge.on_message({ action = "open_editor" }, daemon_state).handled)
+		helpers.assert_eq(shown, { "layout_editor_window" })
+		for _, push in ipairs(state.pushes) do
+			helpers.assert_true(not push.js:find("window.sourceData(", 1, true), "the manager page receives no source")
+		end
 	end)
 end)
 
 helpers.describe("layout editor menu row (Linux)", function()
-	helpers.it("« Create or edit a layout… » shows the window straight on the editor (layout-editor-menu)", function()
+	helpers.it("« Create or edit a layout… » shows the layout editor's own window (layout-editor-own-window)", function()
 		local saved = { bridge = package.loaded["ui.layout_manager.bridge"], builder = package.loaded["ui.menu.builder"] }
 		local calls = {}
 		package.loaded["ui.layout_manager.bridge"] = {
-			open_editor = function() calls[#calls + 1] = "open_editor"; return true end,
+			open_editor_window = function(manager) return manager.show("layout_editor_window") end,
 		}
 		package.loaded["ui.menu.builder"] = nil
 		local ok, err = pcall(function()
@@ -255,7 +266,7 @@ helpers.describe("layout editor menu row (Linux)", function()
 		end)
 		package.loaded["ui.layout_manager.bridge"], package.loaded["ui.menu.builder"] = saved.bridge, saved.builder
 		helpers.assert_true(ok, tostring(err))
-		helpers.assert_eq(calls, { "show layout_manager", "open_editor" })
+		helpers.assert_eq(calls, { "show layout_editor_window" })
 	end)
 end)
 

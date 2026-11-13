@@ -132,6 +132,10 @@ Account and tester actions (maintainer, from the PC):
 - [ ] Layout editor host (2026-11-12): the real UAC install of a source's DLLs, typing, switching and the uninstall
       (Settings > Apps and « Remove »), in source and compiled mode.
 
+- [ ] Layout editor window (2026-11-13): « Create or edit a layout… » and the layout manager's « Layout editor » open
+      the editor in its own window; a second request brings it to the front with its unsaved work; « Close » closes
+      it; an install from it refreshes an open layout manager.
+
 - [ ] Metrics export and purge on Windows (`KL_RunMetricsMaintenance`): only source contracts check that path.
 
 - [ ] Navigation-owner DLL after the folder migration (2026-11-13): its manifest fingerprint was derived by the

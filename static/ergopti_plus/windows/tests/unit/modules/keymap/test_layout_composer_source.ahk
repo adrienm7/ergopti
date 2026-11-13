@@ -4,7 +4,7 @@
 ; MODULE: Layout Editor Windows Host Tests
 ; DESCRIPTION:
 ; The Windows host of the unified layout editor (docs/design/layout-editor.md
-; « Windows host »): the layout manager's new actions and initData flags, the
+; « Windows host »): the editor window's actions and initData flags, the
 ; composer's source form of composer_save (store, stage, elevate, switch) and
 ; composer_emulate, and the menu row. The elevated helper runs against the fake
 ; machine of test_kbd_register.ahk, on the files the composer really staged: no
@@ -313,6 +313,36 @@ _LCS_RemoveCase() {
 Test("layout editor host: initData offers the editor and its file actions reach the store (layout-editor-windows)",
 	_LCS_ManagerCase)
 
+Test("layout editor host: the manager opens the editor in its own window (layout-editor-own-window)",
+	_LCS_OwnWindowCase)
+
+_LCS_OwnWindowCase() {
+	global _LayoutCatalogueLast
+	SavedCatalogue := _LayoutCatalogueLast
+	Dir := _LCH_TempDir()
+	try {
+		_LayoutCatalogueLast := Map("index", _LMH_Index(), "source", "network", "error", 0)
+		Log := []
+		Deps := _LMH_Deps(Dir, Log)
+		Deps["open_editor"] := () => (Log.Push(Map("call", "open editor")), true)
+		AssertTrue(LayoutManager_HandleMessage(Map("action", "ready"), Deps))
+		Init := _LayMgrWeb_Json(_LCH_Pushed(Log, "initData"))
+		AssertContains(Init, '"source_editor":true')
+		AssertTrue(LayoutManager_HandleMessage(Map("action", "open_editor"), Deps))
+		AssertEqual("open editor", _LMH_Calls(Log)[_LMH_Calls(Log).Length], "the manager's button opens the editor window")
+		for Action in ["source_open", "source_save", "source_pick", "nav_save", "composer_emulate"]
+			AssertFalse(LayoutManager_HandleMessage(Map("action", Action), Deps),
+				"the manager page no longer carries the editor: " . Action)
+		AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "install", "id", "ergol"), Deps),
+			"the editor window installs no catalogue layout")
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "close"), Deps))
+		AssertEqual("close", _LMH_Calls(Log)[_LMH_Calls(Log).Length], "the editor's « Close » closes its window")
+	} finally {
+		_LayoutCatalogueLast := SavedCatalogue
+		DirDelete(Dir, true)
+	}
+}
+
 _LCS_ManagerCase() {
 	global _LayoutCatalogueLast
 	SavedCatalogue := _LayoutCatalogueLast
@@ -325,27 +355,28 @@ _LCS_ManagerCase() {
 		Deps["editor_strings"] := () => Map("layout_editor.btn.install", "Install")
 		Deps["apply_nav"] := (Text) => (Log.Push(Map("call", "nav " . Text)),
 			Map("saved", true, "applied", false, "errors", []))
-		AssertTrue(LayoutManager_HandleMessage(Map("action", "ready"), Deps))
+		; The editor window's ready answers with its flags, then with the last saved source.
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "ready"), Deps))
 		Init := _LayMgrWeb_Json(_LCH_Pushed(Log, "initData"))
-		for Flag in ['"source_editor":true', '"emulate":true', '"nav_apply":true', '"source_pick":false']
+		for Flag in ['"source_editor":true', '"emulate":true', '"nav_apply":true', '"source_pick":false',
+				'"layout_editor.title":']
 			AssertContains(Init, Flag)
-		AssertTrue(LayoutManager_HandleMessage(Map("action", "source_open"), Deps))
 		Opened := _LayMgrWeb_Json(_LCH_Pushed(Log, "sourceData"))
 		AssertContains(Opened, '"text":null')
 		AssertContains(Opened, '"layout_editor.btn.install":"Install"')
-		AssertTrue(LayoutManager_HandleMessage(Map("action", "source_save", "filename", "mine.toml",
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "source_save", "filename", "mine.toml",
 			"text", "a = 1`n"), Deps))
 		AssertContains(_LayMgrWeb_Json(_LCH_Pushed(Log, "sourceResult")), '"ok":true')
 		AssertEqual("a = 1`n", FileRead(Dir . "layout_sources\mine.toml", "UTF-8-RAW"))
-		LayoutManager_HandleMessage(Map("action", "source_open"), Deps)
+		LayoutEditorWindow_HandleMessage(Map("action", "source_open"), Deps)
 		AssertContains(_LayMgrWeb_Json(_LCH_Pushed(Log, "sourceData")), '"filename":"mine.toml"')
-		AssertTrue(LayoutManager_HandleMessage(Map("action", "source_save", "filename", "../x.toml", "text", "x"), Deps))
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "source_save", "filename", "../x.toml", "text", "x"), Deps))
 		AssertContains(_LayMgrWeb_Json(_LCH_Pushed(Log, "sourceResult")), '"code":"source_invalid_file"')
-		AssertFalse(LayoutManager_HandleMessage(Map("action", "source_save", "filename", "a.toml"), Deps))
-		AssertFalse(LayoutManager_HandleMessage(Map("action", "source_pick"), Deps), "WebView2 picks files itself")
-		AssertTrue(LayoutManager_HandleMessage(Map("action", "nav_save", "text", "[_meta]`n"), Deps))
+		AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "source_save", "filename", "a.toml"), Deps))
+		AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "source_pick"), Deps), "WebView2 picks files itself")
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "nav_save", "text", "[_meta]`n"), Deps))
 		AssertContains(_LayMgrWeb_Json(_LCH_Pushed(Log, "navResult")), '"applied":false,"errors":[],"saved":true')
-		AssertFalse(LayoutManager_HandleMessage(Map("action", "nav_save"), Deps))
+		AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "nav_save"), Deps))
 	} finally {
 		_LayoutCatalogueLast := SavedCatalogue
 		DirDelete(Dir, true)

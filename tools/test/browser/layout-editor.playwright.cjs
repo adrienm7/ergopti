@@ -90,7 +90,7 @@ async function downloaded(page, click) {
 	};
 }
 
-/** The layout manager page with a recording Linux-style bridge, as ErgoptiPlus hosts it. */
+/** The layout editor's own window with a recording Linux-style bridge, as ErgoptiPlus hosts it. */
 async function exerciseManager(browser, origin) {
 	const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 	const errors = [];
@@ -103,11 +103,11 @@ async function exerciseManager(browser, origin) {
 		window.__posted = [];
 		window.webkit = {
 			messageHandlers: {
-				layout_manager_bridge: { postMessage: (payload) => window.__posted.push(payload) }
+				layout_editor_window_bridge: { postMessage: (payload) => window.__posted.push(payload) }
 			}
 		};
 	}, strings);
-	await page.goto(`${origin}/ui/layout_manager/index.html`);
+	await page.goto(`${origin}/ui/layout_editor_window/index.html`);
 	const state = {
 		platform: 'linux',
 		shortcut_menu_path: 'shortcuts/menu.lua',
@@ -116,17 +116,6 @@ async function exerciseManager(browser, origin) {
 		provided: {},
 		builtin: {}
 	};
-	await page.evaluate((state) => window.initData({ strings: {}, state }), state);
-	assert.equal(
-		await page.locator('#btn-editor').isVisible(),
-		false,
-		'no editor without host support'
-	);
-	assert.equal(
-		await page.locator('#btn-compose').isVisible(),
-		true,
-		'that host keeps the composer'
-	);
 	await page.evaluate(
 		(state) =>
 			window.initData({
@@ -139,16 +128,10 @@ async function exerciseManager(browser, origin) {
 			}),
 		state
 	);
-	assert.equal(
-		await page.locator('#btn-compose').isVisible(),
-		false,
-		'the editor replaces the composer'
-	);
-	await page.click('#btn-editor');
-	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'source_open'));
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'ready'));
+	// The host answers the window's ready with the last saved source.
 	await page.evaluate(() => window.sourceData({ text: null, folder: 'layout_sources/' }));
 	await page.waitForSelector('#layout-editor #le-board');
-	assert.equal(await page.locator('#layout-view').isVisible(), false);
 	// The inline host lists the names table: the magnifier names a character at once.
 	assert.equal(await page.evaluate(() => typeof UNICODE_NAMES_DATA), 'object');
 	await page.click('#le-board [data-code="KeyQ"]');
@@ -179,11 +162,6 @@ async function exerciseManager(browser, origin) {
 		keylayoutText
 	);
 	await page.waitForSelector('#le-fill-source option[value="ergopti"]', { state: 'attached' });
-	assert.equal(
-		await page.locator('#composer').isVisible(),
-		false,
-		'the composer section stays closed'
-	);
 
 	// A host with a native panel (macOS) opens files for the page.
 	await page.click('#le-open');
@@ -273,8 +251,9 @@ async function exerciseManager(browser, origin) {
 	await page.click('#le-start [data-start="blank"]');
 	await page.waitForSelector('#le-start', { state: 'detached' });
 	assert.equal(await page.inputValue('#le-name'), strings['layout_editor.default_name']);
+	// « Close » closes the editor's own window through the host.
 	await page.click('#le-close');
-	assert.equal(await page.locator('#layout-view').isVisible(), true);
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'close'));
 	assert.deepEqual(errors, []);
 	await page.close();
 }

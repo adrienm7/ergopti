@@ -23,6 +23,7 @@
 //   hotstrings_config_bridge  — _shared/ui/hotstrings_config_window
 //   hsOnboarding              — _shared/ui/onboarding
 //   layer_editor_bridge       — _shared/ui/layer_editor
+//   layout_editor_window_bridge — _shared/ui/layout_editor_window
 //   hsPaths                   — _shared/ui/paths_editor
 //   hsPersonalInfo            — _shared/ui/personal_info_editor
 //   layout_manager_bridge     — _shared/ui/layout_manager

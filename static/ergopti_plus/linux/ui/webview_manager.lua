@@ -358,6 +358,7 @@ local BRIDGE_MODULES = {
 	model_browser         = "ui.model_browser.bridge",
 	onboarding            = "ui.onboarding.bridge",
 	layout_manager        = "ui.layout_manager.bridge",
+	layout_editor_window  = "ui.layout_manager.editor_bridge",
 	paths_editor          = "ui.paths_editor.bridge",
 	personal_info_editor  = "ui.personal_info_editor.bridge",
 	numeric_prompt        = "ui.numeric_prompt.bridge",

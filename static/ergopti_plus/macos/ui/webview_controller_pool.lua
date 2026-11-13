@@ -11,6 +11,7 @@
 local M = {}
 local ROLE_PORTS = {
 	action_picker = "action_picker_bridge",
+	layout_editor_window = "layout_editor_window_bridge",
 	layout_manager = "layout_manager_bridge",
 	permission_dialog = "permission_dialog_bridge",
 }

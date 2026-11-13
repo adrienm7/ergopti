@@ -29,8 +29,11 @@
 ---    [, emulation]}): the registry stores the source for the layout emulation
 ---    alone, then the host's emulate port makes the composed layout the
 ---    emulated one and reloads the engine. Nothing is installed in the system.
---- 6. A menu row opens the window straight on the editor (controller.open_editor):
----    the page receives sourceData as if its « Editor » button had asked.
+--- 6. The editor has its own window (_shared/ui/layout_editor_window): the
+---    manager's « Layout editor » button posts open_editor, which the host's
+---    deps.open_editor_window answers by opening it. A controller made with
+---    deps.editor_window serves that window: its ready answers with the last
+---    saved source (sourceData) at once and fetches no catalogue.
 --- 7. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
@@ -55,6 +58,7 @@ M.ACTIONS = {
 	source_save = true,
 	source_pick = true,
 	nav_save = true,
+	open_editor = true,
 }
 
 -- The extension file both Lua drivers load as a layout's shortcut menu; the
@@ -311,6 +315,9 @@ end
 --- deps.reload_extensions(id) reloads the driver after a layout that ships a
 ---   hotstring extension was installed, updated or uninstalled, in place of
 ---   deps.layout_changed (LMH-004); it returns true when the reload started.
+--- deps.open_editor_window() opens (or focuses) the layout editor window; without
+---   it open_editor is refused.
+--- deps.editor_window is true for the controller of the layout editor window.
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
 --- deps.strings() returns the translated strings the page shows.
 --- deps.open_url(url) opens an https URL; deps.close() closes the window.
@@ -319,7 +326,9 @@ end
 --- @return table controller { on_message(payload) -> handled, open_editor() -> boolean }
 function M.new(deps)
 	local controller = { result = nil }
-	local page_ready, editor_wanted = false, false
+	local editor_window = deps.editor_window == true
+	-- The editor window shows the editor as soon as its page is ready.
+	local page_ready, editor_wanted = false, editor_window
 
 	local function push_state()
 		return deps.push("updateState", M.page_state(deps.registry.snapshot(), controller.result))
@@ -368,7 +377,8 @@ function M.new(deps)
 				source_pick = type(deps.pick_source) == "function",
 				nav_apply = type(deps.apply_nav) == "function",
 				emulate = offers_emulate(deps) })
-			deps.registry.refresh(function() push_state() end)
+			-- The editor window lists no catalogue: it needs the platform alone.
+			if not editor_window then deps.registry.refresh(function() push_state() end) end
 			if editor_wanted then
 				editor_wanted = false
 				M.handle_source(deps, "source_open", {})
@@ -382,6 +392,13 @@ function M.new(deps)
 		if action == "close" then
 			deps.close()
 			return true
+		end
+		if action == "open_editor" then
+			if type(deps.open_editor_window) ~= "function" or not offers_source(deps.registry) then
+				deps.log("warn", "Refused to open the layout editor window: this host has no editor window.")
+				return false
+			end
+			return deps.open_editor_window() ~= false
 		end
 		if action == "composer_open" or action == "composer_save" or action == "composer_remove"
 			or action == "composer_emulate" then
