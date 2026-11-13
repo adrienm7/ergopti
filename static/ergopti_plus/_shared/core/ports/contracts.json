@@ -581,6 +581,7 @@
 			"model_identity_mismatch",
 			"model_list_unavailable",
 			"model_missing",
+			"modifier_key_cannot_hold_xkb_level5",
 			"ms",
 			"msklc_character_columns",
 			"named_keyboards",
@@ -757,7 +758,9 @@
 			"wrap_mutation_failed",
 			"write",
 			"written",
-			"xkb_conversion_failed"
+			"xkb_conversion_failed",
+			"xkb_level5_plan",
+			"xkb_types"
 		],
 		"phase": [
 			"",
