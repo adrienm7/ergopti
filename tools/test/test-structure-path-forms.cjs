@@ -52,6 +52,7 @@ const FAKE = [
 	'_shared/zz_inward/y.lua',
 	'linux/zz_scatter/x.lua',
 	'linux/zz_scatter/y.lua',
+	'linux/zz_scatter/d.json',
 	'_shared/zz_pyold/x.py'
 ];
 const MAP = new Map([
@@ -69,6 +70,9 @@ const MAP = new Map([
 	['_shared/zz_inward/y.lua', '_shared/zz_inward/c/y.lua'],
 	['linux/zz_scatter/x.lua', 'linux/zz_scatter/x.lua'],
 	['linux/zz_scatter/y.lua', 'linux/zz_core/y/y.lua'],
+	// A data file's home is no home of a source scope (S28 put keyboard/data,
+	// which holds no Lua, in the convention lint's Lua folders).
+	['linux/zz_scatter/d.json', 'linux/zz_data/d.json'],
 	['_shared/zz_pyold/x.py', '_shared/zz_pynew/deep/x.py']
 ]);
 

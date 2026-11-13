@@ -2486,7 +2486,19 @@ function splitScopeLine(text, index, raw, folderRepo, map) {
 	const element =
 		!property && /[[,]$/.test(before) && (/,\s*$/.test(line) || after.startsWith(']'));
 	if (!element) return null;
-	const homes = splitHomes(folderRepo, map);
+	// A scope of source folders: a home that receives only data files
+	// (keyboard/data from platform/remap/data) holds nothing such a list scans,
+	// and a scanner that refuses an empty folder would stop on it.
+	const code = (f) => /\.(lua|ahk|c?js|mjs|py|sh|ps1|swift|[ch]|go)$/.test(f);
+	const homesWithCode = new Set();
+	for (const [old, target] of map)
+		if (old.startsWith(`${rel}/`) && target && code(target))
+			homesWithCode.add(target === old ? rel : path.posix.dirname(target));
+	const all = splitHomes(folderRepo, map);
+	const sourced = all.filter((h) =>
+		[...homesWithCode].some((c) => c === h || c.startsWith(`${h}/`))
+	);
+	const homes = sourced.length > 0 ? sourced : all;
 	if (homes.length === 0) return null;
 	const stem = raw.slice(0, raw.length - rel.length);
 	const lines = homes.map((h, i) => {
