@@ -92,7 +92,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       `_shared/tests/corpus/layouts/source/direct_levels.toml` installed with the user layout installer types a,
       α (Right Ctrl, XKB's fifth level), æ (AltGr) and β (Right Ctrl). Proven in a container with xkbcomp and
       libxkbcommon on the same files; left: a real GNOME or KDE session.
-- [ ] One-shot modifiers (worker A, 2026-11-13): Tap-holds > sticky delay row accepts 0 and shows « no time limit »,
+- [ ] <!-- field-point: one_shot_modifiers --> One-shot modifiers (worker A, 2026-11-13): Tap-holds > sticky delay row accepts 0 and shows « no time limit »,
       and a one-shot Shift then waits indefinitely; a gesture or key bound to `sticky_ctrl_shift`, `sticky_cmd_ctrl`
       (Super+Ctrl) and `sticky_altgr` wraps the next key in those modifiers once, in a GTK and a Qt application; a
       tap-hold key set to tap `sticky_altgr` and hold AltGr types one AltGr character after a tap.

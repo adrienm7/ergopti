@@ -181,7 +181,8 @@ helpers.describe("action picker headings (macOS)", function()
 						if sticky and sticky ~= "hyper" then
 							local names = {}
 							for token in sticky:gmatch("[^_]+") do
-								names[#names + 1] = Locale.get("key_name." .. token)
+								-- altgr names the key name table's alt_gr.
+								names[#names + 1] = Locale.get("key_name." .. (token == "altgr" and "alt_gr" or token))
 							end
 							expected = expected:gsub("{1}", function() return table.concat(names, " + ") end)
 						end

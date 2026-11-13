@@ -794,6 +794,12 @@
 			"title": "Layout editor in its own window",
 			"checks": [],
 			"not_testable": "Opening, refocusing and closing a WKWebView window needs a person at the Mac: open « Create or edit a layout… » and the manager's « Layout editor », check one window comes back to the front with its unsaved work, then « Close »."
+		},
+		{
+			"id": "one_shot_modifiers",
+			"title": "One-shot modifiers: no time limit, sticky actions, AltGr tap-hold pair",
+			"checks": [],
+			"not_testable": "Whether a `sticky_*` arm or a Karabiner one-shot AltGr tap stays armed and types the right level is a person's reading of the typed result: no log line decides it."
 		}
 	]
 }
