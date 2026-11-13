@@ -53,7 +53,8 @@ const FAKE = [
 	'linux/zz_scatter/x.lua',
 	'linux/zz_scatter/y.lua',
 	'linux/zz_scatter/d.json',
-	'_shared/zz_pyold/x.py'
+	'_shared/zz_pyold/x.py',
+	'_shared/zz_gopkg/x_test.go'
 ];
 const MAP = new Map([
 	['_shared/zz_probe_data/locales/en.json', '_shared/core/zz_probe_i18n/data/locales/en.json'],
@@ -73,7 +74,8 @@ const MAP = new Map([
 	// A data file's home is no home of a source scope (S28 put keyboard/data,
 	// which holds no Lua, in the convention lint's Lua folders).
 	['linux/zz_scatter/d.json', 'linux/zz_data/d.json'],
-	['_shared/zz_pyold/x.py', '_shared/zz_pynew/deep/x.py']
+	['_shared/zz_pyold/x.py', '_shared/zz_pynew/deep/x.py'],
+	['_shared/zz_gopkg/x_test.go', '_shared/zz_net/native/zz_gopkg/x_test.go']
 ]);
 
 function withFakes(fn) {
@@ -221,6 +223,15 @@ function run() {
 		assert.equal(
 			rewrite('tools/x.cjs', "const L = path.join(SP, '_shared', 'zz_probe_data', 'locales');"),
 			"const L = path.join(SP, '_shared', 'core', 'zz_probe_i18n', 'data', 'locales');"
+		);
+		// filepath.Join("..", …) in a Go test is relative to its package folder;
+		// both the package and its data move (S01 broke the Go network tests).
+		assert.equal(
+			rewrite(
+				`${P}_shared/zz_gopkg/x_test.go`,
+				'b, err := os.ReadFile(filepath.Join("..", "zz_probe_data", "locales", "en.json"))'
+			),
+			'b, err := os.ReadFile(filepath.Join("..", "..", "..", "core", "zz_probe_i18n", "data", "locales", "en.json"))'
 		);
 		// A shared argument that climbs into a driver keeps its climb (S35 cut
 		// "../macos/updater/…" to "dater/…" by slicing the _shared prefix).
