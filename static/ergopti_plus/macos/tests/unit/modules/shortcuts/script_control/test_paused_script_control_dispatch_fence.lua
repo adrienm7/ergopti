@@ -43,13 +43,13 @@ package.loaded["modules.gestures.actions"] = {
 	end,
 }
 package.loaded["modules.keystats"] = { log_shortcut = function() end }
-package.loaded["modules.llm.api_mlx"] = {
+package.loaded["ai.engine.api.mlx"] = {
 	stop_warmup = function() return true end,
 	resume_warmup = function() return true end,
 }
-package.loaded["modules.llm.api_ollama"] = { stop_warmup = function() return true end }
-package.loaded["modules.llm.api_remote"] = { stop_warmup = function() return true end }
-package.loaded["modules.llm.warmup_controller"] = {
+package.loaded["ai.engine.api.ollama"] = { stop_warmup = function() return true end }
+package.loaded["ai.engine.api.remote"] = { stop_warmup = function() return true end }
+package.loaded["ai.engine.local_servers.warmup_controller"] = {
 	stop = function() return true end,
 	schedule_warmup_with_retry = function() return true end,
 }

@@ -286,7 +286,7 @@ end)
 
 helpers.describe("prompt editor: messages are bound to an immutable context", function()
 	helpers.it("retains a reentrant prompt candidate whose rollback raises", function()
-		with_editor("ui.prompt_editor", function(editor, state)
+		with_editor("ai.ui.prompt_editor", function(editor, state)
 			state.close_during_create = true
 			state.delete_throws = true
 			helpers.assert_eq(editor.open(nil, function() end), false)
@@ -309,7 +309,7 @@ helpers.describe("prompt editor: messages are bound to an immutable context", fu
 	end)
 
 	helpers.it("retains an accepted prompt until its exact native close succeeds", function()
-		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+		with_editor("ai.ui.prompt_editor", function(editor, state, hs_stub)
 			local saves = 0
 			editor.open(nil, function()
 				saves = saves + 1
@@ -349,7 +349,7 @@ helpers.describe("prompt editor: messages are bound to an immutable context", fu
 	end)
 
 	helpers.it("keeps a refused save open and logs a throwing retry", function()
-		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+		with_editor("ai.ui.prompt_editor", function(editor, state, hs_stub)
 			local attempts = 0
 			editor.open(nil, function()
 				attempts = attempts + 1
@@ -385,7 +385,7 @@ helpers.describe("prompt editor: messages are bound to an immutable context", fu
 	end)
 
 	helpers.it("settles one create context before a re-entrant save can replay it", function()
-		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+		with_editor("ai.ui.prompt_editor", function(editor, state, hs_stub)
 			local bridge
 			local save_message
 			local saved_profiles = {}
@@ -422,7 +422,7 @@ helpers.describe("prompt editor: messages are bound to an immutable context", fu
 	end)
 
 	helpers.it("rejects stale epochs and preserves a context opened by on_save", function()
-		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+		with_editor("ai.ui.prompt_editor", function(editor, state, hs_stub)
 			local saves_a, saves_b, saves_c = 0, 0, 0
 			local profile_a = { id = "profile-a", label = "A", raw_prompt = "Prompt A" }
 			local profile_b = { id = "profile-b", label = "B", raw_prompt = "Prompt B" }

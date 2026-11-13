@@ -45,7 +45,7 @@ const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const BUILD = fs.readFileSync(path.join(ROOT, 'tools/build/build_macos_app.sh'), 'utf8');
 const NETWORK_RETRY = fs.readFileSync(
-	path.join(ROOT, 'static/ergopti_plus/macos/modules/llm/network-retry.sh'),
+	path.join(ROOT, 'static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh'),
 	'utf8'
 );
 const CREATE = path.join(ROOT, 'tools/build/create_macos_signing_identity.sh');

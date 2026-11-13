@@ -29,15 +29,15 @@
 _DPBZ_OldFormAbsent() {
 	; Move-resilient: scan the llm module tree via the framework helper instead of
 	; a pinned api_token_crypto path. Both Buffer forms are unique to that file
-	; within modules/llm, so the scope stays meaningful.
-	Src := _DriverDirConcat("modules/llm")
+	; within ai/engine, so the scope stays meaningful.
+	Src := _DriverDirConcat("ai/engine")
 	Assert(InStr(Src, "Buffer(4 + A_PtrSize") = 0,
 		"api_token_crypto.ahk must not contain Buffer(4 + A_PtrSize — use Buffer(A_PtrSize * 2) to cover 16 bytes on x64")
 }
 Test("api_token_crypto: old Buffer(4 + A_PtrSize) form is absent", _DPBZ_OldFormAbsent)
 
 _DPBZ_NewFormPresent() {
-	Src := _DriverDirConcat("modules/llm")
+	Src := _DriverDirConcat("ai/engine")
 	Assert(InStr(Src, "Buffer(A_PtrSize * 2") > 0,
 		"api_token_crypto.ahk must use Buffer(A_PtrSize * 2) for DATA_BLOB allocations")
 }
@@ -59,10 +59,10 @@ _DPAPI_BlobRoundTrip() {
 Test("api_token_crypto: A_PtrSize*2 buffer holds UInt+Ptr without throw", _DPAPI_BlobRoundTrip)
 
 ; Regression: DATA_BLOB pointer offset hardcoded to 8 -- wrong on x86 where pbData is at offset 4
-; (modules/llm/api_token_crypto.ahk)
+; (ai/engine/api/token_crypto.ahk)
 TestAuditV5_DpapiPtrSizeOffset() {
 	; Move-resilient: scan the whole driver source via the framework helper instead
-	; of a pinned modules/llm/api_token_crypto.ahk read. The in_blob/A_PtrSize DPAPI
+	; of a pinned ai/engine/api/token_crypto.ahk read. The in_blob/A_PtrSize DPAPI
 	; tokens below are unique to api_token_crypto.ahk, so the scope stays unambiguous.
 	Src := _DriverSourceConcat()
 

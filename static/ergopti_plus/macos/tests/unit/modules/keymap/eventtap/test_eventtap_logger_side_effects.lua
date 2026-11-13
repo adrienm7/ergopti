@@ -21,11 +21,11 @@ local RESET_MODULES = {
 	"core.logger.engine.logger", "core.logger.adapters.log_transport", "adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.fs.engine.paths", "core.timing.engine.timings",
-	"modules.llm", "modules.llm.prediction_engine", "modules.keystats",
+	"ai.engine", "ai.engine.prediction.engine", "modules.keystats",
 	"core.ui.ui.tooltip", "modules.hotstrings.hotstrings_config", "core.ui.adapters.tooltip_renderer",
 	"core.fs.adapters.file_system",
 	"modules.keymap", "modules.keymap.init", "settings.engine.registry",
-	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
+	"modules.keymap.expander", "ai.engine.bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
 }
 
@@ -121,11 +121,11 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 			end,
 		}
 		local function noop() end
-		package.loaded["modules.llm"] = {
+		package.loaded["ai.engine"] = {
 			DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = true },
 			check_modifiers = function() return false end,
 		}
-		package.loaded["modules.llm.prediction_engine"] = {
+		package.loaded["ai.engine.prediction.engine"] = {
 			init = function() return true end,
 			set_runtime_guard = noop,
 			get_llm_enabled = function() return false end,

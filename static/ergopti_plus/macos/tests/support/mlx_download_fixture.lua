@@ -19,19 +19,19 @@ local MODULES = {
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
-	"modules.llm",
-	"modules.llm.network_env",
-	"modules.llm.opaque_network_admission",
+	"ai.engine",
+	"ai.engine.api.network_env",
+	"ai.engine.api.opaque_network_admission",
 	"ui.download_window",
 	"ui.download_window.javascript",
 	"core.ui.ui.builder",
 	"core.fs.engine.paths",
 	"core.timing.engine.deferred_work",
-	"ui.menu.menu_llm.model_switcher",
-	"ui.menu.menu_llm.prediction_lock_registry",
-	"ui.menu.menu_llm.models_manager_mlx_download",
-	"ui.menu.menu_llm.models_manager_mlx_repo",
-	"ui.menu.menu_llm.profile_label",
+	"ai.ui.menu.models.switcher",
+	"ai.ui.menu.prediction_lock_registry",
+	"ai.ui.menu.models.manager_mlx_download",
+	"ai.ui.menu.models.manager_mlx_repo",
+	"ai.ui.menu.profile_label",
 }
 
 local function result_value(mode, fallback)
@@ -543,19 +543,19 @@ local function with_fixture(plan, callback)
 			end
 			-- The download script exports the system network settings first; the
 			-- fixture's file system has no shared policy file to source.
-			if plan.network_admission then package.loaded["modules.llm.opaque_network_admission"] = plan.network_admission end
-			package.loaded["modules.llm.network_env"] = plan.network_env or {
+			if plan.network_admission then package.loaded["ai.engine.api.opaque_network_admission"] = plan.network_admission end
+			package.loaded["ai.engine.api.network_env"] = plan.network_env or {
 				policy_path = function() return "/fixture/modules/llm/network-retry.sh" end,
 				prelude = function() return "", nil end,
 				opaque_prelude = function() return "", nil end,
 				managed_http_prelude = function() return "", nil end,
 				uses_managed_transport = function() return true, nil end,
 			}
-			package.loaded["modules.llm"] = {
+			package.loaded["ai.engine"] = {
 				DEFAULT_STATE = {llm_num_predictions = 1},
 				set_active_profile = function() return true end,
 			}
-			package.loaded["ui.menu.menu_llm.profile_label"] = {
+			package.loaded["ai.ui.menu.profile_label"] = {
 				format = function(label) return label end,
 			}
 
@@ -607,7 +607,7 @@ local function with_fixture(plan, callback)
 				elseif plan.server_sync == "failure" then on_cancel("server_failed") end
 				return result_value(plan.server_mode, true)
 			end
-			local mixin = require("ui.menu.menu_llm.models_manager_mlx_download")
+			local mixin = require("ai.ui.menu.models.manager_mlx_download")
 			mixin.install({
 				obj = obj,
 				deps = deps,
@@ -633,8 +633,8 @@ local function with_fixture(plan, callback)
 
 			local switcher
 			if plan.real_switcher then
-				package.loaded["ui.menu.menu_llm.model_switcher"] = nil
-				switcher = require("ui.menu.menu_llm.model_switcher").new({
+				package.loaded["ai.ui.menu.models.switcher"] = nil
+				switcher = require("ai.ui.menu.models.switcher").new({
 					state = state,
 					models_mgr = obj,
 					keymap = deps.keymap,

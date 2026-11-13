@@ -394,7 +394,7 @@ function inventory(driver) {
 	assert.deepEqual(ahk('M.Add()'), ['add']);
 	assert.deepEqual(ahk('M.Add(t("menu.x"), Sub)'), ['add']);
 	assert.deepEqual(ahk('G.Add("Text", "w300", t("x"))'), []);
-	assert.deepEqual(sitesOf('windows/ui/model_browser/init.ahk', 'lv.Add(, name)', '.ahk'), []);
+	assert.deepEqual(sitesOf('windows/ai/ui/model_browser/init.ahk', 'lv.Add(, name)', '.ahk'), []);
 	assert.deepEqual(ahk('Rows.Push(Map("label", t("menu.x"), "action", Fn))'), ['static']);
 	assert.deepEqual(ahk('Rows.Push(Map("label", Name, "action", Fn))'), []);
 	assert.deepEqual(ahk('Rows.Push(Map("separator", true))'), ['separator']);
@@ -413,7 +413,7 @@ const DRIVERS = ['windows', 'macos', 'linux'];
 // minimum against the immutable pre-migration oracle, not the migration debt.
 const FLOORS = { windows: 20, macos: 20, linux: 20 };
 const LEGACY_PATH = path.join(__dirname, 'fixtures', 'native-menu-census-legacy.json');
-const LEGACY_SHA256 = '813dc79feeeef7e04cbb4b604d7fb9938383b4ea06627b20f9167d73f997a8b9';
+const LEGACY_SHA256 = '26dd176a3ae312866d6f7b2a67233454f7c5a6eb3a37cd597e11071f88be046d';
 const legacyBytes = fs.readFileSync(LEGACY_PATH);
 assert.equal(
 	crypto.createHash('sha256').update(legacyBytes).digest('hex'),

@@ -333,7 +333,7 @@ The pass that colours the LLM prediction for display in the tooltip: green for
 corrected tail words, orange for new continuation words, and no colour (gray)
 for unchanged text. Implemented by `process_prediction` in the shared Lua canon
 `_shared/ai/engine/api/parser_core.lua` (Hammerspoon shim `modules/llm/parser.lua`, AHK port
-`windows/modules/llm/parser.ahk`), pinned cross-driver by
+`windows/ai/engine/api/parser.ahk`), pinned cross-driver by
 `_shared/tests/corpus/llm/process_prediction_vectors.json`. (Superseded the
 removed `TokenParser.js` word-level reference, 2026-06-13.)
 

@@ -27,7 +27,7 @@ local MouseControl   = require("adapters.mouse_control")
 local ShellRunner    = require("core.process.adapters.shell_runner")
 local SyntheticInput = require("platform.input.synthetic_input")
 local TimerScheduler = require("core.events.timer_scheduler")
-local PythonInterpreter = require("adapters.python_interpreter")
+local PythonInterpreter = require("ai.adapters.python_interpreter")
 
 local LOG = "shortcuts.actions.system"
 
@@ -729,7 +729,7 @@ function M.toggle_display_mirror(parent)
 	-- Without a native interpreter nothing starts; the user is offered one.
 	local python_bin, python_state = PythonInterpreter.resolve()
 	if not python_bin then
-		require("ui.python_runtime_offer").offer(python_state)
+		require("ai.ui.python_runtime_offer").offer(python_state)
 		return false
 	end
 	Logger.start(LOG, "Toggling display mirror via CoreGraphics…")

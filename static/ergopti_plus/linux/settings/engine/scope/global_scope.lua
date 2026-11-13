@@ -68,7 +68,7 @@ function M.participants(ctx)
 	if ctx.config then
 		registry.keyboard_layout = require("infra.keyboard_layout_scope").participant()
 	end
-	if ctx.llm then registry.llm = require("infra.llm_scope").participant() end
+	if ctx.llm then registry.llm = require("ai.engine.scope").participant() end
 	if ctx.keystats then registry.metrics = require("infra.metrics_scope").participant() end
 	return registry
 end

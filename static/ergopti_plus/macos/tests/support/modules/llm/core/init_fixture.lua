@@ -16,10 +16,10 @@ local _ = helpers.load_with_stubs("core.logger.engine.logger")
 -- A prior test may have installed a stub modules.llm.profiles (with empty
 -- get_all_profiles) that would leak into this file's top-level require.
 -- Force the real implementation to be reloaded so profile accessors work.
-package.loaded["modules.llm.profiles"]   = nil
+package.loaded["ai.engine.settings.profiles"]   = nil
 package.loaded["ai.engine.settings.profile_selector"]   = nil
 
-local Core = helpers.load_with_stubs("modules.llm")
+local Core = helpers.load_with_stubs("ai.engine")
 local INITIAL_HS = _G.hs
 
 local function load_core_with_timer_spy(options)
@@ -101,7 +101,7 @@ local function load_core_with_timer_spy(options)
 		return true
 	end
 	package.loaded["core.events.timer_scheduler"] = scheduler_stub
-	local fresh_core = helpers.load_with_stubs("modules.llm")
+	local fresh_core = helpers.load_with_stubs("ai.engine")
 	local loaded_hs = package.loaded["hs"]
 	local load_time_calls = {}
 	for index, call in ipairs(timer_spy_calls) do load_time_calls[index] = call end
@@ -117,7 +117,7 @@ end
 --- @return function restore Restores the executable resolver.
 local function admit_ollama_start(core)
 	helpers.assert_true(core.set_runtime_llm_enabled(true))
-	local binary = package.loaded["modules.llm.ollama_binary"]
+	local binary = package.loaded["ai.engine.ollama.binary"]
 	local original_resolve = binary.resolve
 	binary.resolve = function() return "/fixture/native/ollama", nil, binary.SOURCE_NATIVE_MANAGED end
 	return function() binary.resolve = original_resolve end

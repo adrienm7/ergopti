@@ -961,7 +961,7 @@ function mapShared(rest) {
 // applier rewrites the prefix in that file only.
 const RUNTIME_PREFIXES = [
 	{
-		file: 'linux/infra/llm_scope.lua',
+		file: 'linux/ai/engine/scope.lua',
 		old: 'modules.llm.',
 		names: [
 			'settings',
@@ -985,7 +985,7 @@ const RUNTIME_PREFIXES = [
 		]
 	},
 	{
-		file: 'linux/tests/unit/modules/llm/runtime/test_scope_native_ack.lua',
+		file: 'linux/tests/unit/ai/engine/runtime/test_scope_native_ack.lua',
 		old: 'modules.llm.',
 		names: ['api_ollama', 'api_remote']
 	},

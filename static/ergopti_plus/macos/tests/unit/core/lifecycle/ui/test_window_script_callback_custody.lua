@@ -69,13 +69,13 @@ end
 --- @param module_name string Host whose bridge is retained.
 --- @param receiver function Original native callback.
 local function old_action(module_name, receiver)
-	if module_name == "ui.model_browser" then receiver({ body = "ready" })
+	if module_name == "ai.ui.model_browser" then receiver({ body = "ready" })
 	elseif module_name == "ui.metrics_apps" then receiver({ body = { action = "pick" } })
 	else receiver({ body = { action = "close" } }) end
 end
 
 helpers.describe("script callback cleanup keeps exact native custody", function()
-	for _, module_name in ipairs({ "ui.update_check", "ui.model_browser", "ui.metrics_apps" }) do
+	for _, module_name in ipairs({ "ui.update_check", "ai.ui.model_browser", "ui.metrics_apps" }) do
 		helpers.it(module_name .. " preserves an active callback during ordinary same-window reuse", function()
 			with_bridge(module_name, function(_, h)
 				helpers.assert_true(h.show())

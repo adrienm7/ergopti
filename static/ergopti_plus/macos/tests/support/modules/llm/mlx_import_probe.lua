@@ -15,7 +15,7 @@ local M = {}
 --- Returns the MLX_IMPORT_PROBE statement of the shipped ensure-mlx-deps.sh.
 --- @return string probe
 function M.read()
-	local handle = assert(io.open(helpers.driver_root() .. "modules/llm/ensure-mlx-deps.sh", "rb"))
+	local handle = assert(io.open(helpers.driver_root() .. "ai/engine/local_servers/ensure-mlx-deps.sh", "rb"))
 	local source = handle:read("*a")
 	handle:close()
 	return assert(source:match('\nMLX_IMPORT_PROBE="([^"]+)"'), "ensure-mlx-deps.sh declares no MLX_IMPORT_PROBE")

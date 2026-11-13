@@ -4,7 +4,7 @@
 --- MODULE: Ollama No usleep Meta Test
 --- DESCRIPTION:
 --- Static source guard for the "ollama-usleep-main-thread-freeze" audit finding
---- in ui/menu/menu_llm/models_manager_ollama.lua.
+--- in ai/ui/menu/models/manager_ollama.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- A synchronous polling loop called hs.timer.usleep(200 * 1000) up to 20 times
@@ -37,17 +37,17 @@ end
 -- ======================================================================
 -- ======================================================================
 
-helpers.describe("ui/menu/menu_llm/models_manager_ollama.lua: no usleep (ollama-usleep-main-thread-freeze)", function()
+helpers.describe("ai/ui/menu/models/manager_ollama.lua: no usleep (ollama-usleep-main-thread-freeze)", function()
 
 	helpers.it("hs.timer.usleep is absent from models_manager_ollama.lua", function()
-		local src = read_source("local function get_ollama_path") -- ui/menu/menu_llm/models_manager_ollama.lua
+		local src = read_source("local function get_ollama_path") -- ai/ui/menu/models/manager_ollama.lua
 		helpers.assert_true(
 			src:find("hs%.timer%.usleep") == nil,
 			"models_manager_ollama.lua must NOT call hs.timer.usleep — it blocks the main thread and can kill eventtap hooks (ollama-usleep-main-thread-freeze)")
 	end)
 
 	helpers.it("readiness polling owns async tasks and retained timers", function()
-		local src = read_source("local function get_ollama_path") -- ui/menu/menu_llm/models_manager_ollama.lua
+		local src = read_source("local function get_ollama_path") -- ai/ui/menu/models/manager_ollama.lua
 		helpers.assert_true(
 			src:find("ShellRunner%.spawn") ~= nil
 				and src:find("TimerScheduler%.after") ~= nil,

@@ -23,11 +23,11 @@ const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MACOS_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
-const SOURCE_SCRIPT = path.join(MACOS_ROOT, 'modules', 'llm', 'ensure-mlx-deps.sh');
+const SOURCE_SCRIPT = path.join(MACOS_ROOT, 'ai', 'engine', 'local_servers', 'ensure-mlx-deps.sh');
 const SOURCE_PYPROJECT = path.join(MACOS_ROOT, 'pyproject.toml');
 const SOURCE_LOCK = path.join(MACOS_ROOT, 'uv.lock');
-const SOURCE_NETWORK = path.join(MACOS_ROOT, 'modules', 'llm', 'network-retry.sh');
-const SOURCE_UV_RELEASE = path.join(MACOS_ROOT, 'modules', 'llm', 'uv-release.sh');
+const SOURCE_NETWORK = path.join(MACOS_ROOT, 'ai', 'engine', 'bootstrap', 'network-retry.sh');
+const SOURCE_UV_RELEASE = path.join(MACOS_ROOT, 'ai', 'engine', 'bootstrap', 'uv-release.sh');
 // network-retry.sh reads the shared origin inventory from its bundle-relative path.
 const SOURCE_ROUTE_ORIGINS = path.join(
 	ROOT,

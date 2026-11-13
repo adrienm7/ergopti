@@ -20,7 +20,7 @@ for name, value in pairs({ XDG_CONFIG_HOME = scratch .. "/.config", XDG_DATA_HOM
 	assert(uv.os_setenv(name, value))
 end
 local Shell = require("core.process.adapters.shell_runner")
-local Connectors = require("modules.llm.agent_connectors")
+local Connectors = require("ai.engine.agent.connectors")
 local Loop, Coordinator = require("core.events.loop"), require("core.lifecycle.engine.shutdown.coordinator")
 local function read(path)
 	local file = io.open(path, "rb"); if not file then return nil end
@@ -131,13 +131,13 @@ print('tool-finished',flush=True)
 	local registry = assert(text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]"))
 	local stops = 0
 	local env = setmetatable({ ShutdownCoordinator = Coordinator,
-		package = { loaded = { ["modules.llm.agent_connectors"] = Connectors } }, keystats = { stop = function() return true end }, privacy_owners = {},
+		package = { loaded = { ["ai.engine.agent.connectors"] = Connectors } }, keystats = { stop = function() return true end }, privacy_owners = {},
 		dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false, webview_manager = false,
 		tooltip_preview = false, gestures = false, input_capture_gate = false, prediction_engine = false,
 		TimerScheduler = require("core.events.timer_scheduler"),
 		require = function(name)
-			if name == "modules.llm.agent_connectors" then return Connectors end
-			assert(name == "modules.llm.agent_learning", "unexpected Main dependency")
+			if name == "ai.engine.agent.connectors" then return Connectors end
+			assert(name == "ai.engine.agent.learning", "unexpected Main dependency")
 			return { flush = function() end }
 		end,
 		keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },

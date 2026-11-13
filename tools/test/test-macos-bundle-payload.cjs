@@ -104,7 +104,7 @@ const CURATED_READS = [
 		why: 'notifications carry the logo'
 	},
 	{
-		reader: 'ergopti_plus/macos/modules/llm/ensure-mlx-deps.sh',
+		reader: 'ergopti_plus/macos/ai/engine/local_servers/ensure-mlx-deps.sh',
 		needles: [
 			'HS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"',
 			'"$HS_ROOT/pyproject.toml"',
@@ -114,13 +114,13 @@ const CURATED_READS = [
 		why: 'the MLX bootstrap fingerprints and syncs the committed Python project'
 	},
 	{
-		reader: 'ergopti_plus/macos/modules/llm/network-retry.sh',
+		reader: 'ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh',
 		needles: ['"$SCRIPT_DIR/managed_bootstrap_http.py"'],
-		targets: ['ergopti_plus/macos/modules/llm/managed_bootstrap_http.py'],
+		targets: ['ergopti_plus/macos/ai/engine/bootstrap/managed_bootstrap_http.py'],
 		why: 'native bootstrap downloads use the bundled offline-input producer'
 	},
 	{
-		reader: 'ergopti_plus/macos/modules/llm/managed_bootstrap_http.py',
+		reader: 'ergopti_plus/macos/ai/engine/bootstrap/managed_bootstrap_http.py',
 		needles: [
 			'SHARED_ROOT / "core/network/data/http/redirect_policy.json"',
 			'SHARED_ROOT / "core/network/adapters/python_network_proxy_policy.py"',
@@ -136,7 +136,7 @@ const CURATED_READS = [
 		why: 'offline inputs retain the canonical routing policy, pinned Python and native request owner'
 	},
 	{
-		reader: 'ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_download.lua',
+		reader: 'ergopti_plus/macos/ai/ui/menu/models/manager_mlx_download.lua',
 		needles: ['from managed_http import install_huggingface_transport'],
 		targets: ['ergopti_plus/macos/core/network/adapters/managed_http.py'],
 		why: 'the emitted Hugging Face downloader activates the bundled native HTTPX transport'
@@ -154,7 +154,7 @@ const CURATED_READS = [
 		why: 'the HTTPX transport loads the exact native protocol owner and shared policy'
 	},
 	{
-		reader: 'ergopti_plus/macos/modules/llm/managed_ollama_runtime.py',
+		reader: 'ergopti_plus/macos/ai/engine/ollama/managed_ollama_runtime.py',
 		needles: [
 			'SHARED / "ai/adapters/python/managed_ollama_runtime.py"',
 			'DRIVER / "modules/llm/managed_bootstrap_http.py"',
@@ -165,7 +165,7 @@ const CURATED_READS = [
 		],
 		targets: [
 			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py',
-			'ergopti_plus/macos/modules/llm/managed_bootstrap_http.py',
+			'ergopti_plus/macos/ai/engine/bootstrap/managed_bootstrap_http.py',
 			'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py',
 			'ergopti_plus/_shared/ai/data/managed_ollama_runtime.json',
@@ -174,7 +174,7 @@ const CURATED_READS = [
 		why: 'native runtime admission retains its canonical source, alias and network policy'
 	},
 	{
-		reader: 'ergopti_plus/macos/modules/llm/managed_ollama_pull.py',
+		reader: 'ergopti_plus/macos/ai/engine/ollama/managed_ollama_pull.py',
 		needles: [
 			'DRIVER / "platform/network/native_ollama_api.py"',
 			'with_name("managed_ollama_runtime.py")',
@@ -190,21 +190,21 @@ const CURATED_READS = [
 		],
 		targets: [
 			'ergopti_plus/macos/core/network/adapters/native_ollama_api.py',
-			'ergopti_plus/macos/modules/llm/managed_ollama_runtime.py',
+			'ergopti_plus/macos/ai/engine/ollama/managed_ollama_runtime.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_pull.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_sessions.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_operation_receipt.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_operation_authority.py',
-			'ergopti_plus/macos/modules/llm/managed_ollama_cleanup.py',
-			'ergopti_plus/macos/platform/ollama_daemon_authority.py',
-			'ergopti_plus/macos/platform/ollama_bootstrap_owner.py',
+			'ergopti_plus/macos/ai/engine/ollama/managed_ollama_cleanup.py',
+			'ergopti_plus/macos/ai/adapters/ollama_daemon_authority.py',
+			'ergopti_plus/macos/ai/adapters/ollama_bootstrap_owner.py',
 			'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
 			'ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json'
 		],
 		why: 'the request owner loads its original session, receipt and cleanup authorities'
 	},
 	{
-		reader: 'ergopti_plus/macos/modules/llm/managed_ollama_cleanup.py',
+		reader: 'ergopti_plus/macos/ai/engine/ollama/managed_ollama_cleanup.py',
 		needles: [
 			'DRIVER / "platform/network/native_ollama_api.py"',
 			'SHARED / "ai/adapters/python/managed_ollama_operation_authority.py"',
@@ -214,19 +214,19 @@ const CURATED_READS = [
 		targets: [
 			'ergopti_plus/macos/core/network/adapters/native_ollama_api.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_operation_authority.py',
-			'ergopti_plus/macos/modules/llm/managed_ollama_runtime.py',
+			'ergopti_plus/macos/ai/engine/ollama/managed_ollama_runtime.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_operation_receipt.py'
 		],
 		why: 'explicit retirement resumes only the original request authority'
 	},
 	{
-		reader: 'ergopti_plus/macos/adapters/managed_ollama_hint.lua',
+		reader: 'ergopti_plus/macos/ai/adapters/managed_ollama_hint.lua',
 		needles: ['driver .. "/modules/llm/managed_ollama_hint.py"'],
-		targets: ['ergopti_plus/macos/modules/llm/managed_ollama_hint.py'],
+		targets: ['ergopti_plus/macos/ai/engine/ollama/managed_ollama_hint.py'],
 		why: 'asynchronous metadata dispatch reads the fixed bundled native hint entry'
 	},
 	{
-		reader: 'ergopti_plus/macos/modules/llm/managed_ollama_hint.py',
+		reader: 'ergopti_plus/macos/ai/engine/ollama/managed_ollama_hint.py',
 		needles: [
 			'SHARED / "ai/adapters/python/managed_ollama_runtime.py"',
 			'SHARED / "ai/adapters/python/managed_ollama_hint.py"',
@@ -241,8 +241,8 @@ const CURATED_READS = [
 		targets: [
 			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_hint.py',
-			'ergopti_plus/macos/platform/ollama_hint_metadata.py',
-			'ergopti_plus/macos/modules/llm/network-retry.sh',
+			'ergopti_plus/macos/ai/adapters/ollama_hint_metadata.py',
+			'ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh',
 			'ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json',
 			'ergopti_plus/_shared/ai/data/managed_ollama_runtime.json',
 			'ergopti_plus/_shared/ai/data/managed_ollama_release.json',
@@ -257,11 +257,11 @@ const CURATED_READS = [
 		why: 'the shared operation caller retains the exact runtime admission policy'
 	},
 	{
-		reader: 'ergopti_plus/macos/adapters/managed_ollama_pull.lua',
+		reader: 'ergopti_plus/macos/ai/adapters/managed_ollama_pull.lua',
 		needles: [
 			'context.arguments[2]:gsub("/managed_ollama_pull%.py$", "/managed_ollama_cleanup.py")'
 		],
-		targets: ['ergopti_plus/macos/modules/llm/managed_ollama_cleanup.py'],
+		targets: ['ergopti_plus/macos/ai/engine/ollama/managed_ollama_cleanup.py'],
 		why: 'explicit retirement derives its worker from the original caller script'
 	},
 	{
@@ -271,7 +271,7 @@ const CURATED_READS = [
 		why: 'session authentication reuses the shared runtime admission policy'
 	},
 	{
-		reader: 'ergopti_plus/macos/modules/llm/managed_ollama_serve.py',
+		reader: 'ergopti_plus/macos/ai/engine/ollama/managed_ollama_serve.py',
 		needles: [
 			'with_name("managed_ollama_runtime.py")',
 			'DRIVER / "platform/suspended_image_owner.py"',
@@ -284,11 +284,11 @@ const CURATED_READS = [
 			'SHARED / "core/network/data/proxy_policy.json"'
 		],
 		targets: [
-			'ergopti_plus/macos/modules/llm/managed_ollama_runtime.py',
-			'ergopti_plus/macos/platform/suspended_image_owner.py',
-			'ergopti_plus/macos/platform/source_alias_owner.py',
-			'ergopti_plus/macos/platform/ollama_bootstrap_owner.py',
-			'ergopti_plus/macos/platform/ollama_daemon_authority.py',
+			'ergopti_plus/macos/ai/engine/ollama/managed_ollama_runtime.py',
+			'ergopti_plus/macos/ai/adapters/suspended_image_owner.py',
+			'ergopti_plus/macos/ai/adapters/source_alias_owner.py',
+			'ergopti_plus/macos/ai/adapters/ollama_bootstrap_owner.py',
+			'ergopti_plus/macos/ai/adapters/ollama_daemon_authority.py',
 			'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
 			'ergopti_plus/macos/core/network/adapters/native_http.py',
 			'ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json',
@@ -297,37 +297,37 @@ const CURATED_READS = [
 		why: 'the serve owner binds original source, empty bootstrap and sealed daemon authority'
 	},
 	{
-		reader: 'ergopti_plus/macos/platform/suspended_image_owner.py',
+		reader: 'ergopti_plus/macos/ai/adapters/suspended_image_owner.py',
 		needles: ['Path(__file__).with_name("trusted_native_guardian.py")'],
-		targets: ['ergopti_plus/macos/platform/trusted_native_guardian.py'],
+		targets: ['ergopti_plus/macos/ai/adapters/trusted_native_guardian.py'],
 		why: 'the suspended original image uses only the admitted bundle guardian'
 	},
 	{
-		reader: 'ergopti_plus/macos/platform/trusted_native_guardian.py',
+		reader: 'ergopti_plus/macos/ai/adapters/trusted_native_guardian.py',
 		needles: ['Path(__file__).parent / "network/native_http.py"'],
 		targets: ['ergopti_plus/macos/core/network/adapters/native_http.py'],
 		why: 'guardian admission retains the existing native helper trust boundary'
 	},
 	{
-		reader: 'ergopti_plus/macos/platform/ollama_bootstrap_owner.py',
+		reader: 'ergopti_plus/macos/ai/adapters/ollama_bootstrap_owner.py',
 		needles: [
 			'Path(__file__).with_name("suspended_image_owner.py")',
 			'Path(__file__).absolute().parents[2] / "_shared/ai/adapters/python/managed_ollama_bootstrap.py"'
 		],
 		targets: [
-			'ergopti_plus/macos/platform/suspended_image_owner.py',
+			'ergopti_plus/macos/ai/adapters/suspended_image_owner.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_bootstrap.py'
 		],
 		why: 'native descriptor ownership delegates bootstrap data and policy to shared code'
 	},
 	{
-		reader: 'ergopti_plus/macos/platform/ollama_daemon_authority.py',
+		reader: 'ergopti_plus/macos/ai/adapters/ollama_daemon_authority.py',
 		needles: [
 			'Path(__file__).with_name("suspended_image_owner.py")',
 			'Path(__file__).absolute().parents[2]\n    / "_shared/ai/adapters/python/managed_ollama_daemon_authority.py"'
 		],
 		targets: [
-			'ergopti_plus/macos/platform/suspended_image_owner.py',
+			'ergopti_plus/macos/ai/adapters/suspended_image_owner.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_daemon_authority.py'
 		],
 		why: 'the same-session source receipt retains its shared lexical authority'
@@ -345,7 +345,7 @@ const CURATED_READS = [
 		why: 'sealed source admission preserves the original session and strict alias policy'
 	},
 	{
-		reader: 'ergopti_plus/macos/platform/source_alias_owner.py',
+		reader: 'ergopti_plus/macos/ai/adapters/source_alias_owner.py',
 		needles: [
 			'Path(__file__).resolve().parents[2] / "_shared/ai/adapters/python/managed_source_alias.py"'
 		],
@@ -365,25 +365,25 @@ const CURATED_READS = [
 		why: 'authenticated loopback calls keep the actual native wire and alias contract'
 	},
 	{
-		reader: 'ergopti_plus/macos/modules/llm/managed_native_python.lua',
+		reader: 'ergopti_plus/macos/ai/engine/bootstrap/managed_native_python.lua',
 		needles: [
 			'require("core.lifecycle.engine.core.managed_python_locator")',
-			'require("adapters.native_python_probe")',
+			'require("ai.adapters.native_python_probe")',
 			'require("core.events.timer_scheduler")',
-			'require("modules.llm.bootstrap_retry_generated")'
+			'require("ai.engine.bootstrap.retry_generated")'
 		],
 		targets: [
 			'ergopti_plus/_shared/core/lifecycle/engine/core/managed_python_locator.lua',
-			'ergopti_plus/macos/adapters/native_python_probe.lua',
+			'ergopti_plus/macos/ai/adapters/native_python_probe.lua',
 			'ergopti_plus/macos/core/events/timer_scheduler.lua',
-			'ergopti_plus/macos/modules/llm/bootstrap_retry_generated.lua'
+			'ergopti_plus/macos/ai/engine/bootstrap/retry_generated.lua'
 		],
 		why: 'private Python selection consumes the generated pinned locator and retained native header probe'
 	},
 	{
-		reader: 'ergopti_plus/macos/adapters/native_python_probe.lua',
-		needles: ['require("modules.llm.bootstrap_retry_generated")'],
-		targets: ['ergopti_plus/macos/modules/llm/bootstrap_retry_generated.lua'],
+		reader: 'ergopti_plus/macos/ai/adapters/native_python_probe.lua',
+		needles: ['require("ai.engine.bootstrap.retry_generated")'],
+		targets: ['ergopti_plus/macos/ai/engine/bootstrap/retry_generated.lua'],
 		why: 'the exact native header probe preserves canonical original admission and retirement budgets'
 	},
 	{
@@ -1154,7 +1154,10 @@ try {
 	// One removal per reference kind: the audit must name the missing file
 	const removals = [
 		['ergopti_plus/_shared/core/text/engine/json.lua', 'a required shared Lua module'],
-		['ergopti_plus/macos/modules/llm/network-retry.sh', 'a file a bootstrap script sources'],
+		[
+			'ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh',
+			'a file a bootstrap script sources'
+		],
 		['ergopti_plus/_shared/ui/host_bridge.js', 'a script a WebView page loads'],
 		['ergopti_plus/_shared/hotstrings/data/catalogue/defaults.toml', 'a shared data file'],
 		['img/logo/logo_white.png', 'a curated image read'],

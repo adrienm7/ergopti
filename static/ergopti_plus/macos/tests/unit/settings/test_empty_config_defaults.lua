@@ -7,7 +7,7 @@ helpers.describe("empty configuration boot projection", function()
 	helpers.it("keeps the AI menu neutral and takes privacy parameters from the shared owner", function()
 		helpers.with_fresh_modules({ "modules.keystats.kc_bridge" }, function()
 		package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
-		local menu = helpers.load_with_stubs("ui.menu.menu_llm")
+		local menu = helpers.load_with_stubs("ai.ui.menu")
 		local manifest = require("menu.engine.manifest_reader")
 		helpers.assert_eq(menu.DEFAULT_STATE.llm_enabled, false)
 		-- The dedicated trigger shortcut is retired: a prediction on demand is the

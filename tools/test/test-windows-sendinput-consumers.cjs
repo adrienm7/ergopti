@@ -65,7 +65,10 @@ const design = fs.readFileSync(DESIGN, 'utf8');
 for (const file of Object.keys(DECIDED)) {
 	if (!design.includes(`\`${file}\``)) errors.push(`the design note does not name ${file}`);
 }
-const adapter = fs.readFileSync(path.join(WINDOWS, 'adapters', 'llm_nav_event_owner.ahk'), 'utf8');
+const adapter = fs.readFileSync(
+	path.join(WINDOWS, 'ai', 'adapters', 'nav_event_owner.ahk'),
+	'utf8'
+);
 if (!adapter.includes('LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES'))
 	errors.push('the native cycle routes are no longer parked');
 const native = fs.readFileSync(

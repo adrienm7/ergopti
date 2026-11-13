@@ -27,7 +27,7 @@ elseif kind == "locale" then
     local result = bridge.on_message({ action = "previewLocale", locale = "en" }, state)
     assert(type(result) == "table" and result.pushed == regular, "onboarding locale admission")
 else
-    local bridge = require("ui.model_browser.bridge")
+    local bridge = require("ai.ui.model_browser.bridge")
     local identity = {}
     local llm = { get_cached_models = function() return {} end,
                   get_cached_models_status = function() return {}, true, identity end, get_current_model = function() return "" end,

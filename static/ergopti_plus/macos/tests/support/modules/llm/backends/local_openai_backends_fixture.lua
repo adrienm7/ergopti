@@ -62,12 +62,12 @@ end
 --- probe, inference and agent HTTP clients faked.
 --- @param scenario function Receives (api, LocalServers, world).
 local function with_backend(scenario)
-	helpers.with_fresh_modules({ "modules.llm.local_servers", "modules.llm.api_remote" }, function()
-		local api = helpers.load_with_stubs("modules.llm.api_remote")
+	helpers.with_fresh_modules({ "ai.engine.local_servers.local_servers", "ai.engine.api.remote" }, function()
+		local api = helpers.load_with_stubs("ai.engine.api.remote")
 		-- A test changes where the fake scan finds a server through world.scan_overrides
 		local scan_overrides = {}
 		local scans = require("tests.support.modules.llm.backends.local_server_scan_fake").install(api, scan_overrides)
-		local LocalServers = require("modules.llm.local_servers")
+		local LocalServers = require("ai.engine.local_servers.local_servers")
 		for _, id in ipairs(LocalServers.ORDER) do
 			if not DRIVEN[id] then scan_overrides[id] = { running = false, pids = {}, detail = "no running process" } end
 		end
@@ -121,7 +121,7 @@ end
 
 local function with_panel(scenario)
 	local owned = {
-		"ui.menu.menu_llm.local_server_panel", "ui.menu.menu_llm.api_panel", "modules.llm",
+		"ai.ui.menu.panels.local_server_panel", "ai.ui.menu.panels.api_panel", "ai.engine",
 		"core.ui.engine.dialog_util", "core.ui.engine.notifications", "core.timing.engine.deferred_work",
 	}
 	with_backend(function(api, LocalServers, world)
@@ -138,7 +138,7 @@ local function with_panel(scenario)
 					return true
 				end,
 			}
-			package.loaded["modules.llm"] = {
+			package.loaded["ai.engine"] = {
 				api_remote = api,
 				persist_api_entries = function(callback)
 					world.persists = world.persists + 1
@@ -157,7 +157,7 @@ local function with_panel(scenario)
 					return true
 				end,
 			}
-			local Panel = require("ui.menu.menu_llm.local_server_panel")
+			local Panel = require("ai.ui.menu.panels.local_server_panel")
 			local ctx = {
 				state = { llm_backend = "ollama", llm_model = "", llm_enabled = true },
 				paused = false,

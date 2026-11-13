@@ -2282,7 +2282,7 @@ try {
 		for (const relative of [
 			'tools/build/launcher_localizations.py',
 			'static/ergopti_plus/_shared/core/text/data/identifiers.sh',
-			'static/ergopti_plus/macos/modules/llm/network-retry.sh',
+			'static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh',
 			'static/ergopti_plus/_shared/core/network/data/route_origins.json',
 			'static/ergopti_plus/_shared/core/i18n/data/locale_order.json'
 		]) {

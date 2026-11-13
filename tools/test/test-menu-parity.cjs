@@ -233,33 +233,33 @@ const OPENS_SUBMENU = {
 			menu: 'agent_system1_frame',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/agent_panel.lua' }
 		},
 		{
 			menu: 'agent_download_frame',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/agent_panel.lua' }
 		},
 		'agent_system_controls',
 		{
 			menu: 'agent_server_empty_status',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/agent_panel.lua' }
 		},
 		'agent_system_model_controls',
 		{
 			menu: 'agent_system_model_installed_controls',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/agent_panel.lua' }
 		},
 		{
 			menu: 'agent_system_model_missing_controls',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/agent_panel.lua' }
 		}
 	],
 	agent_system2: [
@@ -267,33 +267,33 @@ const OPENS_SUBMENU = {
 			menu: 'agent_system2_frame',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/agent_panel.lua' }
 		},
 		{
 			menu: 'agent_download_frame',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/agent_panel.lua' }
 		},
 		'agent_system_controls',
 		{
 			menu: 'agent_server_empty_status',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/agent_panel.lua' }
 		},
 		'agent_system_model_controls',
 		{
 			menu: 'agent_system_model_installed_controls',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/agent_panel.lua' }
 		},
 		{
 			menu: 'agent_system_model_missing_controls',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/agent_panel.lua' }
 		}
 	],
 	configuration: 'configuration_menu',
@@ -929,13 +929,13 @@ const OPENS_SUBMENU = {
 			menu: 'llm_api_add_provider_group',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/api_panel.lua' }
 		},
 		{
 			menu: 'llm_api_add_separator',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/api_panel.lua' }
 		}
 	],
 	// All three profile providers render the shared Create/Clone command head.
@@ -946,14 +946,14 @@ const OPENS_SUBMENU = {
 			menu: 'llm_profile_windows_frame',
 			platforms: ['ahk'],
 			kind: 'compose',
-			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk' }
+			native_sources: { ahk: 'windows/ai/ui/menu/profiles.ahk' }
 		},
 		{
 			menu: 'llm_profile_lua_frame',
 			platforms: ['hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
+				hs: 'macos/ai/ui/menu/profiles_manager.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -968,7 +968,7 @@ const OPENS_SUBMENU = {
 			menu: 'llm_display_provider_boundary',
 			platforms: ['ahk'],
 			kind: 'compose',
-			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
+			native_sources: { ahk: 'windows/ai/ui/menu/settings.ahk' }
 		}
 	],
 	// Native prediction modifier providers consume the shared child records.
@@ -979,7 +979,7 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk',
+				ahk: 'windows/ai/ui/menu/settings.ahk',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -1053,7 +1053,7 @@ const OPENS_SUBMENU = {
 		menu: 'agent_excluded_apps_frame',
 		platforms: ['hs'],
 		kind: 'compose',
-		native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		native_sources: { hs: 'macos/ai/ui/menu/panels/agent_panel.lua' }
 	},
 	agent: [
 		'agent_menu',
@@ -1061,7 +1061,7 @@ const OPENS_SUBMENU = {
 			menu: 'agent_panel_frame',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+			native_sources: { hs: 'macos/ai/ui/menu/panels/agent_panel.lua' }
 		}
 	]
 };
@@ -1071,21 +1071,21 @@ OPENS_SUBMENU.llm_model.push({
 	platforms: ['ahk', 'hs'],
 	kind: 'compose',
 	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_main.ahk',
-		hs: 'macos/ui/menu/menu_llm/init.lua'
+		ahk: 'windows/ai/ui/menu/menu_main.ahk',
+		hs: 'macos/ai/ui/menu/init.lua'
 	}
 });
 OPENS_SUBMENU.llm_model.push({
 	menu: 'llm_install_warning_frame',
 	platforms: ['ahk'],
 	kind: 'compose',
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
+	native_sources: { ahk: 'windows/ai/ui/menu/menu_main.ahk' }
 });
 OPENS_SUBMENU.llm.push({
 	menu: 'llm_native_parent',
 	platforms: ['hs'],
 	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' },
+	native_sources: { hs: 'macos/ai/ui/menu/init.lua' },
 	completed_parent: { hs: 'llm' }
 });
 OPENS_SUBMENU.llm_parent_content = 'llm_menu';
@@ -1094,7 +1094,7 @@ for (const kind of ['llm', 'agent']) {
 		menu: kind === 'llm' ? 'llm_native_parent_linux' : 'agent_native_parent',
 		platforms: ['linux'],
 		kind: 'compose',
-		native_sources: { linux: 'linux/ui/menu/ai_parent.lua' },
+		native_sources: { linux: 'linux/ai/ui/menu/parent.lua' },
 		completed_linux_ai_parent: kind
 	});
 }
@@ -1105,13 +1105,13 @@ OPENS_SUBMENU.llm.push({
 	menu: 'llm_download_shortcut_frame',
 	platforms: ['hs'],
 	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' }
+	native_sources: { hs: 'macos/ai/ui/menu/init.lua' }
 });
 OPENS_SUBMENU.llm_profile.push({
 	menu: 'llm_profile_app_override_frame',
 	platforms: ['ahk'],
 	kind: 'compose',
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk' }
+	native_sources: { ahk: 'windows/ai/ui/menu/profiles.ahk' }
 });
 OPENS_SUBMENU.llm_navigation = [
 	OPENS_SUBMENU.llm_navigation,
@@ -1119,43 +1119,43 @@ OPENS_SUBMENU.llm_navigation = [
 		menu: 'llm_modifier_picker_frame',
 		platforms: ['hs'],
 		kind: 'compose',
-		native_sources: { hs: 'macos/ui/menu/menu_llm/settings_manager.lua' }
+		native_sources: { hs: 'macos/ai/ui/menu/settings_manager.lua' }
 	}
 ];
 OPENS_SUBMENU.llm_model.push({
 	menu: 'llm_api_active_boundary',
 	platforms: ['hs'],
 	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
+	native_sources: { hs: 'macos/ai/ui/menu/panels/api_panel.lua' }
 });
 OPENS_SUBMENU.llm_model.push({
 	menu: 'llm_api_system1_frame',
 	platforms: ['hs'],
 	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
+	native_sources: { hs: 'macos/ai/ui/menu/panels/api_panel.lua' }
 });
 OPENS_SUBMENU.llm_generation_settings.push({
 	menu: 'llm_generation_count_control',
 	platforms: ['ahk', 'hs'],
 	kind: 'compose',
 	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk',
-		hs: 'macos/ui/menu/menu_llm/init.lua'
+		ahk: 'windows/ai/ui/menu/settings.ahk',
+		hs: 'macos/ai/ui/menu/init.lua'
 	}
 });
 OPENS_SUBMENU.llm_generation_settings.push({
 	menu: 'llm_generation_count_reset_control',
 	platforms: ['hs'],
 	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' }
+	native_sources: { hs: 'macos/ai/ui/menu/init.lua' }
 });
 OPENS_SUBMENU.llm_generation_settings.push({
 	menu: 'llm_generation_context_controls',
 	platforms: ['ahk', 'hs'],
 	kind: 'compose',
 	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk',
-		hs: 'macos/ui/menu/menu_llm/init.lua'
+		ahk: 'windows/ai/ui/menu/settings.ahk',
+		hs: 'macos/ai/ui/menu/init.lua'
 	}
 });
 OPENS_SUBMENU.llm_generation_settings.push({
@@ -1163,36 +1163,36 @@ OPENS_SUBMENU.llm_generation_settings.push({
 	platforms: ['ahk', 'hs'],
 	kind: 'compose',
 	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk',
-		hs: 'macos/ui/menu/menu_llm/init.lua'
+		ahk: 'windows/ai/ui/menu/settings.ahk',
+		hs: 'macos/ai/ui/menu/init.lua'
 	}
 });
 OPENS_SUBMENU.llm_generation_settings.push({
 	menu: 'llm_native_numeric_reset',
 	platforms: ['ahk'],
 	kind: 'compose',
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
+	native_sources: { ahk: 'windows/ai/ui/menu/settings.ahk' }
 });
 OPENS_SUBMENU.llm_generation_settings.push({
 	menu: 'llm_generation_temperature_controls',
 	platforms: ['ahk', 'hs'],
 	kind: 'compose',
 	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk',
-		hs: 'macos/ui/menu/menu_llm/temperature_panel.lua'
+		ahk: 'windows/ai/ui/menu/settings.ahk',
+		hs: 'macos/ai/ui/menu/panels/temperature_panel.lua'
 	}
 });
 OPENS_SUBMENU.llm_trigger.push({
 	menu: 'llm_trigger_debounce_control',
 	platforms: ['ahk'],
 	kind: 'compose',
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
+	native_sources: { ahk: 'windows/ai/ui/menu/settings.ahk' }
 });
 OPENS_SUBMENU.llm_display.push({
 	menu: 'llm_display_inline_control',
 	platforms: ['ahk'],
 	kind: 'compose',
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
+	native_sources: { ahk: 'windows/ai/ui/menu/settings.ahk' }
 });
 // Actual switching uses genuine canonical parents and native picker data on every driver.
 OPENS_SUBMENU.layout_switching = {
@@ -1292,20 +1292,20 @@ OPENS_SUBMENU.agent_disabled_apps = [
 		menu: 'agent_linux_disabled_apps_frame',
 		platforms: ['linux'],
 		kind: 'compose',
-		native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+		native_sources: { linux: 'linux/ai/ui/menu/agent_rows.lua' }
 	},
 	{
 		menu: 'agent_linux_disabled_apps_children',
 		platforms: ['linux'],
 		kind: 'compose',
-		native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+		native_sources: { linux: 'linux/ai/ui/menu/agent_rows.lua' }
 	}
 ];
 OPENS_SUBMENU.agent_disabled_app_records = {
 	menu: 'agent_linux_disabled_app_remove',
 	platforms: ['linux'],
 	kind: 'compose',
-	native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+	native_sources: { linux: 'linux/ai/ui/menu/agent_rows.lua' }
 };
 
 // Preserve every existing platform route and add actual complete Linux frames.
@@ -1318,15 +1318,15 @@ for (const system of ['system1', 'system2']) {
 			platforms: ['linux', 'ahk'],
 			kind: 'compose',
 			native_sources: {
-				linux: 'linux/ui/menu/agent_rows.lua',
-				ahk: 'windows/ui/menu/menu_llm/menu_agent.ahk'
+				linux: 'linux/ai/ui/menu/agent_rows.lua',
+				ahk: 'windows/ai/ui/menu/agent.ahk'
 			}
 		},
 		{
 			menu: 'agent_linux_system_children',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+			native_sources: { linux: 'linux/ai/ui/menu/agent_rows.lua' }
 		}
 	];
 }
@@ -1334,13 +1334,13 @@ OPENS_SUBMENU.agent_system_backend_rows = {
 	menu: 'agent_linux_system_backend_record',
 	platforms: ['linux'],
 	kind: 'compose',
-	native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+	native_sources: { linux: 'linux/ai/ui/menu/agent_rows.lua' }
 };
 OPENS_SUBMENU.agent_system_model_rows = {
 	menu: 'agent_system_model_controls',
 	platforms: ['linux'],
 	kind: 'compose',
-	native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+	native_sources: { linux: 'linux/ai/ui/menu/agent_rows.lua' }
 };
 OPENS_SUBMENU.agent_system_off_rows = 'agent_system_controls';
 
@@ -1349,7 +1349,7 @@ OPENS_SUBMENU.llm_profile.push({
 	menu: 'llm_profile_parent_frame_ahk',
 	platforms: ['ahk'],
 	kind: 'compose',
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
+	native_sources: { ahk: 'windows/ai/ui/menu/menu_main.ahk' }
 });
 OPENS_SUBMENU.llm_profile.push({
 	menu: 'llm_profile_parent_ahk',
@@ -1372,7 +1372,7 @@ OPENS_SUBMENU.llm_profile.push({
 			consumer: 'Map("llm_profile_parent_rows", (*) => ParentRows)'
 		}
 	},
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
+	native_sources: { ahk: 'windows/ai/ui/menu/menu_main.ahk' }
 });
 OPENS_SUBMENU.llm_profile_parent = [
 	'llm_profile_commands',
@@ -1380,7 +1380,7 @@ OPENS_SUBMENU.llm_profile_parent = [
 		menu: 'llm_profile_windows_frame',
 		platforms: ['ahk'],
 		kind: 'compose',
-		native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk' }
+		native_sources: { ahk: 'windows/ai/ui/menu/profiles.ahk' }
 	}
 ];
 
@@ -1553,7 +1553,7 @@ const manifest = JSON.parse(readSourceFile(MANIFEST));
 {
 	const assert = require('node:assert/strict');
 	const { nativeBuildCommandBinding } = require('../lib/menu-template-binding.cjs');
-	const source = readSourceFile(path.join(SP, 'windows/ui/menu/menu_llm/menu_agent.ahk'));
+	const source = readSourceFile(path.join(SP, 'windows/ai/ui/menu/agent.ahk'));
 	const renderer = readSourceFile(path.join(SP, 'windows/menu/engine/manifest_menu.ahk'));
 	for (const [key, port] of [
 		['agent_disabled_apps', 1],
@@ -1857,7 +1857,7 @@ const {
 {
 	const assert = require('node:assert/strict');
 	const { nativeLlmParentPublication } = require('../lib/menu-native-llm-parent-binding.cjs');
-	const source = readSourceFile(path.join(SP, 'macos/ui/menu/menu_llm/init.lua'));
+	const source = readSourceFile(path.join(SP, 'macos/ai/ui/menu/init.lua'));
 	const builder = readSourceFile(path.join(SP, 'macos/menu/ui/builder/builder.lua'));
 	const rows = manifest.llm_native_parent;
 	const credits = (
@@ -2696,7 +2696,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 {
 	const assert = require('node:assert/strict');
 	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
-	const file = 'linux/ui/menu/agent_rows.lua';
+	const file = 'linux/ai/ui/menu/agent_rows.lua';
 	const native = readSourceFile(path.join(SP, file));
 	const owners = [
 		['agent_linux_disabled_app_remove', 'agent_disabled_app_remove', 1],
@@ -2773,7 +2773,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 {
 	const assert = require('node:assert/strict');
 	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
-	const linux = 'linux/ui/menu/agent_rows.lua';
+	const linux = 'linux/ai/ui/menu/agent_rows.lua';
 	const owners = [
 		[linux, 'linux', '.lua', 'agent_linux_system_backend_record', 'agent_system_backend', 1],
 		[linux, 'linux', '.lua', 'agent_linux_system_backend_record', 'agent_system_backend_label', 2],
@@ -2808,7 +2808,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		],
 		[linux, 'linux', '.lua', 'agent_system_model_controls', 'agent_system_model_caption', 2],
 		[
-			'windows/ui/menu/menu_llm/menu_agent.ahk',
+			'windows/ai/ui/menu/agent.ahk',
 			'ahk',
 			'.ahk',
 			'agent_system_model_controls',
@@ -2820,7 +2820,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 			'agent_system_model_installed_controls',
 			'agent_system_model_missing_controls'
 		].map((section) => [
-			'macos/ui/menu/menu_llm/agent_panel.lua',
+			'macos/ai/ui/menu/panels/agent_panel.lua',
 			'hs',
 			'.lua',
 			section,
@@ -3071,7 +3071,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		'macos/menu/ui/init.lua',
 		'macos/menu/ui/builder/builder.lua',
 		'macos/menu/ui/builder/canvas_badge.lua',
-		'macos/ui/menu/menu_llm/init.lua'
+		'macos/ai/ui/menu/init.lua'
 	];
 	const sources = Object.fromEntries(
 		sourceFiles.map((file) => [file, readSourceFile(path.join(SP, file))])
@@ -3223,7 +3223,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 	// current executable coordinates follow the already reviewed retained native route.
 	const forwardBadgeSourceControl = (control) => {
 		if (
-			control.path === 'macos/ui/menu/menu_llm/init.lua' &&
+			control.path === 'macos/ai/ui/menu/init.lua' &&
 			control.reason === 'actual finished native download callback disconnected'
 		) {
 			return { ...control, before: 'return item', after: 'item.fn = function() end\nreturn item' };
@@ -3625,7 +3625,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 const linuxMenuSources = readLinuxMenuSources(SP);
 const linuxAiSources = {
 	...Object.fromEntries(
-		['linux/ui/menu/ai_parent.lua', 'linux/ui/menu/agent_rows.lua'].map((file) => [
+		['linux/ai/ui/menu/parent.lua', 'linux/ai/ui/menu/agent_rows.lua'].map((file) => [
 			file,
 			readSourceFile(path.join(SP, file))
 		])
@@ -3655,7 +3655,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 		const readonlyBuilder = linuxAiSources[readonlyFile];
 		const readonlyControls = [
 			[
-				'\n\tlocal Preferences = require("infra.llm_preferences")',
+				'\n\tlocal Preferences = require("ai.engine.preferences")',
 				'\n\tlocal Preferences = require("foreign.preferences")',
 				'foreign preference owner'
 			],
@@ -3687,13 +3687,13 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'unbound row predicate'
 			],
 			[
-				'\n\tlocal Preferences = require("infra.llm_preferences")',
-				'\n\tlocal Preferences = require("infra.llm_preferences") Preferences.admit = function() return true end',
+				'\n\tlocal Preferences = require("ai.engine.preferences")',
+				'\n\tlocal Preferences = require("ai.engine.preferences") Preferences.admit = function() return true end',
 				'mutated preference callback'
 			],
 			[
-				'\n\tlocal Preferences = require("infra.llm_preferences")',
-				'\n\tlocal Preferences = require("infra.llm_preferences") local Preferences = {}',
+				'\n\tlocal Preferences = require("ai.engine.preferences")',
+				'\n\tlocal Preferences = require("ai.engine.preferences") local Preferences = {}',
 				'shadowed preference owner'
 			],
 			[
@@ -3707,8 +3707,8 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'rebound predicate'
 			],
 			[
-				'\n\tlocal Preferences = require("infra.llm_preferences")',
-				'\n\t-- local Preferences = require("infra.llm_preferences")',
+				'\n\tlocal Preferences = require("ai.engine.preferences")',
+				'\n\t-- local Preferences = require("ai.engine.preferences")',
 				'comment-only preference owner'
 			]
 		];
@@ -3898,11 +3898,11 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 		};
 		assert.equal(admits(linuxAiSources, topDuplicate), false, 'duplicate genuine tray declaration');
 		const producerFile =
-			kind === 'agent' ? 'linux/ui/menu/agent_rows.lua' : 'linux/menu/ui/builder/builder.lua';
+			kind === 'agent' ? 'linux/ai/ui/menu/agent_rows.lua' : 'linux/menu/ui/builder/builder.lua';
 		const replacements = [
 			[
 				producerFile,
-				'local NativeParent = require("ui.menu.ai_parent")',
+				'local NativeParent = require("ai.ui.menu.parent")',
 				'local NativeParent = require("foreign.owner")'
 			],
 			[
@@ -3933,19 +3933,19 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'local rendered = {}'
 			],
 			[
-				'linux/ui/menu/ai_parent.lua',
+				'linux/ai/ui/menu/parent.lua',
 				'local current_enabled = enabled(ticket)',
 				'local current_enabled = ticket.enabled'
 			],
 			[
-				'linux/ui/menu/ai_parent.lua',
+				'linux/ai/ui/menu/parent.lua',
 				'if not current(ticket) or not unchanged(native_children)',
 				'if not unchanged(native_children)'
 			],
-			['linux/ui/menu/ai_parent.lua', 'not unchanged(getter_snapshot)', 'false'],
-			['linux/ui/menu/ai_parent.lua', 'not rawequal(rawget(row, "submenu"), children)', 'false'],
-			['linux/ui/menu/ai_parent.lua', 'api_method(renderer, method)', 'renderer[method]'],
-			['linux/ui/menu/ai_parent.lua', 'return row\nend', 'return { label = "synthetic" }\nend']
+			['linux/ai/ui/menu/parent.lua', 'not unchanged(getter_snapshot)', 'false'],
+			['linux/ai/ui/menu/parent.lua', 'not rawequal(rawget(row, "submenu"), children)', 'false'],
+			['linux/ai/ui/menu/parent.lua', 'api_method(renderer, method)', 'renderer[method]'],
+			['linux/ai/ui/menu/parent.lua', 'return row\nend', 'return { label = "synthetic" }\nend']
 		];
 		const disabledRow =
 			'elseif row.disabled == true then\n\t\t\t\t\trows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true,\n\t\t\t\t\t\tdisabled_reason_key = row.reason_key }';
@@ -3976,8 +3976,8 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				],
 				[
 					producerFile,
-					'local NativeParent = require("ui.menu.ai_parent")',
-					'local NativeParent = require("ui.menu.ai_parent")\nlocal NativeParent = {}'
+					'local NativeParent = require("ai.ui.menu.parent")',
+					'local NativeParent = require("ai.ui.menu.parent")\nlocal NativeParent = {}'
 				]
 			);
 
@@ -4002,13 +4002,13 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				],
 				[
 					producerFile,
-					'local NativeParent = require("ui.menu.ai_parent")',
-					'local NativeParent = require("ui.menu.ai_parent")\nNativeParent.finish = function() return nil end'
+					'local NativeParent = require("ai.ui.menu.parent")',
+					'local NativeParent = require("ai.ui.menu.parent")\nNativeParent.finish = function() return nil end'
 				],
 				[
 					producerFile,
-					'local NativeParent = require("ui.menu.ai_parent")',
-					'local NativeParent = require("ui.menu.ai_parent")\nNativeParent["finish"] = function() return { label = "synthetic" } end'
+					'local NativeParent = require("ai.ui.menu.parent")',
+					'local NativeParent = require("ai.ui.menu.parent")\nNativeParent["finish"] = function() return { label = "synthetic" } end'
 				],
 				[
 					producerFile,
@@ -4025,8 +4025,8 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				],
 				[
 					producerFile,
-					'local NativeParent = require("ui.menu.ai_parent")',
-					'local NativeParent = require("ui.menu.ai_parent")\nNativeParent.finish = function() return nil end'
+					'local NativeParent = require("ai.ui.menu.parent")',
+					'local NativeParent = require("ai.ui.menu.parent")\nNativeParent.finish = function() return nil end'
 				],
 				[
 					producerFile,
@@ -4047,7 +4047,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'\nM.build = function() return {} end\nreturn M\n'
 			],
 			[
-				'linux/ui/menu/agent_rows.lua',
+				'linux/ai/ui/menu/agent_rows.lua',
 				'\nreturn M\n',
 				'\nM.build = function() return nil end\nreturn M\n'
 			],
@@ -4057,7 +4057,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'\nM["build"] = function() return {} end\nreturn M\n'
 			],
 			[
-				'linux/ui/menu/agent_rows.lua',
+				'linux/ai/ui/menu/agent_rows.lua',
 				'\nreturn M\n',
 				'\nrawset(M, "build", function() return nil end)\nreturn M\n'
 			]
@@ -4103,17 +4103,17 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'rows[#rows + 1] = build(ctx) and {}'
 			],
 			[
-				'linux/ui/menu/agent_rows.lua',
+				'linux/ai/ui/menu/agent_rows.lua',
 				'local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers)',
 				'local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers) and { { title = "synthetic" } }'
 			],
 			[
-				'linux/ui/menu/agent_rows.lua',
+				'linux/ai/ui/menu/agent_rows.lua',
 				'\tend\n\tlocal providers = {}',
 				'\tend\n\tlocal changed = function() return nil end\n\tlocal providers = {}'
 			],
 			[
-				'linux/ui/menu/agent_rows.lua',
+				'linux/ai/ui/menu/agent_rows.lua',
 				'local children = ManifestMenu.build(',
 				'menu_ctx.commands.agent_mode = function() return false end\nlocal children = ManifestMenu.build('
 			],
@@ -4220,7 +4220,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'local llm = ctx.llm\n\t' + statement
 			]);
 
-		const agentRegistrationFile = 'linux/ui/menu/agent_rows.lua';
+		const agentRegistrationFile = 'linux/ai/ui/menu/agent_rows.lua';
 		const nativeCallbackEnd = '\t\t\t\treturn committed\n\t\t\tend,\n\t\t},';
 		for (const field of [
 			'agent_mode = false',
@@ -4279,8 +4279,8 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 		}
 		const quoted = {
 			...linuxAiSources,
-			'linux/ui/menu/ai_parent.lua':
-				linuxAiSources['linux/ui/menu/ai_parent.lua'] + '\n-- foreign owner comment\n'
+			'linux/ai/ui/menu/parent.lua':
+				linuxAiSources['linux/ai/ui/menu/parent.lua'] + '\n-- foreign owner comment\n'
 		};
 		assert.equal(
 			admits(quoted),
@@ -7842,7 +7842,7 @@ module.exports.receivingParser = luaPublicationParser;
 	const parser = receiving.receivingParser();
 	const producers = [
 		parser.body(
-			parser.lex(linuxAiSources['linux/ui/menu/agent_rows.lua']),
+			parser.lex(linuxAiSources['linux/ai/ui/menu/agent_rows.lua']),
 			'function M.build(ctx, dialogs)'
 		),
 		parser.body(

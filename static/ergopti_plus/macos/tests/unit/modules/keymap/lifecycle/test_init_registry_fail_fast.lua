@@ -30,7 +30,7 @@ local function load_keymap_with_results(results)
 		},
 		["modules.keymap.utils"] = {},
 		["platform.input.text_sender"] = {},
-		["modules.llm.app_filter"] = {},
+		["ai.engine.prediction.app_filter"] = {},
 		-- The real timing registry, read when the keymap loads, logs its path walk.
 		["core.logger.engine.logger"] = helpers.make_logger_stub(),
 		["platform.input.keycodes"] = {},
@@ -51,7 +51,7 @@ local function load_keymap_with_results(results)
 				return results.expander
 			end,
 		},
-		["modules.keymap.llm_bridge"] = {
+		["ai.engine.bridge"] = {
 			init = function()
 				outcome.llm_calls = outcome.llm_calls + 1
 				return results.llm

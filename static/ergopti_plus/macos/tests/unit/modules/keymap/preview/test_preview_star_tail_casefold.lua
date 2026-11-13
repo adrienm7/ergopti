@@ -18,11 +18,11 @@ local REPLACEMENT = "EXP"
 --- Installs narrow collaborators and captures committed tooltip rows.
 --- @param effects table Mutable capture table.
 local function install_collaborators(effects)
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = true },
 		check_modifiers = function() return false end,
 	}
-	package.loaded["modules.llm.prediction_engine"] = {
+	package.loaded["ai.engine.prediction.engine"] = {
 		init = function() return true end,
 		set_runtime_guard = function() end,
 		get_llm_enabled = function() return false end,
@@ -77,7 +77,7 @@ local function fresh_runtime(effects, magic_key)
 		end
 	end
 	install_collaborators(effects)
-	local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+	local Bridge = helpers.load_with_stubs("ai.engine.bridge")
 	local State = require("modules.keymap.state")
 	local Registry = assert(package.loaded["settings.engine.registry"])
 	local Expander = assert(package.loaded["modules.keymap.expander"])
@@ -85,7 +85,7 @@ local function fresh_runtime(effects, magic_key)
 	state.preview_providers = {}
 	state.is_repeat_feature_enabled = function() return false end
 	Registry.init(state)
-	require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
+	require("ai.engine.api.context").seed(state, state.buffer or "", "")
 	Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
 	Expander.init(state, Registry, Bridge)
 	Bridge.set_preview_star_enabled(true)

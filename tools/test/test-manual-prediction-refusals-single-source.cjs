@@ -25,9 +25,9 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const SOURCES = {
-	windows: path.join(SP, 'windows', 'ui', 'menu', 'menu_llm', 'menu_settings.ahk'),
-	macos: path.join(SP, 'macos', 'modules', 'llm', 'prediction_engine.lua'),
-	linux: path.join(SP, 'linux', 'modules', 'llm', 'prediction_engine.lua')
+	windows: path.join(SP, 'windows', 'ai', 'ui', 'menu', 'settings.ahk'),
+	macos: path.join(SP, 'macos', 'ai', 'engine', 'prediction', 'engine.lua'),
+	linux: path.join(SP, 'linux', 'ai', 'engine', 'prediction', 'engine.lua')
 };
 const EN = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales', 'en.json');
 const EXPECTED_REASONS = ['paused', 'disabled', 'backend_not_ready', 'empty_context'];

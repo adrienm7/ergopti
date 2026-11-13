@@ -149,7 +149,7 @@ local function load_fixture(options)
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.llm.ollama_binary"] = {
+	package.loaded["ai.engine.ollama.binary"] = {
 		-- These existing daemon-ready cases model a native-owned source.
 		resolve = function() return "/fixture/ollama", nil, "native_managed" end,
 		-- metadata_pending_reads models the runtime metadata still being read
@@ -162,7 +162,7 @@ local function load_fixture(options)
 			return "/fixture/ollama", {}
 		end,
 	}
-	package.loaded["modules.llm.api_ollama"] = {
+	package.loaded["ai.engine.api.ollama"] = {
 		ensure_running = function(transaction)
 			fixture.daemon_calls = fixture.daemon_calls + 1
 			if options.defer_daemon_ready == true then
@@ -192,7 +192,7 @@ local function load_fixture(options)
 		end,
 		resume_warmup = function() return true end,
 	}
-	package.loaded["modules.llm.api_common"] = {
+	package.loaded["ai.engine.api.common"] = {
 		protected_call = function(callback, _, ...)
 			if type(callback) == "function" then return callback(...) end
 			return true
@@ -227,15 +227,15 @@ local function load_fixture(options)
 	}
 
 	local checker_name = options.backend == "mlx"
-		and "modules.llm.mlx_deps_checker"
-		or "modules.llm.ollama_deps_checker"
+		and "ai.engine.local_servers.mlx_deps_checker"
+		or "ai.engine.ollama.deps_checker"
 	if options.backend == "mlx" then
 		package.loaded["core.fs.engine.paths"] = {
 			find_from_configdir = function()
 				return "/repo/modules/llm/ensure-mlx-deps.sh"
 			end,
 		}
-		package.loaded["modules.llm.pty_process_group"] = {
+		package.loaded["ai.engine.bootstrap.pty_process_group"] = {
 			create = function()
 				fixture.pty_create_calls = fixture.pty_create_calls + 1
 				interrupt_preflight("pty")
@@ -316,8 +316,8 @@ local function load_fixture(options)
 			execute_single = function() return true end,
 		}
 		for _, module_name in ipairs({
-			"modules.llm", "modules.llm.api_mlx",
-			"modules.llm.warmup_controller", "modules.llm.api_remote",
+			"ai.engine", "ai.engine.api.mlx",
+			"ai.engine.local_servers.warmup_controller", "ai.engine.api.remote",
 		}) do
 			package.loaded[module_name] = {
 				pause_warmup = function() return true end,

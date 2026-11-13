@@ -36,7 +36,7 @@ t(Key) => Key
 #Include ..\..\core\process\adapters\shell_runner.ahk
 #Include ..\..\core\network\adapters\proxy_override.ahk
 #Include ..\..\core\network\adapters\http_client.ahk
-#Include ..\..\modules\llm\remote_formats.ahk
+#Include ..\..\ai\engine\api\remote_formats.ahk
 
 _AgentOwnerMain(A_Args[1])
 

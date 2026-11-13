@@ -33,14 +33,14 @@ const brands = JSON.parse(
 // Log-label sites of the prediction engines: they name the backend in a log
 // line, not in the UI, and are compared to the shared file below.
 const REVIEWED_LITERAL_SITES = new Set([
-	'macos/modules/llm/prediction_engine.lua',
-	'windows/modules/llm/prediction_exec.ahk'
+	'macos/ai/engine/prediction/engine.lua',
+	'windows/ai/engine/prediction/exec.ahk'
 ]);
 
 const READERS = {
-	'macos/ui/menu/menu_llm/backend_labels.lua': 'ai/data/backends.json',
-	'windows/modules/llm/models.ahk': 'LLM_GetSharedPath("backends.json")',
-	'linux/modules/llm/backend_brands.lua': 'ai/data/backends.json'
+	'macos/ai/ui/menu/backend_labels.lua': 'ai/data/backends.json',
+	'windows/ai/engine/settings/models.ahk': 'LLM_GetSharedPath("backends.json")',
+	'linux/ai/engine/api/backend_brands.lua': 'ai/data/backends.json'
 };
 
 /** Collects the production sources of the three drivers and the shared tree. */
@@ -109,13 +109,13 @@ for (const [rel, needle] of Object.entries(READERS)) {
 // The three button builders put the emoji first, then one space, then the model.
 const mac = fs.readFileSync(path.join(SP, READERS_KEY('macos')), 'utf8');
 assert.match(mac, /return emoji \.\. " " \.\. model_text/, 'macOS button: emoji first');
-const win = fs.readFileSync(path.join(SP, 'windows/modules/llm/models.ahk'), 'utf8');
+const win = fs.readFileSync(path.join(SP, 'windows/ai/engine/settings/models.ahk'), 'utf8');
 assert.match(
 	win,
 	/return LLM_BackendEmoji\(BackendId\) \. " " \. ModelText/,
 	'Windows button: emoji first'
 );
-const lin = fs.readFileSync(path.join(SP, 'linux/modules/llm/backend_brands.lua'), 'utf8');
+const lin = fs.readFileSync(path.join(SP, 'linux/ai/engine/api/backend_brands.lua'), 'utf8');
 assert.match(
 	lin,
 	/return M\.emoji\(backend\) \.\. " " \.\. model_text/,

@@ -12,7 +12,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local Config = require("core.ui.ui.tooltip.config")
-local DisplaySettings = require("modules.llm.display_settings")
+local DisplaySettings = require("ai.engine.settings.display_settings")
 local LlmLine = require("core.ui.engine.tooltip.llm_line")
 local ConfigKeys = require("settings.engine.keys")
 local InfoBar = require("ai.engine.request_plan.info_bar")

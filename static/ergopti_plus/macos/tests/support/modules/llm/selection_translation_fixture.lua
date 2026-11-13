@@ -193,11 +193,11 @@ local function build_world(selection, ui_locale, options)
 	}
 
 	for _, name in ipairs({
-		"modules.llm", "modules.llm.profiles", "modules.llm.api_remote", "modules.llm.api_ollama",
-		"modules.llm.api_mlx", "modules.llm.parser", "modules.llm.prompt_builder",
-		"modules.llm.streaming_handler", "modules.llm.warmup_controller", "modules.llm.app_filter",
-		"modules.llm.api_common", "modules.llm.prediction_engine", "modules.llm.progressive_reveal",
-		"modules.llm.selection_translation", "modules.shortcuts.actions.text",
+		"ai.engine", "ai.engine.settings.profiles", "ai.engine.api.remote", "ai.engine.api.ollama",
+		"ai.engine.api.mlx", "ai.engine.api.parser", "ai.engine.prediction.prompt_builder",
+		"ai.engine.api.streaming_handler", "ai.engine.local_servers.warmup_controller", "ai.engine.prediction.app_filter",
+		"ai.engine.api.common", "ai.engine.prediction.engine", "ai.engine.prediction.progressive_reveal",
+		"ai.engine.prediction.selection_translation", "modules.shortcuts.actions.text",
 	}) do
 		package.loaded[name] = nil
 	end
@@ -258,7 +258,7 @@ local function build_world(selection, ui_locale, options)
 	i18n.get_locale = function() return ui_locale or "fr" end
 	world.i18n = i18n
 
-	local core = require("modules.llm")
+	local core = require("ai.engine")
 	world.core = core
 	local CoreState = get_upvalue(core.get_active_profile, "CoreState")
 	assert(type(CoreState) == "table", "the LLM core state must be reachable")
@@ -280,7 +280,7 @@ local function build_world(selection, ui_locale, options)
 		return true
 	end
 
-	local engine = require("modules.llm.prediction_engine")
+	local engine = require("ai.engine.prediction.engine")
 	world.engine = engine
 	local engine_state = {
 		buffer = "",
@@ -294,7 +294,7 @@ local function build_world(selection, ui_locale, options)
 	engine.init(engine_state)
 	world.engine_state = engine_state
 	engine.set_llm_enabled(true)
-	world.flow = require("modules.llm.selection_translation")
+	world.flow = require("ai.engine.prediction.selection_translation")
 	-- Only the timers of the actions run: the backend's own stay untouched
 	world.timer_baseline = #hs_stub.timer.__timers
 	package.loaded["modules.keymap"] = {

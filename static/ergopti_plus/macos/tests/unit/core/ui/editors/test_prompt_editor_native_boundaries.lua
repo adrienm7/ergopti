@@ -12,7 +12,7 @@ local function with_editor(callback)
 	local previous_hs = rawget(_G, "hs")
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
-			"ui.prompt_editor", "core.ui.ui.builder", "core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n",
+			"ai.ui.prompt_editor", "core.ui.ui.builder", "core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n",
 			"hs", "tests.stubs.hs",
 			"core.timing.engine.deferred_work",
 		}, function()
@@ -72,7 +72,7 @@ local function with_editor(callback)
 					return view
 				end,
 			}
-			callback(require("ui.prompt_editor"), state, hs_stub)
+			callback(require("ai.ui.prompt_editor"), state, hs_stub)
 		end)
 	end, debug.traceback)
 	_G.hs = previous_hs

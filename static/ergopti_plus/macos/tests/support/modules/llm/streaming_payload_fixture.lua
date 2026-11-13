@@ -10,19 +10,19 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"modules.llm.api_mlx_inference", "modules.llm.api_ollama", "modules.llm.api_common",
-	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
+	"ai.engine.api.mlx_inference", "ai.engine.api.ollama", "ai.engine.api.common",
+	"ai.engine.local_servers.mlx_stream_retirement", "ai.engine.ollama.endpoint", "ai.engine.api.parser",
 	"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.network.adapters.http_client", "core.fs.adapters.file_system",
 	"core.logger.engine.logger", "core.ui.engine.notifications", "core.timing.engine.timings", "core.text.engine.utils",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.lifecycle.engine.compat.utf8", "core.text.engine.toml.reader", "core.text.engine.json",
 	"ai.engine.api.parser_core", "core.logger.engine", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
 	"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
-	"adapters.managed_ollama_daemon", "core.process.adapters.owned_program_runner", "core.fs.engine.app_dirs", "settings.engine.publication.defaults",
+	"ai.adapters.managed_ollama_daemon", "core.process.adapters.owned_program_runner", "core.fs.engine.app_dirs", "settings.engine.publication.defaults",
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.ollama_runtime_choice", "hotstrings.engine.catalogue.personal_files",
-	"menu.engine.manifest_reader", "ai.engine.ollama.local_model_policy", "ai.engine.settings.profile_selector", "modules.llm.network_env",
-	"modules.llm.ollama_binary", "modules.llm.ollama_server_command", "modules.llm.opaque_network_admission",
-	"modules.llm.profiles", "modules.llm.progressive_reveal", "platform.remap.lease_helper",
+	"menu.engine.manifest_reader", "ai.engine.ollama.local_model_policy", "ai.engine.settings.profile_selector", "ai.engine.api.network_env",
+	"ai.engine.ollama.binary", "ai.engine.ollama.server_command", "ai.engine.api.opaque_network_admission",
+	"ai.engine.settings.profiles", "ai.engine.prediction.progressive_reveal", "platform.remap.lease_helper",
 }
 
 local function upvalue(fn, target)
@@ -53,7 +53,7 @@ local function with_stream(backend, callback)
 			debug = function() end, info = function() end, warn = function() end, error = function() end, done = function() end,
 			callback = function(_, _, fn, ...) return pcall(fn, ...) end,
 		}
-		local module = helpers.load_with_stubs(backend == "mlx" and "modules.llm.api_mlx_inference" or "modules.llm.api_ollama")
+		local module = helpers.load_with_stubs(backend == "mlx" and "ai.engine.api.mlx_inference" or "ai.engine.api.ollama")
 		local stream = backend == "mlx" and module.post_and_parse_streaming or upvalue(module.fetch_batch, "post_and_parse_streaming")
 		if backend == "mlx" then
 			module.init({ stream = { generation = 0 }, cancel_streaming = function() return true end,

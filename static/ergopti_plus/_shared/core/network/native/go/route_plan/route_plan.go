@@ -8,7 +8,7 @@ import (
 )
 
 // The per-origin route plan mirrors _shared/core/network/engine/route_plan.lua and the
-// shell twin in macos/modules/llm/network-retry.sh. All three answer the same
+// shell twin in macos/ai/engine/bootstrap/network-retry.sh. All three answer the same
 // vectors (_shared/tests/corpus/network/route_plan_vectors.json). A client that
 // only reads an environment relay holds one relay for the whole download, so
 // the plan turns the route a native lookup named for each origin into that

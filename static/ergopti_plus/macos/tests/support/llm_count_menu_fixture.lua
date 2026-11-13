@@ -14,7 +14,7 @@ return function(callback, options)
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local ok, err = xpcall(function()
 		for name in pairs(package.loaded) do
-			if name:match("^ui%.menu%.menu_llm") or name:match("^modules%.llm")
+			if name:match("^ai%.ui%.menu") or name:match("^ai%.engine")
 				or name == "menu.engine.renderer" then package.loaded[name] = nil end
 		end
 		helpers.load_with_stubs("core.text.engine.toml.codec")
@@ -22,7 +22,7 @@ return function(callback, options)
 		local raw = file:read("*a"); file:close()
 		local defaults, state = hs.json.decode(raw), hs.json.decode(raw)
 		state.llm_enabled, state.llm_backend, state.llm_model = true, options.backend or "ollama", ""
-		-- The macOS state keeps these in seconds (modules/llm/init.lua), as the real
+		-- The macOS state keeps these in seconds (ai/engine/init.lua), as the real
 		-- Trigger rows read them (real_trigger_panel).
 		for _, table_ in ipairs({ defaults, state }) do
 			table_.llm_debounce = table_.llm_debounce_ms / 1000
@@ -51,7 +51,7 @@ return function(callback, options)
 			if options.catalogue then return options.catalogue[key] or key end
 			return real_caption(key) and real_strings[key] or key
 		end }
-		package.loaded["modules.llm"] = { DEFAULT_STATE = defaults,
+		package.loaded["ai.engine"] = { DEFAULT_STATE = defaults,
 			get_backend = function() return state.llm_backend end, set_backend = accept,
 			get_current_model = function() return "" end,
 			-- What the real Display rows read (real_streaming_panel).
@@ -63,8 +63,8 @@ return function(callback, options)
 			get_installed_models = function() return {} end,
 			get_actual_model_name = function(name) return name end,
 			get_model_info = function() return {} end, get_model_ram = function() return 0 end }
-		package.loaded["ui.menu.menu_llm.models_manager"] = { new = function() return models end }
-		package.loaded["ui.menu.menu_llm.settings_manager"] = { new = function()
+		package.loaded["ai.ui.menu.models.manager"] = { new = function() return models end }
+		package.loaded["ai.ui.menu.settings_manager"] = { new = function()
 			return { build_nav_modifier_menu = function() return {} end,
 				build_val_modifier_menu = function() return {} end,
 				setting_snapshot = function(key) return { value = state[key], generation = 0, owner = {} } end,
@@ -83,33 +83,33 @@ return function(callback, options)
 			-- A whole-tray walk reads the real Display and Trigger rows (their label-value joins).
 			if not (name == "streaming_panel" and options.real_streaming_panel)
 				and not (name == "trigger_panel" and options.real_trigger_panel) then
-				package.loaded["ui.menu.menu_llm." .. name] = { build = function() return {} end }
+				package.loaded["ai.ui.menu.panels." .. name] = { build = function() return {} end }
 			end
 		end
 		-- The menu itself must build neither panel: the model selector page
 		-- collects them only when it opens (maintainer, 2026-10-27).
 		calls.panel_builds = 0
 		local function counted_build() calls.panel_builds = calls.panel_builds + 1; return nil, nil end
-		package.loaded["ui.menu.menu_llm.backend_panel"] = {
+		package.loaded["ai.ui.menu.panels.backend_panel"] = {
 			is_apple_silicon = function() return false end, build = counted_build }
-		package.loaded["ui.menu.menu_llm.api_panel"] = {
+		package.loaded["ai.ui.menu.panels.api_panel"] = {
 			build = counted_build,
 			active_entry_caption_text = function() return nil end }
-		package.loaded["ui.menu.menu_llm.model_switcher"] = { new = function()
+		package.loaded["ai.ui.menu.models.switcher"] = { new = function()
 			return { switch_model = unobserved_command, disable_model = unobserved_command,
 				get_display_model_name = function(name) return name end,
 				get_model_power_level = function() return 1 end, settle_recovery_debts = accept }
 		end }
-		package.loaded["ui.menu.menu_llm.startup_controller"] = { new = function() return noop end }
-		package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = { new = function()
+		package.loaded["ai.ui.menu.startup_controller"] = { new = function() return noop end }
+		package.loaded["ai.ui.menu.trigger_orchestrator"] = { new = function()
 			return { bind_hotkey = noop, activate_hotkey = noop,
 				apply_llm_profile_shortcut = noop, restore_shortcuts = accept }
 		end }
-		package.loaded["modules.llm.mlx_deps_checker"] = { check_and_install_deps = accept }
-		package.loaded["modules.llm.ollama_deps_checker"] = { check_and_install_deps = accept }
+		package.loaded["ai.engine.local_servers.mlx_deps_checker"] = { check_and_install_deps = accept }
+		package.loaded["ai.engine.ollama.deps_checker"] = { check_and_install_deps = accept }
 		package.loaded["menu.engine.manifest_menu"] = nil
-		local core = package.loaded["modules.llm"]
-		core.BUILTIN_PROFILES = require("modules.llm.profiles").BUILTIN_PROFILES
+		local core = package.loaded["ai.engine"]
+		core.BUILTIN_PROFILES = require("ai.engine.settings.profiles").BUILTIN_PROFILES
 		calls.profile_constructor_sync = {}
 		core.set_user_profiles = function()
 			calls.profile_constructor_sync[#calls.profile_constructor_sync + 1] = "users"
@@ -119,8 +119,8 @@ return function(callback, options)
 			calls.profile_constructor_sync[#calls.profile_constructor_sync + 1] = "active"
 			return true
 		end
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-		local profiles = require("ui.menu.menu_llm.profiles_manager")
+		package.loaded["ai.ui.menu.profiles_manager"] = nil
+		local profiles = require("ai.ui.menu.profiles_manager")
 		local genuine_profiles_new = profiles.new
 		profiles.new = function(...)
 			local manager = genuine_profiles_new(...)
@@ -128,8 +128,8 @@ return function(callback, options)
 			return manager
 		end
 		if options.real_model_selector then
-			package.loaded["ui.menu.menu_llm.model_selector_page"] = nil
-			local page = require("ui.menu.menu_llm.model_selector_page")
+			package.loaded["ai.ui.menu.models.selector_page"] = nil
+			local page = require("ai.ui.menu.models.selector_page")
 			local genuine_open = page.open
 			calls.page_opens = 0
 			page.open = function(...)
@@ -139,7 +139,7 @@ return function(callback, options)
 			end
 		end
 		if options.window_toggle then package.loaded["core.ui.ui.window_toggle"] = options.window_toggle end
-		local menu = require("ui.menu.menu_llm").create({ state = state,
+		local menu = require("ai.ui.menu").create({ state = state,
 			keymap = { set_llm_model = accept }, script_control = options.script_control,
 			save_prefs = accept, update_menu = accept, active_tasks = {} })
 		helpers.assert_type(menu.build_item, "function")

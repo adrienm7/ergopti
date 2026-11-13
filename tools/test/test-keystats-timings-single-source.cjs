@@ -138,14 +138,14 @@ const PINS = [
 	pin(
 		'tooltip',
 		'infinite_ttl_ms',
-		'windows/modules/keymap/llm_bridge.ahk',
+		'windows/ai/engine/bridge.ahk',
 		'_LLM_INFINITE_TOOLTIP_SEC',
 		'sec'
 	),
 	pin(
 		'tooltip',
 		'hotstring_min_ttl_ms',
-		'windows/modules/keymap/llm_bridge.ahk',
+		'windows/ai/engine/bridge.ahk',
 		'_LLM_MIN_TOOLTIP_DURATION_SEC',
 		'sec'
 	),

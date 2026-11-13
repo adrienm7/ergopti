@@ -25,7 +25,7 @@ guarded(function()
 	assert(hs.fs.attributes(config.uv_root) == nil, "Cold uv cache already exists")
 	-- The inherited kernel sandbox denies stock runtimes. Resolve through the
 	-- actual production adapter; no fake Python edge can qualify native receiving.
-	local python = require("adapters.python_interpreter")
+	local python = require("ai.adapters.python_interpreter")
 	for _, path in ipairs(config.denied_runtime_paths) do
 		local file = io.open(path, "rb")
 		if file then file:close(); error("Cold sandbox allowed a stock runtime read") end
@@ -50,7 +50,7 @@ guarded(function()
 		set_step = function() end, set_progress = function() end,
 		set_error = function() result.ui_failure = true end,
 	}
-	local native_pty = require("adapters.native_bootstrap_pty")
+	local native_pty = require("ai.adapters.native_bootstrap_pty")
 	local prepare = native_pty.prepare
 	native_pty.prepare = function(...)
 		local handle, ready = prepare(...)
@@ -91,7 +91,7 @@ guarded(function()
 		if started then result.worker_pid = task:pid() end
 		return started
 	end
-	owner.checker = require("modules.llm.mlx_deps_checker")
+	owner.checker = require("ai.engine.local_servers.mlx_deps_checker")
 	assert(owner.checker.install_for_selection(guarded(function(success)
 		result.success = success == true
 		result.state = owner.checker.get_state()

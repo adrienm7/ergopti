@@ -17,7 +17,7 @@
 --- 3. A price row is admitted only with finite nonnegative "in" and "out"
 ---    prices in US dollars per million tokens; an unpriced model costs 0.
 ---
---- Windows reads the same catalogue in windows/modules/llm/api_remote.ahk. Both
+--- Windows reads the same catalogue in windows/ai/engine/api/remote.ahk. Both
 --- Lua drivers replay _shared/tests/corpus/llm/remote_usage_vectors.json.
 --- ==============================================================================
 

@@ -376,9 +376,9 @@ local function fresh_mouse_owner()
 	package.loaded["core.process.adapters.shell_runner"] = shell_runner
 	package.loaded["core.events.timer_scheduler"] = nil
 	fixture.python = helpers.healthy_python_resolver()
-	package.loaded["adapters.python_interpreter"] = fixture.python
+	package.loaded["ai.adapters.python_interpreter"] = fixture.python
 	fixture.python_offers = {}
-	package.loaded["ui.python_runtime_offer"] = {
+	package.loaded["ai.ui.python_runtime_offer"] = {
 		offer = function(state)
 			fixture.python_offers[#fixture.python_offers + 1] = state
 			return true

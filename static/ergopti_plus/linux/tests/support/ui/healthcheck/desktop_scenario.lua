@@ -29,7 +29,7 @@ function M.shutdown(options)
 		webview_manager = options.webview_shutdown and { shutdown = options.webview_shutdown } or false,
 		TimerScheduler = { cancelAll = function() observed.timers = observed.timers + 1; return true end },
 		require = function(name)
-			assert(name == "modules.llm.agent_learning", "unexpected cold dependency: " .. name)
+			assert(name == "ai.engine.agent.learning", "unexpected cold dependency: " .. name)
 			return { flush = function() observed.flushes = observed.flushes + 1 end }
 		end,
 		keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },

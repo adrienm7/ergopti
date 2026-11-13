@@ -15,7 +15,7 @@ local ONE_SHOT_DATA = assert(require("core.text.engine.json").decode(SourceFile.
 
 local RESET_MODULES = {
 	"modules.keymap", "modules.keymap.init", "settings.engine.registry",
-	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
+	"modules.keymap.expander", "ai.engine.bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
 	"modules.diagnostics.hid_diagnostic_mailbox",
 	"platform.input.synthetic_input", "adapters.event_provenance",
@@ -183,7 +183,7 @@ local function load_fixture(prepare_input)
 	local reconcile_calls = 0
 	local reset_quarantined_calls = 0
 	local runtime_sentinel = {source = "prediction-engine-runtime"}
-	package.loaded["modules.keymap.llm_bridge"] = api({
+	package.loaded["ai.engine.bridge"] = api({
 		init = function() return true end,
 		invalidate_hotstring_preview = function() return true end,
 		reset_for_teardown = function() return true end,
@@ -831,7 +831,7 @@ local INPUT_MODULES = {
 	"modules.keymap.one_shot_shift", "modules.keymap.control_sentinels",
 	"modules.keymap.magic_key_source", "core.events.clock",
 	"core.logger.engine.key_event_health", "core.logger.engine.keystroke_integrity", "core.timing.engine.deferred_work",
-	"platform.input.text_sender", "platform.input.keyboard_geometry", "modules.llm.app_filter",
+	"platform.input.text_sender", "platform.input.keyboard_geometry", "ai.engine.prediction.app_filter",
 	"infra.hotstring_engine", "hotstrings.engine.matcher", "core.text.engine.utils", "core.text.engine.utils_core",
 	"core.lifecycle.engine.compat.utf8", "platform.input.keycodes.core", "layouts.engine.layers.control_signals", "tap_hold.engine.one_shot_shift_core",
 	"core.text.engine.unicode_case", "unicode_case.init", "core.text.engine.unicode_case.data", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
@@ -861,7 +861,7 @@ local function with_input_fixture(callback)
 				calls.errors[#calls.errors + 1] = message
 			end
 			package.loaded["platform.input.text_sender"] = {}
-			package.loaded["modules.llm.app_filter"] = {}
+			package.loaded["ai.engine.prediction.app_filter"] = {}
 			package.loaded["platform.input.keyboard_geometry"] = {}
 			package.loaded["modules.keymap.magic_key_source"] = {
 				needs_geometry = function() return false end,

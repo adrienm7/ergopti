@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local Receipt = require("core.lifecycle.engine.core.native_pty_receipt")
 local NONCE = "12345678-abcd-4321-abcd-123456789abc"
-local SOURCE = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/modules/llm/ensure-mlx-deps.sh"
+local SOURCE = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/ai/engine/local_servers/ensure-mlx-deps.sh"
 local RECEIPT_PATH = "/private/owned-bootstrap-receipt"
 
 local function proof(changes)
@@ -86,8 +86,8 @@ local function receiving(body, options)
 				return true
 			end,
 		}
-		package.loaded["adapters.native_bootstrap_pty"] = nil
-		body(require("adapters.native_bootstrap_pty"), native)
+		package.loaded["ai.adapters.native_bootstrap_pty"] = nil
+		body(require("ai.adapters.native_bootstrap_pty"), native)
 	end, debug.traceback)
 	_G.hs = old_hs
 	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end

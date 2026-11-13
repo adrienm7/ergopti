@@ -15,7 +15,7 @@
 --- is now the first input owner the guard must precede.
 ---
 --- Test: source scan — assert the onboarding guard byte-position is strictly
---- before both shortcuts.start() and require("modules.llm.boot_cleanup").
+--- before both shortcuts.start() and require("ai.engine.bootstrap.boot_cleanup").
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

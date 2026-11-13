@@ -114,7 +114,7 @@ local function run_case(family, change, route)
 				else
 					local engine_mod = require("modules.hotstrings.engine")
 					local engine = engine_mod.new()
-					engine:attach_ai_context(require("modules.llm.context").new({ is_active = function() return true end }))
+					engine:attach_ai_context(require("ai.engine.api.context").new({ is_active = function() return true end }))
 					local mappings = dynamic.prefix_mappings()
 					if route == "static" then
 						mappings[#mappings + 1] = { auto_expand = true, trigger = trigger,

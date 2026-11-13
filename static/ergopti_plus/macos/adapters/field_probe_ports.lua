@@ -260,7 +260,7 @@ end
 --- Runs one executable with exact stdin bytes and settles once. The bytes are
 --- queued with setInput BEFORE the task starts, on a task with no streaming
 --- callback: hs.task then writes them at launch and closes stdin itself
---- (modules/llm/api_token_crypto.lua relies on the same contract), and
+--- (ai/engine/api/token_crypto.lua relies on the same contract), and
 --- closeInput belongs to the streaming form only. Writing after the start lost
 --- the request (the HTTP worker refused it with 64) and cut large layouts short
 --- (xmllint refused 7 of 8 on the 2026-10-30 21:53 run).
@@ -463,7 +463,7 @@ end
 
 --- The AI menu's models manager, or nil before the menu exists.
 local function models_manager()
-	local menu = package.loaded["ui.menu.menu_llm"]
+	local menu = package.loaded["ai.ui.menu"]
 	return type(menu) == "table" and type(menu.active_models_manager) == "function"
 		and menu.active_models_manager() or nil
 end
@@ -472,8 +472,8 @@ end
 --- @return table facts { ollama_path|nil, mlx_runtime|nil, mlx_installed|nil }
 local function ai_facts()
 	local facts = {}
-	facts.ollama_path = (require("modules.llm.ollama_binary").resolve())
-	local ok, installed = pcall(function() return require("modules.llm.mlx_deps_checker").runtime_installed() end)
+	facts.ollama_path = (require("ai.engine.ollama.binary").resolve())
+	local ok, installed = pcall(function() return require("ai.engine.local_servers.mlx_deps_checker").runtime_installed() end)
 	if ok then facts.mlx_runtime = installed == true end
 	local manager = models_manager()
 	if manager and type(manager.mlx_model_installed) == "function" then
@@ -489,7 +489,7 @@ end
 --- Lists the models of a running Ollama server, without starting it.
 --- @param callback function fn(listed).
 local function ollama_refresh(callback)
-	local Api = require("modules.llm.api_ollama")
+	local Api = require("ai.engine.api.ollama")
 	Api.forget_local_models()
 	Api.refresh_local_models(function(listed) callback(listed == true) end)
 end
@@ -497,7 +497,7 @@ end
 --- The smallest catalogue model the last listing holds.
 --- @return string|nil runtime_name
 local function ollama_installed_model()
-	local Api = require("modules.llm.api_ollama")
+	local Api = require("ai.engine.api.ollama")
 	for _, model in ipairs(catalogue_models("ollama")) do
 		if Api.local_model_installed(model.runtime_name) == true then return model.runtime_name end
 	end
@@ -509,17 +509,17 @@ end
 --- and a remote backend never counts as installed.
 --- @param callback function fn({ enabled, backend, installed }).
 local function prediction_readiness(callback)
-	local engine = package.loaded["modules.llm.prediction_engine"]
+	local engine = package.loaded["ai.engine.prediction.engine"]
 	if type(engine) ~= "table" or type(engine.get_llm_enabled) ~= "function" then
 		return callback({ enabled = false, backend = "absent", installed = false })
 	end
 	local _, model = engine.get_llm_runtime_setting("llm_model")
-	local facts = { enabled = engine.get_llm_enabled() == true, backend = require("modules.llm").get_backend(),
+	local facts = { enabled = engine.get_llm_enabled() == true, backend = require("ai.engine").get_backend(),
 		installed = false }
 	if not facts.enabled or type(model) ~= "string" or model == "" then return callback(facts) end
 	if facts.backend == "ollama" then
 		return ollama_refresh(function(listed)
-			facts.installed = listed and require("modules.llm.api_ollama").local_model_installed(model) == true
+			facts.installed = listed and require("ai.engine.api.ollama").local_model_installed(model) == true
 			callback(facts)
 		end)
 	end
@@ -549,7 +549,7 @@ local function ollama_predict(model, text, callback)
 		timer = nil
 		settle(false, "timeout")
 	end)
-	require("modules.llm.api_ollama").request_raw(model, "", text, "", 0, 1,
+	require("ai.engine.api.ollama").request_raw(model, "", text, "", 0, 1,
 		function() settle(true) end, function() settle(false, "request_failed") end)
 end
 
@@ -590,7 +590,7 @@ local SCRATCH_HTML = [[<!doctype html><html><body style="margin:12px;font:14px -
 --- True while the prediction engine shows predictions, read without starting it.
 --- @return boolean shown
 local function prediction_shown()
-	local engine = package.loaded["modules.llm.prediction_engine"]
+	local engine = package.loaded["ai.engine.prediction.engine"]
 	return type(engine) == "table" and type(engine.is_visible) == "function" and engine.is_visible() == true
 end
 
@@ -890,7 +890,7 @@ end
 --- The local server catalogue the driver loaded (infra/field_check_local_servers.lua).
 --- @return table { order, discovery, published }
 local function local_server_catalogue()
-	local LocalServers = require("modules.llm.local_servers")
+	local LocalServers = require("ai.engine.local_servers.local_servers")
 	return { order = LocalServers.ORDER, discovery = LocalServers.DISCOVERY,
 		published = LocalServers.config_catalogue_published() }
 end
@@ -898,7 +898,7 @@ end
 --- One detection sweep of every local server, as the AI menu runs it; read-only.
 --- @param on_done function fn(views|nil), once.
 local function local_servers_detect(on_done)
-	local Api = require("modules.llm.api_remote")
+	local Api = require("ai.engine.api.remote")
 	local answered = false
 	local started = Api.detect_local_servers(function()
 		if answered then return end

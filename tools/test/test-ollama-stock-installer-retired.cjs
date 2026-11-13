@@ -27,8 +27,8 @@ const { spawnSync } = require('child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const LLM_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'modules', 'llm');
-const VERIFIER = path.join(LLM_ROOT, 'ensure-ollama-deps.sh');
+const LLM_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'ai', 'engine');
+const VERIFIER = path.join(LLM_ROOT, 'ollama/ensure-ollama-deps.sh');
 
 const results = [];
 
@@ -119,14 +119,14 @@ test(
 	'the shared stock installer is gone',
 	!fs.existsSync(path.join(ROOT, 'static/ergopti_plus/_shared/ai/data/install/ollama_install.sh'))
 );
-const checker = code(fs.readFileSync(path.join(LLM_ROOT, 'ollama_deps_checker.lua'), 'utf8'), '--');
+const checker = code(fs.readFileSync(path.join(LLM_ROOT, 'ollama/deps_checker.lua'), 'utf8'), '--');
 test(
 	'the checker has no stock download entry or grant',
 	!/\binstall_for_selection|_install_granted|\bmanaged_install_dir/.test(
 		checker.replace(/native_managed_install_dir/g, '')
 	)
 );
-const resolver = code(fs.readFileSync(path.join(LLM_ROOT, 'ollama_binary.lua'), 'utf8'), '--');
+const resolver = code(fs.readFileSync(path.join(LLM_ROOT, 'ollama/binary.lua'), 'utf8'), '--');
 test(
 	'the resolver names no stock candidate',
 	!/Ollama\.app|homebrew|HOMEBREW|os\.getenv\("PATH"\)|candidates|find_user_installation|managed_install_dir\(/.test(

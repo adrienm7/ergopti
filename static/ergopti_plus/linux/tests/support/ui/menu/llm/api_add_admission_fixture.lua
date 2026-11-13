@@ -19,10 +19,10 @@ function M.run(body)
 	for _, name in ipairs({ "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME" }) do
 		environment[name] = os.getenv(name); assert(uv.os_setenv(name, scratch .. "/" .. name))
 	end
-	for _, name in ipairs({ "ui.menu.llm_backend_rows", "modules.llm.prediction_engine", "modules.llm.api_entries",
-		"modules.llm.api_remote", "infra.llm_preferences", "settings.engine.paths", "core.fs.adapters.storage", "core.network.adapters.http_client",
-		"modules.llm.profiles", "modules.llm.settings", "modules.llm.trigger_settings", "modules.llm.display_settings",
-		"modules.llm.agent_settings", "modules.llm.profile_settings", "modules.llm.navigation_settings" }) do package.loaded[name] = nil end
+	for _, name in ipairs({ "ai.ui.menu.backend_rows", "ai.engine.prediction.engine", "ai.engine.settings.api_entries",
+		"ai.engine.api.api_remote", "ai.engine.preferences", "settings.engine.paths", "core.fs.adapters.storage", "core.network.adapters.http_client",
+		"ai.engine.settings.profiles", "ai.engine.settings.settings", "ai.engine.settings.trigger_settings", "ai.engine.settings.display_settings",
+		"ai.engine.settings.agent_settings", "ai.engine.settings.profile_settings", "ai.engine.settings.navigation_settings" }) do package.loaded[name] = nil end
 	local Logger = require("core.logger.engine.shim")
 	local old_log = { info = Logger.info, debug = Logger.debug, error = Logger.error }
 	local rename = os.rename
@@ -54,7 +54,7 @@ function M.run(body)
 			{ id = "successor", provider = "cerebras", label = "successor", token = "synthetic-successor", model = "successor-model", base_url = "" },
 		}) })
 		write(state.api_path, state.original); assert(uv.fs_chmod(state.api_path, 384))
-		local Entries, Http = require("modules.llm.api_entries"), require("core.network.adapters.http_client")
+		local Entries, Http = require("ai.engine.settings.api_entries"), require("core.network.adapters.http_client")
 		Entries._set_path_for_test(state.api_path)
 		Entries._set_private_create_for_test(function(path, text)
 			state.stages = state.stages + 1
@@ -83,13 +83,13 @@ function M.run(body)
 			end
 			return true
 		end
-		local Engine = require("modules.llm.prediction_engine")
+		local Engine = require("ai.engine.prediction.engine")
 		Engine.init({ is_paused = function()
 			if state.on_pause then state.on_pause() end
 			return state.paused
 		end })
-		state.engine, state.entries, state.remote = Engine, Entries, require("modules.llm.api_remote")
-		state.preferences = require("infra.llm_preferences")
+		state.engine, state.entries, state.remote = Engine, Entries, require("ai.engine.api.api_remote")
+		state.preferences = require("ai.engine.preferences")
 		function state.scope()
 			local owner = { pending = function() return false end }
 			local acquired = Engine.acquire_configuration(owner)
@@ -118,7 +118,7 @@ function M.run(body)
 			info = function(_, text) state.infos[#state.infos + 1] = text end,
 			confirm = function() return true end,
 		}
-		local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(require("ui.menu.llm_backend_rows"),
+		local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(require("ai.ui.menu.backend_rows"),
 			Engine, dialogs, function()
 				state.changed = state.changed + 1
 				if state.on_changed then state.on_changed() end

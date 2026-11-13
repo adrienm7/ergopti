@@ -596,7 +596,7 @@ _required_dependency_package() {
 		xbps:sqlite3) echo "sqlite" ;;
 		apk:sqlite3) echo "sqlite" ;;
 		# Remote API keys live in the desktop secret service, through
-		# secret-tool (modules/llm/api_token_store.lua); without it a key is
+		# secret-tool (ai/engine/settings/api_token_store.lua); without it a key is
 		# refused, never written in plaintext. Only Debian and openSUSE split the
 		# command from the library.
 		apt:secret-tool) echo "libsecret-tools" ;;

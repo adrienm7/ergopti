@@ -13,7 +13,7 @@ local TARGETS = {
 	"platform.input.keycodes", "modules.keymap.layout", "core.logger.engine.perf",
 	"modules.keymap.terminators", "modules.keymap.utils",
 	"platform.remap.defaults", "platform.remap.config",
-	"modules.llm.backend_detector", "modules.llm.parser",
+	"ai.engine.api.backend_detector", "ai.engine.api.parser",
 }
 
 local pass, fail = 0, 0

@@ -32,14 +32,14 @@ local helpers = require("tests.helpers")
 local STUB_MODULES = {
 	"modules.keymap.utils",
 	"core.text.engine.utils",
-	"modules.llm",
+	"ai.engine",
 	"platform.input.keycodes",
 	"modules.keystats",
 	"core.ui.ui.tooltip",
-	"modules.llm.prediction_engine",
+	"ai.engine.prediction.engine",
 	"settings.engine.registry",
 	"modules.hotstrings.hotstrings_config",
-	"modules.keymap.llm_bridge",
+	"ai.engine.bridge",
 	"core.logger.engine.logger",
 }
 for _, mod in ipairs(STUB_MODULES) do
@@ -73,7 +73,7 @@ package.loaded["core.text.engine.utils"] = {
 }
 
 -- modules.llm exposes DEFAULT_STATE; the bridge reads it at module-load time.
-package.loaded["modules.llm"] = {
+package.loaded["ai.engine"] = {
 	DEFAULT_STATE = {
 		llm_after_hotstring   = false,
 		llm_reset_on_nav      = false,
@@ -164,7 +164,7 @@ local engine_stub = {
 	start_timer_word_end          = function() end,
 	perform_check                 = function() end,
 }
-package.loaded["modules.llm.prediction_engine"] = engine_stub
+package.loaded["ai.engine.prediction.engine"] = engine_stub
 
 -- modules.keymap.registry: no-op stub.
 package.loaded["settings.engine.registry"] = {
@@ -181,7 +181,7 @@ package.loaded["modules.hotstrings.hotstrings_config"] = {
 -- Now load the bridge with all stubs in place. load_with_stubs() clears the
 -- bridge entry from package.loaded before requiring it, so we get a pristine
 -- module instance with _state == nil.
-local bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+local bridge = helpers.load_with_stubs("ai.engine.bridge")
 
 local FORWARDED_ENGINE_SETTERS = {
 	"set_preview_ai_enabled",
@@ -235,7 +235,7 @@ local function make_state(sentinel)
 		DELAYS           = {},
 		is_repeat_feature_enabled  = function() return false end,
 	}
-	require("modules.keymap.llm_context").seed(state, "", "")
+	require("ai.engine.api.context").seed(state, "", "")
 	local defaults = {
 		preview_star_enabled        = true,
 		preview_autocorrect_enabled = true,

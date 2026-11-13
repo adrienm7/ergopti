@@ -320,7 +320,7 @@ function H.collect_features(state)
 		add("metrics", state.keystats_enabled)
 	end
 	add("llm", read("the AI switch", function()
-		return require("modules.llm").get_runtime_llm_enabled() == true
+		return require("ai.engine").get_runtime_llm_enabled() == true
 	end))
 	return { items = items }
 end
@@ -378,7 +378,7 @@ end
 --- The AI section: the switch, the backend, the model and the profile.
 --- @return table
 function H.collect_ai()
-	local llm = require("modules.llm")
+	local llm = require("ai.engine")
 	return {
 		ai_enabled = read("the AI switch", function() return llm.get_runtime_llm_enabled() == true end),
 		ai_backend = read("the AI backend", function() return llm.get_backend() end),

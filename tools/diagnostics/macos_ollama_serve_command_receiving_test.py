@@ -13,7 +13,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = Path(os.environ.get("ERGOPTI_SOURCE_ROOT", ROOT))
-# Mirrors REFUSAL_PATTERN in macos/adapters/managed_ollama_daemon.lua, the line the driver logs.
+# Mirrors REFUSAL_PATTERN in macos/ai/adapters/managed_ollama_daemon.lua, the line the driver logs.
 REFUSAL_LINE = re.compile(r"Managed Ollama daemon admission refused: [\w.:=, -]+\.\n")
 
 
@@ -60,8 +60,9 @@ class EmittedServeCommand(unittest.TestCase):
             copied = Path(directory) / "source"
             for relative in (
                 "static/ergopti_plus/_shared",
-                "static/ergopti_plus/macos/modules/llm",
+                "static/ergopti_plus/macos/ai/engine",
                 "static/ergopti_plus/macos/platform",
+                "static/ergopti_plus/macos/ai/adapters",
                 "static/ergopti_plus/macos/core/network/adapters",
                 "static/ergopti_plus/macos/core/network/adapters",
             ):
@@ -70,8 +71,8 @@ class EmittedServeCommand(unittest.TestCase):
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(source, target)
             for relative in (
-                "static/ergopti_plus/macos/modules/llm/ollama_server_command.lua",
-                "static/ergopti_plus/macos/modules/llm/ollama_binary.lua",
+                "static/ergopti_plus/macos/ai/engine/ollama/server_command.lua",
+                "static/ergopti_plus/macos/ai/engine/ollama/binary.lua",
                 "tools/test/managed_ollama_serve_command_test.lua",
                 "tools/test/fixtures/managed_ollama_runtime_hint.lua",
             ):

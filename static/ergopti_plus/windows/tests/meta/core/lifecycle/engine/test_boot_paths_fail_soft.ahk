@@ -113,7 +113,7 @@ _BPF_PathsTomlStripsOnlyUnquotedInlineComments() {
 ; This hotkey is deliberately armed with no #HotIf, which is exactly what makes
 ; it dangerous: it is live from parse time, long before the logger exists.
 _BPF_RescueHotkeyIsGuarded() {
-	Src := _StripFullLineComments(_DriverDirConcat("ui/menu/menu_llm"))
+	Src := _StripFullLineComments(_DriverDirConcat("ai/ui/menu"))
 	Assert(Src != "", "the LLM menu sources must be readable")
 
 	Start := InStr(Src, "^!+i::")

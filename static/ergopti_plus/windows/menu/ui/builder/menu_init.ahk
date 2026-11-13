@@ -360,7 +360,7 @@ _MI_StagePrebuiltLlm(Submenu) {
 	BootProfile_Mark("MENU/initMenu: caller-owned LLM tray projection")
 }
 
-; ── 🤖 AI agent — its own top-level submenu (ui/menu/menu_llm/menu_agent.ahk),
+; ── 🤖 AI agent — its own top-level submenu (ai/ui/menu/agent.ahk),
 ; ticked while the agent is not off.
 _MI_StageAgent() {
 	AgentTitle := t("menu.agent.title")

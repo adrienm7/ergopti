@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 
 local RESET_MODULES = {
 	"modules.keymap", "modules.keymap.init", "settings.engine.registry",
-	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
+	"modules.keymap.expander", "ai.engine.bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
 	"platform.input.synthetic_input", "adapters.event_provenance",
 	"core.logger.engine.logger", "core.logger.engine.perf",
@@ -142,7 +142,7 @@ local function load_fixture()
 	local record_nav_reset = false
 	local llm_quarantined = false
 	local safe_epoch = epoch
-	package.loaded["modules.keymap.llm_bridge"] = api({
+	package.loaded["ai.engine.bridge"] = api({
 		init = function() return true end,
 		reset_predictions = function()
 			calls[#calls + 1] = "ordinary-reset"

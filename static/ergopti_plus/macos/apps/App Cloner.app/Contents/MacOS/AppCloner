@@ -152,7 +152,7 @@ def cloner_python_refusal(app_root, cloner_python):
     """Return why the managed Python cannot run App Cloner, or None.
 
     The interpreter is the versionless link Ergopti's Apps menu passes after
-    installing the pinned PyObjC (modules/llm/ensure-managed-pyobjc.sh); the
+    installing the pinned PyObjC (ai/engine/bootstrap/ensure-managed-pyobjc.sh); the
     modules it must import are that installer's own import check.
     """
     if not cloner_python.startswith("/") or os.path.basename(cloner_python) != "python3":

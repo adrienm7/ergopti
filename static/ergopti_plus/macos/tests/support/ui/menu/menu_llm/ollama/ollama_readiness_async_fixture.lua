@@ -57,11 +57,11 @@ local MODULES = {
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"core.text.engine.utils",
-	"modules.llm.api_ollama",
-	"modules.llm.ollama_binary",
-	"modules.llm.ollama_endpoint",
-	"modules.llm.ollama_server_command",
-	"modules.llm.network_env",
+	"ai.engine.api.ollama",
+	"ai.engine.ollama.binary",
+	"ai.engine.ollama.endpoint",
+	"ai.engine.ollama.server_command",
+	"ai.engine.api.network_env",
 	-- The prelude reads the proxy override through storage: none is stored.
 	"core.fs.adapters.storage",
 	-- FileSystem captures hs when it loads; each fixture binds its own copy.
@@ -71,8 +71,8 @@ local MODULES = {
 	"core.events.timer_scheduler",
 	"core.network.adapters.http_client",
 	"ui.download_window",
-	"ui.menu.menu_llm.requirement_operation_registry",
-	"ui.menu.menu_llm.models_manager_ollama",
+	"ai.ui.menu.requirement_operation_registry",
+	"ai.ui.menu.models.manager_ollama",
 }
 
 --- Receives argv from the actual emitted wrapper through the canonical Bash owner.
@@ -200,10 +200,10 @@ local function with_fixture(spec, body)
 		package.loaded["core.text.engine.utils"] = {
 			shell_quote = function(value) return "'" .. tostring(value) .. "'" end,
 		}
-		package.loaded["modules.llm.ollama_binary"] = {
+		package.loaded["ai.engine.ollama.binary"] = {
 			resolve = function() return "/opt/homebrew/bin/ollama" end,
 		}
-		package.loaded["modules.llm.ollama_server_command"] = {
+		package.loaded["ai.engine.ollama.server_command"] = {
 			build = function() return "exec /opt/homebrew/bin/ollama serve" end,
 		}
 		local window_session = 0
@@ -445,9 +445,9 @@ local function with_fixture(spec, body)
 				return true
 			end,
 		})
-		package.loaded["modules.llm.api_ollama"] = daemon.api
+		package.loaded["ai.engine.api.ollama"] = daemon.api
 		local endpoint_port = spec.ollama_port or 11435
-		package.loaded["modules.llm.ollama_endpoint"] = {
+		package.loaded["ai.engine.ollama.endpoint"] = {
 			get_port = function() return endpoint_port end,
 			get_base_url = function() return "http://127.0.0.1:" .. tostring(endpoint_port) end,
 		}
@@ -456,15 +456,15 @@ local function with_fixture(spec, body)
 		-- The fixture's other cached adapter doubles cannot select a fake policy.
 		local native_root = helpers.driver_root():gsub("\\", "/")
 		package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
-		package.loaded["modules.llm.network_env"] = nil
-		local network = require("modules.llm.network_env")
-		local native_policy_path = native_root .. "modules/llm/network-retry.sh"
+		package.loaded["ai.engine.api.network_env"] = nil
+		local network = require("ai.engine.api.network_env")
+		local native_policy_path = native_root .. "ai/engine/bootstrap/network-retry.sh"
 		local native_policy = assert(io.open(native_policy_path, "r"))
 		assert(native_policy:close())
 		network.policy_path = function() return native_policy_path end
-		package.loaded["modules.llm.network_env"] = network
-		package.loaded["ui.menu.menu_llm.models_manager_ollama"] = nil
-		manager = require("ui.menu.menu_llm.models_manager_ollama").new({
+		package.loaded["ai.engine.api.network_env"] = network
+		package.loaded["ai.ui.menu.models.manager_ollama"] = nil
+		manager = require("ai.ui.menu.models.manager_ollama").new({
 			active_tasks = {},
 			save_prefs = function() return true end,
 			update_menu = function()

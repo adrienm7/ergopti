@@ -11,7 +11,7 @@ local conflicts = Policy.conflicts
 function M.new(keyboard, taps, combinations, manager, capture)
 	local magic = require("modules.hotstrings.magic_key_source")
 	local wrapping = require("modules.shortcuts.manager")
-	local prediction = require("modules.llm.prediction_engine")
+	local prediction = require("ai.engine.prediction.engine")
 	local owners = { [1] = keyboard, [2] = taps, [3] = combinations, [4] = manager, [5] = magic, [6] = wrapping, [7] = prediction }
 	local methods = {}
 	for index = 1, 7 do
@@ -38,7 +38,7 @@ function M.new(keyboard, taps, combinations, manager, capture)
 			and rawequal(package.loaded["adapters.xkb_capture"], capture)
 			and rawequal(package.loaded["modules.hotstrings.magic_key_source"], magic)
 			and rawequal(package.loaded["modules.shortcuts.manager"], wrapping)
-			and rawequal(package.loaded["modules.llm.prediction_engine"], prediction)
+			and rawequal(package.loaded["ai.engine.prediction.engine"], prediction)
 	end
 	local owner = {}
 	function owner.validate(updates)

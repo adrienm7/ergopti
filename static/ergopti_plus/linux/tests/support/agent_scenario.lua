@@ -26,15 +26,15 @@ M.NOW = os.time({ year = 2026, month = 9, day = 29, hour = 14, min = 5, sec = 0 
 
 -- Modules loaded afresh for each scenario, so they bind the scripted boundaries
 local RELOADED = {
-	"modules.llm.prediction_engine", "modules.llm.settings", "modules.llm.profile_settings",
-	"modules.llm.display_settings", "modules.llm.trigger_settings", "modules.llm.navigation_settings",
-	"modules.llm.api_remote", "modules.llm.agent_settings", "modules.llm.agent_connectors",
-	"modules.llm.agent_learning", "modules.llm.local_model_probe", "modules.llm.local_model_offer",
+	"ai.engine.prediction.engine", "ai.engine.settings.settings", "ai.engine.settings.profile_settings",
+	"ai.engine.settings.display_settings", "ai.engine.settings.trigger_settings", "ai.engine.settings.navigation_settings",
+	"ai.engine.api.api_remote", "ai.engine.settings.agent_settings", "ai.engine.agent.connectors",
+	"ai.engine.agent.learning", "ai.engine.ollama.local_model_probe", "ai.engine.ollama.local_model_offer",
 }
 -- The boundaries a scenario scripts
 local FAKED = {
-	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
-	"modules.llm.profiles", "modules.llm.api_ollama", "core.process.adapters.shell_runner",
+	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "ai.engine.settings.api_entries",
+	"ai.engine.settings.profiles", "ai.engine.api.api_ollama", "core.process.adapters.shell_runner",
 }
 
 -- The preferences every scenario starts from: the menu's predictions go to the
@@ -98,7 +98,7 @@ function M.run(opts, body)
 		local entries = opts.entries or { M.ENTRY }
 		local active_entry = entries[1]
 		if opts.active_entry ~= nil then active_entry = opts.active_entry or nil end
-		package.loaded["modules.llm.api_entries"] = {
+		package.loaded["ai.engine.settings.api_entries"] = {
 			active = function() return active_entry end,
 			list = function() return entries end,
 		}
@@ -111,16 +111,16 @@ function M.run(opts, body)
 			get_current_model = function() return "ollama-model" end,
 			get_base_url = function() return world.base_url end,
 		})
-		package.loaded["modules.llm.profiles"] = profiles
+		package.loaded["ai.engine.settings.profiles"] = profiles
 		if opts.local_backend then
-			package.loaded["modules.llm.api_ollama"] = nil
+			package.loaded["ai.engine.api.api_ollama"] = nil
 		else
-			package.loaded["modules.llm.api_ollama"] = {
+			package.loaded["ai.engine.api.api_ollama"] = {
 				chat = function() error("the scenario runs through the API") end,
 				cancel = function() return true end,
 			}
 		end
-		require("modules.llm.local_model_offer")._reset_for_test({
+		require("ai.engine.ollama.local_model_offer")._reset_for_test({
 			confirm = not opts.native_model_dialog and function(title, text, offer_opts)
 				if type(opts.on_model_confirm) == "function" then opts.on_model_confirm(world, offer_opts) end
 				world.model_offers[#world.model_offers + 1] = { title = title, text = text }
@@ -149,7 +149,7 @@ function M.run(opts, body)
 
 		local scheduler = Fakes.timer_scheduler()
 		world.scheduler = scheduler
-		local Connectors = require("modules.llm.agent_connectors")
+		local Connectors = require("ai.engine.agent.connectors")
 		Connectors._set_deps_for_test({
 			run = function(executable, args, options, callback)
 				local run = { executable = executable, args = args, timeout_ms = options.timeout_ms, callback = callback }
@@ -176,9 +176,9 @@ function M.run(opts, body)
 		local learning_path = opts.learning_path or os.tmpname()
 		if not opts.learning_path then os.remove(learning_path) end
 		world.learning_path = learning_path
-		require("modules.llm.agent_learning")._reset_for_test({ path = learning_path, scheduler = scheduler })
+		require("ai.engine.agent.learning")._reset_for_test({ path = learning_path, scheduler = scheduler })
 
-		local engine = require("modules.llm.prediction_engine")
+		local engine = require("ai.engine.prediction.engine")
 		engine.init({
 			scheduler = scheduler,
 			clock_ms = function() return scheduler.now * 1000 end,
@@ -229,7 +229,7 @@ function M.run(opts, body)
 		})
 		world.engine = engine
 		world.handlers = engine.action_handlers()
-		world.config = require("modules.llm.agent_settings").config()
+		world.config = require("ai.engine.settings.agent_settings").config()
 
 		--- The remote server answers request `index` with `text`.
 		function world.respond(index, text)

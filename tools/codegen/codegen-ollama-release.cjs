@@ -9,7 +9,7 @@ const { REPO_ROOT, sharedRel } = require('../lib/paths.cjs');
 const { hosts } = require('../lib/identifiers.cjs');
 
 const SOURCE = sharedRel('ai', 'data', 'ollama_release.json');
-const MACOS_OUTPUT = 'static/ergopti_plus/macos/modules/llm/ollama-release.sh';
+const MACOS_OUTPUT = 'static/ergopti_plus/macos/ai/engine/ollama/ollama-release.sh';
 const ASSET_FILENAMES = Object.freeze({
 	'macos-universal': 'ollama-darwin.tgz',
 	'linux-amd64': 'ollama-linux-amd64.tar.zst',

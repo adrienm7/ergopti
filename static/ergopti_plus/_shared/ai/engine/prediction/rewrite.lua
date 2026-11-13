@@ -21,7 +21,7 @@
 --- 4. The token budget grows with the span, because the continuation budget
 ---    (a few words) would truncate a rewritten sentence.
 ---
---- The AutoHotkey port is windows/modules/llm/rewrite.ahk. Both are pinned by
+--- The AutoHotkey port is windows/ai/engine/prediction/rewrite.ahk. Both are pinned by
 --- _shared/tests/corpus/llm/rewrite_vectors.json.
 --- ==============================================================================
 

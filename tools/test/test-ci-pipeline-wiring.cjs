@@ -4599,10 +4599,10 @@ function stepProblems(files) {
 
 const WINDOWS_FILE_RECEIVER_LINES = [
 	'node "$root/tools/test/test-managed-ollama-protocol.cjs" --windows-file-port 1> $modelsOut 2> $modelsErr',
-	'& "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_ollama_install_files.ps1" 1> $out 2> $err',
+	'& "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/ai/servers/test_ollama_install_files.ps1" 1> $out 2> $err',
 	'if ($modelsExit -ne 0) { throw "File component source models refused (exit $modelsExit)." }',
 	'if ($nativeExit -ne 0 -or $stderr.Length -ne 0 -or',
-	'& "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_ollama_managed_bootstrap.ps1" 1> $bootstrapOut 2> $bootstrapErr',
+	'& "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/ai/servers/test_ollama_managed_bootstrap.ps1" 1> $bootstrapOut 2> $bootstrapErr',
 	'if ($bootstrapExit -ne 0 -or $bootstrapStderr.Length -ne 0 -or'
 ];
 

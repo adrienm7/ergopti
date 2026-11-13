@@ -350,7 +350,7 @@
 		"profile_shortcut_dialog": {
 			"kind": "dialog",
 			"platform": "hs",
-			"source": "static/ergopti_plus/macos/ui/menu/menu_llm/profiles_manager.lua",
+			"source": "static/ergopti_plus/macos/ai/ui/menu/profiles_manager.lua",
 			"title_key": "menu.profiles.shortcut_title"
 		}
 	},

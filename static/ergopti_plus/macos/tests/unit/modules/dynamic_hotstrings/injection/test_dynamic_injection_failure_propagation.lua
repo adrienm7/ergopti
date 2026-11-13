@@ -99,7 +99,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 				return false
 			end,
 		})
-		package.loaded["modules.keymap.llm_bridge"] = api({ init = function() return true end })
+		package.loaded["ai.engine.bridge"] = api({ init = function() return true end })
 		package.loaded["modules.keymap.terminator_replay"] = api()
 		package.loaded["modules.keymap.utils"] = api()
 		package.loaded["adapters.event_provenance"] = api()
@@ -165,7 +165,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 				return true
 			end,
 		})
-		package.loaded["modules.keymap.llm_bridge"] = api({
+		package.loaded["ai.engine.bridge"] = api({
 			init = function() return true end,
 			reset_predictions = function()
 				reset_calls = reset_calls + 1

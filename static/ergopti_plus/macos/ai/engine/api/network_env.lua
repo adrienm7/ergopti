@@ -1,0 +1,367 @@
+--- ai/engine/api/network_env.lua
+
+--- ==============================================================================
+--- MODULE: Download Child Network Prelude
+--- DESCRIPTION:
+--- Names the shell lines that give a download child the system network
+--- settings of a managed (company) Mac: the relay `scutil --proxy` names as
+--- HTTPS_PROXY, HTTP_PROXY and NO_PROXY, loopback always excluded, and the
+--- system trust store (apply_system_network in ai/engine/bootstrap/network-retry.sh,
+--- the policy the installer scripts source too).
+---
+--- FEATURES & RATIONALE:
+--- 1. A child of Hammerspoon has none of a login shell's relay variables, and
+---    neither uv, Python nor Ollama's Go client reads the macOS settings: the
+---    MLX installer, the MLX model download and the Ollama service (which pulls
+---    the models) failed on a network that only lets its relay out.
+--- 2. One policy: the prelude sources the same file the installer scripts do,
+---    so every macOS download child reads the settings the same way.
+--- 3. Fail fast: without the shared policy file the prelude is nil and the
+---    caller refuses to start a download that would fail for an unnamed cause.
+--- 4. The user's proxy override (Issue #101 point 2, core/network/engine/proxy_override.lua)
+---    leads every prelude as ERGOPTI_PROXY_OVERRIDE, always assigned so an
+---    inherited value never applies: the shared policy then treats a relay as
+---    the explicit route and "direct" as no relay, before any PAC lookup. A
+---    managed (signed native worker) prelude cannot honour it, so an override
+---    selects the environment-driven path instead. An invalid stored value
+---    refuses the prelude.
+--- ==============================================================================
+
+local M = {}
+
+local text_utils = require("core.text.engine.utils")
+local FileSystem = require("core.fs.adapters.file_system")
+local Json = require("core.text.engine.json")
+local Admission = require("ai.engine.api.opaque_network_admission")
+local NativePath = require("core.fs.engine.native_path")
+local Storage = require("core.fs.adapters.storage")
+local ProxyOverride = require("core.network.engine.proxy_override")
+
+-- The shared policy, relative to the driver root.
+local POLICY_RELATIVE = "ai/engine/bootstrap/network-retry.sh"
+
+--- The driver root this module was loaded from. A backslash is a filename
+--- byte on macOS, so only the host's own separators split the path.
+--- @return string|nil root
+local function driver_root()
+	local source = debug.getinfo(1, "S").source or ""
+	source = source:sub(1, 1) == "@" and source:sub(2) or source
+	local sep = "[" .. NativePath.separators() .. "]"
+	return source:match("^(.*)" .. sep .. "ai" .. sep .. "engine" .. sep .. "api" .. sep .. "network_env%.lua$")
+end
+
+--- Locates the shared network policy file.
+--- @return string|nil path Absolute path, nil when it is missing.
+local function locate_policy()
+	local root = driver_root()
+	if not root then return nil end
+	local path = root .. "/" .. POLICY_RELATIVE
+	if not FileSystem.exists(path) then return nil end
+	return path
+end
+
+-- The shared inventory of the origins each download client contacts.
+local ORIGINS_RELATIVE = "/../_shared/core/network/data/route_origins.json"
+
+-- Located once, when the module loads: the file ships beside it in the bundle.
+local _policy_path = locate_policy()
+
+--- The shared network policy file.
+--- @return string|nil path Absolute path, nil when it is missing.
+function M.policy_path()
+	return _policy_path
+end
+
+--- Reads and decodes the shared route inventory.
+--- @return table|nil inventory
+--- @return string|nil err Why the inventory cannot be used.
+local function route_inventory()
+	local root = driver_root()
+	if not root then return nil, "the bundled route inventory owner is missing" end
+	local ok, bytes, status = pcall(FileSystem.read_with_status, root .. ORIGINS_RELATIVE, function() end)
+	if not ok or status ~= "ok" or type(bytes) ~= "string" then
+		return nil, "the shared route inventory is unreadable"
+	end
+	local decoded, inventory = pcall(Json.decode, bytes)
+	if not decoded or type(inventory) ~= "table" then return nil, "the shared route inventory is unreadable" end
+	return inventory, nil
+end
+
+-- The contract of the local sign-in relay (docs/design/proxy-auth-relay.md).
+local RELAY_RELATIVE = "/../_shared/core/network/data/proxy_auth_relay.json"
+
+--- The shared sign-in relay policy (core/network/engine/proxy_auth_relay_core.lua).
+--- @return table|nil policy
+--- @return string|nil err Why the contract cannot be used.
+function M.proxy_auth_relay()
+	local root = driver_root()
+	if not root then return nil, "the bundled relay contract owner is missing" end
+	local ok, bytes, status = pcall(FileSystem.read_with_status, root .. RELAY_RELATIVE, function() end)
+	if not ok or status ~= "ok" or type(bytes) ~= "string" then return nil, "the relay contract is unreadable" end
+	local decoded, contract = pcall(Json.decode, bytes)
+	if not decoded then return nil, "the relay contract is unreadable" end
+	return require("core.network.engine.proxy_auth_relay_core").new(contract)
+end
+
+--- Seconds one origin's route lookup may take (route_origins.json).
+--- @return number|nil seconds
+--- @return string|nil err Why the inventory cannot be used.
+function M.route_lookup_budget_seconds()
+	local inventory, err = route_inventory()
+	if not inventory then return nil, err end
+	local seconds = inventory.route_lookup_budget_seconds
+	if type(seconds) ~= "number" or seconds <= 0 then return nil, "the route inventory names no lookup budget" end
+	return seconds, nil
+end
+
+--- The origins one download client contacts, redirect targets included.
+--- @param client string Key of route_origins.json "clients".
+--- @return table|nil origins Ordered https origins.
+--- @return string|nil err Why the inventory cannot be used.
+function M.route_origins(client)
+	local inventory, inventory_error = route_inventory()
+	if not inventory then return nil, inventory_error end
+	local origins = type(inventory.clients) == "table" and inventory.clients[client] or nil
+	if type(origins) ~= "table" or #origins == 0 then
+		return nil, "the route inventory names no origin for " .. tostring(client)
+	end
+	return origins, nil
+end
+
+-- The shared proxy override declaration, relative to the driver root.
+local OVERRIDE_RELATIVE = "/../_shared/core/network/data/proxy_override.json"
+
+--- Reads and validates the shared proxy override declaration.
+--- @return table|nil setting
+--- @return string|nil err Why the declaration cannot be used.
+local function load_override_setting()
+	local root = driver_root()
+	if not root then return nil, "the bundled proxy override owner is missing" end
+	local file = io.open(root .. OVERRIDE_RELATIVE, "rb")
+	local bytes = file and file:read("*a")
+	if file then file:close() end
+	if type(bytes) ~= "string" then return nil, "the shared proxy override declaration is unreadable" end
+	local decoded, data = pcall(Json.decode, bytes)
+	if not decoded then return nil, "the shared proxy override declaration is unreadable" end
+	local setting, reason = ProxyOverride.new(data)
+	if not setting then return nil, "the shared proxy override declaration is invalid (" .. tostring(reason) .. ")" end
+	return setting, nil
+end
+
+-- Read once, when the module loads, like the policy path: the file ships beside
+-- it in the bundle, and prelude builders run under callers that double io.open.
+local _override_setting, _override_error = load_override_setting()
+
+--- The shared proxy override declaration.
+--- @return table|nil setting
+--- @return string|nil err Why the declaration cannot be used.
+function M.proxy_override_setting()
+	return _override_setting, _override_error
+end
+
+--- The stored override in its canonical form: "" (automatic), "direct" or a relay.
+--- @return string|nil value
+--- @return string|nil err Why it cannot be used; the value itself is never named.
+function M.proxy_override_value()
+	local setting, err = M.proxy_override_setting()
+	if not setting then return nil, err end
+	local value = setting.normalize(Storage.get(setting.storage_key, nil))
+	if value == nil then return nil, "the proxy override in the settings is not valid" end
+	return value, nil
+end
+
+--- The shell assignment leading every prelude.
+--- @return string|nil assignment
+--- @return string|nil err
+local function override_assignment()
+	local value, err = M.proxy_override_value()
+	if not value then return nil, err end
+	return "ERGOPTI_PROXY_OVERRIDE=" .. text_utils.shell_quote(value) .. "; ", nil
+end
+
+-- The shared proxy policy, relative to the driver root's shared tree.
+local PROXY_POLICY_RELATIVE = "/../_shared/core/network/data/proxy_policy.json"
+
+--- The shell parameter expansion of the HTTPS proxy precedence, built from the
+--- shared proxy policy: one nested ${name:-...} level per variable, in order.
+--- @return string|nil expansion
+--- @return string|nil err Why the policy cannot be used.
+function M.https_route_expansion()
+	local root = driver_root()
+	if not root then return nil, "the bundled proxy policy owner is missing" end
+	-- Read directly: this runs inside prelude builders whose callers double the file system.
+	local file = io.open(root .. PROXY_POLICY_RELATIVE, "rb")
+	local bytes = file and file:read("*a")
+	if file then file:close() end
+	if type(bytes) ~= "string" then return nil, "the shared proxy policy is unreadable" end
+	local decoded, policy = pcall(Json.decode, bytes)
+	local names = decoded and type(policy) == "table" and type(policy.environment_precedence) == "table"
+		and policy.environment_precedence.https or nil
+	if type(names) ~= "table" or #names < 2 then return nil, "the shared proxy policy names no HTTPS precedence" end
+	local expansion = ""
+	for index = #names, 1, -1 do
+		local name = names[index]
+		if type(name) ~= "string" or not name:match("^[%a_][%w_]*$") then
+			return nil, "the shared proxy policy names an invalid variable"
+		end
+		expansion = "${" .. name .. ":-" .. expansion .. "}"
+	end
+	return expansion, nil
+end
+
+--- The shell lines, ending in "; ", that export the system network settings
+--- for the command that follows them.
+--- @param tag string Log prefix of the child, e.g. "MLX".
+--- @param opaque boolean Whether the client is admitted for an outgoing fetch.
+--- @param options table|nil { pac_probe_url = https origin the client downloads from,
+---   pac_probe_client = key of every origin a client contacts in route_origins.json }.
+--- @return string|nil prelude
+--- @return string|nil err Why it cannot be built.
+local function build_prelude(tag, opaque, options)
+	local probe = options and options.pac_probe_url
+	if probe ~= nil and (type(probe) ~= "string" or not probe:match("^https://[%w%.%-]+/?$")) then
+		return nil, "the automatic-route origin is not a plain https origin"
+	end
+	local probes
+	if options and options.pac_probe_client ~= nil then
+		if probe ~= nil then return nil, "the automatic-route origin is named twice" end
+		local origins, origins_error = M.route_origins(options.pac_probe_client)
+		if not origins then return nil, origins_error end
+		for _, origin in ipairs(origins) do
+			if type(origin) ~= "string" or not origin:match("^https://[%w%.%-]+$") then
+				return nil, "an automatic-route origin is not a plain https origin"
+			end
+		end
+		probes = table.concat(origins, " ")
+	end
+	local policy = M.policy_path()
+	if not policy then return nil, "the shared network policy " .. POLICY_RELATIVE .. " is missing" end
+	local activation = opaque and "apply_system_network opaque" or "apply_system_network"
+	local status = "_ergopti_network_status=$?; [ \"$_ergopti_network_status\" -eq 0 ] || exit \"$_ergopti_network_status\"; "
+	if opaque then
+		status = "_ergopti_network_status=$?; if [ \"$_ergopti_network_status\" -eq 0 ]; then printf '%s\\n' "
+			.. text_utils.shell_quote(Admission.accepted_line) .. " >&2; else "
+			.. "if [ \"$_ergopti_network_status\" -eq " .. tostring(Admission.refusal_exit_code) .. " ]; then "
+			.. "case \"${OPAQUE_NETWORK_FAILURE_PROVENANCE:-}:${OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS:-}\" in "
+			.. "verified:unavailable|unavailable:unavailable) printf "
+			.. text_utils.shell_quote(Admission.refusal_prefix .. "%s:%s\n")
+			.. " \"$OPAQUE_NETWORK_FAILURE_PROVENANCE\" \"$OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS\" >&2 ;; esac; fi; "
+			.. "exit \"$_ergopti_network_status\"; fi; "
+	end
+	local override, override_error = override_assignment()
+	if not override then return nil, override_error end
+	local label = text_utils.shell_quote("[" .. tostring(tag) .. "] %s\n")
+	return override .. "log_info() { printf " .. label .. " \"$1\" >&2; }; "
+		.. "log_error() { printf " .. label .. " \"$1\" >&2; }; "
+		.. (probe and ("OPAQUE_NETWORK_PAC_PROBE_URL=" .. text_utils.shell_quote(probe) .. "; ") or "")
+		.. (probes and ("OPAQUE_NETWORK_PAC_PROBE_URLS=" .. text_utils.shell_quote(probes) .. "; ") or "")
+		.. ". " .. text_utils.shell_quote(policy) .. " && " .. activation .. "; "
+		.. status, nil
+end
+
+--- Exports static settings for local serving and native-aware commands.
+--- A client that reads only HTTPS_PROXY (the Ollama daemon) names the origin it
+--- downloads from in options.pac_probe_url: under an automatic (PAC, WPAD)
+--- configuration the launcher resolves that origin and the first reachable
+--- route becomes HTTPS_PROXY (see resolve_system_route_for_probe in ../bootstrap/network-retry.sh).
+--- @param tag string Child log prefix.
+--- @param options table|nil { pac_probe_url = string }.
+--- @return string|nil prelude
+--- @return string|nil err
+function M.prelude(tag, options)
+	return build_prelude(tag, false, options)
+end
+
+--- Admits an actual outgoing fetch by an opaque client before child dispatch.
+--- Cached/local serving uses prelude() and does not require this capability.
+--- @param tag string Child log prefix.
+--- @param options table|nil { pac_probe_url = string }, as for prelude().
+--- @return string|nil prelude
+--- @return string|nil err
+function M.opaque_prelude(tag, options)
+	return build_prelude(tag, true, options)
+end
+
+--- Emits the existing native receiver admission without observing a route.
+--- @param tag string Child log prefix.
+--- @param root string Canonical bundled driver root.
+--- @return string prelude
+local function managed_receiver_prelude(tag, root)
+	local directory = root .. "/core/network/adapters"
+	-- The canonical receiver validates the exact bundle path and executable
+	-- device/inode. This probe performs no network lookup or request and keeps
+	-- inherited environment selectors intact, including no_proxy precedence.
+	local probe = "import importlib.util,sys; s=importlib.util.spec_from_file_location('ergopti_native_admission',sys.argv[1]); "
+		.. "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m._resolve_worker()"
+	local prefix = text_utils.shell_quote("[" .. tostring(tag) .. "] %s\n")
+	local accepted = text_utils.shell_quote(Admission.accepted_line)
+	local refused = text_utils.shell_quote(Admission.refusal_prefix .. "unavailable:unavailable")
+	return "if \"$PYTHON_BIN\" -c " .. text_utils.shell_quote(probe) .. " " .. text_utils.shell_quote(directory .. "/native_http.py")
+		.. " >/dev/null 2>&1; then printf '%s\\n' " .. accepted .. " >&2; else printf " .. prefix
+		.. " 'The bundled native network receiver is unavailable. No download was started.' >&2; "
+		.. "printf '%s\\n' " .. refused .. " >&2; exit " .. tostring(Admission.refusal_exit_code) .. "; fi; ", nil
+end
+
+--- Admits the bundled managed HTTP receiver without materializing system aliases.
+--- The caller sets PYTHON_BIN to its pinned runtime before this prelude. The
+--- native transport subsequently resolves each exact request and redirect URL.
+--- @param tag string Child log prefix.
+--- @return string|nil prelude
+--- @return string|nil err
+function M.managed_http_prelude(tag)
+	local override, override_error = M.proxy_override_value()
+	if not override then return nil, override_error end
+	-- The signed worker resolves each request natively; an override needs the
+	-- environment-driven client (M.uses_managed_transport tells the caller).
+	if override ~= "" then return M.opaque_prelude(tag) end
+	local root = driver_root()
+	if not root or not M.policy_path() then return nil, "the bundled managed network policy is missing" end
+	local directory = root .. "/core/network/adapters"
+	if not FileSystem.exists(directory .. "/native_http.py") then
+		return nil, "the bundled managed network receiver is missing"
+	end
+	return managed_receiver_prelude(tag, root)
+end
+
+--- Whether a download child may install the managed (signed native worker)
+--- transport: not while a proxy override is set, whose route the worker cannot
+--- take (managed_http_prelude then admits the environment-driven client).
+--- @return boolean|nil managed
+--- @return string|nil err
+function M.uses_managed_transport()
+	local override, err = M.proxy_override_value()
+	if not override then return nil, err end
+	return override == "", nil
+end
+
+--- Admits the transport selected by the installer without changing route provenance.
+--- Native wheel staging uses the existing authenticated receiver; explicit routes
+--- and manual checkouts retain opaque admission. A native refusal never retries
+--- the opaque client. The shell observes the same environment as the installer.
+--- @param tag string Child log prefix.
+--- @param python string Exact interpreter already admitted by the runtime owner.
+--- @return string|nil prelude
+--- @return string|nil err
+function M.bootstrap_prelude(tag, python)
+	if type(python) ~= "string" or python == "" or python:find("%z") then
+		return nil, "the admitted bootstrap interpreter is missing"
+	end
+	local override, override_error = M.proxy_override_value()
+	if not override then return nil, override_error end
+	-- An explicit route keeps opaque admission (see below); so does the override.
+	if override ~= "" then return M.opaque_prelude(tag) end
+	local root = driver_root()
+	if not root then return nil, "the bundled bootstrap owner is missing" end
+	local managed = managed_receiver_prelude(tag, root)
+	local opaque, opaque_error = M.opaque_prelude(tag)
+	if not opaque then return nil, opaque_error end
+	local route, route_error = M.https_route_expansion()
+	if not route then return nil, route_error end
+	local helper = text_utils.shell_quote(root .. "/ai/engine/bootstrap/managed_bootstrap_http.py")
+	return "if [ -n \"${ERGOPTI_LAUNCHER_EXECUTABLE:-}\" ] "
+		.. "&& [ -z \"" .. route .. "\" ] "
+		.. "&& [ -f " .. helper .. " ]; then PYTHON_BIN=" .. text_utils.shell_quote(python) .. "; "
+		.. managed .. "else " .. opaque .. "fi; ", nil
+end
+
+return M

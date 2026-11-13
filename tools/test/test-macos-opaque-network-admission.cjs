@@ -16,7 +16,7 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 const root = path.resolve(__dirname, '../..');
-const policy = path.join(root, 'static/ergopti_plus/macos/modules/llm/network-retry.sh');
+const policy = path.join(root, 'static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh');
 const shellPath = (value) => {
 	const result = path.resolve(value).replace(/\\/g, '/');
 	if (process.platform !== 'win32') return result;
@@ -399,7 +399,7 @@ function receivingNetworkSource(fixturePolicy) {
 		'only the copied real native receiver is admitted'
 	);
 	const networkSource = fs.readFileSync(
-		path.join(root, 'static/ergopti_plus/macos/modules/llm/network_env.lua'),
+		path.join(root, 'static/ergopti_plus/macos/ai/engine/api/network_env.lua'),
 		'utf8'
 	);
 	return [
@@ -462,7 +462,7 @@ function receivePhase(chunks, code) {
 		'package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		'local Json = require("core.text.engine.json")',
 		`local chunks = Json.decode(${luaString(JSON.stringify(chunks))})`,
-		'local phase = require("modules.llm.opaque_network_admission").new()',
+		'local phase = require("ai.engine.api.opaque_network_admission").new()',
 		'for _, chunk in ipairs(chunks) do phase.push(chunk) end',
 		`local receipt = phase.finish(${code})`,
 		'io.write(Json.encode({ has_receipt = receipt ~= nil, receipt = receipt or {} }))'
@@ -1128,7 +1128,7 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 	assert.equal(masquerade.stdout, '', 'no child after system-export masquerade refusal');
 	console.log('ok - original environment override provenance');
 	const bootstrap = fs.readFileSync(
-		path.join(root, 'static/ergopti_plus/macos/modules/llm/ensure-mlx-deps.sh'),
+		path.join(root, 'static/ergopti_plus/macos/ai/engine/local_servers/ensure-mlx-deps.sh'),
 		'utf8'
 	);
 	assert.equal(
@@ -1146,7 +1146,7 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		'native curl uv wheel and cached probes retain default activation'
 	);
 	const localServer = fs.readFileSync(
-		path.join(root, 'static/ergopti_plus/macos/modules/llm/ollama_server_command.lua'),
+		path.join(root, 'static/ergopti_plus/macos/ai/engine/ollama/server_command.lua'),
 		'utf8'
 	);
 	assert.ok(
@@ -1155,7 +1155,7 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		'local serving retains default static policy'
 	);
 	const hfPull = fs.readFileSync(
-		path.join(root, 'static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_download.lua'),
+		path.join(root, 'static/ergopti_plus/macos/ai/ui/menu/models/manager_mlx_download.lua'),
 		'utf8'
 	);
 	assert.ok(
@@ -1163,7 +1163,7 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		'actual HF pull owns managed receiver admission'
 	);
 	const ollamaPull = fs.readFileSync(
-		path.join(root, 'static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_ollama.lua'),
+		path.join(root, 'static/ergopti_plus/macos/ai/ui/menu/models/manager_ollama.lua'),
 		'utf8'
 	);
 	assert.ok(

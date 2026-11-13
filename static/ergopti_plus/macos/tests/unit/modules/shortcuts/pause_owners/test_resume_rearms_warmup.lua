@@ -23,10 +23,10 @@ helpers.describe("script_control pause/resume warmup symmetry", function()
 		local calls = { stop = 0, rearm = 0 }
 		local owner_names = {
 			"platform.input.synthetic_input",
-			"modules.llm.warmup_controller",
-			"modules.llm.api_mlx",
-			"modules.llm.api_ollama",
-			"modules.llm.api_remote",
+			"ai.engine.local_servers.warmup_controller",
+			"ai.engine.api.mlx",
+			"ai.engine.api.ollama",
+			"ai.engine.api.remote",
 			"ui.wpm.wpm_menubar",
 			"ui.wpm.wpm_widget",
 			"platform.remap.onboarding",
@@ -54,19 +54,19 @@ helpers.describe("script_control pause/resume warmup symmetry", function()
 			end,
 			admission_open = function() return admission_fence == nil end,
 		}
-		package.loaded["modules.llm.warmup_controller"] = {
+		package.loaded["ai.engine.local_servers.warmup_controller"] = {
 			stop = function() calls.stop = calls.stop + 1; return true end,
 			schedule_warmup_with_retry = function(_reason)
 				calls.rearm = calls.rearm + 1
 				return true
 			end,
 		}
-		package.loaded["modules.llm.api_mlx"] = {
+		package.loaded["ai.engine.api.mlx"] = {
 			stop_warmup = function() return true end,
 			resume_warmup = function() return true end,
 		}
-		package.loaded["modules.llm.api_ollama"] = { stop_warmup = function() return true end }
-		package.loaded["modules.llm.api_remote"] = { stop_warmup = function() return true end }
+		package.loaded["ai.engine.api.ollama"] = { stop_warmup = function() return true end }
+		package.loaded["ai.engine.api.remote"] = { stop_warmup = function() return true end }
 		package.loaded["ui.wpm.wpm_menubar"] = {
 			is_running = function() return false end,
 		}

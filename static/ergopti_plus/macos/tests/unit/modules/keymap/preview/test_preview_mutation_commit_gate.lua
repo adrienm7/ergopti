@@ -13,19 +13,19 @@ local function fresh_runtime(effects)
 			name:match("^modules%.keymap")
 			or name:match("^adapters%.")
 			or name == "modules.keystats"
-			or name == "modules.llm"
-			or name == "modules.llm.prediction_engine"
+			or name == "ai.engine"
+			or name == "ai.engine.prediction.engine"
 			or name == "core.ui.ui.tooltip"
 		) then
 			package.loaded[name] = nil
 		end
 	end
 
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = true },
 		check_modifiers = function() return false end,
 	}
-	package.loaded["modules.llm.prediction_engine"] = {
+	package.loaded["ai.engine.prediction.engine"] = {
 		init = function() return true end,
 		set_runtime_guard = function() end,
 		get_llm_enabled = function() return false end,
@@ -109,7 +109,7 @@ helpers.describe("keymap semantic mutations wait for native preview revocation",
 		local effects = { allow_hide = true, hide_calls = 0, reset_calls = 0, visible = false }
 		local Keymap = fresh_runtime(effects)
 		local Registry = assert(package.loaded["settings.engine.registry"])
-		local Bridge = assert(package.loaded["modules.keymap.llm_bridge"])
+		local Bridge = assert(package.loaded["ai.engine.bridge"])
 
 		helpers.assert_true(Keymap.set_trigger_char("a"))
 		helpers.assert_true(Keymap.set_base_delay(0))
@@ -158,7 +158,7 @@ helpers.describe("keymap semantic mutations wait for native preview revocation",
 		local effects = { allow_hide = true, hide_calls = 0, reset_calls = 0, visible = false }
 		local Keymap = fresh_runtime(effects)
 		local Registry = assert(package.loaded["settings.engine.registry"])
-		local Bridge = assert(package.loaded["modules.keymap.llm_bridge"])
+		local Bridge = assert(package.loaded["ai.engine.bridge"])
 
 		helpers.assert_eq(type(Keymap.invalidate_hotstring_preview), "function")
 		helpers.assert_true(Keymap.set_trigger_char("a"))

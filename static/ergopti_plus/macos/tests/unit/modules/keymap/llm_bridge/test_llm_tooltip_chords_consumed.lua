@@ -372,7 +372,7 @@ local function load_keymap()
 	local original_awake = scheduler.hotstring_time
 	scheduler.hotstring_time = function() return original_awake() + 10000 end
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:match("^modules%.keymap") or name:match("^modules%.llm")
+		if type(name) == "string" and (name:match("^modules%.keymap") or name:match("^ai%.engine")
 			or name == "platform.input.synthetic_input" or name == "adapters.event_provenance") then
 			package.loaded[name] = nil
 		end
@@ -397,7 +397,7 @@ local function load_keymap()
 		get_llm_enabled = function() return true end,
 		is_runtime_available = function() return true end,
 	}, { __index = function() return function() end end })
-	package.loaded["modules.keymap.llm_bridge"] = bridge
+	package.loaded["ai.engine.bridge"] = bridge
 
 	local state = nil
 	local RealState = require("modules.keymap.state")

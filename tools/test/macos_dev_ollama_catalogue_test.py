@@ -35,7 +35,7 @@ STAGER = ROOT / "tools/dev/stage-macos-dev-ollama-catalogue.py"
 SHARED = "static/ergopti_plus/_shared"
 CONTRACT = SHARED + "/ai/data/managed_ollama_runtime.json"
 OFFICIAL_RELEASE = SHARED + "/ai/data/ollama_release.json"
-RUNTIME = "static/ergopti_plus/macos/modules/llm/managed_ollama_runtime.py"
+RUNTIME = "static/ergopti_plus/macos/ai/engine/ollama/managed_ollama_runtime.py"
 INPUTS = (
     CONTRACT,
     OFFICIAL_RELEASE,
@@ -45,7 +45,7 @@ INPUTS = (
     SHARED + "/core/network/adapters/python_network_proxy_policy.py",
     SHARED + "/ai/adapters/python/managed_source_alias.py",
     RUNTIME,
-    "static/ergopti_plus/macos/modules/llm/managed_bootstrap_http.py",
+    "static/ergopti_plus/macos/ai/engine/bootstrap/managed_bootstrap_http.py",
 )
 CATALOGUE = "managed_ollama_release.json"
 LIBRARY = "lib/ollama/libggml-base.dylib"

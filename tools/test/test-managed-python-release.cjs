@@ -190,7 +190,7 @@ for (const prefix of nativePrefixes) {
 			SOURCE,
 			IDENTIFIERS,
 			'static/ergopti_plus/_shared/core/text/data/identifiers.sh',
-			'static/ergopti_plus/macos/modules/llm/uv-release.sh'
+			'static/ergopti_plus/macos/ai/engine/bootstrap/uv-release.sh'
 		]) {
 			const target = path.join(temporary, relative);
 			fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -305,7 +305,7 @@ for (const prefix of nativePrefixes) {
 		assert.throws(() => generate(temporary, { check: true }), /projection drift/);
 		assert.ok(fs.readFileSync(shell).equals(drifted), 'check mode preserves the edited projection');
 		generate(temporary);
-		const uv = path.join(temporary, 'static/ergopti_plus/macos/modules/llm/uv-release.sh');
+		const uv = path.join(temporary, 'static/ergopti_plus/macos/ai/engine/bootstrap/uv-release.sh');
 		fs.writeFileSync(uv, 'UV_RELEASE_VERSION="0.12.20"\n');
 		assert.throws(() => generate(temporary), /installed uv release/);
 	} finally {

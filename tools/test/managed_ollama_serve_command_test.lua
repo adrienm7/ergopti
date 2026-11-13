@@ -67,9 +67,9 @@ package.loaded["core.fs.adapters.file_system"] = {
 package.loaded["core.crypto.crypto"] = { sha256_bytes = function(raw)
 	if raw == raw_contract then return cd end; if raw == raw_catalogue then return rd end; return ""
 end }
-package.loaded["modules.llm.network_env"] = { prelude = function() network_calls = network_calls + 1; return "STATIC-PRELUDE; " end }
-package.loaded["modules.llm.managed_native_python"] = { resolve = function() return python end }
-package.loaded["adapters.python_interpreter"] = { resolve = function() return python end }
+package.loaded["ai.engine.api.network_env"] = { prelude = function() network_calls = network_calls + 1; return "STATIC-PRELUDE; " end }
+package.loaded["ai.engine.bootstrap.managed_native_python"] = { resolve = function() return python end }
+package.loaded["ai.adapters.python_interpreter"] = { resolve = function() return python end }
 -- The real app_dirs names the daily log. The real timing registry reads the
 -- production _shared/ tree, which the hs.fs double cannot walk to, and logs its
 -- own load: bind it under a silent logger before the command module needs it.
@@ -78,7 +78,7 @@ package.loaded["core.fs.engine.paths"] = { shared = function(relative)
 end }
 package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return function() end end })
 require("core.timing.engine.timings")
-package.loaded["adapters.managed_ollama_hint"] = { get = function(directory)
+package.loaded["ai.adapters.managed_ollama_hint"] = { get = function(directory)
 	local raw = files[receipt_path]
 	if not raw or #raw > 1048576 then return nil end
 	local ok, value = pcall(Json.decode, raw)
@@ -90,8 +90,8 @@ package.loaded["adapters.managed_ollama_hint"] = { get = function(directory)
 	if count ~= 1 then budgets = nil end
 	return { candidate = directory .. "/ollama", budgets = budgets }
 end }
-local Binary = require("modules.llm.ollama_binary")
-local ActualBuilder = require("modules.llm.ollama_server_command")
+local Binary = require("ai.engine.ollama.binary")
+local ActualBuilder = require("ai.engine.ollama.server_command")
 -- The caller carries the explicit provisional source classification; its
 -- original cases and independent expectations remain unchanged.
 local Builder = { build = function(executable, log, port)

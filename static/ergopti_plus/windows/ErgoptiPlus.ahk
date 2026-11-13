@@ -425,11 +425,11 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/app_launcher.ahk
 #Include core/network/adapters/info.ahk
 #Include platform/input/keyboard_hook.ahk
-#Include adapters/llm_nav_event_owner.ahk
+#Include ai/adapters/nav_event_owner.ahk
 #Include core/ui/adapters/terminal_output_preview.ahk
 #Include core/ui/adapters/terminal_output_custody.ahk
 #Include core/ui/adapters/terminal_output_sendinput.ahk
-#Include adapters/llm_automation.ahk
+#Include ai/adapters/automation.ahk
 #Include adapters/mouse_control.ahk
 #Include platform/focus/window_manager.ahk
 #Include platform/system/control.ahk
@@ -523,7 +523,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include platform/input/hook_dispatcher.ahk
 #Include menu/engine/manifest.ahk
 #Include menu/engine/manifest_menu.ahk
-#Include infra/llm_defaults.ahk
+#Include ai/engine/defaults.ahk
 #Include modules/updater.ahk
 #Include core/lifecycle/engine/shutdown/uninstall.ahk
 #Include infra/start_at_login.ahk
@@ -552,7 +552,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include infra/hotstrings/hotstrings_config.ahk
 #Include ui/hotstrings_config_window/init.ahk
 #Include ui/hotstrings_config_window/webview.ahk
-#Include ui/prompt_editor/init.ahk
+#Include ai/ui/prompt_editor/init.ahk
 #Include infra/wrap_symbols_config.ahk
 #Include _generated/window_titles.ahk
 #Include core/ui/engine/native_dialogs.ahk
@@ -656,12 +656,12 @@ if KbdRegister_IsInvocation()
 KLPF_InitializeCleanup()
 
 #Include _generated/prompt_builder.ahk
-#Include modules/llm/api_common.ahk
-#Include modules/llm/api_token_crypto.ahk
-#Include modules/llm/api_ollama.ahk
-#Include modules/llm/rewrite.ahk
-#Include modules/llm/parser.ahk
-#Include modules/llm/remote_formats.ahk
+#Include ai/engine/api/common.ahk
+#Include ai/engine/api/token_crypto.ahk
+#Include ai/engine/api/ollama.ahk
+#Include ai/engine/prediction/rewrite.ahk
+#Include ai/engine/api/parser.ahk
+#Include ai/engine/api/remote_formats.ahk
 #Include ..\_shared\ai\data\local_server_auth.ahk
 #Include ..\_shared\ai\data\api_url_template.ahk
 #Include ..\_shared\ai\data\model_capabilities.ahk
@@ -670,36 +670,36 @@ KLPF_InitializeCleanup()
 #Include ..\_shared\ai\data\local_server_discovery.ahk
 #Include ..\_shared\ai\data\local_server_ports.ahk
 #Include ..\_shared\ai\data\local_server_menu.ahk
-#Include modules/llm/local_server_models.ahk
-#Include modules/llm/local_server_port_scan.ahk
-#Include modules/llm/local_servers.ahk
-#Include modules/llm/api_remote.ahk
-#Include modules/llm/models.ahk
+#Include ai/engine/local_servers/models.ahk
+#Include ai/engine/local_servers/port_scan.ahk
+#Include ai/engine/local_servers/local_servers.ahk
+#Include ai/engine/api/remote.ahk
+#Include ai/engine/settings/models.ahk
 ; LLM_GetSharedPath is now available — load the cross-platform defaults before
 ; prediction_engine.ahk and menu_llm.ahk initialise their state maps.
 LLM_Defaults_Load()
 BootProfile_Stamp("LLM defaults loaded")
 #Include _generated/llm_profiles_data.ahk
-#Include modules/llm/profiles.ahk
-#Include modules/llm/option_validation.ahk
-#Include modules/llm/prompt_action.ahk
-#Include modules/llm/tone.ahk
-#Include modules/llm/tone_action.ahk
-#Include modules/llm/vision.ahk
-#Include modules/llm/vision_action.ahk
-#Include modules/llm/translate.ahk
-#Include modules/llm/translate_action.ahk
-#Include modules/llm/agent.ahk
-#Include modules/llm/agent_connectors.ahk
-#Include modules/llm/agent_action.ahk
-#Include modules/llm/prediction_engine.ahk
-#Include modules/keymap/llm_bridge.ahk
-#Include modules/llm/ollama_webview.ahk
-#Include modules/llm/ollama_install_files_port.ahk
-#Include modules/llm/ollama_deps_checker.ahk
+#Include ai/engine/settings/profiles.ahk
+#Include ai/engine/api/option_validation.ahk
+#Include ai/engine/prediction/prompt_action.ahk
+#Include ai/engine/prediction/tone.ahk
+#Include ai/engine/prediction/tone_action.ahk
+#Include ai/engine/prediction/vision.ahk
+#Include ai/engine/prediction/vision_action.ahk
+#Include ai/engine/prediction/translate.ahk
+#Include ai/engine/prediction/translate_action.ahk
+#Include ai/engine/agent/agent.ahk
+#Include ai/engine/agent/connectors.ahk
+#Include ai/engine/agent/action.ahk
+#Include ai/engine/prediction/engine.ahk
+#Include ai/engine/bridge.ahk
+#Include ai/engine/ollama/webview.ahk
+#Include ai/engine/ollama/install_files_port.ahk
+#Include ai/engine/ollama/deps_checker.ahk
 #Include core/ui/ui/tooltip/tooltip_llm.ahk
-#Include ui/menu/menu_llm/_index.ahk
-#Include ui/model_browser/init.ahk
+#Include ai/ui/menu/_index.ahk
+#Include ai/ui/model_browser/init.ahk
 ; Closes the include graph: every module's top-level initialiser has now run.
 BootProfile_Stamp("Module includes initialised")
 

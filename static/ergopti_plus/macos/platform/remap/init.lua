@@ -5266,7 +5266,7 @@ M.OWNED_REPAIR_REASONS = {
 --- Installs Ergopti's own Karabiner runtime after the user confirmed it. The
 --- caller reloads after telling the user, so the next owner admits it or names
 --- the System Settings approval macOS may still wait for
---- (ui/owned_runtime_install.lua).
+--- (ai/ui/owned_runtime_install.lua).
 --- @param on_done function fn(ok, reason|nil, detail|nil) called once.
 --- @return boolean started False when the owned runtime is not blocked by a missing install.
 function M.install_owned_runtime(on_done)
@@ -5283,7 +5283,7 @@ end
 --- Restarts the services of the installed owned runtime after the user
 --- confirmed it (« Réparer le service », MRT-004). The caller reloads after
 --- telling the user, so the next owner admits the runtime or names what still
---- blocks it (ui/owned_runtime_install.lua).
+--- blocks it (ai/ui/owned_runtime_install.lua).
 --- @param on_done function fn(ok, reason|nil, detail|nil) called once.
 --- @return boolean started False when the owned runtime is not blocked by a stopped service.
 function M.repair_owned_runtime(on_done)

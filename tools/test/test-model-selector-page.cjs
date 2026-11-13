@@ -1011,7 +1011,7 @@ assert.ok(Number(projected.params_b) > 0, 'params from parameters.total');
 assert.equal(projected.backend, 'ollama', 'each row names its backend');
 
 // The Windows twin emits the same fields into the page.
-const ahk = fs.readFileSync(path.join(SP, 'windows/ui/model_browser/init.ahk'), 'utf8');
+const ahk = fs.readFileSync(path.join(SP, 'windows/ai/ui/model_browser/init.ahk'), 'utf8');
 for (const field of [...fields, 'backend', 'installed']) {
 	assert.ok(ahk.includes(`${field}:`) || ahk.includes(`"${field}"`), `Windows projects ${field}`);
 }
@@ -1024,10 +1024,7 @@ assert.ok(ahk.includes(',brand:" . JsonStringLiteral(Brands[Id]["brand"])'), 'Wi
 // backends, and routes the page's install click to its owned-runtime install.
 assert.ok(ahk.includes('",install:" . InstallJson'), 'Windows projects the install state');
 assert.ok(ahk.includes('Tools["ollama`ninstall"] := (*) => _LLM_MBW_InstallOllama()'));
-const macPage = fs.readFileSync(
-	path.join(SP, 'macos/ui/menu/menu_llm/model_selector_page.lua'),
-	'utf8'
-);
+const macPage = fs.readFileSync(path.join(SP, 'macos/ai/ui/menu/models/selector_page.lua'), 'utf8');
 assert.ok(!macPage.includes('BackendLabels.brand('), 'macOS: no "<brand> <emoji>" in the payload');
 assert.ok(macPage.includes('brand = BackendLabels.name(backend)'), 'macOS: bare brand');
 assert.ok(
@@ -1035,7 +1032,7 @@ assert.ok(
 	'macOS projects the install state'
 );
 assert.ok(macPage.includes('if id == "install" then return install_runtime(ctx, backend'));
-const linuxBridge = fs.readFileSync(path.join(SP, 'linux/ui/model_browser/bridge.lua'), 'utf8');
+const linuxBridge = fs.readFileSync(path.join(SP, 'linux/ai/ui/model_browser/bridge.lua'), 'utf8');
 assert.ok(linuxBridge.includes('brand = BackendBrands.brand(id)'), 'Linux: bare brand');
 assert.ok(
 	linuxBridge.includes('b.install = ollama_install(frame, blocked, ollama_ok)'),
@@ -1045,9 +1042,9 @@ assert.ok(linuxBridge.includes('_bound.install_ollama(frame.llm'));
 
 // model-selector-api-listing: every driver replays the shared listing corpus.
 for (const replay of [
-	'macos/tests/unit/modules/llm/vectors/test_api_model_listing_vectors.lua',
+	'macos/tests/unit/ai/engine/vectors/test_api_model_listing_vectors.lua',
 	'linux/tests/meta/corpus/test_corpus_api_model_listing.lua',
-	'windows/tests/unit/modules/llm/menu/test_llm_menu_backend_model_labels.ahk'
+	'windows/tests/unit/ai/menu/test_backend_model_labels.ahk'
 ]) {
 	assert.ok(
 		fs.readFileSync(path.join(SP, replay), 'utf8').includes('api_model_listing_vectors.json'),

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local uv = require('luv')
-local Remote = require('modules.llm.api_remote')
+local Remote = require('ai.engine.api.api_remote')
 local Http = require('core.network.adapters.http_client')
 local Logger = require('core.logger.engine.shim')
 local origin = assert(os.getenv('LLM_WRAPPER_ORIGIN'))
@@ -152,7 +152,7 @@ for _, spec in ipairs({{'models','lmstudio','openai',''}, {'models','openai_comp
         else
             local log=diagnostics[#diagnostics]
             good = good and #diagnostics==old_logs+1 and log ~= nil
-                and log.owner=='modules.llm.api_remote' and log.message=='Terminal callback raised — %s'
+                and log.owner=='ai.engine.api.api_remote' and log.message=='Terminal callback raised — %s'
                 -- A string error may quote provider or user text: the owner withholds it.
                 and log.detail==(case=='string' and 'details withheld' or 'error object (table)')
         end

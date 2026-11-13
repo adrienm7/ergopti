@@ -96,24 +96,16 @@ check('the shared port row label', () => {
 	// The MLX and Ollama ports are tools of the model selector page since
 	// 2026-10-27, not tray rows; the page owners read the same labels.
 	assert(
-		read(`${PLUS}/macos/ui/menu/menu_llm/model_selector_page.lua`).includes(
-			`i18n.get("${PORT_LABEL}")`
-		),
+		read(`${PLUS}/macos/ai/ui/menu/models/selector_page.lua`).includes(`i18n.get("${PORT_LABEL}")`),
 		'the macOS MLX port tool reads the shared label'
 	);
 	assert(
-		read(`${PLUS}/windows/ui/model_browser/init.ahk`).includes(`t("${WINDOWS_PORT_LABEL}")`),
+		read(`${PLUS}/windows/ai/ui/model_browser/init.ahk`).includes(`t("${WINDOWS_PORT_LABEL}")`),
 		'the Windows Ollama port tool keeps its label'
 	);
+	assert(read(`${PLUS}/windows/ai/ui/menu/settings.ahk`).includes('"menu.llm.debounce_prompt"'));
 	assert(
-		read(`${PLUS}/windows/ui/menu/menu_llm/menu_settings.ahk`).includes(
-			'"menu.llm.debounce_prompt"'
-		)
-	);
-	assert(
-		read(`${PLUS}/macos/ui/menu/menu_llm/settings_manager.lua`).includes(
-			'"menu.settings.delay_prompt"'
-		)
+		read(`${PLUS}/macos/ai/ui/menu/settings_manager.lua`).includes('"menu.settings.delay_prompt"')
 	);
 });
 
@@ -139,12 +131,12 @@ check('no source reads a retired key', () => {
 });
 
 check('macOS dialogs', () => {
-	const source = read(`${PLUS}/macos/ui/menu/menu_llm/settings_manager.lua`);
+	const source = read(`${PLUS}/macos/ai/ui/menu/settings_manager.lua`);
 	for (const key of SHARED)
 		assert(source.includes(`"${key}"`), `macOS settings manager must read ${key}`);
 });
 check('Windows dialogs', () => {
-	const source = read(`${PLUS}/windows/ui/menu/menu_llm/menu_settings.ahk`);
+	const source = read(`${PLUS}/windows/ai/ui/menu/settings.ahk`);
 	for (const key of SHARED)
 		assert(source.includes(`"${key}"`), `Windows settings must read ${key}`);
 });

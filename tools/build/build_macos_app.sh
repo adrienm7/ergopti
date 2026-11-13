@@ -124,7 +124,7 @@ GH_REPO="${GH_REPO:-${UPDATER_REPOSITORY#*/}}"
 . "$REPO_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 # One owner of the file digest: shasum escapes the digest of a name holding a
 # backslash, which sha256_file_digest strips (the checkout path is the user's).
-. "$REPO_ROOT/static/ergopti_plus/macos/modules/llm/network-retry.sh"
+. "$REPO_ROOT/static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh"
 BUNDLE_ID="$ERGOPTI_BUNDLE_ID_LAUNCHER"
 HAMMERSPOON_BUNDLE_ID="$ERGOPTI_BUNDLE_ID_HAMMERSPOON"
 

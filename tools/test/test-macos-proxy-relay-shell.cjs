@@ -31,8 +31,9 @@ const SCRIPT = path.join(
 	'static',
 	'ergopti_plus',
 	'macos',
-	'modules',
-	'llm',
+	'ai',
+	'engine',
+	'bootstrap',
 	'network-retry.sh'
 );
 const VECTORS = JSON.parse(
@@ -42,7 +43,16 @@ const VECTORS = JSON.parse(
 	)
 ).vectors;
 const COMMAND = fs.readFileSync(
-	path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'modules', 'llm', 'ollama_server_command.lua'),
+	path.join(
+		ROOT,
+		'static',
+		'ergopti_plus',
+		'macos',
+		'ai',
+		'engine',
+		'ollama',
+		'server_command.lua'
+	),
 	'utf8'
 );
 const PROXY = 'http://proxy.corp.example:3128';

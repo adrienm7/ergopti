@@ -187,7 +187,7 @@ class OwnedOllamaContainer(unittest.TestCase):
 
     def plan(self, env):
         script = (
-            'local r = assert(require("modules.llm.ollama_install_resolver").new())\n'
+            'local r = assert(require("ai.engine.ollama.install_resolver").new())\n'
             'local p = r.plan(); io.write(require("core.text.engine.json").encode({directory = p.directory}))\n'
         )
         completed = subprocess.run(

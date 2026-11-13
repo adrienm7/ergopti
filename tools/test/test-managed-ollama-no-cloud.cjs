@@ -46,15 +46,15 @@ check('the shared declaration disables Ollama cloud contact', () => {
 });
 
 check('Windows passes the captured declaration to every managed serve launch', () => {
-	const bootstrap = read('static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk');
+	const bootstrap = read('static/ergopti_plus/windows/ai/engine/ollama/managed_bootstrap.ahk');
 	assert.match(bootstrap, /\\ai\\data\\managed_ollama_environment\.json"/);
 	assert.match(
 		bootstrap,
 		/"environment", ServeEnvironment, "environment_sha256", this\.Sources\[ServeEnvironment\]/
 	);
-	const owner = read('static/ergopti_plus/windows/modules/llm/ollama_runtime_owner.ahk');
+	const owner = read('static/ergopti_plus/windows/ai/engine/ollama/runtime_owner.ahk');
 	assert.match(owner, /"-ServeEnvironmentPath", this\.Options\["environment"\]/);
-	const launcher = read('static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1');
+	const launcher = read('static/ergopti_plus/windows/ai/engine/ollama/ollama-runtime-launch.ps1');
 	assert.equal(launcher.split("Arguments = 'serve'").length - 1, 1, 'one serve child builder');
 	assert.match(
 		launcher,
@@ -69,10 +69,10 @@ check('Windows passes the captured declaration to every managed serve launch', (
 check(
 	'Windows model CLI inherits the captured serve policy before it can start descendants',
 	() => {
-		const bootstrap = read('static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk');
+		const bootstrap = read('static/ergopti_plus/windows/ai/engine/ollama/managed_bootstrap.ahk');
 		assert.match(bootstrap, /"-ServeEnvironmentPath", this\.Plan\["environment"\]/);
 		assert.match(bootstrap, /"-ServeEnvironmentSha256", this\.Plan\["environment_sha256"\]/);
-		const worker = read('static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1');
+		const worker = read('static/ergopti_plus/windows/ai/engine/ollama/ollama-model-pull.ps1');
 		assert.match(
 			worker,
 			/environment = \$ServeEnvironmentPath; environment_hash = \$ServeEnvironmentSha256/
@@ -99,12 +99,14 @@ check(
 );
 
 check('Linux loads the declaration and applies it to the owned serve child', () => {
-	const factory = read('static/ergopti_plus/linux/modules/llm/runtime_factory.lua');
+	const factory = read('static/ergopti_plus/linux/ai/engine/local_servers/runtime_factory.lua');
 	assert.match(factory, /require\("modules\.llm\.managed_ollama_environment"\)\.load\(\)/);
 	assert.match(factory, /serve_environment = serve_environment,/);
-	const loader = read('static/ergopti_plus/linux/modules/llm/managed_ollama_environment.lua');
+	const loader = read('static/ergopti_plus/linux/ai/engine/ollama/managed_ollama_environment.lua');
 	assert.match(loader, /"ai\/data\/managed_ollama_environment\.json"/);
-	const composition = read('static/ergopti_plus/linux/modules/llm/runtime_composition.lua');
+	const composition = read(
+		'static/ergopti_plus/linux/ai/engine/local_servers/runtime_composition.lua'
+	);
 	assert.match(composition, /for _,row in ipairs\(serve_environment\) do env\[#env\+1\]=row end/);
 });
 

@@ -14,7 +14,7 @@ import unittest
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "static/ergopti_plus/macos/modules/llm/ensure-mlx-deps.sh"
+SOURCE = ROOT / "static/ergopti_plus/macos/ai/engine/local_servers/ensure-mlx-deps.sh"
 
 
 class WorkspaceOwnership(unittest.TestCase):

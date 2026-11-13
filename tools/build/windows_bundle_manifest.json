@@ -33,28 +33,28 @@
 			"why": "Native libraries and PowerShell workers resolved through _VendorDir: sqlite3.dll, 64bit/WebView2Loader.dll, ergopti_nav_owner.dll, the uninstall, crash-report, updater staging and swap, and screen-brightness workers, the bounded PAC worker with its runtime identity receipt and license, and the proxy sign-in relay with its manifest."
 		},
 		{
-			"source": "static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1",
-			"dest": "static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1",
+			"source": "static/ergopti_plus/windows/ai/engine/ollama/ollama_managed_files.ps1",
+			"dest": "static/ergopti_plus/windows/ai/engine/ollama/ollama_managed_files.ps1",
 			"why": "Managed Ollama uses this stock PowerShell runtime worker from the extracted static tree."
 		},
 		{
-			"source": "static/ergopti_plus/windows/modules/llm/ollama_managed_acquisition.ps1",
-			"dest": "static/ergopti_plus/windows/modules/llm/ollama_managed_acquisition.ps1",
+			"source": "static/ergopti_plus/windows/ai/engine/ollama/ollama_managed_acquisition.ps1",
+			"dest": "static/ergopti_plus/windows/ai/engine/ollama/ollama_managed_acquisition.ps1",
 			"why": "Managed Ollama uses this stock PowerShell runtime worker from the extracted static tree."
 		},
 		{
-			"source": "static/ergopti_plus/windows/modules/llm/ollama_download_archive.ps1",
-			"dest": "static/ergopti_plus/windows/modules/llm/ollama_download_archive.ps1",
+			"source": "static/ergopti_plus/windows/ai/engine/ollama/ollama_download_archive.ps1",
+			"dest": "static/ergopti_plus/windows/ai/engine/ollama/ollama_download_archive.ps1",
 			"why": "Managed Ollama uses this stock PowerShell runtime worker from the extracted static tree."
 		},
 		{
-			"source": "static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1",
-			"dest": "static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1",
+			"source": "static/ergopti_plus/windows/ai/engine/ollama/ollama-runtime-launch.ps1",
+			"dest": "static/ergopti_plus/windows/ai/engine/ollama/ollama-runtime-launch.ps1",
 			"why": "Managed Ollama uses this stock PowerShell runtime worker from the extracted static tree."
 		},
 		{
-			"source": "static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1",
-			"dest": "static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1",
+			"source": "static/ergopti_plus/windows/ai/engine/ollama/ollama-model-pull.ps1",
+			"dest": "static/ergopti_plus/windows/ai/engine/ollama/ollama-model-pull.ps1",
 			"why": "Managed Ollama uses this stock PowerShell runtime worker from the extracted static tree."
 		}
 	],
@@ -297,24 +297,24 @@
 			"source": "static/ergopti_plus/_shared/diagnostics/data/collection.json"
 		},
 		{
-			"source": "static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1",
-			"dest": "static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1"
+			"source": "static/ergopti_plus/windows/ai/engine/ollama/ollama_managed_files.ps1",
+			"dest": "static/ergopti_plus/windows/ai/engine/ollama/ollama_managed_files.ps1"
 		},
 		{
-			"source": "static/ergopti_plus/windows/modules/llm/ollama_managed_acquisition.ps1",
-			"dest": "static/ergopti_plus/windows/modules/llm/ollama_managed_acquisition.ps1"
+			"source": "static/ergopti_plus/windows/ai/engine/ollama/ollama_managed_acquisition.ps1",
+			"dest": "static/ergopti_plus/windows/ai/engine/ollama/ollama_managed_acquisition.ps1"
 		},
 		{
-			"source": "static/ergopti_plus/windows/modules/llm/ollama_download_archive.ps1",
-			"dest": "static/ergopti_plus/windows/modules/llm/ollama_download_archive.ps1"
+			"source": "static/ergopti_plus/windows/ai/engine/ollama/ollama_download_archive.ps1",
+			"dest": "static/ergopti_plus/windows/ai/engine/ollama/ollama_download_archive.ps1"
 		},
 		{
-			"source": "static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1",
-			"dest": "static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1"
+			"source": "static/ergopti_plus/windows/ai/engine/ollama/ollama-runtime-launch.ps1",
+			"dest": "static/ergopti_plus/windows/ai/engine/ollama/ollama-runtime-launch.ps1"
 		},
 		{
-			"source": "static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1",
-			"dest": "static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1"
+			"source": "static/ergopti_plus/windows/ai/engine/ollama/ollama-model-pull.ps1",
+			"dest": "static/ergopti_plus/windows/ai/engine/ollama/ollama-model-pull.ps1"
 		}
 	]
 }

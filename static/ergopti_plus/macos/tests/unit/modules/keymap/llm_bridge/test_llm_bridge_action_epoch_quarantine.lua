@@ -51,7 +51,7 @@ local function load_fixture(reset_result)
 		trig_lower = function(value) return tostring(value or ""):lower() end,
 		conform_replacement = function(value) return value end,
 	}
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = {
 			llm_after_hotstring = false,
 			llm_reset_on_nav = false,
@@ -110,7 +110,7 @@ local function load_fixture(reset_result)
 			return function() end
 		end,
 	})
-	package.loaded["modules.llm.prediction_engine"] = engine
+	package.loaded["ai.engine.prediction.engine"] = engine
 	package.loaded["settings.engine.registry"] = {
 		mappings_for_tail = function() return nil end,
 		mappings_for_star_tail = function() return nil end,
@@ -127,8 +127,8 @@ local function load_fixture(reset_result)
 		default_for = function() return "*" end,
 	}
 
-	package.loaded["modules.keymap.llm_bridge"] = nil
-	local Bridge = require("modules.keymap.llm_bridge")
+	package.loaded["ai.engine.bridge"] = nil
+	local Bridge = require("ai.engine.bridge")
 	Bridge.init({
 		llm_context_text = "", llm_context_mark = "", llm_buffer = "",
 		buffer = "",

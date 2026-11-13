@@ -12,14 +12,14 @@ local function check(actual, expected)
 end
 local function scenario(options, run)
 	local saved_fs, saved_adapter, saved_logger, saved_hs = package.loaded["core.fs.adapters.file_system"],
-		package.loaded["adapters.managed_ollama_pull"], package.loaded["core.logger.engine.logger"], _G.hs
+		package.loaded["ai.adapters.managed_ollama_pull"], package.loaded["core.logger.engine.logger"], _G.hs
 	local present, inode, raw, removals, releases = true, 2, "", 0, 0
 	local physical = options.physical == true
 	local marker = physical
 	if options.receipt_flag == false then marker = false end
 	local receipt = { removed = marker }
 	package.loaded["core.logger.engine.logger"] = { error = function() end }
-	package.loaded["adapters.managed_ollama_pull"] = nil
+	package.loaded["ai.adapters.managed_ollama_pull"] = nil
 	package.loaded["core.fs.adapters.file_system"] = {
 		exists = function() return true end,
 		create_secure_temp_file = function() return "/private/legacy-vector" end,
@@ -51,7 +51,7 @@ local function scenario(options, run)
 		end,
 	}
 	_G.hs = { host = { uuid = function() return NONCE end } }
-	local adapter = require("adapters.managed_ollama_pull")
+	local adapter = require("ai.adapters.managed_ollama_pull")
 	local handle, ready = adapter.prepare("owned/model:tiny", 11434, "/native/python")
 	check(ready, true)
 	local f = {
@@ -73,7 +73,7 @@ local function scenario(options, run)
 		settle = function() return handle.settle(0) end,
 	}
 	local ok, failure = xpcall(function() run(f) end, debug.traceback)
-	package.loaded["core.fs.adapters.file_system"], package.loaded["adapters.managed_ollama_pull"],
+	package.loaded["core.fs.adapters.file_system"], package.loaded["ai.adapters.managed_ollama_pull"],
 		package.loaded["core.logger.engine.logger"], _G.hs = saved_fs, saved_adapter, saved_logger, saved_hs
 	if not ok then error(failure, 0) end
 	cases = cases + 1

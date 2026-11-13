@@ -9,7 +9,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\ai_action_gate.ahk
+#Include %A_LineFile%\..\..\ai\engine\action_gate.ahk
 
 
 

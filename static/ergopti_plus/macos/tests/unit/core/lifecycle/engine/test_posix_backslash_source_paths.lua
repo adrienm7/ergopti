@@ -23,7 +23,7 @@ local FIXTURE_ROOT = "/fixture\\with backslash"
 --- Loads the real network_env source as if it lived under a fixture root.
 --- @return table module, table probed paths
 local function network_env_under(root)
-	local path = assert(package.searchpath("modules.llm.network_env", package.path))
+	local path = assert(package.searchpath("ai.engine.api.network_env", package.path))
 	local file = assert(io.open(path, "rb"))
 	local source = file:read("*a")
 	file:close()
@@ -36,7 +36,7 @@ local function network_env_under(root)
 	return helpers.with_fresh_modules({ "core.fs.adapters.file_system" }, function()
 		package.loaded["core.fs.adapters.file_system"] = fs
 		-- Same relative layout as the real file, under the fixture root.
-		local real_root = assert(path:match("^(.*)/modules/llm/[^/]+$"))
+		local real_root = assert(path:match("^(.*)/ai/engine/[^/]+$"))
 		local chunk = assert(load(source, "@" .. root .. path:sub(#real_root + 1)))
 		return chunk(), probed
 	end)
@@ -45,9 +45,9 @@ end
 describe("macOS source-located paths keep their backslashes (posix-backslash-paths)", function()
 	it("network_env finds the shared policy under a root holding a backslash", function()
 		local network_env, probed = network_env_under(FIXTURE_ROOT)
-		assert_eq(network_env.policy_path(), FIXTURE_ROOT .. "/modules/llm/network-retry.sh",
+		assert_eq(network_env.policy_path(), FIXTURE_ROOT .. "/ai/engine/bootstrap/network-retry.sh",
 			"the policy is located under the real root, not under a rewritten one")
-		assert_eq(probed[1], FIXTURE_ROOT .. "/modules/llm/network-retry.sh", "the probe asked about the real path")
+		assert_eq(probed[1], FIXTURE_ROOT .. "/ai/engine/bootstrap/network-retry.sh", "the probe asked about the real path")
 	end)
 
 	it("the webview locale base percent-encodes a backslash and a quote", function()

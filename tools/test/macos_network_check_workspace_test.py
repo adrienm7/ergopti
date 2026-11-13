@@ -10,7 +10,8 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
-    "managed_network_check", ROOT / "static/ergopti_plus/macos/modules/llm/managed_network_check.py"
+    "managed_network_check",
+    ROOT / "static/ergopti_plus/macos/ai/engine/bootstrap/managed_network_check.py",
 )
 NETWORK = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(NETWORK)

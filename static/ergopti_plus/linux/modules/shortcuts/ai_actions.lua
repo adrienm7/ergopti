@@ -23,7 +23,7 @@ local M = {}
 -- Prefix shared by every AI action id in the shared catalogue.
 local AI_ACTION_PREFIX = "llm_"
 
-local ENGINE_MODULE = "modules.llm.prediction_engine"
+local ENGINE_MODULE = "ai.engine.prediction.engine"
 
 --- Whether an action id is an AI action (prediction, prompts, screen reading,
 --- tone, translation, agent, live mode).

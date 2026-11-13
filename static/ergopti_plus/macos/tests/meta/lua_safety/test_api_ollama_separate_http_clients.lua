@@ -24,8 +24,8 @@ helpers.describe("api_ollama.lua separates inference and check clients", functio
 	-- ====================================================================
 
 	helpers.it("api_ollama.lua must use separate _infer_client and _check_client", function()
-		local src = read_source("local function read_ollama_port_override") -- modules/llm/api_ollama.lua
-		assert(src, "modules/llm/api_ollama.lua must be readable")
+		local src = read_source("local function read_ollama_port_override") -- ai/engine/api/ollama.lua
+		assert(src, "ai/engine/api/ollama.lua must be readable")
 		-- The bug: a single HttpClient is reused for both inference POST /api/chat
 		-- and health-check GET /api/tags. A background ping would cancel any
 		-- in-flight completion request, leaving the UI frozen.

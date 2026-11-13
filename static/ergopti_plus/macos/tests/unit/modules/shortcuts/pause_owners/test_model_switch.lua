@@ -83,18 +83,18 @@ local function load_real_model_switch_owner(options)
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return false end }
 	package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
-	package.loaded["ui.menu.menu_llm.profile_label"] = {
+	package.loaded["ai.ui.menu.profile_label"] = {
 		format = function(label) return label end,
 	}
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = { llm_num_predictions = 1 },
 		get_active_profile = function() return { id = "basic" } end,
 		set_active_profile = function() return true end,
 		set_llm_model_mlx = function() return true end,
 		set_llm_model_ollama = function() return true end,
 	}
-	reset_module("ui.menu.menu_llm.model_switcher")
-	local ModelSwitcher = require("ui.menu.menu_llm.model_switcher")
+	reset_module("ai.ui.menu.models.switcher")
+	local ModelSwitcher = require("ai.ui.menu.models.switcher")
 	local switcher = ModelSwitcher.new({
 		state = state,
 		models_mgr = models_mgr,
@@ -268,8 +268,8 @@ helpers.describe("HS-012 real startup/model shared prediction leases", function(
 			set_llm_display_model_name = function() return true end,
 		}
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		reset_module("ui.menu.menu_llm.prediction_lock_registry")
-		local registry = require("ui.menu.menu_llm.prediction_lock_registry").new({
+		reset_module("ai.ui.menu.prediction_lock_registry")
+		local registry = require("ai.ui.menu.prediction_lock_registry").new({
 			state = state,
 			keymap = keymap,
 		})

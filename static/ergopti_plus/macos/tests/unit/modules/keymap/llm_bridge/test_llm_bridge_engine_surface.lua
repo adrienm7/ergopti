@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Regression — every engine call of the LLM bridge exists on the real engine
 --- DESCRIPTION:
---- modules/keymap/llm_bridge.lua forwards its settings and predictions to
+--- ai/engine/bridge.lua forwards its settings and predictions to
 --- modules.llm.prediction_engine through `engine.<name>(...)`. Every bridge test
 --- replaces that engine with a stub, so a stub that defines a name the real
 --- engine does not export keeps the whole suite green while production calls
@@ -45,12 +45,12 @@ end
 
 helpers.describe("llm_bridge: every engine call exists on the real prediction engine", function()
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	local engine = helpers.load_with_stubs("modules.llm.prediction_engine")
+	local engine = helpers.load_with_stubs("ai.engine.prediction.engine")
 
 	helpers.it("the real engine exports every function the bridge calls", function()
 		-- Selected by the module header, not by path, so a move keeps the check.
-		local source = helpers.read_driver_unit("--- modules/keymap/llm_bridge.lua\n")
-		helpers.assert_true(source ~= nil, "modules/keymap/llm_bridge.lua source must be locatable")
+		local source = helpers.read_driver_unit("--- ai/engine/bridge.lua\n")
+		helpers.assert_true(source ~= nil, "ai/engine/bridge.lua source must be locatable")
 		local names = engine_calls(source)
 		-- A floor keeps a broken pattern or a renamed alias from passing on zero
 		-- calls; the bridge made 45 distinct engine calls when this was written.

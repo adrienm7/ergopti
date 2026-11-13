@@ -37,7 +37,7 @@
 ---    may carry a null `error` beside a good answer, so the generic error rule
 ---    does not apply to it, and a tool's item may stand before the message.
 ---
---- The AutoHotkey port is windows/modules/llm/remote_formats.ahk. Both are
+--- The AutoHotkey port is windows/ai/engine/api/remote_formats.ahk. Both are
 --- pinned by _shared/tests/corpus/llm/remote_formats_vectors.json.
 --- ==============================================================================
 

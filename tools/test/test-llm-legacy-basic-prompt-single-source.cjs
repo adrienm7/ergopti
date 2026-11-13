@@ -5,16 +5,16 @@
  * MODULE: LLM legacy_ids + BASIC_PROMPT Single-Source Guard
  * DESCRIPTION:
  * The profile-id migration table and the "basic" profile's fallback prompt
- * used to be hand-copied literals in both windows/modules/llm/profiles.ahk and
- * macos/modules/llm/profiles.lua, with no mechanism catching drift between the
+ * used to be hand-copied literals in both windows/ai/engine/settings/profiles.ahk and
+ * macos/ai/engine/settings/profiles.lua, with no mechanism catching drift between the
  * two copies (or against the shared JSON they were meant to mirror).
  *
  * This test pins the fix:
  *   1. The generated windows/_generated/llm_profiles_data.ahk carries the exact
  *      legacy_ids.json mapping and the exact "basic" profiles.json prompt.
- *   2. windows/modules/llm/profiles.ahk no longer re-declares either literal —
+ *   2. windows/ai/engine/settings/profiles.ahk no longer re-declares either literal —
  *      it must delegate to the generated globals/functions.
- *   3. macos/modules/llm/profiles.lua no longer hardcodes the migration table —
+ *   3. macos/ai/engine/settings/profiles.lua no longer hardcodes the migration table —
  *      it must load it via profile_selector.load_legacy_ids().
  * ==============================================================================
  */
@@ -32,8 +32,8 @@ const GENERATED_AHK = path.join(
 	ROOT,
 	'static/ergopti_plus/windows/_generated/llm_profiles_data.ahk'
 );
-const PROFILES_AHK = path.join(ROOT, 'static/ergopti_plus/windows/modules/llm/profiles.ahk');
-const PROFILES_LUA = path.join(ROOT, 'static/ergopti_plus/macos/modules/llm/profiles.lua');
+const PROFILES_AHK = path.join(ROOT, 'static/ergopti_plus/windows/ai/engine/settings/profiles.ahk');
+const PROFILES_LUA = path.join(ROOT, 'static/ergopti_plus/macos/ai/engine/settings/profiles.lua');
 
 let _pass = 0;
 let _fail = 0;

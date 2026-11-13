@@ -13,7 +13,7 @@ local reset_module = fixtures.reset_module
 
 local function load_prediction_registry()
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	reset_module("ui.menu.menu_llm.prediction_lock_registry")
+	reset_module("ai.ui.menu.prediction_lock_registry")
 	local state = { llm_enabled = true }
 	local runtime = true
 	local mode = "true"
@@ -32,7 +32,7 @@ local function load_prediction_registry()
 			return true
 		end,
 	}
-	local registry = require("ui.menu.menu_llm.prediction_lock_registry").new({
+	local registry = require("ai.ui.menu.prediction_lock_registry").new({
 		state = state,
 		keymap = keymap,
 	})
@@ -152,8 +152,8 @@ helpers.describe("HS-012 real warmup-controller pause snapshot", function()
 				return true
 			end,
 		}
-		reset_module("modules.llm.warmup_controller")
-		local controller = require("modules.llm.warmup_controller")
+		reset_module("ai.engine.local_servers.warmup_controller")
+		local controller = require("ai.engine.local_servers.warmup_controller")
 		helpers.assert_true(controller.init({
 			core_llm = {
 				get_current_model = function() return "model" end,

@@ -120,11 +120,11 @@ local function build_world()
 	local Registry = require("settings.engine.registry")
 	local Expander = require("modules.keymap.expander")
 	local RulesEngine = require("modules.dynamic_hotstrings.rules_engine")
-	local core = require("modules.llm")
-	local bridge = require("modules.keymap.llm_bridge")
-	local engine = require("modules.llm.prediction_engine")
+	local core = require("ai.engine")
+	local bridge = require("ai.engine.bridge")
+	local engine = require("ai.engine.prediction.engine")
 	-- The foreground window of the test is an ordinary, unprotected one.
-	require("modules.llm.app_filter").is_blocked = function() return false end
+	require("ai.engine.prediction.app_filter").is_blocked = function() return false end
 
 	local CoreState = get_upvalue(core.get_active_profile, "CoreState")
 	assert(type(CoreState) == "table", "the LLM core state must be reachable")
@@ -146,7 +146,7 @@ local function build_world()
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })
 	state.DELAYS = { llm_prediction = 1 }
 	assert(Registry.init(state) == true)
-	require("modules.keymap.llm_context").reset(state)
+	require("ai.engine.api.context").reset(state)
 	assert(bridge.init(state, {}) == true)
 	assert(Expander.init(state, Registry, bridge) == true)
 	engine.set_llm_enabled(true)
@@ -183,7 +183,7 @@ end
 --- @param text string
 local function type_text(world, text)
 	world.state.buffer = world.state.buffer .. text
-	require("modules.keymap.llm_context").append(world.state, text)
+	require("ai.engine.api.context").append(world.state, text)
 	world.bridge.update_preview(world.state.buffer)
 end
 
@@ -241,7 +241,7 @@ helpers.describe("a private expansion never reaches an AI prompt (private-ai-con
 		expand_private(world)
 		for _ = 1, 3 do
 			world.state.buffer = world.state.buffer:sub(1, -2)
-			require("modules.keymap.llm_context").backspace(world.state)
+			require("ai.engine.api.context").backspace(world.state)
 			world.bridge.update_preview(world.state.buffer)
 		end
 		helpers.assert_true(world.state.buffer:find(SECRET:sub(1, 8), 1, true) ~= nil,
@@ -277,7 +277,7 @@ helpers.describe("the other doors of the AI context stay shut too (private-ai-co
 	it("the automatic agent watches the typing without the secret", function()
 		local world = build_world()
 		local seen = {}
-		require("modules.llm.agent_runner").observe_typing = function(text) seen[#seen + 1] = text end
+		require("ai.engine.agent.runner").observe_typing = function(text) seen[#seen + 1] = text end
 		type_text(world, "Voici ")
 		type_text(world, "mon numero " .. PREFIX)
 		seen = {}  -- what the user typed before the mapping fired is theirs to send

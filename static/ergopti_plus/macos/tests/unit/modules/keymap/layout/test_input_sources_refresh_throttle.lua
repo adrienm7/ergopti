@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local OWNED = {
 	"modules.keymap.input_sources", "modules.keymap.layout_install",
-	"core.logger.engine.logger", "core.timing.engine.timings", "adapters.python_interpreter",
+	"core.logger.engine.logger", "core.timing.engine.timings", "ai.adapters.python_interpreter",
 	"adapters.input_source_selector", "core.fs.engine.native_path", "core.process.adapters.shell_runner",
 	"core.timing.engine.deferred_work", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
 	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description",
@@ -47,7 +47,7 @@ local function with_sources(scenario)
 			version_gt = function() return false end,
 			USER_LAYOUTS_DIR = "/virtual/user-layouts", SYSTEM_LAYOUTS_DIR = "/virtual/system-layouts",
 		}
-		package.loaded["adapters.python_interpreter"] = { resolve = function() return "/virtual/native-python3" end }
+		package.loaded["ai.adapters.python_interpreter"] = { resolve = function() return "/virtual/native-python3" end }
 		package.loaded["adapters.input_source_selector"] = {}
 		_G.hs = {
 			keycodes = {

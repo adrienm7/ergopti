@@ -246,14 +246,14 @@ local smallest_model = require("adapters.field_check_ports").smallest_model
 
 --- The AI menu's models manager, or nil before the menu exists.
 local function models_manager()
-	local menu = package.loaded["ui.menu.menu_llm"]
+	local menu = package.loaded["ai.ui.menu"]
 	return type(menu) == "table" and type(menu.active_models_manager) == "function"
 		and menu.active_models_manager() or nil
 end
 
 --- Whether this Mac can run MLX, as the selection router decides it.
 local function mlx_supported()
-	local ok, supported = pcall(function() return require("modules.llm.backend_detector").mlx_support() end)
+	local ok, supported = pcall(function() return require("ai.engine.api.backend_detector").mlx_support() end)
 	return ok and supported ~= false
 end
 
@@ -263,7 +263,7 @@ end
 --- runtime_absent); a hint still pending after the bound reads as absent.
 --- @param callback function fn(path|nil, source|nil, pending).
 local function settled_ollama_binary(callback)
-	local Binary = require("modules.llm.ollama_binary")
+	local Binary = require("ai.engine.ollama.binary")
 	local attempts = 0
 	local function look()
 		attempts = attempts + 1
@@ -282,8 +282,8 @@ end
 --- Homebrew) is reused: the router would offer to replace it with the native
 --- runtime in a modal dialog, which is a person's choice.
 local function ollama_runtime(finish)
-	local Binary = require("modules.llm.ollama_binary")
-	local Deps = require("modules.llm.ollama_deps_checker")
+	local Binary = require("ai.engine.ollama.binary")
+	local Deps = require("ai.engine.ollama.deps_checker")
 	local path, _, source = Binary.resolve()
 	local before = Deps.runtime_available()
 	local function settle(ok)
@@ -300,7 +300,7 @@ local function ollama_runtime(finish)
 	if path and require("core.lifecycle.engine.core.ollama_runtime_choice").classify(source) == "foreign" then
 		accepted = Deps.check_and_install_deps(settle)
 	else
-		accepted = require("ui.menu.menu_llm.runtime_install_offer").install_ollama(settle)
+		accepted = require("ai.ui.menu.runtime_install_offer").install_ollama(settle)
 	end
 	if accepted ~= true then finish("fail", { "install_refused" }) end
 end
@@ -310,7 +310,7 @@ end
 --- @param model string Ollama model name.
 --- @param callback function fn(installed|nil, started_server).
 local function ollama_listing(model, callback)
-	local Api = require("modules.llm.api_ollama")
+	local Api = require("ai.engine.api.ollama")
 	local started, attempts = false, 0
 	local function ask()
 		attempts = attempts + 1
@@ -365,9 +365,9 @@ end
 --- selecting the MLX backend does; a failure opens the router's repair offer.
 local function mlx_runtime(finish)
 	if not mlx_supported() then return finish("skip", { "mlx_unsupported_here" }) end
-	local Deps = require("modules.llm.mlx_deps_checker")
+	local Deps = require("ai.engine.local_servers.mlx_deps_checker")
 	local before = Deps.runtime_installed()
-	local accepted = require("ui.menu.menu_llm.runtime_install_offer").select_mlx(function(ok)
+	local accepted = require("ai.ui.menu.runtime_install_offer").select_mlx(function(ok)
 		if ok == true then return finish("pass", { before and "runtime_reused" or "runtime_installed" }) end
 		local cause = Deps.get_failure_cause()
 		finish("fail", { "bootstrap_failed", "cause_" .. tostring(type(cause) == "table" and cause.kind or "unknown") })
@@ -410,10 +410,10 @@ local function mlx_model(finish)
 	if not mlx_supported() then return finish("skip", { "mlx_unsupported_here" }) end
 	local manager = models_manager()
 	if not manager then return finish("skip", { "ai_menu_absent" }) end
-	if not require("modules.llm.mlx_deps_checker").runtime_installed() then
+	if not require("ai.engine.local_servers.mlx_deps_checker").runtime_installed() then
 		return finish("skip", { "runtime_not_ready" })
 	end
-	local Llm = require("modules.llm")
+	local Llm = require("ai.engine")
 	-- The download ends by serving the new model: with MLX predicting, that
 	-- would replace the user's own model.
 	if Llm.get_backend() == "mlx" and Llm.get_runtime_llm_enabled() == true then
@@ -432,7 +432,7 @@ local function mlx_model(finish)
 	end
 	manager.pull_mlx_model(model.name, function()
 		codes[#codes + 1] = "downloaded_and_served"
-		require("ui.menu.menu_llm").stop_mlx_server(function(stopped)
+		require("ai.ui.menu").stop_mlx_server(function(stopped)
 			codes[#codes + 1] = stopped and "server_stopped" or "server_stop_refused"
 			codes[#codes + 1] = "model_kept"
 			settle(stopped)

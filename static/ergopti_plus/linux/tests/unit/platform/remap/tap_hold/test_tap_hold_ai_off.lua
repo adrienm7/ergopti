@@ -20,7 +20,7 @@ local AiActions = require("modules.shortcuts.ai_actions")
 
 local DOWN, UP = 1, 0
 local SPACE, ESCAPE = 57, 1
-local ENGINE_MODULE = "modules.llm.prediction_engine"
+local ENGINE_MODULE = "ai.engine.prediction.engine"
 
 --- Runs a body with a stub prediction engine whose AI switch the body flips.
 local function with_ai(body)

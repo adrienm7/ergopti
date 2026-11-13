@@ -17,12 +17,12 @@ local MODULES = {
 	"core.logger.engine.logger",
 	"menu.engine.manifest_menu",
 	"core.ui.engine.notifications",
-	"modules.llm",
-	"ui.menu.menu_llm.profile_label",
-	"ui.menu.menu_llm.model_switcher",
-	"ui.menu.menu_llm.profiles_manager",
+	"ai.engine",
+	"ai.ui.menu.profile_label",
+	"ai.ui.menu.models.switcher",
+	"ai.ui.menu.profiles_manager",
 	"ui.menu.shortcut_utils",
-	"ui.prompt_editor",
+	"ai.ui.prompt_editor",
 }
 
 local function find_row(rows, label)
@@ -85,7 +85,7 @@ local function with_profiles_fixture(options, body)
 			notification_count = notification_count + 1
 			return true
 		end}
-		package.loaded["modules.llm"] = {
+		package.loaded["ai.engine"] = {
 			DEFAULT_STATE = {llm_num_predictions = 1},
 			BUILTIN_PROFILES = {
 				{id = "basic", label = "Basic"},
@@ -118,11 +118,11 @@ local function with_profiles_fixture(options, body)
 			end,
 			get_active_profile = function() return {id = runtime_profile} end,
 		}
-		package.loaded["ui.menu.menu_llm.profile_label"] = {
+		package.loaded["ai.ui.menu.profile_label"] = {
 			format = function(label) return label end,
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {prompt_shortcut = function() end}
-		package.loaded["ui.prompt_editor"] = {
+		package.loaded["ai.ui.prompt_editor"] = {
 			open = function(profile, callback)
 				editor_calls = editor_calls + 1
 				if profile == nil then
@@ -235,8 +235,8 @@ local function with_profiles_fixture(options, body)
 			check_requirements = function() return false end,
 		}
 		if options.real_recommendation then
-			package.loaded["ui.menu.menu_llm.model_switcher"] = nil
-			local switcher = require("ui.menu.menu_llm.model_switcher").new({
+			package.loaded["ai.ui.menu.models.switcher"] = nil
+			local switcher = require("ai.ui.menu.models.switcher").new({
 				state = state,
 				models_mgr = models_mgr,
 				keymap = {},
@@ -248,8 +248,8 @@ local function with_profiles_fixture(options, body)
 			end
 		end
 
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-		manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
+		package.loaded["ai.ui.menu.profiles_manager"] = nil
+		manager = require("ai.ui.menu.profiles_manager").new(deps, models_mgr)
 		body({
 			dispatch = function(row)
 				local result = row.action()

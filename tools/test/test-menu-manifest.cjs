@@ -1085,12 +1085,8 @@ function checkInfoBarControl() {
 		id: 'llm_display_remaining'
 	});
 	for (const [file, first, last] of [
-		[
-			'windows/ui/menu/menu_llm/menu_settings.ahk',
-			'LLM_Menu_BuildDisplayMenu(',
-			'LLM_Menu_BuildNavMenu('
-		],
-		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
+		['windows/ai/ui/menu/settings.ahk', 'LLM_Menu_BuildDisplayMenu(', 'LLM_Menu_BuildNavMenu('],
+		['macos/ai/ui/menu/panels/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/menu/ui/builder/builder.lua',
 			'group_builders["llm_display"] = function',
@@ -1155,11 +1151,11 @@ function checkAutoTemperatureControl() {
 	);
 	for (const [file, first, last] of [
 		[
-			'windows/ui/menu/menu_llm/menu_settings.ahk',
+			'windows/ai/ui/menu/settings.ahk',
 			'LLM_Menu_BuildGenerationMenu(',
 			'LLM_Menu_BuildDisplayMenu('
 		],
-		['macos/ui/menu/menu_llm/temperature_panel.lua', 'function M.build(', '\nreturn M\n'],
+		['macos/ai/ui/menu/panels/temperature_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/menu/ui/builder/builder.lua',
 			'providers["llm_generation"] = function',
@@ -1190,7 +1186,7 @@ function checkAutoTemperatureControl() {
 				assert(body.includes(`"${owner}"`), `${file}: numeric providers must use the shared child`);
 		}
 	}
-	const mac = readSourceFile(resolve(SHARED, '../macos/ui/menu/menu_llm/init.lua'));
+	const mac = readSourceFile(resolve(SHARED, '../macos/ai/ui/menu/init.lua'));
 	const first = mac.indexOf('local generation_ctx = TempPanel.build(');
 	const last = mac.indexOf('-- ===== Display submenu =====', first);
 	assert(first >= 0 && last > first, 'the actual Mac generation caller bounds must exist');
@@ -1220,12 +1216,8 @@ function checkTokenStreamingControl() {
 		disabled_when: ['llm_token_streaming_ready']
 	});
 	for (const [file, first, last] of [
-		[
-			'windows/ui/menu/menu_llm/menu_settings.ahk',
-			'LLM_Menu_BuildDisplayMenu(',
-			'LLM_Menu_BuildNavMenu('
-		],
-		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
+		['windows/ai/ui/menu/settings.ahk', 'LLM_Menu_BuildDisplayMenu(', 'LLM_Menu_BuildNavMenu('],
+		['macos/ai/ui/menu/panels/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/menu/ui/builder/builder.lua',
 			'group_builders["llm_display"] = function',
@@ -1279,12 +1271,8 @@ function checkShowAllControl() {
 	assert.deepEqual(rows[4].checked_when, ['llm_show_all_enabled']);
 	assert.deepEqual(rows[4].disabled_when, ['llm_show_all_ready']);
 	for (const [file, first, last] of [
-		[
-			'windows/ui/menu/menu_llm/menu_settings.ahk',
-			'LLM_Menu_BuildDisplayMenu(',
-			'LLM_Menu_BuildNavMenu('
-		],
-		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
+		['windows/ai/ui/menu/settings.ahk', 'LLM_Menu_BuildDisplayMenu(', 'LLM_Menu_BuildNavMenu('],
+		['macos/ai/ui/menu/panels/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/menu/ui/builder/builder.lua',
 			'group_builders["llm_display"] = function',
@@ -1307,25 +1295,25 @@ function checkShowAllControl() {
 	}
 	for (const [file, first, last, projection] of [
 		[
-			'windows/ui/menu/menu_llm/_index.ahk',
+			'windows/ai/ui/menu/_index.ahk',
 			'LLM_Menu_ApplySharedDefaults() {',
 			'LLM_Menu_ApplySharedDefaults()',
 			'LLM_DisplayShowAll(LLM_Defaults[shared_key])'
 		],
 		[
-			'windows/modules/llm/prediction_engine.ahk',
+			'windows/ai/engine/prediction/engine.ahk',
 			'LLM_Engine_ApplySharedDefaults() {',
 			'_LLM_Engine_FrameSignaturePart(',
 			'LLM_DisplayShowAll(LLM_Defaults[shared_key])'
 		],
 		[
-			'windows/ui/menu/menu_llm/persist.ahk',
+			'windows/ai/ui/menu/persist.ahk',
 			'_LLM_Menu_SyncToFeatures(',
 			'_LLM_Menu_AppendPersistedUpdates(',
 			'LLM_DisplayProgressive(Validated["show_all_at_once"])'
 		],
 		[
-			'windows/ui/menu/menu_llm/persist.ahk',
+			'windows/ai/ui/menu/persist.ahk',
 			'LLM_Menu_BuildSavedOpts(',
 			'\n}',
 			'LLM_DisplayShowAll(opts["show_all_at_once"])'
@@ -1390,8 +1378,8 @@ function checkAutomaticTriggerControls() {
 		assert.deepEqual(declaration.disabled_when, ['llm_trigger_ready']);
 	}
 	for (const [file, first, last] of [
-		['windows/ui/menu/menu_llm/menu_settings.ahk', 'LLM_Menu_BuildTriggerMenu(', '\n}'],
-		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
+		['windows/ai/ui/menu/settings.ahk', 'LLM_Menu_BuildTriggerMenu(', '\n}'],
+		['macos/ai/ui/menu/panels/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/menu/ui/builder/builder.lua',
 			'group_builders["llm_trigger"] = function',
@@ -1517,13 +1505,9 @@ function checkIndentationControl() {
 			assert.equal(typeof labels[key], 'string', `${locale}: numeric units must be translated`);
 	}
 	for (const [file, intent, writer] of [
+		['windows/ai/ui/menu/settings.ahk', 'LLM_DisplayIndentIntent', '_LLM_Menu_EnableSourceMatches'],
 		[
-			'windows/ui/menu/menu_llm/menu_settings.ahk',
-			'LLM_DisplayIndentIntent',
-			'_LLM_Menu_EnableSourceMatches'
-		],
-		[
-			'macos/ui/menu/menu_llm/streaming_panel.lua',
+			'macos/ai/ui/menu/panels/streaming_panel.lua',
 			'DisplayPolicy.indentation_intent',
 			'SettingsManager.publication_guard'
 		],
@@ -1629,8 +1613,8 @@ function checkPrivacyTriggerControls() {
 		assert.deepEqual(declaration.disabled_when, [expected.id + '_ready']);
 	}
 	for (const [file, startToken, endToken] of [
-		['windows/ui/menu/menu_llm/menu_settings.ahk', 'LLM_Menu_BuildTriggerMenu(', '\n}'],
-		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
+		['windows/ai/ui/menu/settings.ahk', 'LLM_Menu_BuildTriggerMenu(', '\n}'],
+		['macos/ai/ui/menu/panels/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/menu/ui/builder/builder.lua',
 			'group_builders["llm_trigger"] = function',
@@ -2152,8 +2136,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		[{ type: 'command', id: corpus.id, i18n: corpus.i18n, disabled_when: [corpus.ready] }]
 	);
 	for (const file of [
-		'windows/ui/menu/menu_llm/menu_profiles.ahk',
-		'macos/ui/menu/menu_llm/profiles_manager.lua',
+		'windows/ai/ui/menu/profiles.ahk',
+		'macos/ai/ui/menu/profiles_manager.lua',
 		'linux/menu/ui/builder/builder.lua'
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
@@ -2210,8 +2194,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		{ type: 'command', id: corpus.id, i18n: corpus.i18n, disabled_when: [corpus.ready] }
 	]);
 	for (const file of [
-		'windows/ui/menu/menu_llm/menu_profiles.ahk',
-		'macos/ui/menu/menu_llm/profiles_manager.lua',
+		'windows/ai/ui/menu/profiles.ahk',
+		'macos/ai/ui/menu/profiles_manager.lua',
 		'linux/menu/ui/builder/builder.lua'
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
@@ -2469,8 +2453,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const menu = JSON.parse(readSourceFile(MENU_PATH));
 	require('node:assert/strict').deepEqual(menu.llm_navigation_rows, corpus.rows);
 	const providers = [
-		['windows/ui/menu/menu_llm/menu_settings.ahk', '_MR_GetMenuDef("llm_navigation_rows")'],
-		['macos/ui/menu/menu_llm/init.lua', 'ManifestMenu.get_array("llm_navigation_rows")'],
+		['windows/ai/ui/menu/settings.ahk', '_MR_GetMenuDef("llm_navigation_rows")'],
+		['macos/ai/ui/menu/init.lua', 'ManifestMenu.get_array("llm_navigation_rows")'],
 		['linux/menu/ui/builder/builder.lua', 'ManifestMenu.get_array("llm_navigation_rows")']
 	];
 	for (const [native, read] of providers) {
@@ -4232,7 +4216,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		},
 		(g) => {
 			g.about_updates.find((e) => e?.menu === 'about_version_separator').native_sources.linux =
-				'linux/ui/menu/agent_rows.lua';
+				'linux/ai/ui/menu/agent_rows.lua';
 		},
 		(g) => {
 			g.about_updates = g.about_updates.filter((e) => e !== 'about_update_channel_menu');
@@ -4292,7 +4276,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		);
 	}
 	for (const [platform, file] of [
-		['hs', 'macos/ui/menu/menu_llm/profiles_manager.lua'],
+		['hs', 'macos/ai/ui/menu/profiles_manager.lua'],
 		['linux', 'linux/menu/ui/builder/builder.lua']
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
@@ -4502,7 +4486,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		(g) => (g.llm_trigger.find((e) => e?.menu === section).platforms = ['hs']),
 		(g) =>
 			(g.llm_generation.find((e) => e?.menu === section).native_sources.linux =
-				'linux/ui/menu/agent_rows.lua'),
+				'linux/ai/ui/menu/agent_rows.lua'),
 		(g) => (g.llm_trigger = g.llm_trigger.filter((e) => e !== 'llm_trigger_menu'))
 	]) {
 		const wrong = structuredClone(graph);
@@ -4554,8 +4538,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		);
 	}
 	const owners = {
-		ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk',
-		hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
+		ahk: 'windows/ai/ui/menu/profiles.ahk',
+		hs: 'macos/ai/ui/menu/profiles_manager.lua',
 		linux: 'linux/menu/ui/builder/builder.lua'
 	};
 	const { scriptTokens } = require('../lib/script-source.cjs');
@@ -4968,7 +4952,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			}
 		]);
 		const mac = readSourceFile(
-			resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_llm/agent_panel.lua')
+			resolve(REPO_ROOT, 'static/ergopti_plus/macos/ai/ui/menu/panels/agent_panel.lua')
 		);
 		assert(mac.includes('ManifestMenu.template_rows("' + variant.section + '"'));
 	}
@@ -5166,8 +5150,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'the retired Live provider cannot regain a native owner'
 	);
 	for (const [relative, retired] of [
-		['windows/ui/menu/menu_llm/menu_settings.ahk', 'LLM_Menu_BuildLiveModeMenu'],
-		['macos/ui/menu/menu_llm/init.lua', 'ui.menu.menu_llm.live_mode_panel']
+		['windows/ai/ui/menu/settings.ahk', 'LLM_Menu_BuildLiveModeMenu'],
+		['macos/ai/ui/menu/init.lua', 'ui.menu.menu_llm.live_mode_panel']
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', relative));
 		assert.ok(source.trim().length > 0, 'retirement is judged against an actual native consumer');
@@ -5585,9 +5569,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		}
 	}
 	for (const [platform, relative] of [
-		['hs', 'macos/ui/menu/menu_llm/init.lua'],
+		['hs', 'macos/ai/ui/menu/init.lua'],
 		['linux', 'linux/menu/ui/builder/builder.lua'],
-		['ahk', 'windows/ui/menu/menu_llm/menu_main.ahk']
+		['ahk', 'windows/ai/ui/menu/menu_main.ahk']
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', relative));
 		ownsParents(source, platform);
@@ -5631,9 +5615,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			);
 	}
 	for (const [platform, relative, root] of [
-		['hs', 'macos/ui/menu/menu_llm/init.lua', 'child_group_for("llm_'],
+		['hs', 'macos/ai/ui/menu/init.lua', 'child_group_for("llm_'],
 		['linux', 'linux/menu/ui/builder/builder.lua', 'group_builders["llm_'],
-		['ahk', 'windows/ui/menu/menu_llm/menu_main.ahk', 'MenuRenderer_Build("llm_menu"']
+		['ahk', 'windows/ai/ui/menu/menu_main.ahk', 'MenuRenderer_Build("llm_menu"']
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', relative));
 		const foreign = source.replaceAll(root, 'Foreign.' + root);
@@ -5669,7 +5653,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				null,
 				'foreign, partial, data and duplicate helpers cannot publish a body'
 			);
-		const source = readSourceFile(resolve(SHARED, '..', 'windows/ui/menu/menu_llm/menu_main.ahk'));
+		const source = readSourceFile(
+			resolve(SHARED, '..', 'windows', 'ai', 'ui', 'menu', 'menu_main.ahk')
+		);
 		const conditional = source.replace(
 			'_LLM_Menu_GroupBuilders() {',
 			'if _LLM_Menu_GroupBuilders() {'
@@ -6879,7 +6865,7 @@ console.log(
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/agent_panel_frames.json'))
 	);
 	const menu = JSON.parse(readSourceFile(MENU_PATH));
-	const native = readSourceFile(resolve(SHARED, '../macos/ui/menu/menu_llm/agent_panel.lua'));
+	const native = readSourceFile(resolve(SHARED, '../macos/ai/ui/menu/panels/agent_panel.lua'));
 	// Actual top-level native conventions bind each frame to its constructing function.
 	function nativeBody(source, name) {
 		const tokens = scriptTokens(source, '.lua');
@@ -8039,9 +8025,7 @@ console.log(
 		1,
 		'the independent warning-owner locator retains its original two parameters'
 	);
-	const warningOwnerSource = readSourceFile(
-		resolve(SHARED, '../windows/ui/menu/menu_llm/menu_main.ahk')
-	);
+	const warningOwnerSource = readSourceFile(resolve(SHARED, '../windows/ai/ui/menu/menu_main.ahk'));
 	assert(
 		authenticBody(warningOwnerSource, '.ahk', reviewedWarningLocator).trim().length > 0,
 		'one actual constructor retains the original state and warning ports with its explicit native target'
@@ -11021,7 +11005,7 @@ console.log(
 	assert.deepEqual(records[group], [parent]);
 	assert.deepEqual(generated[frame], expected);
 	assert.deepEqual(generated[group], [parent]);
-	const source = readSourceFile(resolve(SHARED, '../windows/ui/menu/menu_llm/menu_main.ahk'));
+	const source = readSourceFile(resolve(SHARED, '../windows/ai/ui/menu/menu_main.ahk'));
 	const owner = (candidate) => {
 		const signature = '_LLM_Menu_ProfileParentRows(NativeChild, Caption, Disabled) {';
 		const at = candidate.indexOf('\n' + signature);
@@ -12160,7 +12144,7 @@ console.log(
 	const { retainedNativeDownloadProjection } = require('../lib/menu-native-download-binding.cjs');
 	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
 	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
-	const owner = readSourceFile(resolve(SHARED, '..', 'macos/ui/menu/menu_llm/init.lua'));
+	const owner = readSourceFile(resolve(SHARED, '..', 'macos', 'ai', 'ui', 'menu', 'init.lua'));
 	const section = 'llm_download_shortcut_frame';
 	const admits = (source) =>
 		retainedNativeDownloadProjection(source) &&
@@ -12808,7 +12792,7 @@ console.log(
 	);
 	const manifest = JSON.parse(readSourceFile(MENU_PATH));
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_llm/menu_agent.ahk')
+		resolve(REPO_ROOT, 'static/ergopti_plus/windows/ai/ui/menu/agent.ahk')
 	);
 	const nativeSources = [{ src: source }];
 	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
@@ -13140,7 +13124,7 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const manifest = JSON.parse(readSourceFile(MENU_PATH));
-	const source = readSourceFile(resolve(SHARED, '../windows/ui/menu/menu_llm/menu_agent.ahk'));
+	const source = readSourceFile(resolve(SHARED, '../windows/ai/ui/menu/agent.ahk'));
 	const renderer = readSourceFile(resolve(SHARED, '../windows/menu/engine/manifest_menu.ahk'));
 	const { scriptTokens } = require('../lib/script-source.cjs');
 	const executable = scriptTokens(source, '.ahk');

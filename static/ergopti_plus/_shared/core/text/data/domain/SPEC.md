@@ -41,7 +41,7 @@ port them faithfully and validate against their test vectors.
 > **Note — LLM output diff-coloring.** It used to have a JS reference here
 > (`TokenParser.js`, a word-level prefix diff). That was superseded by the
 > 2-tier intra-word semantic diff `process_prediction`, whose canonical home is
-> `_shared/ai/engine/api/parser_core.lua` (AHK port `windows/modules/llm/parser.ahk`),
+> `_shared/ai/engine/api/parser_core.lua` (AHK port `windows/ai/engine/api/parser.ahk`),
 > pinned cross-driver by `_shared/tests/corpus/llm/process_prediction_vectors.json`.
 > `TokenParser.js` was removed (2026-06-13) as superseded, orphaned dead code.
 

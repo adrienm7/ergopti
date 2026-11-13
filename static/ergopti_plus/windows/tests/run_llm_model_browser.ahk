@@ -103,7 +103,7 @@ class WebView2 {
 }
 
 #Include ../core/network/engine/external_url_policy.ahk
-#Include ../ui/model_browser/init.ahk
+#Include ../ai/ui/model_browser/init.ahk
 
 ; Isolated suite: bail if a stale lock ever hangs RunTests.
 _LlmMbWatchdog(*) {

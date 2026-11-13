@@ -127,14 +127,14 @@ module.exports.push(
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/menu_llm/init.lua',
+			path: 'macos/ai/ui/menu/init.lua',
 			before: 'return { title = row.label, fn = row.action }',
 			after: 'return { title = row.label, fn = function() end }',
 			reason: 'actual finished native download callback disconnected',
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/menu_llm/init.lua',
+			path: 'macos/ai/ui/menu/init.lua',
 			before: 'build_download_item = build_download_item,',
 			after: 'build_download_item = function() end,',
 			reason: 'actual native download handler export disconnected',

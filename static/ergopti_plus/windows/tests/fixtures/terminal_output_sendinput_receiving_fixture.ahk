@@ -28,10 +28,10 @@ if A_AhkVersion != "2.0.26" || A_PtrSize != 8 {
 #Include %A_LineFile%\..\..\..\modules\keymap\keylayout\keylayout_parser.ahk
 #Include %A_LineFile%\..\..\..\modules\keymap\keylayout\keylayout_tables.ahk
 #Include %A_LineFile%\..\..\..\modules\keymap\keylayout\keylayout_emulation.ahk
-#Include %A_LineFile%\..\..\..\adapters\llm_nav_event_owner.ahk
+#Include %A_LineFile%\..\..\..\ai\adapters\nav_event_owner.ahk
 #Include %A_LineFile%\..\..\..\core\ui\adapters\terminal_output_custody.ahk
-#Include %A_LineFile%\..\..\unit\modules\llm\nav_event_owner\test_terminal_route_metadata.ahk
-#Include %A_LineFile%\..\..\unit\modules\llm\nav_event_owner\test_terminal_output_custody.ahk
+#Include %A_LineFile%\..\..\unit\ai\nav_event_owner\test_terminal_route_metadata.ahk
+#Include %A_LineFile%\..\..\unit\ai\nav_event_owner\test_terminal_output_custody.ahk
 
 ; Unit callbacks are registered by their existing owner but never run here.
 ; Only this fixture's two explicit receiving vectors execute.

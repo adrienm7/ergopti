@@ -404,12 +404,12 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 	local function build_llm_bridge()
 		-- Clear the full dependency chain so load_with_stubs starts clean.
 		local to_clear = {
-			"modules.keymap.llm_bridge",
+			"ai.engine.bridge",
 			"modules.keymap.utils",
 			"settings.engine.registry",
 			"modules.keymap.terminators",
-			"modules.llm",
-			"modules.llm.prediction_engine",
+			"ai.engine",
+			"ai.engine.prediction.engine",
 			"modules.keystats",
 			"modules.hotstrings.hotstrings_config",
 			"core.text.engine.utils",
@@ -470,7 +470,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			set_cancel_callback  = function() end,
 			set_on_show_callback = function() end,
 		}
-		package.loaded["modules.llm"] = {
+		package.loaded["ai.engine"] = {
 			DEFAULT_STATE = {
 				llm_after_hotstring = false,
 				llm_reset_on_nav    = false,
@@ -527,7 +527,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			set_preview_ai_enabled  = function() end,
 			set_preview_ai_color    = function() end,
 		}
-		package.loaded["modules.llm.prediction_engine"] = engine_stub
+		package.loaded["ai.engine.prediction.engine"] = engine_stub
 
 		-- Stub Registry: no mappings, all lookups return nil.
 		package.loaded["settings.engine.registry"] = {
@@ -556,7 +556,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 		package.loaded["core.logger.engine.logger"] = nil
 		helpers.load_with_stubs("core.logger.engine.logger")
 
-		local bridge = require("modules.keymap.llm_bridge")
+		local bridge = require("ai.engine.bridge")
 
 		-- Build a minimal CoreState that satisfies the guard in update_preview.
 		local core_state = {

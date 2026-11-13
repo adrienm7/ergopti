@@ -18,10 +18,10 @@ import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-RUNTIME = "static/ergopti_plus/macos/modules/llm/managed_ollama_runtime.py"
+RUNTIME = "static/ergopti_plus/macos/ai/engine/ollama/managed_ollama_runtime.py"
 INPUTS = (
     RUNTIME,
-    "static/ergopti_plus/macos/modules/llm/managed_bootstrap_http.py",
+    "static/ergopti_plus/macos/ai/engine/bootstrap/managed_bootstrap_http.py",
     "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py",
     "static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py",
     "static/ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py",

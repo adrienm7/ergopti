@@ -292,7 +292,7 @@ local _python_resolver_chunk = nil
 --- @return table resolver
 function M.healthy_python_resolver()
 	if _python_resolver_chunk == nil then
-		_python_resolver_chunk = assert(loadfile(M.driver_root() .. "adapters/python_interpreter.lua"))
+		_python_resolver_chunk = assert(loadfile(M.driver_root() .. "ai/adapters/python_interpreter.lua"))
 	end
 	local resolver = _python_resolver_chunk()
 	local universal = "\202\254\186\190" .. "\0\0\0\2"
@@ -386,9 +386,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- Dependency checkers and their backend-local pause controller form one
 	-- stateful ownership unit. A fresh checker must never inherit the previous
 	-- fixture's registered owner, epoch token, or resume-stage timer.
-	if module_name == "modules.llm.mlx_deps_checker"
-		or module_name == "modules.llm.ollama_deps_checker" then
-		loaded["modules.llm.dependency_bootstrap_pause_owner"] = nil
+	if module_name == "ai.engine.local_servers.mlx_deps_checker"
+		or module_name == "ai.engine.ollama.deps_checker" then
+		loaded["ai.engine.bootstrap.dependency_bootstrap_pause_owner"] = nil
 	end
 	loaded["hs"] = nil
 	-- Force a fresh stub table each call so overrides from one test never leak
@@ -562,8 +562,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- lacks. Every other module under test gets the REAL resolver over a
 	-- modelled Apple silicon Mac whose developer tools hold a universal python3
 	-- (HEALTHY_PYTHON); a test of a refusal replaces its deps with _set_deps.
-	if module_name ~= "adapters.python_interpreter" then
-		loaded["adapters.python_interpreter"] = M.healthy_python_resolver()
+	if module_name ~= "ai.adapters.python_interpreter" then
+		loaded["ai.adapters.python_interpreter"] = M.healthy_python_resolver()
 	end
 
 	-- Register sub-module aliases so that `require("hs.json")` etc. resolve to

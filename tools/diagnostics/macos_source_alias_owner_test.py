@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
-    "alias_native_owner", ROOT / "static/ergopti_plus/macos/platform/source_alias_owner.py"
+    "alias_native_owner", ROOT / "static/ergopti_plus/macos/ai/adapters/source_alias_owner.py"
 )
 OWNER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(OWNER)

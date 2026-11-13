@@ -1,0 +1,216 @@
+--- tests/unit/ai/ui/menu/shortcuts/test_prompt_settlement.lua
+
+--- ==============================================================================
+--- MODULE: LLM Shortcut Prompt Settlement
+--- DESCRIPTION:
+--- Exercises the profile shortcut prompt and the real confirmed profile Delete
+--- action through refusal-capable registrar seams, and pins the retirement of
+--- the trigger submenu's dedicated shortcut row. Real Hammerspoon-shaped
+--- doubles keep enable=self|nil, disable=self, and delete=void|throw contracts.
+--- Tests preserve handle identity and invoke retained callbacks so a
+--- bookkeeping-only rollback cannot pass.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local WarningContract = require("tests.support.dialog_warning_contract")
+local SHORTCUT_OWNERS = {
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"ui.menu.shortcut_utils",
+	"platform.input.send_input",
+	"menu.engine.native_presentation",
+	"core.ui.engine.window_titles",
+	"menu.engine.native_presentation_core",
+	"core.i18n.engine.locale",
+	"core.i18n.engine.core",
+	"core.fs.adapters.json_codec",
+	"core.fs.engine.paths",
+	"core.fs.engine.native_path",
+}
+
+local Fixture = require("tests.support.profile_delete_fixture")
+local with_delete_fixture = Fixture.with_delete_fixture
+
+--- Loads the real shared shortcut prompt around a deterministic dialog result.
+--- @param raw string Prompt input.
+--- @param body function Test callback receiving the real utility.
+local function with_real_shortcut_prompt_owned(raw, body)
+	local saved_dialog = package.loaded["core.ui.engine.dialog_util"]
+	local saved_i18n = package.loaded["core.i18n.engine.i18n"]
+	local saved_logger = package.loaded["core.logger.engine.logger"]
+	local saved_shortcuts = package.loaded["ui.menu.shortcut_utils"]
+	local ok, err = xpcall(function()
+		package.loaded["core.ui.engine.dialog_util"] = {
+			text_prompt = function() return "button.ok", raw end,
+			alert = function() return true end,
+		}
+		local warnings = WarningContract.attach(package.loaded["core.ui.engine.dialog_util"])
+		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["ui.menu.shortcut_utils"] = nil
+		body(require("ui.menu.shortcut_utils"), warnings)
+	end, debug.traceback)
+	package.loaded["core.ui.engine.dialog_util"] = saved_dialog
+	package.loaded["core.i18n.engine.i18n"] = saved_i18n
+	package.loaded["core.logger.engine.logger"] = saved_logger
+	package.loaded["ui.menu.shortcut_utils"] = saved_shortcuts
+	if not ok then error(err, 0) end
+end
+
+--- Restores the local real utility's transitive imports, including native title state.
+--- @param raw string Input returned by the native prompt boundary.
+--- @param body function Existing scenario callback.
+local function with_real_shortcut_prompt(raw, body)
+	return helpers.with_stub_scope(SHORTCUT_OWNERS, function()
+		return with_real_shortcut_prompt_owned(raw, body)
+	end)
+end
+
+helpers.describe("HS-033 shortcut prompt settlement propagation", function()
+	helpers.it("opens a repair prompt for malformed persisted modifier arrays", function()
+		for _, mods in ipairs({ { true }, { {} }, { [1] = "alt", [3] = "shift" }, { extra = "ctrl" }, false }) do
+			with_real_shortcut_prompt("ctrl+b", function(shortcuts)
+				local current = { mods = mods, key = "a" }
+				helpers.assert_eq(shortcuts.shortcut_to_config_string(current), "")
+				helpers.assert_eq(shortcuts.shortcut_to_label(current, "none"), "none")
+				local applied = false
+				helpers.assert_true(shortcuts.prompt_shortcut({ current_shortcut = current,
+					on_apply = function() applied = true; return true end }))
+				helpers.assert_true(applied, "the user can replace the malformed shortcut")
+			end)
+		end
+		with_real_shortcut_prompt("ctrl+b", function(shortcuts)
+			helpers.assert_eq(shortcuts.shortcut_to_config_string({ mods = { "ctrl" }, key = "a" }), "ctrl+a")
+			helpers.assert_eq(shortcuts.shortcut_to_label({ mods = { "ctrl" }, key = "a" }), "Ctrl + A")
+		end)
+	end)
+	for _, raw in ipairs({ "ctrrl+b", "ctrl++b", "+b", "ctrl+" }) do
+		helpers.it("rejects malformed shortcut without saving: " .. raw, function()
+			with_real_shortcut_prompt(raw, function(shortcuts)
+				local applied = false
+				helpers.assert_eq(shortcuts.prompt_shortcut({ default_mods = { "ctrl" },
+					on_apply = function() applied = true; return true end }), false)
+				helpers.assert_eq(applied, false, "invalid text must not silently change the shortcut")
+			end)
+		end)
+	end
+	helpers.it("retains valid modifier aliases and default modifiers", function()
+		with_real_shortcut_prompt(" Option + Control + B ", function(shortcuts)
+			local parsed = shortcuts.parse_shortcut_input(" Option + Control + B ", { "ctrl" })
+			helpers.assert_eq(parsed.key, "b")
+			helpers.assert_eq(#parsed.mods, 2)
+		end)
+		with_real_shortcut_prompt("b", function(shortcuts)
+			local parsed = shortcuts.parse_shortcut_input("b", { "ctrl" })
+			helpers.assert_eq(parsed.mods, { "ctrl" })
+		end)
+	end)
+	for _, raw in ipairs({"ctrl+b", ""}) do
+		for _, outcome in ipairs({"false", "nil", "throw"}) do
+			helpers.it("HS-033 prompt returns refusal for " .. outcome .. " callback on '" .. raw .. "'", function()
+				with_real_shortcut_prompt(raw, function(shortcuts)
+					local function refuse()
+						if outcome == "throw" then error("apply refused", 0) end
+						if outcome == "false" then return false end
+						return nil
+					end
+					helpers.assert_eq(shortcuts.prompt_shortcut({on_apply = refuse}), false)
+				end)
+			end)
+		end
+	end
+
+	helpers.it("HS-033 prompt reports literal committed callback success", function()
+		with_real_shortcut_prompt("ctrl+b", function(shortcuts)
+			helpers.assert_eq(shortcuts.prompt_shortcut({
+				on_apply = function() return true end,
+			}), true)
+		end)
+	end)
+
+	helpers.it("HS-033 profile shortcut menu action propagates prompt refusal", function()
+		with_delete_fixture({active_profile = "basic"},
+			function(_, _, _, shortcut_action)
+				package.loaded["ui.menu.shortcut_utils"].prompt_shortcut = function()
+					return false
+				end
+				helpers.assert_eq(shortcut_action(), false)
+			end)
+	end)
+
+	-- The dedicated trigger shortcut is retired: a prediction on demand is the
+	-- llm_generate_prediction action in a keyboard slot (Ctrl+Space recommended),
+	-- so the trigger submenu opens on its debounce row and prompts for no chord.
+	helpers.it("the trigger submenu draws no dedicated shortcut row (llm-trigger-shortcut-retired)", function()
+		local saved_app_picker = package.loaded["infra.app_picker"]
+		local saved_i18n = package.loaded["core.i18n.engine.i18n"]
+		local saved_logger = package.loaded["core.logger.engine.logger"]
+		local saved_manifest = package.loaded["menu.engine.manifest_menu"]
+		local saved_llm = package.loaded["ai.engine"]
+		local saved_shortcuts = package.loaded["ui.menu.shortcut_utils"]
+		local saved_panel = package.loaded["ai.ui.menu.panels.trigger_panel"]
+		local prompts = 0
+		local ok, err = xpcall(function()
+			package.loaded["infra.app_picker"] = {build_menu = function() return {} end}
+			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["menu.engine.manifest_menu"] = assert(require("menu.engine.renderer").new({
+				platform = "hs",
+				manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
+				json_decode = function(raw) return require("core.text.engine.json").decode(raw) end,
+				i18n = {get = function(key) return key end, section = function(key) return key end},
+				logger = package.loaded["core.logger.engine.logger"],
+			}))
+			package.loaded["ai.engine"] = {
+				DEFAULT_STATE = {llm_debounce = 0.2, llm_min_request_interval = 0.5},
+			}
+			package.loaded["ui.menu.shortcut_utils"] = {
+				prompt_shortcut = function() prompts = prompts + 1 return false end,
+				shortcut_to_label = function() return "None" end,
+			}
+			package.loaded["ai.ui.menu.panels.trigger_panel"] = nil
+			local rows = require("ai.ui.menu.panels.trigger_panel").build({
+				state = {llm_debounce = 0.2, llm_min_request_interval = 0.5},
+				is_disabled = false,
+				settings_mgr = {},
+			})
+			helpers.assert_true(#rows > 0, "the trigger submenu must still draw its rows")
+			helpers.assert_eq(rows[1].title, "menu.llm.debounce_label",
+				"the debounce row now opens the trigger submenu")
+			for _, row in ipairs(rows) do
+				helpers.assert_true(row.title ~= "menu.llm.trigger_shortcut_label",
+					"no row may prompt for a dedicated trigger shortcut")
+				if type(row.fn) == "function" and row.title ~= "menu.llm.debounce_label" then
+					row.fn()
+				end
+			end
+			helpers.assert_eq(prompts, 0, "no row may open the shortcut prompt")
+		end, debug.traceback)
+		package.loaded["infra.app_picker"] = saved_app_picker
+		package.loaded["core.i18n.engine.i18n"] = saved_i18n
+		package.loaded["core.logger.engine.logger"] = saved_logger
+		package.loaded["menu.engine.manifest_menu"] = saved_manifest
+		package.loaded["ai.engine"] = saved_llm
+		package.loaded["ui.menu.shortcut_utils"] = saved_shortcuts
+		package.loaded["ai.ui.menu.panels.trigger_panel"] = saved_panel
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("shortcut warning native signature", function()
+	helpers.it("presents the invalid shortcut warning without applying an update", function()
+		with_real_shortcut_prompt("invalid+a", function(shortcuts, warnings)
+			local applied = 0
+			helpers.assert_eq(shortcuts.prompt_shortcut({ on_apply = function() applied = applied + 1; return true end }), false)
+			helpers.assert_eq(warnings.shown, {
+				{ "shortcut_utils.format_invalid", "shortcut_utils.format_hint", "button.ok" },
+			}, "Invalid shortcut input must display its acknowledgement warning")
+			helpers.assert_eq(warnings.refused, 0)
+			helpers.assert_eq(applied, 0)
+		end)
+	end)
+end)
+
+return true

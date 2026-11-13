@@ -737,19 +737,19 @@ class Receiver:
             "_shared/ai/data/managed_ollama_runtime.json",
             "_shared/ai/adapters/python/managed_ollama_runtime.py",
             "_shared/ai/adapters/python/managed_source_alias.py",
-            "macos/platform/source_alias_owner.py",
-            "macos/platform/suspended_image_owner.py",
-            "macos/platform/ollama_bootstrap_owner.py",
+            "macos/ai/adapters/source_alias_owner.py",
+            "macos/ai/adapters/suspended_image_owner.py",
+            "macos/ai/adapters/ollama_bootstrap_owner.py",
             "_shared/ai/adapters/python/managed_ollama_bootstrap.py",
             "_shared/ai/data/managed_ollama_bootstrap.json",
             "_shared/ai/adapters/python/managed_ollama_pull.py",
             "_shared/ai/data/managed_python_release.json",
             "macos/core/network/adapters/native_http.py",
             "macos/core/network/adapters/native_ollama_api.py",
-            "macos/modules/llm/managed_bootstrap_http.py",
-            "macos/modules/llm/managed_ollama_runtime.py",
-            "macos/modules/llm/managed-python-release.sh",
-            "macos/modules/llm/managed-python-downloads.json",
+            "macos/ai/engine/bootstrap/managed_bootstrap_http.py",
+            "macos/ai/engine/ollama/managed_ollama_runtime.py",
+            "macos/ai/engine/bootstrap/managed-python-release.sh",
+            "macos/ai/engine/managed-python-downloads.json",
             "_shared/core/text/data/identifiers.sh",
         ]
         for relative in relatives:
@@ -954,7 +954,7 @@ class Receiver:
         )
         self.runtime = load(
             "ollama_fixture_real_runtime",
-            self.http_payload / "macos/modules/llm/managed_ollama_runtime.py",
+            self.http_payload / "macos/ai/engine/ollama/managed_ollama_runtime.py",
         )
         self.prepare_phase = "archive_admission"
         archive = self.options.archive.resolve(strict=True)
@@ -1007,15 +1007,16 @@ class Receiver:
             self.api_payload / "_shared/ai/adapters/python/managed_ollama_pull.py",
         )
         self.alias_native = load(
-            "ollama_alias_acquisition", self.http_payload / "macos/platform/source_alias_owner.py"
+            "ollama_alias_acquisition",
+            self.http_payload / "macos/ai/adapters/source_alias_owner.py",
         )
         self.image_native = load(
             "ollama_suspended_native_owner",
-            self.http_payload / "macos/platform/suspended_image_owner.py",
+            self.http_payload / "macos/ai/adapters/suspended_image_owner.py",
         )
         self.bootstrap_native = load(
             "ollama_bootstrap_native_owner",
-            self.http_payload / "macos/platform/ollama_bootstrap_owner.py",
+            self.http_payload / "macos/ai/adapters/ollama_bootstrap_owner.py",
         )
         self.bootstrap_policy = self.bootstrap_native.BootstrapPolicy(
             self.http_payload / "_shared/ai/data/managed_ollama_bootstrap.json",

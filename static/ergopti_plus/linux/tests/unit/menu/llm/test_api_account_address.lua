@@ -27,7 +27,7 @@ local AZURE = { id = "azure", label = "Azure OpenAI", base_url = "https://{resou
 
 --- Adds the Azure row to the scripted remote of the fixture.
 local function with_azure()
-	local remote = package.loaded["modules.llm.api_remote"]
+	local remote = package.loaded["ai.engine.api.api_remote"]
 	local providers, provider = remote.providers, remote.provider
 	remote.providers = function()
 		local list = providers()
@@ -97,7 +97,7 @@ local QWEN = { id = "dashscope", label = "Alibaba Qwen", base_url = "https://das
 
 --- Adds the DashScope row to the scripted remote of the fixture.
 local function with_qwen()
-	local remote = package.loaded["modules.llm.api_remote"]
+	local remote = package.loaded["ai.engine.api.api_remote"]
 	local providers, provider = remote.providers, remote.provider
 	remote.providers = function()
 		local list = providers()
@@ -153,7 +153,7 @@ end)
 
 helpers.describe("Per-account address: the catalogue row and its requests", function()
 	local function catalogue(desc)
-		local Remote = helpers.load_module("modules.llm.api_remote")
+		local Remote = helpers.load_module("ai.engine.api.api_remote")
 		local id = desc.id or "azure"
 		return Remote.parse_catalogue(Json.encode({ provider_order = { id }, providers = { [id] = desc },
 			model_prices = {} })), Remote
@@ -182,7 +182,7 @@ helpers.describe("Per-account address: the catalogue row and its requests", func
 	end)
 
 	helpers.it("an entry without its filled address is refused before anything is sent", function()
-		local Remote = helpers.load_module("modules.llm.api_remote")
+		local Remote = helpers.load_module("ai.engine.api.api_remote")
 		Remote._reset_for_test()
 		local original = Remote.provider
 		Remote.provider = function(id) return id == "azure" and AZURE or original(id) end

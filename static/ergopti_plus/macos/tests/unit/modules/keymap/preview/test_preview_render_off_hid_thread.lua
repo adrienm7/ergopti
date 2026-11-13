@@ -174,11 +174,11 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			"platform.input.synthetic_input",
 			"core.events.timer_scheduler",
 			"modules.keymap.utils",
-			"modules.llm",
-			"modules.llm.prediction_engine",
+			"ai.engine",
+			"ai.engine.prediction.engine",
 			"modules.keystats",
 			"core.ui.ui.tooltip",
-			"modules.keymap.llm_bridge",
+			"ai.engine.bridge",
 		}
 		local previous = {}
 		for _, name in ipairs(dependency_names) do previous[name] = package.loaded[name] end
@@ -217,10 +217,10 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			tokens_from_repl = function(value) return value end,
 			plain_text = function(value) return value end,
 		}
-		package.loaded["modules.llm"] = {
+		package.loaded["ai.engine"] = {
 			DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = true },
 		}
-		package.loaded["modules.llm.prediction_engine"] = {
+		package.loaded["ai.engine.prediction.engine"] = {
 			set_runtime_guard = function() end,
 			init = function() return true end,
 			get_llm_enabled = function() return false end,
@@ -238,7 +238,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 		}
 
 		local ok, err = pcall(function()
-			local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+			local Bridge = helpers.load_with_stubs("ai.engine.bridge")
 			local state = {
 				buffer = "abc",
 				mappings = {},
@@ -249,7 +249,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 				preview_providers = { function() return "replacement" end },
 				is_repeat_feature_enabled = function() return false end,
 			}
-			require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
+			require("ai.engine.api.context").seed(state, state.buffer or "", "")
 			Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
 
 			Bridge.update_preview(state.buffer)

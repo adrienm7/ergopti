@@ -15,7 +15,7 @@ local SETTINGS = { "settings", "trigger_settings", "display_settings", "navigati
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
-		local names = { "settings.engine.paths", "infra.llm_preferences", "core.fs.adapters.storage" }
+		local names = { "settings.engine.paths", "ai.engine.preferences", "core.fs.adapters.storage" }
 		for _, name in ipairs(SETTINGS) do names[#names + 1] = "modules.llm." .. name end
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -41,7 +41,7 @@ helpers.describe("AI preference classification", function()
 	}) do
 		helpers.it("classifies " .. vector.name .. " without changing source bytes", function()
 			with_config(vector.content, function(path)
-				local preferences = require("infra.llm_preferences")
+				local preferences = require("ai.engine.preferences")
 				local before = Sandbox.read_bytes(path)
 				local value, status = preferences.get_with_status("llm.trigger.disabled_apps")
 				helpers.assert_eq(status, vector.status)
@@ -56,15 +56,15 @@ end)
 helpers.describe("canonical Linux AI settings", function()
 	helpers.it("round-trips the agent-mode enum through the real durable owner without changing neighbors", function()
 		with_config('[llm]\nagent_mode = "auto"\nfuture = "keep"\n[other]\nvalue = 42\n', function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			helpers.assert_eq(preferences.get("llm.agent_mode"), "auto")
 			helpers.assert_eq(preferences.set("llm.agent_mode", "action"), true)
 			local document = Codec.decode(Sandbox.read_bytes(path))
 			helpers.assert_eq(document.llm.agent_mode, "action")
 			helpers.assert_eq(document.llm.future, "keep")
 			helpers.assert_eq(document.other.value, 42)
-			package.loaded["infra.llm_preferences"] = nil
-			preferences = require("infra.llm_preferences")
+			package.loaded["ai.engine.preferences"] = nil
+			preferences = require("ai.engine.preferences")
 			helpers.assert_eq(preferences.get("llm.agent_mode"), "action", "a fresh reader owns the durable value")
 			helpers.assert_eq(preferences.set("llm.agent_mode", "off"), true)
 			helpers.assert_nil(Codec.decode(Sandbox.read_bytes(path)).llm.agent_mode, "the neutral default remains sparse")
@@ -73,7 +73,7 @@ helpers.describe("canonical Linux AI settings", function()
 
 	helpers.it("refuses nonmember agent-mode values and preserves actual configuration bytes", function()
 		with_config('[llm]\nagent_mode = "action"\nfuture = "keep"\n', function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local before = Sandbox.read_bytes(path)
 			for _, invalid in ipairs({ "AUTO", "sometimes", false, 1, {} }) do
 				helpers.assert_eq(preferences.set("llm.agent_mode", invalid), false)
@@ -95,14 +95,14 @@ helpers.describe("canonical Linux AI settings", function()
 
 	helpers.it("reads canonical generation and trigger values instead of legacy storage", function()
 		with_config('[llm.generation]\ntemperature = 0.9\n[llm.trigger]\ndebounce_ms = 750\n', function()
-			helpers.assert_eq(require("modules.llm.settings").get("temperature"), 0.9)
-			helpers.assert_eq(require("modules.llm.trigger_settings").get("debounce_ms"), 750)
+			helpers.assert_eq(require("ai.engine.settings.settings").get("temperature"), 0.9)
+			helpers.assert_eq(require("ai.engine.settings.trigger_settings").get("debounce_ms"), 750)
 		end)
 	end)
 
 	helpers.it("refuses a minimum that exceeds the current saved maximum", function()
 		with_config('[llm.generation]\nmin_words = 1\nmax_words = 10\n', function(path)
-			local settings = require("modules.llm.settings")
+			local settings = require("ai.engine.settings.settings")
 			helpers.assert_eq(settings.get("max_words"), 10)
 			local successor = '[llm.generation]\nmin_words = 1\nmax_words = 3\n'
 			local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
@@ -115,7 +115,7 @@ helpers.describe("canonical Linux AI settings", function()
 		local first = '[llm.generation]\nmax_words = 3\n'
 		local interim = '[llm.generation]\nmax_words = 10\n'
 		with_config(first, function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local _, expected = preferences.get_many({ "llm.generation.max_words" })
 			local file = assert(io.open(path, "wb")); assert(file:write(interim)); assert(file:close())
 			local original = preferences.get_many
@@ -124,7 +124,7 @@ helpers.describe("canonical Linux AI settings", function()
 				local restore = assert(io.open(path, "wb")); assert(restore:write(first)); assert(restore:close())
 				return values, source, revision
 			end
-			local settings = require("modules.llm.settings")
+			local settings = require("ai.engine.settings.settings")
 			local ok, accepted = pcall(settings.set, "min_words", 5, expected, function() return true end)
 			preferences.get_many = original
 			helpers.assert_true(ok)
@@ -135,9 +135,9 @@ helpers.describe("canonical Linux AI settings", function()
 
 	helpers.it("accepts generation bounds against the retained matching image", function()
 		with_config('[llm.generation]\nmax_words = 3\n', function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local _, expected = preferences.get_many({ "llm.generation.max_words" })
-			local settings = require("modules.llm.settings")
+			local settings = require("ai.engine.settings.settings")
 			helpers.assert_true(settings.set("min_words", 2, expected, function() return true end))
 			local document = Codec.decode(Sandbox.read_bytes(path))
 			helpers.assert_eq(document.llm.generation.max_words, 3)
@@ -147,7 +147,7 @@ helpers.describe("canonical Linux AI settings", function()
 
 	helpers.it("refuses generation bounds when the source changes before publication", function()
 		with_config('[llm.generation]\nmax_words = 10\n', function(path)
-			local settings = require("modules.llm.settings")
+			local settings = require("ai.engine.settings.settings")
 			local writer = require("core.text.engine.toml_codec.writer")
 			local original = writer.batch_write
 			local successor = '[llm.generation]\nmax_words = 3\n'
@@ -165,7 +165,7 @@ helpers.describe("canonical Linux AI settings", function()
 
 	helpers.it("reclassifies malformed automatic exclusions after another trigger edit", function()
 		with_config('[llm.trigger]\ndisabled_apps = []\n', function(path)
-			local settings = require("modules.llm.trigger_settings")
+			local settings = require("ai.engine.settings.trigger_settings")
 			helpers.assert_eq(settings.is_app_disabled("editor", true), false)
 			local file = assert(io.open(path, "wb"))
 			assert(file:write('[llm.trigger]\ndisabled_apps = ["firefox", "Firefox"]\n')); assert(file:close())
@@ -181,7 +181,7 @@ helpers.describe("canonical Linux AI settings", function()
 
 	helpers.it("refreshes automatic app exclusions after editing another trigger setting", function()
 		with_config('[llm.trigger]\ndisabled_apps = []\n', function(path)
-			local settings = require("modules.llm.trigger_settings")
+			local settings = require("ai.engine.settings.trigger_settings")
 			helpers.assert_eq(settings.is_app_disabled("firefox", true), false)
 			local file = assert(io.open(path, "wb"))
 			assert(file:write('[llm.trigger]\ndisabled_apps = ["firefox"]\n')); assert(file:close())
@@ -192,7 +192,7 @@ helpers.describe("canonical Linux AI settings", function()
 
 	helpers.it("refreshes neighboring generation settings after an external edit", function()
 		with_config('[llm.generation]\ntemperature = 0.2\n', function(path)
-			local settings = require("modules.llm.settings")
+			local settings = require("ai.engine.settings.settings")
 			helpers.assert_eq(settings.get("temperature"), 0.2)
 			local file = assert(io.open(path, "wb"))
 			assert(file:write('[llm.generation]\ntemperature = 0.9\n')); assert(file:close())
@@ -204,14 +204,14 @@ helpers.describe("canonical Linux AI settings", function()
 
 	helpers.it("writes sparse settings and reloads from disk while preserving unknown neighbors", function()
 		with_config('[llm.generation]\nfuture = "keep"\n[other]\nvalue = 42\n', function(path)
-			local settings = require("modules.llm.settings")
+			local settings = require("ai.engine.settings.settings")
 			helpers.assert_true(settings.set("temperature", 0.9))
 			local document = Codec.decode(Sandbox.read_bytes(path))
 			helpers.assert_eq(document.llm.generation.temperature, 0.9)
 			helpers.assert_eq(document.llm.generation.future, "keep")
 			helpers.assert_eq(document.other.value, 42)
-			package.loaded["modules.llm.settings"] = nil
-			settings = require("modules.llm.settings")
+			package.loaded["ai.engine.settings.settings"] = nil
+			settings = require("ai.engine.settings.settings")
 			helpers.assert_eq(settings.get("temperature"), 0.9)
 			helpers.assert_true(settings.set("temperature", require("menu.engine.manifest_reader").default_for("llm.generation.temperature")))
 			helpers.assert_nil(Codec.decode(Sandbox.read_bytes(path)).llm.generation.temperature)
@@ -220,12 +220,12 @@ helpers.describe("canonical Linux AI settings", function()
 
 	helpers.it("keeps false display values and modifier arrays across a fresh reader", function()
 		with_config('[llm.display]\nshow_info_bar = false\n[llm.navigation]\nval_modifiers = ["ctrl", "shift"]\n', function(path)
-			helpers.assert_eq(require("modules.llm.display_settings").get("show_info_bar"), false)
-			local navigation = require("modules.llm.navigation_settings")
+			helpers.assert_eq(require("ai.engine.settings.display_settings").get("show_info_bar"), false)
+			local navigation = require("ai.engine.settings.navigation_settings")
 			helpers.assert_eq(table.concat(navigation.get(), "+"), "ctrl+shift")
 			helpers.assert_true(navigation.set({ "cmd" }))
-			package.loaded["modules.llm.navigation_settings"] = nil
-			helpers.assert_eq(require("modules.llm.navigation_settings").get()[1], "cmd")
+			package.loaded["ai.engine.settings.navigation_settings"] = nil
+			helpers.assert_eq(require("ai.engine.settings.navigation_settings").get()[1], "cmd")
 			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).llm.navigation.val_modifiers[1], "cmd")
 		end)
 	end)
@@ -235,7 +235,7 @@ helpers.describe("canonical Linux AI settings", function()
 		-- legacy storage value, never raised on, and offered by the cleanup.
 		with_config('[llm.generation]\ntemperature = "bad"\n', function(path)
 			local before = Sandbox.read_bytes(path)
-			helpers.assert_eq(require("modules.llm.settings").get("temperature"),
+			helpers.assert_eq(require("ai.engine.settings.settings").get("temperature"),
 				require("menu.engine.manifest_reader").default_for("llm.generation.temperature"))
 			helpers.assert_eq(Sandbox.read_bytes(path), before)
 			local scan = require("settings.ui.menu.unused_keys_cleanup").find(path)
@@ -248,7 +248,7 @@ end)
 helpers.describe("AI enable source generation (ai-enable-admission)", function()
 	helpers.it("records acknowledged A-B-A writes and refuses an old enable source (ai-enable-admission)", function()
 		with_config('[llm]\nenabled = false\n[llm.models]\nollama = "model:2b"\n[future]\nkeep = "personal"\n', function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local _, source = preferences.get_many({ "llm.enabled", "llm.models.ollama" })
 			local initial = preferences.generation()
 			helpers.assert_true(preferences.set("llm.models.ollama", "model:3b"))
@@ -266,7 +266,7 @@ helpers.describe("AI enable source generation (ai-enable-admission)", function()
 
 	helpers.it("a refused scoped write never advances the acknowledged revision (ai-enable-admission)", function()
 		with_config('[llm]\nenabled = false\n', function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local owner = { pending = function() return false end }
 			local initial = preferences.generation()
 			helpers.assert_true(preferences.acquire(owner))
@@ -291,12 +291,12 @@ helpers.describe("Linux real AI root dotted scalar publication", function()
 	for _, vector in ipairs(vectors) do
 		helpers.it("uses the actual native source owner for " .. vector.name, function()
 			with_config(vector.source, function(path)
-				local preferences = require("infra.llm_preferences")
+				local preferences = require("ai.engine.preferences")
 				helpers.assert_eq(Sandbox.read_bytes(path), vector.source)
 				helpers.assert_eq(preferences.set("llm.agent_mode", "action"), vector.accepted)
 				helpers.assert_eq(Sandbox.read_bytes(path), vector.expected or vector.source, "complete independently handwritten physical image")
-				package.loaded["infra.llm_preferences"] = nil
-				local restarted = require("infra.llm_preferences").get("llm.agent_mode")
+				package.loaded["ai.engine.preferences"] = nil
+				local restarted = require("ai.engine.preferences").get("llm.agent_mode")
 				if vector.accepted then helpers.assert_eq(restarted, "action")
 				elseif vector.name == "root inline" then helpers.assert_eq(restarted, "auto")
 				else helpers.assert_nil(restarted) end
@@ -309,11 +309,11 @@ helpers.describe("Linux real root dotted numeric admission", function()
 	helpers.it("acknowledges the exact requested finite temperature and reloads it without rounding", function()
 		with_config('llm.generation.temperature=0.25\nfuture.keep=9007199254740993\n', function(path)
 			local requested = 0.12345678901234567
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			helpers.assert_true(preferences.set("llm.generation.temperature", requested))
 			helpers.assert_eq(Sandbox.read_bytes(path), 'llm.generation.temperature = 0.12345678901234566\nfuture.keep=9007199254740993\n')
-			package.loaded["infra.llm_preferences"] = nil
-			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), requested)
+			package.loaded["ai.engine.preferences"] = nil
+			helpers.assert_eq(require("ai.engine.preferences").get("llm.generation.temperature"), requested)
 		end)
 	end)
 end)
@@ -322,18 +322,18 @@ helpers.describe("Linux real finite header numeric admission", function()
 	helpers.it("reloads an acknowledged exact temperature while keeping foreign source tokens", function()
 		with_config('[llm.generation]\ntemperature=0.25\nfuture=9007199254740993\n', function(path)
 			local requested = 0.12345678901234567
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			helpers.assert_true(preferences.set("llm.generation.temperature", requested))
 			helpers.assert_eq(Sandbox.read_bytes(path), '[llm.generation]\ntemperature = 0.12345678901234566\nfuture=9007199254740993\n')
-			package.loaded["infra.llm_preferences"] = nil
-			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), requested)
+			package.loaded["ai.engine.preferences"] = nil
+			helpers.assert_eq(require("ai.engine.preferences").get("llm.generation.temperature"), requested)
 		end)
 	end)
 
 	helpers.it("refuses a wrong optional literal with no write or generation ACK and permits a repaired retry", function()
 		local source = '[llm.generation]\ntemperature=0.25\nfuture=9007199254740993\n'
 		with_config(source, function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 			local original = LeafRows.value_literal
 			local generation = preferences.generation()
@@ -351,11 +351,11 @@ helpers.describe("Linux real finite header numeric admission", function()
 	end)
 	helpers.it("retains acknowledged negative zero through actual native preference restart", function()
 		with_config('[llm.generation]\ntemperature=0.25\nfuture=9007199254740993\n', function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			helpers.assert_true(preferences.set("llm.generation.temperature", negative_zero()))
 			helpers.assert_eq(Sandbox.read_bytes(path), '[llm.generation]\ntemperature = -0.0\nfuture=9007199254740993\n')
-			package.loaded["infra.llm_preferences"] = nil
-			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
+			package.loaded["ai.engine.preferences"] = nil
+			helpers.assert_eq(1 / require("ai.engine.preferences").get("llm.generation.temperature"), -math.huge)
 		end)
 	end)
 end)
@@ -364,34 +364,34 @@ helpers.describe("Linux real root inline scalar publication", function()
 	local source = 'llm = { generation = { temperature=0.25, future=9007199254740993 }, private="untouched" } # exact trailer\n'
 	helpers.it("acknowledges precise inline temperature and restarts the actual source owner", function()
 		with_config(source, function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local wanted = 0.12345678901234567
 			helpers.assert_true(preferences.set("llm.generation.temperature", wanted))
 			helpers.assert_eq(Sandbox.read_bytes(path), 'llm = { generation = { temperature=0.12345678901234566, future=9007199254740993 }, private="untouched" } # exact trailer\n')
-			package.loaded["infra.llm_preferences"] = nil
-			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), wanted)
+			package.loaded["ai.engine.preferences"] = nil
+			helpers.assert_eq(require("ai.engine.preferences").get("llm.generation.temperature"), wanted)
 		end)
 	end)
 	helpers.it("retains acknowledged inline negative zero and exact foreign bytes through restart", function()
 		with_config(source, function(path)
-			helpers.assert_true(require("infra.llm_preferences").set("llm.generation.temperature", negative_zero()))
+			helpers.assert_true(require("ai.engine.preferences").set("llm.generation.temperature", negative_zero()))
 			helpers.assert_eq(Sandbox.read_bytes(path), 'llm = { generation = { temperature=-0.0, future=9007199254740993 }, private="untouched" } # exact trailer\n')
-			package.loaded["infra.llm_preferences"] = nil
-			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
+			package.loaded["ai.engine.preferences"] = nil
+			helpers.assert_eq(1 / require("ai.engine.preferences").get("llm.generation.temperature"), -math.huge)
 		end)
 	end)
 	helpers.it("deletes only the explicitly reset inline leaf and restarts at its manifest default", function()
 		with_config(source, function(path)
-			helpers.assert_true(require("infra.llm_preferences").delete("llm.generation.temperature"))
+			helpers.assert_true(require("ai.engine.preferences").delete("llm.generation.temperature"))
 			helpers.assert_eq(Sandbox.read_bytes(path), 'llm = { generation = { future=9007199254740993 }, private="untouched" } # exact trailer\n')
-			package.loaded["infra.llm_preferences"] = nil
-			helpers.assert_nil(require("infra.llm_preferences").get("llm.generation.temperature"), "the native reader owns absence after explicit deletion")
-			helpers.assert_eq(require("modules.llm.settings").get("temperature"), require("menu.engine.manifest_reader").default_for("llm.generation.temperature"))
+			package.loaded["ai.engine.preferences"] = nil
+			helpers.assert_nil(require("ai.engine.preferences").get("llm.generation.temperature"), "the native reader owns absence after explicit deletion")
+			helpers.assert_eq(require("ai.engine.settings.settings").get("temperature"), require("menu.engine.manifest_reader").default_for("llm.generation.temperature"))
 		end)
 	end)
 	helpers.it("refuses an inexact inline literal with unchanged revision then accepts a repaired explicit retry", function()
 		with_config(source, function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local revision = preferences.generation()
 			local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 			local original = LeafRows.value_literal
@@ -410,7 +410,7 @@ helpers.describe("Linux real root inline scalar publication", function()
 		with_config(source, function(path)
 			local successor = source .. '# external successor\n'
 			local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			helpers.assert_eq(preferences.set_many({ ["llm.generation.temperature"] = 0.75 }, { status = "ok", content = source }), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), successor)
 			helpers.assert_true(preferences.set("llm.generation.temperature", 0.75))
@@ -423,34 +423,34 @@ helpers.describe("Linux real section-relative dotted scalar publication", functi
 	local source = '[llm] # exact header\ngeneration.temperature=0.25 # owned scalar\ngeneration.future=9007199254740993 # foreign\nprivate="untouched"\n'
 	helpers.it("acknowledges precise section-relative dotted temperature and restarts the actual source owner", function()
 		with_config(source, function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local wanted = 0.12345678901234567
 			helpers.assert_true(preferences.set("llm.generation.temperature", wanted))
 			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration.temperature = 0.12345678901234566\ngeneration.future=9007199254740993 # foreign\nprivate="untouched"\n')
-			package.loaded["infra.llm_preferences"] = nil
-			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), wanted)
+			package.loaded["ai.engine.preferences"] = nil
+			helpers.assert_eq(require("ai.engine.preferences").get("llm.generation.temperature"), wanted)
 		end)
 	end)
 	helpers.it("retains acknowledged section-relative dotted negative zero and exact foreign bytes through restart", function()
 		with_config(source, function(path)
-			helpers.assert_true(require("infra.llm_preferences").set("llm.generation.temperature", negative_zero()))
+			helpers.assert_true(require("ai.engine.preferences").set("llm.generation.temperature", negative_zero()))
 			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration.temperature = -0.0\ngeneration.future=9007199254740993 # foreign\nprivate="untouched"\n')
-			package.loaded["infra.llm_preferences"] = nil
-			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
+			package.loaded["ai.engine.preferences"] = nil
+			helpers.assert_eq(1 / require("ai.engine.preferences").get("llm.generation.temperature"), -math.huge)
 		end)
 	end)
 	helpers.it("deletes only the explicitly reset section-relative dotted leaf and restarts at its manifest default", function()
 		with_config(source, function(path)
-			helpers.assert_true(require("infra.llm_preferences").delete("llm.generation.temperature"))
+			helpers.assert_true(require("ai.engine.preferences").delete("llm.generation.temperature"))
 			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration.future=9007199254740993 # foreign\nprivate="untouched"\n')
-			package.loaded["infra.llm_preferences"] = nil
-			helpers.assert_nil(require("infra.llm_preferences").get("llm.generation.temperature"), "the native reader owns absence after explicit deletion")
-			helpers.assert_eq(require("modules.llm.settings").get("temperature"), require("menu.engine.manifest_reader").default_for("llm.generation.temperature"))
+			package.loaded["ai.engine.preferences"] = nil
+			helpers.assert_nil(require("ai.engine.preferences").get("llm.generation.temperature"), "the native reader owns absence after explicit deletion")
+			helpers.assert_eq(require("ai.engine.settings.settings").get("temperature"), require("menu.engine.manifest_reader").default_for("llm.generation.temperature"))
 		end)
 	end)
 	helpers.it("refuses an inexact section-relative dotted literal with unchanged revision then accepts a repaired explicit retry", function()
 		with_config(source, function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local revision = preferences.generation()
 			local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 			local original = LeafRows.value_literal
@@ -469,7 +469,7 @@ helpers.describe("Linux real section-relative dotted scalar publication", functi
 		with_config(source, function(path)
 			local successor = source .. '# external successor\n'
 			local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			helpers.assert_eq(preferences.set_many({ ["llm.generation.temperature"] = 0.75 }, { status = "ok", content = source }), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), successor)
 			helpers.assert_true(preferences.set("llm.generation.temperature", 0.75))
@@ -482,34 +482,34 @@ helpers.describe("Linux real section-relative inline scalar publication", functi
 	local source = '[llm] # exact header\ngeneration = { temperature=0.25, future=9007199254740993, empty=[], map={} } # exact outer trailer\nprivate="untouched"\n'
 	helpers.it("acknowledges precise section-relative inline temperature and restarts the actual source owner", function()
 		with_config(source, function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local wanted = 0.12345678901234567
 			helpers.assert_true(preferences.set("llm.generation.temperature", wanted))
 			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration = { temperature=0.12345678901234566, future=9007199254740993, empty=[], map={} } # exact outer trailer\nprivate="untouched"\n')
-			package.loaded["infra.llm_preferences"] = nil
-			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), wanted)
+			package.loaded["ai.engine.preferences"] = nil
+			helpers.assert_eq(require("ai.engine.preferences").get("llm.generation.temperature"), wanted)
 		end)
 	end)
 	helpers.it("retains acknowledged section-relative inline negative zero and exact foreign bytes through restart", function()
 		with_config(source, function(path)
-			helpers.assert_true(require("infra.llm_preferences").set("llm.generation.temperature", negative_zero()))
+			helpers.assert_true(require("ai.engine.preferences").set("llm.generation.temperature", negative_zero()))
 			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration = { temperature=-0.0, future=9007199254740993, empty=[], map={} } # exact outer trailer\nprivate="untouched"\n')
-			package.loaded["infra.llm_preferences"] = nil
-			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
+			package.loaded["ai.engine.preferences"] = nil
+			helpers.assert_eq(1 / require("ai.engine.preferences").get("llm.generation.temperature"), -math.huge)
 		end)
 	end)
 	helpers.it("deletes only the explicitly reset section-relative inline leaf and restarts at its manifest default", function()
 		with_config(source, function(path)
-			helpers.assert_true(require("infra.llm_preferences").delete("llm.generation.temperature"))
+			helpers.assert_true(require("ai.engine.preferences").delete("llm.generation.temperature"))
 			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration = { future=9007199254740993, empty=[], map={} } # exact outer trailer\nprivate="untouched"\n')
-			package.loaded["infra.llm_preferences"] = nil
-			helpers.assert_nil(require("infra.llm_preferences").get("llm.generation.temperature"), "the native reader owns absence after explicit deletion")
-			helpers.assert_eq(require("modules.llm.settings").get("temperature"), require("menu.engine.manifest_reader").default_for("llm.generation.temperature"))
+			package.loaded["ai.engine.preferences"] = nil
+			helpers.assert_nil(require("ai.engine.preferences").get("llm.generation.temperature"), "the native reader owns absence after explicit deletion")
+			helpers.assert_eq(require("ai.engine.settings.settings").get("temperature"), require("menu.engine.manifest_reader").default_for("llm.generation.temperature"))
 		end)
 	end)
 	helpers.it("refuses an inexact section-relative inline literal with unchanged revision then accepts a repaired explicit retry", function()
 		with_config(source, function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local revision = preferences.generation()
 			local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 			local original = LeafRows.value_literal
@@ -528,7 +528,7 @@ helpers.describe("Linux real section-relative inline scalar publication", functi
 		with_config(source, function(path)
 			local successor = source .. '# external successor\n'
 			local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			helpers.assert_eq(preferences.set_many({ ["llm.generation.temperature"] = 0.75 }, { status = "ok", content = source }), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), successor)
 			helpers.assert_true(preferences.set("llm.generation.temperature", 0.75))
@@ -540,47 +540,47 @@ end)
 helpers.describe("Linux actual native exact integer publication", function()
 	helpers.it("writes exact requested integer through root inline and cold-restarts the native reader", function()
 		with_config("llm={generation={temperature=9007199254740993,future=[]}} # exact\n", function(path)
-			local preferences=require("infra.llm_preferences")
+			local preferences=require("ai.engine.preferences")
 			helpers.assert_true(preferences.set("llm.generation.temperature", 9007199254740992))
 			helpers.assert_eq(Sandbox.read_bytes(path), "llm={generation={temperature=9007199254740992,future=[]}} # exact\n")
-			package.loaded["infra.llm_preferences"]=nil
-			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), 9007199254740992)
+			package.loaded["ai.engine.preferences"]=nil
+			helpers.assert_eq(require("ai.engine.preferences").get("llm.generation.temperature"), 9007199254740992)
 		end)
 	end)
 	helpers.it("writes exact requested integer through root dotted and cold-restarts the native reader", function()
 		with_config("llm.generation.temperature=9007199254740993 # owned\nfuture=[] # exact\n", function(path)
-			local preferences=require("infra.llm_preferences")
+			local preferences=require("ai.engine.preferences")
 			helpers.assert_true(preferences.set("llm.generation.temperature", 9007199254740992))
 			helpers.assert_eq(Sandbox.read_bytes(path), "llm.generation.temperature = 9007199254740992\nfuture=[] # exact\n")
-			package.loaded["infra.llm_preferences"]=nil
-			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), 9007199254740992)
+			package.loaded["ai.engine.preferences"]=nil
+			helpers.assert_eq(require("ai.engine.preferences").get("llm.generation.temperature"), 9007199254740992)
 		end)
 	end)
 	helpers.it("writes exact requested integer through section dotted and cold-restarts the native reader", function()
 		with_config("[llm]\ngeneration.temperature=9007199254740993 # owned\nfuture=[] # exact\n", function(path)
-			local preferences=require("infra.llm_preferences")
+			local preferences=require("ai.engine.preferences")
 			helpers.assert_true(preferences.set("llm.generation.temperature", 9007199254740992))
 			helpers.assert_eq(Sandbox.read_bytes(path), "[llm]\ngeneration.temperature = 9007199254740992\nfuture=[] # exact\n")
-			package.loaded["infra.llm_preferences"]=nil
-			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), 9007199254740992)
+			package.loaded["ai.engine.preferences"]=nil
+			helpers.assert_eq(require("ai.engine.preferences").get("llm.generation.temperature"), 9007199254740992)
 		end)
 	end)
 	helpers.it("writes exact requested integer through header leaf and cold-restarts the native reader", function()
 		with_config("[llm.generation]\ntemperature=9007199254740993 # owned\nfuture=[] # exact\n", function(path)
-			local preferences=require("infra.llm_preferences")
+			local preferences=require("ai.engine.preferences")
 			helpers.assert_true(preferences.set("llm.generation.temperature", 9007199254740992))
 			helpers.assert_eq(Sandbox.read_bytes(path), "[llm.generation]\ntemperature = 9007199254740992\nfuture=[] # exact\n")
-			package.loaded["infra.llm_preferences"]=nil
-			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), 9007199254740992)
+			package.loaded["ai.engine.preferences"]=nil
+			helpers.assert_eq(require("ai.engine.preferences").get("llm.generation.temperature"), 9007199254740992)
 		end)
 	end)
 	helpers.it("writes exact requested integer through section inline and cold-restarts the native reader", function()
 		with_config("[llm]\ngeneration={temperature=9007199254740993,future=[]} # exact\n", function(path)
-			local preferences=require("infra.llm_preferences")
+			local preferences=require("ai.engine.preferences")
 			helpers.assert_true(preferences.set("llm.generation.temperature", 9007199254740992))
 			helpers.assert_eq(Sandbox.read_bytes(path), "[llm]\ngeneration={temperature=9007199254740992,future=[]} # exact\n")
-			package.loaded["infra.llm_preferences"]=nil
-			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), 9007199254740992)
+			package.loaded["ai.engine.preferences"]=nil
+			helpers.assert_eq(require("ai.engine.preferences").get("llm.generation.temperature"), 9007199254740992)
 		end)
 	end)
 end)
@@ -607,8 +607,8 @@ helpers.describe("Linux actual native authenticated integer candidate proof", fu
 			local rows=LeafRows.prepare(source,{ {path={"llm","generation","temperature"},value=9007199254740992} })
 			helpers.assert_true(Writer.batch_write(path,rows))
 			helpers.assert_eq(Sandbox.read_bytes(path),'[llm.generation]\ntemperature = 9007199254740992\nfuture=9223372036854775807 # exact\n')
-			package.loaded["infra.llm_preferences"]=nil
-			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"),9007199254740992)
+			package.loaded["ai.engine.preferences"]=nil
+			helpers.assert_eq(require("ai.engine.preferences").get("llm.generation.temperature"),9007199254740992)
 		end)
 	end)
 end)
@@ -621,11 +621,11 @@ helpers.describe("Linux native absent inline scalar preference",function()
 	for index,vector in ipairs(vectors) do
 		helpers.it("inserts absent known scalar through actual native owner "..index,function()
 			with_config(vector.source,function(path)
-				local preferences=require("infra.llm_preferences")
+				local preferences=require("ai.engine.preferences")
 				helpers.assert_true(preferences.set("llm.generation.temperature",0.25))
 				helpers.assert_eq(Sandbox.read_bytes(path),vector.expected)
-				package.loaded["infra.llm_preferences"]=nil
-				helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"),0.25)
+				package.loaded["ai.engine.preferences"]=nil
+				helpers.assert_eq(require("ai.engine.preferences").get("llm.generation.temperature"),0.25)
 			end)
 		end)
 	end
@@ -634,7 +634,7 @@ helpers.describe("Linux native absent inline scalar preference",function()
 		with_config(source,function(path)
 			local successor=source..'# foreign successor\n'
 			local file=assert(io.open(path,"wb"));assert(file:write(successor));assert(file:close())
-			local preferences=require("infra.llm_preferences")
+			local preferences=require("ai.engine.preferences")
 			helpers.assert_eq(preferences.set_many({["llm.generation.temperature"]=0.25},{status="ok",content=source}),false)
 			helpers.assert_eq(Sandbox.read_bytes(path),successor)
 			helpers.assert_true(preferences.set("llm.generation.temperature",0.25))
@@ -660,7 +660,7 @@ helpers.describe("Linux actual preference schema drift and runtime reload", func
 		helpers.it("refuses actual ordinary publication after current boot and later schema replacement " .. token, function()
 			with_config(current(false), function(path)
 				helpers.assert_eq(Migration.boot({ path = path, driver = "linux", registry = registry }).status, "current")
-				local preferences = require("infra.llm_preferences")
+				local preferences = require("ai.engine.preferences")
 				local drift = current(false):gsub("schema_version = " .. registry.current, "schema_version = " .. token)
 				put(path, drift)
 				helpers.assert_eq(preferences.set("llm.enabled", true), false)
@@ -668,17 +668,17 @@ helpers.describe("Linux actual preference schema drift and runtime reload", func
 				put(path, current(false))
 				helpers.assert_true(preferences.set("llm.enabled", true), "manual repair permits a fresh explicit request")
 				helpers.assert_eq(Sandbox.read_bytes(path), current(true), "complete independently authored source")
-				package.loaded["infra.llm_preferences"] = nil
-				helpers.assert_eq(require("infra.llm_preferences").get("llm.enabled"), true, "fresh native readback")
+				package.loaded["ai.engine.preferences"] = nil
+				helpers.assert_eq(require("ai.engine.preferences").get("llm.enabled"), true, "fresh native readback")
 			end)
 		end)
 	end
 	helpers.it("the actual profile reload refuses future consent and keeps the old runtime state", function()
 		with_config(current(false), function(path)
 			helpers.assert_eq(Migration.boot({ path = path, driver = "linux", registry = registry }).status, "current")
-			local previous = package.loaded["modules.llm.profiles"]
-			package.loaded["modules.llm.profiles"] = nil
-			local Profiles = require("modules.llm.profiles")
+			local previous = package.loaded["ai.engine.settings.profiles"]
+			package.loaded["ai.engine.settings.profiles"] = nil
+			local Profiles = require("ai.engine.settings.profiles")
 			local called, detail = pcall(function()
 				Profiles.init()
 				helpers.assert_eq(Profiles.is_enabled(), false)
@@ -690,7 +690,7 @@ helpers.describe("Linux actual preference schema drift and runtime reload", func
 				helpers.assert_eq(Profiles.is_enabled(), false, "future source cannot grant runtime consent")
 				helpers.assert_eq(Sandbox.read_bytes(path), future)
 			end)
-			package.loaded["modules.llm.profiles"] = previous
+			package.loaded["ai.engine.settings.profiles"] = previous
 			if not called then error(detail, 0) end
 		end)
 	end)
@@ -708,7 +708,7 @@ helpers.describe("Linux AI runtime source admission", function()
 			helpers.assert_eq(boot.status, "newer")
 			helpers.assert_eq(boot.read_only, true)
 			helpers.assert_type(require("core.text.engine.toml_codec.writer").write_refusal(path), "string", "the genuine writer owns the refusal")
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			helpers.assert_eq(preferences.admit(), false, "a refused file cannot admit AI runtime mutation")
 			helpers.assert_eq(preferences.set("llm.enabled", true), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), source, "read-only admission never repairs or changes source bytes")
@@ -717,7 +717,7 @@ helpers.describe("Linux AI runtime source admission", function()
 
 	helpers.it("current source and exact scope release keep admission while foreign refusals do not block it (ai-readonly-admission)", function()
 		with_config('[llm]\nenabled = false\n', function(path)
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			require("core.text.engine.toml_codec.writer").refuse_writes(path .. ".foreign", "Controlled unrelated refusal")
 			helpers.assert_eq(preferences.admit(), true, "only this configuration path owns admission")
 			local owner = { pending = function() return false end }
@@ -743,7 +743,7 @@ helpers.describe("AI preferences decode identical bytes once (llm-preferences-de
 				return original(...)
 			end
 			local ok, err = pcall(function()
-				local preferences = require("infra.llm_preferences")
+				local preferences = require("ai.engine.preferences")
 				for _ = 1, 50 do helpers.assert_eq(preferences.get("llm.agent_mode"), "auto") end
 				for _ = 1, 50 do preferences.get_many({ "llm.agent_mode" }) end
 				helpers.assert_eq(decodes, 1, "unchanged bytes must be decoded once")
@@ -758,7 +758,7 @@ helpers.describe("AI preferences decode identical bytes once (llm-preferences-de
 
 	helpers.it("a table value handed out cannot change what the next read returns", function()
 		with_config('[llm.navigation]\nval_modifiers = ["ctrl"]\n', function()
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local first = preferences.get("llm.navigation.val_modifiers")
 			helpers.assert_eq(first, { "ctrl" })
 			first[1], first[2] = "shift", "alt"
@@ -773,7 +773,7 @@ end)
 helpers.describe("AI preference enums written in another case", function()
 	helpers.it("reads them in their manifest spelling, as Windows does (config-enum-case)", function()
 		with_config('[llm]\nagent_mode = "Auto"\n[llm.trigger]\nwhile_hotstring_tooltip = "BOTH"\n', function()
-			local preferences = require("infra.llm_preferences")
+			local preferences = require("ai.engine.preferences")
 			local value, status = preferences.get_with_status("llm.agent_mode")
 			helpers.assert_eq({ value, status }, { "auto", "ok" })
 			helpers.assert_eq(preferences.get("llm.trigger.while_hotstring_tooltip"), "both")

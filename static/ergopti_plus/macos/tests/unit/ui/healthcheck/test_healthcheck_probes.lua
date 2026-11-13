@@ -19,7 +19,7 @@ local AppDirs = require("core.fs.engine.app_dirs")
 -- The modules each case replaces, restored after it
 local FIXTURE_MODULES = {
 	"core.logger.engine.logger", "ui.healthcheck.probes", "core.events.timer_scheduler", "core.network.adapters.http_client",
-	"core.process.adapters.shell_runner", "core.fs.adapters.json_codec", "modules.llm", "ui.healthcheck.appleevents",
+	"core.process.adapters.shell_runner", "core.fs.adapters.json_codec", "ai.engine", "ui.healthcheck.appleevents",
 }
 
 --- Runs body with the real probes over recorded adapters.
@@ -112,7 +112,7 @@ local function with_probes(body)
 			end,
 		}
 		package.loaded["core.fs.adapters.json_codec"] = { decode = function(text) return hs.json.decode(text) end }
-		package.loaded["modules.llm"] = {
+		package.loaded["ai.engine"] = {
 			get_runtime_llm_enabled = function() return world.llm_on end,
 			get_backend = function() return "ollama" end,
 		}

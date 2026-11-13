@@ -1,0 +1,868 @@
+--- ai/engine/settings/api_entries.lua
+
+--- ==============================================================================
+--- MODULE: Remote API Entries (Linux)
+--- DESCRIPTION:
+--- The API endpoints the user added (provider, model, optional URL, key) and
+--- which one predictions use.
+---
+--- FEATURES & RATIONALE:
+--- 1. One private file, ~/.config/ergopti/api_keys.json, created with mode
+---    0600 like ~/.netrc: the key is readable by its owner and nobody else. It
+---    lives beside storage.json rather than in the configuration folder, which
+---    users may point at a synced or shared directory.
+--- 2. Written to a fresh temporary file and renamed, so a crash leaves the
+---    previous file intact and a pre-existing file's looser mode never carries
+---    over.
+--- 3. Keys never reach a log: entries are described by id and provider.
+--- 5. The keys themselves live in the desktop secret service
+---    (ai/engine/settings/api_token_store.lua), as in the macOS Keychain and under
+---    Windows DPAPI: the file holds a "secret-service:<id>#<revision>"
+---    reference per key. A save whose key the service refuses is refused
+---    whole, never written in plaintext. A changed key gets a new revision and
+---    the old one is deleted only once the file names the new one, so a failed
+---    save never leaves the file naming a key it did not publish.
+--- 6. A key an earlier build wrote in plaintext is moved to the service in the
+---    background by ai/engine/settings/api_key_migration.lua, which the daemon starts
+---    after boot and which retries until the keyring is unlocked, or by the
+---    next save (migrate_plaintext() is that synchronous move). A load alone
+---    never rewrites the file. Until a move succeeds the key stays as it was,
+---    and the migration logs why.
+--- 4. `label` stays required, so this file still loads in the builds before
+---    2026-10; it holds the automatic name the tray writes and no build after
+---    them reads it: every tray names an entry after its provider and model.
+--- ==============================================================================
+
+local M = {}
+local TextUtils = require("core.text.engine.utils_core")
+
+local Logger = require("core.logger.engine.shim")
+local Json = require("core.text.engine.json")
+local ConfigPaths = require("settings.engine.paths")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local LocalCatalogue = require("ai.engine.local_servers.catalogue")
+local AuthPolicy = require("ai.engine.local_servers.auth")
+local SourceWriter = require("core.text.engine.toml_codec.writer")
+local ProviderConfig = require("ai.engine.policy.provider_config_policy")
+local EntryIdentity = require("ai.engine.api.entry_identity")
+local NativePath = require("core.fs.engine.native_path")
+local TokenStore = require("ai.engine.settings.api_token_store")
+
+local LOG = "ai.engine.settings.api_entries"
+local VERSION = 1
+local PRIVATE_MODE = tonumber("600", 8)
+local O_WRONLY, O_CREAT, O_EXCL = 1, 64, 128
+
+local _path_override = nil
+local _state = nil
+local _sequence = 0
+local _source_receipts = setmetatable({}, { __mode = "k" })
+
+-- Creates a new file only its owner can read: libc through LuaJIT's FFI,
+-- built on first use, or the primitive a test installed.
+local _create_private = nil
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 1/ File =========================
+-- =========================================
+-- =========================================
+
+--- The private entries file.
+--- @return string
+function M.path()
+	return _path_override or (ConfigPaths.default_config_dir() .. "/api_keys.json")
+end
+
+--- The libc primitive: open(2) with O_CREAT | O_EXCL and mode 0600, so the
+--- file is private from its first byte, then write, fsync and close.
+---
+--- Built on first use rather than at load. The FFI exists only under LuaJIT,
+--- the one interpreter the daemon runs on, where this changes nothing; on any
+--- other interpreter the first save raises "module 'ffi' not found" instead of
+--- the whole module refusing to load, so the entry logic stays reachable by a
+--- test that installs its own primitive.
+--- @return function (path, text) -> ok, err
+local function libc_create_private()
+	local ffi = require("ffi")
+	-- Private names: evdev_reader and uinput_writer declare open() without its
+	-- mode argument, and a second declaration of the same name is refused.
+	ffi.cdef([[
+		int ergopti_private_open(const char *pathname, int flags, int mode) __asm__("open");
+		long ergopti_private_write(int fd, const void *buf, unsigned long count) __asm__("write");
+		int ergopti_private_close(int fd) __asm__("close");
+		int ergopti_private_fsync(int fd) __asm__("fsync");
+	]])
+	return function(path, text)
+		local fd = ffi.C.ergopti_private_open(path, O_WRONLY + O_CREAT + O_EXCL, PRIVATE_MODE)
+		if fd < 0 then return false, "cannot create " .. path end
+		local written = tonumber(ffi.C.ergopti_private_write(fd, text, #text))
+		local synced = ffi.C.ergopti_private_fsync(fd)
+		ffi.C.ergopti_private_close(fd)
+		if written ~= #text or synced ~= 0 then return false, "short write to " .. path end
+		return true
+	end
+end
+
+--- Writes text to a new file only its owner can read, then renames it over path.
+--- @param path string
+--- @param text string
+--- @param expected table Exact classified disk source captured at load/publication.
+--- @param admit function|nil Exact live runtime admission.
+--- @param publication table|nil Private native rename acknowledgement.
+--- @return boolean ok, string|nil err
+local function write_private(path, text, expected, admit, publication)
+	local dir = NativePath.dirname(path)
+	if dir then os.execute("mkdir -p " .. TextUtils.shell_quote(dir)) end
+	local tmp = path .. ".tmp"
+	os.remove(tmp)
+	_create_private = _create_private or libc_create_private()
+	local created, create_err = _create_private(tmp, text)
+	if not created then
+		os.remove(tmp)
+		return false, create_err
+	end
+	if admit then
+		local accepted, allowed = pcall(admit)
+		if not accepted or allowed ~= true then
+			os.remove(tmp)
+			return false, "local API admission changed after private staging"
+		end
+	end
+	-- Admission may run application callbacks. Recheck the physical source only
+	-- after those callbacks, immediately before the synchronous native rename.
+	-- This fences observed drift; it is not a cross-process kernel CAS or lock.
+	local source, status = SourceWriter.read_classified(path)
+	if status ~= expected.status or (status == "ok" and source ~= expected.content) then
+		os.remove(tmp)
+		return false, "source changed after private staging"
+	end
+	if publication then publication.renaming = true end
+	local renamed, rename_err = os.rename(tmp, path)
+	if publication then publication.renaming = false end
+	if not renamed then
+		os.remove(tmp)
+		return false, tostring(rename_err)
+	end
+	return true
+end
+
+--- A usable entry, or nil.
+--- @param raw any
+--- @param stored boolean|nil True only for an existing physical source row.
+--- @param key_missing boolean|nil The row's key is absent from the secret
+---   service: its empty key is not checked against the provider's policy.
+--- @return table|nil
+--- @return string|nil detail Exact obsolete identity reason, when proven.
+local function valid_entry(raw, stored, key_missing)
+	if type(raw) ~= "table" then return nil end
+	for _, key in ipairs({ "id", "provider", "label" }) do
+		if type(raw[key]) ~= "string" or raw[key] == "" then return nil end
+	end
+	for _, key in ipairs({ "model", "base_url" }) do
+		if raw[key] ~= nil and type(raw[key]) ~= "string" then return nil end
+	end
+	if type(raw.token) ~= "string" then return nil end
+	local identity
+	if stored == true then
+		local receipt = require("ai.engine.api.api_remote").provider_config_receipt()
+		identity = ProviderConfig.classify(raw.provider, receipt)
+		if identity == "retired" then
+			return nil, "its provider is absent from the published cloud and local catalogues"
+		end
+	end
+	-- An unavailable inventory cannot disprove a stored optional-auth choice.
+	-- Candidate admission keeps its existing strict authentication owner.
+	if identity ~= "unpublished" and key_missing ~= true then
+		local _, servers = LocalCatalogue.load({})
+		if not AuthPolicy.entry_token_allowed(raw.provider, raw.token, raw.base_url, servers) then return nil end
+	end
+	return {
+		id = raw.id,
+		provider = raw.provider,
+		label = raw.label,
+		token = raw.token,
+		model = type(raw.model) == "string" and raw.model or "",
+		base_url = type(raw.base_url) == "string" and raw.base_url or "",
+	}
+end
+
+--- How a warning names a stored entry: its id when it has one, never its key.
+--- @param raw any The stored entry.
+--- @param index number Its position in the file.
+--- @return string
+local function entry_name(raw, index)
+	local id = type(raw) == "table" and type(raw.id) == "string" and raw.id ~= "" and raw.id or nil
+	return id and ("entries[id=" .. id .. "]") or ("entries[#" .. index .. "]")
+end
+
+--- Whether a decoded value is a JSON list: consecutive integer keys from 1.
+--- @param value table
+--- @return boolean
+local function is_list(value)
+	local count = 0
+	for key in pairs(value) do
+		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 then return false end
+		count = count + 1
+	end
+	return count == #value
+end
+
+--- Loads the file once. A malformed file is kept aside, not overwritten. An
+--- entry an older build wrote in another shape is outdated: warned once,
+--- left out, and written back unchanged, so its key is never deleted. A file
+--- this build cannot write back whole (another version, entries that are not
+--- a list) is read as far as it can be, and every write to it is refused.
+--- @return table state
+local function state()
+	if _state then return _state end
+	_state = { version = VERSION, entries = {}, active_id = "", outdated = {}, extras = {}, row_order = {}, root_extras = {},
+		secrets = {}, plaintext = 0, key_missing = {} }
+	local text, read_status = SourceWriter.read_classified(M.path())
+	if read_status ~= "ok" and read_status ~= "absent" then
+		_state.write_refusal = "its physical source could not be read completely"
+		return _state
+	end
+	_state.source = { status = read_status, content = text }
+	if read_status == "absent" then return _state end
+	local root = Json.decode_lossless(text)
+	if type(root) ~= "table" or type(root.entries) ~= "table" then
+		-- Never os.rename: it replaces an older set-aside, or one a second
+		-- process makes at the same instant.
+		local aside = require("core.fs.engine.corrupt_aside").preserve(M.path())
+		if aside ~= nil then
+			_state.source = { status = "absent", content = "" }
+			Logger.error(LOG, "API entries file is malformed — kept at %s, starting empty.", aside)
+		else
+			_state.write_refusal = "its malformed source could not be kept aside"
+			Logger.error(LOG, "The malformed API entries source could not be kept aside; replacement is refused.")
+		end
+		return _state
+	end
+	if root.version ~= nil and root.version ~= VERSION then
+		_state.write_refusal = "it has version " .. tostring(root.version) .. ", which this build does not write"
+	elseif not Json.is_array(root.entries) or not is_list(root.entries) then
+		_state.write_refusal = "its entries are not a list, as this build writes them"
+	end
+	if root.active_id ~= nil and type(root.active_id) ~= "string" then
+		_state.write_refusal = "its selection has a type this build does not write"
+	end
+	for key, value in pairs(root) do
+		if key ~= "version" and key ~= "entries" and key ~= "active_id" then _state.root_extras[key] = value end
+	end
+	-- Every stored reference is read in one keyboard hand-over: a locked
+	-- keyring asks for its password once, not once per key.
+	local references = {}
+	for _, raw in ipairs(root.entries) do
+		if type(raw) == "table" and TokenStore.is_reference(raw.token) then references[#references + 1] = raw.token end
+	end
+	local tokens, unread = TokenStore.lookup_many(references)
+	local ids = {}
+	for index, raw in ipairs(root.entries) do
+		local reference = type(raw) == "table" and TokenStore.is_reference(raw.token) and raw.token or nil
+		local entry, outdated_reason
+		if reference and not tokens[reference] and unread[reference] == "absent" then
+			-- The service confirms no such item: a restored backup whose key was
+			-- deleted with its entry (decided by the maintainer on 2026-11-11).
+			-- The entry is listed as needing its key again; its reference is
+			-- written back unchanged until a new key replaces it.
+			local candidate = {}
+			for key, value in pairs(raw) do candidate[key] = value end
+			candidate.token = ""
+			entry, outdated_reason = valid_entry(candidate, true, true)
+			if entry then _state.key_missing[entry.id] = reference end
+		elseif reference and not tokens[reference] then
+			-- Kept as written, like any row this load cannot use: the key is
+			-- still in the service, and the next load that reaches it uses it.
+			outdated_reason = "its key is in the desktop secret service, which could not be read ("
+				.. tostring(unread[reference]) .. ")"
+		else
+			local candidate = raw
+			if reference then
+				candidate = {}
+				for key, value in pairs(raw) do candidate[key] = value end
+				candidate.token = tokens[reference]
+			end
+			entry, outdated_reason = valid_entry(candidate, true)
+		end
+		if entry and reference then
+			_state.secrets[entry.id] = { reference = reference, token = entry.token }
+		elseif entry and entry.token ~= "" then
+			_state.plaintext = _state.plaintext + 1
+		end
+		_state.row_order[#_state.row_order + 1] = { id = entry and entry.id or nil, raw = raw }
+		if entry and ids[entry.id] then _state.write_refusal = "it contains duplicate API entry identities" end
+		if entry then ids[entry.id] = true end
+		if entry then
+			_state.entries[#_state.entries + 1] = entry
+			-- Fields a later build added travel back with the entry.
+			_state.extras[entry.id] = raw
+		else
+			_state.outdated[#_state.outdated + 1] = raw
+			ConfigOutdated.report_in_file(M.path(), entry_name(raw, index),
+				outdated_reason or "its entry fields do not match this build's supported text types")
+		end
+	end
+	if type(root.active_id) == "string" and M.get(root.active_id) then
+		_state.active_id = root.active_id
+	elseif type(root.active_id) == "string" and root.active_id ~= "" then
+		-- Kept as written until the user chooses an entry.
+		_state.dangling_active_id = root.active_id
+		ConfigOutdated.report_in_file(M.path(), "active_id", "no usable entry has this id; no entry is active")
+	end
+	return _state
+end
+
+--- One entry as written back: its stored fields, this build's values over
+--- them, its key replaced by the reference the secret service holds it under.
+--- @param entry table A usable entry.
+--- @param token string The stored token field: a reference, or "" for no key.
+--- @return table
+local function stored_form(entry, token)
+	local out = {}
+	for key, value in pairs(state().extras[entry.id] or {}) do out[key] = value end
+	for key, value in pairs(entry) do out[key] = value end
+	out.token = token
+	return out
+end
+
+--- Deletes secret-service keys no published file names any more. A key that
+--- cannot be deleted is left behind, never lost: it is only logged.
+--- @param references table
+local function retire_secrets(references)
+	for _, reference in ipairs(references) do
+		if not TokenStore.clear(reference) then
+			pcall(Logger.warn, LOG, "A replaced API key stays in the secret service under '%s'.", reference)
+		end
+	end
+end
+
+--- Persists the current state, the outdated entries included as they were.
+--- A file this build cannot write back whole is never replaced: the write is
+--- refused with its bytes unchanged, since rewriting it would drop keys.
+--- @param admit function|nil Exact live runtime admission.
+--- @param publication table|nil Private reservation and rename acknowledgement.
+--- @param quiet boolean|nil Defers logging until tentative RAM is restored.
+--- @param prestored table|nil Entry id to { reference, token } the background
+---   migration already stored; those keys are not stored again, and a failed
+---   publication leaves their deletion to the migration.
+--- @return boolean
+local function persist(admit, publication, quiet, prestored)
+	local current = state()
+	-- The reason belongs to this attempt only: a caller reads it right after.
+	current.store_refusal = nil
+	if current.publishing == true and not (publication and publication.owner == current) then return false end
+	if admit then
+		local accepted, allowed = pcall(admit)
+		if not accepted or allowed ~= true then return false end
+	end
+	if current.write_refusal then
+		Logger.error(LOG, "API entries were not saved: '%s' %s; fix or move that file first, "
+			.. "or rewriting it would lose its keys.", M.path(), current.write_refusal)
+		return false
+	end
+	-- Each key goes to the secret service before the file can name it. A key
+	-- that is new or changed gets a fresh reference; the one it replaces is
+	-- deleted only after the file stops naming it.
+	local held, fresh, store_refusal = {}, {}, nil
+	for _, entry in ipairs(current.entries) do
+		local secret = current.secrets[entry.id]
+		if entry.token == "" then
+			held[entry.id] = false
+		elseif secret and secret.token == entry.token then
+			held[entry.id] = secret
+		elseif prestored and prestored[entry.id] and prestored[entry.id].token == entry.token then
+			held[entry.id] = prestored[entry.id]
+		else
+			local reference, reason = TokenStore.store(entry.id, entry.token)
+			if not reference then store_refusal = reason; break end
+			fresh[#fresh + 1] = reference
+			held[entry.id] = { reference = reference, token = entry.token }
+		end
+	end
+	if store_refusal then
+		retire_secrets(fresh)
+		current.store_refusal = store_refusal
+		if not quiet then
+			Logger.error(LOG, "API entries were not saved: the desktop secret service refused a key (%s); "
+				.. "no key is written in plaintext.", tostring(store_refusal))
+		end
+		return false
+	end
+	local function token_of(entry)
+		if held[entry.id] then return held[entry.id].reference end
+		-- A key still to re-enter keeps the reference it was restored with.
+		if entry.token == "" and current.key_missing[entry.id] then return current.key_missing[entry.id] end
+		return ""
+	end
+	local entries = {}
+	local pending = {}
+	for _, entry in ipairs(current.entries) do pending[entry.id] = entry end
+	for _, row in ipairs(current.row_order) do
+		if row.id then
+			local entry = pending[row.id]
+			if entry then entries[#entries + 1] = stored_form(entry, token_of(entry)); pending[row.id] = nil end
+		else
+			entries[#entries + 1] = row.raw
+		end
+	end
+	-- New entries have no historical row yet; append in the user's order.
+	for _, entry in ipairs(current.entries) do
+		if pending[entry.id] then entries[#entries + 1] = stored_form(entry, token_of(entry)); pending[entry.id] = nil end
+	end
+	local active = current.active_id ~= "" and current.active_id or current.dangling_active_id or ""
+	local image = {}
+	for key, value in pairs(current.root_extras) do image[key] = value end
+	image.version, image.entries, image.active_id = VERSION, Json.array(entries), active
+	local payload = Json.encode(image)
+	-- The shared publication owner checks the actual disk snapshot before the
+	-- private 0600 writer stages it. The private writer rechecks after staging.
+	-- Reentrant mutations cannot acquire a second publication owner.
+	current.publishing = true
+	local path = M.path()
+	if publication then publication.path = path end
+	local called, ok, err = pcall(SourceWriter.publish_if_unchanged, path, payload, {
+		read_with_status = SourceWriter.read_classified,
+		write_if_unchanged = function(target, text, expected) return write_private(target, text, expected, admit, publication) end,
+	}, current.source)
+	-- An interrupted rename cannot manufacture either commit or rollback ACK.
+	current.publishing = publication ~= nil and publication.renaming == true
+	if not called then ok, err = false, ok end
+	if ok == true then
+		current.source = { status = "ok", content = payload }
+		current.store_refusal = nil
+		local retired = {}
+		for id, secret in pairs(current.secrets) do
+			if not (held[id] and held[id].reference == secret.reference) then retired[#retired + 1] = secret.reference end
+		end
+		local secrets = {}
+		for id, secret in pairs(held) do if secret then secrets[id] = secret end end
+		current.secrets = secrets
+		current.plaintext = 0
+		retire_secrets(retired)
+	elseif not current.publishing then
+		-- The previous file stands: the keys stored for this write name nothing.
+		-- An unacknowledged rename may have published them, so those stay.
+		retire_secrets(fresh)
+	end
+	if not ok and not quiet then Logger.error(LOG, "API entries could not be saved: %s.", tostring(err)) end
+	return ok
+end
+
+--- Moves the keys an earlier build wrote in plaintext to the secret service,
+--- rewriting the file with their references. Without a service the file is
+--- left as it is: removing the key would lose it, so the load says why.
+--- @return boolean moved
+function M.migrate_plaintext()
+	local current = state()
+	local count = current.plaintext
+	if count == 0 then return true end
+	Logger.start(LOG, "Moving %d plaintext API key(s) of '%s' to the desktop secret service…", count, M.path())
+	if persist() then
+		Logger.success(LOG, "%d API key(s) moved to the desktop secret service.", count)
+		return true
+	end
+	Logger.error(LOG, "%d API key(s) stay in plaintext in '%s' until a desktop secret service is available.",
+		count, M.path())
+	return false
+end
+
+--- The keys an earlier build wrote in plaintext, for the background
+--- migration (ai/engine/settings/api_key_migration.lua) to store asynchronously.
+--- @return table keys List of { id, token }, in the user's order.
+function M.plaintext_keys()
+	local current = state()
+	local keys = {}
+	if current.plaintext == 0 then return keys end
+	for _, entry in ipairs(current.entries) do
+		if entry.token ~= "" and not current.secrets[entry.id] then
+			keys[#keys + 1] = { id = entry.id, token = entry.token }
+		end
+	end
+	return keys
+end
+
+--- Publishes the file with the references the background migration stored,
+--- without calling the secret service. Refused when an entry changed since
+--- those keys were read, or a key is still missing: the caller deletes what
+--- it stored and tries again.
+--- @param stored table Entry id to reference, one per plaintext_keys() row.
+--- @param tokens table Entry id to the key stored under that reference.
+--- @return boolean published, string|nil reason
+--- @return boolean uncertain True when an unacknowledged rename may have
+---   published the references: the caller must then keep their keys.
+function M.publish_migrated(stored, tokens)
+	local current = state()
+	-- Nothing left: a save moved every key meanwhile, which is the migration's
+	-- own goal, told apart from a refusal (AIX-002).
+	if current.plaintext == 0 then return false, "no plaintext key is left to move", false, true end
+	if current.publishing then return false, "API entries are already publishing" end
+	local prestored = {}
+	for _, entry in ipairs(current.entries) do
+		if entry.token ~= "" and not current.secrets[entry.id] then
+			local reference = stored[entry.id]
+			if type(reference) ~= "string" or tokens[entry.id] ~= entry.token then
+				return false, "entry '" .. entry.id .. "' changed while its key was being moved"
+			end
+			prestored[entry.id] = { reference = reference, token = entry.token }
+		end
+	end
+	if persist(nil, nil, false, prestored) then return true end
+	return false, current.store_refusal or "the API entries file could not be published", current.publishing == true
+end
+
+--- Whether an entry was restored without its key: its reference names no
+--- item of the secret service, so it needs its key re-entered.
+--- @param id string
+--- @return boolean
+function M.key_missing(id)
+	local entry = M.get(id)
+	return entry ~= nil and entry.token == "" and state().key_missing[id] ~= nil
+end
+
+--- Gives an entry a new key, stored in the secret service before the file
+--- names it. The entry's other fields and the selection stay as they were.
+--- @param id string
+--- @param token string A non-empty key.
+--- @return boolean saved
+function M.set_token(id, token)
+	if type(token) ~= "string" or token == "" then return false end
+	local current = state()
+	for _, entry in ipairs(current.entries) do
+		if entry.id == id then
+			local previous, missing = entry.token, current.key_missing[id]
+			entry.token = token
+			current.key_missing[id] = nil
+			if persist() then
+				Logger.info(LOG, "API entry '%s' has a new key.", id)
+				return true
+			end
+			entry.token, current.key_missing[id] = previous, missing
+			return false
+		end
+	end
+	return false
+end
+
+--- Why the last save was refused by the secret service, or nil.
+--- @return string|nil
+function M.store_refusal()
+	return state().store_refusal
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Entries ======================
+-- =========================================
+-- =========================================
+
+--- Every entry, in the order they were added.
+--- @return table
+function M.list()
+	local copy = {}
+	for index, entry in ipairs(state().entries) do copy[index] = entry end
+	return copy
+end
+
+--- One entry by id.
+--- @param id string
+--- @return table|nil
+function M.get(id)
+	for _, entry in ipairs(state().entries) do
+		if entry.id == id then return entry end
+	end
+	return nil
+end
+
+--- The entry predictions use, or nil.
+--- @return table|nil
+function M.active()
+	local id = state().active_id
+	return id ~= "" and M.get(id) or nil
+end
+
+--- Starts the access-token exchange of the entry predictions now use, when
+--- its provider exchanges keys, so the first request after a key change finds
+--- the token (api_remote.prewarm_access).
+local function prewarm_active_access()
+	local active = M.active()
+	if not active then return end
+	local called, problem = pcall(function() return require("ai.engine.api.api_remote").prewarm_access(active) end)
+	if not called then pcall(Logger.error, LOG, "Access-token prewarm of API entry '%s' raised: %s", active.id, tostring(problem)) end
+end
+
+--- Adds an entry, optionally selecting it in the same private publication.
+--- @param fields table { provider, token, label, model?, base_url? }
+--- @param select boolean|nil Defaults to true; false preserves the prediction selection.
+--- @param admit function|nil Exact live runtime admission, checked before RAM and native rename.
+--- @return table|nil entry, string|nil err, boolean settled, table|nil source
+function M.add(fields, select, admit)
+	local function admitted()
+		if admit == nil then return true end
+		if type(admit) ~= "function" then return false end
+		local called, allowed = pcall(admit)
+		return called and allowed == true
+	end
+	if select ~= nil and type(select) ~= "boolean" then return nil, "selection must be a boolean", true end
+	if not admitted() then return nil, "API entry admission changed", true end
+	local current = state()
+	current.store_refusal = nil
+	local source, path = current.source, M.path()
+	if current.publishing then return nil, "API entries are already publishing", true end
+	if current.write_refusal then
+		pcall(Logger.error, LOG, "API entries were not saved: '%s' %s; fix or move that file first, "
+			.. "or rewriting it would lose its keys.", path, current.write_refusal)
+		return nil, "the API entries file cannot be rewritten", true
+	end
+	local id
+	id, _sequence = EntryIdentity.next(tostring(fields.provider), os.time(), _sequence, current.entries)
+	local entry = valid_entry({
+		id = id,
+		provider = fields.provider,
+		label = fields.label,
+		token = fields.token,
+		model = fields.model,
+		base_url = fields.base_url,
+	})
+	if not entry then return nil, "provider, label and key are required", true end
+	if not admitted() or current ~= state() or current.source ~= source or M.path() ~= path or current.publishing then
+		return nil, "API entry admission changed", true
+	end
+	-- Reserve before tentative RAM: admission and serialization can reenter.
+	local publication = { owner = current }
+	current.publishing = true
+	current.entries[#current.entries + 1] = entry
+	local previous = current.active_id
+	if select ~= false then current.active_id = entry.id end
+	local called, committed = pcall(persist, admit, publication, true)
+	if not called or committed ~= true then
+		if publication.renaming then return nil, "API entry publication remains unacknowledged", false end
+		current.publishing = false
+		table.remove(current.entries)
+		current.active_id = previous
+		-- Restore tentative RAM before logging can reenter another mutation.
+		pcall(Logger.error, LOG, "The API entry could not be saved.")
+		return nil, "the entry could not be saved", true
+	end
+	if select ~= false then
+		-- The user chose an entry: a stored selection nothing matched is replaced.
+		current.dangling_active_id = nil
+	end
+	local receipt = {}
+	_source_receipts[receipt] = { owner = current, source = current.source, path = publication.path }
+	pcall(Logger.info, LOG, "API entry '%s' (%s) added; selected=%s.", entry.id, entry.provider, tostring(select ~= false))
+	if select ~= false then prewarm_active_access() end
+	return entry, nil, true, receipt
+end
+
+--- Selects the entry predictions use.
+--- @param id string
+--- @return boolean
+function M.set_active(id)
+	if not M.get(id) then return false end
+	local previous = state().active_id
+	state().active_id = id
+	if persist() then
+		state().dangling_active_id = nil
+		prewarm_active_access()
+		return true
+	end
+	state().active_id = previous
+	return false
+end
+
+--- Gives an entry another model and selects it, in one private publication
+--- (the model selector page's listed or typed model).
+--- @param id string
+--- @param model string A model id the shared listing rule admits.
+--- @return boolean
+function M.set_model(id, model)
+	if not require("ai.engine.api.model_listing").valid_id(model) then return false end
+	local current = state()
+	if current.publishing or current.write_refusal then return false end
+	for index, entry in ipairs(current.entries) do
+		if entry.id == id then
+			local copy = {}
+			for key, value in pairs(entry) do copy[key] = value end
+			copy.model = model
+			local changed = valid_entry(copy, nil, entry.token == "" and current.key_missing[id] ~= nil)
+			if not changed then return false end
+			local previous = current.active_id
+			current.entries[index], current.active_id = changed, id
+			if persist() then
+				current.dangling_active_id = nil
+				pcall(Logger.info, LOG, "API entry '%s' model set to '%s'.", id, model)
+				prewarm_active_access()
+				return true
+			end
+			current.entries[index], current.active_id = entry, previous
+			return false
+		end
+	end
+	return false
+end
+
+--- Deletes an entry and its key.
+--- @param id string
+--- @return boolean
+function M.remove(id)
+	local current = state()
+	for index, entry in ipairs(current.entries) do
+		if entry.id == id then
+			table.remove(current.entries, index)
+			local previous = current.active_id
+			if previous == id then current.active_id = "" end
+			if persist() then
+				Logger.info(LOG, "API entry '%s' removed.", entry.id)
+				return true
+			end
+			table.insert(current.entries, index, entry)
+			current.active_id = previous
+			return false
+		end
+	end
+	return false
+end
+
+--- Captures an opaque receipt for the currently owned physical private source.
+--- Bytes and credentials stay inside the native file owner. An observed source
+--- fence does not claim a cross-process lock or kernel compare/exchange.
+--- @return table|nil
+function M.capture_source()
+	local current = state()
+	if current.write_refusal or current.publishing or not current.source then return nil end
+	local receipt = {}
+	_source_receipts[receipt] = { owner = current, source = current.source, path = M.path() }
+	if not M.source_is_current(receipt) then _source_receipts[receipt] = nil; return nil end
+	return receipt
+end
+
+--- Tests exact receipt identity against the actual current physical source.
+--- @param receipt table
+--- @return boolean
+function M.source_is_current(receipt)
+	local held = type(receipt) == "table" and _source_receipts[receipt] or nil
+	if not held or held.owner ~= state() or held.source ~= state().source or held.path ~= M.path()
+		or state().write_refusal or state().publishing then return false end
+	local text, status = SourceWriter.read_classified(held.path)
+	return status == held.source.status and (status ~= "ok" or text == held.source.content)
+end
+
+--- Publishes an acknowledged local model/configuration selection in its original
+--- row position. Unknown rows, root data and entry fields remain owned by their
+--- original producer. The independent backend preference is selected separately.
+--- @param provider string Catalogue provider or exact configured discovery view.
+--- @param fields table Closed model/base_url/token updates.
+--- @param source table Opaque physical source receipt.
+--- @param admit function Actual current pause/scope admission.
+--- @param select boolean|nil True for a model choice; false retains the existing active entry.
+--- @param entry_id string|nil Exact configured source row captured by discovery.
+--- @return table|nil entry
+--- @return string|nil reason
+function M.upsert_local(provider, fields, source, admit, select, entry_id)
+	local _, servers = LocalCatalogue.load({})
+	local dynamic = type(provider) == "string" and provider:sub(1, 11) == "configured:"
+	local _, configured = AuthPolicy.configured_views(M.list(), servers, {
+		openai = require("ai.engine.api.api_remote").provider("openai"),
+		openai_compat = require("ai.engine.api.api_remote").provider("openai_compat"),
+	})
+	local server = dynamic and configured[provider] or servers[provider]
+	if dynamic and (not server or server.entry_id ~= entry_id) then return nil, "configured API identity is not current" end
+	if not server or type(fields) ~= "table" or type(admit) ~= "function"
+		or (select ~= nil and type(select) ~= "boolean")
+		or (entry_id ~= nil and type(entry_id) ~= "string")
+		or not M.source_is_current(source) then return nil, "local API source is not current" end
+	for key, value in pairs(fields) do
+		if (key ~= "model" and key ~= "base_url" and key ~= "token") or type(value) ~= "string" then
+			return nil, "local API fields are not supported"
+		end
+	end
+	local accepted, allowed = pcall(admit)
+	if not accepted or allowed ~= true then return nil, "local API mutation is not admitted" end
+	if not M.source_is_current(source) then return nil, "local API source changed during admission" end
+	local current, index, previous_entry = state(), nil, nil
+	local active = M.active()
+	for _, exact in ipairs({ true, false }) do
+		for position, entry in ipairs(current.entries) do
+			if (dynamic and entry.id == entry_id and entry.provider == server.provider and entry.base_url == server.base_url)
+				or (not dynamic and (entry.provider == provider) == exact
+					and AuthPolicy.entry_matches(entry.provider, entry.base_url, provider, servers)
+					and (entry_id == nil or entry.id == entry_id)) then
+				if not previous_entry or (active and active.id == entry.id) then
+					index, previous_entry = position, entry
+				end
+			end
+		end
+		if previous_entry then break end
+	end
+	if entry_id ~= nil and not previous_entry then return nil, "local API entry identity is not current" end
+	local token = fields.token
+	if token == nil then token = previous_entry and previous_entry.token or "" end
+	local model = fields.model
+	if model == nil then model = previous_entry and previous_entry.model or "" end
+	local base_url = fields.base_url
+	if base_url == nil then
+		base_url = previous_entry and previous_entry.base_url ~= "" and previous_entry.base_url or server.base_url
+	end
+	local entry_provider = previous_entry and previous_entry.provider or provider
+	local dynamic_addresses = dynamic and AuthPolicy.configured_views({ { id = entry_id, provider = entry_provider,
+		base_url = base_url, token = token } }, {}, { [entry_provider] = require("ai.engine.api.api_remote").provider(entry_provider) }) or nil
+	if model == "" or not AuthPolicy.entry_token_allowed(entry_provider, token, base_url, servers)
+		or (not dynamic and not AuthPolicy.entry_matches(entry_provider, base_url, provider, servers))
+		or (dynamic and #dynamic_addresses ~= 1)
+		or not require("ai.engine.api.api_remote").normalize_base_url(base_url) then
+		return nil, "local API model, address or authentication is not supported"
+	end
+	local id = previous_entry and previous_entry.id
+	if not id then
+		local used = {}
+		for _, row in ipairs(current.row_order) do
+			if type(row.raw) == "table" and type(row.raw.id) == "string" then used[row.raw.id] = true end
+		end
+		for _, entry in ipairs(current.entries) do used[entry.id] = true end
+		repeat
+			_sequence = _sequence + 1
+			id = string.format("%s-%d-%d", provider, os.time(), _sequence)
+		until not used[id]
+	end
+	local entry = valid_entry({ id = id, provider = entry_provider, label = previous_entry and previous_entry.label or (provider .. "/" .. model),
+		model = model, token = token, base_url = base_url })
+	if not entry then return nil, "local API entry is not supported" end
+	local previous_active = current.active_id
+	if index then current.entries[index] = entry else current.entries[#current.entries + 1] = entry end
+	local selects = select == true or (select == nil and fields.model ~= nil)
+	if selects then current.active_id = id end
+	-- The captured source is checked before the owner is acquired. Inside this
+	-- synchronous publication, the native owner additionally rechecks admission
+	-- after staging without asking a receipt to validate its own publishing flag.
+	local ok = persist(admit)
+	if not ok then
+		if index then current.entries[index] = previous_entry else table.remove(current.entries) end
+		current.active_id = previous_active
+		return nil, "local API publication was refused"
+	end
+	if selects then current.dangling_active_id = nil end
+	return entry
+end
+
+--- Points the store at another file and forgets the loaded state (tests).
+--- @param path string|nil
+function M._set_path_for_test(path)
+	_path_override = path
+	_state = nil
+end
+
+--- Replaces the private-file primitive (tests on a host without POSIX
+--- permission bits). nil restores the libc one.
+--- @param create function|nil (path, text) -> ok, err; must refuse an existing path.
+function M._set_private_create_for_test(create)
+	_create_private = create
+end
+
+return M

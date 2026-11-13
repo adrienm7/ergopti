@@ -8,7 +8,7 @@
 --- to align model predictions perfectly with the user's active buffer. This is
 --- the canonical cross-driver implementation of the diff-coloring contract:
 --- shared between the Hammerspoon driver and any future Lua-based driver (Linux);
---- the AutoHotkey port is windows/modules/llm/parser.ahk, and both are pinned to
+--- the AutoHotkey port is windows/ai/engine/api/parser.ahk, and both are pinned to
 --- the _shared/tests/corpus/llm/process_prediction_vectors.json golden corpus.
 ---
 --- This module is platform-neutral and reads its fixed shared resource policy

@@ -15,16 +15,16 @@ local STUBBED_MODULES = {
 	"core.events.timer_scheduler",
 	"modules.keymap.utils",
 	"core.text.engine.utils",
-	"modules.llm",
+	"ai.engine",
 	"platform.input.keycodes",
 	"modules.keystats",
 	"core.ui.ui.tooltip",
-	"modules.llm.prediction_engine",
+	"ai.engine.prediction.engine",
 	"settings.engine.registry",
 	"modules.hotstrings.hotstrings_config",
 	"modules.keymap.expander",
 	"menu.engine.manifest_reader",
-	"modules.keymap.llm_bridge",
+	"ai.engine.bridge",
 	"modules.diagnostics.hid_diagnostic_mailbox",
 }
 
@@ -69,7 +69,7 @@ local function load_fixture(options, lifetime)
 		trig_lower = function(value) return tostring(value or ""):lower() end,
 		conform_replacement = function(value) return value end,
 	}
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = false },
 		check_modifiers = function() return false end,
 	}
@@ -98,7 +98,7 @@ local function load_fixture(options, lifetime)
 	}
 	package.loaded["core.ui.ui.tooltip"] = tooltip
 
-	package.loaded["modules.llm.prediction_engine"] = setmetatable({
+	package.loaded["ai.engine.prediction.engine"] = setmetatable({
 		init = function() return true end,
 		set_runtime_guard = function() end,
 		reset = function() engine_resets = engine_resets + 1; return true end,
@@ -122,8 +122,8 @@ local function load_fixture(options, lifetime)
 		default_for = function() return "*" end,
 	}
 
-	package.loaded["modules.keymap.llm_bridge"] = nil
-	local Bridge = require("modules.keymap.llm_bridge")
+	package.loaded["ai.engine.bridge"] = nil
+	local Bridge = require("ai.engine.bridge")
 	lifetime.bridge = Bridge
 	local state = {
 		buffer = "agé",
@@ -138,7 +138,7 @@ local function load_fixture(options, lifetime)
 		is_repeat_feature_enabled = function() return false end,
 	}
 	-- The bridge owns an AI context independent of the hotstring buffer.
-	require("modules.keymap.llm_context").seed(state, state.buffer, "")
+	require("ai.engine.api.context").seed(state, state.buffer, "")
 	helpers.assert_true(Bridge.init(state, {
 		preview_star_enabled = true,
 		preview_autocorrect_enabled = true,

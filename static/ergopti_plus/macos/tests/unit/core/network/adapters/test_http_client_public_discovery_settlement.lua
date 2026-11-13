@@ -10,13 +10,13 @@ local helpers = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
 
 local OWNED_MODULES = {
-	"modules.llm.api_remote", "modules.llm.local_servers", "core.network.adapters.http_client",
+	"ai.engine.api.remote", "ai.engine.local_servers.local_servers", "core.network.adapters.http_client",
 	"core.events.timer_scheduler", "core.logger.engine.logger", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.fs.adapters.json_codec", "ai.engine.local_servers.auth", "ai.engine.local_servers.discovery",
-	"ai.engine.policy.provider_config_policy", "core.text.engine.json", "modules.llm.provider_uses",
-	"core.timing.engine.timings", "core.text.engine.utils", "modules.llm.profiles", "modules.llm.parser",
-	"modules.llm.api_common", "ai.engine.prediction.prompt_builder_core", "modules.llm.api_token_crypto",
-	"modules.llm.progressive_reveal", "modules.llm.remote_response_classifier",
+	"ai.engine.policy.provider_config_policy", "core.text.engine.json", "ai.engine.api.provider_uses",
+	"core.timing.engine.timings", "core.text.engine.utils", "ai.engine.settings.profiles", "ai.engine.api.parser",
+	"ai.engine.api.common", "ai.engine.prediction.prompt_builder_core", "ai.engine.api.token_crypto",
+	"ai.engine.prediction.progressive_reveal", "modules.llm.remote_response_classifier",
 	"ai.engine.api.remote_formats", "modules.keystats", "core.fs.adapters.file_system", "core.network.engine.http_header_policy",
 }
 
@@ -64,19 +64,19 @@ local function isolated(scenario)
 		end
 		-- These owners are outside detection; their module state is explicitly
 		-- scoped and none substitutes the detector, shared sweep or HTTP adapter.
-		for _, name in ipairs({ "core.text.engine.utils", "modules.llm.profiles", "modules.llm.parser",
-			"ai.engine.prediction.prompt_builder_core", "modules.llm.api_token_crypto", "modules.llm.progressive_reveal",
+		for _, name in ipairs({ "core.text.engine.utils", "ai.engine.settings.profiles", "ai.engine.api.parser",
+			"ai.engine.prediction.prompt_builder_core", "ai.engine.api.token_crypto", "ai.engine.prediction.progressive_reveal",
 			"modules.llm.remote_response_classifier", "ai.engine.api.remote_formats", "modules.keystats" }) do
 			package.loaded[name] = {}
 		end
 		package.loaded["core.timing.engine.timings"] = { ms = function() return 1000 end, sec = function() return 1 end }
-		package.loaded["modules.llm.api_common"] = { get_retry_policy = function() return 1, 0, 0 end }
+		package.loaded["ai.engine.api.common"] = { get_retry_policy = function() return 1, 0, 0 end }
 		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path) return SourceFile.read(path), "ok" end,
 		}
-		local api = require("modules.llm.api_remote")
+		local api = require("ai.engine.api.remote")
 		require("tests.support.modules.llm.backends.local_server_scan_fake").install(api)
-		local servers = require("modules.llm.local_servers")
+		local servers = require("ai.engine.local_servers.local_servers")
 		local clients = upvalue(api._probe_local_target, "_local_probe_clients")
 		local scheduler = package.loaded["core.events.timer_scheduler"]
 		local ok, err = xpcall(function() scenario(api, servers, clients, state) end, debug.traceback)

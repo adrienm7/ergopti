@@ -10,7 +10,7 @@
 	"old/kalamine/standard/2.1.0/ergopti.ahk": 1,
 	"old/kalamine/standard/2.1.2/ergopti.ahk": 1,
 	"windows/ErgoptiPlus.ahk": 3,
-	"windows/adapters/llm_nav_event_owner.ahk": 1,
+	"windows/ai/adapters/nav_event_owner.ahk": 1,
 	"windows/core/events/timer_scheduler.ahk": 1,
 	"windows/core/process/adapters/uia_worker.ahk": 1,
 	"windows/infra/hotpath_profiler.ahk": 1,
@@ -18,10 +18,10 @@
 	"windows/modules/dynamic_hotstrings/user_code.ahk": 1,
 	"windows/modules/keymap/layout.ahk": 1,
 	"windows/modules/keystats/keystats.ahk": 1,
-	"windows/modules/llm/ollama_managed_bootstrap.ahk": 1,
+	"windows/ai/engine/ollama/managed_bootstrap.ahk": 1,
 	"windows/modules/shortcuts/win.ahk": 1,
 	"windows/ui/healthcheck/collection.ahk": 2,
-	"windows/ui/menu/menu_llm/menu_api_entries.ahk": 1,
+	"windows/ai/ui/menu/api_entries.ahk": 1,
 	"windows/core/ui/ui/spotlight/ownership.ahk": 1,
 	"windows/core/ui/ui/tooltip/core.ahk": 1
 }

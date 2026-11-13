@@ -152,7 +152,7 @@ Archive.native_ollama_artifact = function(...)
 end
 -- Explicit scripted UI input is isolated from actual engine/profiles/writer.
 -- This fixture does not fabricate a physical keyboard/modal restoration receipt.
-package.loaded["ui.llm_enable_refusal"] = { show = function(origin, rows)
+package.loaded["ai.ui.enable_refusal"] = { show = function(origin, rows)
 	scripted_choices = scripted_choices + 1
 	for _, row in ipairs(rows) do print("EXPLICIT_ROW " .. tostring(row.label)) end
 	local selected
@@ -161,14 +161,14 @@ package.loaded["ui.llm_enable_refusal"] = { show = function(origin, rows)
 	end
 	return true, false, selected
 end }
-Profiles = require("modules.llm.profiles")
+Profiles = require("ai.engine.settings.profiles")
 local original_profile_enable = Profiles.enable
 Profiles.enable = function(...)
 	chronological[#chronological + 1] = { kind = "profile_write", engine = Engine and Engine.is_enabled() or false, profile = Profiles.is_enabled() }
 	return original_profile_enable(...)
 end
-local Preferences = require("infra.llm_preferences")
-Engine = require("modules.llm.prediction_engine")
+local Preferences = require("ai.engine.preferences")
+Engine = require("ai.engine.prediction.engine")
 Engine.init({ is_paused = function() return false end })
 -- Public profile initialization configures this fixture's isolated listener;
 -- source provenance and subsequent publication remain the actual owners.
@@ -186,9 +186,9 @@ package.loaded["core.ui.ui.webview_manager"] = {
 }
 local Json = require("core.text.engine.json")
 local Policy = require("ai.engine.ollama.local_model_policy")
-local Api = require("modules.llm.api_ollama")
-local Download = require("modules.llm.model_download")
-local Offer = require("modules.llm.local_model_offer")
+local Api = require("ai.engine.api.api_ollama")
+local Download = require("ai.engine.local_servers.model_download")
+local Offer = require("ai.engine.ollama.local_model_offer")
 local Window = require("ui.download_window.bridge")
 local model = "granite4:350m-h"
 local model_consents, pull_dispatches, chat_dispatches = 0, 0, 0

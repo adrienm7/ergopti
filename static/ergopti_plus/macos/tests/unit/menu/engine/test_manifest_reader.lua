@@ -153,9 +153,9 @@ end)
 
 helpers.describe("Pure manifest declaration metadata", function()
 	helpers.it("reads a backend declaration before hardware defaults resolve (declared-metadata)", function()
-		helpers.with_stub_scope({ "menu.engine.manifest_reader", "modules.llm.backend_detector" }, function()
+		helpers.with_stub_scope({ "menu.engine.manifest_reader", "ai.engine.api.backend_detector" }, function()
 			local calls = 0
-			package.loaded["modules.llm.backend_detector"] = { auto_default = function()
+			package.loaded["ai.engine.api.backend_detector"] = { auto_default = function()
 				calls = calls + 1
 				return "ollama"
 			end }

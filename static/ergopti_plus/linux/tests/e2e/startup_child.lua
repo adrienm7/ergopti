@@ -319,7 +319,7 @@ package.preload["core.events.loop"] = function()
 	end
 	local inventory_owner, inventory_pending
 	local function settle_inventory(deadline)
-		local profiles = package.loaded["modules.llm.profiles"]
+		local profiles = package.loaded["ai.engine.settings.profiles"]
 		if profiles == nil then
 			assert(inventory_owner == nil, "the inventory owner disappeared during startup")
 			return
@@ -330,11 +330,11 @@ package.preload["core.events.loop"] = function()
 			inventory_owner, inventory_pending = profiles, profiles.model_inventory_pending
 		end
 		local function pending()
-			assert(package.loaded["modules.llm.profiles"] == inventory_owner
+			assert(package.loaded["ai.engine.settings.profiles"] == inventory_owner
 				and inventory_owner.model_inventory_pending == inventory_pending,
 				"the startup inventory owner or pending API changed")
 			local value = inventory_pending()
-			assert(package.loaded["modules.llm.profiles"] == inventory_owner
+			assert(package.loaded["ai.engine.settings.profiles"] == inventory_owner
 				and inventory_owner.model_inventory_pending == inventory_pending,
 				"the startup inventory owner or pending API changed")
 			assert(type(value) == "boolean", "the startup inventory pending acknowledgement must be boolean")

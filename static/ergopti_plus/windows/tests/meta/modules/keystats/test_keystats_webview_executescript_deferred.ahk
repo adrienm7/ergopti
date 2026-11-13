@@ -3,8 +3,8 @@
 ; ==============================================================================
 ; MODULE: Keystats WebView ExecuteScript Deferral Meta Test (F41a)
 ; DESCRIPTION:
-; Same bug already fixed in ui/onboarding/webview.ahk, ui/model_browser/init.ahk,
-; ui/changelog/init.ahk and modules/llm/ollama_webview.ahk: the blocking
+; Same bug already fixed in ui/onboarding/webview.ahk, ai/ui/model_browser/init.ahk,
+; ui/changelog/init.ahk and ai/engine/ollama/webview.ahk: the blocking
 ; ExecuteScript() (== ExecuteScriptAsync().await()) was called directly inside
 ; the WebMessageReceived callback that triggers it (via KLWV_InjectI18n), spinning
 ; a nested message loop that re-enters the STA apartment and wedges further

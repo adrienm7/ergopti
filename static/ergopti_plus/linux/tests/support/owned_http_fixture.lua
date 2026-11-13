@@ -85,7 +85,7 @@ end
 --- @return table port
 --- @return table probes Captured software observations, never native receipts.
 function M.local_discovery(port)
-	local order, servers, published = require("modules.llm.local_server_catalogue").load({})
+	local order, servers, published = require("ai.engine.local_servers.catalogue").load({})
 	assert(published and #order > 0, "fixture local discovery catalogue is unavailable")
 	local probes = {}
 	local controlled = M.attach({ get = function(url, headers, options, done)

@@ -360,7 +360,7 @@ for _PresetProfileId in LLM_PROFILE_BUILTIN_ORDER {
 ; ── The tone ladder on the selection ────────────────────────────────────────
 ;
 ; llm_tone_more_formal / _familiar and their _cycle variants, one per
-; direction x cycle entry of LLM_ToneActions (modules/llm/tone_action.ahk).
+; direction x cycle entry of LLM_ToneActions (ai/engine/prediction/tone_action.ahk).
 for _ToneActionId, _ToneStep in LLM_ToneActions() {
 		GESTURE_ACTIONS[_ToneActionId] := { Fn: _GestureMakeToneRunner(_ToneStep.Direction, _ToneStep.Cycle) }
 }
@@ -368,7 +368,7 @@ for _ToneActionId, _ToneStep in LLM_ToneActions() {
 ; ── Answering what is on the screen ────────────────────────────────────────
 ;
 ; llm_screen_region, llm_screen_full and llm_screen_error, one per entry of
-; LLM_VisionActions (modules/llm/vision_action.ahk); the binding's llm_vision
+; LLM_VisionActions (ai/engine/prediction/vision_action.ahk); the binding's llm_vision
 ; parameter names the vision backend.
 for _VisionActionId, _VisionKind in LLM_VisionActions() {
 		GESTURE_ACTIONS[_VisionActionId] := { Fn: _GestureMakeVisionRunner(_VisionActionId) }

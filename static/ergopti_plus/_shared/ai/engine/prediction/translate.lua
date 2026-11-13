@@ -16,7 +16,7 @@
 ---    which models understand, so no second table of names is kept.
 --- 3. Prompt, tag and token budget live in _shared/ai/data/translate.json.
 ---
---- The AutoHotkey port is windows/modules/llm/translate.ahk. Both are pinned by
+--- The AutoHotkey port is windows/ai/engine/prediction/translate.ahk. Both are pinned by
 --- _shared/tests/corpus/llm/translate_vectors.json.
 --- ==============================================================================
 

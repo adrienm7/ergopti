@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Managed PyObjC Pins And Installer
  * DESCRIPTION:
- * Pins static/ergopti_plus/macos/modules/llm/managed-pyobjc.json, the wheels
+ * Pins static/ergopti_plus/macos/ai/engine/managed-pyobjc.json, the wheels
  * the App Cloner helpers need in Ergopti's managed Python, and runs
  * ensure-managed-pyobjc.sh against fake bootstrap, download and uv ports: the
  * wheels are fetched with their pinned digest and size, installed offline and
@@ -30,9 +30,9 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const LLM = path.join(ROOT, 'static/ergopti_plus/macos/modules/llm');
+const LLM = path.join(ROOT, 'static/ergopti_plus/macos/ai/engine');
 const MANIFEST = path.join(LLM, 'managed-pyobjc.json');
-const SCRIPT = path.join(LLM, 'ensure-managed-pyobjc.sh');
+const SCRIPT = path.join(LLM, 'bootstrap/ensure-managed-pyobjc.sh');
 const LOCATOR = path.join(
 	ROOT,
 	'static/ergopti_plus/_shared/core/lifecycle/engine/core/managed_python_locator.lua'

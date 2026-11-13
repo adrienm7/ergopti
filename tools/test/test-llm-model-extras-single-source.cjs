@@ -45,9 +45,9 @@ const SSOT_FILE = path.join(
 // generically. Test files are excluded: asserting merged output legitimately
 // names fields.
 const SHIPPED = [
-	'static/ergopti_plus/windows/modules/llm/api_remote.ahk',
-	'static/ergopti_plus/macos/modules/llm/api_remote.lua',
-	'static/ergopti_plus/linux/modules/llm/api_remote.lua'
+	'static/ergopti_plus/windows/ai/engine/api/remote.ahk',
+	'static/ergopti_plus/macos/ai/engine/api/remote.lua',
+	'static/ergopti_plus/linux/ai/engine/api/api_remote.lua'
 ];
 
 // Other shipped sources that build or complete request bodies: they may not
@@ -56,10 +56,10 @@ const BODY_SOURCES = [
 	'static/ergopti_plus/_shared/ai/engine/policy/thinking_off.lua',
 	'static/ergopti_plus/_shared/ai/data/thinking_off.ahk',
 	'static/ergopti_plus/_shared/ai/engine/prediction/vision.lua',
-	'static/ergopti_plus/windows/modules/llm/vision.ahk',
-	'static/ergopti_plus/windows/modules/llm/vision_action.ahk',
-	'static/ergopti_plus/windows/modules/llm/agent_action.ahk',
-	'static/ergopti_plus/linux/modules/llm/vision_request.lua'
+	'static/ergopti_plus/windows/ai/engine/prediction/vision.ahk',
+	'static/ergopti_plus/windows/ai/engine/prediction/vision_action.ahk',
+	'static/ergopti_plus/windows/ai/engine/agent/action.ahk',
+	'static/ergopti_plus/linux/ai/engine/prediction/vision_request.lua'
 ];
 
 // Nested thinking_dialect names too generic to be a restated rule (an object's
@@ -248,14 +248,23 @@ for (const [index, family] of families.entries()) {
 // be an expression, never a literal, and its file must reach the resolver.
 const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/modules',
+	'static/ergopti_plus/macos/ai/engine',
 	'static/ergopti_plus/macos/settings/engine',
 	'static/ergopti_plus/macos/ui',
+	'static/ergopti_plus/macos/ai/ui',
 	'static/ergopti_plus/macos/menu/ui',
 	'static/ergopti_plus/macos/settings/ui',
 	'static/ergopti_plus/macos/core/ui/ui',
 	'static/ergopti_plus/macos/core/network',
 	'static/ergopti_plus/linux/modules',
+	'static/ergopti_plus/linux/ai/engine/agent',
+	'static/ergopti_plus/linux/ai/engine/api',
+	'static/ergopti_plus/linux/ai/engine/local_servers',
+	'static/ergopti_plus/linux/ai/engine/ollama',
+	'static/ergopti_plus/linux/ai/engine/prediction',
+	'static/ergopti_plus/linux/ai/engine/settings',
 	'static/ergopti_plus/linux/infra',
+	'static/ergopti_plus/linux/ai/engine',
 	'static/ergopti_plus/linux/menu/engine',
 	'static/ergopti_plus/linux/settings/engine',
 	'static/ergopti_plus/linux/platform/input',
@@ -268,7 +277,7 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/linux/core/i18n/engine',
 	'static/ergopti_plus/linux/core/fs/engine',
 	'static/ergopti_plus/_shared/ai/engine',
-	'static/ergopti_plus/windows/modules/llm'
+	'static/ergopti_plus/windows/ai/engine'
 ];
 
 function sourceFiles(dir) {

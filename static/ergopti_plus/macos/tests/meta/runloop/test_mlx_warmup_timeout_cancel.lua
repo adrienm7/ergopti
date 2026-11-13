@@ -20,11 +20,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("api_mlx: warmup timeout uses TimerScheduler.cancel not :stop() (M-2)", function()
 	local function read_src()
-		-- Selected by a declaration unique to modules/llm/api_mlx.lua rather than by
+		-- Selected by a declaration unique to ai/engine/api/mlx.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function read_user_port_override")
-		helpers.assert_true(src ~= nil, "modules/llm/api_mlx.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "ai/engine/api/mlx.lua source must be locatable")
 		return src
 	end
 

@@ -43,11 +43,11 @@ const SSOT_FILE = path.join(ROOT, 'static/ergopti_plus/_shared/ai/data/defaults.
 // the init sub-file which is the authoritative gate for this invariant.
 const OWNED_KEY = 'llm_ollama_owned_port';
 const FILES = [
-	['static/ergopti_plus/windows/modules/llm/api_ollama/init.ahk', OWNED_KEY],
-	['static/ergopti_plus/windows/ui/menu/menu_llm/_index.ahk', OWNED_KEY],
+	['static/ergopti_plus/windows/ai/engine/api_ollama/init.ahk', OWNED_KEY],
+	['static/ergopti_plus/windows/ai/ui/menu/_index.ahk', OWNED_KEY],
 	// The Ollama port tool moved from the tray's model list to the selector page.
-	['static/ergopti_plus/windows/ui/model_browser/init.ahk', OWNED_KEY],
-	['static/ergopti_plus/windows/ui/menu/menu_llm/menu_settings.ahk', OWNED_KEY]
+	['static/ergopti_plus/windows/ai/ui/model_browser/init.ahk', OWNED_KEY],
+	['static/ergopti_plus/windows/ai/ui/menu/settings.ahk', OWNED_KEY]
 ];
 
 const RETIRED_SYSTEM_INSTALLERS = [

@@ -5,20 +5,20 @@ local helpers = require("tests.helpers")
 local M = {}
 
 local OWNED = {
-	"modules.llm", "modules.llm.api_mlx_fetch", "modules.llm.stream_payload_cleanup",
-	"modules.llm.api_mlx_inference", "modules.llm.api_ollama", "modules.llm.api_common",
-	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
+	"ai.engine", "ai.engine.api.mlx_fetch", "ai.engine.api.stream_payload_cleanup",
+	"ai.engine.api.mlx_inference", "ai.engine.api.ollama", "ai.engine.api.common",
+	"ai.engine.local_servers.mlx_stream_retirement", "ai.engine.ollama.endpoint", "ai.engine.api.parser",
 	"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.network.adapters.http_client", "core.fs.adapters.file_system",
 	"core.logger.engine.logger", "core.ui.engine.notifications", "core.timing.engine.timings", "core.text.engine.utils",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.lifecycle.engine.compat.utf8", "core.text.engine.toml.reader", "core.text.engine.json",
 	"ai.engine.api.parser_core", "core.logger.engine", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
 	"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
-	"adapters.managed_ollama_daemon", "core.process.adapters.owned_program_runner", "core.fs.engine.app_dirs", "settings.engine.publication.defaults",
+	"ai.adapters.managed_ollama_daemon", "core.process.adapters.owned_program_runner", "core.fs.engine.app_dirs", "settings.engine.publication.defaults",
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.ollama_runtime_choice", "hotstrings.engine.catalogue.personal_files",
-	"menu.engine.manifest_reader", "ai.engine.ollama.local_model_policy", "ai.engine.settings.profile_selector", "modules.llm.network_env",
-	"modules.llm.ollama_binary", "modules.llm.ollama_server_command", "modules.llm.opaque_network_admission",
-	"modules.llm.profiles", "modules.llm.progressive_reveal", "platform.remap.lease_helper",
+	"menu.engine.manifest_reader", "ai.engine.ollama.local_model_policy", "ai.engine.settings.profile_selector", "ai.engine.api.network_env",
+	"ai.engine.ollama.binary", "ai.engine.ollama.server_command", "ai.engine.api.opaque_network_admission",
+	"ai.engine.settings.profiles", "ai.engine.prediction.progressive_reveal", "platform.remap.lease_helper",
 }
 
 
@@ -36,7 +36,7 @@ function M.with_stream(backend, callback)
 		local defaults_file = assert(io.open(helpers.shared("ai/data/defaults.json"), "rb"))
 		local defaults_raw = assert(defaults_file:read("*a")); assert(defaults_file:close())
 		local defaults = assert(require("core.text.engine.json").decode(defaults_raw))
-		package.loaded["modules.llm"] = { DEFAULT_STATE = defaults }
+		package.loaded["ai.engine"] = { DEFAULT_STATE = defaults }
 		local scheduler = { now = function() return 0 end }
 		function scheduler.after(delay, callback_fn)
 			local timer = { delay = delay, callback = callback_fn, active = true, timer = {} }
@@ -48,10 +48,10 @@ function M.with_stream(backend, callback)
 		package.loaded["core.events.timer_scheduler"] = scheduler
 		local api, ctx
 		if backend == "ollama" then
-			api = helpers.load_with_stubs("modules.llm.api_ollama")
+			api = helpers.load_with_stubs("ai.engine.api.ollama")
 		else
-			local inference = helpers.load_with_stubs("modules.llm.api_mlx_inference")
-			local retirement = require("modules.llm.mlx_stream_retirement")
+			local inference = helpers.load_with_stubs("ai.engine.api.mlx_inference")
+			local retirement = require("ai.engine.local_servers.mlx_stream_retirement")
 			ctx = { stream = { generation = 0 },
 				completions_endpoint = function() return "http://127.0.0.1/v1/completions" end,
 				chat_endpoint = function() return "http://127.0.0.1/v1/chat/completions" end,
@@ -64,7 +64,7 @@ function M.with_stream(backend, callback)
 				return retirement.cancel(ctx.stream, ctx.stream.task)
 			end
 			inference.init(ctx)
-			api = require("modules.llm.api_mlx_fetch")
+			api = require("ai.engine.api.mlx_fetch")
 			api.init({ post_and_parse = inference.post_and_parse,
 				post_and_parse_streaming = inference.post_and_parse_streaming,
 				dedup_enabled = inference.DEDUPLICATION_ENABLED })

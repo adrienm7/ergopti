@@ -365,28 +365,28 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.managed_ollama_hint",
+		id       = "ai.adapters.managed_ollama_hint",
 		contract = { "get", "cancel" },
 		-- Structural dispatch wiring; source and image admission stay independent.
 		wired    = true,
 	},
 	{
-		id       = "adapters.managed_ollama_bootstrap",
+		id       = "ai.adapters.managed_ollama_bootstrap",
 		contract = { "prepare" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.managed_ollama_daemon",
+		id       = "ai.adapters.managed_ollama_daemon",
 		contract = { "new", "prepare" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.native_python_probe",
+		id       = "ai.adapters.native_python_probe",
 		contract = { "get", "cancel", "onSettled" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.native_bootstrap_pty",
+		id       = "ai.adapters.native_bootstrap_pty",
 		contract = { "prepare" },
 		wired    = true,
 	},
@@ -397,7 +397,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.prediction_tooltip_port",
+		id       = "ai.adapters.prediction_tooltip_port",
 		contract = { "wrap" },
 		wired    = true,
 	},
@@ -567,7 +567,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.python_interpreter",
+		id       = "ai.adapters.python_interpreter",
 		contract = { "resolve", "inspect", "native_arch", "parse_header" },
 		wired    = true,
 	},
@@ -666,7 +666,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.managed_ollama_pull",
+		id       = "ai.adapters.managed_ollama_pull",
 		contract = {
 			"handles", "prepare", "prepare_owned", "mark_start_attempted",
 			"rollback", "retire", "prepare_cleanup", "finish_cleanup",

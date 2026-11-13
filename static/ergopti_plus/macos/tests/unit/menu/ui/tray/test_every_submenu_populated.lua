@@ -258,7 +258,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		-- The AI title carries the health dot the manifest declares; the key
 		-- identity is the title without it.
 		local dots = {}
-		local MenuLayout = require("ui.menu.menu_llm.menu_layout")
+		local MenuLayout = require("ai.ui.menu.layout")
 		for _, status in ipairs({ "ready", "warming", "unreachable" }) do
 			dots[#dots + 1] = MenuLayout.title_health_dot(status)
 		end

@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- @return table offer, table record
 local function load(answer)
 	local record = { dialogs = {}, spawns = {} }
-	local offer = helpers.load_with_stubs("ui.python_runtime_offer")
+	local offer = helpers.load_with_stubs("ai.ui.python_runtime_offer")
 	package.loaded["core.ui.engine.dialog_util"] = {
 		choose = function(title, message, choices, cancel_label)
 			record.dialogs[#record.dialogs + 1] = { title = title, message = message, choices = choices,
@@ -47,7 +47,7 @@ end
 
 -- Modules the doubles replace; every test restores them (suite order).
 local OWNED = {
-	"ui.python_runtime_offer", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work", "core.process.adapters.shell_runner", "core.i18n.engine.i18n",
+	"ai.ui.python_runtime_offer", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work", "core.process.adapters.shell_runner", "core.i18n.engine.i18n",
 }
 
 --- Runs one case with the doubled modules restored afterwards.

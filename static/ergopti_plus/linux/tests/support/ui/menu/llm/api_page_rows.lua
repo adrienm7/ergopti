@@ -4,7 +4,7 @@
 --- MODULE: API Page Rows In Transaction-Test Shape
 --- DESCRIPTION:
 --- The API entries left the tray for the model selector page on 2026-10-27
---- (ui/menu/llm_backend_rows.lua api_page). The transaction suites written for
+--- (ai/ui/menu/backend_rows.lua api_page). The transaction suites written for
 --- the tray rows read labels and actions; this adapter lays the page's real
 --- closures out in that shape — each entry (chat: selectable; other: its Test
 --- and Remove), the active entry's Test and Remove, and one "➕ provider" row

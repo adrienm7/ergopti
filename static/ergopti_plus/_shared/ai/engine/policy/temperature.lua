@@ -17,7 +17,7 @@
 --- 3. The result never exceeds the policy's maximum.
 ---
 --- The AutoHotkey twin is LLM_ApiCommon_GetDiversityTemp in
---- windows/modules/llm/api_common.ahk. Pinned by
+--- windows/ai/engine/api/common.ahk. Pinned by
 --- _shared/tests/corpus/llm/temperature_vectors.json.
 --- ==============================================================================
 

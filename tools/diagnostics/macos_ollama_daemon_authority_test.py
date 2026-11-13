@@ -25,17 +25,18 @@ def load(name, path):
 
 AUTH = load(
     "native_daemon_authority",
-    ROOT / "static/ergopti_plus/macos/platform/ollama_daemon_authority.py",
+    ROOT / "static/ergopti_plus/macos/ai/adapters/ollama_daemon_authority.py",
 )
 BOOT = load(
-    "native_daemon_bootstrap", ROOT / "static/ergopti_plus/macos/platform/ollama_bootstrap_owner.py"
+    "native_daemon_bootstrap",
+    ROOT / "static/ergopti_plus/macos/ai/adapters/ollama_bootstrap_owner.py",
 )
 PROXY = load(
     "daemon_proxy",
     SOURCE / "static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py",
 )
 ALIASES = load(
-    "daemon_alias_owner", SOURCE / "static/ergopti_plus/macos/platform/source_alias_owner.py"
+    "daemon_alias_owner", SOURCE / "static/ergopti_plus/macos/ai/adapters/source_alias_owner.py"
 )
 
 

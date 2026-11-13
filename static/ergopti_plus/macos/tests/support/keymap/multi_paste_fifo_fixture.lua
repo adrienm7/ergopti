@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.synthetic_input_fixture")
 local M = {}
 local OWNED = {
-	"adapters.clipboard", "adapters.event_provenance", "adapters.python_interpreter",
+	"adapters.clipboard", "adapters.event_provenance", "ai.adapters.python_interpreter",
 	"platform.focus.secure_field_detector", "core.fs.adapters.storage", "platform.input.synthetic_input",
 	"platform.input.text_sender", "core.events.timer_scheduler", "core.ui.adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",

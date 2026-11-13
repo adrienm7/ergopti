@@ -71,11 +71,11 @@ local function build_world()
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	for _, name in ipairs({
-		"modules.llm", "modules.llm.profiles", "modules.llm.api_remote", "modules.llm.api_ollama",
-		"modules.llm.api_mlx", "modules.llm.parser", "modules.llm.prompt_builder",
-		"modules.llm.streaming_handler", "modules.llm.warmup_controller", "modules.llm.app_filter",
-		"modules.llm.api_common", "modules.llm.prediction_engine", "modules.llm.progressive_reveal",
-		"modules.llm.screen_answer",
+		"ai.engine", "ai.engine.settings.profiles", "ai.engine.api.remote", "ai.engine.api.ollama",
+		"ai.engine.api.mlx", "ai.engine.api.parser", "ai.engine.prediction.prompt_builder",
+		"ai.engine.api.streaming_handler", "ai.engine.local_servers.warmup_controller", "ai.engine.prediction.app_filter",
+		"ai.engine.api.common", "ai.engine.prediction.engine", "ai.engine.prediction.progressive_reveal",
+		"ai.engine.prediction.screen_answer",
 	}) do
 		package.loaded[name] = nil
 	end
@@ -140,7 +140,7 @@ local function build_world()
 		screen_frame_under_cursor = function() return { x = 1512, y = 0, w = 1920, h = 1080.5 } end,
 	}
 
-	local core = require("modules.llm")
+	local core = require("ai.engine")
 	world.core = core
 	local CoreState = get_upvalue(core.get_active_profile, "CoreState")
 	assert(type(CoreState) == "table", "the LLM core state must be reachable")
@@ -173,7 +173,7 @@ local function build_world()
 	local vision = get_upvalue(api.request_vision, "_vision_client")
 	assert(type(vision) == "table", "the remote vision owner must be reachable")
 	vision.post = capture_into(world.vision_posts)
-	local ollama = require("modules.llm.api_ollama")
+	local ollama = require("ai.engine.api.ollama")
 	local local_vision = get_upvalue(ollama.request_vision, "_vision_client")
 	assert(type(local_vision) == "table", "the local vision owner must be reachable")
 	local_vision.post = capture_into(world.local_posts)
@@ -181,13 +181,13 @@ local function build_world()
 		world.local_gets[#world.local_gets + 1] = { url = url, headers = headers, callback = callback }
 		return true
 	end
-	local offer = require("modules.llm.local_model_offer")
+	local offer = require("ai.engine.ollama.local_model_offer")
 	offer.set_installer(function(model)
 		world.installs[#world.installs + 1] = model
 		return true
 	end)
 
-	local engine = require("modules.llm.prediction_engine")
+	local engine = require("ai.engine.prediction.engine")
 	world.engine = engine
 	engine.init({
 		buffer = "",
@@ -199,13 +199,13 @@ local function build_world()
 		suppress_rescan_keep_buffer = function() end,
 	})
 	engine.set_llm_enabled(true)
-	world.flow = require("modules.llm.screen_answer")
+	world.flow = require("ai.engine.prediction.screen_answer")
 	package.loaded["modules.keymap"] = {
 		request_screen_answers = function(value, mode, parent, answers)
 			return world.flow.run(value, mode, parent, answers)
 		end,
 	}
-	world.language = require("modules.llm.profiles").prompt_language()
+	world.language = require("ai.engine.settings.profiles").prompt_language()
 	return world
 end
 

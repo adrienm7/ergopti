@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Regression guard for two hardcoded-French sites that bypassed i18n despite
 ; it being fully initialized at both call sites: core/ui/engine/style.ahk's
-; fatal-startup MsgBox, and ui/menu/menu_llm/actions.ahk's install TrayTip
+; fatal-startup MsgBox, and ai/ui/menu/actions.ahk's install TrayTip
 ; (3 call sites — the warning-row click handler's title/launching/error, and
 ; the debug hotkey's title/launching).
 ; ==============================================================================
@@ -25,11 +25,11 @@ _MetaUiStyleAndLlmTrayI18n() {
 	Assert(InStr(Src, 't("dialog.fatal_error.toml_not_found")') > 0,
 		'UiStyle_LoadSharedConst`'s missing-file branch must use t("dialog.fatal_error.toml_not_found")')
 
-	; ui/menu/menu_llm/actions.ahk must not hardcode the French install TrayTip.
+	; ai/ui/menu/actions.ahk must not hardcode the French install TrayTip.
 	Assert(!InStr(Src, "Lancement de l'installation Ollama"),
-		'ui/menu/menu_llm/actions.ahk must not hardcode the French install TrayTip — use t("llm.deps.install_launching")')
+		'ai/ui/menu/actions.ahk must not hardcode the French install TrayTip — use t("llm.deps.install_launching")')
 	Assert(!InStr(Src, "Installation Ollama (déclenchée par raccourci)"),
-		'ui/menu/menu_llm/actions.ahk`'s debug hotkey must not hardcode French — use t("llm.deps.install_launching_hotkey")')
+		'ai/ui/menu/actions.ahk`'s debug hotkey must not hardcode French — use t("llm.deps.install_launching_hotkey")')
 	Assert(InStr(Src, 't("llm.deps.tray_title")') > 0,
 		'menu_llm/actions.ahk`'s install TrayTip title must use t("llm.deps.tray_title") instead of the hardcoded "Ergopti — IA"')
 }

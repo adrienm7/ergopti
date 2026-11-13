@@ -308,7 +308,7 @@ local function with_registered_personal_sections(frame, scenario, posture)
 	local scoped, scope_error = pcall(helpers.with_stub_scope, {
 		"modules.keymap", "modules.keymap.init", "modules.keymap.state",
 		"settings.engine.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-		"modules.keymap.utils", "modules.keymap.expander", "modules.keymap.llm_bridge",
+		"modules.keymap.utils", "modules.keymap.expander", "ai.engine.bridge",
 		"modules.keymap.terminator_replay", "infra.personal_hotstrings", "settings.engine.preferences.personal_file_controls",
 	}, function()
 		local lfs = require("lfs")

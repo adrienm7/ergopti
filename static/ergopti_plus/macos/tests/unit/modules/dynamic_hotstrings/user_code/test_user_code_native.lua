@@ -10,8 +10,8 @@ local helpers = require("tests.helpers")
 local SyntheticStack = require("tests.support.synthetic_input_stack")
 
 local OWNED = {
-	"modules.keymap", "modules.keymap.state", "modules.keymap.expander", "modules.keymap.llm_bridge",
-	"modules.keystats", "modules.llm", "modules.llm.prediction_engine", "core.ui.ui.tooltip",
+	"modules.keymap", "modules.keymap.state", "modules.keymap.expander", "ai.engine.bridge",
+	"modules.keystats", "ai.engine", "ai.engine.prediction.engine", "core.ui.ui.tooltip",
 	"modules.dynamic_hotstrings.user_code", "modules.dynamic_hotstrings.rules_engine",
 	"modules.dynamic_hotstrings", "modules.dynamic_hotstrings.personal_info",
 	"ui.menu.programmatic_hotstrings", "core.ui.engine.dialog_util", "core.process.adapters.shell_runner",
@@ -63,9 +63,9 @@ local function with_native(body)
 			return fixture.state
 		end }
 		package.loaded["modules.keystats"] = setmetatable({}, { __index = function() return function() end end })
-		package.loaded["modules.llm"] = { DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = false },
+		package.loaded["ai.engine"] = { DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = false },
 			check_modifiers = function() return false end }
-		package.loaded["modules.llm.prediction_engine"] = setmetatable({
+		package.loaded["ai.engine.prediction.engine"] = setmetatable({
 			init = function() return true end, get_llm_enabled = function() return false end,
 			reset = function() return true end, is_visible = function() return false end,
 		}, { __index = function() return function() end end })

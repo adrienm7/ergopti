@@ -205,7 +205,11 @@ try {
 	}
 
 	for (const driver of DRIVERS) {
-		const scanRoot = path.join(sourceRoot, driver, ...(driver === 'windows' ? [] : ['ui', 'menu']));
+		const scanRoot = path.join(
+			sourceRoot,
+			driver,
+			...(driver === 'windows' ? [] : ['ui', 'menu', 'ai'])
+		);
 		reset();
 		fs.renameSync(scanRoot, scanRoot + '-wrong');
 		refusesBoth(/mandatory source root must exist/);
@@ -431,7 +435,7 @@ try {
 	write('static/ergopti_plus/' + RETIRED, 'return {}\n');
 	refusesBoth(/retired production source must remain absent/);
 	reset();
-	fs.rmSync(path.join(sourceRoot, 'macos/ui/menu/menu_llm/init.lua'));
+	fs.rmSync(path.join(sourceRoot, 'macos/ai/ui/menu/init.lua'));
 	refusesBoth(/source coverage .* is incomplete/);
 
 	reset();

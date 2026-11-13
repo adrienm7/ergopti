@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"core.logger.engine.logger", "adapters.field_check_ports", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
-	"platform.remap.lease_helper", "modules.llm.network_env",
+	"platform.remap.lease_helper", "ai.engine.api.network_env",
 }
 local ORIGINS = { "https://registry.ollama.ai", "https://blob.ollama.example" }
 
@@ -126,7 +126,7 @@ local function run(script, launcher)
 		package.loaded["platform.remap.lease_helper"] = {
 			resolve = function() return launcher, nil, { LAUNCHER = "1" } end,
 		}
-		package.loaded["modules.llm.network_env"] = {
+		package.loaded["ai.engine.api.network_env"] = {
 			route_origins = function() return ORIGINS end,
 			route_lookup_budget_seconds = function() return 20 end,
 		}

@@ -1,5 +1,5 @@
 {
-	"_comment": "Rows of one API entry in the model selector page: the ids a provider listing yields, and the plan drawn from a listing or its fallback. _shared/ai/engine/api/model_listing.lua (macOS and Linux unit suites) and its port in windows/modules/llm/api_remote.ahk (AHK suite) each replay this corpus; tools/test/test-model-selector-page.cjs checks that all three do.",
+	"_comment": "Rows of one API entry in the model selector page: the ids a provider listing yields, and the plan drawn from a listing or its fallback. _shared/ai/engine/api/model_listing.lua (macOS and Linux unit suites) and its port in windows/ai/engine/api/remote.ahk (AHK suite) each replay this corpus; tools/test/test-model-selector-page.cjs checks that all three do.",
 	"max_models": 200,
 	"max_id_length": 200,
 	"max_entries": 16,

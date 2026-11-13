@@ -1,5 +1,5 @@
 {
-	"_comment": "Identifiers the model selector page accepts when the user adds a model, and the ones it refuses. The page, _shared/ai/engine/local_servers/model_identifier.lua and windows/modules/llm/models.ahk each validate this corpus (tools/test/test-model-selector-page.cjs, the macOS and Linux unit suites, the AHK suite).",
+	"_comment": "Identifiers the model selector page accepts when the user adds a model, and the ones it refuses. The page, _shared/ai/engine/local_servers/model_identifier.lua and windows/ai/engine/settings/models.ahk each validate this corpus (tools/test/test-model-selector-page.cjs, the macOS and Linux unit suites, the AHK suite).",
 	"ollama": {
 		"valid": [
 			"qwen3:4b",

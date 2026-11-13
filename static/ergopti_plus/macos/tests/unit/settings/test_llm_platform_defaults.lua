@@ -6,7 +6,7 @@ local Codec = require("core.text.engine.toml_codec")
 
 helpers.describe("LLM hardware defaults", function()
 	helpers.it("does not probe hardware for metadata or unrelated configuration values", function()
-		package.loaded["modules.llm.backend_detector"], package.loaded["menu.engine.manifest_reader"] = nil, nil
+		package.loaded["ai.engine.api.backend_detector"], package.loaded["menu.engine.manifest_reader"] = nil, nil
 		local probes = 0
 		local manifest = helpers.load_with_stubs("menu.engine.manifest_reader", { execute = function()
 			probes = probes + 1; return "arm64"
@@ -28,7 +28,7 @@ helpers.describe("LLM hardware defaults", function()
 		helpers.assert_eq(probes, count, "one resolved owner is reused by every projection")
 	end)
 	helpers.it("resolves each backend value projection through the existing hardware owner", function()
-		local saved = package.loaded["modules.llm.backend_detector"]
+		local saved = package.loaded["ai.engine.api.backend_detector"]
 		local projections = {
 			function(m) m.default_for("llm.models.selected") end,
 			function(m) m.recommended_for("llm.models.selected") end,
@@ -42,7 +42,7 @@ helpers.describe("LLM hardware defaults", function()
 		local ok, err = pcall(function()
 			for index, project in ipairs(projections) do
 				local calls = 0
-				package.loaded["modules.llm.backend_detector"] = { auto_default = function()
+				package.loaded["ai.engine.api.backend_detector"] = { auto_default = function()
 					calls = calls + 1; return "ollama"
 				end }
 				package.loaded["menu.engine.manifest_reader"] = nil
@@ -54,17 +54,17 @@ helpers.describe("LLM hardware defaults", function()
 				helpers.assert_eq(calls, 1)
 			end
 		end)
-		package.loaded["modules.llm.backend_detector"] = saved
+		package.loaded["ai.engine.api.backend_detector"] = saved
 		package.loaded["menu.engine.manifest_reader"] = nil
 		if not ok then error(err, 0) end
 	end)
 	for _, case in ipairs({ { "x86_64", "ollama", "14.5" }, { "arm64", "mlx", "14.5" }, { "arm64", "ollama", "12.0" } }) do
 		helpers.it("keeps bootstrap, scoped deletion and sparse persistence coherent on " .. case[1] .. "/" .. case[3], function()
-			package.loaded["modules.llm.backend_detector"] = nil
+			package.loaded["ai.engine.api.backend_detector"] = nil
 			package.loaded["menu.engine.manifest_reader"] = nil
 			local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences", { execute = function(command) if command:find("sw_vers", 1, true) then return case[3] end; return case[1] end })
 			local manifest = require("menu.engine.manifest_reader")
-			local menu = require("ui.menu.menu_llm")
+			local menu = require("ai.ui.menu")
 			helpers.assert_eq(menu.DEFAULT_STATE.llm_backend, case[2])
 			helpers.assert_eq(manifest.default_for("llm.models.selected"), case[2])
 			helpers.assert_eq(manifest.recommended_for("llm.models.selected"), case[2])

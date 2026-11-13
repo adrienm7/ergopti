@@ -18,10 +18,10 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '../..');
 const windows = path.join(root, 'static/ergopti_plus/windows');
-const menu = fs.readFileSync(path.join(windows, 'ui/menu/menu_llm/menu_api_entries.ahk'), 'utf8');
-const remote = fs.readFileSync(path.join(windows, 'modules/llm/api_remote.ahk'), 'utf8');
+const menu = fs.readFileSync(path.join(windows, 'ai/ui/menu/api_entries.ahk'), 'utf8');
+const remote = fs.readFileSync(path.join(windows, 'ai/engine/api/remote.ahk'), 'utf8');
 const suite = fs.readFileSync(
-	path.join(windows, 'tests/unit/modules/llm/api/test_llm_api_add_production.ahk'),
+	path.join(windows, 'tests/unit/ai/api/test_add_production.ahk'),
 	'utf8'
 );
 

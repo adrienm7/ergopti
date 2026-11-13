@@ -1,0 +1,152 @@
+--- ai/engine/ollama/server_command.lua
+
+--- ==============================================================================
+--- MODULE: Ollama Server Command Builder
+--- DESCRIPTION:
+--- Builds the long-lived Ollama server command shared by the API and
+--- model-manager launch paths. The stock pipeline captures only the stable log
+--- directory and resolves the dated ErgoptiPlus filename for every output line,
+--- so a daemon that survives midnight follows the logger's daily rollover.
+--- The optional managed daemon uses its foreground source owner and original
+--- inherited network settings. Stock serving starts with the system network
+--- settings (ai/engine/api/network_env.lua), since Ollama reads only its own
+--- relay variables and a managed network lets nothing else out. A relay that
+--- demands an NTLM or Negotiate sign-in is answered by Ergopti's local relay
+--- (run_with_proxy_sign_in_relay in ../bootstrap/network-retry.sh,
+--- docs/design/proxy-auth-relay.md), with deadlines from the timings registry.
+--- A refused sign-in starts it without the proxy and leaves a receipt
+--- (ai/engine/api/proxy_relay_receipt.lua) that refuses the pull.
+--- ==============================================================================
+
+local M = {}
+
+local text_utils = require("core.text.engine.utils")
+local AppDirs    = require("core.fs.engine.app_dirs")
+local NetworkEnv = require("ai.engine.api.network_env")
+local NativePath = require("core.fs.engine.native_path")
+local Timings    = require("core.timing.engine.timings")
+
+-- The daemon appends to the same dated file the logger names, so the prefix
+-- and extension come from the one registry that names it.
+local DAILY_LOG_PREFIX = AppDirs.files.unified_prefix
+local DAILY_LOG_SUFFIX = AppDirs.files.extension
+local STAMP_FORMAT = "+%Y-%m-%d %H:%M:%S"
+local OLLAMA_HOST = "127.0.0.1"
+local OLLAMA_PORT_MIN, OLLAMA_PORT_MAX = 1024, 65535
+
+-- The registry and its blob redirect hosts are the origins whose automatic route the
+-- launcher resolves (PAC, WPAD); the pull that asks the daemon uses the same.
+M.NETWORK_OPTIONS = { pac_probe_client = "ollama" }
+
+--- Resolves a POSIX parent directory from the Logger's current unified path.
+--- Only the directory is retained by the daemon; the dated filename is rebuilt
+--- at write time inside the shell loop.
+--- @param unified_log_file string Logger.today_log_path() at launch.
+--- @return string|nil log_dir
+--- @return string|nil error_message
+local function resolve_log_dir(unified_log_file)
+	if type(unified_log_file) ~= "string" or unified_log_file == "" then
+		return nil, "unified log path is absent"
+	end
+	local log_dir = NativePath.dirname(unified_log_file)
+	if type(log_dir) ~= "string" or log_dir == "" then
+		return nil, "unified log path has no POSIX parent directory"
+	end
+	return log_dir, nil
+end
+
+--- Builds the source-admitted optional server command without rewriting relays.
+--- @param executable string Exact native managed candidate.
+--- @param port integer Canonical local port.
+--- @return string|nil command Managed source owner invocation.
+--- @return string|nil reason Fixed internal preparation failure.
+local function managed_service(executable, port, log_dir)
+	local Binary = require("ai.engine.ollama.binary")
+	local candidate, budgets = Binary.native_candidate()
+	if executable ~= candidate then return nil, "managed runtime selection is unavailable" end
+	local Python = require("ai.engine.bootstrap.managed_native_python")
+	local FileSystem = require("core.fs.adapters.file_system")
+	local python = Python.resolve()
+	local source = debug.getinfo(1, "S").source:sub(2)
+	local driver = source:match("^(.*)/ai/engine/ollama/server_command%.lua$")
+	if not python or not driver then return nil, "managed native daemon admission is unavailable" end
+	local script = driver .. "/ai/engine/ollama/managed_ollama_serve.py"
+	if not FileSystem.exists(script) then return nil, "managed native daemon owner is unavailable" end
+	local admission, idle, retirement = budgets and budgets.admission, budgets and budgets.idle, budgets and budgets.retirement
+	if not admission or not idle or not retirement then return nil, "managed native budgets are unavailable" end
+	return text_utils.shell_quote(python) .. " -IB " .. text_utils.shell_quote(script)
+		.. " --log-directory " .. text_utils.shell_quote(log_dir) .. " --port " .. string.format("%.0f", port)
+		.. " --timeout " .. string.format("%.0f", admission)
+		.. " --idle-timeout " .. string.format("%.0f", idle)
+		.. " --retirement-timeout " .. string.format("%.0f", retirement), nil
+end
+
+--- Builds the foreground `ollama serve` pipeline.
+--- @param ollama_bin string Absolute Ollama executable path.
+--- @param unified_log_file string Logger.today_log_path() at launch.
+--- @param port integer Canonical configured Ollama port.
+--- @param source_kind string|nil Explicit provisional resolver classification.
+--- @param caller_nonce string|nil Opt-in exact-task lifecycle binding; never grants source authority.
+--- @return string|nil command
+--- @return string|nil error_message
+function M.build(ollama_bin, unified_log_file, port, source_kind, caller_nonce)
+	if type(ollama_bin) ~= "string" or ollama_bin == "" then
+		return nil, "Ollama executable path is absent"
+	end
+	port = tonumber(port)
+	if type(port) ~= "number" or port % 1 ~= 0
+		or port < OLLAMA_PORT_MIN or port > OLLAMA_PORT_MAX then
+		return nil, "Ollama port is outside the supported range"
+	end
+	local log_dir, dir_err = resolve_log_dir(unified_log_file)
+	if not log_dir then return nil, dir_err end
+	local Binary = require("ai.engine.ollama.binary")
+	if caller_nonce ~= nil then
+		if type(caller_nonce) ~= "string" or #caller_nonce ~= 32
+			or not caller_nonce:match("^[0-9a-f]+$") then
+			return nil, "managed daemon caller nonce is invalid"
+		end
+		if type(Binary.SOURCE_NATIVE_MANAGED) ~= "string" or source_kind ~= Binary.SOURCE_NATIVE_MANAGED then
+			return nil, "managed daemon caller requires its native source owner"
+		end
+	end
+	if type(Binary.SOURCE_NATIVE_MANAGED) == "string" and source_kind == Binary.SOURCE_NATIVE_MANAGED then
+		local service, service_err = managed_service(ollama_bin, port, log_dir)
+		if not service then return nil, service_err end
+		if caller_nonce ~= nil then
+			service = service .. " --caller-nonce " .. text_utils.shell_quote(caller_nonce) .. " --acquire-readiness --owned-stdin"
+		end
+		-- The source owner must remain the foreground process. A log pipeline's
+		-- last successful write cannot turn a guarded refusal into exit zero.
+		return "exec " .. service, nil
+	end
+	-- The daemon reads only HTTPS_PROXY: under a company PAC the launcher names
+	-- the route for the registry it pulls from, and a lookup that fails leaves
+	-- the daemon to start anyway, for the models already on disk.
+	local network, network_err = NetworkEnv.prelude("OLLAMA-SERVER", M.NETWORK_OPTIONS)
+	if not network then return nil, network_err end
+	local refusal_file = require("ai.engine.api.proxy_relay_receipt").path()
+
+	return table.concat({
+		network,
+		"LOG_DIR=", text_utils.shell_quote(log_dir), "; ",
+		"ERGOPTI_PROXY_RELAY_REFUSAL_FILE=", text_utils.shell_quote(refusal_file or ""), "; ",
+		"ERGOPTI_PROXY_RELAY_DIAL_MS=", string.format("%.0f", Timings.ms("adapters", "proxy_relay_dial_timeout_ms")), "; ",
+		"ERGOPTI_PROXY_RELAY_HANDSHAKE_MS=", string.format("%.0f", Timings.ms("adapters", "proxy_relay_handshake_timeout_ms")), "; ",
+		"ERGOPTI_PROXY_RELAY_IDLE_MS=", string.format("%.0f", Timings.ms("adapters", "proxy_relay_idle_timeout_ms")), "; ",
+		-- /usr/bin/env carries the bind address into the child the relay may own.
+		"run_with_proxy_sign_in_relay /usr/bin/env ",
+		"OLLAMA_HOST=", text_utils.shell_quote(OLLAMA_HOST .. ":" .. tostring(port)), " ",
+		text_utils.shell_quote(ollama_bin), " serve 2>&1 | ",
+		"while IFS= read -r LINE || [ -n \"$LINE\" ]; do ",
+		"STAMP=\"$(date '", STAMP_FORMAT, "')\"; ",
+		"LOG_DATE=\"${STAMP%% *}\"; ",
+		"LOG_TIME=\"${STAMP#* }\"; ",
+		"if ! printf '%s [OLLAMA-SERVER] %s\\n' \"$LOG_TIME\" \"$LINE\" ",
+		">> \"$LOG_DIR/", DAILY_LOG_PREFIX, "${LOG_DATE}", DAILY_LOG_SUFFIX, "\"; then ",
+		"printf '%s\\n' 'Ollama log append failed.' >&2; exit 1; fi; ",
+		"done",
+	}), nil
+end
+
+return M

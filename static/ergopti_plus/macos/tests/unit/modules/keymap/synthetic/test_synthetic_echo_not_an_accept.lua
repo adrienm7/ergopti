@@ -39,7 +39,7 @@ local function load_fixture()
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
-			or name:match("^modules%.llm")
+			or name:match("^ai%.engine")
 			or name == "platform.input.synthetic_input"
 			or name == "adapters.event_provenance"
 		) then
@@ -65,7 +65,7 @@ local function load_fixture()
 	}, {
 		__index = function() return function() end end,
 	})
-	package.loaded["modules.keymap.llm_bridge"] = llm
+	package.loaded["ai.engine.bridge"] = llm
 
 	package.loaded["tests.stubs.hs"] = nil
 	local base_hs = require("tests.stubs.hs")

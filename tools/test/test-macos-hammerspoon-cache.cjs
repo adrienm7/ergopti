@@ -43,7 +43,7 @@ function shellFunction(name, source = BUILD) {
 
 // The build sources the shared digest owner; the replay runs the real one.
 const NETWORK_RETRY = fs.readFileSync(
-	path.join(ROOT, 'static/ergopti_plus/macos/modules/llm/network-retry.sh'),
+	path.join(ROOT, 'static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh'),
 	'utf8'
 );
 

@@ -26,8 +26,10 @@ def load(name, path):
     return value
 
 
-PORT = load("hint_port", ROOT / "static/ergopti_plus/macos/platform/ollama_hint_metadata.py")
-ENTRY = load("hint_entry", ROOT / "static/ergopti_plus/macos/modules/llm/managed_ollama_hint.py")
+PORT = load("hint_port", ROOT / "static/ergopti_plus/macos/ai/adapters/ollama_hint_metadata.py")
+ENTRY = load(
+    "hint_entry", ROOT / "static/ergopti_plus/macos/ai/engine/ollama/managed_ollama_hint.py"
+)
 VECTORS = load("hint_original_vectors", SOURCE / "tools/test/managed_ollama_runtime_policy_test.py")
 
 
@@ -283,8 +285,8 @@ class IsolatedBytecodeControls(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             copied = Path(temporary)
             paths = (
-                "static/ergopti_plus/macos/modules/llm/managed_ollama_hint.py",
-                "static/ergopti_plus/macos/platform/ollama_hint_metadata.py",
+                "static/ergopti_plus/macos/ai/engine/ollama/managed_ollama_hint.py",
+                "static/ergopti_plus/macos/ai/adapters/ollama_hint_metadata.py",
                 "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py",
                 "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_hint.py",
             )
@@ -307,7 +309,9 @@ class IsolatedBytecodeControls(unittest.TestCase):
         self.assertTrue(self.copied_cli("-I"))
 
     def test_emitted_hint_option_disables_bytecode_without_moving_arguments(self):
-        source = (ROOT / "static/ergopti_plus/macos/adapters/managed_ollama_hint.lua").read_text()
+        source = (
+            ROOT / "static/ergopti_plus/macos/ai/adapters/managed_ollama_hint.lua"
+        ).read_text()
         matched = re.search(
             r'pcall\(ShellRunner\.spawn, python, \{\s*"([^"]+)", driver \.\. "/modules/llm/managed_ollama_hint\.py"',
             source,

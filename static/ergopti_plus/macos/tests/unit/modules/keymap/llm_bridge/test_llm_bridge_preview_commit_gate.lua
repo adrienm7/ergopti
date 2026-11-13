@@ -159,10 +159,10 @@ local function load_fixture(render_result, previews_enabled, options)
 		end,
 		perform_text_replacement = function() return true end,
 	}
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = { llm_after_hotstring = true, llm_reset_on_nav = true },
 	}
-	package.loaded["modules.llm.prediction_engine"] = {
+	package.loaded["ai.engine.prediction.engine"] = {
 		set_runtime_guard = function() end,
 		init = function() return true end,
 		get_llm_enabled = function() return true end,
@@ -228,8 +228,8 @@ local function load_fixture(render_result, previews_enabled, options)
 		end,
 	}
 
-	package.loaded["modules.keymap.llm_bridge"] = nil
-	local Bridge = require("modules.keymap.llm_bridge")
+	package.loaded["ai.engine.bridge"] = nil
+	local Bridge = require("ai.engine.bridge")
 	fixture.bridge = Bridge
 	fixture.state = {
 		buffer = "abc",
@@ -241,7 +241,7 @@ local function load_fixture(render_result, previews_enabled, options)
 		preview_providers = {},
 		is_repeat_feature_enabled = function() return false end,
 	}
-	require("modules.keymap.llm_context").seed(fixture.state, fixture.state.buffer, "")
+	require("ai.engine.api.context").seed(fixture.state, fixture.state.buffer, "")
 	Bridge.init(fixture.state, {
 		preview_star_enabled = previews_enabled,
 		preview_autocorrect_enabled = previews_enabled,
@@ -555,7 +555,7 @@ helpers.describe("llm_bridge: ordinary timer starts are strict and contained", f
 				timer_error = case.error,
 			})
 			fixture.state.buffer = "abc "
-			require("modules.keymap.llm_context").append(fixture.state, " ")
+			require("ai.engine.api.context").append(fixture.state, " ")
 			local ok, err = pcall(fixture.bridge.update_preview, fixture.state.buffer)
 			helpers.assert_true(ok, "word-end failure must not escape the keyboard callback: " .. tostring(err))
 			helpers.assert_eq(fixture.starts[1], "word")

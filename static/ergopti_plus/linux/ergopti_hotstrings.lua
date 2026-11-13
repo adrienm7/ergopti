@@ -296,7 +296,7 @@ local event_loop = require("core.events.loop")
 local menu_builder = RuntimeGuard.optional_require("menu.ui.builder.builder")
 
 -- LLM prediction engine (optional — daemon runs without it).
-local prediction_engine = RuntimeGuard.optional_require("modules.llm.prediction_engine")
+local prediction_engine = RuntimeGuard.optional_require("ai.engine.prediction.engine")
 
 -- Dynamic hotstrings engine (optional — loads personal_info.toml, registers
 -- @-tag letter shortcuts and date expansion rules).
@@ -465,7 +465,7 @@ local shutdown = ShutdownCoordinator.new({
 			name = "local API discovery",
 			wait_for_ack = true,
 			stop = function()
-				local servers = package.loaded["modules.llm.local_servers"]
+				local servers = package.loaded["ai.engine.local_servers.local_servers"]
 				if servers and servers.shutdown() ~= true then
 					Logger.warn("shutdown", "Local API discovery still owns native cleanup debt.")
 					return false
@@ -481,7 +481,7 @@ local shutdown = ShutdownCoordinator.new({
 				return function()
 					if not resolved then
 						resolved = true
-						connectors = package.loaded["modules.llm.agent_connectors"]
+						connectors = package.loaded["ai.engine.agent.connectors"]
 						stop = connectors and connectors.shutdown
 					end
 					return not connectors or stop() == true
@@ -505,7 +505,7 @@ local shutdown = ShutdownCoordinator.new({
 		},
 		{
 			name = "AI agent learning",
-			stop = function() require("modules.llm.agent_learning").flush() end,
+			stop = function() require("ai.engine.agent.learning").flush() end,
 		},
 		{
 			name = "LLM model download",
@@ -518,14 +518,14 @@ local shutdown = ShutdownCoordinator.new({
 		{
 			name = "API key migration",
 			stop = function()
-				local migration = package.loaded["modules.llm.api_key_migration"]
+				local migration = package.loaded["ai.engine.settings.api_key_migration"]
 				return not migration or migration.shutdown() == true
 			end,
 		},
 		{
 			-- The runtime stop above already ended the chain; this releases its ports.
 			name = "LLM model warmup",
-			stop = function() return require("modules.llm.warmup").shutdown() end,
+			stop = function() return require("ai.engine.local_servers.warmup").shutdown() end,
 		},
 		{
 			name = "AI selection capture",
@@ -1052,8 +1052,8 @@ local function main()
 	-- 8.1) Initialise the hotstring engine.
 	local engine = engine_mod.new()
 	-- The AI's own typing context, fed by this engine's edits and read by the
-	-- prediction engine; it outlives the word buffer's resets (modules/llm/context.lua).
-	engine:attach_ai_context(require("modules.llm.context").new({
+	-- prediction engine; it outlives the word buffer's resets (ai/engine/api/context.lua).
+	engine:attach_ai_context(require("ai.engine.api.context").new({
 		is_active = function() return prediction_engine ~= nil and prediction_engine.is_enabled() end,
 	}))
 
@@ -1354,7 +1354,7 @@ local function main()
 			local remapper_paused = TapHold.set_paused(paused)
 			-- A pause turns the AI's live mode off; resuming leaves it off.
 			if prediction_engine then prediction_engine.on_pause_change(paused) end
-			local servers = package.loaded["modules.llm.local_servers"]
+			local servers = package.loaded["ai.engine.local_servers.local_servers"]
 			if paused and servers and servers.cancel() ~= true then
 				Logger.warn("pause", "Local API discovery still owns native cleanup debt.")
 			end
@@ -2063,7 +2063,7 @@ local function main()
 			end,
 			on_models_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
-				require("ui.model_browser.bridge").reproject_current()
+				require("ai.ui.model_browser.bridge").reproject_current()
 			end,
 			on_offer = function(context, count)
 				local output_app = type(context) == "table" and context.app_id or _cached_app_id
@@ -2097,7 +2097,7 @@ local function main()
 		-- The selected Ollama model is loaded before the first prediction needs it,
 		-- as on Windows and macOS. The engine schedules the chain when the AI starts,
 		-- resumes or changes model, and stops it with its runtime.
-		if require("modules.llm.warmup").init({
+		if require("ai.engine.local_servers.warmup").init({
 			scheduler = require("core.events.timer_scheduler"),
 			target = prediction_engine.warmup_target,
 			request = prediction_engine.warmup_request,
@@ -2106,7 +2106,7 @@ local function main()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
 		}) then
-			require("modules.llm.warmup").schedule("startup")
+			require("ai.engine.local_servers.warmup").schedule("startup")
 		end
 		-- API keys an earlier build wrote in plaintext move to the desktop secret
 		-- service in the background: a load never rewrites the file, and waiting
@@ -2114,7 +2114,7 @@ local function main()
 		-- The boot only arms the move; a locked keyring never delays input
 		-- readiness (decided by the maintainer on 2026-11-11), and a failure
 		-- here costs the migration, never the boot.
-		local migration_loaded, migration = pcall(require, "modules.llm.api_key_migration")
+		local migration_loaded, migration = pcall(require, "ai.engine.settings.api_key_migration")
 		local migration_armed, failure = migration_loaded, migration
 		if migration_loaded then
 			migration_armed, failure = pcall(function() return migration.init() and migration.start() end)

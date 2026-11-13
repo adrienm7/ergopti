@@ -565,7 +565,7 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
-	local api, api_reason = require_pause_module("modules.llm.api_mlx")
+	local api, api_reason = require_pause_module("ai.engine.api.mlx")
 	if api_reason then return false, api_reason end
 	if api then
 		local pause_mlx = type(api.pause_warmup) == "function"
@@ -581,7 +581,7 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
-	local wc, wc_reason = require_pause_module("modules.llm.warmup_controller")
+	local wc, wc_reason = require_pause_module("ai.engine.local_servers.warmup_controller")
 	if wc_reason then return false, wc_reason end
 	if wc then
 		local warmup_rollback = nil
@@ -605,7 +605,7 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
-	local oll, oll_reason = require_pause_module("modules.llm.api_ollama")
+	local oll, oll_reason = require_pause_module("ai.engine.api.ollama")
 	if oll_reason then return false, oll_reason end
 	if oll then
 		local pause_ollama = type(oll.pause_warmup) == "function"
@@ -624,7 +624,7 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
-	local remote, remote_reason = require_pause_module("modules.llm.api_remote")
+	local remote, remote_reason = require_pause_module("ai.engine.api.remote")
 	if remote_reason then return false, remote_reason end
 	if remote then
 		local pause_remote = type(remote.pause_warmup) == "function"

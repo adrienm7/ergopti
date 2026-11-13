@@ -108,7 +108,7 @@ local menu_mods = _branch_rows.wrap({
 	shortcuts       = safe_require("ui.menu.menu_shortcuts",       "shortcuts menu"),
 	keyboard_layout = safe_require("ui.menu.menu_keyboard_layout", "keyboard layout menu"),
 	hotstrings      = safe_require("ui.menu.menu_hotstrings",      "hotstrings menu"),
-	llm             = safe_require("ui.menu.menu_llm",             "AI menu"),
+	llm             = safe_require("ai.ui.menu",             "AI menu"),
 	keystats       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
 	tap_holds       = safe_require("ui.menu.menu_tap_holds",    "tap-holds menu"),
 	apps            = safe_require("ui.menu.menu_apps",            "apps menu"),
@@ -117,7 +117,7 @@ local menu_mods = _branch_rows.wrap({
 
 -- Load core modules
 local core_mods = {
-	llm           = safe_require("modules.llm", "AI engine"),
+	llm           = safe_require("ai.engine", "AI engine"),
 	keystats     = safe_require("modules.keystats", "metrics engine"),
 	shortcuts_mod = safe_require("modules.shortcuts", "shortcuts engine"),
 	dyn_hot_mod   = safe_require("modules.dynamic_hotstrings", "dynamic hotstrings engine"),
@@ -689,7 +689,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- DEFAULT backend: an MLX user warms Ollama, the MLX server is never primed, and
 	-- predictions only start working after a manual model switch re-asserts the backend.
 	if type(state.llm_backend) == "string" and state.llm_backend ~= "" then
-		local ok_llm, core_llm = pcall(require, "modules.llm")
+		local ok_llm, core_llm = pcall(require, "ai.engine")
 		if ok_llm and type(core_llm) == "table" and type(core_llm.set_backend) == "function" then
 			pcall(core_llm.set_backend, state.llm_backend)
 		end
@@ -902,7 +902,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			llm_handler = res
 			Logger.info(LOG, "LLM handler created successfully.")
 		else
-			Logger.error(LOG, string.format("create() failed for ui.menu.menu_llm: %s.", tostring(res)))
+			Logger.error(LOG, string.format("create() failed for ai.ui.menu: %s.", tostring(res)))
 		end
 	end
 	
@@ -1342,7 +1342,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if scope == "llm" then
 			if read_only_reason ~= nil or type(llm_handler) ~= "table" or type(llm_handler.scope_runtime) ~= "table" then return nil end
 			if not llm_scope then
-				llm_scope = require("ui.menu.llm_scope").new({
+				llm_scope = require("ai.ui.menu.scope").new({
 					path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					demotions = session_demotions, runtime = llm_handler.scope_runtime, profiles = llm_handler.scope_profiles,

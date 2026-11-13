@@ -703,7 +703,7 @@ local function machine_answer(path, args, helper, environment, launcher_environm
 end
 
 -- The processors a Mac can have, as `uname -m` names them. The platform
--- default AI backend follows it (modules/llm/backend_detector.lua): MLX on
+-- default AI backend follows it (ai/engine/api/backend_detector.lua): MLX on
 -- Apple silicon, Ollama on Intel, which an older config.toml without a
 -- selected backend restores.
 M.ARCHITECTURES = { "arm64", "x86_64" }

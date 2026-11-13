@@ -104,11 +104,11 @@ function M.build_world(options)
 	hs_stub.application.frontmostApplication = function() return front_app end
 
 	for _, name in ipairs({
-		"modules.llm", "modules.llm.profiles", "modules.llm.api_remote", "modules.llm.api_ollama",
-		"modules.llm.api_mlx", "modules.llm.parser", "modules.llm.prompt_builder",
-		"modules.llm.streaming_handler", "modules.llm.warmup_controller", "modules.llm.app_filter",
-		"modules.llm.api_common", "modules.llm.prediction_engine", "modules.llm.progressive_reveal",
-		"modules.llm.agent_runner", "modules.llm.agent_learning",
+		"ai.engine", "ai.engine.settings.profiles", "ai.engine.api.remote", "ai.engine.api.ollama",
+		"ai.engine.api.mlx", "ai.engine.api.parser", "ai.engine.prediction.prompt_builder",
+		"ai.engine.api.streaming_handler", "ai.engine.local_servers.warmup_controller", "ai.engine.prediction.app_filter",
+		"ai.engine.api.common", "ai.engine.prediction.engine", "ai.engine.prediction.progressive_reveal",
+		"ai.engine.agent.runner", "ai.engine.agent.learning",
 	}) do
 		package.loaded[name] = nil
 	end
@@ -155,7 +155,7 @@ function M.build_world(options)
 		end,
 		debugLog = function() end,
 	}
-	package.loaded["modules.llm.agent_connectors"] = {
+	package.loaded["ai.engine.agent.connectors"] = {
 		run = function(action, on_done)
 			world.runs[#world.runs + 1] = { action = action, on_done = on_done }
 			return true
@@ -210,7 +210,7 @@ function M.build_world(options)
 	end
 	world.i18n = i18n
 
-	local core = require("modules.llm")
+	local core = require("ai.engine")
 	local CoreState = M.get_upvalue(core.get_active_profile, "CoreState")
 	CoreState.backend = "api"
 	CoreState.active_profile_id = "advanced"
@@ -226,7 +226,7 @@ function M.build_world(options)
 		return true
 	end
 
-	local local_client = M.get_upvalue(require("modules.llm.api_ollama").request_chat, "_vision_client")
+	local local_client = M.get_upvalue(require("ai.engine.api.ollama").request_chat, "_vision_client")
 	assert(type(local_client) == "table", "the local chat client must be reachable")
 	local_client.post = function(url, headers, body, callback)
 		world.posts[#world.posts + 1] = { url = url, headers = headers, body = json.decode(body), callback = callback }
@@ -237,7 +237,7 @@ function M.build_world(options)
 		return true
 	end
 	-- The AI menu registers the owner of model downloads; this world records them
-	local ok_offer, offer = pcall(require, "modules.llm.local_model_offer")
+	local ok_offer, offer = pcall(require, "ai.engine.ollama.local_model_offer")
 	if ok_offer and type(offer) == "table" and type(offer.set_installer) == "function" then
 		offer.set_installer(function(model, on_done)
 			world.installs[#world.installs + 1] = { model = model, on_done = on_done }
@@ -245,14 +245,14 @@ function M.build_world(options)
 		end)
 	end
 
-	local engine = require("modules.llm.prediction_engine")
+	local engine = require("ai.engine.prediction.engine")
 	world.engine = engine
 	engine.init({
 		buffer = "", llm_buffer = "", mappings = {}, DELAYS = { llm_prediction = 1 },
 		ignored_window_titles = {}, ignored_window_patterns = {}, suppress_rescan_keep_buffer = function() end,
 	})
 	engine.set_llm_enabled(true)
-	local runner = require("modules.llm.agent_runner")
+	local runner = require("ai.engine.agent.runner")
 	world.runner = runner
 	runner.set_clock(function() return M.NOW end)
 	helpers.assert_eq(runner.set_mode(options.mode or "action"), true)

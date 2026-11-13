@@ -6,7 +6,7 @@
 ; Static source guard for the "DPAPI decrypt failure silently wipes token"
 ; finding (dpapi-decrypt-fail-wipes-token).
 ;
-; modules/llm/api_token_crypto.ahk — LLM_ApiToken_Decrypt() — previously
+; ai/engine/api/token_crypto.ahk — LLM_ApiToken_Decrypt() — previously
 ; called _LLM_DPAPI_Unprotect and returned its result directly. When DPAPI
 ; fails (corrupted blob, domain account not available, key inaccessible) that
 ; primitive returns "". The caller (menu_api_entries.ahk) stores "" into the

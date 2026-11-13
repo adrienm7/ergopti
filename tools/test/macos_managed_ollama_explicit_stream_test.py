@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--repository", type=Path, default=Path(__file__).resolve().parents[2])
 parser.add_argument("--source", type=Path)
 options, arguments = parser.parse_known_args()
-SOURCE = options.repository / "static/ergopti_plus/macos/modules/llm/managed_ollama_runtime.py"
+SOURCE = options.repository / "static/ergopti_plus/macos/ai/engine/ollama/managed_ollama_runtime.py"
 specification = importlib.util.spec_from_file_location("receiving_ollama_explicit", SOURCE)
 RUNTIME = importlib.util.module_from_spec(specification)
 sys.modules[specification.name] = RUNTIME

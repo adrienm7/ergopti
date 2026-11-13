@@ -37,10 +37,10 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const PHASE_ALLOWLIST = new Set([
 	'static/ergopti_plus/linux/modules/hotstrings/injector.lua',
 	'static/ergopti_plus/macos/platform/remap/ke_lifecycle.lua',
-	'static/ergopti_plus/macos/modules/llm/api_mlx_discovery.lua',
+	'static/ergopti_plus/macos/ai/engine/api/mlx_discovery.lua',
 	'static/ergopti_plus/macos/tests/unit/modules/keystats/lifecycle/test_keystats_privacy.lua',
 	'static/ergopti_plus/windows/modules/keystats/keystats_webview.ahk',
-	'static/ergopti_plus/windows/modules/llm/ollama_deps_checker.ahk',
+	'static/ergopti_plus/windows/ai/engine/ollama/deps_checker.ahk',
 	'static/ergopti_plus/windows/platform/remap/backspace.ahk',
 	'static/ergopti_plus/windows/platform/remap/delete.ahk',
 	'static/ergopti_plus/windows/platform/remap/enter.ahk',

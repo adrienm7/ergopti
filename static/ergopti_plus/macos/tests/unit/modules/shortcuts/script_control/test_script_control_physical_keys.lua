@@ -224,8 +224,8 @@ helpers.describe("ScriptControl pause stops the LLM warmup retry chain (F-LOW-2)
 	-- violation). pause_all() must cancel it via warmup_controller.stop().
 	helpers.it("pause_all() invokes warmup_controller.stop()", function()
 		local stopped = 0
-		local previous_warmup = package.loaded["modules.llm.warmup_controller"]
-		package.loaded["modules.llm.warmup_controller"] = {
+		local previous_warmup = package.loaded["ai.engine.local_servers.warmup_controller"]
+		package.loaded["ai.engine.local_servers.warmup_controller"] = {
 			stop = function() stopped = stopped + 1; return true end,
 			schedule_warmup_with_retry = function() return true end,
 		}
@@ -233,7 +233,7 @@ helpers.describe("ScriptControl pause stops the LLM warmup retry chain (F-LOW-2)
 		SC.pause_all()
 		SC.resume_all()  -- restore the un-paused state for any later test
 
-		package.loaded["modules.llm.warmup_controller"] = previous_warmup
+		package.loaded["ai.engine.local_servers.warmup_controller"] = previous_warmup
 		helpers.assert_true(stopped >= 1,
 			"pause_all must call warmup_controller.stop() so backend warmup POSTs stop during pause")
 	end)

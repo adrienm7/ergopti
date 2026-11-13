@@ -149,7 +149,7 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", label)
 		if spec == "llm_vision" then
 			-- A backend is picked from a list, as on the action picker page.
-			value = require("ui.vision_parameter_prompt").ask(title, prior)
+			value = require("ai.ui.vision_parameter_prompt").ask(title, prior)
 		else
 			-- The prompt belongs to the parameter kind (the gestures manager owns it).
 			-- Escaped: a wrap-pair sample such as <…> would be read as Pango markup.

@@ -41,16 +41,16 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-managed-python-release.cjs',
 		outputs: [
-			'static/ergopti_plus/macos/modules/llm/managed-python-release.sh',
-			'static/ergopti_plus/macos/modules/llm/managed-python-downloads.json',
+			'static/ergopti_plus/macos/ai/engine/bootstrap/managed-python-release.sh',
+			'static/ergopti_plus/macos/ai/engine/managed-python-downloads.json',
 			'static/ergopti_plus/_shared/core/lifecycle/engine/core/managed_python_locator.lua'
 		]
 	},
 	{
 		script: 'codegen/codegen-bootstrap-retry.cjs',
 		outputs: [
-			'static/ergopti_plus/macos/modules/llm/network-retry.sh',
-			'static/ergopti_plus/macos/modules/llm/bootstrap_retry_generated.lua'
+			'static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh',
+			'static/ergopti_plus/macos/ai/engine/bootstrap/retry_generated.lua'
 		]
 	},
 	{
@@ -78,7 +78,7 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-ollama-release.cjs',
-		outputs: ['static/ergopti_plus/macos/modules/llm/ollama-release.sh']
+		outputs: ['static/ergopti_plus/macos/ai/engine/ollama/ollama-release.sh']
 	},
 	{
 		script: 'codegen/codegen-linux-native-runtime.cjs',

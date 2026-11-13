@@ -171,8 +171,8 @@ function M.run(options)
 		has_pending_work    = function() return false end,
 		navigate = noop,
 	}
-	package.loaded["modules.llm.prediction_engine"] = engine
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine.prediction.engine"] = engine
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = {
 			llm_after_hotstring = false,
 			llm_reset_on_nav = false,
@@ -248,7 +248,7 @@ function M.run(options)
 		expander = require("modules.keymap.expander")
 	end
 
-	local bridge = require("modules.keymap.llm_bridge")
+	local bridge = require("ai.engine.bridge")
 	local suppress_count = 0
 	local state = {
 		buffer = options.buffer or "prefix ",
@@ -268,7 +268,7 @@ function M.run(options)
 	local context = (options.llm_private_mark or "") .. (options.llm_buffer or options.buffer or "prefix ")
 	-- Malformed hotstring buffers exercise rejection independently of AI state.
 	if not utf8.len(context) then context = "" end
-	require("modules.keymap.llm_context").seed(state, context, options.llm_private_mark or "")
+	require("ai.engine.api.context").seed(state, context, options.llm_private_mark or "")
 	bridge.init(state, {
 		preview_star_enabled = true,
 		preview_autocorrect_enabled = true,

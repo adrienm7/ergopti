@@ -436,7 +436,7 @@ helpers.describe("Linux rendered AI source refusal", function()
 					-- The storage adapter keeps storage.json in the default configuration folder.
 					default_config_dir = function() return assert(path:match("^(.*)/[^/]+$")) .. "/" .. require("core.fs.engine.app_dirs").linux.folder_name end,
 				}
-				package.loaded["infra.llm_preferences"] = nil
+				package.loaded["ai.engine.preferences"] = nil
 				local llm, calls = fake_llm(false)
 				local changed = { count = 0 }
 				local before = submenu_of(build(llm, changed), "menu.llm.title")

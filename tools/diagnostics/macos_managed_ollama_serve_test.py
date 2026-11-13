@@ -85,10 +85,10 @@ class ProductionServeControls(unittest.TestCase):
         (self.app / "mode").write_text("normal")
         payload = self.app / "Contents/Resources/static/ergopti_plus"
         dependencies = [
-            "macos/platform/suspended_image_owner.py",
-            "macos/platform/ollama_bootstrap_owner.py",
-            "macos/platform/trusted_native_guardian.py",
-            "macos/platform/ollama_daemon_authority.py",
+            "macos/ai/adapters/suspended_image_owner.py",
+            "macos/ai/adapters/ollama_bootstrap_owner.py",
+            "macos/ai/adapters/trusted_native_guardian.py",
+            "macos/ai/adapters/ollama_daemon_authority.py",
             "_shared/ai/adapters/python/managed_ollama_bootstrap.py",
             "_shared/ai/adapters/python/managed_ollama_daemon_authority.py",
             "_shared/ai/adapters/python/managed_ollama_runtime.py",
@@ -103,18 +103,18 @@ class ProductionServeControls(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(DEPENDENCY / "static/ergopti_plus" / relative, target)
         for relative in (
-            "macos/platform/source_alias_owner.py",
+            "macos/ai/adapters/source_alias_owner.py",
             "macos/core/network/adapters/native_http.py",
             "macos/core/network/adapters/native_ollama_api.py",
-            "macos/modules/llm/managed_ollama_runtime.py",
-            "macos/modules/llm/managed_bootstrap_http.py",
+            "macos/ai/engine/ollama/managed_ollama_runtime.py",
+            "macos/ai/engine/bootstrap/managed_bootstrap_http.py",
         ):
             target = payload / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(SOURCE / "static/ergopti_plus" / relative, target)
-        destination = payload / "macos/modules/llm/managed_ollama_serve.py"
+        destination = payload / "macos/ai/engine/ollama/managed_ollama_serve.py"
         shutil.copy2(
-            ROOT / "static/ergopti_plus/macos/modules/llm/managed_ollama_serve.py", destination
+            ROOT / "static/ergopti_plus/macos/ai/engine/ollama/managed_ollama_serve.py", destination
         )
         self.subject = load("actual_production_serve", destination)
         self.target = self.home / app_dirs.SUPPORT_RELATIVE / "ollama-native-http"

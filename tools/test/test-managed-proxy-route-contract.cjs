@@ -45,7 +45,7 @@ const main = read(path.join(sources, 'main.swift'));
 const swiftTests = read(
 	path.join(driver, 'launcher', 'Tests', 'ErgoptiPlusTests', 'ManagedProxyRouteWorkerTests.swift')
 );
-const policyText = read(path.join(driver, 'modules', 'llm', 'network-retry.sh'));
+const policyText = read(path.join(driver, 'ai', 'engine', 'bootstrap', 'network-retry.sh'));
 const proxyPolicy = JSON.parse(
 	read(
 		path.join(
@@ -255,7 +255,7 @@ function admission(options) {
 				? `OPAQUE_NETWORK_PAC_PROBE_URLS='https://registry.ollama.ai'`
 				: `OPAQUE_NETWORK_PAC_PROBE_URL='https://registry.ollama.ai'`,
 		options.before ?? '',
-		`. '${posix(path.join(driver, 'modules', 'llm', 'network-retry.sh'))}'`,
+		`. '${posix(path.join(driver, 'ai', 'engine', 'bootstrap', 'network-retry.sh'))}'`,
 		`managed_bootstrap_launcher_available() { return ${options.launcherAvailable === false ? 1 : 0}; }`,
 		`opaque_system_proxy_snapshot() { ${snapshot}; }`,
 		`ERGOPTI_LAUNCHER_EXECUTABLE='${posix(launcher)}'`,
@@ -418,7 +418,7 @@ try {
 	const sharedJson = (...parts) => JSON.parse(read(path.join(shared, ...parts)));
 	const origins = sharedJson('core', 'network', 'data', 'route_origins.json');
 	const vectors = sharedJson('tests', 'corpus', 'network', 'route_plan_vectors.json');
-	const policyFile = posix(path.join(driver, 'modules', 'llm', 'network-retry.sh'));
+	const policyFile = posix(path.join(driver, 'ai', 'engine', 'bootstrap', 'network-retry.sh'));
 	const cleanEnvironment = () => {
 		const environment = { ...process.env };
 		for (const name of [
@@ -498,7 +498,9 @@ try {
 	});
 
 	check('uv names its origins before each opaque admission, never before the native ones', () => {
-		const bootstrap = read(path.join(driver, 'modules', 'llm', 'ensure-mlx-deps.sh'));
+		const bootstrap = read(
+			path.join(driver, 'ai', 'engine', 'local_servers', 'ensure-mlx-deps.sh')
+		);
 		const guarded =
 			/if ! native_offline_bootstrap; then use_uv_route_origins; apply_system_network opaque \|\| exit \$\?; fi/g;
 		assert.equal((bootstrap.match(guarded) || []).length, 3);
@@ -512,11 +514,11 @@ try {
 
 	check('the uv inventory covers the hosts the pinned downloads come from', () => {
 		const host = (url) => new URL(url).origin;
-		const release = read(path.join(driver, 'modules', 'llm', 'uv-release.sh'));
+		const release = read(path.join(driver, 'ai', 'engine', 'bootstrap', 'uv-release.sh'));
 		const wheels = [...release.matchAll(/_URL="(https:[^"]+)"/g)].map((match) => host(match[1]));
 		assert.ok(wheels.length >= 2);
 		const python = Object.values(
-			JSON.parse(read(path.join(driver, 'modules', 'llm', 'managed-python-downloads.json')))
+			JSON.parse(read(path.join(driver, 'ai', 'engine', 'managed-python-downloads.json')))
 		).map((entry) => host(entry.url));
 		for (const origin of [...wheels, ...python, 'https://pypi.org']) {
 			assert.ok(origins.clients.uv.includes(origin), origin);
@@ -756,7 +758,9 @@ try {
 
 	check('the shell, the Swift spool and the Python receiver spell the same lines', () => {
 		const swift = read(path.join(sources, 'ManagedBootstrapDownload.swift'));
-		const python = read(path.join(driver, 'modules', 'llm', 'managed_bootstrap_http.py'));
+		const python = read(
+			path.join(driver, 'ai', 'engine', 'bootstrap', 'managed_bootstrap_http.py')
+		);
 		for (const fragment of [
 			'__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:',
 			'The automatic network configuration could not be used (',

@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 local Preferences = require("tests.support.llm_preferences_fixture")
-local ConfigGuard = helpers.load_module("ui.menu.llm_config_guard")
+local ConfigGuard = helpers.load_module("ai.ui.menu.config_guard")
 
 helpers.describe("Linux AI configuration guard (ai-submenus-newer-config-2026-10-23)", function()
 	helpers.it("greys the actionable rows of a list with the cause and wraps nothing when writable", function()
@@ -37,7 +37,7 @@ helpers.describe("Linux AI configuration guard (ai-submenus-newer-config-2026-10
 			local blocked = false
 			Migrate.read_only_reason = function() return blocked and "newer" or nil end
 			Migrate.read_only_status = function() return blocked and "newer" or nil end
-			local engine = require("modules.llm.prediction_engine")
+			local engine = require("ai.engine.prediction.engine")
 			local original_enabled = engine.is_enabled
 			local Logger = require("core.logger.engine.shim")
 			local old_warn = Logger.warn
@@ -92,7 +92,7 @@ helpers.describe("Linux AI configuration guard (ai-submenus-newer-config-2026-10
 					"the parent names the newer configuration as its cause: " .. tostring(greyed.title))
 				-- The model selector button stays live: the page it opens greys every
 				-- backend with the same cause (model-selector-page).
-				local emoji = require("modules.llm.backend_brands").emoji(engine.get_backend())
+				local emoji = require("ai.engine.api.backend_brands").emoji(engine.get_backend())
 				local button
 				for _, row in ipairs(ai_rows) do
 					if type(row.title) == "string" and row.title:sub(1, #emoji) == emoji then button = row end

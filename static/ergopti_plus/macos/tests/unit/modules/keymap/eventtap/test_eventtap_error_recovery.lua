@@ -21,9 +21,9 @@ local RESET_MODULES = {
 	"core.logger.engine.logger", "core.text.engine.utils",
 	"modules.hotstrings.hotstrings_config", "modules.keystats",
 	"modules.keymap", "modules.keymap.init", "modules.keymap.expander",
-	"modules.keymap.llm_bridge", "settings.engine.registry",
+	"ai.engine.bridge", "settings.engine.registry",
 	"modules.keymap.state", "modules.keymap.terminator_replay",
-	"modules.keymap.utils", "modules.llm", "modules.llm.prediction_engine",
+	"modules.keymap.utils", "ai.engine", "ai.engine.prediction.engine",
 	"core.ui.ui.tooltip",
 }
 
@@ -32,7 +32,7 @@ local function load_fixture()
 	for _, name in ipairs(RESET_MODULES) do package.loaded[name] = nil end
 	for name in pairs(package.loaded) do
 		if type(name) == "string"
-			and (name:match("^modules%.keymap") or name:match("^modules%.llm")) then
+			and (name:match("^modules%.keymap") or name:match("^ai%.engine")) then
 			package.loaded[name] = nil
 		end
 	end

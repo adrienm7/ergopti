@@ -42,7 +42,7 @@ function M.install(world)
 		end
 		return op
 	end
-	package.loaded["modules.llm.model_inventory"] = nil
+	package.loaded["ai.engine.local_servers.model_inventory"] = nil
 	package.loaded["core.network.engine.managed_http_deadline"] = { start = function(instant, done)
 		local op = operation("defer", done)
 		op.instant = instant

@@ -8,7 +8,7 @@
  * a log: the size of the context is diagnostic, its content is a keystroke sink.
  *
  * ROOT CAUSE ENCODED:
- * windows/modules/llm/prediction_exec.ahk built `preview := SubStr(tail, -40)`
+ * windows/ai/engine/prediction/exec.ahk built `preview := SubStr(tail, -40)`
  * and logged it at INFO on EVERY prediction request, so the daily log
  * accumulated a rolling 40-character sample of everything typed while the LLM
  * was enabled. docs/security/keystats_privacy.md governs today.log and
@@ -41,11 +41,11 @@ const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
 
 // LLM code per driver, plus the shared Lua the Lua drivers require.
 const SCAN_DIRS = [
-	path.join(DRIVERS, 'windows', 'modules', 'llm'),
-	path.join(DRIVERS, 'windows', 'ui', 'menu', 'menu_llm'),
-	path.join(DRIVERS, 'macos', 'modules', 'llm'),
-	path.join(DRIVERS, 'macos', 'ui', 'menu', 'menu_llm'),
-	path.join(DRIVERS, 'linux', 'modules', 'llm'),
+	path.join(DRIVERS, 'windows', 'ai', 'engine'),
+	path.join(DRIVERS, 'windows', 'ai', 'ui', 'menu'),
+	path.join(DRIVERS, 'macos', 'ai', 'engine'),
+	path.join(DRIVERS, 'macos', 'ai', 'ui', 'menu'),
+	path.join(DRIVERS, 'linux', 'ai', 'engine'),
 	path.join(DRIVERS, '_shared', 'ai', 'engine')
 ];
 

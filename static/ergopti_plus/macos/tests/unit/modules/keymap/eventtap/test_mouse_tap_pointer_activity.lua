@@ -18,14 +18,14 @@ local helpers = require("tests.helpers")
 --- @return table fixture
 local function load_keymap()
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:match("^modules%.keymap") or name:match("^modules%.llm")
+		if type(name) == "string" and (name:match("^modules%.keymap") or name:match("^ai%.engine")
 			or name == "platform.input.synthetic_input" or name == "adapters.event_provenance") then
 			package.loaded[name] = nil
 		end
 	end
 	local calls = { activity = {}, keys = {}, nav_reset = 0 }
 	local bridge = { pending = false, owns_key = false }
-	package.loaded["modules.keymap.llm_bridge"] = setmetatable({
+	package.loaded["ai.engine.bridge"] = setmetatable({
 		init = function() return true end,
 		handle_llm_keys = function() return bridge.owns_key end,
 		check_escape_reset = function() return false end,

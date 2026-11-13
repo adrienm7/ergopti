@@ -20,8 +20,8 @@ local function isolated(body)
 		saved_environment[name] = os.getenv(name)
 		assert(uv.os_setenv(name, scratch .. "/" .. name))
 	end
-	for _, name in ipairs({ "ui.menu.llm_backend_rows", "modules.llm.prediction_engine", "modules.llm.api_entries",
-		"modules.llm.api_remote", "infra.llm_preferences", "settings.engine.paths", "core.fs.adapters.storage" }) do
+	for _, name in ipairs({ "ai.ui.menu.backend_rows", "ai.engine.prediction.engine", "ai.engine.settings.api_entries",
+		"ai.engine.api.api_remote", "ai.engine.preferences", "settings.engine.paths", "core.fs.adapters.storage" }) do
 		package.loaded[name] = nil
 	end
 	local function write(path, content)
@@ -53,7 +53,7 @@ local function isolated(body)
 			{ id = "after", provider = "cerebras", label = "after", token = "synthetic-after", model = "after-model", base_url = "" },
 		}) })
 		write(api_path, original); assert(uv.fs_chmod(api_path, 384))
-		local Entries = require("modules.llm.api_entries")
+		local Entries = require("ai.engine.settings.api_entries")
 		Entries._set_path_for_test(api_path)
 		if not pcall(require, "ffi") then
 			-- PUC lacks the daemon's libc FFI. Only private creation is injected;
@@ -66,8 +66,8 @@ local function isolated(body)
 				return count == #text and synced == true and closed == true, detail
 			end)
 		end
-		local Engine = require("modules.llm.prediction_engine")
-		local Rows = require("ui.menu.llm_backend_rows")
+		local Engine = require("ai.engine.prediction.engine")
+		local Rows = require("ai.ui.menu.backend_rows")
 		local seen = { errors = {}, changed = 0 }
 		local dialogs = {
 			error = function(text, title) seen.errors[#seen.errors + 1] = { text = text, title = title } end,

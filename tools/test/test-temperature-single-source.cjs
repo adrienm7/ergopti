@@ -41,12 +41,12 @@ const SSOT_FILE = path.join(
 );
 
 const ADAPTERS = [
-	'static/ergopti_plus/macos/modules/llm/api_common.lua',
-	'static/ergopti_plus/macos/modules/llm/api_remote.lua',
-	'static/ergopti_plus/macos/modules/llm/api_ollama.lua',
+	'static/ergopti_plus/macos/ai/engine/api/common.lua',
+	'static/ergopti_plus/macos/ai/engine/api/remote.lua',
+	'static/ergopti_plus/macos/ai/engine/api/ollama.lua',
 	// The MLX request builder (where temperature resolves) moved out of api_mlx.lua
 	// into the api_mlx_inference sibling during the P6 god-file split.
-	'static/ergopti_plus/macos/modules/llm/api_mlx_inference.lua'
+	'static/ergopti_plus/macos/ai/engine/api/mlx_inference.lua'
 ];
 
 // Every adapter must reference the single shared default so the resolution is

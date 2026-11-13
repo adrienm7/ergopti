@@ -678,7 +678,7 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 				shutdown_runtime = function() state.stops = state.stops + 1; return state.closed end,
 				cancel = function() state.cancelled = state.cancelled + 1 end,
 			},
-			package = { loaded = { ["modules.llm.local_servers"] = {
+			package = { loaded = { ["ai.engine.local_servers.local_servers"] = {
 				shutdown = native_stop("discovery"),
 			}, ["modules.keymap.layout_registry"] = { shutdown = native_stop("layouts") } } }, require = function() return { cleanup = function() end, flush = function() end } end,
 			TimerScheduler = { cancelAll = function() return true end }, Logger = { warn = function() end },
@@ -1428,7 +1428,7 @@ helpers.describe("actual Main layout helper retirement", function()
 			prediction_engine = false,
 			package = { loaded = { ["modules.keymap.layout_registry"] = loaded and layout or nil } },
 			require = function(name)
-				assert(name == "modules.llm.agent_connectors" or name == "modules.llm.agent_learning",
+				assert(name == "ai.engine.agent.connectors" or name == "ai.engine.agent.learning",
 					"cold shutdown must not import " .. tostring(name))
 				return { cleanup = function() end, flush = function() end }
 			end,
@@ -1520,7 +1520,7 @@ helpers.describe("actual Main HTTP transport retirement", function()
 			prediction_engine = false,
 			package = { loaded = { ["core.network.adapters.http_client"] = loaded and http or nil } },
 			require = function(name)
-				assert(name == "modules.llm.agent_connectors" or name == "modules.llm.agent_learning",
+				assert(name == "ai.engine.agent.connectors" or name == "ai.engine.agent.learning",
 					"cold shutdown must not import " .. tostring(name))
 				return { cleanup = function() end, flush = function() end }
 			end,
@@ -1623,7 +1623,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		modules["core.logger.engine.shim"] = { info = noop, error = noop, warn = noop, debug = noop, success = noop }
 		modules["core.logger.engine.sink"] = { install = function() return true end }
 		modules["modules.keystats.keystats"] = { stop = function() return true end }
-		modules["modules.llm.agent_learning"] = { flush = noop }
+		modules["ai.engine.agent.learning"] = { flush = noop }
 		modules["core.events.timer_scheduler"] = scheduler or { cancelAll = function() state.timers = state.timers + 1; return true end }
 		modules["platform.input.keyboard_hook"] = {
 			isRunning = function() return state.running end,
@@ -1637,7 +1637,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		} or nil
 		modules["core.lifecycle.engine.runtime_guard"] = { optional_require = function(name)
 			if name == "core.ui.ui.webview_manager" then return manager end
-			if name == "modules.llm.prediction_engine" then return runtime end
+			if name == "ai.engine.prediction.engine" then return runtime end
 		end }
 		modules["core.lifecycle.engine.shutdown.coordinator"] = { new = function(options)
 			local coordinator = ShutdownCoordinator.new(options)

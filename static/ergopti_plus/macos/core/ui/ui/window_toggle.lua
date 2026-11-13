@@ -40,7 +40,7 @@ local PAGES = {
 	hotstrings_config_window = { module = "ui.hotstrings_config_window", open = "open" },
 	layout_manager           = { module = "ui.layout_manager", open = "open" },
 	layer_editor             = { module = "ui.layer_editor" },
-	model_browser            = { module = "ui.model_browser" },
+	model_browser            = { module = "ai.ui.model_browser" },
 	changelog                = { module = "ui.changelog" },
 	healthcheck              = { module = "ui.healthcheck", close = "close_window" },
 }

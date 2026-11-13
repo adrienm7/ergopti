@@ -218,7 +218,7 @@ end
 --- @return function Probe body.
 local function ai_health(config)
 	return function(done, on_cancel)
-		local llm = require("modules.llm")
+		local llm = require("ai.engine")
 		if llm.get_runtime_llm_enabled() ~= true then
 			done({ state = "disabled" })
 			return
@@ -229,8 +229,8 @@ local function ai_health(config)
 			done({ state = "unsupported" })
 			return
 		end
-		local base = backend == "mlx" and require("modules.llm.api_mlx").get_base_url()
-			or require("modules.llm.api_ollama").get_base_url()
+		local base = backend == "mlx" and require("ai.engine.api.mlx").get_base_url()
+			or require("ai.engine.api.ollama").get_base_url()
 		local client = require("core.network.adapters.http_client").new({ timeout_ms = config.timeout_ms })
 		on_cancel(function() client.cancel() end)
 		client.get(base .. path, {}, function(result)

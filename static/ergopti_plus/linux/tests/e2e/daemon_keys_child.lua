@@ -198,7 +198,7 @@ local hook = require("platform.input.keyboard_hook")
 hook.start = function(options)
 	callbacks = options
 	if os.getenv("ERGOPTI_E2E_QUEUE_OUTPUT") == "1" then
-		local prediction = require("modules.llm.prediction_engine")
+		local prediction = require("ai.engine.prediction.engine")
 		local original = prediction.on_char
 		prediction.on_char = function(ch, ...)
 			ai_characters[#ai_characters + 1] = ch
@@ -290,7 +290,7 @@ for _, name in ipairs(MENU_ROWS_FILE and {} or { "core.ui.ui.tooltip.preview", "
 	package.preload[name] = function() error("disabled for the daemon key scenarios") end
 end
 if not MENU_ROWS_FILE and not WITH_LLM then
-	package.preload["modules.llm.prediction_engine"] = function() error("disabled for the daemon key scenarios") end
+	package.preload["ai.engine.prediction.engine"] = function() error("disabled for the daemon key scenarios") end
 end
 if not MENU_ROWS_FILE then
 	-- All scripted key scenarios declare an ordinary owned application/window.

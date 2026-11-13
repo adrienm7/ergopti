@@ -7,8 +7,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const proxyPrecedence = require('./codegen-proxy-precedence.cjs');
 const SOURCE = 'static/ergopti_plus/_shared/core/network/data/bootstrap_retry.json';
-const SHELL = 'static/ergopti_plus/macos/modules/llm/network-retry.sh';
-const LUA = 'static/ergopti_plus/macos/modules/llm/bootstrap_retry_generated.lua';
+const SHELL = 'static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh';
+const LUA = 'static/ergopti_plus/macos/ai/engine/bootstrap/retry_generated.lua';
 
 function validate(data) {
 	const keys = ['schema_version', 'admission_seconds', 'idle_seconds', 'retirement_seconds'];

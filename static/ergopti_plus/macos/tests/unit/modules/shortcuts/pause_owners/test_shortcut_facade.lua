@@ -242,14 +242,14 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		}) do
 			package.loaded[module_name] = {}
 		end
-		package.loaded["ui.menu.menu_llm"] = {
+		package.loaded["ai.ui.menu"] = {
 			create = function(deps)
 				injected_control = deps.script_control
 				injected_update_menu = deps.update_menu
 				return {}
 			end,
 		}
-		package.loaded["modules.llm"] = { set_backend = function() return true end }
+		package.loaded["ai.engine"] = { set_backend = function() return true end }
 		package.loaded["modules.keystats"] = {}
 		package.loaded["modules.shortcuts"] = shortcuts
 		package.loaded["modules.dynamic_hotstrings"] = {}
@@ -278,12 +278,12 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		helpers.assert_true(injected_control.is_pause_transition_pending(),
 			"the root-injected facade must expose the live transition owner")
 
-		package.loaded["modules.llm"] = {
+		package.loaded["ai.engine"] = {
 			BUILTIN_PROFILES = {},
 			DEFAULT_STATE = { llm_num_predictions = 1 },
 		}
-		package.loaded["ui.menu.menu_llm.startup_controller"] = nil
-		local StartupController = require("ui.menu.menu_llm.startup_controller")
+		package.loaded["ai.ui.menu.startup_controller"] = nil
+		local StartupController = require("ai.ui.menu.startup_controller")
 		StartupController.new({
 			state = {},
 			keymap = {},
@@ -304,11 +304,11 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.ui.engine.dialog_util"] = {}
 		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
-		package.loaded["ui.menu.menu_llm.profile_label"] = {
+		package.loaded["ai.ui.menu.profile_label"] = {
 			format = function(label) return label end,
 		}
-		package.loaded["ui.menu.menu_llm.model_switcher"] = nil
-		local ModelSwitcher = require("ui.menu.menu_llm.model_switcher")
+		package.loaded["ai.ui.menu.models.switcher"] = nil
+		local ModelSwitcher = require("ai.ui.menu.models.switcher")
 		ModelSwitcher.new({
 			state = { llm_enabled = false },
 			models_mgr = models_mgr,
@@ -349,7 +349,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			return key
 		end }
 		package.loaded["ui.menu.shortcut_utils"] = {}
-		package.loaded["modules.llm"] = {
+		package.loaded["ai.engine"] = {
 			DEFAULT_STATE = {
 				llm_enabled = false,
 				llm_backend = "ollama",
@@ -364,7 +364,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			set_llm_model_mlx = function() return true end,
 			set_llm_model_ollama = function() return true end,
 		}
-		package.loaded["ui.menu.menu_llm.models_manager"] = {
+		package.loaded["ai.ui.menu.models.manager"] = {
 			new = function()
 				return {
 					get_presets = function() return {} end,
@@ -373,24 +373,24 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 				}
 			end,
 		}
-		package.loaded["ui.menu.menu_llm.settings_manager"] = {
+		package.loaded["ai.ui.menu.settings_manager"] = {
 			new = function() return {} end,
 		}
 		for _, name in ipairs({
-			"ui.menu.menu_llm.temperature_panel",
-			"ui.menu.menu_llm.streaming_panel",
-			"ui.menu.menu_llm.trigger_panel",
-			"ui.menu.menu_llm.api_panel",
+			"ai.ui.menu.panels.temperature_panel",
+			"ai.ui.menu.panels.streaming_panel",
+			"ai.ui.menu.panels.trigger_panel",
+			"ai.ui.menu.panels.api_panel",
 		}) do
 			package.loaded[name] = { build = function() return {} end }
 		end
-		package.loaded["ui.menu.menu_llm.api_panel"].active_entry_caption_text = function() return nil end
-		package.loaded["ui.menu.menu_llm.warmup_controller"] = {}
-		package.loaded["ui.menu.menu_llm.backend_panel"] = {
+		package.loaded["ai.ui.menu.panels.api_panel"].active_entry_caption_text = function() return nil end
+		package.loaded["ai.ui.menu.warmup_controller"] = {}
+		package.loaded["ai.ui.menu.panels.backend_panel"] = {
 			is_apple_silicon = function() return false end,
 			build = function() return "backend", {} end,
 		}
-		package.loaded["ui.menu.menu_llm.model_switcher"] = {
+		package.loaded["ai.ui.menu.models.switcher"] = {
 			new = function(ctx)
 				switch_ctx = ctx
 				return {
@@ -405,14 +405,14 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 				}
 			end,
 		}
-		package.loaded["ui.menu.menu_llm.prediction_lock_registry"] = {
+		package.loaded["ai.ui.menu.prediction_lock_registry"] = {
 			new = function() return sentinel end,
 		}
-		package.loaded["modules.llm.api_mlx"] = { get_base_url = function() return "" end }
-		package.loaded["ui.menu.menu_llm.startup_controller"] = {
+		package.loaded["ai.engine.api.mlx"] = { get_base_url = function() return "" end }
+		package.loaded["ai.ui.menu.startup_controller"] = {
 			new = function(ctx) startup_ctx = ctx; return noop end,
 		}
-		package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = {
+		package.loaded["ai.ui.menu.trigger_orchestrator"] = {
 			new = function()
 				return {
 					bind_hotkey = noop,
@@ -422,7 +422,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 				}
 			end,
 		}
-		package.loaded["ui.menu.menu_llm.menu_layout"] = {
+		package.loaded["ai.ui.menu.layout"] = {
 			row_disabled = function() return false end,
 			title_health_dot = function() return nil end,
 		}
@@ -441,10 +441,10 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			end,
 			build = function() return {} end,
 		}
-		local core = package.loaded["modules.llm"]
-		package.loaded["modules.llm.profiles"] = nil
-		package.loaded["ui.menu.menu_llm.profile_label"] = nil
-		core.BUILTIN_PROFILES = require("modules.llm.profiles").BUILTIN_PROFILES
+		local core = package.loaded["ai.engine"]
+		package.loaded["ai.engine.settings.profiles"] = nil
+		package.loaded["ai.ui.menu.profile_label"] = nil
+		core.BUILTIN_PROFILES = require("ai.engine.settings.profiles").BUILTIN_PROFILES
 		local profile_constructor_sync = {}
 		core.set_user_profiles = function()
 			profile_constructor_sync[#profile_constructor_sync + 1] = "users"
@@ -454,12 +454,12 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			profile_constructor_sync[#profile_constructor_sync + 1] = "active"
 			return true
 		end
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-		require("ui.menu.menu_llm.profiles_manager")
-		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({ check_and_install_deps = noop })
-		package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({ check_and_install_deps = noop })
-		reset_module("ui.menu.menu_llm")
-		local MenuLLM = require("ui.menu.menu_llm")
+		package.loaded["ai.ui.menu.profiles_manager"] = nil
+		require("ai.ui.menu.profiles_manager")
+		package.loaded["ai.engine.local_servers.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({ check_and_install_deps = noop })
+		package.loaded["ai.engine.ollama.deps_checker"] = require("tests.support.runtime_checker_stub")({ check_and_install_deps = noop })
+		reset_module("ai.ui.menu")
+		local MenuLLM = require("ai.ui.menu")
 		local handler = MenuLLM.create({
 			state = {
 				llm_enabled = false,

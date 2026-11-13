@@ -16,14 +16,14 @@ local Json = require("core.text.engine.json")
 -- The parent passes the launcher's LUA_PATH; a module resolved elsewhere would
 -- prove another tree than the installed one.
 local installed = assert(os.getenv("ERGOPTI_INSTALLED_ROOT"), "installed root required")
-for _, name in ipairs({ "core.network.engine.route_plan", "core.network.engine.route_origins", "modules.llm.managed_ollama_proxy" }) do
+for _, name in ipairs({ "core.network.engine.route_plan", "core.network.engine.route_origins", "ai.engine.ollama.managed_ollama_proxy" }) do
 	local found = package.searchpath(name, package.path)
 	assert(found and found:sub(1, #installed + 1) == installed .. "/", "module outside the installed root: " .. name)
 end
 
 local policy = assert(require("core.network.engine.proxy_policy").load())
 local origins = assert(require("core.network.engine.route_origins").client("ollama"))
-local Proxy = require("modules.llm.managed_ollama_proxy")
+local Proxy = require("ai.engine.ollama.managed_ollama_proxy")
 local SystemProxy = require("core.network.adapters.system_proxy")
 
 -- Count the native lookups without changing their arguments or answers.
@@ -39,7 +39,7 @@ for key, value in pairs(uv.os_environ()) do environment_rows[#environment_rows +
 table.sort(environment_rows)
 
 -- The relay and the PAC list walk come from the same owners the runtime factory
--- (modules/llm/runtime_factory.lua) gives the shipped stage.
+-- (ai/engine/local_servers/runtime_factory.lua) gives the shipped stage.
 local Relay = require("core.network.engine.proxy_auth_relay")
 local relay_policy = assert(Relay.load())
 local TcpProbe = require("core.network.adapters.tcp_probe")

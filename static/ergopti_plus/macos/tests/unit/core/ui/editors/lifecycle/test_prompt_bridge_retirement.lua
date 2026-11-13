@@ -16,7 +16,7 @@ local function with_editor(scenario)
 	rawset(_G, "lfs", nil)
 	local result = table.pack(xpcall(function()
 		return helpers.with_stub_scope({
-			"ui.prompt_editor", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.events.timer_scheduler", "core.ui.adapters.webview_result",
+			"ai.ui.prompt_editor", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.events.timer_scheduler", "core.ui.adapters.webview_result",
 			"core.timing.engine.deferred_work", "core.fs.engine.paths", "core.logger.engine.logger", "core.i18n.engine.locale", "core.logger.engine.log_folders",
 			"core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact", "core.ui.engine.window_titles",
 			"core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport", "core.fs.engine.app_dirs",
@@ -46,7 +46,7 @@ local function with_editor(scenario)
 				function view:evaluateJavaScript(script) self.scripts[#self.scripts + 1] = script; return self end
 				return view
 			end
-			local editor = helpers.load_with_stubs("ui.prompt_editor", {
+			local editor = helpers.load_with_stubs("ai.ui.prompt_editor", {
 				webview = { new = new_window, windowMasks = { titled = 1, closable = 2 }, usercontent = { new = function()
 					local bridge = {}
 					function bridge:setCallback(callback)

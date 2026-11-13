@@ -33,7 +33,7 @@ end
 
 helpers.describe("Existence probe double (exists-probe-double-2026-10-21)", function()
 	helpers.it("lets the real adapter find a bundled driver file", function()
-		local policy = helpers.driver_root() .. "modules/llm/network-retry.sh"
+		local policy = helpers.driver_root() .. "ai/engine/bootstrap/network-retry.sh"
 		helpers.assert_eq(exists_with(helpers.existence_probe_execute(), policy), true)
 	end)
 

@@ -99,7 +99,7 @@ function M.pac_fallback(ports, report, finish)
 		return finish()
 	end
 	local is_fallback_stage = ports.is_pac_fallback_stage
-		or require("modules.llm.opaque_network_admission").is_pac_fallback_stage
+		or require("ai.engine.api.opaque_network_admission").is_pac_fallback_stage
 	ports.exec(AWK, { M.PAC_FALLBACK_AWK, path }, TOOL_SECONDS, function(code, output)
 		local summary = code == 0 and M.parse_summary(output) or nil
 		if summary == nil then

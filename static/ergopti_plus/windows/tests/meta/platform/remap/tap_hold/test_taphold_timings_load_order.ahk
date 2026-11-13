@@ -58,7 +58,7 @@ _TTLO_EverySentinelFilePrecedesBoot() {
 		"platform/remap/constants.ahk",        "TapHoldsLoadTimings",
 		"infra/hotstrings/hotstrings_config.ahk",   "HotstringsConfigLoadSharedDefaults",
 		"modules/keystats/keystats_walker.ahk", "KeystatsWalkerLoadTimings",
-		"modules/llm/api_ollama.ahk",             "LLMApiLoadTimings",
+		"ai/engine/api/ollama.ahk",             "LLMApiLoadTimings",
 		"core/ui/engine/style.ahk",                       "UiStyle_LoadSharedConst"
 	)
 	for RelPath, Loader in Pairs {

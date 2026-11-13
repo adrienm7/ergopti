@@ -14,17 +14,17 @@ local Outdated = require("settings.engine.migration.outdated")
 
 local function with_preferences(body)
 	Sandbox.with_config('[llm]\nenabled = false\nagent_mode = "action"\n[llm.models]\nselected = "ollama"\n', function(path)
-		local old_paths, old_preferences = package.loaded["settings.engine.paths"], package.loaded["infra.llm_preferences"]
+		local old_paths, old_preferences = package.loaded["settings.engine.paths"], package.loaded["ai.engine.preferences"]
 		local original_default = Manifest.default_for
 		local original_validation = Outdated.manifest_value_fits
 		local ok, reason = pcall(function()
 			package.loaded["settings.engine.paths"] = { config = function() return path end }
-			package.loaded["infra.llm_preferences"] = nil
-			body(require("infra.llm_preferences"), path)
+			package.loaded["ai.engine.preferences"] = nil
+			body(require("ai.engine.preferences"), path)
 		end)
 		Manifest.default_for = original_default
 		Outdated.manifest_value_fits = original_validation
-		package.loaded["settings.engine.paths"], package.loaded["infra.llm_preferences"] = old_paths, old_preferences
+		package.loaded["settings.engine.paths"], package.loaded["ai.engine.preferences"] = old_paths, old_preferences
 		if not ok then error(reason, 0) end
 	end)
 

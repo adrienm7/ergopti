@@ -61,8 +61,8 @@ helpers.describe("llm_vision parameter: native prompt, picker choices and refusa
 		local catalogue = read_json("ai/data/api_providers.json")
 		local i18n = package.loaded["core.i18n.engine.i18n"]
 		local saved_get = i18n.get
-		local ok, err = pcall(helpers.with_fresh_modules, { "modules.llm.api_remote" }, function()
-			package.loaded["modules.llm.api_remote"] = {
+		local ok, err = pcall(helpers.with_fresh_modules, { "ai.engine.api.remote" }, function()
+			package.loaded["ai.engine.api.remote"] = {
 				PROVIDER_ORDER = catalogue.provider_order,
 				PROVIDERS = catalogue.providers,
 			}

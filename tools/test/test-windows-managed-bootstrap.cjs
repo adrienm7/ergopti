@@ -11,13 +11,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '../../static/ergopti_plus/windows');
-const checker = fs.readFileSync(path.join(root, 'modules/llm/ollama_deps_checker.ahk'), 'utf8');
+const checker = fs.readFileSync(path.join(root, 'ai/engine/ollama/deps_checker.ahk'), 'utf8');
 assert.match(
 	checker,
 	/Installer := HasMethod\(InstallerFn, "Call"\) \? InstallerFn : LLM_Deps_RunManagedInstaller/,
 	'Explicit production bootstrap must dispatch managed acquisition instead of winget/browser.'
 );
-const flow = fs.readFileSync(path.join(root, 'modules/llm/ollama_managed_bootstrap.ahk'), 'utf8');
+const flow = fs.readFileSync(path.join(root, 'ai/engine/ollama/managed_bootstrap.ahk'), 'utf8');
 for (const dependency of [
 	'OllamaInstallFilesPort',
 	'OllamaRuntimeOwner',
@@ -57,7 +57,7 @@ assert.throws(() => assertStrictRawRead(silentRead), { code: 'ERR_ASSERTION' });
 const utf8Match = fileSystem.match(/\nFSUtf8Bytes\(Content\) \{[\s\S]*?\n\}\n/);
 assert.ok(utf8Match, 'Inspect the real adapter encoder, not an absent helper.');
 const utf8Source = utf8Match[0];
-const admission = fs.readFileSync(path.join(root, 'ui/menu/menu_llm/enable_admission.ahk'), 'utf8');
+const admission = fs.readFileSync(path.join(root, 'ai/ui/menu/enable_admission.ahk'), 'utf8');
 // The production resolver preserves the injected writer's refusal contract.
 // The config renderer already returns the complete canonical UTF-8/BOM image;
 // copy exactly that image, excluding only StrPut's terminating NUL.
@@ -112,8 +112,11 @@ for (const file of [
 	);
 	assert.doesNotMatch(source, /LLM_OLLAMA_BASE_URL\s*\.\s*"\/api\//);
 }
-const launcher = fs.readFileSync(path.join(root, 'modules/llm/ollama-runtime-launch.ps1'), 'utf8');
-const worker = fs.readFileSync(path.join(root, 'modules/llm/ollama-model-pull.ps1'), 'utf8');
+const launcher = fs.readFileSync(
+	path.join(root, 'ai/engine/ollama/ollama-runtime-launch.ps1'),
+	'utf8'
+);
+const worker = fs.readFileSync(path.join(root, 'ai/engine/ollama/ollama-model-pull.ps1'), 'utf8');
 assert.match(
 	launcher,
 	/child_created_filetime\s*=\s*\[Ergopti\.Ollama\.RuntimeObservation\]::CreationTime\(\$server\.Handle\)/
@@ -181,7 +184,7 @@ const nativeCases = [
 	'test_ollama_managed_origin.ahk',
 	'test_ollama_managed_model_offer.ahk'
 ]
-	.map((file) => fs.readFileSync(path.join(root, 'tests/unit/modules/llm/servers', file), 'utf8'))
+	.map((file) => fs.readFileSync(path.join(root, 'tests/unit/ai/servers', file), 'utf8'))
 	.join('\n');
 for (const name of [
 	'READY native factory throw preserves bootstrap observer',
@@ -205,7 +208,10 @@ process.stdout.write(
 
 // Missing-model consent must remain bound to the exact admitted origin and
 // installer owner. These causal controls are source evidence, not AHK execution.
-const modelOffer = fs.readFileSync(path.join(root, 'modules/llm/local_model_offer.ahk'), 'utf8');
+const modelOffer = fs.readFileSync(
+	path.join(root, 'ai/engine/ollama/local_model_offer.ahk'),
+	'utf8'
+);
 function assertModelOfferAffinity(source, managedSource) {
 	assert.doesNotMatch(source, /Failure\["base_url"\] != LLM_OLLAMA_BASE_URL/);
 	assert.match(source, /return Value is Integer && Value == true/);
@@ -425,12 +431,9 @@ function assertOriginCustody(native, httpSource, streamSource) {
 	);
 }
 
-const originHttp = fs.readFileSync(
-	path.join(root, 'modules/llm/api_ollama/ollama_http.ahk'),
-	'utf8'
-);
+const originHttp = fs.readFileSync(path.join(root, 'ai/engine/api_ollama/ollama_http.ahk'), 'utf8');
 const originStream = fs.readFileSync(
-	path.join(root, 'modules/llm/api_ollama/ollama_streaming.ahk'),
+	path.join(root, 'ai/engine/api_ollama/ollama_streaming.ahk'),
 	'utf8'
 );
 assertOriginCustody(flow, originHttp, originStream);
@@ -541,7 +544,7 @@ for (const withdrawn of [1, 2]) {
 // root as the registered file component: the helper refuses a direct
 // LocalApplicationData child, so a flat fixture root could never pass.
 const bootstrapFixture = fs.readFileSync(
-	path.join(root, 'tests/unit/modules/llm/servers/test_ollama_managed_bootstrap.ps1'),
+	path.join(root, 'tests/unit/ai/servers/test_ollama_managed_bootstrap.ps1'),
 	'utf8'
 );
 assert.match(

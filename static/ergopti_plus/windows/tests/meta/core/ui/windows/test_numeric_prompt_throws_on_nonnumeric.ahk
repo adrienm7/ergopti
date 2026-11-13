@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for the numeric-prompt-throws-on-nonnumeric finding.
 ;
-; The five numeric tray dialogs in ui/menu/menu_llm/menu_settings.ahk feed raw
+; The five numeric tray dialogs in ai/ui/menu/settings.ahk feed raw
 ; InputBox text straight into Integer() / Float(). In AHK v2 those conversion
 ; functions THROW on a non-numeric string (e.g. "abc", or "12,5" — the comma
 ; decimal a French keyboard user types out of habit) instead of returning 0.

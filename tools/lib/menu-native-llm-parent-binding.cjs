@@ -706,14 +706,14 @@ function closedModuleExport(unit, lex, rootPositions) {
 		NativeDialog: 'core.ui.ui.native_dialog',
 		TextPrompt: 'core.ui.ui.text_prompt',
 		PrivacyPolicy: 'ai.engine.policy.trigger_policy',
-		LlmBackendRows: 'ui.menu.llm_backend_rows',
+		LlmBackendRows: 'ai.ui.menu.backend_rows',
 		ProgrammableHotstrings: 'ui.menu.programmatic_hotstrings',
 		ProgrammableMenuPolicy: 'menu.engine.programmable_hotstrings',
 		Version: 'infra.version',
 		Installation: 'core.lifecycle.engine.installation',
 		VersionLabel: 'updater.engine.version_label',
 		Schedule: 'updater.engine.schedule',
-		AgentSettings: 'modules.llm.agent_settings',
+		AgentSettings: 'ai.engine.settings.agent_settings',
 		AppIdentity: 'ai.engine.policy.app_identity',
 		TextUtils: 'core.text.engine.utils_core',
 		SaveFailure: 'settings.engine.publication.save_failure',
@@ -1642,7 +1642,7 @@ function closedCapturedNativeOwners(unit, role, parseTree = luaProducerTree) {
 			'", ctx' +
 			(role === 'agent' ? ', AgentSettings)' : ')'),
 		'local llm = ctx.llm',
-		'local NativeParent = require("ui.menu.ai_parent")',
+		'local NativeParent = require("ai.ui.menu.parent")',
 		...(role === 'agent' ? ['local ManifestMenu = require("menu.engine.manifest_menu")'] : [])
 	].map((source) => shape(luaProducerTree(source).body[0]));
 	const permittedDeclarations = new Set();
@@ -1817,7 +1817,7 @@ function closedLlmReadOnlyToggle(caller) {
 	if (!caller) return false;
 	const { positions, rootPositions, body, lex } = luaPublicationParser();
 	const fragments = [
-		'local Preferences = require("infra.llm_preferences")',
+		'local Preferences = require("ai.engine.preferences")',
 		'local function toggle_ready() return type(llm.toggle) == "function" and ctx.paused ~= true and Preferences.admit() == true end',
 		'local function scope_ready() return Preferences.admit() == true end',
 		'llm_ctx.commands["llm_toggle"] = function() if not toggle_ready() then return false end if llm.toggle then llm.toggle(ctx.on_menu_changed) end if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end end',
@@ -2272,7 +2272,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 			token.value,
 			token.kind === 'string' ? unit.text.slice(token.start, token.end) : null
 		]);
-	const algorithm = lex(sources['linux/ui/menu/ai_parent.lua']);
+	const algorithm = lex(sources['linux/ai/ui/menu/parent.lua']);
 	if (
 		!algorithm ||
 		!isDeepStrictEqual(tokenShape(algorithm), tokenShape(lex(LINUX_AI_PARENT_ALGORITHM)))
@@ -2300,12 +2300,12 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 	)
 		return false;
 	const builder = lex(sources['linux/menu/ui/builder/builder.lua']);
-	const agent = lex(sources['linux/ui/menu/agent_rows.lua']);
+	const agent = lex(sources['linux/ai/ui/menu/agent_rows.lua']);
 	if (
 		!builder ||
 		!agent ||
 		!one(builder, 'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")') ||
-		!one(agent, 'local AgentSettings = require("modules.llm.agent_settings")') ||
+		!one(agent, 'local AgentSettings = require("ai.engine.settings.agent_settings")') ||
 		positions(builder, 'local require').length ||
 		positions(builder, 'require =').length ||
 		positions(agent, 'local require').length ||
@@ -2458,10 +2458,10 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 			!closedNativeControl(producer, 'agent') ||
 			!terminal(
 				caller,
-				'return require("ui.menu.agent_rows").build(ctx, { prompt = function(title, text, initial, hidden, choices) return TextPrompt.ask(title, plain_markup(text), initial, hidden, choices) end, error = function(text) show_error(plain_markup(text)) end, })'
+				'return require("ai.ui.menu.agent_rows").build(ctx, { prompt = function(title, text, initial, hidden, choices) return TextPrompt.ask(title, plain_markup(text), initial, hidden, choices) end, error = function(text) show_error(plain_markup(text)) end, })'
 			) ||
 			!one(producer, 'local ManifestMenu = require("menu.engine.manifest_menu")') ||
-			!one(producer, 'local NativeParent = require("ui.menu.ai_parent")') ||
+			!one(producer, 'local NativeParent = require("ai.ui.menu.parent")') ||
 			positions(producer, 'NativeParent =').length !== 1 ||
 			positions(producer, 'ManifestMenu =').length !== 1 ||
 			!one(
@@ -2499,7 +2499,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 		if (!closedOwnerReferences(caller, ['NativeParent', 'ManifestMenu'])) return false;
 		if (
 			!closedNativeControl(caller, 'llm') ||
-			!one(caller, 'local NativeParent = require("ui.menu.ai_parent")') ||
+			!one(caller, 'local NativeParent = require("ai.ui.menu.parent")') ||
 			positions(caller, 'NativeParent =').length !== 1 ||
 			!one(caller, 'local parent = NativeParent.begin(ManifestMenu, "llm", ctx)') ||
 			!one(caller, 'if not parent then return nil end') ||

@@ -5,10 +5,10 @@ local root = assert(source:match("^(.*)/tools/test/managed_native_python_test%.l
 local repository = arg[1] or root
 package.path = repository .. "/static/ergopti_plus/_shared/?.lua;" .. package.path
 package.loaded["core.logger.engine.logger"] = { error = function() end }
-local Interpreter = assert(loadfile(repository .. "/static/ergopti_plus/macos/adapters/python_interpreter.lua"))()
+local Interpreter = assert(loadfile(repository .. "/static/ergopti_plus/macos/ai/adapters/python_interpreter.lua"))()
 local system = nil
 Interpreter.resolve = function() return system end
-package.loaded["adapters.python_interpreter"] = Interpreter
+package.loaded["ai.adapters.python_interpreter"] = Interpreter
 local catalogue = { schema_version = 1, downloads = {
 	arm = { name = "cpython", os = "darwin", libc = "none", prerelease = "", arch = { family = "aarch64" }, major = 3, minor = 11, patch = 16 },
 	intel = { name = "cpython", os = "darwin", libc = "none", prerelease = "", arch = { family = "x86_64" }, major = 3, minor = 11, patch = 16 },
@@ -18,7 +18,7 @@ local Locator = {
 	x86_64 = "cpython-3.11.16-macos-x86_64-none/bin/python3.11",
 }
 package.loaded["core.lifecycle.engine.core.managed_python_locator"] = Locator
-package.loaded["modules.llm.bootstrap_retry_generated"] = { admission_seconds = 30 }
+package.loaded["ai.engine.bootstrap.retry_generated"] = { admission_seconds = 30 }
 package.loaded["core.fs.adapters.file_system"] = {
 	read_with_status = function() error("GUI catalogue reads are forbidden") end,
 	classify_no_follow = function() return {
@@ -59,8 +59,8 @@ package.loaded["core.process.adapters.task_lifecycle"] = {
 	terminate = function(handle) return handle.terminate() end,
 }
 local native_probe = {}
-package.loaded["adapters.native_python_probe"] = native_probe
-local Provider = assert(loadfile(root .. "/static/ergopti_plus/macos/modules/llm/managed_native_python.lua"))()
+package.loaded["ai.adapters.native_python_probe"] = native_probe
+local Provider = assert(loadfile(root .. "/static/ergopti_plus/macos/ai/engine/bootstrap/managed_native_python.lua"))()
 local resolve = Provider.resolve
 function Provider.resolve()
 	-- Each original vector receives an isolated real owner. A duplicate or
@@ -68,7 +68,7 @@ function Provider.resolve()
 	Locator.duplicate = catalogue.downloads.duplicate and "unqualified" or nil
 	Locator.arm64 = type(catalogue.downloads.arm.minor) == "number"
 		and "cpython-3.11.16-macos-aarch64-none/bin/python3.11" or false
-	local actual = assert(loadfile(root .. "/static/ergopti_plus/macos/adapters/native_python_probe.lua"))()
+	local actual = assert(loadfile(root .. "/static/ergopti_plus/macos/ai/adapters/native_python_probe.lua"))()
 	native_probe.get, native_probe.cancel = actual.get, actual.cancel
 	return resolve()
 end

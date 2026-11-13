@@ -813,7 +813,7 @@ local function await_teardown_owner(owner, on_teardown_ready)
 	local record = _awaited_teardown_owners[owner.key]
 	if record.settled then return true end
 	if record.pending then return true, "pending" end
-	local module = package.loaded["ui.menu.menu_llm"]
+	local module = package.loaded["ai.ui.menu"]
 	if module == nil then
 		record.settled = true
 		return true
@@ -979,7 +979,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		{
 			name = "llm-helper-processes",
 			run = function()
-				local module = package.loaded["ui.menu.menu_llm"]
+				local module = package.loaded["ai.ui.menu"]
 				if module == nil then return true end
 				if type(module.terminate_helper_processes) ~= "function" then
 					error("terminate_helper_processes is unavailable")
@@ -992,7 +992,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		steps[#steps + 1] = {
 			name = "orphan-mlx-server",
 			run = function()
-				local module = package.loaded["ui.menu.menu_llm"]
+				local module = package.loaded["ai.ui.menu"]
 				if module == nil then return true end
 				if type(module.terminate_orphan_mlx_server) ~= "function" then
 					error("terminate_orphan_mlx_server is unavailable")
@@ -1254,9 +1254,9 @@ else
 	end)
 end
 local menu               = require("menu.ui")
-local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
-local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
-local backend_detector    = require("modules.llm.backend_detector")
+local mlx_deps_checker    = require("ai.engine.local_servers.mlx_deps_checker")
+local ollama_deps_checker = require("ai.engine.ollama.deps_checker")
+local backend_detector    = require("ai.engine.api.backend_detector")
 local ErrorDialog         = require("ui.error_dialog")
 local ui_restore         = require("menu.engine.ui_restore")
 
@@ -1635,7 +1635,7 @@ config_overrides.apply(config_paths.get("ConfigTomlPath"))
 -- alone: a config.toml that turned the AI on, with no native value yet, started
 -- the AI bootstrap and skipped the cleanup.
 local Preferences = require("settings.engine.preferences.preferences")
-local ok_core_llm, core_llm = pcall(require, "modules.llm")
+local ok_core_llm, core_llm = pcall(require, "ai.engine")
 local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
 local boot_llm_enabled = config_overrides.read_native_value(require("settings.engine.keys").KEY.LLM_ENABLED)
 if boot_llm_enabled == nil then
@@ -1686,7 +1686,7 @@ end
 -- The exact terminal callback opens the bootstrap gate, preserving the required
 -- port-settlement ordering without parking input eventtaps (HS-195).
 if mlx_cleanup_enabled then
-	local cleanup_started = require("modules.llm.boot_cleanup")
+	local cleanup_started = require("ai.engine.bootstrap.boot_cleanup")
 		.run_selective_cleanup(settle_mlx_cleanup)
 	if cleanup_started ~= true and not mlx_cleanup_settled then
 		settle_mlx_cleanup(false)
@@ -1749,7 +1749,7 @@ local function start_llm_bootstrap()
 	end
 	if selected_checker then
 		local notice_ok, notice_err = xpcall(function()
-			return require("ui.menu.menu_llm.runtime_install_offer").notify_if_missing(active_backend)
+			return require("ai.ui.menu.runtime_install_offer").notify_if_missing(active_backend)
 		end, debug.traceback)
 		if not notice_ok then
 			Logger.error(LOG, "Missing AI runtime notice failed: %s", tostring(notice_err))

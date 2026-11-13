@@ -1488,13 +1488,13 @@ function M.validate_action_parameter(action_name, value)
 	if spec == "llm_prompt" then
 		local parsed = PromptAction.parse(value)
 		return parsed ~= nil and (parsed.translation_target == nil
-			or require("modules.llm.translation").is_valid(parsed.translation_target))
+			or require("ai.engine.prediction.translation").is_valid(parsed.translation_target))
 	end
 	-- Syntax only as well: whether the provider exists, has a key and a
 	-- default model is checked when the action runs.
 	if spec == "llm_vision" then return Vision.is_valid(value) end
 	-- An admitted per-binding language name or retained locale code (translate.lua).
-	if spec == "llm_language" then return require("modules.llm.translation").is_valid(value) end
+	if spec == "llm_language" then return require("ai.engine.prediction.translation").is_valid(value) end
 	-- Syntax only: whether the desktop entry exists is gtk-launch's to say.
 	if spec == "app" then return AppParameter.is_valid(value) end
 	if spec == "program" then return ProgramParameter.parse(value, "posix") ~= nil end
@@ -1538,20 +1538,20 @@ function M.get_action_parameter_prompt(action_name)
 	end
 	if spec == "llm_prompt" then
 		local lines = {}
-		for _, choice in ipairs(require("modules.llm.profile_settings").choices()) do
+		for _, choice in ipairs(require("ai.engine.settings.profile_settings").choices()) do
 			lines[#lines + 1] = choice.value .. " — " .. choice.label
 		end
 		return fill_placeholder(i18n.get("dialog.gestures.param_llm_prompt"), table.concat(lines, "\n"))
 	end
 	if spec == "llm_vision" then
 		local lines = {}
-		for _, choice in ipairs(require("modules.llm.vision_request").backend_choices()) do
+		for _, choice in ipairs(require("ai.engine.prediction.vision_request").backend_choices()) do
 			lines[#lines + 1] = choice.value .. " — " .. choice.label
 		end
 		return fill_placeholder(i18n.get("dialog.gestures.param_llm_vision"), table.concat(lines, "\n"))
 	end
 	if spec == "llm_language" then
-		local data = require("modules.llm.translation").data()
+		local data = require("ai.engine.prediction.translation").data()
 		if not data then error("the translation parameter is unavailable") end
 		return fill_placeholder(i18n.get("dialog.gestures.param_llm_language"), tostring(data.config.max_language_bytes))
 	end
@@ -1823,12 +1823,12 @@ function M.get_picker_parameter_fields(items, binding)
 			end
 		end
 	end
-	local ProfileSettings = require("modules.llm.profile_settings")
+	local ProfileSettings = require("ai.engine.settings.profile_settings")
 	return {
 		send_vocabulary = send_vocabulary(),
 		prompt_choices = ProfileSettings.choices(),
-		vision_choices = require("modules.llm.vision_request").backend_choices(),
-		language_choices = require("modules.llm.translation").choices(),
+		vision_choices = require("ai.engine.prediction.vision_request").backend_choices(),
+		language_choices = require("ai.engine.prediction.translation").choices(),
 		default_count = ProfileSettings.get(ConfigKeys.LEAF.NUM_PREDICTIONS),
 		edit_current_label = i18n.get("dialog.action_picker.edit_current"),
 		parameter_strings = {

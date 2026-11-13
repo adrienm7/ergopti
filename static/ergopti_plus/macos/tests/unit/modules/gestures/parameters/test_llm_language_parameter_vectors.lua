@@ -32,7 +32,7 @@ local _ = helpers.load_with_stubs("core.logger.engine.logger")
 package.loaded["modules.gestures.engine"] = nil
 package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil
-package.loaded["modules.llm.selection_translation"] = nil
+package.loaded["ai.engine.prediction.selection_translation"] = nil
 local _gestures = helpers.load_with_stubs("modules.gestures")
 local Actions = require("modules.gestures.actions")
 

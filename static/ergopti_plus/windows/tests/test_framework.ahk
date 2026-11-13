@@ -770,11 +770,11 @@ global TEST_MODULE_GROUPS := [
 	; Local LLM server panel (view preparation, discovery, panel actions).
 	["llm-server-panel", "^unit/modules/llm/servers/test_local_server_panel"],
 	; Every other local and managed LLM server test: sharing, publication, Ollama.
-	["llm-servers", "^unit/modules/llm/servers/"],
+	["llm-servers", "^unit/ai/servers/"],
 	; LLM terminal navigation owner.
-	["llm-terminal", "^unit/modules/llm/nav_event_owner/"],
+	["llm-terminal", "^unit/ai/nav_event_owner/"],
 	; The rest of the LLM module: prediction, menus, API clients.
-	["llm", "^unit/modules/llm/"],
+	["llm", "^unit/ai/"],
 	; Configuration version transitions.
 	["config-transition", "^unit/settings/engine/transition/"],
 	; Whole-configuration scope: global scope, recommended restore, scope manifest, menus.
@@ -784,7 +784,7 @@ global TEST_MODULE_GROUPS := [
 	; Configuration storage, TOML and the updater.
 	["config-updater", "^unit/(config|toml)/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
 	; Hotstrings, dynamic hotstrings and shortcuts.
-	["hotstrings-shortcuts", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
+	["hotstrings-shortcuts", "^unit/(hotstrings|dynamic_hotstrings|shortcuts)/"],
 	; Keyboard remapping, layouts and gestures.
 	["keymap-gestures", "^unit/(platform/remap|modules/(keymap|gestures))/"],
 	; Keystats capture, storage and metrics.
@@ -792,7 +792,7 @@ global TEST_MODULE_GROUPS := [
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
 	["ui", "^unit/"],
 	; Adapters, platform services, shared infrastructure and the test runner.
-	["core", "^unit/(adapters|platform|infra|suite|core|settings|menu|tray)/"]
+	["core", "^unit/(adapters|platform|infra|suite|core|settings|menu|tray|ai)/"]
 ]
 
 ; The test category of a registering test file; a file no category declares is refused.

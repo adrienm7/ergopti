@@ -42,17 +42,17 @@ local function receiving(body)
 			if name == "OLLAMA_MODELS" then return state.models end
 			return getenv(name)
 		end
-		package.loaded["modules.llm.ollama_binary"] = {
+		package.loaded["ai.engine.ollama.binary"] = {
 			native_managed_install_dir = function() return state.target end,
 		}
-		package.loaded["adapters.python_interpreter"] = {
+		package.loaded["ai.adapters.python_interpreter"] = {
 			native_arch = function() return state.architecture or "arm64" end,
 			native_candidates = function()
 				if state.resolve then state.resolve() end
 				return { "/usr/bin/python3" }
 			end,
 		}
-		package.loaded["adapters.native_bootstrap_pty"] = {
+		package.loaded["ai.adapters.native_bootstrap_pty"] = {
 			prepare = function(script, environment, budget)
 				state.calls[#state.calls + 1] = { script = script, environment = environment, budget = budget }
 				if state.prepare then state.prepare() end
@@ -61,9 +61,9 @@ local function receiving(body)
 		}
 		package.loaded["core.lifecycle.engine.launcher_environment"] = nil
 		package.loaded["core.lifecycle.engine.core.ollama_runtime_choice"] = nil
-		package.loaded["adapters.managed_ollama_bootstrap"] = nil
+		package.loaded["ai.adapters.managed_ollama_bootstrap"] = nil
 		local choice = require("core.lifecycle.engine.core.ollama_runtime_choice")
-		local adapter = require("adapters.managed_ollama_bootstrap")
+		local adapter = require("ai.adapters.managed_ollama_bootstrap")
 		function state.issue(source, kind)
 			local decision = choice.new_migration(source or SOURCE, kind or "app", TARGET, state.models, function()
 				if state.current_hook then state.current_hook() end
@@ -276,8 +276,8 @@ local function shell_receiving(body, refused, python_source)
 		local _, made = command("mkdir " .. quote(root .. "/source") .. " " .. quote(root .. "/home"))
 		helpers.assert_eq(made, 0)
 		local driver = helpers.driver_root()
-		write(root .. "/source/ensure-ollama-native-deps.sh", read(driver .. "modules/llm/ensure-ollama-native-deps.sh"))
-		write(root .. "/source/network-retry.sh", read(driver .. "modules/llm/network-retry.sh"))
+		write(root .. "/source/ensure-ollama-native-deps.sh", read(driver .. "ai/engine/ollama/ensure-ollama-native-deps.sh"))
+		write(root .. "/source/network-retry.sh", read(driver .. "ai/engine/bootstrap/network-retry.sh"))
 		write(root .. "/foreign-python", "#!/bin/bash\nprintf inherited > \"$FIXTURE_ROOT/foreign-called\"\nexit 0\n")
 		write(root .. "/recording-python", python_source or [[#!/bin/bash
 set -eu
@@ -348,7 +348,7 @@ helpers.describe("native installer source and fixed environment receiving", func
 		local worker = read(helpers.driver_root() .. "launcher/Sources/ErgoptiPlus/ManagedPTYWorker.swift")
 		local guardian = assert(worker:match("private static func guardian%(.-\n\t}\n"))
 		helpers.assert_true(guardian:find("admittedSources(for: LuaSourceSelection.resolve(", 1, true) ~= nil)
-		helpers.assert_eq(guardian:find("Contents/Resources/static/ergopti_plus/macos/modules/llm", 1, true), nil)
+		helpers.assert_eq(guardian:find("Contents/Resources/static/ergopti_plus/macos/ai/engine", 1, true), nil)
 		local names = assert(worker:match("static let admittedSourceNames = (%b[])"))
 		helpers.assert_true(names:find('"ensure-ollama-native-deps.sh"', 1, true) ~= nil)
 	end)
@@ -706,8 +706,8 @@ helpers.describe("native installer run from its private snapshot", function()
 		helpers.assert_eq(made, 0)
 		local driver = helpers.driver_root()
 		local snapshot = root .. "/snapshot/ensure-ollama-native-deps.sh"
-		write(snapshot, read(driver .. "modules/llm/ensure-ollama-native-deps.sh"))
-		write(root .. "/source/network-retry.sh", read(driver .. "modules/llm/network-retry.sh"))
+		write(snapshot, read(driver .. "ai/engine/ollama/ensure-ollama-native-deps.sh"))
+		write(root .. "/source/network-retry.sh", read(driver .. "ai/engine/bootstrap/network-retry.sh"))
 		write(root .. "/source/native_python_bootstrap.sh",
 			'native_bootstrap_python() { printf sourced > "$FIXTURE_ROOT/delegate-called"; return 78; }\n')
 		local bytes, status = command("env -u BASH_ENV -u ENV FIXTURE_ROOT=" .. quote(root)

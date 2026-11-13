@@ -71,7 +71,7 @@ check('inference.json has unified "line" key', INFERENCE_JSON, /"line"\s*:/, tru
 // the distinctive first token "<|eot_id|>" appearing as a literal in this file)
 check(
 	'AHK api_ollama.ahk: no inline stop-token literal',
-	path.join(EP, 'windows', 'modules', 'llm', 'api_ollama.ahk'),
+	path.join(EP, 'windows', 'ai', 'engine', 'api', 'ollama.ahk'),
 	/"<\|eot_id\|>"/,
 	false
 );
@@ -79,7 +79,7 @@ check(
 // macOS api_ollama.lua must NOT contain inline stop-token literals
 check(
 	'macOS api_ollama.lua: no inline stop-token literal',
-	path.join(EP, 'macos', 'modules', 'llm', 'api_ollama.lua'),
+	path.join(EP, 'macos', 'ai', 'engine', 'api', 'ollama.lua'),
 	/"<\|eot_id\|>"/,
 	false
 );
@@ -87,7 +87,7 @@ check(
 // macOS api_mlx_inference.lua must NOT contain inline stop-token literals
 check(
 	'macOS api_mlx_inference.lua: no inline stop-token literal',
-	path.join(EP, 'macos', 'modules', 'llm', 'api_mlx_inference.lua'),
+	path.join(EP, 'macos', 'ai', 'engine', 'api', 'mlx_inference.lua'),
 	/"<\|eot_id\|>"/,
 	false
 );

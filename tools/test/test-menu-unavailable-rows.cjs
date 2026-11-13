@@ -913,9 +913,9 @@ console.log(
 	// exist before checking prompt, setting and persistence routes.
 	const numericPaths = {
 		linux: path.join(SP, 'linux/menu/ui/builder/builder.lua'),
-		mac: path.join(SP, 'macos/ui/menu/menu_llm/settings_manager.lua'),
-		windows: path.join(SP, 'windows/ui/menu/menu_llm/menu_settings.ahk'),
-		persist: path.join(SP, 'windows/ui/menu/menu_llm/persist.ahk')
+		mac: path.join(SP, 'macos/ai/ui/menu/settings_manager.lua'),
+		windows: path.join(SP, 'windows/ai/ui/menu/settings.ahk'),
+		persist: path.join(SP, 'windows/ai/ui/menu/persist.ahk')
 	};
 	const numeric = Object.fromEntries(
 		Object.entries(numericPaths).map(([driver, file]) => [

@@ -123,11 +123,11 @@ check('the macOS shell projection is regenerated from the catalogue', () => {
 
 check('Windows and Linux read the catalogue at runtime instead of a copy', () => {
 	assert.match(
-		read('static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk'),
+		read('static/ergopti_plus/windows/ai/engine/ollama/managed_bootstrap.ahk'),
 		/\\ai\\data\\ollama_release\.json"/
 	);
 	assert.match(
-		read('static/ergopti_plus/linux/modules/llm/ollama_install_resolver.lua'),
+		read('static/ergopti_plus/linux/ai/engine/ollama/install_resolver.lua'),
 		/shared\("ai\/data\/ollama_release\.json"\)/
 	);
 });

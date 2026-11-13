@@ -38,23 +38,23 @@ const SSOT_FILE = path.join(
 // Files that must read the shared probe instead of restating it.
 const CONSUMERS = [
 	{
-		rel: 'static/ergopti_plus/windows/modules/llm/api_remote.ahk',
+		rel: 'static/ergopti_plus/windows/ai/engine/api/remote.ahk',
 		refs: ['test_request']
 	},
 	{
-		rel: 'static/ergopti_plus/windows/ui/menu/menu_llm/menu_api_entries.ahk',
+		rel: 'static/ergopti_plus/windows/ai/ui/menu/api_entries.ahk',
 		refs: ['test_request']
 	},
 	{
-		rel: 'static/ergopti_plus/macos/modules/llm/api_remote.lua',
+		rel: 'static/ergopti_plus/macos/ai/engine/api/remote.lua',
 		refs: ['TEST_REQUEST', 'test_request']
 	},
 	{
-		rel: 'static/ergopti_plus/macos/ui/menu/menu_llm/api_panel.lua',
+		rel: 'static/ergopti_plus/macos/ai/ui/menu/panels/api_panel.lua',
 		refs: ['test_request']
 	},
 	{
-		rel: 'static/ergopti_plus/linux/modules/llm/api_remote.lua',
+		rel: 'static/ergopti_plus/linux/ai/engine/api/api_remote.lua',
 		refs: ['test_request']
 	}
 ];

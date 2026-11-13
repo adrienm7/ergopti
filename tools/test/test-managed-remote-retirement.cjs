@@ -280,7 +280,7 @@ assert.deepEqual(ownedOutputResult.stdout.trim().split(/\r?\n/), [
 
 // BEGIN Ollama acquisition inert controls
 // The registered models invoke actual source bodies with closed native/route ports.
-const ollamaModuleRoot = path.join(__dirname, '../../static/ergopti_plus/windows/modules/llm');
+const ollamaModuleRoot = path.join(__dirname, '../../static/ergopti_plus/windows/ai/engine');
 const ollamaSourceFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ollama-source-model-'));
 try {
 	for (const name of [
@@ -299,7 +299,7 @@ try {
 	for (const [script, parameters, count, debt] of [
 		[
 			'test_ollama_managed_acquisition.ps1',
-			['-Library', path.join(ollamaModuleRoot, 'ollama_managed_acquisition.ps1')],
+			['-Library', path.join(ollamaModuleRoot, 'ollama/ollama_managed_acquisition.ps1')],
 			7,
 			''
 		],
@@ -307,7 +307,7 @@ try {
 			'test_ollama_acquisition_source.ps1',
 			[
 				'-Source',
-				path.join(ollamaModuleRoot, 'ollama_download_archive.ps1'),
+				path.join(ollamaModuleRoot, 'ollama/ollama_download_archive.ps1'),
 				'-FixtureRoot',
 				ollamaSourceFixture
 			],
@@ -318,9 +318,9 @@ try {
 			'test_ollama_acquisition_owner.ps1',
 			[
 				'-Source',
-				path.join(ollamaModuleRoot, 'ollama_download_archive.ps1'),
+				path.join(ollamaModuleRoot, 'ollama/ollama_download_archive.ps1'),
 				'-ManagedSource',
-				path.join(ollamaModuleRoot, 'ollama_managed_files.ps1')
+				path.join(ollamaModuleRoot, 'ollama/ollama_managed_files.ps1')
 			],
 			6,
 			[

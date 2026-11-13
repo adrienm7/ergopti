@@ -8,8 +8,8 @@ const path = require('node:path');
 const { REPO_ROOT, sharedRel } = require('../lib/paths.cjs');
 
 const SOURCE = sharedRel('ai', 'data', 'managed_python_release.json');
-const SHELL_OUTPUT = 'static/ergopti_plus/macos/modules/llm/managed-python-release.sh';
-const METADATA_OUTPUT = 'static/ergopti_plus/macos/modules/llm/managed-python-downloads.json';
+const SHELL_OUTPUT = 'static/ergopti_plus/macos/ai/engine/bootstrap/managed-python-release.sh';
+const METADATA_OUTPUT = 'static/ergopti_plus/macos/ai/engine/managed-python-downloads.json';
 const LUA_LOCATOR_OUTPUT = sharedRel(
 	'core',
 	'lifecycle',
@@ -188,7 +188,7 @@ function generate(root = REPO_ROOT, { check = false } = {}) {
 	const data = JSON.parse(fs.readFileSync(path.join(root, SOURCE), 'utf8'));
 	const identifiers = JSON.parse(fs.readFileSync(path.join(root, IDENTIFIERS), 'utf8'));
 	const uv = fs.readFileSync(
-		path.join(root, 'static/ergopti_plus/macos/modules/llm/uv-release.sh'),
+		path.join(root, 'static/ergopti_plus/macos/ai/engine/bootstrap/uv-release.sh'),
 		'utf8'
 	);
 	const version = uv.match(/^UV_RELEASE_VERSION="([0-9]+\.[0-9]+\.[0-9]+)"$/m);

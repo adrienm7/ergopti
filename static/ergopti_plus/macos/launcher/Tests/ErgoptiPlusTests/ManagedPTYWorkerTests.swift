@@ -32,7 +32,7 @@ private final class ManagedPTYTestSession {
 		let app = root.appendingPathComponent("Fixture.app")
 		let contents = app.appendingPathComponent("Contents")
 		let executable = contents.appendingPathComponent("MacOS/ErgoptiPlus")
-		source = contents.appendingPathComponent("Resources/static/ergopti_plus/macos/modules/llm/" + sourceName)
+		source = contents.appendingPathComponent("Resources/static/ergopti_plus/macos/ai/engine/" + sourceName)
 		receipt = root.appendingPathComponent("receipt.json")
 		try manager.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
 		try manager.createDirectory(at: source.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -342,7 +342,7 @@ final class ManagedPTYWorkerTests: XCTestCase {
 		printf 'PTY-OWNED\\000BYTES\\n'
 		printf 'RETIRED 0 0 1\\n'
 		printf 'stderr-on-tty\\n' >&2
-		test "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" = "${PROJECT_ROOT}/Fixture.app/Contents/Resources/static/ergopti_plus/macos/modules/llm" || exit 92
+		test "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" = "${PROJECT_ROOT}/Fixture.app/Contents/Resources/static/ergopti_plus/macos/ai/engine" || exit 92
 		exit 7
 		""" + "\n", inheritedStartup: true)
 		defer { session.cleanup() }
@@ -431,7 +431,7 @@ final class ManagedPTYWorkerTests: XCTestCase {
 		test "$0" = "$ERGOPTI_BOOTSTRAP_SNAPSHOT" && test -f "$0" && test ! -w "$0" || exit 91
 		case "$0" in "$HOME/\(kMacOSSupportHomeRelativePath)/pty-sources/op."*/ensure-ollama-native-deps.sh) ;; *) exit 96;; esac
 		test -t 0 && test -t 1 && test -t 2 || exit 92
-		test "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" = "${PROJECT_ROOT}/Fixture.app/Contents/Resources/static/ergopti_plus/macos/modules/llm" || exit 93
+		test "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" = "${PROJECT_ROOT}/Fixture.app/Contents/Resources/static/ergopti_plus/macos/ai/engine" || exit 93
 		case "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" in ''|*[!0-9]*) exit 94;; esac
 		test "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" -gt 0 && test "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" -le 5000 || exit 95
 		printf 'SECOND-INSTALLER-OWNED\\n'
@@ -488,8 +488,8 @@ final class ManagedPTYWorkerTests: XCTestCase {
 	func testDeveloperBuildAdmitsTheInstallersOfItsRecordedClone() {
 		let clone = "/Users/maintainer/ergopti/static/ergopti_plus/macos"
 		let admitted = ManagedPTYWorker.admittedSources(for: .developer(root: "/Users/maintainer/ergopti", configDir: clone))
-		XCTAssertEqual(admitted, Set(ManagedPTYWorker.admittedSourceNames.map { "\(clone)/modules/llm/\($0)" }))
-		XCTAssertTrue(admitted.contains("\(clone)/modules/llm/ensure-ollama-native-deps.sh"))
+		XCTAssertEqual(admitted, Set(ManagedPTYWorker.admittedSourceNames.map { "\(clone)/ai/engine/\($0)" }))
+		XCTAssertTrue(admitted.contains("\(clone)/ai/engine/ollama/ensure-ollama-native-deps.sh"))
 	}
 
 	/// App Cloner's PyObjC installer runs under the guardian like the AI installers
@@ -498,7 +498,7 @@ final class ManagedPTYWorkerTests: XCTestCase {
 	func testEveryAdmittedInstallerShipsAndThePyObjCInstallerIsAdmitted() {
 		var repository = URL(fileURLWithPath: #filePath)
 		for _ in 0..<7 { repository.deleteLastPathComponent() }
-		let folder = repository.appendingPathComponent("static/ergopti_plus/macos/modules/llm")
+		let folder = repository.appendingPathComponent("static/ergopti_plus/macos/ai/engine")
 		XCTAssertTrue(ManagedPTYWorker.admittedSourceNames.contains("ensure-managed-pyobjc.sh"))
 		XCTAssertEqual(Set(ManagedPTYWorker.admittedSourceNames).count, ManagedPTYWorker.admittedSourceNames.count)
 		for name in ManagedPTYWorker.admittedSourceNames {
@@ -510,8 +510,8 @@ final class ManagedPTYWorkerTests: XCTestCase {
 	func testPackagedAppAdmitsOnlyItsPayloadAndARefusalAdmitsNothing() {
 		let payload = "/Applications/\(Identifiers.App.bundle)/Contents/Resources/static/ergopti_plus/macos"
 		let admitted = ManagedPTYWorker.admittedSources(for: .packaged(configDir: payload))
-		XCTAssertEqual(admitted, Set(ManagedPTYWorker.admittedSourceNames.map { "\(payload)/modules/llm/\($0)" }))
-		XCTAssertFalse(admitted.contains("/Users/maintainer/ergopti/static/ergopti_plus/macos/modules/llm/ensure-ollama-native-deps.sh"))
+		XCTAssertEqual(admitted, Set(ManagedPTYWorker.admittedSourceNames.map { "\(payload)/ai/engine/\($0)" }))
+		XCTAssertFalse(admitted.contains("/Users/maintainer/ergopti/static/ergopti_plus/macos/ai/engine/ollama/ensure-ollama-native-deps.sh"))
 		XCTAssertTrue(ManagedPTYWorker.admittedSources(for: .refused(reason: "malformed key")).isEmpty)
 	}
 }

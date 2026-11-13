@@ -752,7 +752,7 @@ class PayloadDependencyControls(unittest.TestCase):
             )
             runtime = RECEIVING.load(
                 "payload_only_ollama_runtime",
-                payload / "macos/modules/llm/managed_ollama_runtime.py",
+                payload / "macos/ai/engine/ollama/managed_ollama_runtime.py",
             )
             self.assertEqual(runtime.BOOTSTRAP.REDIRECT_POLICY, copied)
             request = Mock(side_effect=AssertionError("payload prerequisite cannot reach network"))
@@ -983,7 +983,8 @@ class ReceivingCatalogueControls(unittest.TestCase):
                 },
             )
             runtime = RECEIVING.load(
-                "planned_receiving_runtime", payload / "macos/modules/llm/managed_ollama_runtime.py"
+                "planned_receiving_runtime",
+                payload / "macos/ai/engine/ollama/managed_ollama_runtime.py",
             )
             contract_bytes = (payload / "_shared/ai/data/managed_ollama_runtime.json").read_bytes()
 

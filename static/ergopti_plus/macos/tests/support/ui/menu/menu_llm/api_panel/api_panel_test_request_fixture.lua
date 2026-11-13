@@ -52,7 +52,7 @@ local function install_doubles(args)
 			return true
 		end,
 	}
-	package.loaded["modules.llm"] = { api_remote = api_remote }
+	package.loaded["ai.engine"] = { api_remote = api_remote }
 	-- The two body templates mirror the en.json shapes so the substitution
 	-- wiring is exercised; every other key echoes itself.
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
@@ -98,7 +98,7 @@ local function install_doubles(args)
 		get_array = command_renderer.get_array,
 		render_rows = function(rows) return rows end,
 	}
-	package.loaded["ui.menu.menu_llm.api_panel"] = nil
+	package.loaded["ai.ui.menu.panels.api_panel"] = nil
 	return api_remote, calls, notifications
 end
 

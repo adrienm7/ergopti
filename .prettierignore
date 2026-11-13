@@ -33,7 +33,7 @@ static/ergopti_plus/_shared/core/network/native/go/native_http/managed_ollama_bo
 static/ergopti_plus/_shared/core/network/native/go/native_http/managed_ollama_environment.json
 static/ergopti_plus/_shared/core/network/native/go/native_http/proxy_policy.json
 static/ergopti_plus/_shared/menu/data/menu_manifest.json
-static/ergopti_plus/macos/modules/llm/managed-python-downloads.json
+static/ergopti_plus/macos/ai/engine/managed-python-downloads.json
 static/ergopti_plus/docs/architecture.md
 docs/design/owned-runtimes.md
 docs/feature-inventory.md

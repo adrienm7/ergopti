@@ -11,7 +11,7 @@
  *
  * FEATURES & RATIONALE:
  * 1. Single source of truth: both facts were previously hand-copied literals in
- *    windows/modules/llm/profiles.ahk AND macos/modules/llm/profiles.lua, with
+ *    windows/ai/engine/settings/profiles.ahk AND macos/ai/engine/settings/profiles.lua, with
  *    no mechanism catching drift between the three copies (JSON + 2 literals).
  *    The macOS driver already reads its copy from the loaded JSON at runtime
  *    (Lua has no equivalent codegen step); AHK cannot do the same without a

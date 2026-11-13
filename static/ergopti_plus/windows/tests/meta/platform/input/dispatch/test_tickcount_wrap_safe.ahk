@@ -4,7 +4,7 @@
 ; MODULE: A_TickCount Wrap-Safe Delta Formula Guard
 ; DESCRIPTION:
 ; Static source guard for the A_TickCount wrap-safe formula fix in
-; modules/llm/prediction_engine.ahk and modules/keymap/llm_bridge.ahk.
+; ai/engine/prediction/engine.ahk and ai/engine/bridge.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; A_TickCount is a 32-bit unsigned counter that wraps from 0xFFFFFFFF back to 0
@@ -40,8 +40,8 @@ _TTCWS_StripLineComments(Src) {
 
 _TTCWS_PredictionEngineWrapSafe() {
 	; Move-resilient: the debounce-rate-limit wrap-safe delta used to live
-	; directly in modules/llm/prediction_engine.ahk, but that logic now lives
-	; in LLM_Engine_FirePrediction (modules/llm/prediction_exec.ahk) after the
+	; directly in ai/engine/prediction/engine.ahk, but that logic now lives
+	; in LLM_Engine_FirePrediction (ai/engine/prediction/exec.ahk) after the
 	; engine was split — scan the function body by name across the whole
 	; driver so a further file move cannot go unnoticed.
 	Src := _TTCWS_StripLineComments(_DriverFuncBody("LLM_Engine_FirePrediction"))
@@ -64,7 +64,7 @@ Test("prediction_engine: TickCount delta uses wrap-safe (now - last + 0x10000000
 
 _TTCWS_LlmBridgeWrapSafe() {
 	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("llm_bridge.ahk"))
-	Assert(Src != "", "modules/keymap/llm_bridge.ahk must be readable")
+	Assert(Src != "", "ai/engine/bridge.ahk must be readable")
 
 	Assert(InStr(Src, "0x100000000") > 0,
 		"llm_bridge.ahk must use the wrap-safe constant 0x100000000 in TickCount delta computation")
@@ -136,7 +136,7 @@ Test("wpm_widget: event ages use the native-width TickElapsed64 delta (F35)", _T
 
 _TTCWS_OllamaWarmupWrapSafe() {
 	; Move-resilient: LLM_OllamaAllowInference used to live directly in
-	; modules/llm/api_ollama.ahk, but that file is now a thin #Include redirect
+	; ai/engine/api/ollama.ahk, but that file is now a thin #Include redirect
 	; shim to api_ollama/ollama_http.ahk (post-split) — scan the function body
 	; by name across the whole driver so a further file move cannot go unnoticed.
 	Src := _TTCWS_StripLineComments(_DriverFuncBody("LLM_OllamaAllowInference"))

@@ -23,10 +23,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SP = path.resolve(__dirname, '..', '..', 'static', 'ergopti_plus');
-const ahk = fs.readFileSync(
-	path.join(SP, 'windows', 'ui', 'menu', 'menu_llm', 'menu_settings.ahk'),
-	'utf8'
-);
+const ahk = fs.readFileSync(path.join(SP, 'windows', 'ai', 'ui', 'menu', 'settings.ahk'), 'utf8');
 const lua = fs.readFileSync(
 	path.join(SP, '_shared', 'ai', 'engine', 'prediction', 'test_prediction.lua'),
 	'utf8'
@@ -65,13 +62,13 @@ if (!sendBody.includes('LLM_Defaults["llm_test_prediction_temperature"]'))
 if (/Temperature := _LLM_Engine\["temperature"\]/.test(sendBody.slice(0, 900)))
 	errors.push('Windows must not send the generation temperature');
 const mac = fs.readFileSync(
-	path.join(SP, 'macos', 'modules', 'llm', 'prediction_engine.lua'),
+	path.join(SP, 'macos', 'ai', 'engine', 'prediction', 'engine.lua'),
 	'utf8'
 );
 if (!mac.includes('.test_prediction_temperature()'))
 	errors.push('macOS must send the temperature of the shared defaults');
 const linux = fs.readFileSync(
-	path.join(SP, 'linux', 'modules', 'llm', 'prediction_engine.lua'),
+	path.join(SP, 'linux', 'ai', 'engine', 'prediction', 'engine.lua'),
 	'utf8'
 );
 if (!linux.includes('request.temperature = HttpBridge.TEST_PREDICTION_TEMPERATURE'))

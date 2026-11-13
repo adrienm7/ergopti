@@ -61,17 +61,17 @@
 ; file that does not exist suppresses nothing and merely hides that its
 ; successor was never triaged. Every path below was confirmed to exist.
 _REQUIRE_STATE_ALLOWLIST := Map(
-	"modules/llm/api_common.ahk", true,
-	"modules/llm/api_ollama/init.ahk", true,
-	"modules/llm/api_remote.ahk", true,
-	"modules/llm/models.ahk", true,
-	"modules/llm/profiles.ahk", true,
+	"ai/engine/api/common.ahk", true,
+	"ai/engine/api_ollama/init.ahk", true,
+	"ai/engine/api/remote.ahk", true,
+	"ai/engine/settings/models.ahk", true,
+	"ai/engine/settings/profiles.ahk", true,
 	"modules/keystats/keystats_hook.ahk", true,
 	"platform/remap/tap_hold_loader.ahk", true,
-	"modules/keymap/llm_bridge.ahk", true,
+	"ai/engine/bridge.ahk", true,
 	"menu/ui/tray_menu.ahk", true,
 	"modules/gestures/actions.ahk", true,
-	"modules/llm/ollama_deps_checker.ahk", true,
+	"ai/engine/ollama/deps_checker.ahk", true,
 	"modules/keymap/layout.ahk", true,
 	; _HardwareCapsLockOn — a self-initialising flag, not injected state. It is
 	; seeded from the real toggle at its declaration and thereafter written only
@@ -143,7 +143,7 @@ _MetaGuardRatchet() {
 
 	; All four trees that hold production code. modules/ alone was the original
 	; blind spot: the stateful code largely lives elsewhere now.
-	for SubDir in ["modules", "infra", "platform", "adapters", "ui", "core", "settings", "menu", "tray"] {
+	for SubDir in ["modules", "infra", "platform", "adapters", "ui", "core", "settings", "menu", "tray", "ai"] {
 		for AbsPath in _MetaListAhkFilesGuardV2(StrReplace(DriverRoot . SubDir, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))

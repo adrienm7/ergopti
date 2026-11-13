@@ -319,7 +319,7 @@ and Fn and Spotlight belong to macOS. The source explains each restriction.
 Some missing menu rows have equivalent providers rather than missing features: Linux's
 `llm_generation` provider exposes min/max words, temperature, prediction count
 and context length even though the native Windows/macOS presentation rows are
-absent. See `linux/ui/menu/menu_llm.lua` and `modules/llm/settings.lua`.
+absent. See `linux/ai/ui/menu/llm.lua` and `modules/llm/settings.lua`.
 
 Windows programmable hotstrings are an equivalent presentation rather than an
 absence: `ui/menu/menu_submenus.ahk` calls `_HS_ProgrammableHotstringRows`, whose
@@ -329,7 +329,7 @@ absence of macOS's per-profile shortcut dialog does not remove prompt actions.
 
 The English catalogue also contains stale Linux claims. The reason
 `platform_reason.llm_configuration_surface_is_not_on_linux` says Linux has no
-backend, profile, trigger or display surfaces, while `linux/ui/menu/menu_llm.lua`
+backend, profile, trigger or display surfaces, while `linux/ai/ui/menu/llm.lua`
 provides them and `menu.toml` explicitly selects Linux's inline generation
 provider. `platform_reason.metrics_extras_are_not_on_linux` says there is no
 per-application exclusion, while `linux/ui/menu/menu_metrics.lua` and

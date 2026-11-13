@@ -6,8 +6,8 @@
 --- wrapped_on_done wraps on_done in xpcall + Logger.error + crash-report
 --- forwarding, but the parallel streaming callback on_chunk was passed
 --- raw/unwrapped into hs.task.new. A throw inside SSE-chunk handling (e.g. the
---- streaming JSON-line parsers in modules/llm/api_ollama.lua and
---- modules/llm/api_mlx_inference.lua) was swallowed to the HS Console only —
+--- streaming JSON-line parsers in ai/engine/api/ollama.lua and
+--- ai/engine/api/mlx_inference.lua) was swallowed to the HS Console only —
 --- reintroducing the "vert mais aucune prédiction" silent-failure class
 --- specifically for the streaming path (also covers F-LOW-2, same gap).
 ---

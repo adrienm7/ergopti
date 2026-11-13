@@ -1,0 +1,652 @@
+﻿; ai/ui/menu/menu_main.ahk
+
+; ==============================================================================
+; MODULE: LLM Tray — Main Menu Orchestrator
+; DESCRIPTION:
+; Top-level builder that assembles every sub-menu (backend, model, profile,
+; predictions count, trigger, generation, display, navigation) into the
+; persistent ``_LLM_Menu_Handle`` object. Reads state from ``_LLM_Menu`` and
+; delegates each submenu to its own builder defined in the menu_<topic>.ahk
+; companion modules.
+;
+; FEATURES & RATIONALE:
+; 1. Persistent menu object: the AHK v2 ``Menu`` instance is reused across
+;    rebuilds so the canonical tray position is preserved.
+; 2. Health dot: backend reachability is reflected by the dot the manifest
+;    declares, appended to the AI tray title from the latest async probe result.
+; 3. Warning row: surfaces a missing Ollama install with a re-install click
+;    target — without this, a missing daemon was completely silent.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+
+
+
+
+
+; ==============================================
+; ==============================================
+; ======= 1/ Top-Level Menu Construction =======
+; ==============================================
+; ==============================================
+
+global _LLM_MenuBuildCoordinator := 0
+
+_LLM_Menu_IsSuspended(*) {
+	return A_IsSuspended
+}
+
+_LLM_Menu_ReportBuildError(Err) {
+	try LoggerError("LLM", "LLM menu build remains pending after failure: {1} ({2}:{3}).",
+		Err.Message, Err.File, Err.Line)
+}
+
+_LLM_Menu_GetBuildCoordinator() {
+	global _LLM_MenuBuildCoordinator
+	PreviousCritical := Critical("On")
+	try {
+		if !(_LLM_MenuBuildCoordinator is LLMMenuBuildCoordinator)
+			_LLM_MenuBuildCoordinator := LLMMenuBuildCoordinator(
+				LLM_Menu_Build, _LLM_Menu_IsSuspended,
+				_LLM_Menu_ReportBuildError)
+		return _LLM_MenuBuildCoordinator
+	} finally Critical(PreviousCritical)
+}
+
+LLM_Menu_RequestBuild(Reason := "unspecified") {
+	return _LLM_Menu_GetBuildCoordinator().Request(Reason)
+}
+
+LLM_Menu_ServiceBuilds() {
+	return _LLM_Menu_GetBuildCoordinator().Service()
+}
+
+; An LLM repaint replaces only its detached submenu. When the settled root
+; already shows the IA row, only that row's child is swapped, under the same
+; generation fence: the LLM state reaches no sibling row, and re-staging the
+; whole root re-rendered every feature menu (the hotstrings one included) on
+; each local-server observation, which kept the input thread busy for seconds
+; (llm-repaint-swaps-only-its-row-2026-10-17). Without such a row the complete
+; root is re-projected, reusing every sibling submenu built by InitSubMenus.
+_LLM_Menu_PublishRoot(Submenu, PublishAuthorizeFn) {
+	global _LLM_Menu_Handle
+	if !(Submenu is Menu) || _LLM_Menu_Handle != Submenu
+		return false
+	Replaced := _LLM_Menu_ReplacePublishedRow(Submenu, PublishAuthorizeFn)
+	if Replaced != -1
+		return Replaced
+	try LoggerDebug("LLM",
+		"Publishing IA submenu through retained root projection.")
+	return initMenu(_LLM_Menu_PreparedRootCurrent.Bind(Submenu, PublishAuthorizeFn), false, Submenu)
+}
+
+/**
+ * The AI tray title with its backend health dot, from the glyphs the manifest's
+ * top-level ``llm`` entry declares for every driver (maintainer, 2026-10-29).
+ * No dot while the AI is off or suspended, or before a first probe answers.
+ * @returns {String} The localized title, followed by the dot when one applies.
+ */
+LLM_Menu_TrayTitle() {
+	global _LLM_Menu
+	Title := t("menu.llm.title")
+	if !(_LLM_Menu is Map) || !_LLM_Menu.Get("enabled", false) || A_IsSuspended
+		return Title
+	Status := _LLM_Menu.Get("last_health_status", "")
+	if Status == ""
+		return Title
+	BackendReady := false
+	try BackendReady := _LLM_Menu_BackendIsReadyForUse()
+	; A reachable server whose backend cannot serve yet (missing runtime, API
+	; not configured) fires no prediction, so it never reads as ready.
+	State := (Status == "ok") ? (BackendReady ? "ready" : "warming") : "unreachable"
+	Glyph := ""
+	for _, Entry in MenuManifest_LoadTopLevel() {
+		if (Entry is Map) && Entry.Get("id", "") == "llm" {
+			Dots := Entry.Get("health_dot", 0)
+			if (Dots is Map)
+				Glyph := Dots.Get(State, "")
+			break
+		}
+	}
+	return Glyph == "" ? Title : Title . " " . Glyph
+}
+
+/**
+ * Swaps the IA row's child in the published root, leaving every sibling row as is.
+ * @param {Menu} Submenu The staged IA child this build owns.
+ * @param {Func} PublishAuthorizeFn The root generation fence of this projection.
+ * @returns {Integer} 1 when swapped, 0 when the fence refused it, -1 when the
+ *     published root has no IA submenu row to swap (the caller re-stages the root).
+ */
+_LLM_Menu_ReplacePublishedRow(Submenu, PublishAuthorizeFn) {
+	if _TrayRootFirstPublicationPending()
+		return -1
+	; A changed health dot changes the caption: no row matches, and the caller
+	; re-stages the root under the new title.
+	Label := LLM_Menu_TrayTitle()
+	PreviousCritical := Critical("On")
+	try {
+		Position := -1
+		loop TrayMenuItemCount(A_TrayMenu) {
+			if TrayMenuItemCaption(A_TrayMenu, A_Index - 1) == Label {
+				Position := A_Index - 1
+				break
+			}
+		}
+		; A disabled top-level row or a root still being bootstrapped has no IA child.
+		if Position < 0 || !TrayMenuSubmenuHandle(A_TrayMenu.Handle, Position)
+			return -1
+		if !_LLM_Menu_PreparedRootCurrent(Submenu, PublishAuthorizeFn)
+			return 0
+		; The same retirement steps as a root publication, for this one row only.
+		MenuDispatcher_BeginReplacement()
+		TrayMenuRebindSubmenu(A_TrayMenu, Label, Submenu)
+		MenuPopulation_Publish(A_TrayMenu)
+		MenuDispatcher_PruneMenu(A_TrayMenu)
+		TrayMenu_ApplyPauseGreying(A_IsSuspended, A_TrayMenu, [Label])
+		try LoggerDebug("LLM", "IA submenu swapped in the published root.")
+		return 1
+	} finally Critical(PreviousCritical)
+}
+
+/** Preserves the original root ticket and the exact candidate at its final claim. */
+_LLM_Menu_PreparedRootCurrent(Submenu, PublishAuthorizeFn) {
+	global _LLM_Menu_Handle
+	if !(Submenu is Menu) || _LLM_Menu_Handle != Submenu || !HasMethod(PublishAuthorizeFn, "Call")
+		return false
+	Authorized := PublishAuthorizeFn.Call()
+	return (Authorized is Integer) && Authorized == 1 && _LLM_Menu_Handle == Submenu
+}
+
+/**
+ * Builds the IA submenu rows (toggle, warning, settings, about) into a new
+ * detached Menu and returns it — no publish, no root rebuild, no tray touch.
+ * initMenu publishes IA through this as a submenu built at its first open
+ * (MenuDeferOrBuild hands it the published child); LLM_Menu_Build uses it for
+ * staged replacements. One row-construction site: the two must never drift.
+ * Each native row retains this invocation's detached target. Nested builds
+ * can publish a successor without redirecting the interrupted row or having
+ * their published handle restored away by the older builder.
+ * @param {Menu} Target The empty child to fill; a new detached Menu when omitted.
+ * @returns {Menu} Staged submenu with all rows.
+ */
+LLM_Menu_BuildSubmenu(Target := 0) {
+	global _LLM_Menu
+	if Target is Menu
+		StagedHandle := Target
+	else
+		StagedHandle := Menu()
+	try {
+	_tStaged := A_TickCount
+
+	; Enable / Disable toggle. The checked state MUST reflect
+	; ``_LLM_Menu["enabled"]`` alone — that's the user's intent. Backend
+	; readiness only colours the health dot of the AI title (LLM_Menu_TrayTitle):
+	; when the checkbox itself followed readiness, clicking ON while Ollama was
+	; missing left the toggle visually OFF — the user thought the click did nothing.
+	; Probe deps ONCE, guarded: when the feature is off at boot the deps
+	; subsystem may not be ready to answer, and an unguarded throw here used to
+	; abort the whole build BEFORE the toggle was added — leaving the IA submenu
+	; empty, with no visible control to switch the feature back on.
+	_deps_ready := false
+	try _deps_ready := LLM_Deps_IsReady()
+
+	; Mirror the macOS menu (ui/menu/menu_llm/init.lua is_disabled): when the
+	; feature is OFF, render the FULL menu unchanged but grey out every settings
+	; row — only the enable toggle stays live so the user can always turn the
+	; feature back on.
+	_disabled := !_LLM_Menu["enabled"]
+
+	Commands := _LLM_ScopeCommands()
+	Commands[MenuCommand.LLM_TOGGLE] := LLM_Menu_OnToggle
+	Commands[MenuCommand.LLM_TEST_PREDICTION] := (*) => LLM_Menu_TestPrediction()
+	StateGetters := _LLM_Menu_StateGetters()
+	WarningRows := []
+	if (_LLM_Menu["enabled"] and _LLM_Menu["backend"] == "ollama" and !_deps_ready) {
+		LoggerInfo("LLM", "Tray: showing 'Ollama not installed' warning row.")
+		WarningRows := MenuRenderer_TemplateRows("llm_install_warning_frame",
+			Map(MenuCommand.LLM_INSTALL_WARNING, _LLM_Menu_OnWarningInstallClick), Map(), Map())
+		if !(WarningRows is Array)
+			throw Error("Declared backend installation warning was refused.")
+	}
+
+	; ── Settings rows ────────────────────────────────────────────────────────
+	; Row ORDER and the disabled-when-off POLICY come from the shared menu manifest
+	; (_shared/menu/data/menu_manifest.json, key llm_menu), so the Windows and
+	; macOS IA menus can never drift again (a greying mismatch between them was the
+	; bug this prevents).
+	; The per-row native label + submenu builder are dispatched by id inside
+	; _LLM_Menu_EmitRow — those must stay native because they read Win32/tray state;
+	; the spec owns only the order and the greying. Every row carries
+	; disabled_when_off=true (the category-off rule). Conditional/native-only rows
+	; (thinking-model info, the num-predictions reset, the inner separator) are
+	; emitted from inside _LLM_Menu_EmitRow at their anchor row.
+	_rows := _LLM_MenuLayout_Rows()
+	; Diagnostic breakdown of the detached staging work. Publishing and pruning
+	; happen only after every row has been successfully constructed.
+	try LoggerInfo("LLM", "LLM_Menu_Build: pre-emit staging took {1} ms.", TickElapsed(_tStaged))
+	try LoggerInfo("LLM", "LLM_Menu_Build: emitting {1} settings row(s) from shared spec…", _rows.Length)
+	; The model and profile rows are declared ``list`` rows: their provider
+	; returns row DATA and the renderer draws it at the declared entry.
+	ListProviders := Map(), GroupDisabled := Map()
+	for _i, _row in _rows {
+		RowDisabled := _row["disabled_when_off"] ? _disabled : false
+		if _MR_Get(_row, "type") == "group" {
+			GroupDisabled[_row["id"]] := RowDisabled
+		} else {
+			ListProviders[_row["id"]] := _LLM_Menu_EmitCapturedRow.Bind(
+				StagedHandle, _row["id"], RowDisabled, WarningRows, StagedHandle, "LLM")
+		}
+	}
+	MenuRenderer_Build("llm_menu", "LLM", Map(), _LLM_Menu_GroupBuilders(),
+		ListProviders, Commands, StateGetters, StagedHandle, GroupDisabled)
+	try LoggerInfo("LLM", "LLM_Menu_Build: settings rows emitted ({1} item(s) so far).", DllCall("GetMenuItemCount", "ptr", StagedHandle.Handle, "int"))
+	} catch as e {
+		; A deferred child's owner restores its placeholder for the next open.
+		if !(Target is Menu)
+			try StagedHandle.Delete()
+		throw e
+	}
+	return StagedHandle
+}
+
+/** Captures readers; backend availability never grants configuration write readiness. */
+_LLM_Menu_StateGetters() {
+	global _LLM_Menu
+	return Map("llm_enabled", () => _LLM_Menu["enabled"],
+		"llm_toggle_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
+		"llm_scope_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
+		"config_newer_schema", () => ConfigNewerSchemaReadOnly(),
+		"config_older_schema", () => ConfigOlderSchemaReadOnly())
+}
+
+/**
+ * Names why the AI submenus that write config.toml (servers, API entries,
+ * profiles) cannot be used: a configuration saved by a newer version, one too
+ * old to migrate, or any other refusal of the session writer. The switch and
+ * the restore row grey
+ * with the same causes through the manifest; these parents are native, so they
+ * name the cause here. A pause is not a cause: it greys the rows already.
+ * @returns {String} A locale key, or "" when the file accepts writes.
+ */
+_LLM_Menu_ConfigBlockReason() {
+	global ConfigurationFile
+	if !IsSet(ConfigurationFile) || !(ConfigurationFile is String) || ConfigurationFile == ""
+		return ""
+	if TOML_WriteRefusal(ConfigurationFile) == ""
+		return ""
+	if ConfigNewerSchemaReadOnly()
+		return "menu.read_only.newer_schema"
+	return ConfigOlderSchemaReadOnly() ? "menu.read_only.older_schema" : "menu.llm.save_unavailable"
+}
+
+/**
+ * Greys one finished parent row with the configuration cause. A parent greyed
+ * for another reason (category off, pause) keeps its plain greying.
+ * @param {Map} Parent Row data from the shared group renderer, edited in place.
+ * @param {Boolean} Disabled Whether the parent is already greyed for another reason.
+ */
+_LLM_Menu_GreyParentForConfig(Parent, Disabled) {
+	if Disabled
+		return
+	Reason := _LLM_Menu_ConfigBlockReason()
+	if Reason == ""
+		return
+	Parent["disabled"] := true
+	Parent["disabled_reason_key"] := Reason
+}
+
+/**
+ * Names the configuration cause on the profile parent an emitted AI row
+ * returned. The model selector button is left enabled: the page it opens greys
+ * every backend with that same cause. The emitters stay pinned to their
+ * declared frames; the cause is applied to what they hand back.
+ * @param {String} Id Row id from the manifest's llm_menu.
+ * @param {Array} Rows Row data the emitter returned.
+ * @param {Boolean} Disabled Whether the row is already greyed for another reason.
+ * @returns {Array} The same rows.
+ */
+_LLM_Menu_GreyConfigParents(Id, Rows, Disabled) {
+	global _LLM_Menu
+	if !(Rows is Array)
+		return Rows
+	if Id != "llm_profile"
+		return Rows
+	for Row in Rows {
+		; Warnings, separators and info rows carry no submenu; the parent does.
+		if (Row is Map) && Row.Has("submenu")
+			_LLM_Menu_GreyParentForConfig(Row, Disabled)
+	}
+	return Rows
+}
+
+/**
+ * Wraps every action of a native row tree, in place, so a retained click asks
+ * the configuration cause again: a menu stays on screen while a reload can
+ * read a newer file, and the click must not write over it.
+ * @param {Array} Rows Row data (label, action, items).
+ * @returns {Array} The same rows.
+ */
+_LLM_Menu_GuardConfigRows(Rows, Depth := 1) {
+	if !(Rows is Array) || Depth > 8
+		return Rows
+	for Row in Rows {
+		if !(Row is Map)
+			continue
+		if Row.Has("action") && HasMethod(Row["action"], "Call")
+			Row["action"] := _LLM_Menu_GuardedAction.Bind(Row["action"])
+		if Row.Has("items")
+			_LLM_Menu_GuardConfigRows(Row["items"], Depth + 1)
+	}
+	return Rows
+}
+
+; The retained click: refused with a log line while config.toml refuses writes.
+_LLM_Menu_GuardedAction(Action, Params*) {
+	Reason := _LLM_Menu_ConfigBlockReason()
+	if Reason != "" {
+		try LoggerWarn("LLM", "AI settings click refused: {1}.", Reason)
+		return false
+	}
+	return Action.Call(Params*)
+}
+
+; Binding captures each row before the native renderer invokes it, avoiding loop closures.
+; The rows go back to the renderer, which draws them at the declared entry.
+_LLM_Menu_EmitCapturedRow(Owner, Id, Disabled, WarningRows, TargetMenu, CategoryName) {
+	if !(Owner is Menu) || !(TargetMenu is Menu) || TargetMenu != Owner
+		throw Error("An LLM row cannot leave its detached native menu owner.")
+	return _LLM_Menu_GreyConfigParents(Id, _LLM_Menu_EmitRow(TargetMenu, Id, Disabled, WarningRows),
+		Disabled)
+}
+
+; Child builders retain genuine native Menu identities; the manifest owns the parents.
+_LLM_Menu_GroupBuilders() {
+	return Map("llm_trigger", LLM_Menu_BuildTriggerMenu,
+		"llm_display", LLM_Menu_BuildDisplayMenu,
+		"llm_navigation", LLM_Menu_BuildNavMenu,
+		"llm_generation_settings", LLM_Menu_BuildGenerationMenu)
+}
+
+/**
+ * Builds one detached LLM submenu candidate and submits it to the complete-root
+ * coordinator. Production callers request work through LLM_Menu_RequestBuild;
+ * the generation owner is the only caller of this raw build step.
+ */
+LLM_Menu_Build() {
+	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray
+	; Never clear the published submenu before its replacement is complete. A menu
+	; build can be preempted by timers and callbacks; an in-place Delete() exposed
+	; an empty or partial LLM tree and silently dropped the user's next click.
+	OldHandle := _LLM_Menu_Handle
+	StagedHandle := ""
+	Published := false
+	try {
+	_t0 := A_TickCount
+	try LoggerInfo("LLM", "LLM_Menu_Build: building IA submenu (enabled={1}, inTray={2}).", _LLM_Menu["enabled"] ? "true" : "false", _LLM_Menu_InTray ? "true" : "false")
+	StagedHandle := LLM_Menu_BuildSubmenu()
+	_LLM_Menu_Handle := StagedHandle
+
+	; The LLM builder owns only a detached child. The root coordinator attaches
+	; it while publishing a complete root, so an asynchronous LLM rebuild can
+	; never expose an IA-only tray or mutate a root currently being staged.
+	; A busy or still-incomplete root replaces the narrow worker with a full
+	; rebuild; the child goes with the request so that rebuild attaches it
+	; instead of constructing the IA submenu a second time.
+	if !RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true, StagedHandle)
+		throw Error("tray root coordinator refused the LLM subtree")
+	MenuDispatcher_PruneMenu(_LLM_Menu_Handle)
+	_LLM_Menu_InTray := true
+	Published := true
+
+	; Check the parent tray entry from user intent alone, like the toggle row
+	; above. Backend readiness already owns the health dot and the install
+	; warning row: folding it into this checkbox left the entry visually OFF
+	; while Ollama was missing although the feature was on.
+	; Both branches are guarded with try: the item may not exist yet if the updater
+	; build request fires before initMenu has had a chance to register it.
+	TrayTitle := LLM_Menu_TrayTitle()
+	if (_LLM_Menu["enabled"]) {
+		try A_TrayMenu.Check(TrayTitle)
+	} else {
+		try A_TrayMenu.Uncheck(TrayTitle)
+	}
+	try LoggerInfo("LLM", "LLM_Menu_Build: IA submenu built with {1} item(s) in {2}ms.", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"), TickElapsed(_t0))
+	} catch as e {
+		; A failed staged build leaves the previous tree live. This is fail-closed
+		; for output: no menu action disappears merely because a new row failed.
+		if !Published {
+			_LLM_Menu_Handle := OldHandle
+			try StagedHandle.Delete()
+		}
+		throw e
+	}
+	return true
+}
+
+
+
+
+
+
+
+
+; =====================================================
+; ===== 1.1) Shared-spec-driven settings row emit =====
+; =====================================================
+
+/**
+ * Returns the ordered settings-row list for this platform from the shared menu
+ * manifest (_shared/menu/data/menu_manifest.json, key ``llm_menu``) — the
+ * SINGLE SOURCE OF TRUTH shared with the macOS renderer so the two IA menus can
+ * never drift in row order or greying policy. Cached after the first read (the
+ * manifest is static for the session).
+ *
+ * The rows used to live in a SECOND shared file of their own
+ * (_shared/ai/data/menu_layout.json); one menu therefore had two shared
+ * descriptions, and the manifest's ``llm_menu`` key described a menu only Linux
+ * drew. Reading the manifest here is what collapses the two back into one.
+ *
+ * Rows carrying a ``platforms`` restriction that excludes "ahk" — Linux's two
+ * inline lists — are filtered out exactly as every other manifest-driven menu
+ * filters them.
+ *
+ * Falls back to a built-in mirror if the manifest is missing/corrupt so the menu
+ * always renders; the built-in list is pinned to the manifest by the
+ * cross-platform contract test (tests/meta/ai/menu/test_layout_shared.ahk), so
+ * it cannot drift.
+ * @returns {Array} Array of Maps, each with "id" (string) and "disabled_when_off" (bool).
+ */
+_LLM_MenuLayout_Rows() {
+	static _cache := ""
+	if (_cache != "")
+		return _cache
+	rows := _LLM_MenuLayout_Fallback()
+	try {
+		Declared := _MR_GetMenuDef("llm_menu")
+		Filtered := []
+		for _, Entry in Declared {
+			; Separators, commands and boundary lists are not settings rows:
+			; only the settings rows declare ``disabled_when_off``. Reading the
+			; field rather than a row type keeps the policy when a row changes
+			; type (the model and profile rows became ``list``).
+			if (Entry is Map && _MR_IsForAhk(Entry) && Entry.Has("disabled_when_off"))
+				Filtered.Push(Entry)
+		}
+		if (Filtered.Length > 0)
+			rows := Filtered
+		else
+			try LoggerWarn("LLM", "menu_manifest.json 'llm_menu' yielded no Windows row — using built-in fallback order.")
+	} catch as e {
+		try LoggerWarn("LLM", "menu_manifest.json load failed ({1}) — using built-in fallback order.", e.Message)
+	}
+	_cache := rows
+	return rows
+}
+
+/**
+ * Built-in fallback for the shared layout — mirrors the manifest's ``llm_menu``
+ * row order and disabled-when-off policy. Pinned to the manifest by the contract
+ * test so the two never diverge; exists only so a missing/corrupt manifest still
+ * yields a menu.
+ * @returns {Array} The canonical settings-row list.
+ */
+_LLM_MenuLayout_Fallback() {
+	return [
+		Map("id", "llm_model",               "disabled_when_off", true),
+		Map("id", "llm_profile",             "disabled_when_off", true),
+		Map("id", "llm_trigger",             "disabled_when_off", true),
+		Map("id", "llm_generation_settings", "disabled_when_off", true),
+		Map("id", "llm_display",             "disabled_when_off", true),
+		Map("id", "llm_navigation",          "disabled_when_off", true)
+	]
+}
+
+/**
+ * Returns the row DATA of one `list` settings row by its shared-spec id; the
+ * renderer draws it into TargetMenu at the declared entry. The declared `group`
+ * rows never come here: the renderer draws them from _LLM_Menu_GroupBuilders.
+ * The spec (_LLM_MenuLayout_Rows) owns the ORDER and the `disabled` flag; this
+ * dispatch owns the platform-native label formatting and submenu construction
+ * (which read Win32/tray state and so cannot live in shared data). Conditional native-only rows that have no shared
+ * entry — the thinking-model info row —
+ * are returned here with their anchor row to preserve menu order.
+ * @param {String}  id                  Row id from the manifest's llm_menu.
+ * @param {Boolean} disabled            Greying flag already resolved from the spec policy.
+ * @returns {Array} Row data for MenuRenderer_Build; empty for an unknown id.
+ */
+_LLM_Menu_EmitRow(TargetMenu, id, disabled, CapturedWarningRows := unset) {
+	global _LLM_Menu
+	if !(TargetMenu is Menu)
+		throw TypeError("An LLM settings row requires its native target.")
+	switch id {
+	case "llm_model":
+		; One button opens the model selector page (maintainer, 2026-10-27): the
+		; backend's emoji and the model; the health dot sits on the AI title. The Backend
+		; chooser, the model list and the API entries left the menu; the menu
+		; builds none of them. BOTH probes are non-blocking and paint on the next
+		; pass, so opening the tray can never freeze the thread.
+		; Force past the idle gate: this row is only painted while the tray menu is
+		; actually being built, i.e. for a user looking at it right now, so the dot
+		; (on the AI title) must refresh even when A_TimeIdlePhysical claims the machine has been
+		; unattended. The 3 s throttle inside the helper is NOT bypassed, so a
+		; rebuild storm still costs a single ping.
+		_LLM_Menu_FireHealthProbe(true)
+		_LLM_Menu_FireInstalledTagsProbe()
+		; The shown model follows the active backend (an API entry's name with
+		; backend api, never the preserved Ollama slot) — the thinking-model row
+		; below must agree with the same text.
+		model_shown := _LLM_Menu_ModelDisplayText()
+		caption_text := _LLM_Menu_ModelCaptionText()
+		Caption := LLM_ModelSelectorCaption(_LLM_Menu.Get("backend", "ollama"),
+			caption_text != "" ? caption_text : t("menu.llm.no_model_none"))
+		; The definitions-only test graph loads no WebView page: the button is
+		; then drawn greyed instead of calling a missing owner.
+		OpenPage := IsSet(LLM_ModelBrowser_Show) ? LLM_ModelBrowser_Show : 0
+		Row := MenuRenderer_CommandRow("llm_model_selector_commands", MenuCommand.LLM_MODEL_SELECTOR,
+			Map(MenuCommand.LLM_MODEL_SELECTOR, (*) => OpenPage.Call()),
+			Map("llm_model_selector_caption", (*) => Caption,
+				"llm_model_selector_ready", (*) => !disabled && IsObject(OpenPage)))
+		if !(Row is Map)
+			throw Error("Declared model selector button was refused.")
+		; The "Ollama not installed" warning heads the button it concerns.
+		ModelRows := []
+		if IsSet(CapturedWarningRows) && (CapturedWarningRows is Array)
+			for Warning in CapturedWarningRows
+				ModelRows.Push(Warning)
+		ModelRows.Push(Row)
+		; An open selector page follows the state this rebuild publishes.
+		if IsSet(LLM_ModelBrowser_Refresh)
+			LLM_ModelBrowser_Refresh.Call()
+		; Thinking-model info row — conditional, native-only (mirrors HS thinking-info).
+		if _LLM_Menu_IsThinkingModel(model_shown) {
+			InfoRows := MenuRenderer_TemplateRows("llm_thinking_info", Map(), Map(), Map())
+			if !(InfoRows is Array)
+				throw Error("Declared thinking-model information was refused.")
+			for Row in InfoRows
+				ModelRows.Push(Row)
+		}
+		return ModelRows
+	case "llm_profile":
+		; Admit the whole frame before building the native child.
+		Admission := MenuRenderer_TemplateRows("llm_profile_parent_frame_ahk", Map(), Map(),
+			Map("llm_profile_parent_rows", (*) => []))
+		if !(Admission is Array) || Admission.Length != 0
+			throw Error("Declared profile parent frame was refused.")
+		; Admit the separate genuine parent before profile data or child construction.
+		; An empty scalar is valid for the existing translated prefix contract.
+		AdmissionChild := Menu()
+		try ParentAdmission := MenuRenderer_GroupRow("llm_profile_parent_ahk", "llm_profile_parent", AdmissionChild,
+			Map("llm_profile_parent_caption", (*) => "", "llm_profile_parent_ready", (*) => !disabled))
+		finally {
+			try AdmissionChild.Delete()
+			finally MenuDispatcher_PruneMenu(AdmissionChild)
+		}
+		if !(ParentAdmission is Map) || ParentAdmission.Get("submenu", false) != AdmissionChild
+			throw Error("Declared profile parent frame was refused.")
+		ProfileCaption := LLM_Menu_GetProfileLabel(_LLM_Menu["profile_id"])
+		ProfileMenu := LLM_Menu_BuildProfileMenu()
+		try {
+			ProfileRows := _LLM_Menu_ProfileParentRows(ProfileMenu, ProfileCaption, disabled)
+			if !(ProfileRows is Array) || ProfileRows.Length != 1
+				throw Error("Declared profile parent frame was withdrawn.")
+		} catch as Err {
+			ProfileMenu.Delete()
+			MenuDispatcher_PruneMenu(ProfileMenu)
+			throw Err
+		}
+		return ProfileRows
+	default:
+		try LoggerWarn("LLM", "_LLM_Menu_EmitRow: unknown row id '{1}' in the shared menu manifest — skipped.", id)
+		return []
+	}
+}
+
+; The terminal owner preserves credential stores and explicit consent. The AI
+; menu offers the restore alone: its « Tout effacer » row was retired.
+_LLM_ScopeCommands(Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	return Map(MenuCommand.SCOPE_RESTORE, (*) => _LLM_ApplyScope("recommended", OwnedOptions))
+}
+
+_LLM_ApplyScope(Mode, Options) {
+	global ConfigurationFile
+	; A retained row callback rechecks what greyed the row when it was built:
+	; a pause or a configuration refused for the session (a newer schema) stops
+	; it before any scope transaction.
+	Path := Options.Get("path", IsSet(ConfigurationFile) ? ConfigurationFile : "")
+	Refusal := (Path is String) && Path != "" ? TOML_WriteRefusal(Path) : "no configuration destination"
+	if A_IsSuspended || Refusal != "" {
+		if A_IsSuspended {
+			try LoggerWarn("LLM", "AI settings {1} scope refused: the script is paused.", Mode)
+		} else {
+			ConfigReportPersistenceFailure("the AI settings " . Mode . " scope", Options.Get("notify", 0), Refusal)
+		}
+		return Map("status", "refused", "scope", "llm", "mode", Mode)
+	}
+	CandidateOptions := Options.Clone()
+	CandidateOptions["supplement"] := _LLM_Menu_ScopeResetOperations
+	return ConfigScopeApply("llm", Mode, Map(), CandidateOptions)
+}
+
+; Keeps native profile contents and handle identity while the shared frame owns placement.
+_LLM_Menu_ProfileParentRows(NativeChild, Caption, Disabled) {
+	Root := _MR_GetManifestRoot()
+	ParentDefinition := Root.Get("llm_profile_parent_ahk", false)
+	FrameDefinition := Root.Get("llm_profile_parent_frame_ahk", false)
+	Getters := Map("llm_profile_parent_caption", (*) => Caption,
+		"llm_profile_parent_ready", (*) => !Disabled)
+	Parent := MenuRenderer_GroupRow("llm_profile_parent_ahk", "llm_profile_parent", NativeChild, Getters)
+	if !(Parent is Map)
+		return false
+	ParentRows := [Parent]
+	Rows := MenuRenderer_TemplateRows("llm_profile_parent_frame_ahk", Map(), Map(),
+		Map("llm_profile_parent_rows", (*) => ParentRows))
+	if !(Rows is Array) || Rows.Length != 1 || _MR_GetManifestRoot() != Root
+		|| Root.Get("llm_profile_parent_ahk", false) != ParentDefinition
+		|| Root.Get("llm_profile_parent_frame_ahk", false) != FrameDefinition
+		return false
+	return Rows
+}
+

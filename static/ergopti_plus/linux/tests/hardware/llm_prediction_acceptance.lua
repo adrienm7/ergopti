@@ -13,20 +13,20 @@ local uv = require('luv')
 require('core.lifecycle.engine.compat.utf8').install()
 local origin = assert(os.getenv('ERGOPTI_ACCEPT_ORIGIN'))
 package.loaded['platform.focus.secure_field_detector'] = { isSecureField = function() return false end, isUrlBar = function() return false end }
-package.loaded['infra.llm_preferences'] = require('tests.support.llm_preferences_fixture').new({initial = {
+package.loaded['ai.engine.preferences'] = require('tests.support.llm_preferences_fixture').new({initial = {
 	['llm.models.selected'] = 'ollama', ['llm.display.streaming'] = true,
 }})
-package.loaded['modules.llm.profiles'] = {
+package.loaded['ai.engine.settings.profiles'] = {
 	init = function() end, is_enabled = function() return true end,
 	get_current_model = function() return 'native-model' end, get_base_url = function() return origin end,
 }
-package.loaded['modules.llm.profile_settings'] = {
+package.loaded['ai.engine.settings.profile_settings'] = {
 	get = function(key) if key == 'num_predictions' then return 1 end end,
 	resolve = function() return {id = 'raw', system_single = '{context}'} end,
 	-- No application is mapped to a profile: the engine falls back to the menu's.
 	resolve_for_app = function() return nil end,
 }
-local engine = require('modules.llm.prediction_engine')
+local engine = require('ai.engine.prediction.engine')
 local applied, resets, accepted, timeout = 0, 0, false, false
 local partial_inflight = false
 engine.init({ focus_id = function() return "owned-transport-target" end, engine = {reset = function() resets = resets + 1 end}, apply_prediction = function(candidate)
@@ -38,7 +38,7 @@ engine.predict('Bonjour à tous')
 local poll, guard = uv.new_timer(), uv.new_timer()
 poll:start(10, 10, function()
 	if not accepted and #engine.get_suggestions() > 0 then
-		partial_inflight = engine.is_predicting() and require("modules.llm.api_ollama").is_active()
+		partial_inflight = engine.is_predicting() and require("ai.engine.api.api_ollama").is_active()
 		accepted = engine.accept(1)
 		poll:stop(); poll:close()
 	end
@@ -54,7 +54,7 @@ assert(partial_inflight, 'acceptance occurred before the real HTTP stream comple
 assert(accepted and applied == 1 and resets == 1, 'one physical commit')
 assert(#engine.get_suggestions() == 0, 'late native stream did not resurrect offer')
 assert(not engine.is_predicting(), 'accepted native request retired')
-assert(not require('modules.llm.api_ollama').is_active(), 'native transport owner retired')
+assert(not require('ai.engine.api.api_ollama').is_active(), 'native transport owner retired')
 assert(not uv.loop_alive(), 'no retained live native work')
 local handles = 0
 uv.walk(function() handles = handles + 1 end)

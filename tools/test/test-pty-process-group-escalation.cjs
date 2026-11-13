@@ -23,8 +23,9 @@ const PTY_PROCESS_GROUP = path.join(
 	'static',
 	'ergopti_plus',
 	'macos',
-	'modules',
-	'llm',
+	'ai',
+	'engine',
+	'bootstrap',
 	'pty_process_group.lua'
 );
 const PY_CANDIDATES = ['python3', 'python'];

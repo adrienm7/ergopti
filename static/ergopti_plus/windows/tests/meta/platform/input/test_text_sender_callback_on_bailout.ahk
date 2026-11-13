@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Regression guard: _TextSendClipboard's early bail-outs (A_IsSuspended,
 ; ClipWait timeout, superseded-generation guard) used to return without
-; invoking the caller's Callback. Callers such as modules/keymap/llm_bridge.ahk's
+; invoking the caller's Callback. Callers such as ai/engine/bridge.ahk's
 ; _InjectCallback own depth-counter guards (PrefixWatcherSuppress/
 ; KL_MarkSynthetic) released exactly once, by the callback, on any path where
 ; TextSend itself did not throw -- its own finally block only releases the

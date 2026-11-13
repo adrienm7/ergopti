@@ -38,7 +38,7 @@ const KNOWN_COPIES = new Map([
 		}
 	],
 	[
-		'static/ergopti_plus/macos/modules/llm/network-retry.sh',
+		'static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh',
 		{
 			count: 3,
 			reason:

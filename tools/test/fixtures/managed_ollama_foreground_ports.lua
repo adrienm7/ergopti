@@ -10,7 +10,7 @@ function M.new(root, production, options)
 	package.path = production .. "/static/ergopti_plus/macos/?.lua;"
 		.. production .. "/static/ergopti_plus/_shared/?.lua;"
 		.. production .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
-	local path = root .. "/static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_ollama.lua"
+	local path = root .. "/static/ergopti_plus/macos/ai/ui/menu/models/manager_ollama.lua"
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	local body = assert(source:match("\t\tstart_restart = function%(%)\n(.-)\n\t\tend\n\n\t\tstart_probe"),
 		"The canonical manager must delegate restart through its owned foreground callback")
@@ -26,9 +26,9 @@ function M.new(root, production, options)
 	modules["core.text.engine.utils"] = text_utils
 	modules["core.ui.engine.notifications"] = { notify = function() return true end }
 	modules["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	modules["modules.llm.parser"], modules["modules.llm.profiles"] = {}, {}
-	modules["modules.llm.progressive_reveal"], modules["ai.engine.ollama.local_model_policy"] = {}, {}
-	modules["modules.llm.api_common"] = { DEFAULT_DEDUPLICATION_ENABLED = true,
+	modules["ai.engine.api.parser"], modules["ai.engine.settings.profiles"] = {}, {}
+	modules["ai.engine.prediction.progressive_reveal"], modules["ai.engine.ollama.local_model_policy"] = {}, {}
+	modules["ai.engine.api.common"] = { DEFAULT_DEDUPLICATION_ENABLED = true,
 		get_retry_policy = function() return 1, 0, 0 end }
 	modules["core.fs.adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
 	-- The backend imports its stream file owner too; foreground restarts must
@@ -41,19 +41,19 @@ function M.new(root, production, options)
 			isSettled = function() return true end, onSettled = function(callback) callback(); return true end }
 	end }
 	modules["core.events.timer_scheduler"] = { after = function() error("No restart delay or detached timer is admitted") end }
-	modules["modules.llm.ollama_endpoint"] = {
+	modules["ai.engine.ollama.endpoint"] = {
 		read_port_override = function() return PORT end, get_default_port = function() return PORT end,
 	}
-	modules["modules.llm.ollama_binary"] = { resolve = function()
+	modules["ai.engine.ollama.binary"] = { resolve = function()
 		if options.absent then return nil, "absent-binary" end
 		return BINARY, nil, options.foreign and "path" or "native_managed"
 	end }
-	modules["modules.llm.ollama_server_command"] = { build = function(binary, log, port, kind, nonce)
+	modules["ai.engine.ollama.server_command"] = { build = function(binary, log, port, kind, nonce)
 		state.calls[#state.calls + 1] = { binary, log, port, kind, nonce }
 		if options.refused then return nil, "guarded-unavailable" end
 		return LAUNCH
 	end }
-	modules["adapters.managed_ollama_pull"] = { handles = function()
+	modules["ai.adapters.managed_ollama_pull"] = { handles = function()
 		state.pull_calls = state.pull_calls + 1; return options.pull_supported
 	end }
 	modules["platform.remap.lease_helper"], modules["core.text.engine.json"] = {}, {}
@@ -90,11 +90,11 @@ function M.new(root, production, options)
 		package = { loaded = {} },
 	}, { __index = _G })
 	local owned_paths = {
-		["modules.llm.api_ollama"] = "macos/modules/llm/api_ollama.lua",
+		["ai.engine.api.ollama"] = "macos/ai/engine/api/ollama.lua",
 		["ai.engine.request_plan.token_budget"] = "_shared/ai/engine/request_plan/token_budget.lua",
 		["ai.engine.request_plan.ports"] = "_shared/ai/engine/request_plan/ports.lua",
 		["diagnostics.engine.adapter_errors"] = "_shared/diagnostics/engine/adapter_errors.lua",
-		["adapters.managed_ollama_daemon"] = "macos/adapters/managed_ollama_daemon.lua",
+		["ai.adapters.managed_ollama_daemon"] = "macos/ai/adapters/managed_ollama_daemon.lua",
 		["core.process.adapters.owned_program_runner"] = "macos/core/process/adapters/owned_program_runner.lua",
 		["core.lifecycle.engine.core.ollama_runtime_choice"] = "_shared/core/lifecycle/engine/core/ollama_runtime_choice.lua",
 		["core.lifecycle.engine.core.managed_ollama_daemon_receipt"] = "_shared/core/lifecycle/engine/core/managed_ollama_daemon_receipt.lua",
@@ -108,7 +108,7 @@ function M.new(root, production, options)
 		cache[name] = value
 		return value
 	end
-	state.api = environment.require("modules.llm.api_ollama")
+	state.api = environment.require("ai.engine.api.ollama")
 	-- The extracted body reads the manager's module-level `Errors` upvalue (the
 	-- closed adapter error ids); provide the same real module it requires.
 	local manager_environment = setmetatable({

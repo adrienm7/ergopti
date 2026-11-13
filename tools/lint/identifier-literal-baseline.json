@@ -10,7 +10,7 @@
 		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeCoreProvisionOwnerTests.swift": {
 			"bundle_id_or_label": 8
 		},
-		"static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1": {
+		"static/ergopti_plus/windows/ai/engine/ollama/ollama_managed_files.ps1": {
 			"host": 1
 		},
 		"tools/build/InstalledRuntimePublisher.hpp": {

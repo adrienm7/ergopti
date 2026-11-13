@@ -400,7 +400,7 @@ local function all_driver_sources()
 				end
 			end
 		end
-		for _, d in ipairs({ "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray" }) do walk(d .. "/", d .. "/") end
+		for _, d in ipairs({ "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai" }) do walk(d .. "/", d .. "/") end
 		-- Root-level sources are NOT inside those four directories, and init.lua is
 		-- the largest of them. The shell fallback below scans the whole tree, so
 		-- coverage silently depended on which of the two paths ran — green on a
@@ -491,15 +491,15 @@ helpers.describe("GC retention: hs.task pinning", function()
 	-- _active_tasks table so the task survives until its callback fires.
 
 	helpers.it("models_manager_ollama: ollama-list task is pinned", function()
-		assert_gc_pinned("local function get_ollama_path") -- ui/menu/menu_llm/models_manager_ollama.lua
+		assert_gc_pinned("local function get_ollama_path") -- ai/ui/menu/models/manager_ollama.lua
 	end)
 
 	helpers.it("models_manager_mlx: download/check tasks are pinned", function()
-		assert_gc_pinned("--- MODULE: MLX Models Manager\n") -- ui/menu/menu_llm/models_manager_mlx.lua
+		assert_gc_pinned("--- MODULE: MLX Models Manager\n") -- ai/ui/menu/models/manager_mlx.lua
 	end)
 
 	helpers.it("models_manager_mlx_server: sweep and probe tasks are pinned", function()
-		assert_gc_pinned("\"a healthy mlx_lm.server is answering on the configured port\"") -- ui/menu/menu_llm/models_manager_mlx_server.lua
+		assert_gc_pinned("\"a healthy mlx_lm.server is answering on the configured port\"") -- ai/ui/menu/models/manager_mlx_server.lua
 	end)
 
 	-- F-MED-20: these 2 of the 6 files split out of the old
@@ -509,11 +509,11 @@ helpers.describe("GC retention: hs.task pinning", function()
 	-- substring check did not recognize. New unpinned hs.task.new() calls in
 	-- these files could previously ship with the suite still green.
 	helpers.it("models_manager_mlx_download: pull/tail tasks are pinned (F-MED-20)", function()
-		assert_gc_pinned("\"mlx.download_interrupted_body\"") -- ui/menu/menu_llm/models_manager_mlx_download.lua
+		assert_gc_pinned("\"mlx.download_interrupted_body\"") -- ai/ui/menu/models/manager_mlx_download.lua
 	end)
 
 	helpers.it("models_manager_mlx_hf: hf_login task is pinned (F-MED-20)", function()
-		assert_gc_pinned("local HF_TOKEN_FILE") -- ui/menu/menu_llm/models_manager_mlx_hf.lua
+		assert_gc_pinned("local HF_TOKEN_FILE") -- ai/ui/menu/models/manager_mlx_hf.lua
 	end)
 
 	helpers.it("onboarding: shasum / curl / hdiutil / osascript tasks are pinned", function()

@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One rule, three drivers: this module (macOS, Linux) and its Windows port
----    in windows/modules/llm/api_remote.ahk replay
+---    in windows/ai/engine/api/remote.ahk replay
 ---    _shared/tests/corpus/llm/api_model_listing_vectors.json, so a provider
 ---    reads the same on every OS.
 --- 2. Bounded: a page lists at most MAX_ENTRIES entries, one at a time; a

@@ -24,7 +24,7 @@
 ;   (b) SFD_IsSecureField body checks control class (Edit/RichEdit) before
 ;       testing the style bit.
 ;
-; SCOPE: source introspection of modules/llm/prediction_engine.ahk
+; SCOPE: source introspection of ai/engine/prediction/engine.ahk
 ;        and platform/focus/secure_field_detector.ahk.
 ; ==============================================================================
 

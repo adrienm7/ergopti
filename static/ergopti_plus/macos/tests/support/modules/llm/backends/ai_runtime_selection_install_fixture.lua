@@ -96,7 +96,7 @@ local function new_state()
 	return {
 		executables = {},
 		files = {},
-		bundled_files = { [helpers.driver_root() .. "modules/llm/network-retry.sh"] = true },
+		bundled_files = { [helpers.driver_root() .. "ai/engine/bootstrap/network-retry.sh"] = true },
 		absent = {
 			[MLX_VENV .. "/bin/python"] = true,
 			[MLX_VENV .. "/.last_sync_hash"] = true,
@@ -140,7 +140,7 @@ local function load_api(state, daemon)
 	state.daemon_frame = function(role)
 		return "ERGOPTI_MANAGED_DAEMON_V1 " .. nonce .. " " .. role .. "\n"
 	end
-	package.loaded["adapters.managed_ollama_hint"] = {
+	package.loaded["ai.adapters.managed_ollama_hint"] = {
 		get = function(directory, driver)
 			helpers.assert_eq(directory, NATIVE_DIR)
 			helpers.assert_eq(driver, helpers.driver_root():gsub("/+$", ""))
@@ -148,8 +148,8 @@ local function load_api(state, daemon)
 			return { candidate = NATIVE_BIN, budgets = { admission = 1, idle = 1, retirement = 1 } }
 		end,
 	}
-	package.loaded["modules.llm.ollama_binary"] = nil
-	helpers.load_with_stubs("modules.llm.ollama_binary", { fs = fake_fs(state) })
+	package.loaded["ai.engine.ollama.binary"] = nil
+	helpers.load_with_stubs("ai.engine.ollama.binary", { fs = fake_fs(state) })
 	package.loaded["core.network.adapters.http_client"] = { new = function()
 		local client = { settled = true, cancel_calls = 0 }
 		function client.isSettled() return client.settled end
@@ -193,22 +193,22 @@ local function load_api(state, daemon)
 		state.daemon_tasks[#state.daemon_tasks + 1] = task
 		return task
 	end }
-	package.loaded["modules.llm.ollama_server_command"] = { build = function(binary, _, _, kind, actual_nonce)
+	package.loaded["ai.engine.ollama.server_command"] = { build = function(binary, _, _, kind, actual_nonce)
 		helpers.assert_eq(binary, NATIVE_BIN)
 		helpers.assert_eq(kind, "native_managed")
 		helpers.assert_eq(actual_nonce, nonce)
 		return "exec /fixture/native-runtime --caller-nonce '" .. nonce .. "' --owned-stdin"
 	end }
 	package.loaded["core.fs.adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
-	package.loaded["modules.llm.parser"] = {}
-	package.loaded["modules.llm.profiles"] = {}
-	package.loaded["modules.llm.progressive_reveal"] = {}
-	package.loaded["modules.llm.prediction_engine"] = { on_ollama_daemon_exit = function() return true end }
+	package.loaded["ai.engine.api.parser"] = {}
+	package.loaded["ai.engine.settings.profiles"] = {}
+	package.loaded["ai.engine.prediction.progressive_reveal"] = {}
+	package.loaded["ai.engine.prediction.engine"] = { on_ollama_daemon_exit = function() return true end }
 	-- This selection fixture has no keyboard inference consumer.
 	package.loaded["modules.keystats"] = {}
-	package.loaded["adapters.managed_ollama_daemon"] = nil
-	package.loaded["modules.llm.api_ollama"] = nil
-	local api = helpers.load_with_stubs("modules.llm.api_ollama", {
+	package.loaded["ai.adapters.managed_ollama_daemon"] = nil
+	package.loaded["ai.engine.api.ollama"] = nil
+	local api = helpers.load_with_stubs("ai.engine.api.ollama", {
 		fs = fake_fs(state), host = state.host,
 	})
 	local ensure_running = api.ensure_running
@@ -221,7 +221,7 @@ local function load_api(state, daemon)
 			return next(state.model_tasks) == nil and state.model_requirement_pending == false
 		end,
 	}
-	package.loaded["ui.menu.menu_llm.models_manager_ollama"] = state.model_manager
+	package.loaded["ai.ui.menu.models.manager_ollama"] = state.model_manager
 	state.api = api
 	return api
 end
@@ -230,13 +230,13 @@ end
 local function load_ollama_checker(state, daemon)
 	package.loaded["ui.download_window"] = state.window or WINDOW_STUB
 	load_api(state, daemon)
-	package.loaded["modules.llm.pty_process_group"] = {
+	package.loaded["ai.engine.bootstrap.pty_process_group"] = {
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,
 	}
 	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	local checker = helpers.load_with_stubs("modules.llm.ollama_deps_checker", {
+	local checker = helpers.load_with_stubs("ai.engine.ollama.deps_checker", {
 		fs = fake_fs(state),
 		task = task_api(state),
 		host = state.host,
@@ -250,16 +250,16 @@ end
 local function load_mlx_checker(state)
 	-- A fresh checker must consume this fixture's filesystem, not a cached
 	-- policy admission bound to the preceding fake native table.
-	package.loaded["modules.llm.network_env"] = nil
+	package.loaded["ai.engine.api.network_env"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["ui.download_window"] = state.window or WINDOW_STUB
-	package.loaded["modules.llm.pty_process_group"] = {
+	package.loaded["ai.engine.bootstrap.pty_process_group"] = {
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,
 	}
 	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	return helpers.load_with_stubs("modules.llm.mlx_deps_checker", {
+	return helpers.load_with_stubs("ai.engine.local_servers.mlx_deps_checker", {
 		fs = fake_fs(state),
 		task = task_api(state),
 	})
@@ -280,18 +280,18 @@ local function start_verification(state, checker, on_complete)
 end
 
 local STUBBED_MODULES = {
-	"ui.download_window", "modules.llm.ollama_binary", "modules.llm.api_ollama",
-	"modules.llm.pty_process_group", "core.process.adapters.task_lifecycle",
-	"core.events.timer_scheduler", "modules.llm.ollama_deps_checker",
-	"modules.llm.mlx_deps_checker", "core.ui.engine.dialog_util", "core.ui.engine.notifications",
-	"ui.menu.menu_llm.runtime_install_offer",
-	"modules.llm.network_env", "core.fs.adapters.file_system",
-	"adapters.managed_ollama_hint", "adapters.managed_ollama_daemon",
+	"ui.download_window", "ai.engine.ollama.binary", "ai.engine.api.ollama",
+	"ai.engine.bootstrap.pty_process_group", "core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler", "ai.engine.ollama.deps_checker",
+	"ai.engine.local_servers.mlx_deps_checker", "core.ui.engine.dialog_util", "core.ui.engine.notifications",
+	"ai.ui.menu.runtime_install_offer",
+	"ai.engine.api.network_env", "core.fs.adapters.file_system",
+	"ai.adapters.managed_ollama_hint", "ai.adapters.managed_ollama_daemon",
 	"core.network.adapters.http_client", "core.process.adapters.shell_runner", "core.fs.adapters.json_codec",
-	"modules.llm.ollama_server_command", "modules.llm.parser", "modules.llm.profiles",
-	"modules.llm.progressive_reveal", "modules.llm.prediction_engine",
-	"ui.menu.menu_llm.models_manager_ollama", "modules.llm.api_common",
-	"modules.llm.ollama_endpoint", "core.fs.adapters.storage", "core.process.adapters.owned_program_runner",
+	"ai.engine.ollama.server_command", "ai.engine.api.parser", "ai.engine.settings.profiles",
+	"ai.engine.prediction.progressive_reveal", "ai.engine.prediction.engine",
+	"ai.ui.menu.models.manager_ollama", "ai.engine.api.common",
+	"ai.engine.ollama.endpoint", "core.fs.adapters.storage", "core.process.adapters.owned_program_runner",
 	"platform.remap.lease_helper", "modules.shortcuts.script_control", "modules.keystats",
 	"core.lifecycle.engine.core.ollama_runtime_choice", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "ai.engine.ollama.local_model_policy",

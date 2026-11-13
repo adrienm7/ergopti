@@ -70,14 +70,14 @@ helpers.describe("llm_prompt parameter: native prompt and refusal", function()
 		local i18n = package.loaded["core.i18n.engine.i18n"]
 		local saved_get = i18n.get
 		local ok, err = pcall(helpers.with_fresh_modules, {
-			"modules.llm", "modules.llm.prediction_engine", "ui.menu.menu_llm.profile_label",
+			"ai.engine", "ai.engine.prediction.engine", "ai.ui.menu.profile_label",
 		}, function()
-			package.loaded["modules.llm"] = {
+			package.loaded["ai.engine"] = {
 				DEFAULT_STATE = { llm_num_predictions = 1 },
 				BUILTIN_PROFILES = builtins,
 				get_user_profiles = function() return { custom } end,
 			}
-			package.loaded["modules.llm.prediction_engine"] = {
+			package.loaded["ai.engine.prediction.engine"] = {
 				get_llm_runtime_setting = function(key)
 					if key == "llm_num_predictions" then return true, 3 end
 					return false, nil

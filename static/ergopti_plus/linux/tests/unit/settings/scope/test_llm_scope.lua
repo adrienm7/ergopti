@@ -14,7 +14,7 @@ local function with_scope(body)
 	Sandbox.with_config(SOURCE, function(path)
 		local loaded_before = {}
 		for name, value in pairs(package.loaded) do loaded_before[name] = value end
-		local names = { "settings.engine.paths", "infra.llm_preferences", "infra.llm_scope",
+		local names = { "settings.engine.paths", "ai.engine.preferences", "ai.engine.scope",
 			"core.network.adapters.http_client", "platform.focus.secure_field_detector", "core.ui.ui.tooltip.llm",
 			"core.fs.adapters.storage", "modules.hotstrings.magic_key" }
 		for _, name in ipairs({ "settings", "trigger_settings", "display_settings", "navigation_settings",
@@ -66,7 +66,7 @@ local function with_scope(body)
 					return true
 				end,
 			}
-			local engine = require("modules.llm.prediction_engine")
+			local engine = require("ai.engine.prediction.engine")
 			engine.init({ overlay = overlay, scheduler = scheduler,
 				focus_id = function() return "x11:scope-fixture:1" end,
 				engine = {},
@@ -81,7 +81,7 @@ local function with_scope(body)
 					return Writer.publish_if_unchanged(target, content, nil, expected)
 				end,
 			}
-			local owner = require("infra.llm_scope").new({ path = path, backup_path = backup, files = files })
+			local owner = require("ai.engine.scope").new({ path = path, backup_path = backup, files = files })
 			body(owner, engine, controls, path, backup)
 		end)
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
@@ -120,12 +120,12 @@ helpers.describe("Linux terminal LLM scope", function()
 
 	helpers.it("clears consumed settings and runtime without touching credentials or unknown neighbors", function()
 		with_scope(function(owner, engine, _, path, backup)
-			local settings = require("modules.llm.settings")
+			local settings = require("ai.engine.settings.settings")
 			helpers.assert_eq(settings.get("temperature"), 0.9)
 			helpers.assert_true(owner.apply("clear"))
 			helpers.assert_eq(Sandbox.read_bytes(backup), SOURCE)
 			helpers.assert_eq(engine.is_enabled(), false)
-			helpers.assert_eq(require("modules.llm.profiles").is_enabled(), false)
+			helpers.assert_eq(require("ai.engine.settings.profiles").is_enabled(), false)
 			helpers.assert_eq(settings.get("temperature"), require("menu.engine.manifest_reader").default_for("llm.generation.temperature"))
 			local document = Codec.decode(Sandbox.read_bytes(path))
 			helpers.assert_eq(document.llm.enabled, nil)
@@ -161,7 +161,7 @@ helpers.describe("Linux terminal LLM scope", function()
 			helpers.assert_eq(controls.active, false)
 			helpers.assert_eq(controls.requests, 1)
 			helpers.assert_true(engine.is_enabled())
-			helpers.assert_eq(require("modules.llm.profiles").get_current_model(), "private-model")
+			helpers.assert_eq(require("ai.engine.settings.profiles").get_current_model(), "private-model")
 			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
 		end)
 	end)
@@ -178,7 +178,7 @@ helpers.describe("Linux terminal LLM scope", function()
 			helpers.assert_eq(status, "absent")
 			helpers.assert_eq(engine.trigger_now(), false)
 			helpers.assert_eq(engine.set_backend("api"), false)
-			helpers.assert_eq(require("modules.llm.settings").set("temperature", 0.6), false)
+			helpers.assert_eq(require("ai.engine.settings.settings").set("temperature", 0.6), false)
 			controls.chunk('{"message":{"content":" sunshine today everywhere around the world"},"done":false}\n')
 			helpers.assert_eq(require("core.ui.ui.tooltip.llm").is_showing(), false,
 				"late transport chunks cannot publish an offer while cancellation is pending")
@@ -186,7 +186,7 @@ helpers.describe("Linux terminal LLM scope", function()
 			helpers.assert_true(owner.retry_restore())
 			helpers.assert_eq(controls.active, false)
 			helpers.assert_eq(controls.requests, 1)
-			helpers.assert_true(require("modules.llm.settings").set("temperature", 0.6))
+			helpers.assert_true(require("ai.engine.settings.settings").set("temperature", 0.6))
 		end)
 	end)
 
@@ -229,7 +229,7 @@ helpers.describe("Linux terminal LLM scope", function()
 
 	helpers.it("restores exact cached state when conditional publication detects a concurrent edit", function()
 		with_scope(function(owner, engine, controls, path)
-			local settings = require("modules.llm.settings")
+			local settings = require("ai.engine.settings.settings")
 			helpers.assert_eq(settings.get("temperature"), 0.9)
 			controls.on_publish = function(target)
 				if target == path then Sandbox.write_bytes(path, SOURCE .. '\n[external]\nvalue = 9\n') end
@@ -265,7 +265,7 @@ helpers.describe("Linux terminal LLM scope", function()
 			local old_top = root.top_level
 			local old_builder = package.loaded["menu.ui.builder.builder"]
 			local execute = os.execute
-			local scope = require("infra.llm_scope")
+			local scope = require("ai.engine.scope")
 			local old_apply = scope.apply
 			local key = "common.restore_recommended"
 			local changed, questions = 0, 0
@@ -316,7 +316,7 @@ end)
 helpers.describe("Linux AI scope while paused", function()
 	helpers.it("applies the restore a paused menu requests (edd1-paused-writes)", function()
 		with_scope(function(owner)
-			local scope = require("infra.llm_scope")
+			local scope = require("ai.engine.scope")
 			local old_new = scope.new
 			scope.new = function() return owner end
 			local ok, applied = pcall(scope.apply, "recommended", true)
@@ -336,7 +336,7 @@ helpers.describe("Linux terminal LLM scope revert", function()
 			helpers.assert_eq(reverted, true, detail)
 			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
 			helpers.assert_true(engine.is_enabled())
-			helpers.assert_eq(require("modules.llm.settings").get("temperature"), 0.9)
+			helpers.assert_eq(require("ai.engine.settings.settings").get("temperature"), 0.9)
 			helpers.assert_eq(owner.pending(), false)
 			os.remove(backup)
 			helpers.assert_true(owner.apply("clear"), "the AI ownership is released after a revert")
@@ -348,7 +348,7 @@ end)
 helpers.describe("LLM private native claims", function()
 	helpers.it("releases actual preference and quiescent engine primitives while public pending remains true", function()
 		with_scope(function(_, engine, controls, path, backup)
-			local Preferences = require("infra.llm_preferences")
+			local Preferences = require("ai.engine.preferences")
 			local public, claim, primary = {}, {}, nil
 			claim.pending = function() return primary.pending() end
 			primary = require("settings.engine.scope.transaction").new({ path = path, backup_path = backup,
@@ -403,7 +403,7 @@ helpers.describe("LLM retained native release and stop debt", function()
 		{ name = "exception", reply = function() error("native AI release refused") end },
 	}
 	local function controlled_scope(engine, controls, path, selected, refusal)
-		local Preferences = require("infra.llm_preferences")
+		local Preferences = require("ai.engine.preferences")
 		local blocked, live, acknowledged, faults, scope = true, {}, {}, {}, nil
 		for _, entry in ipairs({ { "preferences", Preferences, "acquire", "release" },
 			{ "engine", engine, "acquire_configuration", "release_configuration" } }) do
@@ -432,14 +432,14 @@ helpers.describe("LLM retained native release and stop debt", function()
 				return Writer.publish_if_unchanged(target, content, nil, source)
 			end }
 		faults.files = files
-		scope = require("infra.llm_scope").new({ path = path, backup_path = path .. ".scope-backup", files = files, engine = engine })
+		scope = require("ai.engine.scope").new({ path = path, backup_path = path .. ".scope-backup", files = files, engine = engine })
 		return scope, function(value) blocked = value == true end, live, faults
 	end
 	local function restored(engine, controls, path, live)
 		helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)), expected, "complete independent source model")
 		helpers.assert_eq(engine.is_enabled(), true)
-		helpers.assert_eq(require("modules.llm.settings").get("temperature"), 0.9)
-		helpers.assert_eq(require("modules.llm.profiles").get_current_model(), "private-model")
+		helpers.assert_eq(require("ai.engine.settings.settings").get("temperature"), 0.9)
+		helpers.assert_eq(require("ai.engine.settings.profiles").get_current_model(), "private-model")
 		helpers.assert_eq(next(live), nil)
 	end
 	for _, mode in ipairs({ "clear", "recommended" }) do
@@ -456,7 +456,7 @@ helpers.describe("LLM retained native release and stop debt", function()
 						helpers.assert_eq(scope.release(), false)
 						helpers.assert_eq(scope.apply("clear"), false)
 						helpers.assert_eq(engine.trigger_now(), false)
-						helpers.assert_eq(require("modules.llm.settings").set("temperature", 0.6), false)
+						helpers.assert_eq(require("ai.engine.settings.settings").set("temperature", 0.6), false)
 						unblock()
 						helpers.assert_eq(scope.retry_restore(), true)
 						helpers.assert_eq(scope.pending(), false)
@@ -568,7 +568,7 @@ helpers.describe("LLM retained native release and stop debt", function()
 			helpers.assert_eq(scope.apply("recommended"), true)
 			block(true)
 			helpers.assert_eq(scope.revert(), false)
-			local settings = require("modules.llm.settings")
+			local settings = require("ai.engine.settings.settings")
 			local restore, replay = settings.restore_configuration, 0
 			settings.restore_configuration = function(...) replay = replay + 1; return restore(...) end
 			block(false)

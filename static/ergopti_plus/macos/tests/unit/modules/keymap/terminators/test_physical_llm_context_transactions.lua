@@ -55,11 +55,11 @@ local function load_fixture()
 
 	local effects = { emitted = {}, rows = nil, visible = false }
 	local core_state
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = false },
 		check_modifiers = function() return false end,
 	}
-	package.loaded["modules.llm.prediction_engine"] = setmetatable({
+	package.loaded["ai.engine.prediction.engine"] = setmetatable({
 		init = function(state) core_state = state; return true end,
 		set_runtime_guard = function() end,
 		get_llm_enabled = function() return false end,

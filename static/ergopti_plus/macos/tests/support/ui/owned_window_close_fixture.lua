@@ -29,7 +29,7 @@ local function run_window(module_name, scenario)
 		"ai.engine.local_servers.model_catalogue", "core.process.adapters.shell_runner", "core.ui.engine.webview.document_csp", "diagnostics.engine.runtime_log",
 		"core.process.adapters.task_environment", "modules.updater.config_backup", "updater.engine.release_sources", "updater.engine.channels",
 		"updater.engine.version_core", "updater.engine.release_install", "updater.engine.release_assets", "core.network.engine.failure", "updater.engine.config_backup_core",
-		"ui.model_browser", "ui.changelog",
+		"ai.ui.model_browser", "ui.changelog",
 		"core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.events.timer_scheduler", "core.timing.engine.deferred_work", "core.timing.engine.paced_job", "core.timing.engine.paced_json",
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
@@ -99,7 +99,7 @@ local function run_window(module_name, scenario)
 			end
 		end
 		function h.show()
-			if module_name == "ui.model_browser" then return window.open({ presets = {}, active_backend = "mlx" }) end
+			if module_name == "ai.ui.model_browser" then return window.open({ presets = {}, active_backend = "mlx" }) end
 			if module_name == "ui.changelog" then return window.open() end
 			if module_name == "settings.ui.cleanup" then return window.open({ path = "/virtual/config.toml" }) end
 			if module_name == "ui.onboarding" then return window.run("/virtual/config.toml") end

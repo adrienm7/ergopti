@@ -93,20 +93,20 @@ if (DEFAULTS.llm_disable_password_fields !== true) {
 
 // ── macOS: reads the shared value, does not re-declare it ────────────────────
 
-const macInit = read('static/ergopti_plus/macos/modules/llm/init.lua');
+const macInit = read('static/ergopti_plus/macos/ai/engine/init.lua');
 if (macInit) {
 	const stripped = stripLua(macInit);
 	for (const k of KEYS) {
 		if (!stripped.includes(`"${k}"`)) {
 			errors.push(
-				`macos/modules/llm/init.lua: ${k} must appear in _SHARED_SCALAR_KEYS, ` +
+				`macos/ai/engine/init.lua: ${k} must appear in _SHARED_SCALAR_KEYS, ` +
 					'otherwise the shared default is unreachable and the driver silently keeps its own.'
 			);
 		}
 	}
 }
 
-const macEngine = read('static/ergopti_plus/macos/modules/llm/prediction_engine.lua');
+const macEngine = read('static/ergopti_plus/macos/ai/engine/prediction/engine.lua');
 if (macEngine) {
 	const stripped = stripLua(macEngine);
 	const hardcoded = [
@@ -117,7 +117,7 @@ if (macEngine) {
 		const m = stripped.match(re);
 		if (m) {
 			errors.push(
-				`macos/modules/llm/prediction_engine.lua: "${m[0].trim()}" re-declares a shared ` +
+				`macos/ai/engine/prediction/engine.lua: "${m[0].trim()}" re-declares a shared ` +
 					'default as a literal. It must read LLM_DEFAULTS — a literal that happens to ' +
 					'match today is exactly how the two drivers drifted apart.'
 			);
@@ -128,14 +128,14 @@ if (macEngine) {
 		'LLM_DEFAULTS.llm_disable_password_fields'
 	]) {
 		if (!stripped.includes(ref)) {
-			errors.push(`macos/modules/llm/prediction_engine.lua: must read ${ref}.`);
+			errors.push(`macos/ai/engine/prediction/engine.lua: must read ${ref}.`);
 		}
 	}
 }
 
 // ── Windows: the fallback literal must agree with the shared value ───────────
 
-const winEngine = read('static/ergopti_plus/windows/modules/llm/prediction_engine.ahk');
+const winEngine = read('static/ergopti_plus/windows/ai/engine/prediction/engine.ahk');
 if (winEngine) {
 	const pairs = [
 		['disable_password_fields', DEFAULTS.llm_disable_password_fields],
@@ -145,10 +145,10 @@ if (winEngine) {
 		const re = new RegExp(`"${key}",\\s*(true|false)`);
 		const m = winEngine.match(re);
 		if (!m) {
-			errors.push(`windows/modules/llm/prediction_engine.ahk: no seed literal found for ${key}.`);
+			errors.push(`windows/ai/engine/prediction/engine.ahk: no seed literal found for ${key}.`);
 		} else if ((m[1] === 'true') !== expected) {
 			errors.push(
-				`windows/modules/llm/prediction_engine.ahk: ${key} seeds ${m[1]} but defaults.json ` +
+				`windows/ai/engine/prediction/engine.ahk: ${key} seeds ${m[1]} but defaults.json ` +
 					`says ${expected}. LLM_Engine_ApplySharedDefaults() returns early when ` +
 					'LLM_Defaults is unset, so this literal is live in that path and must agree.'
 			);
@@ -158,25 +158,25 @@ if (winEngine) {
 
 // ── Linux: must consult a secure-field signal, and fail closed ───────────────
 
-const linuxEngine = read('static/ergopti_plus/linux/modules/llm/prediction_engine.lua');
+const linuxEngine = read('static/ergopti_plus/linux/ai/engine/prediction/engine.lua');
 if (linuxEngine) {
 	const stripped = stripLua(linuxEngine);
 	if (!stripped.includes('platform.focus.secure_field_detector')) {
 		errors.push(
-			'linux/modules/llm/prediction_engine.lua: must consult ' +
+			'linux/ai/engine/prediction/engine.lua: must consult ' +
 				'adapters.secure_field_detector before predicting. Linux had no gate at all: the ' +
 				'text around the caret in a password field went to the model like any other context.'
 		);
 	}
 	if (!/function M\.predict[\s\S]{0,400}_is_secure_context\(\)/.test(stripped)) {
 		errors.push(
-			'linux/modules/llm/prediction_engine.lua: M.predict must check the secure context ' +
+			'linux/ai/engine/prediction/engine.lua: M.predict must check the secure context ' +
 				'before doing any work — a gate consulted after the request is not a gate.'
 		);
 	}
 	if (!stripped.includes('HttpBridge.DEFAULT_DISABLE_PASSWORD_FIELDS')) {
 		errors.push(
-			'linux/modules/llm/prediction_engine.lua: the posture must come from the shared ' +
+			'linux/ai/engine/prediction/engine.lua: the posture must come from the shared ' +
 				'bridge, never a re-typed literal.'
 		);
 	}

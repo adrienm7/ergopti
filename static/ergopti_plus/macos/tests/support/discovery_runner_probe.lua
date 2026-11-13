@@ -21,8 +21,8 @@ local groups = {
 	["tests/meta"] = { { "harness", "directory" } },
 	["tests/meta/harness"] = { { "test_runner_fixture_selection.lua", "file" } },
 	["tests/unit"] = { { "modules", "directory" } },
-	["tests/unit/modules"] = { { "keymap", "directory" } },
-	["tests/unit/modules/keymap"] = { { "layout", "directory" } },
+	["tests/unit"] = { { "keymap", "directory" } },
+	["tests/unit"] = { { "layout", "directory" } },
 	["tests/unit/modules/keymap/layout"] = { { "test_input_sources_bounded_mutations.lua", "file" } },
 }
 

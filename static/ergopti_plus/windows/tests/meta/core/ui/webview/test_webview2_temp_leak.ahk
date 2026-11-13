@@ -72,19 +72,19 @@ _TWTL_AllHosts() {
 	; Shared-env hosts (leak-free by construction).
 	_TWTL_CheckSharedHost("ui/changelog/init.ahk", "ergopti_changelog_wv_")
 	_TWTL_CheckSharedHost("ui/healthcheck/core.ahk", "ergopti_hc_wv_")
-	_TWTL_CheckSharedHost("ui/model_browser/init.ahk", "ergopti_modelbrowser_wv_")
+	_TWTL_CheckSharedHost("ai/ui/model_browser/init.ahk", "ergopti_modelbrowser_wv_")
 	_TWTL_CheckSharedUpdaterModule()
 	_TWTL_SharedFolderIsFixed()
 	; Legacy per-launch hosts (interactive/long-lived) -- still sweep + delete.
 	_TWTL_CheckLegacyHost("modules/keystats/keystats_ui.ahk", "ergopti_metrics_edge_")
 	_TWTL_CheckLegacyHost("modules/keystats/keystats_webview.ahk", "ergopti_webview2_")
-	_TWTL_CheckLegacyHost("modules/llm/ollama_webview.ahk", "ergopti_ollama_wv_")
+	_TWTL_CheckLegacyHost("ai/engine/ollama/webview.ahk", "ergopti_ollama_wv_")
 }
 
 ; Fixed delays cannot establish browser termination. Keep the environment-exit
 ; subscription paired with retirement in both WebView hosts.
 _TWTL_OllamaWVDeferredDelete() {
-	Src := _TWTL_ReadSource("modules/llm/ollama_webview.ahk")
+	Src := _TWTL_ReadSource("ai/engine/ollama/webview.ahk")
 	Close := _DriverFuncBody("OllamaWV_Close")
 	Assert(Close != "", "OllamaWV_Close must exist")
 	Assert(InStr(Close, "WebView_RetireProfile(UdirToDelete)") > 0,

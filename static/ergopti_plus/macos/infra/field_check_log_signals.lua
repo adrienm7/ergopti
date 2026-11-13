@@ -57,7 +57,7 @@ M.ERROR_SIGNALS = {
 	{ step = "log_start_rollbacks", name = "start_rollback" },
 	-- modules/keystats: a day rollover that skipped or stalled its rotation.
 	{ step = "log_keystats_rotation_warnings", name = "rotation_warning" },
-	-- ui/menu/menu_llm/models_manager_ollama.lua: a pull that failed its digest check.
+	-- ai/ui/menu/models/manager_ollama.lua: a pull that failed its digest check.
 	{ step = "log_digest_mismatches", name = "digest_mismatch" },
 }
 
@@ -65,7 +65,7 @@ M.ERROR_SIGNALS = {
 --- (infra/field_run_guided.lua) and the TODO summary bounds.
 --- @type table { { step, name } } in report order
 M.COUNT_SIGNALS = {
-	-- modules/keymap/llm_bridge.lua: a prediction a window or application switch
+	-- ai/engine/bridge.lua: a prediction a window or application switch
 	-- cancelled; its reason holds spaces, which the generic count refuses.
 	{ step = "log_prediction_switch_cancels", name = "switch_cancel" },
 	-- core/ui/ui/window_toggle.lua: a toggle that opened its page, or raised a covered or
@@ -76,7 +76,7 @@ M.COUNT_SIGNALS = {
 	{ step = "log_hotstring_expansions", name = "expansion" },
 	-- core/logger/engine/boot_profiler.lua: one completed boot.
 	{ step = "log_boot_completions", name = "boot" },
-	-- modules/llm: an API entry restored without its Keychain key, then given one.
+	-- ai/engine: an API entry restored without its Keychain key, then given one.
 	{ step = "log_api_key_absent", name = "api_key_absent" },
 	{ step = "log_api_key_reentered", name = "api_key_reentered" },
 	-- modules/gestures/engine.lua: a three-finger swipe slot that dispatched its action.

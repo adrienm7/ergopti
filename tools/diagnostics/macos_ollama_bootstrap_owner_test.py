@@ -32,7 +32,7 @@ def load(name, path):
 
 
 BOOT = load(
-    "bootstrap_owner", ROOT / "static/ergopti_plus/macos/platform/ollama_bootstrap_owner.py"
+    "bootstrap_owner", ROOT / "static/ergopti_plus/macos/ai/adapters/ollama_bootstrap_owner.py"
 )
 PROXY = load(
     "bootstrap_proxy",

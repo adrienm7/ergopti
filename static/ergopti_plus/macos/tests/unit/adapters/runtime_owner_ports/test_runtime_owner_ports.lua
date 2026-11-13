@@ -112,13 +112,13 @@ helpers.describe("owned runtime ports", function()
 		load_ports(function() return 0, "" end)
 		local Ports = package.loaded["adapters.runtime_owner_ports"]
 		local saved = {}
-		for _, name in ipairs({ "platform.remap", "core.timing.engine.deferred_work", "ui.owned_runtime_install" }) do
+		for _, name in ipairs({ "platform.remap", "core.timing.engine.deferred_work", "ai.ui.owned_runtime_install" }) do
 			saved[name] = package.loaded[name]
 		end
 		local offers, deferred, shown = 0, {}, {}
 		package.loaded["platform.remap"] = { OWNED_INSTALL_REASONS = { runtime_not_installed = true } }
 		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) deferred[#deferred + 1] = fn; return true end }
-		package.loaded["ui.owned_runtime_install"] = { open = function() offers = offers + 1; return true end }
+		package.loaded["ai.ui.owned_runtime_install"] = { open = function() offers = offers + 1; return true end }
 		local ok, failure = pcall(function()
 			local observe = Ports.automatic_observer(function(text) shown[#shown + 1] = text end)
 			observe("unavailable", "runtime_not_installed")

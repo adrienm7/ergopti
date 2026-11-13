@@ -154,7 +154,7 @@ package.loaded['core.ui.ui.builder'] = {
 		return native
 	end,
 }
-local browser = helpers.load_with_stubs('ui.model_browser', {
+local browser = helpers.load_with_stubs('ai.ui.model_browser', {
 	webview = { usercontent = { new = function()
 		return { setCallback = function(self, callback) bridge = callback; return self end }
 	end } },

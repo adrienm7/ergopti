@@ -65,7 +65,7 @@ function M.receive(network, bytes, code, mode, receiver, owner)
 	local policy = json.decode(file:read("*a"))
 	assert(file:close())
 	local contract = require("core.network.engine.failure").new(policy)
-	local admission = require("modules.llm.opaque_network_admission")
+	local admission = require("ai.engine.api.opaque_network_admission")
 	local calls = 0
 	local revoke
 	-- The real classifier of a PAC failure that fell back to a direct try.

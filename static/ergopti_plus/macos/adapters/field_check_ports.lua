@@ -265,7 +265,7 @@ end
 ---   the argument list of another mode ({ "--ollama-blob", model }).
 --- @param timeout_s number|nil Seconds before the helper is terminated.
 local function network_chain(callback, mode, timeout_s)
-	local python = require("adapters.python_interpreter").resolve()
+	local python = require("ai.adapters.python_interpreter").resolve()
 	local source = debug.getinfo(1, "S").source or ""
 	local root = (source:sub(1, 1) == "@" and source:sub(2) or source):match("^(.*)/adapters/field_check_ports%.lua$")
 	if not python or not root then
@@ -273,7 +273,7 @@ local function network_chain(callback, mode, timeout_s)
 		callback(nil, "")
 		return
 	end
-	local args = { "-B", root .. "/modules/llm/managed_network_check.py" }
+	local args = { "-B", root .. "/ai/engine/bootstrap/managed_network_check.py" }
 	for _, argument in ipairs(type(mode) == "table" and mode or { mode }) do args[#args + 1] = argument end
 	exec(python, args, timeout_s or 40, callback)
 end
@@ -284,7 +284,7 @@ end
 --- daemon's own start performs (network-retry.sh).
 --- @param callback function fn({ entries = {{ origin, route }} } | { failure = token }).
 local function route_plan(callback)
-	local NetworkEnv = require("modules.llm.network_env")
+	local NetworkEnv = require("ai.engine.api.network_env")
 	local origins = NetworkEnv.route_origins("ollama")
 	local budget = NetworkEnv.route_lookup_budget_seconds()
 	local launcher, _, environment = require("platform.remap.lease_helper").resolve()
@@ -323,7 +323,7 @@ end
 --- @param upstream string Plain http relay (policy.upstream()).
 --- @param callback function fn(answer|nil, reason|nil).
 local function relay_probe(upstream, callback)
-	local NetworkEnv = require("modules.llm.network_env")
+	local NetworkEnv = require("ai.engine.api.network_env")
 	local policy = NetworkEnv.proxy_auth_relay()
 	local origins = NetworkEnv.route_origins("ollama")
 	if not policy or not origins then return callback(nil, "relay_unavailable") end
@@ -512,7 +512,7 @@ function M.new()
 		smallest_ollama_model = function() return M.smallest_model("ollama") end,
 		route_plan = route_plan,
 		relay_probe = relay_probe,
-		relay_policy = function() return require("modules.llm.network_env").proxy_auth_relay() end,
+		relay_policy = function() return require("ai.engine.api.network_env").proxy_auth_relay() end,
 		timer_probe = timer_probe,
 		after = function(seconds, callback)
 			local _, committed = Timer.after(seconds, callback)

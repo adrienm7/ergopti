@@ -15,7 +15,7 @@ assert(driver and shared and native_driver and native_shared and root and fixtur
 package.path = native_driver .. "/?.lua;" .. native_shared .. "/?.lua;"
 	.. driver .. "/?.lua;" .. shared .. "/?.lua;" .. package.path
 local uv = require("luv")
-local Files = require("modules.llm.ollama_install_files")
+local Files = require("ai.engine.ollama.install_files")
 local Process = require("core.process.adapters.owned_process")
 local Installer = require("ai.engine.ollama.archive_installer")
 local passed = 0

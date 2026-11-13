@@ -202,15 +202,15 @@ function verifyWindowsStartup(summary, sha, packageDigest) {
 
 // Require actual native closure and an independently qualified isolated runtime.
 const COLD_SOURCE_PATHS = [
-	'macos/modules/llm/network-retry.sh',
-	'macos/modules/llm/ensure-mlx-deps.sh',
-	'macos/modules/llm/managed_bootstrap_http.py',
-	'macos/modules/llm/mlx_deps_checker.lua',
-	'macos/modules/llm/uv-release.sh',
-	'macos/modules/llm/managed-python-release.sh',
-	'macos/modules/llm/managed-python-downloads.json',
-	'macos/adapters/native_bootstrap_pty.lua',
-	'macos/adapters/python_interpreter.lua',
+	'macos/ai/engine/bootstrap/network-retry.sh',
+	'macos/ai/engine/local_servers/ensure-mlx-deps.sh',
+	'macos/ai/engine/bootstrap/managed_bootstrap_http.py',
+	'macos/ai/engine/local_servers/mlx_deps_checker.lua',
+	'macos/ai/engine/bootstrap/uv-release.sh',
+	'macos/ai/engine/bootstrap/managed-python-release.sh',
+	'macos/ai/engine/managed-python-downloads.json',
+	'macos/ai/adapters/native_bootstrap_pty.lua',
+	'macos/ai/adapters/python_interpreter.lua',
 	'macos/core/network/adapters/native_http.py',
 	'_shared/core/network/adapters/python_network_proxy_policy.py',
 	'_shared/core/lifecycle/engine/core/native_pty_receipt.lua',
@@ -380,7 +380,10 @@ function verifyColdBootstrap(report, sha) {
 		isolation.paths,
 		'Hammerspoon inherited another sandbox'
 	);
-	assert.equal(caller.source_sha256, report.sources['macos/modules/llm/ensure-mlx-deps.sh']);
+	assert.equal(
+		caller.source_sha256,
+		report.sources['macos/ai/engine/local_servers/ensure-mlx-deps.sh']
+	);
 	assert.deepEqual(caller.native_cli, ['--managed-pty-worker', '1800000']);
 	assert.ok(Number.isSafeInteger(caller.worker_pid) && caller.worker_pid > 0);
 	assert.equal(typeof caller.receipt_path, 'string');

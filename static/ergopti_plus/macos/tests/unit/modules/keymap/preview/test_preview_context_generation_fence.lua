@@ -24,10 +24,10 @@ local function run_scenario(mode)
 		"modules.keymap.expander",
 		"modules.keymap.utils",
 		"modules.keystats",
-		"modules.llm",
-		"modules.llm.prediction_engine",
+		"ai.engine",
+		"ai.engine.prediction.engine",
 		"core.ui.ui.tooltip",
-		"modules.keymap.llm_bridge",
+		"ai.engine.bridge",
 	}
 	local previous = {}
 	for _, name in ipairs(dependency_names) do previous[name] = package.loaded[name] end
@@ -102,10 +102,10 @@ local function run_scenario(mode)
 		log_hotstring_suggested = function() end,
 		log_hotstring_dismissed = function() end,
 	}
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = true },
 	}
-	package.loaded["modules.llm.prediction_engine"] = {
+	package.loaded["ai.engine.prediction.engine"] = {
 		set_runtime_guard = function() end,
 		init = function() return true end,
 		get_llm_enabled = function() return false end,
@@ -126,7 +126,7 @@ local function run_scenario(mode)
 	}
 
 	local ok, err = xpcall(function()
-		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		local Bridge = helpers.load_with_stubs("ai.engine.bridge")
 		local hs_stub = _G.hs
 		local clock_reads = 0
 		hs_stub.timer.secondsSinceEpoch = function()
@@ -151,7 +151,7 @@ local function run_scenario(mode)
 				return remaining > 0, math.max(0, remaining)
 			end,
 		}
-		require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
+		require("ai.engine.api.context").seed(state, state.buffer or "", "")
 		Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
 		Bridge.update_preview(state.buffer)
 

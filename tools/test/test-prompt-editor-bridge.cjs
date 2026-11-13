@@ -42,8 +42,8 @@ const FRONT_DIR = 'static/ergopti_plus/_shared/ui/prompt_editor';
 const SCRIPT = `${FRONT_DIR}/script.js`;
 const INDEX = `${FRONT_DIR}/index.html`;
 const HOST_BRIDGE = 'static/ergopti_plus/_shared/ui/host_bridge.js';
-const WIN_HOST = 'static/ergopti_plus/windows/ui/prompt_editor/init.ahk';
-const WIN_MENU = 'static/ergopti_plus/windows/ui/menu/menu_llm/menu_profiles.ahk';
+const WIN_HOST = 'static/ergopti_plus/windows/ai/ui/prompt_editor/init.ahk';
+const WIN_MENU = 'static/ergopti_plus/windows/ai/ui/menu/profiles.ahk';
 
 let total_pass = 0;
 let total_fail = 0;

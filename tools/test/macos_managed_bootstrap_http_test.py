@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from tools.lib.git_bash import bash_executable  # noqa: E402 (direct-file test needs repository root)
 
-SOURCE = ROOT / "static/ergopti_plus/macos/modules/llm/managed_bootstrap_http.py"
+SOURCE = ROOT / "static/ergopti_plus/macos/ai/engine/bootstrap/managed_bootstrap_http.py"
 SPEC = importlib.util.spec_from_file_location("bootstrap_under_test", SOURCE)
 BOOTSTRAP = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(BOOTSTRAP)
@@ -480,7 +480,7 @@ function /usr/sbin/scutil() {
 """
 
     def test_private_json_preserves_independent_control_and_unicode_vectors(self):
-        script = ROOT / "static/ergopti_plus/macos/modules/llm/network-retry.sh"
+        script = ROOT / "static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh"
         for value in ("plain", 'quote"back\\slash', "line\nreturn\rtab\t", "\x01\x1f", "é日本🙂"):
             with self.subTest(value=repr(value)):
                 result = subprocess.run(
@@ -519,7 +519,7 @@ function /usr/sbin/scutil() {
             )
             for name in ("https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
                 environment.pop(name, None)
-            script = ROOT / "static/ergopti_plus/macos/modules/llm/network-retry.sh"
+            script = ROOT / "static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh"
             command = 'set -u; source "$1"; managed_bootstrap_launcher_available() { return 0; }; '
             command += 'managed_bootstrap_download "$2" "$3" "$4" 5 resumable --replace-owner'
             owner = subprocess.Popen(
@@ -546,7 +546,7 @@ function /usr/sbin/scutil() {
             self.assertEqual(captured["size"], 5)
 
     def test_explicit_all_proxy_aliases_survive_native_static_settings_without_lookup(self):
-        script = ROOT / "static/ergopti_plus/macos/modules/llm/network-retry.sh"
+        script = ROOT / "static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh"
         cases = [
             (
                 {"ALL_PROXY": "http://upper.invalid:3111"},
@@ -621,7 +621,7 @@ printf '%s\n' "${all_proxy:-}" "${ALL_PROXY:-}" "$OPAQUE_NETWORK_INHERITED_HTTPS
                     self.assertEqual(result.stderr, "")
 
     def test_automatic_configuration_logs_only_fixed_actual_helper_availability(self):
-        script = ROOT / "static/ergopti_plus/macos/modules/llm/network-retry.sh"
+        script = ROOT / "static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh"
         with tempfile.TemporaryDirectory(prefix="ergopti-system-pac-log-") as folder:
             snapshot = Path(folder) / "snapshot"
             snapshot.write_text(
@@ -679,7 +679,7 @@ apply_system_network
                         self.assertNotIn(private, result.stdout + result.stderr)
 
     def test_missing_native_helper_refuses_before_curl_or_successor_without_private_pac_logs(self):
-        script = ROOT / "static/ergopti_plus/macos/modules/llm/network-retry.sh"
+        script = ROOT / "static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh"
         with tempfile.TemporaryDirectory(prefix="ergopti-system-pac-refusal-") as folder:
             directory = Path(folder)
             snapshot = directory / "snapshot"

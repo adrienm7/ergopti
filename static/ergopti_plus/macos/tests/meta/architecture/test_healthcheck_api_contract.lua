@@ -42,10 +42,10 @@ local CONTRACT = {
 	{ mod = "modules.shortcuts.script_control", fns = { "is_paused" } },
 	{ mod = "platform.input.key_state",               fns = { "isDown", "is_right_altgr_held", "capslock_on" } },
 	{ mod = "platform.remap.lease_controller",  fns = { "status" } },
-	{ mod = "modules.llm",                      fns = { "get_runtime_llm_enabled", "get_backend", "get_current_model",
+	{ mod = "ai.engine",                      fns = { "get_runtime_llm_enabled", "get_backend", "get_current_model",
 		"get_active_profile" } },
-	{ mod = "modules.llm.api_ollama",           fns = { "get_base_url" } },
-	{ mod = "modules.llm.api_mlx",              fns = { "get_base_url" } },
+	{ mod = "ai.engine.api.ollama",           fns = { "get_base_url" } },
+	{ mod = "ai.engine.api.mlx",              fns = { "get_base_url" } },
 	{ mod = "adapters.accessibility_permission", fns = { "is_trusted" } },
 	{ mod = "platform.system.screen_capture",          fns = { "permission_state" } },
 	{ mod = "core.network.adapters.http_client",             fns = { "new" } },
@@ -135,7 +135,7 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 	local failures = {}
 	local ok_run, snap
 	local scope = {
-		"core.logger.engine.logger", "core.logger.engine", "modules.llm", "ui.healthcheck", "ui.healthcheck.core", "ui.healthcheck.helpers",
+		"core.logger.engine.logger", "core.logger.engine", "ai.engine", "ui.healthcheck", "ui.healthcheck.core", "ui.healthcheck.helpers",
 	}
 	for _, name in ipairs(HS_READERS) do scope[#scope + 1] = name end
 	helpers.with_stub_scope(scope, function()
@@ -143,7 +143,7 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 		answer_as_a_mac(hs)
 		for _, name in ipairs(HS_READERS) do package.loaded[name] = nil end
 		-- Force the real llm module (load_with_stubs injects a DEFAULT_STATE-only stub).
-		package.loaded["modules.llm"] = nil
+		package.loaded["ai.engine"] = nil
 		package.loaded["ui.healthcheck"] = nil
 		package.loaded["ui.healthcheck.core"] = nil
 		package.loaded["ui.healthcheck.helpers"] = nil

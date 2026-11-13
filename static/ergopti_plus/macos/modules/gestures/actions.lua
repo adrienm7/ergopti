@@ -1372,7 +1372,7 @@ for _, screen_action in ipairs(SCREEN_ANSWER_ACTIONS) do
 			Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", spec.id, tostring(keymap))
 			return false
 		end
-		local ScreenAnswer = require("modules.llm.screen_answer")
+		local ScreenAnswer = require("ai.engine.prediction.screen_answer")
 		return keymap.request_screen_answers(value, ScreenAnswer[spec.mode], current_action_parent(),
 			ScreenAnswer[spec.answers])
 	end)
@@ -1400,7 +1400,7 @@ sg("llm_translate_selection", function(binding)
 end)
 -- The AI agent (llm_agent_selection / llm_agent_command / llm_agent_auto_toggle):
 -- its settings are the AI agent menu's, so the bindings carry no parameter; the
--- keymap bridge hands them to modules/llm/agent_runner.lua, which logs and shows
+-- keymap bridge hands them to ai/engine/agent/runner.lua, which logs and shows
 -- every refusal.
 local AGENT_ACTIONS = {
 	{ id = "llm_agent_selection", bridge = "request_agent_selection", parent = true },
@@ -2544,11 +2544,11 @@ function M.validate_action_parameter(action, value)
 	if spec == "llm_prompt" then
 		local parsed = PromptAction.parse(value)
 		return parsed ~= nil and (parsed.translation_target == nil
-			or require("modules.llm.selection_translation").is_valid(parsed.translation_target))
+			or require("ai.engine.prediction.selection_translation").is_valid(parsed.translation_target))
 	end
 	-- Syntax only too: whether the provider exists is checked when the action runs
 	if spec == "llm_vision" then return Vision.is_valid(value) end
-	if spec == "llm_language" then return require("modules.llm.selection_translation").is_valid(value) end
+	if spec == "llm_language" then return require("ai.engine.prediction.selection_translation").is_valid(value) end
 	-- Syntax only: whether the application is installed is checked when it opens
 	if spec == "app" then return AppParameter.is_valid(value) end
 	if spec == "program" then return ProgramParameter.parse(value, "posix") ~= nil end
@@ -2601,7 +2601,7 @@ function M.parameter_prompt(action)
 	end
 	if spec == "llm_language" then
 		return fill_placeholder(i18n.get("dialog.gestures.param_llm_language"),
-			tostring(require("modules.llm.selection_translation").config().max_language_bytes))
+			tostring(require("ai.engine.prediction.selection_translation").config().max_language_bytes))
 	end
 	if spec == "wrap_pair" then
 		local template = i18n.get("dialog.gestures.param_wrap_pair")
@@ -2644,7 +2644,7 @@ end
 --- count of its own requests.
 --- @return number count
 function M.llm_prompt_default_count()
-	local Engine = require("modules.llm.prediction_engine")
+	local Engine = require("ai.engine.prediction.engine")
 	local found, count = Engine.get_llm_runtime_setting("llm_num_predictions")
 	if found ~= true or type(count) ~= "number" then
 		error("gestures/actions: the prediction engine has no prediction count.")
@@ -2656,8 +2656,8 @@ end
 --- built-in profiles in menu order, then the user's custom profiles.
 --- @return table Array of { value = profile id, label = menu label }.
 function M.llm_prompt_choices()
-	local Llm = require("modules.llm")
-	local ProfileLabel = require("ui.menu.menu_llm.profile_label")
+	local Llm = require("ai.engine")
+	local ProfileLabel = require("ai.ui.menu.profile_label")
 	local count = M.llm_prompt_default_count()
 	local choices = {}
 	for _, profile in ipairs(Llm.BUILTIN_PROFILES) do
@@ -2675,16 +2675,16 @@ end
 
 --- The vision backends a llm_vision binding may name: the local server first,
 --- then the local OpenAI-compatible servers that answered the last sweep
---- (modules/llm/local_servers.lua; their model goes in the binding), then the
---- API providers that take an image (modules/llm/provider_uses.lua),
+--- (ai/engine/local_servers/local_servers.lua; their model goes in the binding), then the
+--- API providers that take an image (ai/engine/api/provider_uses.lua),
 --- in the catalogue's order, each with the vision model used when the binding
 --- names none ("" when the backend needs one).
 --- @return table Array of { value = backend id, label, defaultModel }.
 function M.llm_vision_choices()
-	local Remote = require("modules.llm.api_remote")
-	local ProviderUses = require("modules.llm.provider_uses")
-	local LocalServers = require("modules.llm.local_servers")
-	local defaults = require("modules.llm.screen_answer").config().default_models
+	local Remote = require("ai.engine.api.remote")
+	local ProviderUses = require("ai.engine.api.provider_uses")
+	local LocalServers = require("ai.engine.local_servers.local_servers")
+	local defaults = require("ai.engine.prediction.screen_answer").config().default_models
 	local choices = { {
 		value = Vision.LOCAL_BACKEND,
 		label = i18n.get("llm.vision.local_backend"),
@@ -2709,7 +2709,7 @@ end
 --- language first, then every shipped locale in the language menu's order.
 --- @return table Array of { value, label }.
 function M.llm_language_choices()
-	return require("modules.llm.selection_translation").choices()
+	return require("ai.engine.prediction.selection_translation").choices()
 end
 
 function M.get_action_parameter(binding, action)

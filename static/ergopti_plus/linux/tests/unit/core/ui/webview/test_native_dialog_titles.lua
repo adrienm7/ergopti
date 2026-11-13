@@ -145,11 +145,11 @@ end)
 
 h.describe("native menu dialog captions", function()
 	h.it("(linux-model-delete-owner) refuses deletion if the page closes during confirmation", function()
-		local names = { "menu.ui.builder.builder", "ui.menu.menu_llm", "ui.menu.llm_backend_rows", "core.ui.ui.modal" }
+		local names = { "menu.ui.builder.builder", "ai.ui.menu.llm", "ai.ui.menu.backend_rows", "core.ui.ui.modal" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local previous_execute, options, deletions, live, paused = os.execute, nil, 0, true, false
-		package.loaded["ui.menu.llm_backend_rows"] = {
+		package.loaded["ai.ui.menu.backend_rows"] = {
 			bind_page = function(_, bound) options = bound end,
 			caption = function() return "model" end,
 		}
@@ -175,7 +175,7 @@ h.describe("native menu dialog captions", function()
 
 	h.it("(linux-native-titles) real Uninstall callbacks brand confirmation and failure without changing body or refusal", function()
 		-- The prompt captures its Shell owner; load it under this scenario's authority.
-		local names = { "menu.ui.builder.builder", "menu.ui.transactions.uninstall", "core.lifecycle.engine.installation", "core.ui.ui.modal", "ui.menu.llm_backend_rows",
+		local names = { "menu.ui.builder.builder", "menu.ui.transactions.uninstall", "core.lifecycle.engine.installation", "core.ui.ui.modal", "ai.ui.menu.backend_rows",
 			"core.ui.ui.text_prompt" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -183,7 +183,7 @@ h.describe("native menu dialog captions", function()
 		local logger = require("core.logger.engine.shim")
 		local original_error, original_info = logger.error, logger.info
 		local commands, accepted, modals, dialogs = {}, nil, 0, nil
-		package.loaded["ui.menu.llm_backend_rows"] = {
+		package.loaded["ai.ui.menu.backend_rows"] = {
 			bind_page = function(_, options) dialogs = options.dialogs end,
 			caption = function() return "model button" end,
 		}
@@ -339,9 +339,9 @@ h.describe("native caption consumer inventory", function()
 			["ui.gesture_conflicts"] = 1,
 			["modules.gestures.system_actions"] = 1,
 			["menu.ui.builder.dialogs"] = 3,
-			["modules.llm.local_model_offer"] = 1,
+			["ai.engine.ollama.local_model_offer"] = 1,
 			-- The enable refusal tests prove the policy-owned native caption and modal receipts.
-			["ui.llm_enable_refusal"] = 1,
+			["ai.ui.enable_refusal"] = 1,
 			-- The one-click check runner owns the caption of every check report.
 			["ui.field_check.window"] = 1,
 			-- The list prompt's caption is proven by the choice prompt case.

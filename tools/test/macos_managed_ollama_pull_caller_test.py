@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "static/ergopti_plus/macos/modules/llm/managed_ollama_pull.py"
+SOURCE = ROOT / "static/ergopti_plus/macos/ai/engine/ollama/managed_ollama_pull.py"
 specification = importlib.util.spec_from_file_location("managed_pull_caller_receiving", SOURCE)
 CALLER = importlib.util.module_from_spec(specification)
 sys.modules[specification.name] = CALLER

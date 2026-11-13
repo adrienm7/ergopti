@@ -26,7 +26,7 @@ module.exports = function (sources, manifest, menuSources) {
 				nativeLinuxAiParentPublication({ ...sources, [file]: body }, manifest, kind, 'linux')
 		])
 	];
-	const agentFile = 'linux/ui/menu/agent_rows.lua';
+	const agentFile = 'linux/ai/ui/menu/agent_rows.lua';
 	const identityImport = 'local AppIdentity = require("ai.engine.policy.app_identity")';
 	assert.equal(
 		sources[agentFile].split(identityImport).length - 1,

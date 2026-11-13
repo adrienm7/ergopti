@@ -276,7 +276,7 @@ const allowedSeen = new Set();
 		'local ok = Paths.shared("hotstrings/data/catalogue/_index.toml")'
 	].join('\n');
 	const shipped = new Set([
-		'ergopti_plus/macos/data',
+		'ergopti_plus/macos/ai/data',
 		'img/logo',
 		'ergopti_plus/_shared/hotstrings/data/catalogue/_index.toml'
 	]);

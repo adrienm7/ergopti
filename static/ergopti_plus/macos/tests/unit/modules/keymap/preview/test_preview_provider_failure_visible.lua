@@ -25,11 +25,11 @@ local function run_scenario()
 		"modules.keymap.registry_index",
 		"modules.keymap.utils",
 		"modules.keystats",
-		"modules.llm",
-		"modules.llm.prediction_engine",
+		"ai.engine",
+		"ai.engine.prediction.engine",
 		"modules.diagnostics.hid_diagnostic_mailbox",
 		"core.ui.ui.tooltip",
-		"modules.keymap.llm_bridge",
+		"ai.engine.bridge",
 	}
 	local previous = {}
 	for _, name in ipairs(dependency_names) do previous[name] = package.loaded[name] end
@@ -93,10 +93,10 @@ local function run_scenario()
 		log_hotstring_suggested = function() end,
 		log_hotstring_dismissed = function() end,
 	}
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = true },
 	}
-	package.loaded["modules.llm.prediction_engine"] = {
+	package.loaded["ai.engine.prediction.engine"] = {
 		set_runtime_guard = function() end,
 		init = function() return true end,
 		get_llm_enabled = function() return false end,
@@ -117,7 +117,7 @@ local function run_scenario()
 	}
 
 	local ok, err = xpcall(function()
-		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		local Bridge = helpers.load_with_stubs("ai.engine.bridge")
 		local Mailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 		helpers.assert_true(Mailbox.start())
 		local state = {
@@ -136,7 +136,7 @@ local function run_scenario()
 			},
 			is_repeat_feature_enabled = function() return false end,
 		}
-		require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
+		require("ai.engine.api.context").seed(state, state.buffer or "", "")
 		Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
 
 		local delivered = 0
