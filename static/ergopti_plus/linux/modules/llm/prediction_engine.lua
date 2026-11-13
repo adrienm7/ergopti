@@ -133,7 +133,9 @@ local _live = nil
 local _live_config = nil
 -- Injected by init(): told after every live transition, so the tray redraws
 -- its live submenu's check marks.
-local _on_live_change = nil
+-- Tray observers: live mode and the agent mode switched by a binding. One table:
+-- this chunk is at LuaJIT's 200-local ceiling.
+local _observers = { live = nil, agent_mode = nil }
 
 -- Injected by init() for the AI agent: the focused window's application and
 -- title (the request's context), a native text dialog (llm_agent_command), the
@@ -713,7 +715,8 @@ function M.init(opts)
 	_focus_id = type(options.focus_id) == "function" and options.focus_id or nil
 	_buffer_focus = nil
 	_capture_screen = type(options.capture_screen) == "function" and options.capture_screen or nil
-	_on_live_change = type(options.on_live_change) == "function" and options.on_live_change or nil
+	_observers.live = type(options.on_live_change) == "function" and options.on_live_change or nil
+	_observers.agent_mode = type(options.on_agent_mode_change) == "function" and options.on_agent_mode_change or nil
 	_focused_window = type(options.focused_window) == "function" and options.focused_window or nil
 	_ask_text = type(options.ask_text) == "function" and options.ask_text or nil
 	_now = type(options.now) == "function" and options.now or SYSTEM_CLOCK
@@ -1400,8 +1403,8 @@ end
 
 --- Tells the tray that live mode changed, so its submenu redraws.
 local function live_changed()
-	if not _on_live_change then return end
-	local ok, err = pcall(_on_live_change, M.get_live())
+	if not _observers.live then return end
+	local ok, err = pcall(_observers.live, M.get_live())
 	if not ok then Logger.warn(LOG, "Live mode observer failed: %s", tostring(err)) end
 end
 
@@ -2898,7 +2901,14 @@ end
 --- @return boolean changed
 function M.toggle_agent_auto()
 	if _runtime_closed or _scope_owner then return false end
-	return M.set_agent_mode(AgentSettings.get_mode() == "auto" and "action" or "auto")
+	local changed = M.set_agent_mode(AgentSettings.get_mode() == "auto" and "action" or "auto")
+	-- A binding changes the mode outside the menu: the tray's agent rows are
+	-- redrawn, as Windows rebuilds its tray after the commit (LLM_Agent_RefreshTray).
+	if changed == true and _observers.agent_mode then
+		local ok, err = pcall(_observers.agent_mode, AgentSettings.get_mode())
+		if not ok then Logger.warn(LOG, "Agent mode observer failed: %s", tostring(err)) end
+	end
+	return changed
 end
 
 --- The application the user last typed in, for the menu's exclusion row.

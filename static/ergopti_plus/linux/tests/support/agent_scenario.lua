@@ -188,6 +188,10 @@ function M.run(opts, body)
 			context = { text = function() return world.buffer end, replaced = function() end },
 			is_paused = function() return world.paused end,
 			notify = function(text) world.notices[#world.notices + 1] = text; return true end,
+			on_agent_mode_change = function(mode)
+				world.mode_redraws = world.mode_redraws or {}
+				world.mode_redraws[#world.mode_redraws + 1] = mode
+			end,
 			overlay = {
 				show = function(candidates, meta)
 					world.shown = { candidates = candidates, meta = meta }
