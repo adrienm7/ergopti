@@ -42,15 +42,15 @@ StickyModifierConfigureHook(Hook) {
 
 ; Presses the next key with the sticky action's modifiers, once. The key itself is
 ; withheld until then; intervening modifiers pass through and their captured
-; flags accompany the replay. The one-shot Shift timeout ends the wait.
+; flags accompany the replay. The one-shot timeout ends the wait (0: none).
 ; @param {String} ActionId A sticky_* action id other than sticky_shift.
 ; @returns {Boolean} True when a key was pressed with them.
 StickyModifier(ActionId) {
 	if A_IsSuspended
 		return false
 	Held := StickyModifierNames(ActionId)
-	TimeoutSec := (IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) and ONE_SHOT_SHIFT_TIMEOUT_SEC > 0) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
-	Hook := InputHook("L0 T" . TimeoutSec)
+	; 0 is no time limit: the hook then waits until a key spends it.
+	Hook := InputHook("L0" . TapHoldOneShotHookTimeoutOption())
 	StickyModifierConfigureHook(Hook)
 	Custom := 0
 	KeyName := KS_AltGrKeyName(), SendKey := KS_AltGrSendKey()

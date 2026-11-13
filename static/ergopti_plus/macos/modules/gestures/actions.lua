@@ -950,7 +950,7 @@ local function sticky_timeout_sec()
 		return nil
 	end
 	local ms = Remap.get_sticky_timeout()
-	if type(ms) ~= "number" or ms <= 0 then
+	if not require("tap_hold.engine.one_shot_timeout").is_valid(ms) then
 		Logger.error(LOG, "Sticky timeout is '%s' — refusing to arm on a guessed delay.", tostring(ms))
 		return nil
 	end

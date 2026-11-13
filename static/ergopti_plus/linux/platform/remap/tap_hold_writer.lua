@@ -653,12 +653,12 @@ end
 --- Sets how long a one-shot Shift waits for its key, in milliseconds
 --- (config.toml [tap_holds] sticky_timeout_ms). It has no manifest row: the
 --- timing registry's default is written as an absence.
---- @param ms number A positive whole number of milliseconds.
+--- @param ms number 0 (no time limit) or a positive whole number of milliseconds.
 --- @param guard function|nil Original deferred editor, strict true required.
 --- @return boolean
 function M.set_one_shot_timeout_ms(ms, guard)
 	if not require("platform.remap.tap_hold_loader").valid_one_shot_timeout_ms(ms) then
-		Logger.error(LOG, "set_one_shot_timeout_ms: %s is not a positive whole number of milliseconds — nothing written.",
+		Logger.error(LOG, "set_one_shot_timeout_ms: %s is not 0 or a positive whole number of milliseconds — nothing written.",
 			tostring(ms))
 		return false
 	end

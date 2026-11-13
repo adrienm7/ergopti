@@ -172,6 +172,7 @@ end
 
 local TAP_HOLD_TIMEOUT_MS_DEFAULT       = Defaults.tap_hold_timeout_ms
 local LoneTap = require("tap_hold.engine.lone_tap")
+local OneShotTimeout = require("tap_hold.engine.one_shot_timeout")
 -- How long a modifier key pressed alone still taps: the manifest's
 -- tap_holds.lone_modifier_tap_max_ms (0 = the strict tap-hold).
 M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT = LoneTap.validate(
@@ -210,6 +211,20 @@ local function timing_leaf(section, key, default, path, section_name, declaratio
 		and value > 0 and value % 1 == 0 then return value, false end
 	Outdated.report_in_file(path, { section_name, key },
 		"a timing is a finite positive whole number of milliseconds; the canonical default is used", Logger)
+	return default, true
+end
+
+--- Reads the one-shot modifier timeout, where 0 (no time limit) is a choice;
+--- a negative or fractional timeout is obsolete (tap_hold.engine.one_shot_timeout).
+--- @return number value The existing timeout or the canonical default.
+--- @return boolean outdated True when the raw leaf must survive ordinary saves.
+local function one_shot_timeout_leaf(section, key, default, path, section_name)
+	if section[key] == nil then return default, false end
+	local value = section[key]
+	if OneShotTimeout.is_valid(value) then return value, false end
+	Outdated.report_in_file(path, { section_name, key },
+		"a one-shot timeout is 0 (no time limit) or a positive whole number of milliseconds; the canonical default is used",
+		Logger)
 	return default, true
 end
 
@@ -976,8 +991,8 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	end
 	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS,
 		GLOBAL_DELAY_KEY, 0.001)
-	local sticky_ms = timing(tap_holds, ConfigKeys.LEAF.STICKY_TIMEOUT_MS, STICKY_TIMEOUT_MS_DEFAULT,
-		ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
+	local sticky_ms = one_shot_timeout_leaf(tap_holds, ConfigKeys.LEAF.STICKY_TIMEOUT_MS, STICKY_TIMEOUT_MS_DEFAULT,
+		user_config_path, ConfigKeys.KEY.TAP_HOLDS)
 	local lone_tap_ms = lone_tap_leaf(tap_holds, ConfigKeys.LEAF.LONE_MODIFIER_TAP_MAX_MS,
 		M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT, user_config_path, ConfigKeys.KEY.TAP_HOLDS)
 	local simultaneous_ms = timing(combos, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS, SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
@@ -1264,7 +1279,13 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 				Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED), tap_holds_switch)
 			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "timeout_ms", state.tap_hold_timeout_ms,
 				TAP_HOLD_TIMEOUT_MS_DEFAULT, nil, GLOBAL_DELAY_KEY, 0.001)
-			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, ConfigKeys.LEAF.STICKY_TIMEOUT_MS, state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
+			-- 0 is no time limit, a choice of its own: only the default is elided.
+			if state.sticky_timeout_ms ~= nil and not OneShotTimeout.is_valid(state.sticky_timeout_ms) then
+				candidate_refusal = "candidate has an invalid " .. ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS
+				error(candidate_refusal, 0)
+			end
+			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, ConfigKeys.LEAF.STICKY_TIMEOUT_MS,
+				state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT, one_shot_timeout_leaf)
 			-- 0 is the strict tap-hold, a choice of its own: only the default is elided.
 			if state.lone_modifier_tap_max_ms ~= nil and not pcall(LoneTap.validate, state.lone_modifier_tap_max_ms) then
 				candidate_refusal = "candidate has an invalid " .. ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS

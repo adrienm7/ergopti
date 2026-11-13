@@ -4577,7 +4577,9 @@ description_key = "menu.tapholds.lone_tap_title"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 
-# How long a one-shot Shift waits for the key it shifts, in milliseconds: a
+# How long a one-shot modifier waits for the key it modifies, in milliseconds;
+# 0 is no time limit (maintainer decision of 2026-11-13), validated by
+# _shared/tap_hold/engine/one_shot_timeout.lua and its AHK port: a
 # config.toml row on every OS (maintainer decision of 2026-11-11). Its value
 # when absent is the timing registry's tap_hold.one_shot_shift_timeout_ms; on
 # macOS the Hammerspoon sticky modifiers read it, never Karabiner.
