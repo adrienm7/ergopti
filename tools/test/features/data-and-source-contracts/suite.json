@@ -737,6 +737,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-value-schema.cjs"],
 			"repro": "npm run test:value-schema"
+		},
+		{
+			"id": "js-0519",
+			"ordinal": 641,
+			"name": "structure plan follows a Lua module-prefix sweep only when its modules move together, and refuses a scattering step",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-lua-prefix-sweeps.cjs"],
+			"repro": "npm run test:structure-lua-prefix-sweeps"
 		}
 	]
 }
