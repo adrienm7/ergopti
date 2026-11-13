@@ -80,6 +80,15 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: 'assert(json_path == shared_lua .. "/core/text/engine/json.lua"'
 	},
 	{
+		// The serve-command receiving test copies the shared Python the emitted
+		// command loads; S01 splits _shared/python into the ai and network
+		// features, so the one source folder becomes the two it lands in.
+		file: 'tools/diagnostics/macos_ollama_serve_command_receiving_test.py',
+		empties: '_shared/python',
+		from: '                "static/ergopti_plus/_shared/python",',
+		to: '                "static/ergopti_plus/_shared/ai/adapters/python",\n                "static/ergopti_plus/_shared/core/network/adapters",'
+	},
+	{
 		// The bundle guard's needle for the daemon authority's shared load: the
 		// longer path no longer fits the Python line, and the formatter breaks
 		// the expression before its operator, as the needle now spells it.
