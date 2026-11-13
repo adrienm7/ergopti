@@ -469,7 +469,7 @@ end
 --- @return string label
 function M.menu_label(profile, count)
 	if not built_in_exists(profile.id) then return profile.label end
-	local label = require("infra.i18n").get("llm.profile." .. profile.id .. ".label")
+	local label = require("core.i18n.engine.i18n").get("llm.profile." .. profile.id .. ".label")
 	label = fill_if_present(label, "{n}", tostring(count))
 	return fill_if_present(label, "{s}", count == 1 and "" or "s")
 end

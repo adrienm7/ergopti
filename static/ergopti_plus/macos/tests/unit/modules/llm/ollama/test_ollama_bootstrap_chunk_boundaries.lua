@@ -25,7 +25,7 @@ helpers.describe("Ollama bootstrap framing (ollama-bootstrap-chunks)", function(
 				helpers.assert_true(task.stream(task, marker:sub(boundary + 1) .. "\r\n", ""))
 				task.done(1, "", "")
 				helpers.assert_eq(result, false)
-				helpers.assert_eq(checker.get_failure_message(), require("infra.i18n").get("ollama.error_checksum"),
+				helpers.assert_eq(checker.get_failure_message(), require("core.i18n.engine.i18n").get("ollama.error_checksum"),
 					"checksum cause must survive split at byte " .. boundary)
 			end)()
 		end
@@ -38,7 +38,7 @@ helpers.describe("Ollama bootstrap framing (ollama-bootstrap-chunks)", function(
 		local task = state.tasks[1]
 		helpers.assert_true(task.stream(task, "OLLAMA_ERROR_CHECK", "stderr diagnostic\n"))
 		task.done(1, "SUM", "")
-		helpers.assert_eq(checker.get_failure_message(), require("infra.i18n").get("ollama.error_checksum"))
+		helpers.assert_eq(checker.get_failure_message(), require("core.i18n.engine.i18n").get("ollama.error_checksum"))
 	end))
 
 	helpers.it("assembles progress markers and diagnostic lines before presentation", Fixture.scoped(function()

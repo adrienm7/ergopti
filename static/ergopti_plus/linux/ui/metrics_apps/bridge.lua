@@ -152,7 +152,7 @@ local function handle(payload, state, request)
 			local receipt = capture()
 			if not request.valid() then return nil end
 			if type(receipt) ~= "table" then return refused("healthcheck.status.failed") end
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local chosen = M._category_prompt(i18n.get("metrics_apps.new_category_title"),
 				string.format(i18n.get("metrics_apps.new_category_prompt"), app_name), category)
 			if chosen == nil or not request.valid() then return nil end

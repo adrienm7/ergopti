@@ -17,7 +17,7 @@ local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 --- @return table rendered submenu rows
 local function tray_rows(ctx)
 	local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
-	local ManifestMenu = LayoutFixture.install(require("infra.i18n"))
+	local ManifestMenu = LayoutFixture.install(require("core.i18n.engine.i18n"))
 	local item = layout.build(ctx)
 	helpers.assert_true(type(item) == "table", "menu_keyboard_layout.build must return a row")
 	local row = ManifestMenu.render_rows({ item }, "top_level")[1]
@@ -60,7 +60,7 @@ end
 helpers.describe("layout submenu: the input sources have their own header", LayoutFixture.scoped(function()
 	helpers.it("draws « Sources de saisie » right before the input-source rows", function()
 		local rows = tray_rows(make_ctx("v1"))
-		local header = index_of(rows, require("infra.i18n").section("menu.layout.active_layouts"))
+		local header = index_of(rows, require("core.i18n.engine.i18n").section("menu.layout.active_layouts"))
 		helpers.assert_true(header ~= nil, "the input sources must sit under their own header")
 		helpers.assert_eq(rows[header].disabled, true, "a header is a disabled label")
 		helpers.assert_eq(rows[header - 1].title, "-", "a separator opens the input-source section")

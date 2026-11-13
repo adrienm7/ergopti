@@ -26,8 +26,8 @@ local function fixture(body, secondary)
 	local primary_failed, primary = false, nil
 	local restored, scope_failure = pcall(function()
 		helpers.with_stub_scope({
-			"infra.native_presentation", "menu.engine.native_presentation_core", "core.ui.engine.window_titles", "infra.i18n",
-			"infra.locale", "core.i18n.engine.core", "core.fs.engine.paths", "infra.logger", "core.fs.adapters.json_codec",
+			"infra.native_presentation", "menu.engine.native_presentation_core", "core.ui.engine.window_titles", "core.i18n.engine.i18n",
+			"core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths", "infra.logger", "core.fs.adapters.json_codec",
 			"core.fs.adapters.storage", "core.events.timer_scheduler", "adapters.shell_runner", "infra.dialog_util",
 			"ui.menu.shortcut_utils", "infra.text_utils", "platform.input.send_input", "hs", "tests.stubs.hs",
 		}, function()
@@ -42,9 +42,9 @@ local function fixture(body, secondary)
 						return select(4, ...), state.raw
 					end },
 				})
-				package.loaded["infra.i18n"] = nil
-				local i18n = require("infra.i18n")
-				local locale = require("infra.locale")
+				package.loaded["core.i18n.engine.i18n"] = nil
+				local i18n = require("core.i18n.engine.i18n")
+				local locale = require("core.i18n.engine.locale")
 				policy = require("core.ui.engine.window_titles")
 				lookup = policy.native_presentation
 				local factory = require("infra.native_presentation")

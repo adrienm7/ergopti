@@ -27,7 +27,7 @@ package.loaded["infra.keycodes"] = {
 	ESCAPE = 0x35,
 	FORWARD_DELETE = 0x75,
 }
-package.loaded["infra.i18n"] = { get = function(k) return k end, get_locale = function() return "fr" end }
+package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end, get_locale = function() return "fr" end }
 package.loaded["modules.gestures.engine"] = {
   init = function() end
 }

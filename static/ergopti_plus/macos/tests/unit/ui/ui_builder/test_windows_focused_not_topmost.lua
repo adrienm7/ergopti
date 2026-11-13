@@ -223,7 +223,7 @@ end)
 local function load_healthcheck(view)
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
-		"infra.logger", "core.fs.engine.paths", "infra.i18n", "ui.ui_builder",
+		"infra.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -254,7 +254,7 @@ local function load_healthcheck(view)
 	package.loaded["ui.healthcheck.helpers"] = {}
 	package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared" end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	local real = require("ui.ui_builder")
 	package.loaded["ui.ui_builder"] = setmetatable({
 		build_injected_html = function() return "<html></html>" end,
@@ -309,8 +309,8 @@ end)
 --- @return table dialog, table timers
 local function load_error_dialog(view, app)
 	for _, name in ipairs({
-		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "infra.i18n",
-		"infra.locale", "ui.ui_builder", "core.events.timer_scheduler", "core.fs.adapters.storage", "infra.manifest_reader",
+		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "core.i18n.engine.i18n",
+		"core.i18n.engine.locale", "ui.ui_builder", "core.events.timer_scheduler", "core.fs.adapters.storage", "infra.manifest_reader",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -336,8 +336,8 @@ local function load_error_dialog(view, app)
 
 	local timers = {}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
-	package.loaded["infra.locale"] = { all = function() return {} end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
+	package.loaded["core.i18n.engine.locale"] = { all = function() return {} end }
 	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_, fn) timers[#timers + 1] = fn; return { timer = {} }, true end,
 		now_ns = function() return 0 end,

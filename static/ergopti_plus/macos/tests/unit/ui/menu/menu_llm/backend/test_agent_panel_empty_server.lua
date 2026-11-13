@@ -65,9 +65,9 @@ local function with_empty_server_owner(scenario)
 		local paths = require("infra.config_paths")
 		helpers.assert_eq(paths.init(scratch .. "/"), true)
 		helpers.assert_eq(paths.get_config_dir(), scratch .. "/")
-		package.loaded["infra.i18n"] = nil
-		native = require("infra.i18n")
-		local backend = require("infra.locale")
+		package.loaded["core.i18n.engine.i18n"] = nil
+		native = require("core.i18n.engine.i18n")
+		local backend = require("core.i18n.engine.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end)
 		native.init()
 		owner = { pending = function() return false end }

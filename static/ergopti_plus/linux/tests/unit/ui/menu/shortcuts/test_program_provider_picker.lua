@@ -149,7 +149,7 @@ local function bridge_fixture(body)
 		package.loaded["apps.engine.program_provider_picker"] = nil
 		package.loaded["ui.action_picker.bridge"] = nil
 		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["adapters.program_providers"] = { create = function()
 			local state = owner(); f.owners[#f.owners + 1] = state; return state
 		end }
@@ -253,7 +253,7 @@ end)
 local function contextual_native_fixture(body)
 	isolated(function()
 		for _, name in ipairs({ "ui.webview_manager", "ui.action_picker.bridge", "ui.webkit_host",
-			"infra.i18n", "infra.locale", "core.i18n.engine.core", "core.ui.engine.window_titles", "core.ui.engine.webview.presentation",
+			"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.engine.window_titles", "core.ui.engine.webview.presentation",
 			"apps.engine.program_provider_picker" }) do package.loaded[name] = nil end
 		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 		package.loaded["adapters.program_providers"] = {}
@@ -301,8 +301,8 @@ local function contextual_native_fixture(body)
 				end,
 			},
 		}
-		local locale = require("infra.locale")
-		local i18n = require("infra.i18n")
+		local locale = require("core.i18n.engine.locale")
+		local i18n = require("core.i18n.engine.i18n")
 		local core = require("core.i18n.engine.core")
 		local original_get = core.get
 		core.get = function(key)

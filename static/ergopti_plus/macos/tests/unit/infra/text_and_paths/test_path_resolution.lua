@@ -73,7 +73,7 @@ end)
 helpers.describe("locale.locale_path", function()
 	helpers.it("resolves locale JSON via module-relative path", function()
 		log_calls = {}
-		local Locale = helpers.load_with_stubs("infra.locale", {
+		local Locale = helpers.load_with_stubs("core.i18n.engine.locale", {
 			json = {
 				decode = function() return {} end,
 			},
@@ -91,7 +91,7 @@ helpers.describe("locale.locale_path", function()
 		local orig_find = Paths.find_from_configdir
 		Paths.find_from_configdir = function() return nil end
 
-		local Locale = helpers.load_with_stubs("infra.locale", {
+		local Locale = helpers.load_with_stubs("core.i18n.engine.locale", {
 			json = {
 				decode = function() return {} end,
 			},

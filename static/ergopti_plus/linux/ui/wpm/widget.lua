@@ -186,7 +186,7 @@ end
 
 --- The unit under the number, in the user's language, as on macOS and Windows.
 local function unit_label()
-	local ok, I18n = pcall(require, "infra.i18n")
+	local ok, I18n = pcall(require, "core.i18n.engine.i18n")
 	if not ok or type(I18n.get) ~= "function" then error("i18n is unavailable") end
 	return I18n.get("menu.metrics.wpm_unit")
 end

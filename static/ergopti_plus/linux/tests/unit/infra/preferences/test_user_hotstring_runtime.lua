@@ -24,7 +24,7 @@ local NativeConfigPaths = require("infra.config_paths")
 -- Canonical source discovery also loads the installed-layout registry and its
 -- updater/storage readers. They capture paths at require time, so fixture paths
 -- and every such module owner must be scoped together, including false/nil caches.
-local DISCOVERY_OWNERS = { "core.fs.adapters.storage", "modules.updater.manager", "modules.keymap.layout_registry", "infra.i18n" }
+local DISCOVERY_OWNERS = { "core.fs.adapters.storage", "modules.updater.manager", "modules.keymap.layout_registry", "core.i18n.engine.i18n" }
 
 local function drain()
 	for _ = 1, 16 do

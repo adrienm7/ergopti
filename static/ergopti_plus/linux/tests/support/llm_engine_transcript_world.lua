@@ -141,7 +141,7 @@ function M.with_world(config, body)
 				{ max_words = require("modules.llm.settings").get("max_words") }).max_tokens
 		end
 		function world.profile_label(id)
-			return InfoBar.short_profile_label(require("infra.i18n").get("llm.profile." .. id .. ".label"))
+			return InfoBar.short_profile_label(require("core.i18n.engine.i18n").get("llm.profile." .. id .. ".label"))
 		end
 		function world.calls() return log end
 

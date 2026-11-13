@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"core.events.timer_scheduler",
 	"infra.dialog_util",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.manifest_menu",
 	"infra.notifications",
@@ -51,7 +51,7 @@ local function with_profiles_fixture(options, body)
 		package.loaded["infra.dialog_util"] = {
 			block_alert = function() return "button.delete" end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
@@ -73,7 +73,7 @@ local function with_profiles_fixture(options, body)
 				return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json"
 			end,
 			json_decode = require("core.text.engine.json").decode,
-			i18n = package.loaded["infra.i18n"],
+			i18n = package.loaded["core.i18n.engine.i18n"],
 			logger = package.loaded["infra.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {

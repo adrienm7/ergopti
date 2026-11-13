@@ -73,7 +73,7 @@ local function with_provider(kind, options, body)
 	local binding = kind == "keyboard" and "keyboard__primary_1" or kind == "tap" and "tap_key__number_row_left" or "script__script_altgr_enter"
 	local picker_callback, rows, state
 	local ok, failure = xpcall(function()
-		package.loaded["infra.i18n"] = { get = function(key) return key end,
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end,
 			section = function(key) return key end, decorate_section = function(key) return key end }
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...) fixture.errors = fixture.errors + 1; fixture.last_error = string.format(message, ...); if message:find("did not commit", 1, true) then fixture.transaction_error = string.format(message, ...) end end

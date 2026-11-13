@@ -10,7 +10,7 @@
 
 local M = {}
 local WindowTitles = require("core.ui.engine.window_titles")
-local I18n = require("infra.i18n")
+local I18n = require("core.i18n.engine.i18n")
 local Storage = require("core.fs.adapters.storage")
 local Shell = require("adapters.shell_runner")
 local Logger = require("core.logger.engine.shim")

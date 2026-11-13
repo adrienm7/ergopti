@@ -72,7 +72,7 @@ end
 --- @param key string
 --- @return table|nil
 local function row_for(items, key)
-	local label = require("infra.i18n").get(key)
+	local label = require("core.i18n.engine.i18n").get(key)
 	for _, item in ipairs(items) do
 		if type(item.title) == "string" and item.title:sub(1, #label) == label then return item end
 	end
@@ -82,14 +82,14 @@ end
 helpers.describe("tray (linux): the category-off rule", function()
 	helpers.it("greys every gated manifest menu but its enable and reader rows", function()
 		require("tests.lua.category_off_contract").assert_every_gated_menu(helpers,
-			require("infra.manifest_menu"), require("infra.i18n"), "linux")
+			require("infra.manifest_menu"), require("core.i18n.engine.i18n"), "linux")
 	end)
 	for _, on in ipairs({ false, true }) do
 		for _, category in ipairs(CATEGORIES) do
 			helpers.it("the built " .. category.menu .. " with its category on " .. tostring(on), function()
 				local parent = row_for(build_tray(on), category.title)
 				helpers.assert_true(parent ~= nil, category.title .. " must be in the tray")
-				require("tests.lua.category_off_contract").assert_category(helpers, require("infra.i18n"),
+				require("tests.lua.category_off_contract").assert_category(helpers, require("core.i18n.engine.i18n"),
 					require("infra.manifest_menu").get_array(category.menu), parent, not on)
 			end)
 		end

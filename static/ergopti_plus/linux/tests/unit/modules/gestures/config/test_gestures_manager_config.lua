@@ -226,7 +226,7 @@ helpers.describe("modules.gestures.manager", function()
   -- could never have caught that, and neither could it catch the raw key being
   -- echoed back, which is what i18n.get returns on a miss.
   helpers.it("labels come from the shared sg_actions catalogue, not from a local table", function()
-    local i18n = require("infra.i18n")
+    local i18n = require("core.i18n.engine.i18n")
     local label = M.get_action_label("vol_up")
     helpers.assert_eq(label, i18n.get("sg_actions.vol_up"),
       "the label must be whatever the shared catalogue says for the active locale")
@@ -235,7 +235,7 @@ helpers.describe("modules.gestures.manager", function()
   end)
 
   helpers.it("the workspace actions are the catalogue's desktop_* ids", function()
-    local i18n = require("infra.i18n")
+    local i18n = require("core.i18n.engine.i18n")
     -- This driver used private ws_prev / ws_next ids labelled through the
     -- catalogue's desktop_* keys, so no other driver's binding and no picker
     -- entry could name them. They are the shared ids now.
@@ -257,7 +257,7 @@ helpers.describe("modules.gestures.manager", function()
   -- 2026-11-03: the chords read the catalogue's English names (« Enter ») in
   -- every locale; each key is now named from the key name table.
   helpers.it("renders the complete shared modifier matrix in the user's language", function()
-    local i18n = require("infra.i18n")
+    local i18n = require("core.i18n.engine.i18n")
     local function name(id) return i18n.get("key_name." .. id) end
     helpers.assert_eq(M.get_action_label("ctrl_a"), name("ctrl") .. " + A")
     local label = M.get_action_label("ctrl_alt_super_enter")

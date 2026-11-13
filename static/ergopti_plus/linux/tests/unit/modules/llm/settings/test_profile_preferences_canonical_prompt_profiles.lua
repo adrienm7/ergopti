@@ -318,7 +318,7 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 						end
 						return key
 					end }
-					local native_translator = require("infra.i18n")
+					local native_translator = require("core.i18n.engine.i18n")
 					translator.locale = native_translator.locale
 					translator.section = native_translator.section
 					local renderer = assert(require("menu.engine.renderer").new({ platform = "linux",
@@ -537,11 +537,11 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 		local initial='[llm]\nfuture = "keep"\nuser_profiles = "v1:' .. Base64.encode(Json.encode(custom and {profile()} or Json.array({})))
 			.. '"\n[llm.profiles]\nactive = "basic"\nauto_profile_for_model = false\n'
 		with_config(initial,function(settings,path)
-			local names={"infra.manifest_menu","infra.i18n","ui.menu.builder"}
+			local names={"infra.manifest_menu","core.i18n.engine.i18n","ui.menu.builder"}
 			local saved={};for _,name in ipairs(names) do saved[name]=package.loaded[name] end
 			local ok,err=xpcall(function()
 				local document=read_json("menu/data/menu_manifest.json")
-				local native_i18n=require("infra.i18n")
+				local native_i18n=require("core.i18n.engine.i18n")
 				local header_captions=read_json("core/i18n/data/locales/en.json")
 				local i18n=setmetatable({get=function(key)
 					if key == "menu.builder.active_brand" or key == "menu.builder.title_paused" then
@@ -553,7 +553,7 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 				-- section, which frames whatever get currently answers, like the
 				-- native i18n.section does.
 				i18n.section=function(key) return native_i18n.decorate_section(i18n.get(key)) end
-				package.loaded["infra.i18n"]=i18n
+				package.loaded["core.i18n.engine.i18n"]=i18n
 				local renderer=assert(require("menu.engine.renderer").new({platform="linux",
 					manifest_path=function() return shared("menu/data/menu_manifest.json") end,
 					json_decode=function() return document end,i18n=i18n,logger=require("core.logger.engine.shim")}))

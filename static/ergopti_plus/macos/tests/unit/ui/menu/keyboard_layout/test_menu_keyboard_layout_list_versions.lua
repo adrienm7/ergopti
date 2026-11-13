@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 --- Supply only genuine Layout format strings that the complete caption API now reads.
 --- This is fixture input, never an expectation regenerated from the native producer.
 local function install_legacy_layout_formats(translator)
-	translator = translator or require("infra.i18n")
+	translator = translator or require("core.i18n.engine.i18n")
 	local file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "rb"))
 	local catalogue = assert(require("core.text.engine.json").decode(file:read("*a")))
 	assert(file:close())
@@ -66,12 +66,12 @@ local function bundle_labels(opts)
 		"ui.menu.menu_keyboard_layout",
 		"infra.manifest_menu",
 		"infra.notifications",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 	}, function()
 		local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local install = require("modules.keymap.layout_install")
-		package.loaded["infra.i18n"] = { get = function(key) return LABELS[key] or key end }
-		package.loaded["infra.i18n"].section = function(key) return LABELS[key] or key end
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return LABELS[key] or key end }
+		package.loaded["core.i18n.engine.i18n"].section = function(key) return LABELS[key] or key end
 		package.loaded["infra.notifications"] = { notify = function() end }
 		install.bundle_variants = function()
 			return { { name = "Ergopti_v2_2_2_plus", tis_id = "com.apple.keyboardlayout.ergopti.plus",
@@ -282,7 +282,7 @@ end)
 --- Filesystem/TIS mutation ports remain controlled and must not run during builds.
 local function with_no_bundle_status(body, labels)
 	helpers.with_stub_scope({"modules.keymap.input_sources", "modules.keymap.layout_install",
-		"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n", "infra.notifications"}, function()
+		"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "core.i18n.engine.i18n", "infra.notifications"}, function()
 		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local installer = require("modules.keymap.layout_install")
 		local session = {latest = nil, effects = 0}
@@ -298,7 +298,7 @@ local function with_no_bundle_status(body, labels)
 		sources.upgrade_active_list_async = forbid_effect
 		sources.set_input_source_async = forbid_effect
 		package.loaded["infra.notifications"] = {notify = forbid_effect}
-		local translator = require("infra.i18n")
+		local translator = require("core.i18n.engine.i18n")
 		if labels then translator.get = function(key) return labels[key] or key end
 		else install_legacy_layout_formats(translator) end
 		package.loaded["infra.manifest_menu"] = nil

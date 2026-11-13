@@ -7,7 +7,7 @@ helpers.describe("explicit confirmation of a demoted context length", function()
 	for _, outcome in ipairs({ "success", "save_refused", "menu_refused" }) do
 		helpers.it("preserves the original setting until the transaction commits: " .. outcome, function()
 			helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.fs.adapters.storage",
-				"infra.dialog_util", "infra.i18n", "modules.llm", "ui.menu.menu_llm.settings_manager" }, function()
+				"infra.dialog_util", "core.i18n.engine.i18n", "modules.llm", "ui.menu.menu_llm.settings_manager" }, function()
 				local Preferences = helpers.load_with_stubs("infra.preferences")
 				local FileSystem = require("core.fs.adapters.file_system")
 				local Session = require("ui.menu.session_demotions")
@@ -23,7 +23,7 @@ helpers.describe("explicit confirmation of a demoted context length", function()
 					delete_exact = function() native = nil; return true end,
 				}
 				package.loaded["modules.llm"] = { DEFAULT_STATE = { llm_context_length = 1500 } }
-				package.loaded["infra.i18n"] = { get = function(key) return key end }
+				package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 				package.loaded["infra.dialog_util"] = { text_prompt = function() return "button.ok", "1500" end }
 				local Settings = helpers.load_with_stubs("ui.menu.menu_llm.settings_manager")
 				OutputFixture.with_output(function(path)

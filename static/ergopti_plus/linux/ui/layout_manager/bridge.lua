@@ -127,7 +127,7 @@ local function controller(state, context)
 		end
 	end
 	local shell = dependency(state, "shell", "adapters.shell_runner")
-	local i18n = dependency(state, "i18n", "infra.i18n")
+	local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 	local layer_editor = dependency(state, "layer_editor_bridge", "ui.layer_editor.bridge")
 	if layer_editor and type(layer_editor.apply_text) ~= "function" then layer_editor = nil end
 	local preferences = dependency(state, "layout_emulation_preferences", "infra.layout_emulation_preferences")

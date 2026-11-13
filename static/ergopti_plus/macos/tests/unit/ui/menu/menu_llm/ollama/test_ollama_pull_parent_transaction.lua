@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"hs",
 	"infra.dialog_util",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.notifications",
 	"infra.text_utils",
@@ -122,7 +122,7 @@ local function with_fixture(save_results, callback)
 			_G.hs = hs_fixture
 			package.loaded["hs"] = hs_fixture
 			package.loaded["infra.logger"] = logger
-			package.loaded["infra.i18n"] = {get = function(key) return key end}
+			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 			package.loaded["infra.notifications"] = {notify = function() return true end}
 			package.loaded["infra.text_utils"] = {shell_quote = function(value) return value end}
 			package.loaded["infra.dialog_util"] = {block_alert = function() return "button.cancel" end}

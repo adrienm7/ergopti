@@ -272,7 +272,7 @@ local function init_message(session)
 	-- The details pane promises the exact share document, not the local error
 	-- report. Build it from the same captured snapshot as Copy and Report.
 	message.text = require("diagnostics.engine.healthcheck.share").document(session.snapshot, session.documents.schema,
-		require("infra.i18n").get(session.documents.schema.share_policy.notice_key)).text
+		require("core.i18n.engine.i18n").get(session.documents.schema.share_policy.notice_key)).text
 	return message
 end
 
@@ -288,7 +288,7 @@ local function perform(session, name)
 	local shared
 	if name == "copy" or name == "report" then
 		shared = require("diagnostics.engine.healthcheck.share").document(session.snapshot, session.documents.schema,
-			require("infra.i18n").get(session.documents.schema.share_policy.notice_key))
+			require("core.i18n.engine.i18n").get(session.documents.schema.share_policy.notice_key))
 	end
 	if name == "copy" then
 		action = { action = "copy", text = shared.text }
@@ -440,7 +440,7 @@ local function open_window(record)
 		local ok_step, step_err = pcall(step.apply)
 		if not ok_step then Logger.warn(LOG, "%s() failed: %s.", step.name, tostring(step_err)) end
 	end
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	pcall(function() webview:windowTitle(ui_builder.window_title(i18n.get("common.error_title"))) end)
 	pcall(function() webview:allowTextEntry(true) end)
 	pcall(function() webview:allowGestures(false) end)
@@ -455,7 +455,7 @@ local function open_window(record)
 	pcall(function()
 		webview:navigationCallback(function(action)
 			if _session ~= session or action ~= "didFinishNavigation" then return end
-			local ok_strings, strings = pcall(function() return require("infra.locale").catalogue() end)
+			local ok_strings, strings = pcall(function() return require("core.i18n.engine.locale").catalogue() end)
 			local ok_enc, json = pcall(hs.json.encode, ok_strings and strings or {})
 			if not ok_strings or not ok_enc then
 				Logger.error(LOG, "The error window's strings could not be prepared.")
@@ -653,7 +653,7 @@ function M.report(record, complete, current)
 		return nil
 	end
 	local shared = require("diagnostics.engine.healthcheck.share").document(fields.snapshot, fields.documents.schema,
-		require("infra.i18n").get(fields.documents.schema.share_policy.notice_key))
+		require("core.i18n.engine.i18n").get(fields.documents.schema.share_policy.notice_key))
 	return require("ui.healthcheck.report").perform(
 		{ action = "report", text = shared.text, fields = shared.fields },
 		fields.paths, fields.documents, fields.redaction.context, nil, fields.snapshot, {

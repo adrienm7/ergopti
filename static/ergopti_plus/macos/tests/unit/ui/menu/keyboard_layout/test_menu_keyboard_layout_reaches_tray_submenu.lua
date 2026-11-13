@@ -115,7 +115,7 @@ end)
 --- Captures actual provider data while forwarding its status and rendering to the real binding.
 --- @param callback function Receives the native build, fixture state and binding.
 local function with_empty_layout(callback)
-	helpers.with_stub_scope({ "ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n",
+	helpers.with_stub_scope({ "ui.menu.menu_keyboard_layout", "infra.manifest_menu", "core.i18n.engine.i18n",
 		"core.fs.adapters.json_codec", "menu.engine.renderer", "modules.keymap.layout_registry" }, function()
 		local module = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
 		install_legacy_layout_formats()
@@ -194,7 +194,7 @@ helpers.describe("the shared empty native-layout status", function()
 			with_empty_layout(function(build, state, binding)
 				local catalogue = read_empty_layout_json(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"))
 				helpers.assert_eq(catalogue[EmptyLayoutCorpus.row.i18n], expected)
-				require("infra.i18n").get = function(key) return catalogue[key] or key end
+				require("core.i18n.engine.i18n").get = function(key) return catalogue[key] or key end
 				local rows = build()
 				helpers.assert_eq(state.data, { { label = expected, disabled = true } })
 				helpers.assert_eq(count_empty_layout_caption(rows, expected), 1)
@@ -213,7 +213,7 @@ helpers.describe("the shared empty native-layout status", function()
 			with_empty_layout(function(build, state, binding)
 				local statuses = empty_layout_owner(binding).status_rows
 				local baseline = build()
-				local caption = require("infra.i18n").get(EmptyLayoutCorpus.row.i18n)
+				local caption = require("core.i18n.engine.i18n").get(EmptyLayoutCorpus.row.i18n)
 				helpers.assert_eq(count_empty_layout_caption(baseline, caption), 1)
 				local bad = {
 					empty = {}, command = { { type = "command", id = "layout_manager", i18n = "menu.layout.manage" } },
@@ -258,7 +258,7 @@ end)
 --- Uses the actual empty-source list, canonical binding and native row renderer.
 --- Native effect ports are controlled and expose their launch receipt.
 local function with_empty_source_preferences(callback, labels)
-	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n",
+	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "core.i18n.engine.i18n",
 		"modules.keymap.input_sources", "modules.keymap.layout_install", "adapters.shell_runner"}, function()
 		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local installer = require("modules.keymap.layout_install")
@@ -278,7 +278,7 @@ local function with_empty_source_preferences(callback, labels)
 			if state.result == "throw" then error("Native launch refused") end
 			return state.result
 		end }
-		local translator = require("infra.i18n")
+		local translator = require("core.i18n.engine.i18n")
 		if labels then translator.get = function(key) return labels[key] or key end end
 		package.loaded["infra.manifest_menu"] = nil
 		local binding = require("infra.manifest_menu")

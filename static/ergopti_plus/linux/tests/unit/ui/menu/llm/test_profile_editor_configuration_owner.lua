@@ -27,7 +27,7 @@ local function with_profile(body)
 		local file = assert(io.open(f.dirs.b .. "/config.toml", "wb"))
 		assert(file:write(baseline)); assert(file:close())
 		local bridge = helpers.load_module("ui.prompt_editor.bridge")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local rows = require("ui.menu.builder").build({
 			_version = "0.0.0-dev.12", paused = false, is_paused = function() return false end,
 			llm = { is_enabled = function() return true end, get_live = function() return nil end,

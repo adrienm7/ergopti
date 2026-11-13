@@ -216,7 +216,7 @@ function M.with_bindings(callback)
 		"modules.shortcuts.actions.system",
 		"modules.shortcuts.tap_keys",
 		"modules.gestures.actions",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 		"infra.logger",
 	}, function()
 		package.loaded["adapters.hotkey_registrar"] = nil

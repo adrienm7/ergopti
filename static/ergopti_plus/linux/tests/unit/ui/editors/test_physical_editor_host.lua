@@ -22,7 +22,7 @@ end)
 helpers.describe("Physical editor position capture host epoch composition", function()
 	helpers.it("uses genuine thin-host session guards through explicitly controlled native ports", function()
 		local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "adapters.keyboard_hook",
-			"modules.gestures.manager", "core.fs.engine.paths", "infra.i18n", "core.logger.engine.shim" }
+			"modules.gestures.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local host, epoch, callback, native_token, guard, cancel_refused, writes, sends = nil, 0, nil, nil, nil, false, 0, 0
 		local receipt = {}
@@ -46,7 +46,7 @@ helpers.describe("Physical editor position capture host epoch composition", func
 				get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
 				split_action_parameter_key = function() end, get_action_label = function(action) return action end }
 			package.loaded["core.fs.engine.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 			host = helpers.load_module("ui.physical_shortcuts.bridge")
 			helpers.assert_true(host.open({ scope = scope, is_paused = function() return false end }))
@@ -100,7 +100,7 @@ end)
 helpers.describe("Physical editor exact native-closed debt retry", function()
 	helpers.it("(physical-editor-close-debt) settles only the observed closed epoch before admitting a successor", function()
 		local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "adapters.keyboard_hook",
-			"modules.gestures.manager", "core.fs.engine.paths", "infra.i18n", "core.logger.engine.shim" }
+			"modules.gestures.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local host, epoch, serial, callback, token = nil, 0, 0, nil, nil
 		local hide_refused, cancel_refused, hide_calls = false, false, 0
@@ -130,7 +130,7 @@ helpers.describe("Physical editor exact native-closed debt retry", function()
 				get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
 				split_action_parameter_key = function() end, get_action_label = function(action) return action end }
 			package.loaded["core.fs.engine.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 			host = helpers.load_module("ui.physical_shortcuts.bridge")
 			local paused_now = false
@@ -181,7 +181,7 @@ end)
 helpers.describe("Physical editor premature close notice refusal", function()
 	helpers.it("(physical-editor-close-notice) premature same-epoch notice cannot settle cancellation retry without native ACK", function()
 		local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "adapters.keyboard_hook",
-			"modules.gestures.manager", "core.fs.engine.paths", "infra.i18n", "core.logger.engine.shim" }
+			"modules.gestures.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local host, epoch, serial, callback, token = nil, 0, 0, nil, nil
 		local hide_refused, cancel_refused, hide_calls = false, false, 0
@@ -211,7 +211,7 @@ helpers.describe("Physical editor premature close notice refusal", function()
 				get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
 				split_action_parameter_key = function() end, get_action_label = function(action) return action end }
 			package.loaded["core.fs.engine.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 			host = helpers.load_module("ui.physical_shortcuts.bridge")
 			local options = { scope = scope, is_paused = function() return false end }
@@ -249,7 +249,7 @@ helpers.describe("Physical editor pure constructor reservation rollback", functi
 	for _, mode in ipairs({ "throw", "nil", "false" }) do
 		helpers.it("(physical-editor-constructor) refuses before native acquisition and releases only the pure reservation: " .. mode, function()
 			local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "adapters.keyboard_hook",
-				"modules.gestures.manager", "core.fs.engine.paths", "infra.i18n", "core.logger.engine.shim", "shortcuts.engine.physical_editor_window" }
+				"modules.gestures.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim", "shortcuts.engine.physical_editor_window" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 			local host, epoch, serial, options, failing = nil, 0, 0, nil, true
 			local shows, hides, captures, cancellations, source_reads = 0, 0, 0, 0, 0
@@ -277,7 +277,7 @@ helpers.describe("Physical editor pure constructor reservation rollback", functi
 					capture_position = function() captures = captures + 1; return {} end,
 					cancel_position = function() cancellations = cancellations + 1; return true end }
 				package.loaded["core.fs.engine.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
-				package.loaded["infra.i18n"] = { get = function(key) return key end }
+				package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 				package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 				package.loaded["shortcuts.engine.physical_editor_window"] = { new = function(ports)
 					if not failing then return original_new(ports) end
@@ -325,7 +325,7 @@ end)
 helpers.describe("Physical editor returned Window retirement acknowledgement", function()
 	helpers.it("(physical-editor-window-ack) retains false nil and throw retirement debt after acknowledged native close", function()
 		local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "adapters.keyboard_hook",
-			"modules.gestures.manager", "core.fs.engine.paths", "infra.i18n", "core.logger.engine.shim", "shortcuts.engine.physical_editor_window" }
+			"modules.gestures.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim", "shortcuts.engine.physical_editor_window" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local checked, failure = pcall(function()
 			local actual_window = require("shortcuts.engine.physical_editor_window")
@@ -349,7 +349,7 @@ helpers.describe("Physical editor returned Window retirement acknowledgement", f
 					get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
 					split_action_parameter_key = function() end, get_action_label = function(action) return action end }
 				package.loaded["core.fs.engine.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
-				package.loaded["infra.i18n"] = { get = function(key) return key end }
+				package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 				package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 				package.loaded["shortcuts.engine.physical_editor_window"] = { new = function(ports)
 					local owner = original_new(ports)

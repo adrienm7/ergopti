@@ -7,7 +7,7 @@ local boot = require("tests.support.menu_boot_fixture")
 local OWNED = {
 	"ui.menu.init", "ui.menu.menu_state", "ui.menu.preferences_transaction", "ui.menu.session_demotions",
 	"ui.menu.keymap_lifecycle", "ui.menu.global_actions_transaction", "ui.menu.recoverable_file_moves",
-	"infra.logger", "infra.notifications", "infra.i18n", "infra.ui_restore", "infra.text_utils",
+	"infra.logger", "infra.notifications", "core.i18n.engine.i18n", "infra.ui_restore", "infra.text_utils",
 	"infra.deferred_work", "infra.preferences", "ui.hotstring_editor", "ui.menu.builder", "ui.menu.hotstring_counter",
 	"ui.menu.menu_paths", "infra.factory_reset_journal", "ui.menu.menu_watchers", "modules.updater",
 	"adapters.tray_menu", "adapters.hotkey_registrar", "infra.termination_coordinator", "ui.menu.menu_gestures",

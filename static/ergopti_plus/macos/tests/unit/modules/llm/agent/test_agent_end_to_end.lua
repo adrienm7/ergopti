@@ -73,10 +73,10 @@ helpers.describe("AI agent end to end (llm_agent_selection, llm_agent_command)",
 	end)
 
 	helpers.it("shows a calendar title with literal placeholder braces before acceptance", function()
-		local previous = package.loaded["infra.i18n"]
-		package.loaded["infra.i18n"] = nil
-		local real_i18n = require("infra.i18n")
-		package.loaded["infra.i18n"] = previous
+		local previous = package.loaded["core.i18n.engine.i18n"]
+		package.loaded["core.i18n.engine.i18n"] = nil
+		local real_i18n = require("core.i18n.engine.i18n")
+		package.loaded["core.i18n.engine.i18n"] = previous
 		local world = build_world()
 		real_i18n.get = world.i18n.get
 		world.i18n.format = real_i18n.format

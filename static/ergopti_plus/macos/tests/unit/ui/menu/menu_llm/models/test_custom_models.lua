@@ -19,7 +19,7 @@ local function with_models(opts, body)
 	helpers.with_fresh_modules(OWNED, function()
 		package.loaded["infra.dialog_util"] = { block_alert = function()
 			if opts.confirm == "throw" then error("dialog", 0) end
-			return opts.confirm == "cancel" and "Cancel" or require("infra.i18n").get("button.remove")
+			return opts.confirm == "cancel" and "Cancel" or require("core.i18n.engine.i18n").get("button.remove")
 		end }
 		local Custom = require("ui.menu.menu_llm.custom_models")
 		local state = { llm_backend = opts.backend or "ollama", llm_model = opts.model or "", llm_user_models = opts.list }

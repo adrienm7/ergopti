@@ -51,7 +51,7 @@ local function load_lifecycle()
 			ctx.notifications = ctx.notifications + 1
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.text_utils"] = { shell_quote = function(value) return value end }
 	package.loaded["platform.remap.ke_paths"] = {
 		CORE_SERVICE = "/stock/Karabiner-Core-Service",

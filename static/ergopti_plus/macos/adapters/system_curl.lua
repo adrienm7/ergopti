@@ -115,7 +115,7 @@ end
 --- @param verdict table A refused verdict from verdict_for().
 --- @return string title, string body
 function M.message_for(verdict)
-	local I18n = require("infra.i18n")
+	local I18n = require("core.i18n.engine.i18n")
 	if verdict.reason == "too_old" then
 		return I18n.get("system.curl.refused_title"),
 			I18n.format("system.curl.too_old_body", M.PATH, tostring(verdict.found), M.MINIMUM_VERSION)

@@ -41,7 +41,7 @@ local M = {}
 local WindowTitles = require("core.ui.engine.window_titles")
 
 local Logger = require("core.logger.engine.shim")
-local i18n = require("infra.i18n")
+local i18n = require("core.i18n.engine.i18n")
 local ShellRunner = require("adapters.shell_runner")
 local NativeDialog = require("ui.native_dialog")
 local FileSelection = require("core.fs.engine.file_selection")

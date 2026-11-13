@@ -285,7 +285,7 @@ helpers.describe("leaf init ownership: exact dependencies only", function()
 			["modules.llm.parser"] = {},
 			["infra.logger"] = LOGGER_STUB,
 			["infra.timings"] = { sec = function() return 0.1 end },
-			["infra.i18n"] = {},
+			["core.i18n.engine.i18n"] = {},
 		}, function(streaming)
 			local core = {}
 			local tooltip1 = {}
@@ -346,7 +346,7 @@ local function with_prediction_results(warmup_result, streaming_result, callback
 		["infra.logger"] = LOGGER_STUB,
 		["infra.timings"] = { sec = function() return 0.1 end },
 		["core.events.timer_scheduler"] = PortFakes.timer_scheduler(),
-		["infra.i18n"] = {},
+		["core.i18n.engine.i18n"] = {},
 		["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 },
 		["ui.tooltip"] = PortFakes.complete_tooltip({
 			set_navigate_callback = noop,

@@ -55,7 +55,7 @@ end
 local MODULES = {
 	"infra.logger",
 	"infra.notifications",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.text_utils",
 	"modules.llm.api_ollama",
 	"modules.llm.ollama_binary",
@@ -196,7 +196,7 @@ local function with_fixture(spec, body)
 				return true
 			end,
 		}
-		package.loaded["infra.i18n"] = {get = function(key) return key end}
+		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 		package.loaded["infra.text_utils"] = {
 			shell_quote = function(value) return "'" .. tostring(value) .. "'" end,
 		}

@@ -143,7 +143,7 @@ local function fresh_pixel_owner()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.notifications"] = {
 		notify = function(message, _, level)
 			fixture.notifications[#fixture.notifications + 1] = {

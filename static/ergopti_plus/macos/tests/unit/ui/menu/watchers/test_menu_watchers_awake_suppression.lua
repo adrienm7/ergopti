@@ -50,7 +50,7 @@ local OWNED_MODULES = {
 	"infra.factory_reset_journal",
 	"core.fs.engine.dir",
 	"infra.git_status",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.launcher_environment",
 	"infra.log_folders",
 	"infra.logger",

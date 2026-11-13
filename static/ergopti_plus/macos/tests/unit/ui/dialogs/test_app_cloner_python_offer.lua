@@ -15,7 +15,7 @@
 
 local helpers = require("tests.helpers")
 
-local STUBBED = { "infra.i18n", "infra.dialog_util", "infra.deferred_work", "infra.notifications",
+local STUBBED = { "core.i18n.engine.i18n", "infra.dialog_util", "infra.deferred_work", "infra.notifications",
 	"ui.app_cloner_python_offer" }
 local ORIGINALS = {}
 for _, name in ipairs(STUBBED) do ORIGINALS[name] = package.loaded[name] end
@@ -33,7 +33,7 @@ local LINK = "/Users/test/Library/Application Support/Ergopti/native-bootstrap/a
 --- @return table world
 local function load(answer)
 	local world = { alerts = {}, notices = 0 }
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 		format = function(key, ...) return key .. "|" .. table.concat({ ... }, "|") end,
 	}

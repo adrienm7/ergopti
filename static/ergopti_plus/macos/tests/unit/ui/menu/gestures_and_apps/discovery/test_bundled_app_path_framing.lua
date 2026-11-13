@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local OWNED = {
-	"ui.menu.menu_apps", "infra.logger", "core.fs.engine.paths", "infra.i18n",
+	"ui.menu.menu_apps", "infra.logger", "core.fs.engine.paths", "core.i18n.engine.i18n",
 	"infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "lfs",
 }
 
@@ -48,7 +48,7 @@ local function with_apps(newline, scenario)
 			logger.warn = function(_, format, ...) f.warnings[#f.warnings + 1] = string.format(format, ...) end
 			package.loaded["infra.logger"] = logger
 			package.loaded["core.fs.engine.paths"] = {}
-			package.loaded["infra.i18n"] = {}
+			package.loaded["core.i18n.engine.i18n"] = {}
 			package.loaded["infra.manifest_menu"] = {}
 			package.loaded["adapters.task_lifecycle"] = { native = function() error("application launch forbidden") end }
 			local menu = helpers.load_with_stubs("ui.menu.menu_apps", {

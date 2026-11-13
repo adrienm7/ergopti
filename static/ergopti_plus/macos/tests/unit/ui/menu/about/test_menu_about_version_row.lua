@@ -129,7 +129,7 @@ local function version_row(Updater)
 	package.loaded["ui.menu.menu_about"] = nil
 	local About = helpers.load_with_stubs("ui.menu.menu_about")
 	local catalogue = french()
-	require("infra.i18n").get = function(key) return catalogue[key] or key end
+	require("core.i18n.engine.i18n").get = function(key) return catalogue[key] or key end
 	local owner = { get = function() return "dev" end, set = function() end }
 	local rows = About.build({ channel_owner = owner }, {
 		start_at_login = function() error("Building About must not change startup.") end,
