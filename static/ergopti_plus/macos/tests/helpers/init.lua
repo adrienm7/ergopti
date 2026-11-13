@@ -100,6 +100,40 @@ function M.driver_root()
 	return helper_dir:gsub("[/\\]tests$", "") .. "/"
 end
 
+-- Top-level folders of the driver's production Lua, read once per process.
+local _production_heads = nil
+
+--- True when `name` is a module of this driver's production code: its first
+--- segment is a top-level folder holding the driver's Lua (tests/ excluded),
+--- and it does not resolve to a shared module. The folders come from the tree,
+--- never from a list of their names, so a package.loaded sweep through this
+--- predicate keeps covering a module that moves to another folder; a stub a
+--- test placed under such a name is covered too.
+--- @param name any A package.loaded key.
+--- @return boolean
+function M.is_driver_module(name)
+	if type(name) ~= "string" then return false end
+	if not _production_heads then
+		local root = (M.driver_root():gsub("[/\\]$", ""))
+		local paths, detail = require("test.runner_discovery").files(root, function(file)
+			return file:match("%.lua$") ~= nil
+		end, { tests = true })
+		assert(paths, detail)
+		local heads = {}
+		for _, path in ipairs(paths) do
+			local head = path:sub(#root + 2):match("^([^/\\]+)[/\\]")
+			if head then heads[head] = true end
+		end
+		-- An empty inventory is no evidence: a sweep over it would clear nothing.
+		assert(next(heads), "no production folder under " .. root)
+		_production_heads = heads
+	end
+	local head = name:match("^([%w_]+)%.")
+	if not head or not _production_heads[head] then return false end
+	local file = package.searchpath(name, package.path)
+	return not (file and file:gsub("\\", "/"):find("/_shared/", 1, true))
+end
+
 --- Returns the path to the tests/fixtures directory.
 --- @return string Absolute path with trailing slash.
 function M.fixtures_dir()

@@ -51,8 +51,7 @@ local function load_fixture()
 			or name:match("^modules%.llm")
 			or name:match("^modules%.keystats")
 			or name:match("^ui%.tooltip")
-			or name:match("^adapters%.")
-			or name:match("^infra%.")
+			or helpers.is_driver_module(name)
 		) then
 			package.loaded[name] = nil
 		end
