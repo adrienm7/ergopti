@@ -39,8 +39,8 @@ local Indicator = require("platform.tray.appindicator")
 if not Surface.is_available() then abort("the widget surface cannot bind GTK.") end
 if not Indicator.is_available() then abort("the tray library cannot bind.") end
 
-local Model = require("wpm_widget.model")
-local Activity = require("keystats.wpm_activity")
+local Model = require("metrics.engine.wpm_widget_model")
+local Activity = require("metrics.engine.wpm.activity")
 local Constants = require("infra.wpm_constants")
 local Timings = require("infra.timings")
 local Widget = require("ui.wpm.widget")

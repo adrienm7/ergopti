@@ -4,9 +4,9 @@
 ; MODULE: Key Names
 ; DESCRIPTION:
 ; Names a keyboard key or modifier in visible text, from the one table every
-; driver shares (_shared/data/keycodes/key_names.json, its windows column
+; driver shares (_shared/layouts/data/keycodes/key_names.json, its windows column
 ; projected to _generated/key_names.ahk). Port of
-; _shared/lua/keycodes/key_names.lua. A row used to print the id itself
+; _shared/platform/input/keycodes/key_names.lua. A row used to print the id itself
 ; (`lalt`, `caps_lock`) or an abbreviation no locale translated (`LCtrl`).
 ;
 ; FEATURES & RATIONALE:

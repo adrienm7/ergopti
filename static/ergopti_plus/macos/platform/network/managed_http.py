@@ -21,7 +21,10 @@ def _load(name, path):
 
 _ROOT = Path(__file__).absolute().parents[2]
 Native = _load("ergopti_native_http", Path(__file__).with_name("native_http.py"))
-Policy = _load("ergopti_proxy_policy", _ROOT.parent / "_shared/python/network_proxy_policy.py")
+Policy = _load(
+    "ergopti_proxy_policy",
+    _ROOT.parent / "_shared/core/network/adapters/python_network_proxy_policy.py",
+)
 
 
 def _failure(error, request):

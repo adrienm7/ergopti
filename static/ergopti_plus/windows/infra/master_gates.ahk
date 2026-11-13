@@ -311,7 +311,7 @@ _MG_LoadSubCategories(ManifestPath := "") {
 		; removed (F-01), so a few ms of FileRead + JsonParse per live category toggle
 		; no longer sits on the keyboard-hook starvation path and is not worth trading
 		; a fail-fast guarantee for.
-		FilePath := ManifestPath != "" ? ManifestPath : _SharedDir . "\modules\menu\menu_manifest.json"
+		FilePath := ManifestPath != "" ? ManifestPath : _SharedDir . "\menu\data\menu_manifest.json"
 		if !FileExist(FilePath) {
 				throw Error("Master gate manifest is missing: " . FilePath)
 		}

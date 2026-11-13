@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Updater / Release Install From the Versions Window
 ; DESCRIPTION:
-; The Windows port of _shared/lua/updater/release_install.lua: the one-click
+; The Windows port of _shared/updater/engine/release_install.lua: the one-click
 ; install of a release chosen in the Versions window (install_release), in the
 ; same order as on macOS and Linux. Back the configuration up
 ; (modules/updater/config_backup.ahk), find the release's authenticated asset,

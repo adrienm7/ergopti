@@ -97,7 +97,7 @@ global _LifecycleReloadExitRetrying := false
 global _LifecycleExitRequester := ""
 ;
 ; How long a Quit waits for a running writer: [ui] user_quit_deadline_ms of
-; _shared/modules/timings/constants.toml, pinned by test_quit_admission.ahk. The
+; _shared/core/timing/data/constants.toml, pinned by test_quit_admission.ahk. The
 ; poll is the macOS menu's.
 global LIFECYCLE_USER_QUIT_DEADLINE_MS := 12000
 global LIFECYCLE_USER_QUIT_POLL_MS := 250

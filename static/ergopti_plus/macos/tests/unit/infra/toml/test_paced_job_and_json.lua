@@ -226,9 +226,9 @@ end)
 
 helpers.describe("infra.paced_json", function()
 	helpers.it("encodes LuaSkin shapes and round-trips through a JSON decoder", function()
-		helpers.with_fresh_modules({ "infra.paced_json", "json" }, function()
+		helpers.with_fresh_modules({ "infra.paced_json", "core.text.engine.json" }, function()
 			local PacedJson = require("infra.paced_json")
-			local json = require("json")
+			local json = require("core.text.engine.json")
 			local value = {
 				historical = { c = { a = { c = 1, t = 2.5, e = 0 }, ["\"q\\\n"] = { c = 3 } }, bg = {} },
 				list = { 1, 2, 3 }, flag = true, name = "données é",

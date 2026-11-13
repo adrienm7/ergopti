@@ -19,8 +19,8 @@
 local M = {}
 
 local NativeDialog = require("ui.native_dialog")
-local TextUtils = require("text_utils")
-local WindowTitles = require("window_titles")
+local TextUtils = require("core.text.engine.utils_core")
+local WindowTitles = require("core.ui.engine.window_titles")
 
 local RECEIPT = "ERGOPTI_DIALOG_STATUS="
 

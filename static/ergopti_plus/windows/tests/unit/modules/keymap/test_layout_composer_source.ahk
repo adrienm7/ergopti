@@ -359,7 +359,7 @@ _LCS_MenuCase() {
 	Commands := _LAY_ScopeCommands()
 	AssertTrue(Commands.Has(MenuCommand.OPEN_LAYOUT_EDITOR), "the command is bound")
 	AssertEqual(LayoutManager_OpenEditor, Commands[MenuCommand.OPEN_LAYOUT_EDITOR])
-	Manifest := JsonParse(FileRead(_SharedDir . "\modules\menu\menu_manifest.json", "UTF-8"))
+	Manifest := JsonParse(FileRead(_SharedDir . "\menu\data\menu_manifest.json", "UTF-8"))
 	Found := 0
 	Walk(Node) {
 		if Node is Map {

@@ -11,7 +11,7 @@
 ---
 --- ROOT CAUSE ENCODED:
 --- The rule "a batch profile is a batch only above one prediction" was decided
---- separately by each driver. It now comes from _shared/lua/llm/request_plan/
+--- separately by each driver. It now comes from _shared/ai/engine/request_plan/
 --- batching.lua, replayed by the shared contract on both drivers; this case pins
 --- that macOS dispatch obeys it.
 --- ==============================================================================

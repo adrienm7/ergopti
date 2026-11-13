@@ -2,7 +2,7 @@
 
 --- The actual macOS replacement path must receive valid decoded Unicode.
 local helpers = require("tests.helpers")
-local Parser = require("llm.parser")
+local Parser = require("ai.engine.api.parser_core")
 local Fixture = require("tests.support.apply_prediction_fixture")
 
 helpers.describe("Unicode prediction insertion", function()

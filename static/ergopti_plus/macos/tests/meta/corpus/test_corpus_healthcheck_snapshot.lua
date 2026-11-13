@@ -38,7 +38,7 @@ local function read_corpus()
 	if not fh then error("cannot open corpus at " .. path) end
 	local raw = fh:read("*a")
 	fh:close()
-	local data = require("json").decode(raw)
+	local data = require("core.text.engine.json").decode(raw)
 	if type(data) ~= "table" then error("corpus is not valid JSON: " .. path) end
 	return data
 end
@@ -83,8 +83,8 @@ end)
 -- ===================================
 
 helpers.describe("healthcheck snapshot corpus — vector replay", function()
-	package.loaded["healthcheck.snapshot"] = nil
-	local Snapshot = require("healthcheck.snapshot")
+	package.loaded["diagnostics.engine.healthcheck.snapshot"] = nil
+	local Snapshot = require("diagnostics.engine.healthcheck.snapshot")
 
 	for _, vector in ipairs(corpus.vectors) do
 		if vector.category == "extract_recent_issues" then

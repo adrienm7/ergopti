@@ -116,7 +116,7 @@ end)
 --- @param callback function Receives the native build, fixture state and binding.
 local function with_empty_layout(callback)
 	helpers.with_stub_scope({ "ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n",
-		"adapters.json_codec", "menu.renderer", "modules.keymap.layout_registry" }, function()
+		"adapters.json_codec", "menu.engine.renderer", "modules.keymap.layout_registry" }, function()
 		local module = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
 		install_legacy_layout_formats()
 		local binding = require("infra.manifest_menu")
@@ -148,7 +148,7 @@ local function with_empty_layout(callback)
 end
 
 -- Independent pre-migration captions; the generated status declaration is the subject.
-local EmptyLayoutJson = require("json")
+local EmptyLayoutJson = require("core.text.engine.json")
 local function read_empty_layout_json(path)
 	local file = assert(io.open(path, "rb"))
 	local value = assert(EmptyLayoutJson.decode(file:read("*a")))
@@ -192,7 +192,7 @@ helpers.describe("the shared empty native-layout status", function()
 	for locale, expected in pairs(EmptyLayoutCorpus.captions) do
 		helpers.it("(layout-empty-status) renders the real empty provider in " .. locale, function()
 			with_empty_layout(function(build, state, binding)
-				local catalogue = read_empty_layout_json(helpers.shared("data/locales/" .. locale .. ".json"))
+				local catalogue = read_empty_layout_json(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"))
 				helpers.assert_eq(catalogue[EmptyLayoutCorpus.row.i18n], expected)
 				require("infra.i18n").get = function(key) return catalogue[key] or key end
 				local rows = build()
@@ -391,11 +391,11 @@ helpers.describe("empty native Input Sources consumes the canonical preferences 
 	end)
 	helpers.it("consumes every existing real locale caption without a native literal", function()
 		local codec = require("adapters.json_codec")
-		local file = assert(io.open(helpers.shared("data/locale_order.json"), "rb"))
+		local file = assert(io.open(helpers.shared("core/i18n/data/locale_order.json"), "rb"))
 		local locales = assert(codec.decode(file:read("*a"))).order; assert(file:close())
 		helpers.assert_eq(#locales, 21)
 		for _, locale in ipairs(locales) do
-			file = assert(io.open(helpers.shared("data/locales/" .. locale .. ".json"), "rb"))
+			file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
 			local labels = assert(codec.decode(file:read("*a"))); assert(file:close())
 			helpers.assert_true(type(labels["menu.layout.open_prefs"]) == "string" and labels["menu.layout.open_prefs"] ~= "")
 			with_empty_source_preferences(function(build, state)
@@ -513,7 +513,7 @@ helpers.describe("layout switching consumes its complete shared presentation fra
 		local count = 0
 		for lang, vector in pairs(vectors) do
 			count = count + 1
-			file = assert(io.open(helpers.shared("data/locales/" .. lang .. ".json"), "rb"))
+			file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. lang .. ".json"), "rb"))
 			local labels = assert(codec.decode(file:read("*a"))); assert(file:close())
 			with_switch_frame(function(build)
 				local rows = build()

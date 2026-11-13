@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local path = helpers.shared("tests/corpus/llm/app_profile_overrides_vectors.json")
 local handle = assert(io.open(path, "rb"), "cannot open " .. path)
@@ -33,7 +33,7 @@ local function same_map(actual, expected)
 end
 
 helpers.describe("per-application profile overrides corpus: the shared rule on macOS", function()
-	local Overrides = require("llm.app_profile_overrides")
+	local Overrides = require("ai.engine.policy.app_profile_overrides")
 
 	helpers.it("app-override corpus is readable", function()
 		helpers.assert_true(type(corpus) == "table" and #corpus.normalize > 0 and #corpus.resolve > 0

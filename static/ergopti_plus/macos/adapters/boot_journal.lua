@@ -59,7 +59,7 @@ end
 --- @return string raw Complete policy bytes; read or close refusal throws.
 function M.read_privacy_policy(shared_root)
 	assert(type(shared_root) == "string" and shared_root ~= "")
-	local file = assert(io.open(shared_root .. "/modules/diagnostics/redaction.json", "rb"))
+	local file = assert(io.open(shared_root .. "/diagnostics/data/redaction.json", "rb"))
 	local read_ok, raw = pcall(file.read, file, "*a")
 	local close_ok, closed = pcall(file.close, file)
 	assert(read_ok and type(raw) == "string" and close_ok and closed == true)

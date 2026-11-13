@@ -377,7 +377,7 @@ helpers.describe("screen capture: the whole screen falls through the tools", fun
 	end)
 
 	helpers.it("a failure names a closed reason id and keeps the detail apart", function()
-		local Errors = require("adapter_errors")
+		local Errors = require("diagnostics.engine.adapter_errors")
 		helpers.assert_eq(ScreenCapture.classify("full", ScreenCapture.EXIT_NO_TOOL, nil, nil).reason,
 			Errors.SCREEN_CAPTURE_NO_TOOL)
 		helpers.assert_eq(ScreenCapture.classify("full", ScreenCapture.EXIT_NO_FILE, nil, nil).reason,

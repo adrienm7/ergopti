@@ -18,12 +18,12 @@
 
 local root, mode = assert(arg[1], "driver root"), assert(arg[2], "session mode")
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
 local Display = require("infra.display_server")
 local Monotonic = require("infra.monotonic")
-local Navigation = require("desktop_navigation")
+local Navigation = require("keyboard.engine.desktop_navigation")
 local Switcher = require("modules.gestures.workspace_switcher")
 local SystemMetrics = require("modules.keystats.system_metrics")
 

@@ -38,7 +38,7 @@ local function read_corpus()
 	fh:close()
 	-- Use the shared pure-Lua JSON decoder (no hs.* on Linux). It returns nil
 	-- on parse failure rather than raising.
-	local decoded = require("json").decode(raw)
+	local decoded = require("core.text.engine.json").decode(raw)
 	if not decoded then return nil, "JSON parse error for " .. corpus_path end
 	return decoded, nil
 end
@@ -55,8 +55,8 @@ local corpus_root, corpus_err = read_corpus()
 -- ===============================================
 
 local function load_parser()
-	package.loaded["updater.release_parser"] = nil
-	return require("updater.release_parser")
+	package.loaded["updater.engine.release_parser"] = nil
+	return require("updater.engine.release_parser")
 end
 
 --- Coerces a decoded corpus value to a string, or nil when it is not one.
@@ -162,7 +162,7 @@ helpers.describe("updater release parser corpus — vector replay", function()
 	end
 
 	-- parse_notes vectors
-	require("test.release_parser_contract").run(helpers, P)
+	require("tests.lua.updater.release_parser_contract").run(helpers, P)
 
 	for _, vec in ipairs(by_cat["parse_notes"] or {}) do
 		helpers.it("parse_notes: " .. vec.id, function()

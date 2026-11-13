@@ -4,8 +4,8 @@
 local function child()
  local root, temporary = assert(arg[3]), assert(arg[2])
  local driver, shared = root .. '/static/ergopti_plus/macos', root .. '/static/ergopti_plus/_shared'
- package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. shared .. '/lua/?.lua;' .. shared .. '/lua/?/init.lua;' .. package.path
- local json = require('json')
+ package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. shared .. '/?.lua;' .. shared .. '/?/init.lua;' .. package.path
+ local json = require('core.text.engine.json')
  local function request(message)
   message.kind = 'request'
   assert(io.stdout:write(json.encode(message) .. '\n')); assert(io.stdout:flush())
@@ -14,7 +14,7 @@ local function child()
  local sqlite = require('tests.support.keystats.rebuild_sqlite_bridge').new(request)
  local path = temporary .. '/db.sqlite'; local db = sqlite.open(path)
  for _, name in ipairs({ 'schema.sql', 'media_schema.sql' }) do
-  local f = assert(io.open(shared .. '/data/db/' .. name, 'rb')); local schema = assert(f:read('*a')); assert(f:close()); assert(db:exec(schema) == sqlite.OK)
+  local f = assert(io.open(shared .. '/metrics/data/db/' .. name, 'rb')); local schema = assert(f:read('*a')); assert(f:close()); assert(db:exec(schema) == sqlite.OK)
  end
  local helpers = require('tests.helpers'); local logger = helpers.make_logger_stub()
  package.loaded['infra.logger'] = logger
@@ -35,7 +35,7 @@ local function child()
  package.loaded['modules.keystats.export'] = { get_native_app_category = function() return nil end }
  local fail_decrypt, bad_json = case == 'unreadable', case == 'badjson'
  local bad_shape = case == 'object' and '{\"foo\":1}' or (case == 'malformedarray' and '[{\"foo\":1}]' or nil)
- local cipher = require('keystats.text_cipher').new({ logger = logger, log = 'test.cipher',
+ local cipher = require('metrics.engine.privacy.text_cipher_core').new({ logger = logger, log = 'test.cipher',
   sha256 = function() return string.rep('a', 64) end, derive_key = function() return string.rep('b', 64) end,
   ready = function() return true end,
   encrypt = function(_, _, text) return (text:gsub('.', function(c) return string.format('%02x', c:byte()) end)) end,
@@ -132,7 +132,7 @@ local function child()
 end
 if arg and arg[0] and arg[0]:match('test_rebuild_encrypted_typing%.lua$') then child(); return end
 local helpers = require('tests.helpers')
-local quote = require('text_utils').shell_quote
+local quote = require('core.text.engine.utils_core').shell_quote
 local source = assert(debug.getinfo(1, 'S').source):gsub('^@', '')
 helpers.describe('atomic encrypted typing rebuild', function()
  for _, case in ipairs({ 'encrypted', 'plaintext', 'empty', 'unreadable', 'badjson', 'object', 'malformedarray', 'concurrent', 'same', 'switched', 'flush', 'commit', 'rollback', 'fencerollback', 'partial' }) do

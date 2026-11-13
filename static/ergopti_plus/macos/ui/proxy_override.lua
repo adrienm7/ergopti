@@ -4,7 +4,7 @@
 --- MODULE: Proxy Override Row (macOS)
 --- DESCRIPTION:
 --- Debug > proxy for downloads: runs the shared edit flow
---- (network/proxy_override.lua) over this driver's dialogs and settings store.
+--- (core/network/engine/proxy_override.lua) over this driver's dialogs and settings store.
 --- The download preludes (modules/llm/network_env.lua) read the stored value
 --- each time a download starts, so a change applies to the next download.
 --- ==============================================================================
@@ -16,7 +16,7 @@ local I18n = require("infra.i18n")
 local Logger = require("infra.logger")
 local Storage = require("adapters.storage")
 local NetworkEnv = require("modules.llm.network_env")
-local Override = require("network.proxy_override")
+local Override = require("core.network.engine.proxy_override")
 
 local LOG = "ui.proxy_override"
 

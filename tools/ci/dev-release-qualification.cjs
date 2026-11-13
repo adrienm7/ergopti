@@ -14,7 +14,7 @@ function releasesUrl() {
 	const { hosts } = require('../lib/identifiers.cjs');
 	const { shared } = require('../lib/paths.cjs');
 	const { github } = JSON.parse(
-		fs.readFileSync(shared('modules', 'updater', 'defaults.json'), 'utf8')
+		fs.readFileSync(shared('updater', 'data', 'defaults.json'), 'utf8')
 	);
 	return `https://${hosts.github}/${github.owner}/${github.repo}/releases`;
 }

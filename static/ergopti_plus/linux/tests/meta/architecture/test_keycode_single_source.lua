@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Verifies that NEITHER keyboard_hook.lua NOR input_reader.lua contains
 --- hardcoded keycode→character layout tables. The single source is
---- _shared/data/keycodes/evdev.json, loaded by input_reader.lua and exposed
+--- _shared/layouts/data/keycodes/evdev.json, loaded by input_reader.lua and exposed
 --- via M.resolve_char(). keyboard_hook must delegate to it; input_reader must
 --- NOT fall back to inline tables on load failure.
 ---
@@ -119,10 +119,10 @@ end)
 --- @param load function Replacement for keycodes.evdev.load.
 --- @return boolean ok, any reader_or_error
 local function load_reader_over(load)
-	local saved = package.loaded["keycodes.evdev"]
-	package.loaded["keycodes.evdev"] = { load = load }
+	local saved = package.loaded["platform.input.keycodes.evdev"]
+	package.loaded["platform.input.keycodes.evdev"] = { load = load }
 	local ok, result = pcall(helpers.fresh_module, "modules.hotstrings.input_reader")
-	package.loaded["keycodes.evdev"] = saved
+	package.loaded["platform.input.keycodes.evdev"] = saved
 	return ok, result
 end
 

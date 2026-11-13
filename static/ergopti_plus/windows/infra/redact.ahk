@@ -3,12 +3,12 @@
 ; ==============================================================================
 ; MODULE: Diagnostics Redaction
 ; DESCRIPTION:
-; AHK port of _shared/lua/diagnostics/redact.lua: removes what must not leave
+; AHK port of _shared/diagnostics/engine/reports/redact.lua: removes what must not leave
 ; the machine from diagnostic text before it is copied, saved or sent to a
 ; GitHub issue — token-like secrets (URL credentials included), the home folder,
 ; the account name, other accounts' profile folders, the folder and file names
 ; under the configuration directory and e-mail addresses. The
-; rules are data in _shared/modules/diagnostics/redaction.json and both ports
+; rules are data in _shared/diagnostics/data/redaction.json and both ports
 ; replay _shared/tests/corpus/diagnostics/redaction_vectors.json.
 ;
 ; FEATURES & RATIONALE:
@@ -424,7 +424,7 @@ _Redact_AcceptAccount(Rules, Text, First, Last) {
 
 ; Redacts diagnostic text before it leaves the machine.
 ; @param Text {String}
-; @param Rules {Map} Parsed _shared/modules/diagnostics/redaction.json.
+; @param Rules {Map} Parsed _shared/diagnostics/data/redaction.json.
 ; @param Context {Map} { home, user, config_dir, case_insensitive } — the
 ;   platform's home folder, account name, configuration directory, and whether
 ;   its paths compare case-insensitively.

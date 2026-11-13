@@ -18,8 +18,8 @@ local corpus = require("hs").json.decode(handle:read("*a"))
 handle:close()
 
 local function load_module()
-	package.loaded["updater.list_cache"] = nil
-	return require("updater.list_cache")
+	package.loaded["updater.engine.list_cache"] = nil
+	return require("updater.engine.list_cache")
 end
 
 helpers.describe("updater list copy corpus: the shared validation on macOS", function()

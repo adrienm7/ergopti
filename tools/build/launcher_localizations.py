@@ -4,7 +4,7 @@
 A bundle that declares no localization resolves to its development region, and
 the frameworks it hosts follow it: Sparkle's remaining windows stayed English
 whatever the driver or the system language. The launcher therefore declares
-every language the driver ships (_shared/data/locale_order.json), in the
+every language the driver ships (_shared/core/i18n/data/locale_order.json), in the
 identifiers macOS uses for them.
 """
 
@@ -15,7 +15,8 @@ import sys
 
 
 LOCALE_ORDER = (
-    Path(__file__).resolve().parents[2] / "static/ergopti_plus/_shared/data/locale_order.json"
+    Path(__file__).resolve().parents[2]
+    / "static/ergopti_plus/_shared/core/i18n/data/locale_order.json"
 )
 
 # The driver's locale codes macOS spells differently: Norwegian is Bokmål

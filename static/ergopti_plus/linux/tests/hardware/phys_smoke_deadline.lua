@@ -25,7 +25,7 @@
 
 local uv = require("luv")
 local Installer = require("modules.updater.installer")
-local Budget = require("updater.install_budget")
+local Budget = require("updater.engine.install_budget")
 local Shell = require("adapters.shell_runner")
 
 local INSTALL_ROOT, INSTALL_SH, WORK = arg[1], arg[2], arg[3]
@@ -89,7 +89,7 @@ if not check(context.kind == "standalone", "the installed tree resolves as a sta
 	.. tostring(context.kind) .. " " .. tostring(context.reason or context.install_root)) then
 	os.exit(1)
 end
-local Snapshot = require("diagnostics.snapshot")
+local Snapshot = require("diagnostics.engine.snapshot")
 -- A source install carries no build stamp; a release archive does, and the
 -- installer admits a candidate only when its stamp names the selected release.
 local version = "0.0.0-phys.1"

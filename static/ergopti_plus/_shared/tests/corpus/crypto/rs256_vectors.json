@@ -1,5 +1,5 @@
 {
-	"_comment": "RS256 known answers for _shared/lua/crypto/sha256.lua and _shared/lua/crypto/rsa_pkcs1.lua, made by Python cryptography and hashlib (an independent implementation). The keys are throwaway test keys generated for this corpus and held by no service. Their PEM bodies are stored without the BEGIN/END armor so secret scanners do not mistake them for live credentials: a test wraps each in the label it names. Replayed by the macOS and Linux unit suites.",
+	"_comment": "RS256 known answers for _shared/core/crypto/engine/sha256.lua and _shared/core/crypto/engine/rsa_pkcs1.lua, made by Python cryptography and hashlib (an independent implementation). The keys are throwaway test keys generated for this corpus and held by no service. Their PEM bodies are stored without the BEGIN/END armor so secret scanners do not mistake them for live credentials: a test wraps each in the label it names. Replayed by the macOS and Linux unit suites.",
 	"sha256": [
 		{
 			"hex_message": "",

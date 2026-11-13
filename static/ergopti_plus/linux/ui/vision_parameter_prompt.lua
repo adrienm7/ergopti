@@ -23,7 +23,7 @@ local M = {}
 local ChoicePrompt = require("ui.choice_prompt")
 local I18n = require("infra.i18n")
 local TextPrompt = require("ui.text_prompt")
-local Vision = require("llm.vision")
+local Vision = require("ai.engine.prediction.vision")
 
 -- Escapes text for a dialog's --text, which is Pango markup.
 local markup_plain = require("ui.native_dialog").plain_markup

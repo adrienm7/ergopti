@@ -13,13 +13,13 @@ import unittest
 PROBE = r"""
 local root, catalog, mode = arg[1], arg[2], arg[3]
 package.path = root .. '/?.lua;' .. root .. '/?/init.lua;'
-  .. root .. '/../_shared/lua/?.lua;' .. root .. '/../_shared/lua/?/init.lua;' .. package.path
-require('compat.utf8').install()
+  .. root .. '/../_shared/?.lua;' .. root .. '/../_shared/?/init.lua;' .. package.path
+require('core.lifecycle.engine.compat.utf8').install()
 local paths = require('infra.paths')
 local original = paths.shared
 paths.shared = function(name)
-  if name == 'data/locales' then return catalog end
-  if name == 'data/locale_order.json' and mode:match('^order%-') then
+  if name == 'core/i18n/data/locales' then return catalog end
+  if name == 'core/i18n/data/locale_order.json' and mode:match('^order%-') then
     return catalog .. '/../locale_order.json'
   end
   return original(name)
@@ -52,7 +52,7 @@ if ok and (mode == 'directory-entry' or mode == 'regular-link') then
   selected = i18n.persist_locale(mode == 'directory-entry' and 'zz' or 'ja')
   stored = require('adapters.storage').get('locale')
 end
-print('CATALOG_RESULT ' .. require('json').encode({
+print('CATALOG_RESULT ' .. require('core.text.engine.json').encode({
   ok=ok,codes=ok and codes or {},reason=ok and '' or tostring(codes),retained=retained,
   unavailable_refused=unavailable_refused,
   recovered=recovered,
@@ -112,7 +112,9 @@ class NativeLocaleCatalogTests(unittest.TestCase):
 
     def test_native_locale_catalog_authority(self):
         driver = Path(DRIVER).resolve()
-        order = json.loads((driver.parent / "_shared/data/locale_order.json").read_text())["order"]
+        order = json.loads(
+            (driver.parent / "_shared/core/i18n/data/locale_order.json").read_text()
+        )["order"]
         expected = sorted(["en", "fr", "de"], key=lambda code: order.index(code))
         self.assertNotEqual(os.geteuid(), 0, "native permission refusal requires an ordinary user")
         for mode in (

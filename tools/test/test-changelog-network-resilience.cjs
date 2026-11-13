@@ -25,14 +25,14 @@ const PLUS = path.join(ROOT, 'static', 'ergopti_plus');
 const SHARED_UI = path.join(PLUS, '_shared', 'ui');
 const CHANGELOG = path.join(SHARED_UI, 'changelog');
 const DEFAULTS = JSON.parse(
-	fs.readFileSync(path.join(PLUS, '_shared', 'modules', 'updater', 'defaults.json'), 'utf8')
+	fs.readFileSync(path.join(PLUS, '_shared', 'updater', 'data', 'defaults.json'), 'utf8')
 );
 const FEED = fs.readFileSync(
 	path.join(PLUS, '_shared', 'tests', 'corpus', 'updater', 'releases_feed.atom'),
 	'utf8'
 );
 const EN = JSON.parse(
-	fs.readFileSync(path.join(PLUS, '_shared', 'data', 'locales', 'en.json'), 'utf8')
+	fs.readFileSync(path.join(PLUS, '_shared', 'core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
 );
 const RELEASES_PAGE = 'https://github.com/adrienm7/ergopti/releases';
 
@@ -277,7 +277,7 @@ function checkSharedBudgets() {
 	// A URL template is built from the generated host constants: resolve them
 	// against identifiers.json, so the pin still compares the whole URL.
 	const hosts = JSON.parse(
-		fs.readFileSync(path.join(PLUS, '_shared', 'data', 'identifiers.json'), 'utf8')
+		fs.readFileSync(path.join(PLUS, '_shared', 'core', 'text', 'data', 'identifiers.json'), 'utf8')
 	).hosts;
 	const ahkUrlTemplate = (source, name) => {
 		const match = new RegExp(

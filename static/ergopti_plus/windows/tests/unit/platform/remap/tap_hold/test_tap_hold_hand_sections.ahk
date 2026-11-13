@@ -6,7 +6,7 @@
 ; The Tap-Hold submenu lists its keys under « Main gauche (tap / hold) » and
 ; « Main droite (tap / hold) », with a separator between the two hands. Which
 ; key goes under which hand is the shared key catalogue's ([tap_hold.catalog]
-; in _shared/tap_hold/defaults.toml), read by TapHoldKeyDefs().
+; in _shared/tap_hold/data/defaults.toml), read by TapHoldKeyDefs().
 ;
 ; ROOT CAUSE ENCODED: _TH_KeyDefs was a hardcoded array claiming to mirror a
 ; menu-manifest `tap_hold_keys_catalog` that never existed, and this menu had

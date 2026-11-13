@@ -10,8 +10,8 @@
 -- Actual public software typing, current clock/libc and real SQLite snapshots.
 -- Independent oracle reads SQLite directly; no process/SQL/provider/clock doubles.
 local uv = require('luv')
-require('compat.utf8').install()
-local Json = require('json')
+require('core.lifecycle.engine.compat.utf8').install()
+local Json = require('core.text.engine.json')
 local original_date, original_time, original_clock = os.date, os.time, os.clock
 local root = assert(os.getenv('OWN_RAW_COHERENCE_ROOT'))
 assert(uv.fs_mkdir(root,448))

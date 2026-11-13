@@ -6,8 +6,8 @@
  * DESCRIPTION:
  * The Linux driver's Ollama defaults must equal the cross-driver canonicals so it
  * predicts with the same settings as macOS/Windows. They live once:
- *   - owned and stock ports / temperature / context-length / keep-alive → _shared/modules/llm/defaults.json
- *   - max_tokens                                        → _shared/lua/llm/prompt_builder.lua
+ *   - owned and stock ports / temperature / context-length / keep-alive → _shared/ai/data/defaults.json
+ *   - max_tokens                                        → _shared/ai/engine/prediction/prompt_builder_core.lua
  *
  * ROOT CAUSE ENCODED:
  * Linux had silently diverged — temperature 0.3 (prediction_engine) and 0.7
@@ -30,7 +30,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static/ergopti_plus');
 const DEFAULTS = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared/modules/llm/defaults.json'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared/ai/data/defaults.json'), 'utf8')
 );
 
 // Strip Lua line comments (`-- …` to EOL) so explanatory comments that mention a
@@ -151,10 +151,10 @@ if (!macOllama.includes('ApiCommon.OLLAMA_KEEP_ALIVE')) {
 // side is pinned to its key, and a typed copy of either budget is refused.
 // Scanned RAW (not comment-stripped): the literal lives in a shell string and
 // Lua's "--" comment marker would otherwise clip the max-time token.
-const timingsToml = read('_shared/modules/timings/constants.toml');
+const timingsToml = read('_shared/core/timing/data/constants.toml');
 for (const key of ['request_timeout_ms', 'ollama_request_timeout_ms']) {
 	if (!new RegExp(`^${key}\\s*=\\s*\\d+`, 'm').test(timingsToml)) {
-		errors.push(`_shared/modules/timings/constants.toml: [llm] ${key} is missing`);
+		errors.push(`_shared/core/timing/data/constants.toml: [llm] ${key} is missing`);
 	}
 }
 const readsKey = (src, key) =>

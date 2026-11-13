@@ -12,9 +12,9 @@ return function()
 	local root, temporary = assert(arg[3]), assert(arg[2])
 	local driver = root .. "/static/ergopti_plus/macos"
 	package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-		.. root .. "/static/ergopti_plus/_shared/lua/?.lua;"
-		.. root .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
-	local json = require("json")
+		.. root .. "/static/ergopti_plus/_shared/?.lua;"
+		.. root .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
+	local json = require("core.text.engine.json")
 	local helpers = require("tests.helpers")
 	local function request(message)
 		message.kind = "request"
@@ -42,7 +42,7 @@ return function()
 		logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.timings"] = { sec = function() return 5 end, ms = function() return 5000 end }
-		package.loaded["keystats.metrics"] = {}
+		package.loaded["metrics.engine.metrics"] = {}
 		local aggregator = { get_ngram_ctx = function() return {} end }
 		for _, key in ipairs({ "init", "flush", "reset_batch", "reset_ngram_ctx", "set_device_id", "set_ngram_ctx",
 			"walk_typing", "walk_app_switch", "walk_window_switch", "walk_system_event" }) do
@@ -61,7 +61,7 @@ return function()
 			db = open(db_path); opened = true
 			if missing then
 				for _, name in ipairs({ "schema.sql", "media_schema.sql" }) do
-					local file = assert(io.open(root .. "/static/ergopti_plus/_shared/data/db/" .. name, "rb"))
+					local file = assert(io.open(root .. "/static/ergopti_plus/_shared/metrics/data/db/" .. name, "rb"))
 					local schema = assert(file:read("*a")); assert(file:close()); assert(db:exec(schema) == 0)
 				end
 				for key, value in pairs({ local_data_sql_outbox = "", today_log_offset = "0",

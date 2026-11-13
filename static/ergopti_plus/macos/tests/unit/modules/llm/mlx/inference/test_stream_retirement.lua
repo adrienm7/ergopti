@@ -9,24 +9,24 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("logger")
+require("core.logger.engine")
 
 local OWNED = {
-	"app_dirs", "infra.config_paths", "infra.launcher_environment", "infra.log_folders",
-	"infra.notifications", "json", "modules.llm.progressive_reveal",
+	"core.fs.engine.app_dirs", "infra.config_paths", "infra.launcher_environment", "infra.log_folders",
+	"infra.notifications", "core.text.engine.json", "modules.llm.progressive_reveal",
 	"modules.llm.api_mlx", "modules.llm.api_mlx_fetch", "modules.llm.api_mlx_discovery",
 	"modules.llm.mlx_stream_retirement",
 	"modules.llm.api_mlx_inference", "adapters.shell_runner", "modules.keystats",
 	"infra.logger", "adapters.timer_scheduler", "adapters.http_client",
 	"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
-	"llm.prompt_builder", "llm.rewrite", "llm.parser", "llm.profile_selector",
+	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "ai.engine.api.parser_core", "ai.engine.settings.profile_selector",
 	"adapters.file_system", "adapters.json_codec", "infra.timings",
-	"infra.deferred_work", "adapters.task_environment", "diagnostics.runtime_log",
-	"diagnostics.operation_reporter", "diagnostics.redact", "logger.shim",
+	"infra.deferred_work", "adapters.task_environment", "diagnostics.engine.runtime_log",
+	"diagnostics.engine.operation_reporter", "diagnostics.engine.reports.redact", "core.logger.engine.shim",
 	"infra.manifest_reader", "infra.toml.reader", "adapters.storage",
-	"infra.fs_dir", "hotstrings.personal_files", "config_defaults", "lfs",
-	"text_utils", "compat.utf8", "toml_codec.basic_string", "toml_codec.bom",
-	"toml_codec.key_path", "toml_codec.reader", "toml_codec.record_scanner",
+	"infra.fs_dir", "hotstrings.engine.catalogue.personal_files", "settings.engine.publication.defaults", "lfs",
+	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom",
+	"core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 }
 
 local function with_stream(scenario)

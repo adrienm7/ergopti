@@ -162,7 +162,7 @@ helpers.describe("keystats: foreign sync rebuilds UI aggregate partitions", func
 	helpers.it("migrates existing aggregate caches, not only a brand-new tmp cache", function()
 		local manager = read_source("local function _mark_aggregate_cache_rebuilt") -- modules/keystats/log_manager.lua
 		local writer = read_source("local function _read_schema_sql") -- modules/keystats/sqlite_writer.lua
-		local schema = read_shared("data/db/schema.sql")
+		local schema = read_shared("metrics/data/db/schema.sql")
 		helpers.assert_true(manager:find("aggregate_cache_revision", 1, true) ~= nil,
 			"log manager must gate rebuilds with a durable aggregate-cache revision")
 		helpers.assert_true(writer:find('{ "aggregate_cache_revision", "0" }', 1, true) ~= nil,
@@ -179,7 +179,7 @@ helpers.describe("keystats-device-log-privacy", function()
 			helpers.with_stub_scope({
 				"infra.logger", "adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
 				"modules.keystats.aggregator", "modules.keystats.rotation", "modules.keystats.export",
-				"keystats.metrics", "adapters.file_system", "adapters.timer_scheduler",
+				"metrics.engine.metrics", "adapters.file_system", "adapters.timer_scheduler",
 			}, function()
 				local messages, queries = {}, {}
 				local identity = "private-foreign-device"

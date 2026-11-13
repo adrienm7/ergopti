@@ -19,12 +19,12 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
-local Model = require("wpm_widget.model")
-local Codec = require("toml_codec")
+local Model = require("metrics.engine.wpm_widget_model")
+local Codec = require("core.text.engine.toml_codec")
 local Paths = require("infra.paths")
-local LiveWpm = require("keystats.live_wpm")
+local LiveWpm = require("metrics.engine.wpm.live_wpm")
 
-local CANON_PATH = Paths.shared("modules/wpm_widget/constants.toml")
+local CANON_PATH = Paths.shared("metrics/data/wpm_widget/constants.toml")
 
 local function canon()
 	return assert(Model.load(CANON_PATH, Codec.decode))

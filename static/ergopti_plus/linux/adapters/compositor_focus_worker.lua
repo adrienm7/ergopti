@@ -109,7 +109,7 @@ function M.run(service, parent_pid)
 	assert(Focus.is_desktop_service(service), "unsupported desktop service")
 	require("jit").off()
 	local ffi = require("ffi")
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	ffi.cdef([[
 		typedef struct { uint32_t domain; int code; char *message; } ErgoptiGError;
 		typedef void (*ErgoptiMethodCall)(void *, const char *, const char *, const char *,

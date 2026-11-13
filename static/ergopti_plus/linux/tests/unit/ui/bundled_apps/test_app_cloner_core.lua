@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 local Core = require("apps.app_cloner_core")
 local Flow = require("apps.app_cloner")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 
 local CATALOGUE = Core.load_families()
 

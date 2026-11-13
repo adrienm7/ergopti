@@ -24,7 +24,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Slot key-space and action catalogue shared with the other drivers,
----    generated from `_shared/modules/actions/actions.toml` into
+---    generated from `_shared/shortcuts/data/actions/actions.toml` into
 ---    `_generated/action_catalogue.lua` so none of them can drift.
 --- 2. NO default bindings on this driver. The desktop acts on the same gesture —
 ---    every compositor claims 3- and 4-finger swipes, and two-finger motion is
@@ -37,36 +37,36 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
-local BindingIdentity = require("config_binding_identity")
-local KeyboardPublication = require("config_keyboard_publication")
-local BindingPublication = require("config_binding_publication")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local BindingIdentity = require("settings.engine.publication.binding_identity")
+local KeyboardPublication = require("settings.engine.publication.keyboard_publication")
+local BindingPublication = require("settings.engine.publication.binding_publication")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
 local Manifest = require("infra.manifest_reader")
-local ParameterLabel = require("action_parameter_label")
-local ProgramParameter = require("program_parameter")
+local ParameterLabel = require("shortcuts.engine.action_parameter_label")
+local ProgramParameter = require("settings.engine.program_parameter")
 local ProgramOwner = require("modules.gestures.program_owner")
 local UserActions = require("modules.gestures.user_actions")
-local UserActionParameter = require("user_action_parameter")
+local UserActionParameter = require("shortcuts.engine.user_action_parameter")
 local WindowSwitch = require("adapters.window_switch")
-local PromptAction = require("llm.prompt_action")
-local Vision = require("llm.vision")
-local AppParameter = require("app_parameter")
-local TomlCodec = require("toml_codec")
+local PromptAction = require("ai.engine.prediction.prompt_action")
+local Vision = require("ai.engine.prediction.vision")
+local AppParameter = require("apps.engine.parameter")
+local TomlCodec = require("core.text.engine.toml_codec")
 local i18n = require("infra.i18n")
-local KeyNames = require("keycodes.key_names")
+local KeyNames = require("platform.input.keycodes.key_names")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local AiActions = require("modules.shortcuts.ai_actions")
 local ShellRunner = require("adapters.shell_runner")
-local DesktopNavigation = require("desktop_navigation")
+local DesktopNavigation = require("keyboard.engine.desktop_navigation")
 local SystemActions = require("modules.gestures.system_actions")
 local BackgroundCommands = require("modules.gestures.background_commands")
-local TableUtil = require("table_util")
-local TextUtils = require("text_utils")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local TextUtils = require("core.text.engine.utils_core")
+local ConfigKeys = require("settings.engine.keys")
 
 -- Retain the admitted issuer at owner construction. Later module/export swaps
 -- cannot appoint another producer or certify unavailable custody.
@@ -92,7 +92,7 @@ if type(DEFAULT_ENABLED) ~= "boolean" then
 end
 
 -- Actions the shared catalogue describes as a single xdotool combo, generated
--- from _shared/modules/actions/actions.toml. Loaded once at require time.
+-- from _shared/shortcuts/data/actions/actions.toml. Loaded once at require time.
 --
 -- Fails loudly rather than falling back to an empty table: an empty table means
 -- 26 gestures silently do nothing, which is indistinguishable from a user
@@ -104,10 +104,10 @@ if not _ok_emit or type(_EMIT_ROWS) ~= "table" then
 		.. "26 gesture actions will not fire. Run `npm run gen`.", tostring(_EMIT_ROWS))
 	_EMIT_ROWS = {}
 end
-local _writer_ok, TomlWriter = pcall(require, "toml_codec.writer")
+local _writer_ok, TomlWriter = pcall(require, "core.text.engine.toml_codec.writer")
 if not _writer_ok then TomlWriter = nil end
 
--- The Linux action catalogue, generated from _shared/modules/actions/actions.toml
+-- The Linux action catalogue, generated from _shared/shortcuts/data/actions/actions.toml
 -- by tools/codegen/codegen-action-catalogue.cjs and already filtered to this
 -- platform: the slot key-space, the picker order with heading levels and locale
 -- keys, and per-action metadata (label key, parameter kind, requirements).
@@ -209,7 +209,7 @@ local _click_holds = require("modules.gestures.click_hold").new(function() retur
 -- =========================================
 
 -- The gesture slot key-space (tap/swipe slot names) is the SINGLE SOURCE shared
--- with the macOS driver, declared once in _shared/modules/actions/actions.toml
+-- with the macOS driver, declared once in _shared/shortcuts/data/actions/actions.toml
 -- under [slots] and carried into this driver's generated catalogue. Only the
 -- default action VALUES below stay Linux-specific.
 
@@ -350,7 +350,7 @@ local MODIFIER_ACTION_COMMANDS = {}
 local MODIFIER_ACTION_GROUPS = {}
 
 local function load_modifier_chords()
-	local path = Paths.shared("modules/actions/modifier_chords.json")
+	local path = Paths.shared("shortcuts/data/actions/modifier_chords.json")
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "Could not resolve the shared modifier chords JSON path.")
 		return nil
@@ -364,7 +364,7 @@ local function load_modifier_chords()
 		Logger.warn(LOG, "Shared modifier chords JSON unreadable at '%s'.", path)
 		return nil
 	end
-	local ok_json, json = pcall(require, "json")
+	local ok_json, json = pcall(require, "core.text.engine.json")
 	if not ok_json or type(json) ~= "table" or type(json.decode) ~= "function" then
 		Logger.warn(LOG, "JSON decoder unavailable — modifier chord actions skipped.")
 		return nil
@@ -458,7 +458,7 @@ local MEDIA_TOOL_TIMEOUT_S = 1
 -- missing or refuses. The fallback was `xdotool key XF86...`, which exits zero
 -- and presses nothing under Wayland, so a missing brightnessctl or playerctl
 -- left the action dead with no error.
-local BrightnessActions = require("brightness_actions")
+local BrightnessActions = require("shortcuts.engine.brightness_actions")
 local Brightness = BrightnessActions.load()
 local MEDIA_ACTIONS = {
 	vol_up          = { tool = "pactl set-sink-volume @DEFAULT_SINK@ +5%", key = "XF86AudioRaiseVolume" },
@@ -638,7 +638,7 @@ local SETTINGS_APPLICATIONS = {
 local BUILTIN_HANDLERS = {
 	["run_program"] = function(binding) return M.run_program(binding) end,
 	-- The user's own command line and file or folder: each value is decoded by
-	-- _shared/lua/user_action_parameter and never logged.
+	-- _shared/user_action_parameter and never logged.
 	["run_command"] = function(binding)
 		local fields = UserActionParameter.parse("command", M.get_action_parameter(binding, "run_command"))
 		if not fields then
@@ -838,7 +838,7 @@ local function _execute_action(action_name, go_next, binding)
 	--
 	-- 26 elseif branches used to sit here, each spelling out a combo that the
 	-- macOS and Windows registries also spelled out in their own vocabularies.
-	-- They now come from _shared/modules/actions/actions.toml via
+	-- They now come from _shared/shortcuts/data/actions/actions.toml via
 	-- _generated/gesture_emit_actions.lua. The combos are X11 keysym syntax and
 	-- are Linux's own: Linux and Windows agree far more often than either agrees
 	-- with macOS (alt+F4 and ctrl+Right on both, against cmd+w and alt+right).
@@ -1437,7 +1437,7 @@ function M.get_action_parameter_spec(action_name)
 	return M.ACTION_PARAMETER_SPECS[action_name]
 end
 
--- The parameter kinds the shortcuts manager parses (_shared/lua/send_input).
+-- The parameter kinds the shortcuts manager parses (_shared/platform/input).
 local SEND_INPUT_KINDS = { text = true, key = true, shortcut = true }
 
 --- Replaces the {1} of a localized template on plain indices: the detail may
@@ -1523,7 +1523,7 @@ function M.get_action_parameter_prompt(action_name)
 	if UserActionParameter.KINDS[spec] then return i18n.get(UserActionParameter.PROMPT_KEYS[spec]) end
 	if spec == "wrap_pair" then
 		local Shortcuts = shortcuts_manager()
-		local WrapPair = require("wrap_pair")
+		local WrapPair = require("keyboard.engine.wrap_pair")
 		local samples = WrapPair.describe(Shortcuts and Shortcuts.get_wrap_pair_list() or {})
 		local template = i18n.get("dialog.gestures.param_wrap_pair")
 		local at = template:find("{1}", 1, true)
@@ -1533,7 +1533,7 @@ function M.get_action_parameter_prompt(action_name)
 	if SEND_INPUT_KINDS[spec] then
 		local vocabulary = send_vocabulary()
 		local detail = spec == "text" and tostring(vocabulary.text_max_code_points)
-			or require("send_input").describe_keys(vocabulary)
+			or require("platform.input.send_input").describe_keys(vocabulary)
 		return fill_placeholder(i18n.get("dialog.gestures.param_" .. spec), detail)
 	end
 	if spec == "llm_prompt" then
@@ -2068,7 +2068,7 @@ end
 --- The gesture participant of a composed scope, bound to the retained owner.
 --- @return table participant See config_scope_composition.
 function M.scope_participant()
-	return require("config_scope_participant").synchronous({
+	return require("settings.engine.scope.participant").synchronous({
 		apply = function(mode) return M.apply_scope(mode, true) end,
 		owner = function() return _scope_owner end,
 	})
@@ -2259,7 +2259,7 @@ end
 --- @param value number Millimetres, within the shared range.
 --- @return boolean committed
 function M.set_sensitivity(slot, value)
-	local step = require("gestures.sensitivity").coerce(value)
+	local step = require("gestures.engine.sensitivity").coerce(value)
 	if M.DEFAULT_SENSITIVITIES[slot] == nil or step == nil then
 		Logger.warn(LOG, "Refusing gesture step '%s' for '%s'.", tostring(value), tostring(slot))
 		return false
@@ -2710,7 +2710,7 @@ end
 --- @param mark function|nil mark(...segments) from config_unused_keys.
 local function load_slot_settings(config, mark)
 	local section = type(config.gestures) == "table" and config.gestures or {}
-	local Sensitivity = require("gestures.sensitivity")
+	local Sensitivity = require("gestures.engine.sensitivity")
 	for slot, mode in pairs(type(section.modes) == "table" and section.modes or {}) do
 		-- A case variant reads in its manifest spelling, as Windows' loader admits it.
 		if type(slot) == "string" then

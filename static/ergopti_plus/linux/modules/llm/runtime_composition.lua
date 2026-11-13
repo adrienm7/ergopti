@@ -7,7 +7,7 @@
 --- owners without publishing configuration.
 --- ==============================================================================
 
-local Repair=require('llm.runtime_repair')
+local Repair=require('ai.engine.local_servers.runtime_repair')
 local M={}
 local function empty(reason, done)
 	local op={started=false,result={ok=false,error=reason}}

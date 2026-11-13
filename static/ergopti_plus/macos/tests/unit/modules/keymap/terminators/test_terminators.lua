@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 local term    = helpers.load_with_stubs("modules.keymap.terminators")
 
-helpers.describe("keymap.terminators: defaults", function()
+helpers.describe("layouts.engine.layers.terminators: defaults", function()
 	helpers.it("space is enabled by default", function()
 		helpers.assert_true(term.is_terminator(" "))
 	end)
@@ -38,7 +38,7 @@ helpers.describe("keymap.terminators: defaults", function()
 	end)
 end)
 
-helpers.describe("keymap.terminators: enable/disable", function()
+helpers.describe("layouts.engine.layers.terminators: enable/disable", function()
 	helpers.it("toggles space off", function()
 		local disable_result = term.set_terminator_enabled("space", false)
 		local disabled_state = term.is_terminator(" ")
@@ -78,7 +78,7 @@ helpers.describe("keymap.terminators: enable/disable", function()
 	end)
 end)
 
-helpers.describe("keymap.terminators: hot-path", function()
+helpers.describe("layouts.engine.layers.terminators: hot-path", function()
 	helpers.it("non-terminator character returns false", function()
 		helpers.assert_true(not term.is_terminator("x"))
 	end)
@@ -93,7 +93,7 @@ helpers.describe("keymap.terminators: hot-path", function()
 	end)
 end)
 
-helpers.describe("keymap.terminators: custom lifecycle", function()
+helpers.describe("layouts.engine.layers.terminators: custom lifecycle", function()
 	helpers.it("rejects character collisions without changing cache policy", function()
 		local before_count = #term.get_terminator_defs()
 		local committed = term.add_custom_terminator(
@@ -160,7 +160,7 @@ helpers.describe("keymap.terminators: custom lifecycle", function()
 	end)
 end)
 
-helpers.describe("keymap.terminators: magic key sync", function()
+helpers.describe("layouts.engine.layers.terminators: magic key sync", function()
 	helpers.it("rejects non-canonical magic-key bytes without changing the star slot", function()
 		local invalid = string.char(0xC2)
 		local committed = term.update_magic_key(invalid)
@@ -187,7 +187,7 @@ end)
 -- assert_true(true) and a message — a design claim written as a test, which is a
 -- comment that costs a test-suite line and deters anyone from writing the real
 -- one. What can actually be checked is the claim itself.
-helpers.describe("keymap.terminators: the pause gate is not here", function()
+helpers.describe("layouts.engine.layers.terminators: the pause gate is not here", function()
 	-- Both halves: the macOS file is a thin i18n shim over the shared catalogue,
 	-- so checking only one of them leaves the other free to grow the coupling.
 	helpers.it("neither the shim nor the shared core names pause or suspend state", function()
@@ -198,9 +198,9 @@ helpers.describe("keymap.terminators: the pause gate is not here", function()
 		sources["macos/modules/keymap/terminators.lua"] =
 			helpers.read_driver_source("Hammerspoon-local re-export of the shared terminator catalogue")
 
-		local shared_fh = io.open(helpers.shared("lua/keymap/terminators.lua"), "r")
-		helpers.assert_true(shared_fh ~= nil, "_shared/lua/keymap/terminators.lua must be readable")
-		sources["_shared/lua/keymap/terminators.lua"] = shared_fh:read("*a")
+		local shared_fh = io.open(helpers.shared("layouts/engine/layers/terminators.lua"), "r")
+		helpers.assert_true(shared_fh ~= nil, "_shared/layouts/engine/layers/terminators.lua must be readable")
+		sources["_shared/layouts/engine/layers/terminators.lua"] = shared_fh:read("*a")
 		shared_fh:close()
 
 		local checked = 0

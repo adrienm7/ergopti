@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Snapshot = require("diagnostics.snapshot")
+local Snapshot = require("diagnostics.engine.snapshot")
 
 local SHA = "c3005e0b9aaaabbbbccccddddeeeeffff0000111"
 local SHORT = "c3005e0b9"
@@ -83,7 +83,7 @@ local CHECKOUTS = {
 
 -- The identity chain, reloaded per case: earlier suites leave logger stubs in
 -- package.loaded, and a module cached under one of them logs nowhere.
-local IDENTITY_MODULES = { "logger.shim", "infra.diagnostic_snapshot", "infra.version" }
+local IDENTITY_MODULES = { "core.logger.engine.shim", "infra.diagnostic_snapshot", "infra.version" }
 
 --- Runs body(Version) over a freshly loaded identity chain bound to the real
 --- logger, with every log line captured at DEBUG; restores the chain after.
@@ -95,7 +95,7 @@ local function capture_logs(body)
 		saved[name] = package.loaded[name]
 		package.loaded[name] = nil
 	end
-	local Logger = require("logger")
+	local Logger = require("core.logger.engine")
 	local lines = {}
 	local previous_level = Logger.get_level()
 	Logger.set_level(10)

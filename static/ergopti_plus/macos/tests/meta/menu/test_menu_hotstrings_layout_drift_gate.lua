@@ -99,7 +99,7 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	-- walks ext_root for manifest.toml + hotstrings/*.toml and builder.lua renders
 	-- the section under this very header. The row was restricted out of a menu that
 	-- was already drawing it. Linux gained the same scan through
-	-- _shared/lua/hotstrings/extensions.lua; the manifest now says all three.
+	-- _shared/hotstrings/engine/extensions.lua; the manifest now says all three.
 	"list:hotstring_extensions",
 }
 
@@ -146,7 +146,7 @@ local CANONICAL_LAYOUT_MENU = {
 	"list:layout_bundle",
 	-- UPDATED 2026-11-06: the layout emulation runs on the three drivers, so its
 	-- layers header, the layout picker, the two layer switches and the rows
-	-- submenu are drawn here too (layouts/emulation_menu.lua).
+	-- submenu are drawn here too (layouts/engine/emulation/menu.lua).
 	"section_header:menu.layout.header_layers",
 	"list:layout_emulation",
 	"list:layout_features_base",
@@ -181,7 +181,7 @@ local CANONICAL_LAYOUT_MENU = {
 --- Reads and decodes the shared menu_manifest.json.
 --- @return table Decoded manifest.
 local function read_manifest()
-	local fh = io.open(helpers.shared("modules/menu/menu_manifest.json"), "r")
+	local fh = io.open(helpers.shared("menu/data/menu_manifest.json"), "r")
 	helpers.assert_true(fh ~= nil, "Cannot open menu_manifest.json")
 	local raw = fh:read("*a")
 	fh:close()

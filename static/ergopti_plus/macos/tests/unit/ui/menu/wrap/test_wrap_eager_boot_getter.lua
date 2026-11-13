@@ -14,7 +14,7 @@ local OWNED = {
 	"ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout", "ui.menu.menu_hotstrings", "ui.menu.menu_metrics",
 	"ui.menu.menu_tap_holds", "ui.menu.menu_apps", "ui.menu.menu_about", "ui.menu.menu_llm", "infra.personal_shortcuts",
 	"modules.dynamic_hotstrings", "modules.gestures", "modules.keystats.text_cipher", "modules.llm",
-	"modules.keystats", "modules.shortcuts", "modules.shortcuts.actions.text", "menu.wrap_mutation",
+	"modules.keystats", "modules.shortcuts", "modules.shortcuts.actions.text", "menu.engine.wrap_mutation",
 	"ui.menu.global_scope", "ui.menu.metrics_scope", "ui.menu.gesture_scope", "ui.menu.hotstrings_scope",
 	"ui.menu.scoped_preferences", "modules.hotstrings.hotstrings_config",
 }
@@ -50,7 +50,7 @@ helpers.describe("actual eager Wrap getter after physical reload", function()
 					if receipt == "false" then return false end
 					if receipt == "truthy" then return "accepted" end
 				end
-				local accepted = require("menu.wrap_mutation").commit(f.state, function(candidate)
+				local accepted = require("menu.engine.wrap_mutation").commit(f.state, function(candidate)
 					table.remove(candidate.custom_wrap_symbols, 1); return true
 				end, f.save_prefs)
 				helpers.assert_eq(calls, 1, "actual boot preference transaction must invoke its native persistence port")

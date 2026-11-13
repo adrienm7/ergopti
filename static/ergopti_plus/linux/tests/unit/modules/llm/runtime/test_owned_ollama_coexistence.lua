@@ -19,15 +19,15 @@
 local helpers = require("tests.helpers")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 local uv = require("luv")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local restore = helpers.keep_loaded({ "llm.runtime_repair", "modules.llm.ollama_install_resolver",
+local restore = helpers.keep_loaded({ "ai.engine.local_servers.runtime_repair", "modules.llm.ollama_install_resolver",
 	"modules.llm.ollama_installed_runtime", "modules.llm.ollama_install_state", "modules.llm.runtime_composition",
 	"modules.llm.profiles", "infra.llm_bridge" })
 
 -- Both ports come from the one shared source the drivers read.
 local DEFAULTS = (function()
-	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/modules/llm/defaults.json", "r"))
+	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/ai/data/defaults.json", "r"))
 	local text = handle:read("*a"); handle:close()
 	return assert(Json.decode(text))
 end)()
@@ -105,10 +105,10 @@ end
 --- @param http table get_owned port.
 --- @return table controller, table served
 local function composition(http)
-	local Repair = require("llm.runtime_repair")
-	package.loaded["llm.runtime_repair"] = { new = function(ports) return { ports = ports } end }
+	local Repair = require("ai.engine.local_servers.runtime_repair")
+	package.loaded["ai.engine.local_servers.runtime_repair"] = { new = function(ports) return { ports = ports } end }
 	local Composition = helpers.load_module("modules.llm.runtime_composition")
-	package.loaded["llm.runtime_repair"] = Repair
+	package.loaded["ai.engine.local_servers.runtime_repair"] = Repair
 	local served = {}
 	local controller = Composition.new({
 		source = { current = function() return true end, publish = function() end, app_capture = function() end,
@@ -159,7 +159,7 @@ helpers.describe("Ergopti's own Ollama beside a system Ollama (linux-owned-ollam
 	end)
 
 	helpers.it("(linux-owned-ollama) the owned daemon is served on the owned port only", function()
-		local Repair = helpers.load_module("llm.runtime_repair")
+		local Repair = helpers.load_module("ai.engine.local_servers.runtime_repair")
 		local origin, host = Repair.loopback_origin(helpers.load_module("infra.llm_bridge").resolve_base_url())
 		helpers.assert_eq(origin, "http://127.0.0.1:" .. OWNED)
 		local controller, served = composition({ get_owned = function() end })
@@ -215,7 +215,7 @@ helpers.describe("Ergopti's own Ollama beside a system Ollama (linux-owned-ollam
 	helpers.it("(linux-owned-ollama) the readiness probe never reaches a daemon on the stock port", function()
 		local daemon = system_daemon()
 		local ok, err = pcall(function()
-			local Repair = helpers.load_module("llm.runtime_repair")
+			local Repair = helpers.load_module("ai.engine.local_servers.runtime_repair")
 			local origin = Repair.loopback_origin(helpers.load_module("infra.llm_bridge").resolve_base_url())
 			local probed, result
 			local controller = composition({ get_owned = function(url, _, _, done)
@@ -224,7 +224,7 @@ helpers.describe("Ergopti's own Ollama beside a system Ollama (linux-owned-ollam
 				return { started = true }
 			end })
 			-- The URL the shared repair probes after starting the owned daemon.
-			controller.ports.probe(origin .. require("llm.enable_admission").VERSION_PATH,
+			controller.ports.probe(origin .. require("ai.engine.settings.enable_admission_core").VERSION_PATH,
 				{ remaining_ms = function() return 2000 end }, function() return true end,
 				function(value) result = value end)
 			local deadline = uv.now() + 5000

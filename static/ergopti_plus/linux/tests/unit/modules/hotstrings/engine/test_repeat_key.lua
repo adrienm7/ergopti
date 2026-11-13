@@ -69,7 +69,7 @@ helpers.describe("magic-key repeat: the rule", function()
 	end)
 
 	helpers.it("a delimiter the user added ends a word, as on Windows (PAR-8)", function()
-		local Terminators = require("keymap.terminators")
+		local Terminators = require("layouts.engine.layers.terminators")
 		helpers.assert_true(RepeatKey.resolve("ab1" .. STAR, STAR) ~= nil, "before: a digit is a word character")
 		helpers.assert_eq(Terminators.add_custom_terminator("custom_1", "1", "1", false), true)
 		local repeated, resting = RepeatKey.resolve("ab1" .. STAR, STAR), RepeatKey.resolve("1a" .. STAR, STAR)
@@ -136,8 +136,8 @@ end)
 --- @param source string|nil Configuration bytes.
 --- @param body function Test body.
 local function with_repeat(source, body)
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
-	local Writer = require("toml_codec.writer")
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+	local Writer = require("core.text.engine.toml_codec.writer")
 	local loaded = {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local original = Writer.batch_write
@@ -196,9 +196,9 @@ helpers.describe("repeat key menu persistence", function()
 		if not ok then error(err, 0) end
 	end)
 	helpers.it("a backwards clock does not suppress a new case-twin notice", function()
-		local previous = package.loaded["toml_codec.writer"]
-		package.loaded["toml_codec.writer"] = nil
-		local writer = require("toml_codec.writer")
+		local previous = package.loaded["core.text.engine.toml_codec.writer"]
+		package.loaded["core.text.engine.toml_codec.writer"] = nil
+		local writer = require("core.text.engine.toml_codec.writer")
 		local path, time, reports = os.tmpname(), os.time, 0
 		local file = assert(io.open(path, "w")); file:write("[section]\nkey = 1\nKEY = 2\n"); file:close()
 		writer.set_case_twin_reporter(function() reports = reports + 1 end)
@@ -210,15 +210,15 @@ helpers.describe("repeat key menu persistence", function()
 			assert(writer.prepare_batch(path, {{ section = "section", key = "key", value = 3 }}) == false)
 			helpers.assert_eq(reports, 2)
 		end)
-		os.time = time; os.remove(path); package.loaded["toml_codec.writer"] = previous
+		os.time = time; os.remove(path); package.loaded["core.text.engine.toml_codec.writer"] = previous
 		if not ok then error(err, 0) end
 	end)
 	helpers.it("does not duplicate the case-twin notice from this exact write", function()
-		local previous = package.loaded["toml_codec.writer"]
-		package.loaded["toml_codec.writer"] = nil
+		local previous = package.loaded["core.text.engine.toml_codec.writer"]
+		package.loaded["core.text.engine.toml_codec.writer"] = nil
 		local ok, err = pcall(function()
 			with_repeat('[hotstrings]\nrepeat_key_enabled = true\nREPEAT_KEY_ENABLED = false\n', function()
-				local writer = require("toml_codec.writer")
+				local writer = require("core.text.engine.toml_codec.writer")
 				local reports, notices, execute = 0, 0, os.execute
 				writer.set_case_twin_reporter(function() reports = reports + 1 end)
 				local rows = helpers.load_module("ui.menu.builder").build({ config = {
@@ -238,27 +238,27 @@ helpers.describe("repeat key menu persistence", function()
 				helpers.assert_eq(reports, 1); helpers.assert_eq(notices, 0)
 			end)
 		end)
-		package.loaded["toml_codec.writer"] = previous
+		package.loaded["core.text.engine.toml_codec.writer"] = previous
 		if not ok then error(err, 0) end
 	end)
 	helpers.it("does not grant a notice receipt when the reporter refuses", function()
-		local previous = package.loaded["toml_codec.writer"]
-		package.loaded["toml_codec.writer"] = nil
+		local previous = package.loaded["core.text.engine.toml_codec.writer"]
+		package.loaded["core.text.engine.toml_codec.writer"] = nil
 		local ok, err = pcall(function()
 			with_repeat('[hotstrings]\nrepeat_key_enabled = true\nREPEAT_KEY_ENABLED = false\n', function(subject)
-				local writer = require("toml_codec.writer")
+				local writer = require("core.text.engine.toml_codec.writer")
 				writer.set_case_twin_reporter(function() return false end)
 				local committed, noticed = subject.toggle_with_notice()
 				helpers.assert_eq({ committed, noticed }, { false, false })
 			end)
 		end)
-		package.loaded["toml_codec.writer"] = previous
+		package.loaded["core.text.engine.toml_codec.writer"] = previous
 		if not ok then error(err, 0) end
 	end)
 	helpers.it("keeps nested case-twin notice receipts with their own attempts", function()
-		local previous = package.loaded["toml_codec.writer"]
-		package.loaded["toml_codec.writer"] = nil
-		local writer = require("toml_codec.writer")
+		local previous = package.loaded["core.text.engine.toml_codec.writer"]
+		package.loaded["core.text.engine.toml_codec.writer"] = nil
+		local writer = require("core.text.engine.toml_codec.writer")
 		local outer, inner = os.tmpname(), os.tmpname()
 		for _, path in ipairs({ outer, inner }) do
 			local file = assert(io.open(path, "w")); file:write("[section]\nkey = 1\nKEY = 2\n"); file:close()
@@ -275,14 +275,14 @@ helpers.describe("repeat key menu persistence", function()
 		local committed = writer.batch_write(outer, {{ section = "section", key = "key", value = 3 }}, nil, nil, nil, nil,
 			function() outer_notice = true end)
 		os.remove(outer); os.remove(inner)
-		package.loaded["toml_codec.writer"] = previous
+		package.loaded["core.text.engine.toml_codec.writer"] = previous
 		helpers.assert_eq(committed, false)
 		helpers.assert_eq({ outer_notice, inner_notice }, { true, true })
 	end)
 	helpers.it("keeps a previous legacy notice while delivering a new owned notice", function()
-		local previous = package.loaded["toml_codec.writer"]
-		package.loaded["toml_codec.writer"] = nil
-		local writer = require("toml_codec.writer")
+		local previous = package.loaded["core.text.engine.toml_codec.writer"]
+		package.loaded["core.text.engine.toml_codec.writer"] = nil
+		local writer = require("core.text.engine.toml_codec.writer")
 		local path = os.tmpname()
 		local file = assert(io.open(path, "w"))
 		file:write("[first]\nkey = 1\nKEY = 2\n[second]\nitem = 1\nITEM = 2\n"); file:close()
@@ -292,14 +292,14 @@ helpers.describe("repeat key menu persistence", function()
 		assert(writer.batch_write(path, {{ section = "second", key = "item", value = 3 }}, nil, nil, nil, nil,
 			function() noticed = true end) == false)
 		local prior = writer.take_case_twin_notice()
-		os.remove(path); package.loaded["toml_codec.writer"] = previous
+		os.remove(path); package.loaded["core.text.engine.toml_codec.writer"] = previous
 		helpers.assert_true(noticed)
 		helpers.assert_eq(prior, "first.KEY")
 	end)
 	helpers.it("reports a new owned attempt even when the same old setting was recently reported", function()
-		local previous = package.loaded["toml_codec.writer"]
-		package.loaded["toml_codec.writer"] = nil
-		local writer = require("toml_codec.writer")
+		local previous = package.loaded["core.text.engine.toml_codec.writer"]
+		package.loaded["core.text.engine.toml_codec.writer"] = nil
+		local writer = require("core.text.engine.toml_codec.writer")
 		local path = os.tmpname(); local file = assert(io.open(path, "w"))
 		file:write("[first]\nkey = 1\nKEY = 2\n"); file:close()
 		local reports, noticed = 0, false
@@ -308,15 +308,15 @@ helpers.describe("repeat key menu persistence", function()
 		assert(writer.batch_write(path, {{ section = "first", key = "key", value = 3 }}, nil, nil, nil, nil,
 			function() noticed = true end) == false)
 		local previous_notice = writer.take_case_twin_notice()
-		os.remove(path); package.loaded["toml_codec.writer"] = previous
+		os.remove(path); package.loaded["core.text.engine.toml_codec.writer"] = previous
 		helpers.assert_eq(reports, 2)
 		helpers.assert_true(noticed)
 		helpers.assert_eq(previous_notice, "first.KEY")
 	end)
 	helpers.it("an owned notice does not extend the legacy notice suppression window", function()
-		local previous = package.loaded["toml_codec.writer"]
-		package.loaded["toml_codec.writer"] = nil
-		local writer = require("toml_codec.writer")
+		local previous = package.loaded["core.text.engine.toml_codec.writer"]
+		package.loaded["core.text.engine.toml_codec.writer"] = nil
+		local writer = require("core.text.engine.toml_codec.writer")
 		local path, old_time = os.tmpname(), os.time
 		local file = assert(io.open(path, "w")); file:write("[first]\nkey = 1\nKEY = 2\n"); file:close()
 		local reports, now = 0, 100
@@ -331,7 +331,7 @@ helpers.describe("repeat key menu persistence", function()
 			assert(writer.prepare_batch(path, updates) == false)
 			helpers.assert_eq(reports, 3)
 		end)
-		os.time = old_time; os.remove(path); package.loaded["toml_codec.writer"] = previous
+		os.time = old_time; os.remove(path); package.loaded["core.text.engine.toml_codec.writer"] = previous
 		if not ok then error(err, 0) end
 	end)
 	helpers.it("a held scope reports its refusal without consuming an older TOML notice", function()
@@ -349,9 +349,9 @@ helpers.describe("repeat key menu persistence", function()
 			local row = assert(find(rows))
 			local preferences = require("infra.hotstring_preferences")
 			local owner = {}; assert(preferences.acquire(owner))
-			local prior = package.loaded["toml_codec.writer"]
-			package.loaded["toml_codec.writer"] = nil
-			local writer = require("toml_codec.writer")
+			local prior = package.loaded["core.text.engine.toml_codec.writer"]
+			package.loaded["core.text.engine.toml_codec.writer"] = nil
+			local writer = require("core.text.engine.toml_codec.writer")
 			local path = os.tmpname(); local file = assert(io.open(path, "w"))
 			file:write("[section]\nkey = 1\nKEY = 2\n"); file:close()
 			local reports = 0; writer.set_case_twin_reporter(function() reports = reports + 1 end)
@@ -361,7 +361,7 @@ helpers.describe("repeat key menu persistence", function()
 			local called, result = pcall(row.fn)
 			os.execute = execute
 			local retained = writer.take_case_twin_notice()
-			package.loaded["toml_codec.writer"] = prior
+			package.loaded["core.text.engine.toml_codec.writer"] = prior
 			assert(preferences.release(owner)); os.remove(path)
 			helpers.assert_true(called); helpers.assert_eq(result, false); helpers.assert_eq(reports, 1)
 			helpers.assert_eq(notices, 1)
@@ -426,7 +426,7 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 	helpers.it("persists true and preserves neighbors across fresh module load", function()
 		with_repeat(SOURCE:gsub("enabled = true", "enabled = false"), function(subject, controls, path, reload, sandbox)
 			helpers.assert_true(subject.set_enabled(true))
-			local config = require("toml_codec").decode(sandbox.read_bytes(path))
+			local config = require("core.text.engine.toml_codec").decode(sandbox.read_bytes(path))
 			helpers.assert_eq(config.hotstrings.repeat_key_enabled, true)
 			helpers.assert_eq(config.hotstrings.unknown, "keep")
 			helpers.assert_eq(config.other.value, 42)
@@ -440,7 +440,7 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 		with_repeat(SOURCE, function(subject, _, path, reload, sandbox)
 			helpers.assert_true(subject.is_enabled())
 			helpers.assert_true(subject.set_enabled(false))
-			helpers.assert_eq(require("toml_codec").decode(sandbox.read_bytes(path)).hotstrings.repeat_key_enabled, nil)
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(sandbox.read_bytes(path)).hotstrings.repeat_key_enabled, nil)
 			helpers.assert_eq(subject.is_enabled(), false)
 			helpers.assert_eq(reload().is_enabled(), false)
 		end)
@@ -469,8 +469,8 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 	helpers.it("reads an outdated value as neutral, never a legacy value, and offers it (config-outdated-repeat-key)",
 		function()
 			with_repeat('[hotstrings]\nrepeat_key_enabled = "bad"\nunknown = "keep"\n', function(subject, _, path, _, sandbox)
-				require("config_outdated").reset_for_tests()
-				local reported = require("config_outdated").collect_reports(function()
+				require("settings.engine.migration.outdated").reset_for_tests()
+				local reported = require("settings.engine.migration.outdated").collect_reports(function()
 					helpers.assert_eq(subject.is_enabled(), false)
 				end)
 				helpers.assert_eq(reported, { ["hotstrings.repeat_key_enabled"] = true })
@@ -498,7 +498,7 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 	for _, source in ipairs({ '[hotstrings]\nrepeat_key_enabled = "true"\n', "[hotstrings\nbroken" }) do
 		helpers.it("never raises on the typing path for " .. source:gsub("\n", " "), function()
 			with_repeat(source, function(subject)
-				local writer = require("toml_codec.writer")
+				local writer = require("core.text.engine.toml_codec.writer")
 				local read = writer.read_classified
 				local calls = 0
 				writer.read_classified = function(...) calls = calls + 1; return read(...) end
@@ -523,7 +523,7 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 		with_repeat(SOURCE, function(subject, _, path)
 			helpers.assert_true(subject.is_enabled())
 			local operations = require("infra.manifest_reader").scope_operations("hotstrings", "clear")
-			helpers.assert_true(require("toml_codec.writer").batch_write(path, operations))
+			helpers.assert_true(require("core.text.engine.toml_codec.writer").batch_write(path, operations))
 			helpers.assert_true(subject.refresh())
 			helpers.assert_eq(subject.is_enabled(), false)
 		end)
@@ -541,7 +541,7 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 	helpers.it("does not reread disk on each input-path query", function()
 		with_repeat(SOURCE, function(subject)
 			helpers.assert_true(subject.is_enabled())
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local read = writer.read_classified
 			local calls = 0
 			writer.read_classified = function(...) calls = calls + 1; return read(...) end
@@ -584,7 +584,7 @@ local function corpus_vectors(name)
 	local file = assert(io.open(path, "rb"))
 	local raw = file:read("*a")
 	file:close()
-	local corpus = assert(require("json").decode(raw), name .. " must be valid JSON")
+	local corpus = assert(require("core.text.engine.json").decode(raw), name .. " must be valid JSON")
 	assert(#corpus.vectors > 0, name .. " must hold vectors")
 	return corpus.vectors
 end
@@ -605,7 +605,7 @@ helpers.describe("magic-key repeat: the shared repeat_key_vectors.json corpus", 
 end)
 
 helpers.describe("idle word reset: the shared idle_reset_vectors.json corpus", function()
-	local Engine = require("hotstring_engine")
+	local Engine = require("hotstrings.engine.matcher")
 	for _, vector in ipairs(corpus_vectors("idle_reset_vectors.json")) do
 		helpers.it(vector.id .. " (idle-reset-corpus)", function()
 			-- A JSON null decodes to a sentinel table: only a number is a keystroke time.

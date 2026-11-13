@@ -1,8 +1,8 @@
 --- tests/unit/modules/llm/ollama/test_model_preferences_canonical.lua
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Codec = require("core.text.engine.toml_codec")
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
@@ -54,7 +54,7 @@ helpers.describe("canonical Linux model preferences", function()
 		with_config('[llm.models]\nselected = "api"\n', function(path)
 			local engine = require("modules.llm.prediction_engine")
 			helpers.assert_eq(engine.get_backend(), "api")
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local original = writer.batch_write
 			local before = Sandbox.read_bytes(path)
 			writer.batch_write = function() return false, "fixture refusal" end
@@ -74,14 +74,14 @@ helpers.describe("canonical Linux model preferences", function()
 	helpers.it("reads a retired backend as the default, warns once and offers it (config-outdated-llm-backend)", function()
 		local source = '[llm.models]\nselected = "openai"\n'
 		with_config(source, function()
-			require("config_outdated").reset_for_tests()
+			require("settings.engine.migration.outdated").reset_for_tests()
 			local engine = require("modules.llm.prediction_engine")
-			local reported = require("config_outdated").collect_reports(function()
+			local reported = require("settings.engine.migration.outdated").collect_reports(function()
 				helpers.assert_eq(engine.get_backend(), require("infra.manifest_reader").default_for("llm.models.selected"),
 					"a retired backend never raises on the menu or typing path")
 			end)
 			helpers.assert_eq(reported, { ["llm.models.selected"] = true })
-			local scan = require("config_unused_keys").find_in_source(source,
+			local scan = require("settings.engine.migration.unused_keys").find_in_source(source,
 				require("ui.menu.unused_keys_cleanup").collect)
 			helpers.assert_eq(#scan.keys, 1, "the cleanup offers what the reader ignores")
 			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm.models", "selected" })

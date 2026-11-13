@@ -34,8 +34,8 @@ const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
-const MANIFEST = path.join(SHARED, 'modules', 'features', 'manifest.toml');
-const SCHEMA = path.join(SHARED, 'core', 'config_schema', 'config.schema.json');
+const MANIFEST = path.join(SHARED, 'settings', 'data', 'features', 'manifest.toml');
+const SCHEMA = path.join(SHARED, 'settings', 'data', 'config_schema', 'config.schema.json');
 
 // The block starts at the definition (two tabs deep, under $defs) and ends at
 // the first closing brace at the same depth.

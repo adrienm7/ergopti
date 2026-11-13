@@ -37,7 +37,7 @@ const SHARED = path.resolve(__dirname, '../../static/ergopti_plus/_shared');
 const REGISTRY = path.resolve(__dirname, '../../static/layouts/registry');
 const MANAGER = path.join(SHARED, 'ui/layout_manager');
 const COMPOSER = path.join(SHARED, 'ui/layout_composer');
-const LOCALE_DIR = path.join(SHARED, 'data/locales');
+const LOCALE_DIR = path.join(SHARED, 'core/i18n/data/locales');
 const LOCALES = [
 	'ar',
 	'cs',

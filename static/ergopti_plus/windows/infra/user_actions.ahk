@@ -4,7 +4,7 @@
 ; MODULE: User Actions
 ; DESCRIPTION:
 ; The run_command and open_path actions of Windows: the Windows half of
-; _shared/lua/user_action_parameter.lua and the macOS and Linux user_actions.lua.
+; _shared/shortcuts/engine/user_action_parameter.lua and the macOS and Linux user_actions.lua.
 ; _shared/tests/corpus/action_parameters/user_action_vectors.json pins the values.
 ;
 ; FEATURES & RATIONALE:

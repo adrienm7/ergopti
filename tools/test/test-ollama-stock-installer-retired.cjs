@@ -117,9 +117,7 @@ test(
 );
 test(
 	'the shared stock installer is gone',
-	!fs.existsSync(
-		path.join(ROOT, 'static/ergopti_plus/_shared/modules/llm/install/ollama_install.sh')
-	)
+	!fs.existsSync(path.join(ROOT, 'static/ergopti_plus/_shared/ai/data/install/ollama_install.sh'))
 );
 const checker = code(fs.readFileSync(path.join(LLM_ROOT, 'ollama_deps_checker.lua'), 'utf8'), '--');
 test(

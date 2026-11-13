@@ -37,10 +37,10 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-# The executable name is declared once in _shared/data/identifiers.json.
+# The executable name is declared once in _shared/core/text/data/identifiers.json.
 _IDENTIFIERS = (
     Path(__file__).resolve().parent.parent.parent
-    / "static/ergopti_plus/_shared/data/identifiers.py"
+    / "static/ergopti_plus/_shared/core/text/data/identifiers.py"
 )
 sys.path.insert(0, str(_IDENTIFIERS.parent))
 _bytecode_default = sys.dont_write_bytecode

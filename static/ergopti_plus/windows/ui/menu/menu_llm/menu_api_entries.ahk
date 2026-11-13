@@ -23,7 +23,7 @@
 ;    /models endpoint and surface success/failure via TrayTip so the user
 ;    finds out NOW (not mid-typing).
 ; 5. Automatic names: every entry reads <provider>/<model>, told apart by host
-;    then order when two share it (_shared/lua/llm/api_entry_names.lua, which
+;    then order when two share it (_shared/ai/engine/api/entry_names.lua, which
 ;    this file ports). The user no longer types a name (2026-09-30).
 ; ==============================================================================
 
@@ -2363,7 +2363,7 @@ _LLM_Menu_ShowApiManagedFailure(Owner, Info, NotifyFn := 0, PresentFn := 0) {
  * The model selector page's API rows: one per model the entry's provider
  * listed, or, while that listing is pending, refused or unavailable, the
  * provider's known models and a typed-id row with the reason as its hint
- * (LLM_ApiListingPlan, the port of _shared/lua/llm/api_model_listing.lua). An
+ * (LLM_ApiListingPlan, the port of _shared/ai/engine/api/model_listing.lua). An
  * entry without its key keeps one greyed row that offers the edit setting it.
  * @param {Map} Rows Page rows by "<backend>`n<name>", filled.
  * @param {Array} Models Row JSON, filled.

@@ -29,7 +29,7 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "ui.menu.builder"
 
 -- Single source of the driver version and of the build identity. Every other
@@ -122,7 +122,7 @@ local function _build_header(ctx)
 			fields[name] = value
 		end
 		local expected_kind = key == "linux_tray_active_header" and "label" or "command"
-		local expected_id = key == "linux_tray_active_header" and "linux_tray_active_header" or require("config_keys").COMMAND.LINUX_TRAY_RESUME
+		local expected_id = key == "linux_tray_active_header" and "linux_tray_active_header" or require("settings.engine.keys").COMMAND.LINUX_TRAY_RESUME
 		if rawget(record, "type") ~= expected_kind or rawget(record, "id") ~= expected_id
 			or type(rawget(record, "i18n")) ~= "string" or rawget(record, "i18n") == ""
 			or rawget(record, "caption_getter") ~= "linux_tray_version"
@@ -162,7 +162,7 @@ local function _build_header(ctx)
 	if not current() then return nil end
 	local ok, rows = pcall(function()
 		if is_paused then
-			return ManifestMenu.template_rows("linux_tray_paused_header", { [require("config_keys").COMMAND.LINUX_TRAY_RESUME] = function()
+			return ManifestMenu.template_rows("linux_tray_paused_header", { [require("settings.engine.keys").COMMAND.LINUX_TRAY_RESUME] = function()
 				if type(ctx.on_toggle_pause) ~= "function" then
 					Logger.error(LOG, "Paused title row: ctx.on_toggle_pause is absent — the script stays paused.")
 					return

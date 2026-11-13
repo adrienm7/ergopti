@@ -1,3 +1,3 @@
 --- tests/unit/infra/config/test_config_outdated.lua
 
-require("test.config_outdated_contract").register(require("tests.helpers"))
+require("tests.lua.settings.outdated_contract").register(require("tests.helpers"))

@@ -27,9 +27,12 @@ const ahk = fs.readFileSync(
 	path.join(SP, 'windows', 'ui', 'menu', 'menu_llm', 'menu_settings.ahk'),
 	'utf8'
 );
-const lua = fs.readFileSync(path.join(SP, '_shared', 'lua', 'llm', 'test_prediction.lua'), 'utf8');
+const lua = fs.readFileSync(
+	path.join(SP, '_shared', 'ai', 'engine', 'prediction', 'test_prediction.lua'),
+	'utf8'
+);
 const manifest = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json'), 'utf8')
 );
 
 const errors = [];
@@ -51,7 +54,7 @@ else if (ahkSecond[1] !== luaSecond[1])
 	errors.push(`seconds threshold: Windows ${ahkSecond[1]}, Lua ${luaSecond[1]}`);
 
 const defaults = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared', 'modules', 'llm', 'defaults.json'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared', 'ai', 'data', 'defaults.json'), 'utf8')
 );
 const hot = defaults.llm_test_prediction_temperature;
 if (typeof hot !== 'number' || hot <= defaults.llm_temperature || hot > 1)
@@ -74,10 +77,10 @@ const linux = fs.readFileSync(
 if (!linux.includes('request.temperature = HttpBridge.TEST_PREDICTION_TEMPERATURE'))
 	errors.push('Linux must send the temperature of the shared defaults');
 
-for (const entry of fs.readdirSync(path.join(SP, '_shared', 'data', 'locales'))) {
+for (const entry of fs.readdirSync(path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales'))) {
 	if (!entry.endsWith('.json')) continue;
 	const strings = JSON.parse(
-		fs.readFileSync(path.join(SP, '_shared', 'data', 'locales', entry), 'utf8')
+		fs.readFileSync(path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales', entry), 'utf8')
 	);
 	const placeholders = {
 		'llm.test_prediction.result': ['{1}', '{2}'],

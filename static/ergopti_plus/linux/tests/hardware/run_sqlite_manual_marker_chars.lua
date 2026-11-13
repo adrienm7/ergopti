@@ -1,7 +1,7 @@
 --- tests/hardware/run_sqlite_manual_marker_chars.lua
 --- Native production software event-protocol scalar audit; no physical input claim.
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-core-scalar-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", root .. "/" .. name:lower()))
@@ -14,7 +14,7 @@ local K = require("modules.keystats.keystats")
 local W = require("modules.keystats.sqlite_writer")
 local R = require("modules.keystats.sqlite_reader")
 local Clock = require("infra.monotonic")
-local J = require("json")
+local J = require("core.text.engine.json")
 local path, today = root .. "/metrics.sqlite", os.date("%Y-%m-%d")
 K.init({ sqlite_path = path, log_dir = root .. "/logs" })
 assert(K.is_enabled() and W.is_available())

@@ -106,7 +106,7 @@ end
 
 check("healthy fallback retains repeated quotes without requoting the stdin body", function()
 	local data = string.rep("'a", 22000)
-	local command = require("shell.heredoc").with_exact_stdin(Shell.quote(real) .. " dgst -sha256 -hex", data)
+	local command = require("core.process.shell_heredoc").with_exact_stdin(Shell.quote(real) .. " dgst -sha256 -hex", data)
 	local expected = assert(Shell.exec_line(command)):match("[0-9a-f]+$")
 	assert(expected and #expected == 64)
 	assert(Crypto.sha256(data) == expected, "supervision must not expand the data argument beyond its original byte budget")

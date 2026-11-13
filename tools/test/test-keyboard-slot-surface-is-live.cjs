@@ -42,7 +42,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const MAC = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
 const MODULE_REL = 'modules/shortcuts/keyboard_shortcuts.lua';
 const FACADE_REL = 'modules/shortcuts/init.lua';
-const MANIFEST = path.join(ROOT, 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json');
+const MANIFEST = path.join(ROOT, 'static/ergopti_plus/_shared/menu/data/menu_manifest.json');
 const MENU_ENTRY_ID = 'keyboard_slots';
 
 const errors = [];
@@ -179,13 +179,13 @@ if (!Array.isArray(shortcutsMenu) || shortcutsMenu.length === 0) {
 if (moduleSrc) {
 	const catalogue = JSON.parse(
 		fs.readFileSync(
-			path.join(ROOT, 'static/ergopti_plus/_shared/modules/actions/modifier_chords.json'),
+			path.join(ROOT, 'static/ergopti_plus/_shared/shortcuts/data/actions/modifier_chords.json'),
 			'utf8'
 		)
 	);
 	const roleTable = JSON.parse(
 		fs.readFileSync(
-			path.join(ROOT, 'static/ergopti_plus/_shared/modules/actions/slot_roles.json'),
+			path.join(ROOT, 'static/ergopti_plus/_shared/shortcuts/data/actions/slot_roles.json'),
 			'utf8'
 		)
 	);

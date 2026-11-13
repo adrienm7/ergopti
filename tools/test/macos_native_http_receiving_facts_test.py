@@ -44,7 +44,7 @@ CLIENT = load("receiving_fact_client", SUPPORT / "native_http_wire_client_receiv
 # historical whole-source oracles remain unchanged after this first projection.
 NATIVE_FAILURE_STAGE_INVERSE = (
     (
-        '// BEGIN GENERATED NATIVE HTTP FAILURE STAGES\n// Generated from static/ergopti_plus/_shared/modules/network/native_http_failure_stages.json; do not edit this span.\nenum ManagedHTTPFailureStage: String, CaseIterable {\n\tcase policyLoad = "native_policy_load"\n\tcase selectionBound = "native_selection_bound"\n\tcase proxyLookup = "native_proxy_lookup"\n\tcase proxyDictionary = "native_proxy_dictionary"\n\tcase routeEmpty = "native_route_empty"\n\tcase certificateLoad = "native_certificate_load"\n\tcase lookupDeadline = "native_lookup_deadline"\n\tcase dispatchDeadline = "native_dispatch_deadline"\n\tcase sessionTerminal = "native_session_terminal"\n\n\tfunc permits(reason: String) -> Bool {\n\t\tswitch self {\n\t\tcase .policyLoad: return ["unavailable"].contains(reason)\n\t\tcase .selectionBound: return ["unavailable"].contains(reason)\n\t\tcase .proxyLookup: return ["unavailable"].contains(reason)\n\t\tcase .proxyDictionary: return ["proxy"].contains(reason)\n\t\tcase .routeEmpty: return ["unavailable"].contains(reason)\n\t\tcase .certificateLoad: return ["certificate"].contains(reason)\n\t\tcase .lookupDeadline: return ["deadline"].contains(reason)\n\t\tcase .dispatchDeadline: return ["deadline"].contains(reason)\n\t\tcase .sessionTerminal: return ["deadline", "cancelled", "offline", "certificate", "proxy", "connect", "unavailable", "protocol", "content_encoding"].contains(reason)\n\t\t}\n\t}\n}\n// END GENERATED NATIVE HTTP FAILURE STAGES\n\n',
+        '// BEGIN GENERATED NATIVE HTTP FAILURE STAGES\n// Generated from static/ergopti_plus/_shared/core/network/data/native_http_failure_stages.json; do not edit this span.\nenum ManagedHTTPFailureStage: String, CaseIterable {\n\tcase policyLoad = "native_policy_load"\n\tcase selectionBound = "native_selection_bound"\n\tcase proxyLookup = "native_proxy_lookup"\n\tcase proxyDictionary = "native_proxy_dictionary"\n\tcase routeEmpty = "native_route_empty"\n\tcase certificateLoad = "native_certificate_load"\n\tcase lookupDeadline = "native_lookup_deadline"\n\tcase dispatchDeadline = "native_dispatch_deadline"\n\tcase sessionTerminal = "native_session_terminal"\n\n\tfunc permits(reason: String) -> Bool {\n\t\tswitch self {\n\t\tcase .policyLoad: return ["unavailable"].contains(reason)\n\t\tcase .selectionBound: return ["unavailable"].contains(reason)\n\t\tcase .proxyLookup: return ["unavailable"].contains(reason)\n\t\tcase .proxyDictionary: return ["proxy"].contains(reason)\n\t\tcase .routeEmpty: return ["unavailable"].contains(reason)\n\t\tcase .certificateLoad: return ["certificate"].contains(reason)\n\t\tcase .lookupDeadline: return ["deadline"].contains(reason)\n\t\tcase .dispatchDeadline: return ["deadline"].contains(reason)\n\t\tcase .sessionTerminal: return ["deadline", "cancelled", "offline", "certificate", "proxy", "connect", "unavailable", "protocol", "content_encoding"].contains(reason)\n\t\t}\n\t}\n}\n// END GENERATED NATIVE HTTP FAILURE STAGES\n\n',
         "",
     ),
     (
@@ -239,10 +239,31 @@ def route_kind_observation_projection(source):
     return source
 
 
+# The structure migration moved the bundled proxy policy into the network
+# feature; every historical pin names its first place.
+STRUCTURE_MOVE_INVERSE = (
+    (
+        "Contents/Resources/static/ergopti_plus/_shared/core/network/data/proxy_policy.json",
+        "Contents/Resources/static/ergopti_plus/_shared/modules/network/proxy_policy.json",
+    ),
+)
+
+
+def structure_move_projection(source):
+    """Spell each moved resource at its historical place, exactly once."""
+    for new, old in STRUCTURE_MOVE_INVERSE:
+        if source.count(new) != 1 or old in source:
+            raise ValueError("Structure move projection refused")
+        source = source.replace(new, old, 1)
+    return source
+
+
 def worker_source():
     """Read the worker with the newest reviewed layer peeled, as every historical pin expects."""
     return managed_lookup_stage_projection(
-        route_kind_observation_projection(WORKER.read_text(encoding="utf-8"))
+        route_kind_observation_projection(
+            structure_move_projection(WORKER.read_text(encoding="utf-8"))
+        )
     )
 
 

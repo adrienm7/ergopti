@@ -49,7 +49,7 @@ function M.with_sentinel(callback)
 			F14_KARABINER_BACKSPACE = 0x6B,
 			F15_KARABINER_ESCAPE = 0x6C,
 			F18_KARABINER_DELETE = 0x4F,
-			SCRIPT_CHORD_SENTINELS = require("keycodes").SCRIPT_CHORD_SENTINELS,
+			SCRIPT_CHORD_SENTINELS = require("platform.input.keycodes.core").SCRIPT_CHORD_SENTINELS,
 			BACKSPACE = 0x33,
 			RETURN = 0x24,
 			ESCAPE = 0x35,
@@ -124,13 +124,13 @@ function M.with_configurable(callback)
 	local names = {
 		"infra.logger", "infra.paths", "adapters.file_system",
 		"adapters.hotkey_registrar", "adapters.storage", "modules.gestures.actions",
-		"modules.shortcuts.keyboard_shortcuts", "chord", "infra.config_paths", "infra.preferences",
+		"modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord", "infra.config_paths", "infra.preferences",
 	}
 	return helpers.with_stub_scope(names, function()
 		local logger, failures = callback_logger()
 		local bound_callback
-		local Json = require("json")
-		local catalogue_file = assert(io.open(helpers.shared("modules/actions/modifier_chords.json"), "rb"))
+		local Json = require("core.text.engine.json")
+		local catalogue_file = assert(io.open(helpers.shared("shortcuts/data/actions/modifier_chords.json"), "rb"))
 		local catalogue = Json.decode(catalogue_file:read("*a"))
 		catalogue_file:close()
 		catalogue.keys = {{id = "a", label = "A"}}

@@ -26,8 +26,8 @@
 
 local M = {}
 
-local Errors = require("adapter_errors")
-local Logger = require("logger.shim")
+local Errors = require("diagnostics.engine.adapter_errors")
+local Logger = require("core.logger.engine.shim")
 local ShellRunner = require("adapters.shell_runner")
 
 local LOG = "adapters.screen_capture"

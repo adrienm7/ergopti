@@ -13,7 +13,7 @@ class _TCRP_Fixture {
 	__New(Mode, Root) {
 		this.Mode := Mode
 		this.Root := Root
-		this.Path := Root . "\modules\timings\constants.toml"
+		this.Path := Root . "\core\timing\data\constants.toml"
 		this.LogCalls := 0, this.TimerCalls := 0
 		this.Done := false, this.Failure := 0
 		this.TimerFn := ObjBindMethod(this, "OnTimer")
@@ -128,7 +128,7 @@ _TCRP_Case(Mode) {
 	F := _TCRP_Fixture(Mode, Root), Primary := 0, CleanupError := 0
 	PreviousCritical := A_IsCritical
 	try {
-		DirCreate(Root . "\modules\timings")
+		DirCreate(Root . "\core\timing\data")
 		_ResetLogger()
 		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_PATH_DATE := ""

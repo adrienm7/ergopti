@@ -47,9 +47,9 @@ end
 --- A navigation layer with the wheel as the volume, as the recommended one has,
 --- compiled by the production compiler against the shared key registry.
 local function wheel_layer()
-	local ctx = require("keymap.layers").load_context({
-		shared_root = helpers.driver_root() .. "/../_shared", json_decode = require("json").decode,
-		toml_decode = require("toml_codec").decode, read_file = require("keymap.layer_editor").read_shipped,
+	local ctx = require("layouts.engine.layers.layers").load_context({
+		shared_root = helpers.driver_root() .. "/../_shared", json_decode = require("core.text.engine.json").decode,
+		toml_decode = require("core.text.engine.toml_codec").decode, read_file = require("layouts.engine.layers.editor").read_shipped,
 	})
 	local function key(name) return { kind = "keystroke", chords = { { mods = {}, key = name } } } end
 	return require("platform.remap.nav_layer").compile({

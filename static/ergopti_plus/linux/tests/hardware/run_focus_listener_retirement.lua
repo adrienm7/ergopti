@@ -7,11 +7,11 @@
 --- ==============================================================================
 
 local root = assert(arg[1])
-package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;"
-	.. root .. "/../_shared/lua/?/init.lua;" .. package.path
+package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;"
+	.. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
-local Json = require("json")
-local ErrorDescription = require("error_description")
+local Json = require("core.text.engine.json")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 if arg[2] == "--worker" then
 	local output = assert(io.open(arg[3], "w"))
@@ -29,10 +29,10 @@ if arg[2] == "--worker" then
 	os.exit(0)
 end
 
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local Watch = require("adapters.atspi_focus_watch")
 local Owned = require("adapters.owned_process")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local original_error = Logger.error
 local failures, completed = {}, 0
 

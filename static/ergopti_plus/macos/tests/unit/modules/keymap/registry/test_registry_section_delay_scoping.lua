@@ -210,7 +210,7 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 		fixture('[group_a.rolls]\ndelay = 1\nfuture = { nested = { keep = [1, 2] } }\n[untouched.deep]\nvalue = "same"\n', function(_, _, Config, files)
 			helpers.assert_true(Config.set_override("group_a", "rolls", "delay", 2))
 			helpers.assert_true(Config.clear_override("group_a", "rolls", "delay"))
-			local data = require("toml_codec").decode(files.overrides)
+			local data = require("core.text.engine.toml_codec").decode(files.overrides)
 			helpers.assert_nil(data.group_a.rolls.delay)
 			helpers.assert_eq(data.group_a.rolls.future.nested.keep[2], 2)
 			helpers.assert_eq(data.untouched.deep.value, "same")
@@ -348,7 +348,7 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 	helpers.it("uses the existing extension override owner for a colon/slash runtime category", function()
 		fixture("[ext.team.rolls]\ndelay = 4\n", function(state, Registry, Config, files, control)
 			helpers.assert_true(Registry.disable_group("group_a"))
-			local group = require("hotstrings.extensions").category_key("team", "snippets/work")
+			local group = require("hotstrings.engine.extensions").category_key("team", "snippets/work")
 			helpers.assert_true(Registry.load_toml(group, "/virtual/group_a.toml"))
 			helpers.assert_eq(state.resolve_mapping_delay(mapping_for(state, "atrigger")), 4)
 			helpers.assert_true(Config.set_override("ext.team", "rolls", "delay", 6))
@@ -383,7 +383,7 @@ helpers.describe("hotstring delay boot admission", function()
 				config_paths = { get_config_dir = function() return "/virtual" end },
 				require = function(name)
 					-- The fragment joins the override path through the pure shared path owner.
-					if name == "native_path" then return require(name) end
+					if name == "core.fs.engine.native_path" then return require(name) end
 					helpers.assert_eq(name, "modules.hotstrings.hotstrings_config")
 					return {
 						init = function(opts) selected = opts; return admitted end,

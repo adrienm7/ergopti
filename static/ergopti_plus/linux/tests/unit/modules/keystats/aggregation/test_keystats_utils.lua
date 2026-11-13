@@ -2,17 +2,17 @@
 
 local helpers = require("tests.helpers")
 
-helpers.describe("_shared/lua/keystats/utils.lua", function()
+helpers.describe("_shared/metrics/engine/utils.lua", function()
 	helpers.it("module loads without error", function()
-		local ok, mod = pcall(require, "keystats.utils")
-		helpers.assert_true(ok, "require('keystats.utils') should succeed")
+		local ok, mod = pcall(require, "metrics.engine.utils")
+		helpers.assert_true(ok, "require('metrics.engine.utils') should succeed")
 		helpers.assert_true(type(mod) == "table", "should return a table")
 		helpers.assert_true(type(mod.gc) == "function", "should expose gc()")
 		helpers.assert_true(type(mod.char_class) == "function", "should expose char_class()")
 		helpers.assert_true(type(mod.pop_utf8) == "function", "should expose pop_utf8()")
 	end)
 
-	local K = require("keystats.utils")
+	local K = require("metrics.engine.utils")
 
 	helpers.describe("gc (get-or-create)", function()
 		helpers.it("creates sub-table when key is absent", function()

@@ -9,13 +9,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local handle = assert(io.open(helpers.driver_root() .. "/../_shared/modules/updater/defaults.json", "rb"))
+local handle = assert(io.open(helpers.driver_root() .. "/../_shared/updater/data/defaults.json", "rb"))
 local defaults = assert(Json.decode(handle:read("*a")), "defaults.json must decode")
 handle:close()
 
-require("test.config_backup_contract").register(helpers, { defaults = defaults })
+require("tests.lua.settings.backup_contract").register(helpers, { defaults = defaults })
 
 --- Lists a real temporary folder through the Linux listing port.
 --- @param entries table { { name, kind } } with kind file, dir, link_file, link_dir, fifo, link_fifo or link_dangling
@@ -45,8 +45,8 @@ local function real_listing(entries, body)
 	if not ok then error(err, 0) end
 end
 
-require("test.config_backup_binding_contract").register(helpers, { defaults = defaults, listing = real_listing })
-require("test.release_install_contract").register(helpers)
+require("tests.lua.settings.backup_binding_contract").register(helpers, { defaults = defaults, listing = real_listing })
+require("tests.lua.updater.release_install_contract").register(helpers)
 
 helpers.describe("configuration backup listing of special files (config-backup-special-nodes)", function()
 	helpers.it("(config-backup-special-nodes) reports a FIFO, a socket and a link to a FIFO as other and never opens them", function()
@@ -78,7 +78,7 @@ helpers.describe("configuration backup listing of special files (config-backup-s
 	end)
 end)
 
-local policy_handle = assert(io.open(helpers.driver_root() .. "/../_shared/modules/network/managed_network.json", "rb"))
+local policy_handle = assert(io.open(helpers.driver_root() .. "/../_shared/core/network/data/managed_network.json", "rb"))
 local policy = assert(Json.decode(policy_handle:read("*a")), "managed network policy must decode")
 policy_handle:close()
-require("test.release_install_network_contract").register(helpers, policy)
+require("tests.lua.updater.release_install_network_contract").register(helpers, policy)

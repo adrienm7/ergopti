@@ -16,7 +16,7 @@ local function with_window(scenario)
 		"ui.download_window", "ui.download_window.javascript", "ui.ui_builder",
 		"infra.logger", "infra.deferred_work", "infra.paths", "infra.timings", "infra.i18n",
 		"infra.text_utils",
-		"adapters.timer_scheduler", "error_description", "number_policy",
+		"adapters.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	}
 	local saved, saved_hs = {}, _G.hs
 	local saved_shell_runner = package.loaded["adapters.shell_runner"]

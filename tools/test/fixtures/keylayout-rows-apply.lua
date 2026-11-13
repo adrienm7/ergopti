@@ -15,9 +15,9 @@
 --- Exit status 2 and the reason on stderr when the layout is refused.
 --- ==============================================================================
 
-package.path = arg[1] .. "/lua/?.lua;" .. arg[1] .. "/lua/?/init.lua;" .. package.path
-local Json = require("json")
-local Rows = require("layouts.keylayout_rows")
+package.path = arg[1] .. "/?.lua;" .. arg[1] .. "/?/init.lua;" .. package.path
+local Json = require("core.text.engine.json")
+local Rows = require("layouts.engine.composer.keylayout_rows")
 
 local function read(path)
 	local handle = assert(io.open(path, "rb"))

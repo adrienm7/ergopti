@@ -25,9 +25,9 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local TextUtils = require("text_utils")
-local NativePath = require("native_path")
+local Logger = require("core.logger.engine.shim")
+local TextUtils = require("core.text.engine.utils_core")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "ui.bundled_apps"
 
@@ -46,7 +46,7 @@ M._children = {}
 local DEFAULT_DEPS = {
 	exepath = function() return require("luv").exepath() end,
 	driver_root = function() return require("infra.paths").driver_root() end,
-	locales_dir = function() return require("infra.paths").shared("data/locales") end,
+	locales_dir = function() return require("infra.paths").shared("core/i18n/data/locales") end,
 	locale = function() return require("infra.i18n").get_locale() end,
 	text = function(key) return require("infra.i18n").get(key) end,
 	getenv = os.getenv,
@@ -141,7 +141,7 @@ function M.launcher_text(executable, words, deps)
 end
 
 --- The shared-mime-info package declaring the encrypted file type on its
---- extension (_shared/data/encryptor/format.json).
+--- extension (_shared/apps/data/encryptor/format.json).
 --- @param format table The decoded format.
 --- @return string xml
 function M.mime_package(format)

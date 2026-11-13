@@ -31,9 +31,9 @@
 --- ==============================================================================
 
 local helpers   = require("tests.helpers")
-local Json      = require("json")
-local TomlCodec = require("toml_codec")
-local Layers    = require("keymap.layers")
+local Json      = require("core.text.engine.json")
+local TomlCodec = require("core.text.engine.toml_codec")
+local Layers    = require("layouts.engine.layers.layers")
 
 package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
@@ -90,7 +90,7 @@ local ctx = Layers.load_context({
 	toml_decode = TomlCodec.decode,
 	read_file   = read_file,
 })
-local recommended = read_file(helpers.shared("keymap/layers.recommended.toml"))
+local recommended = read_file(helpers.shared("layouts/data/layers.recommended.toml"))
 
 --- The navigation bindings a layer file resolves to on macOS; the file must load cleanly.
 local function bindings_of(text)
@@ -626,7 +626,7 @@ helpers.describe("navigation source close acknowledgement", function()
 			return record.closed
 		end
 		local called, outcome = pcall(function()
-			quote = require("text_utils").shell_quote
+			quote = require("core.text.engine.utils_core").shell_quote
 			fixture_sequence = fixture_sequence + 1
 			directory = helpers.temp_dir() .. "/ergopti_mac_nav_close_" .. tostring(os.time()) .. "_"
 				.. tostring(math.random(100000, 999999)) .. "_" .. tostring(fixture_sequence)
@@ -647,7 +647,7 @@ helpers.describe("navigation source close acknowledgement", function()
 			package.loaded["infra.logger"] = capture
 			package.loaded["platform.remap.nav_layer"] = nil
 			local Fresh = require("platform.remap.nav_layer")
-			local target = source == "user" and user_path or helpers.shared("data/keycodes/physical_keys.json")
+			local target = source == "user" and user_path or helpers.shared("layouts/data/keycodes/physical_keys.json")
 			io.open = function(path, mode)
 				if path ~= target or mode ~= "r" and mode ~= "rb" then return original_open(path, mode) end
 				local handle, detail, code = original_open(path, mode)
@@ -829,7 +829,7 @@ helpers.describe("navigation configured input observations", function()
 	helpers.it("nav-configured source exports cannot supply replacement observations", function()
 		with_source(function(subject, options)
 			local layer, observation = subject.load(options)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local original, reads = writer.read_classified, 0
 			writer.read_classified = function(...) reads = reads + 1; return original(...) end
 			local called, capture = pcall(subject.capture_configured_inputs, layer, observation)

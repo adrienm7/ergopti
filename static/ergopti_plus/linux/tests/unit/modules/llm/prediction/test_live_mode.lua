@@ -22,12 +22,12 @@
 local helpers = require("tests.helpers")
 local ProfilesFixture = require("tests.support.llm_profiles_fixture")
 local Fakes = require("tests.fakes")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 local EvdevCodes = require("infra.evdev_codes")
 
 local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", token = "k", model = "", base_url = "" }
-local LIVE_JSON = helpers.driver_root() .. "/../_shared/modules/llm/live.json"
+local LIVE_JSON = helpers.driver_root() .. "/../_shared/ai/data/live.json"
 local SENTENCE = "on se voit demain"
 
 -- Modules loaded afresh for each scenario, so they bind the scripted boundaries
@@ -261,7 +261,7 @@ helpers.it("live mode refuses a FIFO configuration without blocking", function()
 	scenario({}, function(world)
 		local uv, Paths = require("luv"), require("infra.paths")
 		local original = Paths.shared
-		local source = assert(original("modules/llm/live.json"))
+		local source = assert(original("ai/data/live.json"))
 		local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-live-config-XXXXXX"))
 		local path = dir .. "/live.json"
 		local made = os.execute("mkfifo '" .. path .. "'")
@@ -271,7 +271,7 @@ helpers.it("live mode refuses a FIFO configuration without blocking", function()
 			exited = true; process:close()
 		end))
 		Paths.shared = function(relative)
-			if relative == "modules/llm/live.json" then return path end
+			if relative == "ai/data/live.json" then return path end
 			return original(relative)
 		end
 		local called, started = pcall(world.handlers.llm_live_prompt_toggle, "tap_3", "translate_en|1")
@@ -490,7 +490,7 @@ helpers.describe("live mode: turning it on and off", function()
 
 	helpers.it("stops, never falls back, when its prompt is deleted while it runs", function()
 		scenario({ stored = {
-			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("ai.engine.settings.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite as a pirate.\nREWRITE: <text>", batch = false },
 			}),
 		} }, function(world)
@@ -683,7 +683,7 @@ helpers.describe("live mode: one normal profile chooser and retained prompt acti
 
 	helpers.it("has one profile chooser, keeps prompt actions and retires their override on explicit selection", function()
 		scenario({ stored = {
-			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("ai.engine.settings.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite as a pirate.\nREWRITE: <text>", batch = false },
 				{ id = "user_plain", label = "Plain", system_single = "Continue.", batch = false },
 			}),
@@ -767,7 +767,7 @@ helpers.describe("manual profile selection retires retained Linux live actions",
 
 	helpers.it("requires exact stop ACK before profile persistence and never redraws a refused cancellation", function()
 		scenario({ stored = {
-			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("ai.engine.settings.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite. REWRITE: <text>", batch = false },
 			}),
 		} }, function(world)
@@ -826,7 +826,7 @@ helpers.describe("manual profile selection retires retained Linux live actions",
 			local count = 0
 			local ok, err = xpcall(function()
 				for _, code in ipairs(spec.locales) do
-					local locale = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/" .. code .. ".json", "r"))
+					local locale = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/" .. code .. ".json", "r"))
 					local catalog = Json.decode(locale:read("*a")); locale:close()
 					i18n.get = function(key) return catalog[key] or key end
 					helpers.assert_true(world.engine.set_live("translate_en"))

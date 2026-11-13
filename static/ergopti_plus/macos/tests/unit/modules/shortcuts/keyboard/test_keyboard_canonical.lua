@@ -2,7 +2,7 @@
 
 --- Canonical sources drive actual native acquisition and exact cleanup ownership.
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 local function with_subject(source, body)
 	local names = { "adapters.storage", "adapters.file_system", "adapters.hotkey_registrar", "infra.preferences",
 		"infra.paths", "infra.config_paths", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts" }
@@ -76,7 +76,7 @@ helpers.describe("canonical keyboard shortcut ownership", function()
 			helpers.assert_eq(subject.get_owned_config_paths(), {
 				"shortcuts.keyboard.magic_editor", "shortcuts.keyboard.primary_a",
 			})
-			local scan = require("config_unused_keys").find_in_source(control.content,
+			local scan = require("settings.engine.migration.unused_keys").find_in_source(control.content,
 				require("ui.menu.unused_keys_cleanup").collect)
 			helpers.assert_eq(#scan.keys, 2)
 			for _, key in ipairs(scan.keys) do helpers.assert_true(key.key ~= "primary_a") end
@@ -214,4 +214,4 @@ helpers.describe("keyboard scope candidate admission", function()
 	end)
 end)
 
-require("test.keyboard_native_publication_contract").register(helpers, "macos")
+require("tests.lua.layouts.keyboard_native_publication_contract").register(helpers, "macos")

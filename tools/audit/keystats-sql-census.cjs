@@ -41,7 +41,7 @@ const DRIVERS = {
 	windows: { dirs: ['windows/modules/keystats'], ext: '.ahk' },
 	macos: { dirs: ['macos/modules/keystats'], ext: '.lua' },
 	linux: { dirs: ['linux/modules/keystats'], ext: '.lua' },
-	shared: { dirs: ['_shared/lua/keystats', '_shared/lua/sqlite'], ext: '.lua' }
+	shared: { dirs: ['_shared/metrics/engine', '_shared/core/fs/engine/sqlite'], ext: '.lua' }
 };
 
 // Words that open an SQL statement. A string literal whose text starts with one
@@ -49,7 +49,7 @@ const DRIVERS = {
 const STATEMENT_START =
 	/^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|PRAGMA|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|ATTACH|DETACH|VACUUM|ANALYZE|REPLACE|WITH|REINDEX)\b/;
 
-const GENERATED_CATALOGUE = '_shared/lua/keystats/queries.lua';
+const GENERATED_CATALOGUE = '_shared/metrics/engine/queries.lua';
 
 // Every name the shared query catalogue declares; a driver that renders one by
 // name is counted as a catalogue site rather than disappearing from the census.

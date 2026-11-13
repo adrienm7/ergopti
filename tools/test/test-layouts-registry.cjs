@@ -46,7 +46,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const BUNDLES_DIR = path.join(ROOT, 'static', 'ergopti', 'macos', 'bundles');
 const LAYOUT_DEFAULTS = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'layouts', 'defaults.json'),
+		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'layouts', 'data', 'defaults.json'),
 		'utf8'
 	)
 );
@@ -281,7 +281,7 @@ check('a .keylayout-only change selects the registry and XKB conversion gates', 
 	}
 	for (const file of [
 		'static/ergopti/linux/xkb_generation/keylayout_to_xkb.py',
-		'static/ergopti_plus/_shared/modules/layouts/mac_keycodes.json'
+		'static/ergopti_plus/_shared/layouts/data/mac_keycodes.json'
 	]) {
 		assert.ok(selectGates([file]).has('xkb-python'), `${file} does not select the XKB Python gate`);
 	}
@@ -512,23 +512,23 @@ check(
 			);
 		assert.deepStrictEqual(entries, reference.entries, 'relocation must not change a rule or flag');
 		assert.strictEqual(
-			fs.existsSync(path.join(shared, 'modules/hotstrings/distancesreduction.toml')),
+			fs.existsSync(path.join(shared, 'hotstrings/data/catalogue/distancesreduction.toml')),
 			false
 		);
 		// The menu rows live in the tray-menu source, beside the generated manifest.
 		const manifest = parse(
-			fs.readFileSync(path.join(shared, 'modules/features/manifest.toml'), 'utf8')
+			fs.readFileSync(path.join(shared, 'settings/data/features/manifest.toml'), 'utf8')
 		);
 		manifest.menu = require('../lib/menu-source.cjs').readMenuTables(parse);
 		assert.ok(!manifest.menu.hotstring_groups.standard.includes('distances_reduction'));
 		assert.ok(manifest.menu.hotstring_groups.ergopti.includes('distances_reduction'));
 		const index = parse(
-			fs.readFileSync(path.join(shared, 'modules/hotstrings/_index.toml'), 'utf8')
+			fs.readFileSync(path.join(shared, 'hotstrings/data/catalogue/_index.toml'), 'utf8')
 		);
 		assert.ok(!index.menu.categories_order.includes(reference.category));
 		assert.ok(!index.languages.french.categories_order.includes(reference.category));
 		assert.strictEqual(
-			fs.existsSync(path.join(shared, 'modules/hotstrings/french/distancesreduction.toml')),
+			fs.existsSync(path.join(shared, 'hotstrings/data/catalogue/french/distancesreduction.toml')),
 			false,
 			'Ergopti suffixes have one extension source'
 		);
@@ -607,7 +607,7 @@ check('Ergopti owns suffixes and magic-key replacement with exact historical dat
 		'replacement remains a native feature, with no fabricated hotstring'
 	);
 	const common = parse(
-		fs.readFileSync(path.join(shared, 'modules/hotstrings/magickey.toml'), 'utf8')
+		fs.readFileSync(path.join(shared, 'hotstrings/data/catalogue/magickey.toml'), 'utf8')
 	);
 	assert.strictEqual(
 		common._meta.sections.replace,

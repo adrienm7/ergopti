@@ -10,7 +10,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. The same rules as the macOS and Linux hosts
-;    (_shared/lua/layouts/manager_bridge.lua): an allowlist of actions, each
+;    (_shared/layouts/engine/manager_bridge.lua): an allowlist of actions, each
 ;    checked against the catalogue or the installed layouts before it runs,
 ;    and one page state for the three drivers.
 ; 2. Selecting a layout writes [layout] emulated_layout (the Ergopti layouts

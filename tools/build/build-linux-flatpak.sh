@@ -90,11 +90,11 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 IFS= read -r -d '' PROJECT_ROOT < <(CDPATH= cd -Pe -- "${SCRIPT_DIR}/../.." && printf '%s\0' "$PWD")
-# The external hosts are declared once in _shared/data/identifiers.json.
-# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
-. "$PROJECT_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# The external hosts are declared once in _shared/core/text/data/identifiers.json.
+# shellcheck source=../../static/ergopti_plus/_shared/core/text/data/identifiers.sh
+. "$PROJECT_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 # The homepage is the repository the runtime updater follows.
-ERGOPTI_REPOSITORY="$(node - "$PROJECT_ROOT/static/ergopti_plus/_shared/modules/updater/defaults.json" <<'NODE'
+ERGOPTI_REPOSITORY="$(node - "$PROJECT_ROOT/static/ergopti_plus/_shared/updater/data/defaults.json" <<'NODE'
 const { github } = require(process.argv[2]);
 if (!github || ![github.owner, github.repo].every((value) =>
 	typeof value === 'string' && /^[A-Za-z0-9._-]+$/.test(value))) {
@@ -225,7 +225,7 @@ modules:
 MANIFEST_EOF
 # The pinned source is read from the runtime catalogue, the one place the other
 # owned modules are pinned too.
-node - "$PROJECT_ROOT/static/ergopti_plus/_shared/data/linux_native_runtime.json" >> "$MANIFEST_FILE" << 'LUAJIT_SOURCE_EOF'
+node - "$PROJECT_ROOT/static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json" >> "$MANIFEST_FILE" << 'LUAJIT_SOURCE_EOF'
 const source = require(process.argv[2]).network_runtime.portable.flatpak_sources.luajit;
 process.stdout.write(`        url: ${source.url}\n        commit: ${source.commit}\n\n`);
 LUAJIT_SOURCE_EOF
@@ -256,7 +256,7 @@ cat >> "$MANIFEST_FILE" << 'MANIFEST_EOF'
       - install -Dm755 native-output/libergopti_archive_publication.so /app/lib/ergopti/bin/libergopti_archive_publication.so
       # The relay from the shipped Go sources, offline (standard library only),
       # with the SDK's compiler for its cgo GSS-API half.
-      - bash -c 'set -euo pipefail; source /usr/lib/sdk/golang/enable.sh; export GOCACHE="$PWD/.gocache" GOPATH="$PWD/.gopath"; bash tools/build/build-proxy-relay.sh --source-directory "$PWD/lib/ergopti/_shared/go/native_http" --output "$PWD/native-output/ergopti-proxy-relay"'
+      - bash -c 'set -euo pipefail; source /usr/lib/sdk/golang/enable.sh; export GOCACHE="$PWD/.gocache" GOPATH="$PWD/.gopath"; bash tools/build/build-proxy-relay.sh --source-directory "$PWD/lib/ergopti/_shared/core/network/native/go/native_http" --output "$PWD/native-output/ergopti-proxy-relay"'
       - install -Dm755 native-output/ergopti-proxy-relay /app/lib/ergopti/bin/ergopti-proxy-relay
       - install -Dm755 bin/ergopti /app/bin/ergopti
       - install -Dm644 lib/ergopti/network-runtime-env.sh /app/lib/ergopti/network-runtime-env.sh
@@ -300,7 +300,7 @@ mkdir -p "$PAYLOAD_DIR/tools/build"
 install -m 755 "$SCRIPT_DIR/build-linux-native-output.sh" "$PAYLOAD_DIR/tools/build/build-linux-native-output.sh"
 install -m 755 "$SCRIPT_DIR/build-proxy-relay.sh" "$PAYLOAD_DIR/tools/build/build-proxy-relay.sh"
 
-# The whole shared tree, not just _shared/lua: the keycode tables, hotstring
+# The whole shared tree, not just _shared: the keycode tables, hotstring
 # packs, locales and the defaults the resolver fails fast on live in
 # _shared/data and _shared/modules.
 mkdir -p "$PAYLOAD_DIR/lib/ergopti/_shared"
@@ -321,11 +321,11 @@ echo "  $(find "$PAYLOAD_DIR/lib/ergopti" -type f | wc -l) files staged for /app
 cat > "$PAYLOAD_DIR/bin/ergopti" << 'WRAPPER_EOF'
 #!/bin/bash
 # ergopti launcher — delegates to the LuaJIT driver inside the Flatpak.
-# LUA_PATH is what makes require("logger.shim") resolve; without it the daemon
+# LUA_PATH is what makes require("core.logger.engine.shim") resolve; without it the daemon
 # dies on its first require, before it can log anything useful.
 set -euo pipefail
 DRIVER_ROOT="/app/lib/ergopti"
-SHARED_LUA="$DRIVER_ROOT/_shared/lua"
+SHARED_LUA="$DRIVER_ROOT/_shared"
 export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;"
 source "$DRIVER_ROOT/network-runtime-env.sh" /app "$DRIVER_ROOT"
 exec /app/bin/luajit /app/lib/ergopti/ergopti_hotstrings.lua "$@"
@@ -360,7 +360,7 @@ echo "  Desktop entry: $(basename "$DESKTOP_FILE")"
 # Desktop and tray branding must come from the same asset; publishing a separate
 # handwritten placeholder hid the actual logo from the desktop/software centre.
 ICON_FILE="$PAYLOAD_DIR/share/icons/hicolor/512x512/apps/${APP_ID}.png"
-install -m 644 "$BUILD_DIR/_shared/assets/ergopti_tray.png" "$ICON_FILE"
+install -m 644 "$BUILD_DIR/_shared/tray/data/ergopti_tray.png" "$ICON_FILE"
 echo "  Application icon: $(basename "$ICON_FILE")"
 
 # ----------------------------------------------------------------------

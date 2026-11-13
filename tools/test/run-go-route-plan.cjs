@@ -5,7 +5,7 @@
  * MODULE: Go Route Plan Twin Gate
  * DESCRIPTION:
  * Runs the standalone Go twin of the shared per-origin route plan
- * (_shared/go/route_plan) against route_plan_vectors.json, offline and with
+ * (_shared/core/network/native/go/route_plan) against route_plan_vectors.json, offline and with
  * the installed toolchain only. A missing toolchain or a run in which a
  * required test did not pass is a failure: "no test files" is never green.
  * ==============================================================================
@@ -17,7 +17,17 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const MODULE = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'go', 'route_plan');
+const MODULE = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'network',
+	'native',
+	'go',
+	'route_plan'
+);
 
 // Every test the twin must answer; a renamed or skipped one fails the gate.
 const REQUIRED_TESTS = [

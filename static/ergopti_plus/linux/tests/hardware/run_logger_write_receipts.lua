@@ -12,7 +12,7 @@
 local uv = require("luv")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local ffi = require("ffi")
 local RLIMIT_FSIZE = 1 -- Linux resource ABI; only this fixture's soft limit changes.
 local SIG_IGN, SIG_ERR = 1, -1 -- POSIX signal handler sentinels.
@@ -27,7 +27,7 @@ local root = assert(uv.fs_mkdtemp("/tmp/ergopti-logger-receipts-XXXXXX"))
 local previous_config, previous_state = os.getenv("XDG_CONFIG_HOME"), os.getenv("XDG_STATE_HOME")
 assert(uv.os_setenv("XDG_CONFIG_HOME", root .. "/config"))
 assert(uv.os_setenv("XDG_STATE_HOME", root .. "/state"))
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Sink = require("infra.logger_sink")
 local checks, failures = 0, 0
 local directories = {}
@@ -64,7 +64,7 @@ local function write(path, content)
 end
 
 local function paths(path)
-	local dirs = require("app_dirs")
+	local dirs = require("core.fs.engine.app_dirs")
 	local date = os.date("%Y-%m-%d")
 	return path .. "/" .. dirs.files.unified_prefix .. date .. dirs.files.extension,
 		path .. "/" .. dirs.files.errors_prefix .. date .. dirs.files.extension

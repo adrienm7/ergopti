@@ -49,11 +49,11 @@
 -- One file from each tree the packagers copy in a separate stanza. Losing one
 -- stanza loses one of these and nothing else, so they are checked individually.
 local REQUIRED_SHARED_FILES = {
-	"data/locales/en.json",
-	"data/locales/fr.json",
-	"data/keycodes/evdev.json",
-	"modules/llm/defaults.json",
-	"modules/timings/constants.toml",
+	"core/i18n/data/locales/en.json",
+	"core/i18n/data/locales/fr.json",
+	"layouts/data/keycodes/evdev.json",
+	"ai/data/defaults.json",
+	"core/timing/data/constants.toml",
 }
 
 -- Twenty-one locales ship. The hardcoded fallback that masks a missing tree has
@@ -117,7 +117,7 @@ end
 
 -- The daemon installs this before its first shared require; mirror it so a
 -- module that expects utf8 under LuaJIT is not the thing that fails.
-local ok_compat, compat = pcall(require, "compat.utf8")
+local ok_compat, compat = pcall(require, "core.lifecycle.engine.compat.utf8")
 if ok_compat and type(compat) == "table" and type(compat.install) == "function" then
 	pcall(compat.install)
 end

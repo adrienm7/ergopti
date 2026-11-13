@@ -138,7 +138,7 @@ end)
 
 -- Complete Language parent: the actual locale owner, canonical child and selected parent.
 local function language_parent_fixture(language, scenario)
-	return helpers.with_stub_scope({ "ui.menu.builder", "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }, function()
+	return helpers.with_stub_scope({ "ui.menu.builder", "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }, function()
 		helpers.load_with_stubs("ui.menu.builder")
 		-- The generic helper deliberately installs an i18n stub; this cohort owns the real reader.
 		rawset(package.loaded, "ui.menu.builder", nil)

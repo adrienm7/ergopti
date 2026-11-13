@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local ASSET = "ergopti-plus-linux.tar.gz"
 local DIGEST = string.rep("ab", 32)

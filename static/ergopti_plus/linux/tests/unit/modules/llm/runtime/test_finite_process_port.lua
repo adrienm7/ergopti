@@ -1,8 +1,8 @@
 --- tests/unit/modules/llm/runtime/test_finite_process_port.lua
 
 local helpers = require("tests.helpers")
-local Worker = require("native_worker_owner")
-local Port = require("llm.finite_process_port")
+local Worker = require("core.lifecycle.engine.native_worker_owner")
+local Port = require("ai.engine.policy.finite_process_port")
 local function expect(value, reason) assert(value, reason) end
 local function test(name, body) helpers.it(name, body) end
 

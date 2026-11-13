@@ -26,10 +26,10 @@
 --- ==============================================================================
 
 local M = {}
-local ProgramProviderPicker = require("program_provider_picker")
+local ProgramProviderPicker = require("apps.engine.program_provider_picker")
 M.bridge_name = "action_picker_bridge"
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.action_picker"
 
 local _session_serial = 0
@@ -41,7 +41,7 @@ local _handle_json, _handle_table
 --- Handles a JSON string payload (shared — no duplicated JSON parsing).
 local function _handle_json(payload_str, state, context)
 	local ok, data = pcall(function()
-		local json_mod = require("json")
+		local json_mod = require("core.text.engine.json")
 		return json_mod.decode(payload_str)
 	end)
 	if not ok or type(data) ~= "table" then
@@ -294,7 +294,7 @@ local function _push_init()
 	-- The same JSON module _handle_json decodes with. dkjson is the webview
 	-- manager's optional dependency and is absent on a plain Lua host, so
 	-- encoding through it made the push fail everywhere the decode half worked.
-	local ok_json, json_mod = pcall(require, "json")
+	local ok_json, json_mod = pcall(require, "core.text.engine.json")
 	if not ok_json or type(json_mod.encode) ~= "function" then
 		Logger.error(LOG, "Cannot push init(): the shared json module is unavailable — the page stays empty.")
 		return false

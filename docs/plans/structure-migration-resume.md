@@ -170,4 +170,4 @@ npm run audit:structure-plan
 ```
 
 Run it after every dev merge. A file that moved on dev, such as `check_notice`
-now under `_shared/lua/updater`, otherwise keeps its old row.
+now under `_shared/updater/engine`, otherwise keeps its old row.

@@ -54,7 +54,7 @@ const UNBUILT_RUNTIME = [
 	'runtime.size'
 ];
 const UNBUILT = new Set(UNBUILT_RUNTIME);
-const IDENTIFIERS = path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.json');
+const IDENTIFIERS = path.join(ROOT, 'static/ergopti_plus/_shared/core/text/data/identifiers.json');
 const PUBLISH_TEST = path.join(ROOT, 'tools/build/remap_runtime_publish_test.py');
 const PUBLISHER = path.join(ROOT, 'tools/build/remap_runtime_publish.py');
 

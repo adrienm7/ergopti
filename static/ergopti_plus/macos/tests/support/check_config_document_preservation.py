@@ -81,8 +81,8 @@ local root, path = assert(arg[1]), assert(arg[2])
 package.path = root .. "/static/ergopti_plus/macos/?.lua;"
     .. root .. "/static/ergopti_plus/macos/?/init.lua;"
     .. root .. "/static/ergopti_plus/macos/tests/stubs/?.lua;"
-    .. root .. "/static/ergopti_plus/_shared/lua/?.lua;"
-    .. root .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
+    .. root .. "/static/ergopti_plus/_shared/?.lua;"
+    .. root .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
 local helpers = require("tests.helpers")
 local Config = helpers.load_with_stubs("platform.remap.config")
 local candidate = Config.build_default_state({ { id = "tab" } }, {})

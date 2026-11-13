@@ -4,7 +4,7 @@
 --- MODULE: Navigation Layer Rule (Karabiner)
 --- DESCRIPTION:
 --- Turns the navigation layer's bindings — the user's layers.toml, resolved for
---- macOS by the shared loader (_shared/lua/keymap/layers.lua) — into the
+--- macOS by the shared loader (_shared/layouts/engine/layers/layers.lua) — into the
 --- Karabiner rule the generator deploys, in place of the hand-written
 --- data/layer_keys.json it used to append verbatim. That file survives as
 --- data/legacy_layer_keys.json, the anchor that proves and removes the blocks
@@ -45,18 +45,18 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local Layout = require("modules.keymap.layout")
 
 local LOG = "karabiner.nav_layer"
 
 -- Configured input observations originate in the same acknowledged load. They
 -- reserve mapping inputs only; no Karabiner installation or lease is admitted.
-local Json = require("json")
-local TomlCodec = require("toml_codec")
-local Layers = require("keymap.layers")
-local Writer = require("toml_codec.writer")
-local TableUtil = require("table_util")
+local Json = require("core.text.engine.json")
+local TomlCodec = require("core.text.engine.toml_codec")
+local Layers = require("layouts.engine.layers.layers")
+local Writer = require("core.text.engine.toml_codec.writer")
+local TableUtil = require("core.text.engine.table_util")
 local original_read, original_json, original_toml = Writer.read_classified, Json.decode, TomlCodec.decode
 local source_records = setmetatable({}, { __mode = "k" })
 local layer_ports = {}
@@ -69,16 +69,16 @@ local function source_ports_current()
 	if package.loaded["platform.remap.nav_layer"] ~= M or getmetatable(M) ~= nil
 		or M.load ~= original_load or M.build_rule ~= original_build or M.wheel_slots ~= original_wheel
 		or M.capture_configured_inputs ~= original_capture
-		or package.loaded["json"] ~= Json or getmetatable(Json) ~= nil or Json.decode ~= original_json
-		or package.loaded["toml_codec"] ~= TomlCodec or getmetatable(TomlCodec) ~= nil or TomlCodec.decode ~= original_toml
-		or package.loaded["toml_codec.writer"] ~= Writer or getmetatable(Writer) ~= nil or Writer.read_classified ~= original_read
-		or package.loaded["keymap.layers"] ~= Layers or getmetatable(Layers) ~= nil then return false end
+		or package.loaded["core.text.engine.json"] ~= Json or getmetatable(Json) ~= nil or Json.decode ~= original_json
+		or package.loaded["core.text.engine.toml_codec"] ~= TomlCodec or getmetatable(TomlCodec) ~= nil or TomlCodec.decode ~= original_toml
+		or package.loaded["core.text.engine.toml_codec.writer"] ~= Writer or getmetatable(Writer) ~= nil or Writer.read_classified ~= original_read
+		or package.loaded["layouts.engine.layers.layers"] ~= Layers or getmetatable(Layers) ~= nil then return false end
 	for name, port in pairs(layer_ports) do if type(port) ~= "function" or Layers[name] ~= port then return false end end
 	return true
 end
 
 -- The layer a tap-hold key's hold_layer "nav" enters
--- (_shared/tap_hold/defaults.toml [tap_hold.hold_picker].layers).
+-- (_shared/tap_hold/data/defaults.toml [tap_hold.hold_picker].layers).
 M.NAV_LAYER_ID = "nav"
 
 -- The tap-hold hold action (data/actions.json) that sets layer_active, the
@@ -161,7 +161,7 @@ local function karabiner_event(code, registry)
 	local override = type(entry["macos_" .. KEYBOARD_FORM]) == "table"
 		and entry["macos_" .. KEYBOARD_FORM].karabiner
 	if type(override) == "table" then source = override end
-	-- json.lua decodes a JSON null to a sentinel table, so check for a real field.
+	-- core/text/engine/json.lua decodes a JSON null to a sentinel table, so check for a real field.
 	if type(source) == "table" then
 		for _, field in ipairs(EVENT_FIELDS) do
 			if type(source[field]) == "string" then return { [field] = source[field] } end
@@ -219,9 +219,9 @@ end
 -- =========================================
 -- =========================================
 
--- [call_handlers].macos in _shared/keymap/layer_actions.toml; each fills the
+-- [call_handlers].macos in _shared/layouts/data/layer_actions.toml; each fills the
 -- manipulator's outputs.
-local Brightness = require("brightness_actions").load()
+local Brightness = require("shortcuts.engine.brightness_actions").load()
 local CALL_HANDLERS = {
 	brightness_up = function(manipulator)
 		manipulator.to = { { consumer_key_code = Brightness.actions.brightness_up.karabiner_consumer } }
@@ -496,7 +496,7 @@ end
 --- Reads the user's layer file: only genuine absence is nil; failed read or
 --- close acknowledgement must not lend its bytes to the navigation loader.
 local function read_user_file(path, remember, reader)
-	local content, status, detail = (reader or require("toml_codec.writer").read_classified)(path)
+	local content, status, detail = (reader or require("core.text.engine.toml_codec.writer").read_classified)(path)
 	if remember then remember(path, content, status) end
 	if status == "ok" and type(content) == "string" then return content end
 	if status == "absent" and content == nil then return nil end
@@ -655,8 +655,8 @@ function M.load(opts)
 	local layer = { bindings = bindings, registry = ctx.registry, wheel = wheel }
 	local observation
 	if eligible and source_ports_current() and #sources == 3
-		and sources[1].path == NativePath.without_trailing_separators(shared_root) .. "/data/keycodes/physical_keys.json"
-		and sources[2].path == NativePath.without_trailing_separators(shared_root) .. "/keymap/layer_actions.toml"
+		and sources[1].path == NativePath.without_trailing_separators(shared_root) .. "/layouts/data/keycodes/physical_keys.json"
+		and sources[2].path == NativePath.without_trailing_separators(shared_root) .. "/layouts/data/layer_actions.toml"
 		and sources[3].path == result.path then
 		local complete = sources[1].status == "ok" and sources[2].status == "ok"
 		for _, source in ipairs(sources) do
@@ -743,12 +743,12 @@ function M.import_recommended(opts)
 	opts = opts or {}
 	local shared_root = opts.shared_root or require("infra.paths").shared_root()
 	local config_dir = opts.config_dir or require("infra.config_paths").get_config_dir()
-	local LayerPreset = require("keymap.layer_preset")
+	local LayerPreset = require("layouts.engine.layers.preset")
 	Logger.start(LOG, "Importing the recommended navigation layer into '%s' when it has none…", tostring(config_dir))
 	local ok, import, err, failed = pcall(LayerPreset.import_if_absent, {
 		shared_root  = shared_root,
 		config_dir   = config_dir,
-		toml_decode  = require("toml_codec").decode,
+		toml_decode  = require("core.text.engine.toml_codec").decode,
 		file_adapter = opts.file_adapter or require("adapters.file_system"),
 	})
 	if not ok then import, err = nil, tostring(import) end
@@ -770,7 +770,7 @@ end
 --- @param file_adapter table|nil The adapter it wrote through; the driver's own by default.
 --- @return boolean undone
 function M.undo_import(import, file_adapter)
-	local undone, err = require("keymap.layer_preset").undo(import, file_adapter or require("adapters.file_system"))
+	local undone, err = require("layouts.engine.layers.preset").undo(import, file_adapter or require("adapters.file_system"))
 	if undone ~= true then
 		Logger.error(LOG, "The navigation layer '%s' could not be removed again: %s.",
 			tostring(import and import.path), tostring(err))
@@ -860,7 +860,7 @@ function M.commit_hold(label, action_id, commit)
 		end
 		return committed
 	end
-	if layer and layer.status == require("keymap.layer_preset").IMPORTED then
+	if layer and layer.status == require("layouts.engine.layers.preset").IMPORTED then
 		M.reconcile_wheel(label)
 	end
 	return committed

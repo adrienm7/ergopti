@@ -168,7 +168,7 @@ check(
 // 2. The preview switches exist on all three drivers (PAR-24) and ship on, so the
 // bubble shows on a fresh configuration without any import.
 const manifest = TOML.parse(
-	read(path.join(PLUS, '_shared', 'modules', 'features', 'manifest.toml'))
+	read(path.join(PLUS, '_shared', 'settings', 'data', 'features', 'manifest.toml'))
 );
 const previews = manifest.features.hotstrings.filter((entry) => /^preview_/.test(entry.id));
 check(previews.length === 4, 'the manifest must declare the four hotstring preview switches');

@@ -8,7 +8,7 @@
 --- The page asks for the user's layers.toml ("ready"), saves the text it built
 --- ({action = "save", text}), closes ({action = "cancel"}) or, back in front,
 --- asks for the legends again ({action = "legends"}). The shared host logic
---- (_shared/lua/keymap/layer_editor.lua) checks a saved text against every
+--- (_shared/layouts/engine/layers/editor.lua) checks a saved text against every
 --- OS's loader and publishes it atomically; the remap manager then regenerates
 --- its configuration, which reads layers.toml again, so the layer applies.
 --- The Linux part stays this thin on purpose: only the apply call knows which
@@ -26,13 +26,13 @@
 local M = {}
 M.bridge_name = "layer_editor_bridge"
 
-local Json        = require("json")
-local Logger      = require("logger.shim")
-local TomlCodec   = require("toml_codec")
-local Layers      = require("keymap.layers")
-local LayerEditor = require("keymap.layer_editor")
-local LayerPreset = require("keymap.layer_preset")
-local Writer      = require("toml_codec.writer")
+local Json        = require("core.text.engine.json")
+local Logger      = require("core.logger.engine.shim")
+local TomlCodec   = require("core.text.engine.toml_codec")
+local Layers      = require("layouts.engine.layers.layers")
+local LayerEditor = require("layouts.engine.layers.editor")
+local LayerPreset = require("layouts.engine.layers.preset")
+local Writer      = require("core.text.engine.toml_codec.writer")
 
 local LOG = "bridge.layer_editor"
 local APP_NAME = "layer_editor"

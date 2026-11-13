@@ -14,9 +14,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Catalogue = require("layouts.catalogue")
-local Registry = require("layouts.registry")
+local Json = require("core.text.engine.json")
+local Catalogue = require("layouts.engine.composer.catalogue")
+local Registry = require("layouts.engine.registry.registry_core")
 
 local VECTORS_PATH = helpers.shared("tests/corpus/layouts/catalogue_vectors.json")
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"
@@ -33,7 +33,7 @@ end
 
 local vectors = Json.decode(read(VECTORS_PATH))
 
-require("test.layout_catalogue_local_contract")(helpers, Catalogue, Json,
+require("tests.lua.layouts.catalogue_local_contract")(helpers, Catalogue, Json,
 	{ max_file_bytes = vectors.max_bytes }, vectors.indexes.shipped)
 
 --- The body a vector names.
@@ -304,8 +304,8 @@ helpers.describe("layout catalogue: where a layout's bytes come from", function(
 	end)
 end)
 
-require("test.layout_installed_record_contract")(helpers, Catalogue, Json)
+require("tests.lua.layouts.installed_record_contract")(helpers, Catalogue, Json)
 
-require("test.layout_installed_update_contract")(helpers, Catalogue, Json)
+require("tests.lua.layouts.installed_update_contract")(helpers, Catalogue, Json)
 
-require("test.layout_installed_extension_contract")(helpers, Catalogue, Json)
+require("tests.lua.layouts.installed_extension_contract")(helpers, Catalogue, Json)

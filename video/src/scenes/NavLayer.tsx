@@ -2,7 +2,7 @@
 //
 // The navigation layer on a keyboard with no legends (the layer works on
 // physical positions, whatever the layout): the recommended bindings from
-// _shared/keymap/layers.recommended.toml light up group by group while Space
+// _shared/layouts/data/layers.recommended.toml light up group by group while Space
 // is held, as one example of where the layer can live.
 
 import React from 'react';

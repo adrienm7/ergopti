@@ -12,9 +12,9 @@ local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
 	"infra.config_paths", "infra.logger", "adapters.file_system", "infra.text_utils",
-	"text_utils", "app_dirs", "infra.log_folders", "lfs", "infra.toml.codec",
-	"toml_codec", "toml_codec.codec", "toml_codec.record_scanner", "toml_codec.key_path",
-	"toml_codec.bom", "toml_codec.basic_string", "compat.utf8",
+	"core.text.engine.utils_core", "core.fs.engine.app_dirs", "infra.log_folders", "lfs", "infra.toml.codec",
+	"core.text.engine.toml_codec", "core.text.engine.toml_codec.codec", "core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path",
+	"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.basic_string", "core.lifecycle.engine.compat.utf8",
 }
 
 local function read_file(path)
@@ -57,7 +57,7 @@ local function fixture(callback)
 			state.codec = require("infra.toml.codec")
 			state.config = root .. "/config/"
 			-- Named after the application, so the resolver keeps it as is.
-			state.logs = root .. "/logs/" .. require("app_dirs").macos.folder_name .. "/"
+			state.logs = root .. "/logs/" .. require("core.fs.engine.app_dirs").macos.folder_name .. "/"
 			state.line = function(key, value)
 				return key .. " = " .. state.codec.encode_value(value)
 			end

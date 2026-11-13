@@ -1,8 +1,8 @@
 --- tests/unit/infra/preferences/test_llm_preferences.lua
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Codec = require("core.text.engine.toml_codec")
 -- Source literals can lose their zero sign on some LuaJIT builds.
 -- Establish the intended IEEE sign before calling any producer under test.
 local function negative_zero()
@@ -148,7 +148,7 @@ helpers.describe("canonical Linux AI settings", function()
 	helpers.it("refuses generation bounds when the source changes before publication", function()
 		with_config('[llm.generation]\nmax_words = 10\n', function(path)
 			local settings = require("modules.llm.settings")
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local original = writer.batch_write
 			local successor = '[llm.generation]\nmax_words = 3\n'
 			writer.batch_write = function(...)
@@ -334,7 +334,7 @@ helpers.describe("Linux real finite header numeric admission", function()
 		local source = '[llm.generation]\ntemperature=0.25\nfuture=9007199254740993\n'
 		with_config(source, function(path)
 			local preferences = require("infra.llm_preferences")
-			local LeafRows = require("toml_codec.leaf_rows")
+			local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 			local original = LeafRows.value_literal
 			local generation = preferences.generation()
 			LeafRows.value_literal = function() return "0.12345678901235" end
@@ -393,7 +393,7 @@ helpers.describe("Linux real root inline scalar publication", function()
 		with_config(source, function(path)
 			local preferences = require("infra.llm_preferences")
 			local revision = preferences.generation()
-			local LeafRows = require("toml_codec.leaf_rows")
+			local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 			local original = LeafRows.value_literal
 			LeafRows.value_literal = function() return "0.12345678901235" end
 			local called, accepted = pcall(preferences.set, "llm.generation.temperature", 0.12345678901234567)
@@ -452,7 +452,7 @@ helpers.describe("Linux real section-relative dotted scalar publication", functi
 		with_config(source, function(path)
 			local preferences = require("infra.llm_preferences")
 			local revision = preferences.generation()
-			local LeafRows = require("toml_codec.leaf_rows")
+			local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 			local original = LeafRows.value_literal
 			LeafRows.value_literal = function() return "0.12345678901235" end
 			local called, accepted = pcall(preferences.set, "llm.generation.temperature", 0.12345678901234567)
@@ -511,7 +511,7 @@ helpers.describe("Linux real section-relative inline scalar publication", functi
 		with_config(source, function(path)
 			local preferences = require("infra.llm_preferences")
 			local revision = preferences.generation()
-			local LeafRows = require("toml_codec.leaf_rows")
+			local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 			local original = LeafRows.value_literal
 			LeafRows.value_literal = function() return "0.12345678901235" end
 			local called, accepted = pcall(preferences.set, "llm.generation.temperature", 0.12345678901234567)
@@ -589,8 +589,8 @@ helpers.describe("Linux actual native authenticated integer candidate proof", fu
 	helpers.it("refuses a wrong genuine prepared scalar then cold-reloads a repaired exact publication", function()
 		local source='[llm.generation]\ntemperature=0\nfuture=9223372036854775807 # exact\n'
 		with_config(source,function(path)
-			local LeafRows=require("toml_codec.leaf_rows")
-			local Writer=require("toml_codec.writer")
+			local LeafRows=require("core.text.engine.toml_codec.leaf_rows")
+			local Writer=require("core.text.engine.toml_codec.writer")
 			local original=LeafRows.value_literal
 			local capability
 			LeafRows.value_literal=function(value) if value==9007199254740992 then return "9007199254740993" end return original(value) end
@@ -644,7 +644,7 @@ helpers.describe("Linux native absent inline scalar preference",function()
 end)
 
 helpers.describe("Linux actual preference schema drift and runtime reload", function()
-	local Migration = require("config_migrate")
+	local Migration = require("settings.engine.migration.migrate")
 	local registry = assert(Migration.load_registry(require("infra.paths").shared(Migration.REGISTRY_PATH)))
 	local function current(enabled)
 		return '# retain every foreign byte\n[_meta]\nschema_version = ' .. registry.current
@@ -699,7 +699,7 @@ end)
 
 helpers.describe("Linux AI runtime source admission", function()
 	helpers.it("a genuine newer-schema boot refuses ordinary runtime admission (ai-readonly-admission)", function()
-		local Migration = require("config_migrate")
+		local Migration = require("settings.engine.migration.migrate")
 		local registry = assert(Migration.load_registry(require("infra.paths").shared(Migration.REGISTRY_PATH)))
 		local source = '[_meta]\nschema_version = ' .. (registry.current + 1)
 			.. '\n[llm]\nenabled = false\n[private]\nkeep = "exact"\n'
@@ -707,7 +707,7 @@ helpers.describe("Linux AI runtime source admission", function()
 			local boot = Migration.boot({ path = path, driver = "linux", registry = registry })
 			helpers.assert_eq(boot.status, "newer")
 			helpers.assert_eq(boot.read_only, true)
-			helpers.assert_type(require("toml_codec.writer").write_refusal(path), "string", "the genuine writer owns the refusal")
+			helpers.assert_type(require("core.text.engine.toml_codec.writer").write_refusal(path), "string", "the genuine writer owns the refusal")
 			local preferences = require("infra.llm_preferences")
 			helpers.assert_eq(preferences.admit(), false, "a refused file cannot admit AI runtime mutation")
 			helpers.assert_eq(preferences.set("llm.enabled", true), false)
@@ -718,7 +718,7 @@ helpers.describe("Linux AI runtime source admission", function()
 	helpers.it("current source and exact scope release keep admission while foreign refusals do not block it (ai-readonly-admission)", function()
 		with_config('[llm]\nenabled = false\n', function(path)
 			local preferences = require("infra.llm_preferences")
-			require("toml_codec.writer").refuse_writes(path .. ".foreign", "Controlled unrelated refusal")
+			require("core.text.engine.toml_codec.writer").refuse_writes(path .. ".foreign", "Controlled unrelated refusal")
 			helpers.assert_eq(preferences.admit(), true, "only this configuration path owns admission")
 			local owner = { pending = function() return false end }
 			helpers.assert_true(preferences.acquire(owner))

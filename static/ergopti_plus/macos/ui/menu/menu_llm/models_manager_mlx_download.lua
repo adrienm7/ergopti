@@ -33,9 +33,9 @@ local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
 local FileSystem = require("adapters.file_system")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 -- A backslash is a filename byte on macOS: only the host's separators split it.
 local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
 local _source_sep = "[" .. NativePath.separators() .. "]"

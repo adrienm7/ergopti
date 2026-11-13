@@ -21,7 +21,7 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 local HOME = "/home/jdoe"
 
@@ -73,7 +73,7 @@ local function load_bridge(controls)
 		sink.log_dir = function() return controls.logs_dir end
 	end
 	local bridge = helpers.load_module("ui.healthcheck.bridge")
-	local logger = require("logger.shim")
+	local logger = require("core.logger.engine.shim")
 	local warn = logger.warn
 	context.restore = function()
 		sink.log_dir = previous_log_dir
@@ -210,7 +210,7 @@ helpers.describe("diagnostics bridge (linux): the page's messages", function()
 	helpers.it("copies the redacted report", function()
 		with_bridge(nil, function(bridge, context)
 			local ready = bridge.on_message("ready", {}, page(context))
-			local redacted = require("diagnostics.redact").apply("at /home/jdoe/x by jdoe",
+			local redacted = require("diagnostics.engine.reports.redact").apply("at /home/jdoe/x by jdoe",
 				ready.config.redaction, ready.config.context)
 			helpers.assert_eq({ redacted }, { "at ~/x by <user>" })
 			local exported = bridge.on_message({ action = "export_snapshot", export_sequence = 1 }, {}, page(context))
@@ -430,8 +430,8 @@ helpers.describe("diagnostics bridge stable-metadata report", function()
 				helpers.assert_true(calls[1]:find("mkdir -p", 1, true) == 1)
 				helpers.assert_eq(calls[2], "write")
 				local repo = bridge.config().repository
-				local stable = require("healthcheck.share").document(exported.snapshot, bridge.config().schema, "ignored").fields
-				local url = require("diagnostics.issue_link").build_url(bridge.config().templates, repo, "bug", stable)
+				local stable = require("diagnostics.engine.healthcheck.share").document(exported.snapshot, bridge.config().schema, "ignored").fields
+				local url = require("diagnostics.engine.reports.issue_link").build_url(bridge.config().templates, repo, "bug", stable)
 				helpers.assert_eq(calls[4], { executable = "xdg-open", args = { url } })
 			end, debug.traceback)
 			fs.write_new, package.loaded["adapters.shell_runner"] = old_write, old_shell
@@ -486,7 +486,7 @@ helpers.describe("diagnostics asynchronous opener ownership", function()
 			helpers.assert_eq(#c.pushed, 0, "browser admission does not acknowledge report completion")
 			c.openers[2].done({ ok = false, code = 24, error = "native browser refused" })
 			helpers.assert_eq(#c.pushed, 1)
-			local result = require("json").decode(c.pushed[1]:match("receiveDiagnostics%((.*)%)$"))
+			local result = require("core.text.engine.json").decode(c.pushed[1]:match("receiveDiagnostics%((.*)%)$"))
 			helpers.assert_eq(result.ok, false); helpers.assert_eq(result.action, "report")
 			c.openers[2].done({ ok = true, code = 0 }); helpers.assert_eq(#c.pushed, 1)
 		end)
@@ -558,7 +558,7 @@ helpers.describe("diagnostics bridge fixture ownership", function()
 			"ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes" }
 		local before = {}
 		for _, name in ipairs(names) do before[name] = package.loaded[name] end
-		local logger, sink = require("logger.shim"), require("infra.logger_sink")
+		local logger, sink = require("core.logger.engine.shim"), require("infra.logger_sink")
 		local warn, log_dir, getenv = logger.warn, sink.log_dir, os.getenv
 		local failure, visited = {}, 0
 		local ok, detail = pcall(with_bridge, nil, function(bridge, context)

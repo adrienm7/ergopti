@@ -3267,7 +3267,7 @@ local function refuse_paced_publication(batch, owner)
 	end
 	discard_unposted_suffix(batch, owner.ordinal)
 	if owner.publication_cancelled then batch.tx.cancelled = true end
-	finish_serial_batch(batch, owner, "failed", require("adapter_errors").PROGRAMMABLE_PUBLICATION_STALE)
+	finish_serial_batch(batch, owner, "failed", require("diagnostics.engine.adapter_errors").PROGRAMMABLE_PUBLICATION_STALE)
 end
 
 --- Evaluates a retained publication; full checks run only on the timer path.

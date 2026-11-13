@@ -2,7 +2,7 @@
 
 --- Exercises private completion through the real process adapter and action owner.
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local SOURCE = { source_path = "/private/config.toml", source_sha256 = string.rep("a", 64) }
 local HELPER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 

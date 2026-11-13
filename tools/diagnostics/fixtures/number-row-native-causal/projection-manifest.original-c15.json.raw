@@ -253,12 +253,12 @@
     {
       "git_blob": "759a7b022edf687c74116f396cc5a620a8efb3d4",
       "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdateChannelFeed.swift",
-      "sha256": "65cae66efeeccd6c547d047fe11b19fd7f0ad9c434d6bdb2eab84f29c025d9d1"
+      "sha256": "a59f7237fa2e20c00308d8d8da0bb4681610a730174b14658345c5a35d717556"
     },
     {
       "git_blob": "bf5514f742eb132daafc3aefe0eae1037b72ba60",
       "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdateChannels.generated.swift",
-      "sha256": "70b0c2f5d638b0edf7da2ab73178c4713a82bf8ea62bc6c65dad69514fe32cc2"
+      "sha256": "9a5c4d5158ee82ef6d778c7db544862dc9cd24be69550cfcd2a82643037dc5ec"
     },
     {
       "git_blob": "57fb3e644a5e275bbc53a2066765dc286a2fa082",
@@ -308,7 +308,7 @@
     {
       "git_blob": "a27f56938d4a9a9d035e74a87cdbcdef48551b36",
       "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/CatalogUpdateUserDriverTests.swift",
-      "sha256": "3bcc017302bf5c42eb2cfe64618b0a7690ecee798e2237d74162a8d1986a7fc1"
+      "sha256": "68f1011a27ea1e0f53e445ab93c7fbcc540c06c50e71ff6b642373636b5dc66e"
     },
     {
       "git_blob": "83d479c23b7d023e87b97a8f6e786d6dce5946ab",

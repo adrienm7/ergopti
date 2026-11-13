@@ -76,7 +76,7 @@ global BUNDLE_RELEASE_ASSET := Identifiers.App.EXE
 
 ; Update channel this exe was BUILT from: the release workflow rewrites the
 ; placeholder to the registry id of the channel it publishes
-; (_shared/modules/updater/channels.json). The updater follows it while
+; (_shared/updater/data/channels.json). The updater follows it while
 ; config.toml [updater] channel names none, so a user who downloaded a
 ; pre-release build keeps receiving that channel; the About menu's channel
 ; rows switch it afterwards. A source run keeps the placeholder, which is no

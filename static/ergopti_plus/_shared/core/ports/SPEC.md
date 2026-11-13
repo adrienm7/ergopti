@@ -180,4 +180,4 @@ adapters expose these methods under their own naming convention:
 - [Crypto.spec.js](./Crypto.spec.js)
 - [GraphicsRenderer.spec.js](./GraphicsRenderer.spec.js)
 - [Tooltip engine spec](../tooltip/SPEC.md)
-- [Config schema](../config_schema/SCHEMA.md)
+- [Config schema](../../settings/data/config_schema/SCHEMA.md)

@@ -34,7 +34,7 @@ class AliasWireReceiving(unittest.TestCase):
         for relative in (
             "static/ergopti_plus/macos/platform/network/native_http.py",
             "static/ergopti_plus/macos/platform/network/native_ollama_api.py",
-            "static/ergopti_plus/_shared/python/managed_source_alias.py",
+            "static/ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py",
         ):
             target = self.directory / relative
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -155,7 +155,10 @@ class AliasWireReceiving(unittest.TestCase):
         self.assertFalse(self.receipt.exists())
 
     def test_missing_schema_source_refuses_without_protocol_peer(self):
-        (self.directory / "static/ergopti_plus/_shared/python/managed_source_alias.py").unlink()
+        (
+            self.directory
+            / "static/ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py"
+        ).unlink()
         with self.assertRaises(self.api.ENGINE.NativeHTTPError) as caught:
             self.discover(self.proof)
         self.assertEqual(caught.exception.reason, "unavailable")

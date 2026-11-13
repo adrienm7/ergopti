@@ -9,7 +9,7 @@
 ; platform/remap/nav_layer_table.ahk as one hotkey per bound key under the
 ; LayerEnabled gate. Without a layers.toml nothing is bound and every key keeps
 ; its normal behaviour while the layer is held; Ergopti's own layer is
-; _shared/keymap/layers.recommended.toml, which reaches layers.toml through the
+; _shared/layouts/data/layers.recommended.toml, which reaches layers.toml through the
 ; first-run wizard or "Restore recommended values".
 ;
 ; What stays here is the code no binding can express: how a hold key ENTERS the

@@ -361,7 +361,7 @@ helpers.describe("aggregate menu preserves actual private choices and native pub
 						.. '[private]\nfuture = "retained foreign source"\n'
 					Choices.with_file(Config, source, function(path)
 						local published = {}
-						local engine = require("hotstring_engine").new()
+						local engine = require("hotstrings.engine.matcher").new()
 						local load = engine.load_mappings
 						engine.load_mappings = function(self, mappings)
 							local committed = load(self, mappings)
@@ -377,7 +377,7 @@ helpers.describe("aggregate menu preserves actual private choices and native pub
 						view.is_section_checked = Config.is_section_checked
 						with_bulk_error_receipts(function(notices)
 							local row = assert(aggregate_row(hotstrings_menu(view), kind))
-							local Writer = require("toml_codec.writer")
+							local Writer = require("core.text.engine.toml_codec.writer")
 							local batch_write, writes = Writer.batch_write, 0
 							Writer.batch_write = function()
 								writes = writes + 1
@@ -424,13 +424,13 @@ local function with_dynamic_family_owners(body)
 	end
 	write(path, source)
 	write(personal, '[info]\nphone = "0000000000"\n[letters]\np = "phone"\n')
-	local Writer = require("toml_codec.writer")
+	local Writer = require("core.text.engine.toml_codec.writer")
 	local batch_write = Writer.batch_write
 	local Preferences
 	local called, failure = pcall(function()
 		Preferences = helpers.load_module("infra.hotstring_preferences")
 		assert(Preferences._set_file_for_test(path))
-		package.loaded["dynamic_hotstrings"] = nil
+		package.loaded["hotstrings.engine.dynamic.core"] = nil
 		package.loaded["modules.dynamic_hotstrings.prefix_rules"] = nil
 		local dynamic = helpers.load_module("modules.dynamic_hotstrings.manager")
 		assert(dynamic.init({ personal_info_path = personal, trigger_char = "★" }))
@@ -512,7 +512,7 @@ helpers.describe("dynamic family menu acknowledges its actual owner", function()
 						helpers.assert_eq(retry_committed, true)
 						helpers.assert_eq(owner.dynamic.is_rule_enabled(nil, section), true)
 						helpers.assert_eq(seen, { reloads = section == "phoneprefixes" and 1 or 0, refreshes = 1 })
-						local document = require("toml_codec").decode(owner.read(owner.path))
+						local document = require("core.text.engine.toml_codec").decode(owner.read(owner.path))
 						helpers.assert_eq(document.private.future, "independent retained neighbor")
 						helpers.assert_true(owner.preferences.refresh())
 						helpers.assert_eq(owner.dynamic.is_rule_enabled(nil, section), true, "actual disk reload owns the new choice")
@@ -636,9 +636,9 @@ local function with_dynamic_section_frame(body)
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local called, detail = xpcall(function()
 			local translator = require("infra.i18n")
-			local renderer = assert(require("menu.renderer").new({ platform = "linux",
-				manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-				json_decode = require("json").decode, i18n = translator, logger = require("logger.shim"),
+			local renderer = assert(require("menu.engine.renderer").new({ platform = "linux",
+				manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+				json_decode = require("core.text.engine.json").decode, i18n = translator, logger = require("core.logger.engine.shim"),
 			}))
 			package.loaded["infra.manifest_menu"] = renderer
 			local root = renderer.get_root()
@@ -832,7 +832,7 @@ helpers.describe("hotstring section order native menu", function()
 			local up = assert(row_for(parent.menu[2].menu, "menu.hotstrings.move_up"))
 			helpers.assert_eq(up.fn(), true)
 			local written = assert(io.open(path, "rb")); local content = written:read("*a"); written:close()
-			helpers.assert_eq(require("toml_codec").decode(content).hotstrings.order_overrides.autocorrection, { "second", "-", "first" })
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(content).hotstrings.order_overrides.autocorrection, { "second", "-", "first" })
 			menu = hotstrings_menu(config)
 			category = assert(row_for(menu, "category.autocorrection") or row_for(menu, "autocorrection"))
 			parent = assert(row_for(category.menu, "menu.hotstrings.section_order"))
@@ -847,7 +847,7 @@ helpers.describe("hotstring section order native menu", function()
 			local move = assert(row_for(dynamic_order.menu[2].menu, "menu.hotstrings.move_up"))
 			helpers.assert_eq(move.fn(), true)
 			local dynamic_file = assert(io.open(path, "rb")); local source = dynamic_file:read("*a"); dynamic_file:close()
-			helpers.assert_eq(require("toml_codec").decode(source).hotstrings.order_overrides.dynamichotstrings, { "tags", "dates" })
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(source).hotstrings.order_overrides.dynamichotstrings, { "tags", "dates" })
 		end, debug.traceback)
 		preferences._set_file_for_test(nil)
 		os.remove(path)

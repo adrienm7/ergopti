@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local with_changelog = require("tests.support.changelog_fixture").with_changelog
 
 -- LuaSkin encodes an empty table as NSArray; the shared encoder chooses an object.

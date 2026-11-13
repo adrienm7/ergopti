@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Rewrite Request Helpers (AHK)
 ; DESCRIPTION:
-; AutoHotkey port of _shared/lua/llm/rewrite.lua. A "rewrite" prompt asks the
+; AutoHotkey port of _shared/ai/engine/prediction/rewrite.lua. A "rewrite" prompt asks the
 ; model to rewrite the sentence being typed (expand abbreviations, fix spelling,
 ; punctuation and typography) instead of predicting the next words.
 ;

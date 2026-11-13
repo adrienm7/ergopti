@@ -4,7 +4,7 @@
 --- MODULE: Field Run Network Hosts Probe
 --- DESCRIPTION:
 --- The field run's host reachability check over a scripted helper:
---- 1. every host of _shared/data/identifiers.json is its own step, named by
+--- 1. every host of _shared/core/text/data/identifiers.json is its own step, named by
 ---    its key, in key order, whatever order the helper printed;
 --- 2. a host the helper failed, or did not answer for, fails by its key while
 ---    the others keep their verdict;
@@ -52,7 +52,7 @@ end
 --- @return table keys
 local function host_keys()
 	local keys = {}
-	for key in pairs(require("identifiers").hosts) do keys[#keys + 1] = key end
+	for key in pairs(require("core.text.engine.identifiers").hosts) do keys[#keys + 1] = key end
 	table.sort(keys)
 	return keys
 end

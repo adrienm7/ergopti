@@ -33,7 +33,7 @@ local helpers = require("tests.helpers")
 --- @param source string|nil Configuration bytes.
 --- @param body function body(context)
 local function with_caps_word(source, body)
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	local loaded = {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
@@ -157,13 +157,13 @@ helpers.describe("caps word auto-off: the settings", function()
 			helpers.assert_true(c.AutoOff.set_terminator("comma", true))
 			local f = assert(io.open(c.path, "rb"))
 			local text = assert(f:read("*a")); assert(f:close())
-			local document = require("toml_codec").decode(text)
+			local document = require("core.text.engine.toml_codec").decode(text)
 			helpers.assert_eq(table.concat(document.shortcuts.caps_word.terminators, ","), "space,comma,future_key")
 			helpers.assert_eq(table.concat(c.AutoOff.settings().terminators, ","), "space,comma")
 			helpers.assert_true(c.AutoOff.set_terminator("space", false))
 			local second = assert(io.open(c.path, "rb"))
 			local updated = assert(second:read("*a")); assert(second:close())
-			local again = require("toml_codec").decode(updated)
+			local again = require("core.text.engine.toml_codec").decode(updated)
 			helpers.assert_eq(table.concat(again.shortcuts.caps_word.terminators, ","), "comma,future_key")
 		end)
 	end)
@@ -644,7 +644,7 @@ local function corpus()
 	local file = assert(io.open(path, "rb"), "the shared CapsWord corpus is readable")
 	local text = file:read("*a")
 	file:close()
-	return require("json").decode(text)
+	return require("core.text.engine.json").decode(text)
 end
 
 -- The policy contract proves each vector's verdict on the policy alone; these

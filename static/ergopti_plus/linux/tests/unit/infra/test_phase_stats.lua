@@ -11,7 +11,7 @@
 
 local helpers = require("tests.support.logger_fixture").helpers({
 	"infra.phase_stats", "adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "infra.boot_profiler",
-	"infra.perf_counters", "toml_codec.reader",
+	"infra.perf_counters", "core.text.engine.toml_codec.reader",
 })
 
 local MS = 1e6
@@ -20,9 +20,9 @@ local MS = 1e6
 --- @param level number Logger minimum level.
 --- @return table stats, table lines
 local function fixture(level)
-	package.loaded["logger"] = nil
-	package.loaded["logger.shim"] = nil
-	local logger = require("logger")
+	package.loaded["core.logger.engine"] = nil
+	package.loaded["core.logger.engine.shim"] = nil
+	local logger = require("core.logger.engine")
 	local lines = {}
 	logger.set_sink(function(line) lines[#lines + 1] = line end)
 	logger.set_level(level)
@@ -167,7 +167,7 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 		local stats = fixture(20)
 		package.loaded["infra.toml.reader"] = nil
 		local Reader = require("infra.toml.reader")
-		local shared = require("toml_codec.reader")
+		local shared = require("core.text.engine.toml_codec.reader")
 		helpers.assert_eq(Reader.parse_text, shared.parse_text)
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb"))

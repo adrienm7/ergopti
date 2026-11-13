@@ -24,7 +24,7 @@
 ---    path are parameters, so every branch is tested without Hammerspoon.
 --- ==============================================================================
 
-local Identifiers = require("identifiers")
+local Identifiers = require("core.text.engine.identifiers")
 
 local M = {}
 

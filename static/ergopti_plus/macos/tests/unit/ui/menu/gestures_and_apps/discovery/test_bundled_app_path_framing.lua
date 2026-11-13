@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local OWNED = {
 	"ui.menu.menu_apps", "infra.logger", "infra.paths", "infra.i18n",
-	"infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "infra.fs_dir", "text_utils", "compat.utf8", "lfs",
+	"infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "infra.fs_dir", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "lfs",
 }
 
 --- Owns only named scratch files and directories, restoring cold native imports.

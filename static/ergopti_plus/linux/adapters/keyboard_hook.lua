@@ -44,9 +44,9 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local RuntimeGuard = require("infra.runtime_guard")
 -- The new logical lease trusts the normal package loader's cold construction,
 -- before any backend/setup callback. A preloaded facade keeps ordinary input
@@ -70,8 +70,8 @@ local installed_output_broker = ModifierBroker.for_channel
 local INPUT_OUTPUT_PORT_NAMES = { "capture_output", "capture_output_observer", "output_view", "acquire_transaction", "transaction_view", "transaction_current",
 	"transaction_emit", "dispatch_transaction", "commit_transaction", "retire_transaction", "close_owned" }
 local InputIssuer = require("platform.remap.key_combination_engine")
-local HookModuleSource = require("module_source_identity")
-local HookModuleDirectory = require("module_source_directory")
+local HookModuleSource = require("core.fs.engine.module_source_identity")
+local HookModuleDirectory = require("core.fs.engine.module_source_directory")
 local hook_directory = HookModuleDirectory.capture()
 local hook_source_label = debug.getinfo(1, "S").source
 local original_input_hook_ports = {}
@@ -230,7 +230,7 @@ for _, code in pairs(_locks.codes) do _locks.keys[code] = true end
 -- { emit, on_lost, owned }, `owned` when the session locked it itself. Kept in
 -- _locks, not a local of its own: this chunk is near LuaJIT's local budget.
 _locks.word = nil
-_locks.describe_failure = require("error_description").describe
+_locks.describe_failure = require("diagnostics.engine.reports.error_description").describe
 
 -- Modifier tracking — updated by _dispatch_event() on each press/release.
 -- Split by ROLE, not by key: shift and AltGr select a level of the layout and
@@ -4317,7 +4317,7 @@ function M.start(opts)
 	if admission ~= nil and type(admission) ~= "function" then return false end
 	if _number_row.retire() ~= true then return false end
 	_number_row.suppressed = {}
-	local row_mode = require("layout.number_row_policy").mode(rawget(options, "numberRowMode") or "native")
+	local row_mode = require("layouts.engine.layout.number_row_policy").mode(rawget(options, "numberRowMode") or "native")
 	if not row_mode then return false end
 	_number_row.mode = row_mode
 	_capture_session, _capture_options = {}, options

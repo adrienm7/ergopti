@@ -2,14 +2,14 @@
 
 local helpers = require("tests.helpers")
 
-helpers.describe("_shared/lua/updater/version.lua", function()
+helpers.describe("_shared/updater/engine/version_core.lua", function()
 	helpers.it("module loads without error", function()
-		local ok, mod = pcall(require, "updater.version")
-		helpers.assert_true(ok, "require('updater.version') should succeed")
+		local ok, mod = pcall(require, "updater.engine.version_core")
+		helpers.assert_true(ok, "require('updater.engine.version_core') should succeed")
 		helpers.assert_true(type(mod) == "table", "should return a table")
 	end)
 
-	local V = require("updater.version")
+	local V = require("updater.engine.version_core")
 
 	helpers.it("normalize_tag strips leading 'v'", function()
 		helpers.assert_eq(V.normalize_tag("v2.5.0"), "2.5.0")
@@ -56,9 +56,9 @@ helpers.describe("_shared/lua/updater/version.lua", function()
 	end)
 
 	helpers.it("replays the shared comparison vectors", function()
-		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/updater/version_vectors.json", "rb"))
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/updater/data/version_vectors.json", "rb"))
 		local raw = file:read("*a"); assert(file:close())
-		local vectors = assert(require("json").decode(raw)).vectors
+		local vectors = assert(require("core.text.engine.json").decode(raw)).vectors
 		for _, row in ipairs(vectors) do
 			helpers.assert_eq(V.compare_versions(row.a, row.b), row.expect, row.id)
 		end

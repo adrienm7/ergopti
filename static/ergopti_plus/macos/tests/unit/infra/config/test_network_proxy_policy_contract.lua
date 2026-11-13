@@ -10,7 +10,7 @@
 --- Register the exact shared policy controls through the actual driver path owner.
 local helpers = require("tests.helpers")
 local Paths = require("infra.paths")
-local Contract = require("test.network_proxy_policy_contract")
+local Contract = require("tests.lua.core.network_proxy_policy_contract")
 local function read(relative)
     local file = assert(io.open(assert(Paths.shared(relative)), "rb"))
     local bytes = file:read("*a")

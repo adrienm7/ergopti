@@ -22,13 +22,13 @@ const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const VENDOR = path.join(ROOT, 'static/ergopti_plus/windows/vendor');
-const MODULE = path.join(ROOT, 'static/ergopti_plus/_shared/go/native_http');
+const MODULE = path.join(ROOT, 'static/ergopti_plus/_shared/core/network/native/go/native_http');
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(VENDOR, 'ergopti-proxy-relay.json'), 'utf8'));
 const pin = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json'),
 		'utf8'
 	)
 ).go_version;

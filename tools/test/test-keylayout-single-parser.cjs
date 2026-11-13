@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: One .keylayout Reader
  * DESCRIPTION:
- * `_shared/lua/layouts/keylayout.lua` reads a macOS .keylayout into the canonical
+ * `_shared/layouts/engine/composer/keylayout.lua` reads a macOS .keylayout into the canonical
  * parsed form that the XKB converter, the macOS and Linux managers and the
  * composer check consume (PAR-76 R23). This gate refuses a second reader in the
  * code the Lua drivers load and in the repository's JavaScript tooling, so a
@@ -29,7 +29,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CANONICAL = 'static/ergopti_plus/_shared/lua/layouts/keylayout.lua';
+const CANONICAL = 'static/ergopti_plus/_shared/layouts/engine/composer/keylayout.lua';
 const ROOTS = [
 	'static/ergopti_plus/macos',
 	'static/ergopti_plus/linux',
@@ -93,8 +93,8 @@ assert.deepStrictEqual(
 
 // The Lua callers go through the canonical reader.
 for (const [file, needle] of [
-	['static/ergopti_plus/_shared/lua/layouts/composer.lua', 'Keylayout.parse('],
-	['static/ergopti_plus/_shared/lua/layouts/xkb_converter.lua', 'keylayout']
+	['static/ergopti_plus/_shared/layouts/engine/composer/composer.lua', 'Keylayout.parse('],
+	['static/ergopti_plus/_shared/layouts/engine/composer/xkb_converter.lua', 'keylayout']
 ]) {
 	assert(
 		fs.readFileSync(path.join(ROOT, file), 'utf8').includes(needle),
@@ -102,7 +102,7 @@ for (const [file, needle] of [
 	);
 }
 const composer = fs.readFileSync(
-	path.join(ROOT, 'static/ergopti_plus/_shared/lua/layouts/composer.lua'),
+	path.join(ROOT, 'static/ergopti_plus/_shared/layouts/engine/composer/composer.lua'),
 	'utf8'
 );
 assert(

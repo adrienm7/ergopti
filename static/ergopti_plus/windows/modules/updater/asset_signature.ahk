@@ -4,7 +4,7 @@
 ; MODULE: Update Asset Signature Verification (Windows)
 ; DESCRIPTION:
 ; Verifies the detached signature of the Windows update asset against the key in
-; _shared/modules/updater/asset_signing.json with the Windows CNG provider
+; _shared/updater/data/asset_signing.json with the Windows CNG provider
 ; (ECDSA P-256, SHA-256). The signed record binds the asset name, its size and
 ; its SHA-256, so verification needs the digest the updater already holds, not
 ; the archive. tools/build/update-asset-signature.cjs signs; the shared vectors
@@ -187,7 +187,7 @@ AssetSignature_Evaluate(Policy, Asset, SignatureBase64) {
 ; @returns {Map} The decoded asset_signing.json.
 _AssetSignature_ReadPolicy() {
 	global _SharedDir
-	return JsonParse(FSReadStrict(_SharedDir . "\modules\updater\asset_signing.json"))
+	return JsonParse(FSReadStrict(_SharedDir . "\updater\data\asset_signing.json"))
 }
 
 ; Downloads a published signature, bounded, on the manual request's lifetime.

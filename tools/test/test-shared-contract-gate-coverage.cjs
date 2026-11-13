@@ -7,7 +7,7 @@
  * Asserts that editing a cross-driver contract — anything under
  * `_shared/core/` (the port specs) or `_shared/tests/` (the corpora the three
  * suites replay), and the layer data every driver's loader reads at run time
- * (`_shared/keymap/` and the physical-key registry) — selects the unit suite
+ * (`_shared/layouts/data/` and the physical-key registry) — selects the unit suite
  * of EVERY driver in verify-change.cjs.
  *
  * ROOT CAUSE ENCODED:
@@ -95,8 +95,8 @@ for (const gate of DRIVER_UNIT_GATES) {
 // The layer vocabulary, the presets and the physical-key registry are read by
 // the AHK and Lua layer loaders and replayed by every driver's corpus consumer;
 // an edit that ran only the JS gate would leave two loaders unexercised.
-const SHARED_TREES = ['core', 'tests', 'keymap'];
-const SHARED_FILES = ['data/keycodes/physical_keys.json'];
+const SHARED_TREES = ['core', 'tests', 'layouts/data'];
+const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];
 
 const samples = [];
 for (const tree of SHARED_TREES) {

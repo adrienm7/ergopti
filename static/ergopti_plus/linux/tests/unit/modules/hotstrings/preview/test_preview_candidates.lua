@@ -27,7 +27,7 @@
 
 local helpers = require("tests.helpers")
 
-local Engine = helpers.load_module("hotstring_engine")
+local Engine = helpers.load_module("hotstrings.engine.matcher")
 
 --- An engine loaded with the given mappings.
 --- @param mappings table

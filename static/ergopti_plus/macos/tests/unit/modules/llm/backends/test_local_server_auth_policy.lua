@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Policy = require("llm.local_server_auth")
+local Json = require("core.text.engine.json")
+local Policy = require("ai.engine.local_servers.auth")
 local Paths = require("infra.paths")
 
 --- Reads the independent shared fixture without deriving its expected verdicts.
@@ -23,7 +23,7 @@ local function read(relative)
 end
 
 helpers.describe("Local API optional authentication policy (local-api-optional-auth)", function()
-	local _, servers = Policy.catalogue(read("modules/llm/local_servers.json"), { openai = true, openai_compat = true })
+	local _, servers = Policy.catalogue(read("ai/data/local_servers.json"), { openai = true, openai_compat = true })
 	local corpus = read("tests/corpus/llm/local_server_auth.json")
 	for _, vector in ipairs(corpus.discovered_key_cases) do
 		helpers.it("settings-file key: " .. vector.name .. " (local-api-optional-auth)", function()
@@ -57,7 +57,7 @@ helpers.describe("Local API optional authentication policy (local-api-optional-a
 end)
 
 helpers.describe("Shared local discovery controller", function()
-	require("test.local_server_discovery_contract").run(read("tests/corpus/llm/local_server_discovery.json"), helpers)
+	require("tests.lua.core.local_server_discovery_contract").run(read("tests/corpus/llm/local_server_discovery.json"), helpers)
 end)
 
 
@@ -96,7 +96,7 @@ helpers.describe("Actual local catalogue publication acknowledgement", function(
 end)
 
 helpers.describe("Configured endpoint affinity (local-configured-affinity)", function()
-	local _, servers = Policy.catalogue(read("modules/llm/local_servers.json"), {})
+	local _, servers = Policy.catalogue(read("ai/data/local_servers.json"), {})
 	local corpus = read("tests/corpus/llm/local_server_affinity.json")
 	for _, vector in ipairs(corpus.affinity_cases) do
 		helpers.it(vector.name .. " (local-configured-affinity)", function()
@@ -109,7 +109,7 @@ helpers.describe("Configured endpoint affinity (local-configured-affinity)", fun
 end)
 
 helpers.describe("Configured loopback optional credentials (local-configured-affinity)", function()
-	local _, servers = Policy.catalogue(read("modules/llm/local_servers.json"), {})
+	local _, servers = Policy.catalogue(read("ai/data/local_servers.json"), {})
 	for _, vector in ipairs(read("tests/corpus/llm/local_server_affinity.json").entry_auth_cases) do
 		helpers.it(vector.name .. " (local-configured-affinity)", function()
 			helpers.assert_eq(Policy.entry_token_allowed(vector.provider, vector.token, vector.base_url, servers), vector.allowed)
@@ -118,8 +118,8 @@ helpers.describe("Configured loopback optional credentials (local-configured-aff
 end)
 
 helpers.describe("Configured generic endpoint view projection (local-configured-views)", function()
-	local _, servers = Policy.catalogue(read("modules/llm/local_servers.json"), {})
-	local providers = read("modules/llm/api_providers.json").providers
+	local _, servers = Policy.catalogue(read("ai/data/local_servers.json"), {})
+	local providers = read("ai/data/api_providers.json").providers
 	for _, vector in ipairs(read("tests/corpus/llm/local_server_affinity.json").configured_view_cases) do
 		helpers.it(vector.name .. " (local-configured-views)", function()
 			local order, views = Policy.configured_views(vector.entries, servers, providers)

@@ -1,8 +1,8 @@
 {
-	"_comment": "What a live-mode keystroke asks for, replayed through _shared/lua/llm/request_plan/live.lua by the macOS and Linux runners. config vectors validate the decoded live.json (the real file is {debounce_ms: 80, min_words: 0}); decide vectors give the receipt live mode started with, the menu's count and whether the prompt still exists (profile_found). A deleted prompt stops live mode and asks for nothing; macOS used to run the keystroke with the menu's prompt after stopping, a convergence to Linux and to the rule that live typing never falls back. A receipt without its own count uses the menu's. expect_error is a substring of the message the plan must raise.",
+	"_comment": "What a live-mode keystroke asks for, replayed through _shared/ai/engine/request_plan/live.lua by the macOS and Linux runners. config vectors validate the decoded live.json (the real file is {debounce_ms: 80, min_words: 0}); decide vectors give the receipt live mode started with, the menu's count and whether the prompt still exists (profile_found). A deleted prompt stops live mode and asks for nothing; macOS used to run the keystroke with the menu's prompt after stopping, a convergence to Linux and to the rule that live typing never falls back. A receipt without its own count uses the menu's. expect_error is a substring of the message the plan must raise.",
 	"drivers": {
-		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
-		"linux": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
+		"macos": "Replays every vector (_shared/tests/lua/ai/request_plan_contract.lua).",
+		"linux": "Replays every vector (_shared/tests/lua/ai/request_plan_contract.lua).",
 		"windows": "Replays every vector through prediction_live.ahk (tests/meta/corpus/test_corpus_llm_request_plan.ahk)."
 	},
 	"differences": {

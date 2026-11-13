@@ -18,15 +18,15 @@ local SHORTCUT_OWNERS = {
 	"infra.i18n",
 	"infra.logger",
 	"ui.menu.shortcut_utils",
-	"send_input",
+	"platform.input.send_input",
 	"infra.native_presentation",
-	"window_titles",
-	"native_presentation",
+	"core.ui.engine.window_titles",
+	"menu.engine.native_presentation_core",
 	"infra.locale",
-	"locale.core",
+	"core.i18n.engine.core",
 	"adapters.json_codec",
 	"infra.paths",
-	"native_path",
+	"core.fs.engine.native_path",
 }
 
 local Fixture = require("tests.support.profile_delete_fixture")
@@ -155,10 +155,10 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 			package.loaded["infra.app_picker"] = {build_menu = function() return {} end}
 			package.loaded["infra.i18n"] = {get = function(key) return key end}
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
+			package.loaded["infra.manifest_menu"] = assert(require("menu.engine.renderer").new({
 				platform = "hs",
-				manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
-				json_decode = function(raw) return require("json").decode(raw) end,
+				manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
+				json_decode = function(raw) return require("core.text.engine.json").decode(raw) end,
 				i18n = {get = function(key) return key end, section = function(key) return key end},
 				logger = package.loaded["infra.logger"],
 			}))

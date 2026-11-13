@@ -6,7 +6,7 @@
 --- Lets a remap test keep stating its source in the Karabiner model (the
 --- `[tap_holds]` / `[mod_combos.config.esc_tab]` layout config_karabiner.toml had)
 --- while the driver reads and writes the shared tap_hold.toml
---- (_shared/tap_hold/SCHEMA.md) and the config.toml beside it, which holds the
+--- (_shared/tap_hold/data/SCHEMA.md) and the config.toml beside it, which holds the
 --- manifest's tap-hold rows (`[tap_holds]` enabled, sticky_timeout_ms,
 --- lone_modifier_tap_max_ms and `[mod_combos]`). `file(text)` is the pair a
 --- model text becomes (tap_hold.toml stamped with the current version, then the
@@ -23,8 +23,8 @@
 
 local M = {}
 
-local TomlCodec = require("toml_codec")
-local SharedFile = require("tap_hold.shared_file")
+local TomlCodec = require("core.text.engine.toml_codec")
+local SharedFile = require("tap_hold.engine.shared_file")
 
 --- The driver's translation binding, loaded fresh for the current stub scope.
 local function binding()

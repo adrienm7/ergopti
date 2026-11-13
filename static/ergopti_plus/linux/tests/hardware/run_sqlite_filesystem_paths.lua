@@ -9,11 +9,11 @@
 --- ==============================================================================
 
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-sqlite-filesystem-paths-XXXXXX"))
 local initial_cwd = assert(uv.cwd())
 package.path = initial_cwd .. "/?.lua;" .. initial_cwd .. "/?/init.lua;"
-	.. initial_cwd .. "/../_shared/lua/?.lua;" .. initial_cwd .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. initial_cwd .. "/../_shared/?.lua;" .. initial_cwd .. "/../_shared/?/init.lua;" .. package.path
 local original_xdg = {}
 local checks, failures = 0, 0
 

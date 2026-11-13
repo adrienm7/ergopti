@@ -18,7 +18,7 @@
 ---    is mid-decision about a physical event, and an action that types (send_text)
 ---    must not start injecting before that decision has returned.
 --- 3. The key identity, the order and the default action are shared data
----    (_shared/modules/actions/tap_keys.json and the manifest's
+---    (_shared/shortcuts/data/actions/tap_keys.json and the manifest's
 ---    shortcuts.tap_keys entries), so the three drivers offer the same keys.
 --- 4. The menu names each key by what a tap on it types under the keymap the
 ---    session has loaded (adapters/keyboard_layout over infra/xkb_keymap), a dead
@@ -26,17 +26,17 @@
 --- ==============================================================================
 
 local M = {}
-local BindingPublication = require("config_binding_publication")
+local BindingPublication = require("settings.engine.publication.binding_publication")
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Paths = require("infra.paths")
 local AiActions = require("modules.shortcuts.ai_actions")
 local Manifest = require("infra.manifest_reader")
-local TomlCodec = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
-local ShortcutCatalogue = require("shortcuts.catalogue")
-local ConfigKeys = require("config_keys")
+local TomlCodec = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
+local ShortcutCatalogue = require("shortcuts.engine.catalogue")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.shortcuts.tap_keys"
 
@@ -51,17 +51,17 @@ local BLOCKING_MODIFIERS = { "ctrl", "shift", "alt", "altgr", "meta" }
 -- The shared key list (tap_keys.json) in menu order and its published identity,
 -- shared with macOS.
 local TapKeys = ShortcutCatalogue.new_tap_keys({
-	keys_rel_path = "modules/actions/tap_keys.json",
+	keys_rel_path = "shortcuts/data/actions/tap_keys.json",
 	-- Resolved on every read: tests redirect Paths.shared to a throwaway file.
 	resolve_path = function(rel) return Paths.shared(rel) end,
 	read = function(path)
 		local body, status
-		if path then body, status = require("toml_codec.writer").read_classified(path) end
+		if path then body, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 		if status ~= "ok" then error("tap_keys: cannot read " .. tostring(path)) end
 		return body
 	end,
 	decode = function(body)
-		local ok, parsed = pcall(require("json").decode, body)
+		local ok, parsed = pcall(require("core.text.engine.json").decode, body)
 		return ok and parsed or nil
 	end,
 	valid_entry = function(entry) return type(entry.id) == "string" and type(entry.linux) == "number" end,

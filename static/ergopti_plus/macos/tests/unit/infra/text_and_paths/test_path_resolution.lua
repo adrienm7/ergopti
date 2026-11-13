@@ -42,7 +42,7 @@ helpers.describe("wpm_widget.resolve_shared_constants_path", function()
 		-- `WpmWidget ~= nil` holds even when resolution FAILS. We must assert that
 		-- NO "file not found after all attempts" ERROR was logged during load.
 		-- A wrong shared-tree relative path — e.g. the _shared/ reorg leftover
-		-- "wpm_widget/constants.toml" instead of "modules/wpm_widget/constants.toml"
+		-- "wpm_widget/constants.toml" instead of "metrics/data/wpm_widget/constants.toml"
 		-- — makes resolve_shared_constants_path log exactly that and the widget go
 		-- non-functional at boot (project-shared-tree-layout bypass gotcha).
 		log_calls = {}

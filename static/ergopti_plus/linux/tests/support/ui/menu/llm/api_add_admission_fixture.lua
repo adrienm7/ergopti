@@ -23,7 +23,7 @@ function M.run(body)
 		"modules.llm.api_remote", "infra.llm_preferences", "infra.config_paths", "adapters.storage", "adapters.http_client",
 		"modules.llm.profiles", "modules.llm.settings", "modules.llm.trigger_settings", "modules.llm.display_settings",
 		"modules.llm.agent_settings", "modules.llm.profile_settings", "modules.llm.navigation_settings" }) do package.loaded[name] = nil end
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local old_log = { info = Logger.info, debug = Logger.debug, error = Logger.error }
 	local rename = os.rename
 	local function write(path, text)
@@ -43,7 +43,7 @@ function M.run(body)
 		assert(uv.fs_rmdir(path))
 	end
 	local ok, why = xpcall(function()
-		local Json, Paths = require("json"), require("infra.config_paths")
+		local Json, Paths = require("core.text.engine.json"), require("infra.config_paths")
 		assert(uv.fs_mkdir(Paths.config_home(), 448)); assert(uv.fs_mkdir(Paths.get_config_dir(), 448))
 		local state = { requests = {}, errors = {}, infos = {}, stages = 0, writes = 0, changed = 0, paused = false, owners = {},
 			api_path = scratch .. "/api.json", config_path = Paths.config("config.toml"), read = read, write = write, json = Json }

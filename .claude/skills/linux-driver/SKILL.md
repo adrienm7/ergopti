@@ -123,7 +123,7 @@ runner cannot answer.
   rule holds on every OS (Windows follows; the ordered-pair policy applies
   the same minimum to a pair's release-judged tap).
 - **`tap_hold_loader.lua`** lays the user's `tap_hold.toml` over
-  `_shared/tap_hold/defaults.toml` key by key and field by field, but only
+  `_shared/tap_hold/data/defaults.toml` key by key and field by field, but only
   when the file says `inherit_defaults = true`; otherwise it starts from no
   keys, so an empty file is the keyboard's own behaviour.
   A hold modifier drops the default layer and the reverse; `tap_action = ""`

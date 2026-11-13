@@ -13,13 +13,13 @@
 local M = {}
 
 local hs            = hs
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local OllamaBinary = require("modules.llm.ollama_binary")
-local RuntimeChoice = require("core.llm.ollama_runtime_choice")
+local RuntimeChoice = require("core.lifecycle.engine.core.ollama_runtime_choice")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
 local NetworkEnv = require("modules.llm.network_env")
 local ManagedPullReceipt = require("adapters.managed_ollama_pull")

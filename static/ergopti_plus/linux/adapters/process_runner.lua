@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local M = {}
-local Errors = require("adapter_errors")
-local Logger = require("logger.shim")
+local Errors = require("diagnostics.engine.adapter_errors")
+local Logger = require("core.logger.engine.shim")
 local Timings = require("infra.timings")
 local ShellRunner = require("adapters.shell_runner")
 local OwnedProcess = require("adapters.owned_process")
@@ -20,7 +20,7 @@ if not available then Native = nil end
 
 local LOG = "adapters.process_runner"
 local DEFAULT_TIMEOUT_MS = Timings.ms("adapters", "default_timeout_ms")
-local DEFAULT_MAX_OUTPUT_BYTES = require("llm.process_limits").defaults().max_output_bytes
+local DEFAULT_MAX_OUTPUT_BYTES = require("ai.engine.policy.process_limits").defaults().max_output_bytes
 local claims = {}
 local stopping = false
 

@@ -24,7 +24,7 @@
 local helpers = require("tests.helpers")
 local World = require("tests.support.agent_world")
 
-local Agent = require("llm.agent")
+local Agent = require("ai.engine.agent.agent")
 
 local CONFIG = World.CONFIG
 local SENTENCE = "Rappelle-moi d'appeler Paul demain à 9h"

@@ -2,7 +2,7 @@
 --- Native SQLite/public software event-protocol proof; no physical collection claim.
 --- Current Hook manual Backspace dispatch is outside this aggregate contract.
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-hour-errors-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", root .. "/" .. name:lower()))
@@ -15,7 +15,7 @@ local K = require("modules.keystats.keystats")
 local W = require("modules.keystats.sqlite_writer")
 local R = require("modules.keystats.sqlite_reader")
 local Clock = require("infra.monotonic")
-local J = require("json")
+local J = require("core.text.engine.json")
 local path, today, app = root .. "/metrics.sqlite", os.date("%Y-%m-%d"), "owned-hour-error"
 K.init({ sqlite_path = path, log_dir = root .. "/logs" })
 assert(K.is_enabled() and W.is_available())

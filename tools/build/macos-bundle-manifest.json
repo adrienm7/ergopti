@@ -50,7 +50,7 @@
 			"reason": "The native half of the bundled LuaSocket."
 		},
 		{
-			"target": "ergopti_plus/_shared/modules/llm/managed_ollama_release.json",
+			"target": "ergopti_plus/_shared/ai/data/managed_ollama_release.json",
 			"owner": "tools/build/stage-macos-managed-ollama-inputs.py",
 			"reason": "Generated conditionally from both genuine native producer archives and provenance receipts through the source-qualified catalogue owner; never committed."
 		}
@@ -67,14 +67,13 @@
 			"patterns": [
 				"ergopti_plus/macos/tests/**",
 				"ergopti_plus/_shared/tests/**",
-				"ergopti_plus/_shared/lua/test/**",
 				"ergopti_plus/macos/data/test_*.py"
 			]
 		},
 		{
 			"group": "documentation",
 			"reason": "READMEs, specifications and configuration examples document the repository; no runtime path opens them. The third-party license notice ships with the vendored code it covers.",
-			"patterns": ["**/*.md", "ergopti_plus/_shared/core/config_schema/examples/**"],
+			"patterns": ["**/*.md", "ergopti_plus/_shared/settings/data/config_schema/examples/**"],
 			"except": ["**/LICENSES.md"]
 		},
 		{
@@ -86,11 +85,10 @@
 			"group": "developer-tooling",
 			"reason": "Maintainer scripts and source-review declarations consumed by code generators, and installer scripts no driver invokes.",
 			"patterns": [
-				"ergopti_plus/_shared/modules/features/behaviors.json",
+				"ergopti_plus/_shared/settings/data/features/behaviors.json",
 				"ergopti_plus/macos/data/generate_models.py",
-				"ergopti_plus/_shared/modules/llm/validate_*.py",
-				"ergopti_plus/_shared/native/**",
-				"ergopti_plus/_shared/go/**"
+				"ergopti_plus/_shared/ai/data/validate_*.py",
+				"ergopti_plus/_shared/core/network/native/**"
 			]
 		}
 	]

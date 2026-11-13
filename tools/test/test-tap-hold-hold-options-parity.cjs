@@ -10,13 +10,13 @@
  *
  * WHAT THIS CAUGHT (2026-08-08):
  * the list was a hardcoded array in windows/platform/remap/tap_hold_writer.ahk
- * whose own comment claimed it "mirrors _shared/modules/menu/menu_manifest.json
+ * whose own comment claimed it "mirrors _shared/menu/data/menu_manifest.json
  * hold_options" — a key that has never existed in that file. So the canonical
  * list was a copy pointing at nothing, and the two Lua drivers offered no hold
  * picker at all: on Linux the whole tap-hold submenu was greyed read-outs.
  *
  * WHAT IS COMPARED:
- * the ids in `_shared/tap_hold/defaults.toml` under `[tap_hold.hold_picker]`,
+ * the ids in `_shared/tap_hold/data/defaults.toml` under `[tap_hold.hold_picker]`,
  * the sequence the shared Lua module builds from them, and the sequence the
  * AutoHotkey enumerator produces. The ORDER is the thing that must not differ:
  * both walk the modifiers depth-first, left to right, and this reproduces that
@@ -33,8 +33,8 @@ const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const DEFAULTS = path.join(SP, '_shared', 'tap_hold', 'defaults.toml');
-const SHARED_LUA = path.join(SP, '_shared', 'lua', 'tap_hold', 'hold_options.lua');
+const DEFAULTS = path.join(SP, '_shared', 'tap_hold', 'data', 'defaults.toml');
+const SHARED_LUA = path.join(SP, '_shared', 'tap_hold', 'engine', 'hold_options.lua');
 const AHK_WRITER = path.join(SP, 'windows', 'platform', 'remap', 'tap_hold_writer.ahk');
 
 const errors = [];
@@ -57,7 +57,7 @@ const layers = readArray(toml, 'layers');
 
 if (!modifiers || modifiers.length === 0) {
 	errors.push(
-		'_shared/tap_hold/defaults.toml declares no [tap_hold.hold_picker] modifiers. Every driver builds ' +
+		'_shared/tap_hold/data/defaults.toml declares no [tap_hold.hold_picker] modifiers. Every driver builds ' +
 			'its hold picker from that table; without it they each fall back to whatever they had, which is ' +
 			'how the lists drifted in the first place.'
 	);
@@ -107,7 +107,7 @@ if (modifiers && modifiers.length > 0) {
 	if (/_TH_HoldModifierIds\s*:=\s*\[/.test(ahk)) {
 		errors.push(
 			'windows/platform/remap/tap_hold_writer.ahk declares its own modifier array again. The ids ' +
-				'belong to _shared/tap_hold/defaults.toml — a second list is one edit away from two ' +
+				'belong to _shared/tap_hold/data/defaults.toml — a second list is one edit away from two ' +
 				'different hold pickers reading one config file.'
 		);
 	}
@@ -120,7 +120,7 @@ if (modifiers && modifiers.length > 0) {
 
 	// The Linux menu must actually offer the picker — the point of the exercise.
 	const linuxMenu = readSourceFile(path.join(SP, 'linux', 'ui', 'menu', 'builder.lua'));
-	if (!/tap_hold\.hold_options/.test(linuxMenu)) {
+	if (!/tap_hold\.engine\.hold_options/.test(linuxMenu)) {
 		errors.push(
 			'linux/ui/menu/builder.lua no longer builds its hold picker from the shared catalogue. ' +
 				'Its tap-hold submenu was greyed read-outs until 2026-08-08 and this is what stops it ' +
@@ -182,7 +182,7 @@ if (Object.keys(aliases).length > 0) {
 	for (const field of aliasTables) {
 		if (!lua.includes(field)) {
 			errors.push(
-				`_shared/lua/tap_hold/hold_options.lua does not read \`${field}\` from the hold picker.`
+				`_shared/tap_hold/engine/hold_options.lua does not read \`${field}\` from the hold picker.`
 			);
 		}
 		if (!ahkLoader.includes('"' + field + '"')) {
@@ -194,7 +194,7 @@ if (Object.keys(aliases).length > 0) {
 	for (const alias of Object.keys(aliases)) {
 		if (new RegExp(`\\b${alias}\\s*=\\s*"`).test(lua)) {
 			errors.push(
-				`_shared/lua/tap_hold/hold_options.lua spells the alias '${alias}' itself again.`
+				`_shared/tap_hold/engine/hold_options.lua spells the alias '${alias}' itself again.`
 			);
 		}
 		if (new RegExp(`case[^\\n]*"${alias}"`).test(resolveBody)) {

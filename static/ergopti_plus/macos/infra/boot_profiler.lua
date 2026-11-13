@@ -33,7 +33,7 @@ local PhaseStats  = require("infra.phase_stats")
 local Logger      = require("infra.logger")
 local Timer       = require("adapters.timer_scheduler")
 local BootJournal = require("adapters.boot_journal")
-local PerfBudget  = require("perf_budget")
+local PerfBudget  = require("core.logger.engine.perf_budget")
 local LOG         = "BootProfile"
 
 -- Monotonic nanoseconds captured at the previous mark and at M.begin(). A nil

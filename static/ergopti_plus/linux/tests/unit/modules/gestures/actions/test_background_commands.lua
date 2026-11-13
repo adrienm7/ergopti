@@ -18,7 +18,7 @@ local function fresh_runner()
 	local errors = {}
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
-	local runner = helpers.load_module_with_dependency("modules.gestures.background_commands", "logger.shim", logger)
+	local runner = helpers.load_module_with_dependency("modules.gestures.background_commands", "core.logger.engine.shim", logger)
 	return runner, errors
 end
 

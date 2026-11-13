@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Physical Shortcut Slots
 ; DESCRIPTION:
-; Port of _shared/lua/shortcuts/physical_slots.lua for the Windows editor:
+; Port of _shared/shortcuts/engine/physical_slots.lua for the Windows editor:
 ; names a physical key position and an exact modifier set in the existing
 ; shortcuts.keyboard namespace (physical_<mods>_<W3C code>). Native identity is
 ; the registry's ahk field (SCnnn); this owner never resolves logical text.
@@ -15,12 +15,12 @@ PhysicalShortcutsShared() {
 	global _SharedDir
 	static Shared := 0
 	if !(Shared is Map)
-		Shared := JsonParse(FSReadStrict(_SharedDir . "\modules\shortcuts\physical_shortcuts.json"))
+		Shared := JsonParse(FSReadStrict(_SharedDir . "\shortcuts\data\physical_shortcuts.json"))
 	return Shared
 }
 
 class PhysicalSlots {
-	; The slot prefix every driver names, from _shared/modules/shortcuts/physical_shortcuts.json.
+	; The slot prefix every driver names, from _shared/shortcuts/data/physical_shortcuts.json.
 	static PREFIX => PhysicalShortcutsShared()["slot_prefix"]
 	static MODIFIER_ORDER := ["ctrl", "alt", "shift", "super"]
 	; Modifier positions are held, never bound as a physical shortcut key.
@@ -44,7 +44,7 @@ class PhysicalSlots {
 	static Load(Path := "") {
 		global _SharedDir
 		if (Path == "")
-			Path := _SharedDir . "\data\keycodes\physical_keys.json"
+			Path := _SharedDir . "\layouts\data\keycodes\physical_keys.json"
 		return PhysicalSlots(JsonParse(FSReadStrict(Path)))
 	}
 

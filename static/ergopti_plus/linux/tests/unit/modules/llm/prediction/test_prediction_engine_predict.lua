@@ -189,7 +189,7 @@ helpers.describe("prediction_engine.predict: 'no model selected' guard is not de
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		}
 
-		local logger    = require("logger.shim")
+		local logger    = require("core.logger.engine.shim")
 		local orig_warn = logger.warn
 		local warns     = {}
 		logger.warn = function(_t, fmt, ...)
@@ -221,7 +221,7 @@ end)
 helpers.describe("prediction_engine: durable logical-output callback", function()
 	helpers.it("withholds private text raised by the output observer", function()
 		local restore_focus = install_insecure_focus()
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local previous_warn, warnings = logger.warn, {}
 		local previous_ollama = package.loaded["modules.llm.api_ollama"]
 		local previous_profiles = package.loaded["modules.llm.profiles"]

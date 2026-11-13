@@ -4,7 +4,7 @@
 --- MODULE: Local Driver Control (macOS)
 --- DESCRIPTION:
 --- A tool run by the same user asks this Hammerspoon driver to reload. The
---- policy is the shared _shared/lua/control/driver_control.lua; this module owns
+--- policy is the shared _shared/diagnostics/engine/control_driver_control.lua; this module owns
 --- the session in ~/Library/Application Support, the request it consumes and
 --- the result it reports.
 ---
@@ -24,10 +24,10 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local Policy = require("control.driver_control")
-local Json = require("json")
-local ErrorDescription = require("error_description")
-local TextUtils = require("text_utils")
+local Policy = require("diagnostics.engine.control_driver_control")
+local Json = require("core.text.engine.json")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "driver_control"
 
@@ -329,11 +329,11 @@ function M.start(opts)
 	local ok, session_or_err = pcall(function()
 		Logger.start(LOG, "Starting the local reload control…")
 		local declaration = opts.declaration
-			or require("infra.paths").shared("modules/control/driver_control.json")
+			or require("infra.paths").shared("diagnostics/data/control/driver_control.json")
 		local text = require("adapters.file_system").read(declaration)
 		if type(text) ~= "string" then error("the declaration could not be read: " .. tostring(declaration), 0) end
 		local spec = Policy.validate(Json.decode(text))
-		local folder, why = Policy.folder(spec, "macos", os.getenv, require("app_dirs").macos.folder_name, "/")
+		local folder, why = Policy.folder(spec, "macos", os.getenv, require("core.fs.engine.app_dirs").macos.folder_name, "/")
 		if not folder then error(why, 0) end
 		local session = M.new({ spec = spec, folder = folder, pid = opts.pid, request_reload = opts.request_reload })
 		_session = session

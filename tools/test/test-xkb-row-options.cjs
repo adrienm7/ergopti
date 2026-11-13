@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: XKB Number-Row Options Gate
  * DESCRIPTION:
- * The Linux converter (_shared/lua/layouts/xkb_converter.lua) applies the
+ * The Linux converter (_shared/layouts/engine/composer/xkb_converter.lua) applies the
  * number-row options to a layout it converts. The web composer applies the same
  * options when it compiles a layout (composer_model.js). The two must agree, and
  * both must agree with what Windows types.
@@ -34,7 +34,7 @@ const { shared } = require('../lib/paths.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PROBE = path.join(__dirname, 'fixtures', 'keylayout-xkb-convert.lua');
 const DATA = path.join(ROOT, 'static', 'ergopti', 'linux', 'xkb_generation', 'data');
-const TABLE_PATH = shared('modules', 'layouts', 'mac_keycodes.json');
+const TABLE_PATH = shared('layouts', 'data', 'mac_keycodes.json');
 const CASES = JSON.parse(
 	fs.readFileSync(shared('tests', 'corpus', 'layouts', 'row_options_vectors.json'), 'utf8')
 ).cases;

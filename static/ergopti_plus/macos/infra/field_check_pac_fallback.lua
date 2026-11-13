@@ -21,8 +21,8 @@
 ---    still fails there is the defect the item exists for.
 --- ==============================================================================
 
-local Report = require("field_check_report")
-local TableUtil = require("table_util")
+local Report = require("diagnostics.engine.field_check.report")
+local TableUtil = require("core.text.engine.table_util")
 
 local M = {}
 

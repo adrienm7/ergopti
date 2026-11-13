@@ -79,7 +79,7 @@ const inventoryLocales = Object.fromEntries(
 		lang,
 		JSON.parse(
 			fs.readFileSync(
-				path.join(ROOT, `static/ergopti_plus/_shared/data/locales/${lang}.json`),
+				path.join(ROOT, `static/ergopti_plus/_shared/core/i18n/data/locales/${lang}.json`),
 				'utf8'
 			)
 		)
@@ -87,13 +87,13 @@ const inventoryLocales = Object.fromEntries(
 );
 const inventoryActions = require('smol-toml').parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/_shared/modules/actions/actions.toml'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/shortcuts/data/actions/actions.toml'),
 		'utf8'
 	)
 );
 const inventoryMenu = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/menu/data/menu_manifest.json'),
 		'utf8'
 	)
 );
@@ -110,7 +110,7 @@ const hiddenProfileRow = JSON.parse(beforeInventory['src/routes/ergopti-plus/men
 assert.ok(hiddenProfileRow, 'the restricted profile shortcut row must be inventoried');
 const hiddenProfileReasons = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/_shared/modules/menu/hidden_row_reasons.json'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/menu/data/hidden_row_reasons.json'),
 		'utf8'
 	)
 );
@@ -161,7 +161,7 @@ assert.throws(
 			{
 				...JSON.parse(
 					fs.readFileSync(
-						path.join(ROOT, 'static/ergopti_plus/_shared/modules/menu/hidden_row_reasons.json'),
+						path.join(ROOT, 'static/ergopti_plus/_shared/menu/data/hidden_row_reasons.json'),
 						'utf8'
 					)
 				),
@@ -395,7 +395,8 @@ const EVIDENCE_PATH = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
+	'settings',
+	'data',
 	'features',
 	'linux_evidence.json'
 );
@@ -466,7 +467,10 @@ for (const file of ['src/routes/ergopti-plus/menu-gaps.json', 'docs/feature-inve
 }
 
 const layerVocabulary = require('smol-toml').parse(
-	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/keymap/layer_actions.toml'), 'utf8')
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/layouts/data/layer_actions.toml'),
+		'utf8'
+	)
 );
 const withLayers = inventory.render(
 	inventoryModel,
@@ -507,7 +511,10 @@ const inputInventory = JSON.parse(
 	fs.readFileSync(path.join(ROOT, 'src/routes/ergopti-plus/input-inventory.json'), 'utf8')
 );
 const tapDefaults = require('smol-toml').parse(
-	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/tap_hold/defaults.toml'), 'utf8')
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/tap_hold/data/defaults.toml'),
+		'utf8'
+	)
 );
 assert.strictEqual(inputInventory.length, tapDefaults.tap_hold.catalog.keys.length);
 assert.ok(inputInventory.length >= 19, 'input inventory must cover the native key catalogue');
@@ -519,7 +526,16 @@ assert.strictEqual(
 const rows = build();
 const summary = summarize(rows);
 const canonical = fs.readFileSync(
-	path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'features', 'manifest.toml'),
+	path.join(
+		ROOT,
+		'static',
+		'ergopti_plus',
+		'_shared',
+		'settings',
+		'data',
+		'features',
+		'manifest.toml'
+	),
 	'utf8'
 );
 const declaredCount = [...canonical.matchAll(/^\[\[features\.[^\]]+\]\]$/gm)].length;

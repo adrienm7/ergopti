@@ -10,7 +10,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Launcher authority: the developer launcher sets the variable named by
-;    dev_source.environment in _shared/data/identifiers.json (the one the macOS
+;    dev_source.environment in _shared/core/text/data/identifiers.json (the one the macOS
 ;    and Linux developer runs use). A compiled build ignores it: its includes
 ;    are embedded, so a source edit cannot reach it.
 ; 2. Exact match: the root must name the clone this script runs from. A root
@@ -52,7 +52,7 @@ global _DevSourceWatcher := 0
 ; @param SharedDir {String} The _shared folder.
 ; @returns {String}
 DevSource_EnvironmentName(SharedDir) {
-	Data := JsonParse(FileRead(SharedDir . "\data\identifiers.json", "UTF-8"))
+	Data := JsonParse(FileRead(SharedDir . "\core\text\data\identifiers.json", "UTF-8"))
 	Name := Data["dev_source"]["environment"]
 	if (Type(Name) != "String" || Name == "")
 		throw Error("identifiers.json names no dev_source.environment")
@@ -134,7 +134,7 @@ DevSource_DeriveRoot(ScriptDir) {
 	if (FileExist(Root . "\.git") == "")
 		return ""
 	; The repository's own tree, a file and not a folder of that name.
-	Attributes := FileExist(Root . "\static\ergopti_plus\_shared\data\identifiers.json")
+	Attributes := FileExist(Root . "\static\ergopti_plus\_shared\core\text\data\identifiers.json")
 	if (Attributes == "" || InStr(Attributes, "D"))
 		return ""
 	return Root

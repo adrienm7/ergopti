@@ -89,7 +89,7 @@ def published_archive_bindings(execute=None):
             "-e",
             program,
             str(root / "tools/build/macos-release-archives.cjs"),
-            str(root / "static/ergopti_plus/_shared/modules/updater/defaults.json"),
+            str(root / "static/ergopti_plus/_shared/updater/data/defaults.json"),
         ],
         execute,
         True,
@@ -226,7 +226,7 @@ def main():
             raise RuntimeError("A fixture executable is already running")
     report = {"app": str(app), "samples": [], "full_functionality_validated": False}
     # launcher.log and, without a LogsDirPath override, the driver logs share
-    # the default logs folder (_shared/modules/paths/app_dirs.toml).
+    # the default logs folder (_shared/core/fs/data/paths/app_dirs.toml).
     logs = Path.home() / app_dirs.LOGS_RELATIVE
     launcher_log = logs / app_dirs.LAUNCHER_LOG_NAME
     if launcher_log.exists():

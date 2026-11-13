@@ -5,7 +5,7 @@
  * MODULE: Update Channel Registry
  * DESCRIPTION:
  * Canonical interpreter of the shared update-channel registry
- * (_shared/modules/updater/channels.json): which channel a release tag belongs
+ * (_shared/updater/data/channels.json): which channel a release tag belongs
  * to, how a persisted value maps to a channel, which releases a channel's
  * Versions view lists, whether an update check offers a candidate, which
  * release is a channel's latest, and which other channels published a newer
@@ -16,8 +16,8 @@
  *    optional prerelease label with a counter), interpreted by hand-written
  *    code in each runtime. No regular expression has to survive translation
  *    between JavaScript, PCRE and Lua patterns.
- * 2. One vector table: _shared/modules/updater/channel_vectors.json is replayed
- *    by this file, the Lua port (_shared/lua/updater/channels.lua) and the AHK
+ * 2. One vector table: _shared/updater/data/channel_vectors.json is replayed
+ *    by this file, the Lua port (_shared/updater/engine/channels.lua) and the AHK
  *    port (windows/modules/updater/channels.ahk).
  * 3. Fail fast: a malformed registry throws at creation instead of degrading to
  *    a default channel.

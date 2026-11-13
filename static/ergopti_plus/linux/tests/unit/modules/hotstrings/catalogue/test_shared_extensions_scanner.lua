@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Extension Pack Discovery (shared)
 --- DESCRIPTION:
---- Covers _shared/lua/hotstrings/extensions.lua, the scanner both Lua drivers use
+--- Covers _shared/hotstrings/engine/extensions.lua, the scanner both Lua drivers use
 --- to find installed extension packs.
 ---
 --- WHY THIS EXISTS:
@@ -26,9 +26,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local Extensions = helpers.load_module("hotstrings.extensions")
+local Extensions = helpers.load_module("hotstrings.engine.extensions")
 
 -- Shared with the macOS suite and the Windows scanner, so the three readers of a
 -- manifest's historical bindings are pinned to one set of decisions.
@@ -295,12 +295,12 @@ do
 	local fh = assert(io.open(BINDING_VECTORS_PATH, "r"))
 	local text = fh:read("*a")
 	fh:close()
-	require("test.extension_binding_contract")(helpers, Extensions, Json.decode(text))
+	require("tests.lua.extension_binding_contract")(helpers, Extensions, Json.decode(text))
 end
 
 do
 	local fh = assert(io.open(MAGIC_KEY_VECTORS_PATH, "r"))
 	local text = fh:read("*a")
 	fh:close()
-	require("test.extension_magic_key_contract")(helpers, Extensions, Json.decode(text))
+	require("tests.lua.extension_magic_key_contract")(helpers, Extensions, Json.decode(text))
 end

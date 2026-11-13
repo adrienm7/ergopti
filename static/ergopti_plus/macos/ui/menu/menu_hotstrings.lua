@@ -7,20 +7,20 @@
 --- ==============================================================================
 
 local M = {}
-local PersonalFiles = require("hotstrings.personal_files")
-local SectionOrder = require("hotstrings.section_order")
-local TableUtil = require("table_util")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
+local SectionOrder = require("hotstrings.engine.section_order")
+local TableUtil = require("core.text.engine.table_util")
 local Logger        = require("infra.logger")
 local DeferredWork  = require("infra.deferred_work")
 local ShellRunner   = require("adapters.shell_runner")
 local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
-local Labels        = require("menu.labels")
-local Extensions    = require("hotstrings.extensions")
+local Labels        = require("menu.engine.labels")
+local Extensions    = require("hotstrings.engine.extensions")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local ManifestMenu = require("infra.manifest_menu")
-local PersonalInfoSource = require("menu.frames.personal_info_source")
+local PersonalInfoSource = require("menu.engine.frames.personal_info_source")
 -- Owns the « all sections » checkbox, which the personal submenu draws too.
 local Custom        = require("ui.menu.menu_hotstrings_custom")
 local LOG           = "menu_hotstrings"
@@ -52,11 +52,11 @@ local keymap       = require("modules.keymap")
 -- (persisted to hotstrings_config.toml, shared with the config window). The quick
 -- menu items below read/write through it so the two UIs never desync.
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
-local HotstringLanguages = require("hotstrings.languages")
-local BulkScope = require("hotstrings.bulk_scope")
+local HotstringLanguages = require("hotstrings.engine.languages")
+local BulkScope = require("hotstrings.engine.bulk_scope")
 local ManifestReader = require("infra.manifest_reader")
 local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
-local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
+local ProgrammableMenuPolicy = require("menu.engine.programmable_hotstrings")
 
 
 
@@ -118,7 +118,7 @@ end
 -- ====================================
 -- ====================================
 
--- Thousands separator formatting lives in _shared/lua/menu/labels.lua, so the
+-- Thousands separator formatting lives in _shared/menu/engine/labels.lua, so the
 -- three drivers render the same count the same way. This file used to carry its
 -- own byte-identical copy.
 local fmt_count = Labels.fmt_count
@@ -434,7 +434,7 @@ function M.build_extension_bulk_actions(ctx, groups, bound)
 		end
 	end
 	local rows = ManifestMenu.template_rows("hotstring_extension_bulk_controls", {
-		[require("config_keys").COMMAND.EXTENSION_ALL_SECTIONS] = function()
+		[require("settings.engine.keys").COMMAND.EXTENSION_ALL_SECTIONS] = function()
 			return M.commit_extension_selection(ctx, groups, bound, not all_on)
 		end,
 	}, {
@@ -567,7 +567,7 @@ function M.build_groups(ctx, only, counts)
 				if not called or committed ~= true then
 					ctx.state.sections_order_overrides = saved_orders
 					Logger.error(LOG, "Hotstring section order was not persisted.")
-					require("config_save_failure").present(i18n.get, function(message)
+					require("settings.engine.publication.save_failure").present(i18n.get, function(message)
 						notifications.notify(i18n.get("common.error_title"), message, "error")
 					end)
 					return false
@@ -587,8 +587,8 @@ function M.build_groups(ctx, only, counts)
 			local render_ctx = { commands = {
 				-- The submenu's own sections: an extension's bound ones are drawn,
 				-- and switched, in that extension's submenu (2026-10-17).
-				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = Custom.category_scope_fn(ctx, { name }, true, nil, bound_by_group),
-				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = Custom.category_scope_fn(ctx, { name }, false, nil, bound_by_group),
+				[require("settings.engine.keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = Custom.category_scope_fn(ctx, { name }, true, nil, bound_by_group),
+				[require("settings.engine.keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = Custom.category_scope_fn(ctx, { name }, false, nil, bound_by_group),
 			} }
 			-- The renderer owns the head and separator order. A rendered child is
 			-- attached as `submenu` so its native commands are not rendered twice.
@@ -596,7 +596,7 @@ function M.build_groups(ctx, only, counts)
 				render_ctx, {
 					["hotstring_category_file"] = function()
 						if not toml_path then return {} end
-						local row = ManifestMenu.command_row("hotstring_file_commands", require("config_keys").COMMAND.HOTSTRING_FILE_OPEN,
+						local row = ManifestMenu.command_row("hotstring_file_commands", require("settings.engine.keys").COMMAND.HOTSTRING_FILE_OPEN,
 							{ hotstring_file_open = function() return open_toml_path(toml_path) end },
 							{ hotstring_file_ready = function() return type(ShellRunner.open) == "function" end })
 						return row and { row } or {}

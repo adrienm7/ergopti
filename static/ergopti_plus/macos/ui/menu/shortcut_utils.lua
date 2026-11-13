@@ -12,9 +12,9 @@ local hs     = hs
 local dialog = require("infra.dialog_util")
 local i18n   = require("infra.i18n")
 local Logger = require("infra.logger")
-local SendInput = require("send_input")
+local SendInput = require("platform.input.send_input")
 local NativePresentation = require("infra.native_presentation")
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 
 local LOG = "menu.shortcut_utils"
@@ -36,7 +36,7 @@ local VALID_MODS = {
 	shift = true,
 }
 
-local MOD_BEFORE = require("menu.row_order").comparator("menu_chord_modifiers")
+local MOD_BEFORE = require("menu.engine.row_order").comparator("menu_chord_modifiers")
 
 local function sort_modifiers(mods)
 	table.sort(mods, MOD_BEFORE)
@@ -205,7 +205,7 @@ end
 --- @return string|nil reason Existing translated native-runner availability reason.
 function M.program_assignment_reason(value)
 	local checked, reserved = pcall(function()
-		local parsed = require("program_parameter").parse(value, "posix")
+		local parsed = require("settings.engine.program_parameter").parse(value, "posix")
 		if not parsed then return false end
 		local Native = require("adapters.apple_shortcuts_native")
 		return Native.is_chosen_program(parsed.executable, parsed.arguments)
@@ -320,7 +320,7 @@ end
 --- @param prior string The value shown first.
 --- @return string|nil value Nil when the user cancelled.
 function M.ask_vision_parameter(gestures, title, prior)
-	local Vision = require("llm.vision")
+	local Vision = require("ai.engine.prediction.vision")
 	local choices = gestures.llm_vision_choices()
 	local parsed = type(prior) == "string" and Vision.parse(prior) or nil
 	local labels, ordered = {}, {}
@@ -378,7 +378,7 @@ local OUTPUT_OPTIONS = {
 --- @param prior string The stored value.
 --- @return string|nil value Nil when the user cancelled.
 function M.ask_command_parameter(gestures, action, title, prior)
-	local UserActionParameter = require("user_action_parameter")
+	local UserActionParameter = require("shortcuts.engine.user_action_parameter")
 	local stored = UserActionParameter.parse("command", prior) or {}
 	local save_btn = i18n.get("button.save")
 	local prompt_ok, button, typed = pcall(dialog.text_prompt, title, gestures.parameter_prompt(action),
@@ -406,7 +406,7 @@ end
 --- @param prior string The stored value.
 --- @return string|nil value Nil when the user cancelled or nothing can be listed.
 function M.ask_apple_shortcut_parameter(gestures, action, title, prior)
-	local UserActionParameter = require("user_action_parameter")
+	local UserActionParameter = require("shortcuts.engine.user_action_parameter")
 	local stored = UserActionParameter.parse("apple_shortcut", prior) or {}
 	local rows, reason = require("adapters.apple_shortcuts_cli").list_blocking()
 	if not rows or #rows == 0 then
@@ -543,7 +543,7 @@ function M.prompt_action_parameter(gestures, binding, action, spec, picked, muta
 end
 
 --- Greys the picker rows whose catalogue requirement is proven absent: an
---- action that needs the AI ("ai:on" in _shared/modules/actions/actions.toml,
+--- action that needs the AI ("ai:on" in _shared/shortcuts/data/actions/actions.toml,
 --- the agent's manual actions) stays visible and greyed, with the AI-off hint
 --- (dialog.action_picker.requires_ai) as its reason, while the AI is switched
 --- off. Read at each open, so switching the AI on offers them again without a

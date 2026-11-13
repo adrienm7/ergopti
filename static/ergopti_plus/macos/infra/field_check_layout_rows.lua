@@ -21,7 +21,7 @@
 --- 3. The restore always runs once a build was attempted, whatever failed.
 --- ==============================================================================
 
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 local Logger = require("infra.logger")
 
 local M = {}

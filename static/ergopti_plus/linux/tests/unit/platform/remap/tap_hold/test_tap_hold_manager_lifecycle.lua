@@ -47,14 +47,14 @@ helpers.describe("tap-hold manager", function()
 		os.remove(path)
 		assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
 		local code = string.format([[package.path = %q
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local fixture = require("tests.support.platform.remap.tap_hold.tap_hold_manager_fixture")
 local manager, hook, _, user_path = fixture.manager()
 local original = hook.engine
 local paths = require("infra.paths")
 local shared = paths.shared
 paths.shared = function(name)
-  if name == "tap_hold/one_shot_shift.json" then return %q end
+  if name == "tap_hold/data/one_shot_shift.json" then return %q end
   return shared(name)
 end
 assert(manager.reload() == false)
@@ -299,7 +299,7 @@ os.remove(user_path)
 		os.remove(user_path)
 	end)
 
-	-- The engine gets the one-shot results of _shared/tap_hold/one_shot_shift.json
+	-- The engine gets the one-shot results of _shared/tap_hold/data/one_shot_shift.json
 	-- and the magic key's, and what it cannot type goes to the injector
 	-- (one-shot-results-shared).
 	helpers.it("gives the one-shot Shift the shared results and the magic key's (one-shot-results-shared)", function()
@@ -613,7 +613,7 @@ helpers.describe("tap-hold manager: taps this driver cannot run", function()
 	--- warnings its configuration load logged.
 	local function catalogue_manager(user_text)
 		local Gestures = helpers.load_module("modules.gestures.manager")
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_warn, warnings = Logger.warn, {}
 		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
@@ -730,7 +730,7 @@ helpers.describe("tap-hold manager: the daemon's action executor", function()
 		local compile = loadstring or load
 		local factory = assert(compile("local engine = ...; local _undoable = {}; return function() " .. body
 			.. " end, function() return _undoable end", "=owned-one-shot-callback"))
-		local engine = require("hotstring_engine").new({})
+		local engine = require("hotstrings.engine.matcher").new({})
 		engine:on_char("x")
 		local callback, undoable = factory(engine)
 		helpers.assert_true(undoable() ~= nil, "the original undoable record is present")
