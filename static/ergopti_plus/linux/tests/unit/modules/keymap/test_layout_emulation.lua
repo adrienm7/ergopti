@@ -311,6 +311,21 @@ helpers.describe("layout emulation (Linux): a layout source's records", function
 		helpers.assert_eq(record.typed, { "α", "a" })
 	end)
 
+	helpers.it("keeps a custom modifier held through a pause until its release (pause-keeps-held-modifier)", function()
+		local M, record = source_fixture()
+		helpers.assert_true(M.reload())
+		local consumed, _, on_release = press(M, KEY_INTL)
+		helpers.assert_true(consumed, "the modifier is held")
+		record.paused = true
+		M.drop_pending_dead_key()
+		record.paused = false
+		helpers.assert_true(press(M, KEY_A), "its layer still types after the resume")
+		helpers.assert_eq(record.typed, { "α" }, "a full reset at pause would have dropped the hold")
+		helpers.assert_true(on_release({ code = KEY_INTL, value = 0 }), "its release is still owned")
+		helpers.assert_true(press(M, KEY_A))
+		helpers.assert_eq(record.typed, { "α", "a" }, "and ends the layer")
+	end)
+
 	helpers.it("settles a lost release before a new press of a held key (source-emulation)", function()
 		local M, record = source_fixture()
 		helpers.assert_true(M.reload())
