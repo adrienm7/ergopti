@@ -88,6 +88,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '\t\t\tlocal source = "@" .. case.prefix .. separator .. "linux" .. separator .. "core" .. separator .. "fs"\n\t\t\t\t.. separator .. "engine" .. separator .. "paths.lua"'
 	},
 	{
+		// The port wiring check joins each Lua driver's file-system adapter with
+		// the driver as a variable piece; S04 moves both to core/fs/adapters.
+		file: 'tools/test/test-file-system-port-wired.cjs',
+		moves: 'macos/adapters/file_system.lua',
+		from: "\tpath.join(ROOT, 'static', 'ergopti_plus', driver, 'adapters', 'file_system.lua')",
+		to: "\tpath.join(ROOT, 'static', 'ergopti_plus', driver, 'core', 'fs', 'adapters', 'file_system.lua')"
+	},
+	{
 		// The hs.fs.dir guard exempts the one wrapper by its file stem; S04
 		// renames macos/infra/fs_dir.lua to core/fs/engine/dir.lua.
 		file: 'static/ergopti_plus/macos/tests/meta/lua_safety/test_fs_dir_iterator_contract.lua',
