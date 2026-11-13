@@ -198,9 +198,9 @@ local get_release = Updater.get_cached_release
 local get_state = Updater.get_state
 local selected = get_release()
 local selected_tag = selected and selected.tag
-local install_done, installed = false, false
-local accepted = install(archive, function(ok)
-	install_done, installed = true, ok == true
+local install_done, installed, install_detail = false, false, nil
+local accepted = install(archive, function(ok, detail)
+	install_done, installed, install_detail = true, ok == true, detail
 end, function()
 	return probe_active and not install_done
 		and package.loaded["modules.updater.manager"] == Updater
@@ -214,7 +214,9 @@ end)
 if accepted == true or get_state() == "installing" then
 	while not install_done do luv.run("once") end
 end
-if not expect(accepted == true and install_done and installed, "installed") then finish(1) end
+-- The installer's own refusal reason is the only CI evidence of why it failed.
+if not expect(accepted == true and install_done and installed,
+	"installed (" .. tostring(install_detail) .. ")") then finish(1) end
 
 local stamp = read(HOME .. "/.local/lib/ergopti/_shared/build_stamp.txt") or ""
 local installed = stamp:match("version=([^\n]+)")
