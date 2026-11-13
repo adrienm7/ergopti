@@ -58,4 +58,8 @@ plus the Lua menu suites; no tray was rendered natively.
   commit (`LLM_Agent_RefreshTray`) and macOS refreshes through
   `apply_setting_transaction`: fixed, the engine's `on_agent_mode_change`
   observer rebuilds the tray (regression in `test_agent_auto`,
-  agent-mode-tray-redraw). Left: the user hotstring load.
+  agent-mode-tray-redraw). The programmable source loads synchronously on
+  macOS and Linux (`Source.load` in the shared `user_code_driver`), at boot
+  before the tray or from a menu action that redraws it, so the Windows
+  asynchronous-load rebuild (`_UserHotstringsRefreshMenu`) has no Lua
+  counterpart to add.
