@@ -151,6 +151,46 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 			'\t\t) || path.join(AHK_ADAPTERS_DIRS[0], `${adapterName}.ahk`);'
 	},
 	{
+		// windows/platform was never in the convention lint's scan; S28 moves this
+		// file into keyboard/engine, which is, and its banner was never balanced.
+		// The fix lands with the move, so the cohort receipt pinning it is
+		// requalified there.
+		file: 'static/ergopti_plus/windows/platform/remap/altgr_criteria.ahk',
+		moves: 'windows/platform/remap/altgr_criteria.ahk',
+		from: '; ==============================================\n; ==============================================\n; ======= 1/ AltGr tap-hold owner criteria =====\n; ==============================================\n; ==============================================\n',
+		to: '; ================================================\n; ================================================\n; ======= 1/ AltGr tap-hold owner criteria =======\n; ================================================\n; ================================================\n'
+	},
+	{
+		// windows/platform was never in the convention lint's scan; S28 moves this
+		// file into keyboard/engine, which is, and its first section followed
+		// #Requires with no blank line. The fix lands with the move, so the cohort
+		// receipt pinning it is requalified there.
+		file: 'static/ergopti_plus/windows/platform/remap/one_shot_shift.ahk',
+		moves: 'windows/platform/remap/one_shot_shift.ahk',
+		from: '#Requires AutoHotkey v2.0\n; ====',
+		to: '#Requires AutoHotkey v2.0\n\n\n\n\n\n; ===='
+	},
+	{
+		// windows/platform was never in the convention lint's scan; S34 moves this
+		// file into tap_hold/engine, which is, and one section had four blank lines
+		// before it. The fix lands with the move, so the cohort receipt pinning it
+		// is requalified there.
+		file: 'static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk',
+		moves: 'windows/platform/remap/tap_hold_loader.ahk',
+		from: '	return Resolved\n}\n\n\n\n\n; =========================================',
+		to: '	return Resolved\n}\n\n\n\n\n\n; ========================================='
+	},
+	{
+		// windows/platform was never in the convention lint's scan; S34 moves this
+		// file into tap_hold/engine, which is, and its first section followed the
+		// includes with one blank line. The fix lands with the move, so the cohort
+		// receipt pinning it is requalified there.
+		file: 'static/ergopti_plus/windows/platform/remap/tap_hold_writer.ahk',
+		moves: 'windows/platform/remap/tap_hold_writer.ahk',
+		from: '#Include ../../adapters/native_number.ahk\n\n; ===',
+		to: '#Include ../../adapters/native_number.ahk\n\n\n\n\n\n; ==='
+	},
+	{
 		// The ledger's family contracts leave one folder for two, and lose the
 		// name prefixes that told them from their neighbours there.
 		file: 'tools/test/test-contract-vector-ledger.cjs',
