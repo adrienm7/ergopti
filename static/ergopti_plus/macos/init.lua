@@ -381,7 +381,7 @@ local base_dir = require("core.fs.engine.native_path").directory_prefix(script_p
 
 -- Boot initialises the RESOLVER, not the path editor: every consumer below
 -- resolves through it, and none of them draws a UI. The editor's reload
--- callback is wired later by ui/menu/init.lua, which is the only caller that
+-- callback is wired later by menu/ui/init.lua, which is the only caller that
 -- can act on it.
 local config_paths_ready = config_paths.init(base_dir)
 if config_paths_ready ~= true then
@@ -397,7 +397,7 @@ i18n.adopt_saved_locale()
 -- Configuration consumers may perform reads during require; path ownership comes first.
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
-local ManifestReader     = require("infra.manifest_reader")
+local ManifestReader     = require("menu.engine.manifest_reader")
 -- Wire keymap → locale so trigger-character substitutions (★) use the live char.
 -- Read from the manifest rather than from the `magic_key` local: that one is
 -- declared ~500 lines below, so naming it here would capture the GLOBAL of the
@@ -676,7 +676,7 @@ end
 
 -- The once-only quit step that applies the pause layout (ui.menu.quit_layout).
 local quit_layout_step = require("ui.menu.quit_layout").create({
-	resolve_menu = function() return package.loaded["ui.menu"] end,
+	resolve_menu = function() return package.loaded["menu.ui"] end,
 	logger = Logger,
 })
 
@@ -1031,7 +1031,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 	steps[#steps + 1] = {
 		name = "menu-watchers",
 		run = function()
-			local module = package.loaded["ui.menu"]
+			local module = package.loaded["menu.ui"]
 			if module == nil then return true end
 			if type(module) ~= "table" or type(module.stop_watchers) ~= "function" then
 				error("ui.menu.stop_watchers is unavailable")
@@ -1253,12 +1253,12 @@ else
 		return bridge.virtual_keyboard_form()
 	end)
 end
-local menu               = require("ui.menu")
+local menu               = require("menu.ui")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
 local backend_detector    = require("modules.llm.backend_detector")
 local ErrorDialog         = require("ui.error_dialog")
-local ui_restore         = require("infra.ui_restore")
+local ui_restore         = require("menu.engine.ui_restore")
 
 do
 	local init_ok, initialized_or_err = xpcall(function()
@@ -1355,7 +1355,7 @@ Boot.stage("Config schema migration")
 do
 	local ConfigMigrate = require("settings.engine.migration.migrate")
 	require("core.text.engine.toml_codec.writer").set_sparse_defaults(
-		config_paths.get("ConfigTomlPath"), require("infra.manifest_reader"))
+		config_paths.get("ConfigTomlPath"), require("menu.engine.manifest_reader"))
 	require("core.text.engine.toml_codec.writer").set_case_twin_reporter(function(message)
 		local sent, notice_error = require("core.ui.engine.notifications").notify(i18n.get("paths_editor.save_failed_title"), message, "error")
 		if not sent then error(tostring(notice_error)) end
@@ -2309,7 +2309,7 @@ end
 -- the one the next deploy writes. An unreadable file refuses the deploy instead
 -- of guessing a product.
 do
-	local virtual_keyboard_default = require("infra.manifest_reader").default_for(require("settings.engine.keys").KEY.LAYOUT_VIRTUAL_KEYBOARD)
+	local virtual_keyboard_default = require("menu.engine.manifest_reader").default_for(require("settings.engine.keys").KEY.LAYOUT_VIRTUAL_KEYBOARD)
 	local registered = type(karabiner) == "table" and karabiner.set_virtual_keyboard_source(function()
 		-- Read-only: a retired key an older release left is warned and ignored, never a refusal.
 		local flat, _, reason, key_path = Preferences.current_view(config_paths.get("ConfigTomlPath"), true)

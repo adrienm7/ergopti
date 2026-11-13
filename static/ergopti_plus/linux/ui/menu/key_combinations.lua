@@ -6,7 +6,7 @@ local SaveFailure = require("settings.engine.publication.save_failure")
 local Shared = require("tap_hold.engine.key_combinations")
 local HoldOptions = require("tap_hold.engine.hold_options")
 local KeyCatalog = require("tap_hold.engine.key_catalog")
-local Features = require("infra.manifest_reader")
+local Features = require("menu.engine.manifest_reader")
 local Codec = require("core.text.engine.toml_codec")
 local M = {}
 
@@ -149,7 +149,7 @@ function M.build(ctx,ui)
 		local source=snapshot();if not source then return feedback(false) end
 		local desired=not pairs.is_enabled()
 		local committed=feedback(Scope.set_enabled(desired,source))
-		if committed==true then require("ui.menu.feature_notice").feature(t("menu.shortcuts.key_combinations"),desired) end
+		if committed==true then require("menu.ui.builder.feature_notice").feature(t("menu.shortcuts.key_combinations"),desired) end
 		return committed
 	end
 	render.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE]=function()

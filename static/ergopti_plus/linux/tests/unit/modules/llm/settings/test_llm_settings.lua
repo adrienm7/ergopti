@@ -61,7 +61,7 @@ helpers.describe("llm settings: where the default comes from", function()
 
 	helpers.it("takes every consumed generation value from the shared manifest", function()
 		local settings = load_over_storage()
-		local Manifest = helpers.load_module("infra.manifest_reader")
+		local Manifest = helpers.load_module("menu.engine.manifest_reader")
 		local actual = {}
 		for _, name in ipairs({ "temperature", "context_length", "min_words", "max_words", "auto_raise_temp", "reset_on_nav" }) do
 			actual[name] = settings.get(name)
@@ -170,7 +170,7 @@ helpers.describe("llm settings: changing them", function()
 		helpers.assert_eq(settings.set("temperature", 0.8), false)
 		helpers.assert_eq(settings.get("temperature"), 0.5,
 			"a failed write must not publish a session-only value")
-		local default = helpers.load_module("infra.manifest_reader")
+		local default = helpers.load_module("menu.engine.manifest_reader")
 			.default_for("llm.generation.temperature")
 		helpers.assert_eq(settings.set("temperature", default), false)
 		helpers.assert_eq(settings.get("temperature"), 0.5,
@@ -250,7 +250,7 @@ end)
 --- @param options table Independent count/state, refusal and declaration mutations.
 --- @param callback function Observations asserted outside delivered callbacks.
 local function with_auto_menu(options, callback)
-	local names = { "infra.llm_preferences", "modules.llm.settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.builder" }
+	local names = { "infra.llm_preferences", "modules.llm.settings", "modules.llm.profile_settings", "menu.engine.manifest_menu", "menu.ui.builder.builder" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local storage = PreferencesFixture.new({initial = {
@@ -262,7 +262,7 @@ local function with_auto_menu(options, callback)
 	package.loaded["infra.llm_preferences"] = storage
 	package.loaded["modules.llm.settings"] = nil
 	package.loaded["modules.llm.profile_settings"] = nil
-	package.loaded["ui.menu.builder"] = nil
+	package.loaded["menu.ui.builder.builder"] = nil
 	local settings = require("modules.llm.settings")
 	local profiles = require("modules.llm.profile_settings")
 	settings._reset()
@@ -282,7 +282,7 @@ local function with_auto_menu(options, callback)
 		end,
 		i18n = require("core.i18n.engine.i18n"), logger = require("core.logger.engine.shim"),
 	}))
-	package.loaded["infra.manifest_menu"] = renderer
+	package.loaded["menu.engine.manifest_menu"] = renderer
 	local observed = { writes = 0, redraws = 0 }
 	local native_set = storage.set
 	storage.set = function(...)
@@ -302,7 +302,7 @@ local function with_auto_menu(options, callback)
 		on_menu_changed = function() observed.redraws = observed.redraws + 1 end,
 	}
 	local ok, err = xpcall(function()
-		local items = helpers.load_module("ui.menu.builder").build(context)
+		local items = helpers.load_module("menu.ui.builder.builder").build(context)
 		local function find(rows, title)
 			for index, row in ipairs(rows or {}) do
 				if row.title == title then return row, rows, index end

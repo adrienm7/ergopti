@@ -843,7 +843,7 @@ end
 --- @param section string|nil Section name.
 --- @return number|nil seconds
 local function declared_delay(category, section)
-	return Languages.section_default_delay(require("infra.manifest_reader").features(), category, section)
+	return Languages.section_default_delay(require("menu.engine.manifest_reader").features(), category, section)
 end
 
 --- A user override rung as the cascade reads it: its stored delay turned into
@@ -1664,7 +1664,7 @@ local function load_shared_defaults()
 		return s[key]
 	end
 
-	GLOBAL_DEFAULT_DELAY             = tonumber(require("infra.manifest_reader").default_for(ConfigKeys.KEY.HOTSTRINGS_EXPANSION_DELAY))
+	GLOBAL_DEFAULT_DELAY             = tonumber(require("menu.engine.manifest_reader").default_for(ConfigKeys.KEY.HOTSTRINGS_EXPANSION_DELAY))
 	GLOBAL_DEFAULT_COLOR             = require_key("colors", "global_default")
 	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")
 

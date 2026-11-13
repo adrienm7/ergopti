@@ -33,7 +33,7 @@ local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Driver subtrees to scan, matching the sibling meta guards.
-local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu" }
 
 -- package.path roots the driver injects at boot (init.lua:14-28), in search
 -- order. "../_shared" is the module root shared with the Windows and Linux
@@ -197,7 +197,7 @@ helpers.describe("lazily required modules and methods exist", function()
 				local rel = path:sub(#root + 1)
 				-- Walk each `local ok, VAR = pcall(require, "MOD")` and inspect only
 				-- the text up to the point VAR is re-bound (by any assignment form,
-				-- not just another pcall-require). infra/ui_restore.lua is why: its
+				-- not just another pcall-require). menu/engine/ui_restore.lua is why: its
 				-- list entries all name their module `m`, and the next entry rebinds
 				-- it via `local m = package.loaded[…]`. A window bounded only by the
 				-- next pcall-require swallows that entry's own guard and blames it on

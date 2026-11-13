@@ -44,7 +44,7 @@ const MANIFEST = path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json');
 const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 const RENDERERS = [
 	path.join(SP, '_shared', 'menu', 'engine', 'renderer.lua'),
-	path.join(SP, 'windows', 'infra', 'manifest_menu.ahk')
+	path.join(SP, 'windows', 'menu', 'engine', 'manifest_menu.ahk')
 ];
 
 const PLATFORMS = ['ahk', 'hs', 'linux'];
@@ -912,7 +912,7 @@ console.log(
 	// not a removed capability. Strip comments and require each actual owner to
 	// exist before checking prompt, setting and persistence routes.
 	const numericPaths = {
-		linux: path.join(SP, 'linux/ui/menu/builder.lua'),
+		linux: path.join(SP, 'linux/menu/ui/builder/builder.lua'),
 		mac: path.join(SP, 'macos/ui/menu/menu_llm/settings_manager.lua'),
 		windows: path.join(SP, 'windows/ui/menu/menu_llm/menu_settings.ahk'),
 		persist: path.join(SP, 'windows/ui/menu/menu_llm/persist.ahk')

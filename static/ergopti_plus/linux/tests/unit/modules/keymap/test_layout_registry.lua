@@ -518,13 +518,13 @@ helpers.describe("layout manager (Linux): installing", function()
 
 	helpers.it("asks once before downloading Ergopti's own Python, naming its size (layout-registry-managed-python)", function()
 		local saved = { registry = package.loaded["modules.keymap.layout_registry"],
-			managed = package.loaded["modules.keymap.managed_python"], dialogs = package.loaded["ui.menu.menu_dialogs"],
+			managed = package.loaded["modules.keymap.managed_python"], dialogs = package.loaded["menu.ui.builder.dialogs"],
 			i18n = package.loaded["core.i18n.engine.i18n"] }
 		local asked, answer = {}, nil
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			return key == "layouts.managed_python_offer" and "Download {1} MB <now>?" or key
 		end }
-		package.loaded["ui.menu.menu_dialogs"] = {
+		package.loaded["menu.ui.builder.dialogs"] = {
 			plain_markup = function(text) return (text:gsub("<", "&lt;"):gsub(">", "&gt;")) end,
 			ask_yes_no = function(title, text, ok_label, cancel_label)
 				asked[#asked + 1] = { title = title, text = text, ok = ok_label, cancel = cancel_label }
@@ -547,7 +547,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		end)
 		package.loaded["modules.keymap.layout_registry"] = saved.registry
 		package.loaded["modules.keymap.managed_python"] = saved.managed
-		package.loaded["ui.menu.menu_dialogs"] = saved.dialogs
+		package.loaded["menu.ui.builder.dialogs"] = saved.dialogs
 		package.loaded["core.i18n.engine.i18n"] = saved.i18n
 		helpers.assert_true(ok, tostring(err))
 		helpers.assert_eq(asked[1], { title = "layouts.managed_python_title", text = "Download 31 MB &lt;now&gt;?",

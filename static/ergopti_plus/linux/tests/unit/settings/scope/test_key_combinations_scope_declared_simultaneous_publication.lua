@@ -14,7 +14,7 @@ local helpers, Codec, path, backup, pair, binding, parameter, source, with_menu,
 helpers.describe("declared Linux simultaneous publication through original owners",function()
  helpers.it("uses declared Linux neutral values and all182 unassigned third slots",function()
   with_public_owner(function(s)
-   local f=require("infra.manifest_reader")
+   local f=require("menu.engine.manifest_reader")
    helpers.assert_eq(f.default_for("mod_combos.simultaneous_threshold_ms"),100)
    helpers.assert_eq(f.default_for("mod_combos.symmetric"),false)
    helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})

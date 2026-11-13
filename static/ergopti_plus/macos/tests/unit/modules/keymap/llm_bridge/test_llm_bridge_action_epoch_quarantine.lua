@@ -123,7 +123,7 @@ local function load_fixture(reset_result)
 		resolve_magic_action = function() return nil end,
 		perform_text_replacement = function() return false end,
 	}
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return "*" end,
 	}
 

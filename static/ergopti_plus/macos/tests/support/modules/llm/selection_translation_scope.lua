@@ -127,7 +127,7 @@ local OWNED = {
 	"core.lifecycle.engine.launcher_environment",
 	"core.logger.engine.log_folders",
 	"core.logger.engine.logger",
-	"infra.manifest_reader",
+	"menu.engine.manifest_reader",
 	"core.ui.engine.notifications",
 	"core.fs.engine.paths",
 	"infra.script_chord_catalogue",

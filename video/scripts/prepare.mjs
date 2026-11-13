@@ -270,7 +270,7 @@ const tapHoldOptions = {
 
 // ======= Tray menu, exactly as the manifest lays it out =======
 // Top-level titles are hard-coded by each driver's builder; these are the
-// keys they use (windows/ui/menu/menu_init.ahk).
+// keys they use (windows/menu/ui/builder/menu_init.ahk).
 const MENU_TITLES = {
 	tap_holds: 'menu.tapholds.title',
 	shortcuts: 'menu.shortcuts.title',

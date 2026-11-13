@@ -2,7 +2,7 @@
 
 --- Applies the complete LLM preference scope through its native terminal owner.
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Preferences = require("settings.engine.preferences.preferences")
 local Transaction = require("settings.engine.scope.transaction")
 local Writer = require("core.text.engine.toml_codec.writer")

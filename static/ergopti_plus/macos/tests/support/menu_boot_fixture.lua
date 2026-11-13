@@ -27,13 +27,13 @@ local M = {}
 -- case inherits the previous case's session state.
 local REAL_MODULES = {
 	"ui.menu.init",
-	"ui.menu.menu_state",
+	"menu.ui.builder.state",
 	"settings.ui.menu.preferences_transaction",
-	"ui.menu.session_demotions",
-	"ui.menu.keymap_lifecycle",
-	"ui.menu.global_actions_transaction",
-	"ui.menu.recoverable_file_moves",
-	"ui.menu.click_gate",
+	"menu.ui.transactions.session_demotions",
+	"menu.ui.keyboard.keymap_lifecycle",
+	"menu.ui.transactions.global_actions_transaction",
+	"menu.ui.transactions.recoverable_file_moves",
+	"menu.ui.builder.click_gate",
 	-- Captures hs at require time; each boot gets a fresh stub table.
 	"core.events.timer_scheduler",
 }
@@ -115,7 +115,7 @@ function M.boot(opts)
 	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["core.ui.engine.notifications"] = { notify = noop }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.ui_restore"] = {}
+	package.loaded["menu.engine.ui_restore"] = {}
 	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
@@ -157,7 +157,7 @@ function M.boot(opts)
 		end,
 		clear_shortcut = function() return true end,
 	}
-	package.loaded["ui.menu.builder"] = {
+	package.loaded["menu.ui.builder.builder"] = {
 		generate = function(ctx, _menu_mods, actions)
 			fixture.ctx = ctx
 			fixture.actions = actions
@@ -184,7 +184,7 @@ function M.boot(opts)
 			}
 		end,
 	}
-	package.loaded["ui.menu.menu_watchers"] = {
+	package.loaded["menu.ui.builder.watchers"] = {
 		start_config_watcher = function() return { stop = function() return true end } end,
 		start_theme_watcher = function() return { stop = function() return true end } end,
 	}

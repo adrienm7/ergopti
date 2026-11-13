@@ -31,8 +31,8 @@ function M.install(translator)
 		return previous_get(key, ...)
 	end
 	assert(package.loaded["core.i18n.engine.i18n"] == translator, "caption fixture translator was not published")
-	package.loaded["infra.manifest_menu"] = nil
-	return require("infra.manifest_menu")
+	package.loaded["menu.engine.manifest_menu"] = nil
+	return require("menu.engine.manifest_menu")
 end
 
 --- Retains exact predecessor modules around the complete positive assertion body.

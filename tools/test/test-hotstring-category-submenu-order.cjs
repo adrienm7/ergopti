@@ -71,9 +71,9 @@ const DRIVERS = [
 		call: '_HS_AllSectionsRow(',
 		files: [
 			'windows/ui/menu/menu_hotstring_switches.ahk',
-			'windows/ui/menu/menu_submenus.ahk',
+			'windows/menu/ui/builder/submenus.ahk',
 			'windows/ui/menu/menu_hotstrings.ahk',
-			'windows/ui/menu/menu_init.ahk'
+			'windows/menu/ui/builder/menu_init.ahk'
 		]
 	},
 	{
@@ -87,18 +87,18 @@ const DRIVERS = [
 		files: [
 			'macos/ui/menu/menu_hotstrings.lua',
 			'macos/ui/menu/menu_hotstrings_custom.lua',
-			'macos/ui/menu/builder.lua'
+			'macos/menu/ui/builder/builder.lua'
 		]
 	},
 	{
 		driver: 'linux',
 		helper: {
-			file: 'linux/ui/menu/builder.lua',
+			file: 'linux/menu/ui/builder/builder.lua',
 			from: 'local function all_sections_row(ids)',
 			to: '\n\tend'
 		},
 		call: 'all_sections_row(',
-		files: ['linux/ui/menu/builder.lua']
+		files: ['linux/menu/ui/builder/builder.lua']
 	}
 ];
 
@@ -119,7 +119,7 @@ const CATEGORY_REGIONS = [
 	},
 	{
 		driver: 'linux',
-		file: 'linux/ui/menu/builder.lua',
+		file: 'linux/menu/ui/builder/builder.lua',
 		from: 'local render_ctx = { commands = {\n\t\t\t["hotstring_category_enable_all"]',
 		to: '\n\t\treturn {'
 	}
@@ -155,7 +155,7 @@ const PERSONAL_REGIONS = [
 	},
 	{
 		driver: 'linux',
-		file: 'linux/ui/menu/builder.lua',
+		file: 'linux/menu/ui/builder/builder.lua',
 		from: '["hotstring_personal"] = function()',
 		to: '["hotstring_extensions"] = function()',
 		tokens: ['group_row(name)']
@@ -167,7 +167,7 @@ const PERSONAL_REGIONS = [
 const LANGUAGE_REGIONS = [
 	{
 		driver: 'windows',
-		file: 'windows/ui/menu/menu_submenus.ahk',
+		file: 'windows/menu/ui/builder/submenus.ahk',
 		from: '_HS_LanguageRows() {',
 		to: '\n}',
 		// The language checkbox has a builder of its own here, which the unit
@@ -182,7 +182,7 @@ const LANGUAGE_REGIONS = [
 	},
 	{
 		driver: 'linux',
-		file: 'linux/ui/menu/builder.lua',
+		file: 'linux/menu/ui/builder/builder.lua',
 		from: 'local function language_rows()',
 		to: '\n\tend'
 	}

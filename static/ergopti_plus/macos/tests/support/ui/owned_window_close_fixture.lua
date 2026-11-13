@@ -18,7 +18,7 @@ local function run_window(module_name, scenario)
 	helpers.with_stub_scope({
 		"settings.ui.cleanup", "settings.engine.migration.cleanup_session", "config_cleanup", "ui.onboarding", "onboarding.engine.answers",
 		"ui.update_check", "updater.engine.check_session", "modules.updater", "adapters.update_launcher",
-		"ui.metrics_apps", "core.ui.engine.dialog_util", "core.text.engine.toml.writer", "core.text.engine.toml.codec", "infra.manifest_reader",
+		"ui.metrics_apps", "core.ui.engine.dialog_util", "core.text.engine.toml.writer", "core.text.engine.toml.codec", "menu.engine.manifest_reader",
 		"tests.support.onboarding_shared_data", "core.fs.adapters.file_system", "hs.spaces",
 		"core.text.engine.toml_codec.writer", "settings.engine.migration.unused_keys", "diagnostics.engine.operation_reporter", "core.text.engine.toml_codec.record_list",
 		"settings.engine.migration.outdated", "core.fs.engine.module_source_identity", "core.text.engine.toml_codec.leaf_rows", "lfs", "core.fs.engine.module_source_directory",

@@ -23,7 +23,7 @@ local M = {}
 
 local Logger   = require("core.logger.engine.logger")
 local i18n     = require("core.i18n.engine.i18n")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Selector = require("ai.engine.settings.profile_selector")
 local Storage  = require("core.fs.adapters.storage")
 local ConfigKeys = require("settings.engine.keys")

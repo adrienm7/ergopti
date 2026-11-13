@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Pins the inverted classification that decides which hotstring section toggles
 ; rebuild in-process (no Reload) versus which must Reload. After the
-; RegisterAllHotstrings() wrap, the tray fast path (ui/tray_menu.ahk
+; RegisterAllHotstrings() wrap, the tray fast path (menu/ui/tray_menu.ahk
 ; _HS_TryLiveToggle) treats EVERY hotstring section as live-eligible except the
 ; reload-only groups in the blocklist. These tests guard that the blocklist holds
 ; exactly those exceptions: a cross-dependent or inline section must never be

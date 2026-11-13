@@ -34,7 +34,7 @@ helpers.describe("canonical Linux model preferences", function()
 
 	helpers.it("takes absence from the manifest and persists only explicit changes", function()
 		with_config('[llm]\nfuture = "keep"\n', function(path)
-			local manifest = require("infra.manifest_reader")
+			local manifest = require("menu.engine.manifest_reader")
 			local profiles = require("modules.llm.profiles")
 			profiles.init()
 			helpers.assert_eq(profiles.is_enabled(), manifest.default_for("llm.enabled"))
@@ -77,7 +77,7 @@ helpers.describe("canonical Linux model preferences", function()
 			require("settings.engine.migration.outdated").reset_for_tests()
 			local engine = require("modules.llm.prediction_engine")
 			local reported = require("settings.engine.migration.outdated").collect_reports(function()
-				helpers.assert_eq(engine.get_backend(), require("infra.manifest_reader").default_for("llm.models.selected"),
+				helpers.assert_eq(engine.get_backend(), require("menu.engine.manifest_reader").default_for("llm.models.selected"),
 					"a retired backend never raises on the menu or typing path")
 			end)
 			helpers.assert_eq(reported, { ["llm.models.selected"] = true })

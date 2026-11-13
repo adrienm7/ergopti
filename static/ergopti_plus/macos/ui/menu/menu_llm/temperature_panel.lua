@@ -15,7 +15,7 @@
 local M = {}
 
 local llm_mod = require("modules.llm")
-local ManifestMenu = require("infra.manifest_menu")
+local ManifestMenu = require("menu.engine.manifest_menu")
 local ConfigKeys = require("settings.engine.keys")
 
 

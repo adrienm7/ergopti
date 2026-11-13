@@ -16,16 +16,16 @@ local RowDialect = require("menu.engine.row_dialect")
 local Logger = require("core.logger.engine.shim")
 local Extensions = require("hotstrings.engine.extensions")
 local TextPrompt = require("core.ui.ui.text_prompt")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local _fill = require("ui.menu.menu_dialogs")._fill
-local prompt_text = require("ui.menu.menu_dialogs").prompt_text
-local show_error = require("ui.menu.menu_dialogs").show_error
-local plain_markup = require("ui.menu.menu_dialogs").plain_markup
-local assign_parameterized_action = require("ui.menu.menu_dialogs").assign_parameterized_action
-local open_action_picker = require("ui.menu.menu_dialogs").open_action_picker
-local slot_binding_rows = require("ui.menu.menu_dialogs").slot_binding_rows
+local _fill = require("menu.ui.builder.dialogs")._fill
+local prompt_text = require("menu.ui.builder.dialogs").prompt_text
+local show_error = require("menu.ui.builder.dialogs").show_error
+local plain_markup = require("menu.ui.builder.dialogs").plain_markup
+local assign_parameterized_action = require("menu.ui.builder.dialogs").assign_parameterized_action
+local open_action_picker = require("menu.ui.builder.dialogs").open_action_picker
+local slot_binding_rows = require("menu.ui.builder.dialogs").slot_binding_rows
 
 local LOG = "ui.menu.menu_shortcuts"
 
@@ -316,7 +316,7 @@ local function _build_shortcuts(ctx)
 		[require("settings.engine.keys").COMMAND.SELECTION_CAPS_WORD] = function()
 			if not caps_word_ready() or sc.toggle_caps_word() ~= true then return false end
 			Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
-			require("ui.menu.feature_notice").feature(i18n_safe("sg_actions.caps_word"), sc.is_caps_word_active() == true)
+			require("menu.ui.builder.feature_notice").feature(i18n_safe("sg_actions.caps_word"), sc.is_caps_word_active() == true)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end,
@@ -626,7 +626,7 @@ local function _build_shortcuts(ctx)
 				SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 				return false
 			end
-			require("ui.menu.feature_notice").feature(i18n_safe("notify.script_control"), not current)
+			require("menu.ui.builder.feature_notice").feature(i18n_safe("notify.script_control"), not current)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end
@@ -766,7 +766,7 @@ local function _build_shortcuts(ctx)
 			SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 			return false
 		end
-		require("ui.menu.feature_notice").feature(i18n_safe("menu.shortcuts.title"), not current)
+		require("menu.ui.builder.feature_notice").feature(i18n_safe("menu.shortcuts.title"), not current)
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return true
 	end
@@ -833,7 +833,7 @@ local function _build_shortcuts(ctx)
 					local current = sc.is_wrap_on_type_enabled()
 					if type(current) ~= "boolean" or not wrap_on_type_ready() then return false end
 					if sc.set_wrap_on_type_enabled(not current) ~= true then return false end
-					require("ui.menu.feature_notice").feature(i18n_safe("shortcuts.label_wrap_text"), not current)
+					require("menu.ui.builder.feature_notice").feature(i18n_safe("shortcuts.label_wrap_text"), not current)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,

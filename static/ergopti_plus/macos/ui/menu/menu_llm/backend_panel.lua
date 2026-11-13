@@ -17,7 +17,7 @@ local M = {}
 
 local llm_mod  = require("modules.llm")
 local i18n     = require("core.i18n.engine.i18n")
-local ManifestMenu  = require("infra.manifest_menu")
+local ManifestMenu  = require("menu.engine.manifest_menu")
 local Logger   = require("core.logger.engine.logger")
 
 local LOG = "backend_panel"

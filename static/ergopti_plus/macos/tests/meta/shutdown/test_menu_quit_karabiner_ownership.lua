@@ -55,7 +55,7 @@ local function load_menu_quit_action()
 	-- Menu startup loads optional user code; the quit contract must never acquire
 	-- a real personal configuration file or its persistent cooperative lock.
 	package.loaded["infra.personal_shortcuts"] = { load = function() return true end }
-	package.loaded["ui.menu.global_actions_transaction"] = {
+	package.loaded["menu.ui.transactions.global_actions_transaction"] = {
 		create = function(deps)
 			return {
 				is_exclusive_blocked = function() return stock_calls.writer_blocked == true end,
@@ -74,7 +74,7 @@ local function load_menu_quit_action()
 		escape_gsub_replacement = function(value) return tostring(value) end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.ui_restore"] = {}
+	package.loaded["menu.engine.ui_restore"] = {}
 	package.loaded["settings.engine.preferences.preferences"] = {
 		build_initial_state = function()
 			return {
@@ -89,7 +89,7 @@ local function load_menu_quit_action()
 		get_group_name = function() return "group" end,
 		save = function() return true end,
 	}
-	package.loaded["ui.menu.builder"] = { generate = function() return {} end }
+	package.loaded["menu.ui.builder.builder"] = { generate = function() return {} end }
 	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = function() end }
 	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
@@ -113,10 +113,10 @@ local function load_menu_quit_action()
 			}
 		end,
 	}
-	package.loaded["ui.menu.menu_state"] = {
+	package.loaded["menu.ui.builder.state"] = {
 		sync_state_to_modules = function() return true end,
 	}
-	package.loaded["ui.menu.menu_watchers"] = {
+	package.loaded["menu.ui.builder.watchers"] = {
 		start_config_watcher = function() return {} end,
 		start_theme_watcher = function() return {} end,
 	}

@@ -18,11 +18,11 @@ local M = {}
 
 local llm_mod = require("modules.llm")
 local i18n    = require("core.i18n.engine.i18n")
-local ManifestMenu  = require("infra.manifest_menu")
+local ManifestMenu  = require("menu.engine.manifest_menu")
 local DisplayPolicy = require("ai.engine.settings.display_policy")
 local Preferences = require("settings.engine.preferences.preferences")
 local ConfigPaths = require("settings.engine.paths")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local SettingsManager = require("ui.menu.menu_llm.settings_manager")
 
 

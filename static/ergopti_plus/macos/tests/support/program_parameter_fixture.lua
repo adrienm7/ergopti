@@ -3,7 +3,7 @@
 --- Real writer, preference checkpoint and global writer fence for picker fixtures.
 local helpers = require("tests.helpers")
 local Writer = require("core.text.engine.toml_codec.writer")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Assignment = require("shortcuts.engine.assignment")
 
 return function(gestures, state, kind, read_action, save_attempt, controls)
@@ -71,7 +71,7 @@ return function(gestures, state, kind, read_action, save_attempt, controls)
 		end,
 		snapshot_view = controls.snapshot_view,
 	})
-	local global = require("ui.menu.global_actions_transaction").create({
+	local global = require("menu.ui.transactions.global_actions_transaction").create({
 		state = state, capture_preferences = function() return {} end, sync_runtime = noop,
 		restore_state = noop,
 		settings = { get = function() end, set = noop, get_keys = function() return {} end },
@@ -84,8 +84,8 @@ return function(gestures, state, kind, read_action, save_attempt, controls)
 		request_reload = noop, terminal_pending = function() return false end,
 	})
 	assert(global, "real global writer fixture unavailable")
-	package.loaded["ui.menu.program_parameter_transaction"] = nil
-	local owner = require("ui.menu.program_parameter_transaction").new({
+	package.loaded["menu.ui.transactions.program_parameter_transaction"] = nil
+	local owner = require("menu.ui.transactions.program_parameter_transaction").new({
 		path = "config", files = files_port, gestures = gestures, preferences = preferences, checkpoint = checkpoint,
 		paused = function() return false end, admission = global.run_exclusive,
 		current_path = function() return controls.current_path or "config" end,

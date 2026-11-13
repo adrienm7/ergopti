@@ -1605,7 +1605,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		for _, name in ipairs({ "infra.version", "modules.hotstrings.engine", "modules.hotstrings.hotstrings_config",
 			"modules.hotstrings.injector", "adapters.keyboard_layout", "modules.hotstrings.magic_key",
 			"modules.hotstrings.magic_key_source", "modules.hotstrings.repeat_key", "modules.shortcuts.keyboard_shortcuts",
-			"modules.hotstrings.device_finder", "platform.input.event", "core.logger.engine.monotonic", "infra.manifest_reader",
+			"modules.hotstrings.device_finder", "platform.input.event", "core.logger.engine.monotonic", "menu.engine.manifest_reader",
 			"settings.engine.scope.script_settings", "core.timing.engine.timings", "modules.shortcuts.script_actions", "modules.diagnostics.crash_reporter",
 			"modules.keystats.focus_guard", "platform.input.capture_gate", "core.logger.engine.boot_profiler", "infra.diagnostic_snapshot" }) do
 			modules[name] = {}

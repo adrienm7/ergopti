@@ -10,7 +10,7 @@
 
 local M = {}
 local Policy = require("menu.engine.programmable_hotstrings")
-local Manifest = require("infra.manifest_menu")
+local Manifest = require("menu.engine.manifest_menu")
 local Preferences = require("infra.hotstring_preferences")
 local Shell = require("core.process.adapters.shell_runner")
 local Prompt = require("core.ui.ui.text_prompt")

@@ -275,7 +275,7 @@ helpers.describe("i18n persistence", function()
 
   helpers.describe("menu language submenu", function()
     helpers.it("language submenu items have callbacks and valid shape", function()
-      local mb = helpers.load_module("ui.menu.builder")
+      local mb = helpers.load_module("menu.ui.builder.builder")
       local items = mb.build({ _version = "test", on_quit = function() end })
 
       local lang_section = nil

@@ -16,7 +16,7 @@ local M = {}
 
 local SaveFailure = require("settings.engine.publication.save_failure")
 local Logger = require("core.logger.engine.shim")
-local ManifestMenu = require("infra.manifest_menu")
+local ManifestMenu = require("menu.engine.manifest_menu")
 local Policy = require("layouts.engine.layout.pause_switch_policy")
 
 local LOG = "ui.menu.pause_layout_rows"

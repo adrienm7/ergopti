@@ -60,7 +60,7 @@ const AHK_DEF = (name) => {
 // parity gate and the AHK suite instead. They go away when the menu renderer is
 // shared.
 const DUPLICATES = {
-	'static/ergopti_plus/windows/infra/menu_helpers.ahk': ['fmt_count']
+	'static/ergopti_plus/windows/menu/engine/helpers.ahk': ['fmt_count']
 };
 
 const errors = [];

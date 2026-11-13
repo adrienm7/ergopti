@@ -1558,7 +1558,7 @@ end
 -- Applications and Stats
 -- Each window action toggles one page through ui/window_toggle: closed opens
 -- it, covered brings it to the front, focused closes it. The page ids name
--- the modules the menu dispatches to (ui/menu/init.lua): the metrics overlays
+-- the modules the menu dispatches to (menu/ui/init.lua): the metrics overlays
 -- were never one "ui.metrics_overlay" module, the hotstring editor is
 -- singular, and the paths editor lives behind the menu_paths module.
 local WINDOW_ACTIONS = {

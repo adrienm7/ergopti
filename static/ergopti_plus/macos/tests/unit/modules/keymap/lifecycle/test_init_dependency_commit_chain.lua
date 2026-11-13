@@ -226,7 +226,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 			["modules.hotstrings.hotstrings_config"] = {},
 			["modules.keymap.expander"] = {},
 			["core.events.timer_scheduler"] = {},
-			["infra.manifest_reader"] = { default_for = function() return "★" end },
+			["menu.engine.manifest_reader"] = { default_for = function() return "★" end },
 			["modules.diagnostics.hid_diagnostic_mailbox"] = {},
 		}, function(bridge)
 			helpers.assert_eq(bridge.init({ buffer = "", mappings = {}, llm_context_text = "", llm_context_mark = "" }, {}), false)

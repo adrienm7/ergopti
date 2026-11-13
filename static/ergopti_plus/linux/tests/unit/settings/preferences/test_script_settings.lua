@@ -71,12 +71,12 @@ local function load_settings(options)
 
 	local previous = {
 		logger = package.loaded["core.logger.engine.shim"],
-		manifest = package.loaded["infra.manifest_reader"],
+		manifest = package.loaded["menu.engine.manifest_reader"],
 		storage = package.loaded["core.fs.adapters.storage"],
 		settings = package.loaded["settings.engine.scope.script_settings"],
 	}
 	package.loaded["core.logger.engine.shim"] = logger
-	package.loaded["infra.manifest_reader"] = manifest
+	package.loaded["menu.engine.manifest_reader"] = manifest
 	package.loaded["core.fs.adapters.storage"] = storage
 	package.loaded["settings.engine.scope.script_settings"] = nil
 	local settings = require("settings.engine.scope.script_settings")
@@ -101,7 +101,7 @@ local function load_settings(options)
 		return result
 	end
 	package.loaded["core.logger.engine.shim"] = previous.logger
-	package.loaded["infra.manifest_reader"] = previous.manifest
+	package.loaded["menu.engine.manifest_reader"] = previous.manifest
 	package.loaded["core.fs.adapters.storage"] = previous.storage
 	package.loaded["settings.engine.scope.script_settings"] = previous.settings
 	return settings, storage, logger

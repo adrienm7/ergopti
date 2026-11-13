@@ -3,7 +3,7 @@
 --- Shared behavior proves the composite scope orders, skips and reverts its
 --- participants through the manifest registry on every Lua host.
 return function(helpers)
-	local Manifest = require("infra.manifest_reader")
+	local Manifest = require("menu.engine.manifest_reader")
 	local Composition = require("settings.engine.scope.composition")
 
 	--- A logger double recording every line by level.

@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local M = {}
 local MODULE_NAMES = {
 	"core.fs.adapters.storage", "core.events.timer_scheduler", "core.logger.engine.logger", "core.timing.engine.timings",
-	"infra.ui_restore", "ui.hotstring_editor", "ui.metrics_typing", "ui.metrics_typing.init",
+	"menu.engine.ui_restore", "ui.hotstring_editor", "ui.metrics_typing", "ui.metrics_typing.init",
 	"ui.metrics_apps", "ui.metrics_apps.init",
 }
 
@@ -88,7 +88,7 @@ function M.with_fixture(options, scenario)
 			end
 			package.loaded["core.events.timer_scheduler"] = scheduler
 
-			local ui_restore = require("infra.ui_restore")
+			local ui_restore = require("menu.engine.ui_restore")
 			local result = table.pack(xpcall(function()
 				return scenario(ui_restore, scheduler, ui_state)
 			end, debug.traceback))

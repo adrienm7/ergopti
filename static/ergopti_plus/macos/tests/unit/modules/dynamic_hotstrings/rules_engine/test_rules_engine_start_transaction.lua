@@ -280,7 +280,7 @@ helpers.describe("dynamic menu shared family order", function()
 	local corpus = assert(require("core.text.engine.json").decode(file:read("*a")))
 	file:close()
 	helpers.it("keeps the independent published family metadata and returns detached records", function()
-		local menu = require("infra.manifest_menu")
+		local menu = require("menu.engine.manifest_menu")
 		local root = assert(menu.get_root())
 		helpers.assert_eq(root.dynamic_hotstring_families.rows, corpus.rows,
 			"the pre-centralization metadata snapshot must remain exact")
@@ -303,7 +303,7 @@ helpers.describe("dynamic menu shared family order", function()
 	end)
 	for _, vector in ipairs(corpus.vectors) do
 		helpers.it("consumes the actual published family order: " .. vector.id, function()
-			local menu = require("infra.manifest_menu")
+			local menu = require("menu.engine.manifest_menu")
 			local root = assert(menu.get_root())
 			local previous = root.dynamic_hotstring_families
 			local rows = {}

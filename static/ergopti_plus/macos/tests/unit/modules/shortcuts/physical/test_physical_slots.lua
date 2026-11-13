@@ -19,5 +19,5 @@ require("tests.lua.layouts.physical_slots_contract")(helpers, PhysicalSlots, {
 	registry = read_shared("layouts/data/keycodes/physical_keys.json"),
 	corpus = read_shared("tests/corpus/shortcuts/physical_slots.json"),
 	json = Json,
-	manifest = require("infra.manifest_reader"),
+	manifest = require("menu.engine.manifest_reader"),
 })

@@ -29,8 +29,8 @@ local AppPickerLib  = require("infra.app_picker")
 local dialog        = require("core.ui.engine.dialog_util")
 local kl_mod        = require("modules.keystats")
 local i18n          = require("core.i18n.engine.i18n")
-local ManifestMenu  = require("infra.manifest_menu")
-local Manifest      = require("infra.manifest_reader")
+local ManifestMenu  = require("menu.engine.manifest_menu")
+local Manifest      = require("menu.engine.manifest_reader")
 local Logger        = require("core.logger.engine.logger")
 local ParentSource = require("menu.engine.frames.parent_source")
 
@@ -118,7 +118,7 @@ function M.build(ctx)
 	local script_control = ctx.script_control
 
 	-- Sync widget visibility on every build so a reload restores the saved state.
-	-- Keystats start/stop is handled by sync_state_to_modules in init.lua.
+	-- Keystats start/stop is handled by sync_state_to_modules in ../../menu/ui/init.lua.
 	-- Gate the WPM UIs on pause too: pause_all() never tears them down, but the
 	-- pause-change listener calls updateMenu() (this build), so honouring the pause
 	-- state HERE is what stops the widget's 0.2 s timer + mouse eventtap and the

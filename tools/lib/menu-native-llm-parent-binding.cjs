@@ -29,9 +29,11 @@ function nativeLlmParentPublication(source, builderSource, definition, topLevel,
 	if (
 		!whole ||
 		!builder ||
-		rootPositions(builder, 'local ManifestMenu = require("infra.manifest_menu")').length !== 1 ||
+		rootPositions(builder, 'local ManifestMenu = require("menu.engine.manifest_menu")').length !==
+			1 ||
 		rootPositions(builder, 'ManifestMenu =').length !== 1 ||
-		rootPositions(whole, 'local ManifestMenu = require("infra.manifest_menu")').length !== 1 ||
+		rootPositions(whole, 'local ManifestMenu = require("menu.engine.manifest_menu")').length !==
+			1 ||
 		rootPositions(whole, 'ManifestMenu =').length !== 1 ||
 		positions(whole, 'local require').length ||
 		positions(whole, 'require =').length
@@ -71,7 +73,7 @@ function nativeLlmParentPublication(source, builderSource, definition, topLevel,
 		childAt.length !== 1 ||
 		parentAt.length !== 1 ||
 		childAt[0] >= parentAt[0] ||
-		!one(build, 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")') ||
+		!one(build, 'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")') ||
 		!one(build, 'if ok_mm and type(ManifestMenu.build) == "function" then') ||
 		positions(build, 'ManifestMenu.group_row').length !== 1 ||
 		positions(build, 'llm_parent_enabled =').length !== 1 ||
@@ -154,7 +156,8 @@ function declaredMacTopLevelPublication(builderSource) {
 	const builder = lex(builderSource);
 	if (
 		!builder ||
-		rootPositions(builder, 'local ManifestMenu = require("infra.manifest_menu")').length !== 1 ||
+		rootPositions(builder, 'local ManifestMenu = require("menu.engine.manifest_menu")').length !==
+			1 ||
 		rootPositions(builder, 'ManifestMenu =').length !== 1 ||
 		positions(builder, 'local require').length ||
 		positions(builder, 'require =').length ||
@@ -283,7 +286,7 @@ function declaredFacadeOwner(builder, parser) {
 	const expected = lex(`
 		return type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil
 			and rawget(package, "loaded") == separator_modules
-			and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
+			and rawget(separator_modules, "menu.engine.manifest_menu") == ManifestMenu
 			and type(separator_factory) == "function" and rawget(ManifestMenu, "top_level_separator_receiver") == separator_factory
 			and type(separator_render) == "function" and rawget(ManifestMenu, "render_rows") == separator_render
 			and type(separator_array) == "function" and rawget(ManifestMenu, "get_array") == separator_array
@@ -542,7 +545,7 @@ const LINUX_AI_PARENT_ALGORITHM =
 function declaredLinuxNativeCaptionOwner(unit) {
 	const { positions, rootPositions, body } = luaPublicationParser();
 	if (!unit) return false;
-	const imported = 'local NativePresentation = require("infra.native_presentation")';
+	const imported = 'local NativePresentation = require("menu.engine.native_presentation")';
 	const captured =
 		'local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title';
 	const captureAt = rootPositions(unit, captured),
@@ -614,9 +617,9 @@ const LINUX_UNINSTALL_CAPTION_LOCALS = {
 		'type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")'
 };
 const LINUX_UNINSTALL_CAPTION_FACADE_SOURCE =
-	'local function uninstall_caption_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand rawget(separator_modules, "infra.manifest_menu") == ManifestMenu\n\t\tand type(uninstall_caption_factory) == "function" and rawget(ManifestMenu, "command_caption_receiver") == uninstall_caption_factory\n\t\tand type(uninstall_caption_i18n) == "table" and getmetatable(uninstall_caption_i18n) == nil\n\t\tand rawget(separator_modules, "core.i18n.engine.i18n") == uninstall_caption_i18n\n\t\tand type(uninstall_caption_get) == "function" and rawget(uninstall_caption_i18n, "get") == uninstall_caption_get\nend';
+	'local function uninstall_caption_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand rawget(separator_modules, "menu.engine.manifest_menu") == ManifestMenu\n\t\tand type(uninstall_caption_factory) == "function" and rawget(ManifestMenu, "command_caption_receiver") == uninstall_caption_factory\n\t\tand type(uninstall_caption_i18n) == "table" and getmetatable(uninstall_caption_i18n) == nil\n\t\tand rawget(separator_modules, "core.i18n.engine.i18n") == uninstall_caption_i18n\n\t\tand type(uninstall_caption_get) == "function" and rawget(uninstall_caption_i18n, "get") == uninstall_caption_get\nend';
 const LINUX_UNINSTALL_CAPTION_COMMAND_SOURCE =
-	'local function _uninstall_command(ctx)\n\tlocal receive, current\n\tif uninstall_caption_facade_current() then receive, current = uninstall_caption_factory("about_menu", "uninstall") end\n\treturn function()\n\t\tif not uninstall_caption_facade_current() or type(receive) ~= "function" or type(current) ~= "function" or not current() then return false end\n\t\tlocal run = require("ui.menu.uninstall").run\n\t\tlocal title = receive()\n\t\tif title == nil or not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal confirmation = i18n_safe("dialog.uninstall.confirm")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal failure = i18n_safe("dialog.uninstall.failed")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal missing_program = i18n_safe("dialog.uninstall.missing_program")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal options = {\n\t\t\ttitle = title,\n\t\t\tconfirmation = confirmation,\n\t\t\tfailure = failure,\n\t\t\tmissing_program = missing_program,\n\t\t\tconfirm = function(title, text)\n\t\t\t\treturn ask_yes_no(title, plain_markup(text),\n\t\t\t\t\ti18n_safe("button.remove"), i18n_safe("button.cancel"))\n\t\t\tend,\n\t\t\tfail = function(text) show_error(plain_markup(text), i18n_safe("menu.global.uninstall")) end,\n\t\t\tquit = function()\n\t\t\t\tif type(ctx.on_quit) ~= "function" then\n\t\t\t\t\tLogger.error(LOG, "Uninstall: ctx.on_quit is absent — the daemon cannot quit.")\n\t\t\t\t\treturn\n\t\t\t\tend\n\t\t\t\tctx.on_quit()\n\t\t\tend,\n\t\t}\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\trun(options)\n\tend\nend';
+	'local function _uninstall_command(ctx)\n\tlocal receive, current\n\tif uninstall_caption_facade_current() then receive, current = uninstall_caption_factory("about_menu", "uninstall") end\n\treturn function()\n\t\tif not uninstall_caption_facade_current() or type(receive) ~= "function" or type(current) ~= "function" or not current() then return false end\n\t\tlocal run = require("menu.ui.transactions.uninstall").run\n\t\tlocal title = receive()\n\t\tif title == nil or not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal confirmation = i18n_safe("dialog.uninstall.confirm")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal failure = i18n_safe("dialog.uninstall.failed")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal missing_program = i18n_safe("dialog.uninstall.missing_program")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal options = {\n\t\t\ttitle = title,\n\t\t\tconfirmation = confirmation,\n\t\t\tfailure = failure,\n\t\t\tmissing_program = missing_program,\n\t\t\tconfirm = function(title, text)\n\t\t\t\treturn ask_yes_no(title, plain_markup(text),\n\t\t\t\t\ti18n_safe("button.remove"), i18n_safe("button.cancel"))\n\t\t\tend,\n\t\t\tfail = function(text) show_error(plain_markup(text), i18n_safe("menu.global.uninstall")) end,\n\t\t\tquit = function()\n\t\t\t\tif type(ctx.on_quit) ~= "function" then\n\t\t\t\t\tLogger.error(LOG, "Uninstall: ctx.on_quit is absent — the daemon cannot quit.")\n\t\t\t\t\treturn\n\t\t\t\tend\n\t\t\t\tctx.on_quit()\n\t\t\tend,\n\t\t}\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\trun(options)\n\tend\nend';
 
 const LINUX_UNINSTALL_CAPTION_ABOUT_SOURCE =
 	// config-key-literal-ok: quotes the driver source this gate pins
@@ -626,7 +629,7 @@ function declaredLinuxUninstallCaptionOwner(unit) {
 	if (!unit) return false;
 	const { positions, rootPositions, body } = luaPublicationParser();
 	const fragments = [
-		'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+		'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")',
 		'if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end',
 		'local separator_modules = package.loaded',
 		...Object.entries(LINUX_UNINSTALL_CAPTION_LOCALS).map(
@@ -680,7 +683,7 @@ function closedModuleExport(unit, lex, rootPositions) {
 	if (!unit) return false;
 	const imports = {
 		WindowTitles: 'core.ui.engine.window_titles',
-		NativePresentation: 'infra.native_presentation',
+		NativePresentation: 'menu.engine.native_presentation',
 		NumberRowPolicy: 'layouts.engine.layout.number_row_policy',
 		ParameterLabel: 'shortcuts.engine.action_parameter_label',
 		RowDialect: 'menu.engine.row_dialect',
@@ -767,7 +770,7 @@ function closedModuleExport(unit, lex, rootPositions) {
 					'local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title'
 				);
 			} else if (name.value === 'ok_mm') {
-				at = take(at, 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")');
+				at = take(at, 'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")');
 			} else {
 				if (Object.hasOwn(LINUX_UNINSTALL_CAPTION_LOCALS, name.value)) {
 					if (!declaredLinuxUninstallCaptionOwner(unit)) return false;
@@ -1030,7 +1033,7 @@ function closedSiblingRendererBindings(unit) {
 			before === 'local' &&
 			next === '=' &&
 			unit.tokens[at + 2]?.value === 'require' &&
-			unit.tokens[at + 4]?.value === 'infra.manifest_menu'
+			unit.tokens[at + 4]?.value === 'menu.engine.manifest_menu'
 		)
 			continue;
 		if (
@@ -1640,7 +1643,7 @@ function closedCapturedNativeOwners(unit, role, parseTree = luaProducerTree) {
 			(role === 'agent' ? ', AgentSettings)' : ')'),
 		'local llm = ctx.llm',
 		'local NativeParent = require("ui.menu.ai_parent")',
-		...(role === 'agent' ? ['local ManifestMenu = require("infra.manifest_menu")'] : [])
+		...(role === 'agent' ? ['local ManifestMenu = require("menu.engine.manifest_menu")'] : [])
 	].map((source) => shape(luaProducerTree(source).body[0]));
 	const permittedDeclarations = new Set();
 	const permittedEngineReads = new Set();
@@ -2296,12 +2299,12 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 		manifest[kind + '_menu'].length === 0
 	)
 		return false;
-	const builder = lex(sources['linux/ui/menu/builder.lua']);
+	const builder = lex(sources['linux/menu/ui/builder/builder.lua']);
 	const agent = lex(sources['linux/ui/menu/agent_rows.lua']);
 	if (
 		!builder ||
 		!agent ||
-		!one(builder, 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")') ||
+		!one(builder, 'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")') ||
 		!one(agent, 'local AgentSettings = require("modules.llm.agent_settings")') ||
 		positions(builder, 'local require').length ||
 		positions(builder, 'require =').length ||
@@ -2457,7 +2460,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 				caller,
 				'return require("ui.menu.agent_rows").build(ctx, { prompt = function(title, text, initial, hidden, choices) return TextPrompt.ask(title, plain_markup(text), initial, hidden, choices) end, error = function(text) show_error(plain_markup(text)) end, })'
 			) ||
-			!one(producer, 'local ManifestMenu = require("infra.manifest_menu")') ||
+			!one(producer, 'local ManifestMenu = require("menu.engine.manifest_menu")') ||
 			!one(producer, 'local NativeParent = require("ui.menu.ai_parent")') ||
 			positions(producer, 'NativeParent =').length !== 1 ||
 			positions(producer, 'ManifestMenu =').length !== 1 ||

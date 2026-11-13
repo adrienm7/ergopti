@@ -18,8 +18,8 @@ local notifications = require("core.ui.engine.notifications")
 local i18n          = require("core.i18n.engine.i18n")
 local Labels        = require("menu.engine.labels")
 local Extensions    = require("hotstrings.engine.extensions")
-local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
-local ManifestMenu = require("infra.manifest_menu")
+local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
+local ManifestMenu = require("menu.engine.manifest_menu")
 local PersonalInfoSource = require("menu.engine.frames.personal_info_source")
 -- Owns the « all sections » checkbox, which the personal submenu draws too.
 local Custom        = require("ui.menu.menu_hotstrings_custom")
@@ -45,7 +45,7 @@ local function resolve_desc(desc)
 end
 
 local dh_mod       = require("modules.dynamic_hotstrings")
--- Keymap is already loaded by init.lua before this module is required;
+-- Keymap is already loaded by ../../menu/ui/init.lua before this module is required;
 -- require() returns the cached module with no side-effects.
 local keymap       = require("modules.keymap")
 -- Per-category delays (magic key, autocorrection) are owned by hotstrings_config
@@ -54,7 +54,7 @@ local keymap       = require("modules.keymap")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local HotstringLanguages = require("hotstrings.engine.languages")
 local BulkScope = require("hotstrings.engine.bulk_scope")
-local ManifestReader = require("infra.manifest_reader")
+local ManifestReader = require("menu.engine.manifest_reader")
 local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
 local ProgrammableMenuPolicy = require("menu.engine.programmable_hotstrings")
 

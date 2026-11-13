@@ -10,13 +10,13 @@
 
 local M = {}
 local Policy = require("menu.engine.programmable_hotstrings")
-local Manifest = require("infra.manifest_menu")
+local Manifest = require("menu.engine.manifest_menu")
 local Dialog = require("core.ui.engine.dialog_util")
 local Shell = require("core.process.adapters.shell_runner")
 local I18n = require("core.i18n.engine.i18n")
 local User = require("modules.dynamic_hotstrings")
 local Logger = require("core.logger.engine.logger")
-local Features = require("infra.manifest_reader")
+local Features = require("menu.engine.manifest_reader")
 local Publication = require("hotstrings.engine.dynamic.menu_publication").new()
 
 --- Builds declared rows around the currently owned menu state.

@@ -91,7 +91,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local shortcuts = helpers.load_with_stubs("modules.shortcuts")
 		local url_state = { chatgpt_url = live_url }
-		local url_owner = require("ui.menu.chatgpt_url_transaction").new({
+		local url_owner = require("menu.ui.llm_chatgpt_url_transaction").new({
 			state = url_state, shortcuts = shortcuts, paused = function() return false end,
 			admission = function(_, callback) return callback() end,
 			save_prefs = function() return true end,
@@ -140,7 +140,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			shell_quote = function(value) return value end,
 		}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.ui_restore"] = {}
+		package.loaded["menu.engine.ui_restore"] = {}
 		package.loaded["settings.engine.preferences.preferences"] = {
 			build_initial_state = function() return state end,
 			load = function() return {}, "present" end,
@@ -158,7 +158,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			restore_table = function() return true end,
 			bind = function() return function() return true end end,
 		}
-		package.loaded["ui.menu.global_actions_transaction"] = {
+		package.loaded["menu.ui.transactions.global_actions_transaction"] = {
 			create = function()
 				return {
 					disable_all = function() return true end,
@@ -166,10 +166,10 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 				}
 			end,
 		}
-		package.loaded["ui.menu.recoverable_file_moves"] = {
+		package.loaded["menu.ui.transactions.recoverable_file_moves"] = {
 			create = function() return {} end,
 		}
-		package.loaded["ui.menu.builder"] = {
+		package.loaded["menu.ui.builder.builder"] = {
 			generate = function() return {} end,
 			invalidate_cache = noop,
 		}
@@ -197,13 +197,13 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 				}
 			end,
 		}
-		package.loaded["ui.menu.menu_state"] = {
+		package.loaded["menu.ui.builder.state"] = {
 			sync_state_to_modules = function() return true end,
 		}
-		package.loaded["ui.menu.keymap_lifecycle"] = {
+		package.loaded["menu.ui.keyboard.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
-		package.loaded["ui.menu.menu_watchers"] = {
+		package.loaded["menu.ui.builder.watchers"] = {
 			start_config_watcher = function()
 				return { stop = function() return true end }
 			end,
@@ -268,7 +268,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		helpers.assert_not_nil(menu,
 			"the real root menu must reach its LLM dependency-injection boundary")
 		helpers.assert_true(injected_control == shortcuts,
-			"ui.menu must inject the real shortcuts facade, not ScriptControl or a snapshot")
+			"menu.ui must inject the real shortcuts facade, not ScriptControl or a snapshot")
 		helpers.assert_eq(injected_update_menu(), true,
 			"the root adapter must acknowledge an exact menu publication")
 		epoch = 43
@@ -433,7 +433,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			i18n = {get = package.loaded["core.i18n.engine.i18n"].get, section = package.loaded["core.i18n.engine.i18n"].get},
 			logger = package.loaded["core.logger.engine.logger"],
 		}))
-		package.loaded["infra.manifest_menu"] = {
+		package.loaded["menu.engine.manifest_menu"] = {
 			template_rows = profile_renderer.template_rows,
 			render_rows = function(rows, slot)
 				if slot == "llm_profile" then return profile_renderer.render_rows(rows, slot) end

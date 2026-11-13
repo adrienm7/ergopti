@@ -36,7 +36,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 			"symbol": "hotstrings.shortcut_resets_word",
-			"sha256": "c7963084866c483bd7748b96b56b536481b3f66c330274d711d2b2b5bb30e2cc"
+			"sha256": "bdde1d717289aab020309c4fb1ab0d5b34668f9b139c6f5b09d89d74f1940d9d"
 		},
 		{
 			"id": "macos-undo",
@@ -50,14 +50,14 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
 			"symbol": "function M.resolve",
-			"sha256": "0faf147f736dfe37e52a46aaa689cc6f7694467adefb33f4e896d2d394f1ef31"
+			"sha256": "5550e5af60ebd2ba240fafd53e3ca229214bc1a0b0605437009812658b84aeb7"
 		},
 		{
 			"id": "linux-control",
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "769566e03167caa13656a4ada794639f6cccf2206b56435f60ff053a11e0611a"
+			"sha256": "cfad0c23a140e6fac2d4c20ad89dbc41dd940f62cf26ebaa208d10660d122358"
 		},
 		{
 			"id": "windows-dead-legacy",
@@ -78,7 +78,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 			"symbol": "local chars = e:getCharacters(false)",
-			"sha256": "c7963084866c483bd7748b96b56b536481b3f66c330274d711d2b2b5bb30e2cc"
+			"sha256": "bdde1d717289aab020309c4fb1ab0d5b34668f9b139c6f5b09d89d74f1940d9d"
 		},
 		{
 			"id": "linux-dead-capture",
@@ -106,14 +106,14 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/layout_emulation.lua",
 			"symbol": "function M.key_down(e, key_code)",
-			"sha256": "f1bd3f0bd6b96b26ec20f485afe27eeeb2f301c4bfaab7917894c19c5f58c304"
+			"sha256": "c6358fa07f7bee3e8a253dcee1cc0e01c546bf9f11c8f53d67232580ec2108af"
 		},
 		{
 			"id": "linux-layout-emulation",
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
 			"symbol": "function M.on_key(detail)",
-			"sha256": "695c86c136a9c55fa8b9e025d821b82f9f51fa97a0341acd834543b01e37e9e7"
+			"sha256": "ab5e6a9cc2f19d4f1876d90aa894aaafa36c9ff1ff5a57917b4667d5e871c0fd"
 		}
 	],
 	"behaviors": [

@@ -7,4 +7,4 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("tests.lua.features_manifest_contract").run(helpers, "linux", require("infra.manifest_reader"))
+require("tests.lua.features_manifest_contract").run(helpers, "linux", require("menu.engine.manifest_reader"))

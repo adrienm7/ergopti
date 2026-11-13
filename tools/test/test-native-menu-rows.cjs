@@ -50,11 +50,11 @@ const UPDATE = process.argv.includes('--update-baseline');
 // The renderer and the adapters it draws through are where rows are meant to
 // be created; everything else is driver code.
 const WINDOWS_RENDERER = new Set([
-	'windows/infra/manifest_menu.ahk',
-	'windows/infra/menu_dispatcher.ahk',
+	'windows/menu/engine/manifest_menu.ahk',
+	'windows/menu/engine/dispatcher.ahk',
 	'windows/adapters/tray_menu.ahk',
-	'windows/ui/menu/menu_engine.ahk',
-	'windows/ui/menu/menu_rebuild.ahk'
+	'windows/menu/ui/builder/engine.ahk',
+	'windows/menu/ui/builder/rebuild.ahk'
 ]);
 
 // Gui.Add's first argument is a control type; Menu.Add's is a label.
@@ -413,7 +413,7 @@ const DRIVERS = ['windows', 'macos', 'linux'];
 // minimum against the immutable pre-migration oracle, not the migration debt.
 const FLOORS = { windows: 20, macos: 20, linux: 20 };
 const LEGACY_PATH = path.join(__dirname, 'fixtures', 'native-menu-census-legacy.json');
-const LEGACY_SHA256 = '8e8441a38474348460e748dd85d9abdeb4d6d62f72015f9995a35ea14b215174';
+const LEGACY_SHA256 = 'c7879d723c8de9351fe51aab39057e5fff94a0a9b64ddf60b94c2b3b7a038dc2';
 const legacyBytes = fs.readFileSync(LEGACY_PATH);
 assert.equal(
 	crypto.createHash('sha256').update(legacyBytes).digest('hex'),
@@ -440,7 +440,10 @@ const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
 // The Linux tray root took the macOS name once its sections moved to menu_*.lua.
 const CURRENT_SOURCE_RENAMES = Object.freeze([
 	Object.freeze({ from: /keylogger/g, to: 'keystats' }),
-	Object.freeze({ from: /^linux\/ui\/menu\/menu_builder\.lua$/, to: 'linux/ui/menu/builder.lua' })
+	Object.freeze({
+		from: /^linux\/ui\/menu\/menu_builder\.lua$/,
+		to: 'linux/menu/ui/builder/builder.lua'
+	})
 ]);
 
 const SOURCE_COUNTS = {};

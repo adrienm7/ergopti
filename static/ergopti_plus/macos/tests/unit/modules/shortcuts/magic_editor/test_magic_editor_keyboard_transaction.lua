@@ -13,7 +13,7 @@ local Json = require("core.text.engine.json")
 
 local MODULES = {
 	"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "core.fs.engine.paths", "core.logger.engine.logger",
-	"settings.engine.preferences.preferences", "settings.engine.paths", "infra.manifest_reader", "core.text.engine.toml_codec.writer",
+	"settings.engine.preferences.preferences", "settings.engine.paths", "menu.engine.manifest_reader", "core.text.engine.toml_codec.writer",
 	"modules.gestures.actions", "modules.shortcuts.magic_editor",
 	"modules.shortcuts.keyboard_shortcuts",
 }
@@ -31,7 +31,7 @@ local function with_subject(assignments, scenario)
 		}
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "modifier-chords.json" end }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.manifest_reader"] = nil
+		package.loaded["menu.engine.manifest_reader"] = nil
 		package.loaded["modules.gestures.actions"] = {
 			is_assignable = function(action) return type(action) == "string" end,
 			execute_single = function(action) observed.actions[#observed.actions + 1] = action; return true end,
@@ -58,7 +58,7 @@ local function with_subject(assignments, scenario)
 			observed.callback_during_write = observed.latest.execute(observed.latest.action, "keyboard__magic_editor")
 			if controls.publication_refuses then error("owned publication refused") end
 		end)
-		require("core.text.engine.toml_codec.writer").set_sparse_defaults("keyboard-fixture-config", require("infra.manifest_reader"))
+		require("core.text.engine.toml_codec.writer").set_sparse_defaults("keyboard-fixture-config", require("menu.engine.manifest_reader"))
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 		local subject = require("modules.shortcuts.keyboard_shortcuts")
 		local context = {

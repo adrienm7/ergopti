@@ -42,63 +42,63 @@ module.exports = prior.map((control) =>
 module.exports.push(
 	...[
 		{
-			path: 'macos/ui/menu/canvas_badge.lua',
+			path: 'macos/menu/ui/builder/canvas_badge.lua',
 			before: 'body = items }) ~= true then',
 			after: 'body = {} }) ~= true then',
 			reason: 'completed badge handed to a foreign native target',
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/canvas_badge.lua',
+			path: 'macos/menu/ui/builder/canvas_badge.lua',
 			before: 'ManifestMenu.native_composition("macos_canvas_badge_root")',
 			after: 'Unrelated.native_composition("macos_canvas_badge_root")',
 			reason: 'wrong shared root composition owner',
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/canvas_badge.lua',
+			path: 'macos/menu/ui/builder/canvas_badge.lua',
 			before: 'if type(compose) ~= "function" then',
 			after: 'if false and type(compose) ~= "function" then',
 			reason: 'root policy admission weakened before native allocation',
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/canvas_badge.lua',
+			path: 'macos/menu/ui/builder/canvas_badge.lua',
 			before: 'local boundary = { title = frame[2].separator and "-" }',
 			after: 'local boundary = { title = frame[2].separator and "-" }\n\tboundary.title = "-"',
 			reason: 'completed boundary overwritten before publication',
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/canvas_badge.lua',
+			path: 'macos/menu/ui/builder/canvas_badge.lua',
 			before: 'local boundary = { title = frame[2].separator and "-" }',
 			after: 'local boundary = { title = frame[2].separator and "-" }\n\tbadge.image = nil',
 			reason: 'completed image overwritten before publication',
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/builder.lua',
+			path: 'macos/menu/ui/builder/builder.lua',
 			before: 'body = rendered }) ~= true then',
 			after: 'body = {} }) ~= true then',
 			reason: 'download composition handed to foreign native target',
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/builder.lua',
+			path: 'macos/menu/ui/builder/builder.lua',
 			before: 'download = _dl_item and { _dl_item } or {}',
 			after: 'download = {}',
 			reason: 'actual finished download result disconnected',
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/builder.lua',
+			path: 'macos/menu/ui/builder/builder.lua',
 			before: 'local compose_download = ManifestMenu.native_composition("macos_download_root")',
 			after: 'local compose_download = Unrelated.native_composition("macos_download_root")',
 			reason: 'download canonical composition owner disconnected',
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/builder.lua',
+			path: 'macos/menu/ui/builder/builder.lua',
 			before: 'local compose_download = ManifestMenu.native_composition("macos_download_root")',
 			after:
 				'local compose_download = ManifestMenu.native_composition("macos_download_root")\n\t_dl_item = {}',
@@ -106,21 +106,21 @@ module.exports.push(
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/builder.lua',
+			path: 'macos/menu/ui/builder/builder.lua',
 			before: 'pcall(ctx.llm_handler.build_download_item)',
 			after: 'pcall(Unrelated.build_download_item)',
 			reason: 'actual native download producer receiver disconnected',
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/init.lua',
+			path: 'macos/menu/ui/init.lua',
 			before: 'llm             = safe_require("ui.menu.menu_llm",             "AI menu")',
 			after: 'llm             = safe_require("ui.menu.unrelated_llm",             "AI menu")',
 			reason: 'actual exported native download producer import disconnected',
 			expected: false
 		},
 		{
-			path: 'macos/ui/menu/init.lua',
+			path: 'macos/menu/ui/init.lua',
 			before: 'llm_handler              = llm_handler,',
 			after: 'llm_handler              = {},',
 			reason: 'actual native download handler disconnected from root context',
@@ -145,7 +145,7 @@ module.exports.push(
 
 module.exports = module.exports.concat([
 	{
-		path: 'macos/ui/menu/builder.lua',
+		path: 'macos/menu/ui/builder/builder.lua',
 		before:
 			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }',
 		after:
@@ -154,14 +154,14 @@ module.exports = module.exports.concat([
 		expected: false
 	},
 	{
-		path: 'macos/ui/menu/builder.lua',
+		path: 'macos/menu/ui/builder/builder.lua',
 		before: 'table.insert(result, projected)',
 		after: 'table.insert(result, {})',
 		reason: 'current projected top-level record disconnected',
 		expected: false
 	},
 	{
-		path: 'macos/ui/menu/builder.lua',
+		path: 'macos/menu/ui/builder/builder.lua',
 		before:
 			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif entry.disabled == true then',
 		after:
@@ -170,7 +170,7 @@ module.exports = module.exports.concat([
 		expected: false
 	},
 	{
-		path: 'macos/ui/menu/builder.lua',
+		path: 'macos/menu/ui/builder/builder.lua',
 		before:
 			'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key',
 		after: 'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, "foreign"',

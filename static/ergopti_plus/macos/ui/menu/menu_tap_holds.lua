@@ -30,13 +30,13 @@
 local M = {}
 
 local Logger      = require("core.logger.engine.logger")
-local MenuUtils   = require("ui.menu.menu_utils")
-local ManifestMenu = require("infra.manifest_menu")
+local MenuUtils   = require("menu.ui.builder.utils")
+local ManifestMenu = require("menu.engine.manifest_menu")
 local Paths       = require("core.fs.engine.paths")
 local KeyCatalog  = require("tap_hold.engine.key_catalog")
 local CombinationLabels = require("tap_hold.engine.combination_labels")
 local LoneTap     = require("tap_hold.engine.lone_tap")
-local Manifest    = require("infra.manifest_reader")
+local Manifest    = require("menu.engine.manifest_reader")
 local LOG         = "menu.tap_holds"
 local i18n        = require("core.i18n.engine.i18n")
 local text_utils  = require("core.text.engine.utils")

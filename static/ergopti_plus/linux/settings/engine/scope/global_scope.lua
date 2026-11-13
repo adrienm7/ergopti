@@ -23,7 +23,7 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Composition = require("settings.engine.scope.composition")
 local Logger = require("core.logger.engine.shim")
 local LOG = "settings.engine.scope.global_scope"

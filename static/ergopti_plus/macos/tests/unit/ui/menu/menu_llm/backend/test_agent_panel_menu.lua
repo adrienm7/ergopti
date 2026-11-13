@@ -60,7 +60,7 @@ helpers.describe("AI agent menu (macOS)", function()
 
 	helpers.it("uses reordered shared choices and preserves the durable owner's refusal", function()
 		with_panel(base_state(), function(build, world)
-			local manifest = require("infra.manifest_menu").get_root()
+			local manifest = require("menu.engine.manifest_menu").get_root()
 			local mode = manifest.agent_menu[1]
 			local previous = mode.choices
 			local corpus = mode_corpus()
@@ -413,7 +413,7 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 		local state = base_state()
 		state.llm_agent_system1 = "cerebras"
 		with_panel(state, function(build, world)
-			local declaration = require("infra.manifest_menu").get_root().agent_system_controls[1]
+			local declaration = require("menu.engine.manifest_menu").get_root().agent_system_controls[1]
 			local label = declaration.i18n
 			declaration.i18n = system_off_corpus().mutated_label_key
 			local ok, err = pcall(function()
@@ -449,7 +449,7 @@ helpers.describe("Agent shared system model control (agent-system-model)", funct
 		local state = base_state()
 		state.llm_agent_system1, state.llm_agent_system2 = corpus.spec, corpus.spec
 		with_panel(state, function(build, world)
-			local root = require("infra.manifest_menu").get_root()
+			local root = require("menu.engine.manifest_menu").get_root()
 			local declaration = root[corpus.section][2]
 			local label = declaration.i18n
 			local ok, err = pcall(function()
@@ -484,7 +484,7 @@ helpers.describe("Agent shared system model control (agent-system-model)", funct
 		local state = base_state()
 		state.llm_agent_system1 = corpus.spec
 		with_panel(state, function(build)
-			local root = require("infra.manifest_menu").get_root()
+			local root = require("menu.engine.manifest_menu").get_root()
 			local original = root[corpus.section]
 			local ok, err = pcall(function()
 				root[corpus.section] = { original[2], original[1], {
@@ -515,7 +515,7 @@ helpers.describe("Agent model observed-state frames (agent-system-model)", funct
 				world.listed = { ["qwen2.5:7b"] = variant.installed }
 				local rows = row_starting(build().submenu, "🧠").menu
 				helpers.assert_eq(row_starting(rows, "Model…").title, variant.caption)
-				local declaration = require("infra.manifest_menu").get_root()[variant.section][2]
+				local declaration = require("menu.engine.manifest_menu").get_root()[variant.section][2]
 				local label = declaration.i18n
 				declaration.i18n = system_model_corpus().label_key
 				local ok, err = pcall(function()

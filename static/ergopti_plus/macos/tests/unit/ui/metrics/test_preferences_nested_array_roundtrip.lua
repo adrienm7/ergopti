@@ -28,7 +28,7 @@ local cases = {
 local function check_roundtrip(key, value, path)
 	fixture.with_roundtrip({ [key] = value }, function(saved, preferences)
 		-- The neutral value in state form: llm.user_profiles stores "" for no profile.
-		local neutral = path and preferences.state_value_for(path, require("infra.manifest_reader").default_for(path)) or nil
+		local neutral = path and preferences.state_value_for(path, require("menu.engine.manifest_reader").default_for(path)) or nil
 		if neutral and helpers.deep_equal(neutral, value) then
 			helpers.assert_nil(saved[key], key .. " must remain sparse at its neutral value")
 		else

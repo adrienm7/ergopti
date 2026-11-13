@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 -- Stub menu.labels before anything requires it — decorate_section is a pure wrapper.
 -- This module-scope stub is cleared at the end of the file (see the teardown block)
 -- so it does not leak into later test files that require the REAL menu.labels
--- (test_log_level_emojis.lua and ui/menu/builder.lua both call log_level_emoji).
+-- (test_log_level_emojis.lua and menu/ui/builder/builder.lua both call log_level_emoji).
 local _labels_called = {}
 package.loaded["menu.engine.labels"] = {
 	decorate_section = function(text)
@@ -1259,7 +1259,7 @@ end)
 -- Teardown — the runner requires each test file once, in sequence, running its
 -- cases inline (helpers.describe/it execute immediately). Clearing the stubs this
 -- file installed forces the NEXT file to load the genuine modules: menu.labels
--- (needed real by test_log_level_emojis.lua and ui/menu/builder.lua) and the
+-- (needed real by test_log_level_emojis.lua and menu/ui/builder/builder.lua) and the
 -- stub-wired lib.i18n / lib.locale pair must not leak either.
 package.loaded["menu.engine.labels"] = nil
 package.loaded["core.i18n.engine.locale"]  = nil

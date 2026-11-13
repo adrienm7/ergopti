@@ -348,7 +348,7 @@ function H.configuration_context(schema, overrides)
 	return {
 		schema   = schema,
 		driver   = "macos",
-		features = overrides.features or function() return require("infra.manifest_reader").features() end,
+		features = overrides.features or function() return require("menu.engine.manifest_reader").features() end,
 		path_of  = overrides.path_of or path_of,
 		decode   = require("core.text.engine.toml_codec").decode,
 		open_fn  = overrides.open_fn,
@@ -372,7 +372,7 @@ end
 --- translates each reason key.
 --- @return table { items = { { feature, platforms, reason } } }
 function H.collect_unavailable()
-	return require("diagnostics.engine.healthcheck.unavailable").collect(require("infra.manifest_reader"))
+	return require("diagnostics.engine.healthcheck.unavailable").collect(require("menu.engine.manifest_reader"))
 end
 
 --- The AI section: the switch, the backend, the model and the profile.

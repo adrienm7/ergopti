@@ -40,7 +40,7 @@ local function bridge_fixture(replace)
 	-- before the fixture can return its owned close callback.
 	for _, name in ipairs({ "lgi", "core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline",
 		"core.events.loop", "platform.system.notifier", "core.ui.ui.webkit_host", "core.ui.ui.webview_manager",
-		"infra.manifest_reader" }) do
+		"menu.engine.manifest_reader" }) do
 		replace(name, package.loaded[name])
 	end
 	replace("ui.download_window.bridge", nil)
@@ -396,7 +396,7 @@ helpers.describe("actual model cancellation preserves caller UI ownership", func
 		world.evaluated = {}
 		for _, name in ipairs({ "lgi", "core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline",
 			"core.events.loop", "platform.system.notifier", "core.ui.ui.webkit_host", "core.ui.ui.webview_manager",
-			"infra.manifest_reader" }) do
+			"menu.engine.manifest_reader" }) do
 			replace(name, package.loaded[name])
 		end
 		replace("ui.download_window.bridge", nil)

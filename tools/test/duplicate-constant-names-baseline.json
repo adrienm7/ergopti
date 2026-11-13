@@ -1,7 +1,7 @@
 {
 	"_comment": "Constant names declared in more than one production file (tools/test/test-duplicate-constant-names.cjs). Shrink it with --update-baseline as copies move to the timing registry or one defining module; never add to it.",
 	"BOOT_SUPPRESS_SEC": {
-		"files": ["macos/core/fs/engine/file_watchers.lua", "macos/ui/menu/init.lua"],
+		"files": ["macos/core/fs/engine/file_watchers.lua", "macos/menu/ui/init.lua"],
 		"divergent": false
 	},
 	"CHUNK_BYTES": {
@@ -80,7 +80,7 @@
 		"divergent": false
 	},
 	"POLL_INTERVAL_SEC": {
-		"files": ["macos/infra/ui_restore.lua", "macos/platform/remap/onboarding.lua"],
+		"files": ["macos/menu/engine/ui_restore.lua", "macos/platform/remap/onboarding.lua"],
 		"divergent": false
 	},
 	"REQUEST_TIMEOUT_MS": {
@@ -88,7 +88,7 @@
 		"divergent": false
 	},
 	"RESTORE_DELAY_SEC": {
-		"files": ["macos/infra/ui_restore.lua", "macos/modules/shortcuts/actions/text.lua"],
+		"files": ["macos/menu/engine/ui_restore.lua", "macos/modules/shortcuts/actions/text.lua"],
 		"divergent": false
 	},
 	"SESSION_TIMEOUT_MS": {

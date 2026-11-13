@@ -84,7 +84,7 @@ if _ORIGINAL_SETTINGS then _G.hs.settings = _ORIGINAL_SETTINGS end
 
 helpers.describe("Expert known-value admission", function()
 	local function with_file(source, body)
-		helpers.with_stub_scope({ "settings.engine.overrides", "core.fs.adapters.storage", "core.logger.engine.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
+		helpers.with_stub_scope({ "settings.engine.overrides", "core.fs.adapters.storage", "core.logger.engine.logger", "core.logger.engine.shim", "menu.engine.manifest_reader" }, function()
 			local observed, warnings, errors, writes = {}, {}, {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.LEVELS = require("core.logger.engine").LEVELS
@@ -237,7 +237,7 @@ end)
 helpers.describe("Expert classified source admission", function()
 	local SOURCE = '[script]\nlog_level = "INFO"\n[future]\nkeep = "independent"\n'
 	local function with_file(body)
-		helpers.with_stub_scope({ "settings.engine.overrides", "core.fs.adapters.storage", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
+		helpers.with_stub_scope({ "settings.engine.overrides", "core.fs.adapters.storage", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim", "menu.engine.manifest_reader" }, function()
 			local observed, warnings, errors, debug_messages = {}, {}, {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.LEVELS = require("core.logger.engine").LEVELS
@@ -357,7 +357,7 @@ end)
 
 helpers.describe("Persisted native consent admission", function()
 	local function with_native(value, body)
-		helpers.with_stub_scope({ "settings.engine.overrides", "core.fs.adapters.storage", "core.logger.engine.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
+		helpers.with_stub_scope({ "settings.engine.overrides", "core.fs.adapters.storage", "core.logger.engine.logger", "core.logger.engine.shim", "menu.engine.manifest_reader" }, function()
 			local stored = { ["ergopti.llm.enabled"] = value, ["ergopti.log_level"] = "ERROR",
 				["foreign.future"] = { keep = false, values = { 1, "future" } } }
 			local function detached(value)
@@ -382,7 +382,7 @@ helpers.describe("Persisted native consent admission", function()
 			_G.hs.settings = native
 			local storage = require("core.fs.adapters.storage")
 			require("settings.engine.migration.outdated").reset_for_tests()
-			local manifest = require("infra.manifest_reader")
+			local manifest = require("menu.engine.manifest_reader")
 			local entry = assert(manifest.find_declared_entry_by_path("llm.enabled"))
 			helpers.assert_eq(entry.type, "boolean", "the actual published declaration owns consent's type")
 			local neutral = manifest.default_for("llm.enabled")

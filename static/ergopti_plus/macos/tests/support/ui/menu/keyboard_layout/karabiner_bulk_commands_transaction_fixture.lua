@@ -367,13 +367,13 @@ local function build_menu(mode, configure)
 	}
 	local saved_logger = package.loaded["core.logger.engine.logger"]
 	local saved_controller = package.loaded["platform.remap.lease_controller"]
-	local saved_manifest = package.loaded["infra.manifest_menu"]
+	local saved_manifest = package.loaded["menu.engine.manifest_menu"]
 	package.loaded["core.logger.engine.logger"] = recording_logger(observations)
 	package.loaded["platform.remap.lease_controller"] = {
 		status = function() return "active", { phase = "active" } end,
 		stop = function() return true end,
 	}
-	package.loaded["infra.manifest_menu"] = nil
+	package.loaded["menu.engine.manifest_menu"] = nil
 	local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 	local remap = make_remap(observations, mode)
 	if type(configure) == "function" then configure(remap, observations) end
@@ -391,7 +391,7 @@ local function build_menu(mode, configure)
 	built.submenu[#built.submenu + 1] = { title = "menu.shortcuts.key_combinations", submenu = group }
 	package.loaded["core.logger.engine.logger"] = saved_logger
 	package.loaded["platform.remap.lease_controller"] = saved_controller
-	package.loaded["infra.manifest_menu"] = saved_manifest
+	package.loaded["menu.engine.manifest_menu"] = saved_manifest
 	return built, observations, remap
 end
 
@@ -434,7 +434,7 @@ local function with_guidance_declaration(section, mutate, body)
 					return true
 				end
 			end
-			declaration = require("infra.manifest_menu").get_array(section)
+			declaration = require("menu.engine.manifest_menu").get_array(section)
 			for index, row in ipairs(declaration) do
 				saved[index] = {}
 				for key, value in pairs(row) do saved[index][key] = value end

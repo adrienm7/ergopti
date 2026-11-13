@@ -63,7 +63,7 @@ helpers.describe("LLM trigger settings: durable manifest-backed values", functio
 	end)
 	helpers.it("uses the Linux manifest defaults without storing them", function()
 		local settings, storage = load_settings()
-		local manifest = require("infra.manifest_reader")
+		local manifest = require("menu.engine.manifest_reader")
 		for _, name in ipairs({
 			"debounce_ms", "instant_on_word_end", "after_hotstring",
 			"secure_filter_enabled", "url_bar_filter_enabled",
@@ -103,7 +103,7 @@ helpers.describe("LLM trigger settings: durable manifest-backed values", functio
 
 	helpers.it("keeps one minimum request interval for every backend, in its own range (request-floor-setting)", function()
 		local settings, storage = load_settings()
-		local manifest = require("infra.manifest_reader")
+		local manifest = require("menu.engine.manifest_reader")
 		helpers.assert_eq(settings.get("min_request_interval_ms"), manifest.default_for("llm.trigger.min_request_interval_ms"))
 		helpers.assert_eq(settings.get("min_request_interval_ms"), 300, "the shipped interval is 300 ms")
 		helpers.assert_eq(settings.bounds("min_request_interval_ms"), { min = 0, max = 10000 })
@@ -376,7 +376,7 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 	helpers.it("renders the declared trigger submenu and changes a privacy filter", function()
 		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
 		local i18n = require("core.i18n.engine.i18n")
-		local menu_builder = helpers.load_module("ui.menu.builder")
+		local menu_builder = helpers.load_module("menu.ui.builder.builder")
 		local menu = menu_builder.build({
 			is_paused = function() return false end,
 			llm = {
@@ -413,7 +413,7 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 	helpers.it("offers the minimum request interval next to the idle time and saves a preset (request-floor-setting)", function()
 		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
 		local i18n = require("core.i18n.engine.i18n")
-		local menu_builder = helpers.load_module("ui.menu.builder")
+		local menu_builder = helpers.load_module("menu.ui.builder.builder")
 		local menu = menu_builder.build({
 			is_paused = function() return false end,
 			llm = {
@@ -446,7 +446,7 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 	helpers.it("offers the \"never\" idle time as macOS does and shows it as the current choice (llm-debounce-never)", function()
 		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
 		local i18n = require("core.i18n.engine.i18n")
-		local menu_builder = helpers.load_module("ui.menu.builder")
+		local menu_builder = helpers.load_module("menu.ui.builder.builder")
 		local function build()
 			return menu_builder.build({
 				is_paused = function() return false end,
@@ -559,10 +559,10 @@ local function with_trigger_menu(options, body)
 			end,
 			i18n = require("core.i18n.engine.i18n"), logger = require("core.logger.engine.shim"),
 		}))
-		replace("infra.manifest_menu", renderer)
+		replace("menu.engine.manifest_menu", renderer)
 	end
-	replace("ui.menu.builder", nil)
-	local menu = require("ui.menu.builder").build({
+	replace("menu.ui.builder.builder", nil)
+	local menu = require("menu.ui.builder.builder").build({
 		is_paused = function() return options.paused == true end,
 		on_menu_changed = function() observed.redraws = observed.redraws + 1 end,
 		llm = {

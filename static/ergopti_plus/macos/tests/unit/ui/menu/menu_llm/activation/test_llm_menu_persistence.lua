@@ -137,7 +137,7 @@ helpers.describe("LLM menu persistence — disk round-trip", function()
 
 		local label = entry.id
 		helpers.it("round-trips " .. label .. " through preferences.save/load", function()
-			local manifest = require("infra.manifest_reader")
+			local manifest = require("menu.engine.manifest_reader")
 			local path = hs.section .. "." .. (hs.nested_key or (hs.path and hs.path .. "." .. hs.key or hs.key))
 			local expected = hs.sample
 			local expected_disk = hs.disk_sample ~= nil and hs.disk_sample or hs.sample

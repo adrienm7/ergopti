@@ -228,14 +228,14 @@ end)
 
 helpers.describe("layout editor menu row (Linux)", function()
 	helpers.it("« Create or edit a layout… » shows the window straight on the editor (layout-editor-menu)", function()
-		local saved = { bridge = package.loaded["ui.layout_manager.bridge"], builder = package.loaded["ui.menu.builder"] }
+		local saved = { bridge = package.loaded["ui.layout_manager.bridge"], builder = package.loaded["menu.ui.builder.builder"] }
 		local calls = {}
 		package.loaded["ui.layout_manager.bridge"] = {
 			open_editor = function() calls[#calls + 1] = "open_editor"; return true end,
 		}
-		package.loaded["ui.menu.builder"] = nil
+		package.loaded["menu.ui.builder.builder"] = nil
 		local ok, err = pcall(function()
-			local module = helpers.load_module("ui.menu.builder")
+			local module = helpers.load_module("menu.ui.builder.builder")
 			local items = module.build({ webview = { show = function(name)
 				calls[#calls + 1] = "show " .. name
 				return true
@@ -253,7 +253,7 @@ helpers.describe("layout editor menu row (Linux)", function()
 			helpers.assert_eq(type(row.fn), "function")
 			row.fn()
 		end)
-		package.loaded["ui.layout_manager.bridge"], package.loaded["ui.menu.builder"] = saved.bridge, saved.builder
+		package.loaded["ui.layout_manager.bridge"], package.loaded["menu.ui.builder.builder"] = saved.bridge, saved.builder
 		helpers.assert_true(ok, tostring(err))
 		helpers.assert_eq(calls, { "show layout_manager", "open_editor" })
 	end)
@@ -262,7 +262,7 @@ end)
 --- Captures actual provider data while forwarding its status and rendering to the real binding.
 --- @param callback function Receives the native build, fixture state and binding.
 local function with_empty_layout(callback)
-	local names = { "ui.menu.builder", "infra.manifest_menu", "core.i18n.engine.i18n", "modules.keymap.layout_registry" }
+	local names = { "menu.ui.builder.builder", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "modules.keymap.layout_registry" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local ok, err = xpcall(function()
@@ -273,8 +273,8 @@ local function with_empty_layout(callback)
 			end,
 			select = function() state.selections = state.selections + 1; return true end,
 		}
-		local binding = require("infra.manifest_menu")
-		local module = helpers.load_module("ui.menu.builder")
+		local binding = require("menu.engine.manifest_menu")
+		local module = helpers.load_module("menu.ui.builder.builder")
 		local native_build = binding.build
 		binding.build = function(key, title, dynamic, click, ctx, providers)
 			if key == "layout_menu" then

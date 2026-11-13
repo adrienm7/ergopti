@@ -175,7 +175,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 				count = 1,
 				patterns = { "_menu_refresh_timer%s*=%s*hs%.timer%.doAfter" },
 			},
-			[module_source("ui.menu.menu_watchers")] = {
+			[module_source("menu.ui.builder.watchers")] = {
 				count = 1,
 				patterns = { "_debounce_timer%s*=%s*timer" },
 			},

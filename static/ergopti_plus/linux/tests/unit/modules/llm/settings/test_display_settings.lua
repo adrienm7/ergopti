@@ -34,7 +34,7 @@ end
 helpers.describe("LLM display settings: durable manifest-backed values", function()
 	helpers.it("reads all four defaults without persisting them", function()
 		local settings, storage = load_settings()
-		local manifest = require("infra.manifest_reader")
+		local manifest = require("menu.engine.manifest_reader")
 		for _, name in ipairs({ "pred_indent", "show_info_bar", "streaming", "streaming_multi" }) do
 			helpers.assert_eq(settings.get(name), manifest.default_for("llm.display." .. name))
 			helpers.assert_true(not storage.has("llm.display." .. name))
@@ -151,7 +151,7 @@ end)
 --- @param options table Fixture state, writer refusal and shared label mutation.
 --- @param callback function Observations asserted outside native callbacks.
 local function with_info_menu(options, callback)
-	local names = { "infra.llm_preferences", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.builder" }
+	local names = { "infra.llm_preferences", "modules.llm.display_settings", "modules.llm.profile_settings", "menu.engine.manifest_menu", "menu.ui.builder.builder" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local settings, storage = load_settings({
@@ -187,7 +187,7 @@ local function with_info_menu(options, callback)
 		end,
 		i18n = require("core.i18n.engine.i18n"), logger = require("core.logger.engine.shim"),
 	}))
-	package.loaded["infra.manifest_menu"] = renderer
+	package.loaded["menu.engine.manifest_menu"] = renderer
 	local observed = { writes = 0, redraws = 0, active = true, paused = false, backend = options.backend or "ollama", revision = 0 }
 	local native_set, native_many = storage.set, storage.set_many
 	local function admission_boundary()
@@ -211,7 +211,7 @@ local function with_info_menu(options, callback)
 		return native_many(...)
 	end
 	local ok, err = xpcall(function()
-		local items = helpers.load_module("ui.menu.builder").build({
+		local items = helpers.load_module("menu.ui.builder.builder").build({
 			_version = "0.0.0-dev.12",
 			llm = { is_enabled = function() return observed.active end, toggle = function() return true end,
 				get_backend = function() return observed.backend end,
@@ -723,4 +723,4 @@ helpers.describe("LLM retained Info Bar admission", function()
 end)
 
 require("tests.lua.pred_indent_default_contract")(helpers,
-	require("infra.manifest_reader").default_for(require("settings.engine.keys").KEY.LLM_DISPLAY_PRED_INDENT))
+	require("menu.engine.manifest_reader").default_for(require("settings.engine.keys").KEY.LLM_DISPLAY_PRED_INDENT))

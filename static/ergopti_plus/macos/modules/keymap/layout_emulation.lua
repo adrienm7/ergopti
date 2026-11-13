@@ -459,7 +459,7 @@ function M.start(ports)
 			if status ~= "ok" and status ~= "absent" then error("config.toml is unreadable: " .. tostring(detail)) end
 			return require("core.text.engine.toml_codec").decode(content or "")
 		end,
-		default_for = require("infra.manifest_reader").default_for,
+		default_for = require("menu.engine.manifest_reader").default_for,
 		report_outdated = function(segments, detail) require("settings.engine.migration.outdated").report(segments, detail, Logger) end,
 		source = function(id)
 			local composer = Registry.composer_settings()

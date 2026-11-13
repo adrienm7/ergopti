@@ -17,16 +17,16 @@ local PrivacyPolicy = require("ai.engine.policy.trigger_policy")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local COMMAND = require("settings.engine.keys").COMMAND
 local KeyNames = require("platform.input.keycodes.key_names")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local _fill = require("ui.menu.menu_dialogs")._fill
-local succeeded = require("ui.menu.menu_dialogs").succeeded
-local prompt_text = require("ui.menu.menu_dialogs").prompt_text
-local show_error = require("ui.menu.menu_dialogs").show_error
-local show_info = require("ui.menu.menu_dialogs").show_info
-local plain_markup = require("ui.menu.menu_dialogs").plain_markup
-local ask_yes_no = require("ui.menu.menu_dialogs").ask_yes_no
+local _fill = require("menu.ui.builder.dialogs")._fill
+local succeeded = require("menu.ui.builder.dialogs").succeeded
+local prompt_text = require("menu.ui.builder.dialogs").prompt_text
+local show_error = require("menu.ui.builder.dialogs").show_error
+local show_info = require("menu.ui.builder.dialogs").show_info
+local plain_markup = require("menu.ui.builder.dialogs").plain_markup
+local ask_yes_no = require("menu.ui.builder.dialogs").ask_yes_no
 
 local LOG = "ui.menu.menu_llm"
 
@@ -412,7 +412,7 @@ local function _build_llm(ctx)
 	providers["llm_profile"] = function()
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles then return {} end
-		local save_edit, edit_current, select_edit, delete_edit = require("ui.menu.profile_editor_request").capture(ProfileSettings)
+		local save_edit, edit_current, select_edit, delete_edit = require("menu.ui.transactions.profile_editor_request").capture(ProfileSettings)
 		-- The model predictions actually use: an API entry's when the API answers.
 		local current_model = llm.get_prediction_model and llm.get_prediction_model() or nil
 		local effective = ProfileSettings.effective_profile(current_model)

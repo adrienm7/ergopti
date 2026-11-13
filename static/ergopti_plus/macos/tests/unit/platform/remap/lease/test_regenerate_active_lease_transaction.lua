@@ -287,7 +287,7 @@ end
 --- The deployment port records its input; it does not acknowledge native reload.
 --- @param run function Receives remap, protocol observations and a menu pick function.
 local function with_live_picker(run)
-	helpers.with_fresh_modules({ "ui.menu.menu_tap_holds", "ui.menu.menu_utils", "ui.action_picker" }, function()
+	helpers.with_fresh_modules({ "ui.menu.menu_tap_holds", "menu.ui.builder.utils", "ui.action_picker" }, function()
 		local remap, calls = load_active_remap({ actions = {
 			{ id = "none", label = "None", category = "Spécial", holdable = true, tappable = true },
 			{ id = "escape", label = "Escape", category = "Spécial", holdable = false, tappable = true },

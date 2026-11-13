@@ -38,8 +38,8 @@ end
 --- @param render_ctx table The context the IA menu handed to the renderer.
 --- @return table Rendered hs.menubar rows.
 local function render(render_ctx)
-	return helpers.with_fresh_modules({ "infra.manifest_menu", "menu.engine.renderer" }, function()
-		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
+	return helpers.with_fresh_modules({ "menu.engine.manifest_menu", "menu.engine.renderer" }, function()
+		local ManifestMenu = helpers.load_with_stubs("menu.engine.manifest_menu")
 		-- Every dynamic row answers with nothing: only the gate is under test here.
 		local handlers = setmetatable({}, { __index = function() return function() end end })
 		return ManifestMenu.build("llm_menu", "LLM", handlers, nil, render_ctx, {})
@@ -161,7 +161,7 @@ helpers.describe("Active download shortcut shared frame", function()
 	end)
 	helpers.it("refuses an unbound declaration without losing the active task or triggering effects", function()
 		with_activation("ollama", { true }, nil, function(_, _, calls)
-			local renderer = package.loaded["infra.manifest_menu"]
+			local renderer = package.loaded["menu.engine.manifest_menu"]
 			local rows = renderer.get_array("llm_download_shortcut_frame")
 			local original = rows[1]
 			helpers.assert_not_nil(original)
@@ -206,7 +206,7 @@ helpers.describe("Genuine temperature fixture dependency", function()
 			helpers.assert_eq(rows[1].action(), true)
 			helpers.assert_eq(sets, 1)
 			helpers.assert_eq(resets, 0)
-			local declaration = package.loaded["infra.manifest_menu"].get_array("llm_generation_temperature_control")
+			local declaration = package.loaded["menu.engine.manifest_menu"].get_array("llm_generation_temperature_control")
 			local original = declaration[1]
 			local ok, detail = xpcall(function()
 				declaration[1] = { type = "command", id = "missing_temperature_owner", i18n = original.i18n }
@@ -250,7 +250,7 @@ helpers.describe("actual transient download producer reaches completed root comp
 					-- The activation fixture deliberately exposes a subset renderer and key-only i18n.
 					-- Root construction needs the genuine native binding and complete locale owners.
 					local activation_logger = package.loaded["core.logger.engine.logger"]
-					local owned = { "ui.menu.builder", "ui.menu.canvas_badge", "infra.manifest_menu",
+					local owned = { "menu.ui.builder.builder", "menu.ui.builder.canvas_badge", "menu.engine.manifest_menu",
 						"menu.engine.renderer", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.logger.engine.logger" }
 					local previous = {}
 					for index, name in ipairs(owned) do previous[index] = package.loaded[name] end
@@ -270,12 +270,12 @@ helpers.describe("actual transient download producer reaches completed root comp
 						local native_locale = require("core.i18n.engine.locale")
 						native_i18n.set_locale_injector(native_locale.set_locale)
 						native_i18n.set_locale_no_reload("en")
-						local native_renderer = require("infra.manifest_menu")
+						local native_renderer = require("menu.engine.manifest_menu")
 						helpers.assert_type(native_renderer.get_root, "function")
 						helpers.assert_type(native_renderer.native_composition, "function")
 						helpers.assert_type(native_i18n.section, "function")
 						helpers.assert_eq(native_locale.current_locale(), native_i18n.get_locale())
-						local builder = require("ui.menu.builder")
+						local builder = require("menu.ui.builder.builder")
 						local menu = builder.generate({ config = { log_level = 2 }, llm_handler = calls.handler,
 							script_control = { toggle = function() resumed = resumed + 1 end } }, {}, {
 							reload = function() return "reload-ack" end, quit = function() return "quit-ack" end })
@@ -318,10 +318,10 @@ end
 local function with_genuine_outer_parent(calls, callback)
 	-- The actual API backend has no local health probe; no refresh port is suppressed.
 	helpers.assert_eq(calls.root_deps.state.llm_backend, "api")
-	local port = package.loaded["infra.manifest_menu"]
+	local port = package.loaded["menu.engine.manifest_menu"]
 	local before_build, before_group = port.build, port.group_row
 	local activation_logger = package.loaded["core.logger.engine.logger"]
-	local owned = { "infra.manifest_menu", "menu.engine.renderer", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.logger.engine.logger" }
+	local owned = { "menu.engine.manifest_menu", "menu.engine.renderer", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.logger.engine.logger" }
 	local previous = {}
 	for index, name in ipairs(owned) do previous[index] = package.loaded[name] end
 	local ok, detail = xpcall(function()
@@ -334,7 +334,7 @@ local function with_genuine_outer_parent(calls, callback)
 			local native_i18n, native_locale = require("core.i18n.engine.i18n"), require("core.i18n.engine.locale")
 			native_i18n.set_locale_injector(native_locale.set_locale)
 			native_i18n.set_locale_no_reload("en")
-			local native = require("infra.manifest_menu")
+			local native = require("menu.engine.manifest_menu")
 			local capture = {}
 			-- The producer requires this genuine table at call time. Observe that
 			-- owner, rather than the older port captured by its outer constructor.
@@ -461,8 +461,8 @@ helpers.describe("actual outer IA parent reaches real tray transport", function(
 						observed = original_build(...)
 						return observed
 					end
-					helpers.with_fresh_modules({ "ui.menu.builder", "ui.menu.canvas_badge" }, function()
-						local actual = require("ui.menu.builder").generate({ config = { log_level = 2 },
+					helpers.with_fresh_modules({ "menu.ui.builder.builder", "menu.ui.builder.canvas_badge" }, function()
+						local actual = require("menu.ui.builder.builder").generate({ config = { log_level = 2 },
 							llm_handler = calls.handler, script_control = { toggle = function() error("draw never resumes") end } },
 							{}, { reload = function() error("draw never reloads") end, quit = function() error("draw never quits") end })
 						helpers.assert_type(observed, "table")
@@ -490,7 +490,7 @@ end)
 -- These subjects retain actual template/native renderer results. They supply
 -- no hand-authored native row and restore the exact captured owner descriptors.
 local function with_download_projection(calls, callback)
-	local facade = package.loaded["infra.manifest_menu"]
+	local facade = package.loaded["menu.engine.manifest_menu"]
 	local template, render = facade.template_rows, facade.render_rows
 	local root = facade.get_root()
 	local source = root.llm_download_shortcut_frame
@@ -507,7 +507,7 @@ local function with_download_projection(calls, callback)
 		callback(facade, captured, function() return focused, successor_focused end,
 			{ focus = function() successor_focused = successor_focused + 1 end })
 	end, debug.traceback)
-	package.loaded["infra.manifest_menu"] = facade
+	package.loaded["menu.engine.manifest_menu"] = facade
 	facade.template_rows, facade.render_rows = template, render
 	root.llm_download_shortcut_frame = source
 	source[1] = declaration
@@ -580,7 +580,7 @@ helpers.describe("Actual download native projection custody", function()
 					local old_id, old_platform = captured.declaration.id, captured.platforms[1]
 					facade.render_rows = function(...)
 						native = captured.render(...)
-						if scenario == "facade" then package.loaded["infra.manifest_menu"] = nil
+						if scenario == "facade" then package.loaded["menu.engine.manifest_menu"] = nil
 						elseif scenario == "array" then captured.root.llm_download_shortcut_frame = nil
 						elseif scenario == "record" then captured.declaration.id = "missing_download_owner"
 						else captured.platforms[1] = "linux" end
@@ -594,7 +594,7 @@ helpers.describe("Actual download native projection custody", function()
 					helpers.assert_eq(calls.saves, 0)
 					helpers.assert_eq(calls.updates, 0)
 					helpers.assert_eq(calls.notifications, 0)
-					package.loaded["infra.manifest_menu"] = facade
+					package.loaded["menu.engine.manifest_menu"] = facade
 					captured.root.llm_download_shortcut_frame = captured.source
 					captured.declaration.id, captured.platforms[1] = old_id, old_platform
 					facade.render_rows = captured.render

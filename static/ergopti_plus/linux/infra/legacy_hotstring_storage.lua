@@ -29,7 +29,7 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Preferences = require("infra.hotstring_preferences")
 local TerminatorSettings = require("modules.hotstrings.terminator_settings")
 local Writer = require("core.text.engine.toml_codec.writer")

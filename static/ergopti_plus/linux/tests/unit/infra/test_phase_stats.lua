@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.support.logger_fixture").helpers({
-	"infra.phase_stats", "core.process.adapters.shell_runner", "ui.menu.timed_build", "core.text.engine.toml.reader", "core.logger.engine.boot_profiler",
+	"infra.phase_stats", "core.process.adapters.shell_runner", "menu.ui.builder.timed_build", "core.text.engine.toml.reader", "core.logger.engine.boot_profiler",
 	"core.logger.engine.perf_counters", "core.text.engine.toml_codec.reader",
 })
 
@@ -112,14 +112,14 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 	helpers.it("times a tray menu rebuild as menu.rebuild, and the daemon's rebuild owner uses it", function()
 		local stats = fixture(20)
 		package.loaded["infra.phase_stats"] = stats
-		package.loaded["ui.menu.timed_build"] = nil
-		local items = require("ui.menu.timed_build").run(function(ctx) return { ctx.title } end, { title = "Ergopti" })
+		package.loaded["menu.ui.builder.timed_build"] = nil
+		local items = require("menu.ui.builder.timed_build").run(function(ctx) return { ctx.title } end, { title = "Ergopti" })
 		helpers.assert_eq(items, { "Ergopti" })
 		helpers.assert_eq(stats.figures("menu.rebuild").n, 1)
 		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
 		local source = file:read("*a")
 		file:close()
-		helpers.assert_not_nil(source:find('require("ui.menu.timed_build").run(build, ctx)', 1, true),
+		helpers.assert_not_nil(source:find('require("menu.ui.builder.timed_build").run(build, ctx)', 1, true),
 			"the daemon's tray rebuild goes through the timed build")
 	end)
 
@@ -128,7 +128,7 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 		local clock = 0
 		stats.use_clock(function() return clock end)
 		package.loaded["infra.phase_stats"] = stats
-		package.loaded["ui.menu.timed_build"] = nil
+		package.loaded["menu.ui.builder.timed_build"] = nil
 		local Timings = require("core.timing.engine.timings")
 		local held_ms = Timings.ms
 		Timings.ms = function(section, key)
@@ -136,7 +136,7 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 			return held_ms(section, key)
 		end
 		local ok, failure = pcall(function()
-			local TimedBuild = require("ui.menu.timed_build")
+			local TimedBuild = require("menu.ui.builder.timed_build")
 			TimedBuild.run(function() clock = clock + 120 * MS; return { 1, 2, 3 } end, {})
 			TimedBuild.run(function() clock = clock + 300 * MS; return { 1 } end, {})
 		end)

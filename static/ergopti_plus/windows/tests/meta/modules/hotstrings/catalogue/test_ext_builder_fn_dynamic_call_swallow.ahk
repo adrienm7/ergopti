@@ -18,7 +18,7 @@
 ; marker when it populated nothing. This test receives the caller, observer and declared construction owner as
 ; one physical control-flow closure; refactoring cannot detach their proof.
 ;
-; Meta-static because ui/tray_menu.ahk registers top-level menu hooks and is not
+; Meta-static because menu/ui/tray_menu.ahk registers top-level menu hooks and is not
 ; part of the headless run_all include graph; it cannot be #Included by the
 ; runner without side effects.
 ; ==============================================================================

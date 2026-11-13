@@ -252,7 +252,7 @@ helpers.describe("layout manager bridge: the emulation follows a changed layout"
 	end)
 
 	helpers.it("(lmh-001-002-emulation-reload) the macOS host reloads the emulated layout and the menu", function()
-		local menu = assert(helpers.read_module_source("ui.menu"))
+		local menu = assert(helpers.read_module_source("menu.ui"))
 		helpers.assert_contains(menu, 'require("ui.layout_manager").set_layout_change_handler(function(id)')
 		helpers.assert_contains(menu, "if Emulation.status().id ~= id then return end")
 		local host = assert(helpers.read_module_source("ui.layout_manager"))

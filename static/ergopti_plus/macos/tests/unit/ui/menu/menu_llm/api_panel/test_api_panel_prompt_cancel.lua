@@ -16,7 +16,7 @@ local MODULES = {
 	"core.logger.engine.logger",
 	"core.ui.engine.dialog_util",
 	"core.ui.engine.notifications",
-	"infra.manifest_menu",
+	"menu.engine.manifest_menu",
 	"ui.menu.menu_llm.api_panel",
 }
 
@@ -99,7 +99,7 @@ local function run_add_fixture(prompt_result, confirm_choice, seed_entries)
 		},
 			logger = helpers.make_logger_stub(),
 		}))
-		package.loaded["infra.manifest_menu"] = {
+		package.loaded["menu.engine.manifest_menu"] = {
 			command_row = command_renderer.command_row,
 			template_rows = command_renderer.template_rows,
 			get_array = command_renderer.get_array,

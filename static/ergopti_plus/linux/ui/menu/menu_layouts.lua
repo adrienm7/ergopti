@@ -11,15 +11,15 @@
 
 local M = {}
 
-local NativePresentation = require("infra.native_presentation")
+local NativePresentation = require("menu.engine.native_presentation")
 local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 local NumberRowPolicy = require("layouts.engine.layout.number_row_policy")
 local Logger = require("core.logger.engine.shim")
 local MagicKeySourceRows = require("layouts.engine.layers.magic_key_source")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local show_error = require("ui.menu.menu_dialogs").show_error
+local show_error = require("menu.ui.builder.dialogs").show_error
 
 local LOG = "ui.menu.menu_layouts"
 

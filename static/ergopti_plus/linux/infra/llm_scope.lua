@@ -2,7 +2,7 @@
 
 --- Owns terminal AI preference restoration through the shared transaction.
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Preferences = require("infra.llm_preferences")
 local Transaction = require("settings.engine.scope.transaction")
 local FencedTransaction = require("settings.engine.scope.fenced_transaction")

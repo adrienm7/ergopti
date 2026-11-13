@@ -265,7 +265,7 @@ global _PersonalShortcutsRegistry := Map("__Order", [])
 ; this global. Assigned in the pre-pump block so it exists before the first
 ; LoggerStart and before any parse-time-armed callback or deferred worker reads it.
 global DriverPid := DllCall("GetCurrentProcessId", "UInt")
-#Include infra/manifest_reader.ahk
+#Include menu/engine/manifest_reader.ahk
 #Include settings/engine/preferences/feature_io.ahk
 
 ; ===== Global error net — armed BEFORE the first message pump =====
@@ -341,7 +341,7 @@ BootProfile_Stamp("UIA include initialised")
 ; The global error net itself is armed far above, before Bundle_Init()'s
 ; message-pumping RunWait — see the "Global error net" block there.
 #Include settings/engine/preferences/personal_features.ahk
-#Include infra/menu_helpers.ahk
+#Include menu/engine/helpers.ahk
 
 ; #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t   ; Adds the no breaking spaces as hotstrings triggers
 A_MenuMaskKey := "vkff" ; Change the masking key to the void key
@@ -351,7 +351,7 @@ A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed
 ; OnMessage handlers, SetTimer callbacks) once A_MaxThreads concurrent
 ; threads are already active. The default ceiling of 10 is easy to hit
 ; with the keystats's ~6 background timers + mouse/keyboard hooks. The
-; menu-dispatcher bypass in infra/menu_dispatcher.ahk also relies on a free
+; menu-dispatcher bypass in menu/engine/dispatcher.ahk also relies on a free
 ; slot for its retry SetTimer, so the headroom matters even more there.
 A_MaxThreads := 64
 
@@ -518,11 +518,11 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 ; DYN_HOTSTRINGS_DEFAULT_DELAY early-layer precedent).
 #Include platform/remap/constants.ahk
 #Include core/lifecycle/engine/master_gates.ahk
-#Include infra/manifest_descriptions.ahk
-#Include infra/menu_dispatcher.ahk
+#Include menu/engine/manifest_descriptions.ahk
+#Include menu/engine/dispatcher.ahk
 #Include platform/input/hook_dispatcher.ahk
-#Include infra/menu_manifest.ahk
-#Include infra/manifest_menu.ahk
+#Include menu/engine/manifest.ahk
+#Include menu/engine/manifest_menu.ahk
 #Include infra/llm_defaults.ahk
 #Include modules/updater.ahk
 #Include core/lifecycle/engine/shutdown/uninstall.ahk
@@ -1028,7 +1028,7 @@ _SpaceAroundSymbolsNode := (Features.Has("hotstrings")
 	: Map()
 global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceAroundSymbolsNode["enabled"]) ? " " : ""
 
-#Include ui/tray_menu.ahk
+#Include menu/ui/tray_menu.ahk
 
 
 
@@ -1300,7 +1300,7 @@ global _DriverInputInitPending := true
 global _DriverBootTailPending := true
 global _DriverMenuReady := false
 ; Commands clicked while the previous instance's reload was pending are replayed
-; first, once input is ready (infra/menu_reload_replay.ahk).
+; first, once input is ready (menu/engine/reload_replay.ahk).
 MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated, MenuReloadReplay_Consume())
 _TrayRootBootDetailsPending := true
 BootProfile_StageBegin("magic key source")

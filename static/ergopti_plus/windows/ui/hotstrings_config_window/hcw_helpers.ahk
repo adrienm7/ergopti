@@ -43,7 +43,7 @@ global _HCW_CATEGORY_LIST := []
 ; Shape: { Key, Label }
 global _HCW_GROUP_LIST := []
 
-#Include ../../infra/menu_row_order.ahk
+#Include ../../menu/engine/row_order.ahk
 
 ; The bundled common categories (always present), in the shared display order;
 ; "personal" closes that order but has its own group, built from the user's files.

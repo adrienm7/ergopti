@@ -120,7 +120,7 @@ local function with_caps_word_menu(body, shortcuts_enabled)
 			'[shortcuts]\nenabled = ' .. enabled .. '\n[foreign]\nvalue = "keep"\n', function(path)
 				manager.init({ persist = true, config_path = path, capture_text_owner = capture_text_owner })
 				local changed = { count = 0 }
-				local builder = helpers.load_module("ui.menu.builder")
+				local builder = helpers.load_module("menu.ui.builder.builder")
 				local function row()
 					local rows = builder.build({ _version = "0.0.0-dev.12", shortcuts = manager,
 						paused = false, is_paused = function() return true end,
@@ -246,8 +246,8 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 
 	helpers.it("announces each committed CapsWord switch with its new state and never a refused one (selection-caps-word)", function()
 		with_caps_word_menu(function(manager, row)
-			local saved, notices = package.loaded["ui.menu.feature_notice"], {}
-			package.loaded["ui.menu.feature_notice"] = { feature = function(label, enabled)
+			local saved, notices = package.loaded["menu.ui.builder.feature_notice"], {}
+			package.loaded["menu.ui.builder.feature_notice"] = { feature = function(label, enabled)
 				notices[#notices + 1] = { label, enabled }
 			end }
 			local ok, err = pcall(function()
@@ -263,7 +263,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 				helpers.assert_eq(#notices, 2, "a refused switch must stay silent")
 				helpers.assert_eq(manager.release_configuration(owner), true)
 			end)
-			package.loaded["ui.menu.feature_notice"] = saved
+			package.loaded["menu.ui.builder.feature_notice"] = saved
 			if not ok then error(err, 0) end
 		end)
 	end)
@@ -353,7 +353,7 @@ local function with_case_menu(body)
 			observed.replacement = transform(observed.selected or "été")
 			return true
 		end
-		local builder = helpers.load_module("ui.menu.builder")
+		local builder = helpers.load_module("menu.ui.builder.builder")
 		local function rows()
 			return builder.build({ _version = "0.0.0-dev.12", shortcuts = manager,
 				paused = false, is_paused = function() return true end,
@@ -684,7 +684,7 @@ helpers.describe("shared selection helper command ownership", function()
 
 	helpers.it("follows changed shared helper order and caption (selection-helper-command)", function()
 		with_helper_menu(function(_, _, _, rows)
-			local root = require("infra.manifest_menu").get_root()
+			local root = require("menu.engine.manifest_menu").get_root()
 			local original = root[corpus.section]
 			helpers.assert_type(original, "table")
 			helpers.assert_eq(#original, 3)
@@ -708,7 +708,7 @@ helpers.describe("shared selection helper command ownership", function()
 	helpers.it("uses actual helper captions in all 21 locales (selection-helper-command)", function()
 		-- Each binding captures its locale owner at load time. The full suite may
 		-- have replaced that owner; reload the whole chain and restore it together.
-		local names = { "core.i18n.engine.core", "core.i18n.engine.locale", "core.i18n.engine.i18n", "infra.manifest_menu", "ui.menu.builder" }
+		local names = { "core.i18n.engine.core", "core.i18n.engine.locale", "core.i18n.engine.i18n", "menu.engine.manifest_menu", "menu.ui.builder.builder" }
 		local previous_modules = {}
 		for _, name in ipairs(names) do
 			previous_modules[name] = package.loaded[name]
@@ -816,7 +816,7 @@ helpers.describe("shared selection presentation boundaries", function()
 		local section = fragment
 		helpers.it("consumes the genuine " .. section .. " and refuses missing or unbound replacements", function()
 			with_helper_menu(function(_, _, effects, rows)
-				local manifest = require("infra.manifest_menu")
+				local manifest = require("menu.engine.manifest_menu")
 				local root = manifest.get_root()
 				local original = root[section]
 				helpers.assert_type(original, "table")

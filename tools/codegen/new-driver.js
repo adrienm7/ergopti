@@ -66,7 +66,8 @@ const DRIVER_SUBDIRS = [
 	'_generated',
 	'tests',
 	'core',
-	'settings'
+	'settings',
+	'menu'
 ];
 
 /** Supported target languages. */

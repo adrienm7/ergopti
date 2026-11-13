@@ -51,7 +51,7 @@ _DMNCSM_ReadSource(RelPath) {
 ; ==================================================
 
 _DMNCSM_ResetHelperClearsBothMaps() {
-	Src := _DMNCSM_ReadSource("infra/menu_dispatcher.ahk")
+	Src := _DMNCSM_ReadSource("menu/engine/dispatcher.ahk")
 	Seg := _DriverFuncBody("MenuDispatcher_Reset")
 	Assert(Seg != "", "MenuDispatcher_Reset() must be defined in menu_dispatcher.ahk")
 	; Whitespace-tolerant: the assignments are alignment-padded in the source
@@ -74,9 +74,9 @@ Test("menu_dispatcher: MenuDispatcher_Reset clears both dispatch Maps (dispatche
 ; ==================================================
 
 _DMNCSM_StagedPublicationRetiresOldIdsAfterAttach() {
-	Src := _DMNCSM_ReadSource("ui/tray_menu.ahk")
+	Src := _DMNCSM_ReadSource("menu/ui/tray_menu.ahk")
 	Seg := _DriverFuncBody("TrayMenuStage_Publish")
-	Assert(Seg != "", "TrayMenuStage_Publish() must exist in ui/tray_menu.ahk")
+	Assert(Seg != "", "TrayMenuStage_Publish() must exist in menu/ui/tray_menu.ahk")
 	EpochPos := InStr(Seg, "MenuDispatcher_BeginReplacement()")
 	DeletePos := InStr(Seg, "A_TrayMenu.Delete()")
 	PrunePos := InStr(Seg, "MenuDispatcher_PruneMenu(A_TrayMenu)")

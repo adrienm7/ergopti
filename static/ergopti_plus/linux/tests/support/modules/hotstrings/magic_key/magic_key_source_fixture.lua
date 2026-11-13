@@ -28,7 +28,7 @@ local function registry()
 end
 
 require("tests.lua.layouts.magic_key_source_contract")(helpers, Shared, {
-	entry = require("infra.manifest_reader").find_entry_by_path(PATH),
+	entry = require("menu.engine.manifest_reader").find_entry_by_path(PATH),
 	registry = registry(),
 	field = "evdev",
 })
@@ -189,8 +189,8 @@ assert(native_caption_closed and native_caption_close ~= nil and native_caption_
 
 local native_caption_corpus = assert(Json.decode(native_caption_bytes))
 
-local magic_notice_module_names = { "ui.menu.builder", "infra.native_presentation", "platform.focus.application_notifier",
-	"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+local magic_notice_module_names = { "menu.ui.builder.builder", "menu.engine.native_presentation", "platform.focus.application_notifier",
+	"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu" }
 
 -- A caller catching an expected primary must also consume cleanup_failures.
 -- Normal positive subjects fail on any cleanup refusal after all attempts finish.
@@ -219,7 +219,7 @@ local function with_magic_notice(body, cleanup_failures)
 		with_source(nil, function(Source)
 			local settled, primary = pcall(function()
 				local calls = wire(Source, { active = true, replace = true, typed_ok = true })
-				local Builder = require("ui.menu.builder")
+				local Builder = require("menu.ui.builder.builder")
 				local changed = 0
 				local items = Builder.build({ on_quit = function() end, magic_key_source = Source,
 					on_menu_changed = function() changed = changed + 1 end })
@@ -234,7 +234,7 @@ local function with_magic_notice(body, cleanup_failures)
 				helpers.assert_type(capture, "function", "actual physical capture command must exist")
 				body({ source = Source, calls = calls, capture = capture, notices = notices,
 					locale = Locale, i18n = I18n, changed = function() return changed end,
-					policy = policy, native = require("infra.native_presentation") })
+					policy = policy, native = require("menu.engine.native_presentation") })
 			end)
 			-- The genuine reset returns nil; only a thrown failure is refusal here.
 			restore("physical_source_reset", function() Source._reset_for_test() end)

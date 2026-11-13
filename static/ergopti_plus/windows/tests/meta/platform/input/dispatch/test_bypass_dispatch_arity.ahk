@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for the "bypass-dispatch-wrong-arity" finding (T-W06).
 ;
-; _DispatchIfMissed() in infra/menu_dispatcher.ahk previously called the stored
+; _DispatchIfMissed() in menu/engine/dispatcher.ahk previously called the stored
 ; callback with a single string argument: Callback.Call("bypass_dispatch").
 ; AHK menu callbacks registered via Menu.Add receive three positional params
 ; (ItemName, ItemPos, MenuObj), so passing only one argument causes AHK to

@@ -283,7 +283,7 @@ end
 -- Backspace and once wiped the hotstring buffer.
 local WITH_LLM = os.getenv("ERGOPTI_E2E_LLM") == "1"
 for _, name in ipairs(MENU_ROWS_FILE and {} or { "core.ui.ui.tooltip.preview", "core.ui.ui.tooltip.llm", "adapters.tray_menu",
-	"ui.menu.builder", "modules.updater.manager",
+	"menu.ui.builder.builder", "modules.updater.manager",
 	"modules.gestures.manager", "platform.focus.window_info", "core.process.adapters.lifecycle",
 	"core.ui.ui.webview_manager",
 	"core.fs.engine.file_watchers", "ui.wpm.widget", "modules.keystats.system_metrics", "platform.system.notifier" }) do

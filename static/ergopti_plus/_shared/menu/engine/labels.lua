@@ -15,7 +15,7 @@
 --- 2. decorate_section: frames a section header title for disabled menu
 ---    header rows. The frame is data, _shared/menu/data/section_header.json,
 ---    generated into menu.section_header_data here and into the constants
----    MenuSectionTitle (windows/infra/menu_helpers.ahk) reads, so one edit
+---    MenuSectionTitle (windows/menu/engine/helpers.ahk) reads, so one edit
 ---    restyles every header of the three drivers.
 ---
 --- Windows cannot require Lua modules; a JS drift gate keeps its formatters

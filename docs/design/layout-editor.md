@@ -133,7 +133,7 @@ emulation_vectors.json` like `test-layout-source-emulation.cjs` does.
 5. `windows/ui/layout_manager/kbd_register.ahk` (new): the elevated helper below, `install <staging dir>` and
    `uninstall <dll>`.
 6. Menu: in `_shared/menu/data/menu.toml` row `open_layout_editor`, drop `platforms`, `unavailable` and `reason_key`
-   (and the locale key `platform_reason.layout_editor_is_on_the_website_on_windows`); in `windows/ui/menu/menu_init.ahk`
+   (and the locale key `platform_reason.layout_editor_is_on_the_website_on_windows`); in `windows/menu/ui/builder/menu_init.ahk`
    bind `Commands[MenuCommand.OPEN_LAYOUT_EDITOR] := LayoutManager_OpenEditor` next to `LAYOUT_MANAGER` (line 700).
 
 **Installing from Windows.** No Node, no NSIS, no clang on the user's PC. The page writes the four DLL images itself

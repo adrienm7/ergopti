@@ -17,7 +17,7 @@ local function run_scenario()
 		"platform.input.synthetic_input",
 		"core.events.timer_scheduler",
 		"core.logger.engine.logger",
-		"infra.manifest_reader",
+		"menu.engine.manifest_reader",
 		"modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander",
 		"settings.engine.registry",
@@ -67,7 +67,7 @@ local function run_scenario()
 		cancel = function() return true end,
 	}
 	package.loaded["core.logger.engine.logger"] = Logger
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return "★" end,
 	}
 	package.loaded["modules.hotstrings.hotstrings_config"] = {

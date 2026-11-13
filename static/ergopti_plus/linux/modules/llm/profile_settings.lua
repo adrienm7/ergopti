@@ -12,7 +12,7 @@ local TextUtils = require("core.text.engine.utils_core")
 
 local Logger = require("core.logger.engine.shim")
 local ConfigOutdated = require("settings.engine.migration.outdated")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Selector = require("ai.engine.settings.profile_selector")
 local ModelProfile = require("modules.llm.model_profile")
 local RegistryCodec = require("ai.engine.settings.profile_registry_codec")

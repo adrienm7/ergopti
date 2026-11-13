@@ -32,7 +32,7 @@ local function with_config(source, body)
 end
 
 local Contract = require("tests.lua.settings.pause_switch_policy_contract")
-Contract.run_manifest(helpers, require("infra.manifest_reader"))
+Contract.run_manifest(helpers, require("menu.engine.manifest_reader"))
 
 helpers.describe("pause layout preferences", function()
 	helpers.it("reads the manifest defaults from a configuration without the settings", function()

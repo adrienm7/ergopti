@@ -1686,7 +1686,7 @@ helpers.describe("generated Linux defaults received by original native combinati
  for _,field in ipairs({"default_for","find_entry_by_path"}) do
   helpers.it("retires pending input after replaced declared getter "..field,function()
    with_public({},function(s)
-    local features=require("infra.manifest_reader");local original=features[field]
+    local features=require("menu.engine.manifest_reader");local original=features[field]
     s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
     features[field]=function(...) return original(...) end
     local called,detail=pcall(function()
@@ -1701,7 +1701,7 @@ helpers.describe("generated Linux defaults received by original native combinati
  end
  helpers.it("retires pending input after mutation of the original declared default map",function()
   with_public({},function(s)
-   local features=require("infra.manifest_reader")
+   local features=require("menu.engine.manifest_reader")
    local entry=features.find_entry_by_path("mod_combos.simultaneous_threshold_ms");local previous=entry.default
    s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
    entry.default=101

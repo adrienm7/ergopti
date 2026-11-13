@@ -28,7 +28,7 @@
  *
  * THE TWO KEYS THAT CAME FIRST:
  * `dynamic_hotstrings_order` duplicated _DYNAMIC_HOTSTRINGS_ORDER in
- * windows/ui/tray_menu.ahk — and DISAGREED with it, spelling the separator
+ * windows/menu/ui/tray_menu.ahk — and DISAGREED with it, spelling the separator
  * "---" where the live one spells it "-". Whichever a reader trusted, one of
  * them was lying. `word_delimiter_defs` carried 20 entries no driver asked for.
  * Both are gone; this guard is what keeps the next pair from accumulating.
@@ -267,7 +267,7 @@ const shortcutWindowsSource = sources.find(
 	({ rel }) => rel === 'windows/ui/menu/menu_shortcuts.ahk'
 )?.src;
 const shortcutRendererSource = sources.find(
-	({ rel }) => rel === 'windows/infra/manifest_menu.ahk'
+	({ rel }) => rel === 'windows/menu/engine/manifest_menu.ahk'
 )?.src;
 const shortcutReaderSections = new Set(
 	shortcutConstructionReaderSections(manifest, shortcutWindowsSource, shortcutRendererSource)
@@ -306,7 +306,7 @@ for (const key of Object.keys(startup.sources)) {
 // The optional replay metadata extends the real native callee ABI. Its exact
 // empty default and fail-fast guard retain the three-argument cold caller;
 // relaxing either must not earn credit through a signature-only match.
-const startupDispatcher = 'windows/infra/menu_dispatcher.ahk';
+const startupDispatcher = 'windows/menu/engine/dispatcher.ahk';
 for (const [name, before, after] of [
 	[
 		'old native signature',

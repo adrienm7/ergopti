@@ -18,7 +18,7 @@ local M = {}
 local llm_mod      = require("modules.llm")
 local AppPickerLib = require("infra.app_picker")
 local i18n         = require("core.i18n.engine.i18n")
-local ManifestMenu = require("infra.manifest_menu")
+local ManifestMenu = require("menu.engine.manifest_menu")
 local Logger       = require("core.logger.engine.logger")
 
 local PrivacyPolicy = require("ai.engine.policy.trigger_policy")
@@ -26,7 +26,7 @@ local Preferences = require("settings.engine.preferences.preferences")
 local ConfigPaths = require("settings.engine.paths")
 local SettingsManager = require("ui.menu.menu_llm.settings_manager")
 local ConfigKeys = require("settings.engine.keys")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 
 local LOG = "menu_llm.trigger_panel"
 

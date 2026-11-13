@@ -62,7 +62,7 @@ local function new_harness(sensitivity, held)
 	package.loaded["modules.gestures.engine"] = nil
 	hs.eventtap.__reset()
 
-	local Manifest = require("infra.manifest_reader")
+	local Manifest = require("menu.engine.manifest_reader")
 	local step_up = sensitivity or Manifest.default_for("gestures.sensitivities.swipe_3_up")
 	local step_down = sensitivity or Manifest.default_for("gestures.sensitivities.swipe_3_down")
 	local Engine = require("modules.gestures.engine")

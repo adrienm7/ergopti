@@ -33,7 +33,16 @@ const path = require('path');
 const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SOURCE = path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'ui', 'menu', 'builder.lua');
+const SOURCE = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'linux',
+	'menu',
+	'ui',
+	'builder',
+	'builder.lua'
+);
 const EN = path.join(
 	ROOT,
 	'static',

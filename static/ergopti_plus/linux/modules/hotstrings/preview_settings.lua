@@ -35,7 +35,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local Preferences = require("infra.hotstring_preferences")
-local ManifestReader = require("infra.manifest_reader")
+local ManifestReader = require("menu.engine.manifest_reader")
 local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "hotstrings.preview_settings"

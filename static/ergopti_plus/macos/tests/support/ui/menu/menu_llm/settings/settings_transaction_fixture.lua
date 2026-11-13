@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"modules.llm.backend_detector",
-	"infra.manifest_reader",
+	"menu.engine.manifest_reader",
 	"core.fs.adapters.storage",
 	"ui.menu.menu_llm",
 	"ui.menu.menu_llm.settings_manager",
@@ -42,7 +42,7 @@ local MODULES = {
 	"core.ui.engine.dialog_util",
 	"ui.menu.shortcut_utils",
 	"infra.app_picker",
-	"infra.manifest_menu",
+	"menu.engine.manifest_menu",
 	"settings.engine.preferences.preferences",
 }
 
@@ -389,7 +389,7 @@ local function with_fixture(options, callback)
 		i18n = { get = fixture_caption, section = fixture_caption },
 		logger = Logger,
 	}))
-	package.loaded["infra.manifest_menu"] = display_renderer
+	package.loaded["menu.engine.manifest_menu"] = display_renderer
 
 	local keymap = {}
 	keymap.set_llm_model = function() return true end
@@ -660,11 +660,11 @@ local function with_fixture(options, callback)
 				settings_mgr = manager,
 			}, rows)
 			if generation_ctx then
-				return package.loaded["infra.manifest_menu"].build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
+				return package.loaded["menu.engine.manifest_menu"].build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
 					["llm_generation_values"] = function() return rows end,
 				})
 			end
-			return package.loaded["infra.manifest_menu"].render_rows(rows)
+			return package.loaded["menu.engine.manifest_menu"].render_rows(rows)
 		end,
 		top_level_callbacks = build_top_level_callbacks,
 		trigger_menu = function()

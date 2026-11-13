@@ -5,7 +5,7 @@
  *
  * tools/lib/linux-menu-parts.cjs binds each
  * `local _build_x = require("ui.menu.menu_x").build` of
- * linux/ui/menu/builder.lua to that module's builder and recomposes the
+ * linux/menu/ui/builder/builder.lua to that module's builder and recomposes the
  * root the menu gates analyse. This gate proves the two halves of that
  * contract: a faithful split recomposes token for token into the root it came
  * from, and every other wiring is refused rather than composed.
@@ -133,15 +133,15 @@ const partOnlyCases = [
 	[
 		'a part binds a dialog the dialogs module does not export',
 		partOnly(
-			'linux/ui/menu/menu_quit.lua',
+			'linux/menu/ui/builder/quit.lua',
 			'local LOG = "ui.menu.menu_quit"',
-			'local foreign_dialog = require("ui.menu.menu_dialogs").foreign_dialog\nlocal LOG = "ui.menu.menu_quit"'
+			'local foreign_dialog = require("menu.ui.builder.dialogs").foreign_dialog\nlocal LOG = "ui.menu.menu_quit"'
 		)
 	],
 	[
 		'part modules bind each other in a cycle',
 		partOnly(
-			'linux/ui/menu/menu_dialogs.lua',
+			'linux/menu/ui/builder/dialogs.lua',
 			'local LOG = "ui.menu.menu_dialogs"',
 			'local layouts_probe = require("ui.menu.menu_layouts").layouts_probe\nlocal LOG = "ui.menu.menu_dialogs"'
 		)
@@ -160,11 +160,11 @@ for (const [cause, changed] of partOnlyCases) {
 // `ui/menu/builder.lua` as the tray root. Nothing may still load the old name.
 assert.equal(
 	LINUX_MENU_ROOT,
-	'linux/ui/menu/builder.lua',
+	'linux/menu/ui/builder/builder.lua',
 	'the Linux root has the macOS root name'
 );
 assert.ok(
-	fs.existsSync(path.join(SP, 'macos/ui/menu/builder.lua')),
+	fs.existsSync(path.join(SP, 'macos/menu/ui/builder/builder.lua')),
 	'the macOS root it mirrors exists'
 );
 assert.ok(

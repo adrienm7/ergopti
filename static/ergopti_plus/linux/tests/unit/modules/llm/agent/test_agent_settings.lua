@@ -169,7 +169,7 @@ local function with_agent_declaration(component, body)
 	local renderer, build, group_row, root, top, agent_index, public_agent, file
 	local ok, result = xpcall(function()
 		-- Retain the actual current locale/manifest owner cohort of this scenario.
-		renderer = require("infra.manifest_menu")
+		renderer = require("menu.engine.manifest_menu")
 		build, group_row = renderer.build, renderer.group_row
 		root = renderer.get_root(); top = root and root.top_level
 		helpers.assert_type(top, "table", "the actual top-level declaration must exist")
@@ -264,7 +264,7 @@ local function build_menu(world, answers)
 	local ok, rows = pcall(function()
 		-- Both bind the scenario's freshly loaded agent settings.
 		package.loaded["ui.menu.agent_rows"] = nil
-		local menu_builder = helpers.load_module("ui.menu.builder")
+		local menu_builder = helpers.load_module("menu.ui.builder.builder")
 		return menu_builder.build({ llm = world.engine, on_menu_changed = function() world.redraws =
 			(world.redraws or 0) + 1 end })
 	end)
@@ -498,7 +498,7 @@ helpers.describe("AI agent component menu: the published available top-level sub
 
 	helpers.it("uses reordered shared choices and preserves persistence refusal without redraw", function()
 		Scenario.run({}, function(world)
-			local renderer = require("infra.manifest_menu")
+			local renderer = require("menu.engine.manifest_menu")
 			local mode = renderer.get_root().agent_menu[1]
 			local previous = mode.choices
 			local corpus, keys = mode_corpus(), {}
@@ -644,7 +644,7 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 
 	helpers.it("uses the declaration label and exact owner ACK on a retained Off callback (agent-system-off)", function()
 		Scenario.run({ stored = { ["llm.agent_system1"] = "cerebras" } }, function(world)
-			local renderer = require("infra.manifest_menu")
+			local renderer = require("menu.engine.manifest_menu")
 			local declaration = renderer.get_root().agent_system_controls[1]
 			local old_label = declaration.i18n
 			declaration.i18n = system_off_corpus().mutated_label_key
@@ -749,7 +749,7 @@ end
 --- @param code string Runtime-only fixture locale.
 --- @param scenario function Receives the authentic production i18n owner.
 local function with_system_model_locale(code, scenario)
-	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	local native, owner, receipt, acquired
@@ -787,7 +787,7 @@ helpers.describe("AI agent shared system model control (agent-system-model)", fu
 		local corpus = system_model_corpus()
 		Scenario.run({ stored = { ["llm.agent_system1"] = corpus.spec, ["llm.agent_system2"] = corpus.spec } }, function(world)
 			with_system_model_locale("en", function(i18n)
-				local root = require("infra.manifest_menu").get_root()
+				local root = require("menu.engine.manifest_menu").get_root()
 				local declaration = root[corpus.section][2]
 				local label = declaration.i18n
 				local settings = require("modules.llm.agent_settings")
@@ -835,7 +835,7 @@ helpers.describe("AI agent shared system model control (agent-system-model)", fu
 		local corpus = system_model_corpus()
 		Scenario.run({ stored = { ["llm.agent_system1"] = corpus.spec } }, function(world)
 			with_system_model_locale("en", function(i18n)
-				local root = require("infra.manifest_menu").get_root()
+				local root = require("menu.engine.manifest_menu").get_root()
 				local original = root[corpus.section]
 				local ok, err = pcall(function()
 					root[corpus.section] = { original[2], original[1], {
@@ -926,7 +926,7 @@ local function with_system_model_french_seed(scenario)
 	with_system_model_locale("fr", function(native)
 		local backend, core = package.loaded["core.i18n.engine.locale"], package.loaded["core.i18n.engine.core"]
 		local ok, err = pcall(function()
-			require("infra.manifest_menu").get_root()
+			require("menu.engine.manifest_menu").get_root()
 			local newer = helpers.load_module("core.i18n.engine.locale")
 			newer.set_locale("en")
 			helpers.assert_eq(newer.get("menu.agent.model"), "Model… ({1})")
@@ -942,7 +942,7 @@ end
 helpers.describe("Agent model locale cohort isolation (agent-system-model)", function()
 	helpers.it("uses actual English producers and restores the split French cohort exactly (agent-system-model)", function()
 		with_system_model_french_seed(function(native, newer)
-			local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+			local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu" }
 			local before = {}
 			for _, name in ipairs(names) do before[name] = package.loaded[name] end
 			local strings = native.get("menu.agent.model")
@@ -966,7 +966,7 @@ helpers.describe("Agent model locale cohort isolation (agent-system-model)", fun
 
 	helpers.it("restores prior owners on a raised English scenario and permits a genuine retry (agent-system-model)", function()
 		with_system_model_french_seed(function(native, newer)
-			local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+			local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu" }
 			local before = {}
 			for _, name in ipairs(names) do before[name] = package.loaded[name] end
 			local strings = native.get("menu.agent.model")
@@ -998,7 +998,7 @@ end)
 --- @param observed table Receives id -> array of the row arrays returned.
 --- @return function restore
 local function spy_agent_lists(ids, observed)
-	local renderer = require("infra.manifest_menu")
+	local renderer = require("menu.engine.manifest_menu")
 	local build = renderer.build
 	renderer.build = function(key, category, handlers, groups, ctx, providers)
 		if key == "agent_menu" and type(providers) == "table" then
@@ -1099,7 +1099,7 @@ helpers.describe("Linux Agent complete excluded-applications frame (agent-disabl
 
 	helpers.it("takes parent, leaf caption and exact order from the physical declaration (agent-disabled-apps-frame)", function()
 		with_system_model_locale("en", function()
-			local menu = require("infra.manifest_menu")
+			local menu = require("menu.engine.manifest_menu")
 			local root = menu.get_root()
 			local sections = disabled_apps_frame_corpus().sections
 			local children, parent, remove = root[sections.children], root[sections.parent][1], root[sections.remove][1]
@@ -1123,7 +1123,7 @@ helpers.describe("Linux Agent complete excluded-applications frame (agent-disabl
 		local case = name
 		helpers.it("refuses " .. case .. " without settings effects and restores the real frame (agent-disabled-apps-frame)", function()
 			with_system_model_locale("en", function()
-				local root = require("infra.manifest_menu").get_root()
+				local root = require("menu.engine.manifest_menu").get_root()
 				local sections = disabled_apps_frame_corpus().sections
 				local parent, remove, current, add = root[sections.parent][1], root[sections.remove][1],
 					root[sections.current][1], root[sections.add][1]
@@ -1349,7 +1349,7 @@ helpers.describe("Linux Agent complete System1/System2 frames (agent-linux-syste
 	helpers.it("takes finished parents, backend policy and whole child order from shared declarations (agent-linux-system-frame)", function()
 		with_system_model_locale("en", function()
 			local corpus = agent_system_frames_corpus()
-			local menu = require("infra.manifest_menu")
+			local menu = require("menu.engine.manifest_menu")
 			local root, sections = menu.get_root(), corpus.sections
 			local parents = { root[sections.system1][1], root[sections.system2][1] }
 			local labels = { parents[1].i18n, parents[2].i18n }
@@ -1413,7 +1413,7 @@ helpers.describe("Linux Agent complete System1/System2 frames (agent-linux-syste
 		helpers.it("refuses " .. case .. " and repairs the genuine complete family (agent-linux-system-frame)", function()
 			with_system_model_locale("en", function()
 				local corpus = agent_system_frames_corpus()
-				local root, sections = require("infra.manifest_menu").get_root(), corpus.sections
+				local root, sections = require("menu.engine.manifest_menu").get_root(), corpus.sections
 				local backend, parent, model = root[sections.backend][1], root[sections.system1][1], root.agent_system_model_controls[2]
 				local id, getter, parent_getter, model_getter, children = backend.id, backend.caption_getter,
 					parent.caption_getter, model.caption_getter, root[sections.children]
@@ -1488,7 +1488,7 @@ helpers.describe("AI agent settings: current disabled public policy", function()
 					if state == "absent" then context.llm = nil end
 					local native_i18n = require("core.i18n.engine.i18n")
 					local caption, found = native_i18n.get("menu.agent.title"), nil
-					for _, row in ipairs(helpers.load_module("ui.menu.builder").build(context)) do
+					for _, row in ipairs(helpers.load_module("menu.ui.builder.builder").build(context)) do
 						if type(row.title) == "string" and row.title:sub(1, #caption) == caption then
 							helpers.assert_nil(found, "the current public row must be unique")
 							found = row
@@ -1513,7 +1513,7 @@ helpers.describe("AI agent settings: current disabled public policy", function()
 		helpers.assert_true(rawequal(Scenario.ENTRY, ActualScenario.ENTRY))
 		helpers.assert_eq(Scenario.NOW, ActualScenario.NOW)
 		helpers.assert_true(rawequal(Scenario.text, ActualScenario.text))
-		local renderer = require("infra.manifest_menu")
+		local renderer = require("menu.engine.manifest_menu")
 		local root, top = renderer.get_root(), renderer.get_root().top_level
 		local public_agent; for _, row in ipairs(top) do if row.id == "agent" then public_agent = row end end
 		local previous = {}; for name, value in pairs(package.loaded) do previous[name] = value end
@@ -1532,7 +1532,7 @@ helpers.describe("AI agent settings: current disabled public policy", function()
 				helpers.assert_nil(component_agent.disabled, "the callback executes in recorded available component policy")
 				helpers.assert_eq(retained(), true, "the original current owner acknowledges the retained mode command")
 				callback_executed = true
-				package.loaded["infra.manifest_menu"] = {}
+				package.loaded["menu.engine.manifest_menu"] = {}
 				renderer.build = function() error("temporary component renderer") end
 				os.getenv = function() return nil end; rawset(_G, "i18n_safe", function() return "temporary" end)
 				error("deliberate Agent settings component refusal")

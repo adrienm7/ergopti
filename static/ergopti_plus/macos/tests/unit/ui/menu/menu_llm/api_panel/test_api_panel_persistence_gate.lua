@@ -14,7 +14,7 @@ helpers.describe("API panel durable persistence gate", function()
 	helpers.it("rolls back a validated Add when Keychain persistence fails", function()
 		local module_names = {
 			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
-			"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+			"core.ui.engine.notifications", "menu.engine.manifest_menu", "ui.menu.menu_llm.api_panel",
 		}
 		local saved = {}
 		for _, name in ipairs(module_names) do saved[name] = package.loaded[name] end
@@ -86,7 +86,7 @@ helpers.describe("API panel durable persistence gate", function()
 		},
 			logger = helpers.make_logger_stub(),
 		}))
-		package.loaded["infra.manifest_menu"] = {
+		package.loaded["menu.engine.manifest_menu"] = {
 			command_row = command_renderer.command_row,
 			template_rows = command_renderer.template_rows,
 			get_array = command_renderer.get_array, render_rows = function(rows) return rows end }

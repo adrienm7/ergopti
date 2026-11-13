@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- Exercises the browser provider with its unrelated tray surfaces isolated.
 --- @param callback function Receives native rows and observable browser ports.
 local function with_browser(callback)
-	local names = { "ui.menu.builder", "ui.menu.llm_backend_rows", "infra.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
+	local names = { "menu.ui.builder.builder", "ui.menu.llm_backend_rows", "menu.engine.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
 		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "core.ui.ui.modal",
@@ -53,8 +53,8 @@ local function with_browser(callback)
 			end,
 			section = function(key) return key end,
 		}
-		package.loaded["infra.manifest_menu"] = nil
-		local native = require("infra.manifest_menu")
+		package.loaded["menu.engine.manifest_menu"] = nil
+		local native = require("menu.engine.manifest_menu")
 		local root, selected = native.get_root(), {}
 		for _, row in ipairs(native.get_array("top_level")) do
 			if row.id == "llm" then selected[#selected + 1] = row end
@@ -65,9 +65,9 @@ local function with_browser(callback)
 			-- The model row is list DATA: the shared renderer materialises it.
 			return native.render_rows(providers.llm_model(), "llm_model")
 		end
-		package.loaded["infra.manifest_menu"] = facade
-		package.loaded["ui.menu.builder"] = nil
-		local Builder = require("ui.menu.builder")
+		package.loaded["menu.engine.manifest_menu"] = facade
+		package.loaded["menu.ui.builder.builder"] = nil
+		local Builder = require("menu.ui.builder.builder")
 		local ctx = {
 			llm = {
 				is_enabled = function() return false end,

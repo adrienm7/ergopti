@@ -16,7 +16,7 @@ local OWNERS = {
 	"modules.llm", "platform.input.keycodes", "modules.keystats", "core.ui.ui.tooltip",
 	"modules.llm.prediction_engine", "settings.engine.registry",
 	"modules.hotstrings.hotstrings_config", "modules.keymap.expander",
-	"infra.manifest_reader", "modules.keymap.llm_bridge",
+	"menu.engine.manifest_reader", "modules.keymap.llm_bridge",
 	"modules.diagnostics.hid_diagnostic_mailbox",
 }
 

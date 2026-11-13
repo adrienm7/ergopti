@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Outdated = require("settings.engine.migration.outdated")
 
 local function with_preferences(body)

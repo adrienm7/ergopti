@@ -8,7 +8,7 @@ helpers.describe("LLM scope runtime composition", function()
 		local keymap = helpers.load_with_stubs("modules.keymap")
 		local core = require("modules.llm")
 		local Preferences = require("settings.engine.preferences.preferences")
-		local Manifest = require("infra.manifest_reader")
+		local Manifest = require("menu.engine.manifest_reader")
 		local state = { llm_profile_shortcuts = {} }
 		for _, row in ipairs(Manifest.scope_operations("llm", "clear")) do
 			local path = row.section .. "." .. row.key

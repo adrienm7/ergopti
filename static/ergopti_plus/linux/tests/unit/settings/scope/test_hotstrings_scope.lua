@@ -399,7 +399,7 @@ helpers.describe("hotstrings scope: refusals", function()
 	for _, mode in ipairs({ "clear", "recommended" }) do
 		helpers.it("routes the rendered " .. mode .. " request to the public terminal", function()
 			with_scope(function(c)
-				local renderer = require("infra.manifest_menu")
+				local renderer = require("menu.engine.manifest_menu")
 				local root = renderer.get_root()
 				local top, execute = root.top_level, os.execute
 				local key = mode == "clear" and "common.clear_to_system" or "common.restore_recommended"
@@ -414,7 +414,7 @@ helpers.describe("hotstrings scope: refusals", function()
 						end
 						return execute(command)
 					end
-					local menu = require("ui.menu.builder").build({ config = c.Config, paused = false,
+					local menu = require("menu.ui.builder.builder").build({ config = c.Config, paused = false,
 						is_paused = function() return false end, dyn_hotstrings = c.dynamic,
 						tooltip_preview = c.preview_port, on_menu_changed = function() changed = changed + 1 end })
 					-- A direct row of the Hotstrings submenu: the word-delimiter
@@ -452,7 +452,7 @@ helpers.describe("hotstrings scope: refusals", function()
 					return execute(command)
 				end
 				local i18n = require("core.i18n.engine.i18n")
-				local menu = require("ui.menu.builder").build({ config = c.Config, paused = false,
+				local menu = require("menu.ui.builder.builder").build({ config = c.Config, paused = false,
 					is_paused = function() return false end, dyn_hotstrings = c.dynamic,
 					tooltip_preview = c.preview_port })
 				local action
@@ -771,7 +771,7 @@ helpers.describe("hotstrings retained native release debt", function()
 				pending = function() return false end, retry_restore = function(done) done(true) end }
 			local actual = require("settings.engine.scope.participant").synchronous({ apply = scope.apply, owner = function() return scope end })
 			local logger = {}; for _, name in ipairs({ "start", "success", "warn", "info", "error" }) do logger[name] = function() end end
-			local global = require("settings.engine.scope.composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
+			local global = require("settings.engine.scope.composition").new({ manifest = require("menu.engine.manifest_reader"), scope = "global",
 				logger = logger, participants = function() return { tap_holds = before, hotstrings = actual, llm = after } end })
 			local verdict, report
 			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)

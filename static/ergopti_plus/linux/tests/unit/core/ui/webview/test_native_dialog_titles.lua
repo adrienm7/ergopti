@@ -19,7 +19,7 @@ local function scenario(body)
 	local names = { "core.ui.ui.text_prompt", "ui.app_chooser", "settings.ui.dir_picker", "ui.gesture_conflicts",
 		"modules.gestures.system_actions", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "core.ui.ui.modal",
 		"core.fs.adapters.storage", "core.events.loop", "platform.input.keyboard_hook",
-		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "infra.manifest_menu" }
+		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "menu.engine.manifest_menu" }
 	local saved, observed = {}, { commands = {}, modals = 0, queued = {}, writes = {} }
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local original_popen = io.popen
@@ -145,7 +145,7 @@ end)
 
 h.describe("native menu dialog captions", function()
 	h.it("(linux-model-delete-owner) refuses deletion if the page closes during confirmation", function()
-		local names = { "ui.menu.builder", "ui.menu.menu_llm", "ui.menu.llm_backend_rows", "core.ui.ui.modal" }
+		local names = { "menu.ui.builder.builder", "ui.menu.menu_llm", "ui.menu.llm_backend_rows", "core.ui.ui.modal" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local previous_execute, options, deletions, live, paused = os.execute, nil, 0, true, false
@@ -156,7 +156,7 @@ h.describe("native menu dialog captions", function()
 		package.loaded["core.ui.ui.modal"] = { run = function(fn) return fn() end }
 		os.execute = function() live = false; return 0 end
 		local ok, err = xpcall(function()
-			require("ui.menu.builder").build({ _version = "9.9.9", paused = false,
+			require("menu.ui.builder.builder").build({ _version = "9.9.9", paused = false,
 				is_paused = function() return paused end, on_quit = function() end,
 				llm = { is_enabled = function() return false end,
 					delete_model = function() deletions = deletions + 1; return true end } })
@@ -175,7 +175,7 @@ h.describe("native menu dialog captions", function()
 
 	h.it("(linux-native-titles) real Uninstall callbacks brand confirmation and failure without changing body or refusal", function()
 		-- The prompt captures its Shell owner; load it under this scenario's authority.
-		local names = { "ui.menu.builder", "ui.menu.uninstall", "core.lifecycle.engine.installation", "core.ui.ui.modal", "ui.menu.llm_backend_rows",
+		local names = { "menu.ui.builder.builder", "menu.ui.transactions.uninstall", "core.lifecycle.engine.installation", "core.ui.ui.modal", "ui.menu.llm_backend_rows",
 			"core.ui.ui.text_prompt" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -189,7 +189,7 @@ h.describe("native menu dialog captions", function()
 		}
 		package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return false end }
 		package.loaded["core.ui.ui.modal"] = { run = function(fn) modals = modals + 1; return fn() end }
-		package.loaded["ui.menu.uninstall"] = { run = function(opts)
+		package.loaded["menu.ui.transactions.uninstall"] = { run = function(opts)
 			accepted = opts.confirm(opts.title, "Preserved <confirmation>")
 			opts.fail("Preserved <failure>")
 		end }
@@ -199,7 +199,7 @@ h.describe("native menu dialog captions", function()
 		end
 		local ok, err = xpcall(function()
 			local i18n = require("core.i18n.engine.i18n")
-			local items = require("ui.menu.builder").build({ _version = "9.9.9", on_quit = function() end, llm = { is_enabled = function() return false end } })
+			local items = require("menu.ui.builder.builder").build({ _version = "9.9.9", on_quit = function() end, llm = { is_enabled = function() return false end } })
 			local found
 			for _, item in ipairs(items) do
 				for _, row in ipairs(item.menu or {}) do
@@ -338,7 +338,7 @@ h.describe("native caption consumer inventory", function()
 			["settings.ui.dir_picker"] = 1,
 			["ui.gesture_conflicts"] = 1,
 			["modules.gestures.system_actions"] = 1,
-			["ui.menu.menu_dialogs"] = 3,
+			["menu.ui.builder.dialogs"] = 3,
 			["modules.llm.local_model_offer"] = 1,
 			-- The enable refusal tests prove the policy-owned native caption and modal receipts.
 			["ui.llm_enable_refusal"] = 1,

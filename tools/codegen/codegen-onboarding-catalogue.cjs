@@ -254,7 +254,7 @@ function loadLocales() {
 /**
  * Creates the per-platform value projection over the indexed manifest: the
  * same static-entry, sub-key and dynamic-default rules the drivers' readers
- * (_shared/settings/engine/publication/defaults.lua, windows/infra/manifest_reader.ahk) apply.
+ * (_shared/settings/engine/publication/defaults.lua, windows/menu/engine/manifest_reader.ahk) apply.
  * @param {Map<string, object>} features Indexed features.
  * @param {object} scopes Manifest scope declarations.
  * @returns {object} Projection helpers.

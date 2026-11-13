@@ -43,7 +43,7 @@ local JsonCodec  = require("core.fs.adapters.json_codec")
 
 local Defaults = require("platform.remap.defaults")
 local ActionCatalogue = require("platform.remap.action_catalogue")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local OutdatedEntries = require("settings.engine.migration.outdated")
 local KePaths = require("platform.remap.ke_paths")
 local TableUtil = require("core.text.engine.table_util")

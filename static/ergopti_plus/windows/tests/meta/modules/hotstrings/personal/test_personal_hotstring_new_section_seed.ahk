@@ -30,7 +30,7 @@
 
 _PHNS_AssertMenuRowWithLabelGuarded() {
 	Body := _DriverFuncBody("MenuRowWithLabel")
-	Assert(Body != "", "MenuRowWithLabel() declaration must exist in ui/menu/menu_engine.ahk")
+	Assert(Body != "", "MenuRowWithLabel() declaration must exist in menu/ui/builder/engine.ahk")
 	Assert(InStr(Body, "FeatureLocateV2(Features, V2Path) == false") > 0,
 		"MenuRowWithLabel must skip an item whose feature does not resolve, mirroring MenuRowFromManifest's guard (personal-hotstring-live-toggle-seed)")
 }

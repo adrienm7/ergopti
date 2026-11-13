@@ -45,7 +45,7 @@ local Registrar   = require("platform.input.hotkey_registrar")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Timings     = require("core.timing.engine.timings")
 local FileSystem  = require("core.fs.adapters.file_system")
-local Manifest    = require("infra.manifest_reader")
+local Manifest    = require("menu.engine.manifest_reader")
 local TomlWriter  = require("core.text.engine.toml_codec.writer")
 local NavigationInventory = { config = Config.load_user_config, save = Config.save_user_config,
 	write = FileSystem.write_if_unchanged, read = FileSystem.read_with_status,

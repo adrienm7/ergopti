@@ -96,8 +96,8 @@ helpers.describe("screen action vision parameter (linux-vision-choice-list)", fu
 			apply = function(_, value) stored = value; return true end }
 		local ok, failure = pcall(function()
 			-- The tray root defines the i18n_safe global the dialog helpers read.
-			require("ui.menu.builder")
-			local Dialogs = require("ui.menu.menu_dialogs")
+			require("menu.ui.builder.builder")
+			local Dialogs = require("menu.ui.builder.dialogs")
 			local gestures = {
 				get_action_parameter_spec = function() return "llm_vision" end,
 				get_action_parameter = function() return "local" end,

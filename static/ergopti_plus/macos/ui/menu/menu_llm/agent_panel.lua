@@ -34,7 +34,7 @@ local M = {}
 
 local Logger       = require("core.logger.engine.logger")
 local i18n         = require("core.i18n.engine.i18n")
-local ManifestMenu = require("infra.manifest_menu")
+local ManifestMenu = require("menu.engine.manifest_menu")
 local AppPickerLib = require("infra.app_picker")
 local dialog       = require("core.ui.engine.dialog_util")
 local Vision       = require("ai.engine.prediction.vision")

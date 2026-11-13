@@ -48,7 +48,7 @@ _HSC_NotWiredIntoInitSubMenus() {
 	; warm-up and put the unbounded personal-folder scan back under Critical
 	; at boot (test_deferred_menu_critical_file_io.ahk's regression).
 	Body := _DriverFuncBody("InitSubMenus")
-	Assert(Body != "", "InitSubMenus() declaration must exist in ui/menu/menu_submenus.ahk")
+	Assert(Body != "", "InitSubMenus() declaration must exist in menu/ui/builder/submenus.ahk")
 	Assert(InStr(Body, "_HS_InvalidatePersonalCache()") == 0,
 		"InitSubMenus must NOT invalidate the personal cache itself — that would force the unbounded personal-folder scan back under Critical at boot (personal-hotstring-cache-never-invalidated)")
 }

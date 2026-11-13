@@ -51,7 +51,7 @@ const RENDERERS = [
 		forbidden: ['def.label or ""', 'Guillemets fermants', 'Tiret bas']
 	},
 	{
-		file: path.join(SP, 'linux', 'ui', 'menu', 'builder.lua'),
+		file: path.join(SP, 'linux', 'menu', 'ui', 'builder', 'builder.lua'),
 		resolves: 'i18n_safe(def.label_key)',
 		forbidden: ['(def.label or key)']
 	}

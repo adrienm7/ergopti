@@ -28,7 +28,7 @@ local MODULES = {
 	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "modules.llm.api_token_crypto", "core.network.adapters.http_client",
 	"ai.engine.policy.remote_response_classifier", "modules.llm.local_servers",
 	"modules.llm.provider_uses", "modules.llm.progressive_reveal", "modules.llm.parser",
-	"infra.manifest_reader", "ai.engine.policy.provider_config_policy", "ai.engine.api.remote_formats",
+	"menu.engine.manifest_reader", "ai.engine.policy.provider_config_policy", "ai.engine.api.remote_formats",
 	"ai.engine.settings.profile_selector", "ai.engine.api.parser_core", "ai.engine.prediction.prompt_builder_core", "ai.engine.local_servers.auth",
 	"ai.engine.local_servers.discovery", "settings.engine.publication.defaults", "diagnostics.engine.operation_reporter",
 	"hotstrings.engine.catalogue.personal_files", "core.fs.engine.dir", "core.text.engine.toml.reader", "lfs", "core.logger.engine.shim",

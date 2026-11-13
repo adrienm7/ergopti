@@ -1,8 +1,8 @@
 {
 	"kind": "Independent old physical root composition vectors, frozen before successor qualification; never regenerate from candidate",
 	"source_sha256": {
-		"static/ergopti_plus/macos/ui/menu/builder.lua": "f9965931363e93bd77261ec89f16a226ae38243dacb93280e4607058d1302fc2",
-		"static/ergopti_plus/macos/ui/menu/canvas_badge.lua": "33a7fbe72b6fd4c68f9104cd629f0a4adf0475d681a49b4c86288c2c2b71a05e"
+		"static/ergopti_plus/macos/menu/ui/builder/builder.lua": "f9965931363e93bd77261ec89f16a226ae38243dacb93280e4607058d1302fc2",
+		"static/ergopti_plus/macos/menu/ui/builder/canvas_badge.lua": "33a7fbe72b6fd4c68f9104cd629f0a4adf0475d681a49b4c86288c2c2b71a05e"
 	},
 	"vectors": [
 		{

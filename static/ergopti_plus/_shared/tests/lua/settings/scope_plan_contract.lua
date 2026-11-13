@@ -2,7 +2,7 @@
 
 --- Plans carry dynamic ownership and separate-file requirements explicitly.
 return function(helpers)
-	local Manifest = require("infra.manifest_reader")
+	local Manifest = require("menu.engine.manifest_reader")
 	local Actions = require("_generated.action_catalogue").actions
 	-- This port stands in for each host's existing parameter-key validator. The
 	-- real generated catalogue supplies parameter capability; scopes never infer it.

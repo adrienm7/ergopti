@@ -23,7 +23,7 @@ local STUBBED_MODULES = {
 	"settings.engine.registry",
 	"modules.hotstrings.hotstrings_config",
 	"modules.keymap.expander",
-	"infra.manifest_reader",
+	"menu.engine.manifest_reader",
 	"modules.keymap.llm_bridge",
 	"modules.diagnostics.hid_diagnostic_mailbox",
 }
@@ -118,7 +118,7 @@ local function load_fixture(options, lifetime)
 		resolve_magic_action = function() return nil end,
 		perform_text_replacement = function() return false end,
 	}
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return "*" end,
 	}
 

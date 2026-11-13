@@ -65,7 +65,7 @@ helpers.describe("AI submenu configuration guard (ai-submenus-newer-config-2026-
 				read_only_reason = function() return protected and "newer schema" or nil end,
 				read_only_status = function() return protected and "newer" or nil end,
 			}
-			local renderer = package.loaded["infra.manifest_menu"]
+			local renderer = package.loaded["menu.engine.manifest_menu"]
 			local providers
 			renderer.build = function(_key, _category, _handlers, _groups, _ctx, built_providers)
 				providers = built_providers

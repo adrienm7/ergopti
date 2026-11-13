@@ -58,16 +58,16 @@ const declarations = {
 
 const files = {
 	ahk: [
-		'windows/ui/menu/menu_submenus.ahk',
+		'windows/menu/ui/builder/submenus.ahk',
 		'windows/ui/menu/menu_hotstring_switches.ahk',
-		'windows/ui/menu/menu_init.ahk'
+		'windows/menu/ui/builder/menu_init.ahk'
 	],
 	hs: [
-		'macos/ui/menu/builder.lua',
+		'macos/menu/ui/builder/builder.lua',
 		'macos/ui/menu/menu_hotstrings_custom.lua',
 		'macos/ui/menu/menu_hotstrings.lua'
 	],
-	linux: ['linux/ui/menu/builder.lua']
+	linux: ['linux/menu/ui/builder/builder.lua']
 };
 
 /** Records native block depth while keeping strings and field names inert. */
@@ -793,7 +793,7 @@ function luaCanonical(record) {
 				e.callee.binding.global &&
 				e.callee.binding.writes.length === 0 &&
 				e.args[0]?.type === 'string' &&
-				e.args[0].value === 'infra.manifest_menu') ||
+				e.args[0].value === 'menu.engine.manifest_menu') ||
 			(luaCall(e, 'pcall') &&
 				e.callee.binding.global &&
 				e.callee.binding.writes.length === 0 &&
@@ -802,7 +802,7 @@ function luaCanonical(record) {
 				record.valueIndex === 1 &&
 				e.args[0]?.name === 'require' &&
 				e.args[1]?.type === 'string' &&
-				e.args[1].value === 'infra.manifest_menu')
+				e.args[1].value === 'menu.engine.manifest_menu')
 		)
 	)
 		return false;
@@ -1346,7 +1346,8 @@ function hotstringScopePublication(source, platform, manifest) {
 			]);
 		if (
 			platform === 'hs' &&
-			ranges(source, 'local ManifestMenu = require("infra.manifest_menu")', '.lua').length !== 1
+			ranges(source, 'local ManifestMenu = require("menu.engine.manifest_menu")', '.lua').length !==
+				1
 		)
 			return false;
 		if (platform === 'hs')
@@ -1366,8 +1367,11 @@ function hotstringScopePublication(source, platform, manifest) {
 			);
 		if (
 			platform !== 'linux' ||
-			ranges(source, 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")', '.lua')
-				.length !== 1
+			ranges(
+				source,
+				'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")',
+				'.lua'
+			).length !== 1
 		)
 			return false;
 		const outer = owner(source, 'local function _manifest_hotstring_rows(ctx, config)', '.lua');
@@ -1586,8 +1590,8 @@ function hotstringLanguagePublication(sources, manifest, platform, target) {
 		}
 		if (platform === 'hs') {
 			if (
-				ranges(source, 'local ManifestMenu = require("infra.manifest_menu")', '.lua').length !==
-					1 ||
+				ranges(source, 'local ManifestMenu = require("menu.engine.manifest_menu")', '.lua')
+					.length !== 1 ||
 				ranges(
 					sources[consumerFile],
 					'local Custom = require("ui.menu.menu_hotstrings_custom")',
@@ -1667,7 +1671,7 @@ function hotstringLanguagePublication(sources, manifest, platform, target) {
 					],
 					['for _, row in ipairs(parents or {}) do language_rows[#language_rows + 1] = row end', 2],
 					['["hotstring_languages"] = function() return language_rows end,'],
-					['local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")', 1],
+					['local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")', 1],
 					[
 						'local rendered = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)',
 						2
@@ -2238,7 +2242,7 @@ function personalSectionChoicePublication(source, platform, manifest) {
 			return rooted(alias.value, record, seen);
 		};
 		const imports = {
-			ManifestMenu: 'infra.manifest_menu',
+			ManifestMenu: 'menu.engine.manifest_menu',
 			PersonalFileScope: 'infra.personal_file_scope',
 			KeymapLifecycle: 'ui.menu.keymap_lifecycle',
 			PersonalFiles: 'hotstrings.engine.catalogue.personal_files',

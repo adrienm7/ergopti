@@ -25,7 +25,7 @@ local function run_add_action(check_result, assertions)
 			"core.logger.engine.logger",
 			"core.ui.engine.dialog_util",
 			"core.ui.engine.notifications",
-			"infra.manifest_menu",
+			"menu.engine.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
 			local previous_entry = {
@@ -107,7 +107,7 @@ local function run_add_action(check_result, assertions)
 		},
 				logger = helpers.make_logger_stub(),
 			}))
-			package.loaded["infra.manifest_menu"] = {
+			package.loaded["menu.engine.manifest_menu"] = {
 				command_row = command_renderer.command_row,
 				template_rows = command_renderer.template_rows,
 			get_array = command_renderer.get_array,

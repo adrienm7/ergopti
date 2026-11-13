@@ -193,7 +193,7 @@ helpers.describe("keystats parent requires KC bridge commitment", function()
 			ms = function() return 1 end,
 			sec = function() return 1 end,
 		}
-		package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
+		package.loaded["menu.engine.manifest_reader"] = { default_for = function() return false end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.ui.engine.dialog_util"] = {}
 		package.loaded["core.lifecycle.engine.shutdown.teardown_transaction"] = {}

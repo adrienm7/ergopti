@@ -91,7 +91,7 @@ local function with_empty_server_owner(scenario)
 		end }, update_menu = function() observations.refreshes = observations.refreshes + 1 end, observations = observations }
 		local panel = require("ui.menu.menu_llm.agent_panel")
 		fresh_bridge = package.loaded["modules.keystats.kc_bridge"]
-		scenario(function() return panel.build(ctx) end, ctx, require("infra.manifest_menu"), native, applied, corpus, servers)
+		scenario(function() return panel.build(ctx) end, ctx, require("menu.engine.manifest_menu"), native, applied, corpus, servers)
 	end)
 	local restored, released, forgotten = true, true, true
 	if receipt then restored = native.scope_restore(owner, receipt) == true end
@@ -264,7 +264,7 @@ helpers.describe("Agent complete declared presentation frames", function()
 		local state = base_state(); state.llm_agent_system2 = "local"
 		with_panel(state, function(build, world)
 			world.listed = {}
-			local manifest = require("infra.manifest_menu")
+			local manifest = require("menu.engine.manifest_menu")
 			local root = manifest.get_root()
 			local saved = {}
 			for section, rows in pairs(corpus.frames) do
@@ -351,7 +351,7 @@ helpers.describe("Agent complete declared presentation frames", function()
 			world.listed = {}
 			local item = assert(build())
 			local retained = item.submenu[4].menu[#item.submenu[4].menu].fn
-			local root = require("infra.manifest_menu").get_root()
+			local root = require("menu.engine.manifest_menu").get_root()
 			local saved = root.agent_download_frame
 			local ok, err = pcall(function()
 				root.agent_download_frame = nil
@@ -425,7 +425,7 @@ helpers.describe("Agent canonical model caption getter (agent-model-caption-gett
 		local corpus = agent_model_caption_corpus()
 		local state = { llm_agent_system1 = corpus.spec, llm_agent_system2 = corpus.spec, llm_agent_mode = "action", llm_agent_disabled_apps = {} }
 		with_panel(state, function(build, world)
-			local declaration = require("infra.manifest_menu").get_array("agent_system_model_controls")[2]
+			local declaration = require("menu.engine.manifest_menu").get_array("agent_system_model_controls")[2]
 			local getter = declaration.caption_getter
 			local ok, err = pcall(function()
 				declaration.caption_getter = "foreign_model_caption"

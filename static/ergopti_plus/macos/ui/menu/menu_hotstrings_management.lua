@@ -19,9 +19,9 @@ local notifications     = require("core.ui.engine.notifications")
 local i18n              = require("core.i18n.engine.i18n")
 local LabelValue = require("core.i18n.engine.label_value")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
-local ManifestReader = require("infra.manifest_reader")
-local ManifestMenu   = require("infra.manifest_menu")
-local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
+local ManifestReader = require("menu.engine.manifest_reader")
+local ManifestMenu   = require("menu.engine.manifest_menu")
+local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
 local Terminators     = require("layouts.engine.layers.terminators")
 local HotstringCore   = require("infra.hotstring_engine")
 local TextUtils = require("core.text.engine.utils_core")
@@ -454,7 +454,7 @@ function M.build_management(ctx)
 		end
 		-- Coerce + fail closed to default_val: state.expansion_delay (and per-key
 		-- delays) come straight from config.toml and can be a string (hand edit /
-		-- AHK migration). The engine apply is already type-guarded (menu_state.lua),
+		-- AHK migration). The engine apply is already type-guarded (../../menu/ui/builder/state.lua),
 		-- but this arithmetic (cur_val * 1000) would crash the delay submenu build —
 		-- swallowed by the builder pcall, dropping the whole Paramètres submenu (F-L13).
 		local cur_val = tonumber(is_base and state.expansion_delay or (state.delays[key] or default_val)) or default_val

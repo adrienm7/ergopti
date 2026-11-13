@@ -104,7 +104,7 @@ helpers.describe("caps word auto-off: the settings", function()
 
 	helpers.it("caps word auto-off, declares exactly the manifest's pointer kinds", function()
 		with_caps_word(nil, function(c)
-			local Manifest = require("infra.manifest_reader")
+			local Manifest = require("menu.engine.manifest_reader")
 			local expected = {}
 			for _, entry in ipairs(Manifest.features()) do
 				if entry.section == "shortcuts.caps_word.pointer" then expected[#expected + 1] = entry.id end

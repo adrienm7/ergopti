@@ -17,7 +17,7 @@
 ; scan degrades to "no extension hotstrings" instead of crashing. This test
 ; asserts those three guards are present in the source.
 ;
-; Meta-static because ui/tray_menu.ahk registers top-level menu hooks and is
+; Meta-static because menu/ui/tray_menu.ahk registers top-level menu hooks and is
 ; not part of the headless run_all include graph; it cannot be #Included by the
 ; runner without side effects.
 ; ==============================================================================

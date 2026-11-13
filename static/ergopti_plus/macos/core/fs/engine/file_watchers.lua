@@ -30,7 +30,7 @@ local NativePath = require("core.fs.engine.native_path")
 local FileSystem = require("core.fs.adapters.file_system")
 local i18n          = require("core.i18n.engine.i18n")
 local notifications = require("core.ui.engine.notifications")
-local ui_restore    = require("infra.ui_restore")
+local ui_restore    = require("menu.engine.ui_restore")
 local fs_dir        = require("core.fs.engine.dir")
 local git_status    = require("infra.git_status")
 local reload_gate   = require("core.lifecycle.engine.reload.gate")
@@ -62,7 +62,7 @@ local SCAN_MAX_DEPTH = 16
 -- previous boot would re-fire a reload immediately after the next boot — and,
 -- because the replay recurs every boot, cascade into the keyboard-freezing reload
 -- storm (fe57ce045). Mirrors the menu watcher's identical guard
--- (ui/menu/init.lua BOOT_SUPPRESS_SEC) — the sibling this one was missing.
+-- (menu/ui/init.lua BOOT_SUPPRESS_SEC) — the sibling this one was missing.
 local BOOT_SUPPRESS_SEC = 5
 
 -- Consecutive Git-hold re-polls before one visible warning is emitted. A live

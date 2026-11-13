@@ -387,7 +387,7 @@ end)
 helpers.describe("Obsolete scalar user-model list preservation", function()
 	local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 	local Outdated = require("settings.engine.migration.outdated")
-	local Manifest = require("infra.manifest_reader")
+	local Manifest = require("menu.engine.manifest_reader")
 	local tail = '[llm.models]\nuser_models = TOKEN\nactive_backend = "ollama"\n[future]\nkeep = "independent"\nempty = []\nitems = [1, 2]\n"literal.dot" = { stamp = 2026-10-05T10:20:30Z, child = [] }\n'
 
 	local function with_file(source, body)

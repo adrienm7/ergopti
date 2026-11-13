@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"core.fs.engine.file_watchers", "ui.menu.menu_watchers", "infra.ui_restore", "infra.git_status", "core.fs.engine.dir",
+	"core.fs.engine.file_watchers", "menu.ui.builder.watchers", "menu.engine.ui_restore", "infra.git_status", "core.fs.engine.dir",
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.lifecycle.engine.reload.gate", "core.fs.engine.native_path",
 	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.fs.adapters.storage", "core.timing.engine.timings", "core.fs.adapters.file_system",
@@ -93,7 +93,7 @@ local function with_watchers(kind, callback)
 				read = function() return nil end,
 			}
 			package.loaded["ui.hotstring_editor"] = { is_open = function() return world.ui_open end }
-			local Restore = require("infra.ui_restore")
+			local Restore = require("menu.engine.ui_restore")
 			local Scheduler = require("core.events.timer_scheduler")
 			_G.script_watchers = nil
 			local body_ok, body_failure = xpcall(function()
@@ -110,7 +110,7 @@ local function with_watchers(kind, callback)
 					world.owner = _G.script_watchers[1]
 				else
 					helpers.assert_eq(kind, "menu watcher")
-					local Watchers = require("ui.menu.menu_watchers")
+					local Watchers = require("menu.ui.builder.watchers")
 					world.owner = Watchers.start_config_watcher(BASE_ROOT, hs.reload,
 						function() return 0 end, Restore, {}, {})
 					helpers.assert_not_nil(world.owner, "the healthy native menu root must commit")

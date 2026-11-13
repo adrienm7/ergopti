@@ -31,7 +31,7 @@ local Writer = require("core.text.engine.toml_codec.writer")
 
 local Codec = require("core.text.engine.toml_codec")
 
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 
 local SOURCE = '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\nchatgpt_url = "https://old.example"\nunknown = "keep"\n'
 	.. '[shortcuts.keyboard]\nprimary_j = "open_url"\nprimary_k = "enter"\nprimary_p = "script_reload"\nforeign_slot = "keep"\n'
@@ -52,7 +52,7 @@ local function with_scope(body, source, options)
 		Sandbox.with_config(source or SOURCE, function(path)
 			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
 				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.shortcuts.key_combinations", "modules.gestures.manager",
-				"infra.shortcuts_scope", "ui.menu.builder" }) do
+				"infra.shortcuts_scope", "menu.ui.builder.builder" }) do
 				package.loaded[name] = nil
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0, pair_changes = 0 }

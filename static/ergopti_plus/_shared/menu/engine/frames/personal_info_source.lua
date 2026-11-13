@@ -40,13 +40,13 @@ local COMMAND = require("settings.engine.keys").COMMAND
 --- @return function|nil template
 local function read_source(renderer)
 	local modules = rawget(package, "loaded")
-	if type(modules) ~= "table" or rawget(modules, "infra.manifest_menu") ~= renderer
+	if type(modules) ~= "table" or rawget(modules, "menu.engine.manifest_menu") ~= renderer
 		or type(renderer) ~= "table" or getmetatable(renderer) ~= nil then return nil end
 	local template, root_owner, array_owner = rawget(renderer, "template_rows"),
 		rawget(renderer, "get_root"), rawget(renderer, "get_array")
 	if type(template) ~= "function" or type(root_owner) ~= "function" or type(array_owner) ~= "function" then return nil end
 	local function facade_current()
-		return rawget(package, "loaded") == modules and rawget(modules, "infra.manifest_menu") == renderer
+		return rawget(package, "loaded") == modules and rawget(modules, "menu.engine.manifest_menu") == renderer
 			and getmetatable(renderer) == nil and rawget(renderer, "template_rows") == template
 			and rawget(renderer, "get_root") == root_owner and rawget(renderer, "get_array") == array_owner
 	end

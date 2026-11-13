@@ -13,12 +13,12 @@ local M = {}
 local SaveFailure = require("settings.engine.publication.save_failure")
 local KeyNames = require("platform.input.keycodes.key_names")
 local Logger = require("core.logger.engine.shim")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local prompt_text = require("ui.menu.menu_dialogs").prompt_text
-local show_error = require("ui.menu.menu_dialogs").show_error
-local plain_markup = require("ui.menu.menu_dialogs").plain_markup
+local prompt_text = require("menu.ui.builder.dialogs").prompt_text
+local show_error = require("menu.ui.builder.dialogs").show_error
+local plain_markup = require("menu.ui.builder.dialogs").plain_markup
 
 local LOG = "ui.menu.menu_tap_holds"
 
@@ -373,7 +373,7 @@ local function _build_tap_holds(ctx)
 			local current_ms = th.lone_tap_max_ms()
 			-- The windows offered are the feature's preset_values, the one list the
 			-- three drivers read; 0 is Off, the strict tap-hold.
-			local offered = require("tap_hold.engine.lone_tap").choices(require("infra.manifest_reader")
+			local offered = require("tap_hold.engine.lone_tap").choices(require("menu.engine.manifest_reader")
 				.find_entry_by_path(require("settings.engine.keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
 			local choices = {}
 			for _, ms in ipairs(offered) do

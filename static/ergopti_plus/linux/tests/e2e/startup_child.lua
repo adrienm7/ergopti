@@ -240,8 +240,8 @@ end
 
 -- The menu context the tray builds, kept for the recommended restore.
 local menu_ctx = nil
-package.preload["ui.menu.builder"] = function()
-	local builder = dofile("ui/menu/builder.lua")
+package.preload["menu.ui.builder.builder"] = function()
+	local builder = dofile("menu/ui/builder/builder.lua")
 	local build = builder.build
 	builder.build = function(ctx)
 		menu_ctx = ctx

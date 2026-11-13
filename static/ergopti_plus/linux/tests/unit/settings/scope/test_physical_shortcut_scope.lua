@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 
 local SOURCE = '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\nchatgpt_url = "https://old.example"\nunknown = "keep"\n'
 	.. '[shortcuts.keyboard]\nprimary_j = "open_url"\nprimary_k = "enter"\nprimary_p = "script_reload"\nforeign_slot = "keep"\n'
@@ -32,7 +32,7 @@ local function with_scope(body, source, chord_j_identity)
 		Sandbox.with_config(source or SOURCE, function(path)
 			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
 				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.gestures.manager",
-				"infra.shortcuts_scope", "ui.menu.builder", "modules.shortcuts.key_combinations",
+				"infra.shortcuts_scope", "menu.ui.builder.builder", "modules.shortcuts.key_combinations",
 				"platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
 				"modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }) do
 				package.loaded[name] = nil

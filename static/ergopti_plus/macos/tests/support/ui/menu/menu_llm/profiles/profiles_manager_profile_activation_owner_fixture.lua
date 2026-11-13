@@ -15,7 +15,7 @@ local MODULES = {
 	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.manifest_menu",
+	"menu.engine.manifest_menu",
 	"core.ui.engine.notifications",
 	"modules.llm",
 	"ui.menu.menu_llm.profile_label",
@@ -76,7 +76,7 @@ local function with_profiles_fixture(options, body)
 			i18n = package.loaded["core.i18n.engine.i18n"],
 			logger = package.loaded["core.logger.engine.logger"],
 		}))
-		package.loaded["infra.manifest_menu"] = {
+		package.loaded["menu.engine.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 			command_row = renderer.command_row,
 			template_rows = renderer.template_rows,

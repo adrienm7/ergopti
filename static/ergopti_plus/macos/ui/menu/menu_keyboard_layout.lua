@@ -24,13 +24,13 @@ local M = {}
 local hs            = hs
 local Logger        = require("core.logger.engine.logger")
 local NativePath = require("core.fs.engine.native_path")
-local Manifest      = require("infra.manifest_reader")
+local Manifest      = require("menu.engine.manifest_reader")
 local DeferredWork  = require("core.timing.engine.deferred_work")
 local Timings       = require("core.timing.engine.timings")
 local PhaseStats    = require("infra.phase_stats")
 local notifications = require("core.ui.engine.notifications")
 local i18n          = require("core.i18n.engine.i18n")
-local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
+local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
 local MagicKeySourceMenu = require("ui.menu.magic_key_source_menu")
 local LayoutManagerWindow = require("ui.layout_manager")
 local install       = require("modules.keymap.layout_install")
@@ -215,7 +215,7 @@ end
 --- @param children table|nil Genuine provider children.
 --- @return table|nil row
 local function layout_declared_row(section, commands, getters, children)
-	local renderer = require("infra.manifest_menu")
+	local renderer = require("menu.engine.manifest_menu")
 	local rows = type(renderer.template_rows) == "function"
 		and renderer.template_rows(section, commands or {}, getters or {}, children or {}) or nil
 	if type(rows) ~= "table" or #rows ~= 1 then return nil end
@@ -307,7 +307,7 @@ end
 --- @param render_ctx table The renderer context holding the row commands.
 --- @return table rows
 local function number_row_rows(state, save_prefs, update_menu, render_ctx)
-	local ManifestMenu = require("infra.manifest_menu")
+	local ManifestMenu = require("menu.engine.manifest_menu")
 	if type(state) ~= "table" then return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
 	local Live = require("modules.keymap.number_row_live")
 	-- Timed here rather than around the call: the menu parity proofs read the
@@ -630,7 +630,7 @@ function M.build(ctx)
 	local function active_layout_rows()
 		local rows = {}
 	if #records == 0 then
-		local ManifestMenu = require("infra.manifest_menu")
+		local ManifestMenu = require("menu.engine.manifest_menu")
 		return ManifestMenu.template_rows("layout_active_source_empty_commands", {
 			[require("settings.engine.keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function()
 				local ok, started = pcall(function()
@@ -677,7 +677,7 @@ function M.build(ctx)
 
 	local function build_layout_switching_rows()
 		if not state then return {} end
-		local ManifestMenu = require("infra.manifest_menu")
+		local ManifestMenu = require("menu.engine.manifest_menu")
 		local feature_on = state.layout_pause_switch_enabled and true or false
 		local cur_pause, cur_resume = state.layout_on_pause, state.layout_on_resume
 		local function target_label(current)
@@ -772,7 +772,7 @@ function M.build(ctx)
 	-- Rendered LAST, once every provider list is filled. The providers are read
 	-- when the renderer reaches their row, so a build issued before the
 	-- pause/resume pickers were collected drew an empty `layout_switching`.
-	local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+	local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 	if not ok_mm or type(ManifestMenu.build) ~= "function" then
 		-- Loud: the rows would simply be absent, and a layout list that
 		-- silently disappears reads as "macOS has no layouts installed".

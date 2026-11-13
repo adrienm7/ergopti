@@ -17,8 +17,8 @@
 const assert = require('node:assert/strict');
 const { LINUX_MENU_ROOT, composeLinuxMenuRoot } = require('../../lib/linux-menu-parts.cjs');
 
-const QUIT_FILE = 'linux/ui/menu/menu_quit.lua';
-const QUIT_BINDING = 'local _build_quit = require("ui.menu.menu_quit").build';
+const QUIT_FILE = 'linux/menu/ui/builder/quit.lua';
+const QUIT_BINDING = 'local _build_quit = require("menu.ui.builder.quit").build';
 
 /** Replaces the one occurrence of `before` in `text`; throws when it is not unique. */
 function replaceOnce(text, before, after, label) {
@@ -48,7 +48,7 @@ function splitQuit(sources) {
 		'--- ui/menu/menu_quit.lua',
 		'local M = {}',
 		'local Logger = require("core.logger.engine.shim")',
-		'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+		'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")',
 		'if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end',
 		'local LOG = "ui.menu.menu_quit"',
 		body,
@@ -82,13 +82,13 @@ function quitWiringCases(split) {
 		],
 		[
 			'binding a foreign export',
-			inRoot(QUIT_BINDING, 'local _build_quit = require("ui.menu.menu_quit").quit')
+			inRoot(QUIT_BINDING, 'local _build_quit = require("menu.ui.builder.quit").quit')
 		],
 		[
 			'binding through an alias',
 			inRoot(
 				QUIT_BINDING,
-				'local QuitPart = require("ui.menu.menu_quit")\nlocal _build_quit = QuitPart.build'
+				'local QuitPart = require("menu.ui.builder.quit")\nlocal _build_quit = QuitPart.build'
 			)
 		],
 		[
@@ -104,7 +104,10 @@ function quitWiringCases(split) {
 		],
 		[
 			'foreign facade import in the split module',
-			inPart('pcall(require, "infra.manifest_menu")', 'pcall(require, "foreign.manifest_menu")')
+			inPart(
+				'pcall(require, "menu.engine.manifest_menu")',
+				'pcall(require, "foreign.manifest_menu")'
+			)
 		],
 		[
 			'extra top-level statement in the split module',
@@ -117,7 +120,7 @@ function quitWiringCases(split) {
 		['foreign log source', inPart('"ui.menu.menu_quit"', '"ui.menu.menu_foreign"')],
 		[
 			'header reading a facade the module never declared',
-			inPart('local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")\n', '')
+			inPart('local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")\n', '')
 		]
 	];
 }

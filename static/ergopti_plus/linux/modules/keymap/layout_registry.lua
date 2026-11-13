@@ -340,7 +340,7 @@ end
 --- @param bytes number The archive's size.
 --- @return boolean accepted
 local function confirm_python_download(bytes)
-	local Dialogs = require("ui.menu.menu_dialogs")
+	local Dialogs = require("menu.ui.builder.dialogs")
 	local megabytes = string.format("%d", math.ceil(bytes / 1048576))
 	local text = I18n.get("layouts.managed_python_offer"):gsub("{1}", function() return megabytes end)
 	return Dialogs.ask_yes_no(I18n.get("layouts.managed_python_title"), Dialogs.plain_markup(text),

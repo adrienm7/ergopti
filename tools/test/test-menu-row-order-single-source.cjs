@@ -50,8 +50,9 @@ const WINDOWS_READER = path.join(
 	'static',
 	'ergopti_plus',
 	'windows',
-	'infra',
-	'menu_row_order.ahk'
+	'menu',
+	'engine',
+	'row_order.ahk'
 );
 
 const data = JSON.parse(

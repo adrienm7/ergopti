@@ -32,7 +32,7 @@ local function with_owner(domain, body)
 			-- Each persist revalidates every slot, so the catalogue also accepts
 			-- the manifest defaults of the slots the source leaves unset.
 			local assignable = { screen_capture = true, send_text = true, script_pause_toggle = true }
-			local Manifest, section = require("infra.manifest_reader"), require("settings.engine.keys").KEY.SHORTCUTS_SCRIPT_CONTROL
+			local Manifest, section = require("menu.engine.manifest_reader"), require("settings.engine.keys").KEY.SHORTCUTS_SCRIPT_CONTROL
 			for _, slot in ipairs(require("modules.shortcuts.script_chords").slots()) do
 				assignable[Manifest.default_for(section .. "." .. slot.id)] = true
 			end

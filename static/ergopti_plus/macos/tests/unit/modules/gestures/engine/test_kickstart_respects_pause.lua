@@ -40,7 +40,7 @@ helpers.describe("gestures: the HID kickstart is silent while paused", function(
 		local reset_modules = {
 			"modules.gestures.init", "modules.gestures.engine",
 			"modules.gestures.actions", "modules.gestures.conflicts",
-			"core.ui.engine.notifications", "core.logger.engine.logger", "infra.manifest_reader",
+			"core.ui.engine.notifications", "core.logger.engine.logger", "menu.engine.manifest_reader",
 			"core.timing.engine.timings", "hs._asm.undocumented.touchdevice",
 			"hs.caffeinate.watcher",
 		}
@@ -75,7 +75,7 @@ helpers.describe("gestures: the HID kickstart is silent while paused", function(
 		package.loaded["core.logger.engine.logger"] = setmetatable({
 			pcall = function(_, fn, ...) return pcall(fn, ...) end,
 		}, { __index = function() return noop end })
-		package.loaded["infra.manifest_reader"] = {
+		package.loaded["menu.engine.manifest_reader"] = {
 			default_for = function() return false end,
 			recommended_for = function() return "none" end,
 		}

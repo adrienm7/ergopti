@@ -205,7 +205,7 @@ function M.run(options)
 		init = function() return true end,
 		flush_now = noop,
 	}
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function(key)
 			if key == "hotstrings.trigger_char" then return "\u{2605}" end
 			return false

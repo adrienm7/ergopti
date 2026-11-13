@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("tests.lua.ergopti_extension_selection_contract").run(helpers, require("infra.manifest_reader").features())
+require("tests.lua.ergopti_extension_selection_contract").run(helpers, require("menu.engine.manifest_reader").features())
 
 --- Finds an exact rendered row anywhere in the native menu tree.
 --- @param rows table Rendered native rows.
@@ -43,7 +43,7 @@ end
 helpers.describe("Shipped Ergopti native menu (Linux)", function()
 	helpers.it("(ergopti-extension-selection) controls real shipped metadata and physical replacement without an installed layout", function()
 		local names = { "modules.hotstrings.hotstrings_config", "modules.hotstrings.loader",
-			"modules.hotstrings.magic_key_source", "infra.hotstring_preferences", "ui.menu.builder" }
+			"modules.hotstrings.magic_key_source", "infra.hotstring_preferences", "menu.ui.builder.builder" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, err = pcall(function()
@@ -84,7 +84,7 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 				local I18n = require("core.i18n.engine.i18n")
 				local description = category.sections.replace.description
 				local label = description[I18n.get_locale()] or description.en
-				local Builder = require("ui.menu.builder")
+				local Builder = require("menu.ui.builder.builder")
 				local ctx = { config = Config, paused = false }
 				local function extension()
 					return find_row(Builder.build(ctx), string.format(I18n.get("menu.extensions.hotstrings_of"), "Ergopti+"))

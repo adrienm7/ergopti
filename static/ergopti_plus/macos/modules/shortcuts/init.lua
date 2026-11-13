@@ -20,7 +20,7 @@ local GestureActions    = require("modules.gestures.actions")
 local HotkeyRegistrar   = require("platform.input.hotkey_registrar")
 local StartupTransaction = require("core.lifecycle.engine.startup_transaction")
 local Logger             = require("core.logger.engine.logger")
-local Manifest           = require("infra.manifest_reader")
+local Manifest           = require("menu.engine.manifest_reader")
 local ChordCatalogue     = require("infra.script_chord_catalogue")
 local ConfigKeys = require("settings.engine.keys")
 

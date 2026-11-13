@@ -115,7 +115,7 @@ local SWITCHES = { "click_resets_word", "arrow_resets_word", "shortcut_resets_wo
 helpers.describe("word reset: the settings", function()
 	helpers.it("word reset, reads the manifest defaults from an empty configuration", function()
 		with_settings(nil, function(subject)
-			local Manifest = require("infra.manifest_reader")
+			local Manifest = require("menu.engine.manifest_reader")
 			helpers.assert_eq(subject.idle_seconds(), 3, "a pause of 3 s starts a new word by default")
 			helpers.assert_eq(subject.click_resets_word(), true, "a click starts a new word by default")
 			for _, key in ipairs(SWITCHES) do
@@ -352,7 +352,7 @@ end)
 helpers.describe("word reset: the menu's choice and free entry", function()
 	local i18n = require("core.i18n.engine.i18n")
 	local function row_for(current, calls)
-		local Menu = require("infra.manifest_menu")
+		local Menu = require("menu.engine.manifest_menu")
 		return Menu.choice_row("hotstrings_params_group", "idle_reset", {
 			idle_reset = function(value) calls[#calls + 1] = value; return true end,
 			idle_reset_custom = function() calls[#calls + 1] = "custom"; return true end,
@@ -390,7 +390,7 @@ helpers.describe("word reset: the menu's choice and free entry", function()
 	end)
 
 	helpers.it("word reset, refuses the row when the free entry has no owner", function()
-		local Menu = require("infra.manifest_menu")
+		local Menu = require("menu.engine.manifest_menu")
 		helpers.assert_nil(Menu.choice_row("hotstrings_params_group", "idle_reset",
 			{ idle_reset = function() return true end },
 			{ ["hotstrings.idle_reset_seconds"] = function() return 3 end }))
@@ -520,7 +520,7 @@ helpers.describe("word reset: the cascade arrow count", function()
 	helpers.it("cascade arrows, default to three, the manifest default", function()
 		with_settings(nil, function(subject)
 			helpers.assert_eq(subject.cascade_max_arrows(), 3)
-			helpers.assert_eq(subject.cascade_max_arrows(), require("infra.manifest_reader").default_for("hotstrings.cascade_max_arrows"))
+			helpers.assert_eq(subject.cascade_max_arrows(), require("menu.engine.manifest_reader").default_for("hotstrings.cascade_max_arrows"))
 		end)
 	end)
 

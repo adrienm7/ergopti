@@ -23,7 +23,7 @@ local with_api_add_locale = Fixture.with_api_add_locale
 
 helpers.describe("API Add: retained native admission", function()
 	local owned = { "modules.keymap.llm_bridge", "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
-		"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+		"core.ui.engine.notifications", "menu.engine.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	local function install_add(provider_id)
 		local entry = { id = "old", provider = "openai", model = "old-model", token = "inert-old-secret" }
 		local remote, _, notices = install_doubles({ entries = { entry }, active_id = entry.id, spec = {} })
@@ -302,7 +302,7 @@ local function install_api_add_doubles(args, native)
 		i18n = native,
 		logger = helpers.make_logger_stub(),
 	}))
-	package.loaded["infra.manifest_menu"] = {
+	package.loaded["menu.engine.manifest_menu"] = {
 		command_row = renderer.command_row, template_rows = renderer.template_rows,
 		get_array = renderer.get_array, render_rows = function(rows) return rows end,
 	}
@@ -310,13 +310,13 @@ end
 
 helpers.describe("Shared API Add frame (api-add-controls)", function()
 	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
-		"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+		"core.ui.engine.notifications", "menu.engine.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	helpers.it("uses the shared Add label and retains the genuine provider action (api-add-controls)", function()
 		helpers.with_fresh_modules(owned, function()
 			with_api_add_locale(function(native)
 			local corpus = api_add_corpus()
 			install_api_add_doubles({ entries = {}, active_id = "" }, native)
-			local menu = package.loaded["infra.manifest_menu"]
+			local menu = package.loaded["menu.engine.manifest_menu"]
 			local declaration = menu.get_array(corpus.group_section)[1]
 			local original = declaration.i18n
 			local panel = require("ui.menu.menu_llm.api_panel")
@@ -343,7 +343,7 @@ helpers.describe("Shared API Add frame (api-add-controls)", function()
 			local corpus = api_add_corpus()
 			local entry = { id = "prod", provider = "openai", token = "inert", model = "probe" }
 			install_api_add_doubles({ entries = { entry }, active_id = "prod" }, native)
-			local menu = package.loaded["infra.manifest_menu"]
+			local menu = package.loaded["menu.engine.manifest_menu"]
 			local declaration = menu.get_array(corpus.separator_section)
 			local original = declaration[1]
 			local panel = require("ui.menu.menu_llm.api_panel")
@@ -375,7 +375,7 @@ end)
 
 helpers.describe("API Add locale scope failure inverse (api-add-controls)", function()
 	helpers.it("restores the actual prior locale cohort after a raised case (api-add-controls)", function()
-		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local raised = {}

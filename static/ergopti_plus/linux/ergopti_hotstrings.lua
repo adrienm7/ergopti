@@ -276,7 +276,7 @@ local keystats         = require("modules.keystats.keystats")
 local keyboard_hook     = require("platform.input.keyboard_hook")
 local InputEvent        = require("platform.input.event")
 local Monotonic         = require("core.logger.engine.monotonic")
-local ManifestReader    = require("infra.manifest_reader")
+local ManifestReader    = require("menu.engine.manifest_reader")
 local ScriptSettings    = require("settings.engine.scope.script_settings")
 local Timings           = require("core.timing.engine.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
@@ -293,7 +293,7 @@ local tray_menu = RuntimeGuard.optional_require("adapters.tray_menu")
 local event_loop = require("core.events.loop")
 
 -- Menu builder (builds rich submenus from daemon state).
-local menu_builder = RuntimeGuard.optional_require("ui.menu.builder")
+local menu_builder = RuntimeGuard.optional_require("menu.ui.builder.builder")
 
 -- LLM prediction engine (optional — daemon runs without it).
 local prediction_engine = RuntimeGuard.optional_require("modules.llm.prediction_engine")
@@ -885,15 +885,15 @@ privacy_owners.tray_quit = require("core.lifecycle.engine.shutdown.quit_request"
 	now = function() return require("luv").hrtime() / 1e9 end,
 	timeout = Timings.ms("ui", "user_quit_deadline_ms") / 1000,
 	poll = 0.25,
-	notify_refused = function() require("ui.menu.feature_notice").quit_refused(require("core.i18n.engine.i18n").get) end,
+	notify_refused = function() require("menu.ui.builder.feature_notice").quit_refused(require("core.i18n.engine.i18n").get) end,
 })
 
 --- A Quit from a shortcut, a gesture or the degraded tray row: the owner tells
 --- the user of a refusal that comes after the call returned, this of one that
---- comes at once, as the tray row (ui/menu/menu_quit.lua) and Windows' quit
+--- comes at once, as the tray row (menu/ui/builder/quit.lua) and Windows' quit
 --- admission do (NUI-001).
 privacy_owners.user_quit = require("core.lifecycle.engine.shutdown.quit_request").notifying(privacy_owners.tray_quit,
-	function() require("ui.menu.feature_notice").quit_refused(require("core.i18n.engine.i18n").get) end)
+	function() require("menu.ui.builder.feature_notice").quit_refused(require("core.i18n.engine.i18n").get) end)
 
 
 -- =========================================
@@ -997,7 +997,7 @@ local function main()
 
 	BootProfiler.stage("config")
 	require("core.text.engine.toml_codec.writer").set_sparse_defaults(
-		require("settings.engine.paths").config("config.toml"), require("infra.manifest_reader"))
+		require("settings.engine.paths").config("config.toml"), require("menu.engine.manifest_reader"))
 	require("core.text.engine.toml_codec.writer").set_case_twin_reporter(function(message, admission)
 		local notifier = require("platform.system.notifier")
 		if admission ~= nil then
@@ -3003,14 +3003,14 @@ local function main()
 		-- after the keyboard pump, using the latest committed menu context.
 		privacy_owners.menu_rebuild = (function(builder, tray, context)
 			local build, publish, set_paused = builder.build, tray.setMenu, tray.setPaused
-			return require("ui.menu.rebuild_owner").new({
+			return require("menu.ui.builder.rebuild_owner").new({
 				current = function()
 					return not shutdown.is_requested() and menu_builder == builder and tray_menu == tray
 						and builder.build == build and tray.setMenu == publish and tray.setPaused == set_paused
 				end,
 				build = function()
 					local ctx = context()
-					return require("ui.menu.timed_build").run(build, ctx), ctx.paused == true
+					return require("menu.ui.builder.timed_build").run(build, ctx), ctx.paused == true
 				end,
 				publish = publish,
 				appearance = type(set_paused) == "function" and function(paused) return set_paused(paused) end or nil,

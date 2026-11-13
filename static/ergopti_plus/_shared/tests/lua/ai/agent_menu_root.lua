@@ -45,9 +45,9 @@ local function with_boundary_owner(helpers, platform, source, top_level, body)
 	local current_start = assert(source:find("local function separator_facade_current()", start, true))
 	local finish = assert(source:find("\nend\n", current_start, true)) + #"\nend\n" - 1
 	local imported = source:sub(start, finish)
-	local modules, previous = package.loaded, rawget(package.loaded, "infra.manifest_menu")
+	local modules, previous = package.loaded, rawget(package.loaded, "menu.engine.manifest_menu")
 	local outcome = pack_values(xpcall(function()
-		rawset(modules, "infra.manifest_menu", renderer)
+		rawset(modules, "menu.engine.manifest_menu", renderer)
 		-- Compile the unchanged actual import/custody function, not a ready stub.
 		local current, factory = assert(compile_source("local ManifestMenu = actual_renderer\n" .. imported
 			.. "\nreturn separator_facade_current, separator_factory", "@actual-boundary-facade",
@@ -55,8 +55,8 @@ local function with_boundary_owner(helpers, platform, source, top_level, body)
 		helpers.assert_true(current(), "the actual imported native facade is admitted")
 		return body(renderer, current, factory)
 	end, debug.traceback))
-	rawset(modules, "infra.manifest_menu", previous)
-	helpers.assert_true(rawequal(rawget(modules, "infra.manifest_menu"), previous), "the exact prior native facade is restored")
+	rawset(modules, "menu.engine.manifest_menu", previous)
+	helpers.assert_true(rawequal(rawget(modules, "menu.engine.manifest_menu"), previous), "the exact prior native facade is restored")
 	if not outcome[1] then error(outcome[2], 0) end
 	return unpack_values(outcome, 2, outcome.n)
 end

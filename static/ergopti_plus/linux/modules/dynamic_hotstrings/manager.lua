@@ -25,7 +25,7 @@ local TableUtil = require("core.text.engine.table_util")
 local UnicodeCase = require("core.text.engine.unicode_case")
 
 local Logger = require("core.logger.engine.shim")
-local ManifestReader = require("infra.manifest_reader")
+local ManifestReader = require("menu.engine.manifest_reader")
 local Preferences = require("infra.hotstring_preferences")
 local UserCode = require("modules.dynamic_hotstrings.user_code")
 
@@ -980,7 +980,7 @@ end
 --- here all the same, because a user does not care which matcher answers them —
 --- they care that the dynamic-hotstrings submenu has one line per family, as it
 --- does on the other two drivers.
-local RULE_FAMILIES = require("infra.manifest_menu").get_dynamic_hotstring_families()
+local RULE_FAMILIES = require("menu.engine.manifest_menu").get_dynamic_hotstring_families()
 for _, family in ipairs(RULE_FAMILIES) do
 	if not family.separator then family.section = family.linux_section or family.section end
 end

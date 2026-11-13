@@ -116,7 +116,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 	local SOURCE = '# private independent neighbor\n[llm.navigation]\nfuture = "retain" # unknown\n[other]\nvalue = 42\n'
 	local function with_native_navigation(variant, body)
 		Sandbox.with_config(type(variant) == "table" and variant.source or SOURCE, function(path)
-			local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.navigation_settings", "modules.llm.trigger_settings", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.builder", "core.fs.adapters.storage", "ui.error_dialog.bridge", "ui.menu.start_at_login", "core.i18n.engine.i18n" }
+			local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.navigation_settings", "modules.llm.trigger_settings", "modules.llm.display_settings", "modules.llm.profile_settings", "menu.engine.manifest_menu", "menu.ui.builder.builder", "core.fs.adapters.storage", "ui.error_dialog.bridge", "ui.menu.start_at_login", "core.i18n.engine.i18n" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local previous_execute, previous_rename = os.execute, os.rename
 			local notices, changed, refused_publications = 0, 0, 0
@@ -159,7 +159,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 					end,
 					i18n = i18n, logger = require("core.logger.engine.shim"),
 				}))
-				package.loaded["infra.manifest_menu"] = native_menu
+				package.loaded["menu.engine.manifest_menu"] = native_menu
 				os.execute = function(command)
 					if command:find("dialog_host.lua' --error", 1, true) then notices = notices + 1; return true end
 					if command:find("start_at_login.sh", 1, true) then return false end
@@ -170,14 +170,14 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 					get_backend = function() return "ollama" end, streaming_revision = function() return 0 end }, on_quit = function() end,
 					on_menu_changed = function() changed = changed + 1 end }
 				local function full()
-					local items = require("ui.menu.builder").build(context)
+					local items = require("menu.ui.builder.builder").build(context)
 					for _, item in ipairs(items) do
 						if item.title == i18n.get("menu.llm.title") then return item.menu end
 					end
 					error("the actual tray AI owner is absent")
 				end
 				local function build()
-					local items = require("ui.menu.builder").build(context)
+					local items = require("menu.ui.builder.builder").build(context)
 					for _, item in ipairs(items) do
 						if item.title == i18n.get("menu.llm.title") then
 							for _, child in ipairs(item.menu or {}) do if child.title == i18n.get("menu.llm.nav_menu_title") then return child.menu end end

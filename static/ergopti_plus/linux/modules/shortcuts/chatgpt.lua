@@ -23,7 +23,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local ConfigOutdated = require("settings.engine.migration.outdated")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Shell = require("core.process.adapters.shell_runner")
 local Paths = require("settings.engine.paths")
 local Writer = require("core.text.engine.toml_codec.writer")

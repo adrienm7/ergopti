@@ -22,8 +22,8 @@ local Labels = require("menu.engine.labels")
 local text_utils = require("core.text.engine.utils")
 local dialog = require("core.ui.engine.dialog_util")
 local Chord = require("keyboard.engine.chord")
-local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
-local ManifestMenu = require("infra.manifest_menu")
+local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
+local ManifestMenu = require("menu.engine.manifest_menu")
 local TableUtil = require("core.text.engine.table_util")
 
 

@@ -309,7 +309,7 @@ helpers.describe("Linux terminal shortcut scope", function()
 	for _, mode in ipairs({ "clear", "recommended", "paused" }) do
 		helpers.it("routes the actual rendered " .. mode .. " request to the public terminal", function()
 			with_scope(function(_, owners, controls, path)
-				local renderer = require("infra.manifest_menu")
+				local renderer = require("menu.engine.manifest_menu")
 				local root = renderer.get_root()
 				local top, execute = root.top_level, os.execute
 				local selected = mode == "recommended" and "recommended" or "clear"
@@ -324,7 +324,7 @@ helpers.describe("Linux terminal shortcut scope", function()
 						end
 						return execute(command)
 					end
-					local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
+					local menu = require("menu.ui.builder.builder").build({ shortcuts = owners.manager, paused = false,
 						is_paused = function() return controls.paused end,
 						on_menu_changed = function() changed = changed + 1 end })
 					local submenu
@@ -358,7 +358,7 @@ end)
 helpers.describe("Linux Shortcuts restore row", function()
 	helpers.it("the declared Shortcuts restore row restores the recommended scope without a question", function()
 		with_scope(function(_, owners, controls, path)
-			local renderer = require("infra.manifest_menu")
+			local renderer = require("menu.engine.manifest_menu")
 			local root = renderer.get_root()
 			local top, execute = root.top_level, os.execute
 			local changed, questions = 0, 0
@@ -369,7 +369,7 @@ helpers.describe("Linux Shortcuts restore row", function()
 					if command:find("dialog_host.lua' --question", 1, true) then questions = questions + 1; return 1 end
 					return execute(command)
 				end
-				local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
+				local menu = require("menu.ui.builder.builder").build({ shortcuts = owners.manager, paused = false,
 					is_paused = function() return controls.paused end,
 					on_menu_changed = function() changed = changed + 1 end })
 				local i18n = require("core.i18n.engine.i18n")
@@ -404,12 +404,12 @@ end)
 helpers.describe("Linux Shortcuts wrap group", function()
 	helpers.it("draws the wrap toggle by its behaviour, followed by its symbols", function()
 		with_scope(function(_, owners, controls)
-			local renderer = require("infra.manifest_menu")
+			local renderer = require("menu.engine.manifest_menu")
 			local root = renderer.get_root()
 			local top = root.top_level
 			local passed, err = pcall(function()
 				root.top_level = declared_parent(top, "shortcuts")
-				local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
+				local menu = require("menu.ui.builder.builder").build({ shortcuts = owners.manager, paused = false,
 					is_paused = function() return controls.paused end })
 				local i18n = require("core.i18n.engine.i18n")
 				local submenu
@@ -517,7 +517,7 @@ helpers.describe("Linux script chords in the Shortcuts scope", function()
 
 	helpers.it("script-chord: the tray draws the shared submenu, ticks it from the switch and asks nothing", function()
 		with_scope(function(_, owners, controls, path)
-			local renderer = require("infra.manifest_menu")
+			local renderer = require("menu.engine.manifest_menu")
 			local root = renderer.get_root()
 			local top, execute = root.top_level, os.execute
 			local questions, changed = 0, 0
@@ -530,7 +530,7 @@ helpers.describe("Linux script chords in the Shortcuts scope", function()
 				end
 				local i18n = require("core.i18n.engine.i18n")
 				local function group()
-					local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
+					local menu = require("menu.ui.builder.builder").build({ shortcuts = owners.manager, paused = false,
 						is_paused = function() return controls.paused end,
 						on_menu_changed = function() changed = changed + 1 end })
 					for _, item in ipairs(menu) do

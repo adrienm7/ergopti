@@ -3,10 +3,10 @@
 /**
  * Follows the Linux tray root across its per-section modules.
  *
- * `linux/ui/menu/builder.lua` keeps the tray root and binds each section
+ * `linux/menu/ui/builder/builder.lua` keeps the tray root and binds each section
  * builder from its own module:
  *
- *     local _build_quit = require("ui.menu.menu_quit").build
+ *     local _build_quit = require("menu.ui.builder.quit").build
  *
  * The menu gates are single-source analysers: they prove a builder's wiring
  * by reading its body next to the root's imports and facade checks. This
@@ -26,7 +26,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { scriptTokens } = require('./script-source.cjs');
 
-const LINUX_MENU_ROOT = 'linux/ui/menu/builder.lua';
+const LINUX_MENU_ROOT = 'linux/menu/ui/builder/builder.lua';
 const PART_MODULE = /^ui\.menu\.menu_([a-z][a-z_]*)$/;
 
 /** The repository-relative file of one part module, or null for a foreign name. */

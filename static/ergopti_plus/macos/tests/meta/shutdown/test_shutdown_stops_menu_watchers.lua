@@ -24,12 +24,12 @@ helpers.describe("shutdown: the menubar's own watchers are stopped too", functio
 		-- leaves the real ui.menu (and everything it pulls in) in package.loaded
 		-- for every later test file, which is the discovery-order contamination
 		-- this suite has been bitten by before.
-		package.loaded["ui.menu"] = nil
-		local menu = helpers.load_with_stubs("ui.menu")
+		package.loaded["menu.ui"] = nil
+		local menu = helpers.load_with_stubs("menu.ui")
 		helpers.assert_type(menu.stop_watchers, "function",
 			"the menu holds the config pathwatcher and the theme watcher, so it is the only "
 			.. "place that can stop them; without this the shutdown callback cannot ask")
-		package.loaded["ui.menu"] = nil
+		package.loaded["menu.ui"] = nil
 	end)
 
 	helpers.it("the shutdown callback calls it", function()
@@ -43,8 +43,8 @@ helpers.describe("shutdown: the menubar's own watchers are stopped too", functio
 
 	helpers.it("retains a menu watcher whose exact stop throws or returns false", function()
 		for _, failure in ipairs({ "false", "throw" }) do
-			package.loaded["ui.menu"] = nil
-			local menu = helpers.load_with_stubs("ui.menu")
+			package.loaded["menu.ui"] = nil
+			local menu = helpers.load_with_stubs("menu.ui")
 			local attempts = 0
 			local watcher = {}
 			function watcher:stop()
@@ -67,7 +67,7 @@ helpers.describe("shutdown: the menubar's own watchers are stopped too", functio
 			helpers.assert_eq(2, attempts,
 				"the second pass must retry the same capability exactly once (" .. failure .. ")")
 			helpers.assert_eq(nil, menu._watcher, "ownership clears only after confirmed cleanup")
-			package.loaded["ui.menu"] = nil
+			package.loaded["menu.ui"] = nil
 		end
 	end)
 
@@ -75,8 +75,8 @@ helpers.describe("shutdown: the menubar's own watchers are stopped too", functio
 	-- due check firing during the teardown window would start a request into a
 	-- dying Lua state.
 	helpers.it("stops the automatic update checks the menu session started", function()
-		package.loaded["ui.menu"] = nil
-		local menu = helpers.load_with_stubs("ui.menu")
+		package.loaded["menu.ui"] = nil
+		local menu = helpers.load_with_stubs("menu.ui")
 		local stops = 0
 		menu._watcher = nil
 		menu._theme_watcher = nil
@@ -84,7 +84,7 @@ helpers.describe("shutdown: the menubar's own watchers are stopped too", functio
 		helpers.assert_eq(true, menu.stop_watchers(), "the session's checks stop with the menu watchers")
 		helpers.assert_eq(1, stops, "the automatic checks are stopped exactly once")
 		helpers.assert_eq(nil, menu._update_checks, "ownership clears after the stop")
-		package.loaded["ui.menu"] = nil
+		package.loaded["menu.ui"] = nil
 	end)
 
 end)

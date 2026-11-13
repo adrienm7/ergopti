@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local OWNED = {
 	"ui.menu.menu_llm.agent_panel", "modules.llm.agent_runner", "modules.llm.agent_connectors",
-	"core.ui.engine.dialog_util", "core.ui.ui.tooltip", "infra.app_picker", "infra.manifest_menu", "modules.llm.api_remote",
+	"core.ui.engine.dialog_util", "core.ui.ui.tooltip", "infra.app_picker", "menu.engine.manifest_menu", "modules.llm.api_remote",
 	"core.logger.engine.logger", "core.i18n.engine.locale", "modules.llm.api_ollama", "modules.llm.local_model_offer",
 	"modules.llm.local_servers", "ui.menu.menu_llm.local_server_panel",
 }

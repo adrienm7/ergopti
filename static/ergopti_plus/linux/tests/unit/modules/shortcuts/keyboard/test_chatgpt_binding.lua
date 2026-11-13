@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 local Codec = require("core.text.engine.toml_codec")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local CHORD = { key = "g", mods = { ctrl = true } }
 local SOURCE = '[shortcuts]\nenabled = true\nchatgpt_url = "https://initial.example/chat"\nunknown = "keep"\n[other]\nvalue = 42\n'
 

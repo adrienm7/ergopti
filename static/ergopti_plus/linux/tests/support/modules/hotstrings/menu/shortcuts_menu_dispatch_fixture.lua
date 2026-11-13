@@ -61,7 +61,7 @@ end
 --- @param ctx_extra table|nil
 --- @return table|nil rows
 local function shortcuts_menu(ctx_extra)
-	local mb = helpers.load_module("ui.menu.builder")
+	local mb = helpers.load_module("menu.ui.builder.builder")
 	local ctx = { _version = "9.9.9", shortcuts = fake_shortcuts() }
 	for k, v in pairs(ctx_extra or {}) do ctx[k] = v end
 
@@ -121,7 +121,7 @@ local function with_keyboard_slot_picker(prompt, body)
 		Sandbox.with_config(source, function(path)
 			for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts",
 				"modules.shortcuts.manager", "modules.hotstrings.magic_key", "settings.engine.preferences.program_binding_transaction",
-				"infra.manifest_menu" }) do package.loaded[name] = nil end
+				"menu.engine.manifest_menu" }) do package.loaded[name] = nil end
 			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
@@ -226,7 +226,7 @@ end
 
 -- Own the genuine native translation cohort while exercising cold and warm trays.
 local function with_shortcut_locale(code, scenario)
-	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.menu.builder" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "menu.ui.builder.builder" }
 	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
 	local native, owner, receipt, acquired
 	local ok, detail = xpcall(function()

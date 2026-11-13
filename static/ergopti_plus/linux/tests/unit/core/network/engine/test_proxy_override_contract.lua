@@ -23,13 +23,13 @@ Contract.register(read, helpers)
 helpers.it("proxy dialog refuses an externally changed proxy and preserves other settings", function()
     local fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
     fixture.storage_cohort_fixture('{"network.proxy_override":"direct","other":1}', function(storage, _, path, _, write, read_file)
-        local names = { "core.network.proxy_override", "ui.menu.menu_dialogs", "core.i18n.engine.i18n" }
+        local names = { "core.network.proxy_override", "menu.ui.builder.dialogs", "core.i18n.engine.i18n" }
         local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
         local shown = {}
         local ok, err = pcall(function()
             package.loaded["core.network.proxy_override"] = nil
             package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-            package.loaded["ui.menu.menu_dialogs"] = {
+            package.loaded["menu.ui.builder.dialogs"] = {
                 prompt_text = function(_, _, initial)
                     helpers.assert_eq(initial, "direct")
                     write(path, '{"network.proxy_override":"http://external.invalid:8080","other":2}')
@@ -122,13 +122,13 @@ helpers.it("proxy dialog preserves unrelated external changes and refuses unread
             or mode == "wrong_type" and '{"network.proxy_override":false,"other":1}'
             or '{"network.proxy_override":"direct","other":1}'
         fixture.storage_cohort_fixture(source, function(_, _, path, _, write, read_file)
-            local names = { "core.network.proxy_override", "ui.menu.menu_dialogs", "core.i18n.engine.i18n" }
+            local names = { "core.network.proxy_override", "menu.ui.builder.dialogs", "core.i18n.engine.i18n" }
             local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
             local prompted, shown = false, {}
             local ok, err = pcall(function()
                 package.loaded["core.network.proxy_override"] = nil
                 package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-                package.loaded["ui.menu.menu_dialogs"] = {
+                package.loaded["menu.ui.builder.dialogs"] = {
                     prompt_text = function(_, _, initial)
                         prompted = true
                         if mode == "wrong_type" then helpers.assert_eq(initial, "") end
@@ -164,13 +164,13 @@ helpers.it("external process writes during the open proxy dialog", function()
     local shell = require("core.process.adapters.shell_runner")
     for _, mode in ipairs({ "conflict", "other" }) do
         fixture.storage_cohort_fixture('{"network.proxy_override":"direct","other":1}', function(_, _, path, _, _, read_file)
-            local names = { "core.network.proxy_override", "ui.menu.menu_dialogs", "core.i18n.engine.i18n" }
+            local names = { "core.network.proxy_override", "menu.ui.builder.dialogs", "core.i18n.engine.i18n" }
             local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
             local shown = {}
             local ok, err = xpcall(function()
                 package.loaded["core.network.proxy_override"] = nil
                 package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-                package.loaded["ui.menu.menu_dialogs"] = {
+                package.loaded["menu.ui.builder.dialogs"] = {
                     prompt_text = function(_, _, initial)
                         helpers.assert_eq(initial, "direct")
                         local external = mode == "conflict" and '{"network.proxy_override":"http://external.invalid:8080","other":2}'
@@ -213,13 +213,13 @@ helpers.it("proxy dialog refuses a real unreadable source before or during editi
     if uv.getuid() == 0 then return end
     for _, mode in ipairs({ "before", "during" }) do
         fixture.storage_cohort_fixture('{"network.proxy_override":"direct","other":1}', function(_, _, path, _, _, read_file)
-            local names = { "core.network.proxy_override", "ui.menu.menu_dialogs", "core.i18n.engine.i18n" }
+            local names = { "core.network.proxy_override", "menu.ui.builder.dialogs", "core.i18n.engine.i18n" }
             local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
             local shown, prompted = {}, false
             local ok, err = xpcall(function()
                 package.loaded["core.network.proxy_override"] = nil
                 package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-                package.loaded["ui.menu.menu_dialogs"] = {
+                package.loaded["menu.ui.builder.dialogs"] = {
                     prompt_text = function()
                         prompted = true
                         assert(uv.fs_chmod(path, 0))

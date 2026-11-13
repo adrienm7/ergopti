@@ -85,7 +85,7 @@ end
 --- @param config table
 --- @return table|nil
 local function rolls_row(config)
-	local mb = helpers.load_module("ui.menu.builder")
+	local mb = helpers.load_module("menu.ui.builder.builder")
 	local found = nil
 	local function search(list)
 		for _, item in ipairs(list or {}) do
@@ -196,7 +196,7 @@ helpers.describe("category row: its bulk rows", function()
 	helpers.it("leaves the enable-all row clickable while the category is off", function()
 		local row = rolls_row(fake_config({ enabled = false }))
 		local declaration, declarations = nil, 0
-		for _, item in ipairs(require("infra.manifest_menu").get_array("hotstring_category_menu") or {}) do
+		for _, item in ipairs(require("menu.engine.manifest_menu").get_array("hotstring_category_menu") or {}) do
 			if item.id == "hotstring_category_enable_all" then
 				declaration, declarations = item, declarations + 1
 			end

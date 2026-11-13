@@ -8,7 +8,7 @@
 --- dispatching each item type to the appropriate render function.
 ---
 --- WHY THIS IS SHARED AND WHAT MADE IT LOOK OTHERWISE.
---- It lived in ``macos/infra/manifest_menu.lua``, 561 lines, and read as a
+--- It lived in ``macos/menu/engine/manifest_menu.lua``, 561 lines, and read as a
 --- Hammerspoon module: its docstrings say "hs.menubar item table" throughout.
 --- It made exactly ONE Hammerspoon call — ``hs.json.decode`` — and the "hs.menubar
 --- item table" is a plain Lua table of ``{title, fn, menu, checked, disabled}``.
@@ -255,7 +255,7 @@ local LOG = "menu.engine.renderer"
 -- How deep a list provider's rows may nest. A provider returning a table that
 -- contains itself would recurse until the stack gave out, taking the whole menu
 -- with it, so this is a runaway-recursion guard — NOT a statement about how deep
--- a menu may legitimately be. Kept equal to windows/infra/manifest_menu.ahk's
+-- a menu may legitimately be. Kept equal to windows/menu/engine/manifest_menu.ahk's
 -- MR_MAX_LIST_DEPTH so a list that renders on one driver cannot be silently
 -- truncated on another.
 --

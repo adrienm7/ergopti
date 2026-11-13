@@ -67,7 +67,7 @@ local _keymap    = nil
 local _refresh_personal_data = nil
 local _active_start_token = nil
 local _starting_token = nil
-local ManifestReader = require("infra.manifest_reader")
+local ManifestReader = require("menu.engine.manifest_reader")
 local TableUtil = require("core.text.engine.table_util")
 local ConfigKeys = require("settings.engine.keys")
 

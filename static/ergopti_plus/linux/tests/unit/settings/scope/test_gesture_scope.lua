@@ -145,7 +145,7 @@ helpers.describe("Linux gesture scope transaction", function()
 	-- act at once, with no question, because the owner's backup is the way back.
 	helpers.it("gesture-scope: the real menu opens with switch, restore and clear, each applied at once", function()
 		with_scope(function(_, gestures, controls, path)
-			local menu_name = "ui.menu.builder"
+			local menu_name = "menu.ui.builder.builder"
 			local previous_menu = package.loaded[menu_name]
 			local previous_execute = os.execute
 			local ok, err = pcall(function()
@@ -201,7 +201,7 @@ helpers.describe("Linux gesture scope transaction", function()
 					"the clear backs the file up before it rewrites it")
 				restore.fn()
 				helpers.assert_eq(table.concat(calls, ","), "clear,clear,recommended")
-				local recommended = require("infra.manifest_reader").recommended_for("gestures.enabled")
+				local recommended = require("menu.engine.manifest_reader").recommended_for("gestures.enabled")
 				helpers.assert_eq(gestures.is_enabled(), recommended)
 				helpers.assert_eq(questions, 0, "neither scope row asks a question")
 			end)
@@ -249,7 +249,7 @@ helpers.describe("Linux gesture scope transaction", function()
 			helpers.assert_eq(gestures.is_enabled(), true)
 			helpers.assert_eq(gestures.is_reading(), true)
 			for slot in pairs(gestures.DEFAULT_GESTURES) do
-				helpers.assert_eq(gestures.get_action(slot), require("infra.manifest_reader").recommended_for("gestures." .. slot))
+				helpers.assert_eq(gestures.get_action(slot), require("menu.engine.manifest_reader").recommended_for("gestures." .. slot))
 			end
 		end)
 	end)

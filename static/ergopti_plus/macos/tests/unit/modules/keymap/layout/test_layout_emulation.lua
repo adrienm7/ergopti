@@ -45,7 +45,7 @@ local function fixture(layout, form, source_override)
 	local record = { paused = false, magic = nil, now = 0, posted = {} }
 	M.init({
 		read_config = function() return { layout = layout } end,
-		default_for = require("infra.manifest_reader").default_for,
+		default_for = require("menu.engine.manifest_reader").default_for,
 		source = source_override or function(id)
 			for _, entry in ipairs(INDEX.layouts) do
 				if entry.id == id then

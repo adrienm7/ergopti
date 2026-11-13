@@ -347,7 +347,7 @@ helpers.describe("wrap on type (linux): the tray row", function()
 	helpers.it("draws the wrap-on-type toggle in the shortcuts submenu", function()
 		local shortcuts = helpers.load_module("modules.shortcuts.manager")
 		shortcuts.init({ enabled = true, persist = false })
-		local mb = helpers.load_module("ui.menu.builder")
+		local mb = helpers.load_module("menu.ui.builder.builder")
 		local items = mb.build({ _version = "0.0.0-dev.12", shortcuts = shortcuts, on_quit = function() end })
 		local i18n = require("core.i18n.engine.i18n")
 		local title = i18n.get("menu.shortcuts.title")
@@ -381,7 +381,7 @@ end)
 --- Exercises the real preference owner and shared feature row on a private file.
 --- @param body function Receives manager, row finder, and external observations.
 local function with_wrap_feature(body)
-	local manager_name, builder_name = "modules.shortcuts.manager", "ui.menu.builder"
+	local manager_name, builder_name = "modules.shortcuts.manager", "menu.ui.builder.builder"
 	local previous_manager, previous_builder = package.loaded[manager_name], package.loaded[builder_name]
 	local writer = require("core.text.engine.toml_codec.writer")
 	local original_batch = writer.batch_write

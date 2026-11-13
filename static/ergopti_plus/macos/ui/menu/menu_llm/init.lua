@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 
 local hs            = hs
 local llm_mod       = require("modules.llm")
@@ -50,7 +50,7 @@ local TriggerOrch      = require("ui.menu.menu_llm.trigger_orchestrator")
 -- single source of truth for which rows grey out while the feature is OFF, consumed
 -- identically by the Windows renderer so the two menus can never drift again.
 local MenuLayout       = require("ui.menu.menu_llm.menu_layout")
-local ManifestMenu     = require("infra.manifest_menu")
+local ManifestMenu     = require("menu.engine.manifest_menu")
 
 -- AI runtimes install only when their backend is selected (a backend row, or
 -- enabling the AI with that backend), through runtime_install_offer — never at
@@ -1959,7 +1959,7 @@ local function create_menu(deps)
 
 				local main_menu = {}
 				do
-						local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+						local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 						if ok_mm and type(ManifestMenu.build) == "function" then
 								-- The restore alone: the AI menu's clear row was retired.
 								local render_ctx = {
@@ -2047,14 +2047,14 @@ local function create_menu(deps)
 				)
 				if not is_active then return nil end
 				local _dw = package.loaded["ui.download_window"]
-				local renderer = rawget(package.loaded, "infra.manifest_menu")
+				local renderer = rawget(package.loaded, "menu.engine.manifest_menu")
 				if type(renderer) ~= "table" or getmetatable(renderer) ~= nil then return nil end
 				local template_owner, render_owner = rawget(renderer, "template_rows"), rawget(renderer, "render_rows")
 				local root_owner, array_owner = rawget(renderer, "get_root"), rawget(renderer, "get_array")
 				if type(template_owner) ~= "function" or type(render_owner) ~= "function"
 					or type(root_owner) ~= "function" or type(array_owner) ~= "function" then return nil end
 				local function renderer_live()
-					return rawequal(rawget(package.loaded, "infra.manifest_menu"), renderer)
+					return rawequal(rawget(package.loaded, "menu.engine.manifest_menu"), renderer)
 						and getmetatable(renderer) == nil
 						and rawequal(rawget(renderer, "template_rows"), template_owner)
 						and rawequal(rawget(renderer, "render_rows"), render_owner)

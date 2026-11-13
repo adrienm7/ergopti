@@ -30,7 +30,7 @@ helpers.describe("API panel test request", function()
 			"core.logger.engine.logger",
 			"core.ui.engine.dialog_util",
 			"core.ui.engine.notifications",
-			"infra.manifest_menu",
+			"menu.engine.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
 			local entry = {
@@ -68,7 +68,7 @@ helpers.describe("API panel test request", function()
 			"core.logger.engine.logger",
 			"core.ui.engine.dialog_util",
 			"core.ui.engine.notifications",
-			"infra.manifest_menu",
+			"menu.engine.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
 			local entry = {
@@ -111,7 +111,7 @@ helpers.describe("API panel test request", function()
 			"core.logger.engine.logger",
 			"core.ui.engine.dialog_util",
 			"core.ui.engine.notifications",
-			"infra.manifest_menu",
+			"menu.engine.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
 			local entry = {
@@ -147,7 +147,7 @@ helpers.describe("API panel test request", function()
 			"core.logger.engine.logger",
 			"core.ui.engine.dialog_util",
 			"core.ui.engine.notifications",
-			"infra.manifest_menu",
+			"menu.engine.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
 			local entry = {
@@ -185,7 +185,7 @@ helpers.describe("API panel test request", function()
 			"core.logger.engine.logger",
 			"core.ui.engine.dialog_util",
 			"core.ui.engine.notifications",
-			"infra.manifest_menu",
+			"menu.engine.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
 			local entry = {
@@ -224,7 +224,7 @@ helpers.describe("API panel test request", function()
 			"core.logger.engine.logger",
 			"core.ui.engine.dialog_util",
 			"core.ui.engine.notifications",
-			"infra.manifest_menu",
+			"menu.engine.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
 			local entry = {
@@ -263,7 +263,7 @@ helpers.describe("API panel test request", function()
 			"core.logger.engine.logger",
 			"core.ui.engine.dialog_util",
 			"core.ui.engine.notifications",
-			"infra.manifest_menu",
+			"menu.engine.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
 			local entry = {
@@ -304,7 +304,7 @@ helpers.describe("API panel test request", function()
 			"core.logger.engine.logger",
 			"core.ui.engine.dialog_util",
 			"core.ui.engine.notifications",
-			"infra.manifest_menu",
+			"menu.engine.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
 			local first = {
@@ -350,7 +350,7 @@ helpers.describe("API panel test request", function()
 			"core.logger.engine.logger",
 			"core.ui.engine.dialog_util",
 			"core.ui.engine.notifications",
-			"infra.manifest_menu",
+			"menu.engine.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
 			local entries = {
@@ -387,7 +387,7 @@ helpers.describe("API panel test request", function()
 			"core.logger.engine.logger",
 			"core.ui.engine.dialog_util",
 			"core.ui.engine.notifications",
-			"infra.manifest_menu",
+			"menu.engine.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
 			local _, calls, notifications = install_doubles({
@@ -427,7 +427,7 @@ end)
 
 helpers.describe("Active API commands: canonical labels and retained owner", function()
 	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
-		"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+		"core.ui.engine.notifications", "menu.engine.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	for _, locale in ipairs({ "ar", "da", "de", "en", "es", "cs", "fr", "he", "hi", "it",
 		"ja", "ko", "no", "nl", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
 		helpers.it("uses the actual shared active commands in " .. locale, function()
@@ -437,7 +437,7 @@ helpers.describe("Active API commands: canonical labels and retained owner", fun
 				local labels = require("core.fs.adapters.json_codec").decode(raw)
 				local entry = { id = "chosen", provider = "openai", model = "test-model", token = "inert" }
 				install_doubles({ entries = { entry }, active_id = entry.id, spec = {}, locale_strings = labels })
-				local declaration = package.loaded["infra.manifest_menu"].get_array("llm_api_active_commands")
+				local declaration = package.loaded["menu.engine.manifest_menu"].get_array("llm_api_active_commands")
 				-- A real shared-data change must reach the actual provider, not its old hardcoded caption.
 				declaration[1].i18n = "button.cancel"
 				local _, rows = require("ui.menu.menu_llm.api_panel").build(fixture_context())
@@ -475,7 +475,7 @@ end)
 
 helpers.describe("Active API commands: strict native pause receipt", function()
 	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
-		"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+		"core.ui.engine.notifications", "menu.engine.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	for _, fault in ipairs({ "missing", "nil", "number", "table", "throw" }) do
 		helpers.it("refuses a retained request after the native pause reader becomes " .. fault, function()
 			helpers.with_fresh_modules(owned, function()

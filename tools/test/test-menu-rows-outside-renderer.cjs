@@ -120,7 +120,7 @@ const MEASURE = process.argv.includes('--measure');
 // renderer materialises it: `type = "check"` carries the label key, the
 // checked_when predicate and the disabled_when predicate, and the driver
 // registers only a named command. Both renderers gained the type in the same
-// change — _shared/menu/engine/renderer.lua and windows/infra/manifest_menu.ahk —
+// change — _shared/menu/engine/renderer.lua and windows/menu/engine/manifest_menu.ahk —
 // because a shared declaration that only one renderer understands is a row that
 // disappears on the other two.
 //
@@ -741,7 +741,7 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 const LIST_PROVIDERS_FLOOR = { linux: 7 };
 
 const MENU_MANIFEST = path.join(DRIVERS, '_shared', 'menu', 'data', 'menu_manifest.json');
-const LINUX_SRC = path.join(DRIVERS, 'linux', 'ui', 'menu', 'builder.lua');
+const LINUX_SRC = path.join(DRIVERS, 'linux', 'menu', 'ui', 'builder', 'builder.lua');
 if (fs.existsSync(LINUX_SRC) && fs.existsSync(MENU_MANIFEST)) {
 	const menuManifest = JSON.parse(fs.readFileSync(MENU_MANIFEST, 'utf8'));
 	const src = readSourceFile(LINUX_SRC);

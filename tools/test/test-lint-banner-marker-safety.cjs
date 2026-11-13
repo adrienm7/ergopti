@@ -9,7 +9,7 @@
  * prefix assumption (isAhk ? '; ' : '--- ') instead of the marker actually
  * captured on the title line. Lua section banners legitimately use either "--"
  * (the language's own comment marker — the dominant convention, e.g.
- * macos/infra/manifest_menu.lua) or "---" (the EmmyLua docstring marker). Against
+ * macos/menu/engine/manifest_menu.lua) or "---" (the EmmyLua docstring marker). Against
  * a correctly-aligned "--"-marker banner, the hardcoded 4-char '--- ' assumption
  * was off by one character, so:
  *   1. checkBannerAlignment WARNed on an already-correct banner (false positive).
@@ -89,7 +89,7 @@ function prepareLintFixture() {
 /**
  * Builds a genuinely self-consistent 5-line major-section banner using the
  * Lua "--" (2-dash) comment marker — the dominant real-world convention (see
- * macos/infra/manifest_menu.lua sections 1-5).
+ * macos/menu/engine/manifest_menu.lua sections 1-5).
  * @param {string} title
  * @returns {string} The 5-line banner block (2 fill, title, 2 fill), newline-joined.
  */

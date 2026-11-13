@@ -26,7 +26,7 @@ local Generator = Fixture.Generator
 local NONE_ACTION = Fixture.NONE_ACTION
 local make_state = Fixture.make_state
 local Layout = require("modules.keymap.layout")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 
 -- What each virtual product makes of a HID usage (IOHIDFamily; Karabiner's
 -- event_tap_utility: the ISO product sends 0x35 as 10 and 0x64 as 50).

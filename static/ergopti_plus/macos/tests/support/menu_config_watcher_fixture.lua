@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"ui.menu.menu_watchers", "core.logger.engine.logger", "infra.git_status", "core.lifecycle.engine.reload.gate",
+	"menu.ui.builder.watchers", "core.logger.engine.logger", "infra.git_status", "core.lifecycle.engine.reload.gate",
 	"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 }
 
@@ -28,7 +28,7 @@ function M.with_watcher(body, options)
 			package.loaded["infra.git_status"] = {
 				operation_in_progress = options.git_probe or function() return false end,
 			}
-			local Watchers = require("ui.menu.menu_watchers")
+			local Watchers = require("menu.ui.builder.watchers")
 			local clock = options.clock or 1000
 			local changed, pending, deferred
 			local arms, reloads, defer_calls, timer_stops = 0, 0, 0, 0

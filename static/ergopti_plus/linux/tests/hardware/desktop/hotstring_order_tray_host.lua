@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The daemon's tray without its keyboard: the real hotstring catalogue
 --- (modules/hotstrings/hotstrings_config.lua over the bundled packs), the real
---- menu builder (ui/menu/builder.lua) and the real tray (adapters/tray_menu.lua
+--- menu builder (menu/ui/builder/builder.lua) and the real tray (adapters/tray_menu.lua
 --- over libayatana-appindicator), rebuilt through the daemon's own rebuild owner
 --- after every committed click. tray_panel.py clicks it over D-Bus.
 ---
@@ -34,7 +34,7 @@ end
 
 local LOG = "tests.desktop.hotstring_order"
 local Config = require("modules.hotstrings.hotstrings_config")
-local Builder = require("ui.menu.builder")
+local Builder = require("menu.ui.builder.builder")
 local rebuild = nil
 assert(Config.init(require("modules.hotstrings.engine").new(), nil, function() if rebuild then rebuild() end end))
 assert(select(2, Config.load_all(nil, true)) == true, "the bundled catalogue must load")
@@ -48,11 +48,11 @@ local function context()
 	}
 end
 
-local owner = require("ui.menu.rebuild_owner").new({
+local owner = require("menu.ui.builder.rebuild_owner").new({
 	current = function() return true end,
 	build = function()
 		local ctx = context()
-		return require("ui.menu.timed_build").run(Builder.build, ctx), false
+		return require("menu.ui.builder.timed_build").run(Builder.build, ctx), false
 	end,
 	publish = TrayMenu.setMenu,
 	on_error = function(reason) Logger.error(LOG, "Tray menu refresh refused: %s.", reason) end,

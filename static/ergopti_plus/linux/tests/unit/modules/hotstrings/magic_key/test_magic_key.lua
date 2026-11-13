@@ -45,7 +45,7 @@ local function stub_storage(opts)
 	local previous = package.loaded["infra.hotstring_preferences"]
 	local stub = { values = {}, writes = 0, deletes = 0, writable = opts.writable ~= false }
 	if opts.stored ~= nil then stub.values["hotstrings.trigger_char"] = opts.stored end
-	local function neutral(path) return require("infra.manifest_reader").default_for(path) end
+	local function neutral(path) return require("menu.engine.manifest_reader").default_for(path) end
 	stub.get = function(path)
 		local value = stub.values[path]
 		if value == nil then return neutral(path) end
@@ -73,14 +73,14 @@ end
 --- @param default string|nil
 --- @return function restore
 local function stub_manifest(default)
-	local previous = package.loaded["infra.manifest_reader"]
-	package.loaded["infra.manifest_reader"] = {
+	local previous = package.loaded["menu.engine.manifest_reader"]
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function(path)
 			if path == "hotstrings.trigger_char" then return default end
 			return nil
 		end,
 	}
-	return function() package.loaded["infra.manifest_reader"] = previous end
+	return function() package.loaded["menu.engine.manifest_reader"] = previous end
 end
 
 
@@ -408,7 +408,7 @@ end)
 
 -- Uses the actual native builder closure and genuine shared factory; no provider stand-in.
 local function with_magic_frame(language, stored, mode, body)
-	local names = { "infra.manifest_menu", "ui.menu.builder", "modules.hotstrings.magic_key", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.ui.text_prompt" }
+	local names = { "menu.engine.manifest_menu", "menu.ui.builder.builder", "modules.hotstrings.magic_key", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.ui.text_prompt" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local storage, restore_storage, restore_manifest
@@ -441,10 +441,10 @@ local function with_magic_frame(language, stored, mode, body)
 			end
 			return rows
 		end
-		package.loaded["infra.manifest_menu"] = renderer
+		package.loaded["menu.engine.manifest_menu"] = renderer
 		package.loaded["modules.hotstrings.magic_key"] = nil
-		package.loaded["ui.menu.builder"] = nil
-		local native = require("ui.menu.builder")
+		package.loaded["menu.ui.builder.builder"] = nil
+		local native = require("menu.ui.builder.builder")
 		local function upvalue(fn, wanted)
 			for index = 1, math.huge do
 				local name, value = debug.getupvalue(fn, index)

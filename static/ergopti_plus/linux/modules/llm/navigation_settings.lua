@@ -12,7 +12,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local ConfigOutdated = require("settings.engine.migration.outdated")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.llm.navigation_settings"
@@ -241,7 +241,7 @@ function M.capture_collision_configuration()
 			and CollisionPreferences.generation == collision_generation
 			and rawequal(package.loaded["settings.engine.paths"], CollisionRoutes) and CollisionRoutes.config == collision_route
 			and rawequal(package.loaded["core.text.engine.toml_codec.writer"], CollisionWriter) and CollisionWriter.read_classified == collision_read
-			and rawequal(package.loaded["infra.manifest_reader"], Manifest) and Manifest.default_for == collision_default
+			and rawequal(package.loaded["menu.engine.manifest_reader"], Manifest) and Manifest.default_for == collision_default
 			and rawequal(package.loaded["core.text.engine.toml_codec"], CollisionCodec) and CollisionCodec.decode == collision_decode
 	end
 	if not ports_current() then return nil end

@@ -18,7 +18,7 @@ local helpers, Engine, DOWN, UP, SHIFT, CTRL, CAPS, KEY_A, trail =
 	Fixture.helpers, Fixture.Engine, Fixture.DOWN, Fixture.UP, Fixture.SHIFT, Fixture.CTRL, Fixture.CAPS,
 	Fixture.KEY_A, Fixture.trail
 local Loader = require("platform.remap.tap_hold_loader")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local ConfigKeys = require("settings.engine.keys")
 
 local SPACE = 57

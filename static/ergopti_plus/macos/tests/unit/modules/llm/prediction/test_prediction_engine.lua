@@ -230,7 +230,7 @@ local function load_real_setting_bridge()
 		["modules.hotstrings.hotstrings_config"] = {},
 		["modules.keymap.expander"] = {},
 		["core.events.timer_scheduler"] = {after = noop},
-		["infra.manifest_reader"] = {},
+		["menu.engine.manifest_reader"] = {},
 		["modules.diagnostics.hid_diagnostic_mailbox"] = {},
 		["modules.llm.prediction_engine"] = PE,
 	}
@@ -1170,7 +1170,7 @@ end)
 --- @param body function Assertions receiving the actual action and snapshots.
 local function with_backend_label_composition(target, refuse_menu, body)
 	local names = {
-		"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.manifest_menu",
+		"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "menu.engine.manifest_menu",
 		"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 		"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
 		"ui.menu.menu_llm.mlx_repair_offer", "modules.llm.mlx_bootstrap_diagnosis",
@@ -1196,7 +1196,7 @@ local function with_backend_label_composition(target, refuse_menu, body)
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, message) record.errors[#record.errors + 1] = message end
 			package.loaded["core.logger.engine.logger"] = logger
-			package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
+			package.loaded["menu.engine.manifest_menu"] = { render_rows = function(rows) return rows end }
 			local checker = require("tests.support.runtime_checker_stub")({
 				check_and_install_deps = function() record.installs = record.installs + 1; return true end,
 			})

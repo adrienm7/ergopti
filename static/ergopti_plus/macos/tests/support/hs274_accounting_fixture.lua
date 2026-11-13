@@ -28,7 +28,7 @@ local OWNED_MODULES = {
 	"modules.llm.mlx_stream_retirement", "modules.llm.network_env",
 	"modules.llm.ollama_endpoint", "modules.llm.ollama_server_command",
 	"modules.llm.opaque_network_admission", "modules.llm.progressive_reveal",
-	"hs", "tests.stubs.hs", "core.logger.engine.logger", "infra.manifest_reader", "settings.engine.paths",
+	"hs", "tests.stubs.hs", "core.logger.engine.logger", "menu.engine.manifest_reader", "settings.engine.paths",
 	"core.ui.engine.dialog_util", "core.lifecycle.engine.shutdown.teardown_transaction", "modules.keystats.init",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 	"modules.keystats.kc_bridge", "modules.keystats.watchers", "modules.keystats.timestamp",

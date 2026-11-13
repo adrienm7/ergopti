@@ -8,7 +8,7 @@
 ; The keyboard-shortcut group submenus were built with raw GMenu.Add(Label,
 ; Callback) for the per-slot picker and the add-slot item. AHK 2.0's WM_COMMAND
 ; -> menu-callback dispatch silently drops roughly one click in three.
-; infra/menu_dispatcher.ahk installs a parallel WM_COMMAND retry path, but ONLY
+; menu/engine/dispatcher.ahk installs a parallel WM_COMMAND retry path, but ONLY
 ; for items registered via RegisterMenuItem(MenuObj, Label, Cb).
 ;
 ; Since these items used raw .Add, they were never in the retry path and ~30-50%

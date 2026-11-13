@@ -14,7 +14,7 @@ local MODULE_KEYS = {
 	"ui.menu.metrics_scope",
 	"ui.menu.hotstrings_scope",
 	"modules.hotstrings.hotstrings_config",
-	"ui.menu.global_scope",
+	"menu.ui.transactions.global_scope",
 	"settings.ui.menu.scoped_preferences",
 	"ui.menu.gesture_scope",
 	"core.ui.engine.dialog_util",
@@ -23,14 +23,14 @@ local MODULE_KEYS = {
 	"ui.hotstring_editor",
 	"core.text.engine.utils",
 	"core.i18n.engine.i18n",
-	"infra.ui_restore",
+	"menu.engine.ui_restore",
 	"settings.engine.preferences.preferences",
-	"ui.menu.builder",
+	"menu.ui.builder.builder",
 	"ui.menu.hotstring_counter",
 	"settings.ui.menu.paths",
-	"ui.menu.menu_state",
-	"ui.menu.keymap_lifecycle",
-	"ui.menu.menu_watchers",
+	"menu.ui.builder.state",
+	"menu.ui.keyboard.keymap_lifecycle",
+	"menu.ui.builder.watchers",
 	"modules.updater",
 	"core.fs.adapters.file_system",
 	"core.fs.adapters.storage",
@@ -39,8 +39,8 @@ local MODULE_KEYS = {
 	"platform.input.hotkey_registrar",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"settings.engine.factory_reset_journal",
-	"ui.menu.recoverable_file_moves",
-	"ui.menu.global_actions_transaction",
+	"menu.ui.transactions.recoverable_file_moves",
+	"menu.ui.transactions.global_actions_transaction",
 	"ui.menu.menu_gestures",
 	"ui.menu.menu_shortcuts",
 	"ui.menu.menu_keyboard_layout",
@@ -57,7 +57,7 @@ local MODULE_KEYS = {
 	"modules.gestures",
 	"infra.personal_shortcuts",
 	"settings.ui.menu.preferences_transaction",
-	"ui.menu.program_parameter_transaction",
+	"menu.ui.transactions.program_parameter_transaction",
 	"ui.menu.init",
 }
 
@@ -313,7 +313,7 @@ local function with_menu_fixture(options, callback)
 		shell_quote = function(value) return value end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.ui_restore"] = {}
+	package.loaded["menu.engine.ui_restore"] = {}
 	package.loaded["settings.engine.preferences.preferences"] = {
 		build_initial_state = function() return state end,
 		load = function() return {}, "ok" end,
@@ -342,7 +342,7 @@ local function with_menu_fixture(options, callback)
 			return true, snapshot, runtime
 		end,
 	}
-	package.loaded["ui.menu.builder"] = {
+	package.loaded["menu.ui.builder.builder"] = {
 		generate = function(ctx)
 			observations.builder_ctx = ctx
 			return {}
@@ -360,7 +360,7 @@ local function with_menu_fixture(options, callback)
 		get_config_dir = function() return "/virtual" end,
 		open_editor = noop,
 	}
-	package.loaded["ui.menu.menu_state"] = {
+	package.loaded["menu.ui.builder.state"] = {
 		metrics_start_pending = function() return false end,
 		-- Same order as menu_state: the Shortcuts switch opens or closes the
 		-- admission fence first, then every saved key is replayed behind it.
@@ -375,7 +375,7 @@ local function with_menu_fixture(options, callback)
 			end)
 		end,
 	}
-	package.loaded["ui.menu.menu_watchers"] = {
+	package.loaded["menu.ui.builder.watchers"] = {
 		start_config_watcher = function(_, callback)
 			observations.config_watcher_callback = callback
 			return { stop = noop }
@@ -492,7 +492,7 @@ local function with_menu_fixture(options, callback)
 			end
 		end)
 	end
-	package.loaded["ui.menu.recoverable_file_moves"] = {
+	package.loaded["menu.ui.transactions.recoverable_file_moves"] = {
 		create = function() return file_mover end,
 	}
 	local reset_journal = {

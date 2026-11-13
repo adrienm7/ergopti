@@ -59,7 +59,7 @@ local OWNERS = {
 	"settings.engine.paths",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.manifest_reader",
+	"menu.engine.manifest_reader",
 	"core.ui.engine.notifications",
 	"core.fs.engine.paths",
 	"core.lifecycle.engine.startup_transaction",
@@ -925,7 +925,7 @@ local function with_feature_lifecycles(actions, calls, body)
 		"modules.gestures",
 		"modules.gestures.engine",
 		"modules.gestures.conflicts",
-		"infra.manifest_reader",
+		"menu.engine.manifest_reader",
 	}
 	local saved = {}
 	for _, name in ipairs(module_names) do saved[name] = package.loaded[name] end
@@ -987,7 +987,7 @@ local function with_feature_lifecycles(actions, calls, body)
 	package.loaded["modules.gestures.conflicts"] = setmetatable({}, {
 		__index = function() return function() return true end end,
 	})
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return true end,
 		recommended_for = function() return "none" end,
 	}

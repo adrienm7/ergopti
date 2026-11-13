@@ -20,7 +20,7 @@ local function run_scenario()
 	local dependency_names = {
 		"platform.input.synthetic_input",
 		"core.events.timer_scheduler",
-		"infra.manifest_reader",
+		"menu.engine.manifest_reader",
 		"modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander",
 		"modules.keymap.utils",
@@ -61,7 +61,7 @@ local function run_scenario()
 			return handle, true
 		end,
 	}
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return "a" end,
 	}
 	package.loaded["modules.hotstrings.hotstrings_config"] = {

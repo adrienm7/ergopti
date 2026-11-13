@@ -198,9 +198,18 @@ const presetLiteral = /(?:Code:\s*"|code\s*=\s*")(?:1m|5m|10m|1h|24h|1d|7d|never
 for (const [label, source] of [
 	['windows/modules/updater/core.ahk', ahkSrc],
 	[
-		'windows/ui/menu/menu_init.ahk',
+		'windows/menu/ui/builder/menu_init.ahk',
 		fs.readFileSync(
-			path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'ui', 'menu', 'menu_init.ahk'),
+			path.join(
+				ROOT,
+				'static',
+				'ergopti_plus',
+				'windows',
+				'menu',
+				'ui',
+				'builder',
+				'menu_init.ahk'
+			),
 			'utf8'
 		)
 	],

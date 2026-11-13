@@ -497,7 +497,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- (i18n.section nil), masking real regressions behind a flaky failure (F-T1).
 	-- Setting an existing key to nil during pairs() is safe (only ADDING keys is not).
 	for name in pairs(loaded) do
-		if type(name) == "string" and name:match("^ui%.menu") then
+		if type(name) == "string" and name:match("^menu%.ui") then
 			loaded[name] = nil
 		end
 	end

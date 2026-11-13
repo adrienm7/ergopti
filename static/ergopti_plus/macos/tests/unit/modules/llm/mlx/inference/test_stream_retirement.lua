@@ -23,7 +23,7 @@ local OWNED = {
 	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "core.timing.engine.timings",
 	"core.timing.engine.deferred_work", "core.process.adapters.task_environment", "diagnostics.engine.runtime_log",
 	"diagnostics.engine.operation_reporter", "diagnostics.engine.reports.redact", "core.logger.engine.shim",
-	"infra.manifest_reader", "core.text.engine.toml.reader", "core.fs.adapters.storage",
+	"menu.engine.manifest_reader", "core.text.engine.toml.reader", "core.fs.adapters.storage",
 	"core.fs.engine.dir", "hotstrings.engine.catalogue.personal_files", "settings.engine.publication.defaults", "lfs",
 	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom",
 	"core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",

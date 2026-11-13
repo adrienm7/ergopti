@@ -236,7 +236,7 @@ helpers.describe("Extension packs: one catalogue per boot", function()
 		helpers.assert_eq(#errors, 2, "the dotted pack and the backup file are each reported")
 		-- The projection run before keymap.start asks the manifest for each
 		-- registered group's default; one unknown path aborts the boot there.
-		local Manifest = require("infra.manifest_reader")
+		local Manifest = require("menu.engine.manifest_reader")
 		for _, pack in ipairs(found) do
 			for _, file in ipairs(pack.toml_files) do
 				local key = "hotstrings.groups." .. require("hotstrings.engine.extensions").category_key(pack.id, file.stem)

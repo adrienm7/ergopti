@@ -12,7 +12,7 @@
 --- FEATURES & RATIONALE:
 --- 1. Narrow owner: the only file the Versions window reaches the launcher
 ---    through, so every file that asks Sparkle for an update keeps owning no
----    install primitive (tests/unit/ui/menu/metrics_and_about/
+---    install primitive (tests/unit/menu/ui/metrics_and_about/
 ---    test_menu_about_sparkle_ownership.lua) while the window keeps its own
 ---    verified install path.
 --- 2. Newest only: newest_offered() names the one tag Sparkle would install

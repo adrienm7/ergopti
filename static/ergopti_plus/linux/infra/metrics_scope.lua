@@ -3,7 +3,7 @@
 --- Coordinates collector and readouts through the canonical scope transaction.
 --- Historical databases and widget positions are outside preference ownership.
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
 local Transaction = require("settings.engine.scope.transaction")
 local FencedTransaction = require("settings.engine.scope.fenced_transaction")

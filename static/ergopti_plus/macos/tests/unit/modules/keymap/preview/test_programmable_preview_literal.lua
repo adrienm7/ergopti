@@ -73,7 +73,7 @@ local function render_provider_row(provider_result)
 	local text
 	helpers.with_stub_scope({
 		"platform.input.synthetic_input", "core.events.timer_scheduler", "core.logger.engine.logger",
-		"infra.manifest_reader", "modules.hotstrings.hotstrings_config",
+		"menu.engine.manifest_reader", "modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander", "modules.keystats", "modules.llm",
 		"modules.llm.prediction_engine", "core.ui.ui.tooltip", "modules.keymap.llm_bridge",
 	}, function()
@@ -93,7 +93,7 @@ local function render_provider_row(provider_result)
 			cancel = function() return true end,
 		}
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.manifest_reader"] = { default_for = function() return MAGIC end }
+		package.loaded["menu.engine.manifest_reader"] = { default_for = function() return MAGIC end }
 		package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return nil end }
 		package.loaded["modules.keymap.expander"] = {
 			resolve_magic_action = function() return { winner = nil, candidates = {} } end,

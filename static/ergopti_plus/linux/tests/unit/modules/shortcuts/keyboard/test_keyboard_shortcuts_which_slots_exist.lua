@@ -537,7 +537,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 	local function with_editor(initial, body, writes_fail)
 		local saved_source = package.loaded["modules.hotstrings.magic_key_source"]
 		local saved_magic = package.loaded["modules.hotstrings.magic_key"]
-		local saved_builder = package.loaded["ui.menu.builder"]
+		local saved_builder = package.loaded["menu.ui.builder.builder"]
 		local gestures = require("modules.gestures.manager")
 		local saved_execute = gestures.execute_action
 		local state = { trigger = "★", generation = 1, master = true, paused = false, inhibited = false,
@@ -561,7 +561,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 		gestures.execute_action = saved_execute
 		package.loaded["modules.hotstrings.magic_key_source"] = saved_source
 		package.loaded["modules.hotstrings.magic_key"] = saved_magic
-		package.loaded["ui.menu.builder"] = saved_builder
+		package.loaded["menu.ui.builder.builder"] = saved_builder
 		drop_config()
 		if not ok then error(err, 0) end
 	end
@@ -594,7 +594,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 	helpers.it("(magic-editor-broker) exposes the ordinary contextual action and durable clearing in the tray", function()
 		with_editor(nil, function(shortcuts, config, state)
 			local changed = 0
-			local builder = helpers.load_module("ui.menu.builder")
+			local builder = helpers.load_module("menu.ui.builder.builder")
 			local i18n = require("core.i18n.engine.i18n")
 			local function contextual(items)
 				for _, row in ipairs(items or {}) do

@@ -425,7 +425,7 @@ end
 		local Installation = require("core.lifecycle.engine.installation")
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return source_run == true end
-		local mb = helpers.load_module("ui.menu.builder")
+		local mb = helpers.load_module("menu.ui.builder.builder")
 		local ctx = { _version = "test", on_quit = function() end, updater = fake }
 		for key, value in pairs(ctx_extra) do ctx[key] = value end
 		local title = require("core.i18n.engine.i18n").get("menu.about.title")

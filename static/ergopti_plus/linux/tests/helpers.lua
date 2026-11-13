@@ -146,7 +146,7 @@ function M.read_module_source(module_name)
 end
 
 --- Returns the tray root's source followed by every section module it binds.
---- ui/menu/builder.lua binds each section builder from its own
+--- menu/ui/builder/builder.lua binds each section builder from its own
 --- ui/menu/menu_<section>.lua; a test that looks for a builder's code by text
 --- finds it in whichever of these files now holds it.
 --- @return string The root's text, then each module it or a part binds, in binding order.

@@ -6,9 +6,9 @@ local Codec = require("core.text.engine.toml_codec")
 
 helpers.describe("LLM hardware defaults", function()
 	helpers.it("does not probe hardware for metadata or unrelated configuration values", function()
-		package.loaded["modules.llm.backend_detector"], package.loaded["infra.manifest_reader"] = nil, nil
+		package.loaded["modules.llm.backend_detector"], package.loaded["menu.engine.manifest_reader"] = nil, nil
 		local probes = 0
-		local manifest = helpers.load_with_stubs("infra.manifest_reader", { execute = function()
+		local manifest = helpers.load_with_stubs("menu.engine.manifest_reader", { execute = function()
 			probes = probes + 1; return "arm64"
 		end })
 		manifest.coverage_gaps()
@@ -45,8 +45,8 @@ helpers.describe("LLM hardware defaults", function()
 				package.loaded["modules.llm.backend_detector"] = { auto_default = function()
 					calls = calls + 1; return "ollama"
 				end }
-				package.loaded["infra.manifest_reader"] = nil
-				local manifest = require("infra.manifest_reader")
+				package.loaded["menu.engine.manifest_reader"] = nil
+				local manifest = require("menu.engine.manifest_reader")
 				helpers.assert_eq(calls, 0)
 				project(manifest)
 				helpers.assert_eq(calls, 1, "projection " .. index)
@@ -55,15 +55,15 @@ helpers.describe("LLM hardware defaults", function()
 			end
 		end)
 		package.loaded["modules.llm.backend_detector"] = saved
-		package.loaded["infra.manifest_reader"] = nil
+		package.loaded["menu.engine.manifest_reader"] = nil
 		if not ok then error(err, 0) end
 	end)
 	for _, case in ipairs({ { "x86_64", "ollama", "14.5" }, { "arm64", "mlx", "14.5" }, { "arm64", "ollama", "12.0" } }) do
 		helpers.it("keeps bootstrap, scoped deletion and sparse persistence coherent on " .. case[1] .. "/" .. case[3], function()
 			package.loaded["modules.llm.backend_detector"] = nil
-			package.loaded["infra.manifest_reader"] = nil
+			package.loaded["menu.engine.manifest_reader"] = nil
 			local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences", { execute = function(command) if command:find("sw_vers", 1, true) then return case[3] end; return case[1] end })
-			local manifest = require("infra.manifest_reader")
+			local manifest = require("menu.engine.manifest_reader")
 			local menu = require("ui.menu.menu_llm")
 			helpers.assert_eq(menu.DEFAULT_STATE.llm_backend, case[2])
 			helpers.assert_eq(manifest.default_for("llm.models.selected"), case[2])

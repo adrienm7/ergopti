@@ -28,7 +28,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local ConfigOutdated = require("settings.engine.migration.outdated")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local ConfigKeys = require("settings.engine.keys")
 local ContextBuffer = require("ai.engine.policy.context_buffer")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF

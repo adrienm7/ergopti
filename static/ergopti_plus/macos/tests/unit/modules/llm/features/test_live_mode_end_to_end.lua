@@ -637,7 +637,7 @@ local function with_live_boundary_owner(scenario)
 	local world, native, owner, receipt, acquired
 	local ok, detail = xpcall(function()
 		world = build_world()
-		for _, name in ipairs({ "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
+		for _, name in ipairs({ "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu",
 			"ui.menu.menu_llm.profile_label" }) do package.loaded[name] = nil end
 		native = require("core.i18n.engine.i18n")
 		local backend = require("core.i18n.engine.locale")
@@ -646,7 +646,7 @@ local function with_live_boundary_owner(scenario)
 		owner = { pending = function() return false end }
 		acquired = native.scope_acquire(owner); helpers.assert_eq(acquired, true)
 		receipt = assert(native.scope_capture(owner)); helpers.assert_eq(native.scope_apply(owner, receipt, "en"), true)
-		local menu = require("infra.manifest_menu"); assert(menu.get_root())
+		local menu = require("menu.engine.manifest_menu"); assert(menu.get_root())
 		scenario(world, world.engine, menu, native)
 	end, debug.traceback)
 	local restored, released, forgotten = true, true, true

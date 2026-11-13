@@ -19,7 +19,7 @@ local SHORTCUT_OWNERS = {
 	"core.logger.engine.logger",
 	"ui.menu.shortcut_utils",
 	"platform.input.send_input",
-	"infra.native_presentation",
+	"menu.engine.native_presentation",
 	"core.ui.engine.window_titles",
 	"menu.engine.native_presentation_core",
 	"core.i18n.engine.locale",
@@ -146,7 +146,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 		local saved_app_picker = package.loaded["infra.app_picker"]
 		local saved_i18n = package.loaded["core.i18n.engine.i18n"]
 		local saved_logger = package.loaded["core.logger.engine.logger"]
-		local saved_manifest = package.loaded["infra.manifest_menu"]
+		local saved_manifest = package.loaded["menu.engine.manifest_menu"]
 		local saved_llm = package.loaded["modules.llm"]
 		local saved_shortcuts = package.loaded["ui.menu.shortcut_utils"]
 		local saved_panel = package.loaded["ui.menu.menu_llm.trigger_panel"]
@@ -155,7 +155,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 			package.loaded["infra.app_picker"] = {build_menu = function() return {} end}
 			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.manifest_menu"] = assert(require("menu.engine.renderer").new({
+			package.loaded["menu.engine.manifest_menu"] = assert(require("menu.engine.renderer").new({
 				platform = "hs",
 				manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 				json_decode = function(raw) return require("core.text.engine.json").decode(raw) end,
@@ -190,7 +190,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 		package.loaded["infra.app_picker"] = saved_app_picker
 		package.loaded["core.i18n.engine.i18n"] = saved_i18n
 		package.loaded["core.logger.engine.logger"] = saved_logger
-		package.loaded["infra.manifest_menu"] = saved_manifest
+		package.loaded["menu.engine.manifest_menu"] = saved_manifest
 		package.loaded["modules.llm"] = saved_llm
 		package.loaded["ui.menu.shortcut_utils"] = saved_shortcuts
 		package.loaded["ui.menu.menu_llm.trigger_panel"] = saved_panel

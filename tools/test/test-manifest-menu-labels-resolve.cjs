@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Every tray-menu row gets its label from the manifest's `description_key`,
  * resolved through the candidate chain in
- * `static/ergopti_plus/windows/infra/manifest_descriptions.ahk`. When no candidate
+ * `static/ergopti_plus/windows/menu/engine/manifest_descriptions.ahk`. When no candidate
  * hits, `MenuLabelFromDescriptionKey` falls back to the LAST SEGMENT OF THE PATH
  * — so the user sees a raw snake_case id in the menu.
  *
@@ -46,7 +46,7 @@ const PASS_SYMBOL = '✓';
 const FAIL_SYMBOL = '✗';
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
-const RESOLVER = 'static/ergopti_plus/windows/infra/manifest_descriptions.ahk';
+const RESOLVER = 'static/ergopti_plus/windows/menu/engine/manifest_descriptions.ahk';
 const LOCALE_DIR = 'static/ergopti_plus/_shared/core/i18n/data/locales';
 
 // Non-feature entries whose label does not resolve today. This number may only

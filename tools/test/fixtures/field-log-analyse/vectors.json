@@ -90,7 +90,7 @@
 			"driver": "macos",
 			"source": "static/ergopti_plus/macos/core/logger/engine/logger.lua",
 			"template": "Main-thread hold of %d ms in an hs.timer.%s callback (%s).%s",
-			"line": "2026-10-30 10:00:00:123 [INFO] [runtime] Main-thread hold of 564 ms in an hs.timer.new callback (.../macos/ui/menu/init.lua:1753). Phases inside the hold: menu.rebuild=279.5 ms. Lua heap 44->37 MB.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [runtime] Main-thread hold of 564 ms in an hs.timer.new callback (.../macos/menu/ui/init.lua:1753). Phases inside the hold: menu.rebuild=279.5 ms. Lua heap 44->37 MB.",
 			"expect": {
 				"measures": [
 					{
@@ -121,7 +121,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/ui/menu/init.lua",
+			"source": "static/ergopti_plus/macos/menu/ui/init.lua",
 			"template": "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s",
 			"line": "2026-10-30 10:00:00:123 [INFO] [menu] Menu tree rebuilt in 279.5 ms (22 top-level item(s)). Slowest: keyboard_layout=61.8 ms, shortcuts=47.3 ms.",
 			"expect": {
@@ -531,7 +531,7 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/linux/ui/menu/menu_reload.lua",
+			"source": "static/ergopti_plus/linux/menu/ui/builder/reload.lua",
 			"template": "Reload requested from the tray menu…",
 			"line": "2026-10-30 10:00:00:123 [INFO] [menu] Reload requested from the tray menu…",
 			"expect": {
@@ -973,7 +973,7 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/linux/ui/menu/timed_build.lua",
+			"source": "static/ergopti_plus/linux/menu/ui/builder/timed_build.lua",
 			"template": "Menu tree rebuilt in %.1f ms (%d top-level item(s)).",
 			"line": "2026-10-30 10:00:00:123 [INFO] [ui.menu.timed_build] Menu tree rebuilt in 96.4 ms (19 top-level item(s)).",
 			"expect": {

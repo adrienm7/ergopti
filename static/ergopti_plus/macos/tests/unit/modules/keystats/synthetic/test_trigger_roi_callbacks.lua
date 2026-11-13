@@ -10,12 +10,12 @@
 
 local helpers = require("tests.helpers")
 local Fixtures = require("tests.support.keystats_provenance_fixture")
-local PreferenceManifest = helpers.load_with_stubs("infra.manifest_reader")
+local PreferenceManifest = helpers.load_with_stubs("menu.engine.manifest_reader")
 
 --- Starts the real engine with observable persistence and native callback boundaries.
 local function fixture()
 	local f = Fixtures.load_keystats()
-	package.loaded["infra.manifest_reader"] = PreferenceManifest
+	package.loaded["menu.engine.manifest_reader"] = PreferenceManifest
 	package.loaded["settings.engine.preferences.preferences"] = nil
 	f.hs.caffeinate = { watcher = { new = function()
 		return { start = function(self) return self end, stop = function(self) return self end }

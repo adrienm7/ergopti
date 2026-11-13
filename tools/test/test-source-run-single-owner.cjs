@@ -225,7 +225,7 @@ expect(
 	),
 	'the macOS About menu must answer installed_build from Updater.is_local_source'
 );
-const macUninstall = code('macos', 'ui/menu/uninstall.lua', luaComment);
+const macUninstall = code('macos', 'menu', 'ui', 'transactions', 'uninstall.lua', luaComment);
 expect(
 	macUninstall.indexOf('is_local_source()') >= 0 &&
 		macUninstall.indexOf('is_local_source()') < macUninstall.indexOf('block_alert'),

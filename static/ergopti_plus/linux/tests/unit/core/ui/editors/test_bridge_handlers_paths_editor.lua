@@ -812,7 +812,7 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 			local Writer = require("core.text.engine.toml_codec.writer")
 			local state = {
 				i18n = i18n,
-				manifest = require("infra.manifest_reader"),
+				manifest = require("menu.engine.manifest_reader"),
 				config_paths = {
 					default_config_dir = function() return root .. "/config" end,
 					get_config_dir = function() return root .. "/config" end,

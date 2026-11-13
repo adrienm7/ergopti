@@ -92,7 +92,7 @@ local function install_doubles(args)
 		},
 		logger = helpers.make_logger_stub(),
 	}))
-	package.loaded["infra.manifest_menu"] = {
+	package.loaded["menu.engine.manifest_menu"] = {
 		command_row = command_renderer.command_row,
 		template_rows = command_renderer.template_rows,
 		get_array = command_renderer.get_array,
@@ -112,7 +112,7 @@ end
 
 
 local function with_api_add_locale(scenario)
-	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	local native, owner, receipt, acquired

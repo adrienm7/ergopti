@@ -82,7 +82,7 @@ local function load_policy()
 	if _policy then return _policy end
 
 	local policy = nil
-	local ok_menu, ManifestMenu = pcall(require, "infra.manifest_menu")
+	local ok_menu, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 	if ok_menu and ManifestMenu and type(ManifestMenu.get_array) == "function" then
 		local rows = ManifestMenu.get_array(LLM_MENU_KEY)
 		if type(rows) == "table" then
@@ -132,7 +132,7 @@ end
 --- @param status string "ready", "warming" or "unreachable".
 --- @return string|nil The glyph, or nil when the manifest declares none.
 function M.title_health_dot(status)
-	local ok_menu, ManifestMenu = pcall(require, "infra.manifest_menu")
+	local ok_menu, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 	if not ok_menu or type(ManifestMenu) ~= "table" or type(ManifestMenu.get_root) ~= "function" then
 		Logger.error(LOG, "Manifest renderer unavailable — the AI title has no health dot.")
 		return nil

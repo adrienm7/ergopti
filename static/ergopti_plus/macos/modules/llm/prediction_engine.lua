@@ -936,7 +936,7 @@ end
 --- @return table|nil entry
 local function while_hotstring_tooltip_entry()
 	local ok, entry = pcall(function()
-		return require("infra.manifest_reader").find_entry_by_path(ConfigKeys.KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
+		return require("menu.engine.manifest_reader").find_entry_by_path(ConfigKeys.KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
 	end)
 	return ok and type(entry) == "table" and entry or nil
 end

@@ -15,7 +15,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.manifest_menu",
+	"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "menu.engine.manifest_menu",
 	"core.ui.engine.dialog_util", "core.ui.engine.notifications", "modules.llm.ollama_binary",
 	"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
@@ -57,7 +57,7 @@ local function build(backend, local_rows)
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, message) warnings[#warnings + 1] = message end
 		package.loaded["core.logger.engine.logger"] = logger
-		package.loaded["infra.manifest_menu"] = { render_rows = function(items) return items end }
+		package.loaded["menu.engine.manifest_menu"] = { render_rows = function(items) return items end }
 		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return "" end }
 		package.loaded["modules.llm.mlx_deps_checker"] = installed_checker()

@@ -29,12 +29,12 @@ local RepeatKey = require("modules.hotstrings.repeat_key")
 local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
 local ProgrammableMenuPolicy = require("menu.engine.programmable_hotstrings")
 local COMMAND = require("settings.engine.keys").COMMAND
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local prompt_text = require("ui.menu.menu_dialogs").prompt_text
-local show_error = require("ui.menu.menu_dialogs").show_error
-local ask_yes_no = require("ui.menu.menu_dialogs").ask_yes_no
+local prompt_text = require("menu.ui.builder.dialogs").prompt_text
+local show_error = require("menu.ui.builder.dialogs").show_error
+local ask_yes_no = require("menu.ui.builder.dialogs").ask_yes_no
 
 local LOG = "ui.menu.menu_hotstrings"
 
@@ -351,7 +351,7 @@ local function _manifest_hotstring_rows(ctx, config)
 								return config.toggle_section(id, name)
 							end)
 							if called and committed == true then
-								require("ui.menu.feature_notice").feature(name, config.is_section_checked and config.is_section_checked(id, name)
+								require("menu.ui.builder.feature_notice").feature(name, config.is_section_checked and config.is_section_checked(id, name)
 									or (config.is_section_enabled and config.is_section_enabled(id, name)) or false)
 								return true
 							end
@@ -386,7 +386,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				return config.set_category_scope_enabled({ id }, enabled)
 			end)
 			if called and committed == true then
-				require("ui.menu.feature_notice").feature(category_label(id, category), enabled)
+				require("menu.ui.builder.feature_notice").feature(category_label(id, category), enabled)
 				return true
 			end
 			Logger.error(LOG, "Hotstring category scope refused for '%s' (%s).", id,
@@ -421,7 +421,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				available = function(field) return controls ~= nil and controls.file[field] ~= true end,
 				enable = function(enabled)
 					local committed = (enabled and config.enable_group or config.disable_group)(id) == true
-					if committed then require("ui.menu.feature_notice").feature(category_label(id, category), enabled) end
+					if committed then require("menu.ui.builder.feature_notice").feature(category_label(id, category), enabled) end
 					return committed
 				end,
 				tooltip_enabled = function() return type(config.resolve) == "function" and config.resolve(id, nil).show_tooltip == true end,
@@ -766,7 +766,7 @@ local function _manifest_hotstring_rows(ctx, config)
 							if Terminators.set_terminators_consume({ [key] = next_consume }) ~= true or not commit(saved) then
 								return false
 							end
-							require("ui.menu.feature_notice").feature(string.format(i18n_safe("notify.word_expander_prefix"),
+							require("menu.ui.builder.feature_notice").feature(string.format(i18n_safe("notify.word_expander_prefix"),
 								label .. " " .. i18n_safe("menu.hotstrings.consumed_suffix")), next_consume)
 							return true
 						end,
@@ -804,7 +804,7 @@ local function _manifest_hotstring_rows(ctx, config)
 							local saved = snapshot()
 							if Terminators.set_terminator_enabled(key,
 								not Terminators.is_terminator_enabled(key)) and commit(saved) then
-								require("ui.menu.feature_notice").feature(string.format(i18n_safe("notify.word_expander_prefix"), label),
+								require("menu.ui.builder.feature_notice").feature(string.format(i18n_safe("notify.word_expander_prefix"), label),
 									Terminators.is_terminator_enabled(key))
 							end
 						end,
@@ -1445,7 +1445,7 @@ local function _manifest_hotstring_rows(ctx, config)
 								return config.toggle_section(bound.category, bound.section)
 							end)
 							if called and committed == true then
-								require("ui.menu.feature_notice").feature(description, config.is_section_checked
+								require("menu.ui.builder.feature_notice").feature(description, config.is_section_checked
 									and config.is_section_checked(bound.category, bound.section) or false)
 								return true
 							end
@@ -1504,7 +1504,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			local row = ManifestMenu.check_row("preview_magic_control", require("settings.engine.keys").LEAF.PREVIEW_STAR_ENABLED, {
 				[require("settings.engine.keys").LEAF.PREVIEW_STAR_ENABLED] = function()
 					if not toggle_preview("star") then return false end
-					require("ui.menu.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_star"), PreviewSettings.get("star") == true)
+					require("menu.ui.builder.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_star"), PreviewSettings.get("star") == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
@@ -1524,7 +1524,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			for key, name in pairs({ [COMMAND.PREVIEW_AUTOCORRECT_ENABLED] = "autocorrect", [COMMAND.PREVIEW_AI_ENABLED] = "ai" }) do
 				presence_commands[key] = function()
 					if not toggle_preview(name) then return false end
-					require("ui.menu.feature_notice").feature(i18n_safe(bubble_notice_keys[name]), PreviewSettings.get(name) == true)
+					require("menu.ui.builder.feature_notice").feature(i18n_safe(bubble_notice_keys[name]), PreviewSettings.get(name) == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end
@@ -1539,7 +1539,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			local row = ManifestMenu.check_row("preview_colored_control", require("settings.engine.keys").LEAF.PREVIEW_COLORED_TOOLTIPS, {
 				[require("settings.engine.keys").LEAF.PREVIEW_COLORED_TOOLTIPS] = function()
 					if not toggle_preview("colored") then return false end
-					require("ui.menu.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_colored"), PreviewSettings.get("colored") == true)
+					require("menu.ui.builder.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_colored"), PreviewSettings.get("colored") == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
@@ -1691,7 +1691,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			else
 				changed = config.enable_all()
 			end
-			if changed ~= false then require("ui.menu.feature_notice").feature(i18n_safe("notify.hotstrings"), enabling) end
+			if changed ~= false then require("menu.ui.builder.feature_notice").feature(i18n_safe("notify.hotstrings"), enabling) end
 			if changed ~= false and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
 		-- Reloading the catalogue from disk: this driver's own affordance, because

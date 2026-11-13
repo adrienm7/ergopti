@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 return function(helpers, json, shared_root)
-	local Manifest = require("infra.manifest_reader")
+	local Manifest = require("menu.engine.manifest_reader")
 	local Composition = require("settings.engine.scope.composition")
 	local ResetFailure = require("settings.engine.publication.reset_failure")
 

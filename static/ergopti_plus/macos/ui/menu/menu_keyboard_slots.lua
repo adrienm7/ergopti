@@ -37,7 +37,7 @@ local ActionPicker = require("ui.action_picker")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KbShortcuts  = require("modules.shortcuts")
 local InputSourceConflict = require("modules.shortcuts.input_source_conflict")
-local ManifestMenu = require("infra.manifest_menu")
+local ManifestMenu = require("menu.engine.manifest_menu")
 local ShellRunner  = require("core.process.adapters.shell_runner")
 local dialog       = require("core.ui.engine.dialog_util")
 

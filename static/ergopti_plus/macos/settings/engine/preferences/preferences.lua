@@ -64,7 +64,7 @@ end
 local Logger    = require("core.logger.engine.logger")
 local FileSystem = require("core.fs.adapters.file_system")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local LEAF = require("settings.engine.keys").LEAF
 local HotstringLanguages = require("hotstrings.engine.languages")
 local ConfigOutdated = require("settings.engine.migration.outdated")
@@ -90,7 +90,7 @@ local MetricsState = require("infra.metrics_state_keys")
 
 
 --- Top-level TOML section names in the order they appear on disk.
-local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui", "core", "settings" }
+local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui", "core", "settings", "menu" }
 
 --- Maps every flat state key (as used in memory throughout the codebase) to
 --- its on-disk location. Fields:

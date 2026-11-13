@@ -9,8 +9,8 @@ const keys = Object.freeze({
 	entry: 'windows/ErgoptiPlus.ahk',
 	bootstrap: 'windows/infra/tray_bootstrap.ahk',
 	adapter: 'windows/adapters/tray_menu.ahk',
-	dispatcher: 'windows/infra/menu_dispatcher.ahk',
-	safe: 'windows/infra/menu_startup_commands.ahk'
+	dispatcher: 'windows/menu/engine/dispatcher.ahk',
+	safe: 'windows/menu/engine/startup_commands.ahk'
 });
 function tokensOf(source) {
 	const tokens = scriptTokens(source, '.ahk');

@@ -90,7 +90,7 @@ end
 local function with_fixture(options, scenario)
 	options = options or {}
 	local saved_file_watchers = package.loaded["core.fs.engine.file_watchers"]
-	local saved_ui_restore = package.loaded["infra.ui_restore"]
+	local saved_ui_restore = package.loaded["menu.engine.ui_restore"]
 	local saved_logger = package.loaded["core.logger.engine.logger"]
 	local saved_scheduler_modules = {}
 	for _, name in ipairs(SCHEDULER_OWNERS) do saved_scheduler_modules[name] = package.loaded[name] end
@@ -124,7 +124,7 @@ local function with_fixture(options, scenario)
 			runtime.errors[#runtime.errors + 1] = string.format(message, ...)
 		end,
 	}, { __index = function() return noop end })
-	package.loaded["infra.ui_restore"] = {
+	package.loaded["menu.engine.ui_restore"] = {
 		defer_reload = function(callback)
 			runtime.deferred_reloads = runtime.deferred_reloads + 1
 			callback()
@@ -218,7 +218,7 @@ local function with_fixture(options, scenario)
 	end, debug.traceback)
 
 	package.loaded["core.fs.engine.file_watchers"] = saved_file_watchers
-	package.loaded["infra.ui_restore"] = saved_ui_restore
+	package.loaded["menu.engine.ui_restore"] = saved_ui_restore
 	package.loaded["core.logger.engine.logger"] = saved_logger
 	for _, name in ipairs(SCHEDULER_OWNERS) do package.loaded[name] = saved_scheduler_modules[name] end
 	hs.pathwatcher = saved_pathwatcher

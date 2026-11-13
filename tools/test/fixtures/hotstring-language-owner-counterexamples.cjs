@@ -470,7 +470,7 @@ function verifyIndependentHotstringMutants(base, manifest) {
 const publicationCases = [
 	{
 		name: 'real-language-producer-shadowed-after-declaration',
-		source_file: 'linux/ui/menu/builder.lua',
+		source_file: 'linux/menu/ui/builder/builder.lua',
 		mutation_file: 'real-language-producer-shadowed-after-declaration.lua',
 		source_sha256: '11cbf1585cd99374375e847005d7828691bbe8df5b0219607fdfcf7cdf20b140',
 		actual: true,
@@ -481,7 +481,7 @@ const publicationCases = [
 	},
 	{
 		name: 'canonical-renderer-import-shadowed-in-real-owner',
-		source_file: 'linux/ui/menu/builder.lua',
+		source_file: 'linux/menu/ui/builder/builder.lua',
 		mutation_file: 'canonical-renderer-import-shadowed-in-real-owner.lua',
 		source_sha256: 'c69bf314d518b1d1fee1aad2512fb1fa812efe21843eb4a7d6cd0554e66bc9f9',
 		actual: true,
@@ -493,7 +493,7 @@ const publicationCases = [
 	},
 	{
 		name: 'returned-native-hotstrings-child-discarded',
-		source_file: 'linux/ui/menu/builder.lua',
+		source_file: 'linux/menu/ui/builder/builder.lua',
 		mutation_file: 'returned-native-hotstrings-child-discarded.lua',
 		source_sha256: 'df144fcafde75e7bc8fb270e03599132fa1b0be3200b8f32b5600a8dfc8b19f6',
 		actual: true,
@@ -504,7 +504,7 @@ const publicationCases = [
 	},
 	{
 		name: 'unconditional-true-loop-return-before-real-effects',
-		source_file: 'linux/ui/menu/builder.lua',
+		source_file: 'linux/menu/ui/builder/builder.lua',
 		mutation_file: 'unconditional-true-loop-return-before-real-effects.lua',
 		source_sha256: '1441aaaf8f27b68ec6a0f914e3f100b930f4ffc16b8c6f9a622499d0d0b3fd9e',
 		actual: true,
@@ -515,7 +515,7 @@ const publicationCases = [
 	},
 	{
 		name: 'actual-top-level-registration-discards-genuine-child',
-		source_file: 'linux/ui/menu/builder.lua',
+		source_file: 'linux/menu/ui/builder/builder.lua',
 		mutation_file: 'actual-top-level-registration-discards-genuine-child.lua',
 		source_sha256: '50a1417b5670b7b35ac08fbe11c6fdf6a419d9631bb9e50d491bb6c95fc3a04f',
 		actual: true,
@@ -577,7 +577,7 @@ const exportCases = [
 	{
 		platform: 'linux',
 		name: 'actual-module-export-discarded-linux',
-		source_file: 'linux/ui/menu/builder.lua',
+		source_file: 'linux/menu/ui/builder/builder.lua',
 		mutation_file: 'actual-module-export-discarded-linux.lua',
 		source_sha256: '8b07dc4634d5a1b3b0dba4c40eeca8735fc8ab08da77c4db999aff107e254a05',
 		actual: true,
@@ -586,7 +586,7 @@ const exportCases = [
 	{
 		platform: 'hs',
 		name: 'actual-module-export-discarded-hs',
-		source_file: 'macos/ui/menu/builder.lua',
+		source_file: 'macos/menu/ui/builder/builder.lua',
 		mutation_file: 'actual-module-export-discarded-hs.lua',
 		source_sha256: 'dfc096e21cd9fc473ffd18d994da0631ba2dfa684e9c87b15c563ee68702912c',
 		actual: true,
@@ -646,7 +646,7 @@ const singleExportCases = [
 	{
 		platform: 'linux',
 		name: 'actual-first-module-export-empty-linux',
-		source_file: 'linux/ui/menu/builder.lua',
+		source_file: 'linux/menu/ui/builder/builder.lua',
 		mutation_file: 'actual-first-module-export-empty-linux.lua',
 		source_sha256: 'e4477baef866322a7280cd6547cbafea5e3fb09a9eac4e09c655cd05fbe9aa29',
 		original_source_sha256: '936043f79f4a2061b6b0f3e12f672156f52fbed0edb6f5347ffd28d23d6302f1',
@@ -656,7 +656,7 @@ const singleExportCases = [
 	{
 		platform: 'hs',
 		name: 'actual-first-module-export-empty-hs',
-		source_file: 'macos/ui/menu/builder.lua',
+		source_file: 'macos/menu/ui/builder/builder.lua',
 		mutation_file: 'actual-first-module-export-empty-hs.lua',
 		source_sha256: '17a33cb0ee798de321aa1e68d8d27888694e9723d42ea8ac89d363c9779bfe60',
 		original_source_sha256: '5f1973978f4aeae172eefa16f9f1c22a546648edf63f1ad3ffd429aabc3c4b32',

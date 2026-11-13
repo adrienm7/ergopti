@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 -- The declared base expansion delay, read through the real reader before the
 -- fixture replaces it.
-local EXPANSION_DELAY = require("infra.manifest_reader").default_for("hotstrings.expansion_delay")
+local EXPANSION_DELAY = require("menu.engine.manifest_reader").default_for("hotstrings.expansion_delay")
 
 local MODULE_NAMES = {
 	"hs",
@@ -41,7 +41,7 @@ local MODULE_NAMES = {
 	"settings.engine.factory_reset_journal",
 	"modules.gestures",
 	"modules.keymap",
-	"infra.manifest_reader",
+	"menu.engine.manifest_reader",
 	"core.text.engine.toml_codec.writer",
 	"modules.shortcuts",
 	"modules.dynamic_hotstrings",
@@ -52,14 +52,14 @@ local MODULE_NAMES = {
 	"core.fs.adapters.file_system",
 	"platform.remap",
 	"platform.remap.tap_hold_file",
-	"ui.menu",
+	"menu.ui",
 	"ui.menu.menu_llm",
 	"modules.llm.mlx_deps_checker",
 	"modules.llm.ollama_deps_checker",
 	"modules.llm.backend_detector",
 	"core.ui.engine.notifications",
 	"ui.error_dialog",
-	"infra.ui_restore",
+	"menu.engine.ui_restore",
 	"ui.onboarding",
 }
 
@@ -335,7 +335,7 @@ local function run_isolated(options, assertions)
 				get_trigger_char = function() return "★" end,
 				stop = function() return true end,
 			},
-			["infra.manifest_reader"] = {
+			["menu.engine.manifest_reader"] = {
 				-- The real cold hotstring controller reads the base expansion
 				-- delay from the manifest (31372616); every other read is the
 				-- trigger character the boot asks for.
@@ -379,7 +379,7 @@ local function run_isolated(options, assertions)
 				config_toml_path_for = function() return "/virtual/ConfigTomlPath" end,
 				import_legacy = function() return true, "none" end,
 			},
-			["ui.menu"] = { stop_watchers = function() return true end },
+			["menu.ui"] = { stop_watchers = function() return true end },
 			["ui.menu.menu_llm"] = MenuLLM,
 			["modules.llm.mlx_deps_checker"] = {},
 			["modules.llm.ollama_deps_checker"] = {},
@@ -395,7 +395,7 @@ local function run_isolated(options, assertions)
 					return true
 				end,
 			},
-			["infra.ui_restore"] = {},
+			["menu.engine.ui_restore"] = {},
 			["ui.onboarding"] = {
 				should_run = function() return true end,
 				run = function()

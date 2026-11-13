@@ -553,7 +553,7 @@ function nativeFunctionReferenceKeys(source) {
 		),
 		false
 	);
-	const linux = readSourceFile(path.join(SP, 'linux/ui/menu/builder.lua'));
+	const linux = readSourceFile(path.join(SP, 'linux/menu/ui/builder/builder.lua'));
 	assert.equal(
 		nativeTemplateBinding(linux, '.lua', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1),
 		true

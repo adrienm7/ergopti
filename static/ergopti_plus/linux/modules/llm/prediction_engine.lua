@@ -848,7 +848,7 @@ local function prompt_language()
 	local ok, I18n = pcall(require, "core.i18n.engine.i18n")
 	local locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
 	if type(locale) == "string" and locale ~= "" then return locale end
-	return require("infra.manifest_reader").default_for(require("settings.engine.keys").KEY.SCRIPT_LOCALE)
+	return require("menu.engine.manifest_reader").default_for(require("settings.engine.keys").KEY.SCRIPT_LOCALE)
 end
 
 --- The profile's name as the menu shows it, for the suggestions' info bar:
@@ -4020,7 +4020,7 @@ function M.get_backend()
 		ConfigOutdated.report(BACKEND_KEY, ConfigOutdated.REFUSED, Logger)
 		value = nil
 	end
-	if value == nil then value = require("infra.manifest_reader").default_for(BACKEND_KEY) end
+	if value == nil then value = require("menu.engine.manifest_reader").default_for(BACKEND_KEY) end
 	assert(BACKENDS[value], "the manifest default prediction backend is not one this build runs")
 	return value
 end

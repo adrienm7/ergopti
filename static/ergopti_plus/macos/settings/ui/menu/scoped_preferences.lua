@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Scope = require("settings.engine.scope.transaction")
 local Logger = require("core.logger.engine.logger")
 local LOG = "scoped_preferences"

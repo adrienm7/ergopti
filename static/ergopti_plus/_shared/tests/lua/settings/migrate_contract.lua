@@ -1256,7 +1256,7 @@ local function register_version_refused_reads(h, driver)
 					h.assert_eq(TomlWriter.remove_if_unchanged(path, nil, { status = 'ok', content = original }), false)
 					local effects = 0
 					local scope = require('settings.engine.scope.transaction').new({ path = path, backup_path = path .. '.scope-backup',
-						manifest = require('infra.manifest_reader'), files = require('core.fs.adapters.file_system'),
+						manifest = require('menu.engine.manifest_reader'), files = require('core.fs.adapters.file_system'),
 						capture = function() effects = effects + 1; return {} end,
 						apply = function() effects = effects + 1; return true end,
 						restore = function() effects = effects + 1; return true end })

@@ -81,7 +81,7 @@ const CURATED_READS = [
 		why: 'a packaged launcher selects the bundled driver folder'
 	},
 	{
-		reader: 'ergopti_plus/macos/ui/menu/init.lua',
+		reader: 'ergopti_plus/macos/menu/ui/init.lua',
 		needles: [
 			'base_dir .. "../../img/logo/"',
 			'"logo_simple.png"',

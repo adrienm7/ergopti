@@ -51,7 +51,7 @@ helpers.describe("Shortcut extension genuine physical failure marker", function(
 				write(pack .. "/manifest.toml", '[extension]\nname = "Native %s $1 50%"\n')
 				write(pack .. "/shortcuts/menu.lua", 'error("Actual compiled physical extension failure", 0)\n')
 				local original_roots = Paths.extension_roots
-				local root = require("infra.manifest_menu").get_root()
+				local root = require("menu.engine.manifest_menu").get_root()
 				local original_frame = root.shortcut_extension_error_frame
 				local expected = language == "fr" and "Native %s $1 50% — Erreur" or "Native %s $1 50% — Error"
 				local ok, detail = xpcall(function()

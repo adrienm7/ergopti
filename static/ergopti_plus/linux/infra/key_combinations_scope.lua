@@ -25,7 +25,7 @@ function M.new(options)
 	for _,name in ipairs({"acquire_configuration","release_configuration","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","owns_configuration","configuration_domain","validate_slot","configuration_snapshot","configuration_source","configuration_source_matches","capture_edit_source","configuration_candidate","apply_configuration"}) do
 		assert(type(combinations[name]) == "function", "combination configuration owner is incomplete")
 	end
-	local manifest = options.manifest or require("infra.manifest_reader")
+	local manifest = options.manifest or require("menu.engine.manifest_reader")
 	local function declared()
 		if type(manifest.find_entry_by_path) ~= "function" then return false end
 		local entry = manifest.find_entry_by_path("category_enabled.key_combinations")

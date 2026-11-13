@@ -126,7 +126,7 @@ helpers.describe("Linux terminal LLM scope", function()
 			helpers.assert_eq(Sandbox.read_bytes(backup), SOURCE)
 			helpers.assert_eq(engine.is_enabled(), false)
 			helpers.assert_eq(require("modules.llm.profiles").is_enabled(), false)
-			helpers.assert_eq(settings.get("temperature"), require("infra.manifest_reader").default_for("llm.generation.temperature"))
+			helpers.assert_eq(settings.get("temperature"), require("menu.engine.manifest_reader").default_for("llm.generation.temperature"))
 			local document = Codec.decode(Sandbox.read_bytes(path))
 			helpers.assert_eq(document.llm.enabled, nil)
 			helpers.assert_eq(document.llm.unknown, "keep")
@@ -259,11 +259,11 @@ helpers.describe("Linux terminal LLM scope", function()
 	-- (ai-menu-no-clear, test_llm_menu_toggle_row.lua).
 	helpers.it("dispatches the real rendered restore command into the terminal owner", function()
 		with_scope(function(owner, engine, _, path)
-			local renderer = require("infra.manifest_menu")
+			local renderer = require("menu.engine.manifest_menu")
 			local root = renderer.get_root()
 			local old_rows = root.llm_menu
 			local old_top = root.top_level
-			local old_builder = package.loaded["ui.menu.builder"]
+			local old_builder = package.loaded["menu.ui.builder.builder"]
 			local execute = os.execute
 			local scope = require("infra.llm_scope")
 			local old_apply = scope.apply
@@ -283,8 +283,8 @@ helpers.describe("Linux terminal LLM scope", function()
 					return execute(command)
 				end
 				scope.apply = function(selected) return owner.apply(selected) end
-				package.loaded["ui.menu.builder"] = nil
-				local rows = require("ui.menu.builder").build({ llm = engine,
+				package.loaded["menu.ui.builder.builder"] = nil
+				local rows = require("menu.ui.builder.builder").build({ llm = engine,
 					on_menu_changed = function() changed = changed + 1 end })
 				local action
 				local function find(items)
@@ -306,7 +306,7 @@ helpers.describe("Linux terminal LLM scope", function()
 				helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).llm.unknown, "keep")
 			end)
 			root.llm_menu, root.top_level, scope.apply, os.execute = old_rows, old_top, old_apply, execute
-			package.loaded["ui.menu.builder"] = old_builder
+			package.loaded["menu.ui.builder.builder"] = old_builder
 			if not ok then error(err, 0) end
 		end)
 	end)
@@ -356,7 +356,7 @@ helpers.describe("LLM private native claims", function()
 					write = function() error("unconditional publication") end,
 					write_if_unchanged = function(target, content, expected)
 						return Writer.publish_if_unchanged(target, content, nil, expected)
-					end }, manifest = require("infra.manifest_reader"),
+					end }, manifest = require("menu.engine.manifest_reader"),
 				capture = function()
 					helpers.assert_eq(engine.quiesce_configuration(claim), true)
 					return engine.configuration_snapshot(claim)
@@ -589,7 +589,7 @@ helpers.describe("LLM retained native release and stop debt", function()
 				pending = function() return false end, retry_restore = function(done) done(true) end }
 			local actual = require("settings.engine.scope.participant").synchronous({ apply = scope.apply, owner = function() return scope end })
 			local logger = {}; for _, name in ipairs({ "start", "success", "warn", "info", "error" }) do logger[name] = function() end end
-			local global = require("settings.engine.scope.composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
+			local global = require("settings.engine.scope.composition").new({ manifest = require("menu.engine.manifest_reader"), scope = "global",
 				logger = logger, participants = function() return { hotstrings = before, llm = actual, metrics = after } end })
 			local verdict, report
 			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)

@@ -34,7 +34,7 @@ local function load_keymap_with_results(results)
 		-- The real timing registry, read when the keymap loads, logs its path walk.
 		["core.logger.engine.logger"] = helpers.make_logger_stub(),
 		["platform.input.keycodes"] = {},
-		["infra.manifest_reader"] = {
+		["menu.engine.manifest_reader"] = {
 			default_for = function() return true end,
 		},
 		["settings.engine.registry"] = {

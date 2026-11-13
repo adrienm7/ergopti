@@ -1024,7 +1024,7 @@
 				"tr",
 				"lsblk"
 			],
-			"used_for": "Small queries and filters: system facts, file watching, the local AI servers' listening ports, the updater relay, the uninstall detach (`linux/modules/keystats/system_metrics.lua`, `linux/core/fs/engine/file_watchers.lua`, `linux/modules/llm/local_server_ports.lua`, `linux/modules/updater/restarter.lua`, `linux/ui/menu/uninstall.lua`, `linux/modules/gestures/system_actions.lua`, `linux/modules/gestures/manager.lua`)",
+			"used_for": "Small queries and filters: system facts, file watching, the local AI servers' listening ports, the updater relay, the uninstall detach (`linux/modules/keystats/system_metrics.lua`, `linux/core/fs/engine/file_watchers.lua`, `linux/modules/llm/local_server_ports.lua`, `linux/modules/updater/restarter.lua`, `linux/menu/ui/transactions/uninstall.lua`, `linux/modules/gestures/system_actions.lua`, `linux/modules/gestures/manager.lua`)",
 			"today": "System (coreutils, iproute2, util-linux)",
 			"current_class": "SYS",
 			"version_needed": "POSIX",

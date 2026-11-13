@@ -11,7 +11,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
 local LOG = "settings.ui.menu.language"

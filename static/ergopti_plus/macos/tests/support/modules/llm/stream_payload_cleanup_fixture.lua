@@ -16,7 +16,7 @@ local OWNED = {
 	"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 	"adapters.managed_ollama_daemon", "core.process.adapters.owned_program_runner", "core.fs.engine.app_dirs", "settings.engine.publication.defaults",
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.ollama_runtime_choice", "hotstrings.engine.catalogue.personal_files",
-	"infra.manifest_reader", "ai.engine.ollama.local_model_policy", "ai.engine.settings.profile_selector", "modules.llm.network_env",
+	"menu.engine.manifest_reader", "ai.engine.ollama.local_model_policy", "ai.engine.settings.profile_selector", "modules.llm.network_env",
 	"modules.llm.ollama_binary", "modules.llm.ollama_server_command", "modules.llm.opaque_network_admission",
 	"modules.llm.profiles", "modules.llm.progressive_reveal", "platform.remap.lease_helper",
 }

@@ -22,7 +22,7 @@ local function with_remote(callback)
 		"modules.llm.provider_uses", "modules.llm.progressive_reveal",
 		"modules.llm.api_common", "modules.llm.profiles", "modules.llm.parser",
 		"core.logger.engine.logger", "core.events.timer_scheduler", "core.fs.adapters.file_system",
-		"core.fs.adapters.json_codec", "core.fs.adapters.storage", "infra.manifest_reader",
+		"core.fs.adapters.json_codec", "core.fs.adapters.storage", "menu.engine.manifest_reader",
 		"ai.engine.policy.provider_config_policy", "ai.engine.api.remote_formats", "ai.engine.settings.profile_selector",
 		"ai.engine.api.parser_core", "ai.engine.prediction.prompt_builder_core", "ai.engine.local_servers.auth", "ai.engine.local_servers.discovery",
 		"core.lifecycle.engine.compat.utf8", "settings.engine.publication.defaults", "diagnostics.engine.operation_reporter",

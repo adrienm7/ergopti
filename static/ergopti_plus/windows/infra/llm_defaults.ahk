@@ -11,7 +11,7 @@
 ; 1. Single Source of Truth: defaults.json is shared with the Hammerspoon driver,
 ;    so a value change only needs to happen in one place.
 ; 2. Micro-parser: uses the same regex strategy as toml_loader.ahk and
-;    menu_manifest.ahk — no external dependency.
+;    ../menu/engine/manifest.ahk — no external dependency.
 ; 3. Fail fast: defaults.json is REQUIRED. A missing/unreadable file or any
 ;    missing shared key raises loudly instead of silently substituting a mirror
 ;    of the values. Only the AHK-local keys (model, backend) have an in-code source.

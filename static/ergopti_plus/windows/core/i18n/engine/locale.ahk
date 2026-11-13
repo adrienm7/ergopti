@@ -391,7 +391,7 @@ _I18nEnsureLoaded() {
 ; This is the accessor for SPECULATIVE lookups — a caller walking a chain of
 ; candidate keys, where a miss is the normal control flow rather than a defect.
 ; It exists because t() below both resolves and DIAGNOSES, and those two
-; contracts collided: infra/manifest_descriptions.ahk probes up to nine candidates
+; contracts collided: menu/engine/manifest_descriptions.ahk probes up to nine candidates
 ; per menu label and expects all but one to miss, so every label emitted several
 ; warnings claiming "the raw key is being displayed to the user" when it was not.
 ; Measured 2026-07-29: 282 unique keys warned per boot, of which 281 were probes

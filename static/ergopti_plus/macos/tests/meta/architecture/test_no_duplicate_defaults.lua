@@ -46,7 +46,7 @@ end
 helpers.describe("meta: duplicate default values", function()
 	-- Map of "varname=value" -> list of files declaring it
 	local seen = {}
-	for _, sub in ipairs({ "infra", "modules", "platform", "core", "settings" }) do
+	for _, sub in ipairs({ "infra", "modules", "platform", "core", "settings", "menu" }) do
 		for _, abs in ipairs(list_lua_files(DRIVER_ROOT .. sub)) do
 			local body = SourceFile.read(abs)
 			-- Only scan inside DEFAULT_STATE or DEFAULTS literal tables

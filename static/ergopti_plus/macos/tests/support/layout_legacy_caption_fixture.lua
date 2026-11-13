@@ -28,8 +28,8 @@ function M.install(translator)
 		return original
 	end
 	-- The real binding must capture this fixture's dictionary, never a stale prior fixture.
-	package.loaded["infra.manifest_menu"] = nil
-	return require("infra.manifest_menu")
+	package.loaded["menu.engine.manifest_menu"] = nil
+	return require("menu.engine.manifest_menu")
 end
 
 --- Scopes complete legacy subjects, including their caption assertions, to exact predecessor modules.

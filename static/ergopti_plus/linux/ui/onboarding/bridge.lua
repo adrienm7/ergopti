@@ -414,7 +414,7 @@ local function finish_owned(state, answers)
 	local authorities = {
 		i18n = dependency(state, "i18n", "core.i18n.engine.i18n"),
 		config_paths = dependency(state, "config_paths", "settings.engine.paths"),
-		manifest = dependency(state, "manifest", "infra.manifest_reader"),
+		manifest = dependency(state, "manifest", "menu.engine.manifest_reader"),
 		writer = dependency(state, "writer", "core.text.engine.toml_codec.writer"),
 		prepare = type(state.prepare_destination) == "function" and state.prepare_destination
 			or prepare_destination,

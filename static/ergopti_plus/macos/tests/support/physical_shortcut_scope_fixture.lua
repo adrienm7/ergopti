@@ -299,7 +299,7 @@ local function run_fixture(body, source)
 	local function start_script() return script.start({}, shortcuts, gestures) end
 	helpers.assert_eq(start_script(), true)
 	local modules = { gestures = gestures, shortcuts_mod = shortcuts }
-	local demotions = require("ui.menu.session_demotions").new()
+	local demotions = require("menu.ui.transactions.session_demotions").new()
 	local save, checkpoint = require("settings.ui.menu.preferences_transaction").bind(prefs, {
 		path = "config", state = state, hotfiles = {}, core_modules = modules,
 		initial_state = state, initial_preferences = prefs.snapshot(state, {}, modules),
