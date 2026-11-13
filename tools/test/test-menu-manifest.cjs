@@ -3097,7 +3097,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'Windows captions the delay row with the current value'
 	);
 	assert(
-		windows.includes('WriteTapHoldDuration(KeyId, Ms / 1000, 0, 0, 0, 0, SourceWitness)'),
+		windows.includes('WriteTapHoldDuration(KeyId, Seconds, 0, 0, 0, 0, SourceWitness)'),
 		'Windows persists through the existing native transaction owner'
 	);
 	console.log(

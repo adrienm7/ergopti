@@ -446,6 +446,7 @@
 	"enums": {
 		"reason": [
 			"",
+			"above_maximum",
 			"absent",
 			"absent-archive",
 			"action_not_in_keylayout",
@@ -464,6 +465,7 @@
 			"bad_asset",
 			"bad_deadline",
 			"bad_key",
+			"below_minimum",
 			"buffer_flush_failed",
 			"builtin-unavailable",
 			"busy",
@@ -608,8 +610,11 @@
 			"no_source_layout",
 			"noop_final",
 			"not-initialized",
+			"not_allowed",
 			"not_deployed",
+			"not_finite",
 			"not_initialized",
+			"not_integer",
 			"not_json",
 			"not_running",
 			"not_swept",
@@ -710,6 +715,7 @@
 			"timeout",
 			"today_log_open_failed",
 			"too_large",
+			"too_long",
 			"too_old",
 			"touchpad_no_event_node",
 			"touchpad_no_multitouch_slot",
@@ -757,6 +763,7 @@
 			"wrap_mutation_failed",
 			"write",
 			"written",
+			"wrong_type",
 			"xkb_conversion_failed"
 		],
 		"phase": [
