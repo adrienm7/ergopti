@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "一時停止/再開時のレイアウト",
 	"menu.layout.pause_layout_unsupported_desktop": "一時停止 / 再開時のレイアウト：このデスクトップでは利用できません（GNOME、KDE または X11 のみ）",
 	"menu.layout.select_failed": "キーボードレイアウトを切り替えられませんでした。詳細はログを確認してください。",
+	"menu.layout.select_failed_gnome_extension": "キーボードレイアウトを切り替えられませんでした。GNOME では Ergopti は自身の GNOME Shell 拡張機能で切り替えますが、それが動作していません。Ergopti のインストールまたは更新後にログアウトして再ログインしてください。Flatpak 版ではインストールできません。",
 	"menu.layout.system_layout_install": "Ergopti システムレイアウトのインストーラーをダウンロード(未署名、管理者権限)…",
 	"menu.layout.system_layout_update": "Ergopti システムレイアウトのインストーラーを再ダウンロードして更新…",
 	"menu.layout.system_layout_installed": "Ergopti システムレイアウトはインストール済み",

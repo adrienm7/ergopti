@@ -38,6 +38,17 @@ helpers.describe("compositor_focus: shipped desktop files", function()
 			"the worker exports the interface the desktops call")
 	end)
 
+	helpers.it("(gnome-runtime-switch) the extension exports the layout switch the daemon calls", function()
+		local Switch = helpers.load_module("adapters.input_source_switch")
+		local text = read("desktop_focus/gnome/extension.js")
+		helpers.assert_eq(constant(text, "INPUT_SOURCE_PATH"), Switch.GNOME_SWITCH_PATH)
+		helpers.assert_eq(constant(text, "INPUT_SOURCE_INTERFACE"), Switch.GNOME_SWITCH_INTERFACE)
+		helpers.assert_true(text:find('<method name="Activate">', 1, true) ~= nil
+			and text:find('<arg type="b" direction="out"', 1, true) ~= nil, "Activate(s) -> b, as the plan expects")
+		helpers.assert_true(text:find("source.activate(true)", 1, true) ~= nil,
+			"an interactive activation, as the Shell's own switcher, so the recent list follows")
+	end)
+
 	helpers.it("(wayland-desktop-focus) the installer and the worker name the shipped packages", function()
 		local json = require("core.text.engine.json")
 		local gnome = json.decode(read("desktop_focus/gnome/metadata.json"))

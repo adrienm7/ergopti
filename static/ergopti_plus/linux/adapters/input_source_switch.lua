@@ -21,12 +21,13 @@
 ---    is refused with the reason logged.
 --- 2. GNOME Shell (checked on 46) reads `mru-sources` only when it starts and
 ---    ignores `current`: on a `sources` change it keeps its in-memory recent
----    list and activates its first entry. Switching therefore writes `sources`
----    as the target alone, which the shell must activate, waits for the shell
----    to read it, then writes the user's list back with the target first (as
----    desktop_activation.py places an installed layout) and `mru-sources` for
----    the next start. Writes the shell coalesces end on no switch, never on
----    another layout. KDE switching asks the daemon
+---    list and activates its first entry. Switching therefore asks the Ergopti
+---    GNOME Shell extension (desktop_focus/gnome, installed with the focus
+---    reports) to activate the source as the Shell's own switcher does; the
+---    user's `sources` list is never rewritten. Without the extension running
+---    (Flatpak, turned off, or an update not yet loaded by a new login) the
+---    switch is refused with GNOME_EXTENSION_MISSING, which the menu names.
+---    Decided by the maintainer on 2026-11-13. KDE switching asks the daemon
 ---    for the layout's index (setLayout), which answers whether it switched.
 ---    X11 switching moves the layout to the first group: setxkbmap keeps the
 ---    components it is not given.
@@ -53,6 +54,15 @@ M.KDE = "kde"
 M.X11 = "x11"
 
 local GNOME_SCHEMA = "org.gnome.desktop.input-sources"
+-- Exported by desktop_focus/gnome/extension.js on GNOME Shell's own connection;
+-- tests/unit/adapters/compositor_focus/test_compositor_focus_assets.lua pins both.
+M.GNOME_SWITCH_PATH = "/org/ergopti/InputSource"
+M.GNOME_SWITCH_INTERFACE = "org.ergopti.InputSource1"
+-- The refusal code a switch reports when the extension does not answer.
+M.GNOME_EXTENSION_MISSING = "gnome_extension_missing"
+-- What GDBus answers for a path or method nobody exports on the Shell.
+local GNOME_MISSING_ERRORS = { "org.freedesktop.DBus.Error.UnknownMethod", "org.freedesktop.DBus.Error.UnknownObject",
+	"org.freedesktop.DBus.Error.UnknownInterface" }
 local GNOME_EMPTY = "@a(ss) []"
 -- The Plasma keyboard daemon (kded keyboard module, Plasma 5.21 and later).
 local KDE_CALL = { "call", "--session", "--dest", "org.kde.keyboard", "--object-path", "/Layouts", "--method" }
@@ -314,9 +324,10 @@ end
 --- The commands that make one listed id active, in order.
 --- @param listing table Backend reading.
 --- @param id string Target id.
---- @return table|nil steps Array of { program, args, expect?, undo? }: a step with
----   `expect` fails unless its trimmed output is exactly that text; a step's
----   `undo` { program, args } runs when a later step fails.
+--- @return table|nil steps Array of { program, args, expect?, missing? }: a step
+---   with `expect` fails unless its trimmed output is exactly that text; a
+---   failed step whose stderr holds one of `missing.markers` reports
+---   `missing.reason` and `missing.code` instead of the command's own error.
 --- @return string|nil reason Why no plan exists.
 function M.plan(listing, id)
 	if listing.backend == M.GNOME then
@@ -325,22 +336,13 @@ function M.plan(listing, id)
 			if M.gnome_id(pair) == id then index = position; break end
 		end
 		if index == nil then return nil, "the input source '" .. id .. "' is not configured on this desktop" end
-		local target = listing.sources[index]
-		local sources, mru = { target }, { target }
-		for _, pair in ipairs(listing.sources) do
-			if M.gnome_id(pair) ~= id then sources[#sources + 1] = pair end
-		end
-		for _, pair in ipairs(listing.mru) do
-			if M.gnome_id(pair) ~= id then mru[#mru + 1] = pair end
-		end
-		local settle = string.format("%.3f", require("infra.timings").ms("ui", "gnome_input_source_settle_ms") / 1000)
 		return {
-			{ program = "gsettings", args = { "set", GNOME_SCHEMA, "sources", M.format_gnome_sources({ target }) },
-				undo = { program = "gsettings",
-					args = { "set", GNOME_SCHEMA, "sources", M.format_gnome_sources(listing.sources) } } },
-			{ program = "sleep", args = { settle } },
-			{ program = "gsettings", args = { "set", GNOME_SCHEMA, "sources", M.format_gnome_sources(sources) } },
-			{ program = "gsettings", args = { "set", GNOME_SCHEMA, "mru-sources", M.format_gnome_sources(mru) } },
+			{ program = "gdbus", args = { "call", "--session", "--dest", "org.gnome.Shell", "--object-path",
+				M.GNOME_SWITCH_PATH, "--method", M.GNOME_SWITCH_INTERFACE .. ".Activate", "'" .. id .. "'" },
+				expect = "(true,)",
+				missing = { markers = GNOME_MISSING_ERRORS, code = M.GNOME_EXTENSION_MISSING,
+					reason = "the Ergopti GNOME Shell extension (focus@ergopti.fr) is not running: it is installed "
+						.. "with the driver outside Flatpak and needs a new login after an install or an update" } },
 		}
 	end
 	if listing.backend == M.KDE then
@@ -422,7 +424,10 @@ function M.new(port)
 			if delivered then return end
 			delivered = true
 			if type(result) == "table" and result.ok == true then on_done(result.stdout or "")
-			else on_done(nil, program .. " failed: " .. tostring(type(result) == "table" and result.error or result)) end
+			else
+				on_done(nil, program .. " failed: " .. tostring(type(result) == "table" and result.error or result),
+					type(result) == "table" and type(result.stderr) == "string" and result.stderr or "")
+			end
 		end)
 		if started ~= true and not delivered then
 			delivered = true
@@ -479,29 +484,24 @@ function M.new(port)
 	end
 
 	--- Runs steps in order; the first failure ends the sequence.
-	--- A step's `undo` runs when a later step fails, newest first, so a
-	--- partial switch puts back what it changed; the failure names the undo's
-	--- outcome too.
-	local function run_steps(steps, index, on_done, undos)
-		undos = undos or {}
+	local function run_steps(steps, index, on_done)
 		local step = steps[index]
 		if step == nil then return on_done(true) end
-		local function fail(reason)
-			local pending = {}
-			for position = #undos, 1, -1 do pending[#pending + 1] = undos[position] end
-			if #pending == 0 then return on_done(false, reason) end
-			run_steps(pending, 1, function(undone, undo_reason)
-				on_done(false, reason .. (undone and " (the earlier change was put back)"
-					or ("; putting the earlier change back failed: " .. tostring(undo_reason))))
-			end)
-		end
-		run(step.program, step.args, function(output, reason)
-			if output == nil then return fail(reason) end
-			if step.expect ~= nil and TextUtils.trim(output) ~= step.expect then
-				return fail(step.program .. " refused the switch: " .. TextUtils.trim(output))
+		run(step.program, step.args, function(output, reason, stderr)
+			if output == nil then
+				if step.missing ~= nil then
+					for _, marker in ipairs(step.missing.markers) do
+						if stderr:find(marker, 1, true) then
+							return on_done(false, step.missing.reason .. " (" .. reason .. ")", step.missing.code)
+						end
+					end
+				end
+				return on_done(false, reason)
 			end
-			if step.undo ~= nil then undos[#undos + 1] = step.undo end
-			run_steps(steps, index + 1, on_done, undos)
+			if step.expect ~= nil and TextUtils.trim(output) ~= step.expect then
+				return on_done(false, step.program .. " refused the switch: " .. TextUtils.trim(output))
+			end
+			run_steps(steps, index + 1, on_done)
 		end)
 	end
 
@@ -563,10 +563,10 @@ function M.new(port)
 		listing_epoch = listing_epoch + 1
 		local epoch = listing_epoch
 		read_listing(function(listing, reason)
-			local function done(ok, detail)
+			local function done(ok, detail, code)
 				-- Keep the slot occupied during delivery: a reentrant selection must
 				-- replace the queued request, not start alongside it.
-				local ran, err = pcall(on_done, ok, detail)
+				local ran, err = pcall(on_done, ok, detail, code)
 				if not ran then Logger.error(LOG, "A switch completion callback failed: %s.", tostring(err)) end
 				busy = false
 				if queued ~= nil then
@@ -590,7 +590,8 @@ function M.new(port)
 		end)
 	end
 
-	--- Makes one listed layout active. on_done(ok, detail) runs exactly once.
+	--- Makes one listed layout active. on_done(ok, detail, code) runs exactly
+	--- once; code is M.GNOME_EXTENSION_MISSING when GNOME has no extension to ask.
 	--- @param id string A choice id.
 	--- @param on_done function
 	function switcher.select(id, on_done)

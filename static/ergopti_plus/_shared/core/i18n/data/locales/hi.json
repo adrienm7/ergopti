@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "विराम / पुनः आरंभ पर लेआउट",
 	"menu.layout.pause_layout_unsupported_desktop": "विराम / पुनः आरंभ पर लेआउट: इस डेस्कटॉप पर उपलब्ध नहीं (केवल GNOME, KDE या X11)",
 	"menu.layout.select_failed": "कीबोर्ड लेआउट नहीं बदला जा सका। विवरण के लिए लॉग देखें।",
+	"menu.layout.select_failed_gnome_extension": "कीबोर्ड लेआउट नहीं बदला जा सका: GNOME पर Ergopti इसे अपने GNOME Shell एक्सटेंशन से बदलता है, जो चल नहीं रहा है। Ergopti इंस्टॉल या अपडेट करने के बाद लॉग आउट करके फिर से लॉग इन करें; Flatpak संस्करण इसे इंस्टॉल नहीं कर सकता।",
 	"menu.layout.system_layout_install": "Ergopti सिस्टम लेआउट का इंस्टॉलर डाउनलोड करें (बिना हस्ताक्षर, व्यवस्थापक अधिकार)…",
 	"menu.layout.system_layout_update": "Ergopti सिस्टम लेआउट को अपडेट करने के लिए इसका इंस्टॉलर फिर से डाउनलोड करें…",
 	"menu.layout.system_layout_installed": "Ergopti सिस्टम लेआउट इंस्टॉल है",

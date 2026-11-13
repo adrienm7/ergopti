@@ -2060,6 +2060,7 @@
 	"menu.layout.pause_layout_section": "Disposition à la pause / reprise",
 	"menu.layout.pause_layout_unsupported_desktop": "Disposition à la pause / reprise : indisponible sur ce bureau (GNOME, KDE ou X11 uniquement)",
 	"menu.layout.select_failed": "Impossible de changer de disposition clavier. Consultez les journaux pour plus de détails.",
+	"menu.layout.select_failed_gnome_extension": "Impossible de changer de disposition clavier : sous GNOME, Ergopti la change par son extension GNOME Shell, qui n’est pas active. Déconnectez-vous puis reconnectez-vous après avoir installé ou mis à jour Ergopti ; la version Flatpak ne peut pas l’installer.",
 	"menu.layout.system_layout_install": "Télécharger l’installateur de la disposition système Ergopti (non signé, droits administrateur)…",
 	"menu.layout.system_layout_update": "Télécharger à nouveau l’installateur de la disposition système Ergopti pour la mettre à jour…",
 	"menu.layout.system_layout_installed": "Disposition système Ergopti installée",

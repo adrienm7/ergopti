@@ -32,7 +32,7 @@ local function world(backend, choices)
 		end,
 		select = function(id, on_done)
 			state.selected[#state.selected + 1] = id
-			on_done(state.answer, state.answer and nil or "gsettings failed")
+			on_done(state.answer, state.answer and nil or "gdbus failed", state.code)
 		end,
 	}
 	state.ctx = {
@@ -73,6 +73,18 @@ helpers.describe("active layout rows", function()
 		state.answer = false
 		rows[1].action()
 		helpers.assert_eq(state.errors[1], "menu.layout.select_failed", "a refused switch is told")
+	end)
+
+	helpers.it("names the GNOME Shell extension when GNOME refuses for its absence", function()
+		local state = world("gnome", CHOICES)
+		local rows = Rows.rows(state.ctx)
+		state.answer = false
+		state.code = require("adapters.input_source_switch").GNOME_EXTENSION_MISSING
+		rows[1].action()
+		helpers.assert_eq(state.errors[1], "menu.layout.select_failed_gnome_extension")
+		local en = require("core.text.engine.json").decode(read(helpers.driver_root()
+			.. "/../_shared/core/i18n/data/locales/en.json"))
+		helpers.assert_true(type(en["menu.layout.select_failed_gnome_extension"]) == "string", "the key is localized")
 	end)
 
 	helpers.it("shows why on a desktop that cannot change its layout", function()

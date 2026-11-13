@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "Indeling bij pauze / hervatten",
 	"menu.layout.pause_layout_unsupported_desktop": "Indeling bij pauze / hervatten: niet beschikbaar op deze desktop (alleen GNOME, KDE of X11)",
 	"menu.layout.select_failed": "Kan de toetsenbordindeling niet wijzigen. Zie de logboeken voor details.",
+	"menu.layout.select_failed_gnome_extension": "De toetsenbordindeling kon niet worden gewisseld: onder GNOME wisselt Ergopti deze via zijn GNOME Shell-extensie, die niet actief is. Meld u af en weer aan na het installeren of bijwerken van Ergopti; de Flatpak-versie kan deze niet installeren.",
 	"menu.layout.system_layout_install": "Installatieprogramma van de Ergopti-systeemindeling downloaden (niet-ondertekend, beheerdersrechten)…",
 	"menu.layout.system_layout_update": "Installatieprogramma van de Ergopti-systeemindeling opnieuw downloaden om haar bij te werken…",
 	"menu.layout.system_layout_installed": "Ergopti-systeemindeling geïnstalleerd",

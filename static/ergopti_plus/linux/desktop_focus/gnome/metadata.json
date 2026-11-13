@@ -1,8 +1,8 @@
 {
 	"uuid": "focus@ergopti.fr",
 	"name": "Ergopti focus",
-	"description": "Tells the Ergopti daemon which window has focus (WM class, title and process), so its per-application rules work under Wayland.",
+	"description": "Tells the Ergopti daemon which window has focus (WM class, title and process), so its per-application rules work under Wayland, and switches the keyboard layout when the daemon asks.",
 	"shell-version": ["45", "46", "47", "48", "49"],
 	"url": "https://ergopti.fr",
-	"version": 1
+	"version": 2
 }

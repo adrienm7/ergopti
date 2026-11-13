@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "Disposición al pausar / reanudar",
 	"menu.layout.pause_layout_unsupported_desktop": "Disposición al pausar / reanudar: no disponible en este escritorio (solo GNOME, KDE o X11)",
 	"menu.layout.select_failed": "No se pudo cambiar la disposición del teclado. Consulta los registros para más detalles.",
+	"menu.layout.select_failed_gnome_extension": "No se pudo cambiar la distribución del teclado: en GNOME, Ergopti la cambia mediante su extensión de GNOME Shell, que no está activa. Cierre la sesión y vuelva a iniciarla tras instalar o actualizar Ergopti; la versión Flatpak no puede instalarla.",
 	"menu.layout.system_layout_install": "Descargar el instalador de la distribución del sistema Ergopti (sin firmar, derechos de administrador)…",
 	"menu.layout.system_layout_update": "Volver a descargar el instalador de la distribución del sistema Ergopti para actualizarla…",
 	"menu.layout.system_layout_installed": "Distribución del sistema Ergopti instalada",

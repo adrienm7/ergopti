@@ -12,7 +12,11 @@
 #              logind on the system bus: python-dbusmock's logind template
 #              runs on a private bus named as the system bus. A RemoteDesktop
 #              session adds the virtual keyboard XWayland needs to receive
-#              mutter's keymap.
+#              mutter's keymap. The Ergopti GNOME Shell extension
+#              (desktop_focus/gnome) is installed and enabled first: the
+#              daemon switches GNOME's layout only through it.
+#   gnome-no-extension  The same session without the extension: every switch
+#              must be refused with the extension named.
 #   kde        KWin on Wayland (--virtual), which serves org.kde.keyboard
 #              /Layouts itself.
 #   kde-x11    KWin on Xvfb with kded's keyboard module (org.kde.keyboard).
@@ -31,11 +35,16 @@ set -u
 cd "$(dirname "$0")/../.." || exit 2
 DESKTOP="${1:-}"
 # The script run inside the session (default: the input sources proof).
-case "${DESKTOP}" in gnome | kde | kde-x11 | x11 | sway) ;; *)
-	echo "usage: $0 gnome|kde|kde-x11|x11|sway" >&2
+case "${DESKTOP}" in gnome | gnome-no-extension | kde | kde-x11 | x11 | sway) ;; *)
+	echo "usage: $0 gnome|gnome-no-extension|kde|kde-x11|x11|sway" >&2
 	exit 2
 	;;
 esac
+GNOME_EXTENSION=on
+if [ "${DESKTOP}" = gnome-no-extension ]; then
+	DESKTOP=gnome
+	GNOME_EXTENSION=off
+fi
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "ENVIRONMENT: $1 is missing" >&2; exit 2; }; }
 for tool in luajit dbus-launch xkbcomp gdbus; do need "${tool}"; done
@@ -171,7 +180,15 @@ gnome)
 	sleep 1
 	gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us'), ('xkb', 'fr')]"
 	gsettings set org.gnome.desktop.input-sources mru-sources "[('xkb', 'us'), ('xkb', 'fr')]"
+	if [ "${GNOME_EXTENSION}" = on ]; then
+		# What install/compositor_focus.sh does for a user, before the login.
+		extension="${XDG_DATA_HOME:-${HOME}/.local/share}/gnome-shell/extensions/focus@ergopti.fr"
+		for file in desktop_focus/gnome/*; do install -D -m 644 -- "${file}" "${extension}/$(basename "${file}")"; done
+		gsettings set org.gnome.shell disable-user-extensions false
+		gsettings set org.gnome.shell enabled-extensions "['focus@ergopti.fr']"
+	fi
 	start_gnome
+	export ERGOPTI_LIVE_GNOME_EXTENSION="${GNOME_EXTENSION}"
 	export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=GNOME ERGOPTI_LIVE_DESKTOP=gnome ERGOPTI_LIVE_GNOME_UNSAFE=1
 	export ERGOPTI_LIVE_ACTIVE_CMD="sh tests/hardware/lib/gnome_active_layout.sh" ERGOPTI_LIVE_SIGNATURES="us=q fr=a"
 	;;

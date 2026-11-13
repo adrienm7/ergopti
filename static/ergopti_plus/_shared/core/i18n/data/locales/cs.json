@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "Rozložení při pozastavení / obnovení",
 	"menu.layout.pause_layout_unsupported_desktop": "Rozložení při pozastavení / obnovení: v tomto prostředí nedostupné (pouze GNOME, KDE nebo X11)",
 	"menu.layout.select_failed": "Rozložení klávesnice nelze přepnout. Podrobnosti najdete v protokolech.",
+	"menu.layout.select_failed_gnome_extension": "Rozložení klávesnice nelze přepnout: v GNOME jej Ergopti přepíná svým rozšířením GNOME Shell, které neběží. Po instalaci nebo aktualizaci Ergopti se odhlaste a znovu přihlaste; verze Flatpak jej nainstalovat nemůže.",
 	"menu.layout.system_layout_install": "Stáhnout instalátor systémového rozložení Ergopti (nepodepsaný, práva správce)…",
 	"menu.layout.system_layout_update": "Znovu stáhnout instalátor systémového rozložení Ergopti a aktualizovat ho…",
 	"menu.layout.system_layout_installed": "Systémové rozložení Ergopti nainstalováno",
