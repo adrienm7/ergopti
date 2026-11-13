@@ -67,12 +67,16 @@ _UHLT_Source(Root) {
 
 _UHLT_Assets(Root) {
 	global _SharedDir, _VendorDir
-	for Subdir in ["config", "logs", "vendor", "shared", "shared\modules", "shared\modules\hotstrings",
-		"shared\modules\diagnostics", "localappdata"]
+	for Subdir in ["config", "logs", "vendor", "shared", "localappdata"]
 		FSCreateDirectoryExclusiveStrict(Root . "\" . Subdir)
-	for Pair in [[_SharedDir . "\modules\hotstrings\user_code.ahk", Root . "\shared\modules\hotstrings\user_code.ahk"],
-		[_SharedDir . "\modules\diagnostics\redaction.json", Root . "\shared\modules\diagnostics\redaction.json"],
-		[_VendorDir . "\ergopti_user_hotstrings.ahk", Root . "\vendor\ergopti_user_hotstrings.ahk"]] {
+	; The shared inputs' folders come from their own paths, wherever the shared
+	; tree keeps them.
+	Shared := ["modules\hotstrings\user_code.ahk", "modules\diagnostics\redaction.json"]
+	_EDOT_CreateParents(Root . "\shared", Shared)
+	Pairs := [[_VendorDir . "\ergopti_user_hotstrings.ahk", Root . "\vendor\ergopti_user_hotstrings.ahk"]]
+	for Relative in Shared
+		Pairs.Push([_SharedDir . "\" . Relative, Root . "\shared\" . Relative])
+	for Pair in Pairs {
 		FileCopy(Pair[1], Pair[2], false)
 		AssertEqual(CryptoSha256Bytes(FSReadBytesStrict(Pair[1])), CryptoSha256Bytes(FSReadBytesStrict(Pair[2])),
 			"Private worker and policy assets must retain their actual bytes.")
