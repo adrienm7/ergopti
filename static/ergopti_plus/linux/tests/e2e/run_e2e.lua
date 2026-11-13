@@ -583,6 +583,18 @@ local DYNAMIC_SCENARIOS = {
 		screen = " update★" },
 }
 
+-- Items 104, 105: each common autocorrection section fires alone. With only
+-- one section on, its trigger expands and the other two sections' triggers
+-- stay as typed (_shared/tests/corpus/hotstrings/common_autocorrection_entries.json).
+local AUTOCORRECT_SCENARIOS = {
+	{ name = "the names section alone expands a name", autocorrect = "names",
+		keys = " chatgpt adn adaboost ", screen = " ChatGPT adn adaboost " },
+	{ name = "the abbreviations section alone expands an abbreviation", autocorrect = "abbreviations",
+		keys = " chatgpt adn adaboost ", screen = " chatgpt ADN adaboost " },
+	{ name = "the technical terms section alone expands a technical term", autocorrect = "technical_terms",
+		keys = " chatgpt adn adaboost ", screen = " chatgpt adn AdaBoost " },
+}
+
 -- A real consumed down owns repeats only while its native epochs and owners
 -- remain valid. A refused repeat stays swallowed until release, even if the
 -- pause, group or inhibition is restored before the next repeat.
@@ -733,6 +745,7 @@ do
 			env[#env + 1] = { "ERGOPTI_E2E_TAP_WRAP", scenario.tap_wrap or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_MAGIC_REPEAT", scenario.magic_repeat or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_DYNAMIC", scenario.dynamic or "none" }
+			env[#env + 1] = { "ERGOPTI_E2E_AUTOCORRECT", scenario.autocorrect or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_QUEUE_OUTPUT", scenario.queue_output and "1" or "0" }
 			env[#env + 1] = { "ERGOPTI_E2E_CASCADE", scenario.cascade or "none" }
 			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
@@ -783,6 +796,7 @@ do
 	run_key_scenarios(home_env, "", TAP_WRAP_SCENARIOS)
 	run_key_scenarios(home_env, "", MAGIC_REPEAT_SCENARIOS)
 	run_key_scenarios(home_env, "", DYNAMIC_SCENARIOS)
+	run_key_scenarios(home_env, "", AUTOCORRECT_SCENARIOS)
 
 	-- hardening-e-presets: the same keys over the recommended preset, committed
 	-- by a start-up child through the menu's own composition in a folder tree

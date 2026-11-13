@@ -31,6 +31,10 @@ local CONFIG, DEVICE, SCRIPT = arg[1], arg[2], arg[3]
 local MAGIC_REPEAT = os.getenv("ERGOPTI_E2E_MAGIC_REPEAT") or "none"
 local TAP_COLLISION = MAGIC_REPEAT:match("^tap%-") ~= nil
 if MAGIC_REPEAT ~= "none" then CONFIG = "../_shared/hotstrings/data/catalogue/magickey.toml" end
+-- The autocorrection scenarios type against the shipped common sections.
+if (os.getenv("ERGOPTI_E2E_AUTOCORRECT") or "none") ~= "none" then
+	CONFIG = "../_shared/hotstrings/data/catalogue"
+end
 arg = { "--device", DEVICE, "--config", CONFIG }
 package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 
@@ -64,6 +68,24 @@ local function with_date_rules(content)
 	end
 	return content
 end
+-- ERGOPTI_E2E_AUTOCORRECT=<section> (items 104, 105): the same private config
+-- with one common autocorrection section switched on and the other two left
+-- off, so a scenario proves each section fires alone.
+local AUTOCORRECT = os.getenv("ERGOPTI_E2E_AUTOCORRECT") or "none"
+local AUTOCORRECT_SECTIONS = { names = true, abbreviations = true, technical_terms = true }
+assert(AUTOCORRECT == "none" or AUTOCORRECT_SECTIONS[AUTOCORRECT], "unknown autocorrection scenario")
+--- The neutral template with the autocorrection category and one of its common
+--- sections chosen, as the menu writes them, the other two sections off.
+--- @param content string
+--- @return string
+local function with_autocorrection_section(content)
+	assert(not content:find("[hotstrings.groups]", 1, true), "the template now holds category choices")
+	local lines = { "", "[hotstrings.groups]", "autocorrection = true", "", "[hotstrings.modules.autocorrection]" }
+	for _, section in ipairs({ "names", "abbreviations", "technical_terms" }) do
+		lines[#lines + 1] = section .. " = " .. tostring(section == AUTOCORRECT)
+	end
+	return content .. table.concat(lines, "\n") .. "\n"
+end
 -- ERGOPTI_E2E_CASCADE=<arrows>[,consume] (item 50): the same private config
 -- with hotstrings.cascade_max_arrows set, and with "consume" the Space and Enter
 -- delimiters consumed (hotstrings.terminator_consume), as the menu writes them.
@@ -84,7 +106,8 @@ local function with_cascade(content)
 	end
 	return content
 end
-if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" or CASCADE ~= "none" then
+if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" or CASCADE ~= "none"
+	or AUTOCORRECT ~= "none" then
 	local modes = { accepted = true, unassigned = true, modified = true, refused = true, reopened = true }
 	assert(TAP_WRAP == "none" or modes[TAP_WRAP], "unknown tap/wrap scenario")
 	local Paths = require("infra.config_paths")
@@ -99,6 +122,7 @@ if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" or CASCADE 
 	local content = template:read("*a")
 	if DYNAMIC == "dates" then content = with_date_rules(content) end
 	if CASCADE ~= "none" then content = with_cascade(content) end
+	if AUTOCORRECT ~= "none" then content = with_autocorrection_section(content) end
 	local file = assert(io.open(selection_config, "wb"))
 	assert(file:write(content))
 	assert(file:close())

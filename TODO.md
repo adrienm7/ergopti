@@ -640,8 +640,13 @@ Each closes on a named green hosted or native run, recorded here.
       build, which tonight's no-release rule forbids, so the signed run needs the next release candidate.
       Ad hoc receipt 2026-11-11: `macOS launch gate [karabiner_config] passed on arm64` in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (job 130257482253),
       which requires all eight variants to build, merge and publish on the installed app.
-- [ ] **104, 105.** Common autocorrection sections (native Windows/macOS, per-section E2E, package); dynamic
+- [ ] **104, 105.** (claimed by worker F, 2026-11-13) Common autocorrection sections (native Windows/macOS, per-section E2E, package); dynamic
       hotstrings on macOS.
+      Per-section E2E on Linux (2026-11-13, worker F): the daemon E2E types `chatgpt adn adaboost` against the shipped
+      catalogue with one common section chosen at a time (`[hotstrings.groups]`, `[hotstrings.modules.autocorrection]`):
+      names publishes 34 rules and gives only ChatGPT, abbreviations 95 and only ADN, technical terms 11 and only
+      AdaBoost (`AUTOCORRECT_SCENARIOS`, `ERGOPTI_E2E_AUTOCORRECT`). Left: the native Windows and macOS cases and the
+      macOS dynamic hotstrings on a real machine (maintainer).
 - [ ] **34, 37, 102, 129.** Native macOS delimiter transactions; macOS packaging with both extension TOML files;
       Windows native cases and Fedora/Alpine ShellRunner fixtures (Linux done in the start-up E2E).
       macOS packaging received 2026-11-11: 85f3dfee20 makes the macOS and Linux builds require every hotstring file the
@@ -651,7 +656,7 @@ Each closes on a named green hosted or native run, recorded here.
       received: the full Linux unit suite passes on Fedora's and Alpine's own LuaJIT in 43012051378 (jobs 130494409773, 130494409706) and their Integration rows too. Still open: native macOS delimiter transactions (typing into an
       installed driver on a real Mac) and the Windows native cases (maintainer; Windows counterpart of the payload check:
       run it from the Windows packaging against the registry `windows_bundle_manifest.json` ships).
-- [ ] **121, 123, 137.** AI Agent submenu composed-menu qualification on macOS and Windows; provider published before
+- [ ] **121, 123, 137.** (claimed by worker F, 2026-11-13: the CI part is green below; only the installed Mac menu and the Windows part are left, both native) AI Agent submenu composed-menu qualification on macOS and Windows; provider published before
       model loading on macOS (Linux done).
       macOS part on hosted CI: the macOS Unit lots (menu_llm, ui) that hold the composed-menu and provider-order tests
       are green in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137); a composed menu shown by an installed driver needs a real Mac. Windows part is the maintainer's.
