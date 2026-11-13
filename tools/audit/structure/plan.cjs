@@ -1618,6 +1618,18 @@ function scanFile(file, text, ctx) {
 			new RegExp(`\\bpath\\.(?:join|resolve)\\([^)]*(["'])${d}\\1`).test(text) ||
 			ownsAlone(d)
 	);
+	// A tool that names the Windows driver (path.join(root, 'windows')) reads
+	// its AutoHotkey sources by driver-relative path ('infra/uninstall.ahk'):
+	// those live in that driver alone, whatever other drivers the tool names.
+	const namesWindows =
+		file.includes('windows') ||
+		text.includes('/windows') ||
+		/\bpath\.(?:join|resolve)\([^)]*(["'])windows\1/.test(text);
+	const toolDriverOf = (token) => {
+		if (inTree) return null;
+		if (namesWindows && /\.(?:ahk|ps1)$/.test(token)) return 'windows';
+		return namedDrivers.length === 1 ? namedDrivers[0] : null;
+	};
 	const category = categoryOf(file);
 	const seen = new Set();
 	const add = (kind, oldToken, newToken, resolution = null) => {
@@ -1734,7 +1746,7 @@ function scanFile(file, text, ctx) {
 				byRepoPath,
 				isSharedArgument(text, m.index),
 				byRepoDir,
-				!inTree && namedDrivers.length === 1 ? namedDrivers[0] : null
+				toolDriverOf(m[0])
 			)
 		);
 		if (hit) add('path', m[0], hit.newRepo === PREFIX ? '(retired)' : hit.newRepo, hit);
