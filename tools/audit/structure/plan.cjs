@@ -2285,9 +2285,11 @@ function scanFile(file, text, ctx) {
 		}
 	}
 	if (file.endsWith('.lua')) {
-		// A quoted prefix completed by concatenation: "modules.llm." .. name.
+		// A quoted prefix completed by concatenation: "modules.llm." .. name,
+		// loaded by require, package.loaded or a test helper that loads a module
+		// by name (helpers.load_with_stubs("adapters." .. name)).
 		for (const m of text.matchAll(
-			/(?:\brequire\s*\(?\s*|package\.loaded\s*\[\s*)["']((?:[A-Za-z_][A-Za-z0-9_]*\.)+)["']\s*\.\./g
+			/(?:\brequire\s*\(?\s*|package\.loaded\s*\[\s*|\.(?:load_with_stubs|load_module|fresh_module|load_module_with_dependency)\s*\(\s*)["']((?:[A-Za-z_][A-Za-z0-9_]*\.)+)["']\s*\.\./g
 		)) {
 			if (Rules.RUNTIME_EDITS.some((e) => PREFIX + e.file === file && e.prefix === m[1])) continue;
 			const site = Rules.RUNTIME_PREFIXES.find((r) => PREFIX + r.file === file && r.old === m[1]);
