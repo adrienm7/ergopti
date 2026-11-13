@@ -920,6 +920,22 @@ function run() {
 			"const D = ['adapters', 'docs'];\n",
 		'a sibling folder list gains the folder the step creates'
 	);
+	// $shared = Join-Path $PSScriptRoot '..\..\static\ergopti_plus\_shared', then
+	// Join-Path $shared 'modules\control\x.json': the joined path follows its
+	// file. Left as it was, the control CLI read a spec S01 had moved.
+	const control = '_shared/modules/control/driver_control.json';
+	if (fs.existsSync(path.join(repo, P, control)) && full.get(control) !== control) {
+		const ps1 = 'tools/control/z.ps1';
+		const script =
+			"$shared = Join-Path $PSScriptRoot '..\\..\\static\\ergopti_plus\\_shared'\n" +
+			"$spec = Join-Path $shared 'modules\\control\\driver_control.json'\n";
+		const out = Apply.rewriteText(script, Plan.scanFile(ps1, script, fullCtx), moved, ps1);
+		const rel = full.get(control).slice('_shared/'.length).replace(/\//g, '\\');
+		assert.ok(
+			out.includes(`Join-Path $shared '${rel}'`),
+			'a PowerShell joined path follows its file'
+		);
+	}
 	// Third-party code keeps its own paths; our scripts in a vendor folder move.
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/_shared/ui/vendor/fengari-web.js'));
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/windows/vendor/WebView2.ahk'));

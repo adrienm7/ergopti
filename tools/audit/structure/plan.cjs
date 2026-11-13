@@ -1805,6 +1805,36 @@ function scanFile(file, text, ctx) {
 			add('lua-concat', m[0], m[0].replace(j.text, `${m[1]}${lead}${piece}${trail}${m[1]}`), hit);
 		}
 	}
+	// $shared = Join-Path $PSScriptRoot '..\..\static\ergopti_plus\_shared' and
+	// then Join-Path $shared 'modules\control\x.json': a PowerShell path joined
+	// onto a base the script anchors on itself follows its file, spelled from
+	// the same base.
+	if (/\.(ps1|psm1)$/.test(file)) {
+		const bases = new Map();
+		for (const m of text.matchAll(
+			/^\s*\$(\w+)\s*=\s*Join-Path\s+\$PSScriptRoot\s+'([\w.\\\/-]+)'\s*$/gm
+		))
+			bases.set(
+				m[1].toLowerCase(),
+				path.posix.normalize(`${path.posix.dirname(file)}/${m[2].replace(/\\/g, '/')}`)
+			);
+		for (const m of text.matchAll(/Join-Path\s+\$(\w+)\s+'([\w.\\\/-]+)'/g)) {
+			const base = bases.get(m[1].toLowerCase());
+			if (!base) continue;
+			const old = path.posix.normalize(`${base}/${m[2].replace(/\\/g, '/')}`);
+			const moved = byRepoPath.get(old) || byRepoDir.get(old);
+			if (!moved || moved === SPLIT) continue;
+			if (!moved.startsWith(`${base}/`)) {
+				add('dir-split', m[0], '(split)', { oldRepo: old });
+				continue;
+			}
+			const rel = moved.slice(base.length + 1).replace(/\//g, '\\');
+			add('lua-module-quoted', m[0], m[0].replace(`'${m[2]}'`, `'${rel}'`), {
+				oldRepo: old,
+				newRepo: moved
+			});
+		}
+	}
 	// Path(__file__).parent.parent / "modules/network/x.json": a Python path
 	// anchored on the file's own place. When the file or its target moves,
 	// the climb and the literal are both respelled from the file's new place.
