@@ -342,6 +342,11 @@ function committedSteps(
 // References
 // ──────────────────────────────────────────────────────────────────────────────
 
+/** True when `text` writes or runs Ruby and never names Lua. */
+function rubyNotLua(text) {
+	return /\.rb\b|\bruby\b/i.test(text) && !/lua/i.test(text);
+}
+
 /** The Lua module name of a tree-relative Lua path, or null. */
 function luaModuleName(treeRel, target = false) {
 	if (!treeRel || !treeRel.endsWith('.lua')) return null;
@@ -2327,6 +2332,9 @@ function scanFile(file, text, ctx) {
 			// is a key everywhere but at a load site, like a one-word name.
 			const loadOnly = !m[1].includes('.') || configKeys().has(m[1]);
 			if (loadOnly && !isModuleLoadSite(text, m.index)) continue;
+			// require "json" in a file that writes Ruby and never names Lua is a
+			// Ruby load (a Homebrew probe written by a Python tool).
+			if (loadOnly && !file.endsWith('.lua') && rubyNotLua(text)) continue;
 			for (const r of roots) {
 				const hit = byLuaName.get(`${r}|${m[1]}`);
 				if (hit) {
@@ -2371,6 +2379,8 @@ function scanFile(file, text, ctx) {
 				NODE_MODULES.has(m[1])
 			)
 				continue;
+			// The same Ruby load in a tool.
+			if (!dotted && !listed && !tag && rubyNotLua(text)) continue;
 			const shared = byLuaName.get(`_shared|${m[1]}`);
 			const own = drivers.map((d) => byLuaName.get(`${d}|${m[1]}`)).filter(Boolean);
 			const targets = new Set(own.map((h) => h[2]));
