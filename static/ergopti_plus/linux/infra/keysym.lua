@@ -178,6 +178,12 @@ local function xkb()
 		int xkb_keysym_to_utf8(unsigned int keysym, char *buffer, unsigned long size);
 	]])
 	if not ok_cdef and not tostring(cdef_err):find("redefin", 1, true) then return nil end
+	-- Declared alone: another module may already hold the two above, and one
+	-- redefinition would drop this declaration with them.
+	local ok_name, name_err = pcall(ffi.cdef, [[
+		int xkb_keysym_get_name(unsigned int keysym, char *buffer, unsigned long size);
+	]])
+	if not ok_name and not tostring(name_err):find("redefin", 1, true) then return nil end
 
 	-- The soname, not the development symlink: libxkbcommon-dev is not installed
 	-- on a user's machine and dlopen("libxkbcommon.so") would fail there while
@@ -192,6 +198,8 @@ local function xkb()
 	-- 8 bytes holds any UTF-8 sequence plus its terminator; xkb_keysym_to_utf8
 	-- writes at most 5.
 	local buffer = ffi.new("char[8]")
+	-- 64 bytes holds every keysym name keysymdef.h defines plus its terminator.
+	local name_buffer = ffi.new("char[64]")
 	_xkb = {
 		from_name = function(name)
 			local sym = lib.xkb_keysym_from_name(name, 0)
@@ -204,6 +212,13 @@ local function xkb()
 			-- has no character — a modifier or a dead key.
 			if n <= 1 then return nil end
 			return ffi.string(buffer, n - 1)
+		end,
+		name = function(sym)
+			local n = lib.xkb_keysym_get_name(sym, name_buffer, 64)
+			-- The count excludes the terminator; -1 means an invalid keysym, and
+			-- a count of 64 or more means the name did not fit.
+			if n <= 0 or n >= 64 then return nil end
+			return ffi.string(name_buffer, n)
 		end,
 	}
 	Logger.debug(LOG, "libxkbcommon bound.")
@@ -257,6 +272,19 @@ function M.to_char(name)
 	end
 
 	return nil
+end
+
+--- The canonical name of a numeric keysym, as a keymap writes it by name.
+---
+--- libxkbcommon 1.13 (Ubuntu 26.04) serializes a keymap with numeric keysyms
+--- (`[ 0x61, 0x41 ]`), the form a compositor sends; the layout code reads
+--- names (`dead_acute`, `ISO_Level3_Shift`), so the parser restores them here.
+--- @param sym integer Numeric xkb_keysym_t.
+--- @return string|nil Name such as "a", "EuroSign" or "U20AC"; nil without libxkbcommon.
+function M.name_of(sym)
+	if type(sym) ~= "number" or sym <= 0 or sym % 1 ~= 0 then return nil end
+	local lib = xkb()
+	return lib and lib.name and lib.name(sym) or nil
 end
 
 --- Resolves an already-numeric keysym to its UTF-8 identity.

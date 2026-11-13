@@ -561,8 +561,10 @@ local function ordered_aliases(text)
 	-- 0x80 as a sign-extended octal escape that libxkbcommon reads back as other
 	-- bytes: a layout named « bépo » or « Français — Ergopti » never matched its
 	-- printed copy, and every key press it was asked to type was refused.
-	return (result:gsub('(\n[ \t]*name%[[Gg]roup%d+%][ \t]*=[ \t]*)"[^\n]*";', '%1"";'))
+	return (result:gsub('(\n[ \t]*name%[%a*%d+%][ \t]*=[ \t]*)"[^\n]*";', '%1"";'))
 end
+
+M._ordered_aliases = ordered_aliases
 
 --- Projects native serialization through the capture owner's exact parser codec.
 --- X11 may retain unreferenced types and interprets that a parsed map omits.

@@ -106,7 +106,7 @@ local ok, err = pcall(function()
 	for _, spec in ipairs(cases) do
 		local text, count = original, 0
 		if spec.group then
-			text, count = text:gsub('name%[Group1%]%s*=%s*"[^"]*"', function() return 'name[Group1]="' .. spec.group .. '"' end, 1)
+			text, count = text:gsub('%f[%w_](name%[%a*1%])%s*=%s*"[^"]*"', function(field) return field .. '="' .. spec.group .. '"' end, 1)
 			assert(count == 1, "the native input must carry the intended group name")
 		elseif spec.type_name then
 			text = custom_type(text, spec.type_name)
@@ -117,7 +117,9 @@ local ok, err = pcall(function()
 		local canonical = canonicalize(text)
 		local section = assert(canonical:find('\nxkb_symbols "', 1, true), "the actual symbols section must be retained")
 		if spec.group then
-			local retained = assert(canonical:find('name[Group1]="' .. spec.group .. '"', 1, true), "the exact group literal must survive native serialization")
+			-- libxkbcommon 1.13 writes the group index bare (`name[1]=`).
+			local retained = assert(canonical:find('name[Group1]="' .. spec.group .. '"', 1, true)
+				or canonical:find('name[1]="' .. spec.group .. '"', 1, true), "the exact group literal must survive native serialization")
 			assert(retained > section, "the group literal must remain in the symbols section")
 		elseif spec.type_name then
 			local literal = '"' .. spec.type_name .. '"'
