@@ -43,7 +43,7 @@ local function install_collaborators(effects)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
-			or name:match("^adapters%.")
+			or helpers.is_driver_module(name)
 		) then
 			package.loaded[name] = nil
 		end
