@@ -349,7 +349,8 @@ function M.save(report)
 	-- log tail may quote a token, an account name or a path. A redactor that
 	-- cannot answer refuses the report; no raw fallback is written.
 	local admitted, json_str = pcall(function()
-		return Logger.redact_message(CrashReport.encode(CrashReport.build(report)))
+		local redacted = CrashReport.redact(CrashReport.build(report), Logger.redact_message)
+		return redacted and CrashReport.encode(redacted) or nil
 	end)
 	if not admitted or type(json_str) ~= "string" then
 		Logger.error(LOG, "Crash report refused: the privacy redactor is unavailable (%s).",
