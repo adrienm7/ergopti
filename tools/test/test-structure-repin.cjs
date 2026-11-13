@@ -188,6 +188,14 @@ function run() {
 
 	// The listed derivations reproduce their pins on the tree as it stands.
 	deriveAll({ pinned: true });
+	// The native manifests whose fingerprint covers source paths are derived:
+	// a step that moves their sources would otherwise stop every Windows lane.
+	const derivedFiles = require('../audit/structure/edits.cjs').DERIVED_PINS.map((e) => e.file);
+	for (const manifest of [
+		'static/ergopti_plus/windows/vendor/ergopti-proxy-relay.json',
+		'static/ergopti_plus/windows/vendor/ergopti_nav_owner.manifest.json'
+	])
+		assert.ok(derivedFiles.includes(manifest), `${manifest} is a derived pin`);
 
 	for (const r of [repo, twin, checked, derivedRepo, frame])
 		fs.rmSync(r.root, { recursive: true, force: true });

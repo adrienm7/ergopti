@@ -448,6 +448,54 @@ const DERIVED_PINS = [
 				identity += `${relative}\n${sha(fs.readFileSync(path.join(module, relative)))}\n`;
 			return sha(Buffer.from(identity, 'utf8'));
 		}
+	},
+	{
+		// The navigation owner manifest pins its sources and recipe as the
+		// builder's Get-SourceRecipeFingerprint computes them: each fingerprint
+		// file by repository path and canonical-LF SHA-256, then the recipe. A
+		// step moves the sources and rewrites only their comments and the
+		// builder's paths; no __FILE__ and no debug record reach the /Brepro
+		// DLL, and every Windows CI lane recompiles and tests the moved sources.
+		file: 'static/ergopti_plus/windows/vendor/ergopti_nav_owner.manifest.json',
+		source: 'tools/build/build_windows_nav_owner.ps1',
+		why: 'source_fingerprint_sha256 is the identity of the sources and recipe the tracked DLL was built from',
+		derive(builder, holder, _lib, builderPath) {
+			const fs = require('node:fs');
+			const path = require('node:path');
+			const crypto = require('node:crypto');
+			const root = path.resolve(path.dirname(builderPath), '..', '..');
+			const own = path.relative(root, builderPath).split(path.sep).join('/');
+			const dir = builder.match(/^\$sourceDir = Join-Path \$repoRoot "([^"]+)"$/m);
+			if (!dir) return null;
+			const sourceDir = dir[1].split('\\').join('/');
+			const files = fs
+				.readdirSync(path.join(root, sourceDir), { withFileTypes: true })
+				.filter((d) => d.isFile() && (/\.(c|h|def)$/.test(d.name) || d.name === 'CMakeLists.txt'))
+				.map((d) => `${sourceDir}/${d.name}`)
+				.concat(own)
+				.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+			const manifest = JSON.parse(holder);
+			// The builder rejects a manifest whose list differs from the tree's.
+			if (JSON.stringify(manifest.fingerprint_files) !== JSON.stringify(files)) return null;
+			const lines = ['ergopti-nav-owner-source-recipe-v1'];
+			files.forEach((f, i) => {
+				const text = fs
+					.readFileSync(path.join(root, f), 'utf8')
+					.replace(/^\uFEFF/, '')
+					.replace(/\r\n?/g, '\n');
+				lines.push(`input[${i}].path=${f}`);
+				lines.push(
+					`input[${i}].sha256=${crypto.createHash('sha256').update(text, 'utf8').digest('hex').toUpperCase()}`
+				);
+			});
+			lines.push(`recipe.executable=${manifest.build_recipe.executable}`);
+			manifest.build_recipe.arguments.forEach((a, i) => lines.push(`recipe.argument[${i}]=${a}`));
+			return crypto
+				.createHash('sha256')
+				.update(`${lines.join('\n')}\n`, 'utf8')
+				.digest('hex')
+				.toUpperCase();
+		}
 	}
 ];
 
