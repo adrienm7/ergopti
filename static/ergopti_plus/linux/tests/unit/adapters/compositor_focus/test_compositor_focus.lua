@@ -118,6 +118,40 @@ helpers.describe("compositor_focus: COSMIC toplevel tracker", function()
 		helpers.assert_eq(pcall(tracker.title, "a", string.rep("t", 2049)), false, "an oversized title is refused")
 	end)
 
+	helpers.it("(wayland-desktop-focus) binds version 2 only beside the toplevel list, version 1 otherwise", function()
+		local info, list = Worker.INFO_INTERFACE, Worker.LIST_INTERFACE
+		helpers.assert_eq(Worker.choose_protocol({ [info] = { name = 7, version = 1 } }),
+			{ info_version = 1, list = false }, "a version 1 compositor")
+		helpers.assert_eq(Worker.choose_protocol({ [info] = { name = 7, version = 3 }, [list] = { name = 8, version = 1 } }),
+			{ info_version = 2, list = true }, "a version 3 compositor with the list")
+		helpers.assert_eq(Worker.choose_protocol({ [info] = { name = 7, version = 2 } }),
+			{ info_version = 1, list = false }, "a later version without the list keeps version 1")
+		helpers.assert_eq(Worker.choose_protocol({ [info] = { name = 7, version = 1 }, [list] = { name = 8, version = 1 } }),
+			{ info_version = 1, list = false }, "the list alone does not raise a version 1 global")
+		helpers.assert_eq(pcall(Worker.choose_protocol, { [list] = { name = 8, version = 1 } }), false,
+			"no toplevel info is a failure, never a guess")
+		helpers.assert_eq(pcall(Worker.choose_protocol, { [info] = { name = 7, version = 0 } }), false,
+			"an invalid version is refused")
+	end)
+
+	helpers.it("(wayland-desktop-focus) version 2 commits states only with the batch done", function()
+		local tracker = Worker.new_tracker({ atomic_states = true })
+		tracker.add("a"); tracker.title("a", "notes"); tracker.app_id("a", "com.system76.CosmicEdit")
+		helpers.assert_eq(tracker.done("a"), { kind = "clear" }, "a window with no committed state is not the focus")
+		tracker.state("a", { ACTIVATED })
+		helpers.assert_eq(tracker.current(), { kind = "clear" }, "a pending state is not the window's until the batch")
+		helpers.assert_eq(tracker.batch_done().id, "cosmic-1")
+		tracker.add("b"); tracker.app_id("b", "com.system76.CosmicTerm"); tracker.done("b")
+		tracker.state("a", {})
+		tracker.state("b", { ACTIVATED })
+		helpers.assert_eq(tracker.batch_done().class, "com.system76.CosmicTerm",
+			"the activation moves with no clear in between")
+		helpers.assert_eq(tracker.batch_done(), nil, "an empty batch prints nothing")
+		tracker.title("b", "~")
+		helpers.assert_eq(tracker.done("b").title, "~", "a title is committed by the window's own done")
+		helpers.assert_eq(pcall(Worker.new_tracker().batch_done), false, "version 1 has no batch done")
+	end)
+
 	helpers.it("(wayland-desktop-focus) the COSMIC worker command names its own worker and the Wayland library", function()
 		local Focus = helpers.load_module("adapters.compositor_focus")
 		local start, process = fake_process()
@@ -161,6 +195,7 @@ helpers.describe("compositor_focus: source", function()
 		{ "an unknown kind", '{"kind":"ready"}\n{"kind":"guess"}\n' },
 		{ "a zero process id", '{"kind":"ready"}\n{"kind":"focus","class":"a","title":"b","pid":0,"id":"1"}\n' },
 		{ "a second readiness", '{"kind":"ready"}\n{"kind":"ready"}\n' },
+		{ "a readiness naming a fractional protocol", '{"kind":"ready","protocol":1.5}\n' },
 		{ "an unbounded line", '{"kind":"ready"}\n' .. string.rep("x", 9000) },
 	}) do
 		helpers.it("(wayland-desktop-focus) fails closed on " .. case[1], function()
@@ -293,7 +328,7 @@ helpers.describe("compositor_focus: window_info join", function()
 		local ok, failure = pcall(function()
 			helpers.assert_true(window_info.start_compositor_focus({ start_process = start,
 				command = function() return "luajit", {}, "/" end }))
-			process.say('{"kind":"ready"}\n{"kind":"focus","class":"com.system76.CosmicTerm","title":"~","id":"cosmic-2"}\n')
+			process.say('{"kind":"ready","protocol":2}\n{"kind":"focus","class":"com.system76.CosmicTerm","title":"~","id":"cosmic-2"}\n')
 			helpers.assert_eq(window_info.getFocused().appId, "com.system76.CosmicTerm")
 			helpers.assert_eq(window_info.focused_identity(), "cosmic::cosmic-2")
 			helpers.assert_eq(commands, {}, "no lswt probe either")
