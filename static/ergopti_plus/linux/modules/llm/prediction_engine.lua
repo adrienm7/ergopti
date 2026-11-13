@@ -66,8 +66,9 @@ local _context = nil
 local _overlay = nil
 local _apply_prediction = nil
 local _on_output = nil
--- The metrics observers: offer(context, count), dismiss(context, shown), generation(context, info).
--- One table: the main chunk is at the interpreter's limit of 200 locals.
+-- The observers: offer(context, count), dismiss(context, shown), generation(context, info)
+-- for the metrics; live(live) and agent_mode(mode) for the tray. One table: the
+-- main chunk is at the interpreter's limit of 200 locals.
 local _observers = {}
 local _offer_notified = false
 local _suggestions = {}
@@ -131,11 +132,6 @@ local _vision_unscaled_logged = false
 local _live = nil
 -- The decoded live.json, loaded on the first activation
 local _live_config = nil
--- Injected by init(): told after every live transition, so the tray redraws
--- its live submenu's check marks.
--- Tray observers: live mode and the agent mode switched by a binding. One table:
--- this chunk is at LuaJIT's 200-local ceiling.
-local _observers = { live = nil, agent_mode = nil }
 
 -- Injected by init() for the AI agent: the focused window's application and
 -- title (the request's context), a native text dialog (llm_agent_command), the
@@ -703,6 +699,8 @@ function M.init(opts)
 		offer = type(options.on_offer) == "function" and options.on_offer or nil,
 		dismiss = type(options.on_dismiss) == "function" and options.on_dismiss or nil,
 		generation = type(options.on_generation) == "function" and options.on_generation or nil,
+		live = type(options.on_live_change) == "function" and options.on_live_change or nil,
+		agent_mode = type(options.on_agent_mode_change) == "function" and options.on_agent_mode_change or nil,
 	}
 	_is_paused = type(options.is_paused) == "function" and options.is_paused or NEVER_PAUSED
 	_notify = type(options.notify) == "function" and options.notify or nil
@@ -715,8 +713,6 @@ function M.init(opts)
 	_focus_id = type(options.focus_id) == "function" and options.focus_id or nil
 	_buffer_focus = nil
 	_capture_screen = type(options.capture_screen) == "function" and options.capture_screen or nil
-	_observers.live = type(options.on_live_change) == "function" and options.on_live_change or nil
-	_observers.agent_mode = type(options.on_agent_mode_change) == "function" and options.on_agent_mode_change or nil
 	_focused_window = type(options.focused_window) == "function" and options.focused_window or nil
 	_ask_text = type(options.ask_text) == "function" and options.ask_text or nil
 	_now = type(options.now) == "function" and options.now or SYSTEM_CLOCK
