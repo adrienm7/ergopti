@@ -40,10 +40,11 @@ global UC_HOST_ACCESS_ALLOW := 1
 global UC_PAGE_ACTIONS := Map("close", "", "update", "available", "whats_new", "available",
 	"open_url", "available", "switch_channel", "", "report", "error", "open_log", "error")
 
-; The actions that drive the updater, refused while the driver is paused; the
-; others (close, report, open the log) change nothing ErgoptiPlus does, as in
-; the error window
-global UC_UPDATER_ACTIONS := Map("update", true, "whats_new", true, "open_url", true, "switch_channel", true)
+; The actions that install, refused while the driver is paused: the
+; self-update transaction stops at a pause. Every other action runs while
+; paused, as on macOS and Linux (UPD-2: a pause stops typing, not what the user
+; asks for)
+global UC_INSTALL_ACTIONS := Map("update", true)
 
 ; The phases an answer may carry, as the page knows them
 global UC_ANSWER_STATES := Map("up_to_date", true, "available", true, "no_release", true, "error", true)
@@ -291,13 +292,13 @@ _UpdateCheck_NativeTexts(State) {
 ; @param Effects {Map|Integer} Replacements of the effects (tests only): install,
 ;   changelog, open_url, set_channel, report, open_log, close, refuse_paused.
 ; @param BornSuspended {Boolean} Whether the driver was paused when the click
-;   arrived: an updater action is then refused visibly.
+;   arrived: an install is then refused visibly (UPD-2 runs the others).
 ; @param ActionOwner {Object} Optional exact answer captured at dispatch; direct
 ;   synchronous callers capture the current answer at entry.
 ; @param Url {String} The clicked link of an open_url action.
 ; @returns {Map} { ok, missing, closed }
 UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false, ActionOwner := unset, Url := "") {
-	global UC_PAGE_ACTIONS, UC_UPDATER_ACTIONS
+	global UC_PAGE_ACTIONS, UC_INSTALL_ACTIONS
 	Outcome := Map("ok", false, "missing", false, "closed", false)
 	Owner := IsSet(ActionOwner) ? ActionOwner : _UpdateCheck_CaptureActionOwner()
 	if !UC_PAGE_ACTIONS.Has(Name) || !_UpdateCheck_ActionCurrent(Owner)
@@ -309,8 +310,8 @@ UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false, A
 		return Outcome
 	}
 	Effect(Key, Default) => (Effects is Map && Effects.Has(Key)) ? Effects[Key] : Default
-	if (BornSuspended && UC_UPDATER_ACTIONS.Has(Name)) {
-		Effect("refuse_paused", _Updater_RefuseManualWhileSuspended).Call()
+	if (BornSuspended && UC_INSTALL_ACTIONS.Has(Name)) {
+		Effect("refuse_paused", _Updater_RefuseInstallWhileSuspended).Call()
 		return Outcome
 	}
 
