@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 02:45)
+## Where things stand (2026-11-13, 05:00)
 
 - Branch: `claude/ergopti-todo-structure-phase2`, fast-forward only. Base:
   dev `520bb24c`, merged in `ee1aa96f`.
@@ -15,9 +15,14 @@ same commit as each step or checkpoint. Times are Paris time.
   `claude/ergopti-todo-structure-phase2-proof-3` at `c4cec48e` (built from
   `2627e45d`), was dispatched to `ci.yml` (`os_lanes=all`) at 02:44. About 120 checks are red locally on dev itself (root user, no
   `pwsh`, no Windows), so **measure S01 by CI, not locally.**
-- S02 (`core/crypto`) applies locally on top of S01 and has no CI run yet.
-  Its own new local reds, not yet read: js-0035, js-0241, js-0253, js-0280,
-  js-0281, js-0441; macOS meta (3), macOS modules (1).
+- S02 (`core/crypto`) applies locally on top of the S01 proof
+  (`/home/user/wt-seq` holds S01 proof + the tool commits since `2627e45d` +
+  S02). S02 needed: derived pins found where S01 left them (`a4d8fcd6`,
+  `4c145c12`), the committed step numbers kept (`4e04dd96`), the folder gain
+  rule (`ffe92aff`, `1e98ba49`), the adapter matrix by path (`31583188`), the
+  I1 records moved by the runner (`57869cd5`) and the banner fixture read from
+  the lint (`691e47a4`). Its six JS reds are fixed; macOS meta (3) and macOS
+  modules (1) are being compared.
 
 ### S01 CI failures (run 43311674550) and their state
 
@@ -80,6 +85,12 @@ A red outside this list is the step's (the coordinator, 2026-11-12 22:00).
   `[detection.<driver>.…]` resolve against that driver.
 - The contract ledger's family is listed per folder, with names excluded
   where S01 mixes the family with its neighbours (`91b3a046`).
+- Folder gains (`ffe92aff`, `1e98ba49`): a list or regex alternation of a
+  driver's sibling folders that names the folder a step's file leaves also
+  names the folder it moves into (adapters → core). This widens deliberately
+  narrow scanners too (the OS-purity lists, the platform-only convention).
+- The runner moves the I1 tree parity records (`57869cd5`) to the measured
+  values at each step, named in the commit with the folder bounds.
 
 ## Next commands
 
