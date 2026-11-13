@@ -96,6 +96,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '\t\t{ name = "a system package (/usr/lib/ergopti)", chunk = "/usr/lib/ergopti/core/i18n/engine/locale.lua" },\n\t\t{ name = "a relative checkout launch", chunk = "./core/i18n/engine/locale.lua" },'
 	},
 	{
+		// The i18n boot check reads the folder that holds i18n.ahk; S05 moves it
+		// out of infra/ into core/i18n/engine, while infra/ keeps other files.
+		file: 'static/ergopti_plus/windows/tests/meta/infra/i18n/test_i18n_fallback_deferred.ahk',
+		moves: 'windows/infra/i18n.ahk',
+		from: '\tI18n := _DriverDirConcat("infra")\n\tAssert(I18n != "", "infra\\i18n.ahk must be readable")',
+		to: '\tI18n := _DriverDirConcat("core/i18n/engine")\n\tAssert(I18n != "", "core\\i18n\\engine\\i18n.ahk must be readable")'
+	},
+	{
 		// The OS-purity ratchets exempt adapters/ by folder; S02 and S03 put three
 		// adapters in core/ without one, and S03 adds core/ to the scan (to review).
 		file: 'static/ergopti_plus/windows/tests/meta/suite/test_ahk_os_purity_ratchet.ahk',
