@@ -675,7 +675,7 @@ local SCALAR_VALUE_RULES = {
 -- The CapsWord delay and delimiters follow the shared policy's rules.
 SCALAR_VALUE_RULES.caps_word_idle_timeout_seconds = function(value)
 	if CapsWordPolicy.validate_idle_timeout(value) then return true end
-	return false, "the CapsWord delay is not a finite non-negative number of seconds"
+	return false, "the CapsWord delay is not a number of seconds in the declared range (0 = never)"
 end
 -- The pause and resume layouts are layout ids or "" (no change), by the
 -- shared policy; a legacy `false` from the boolean declaration is outdated.

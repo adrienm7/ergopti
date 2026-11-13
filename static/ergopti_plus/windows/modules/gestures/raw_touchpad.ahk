@@ -33,6 +33,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\infra\value_check.ahk
 
 ; The running owner, "" until RawTouchpadStart.
 global _RawTouchpadOwner := ""
@@ -92,11 +93,12 @@ GestureSlotSensitivity(Slot) {
 ; Coerces a sensitivity within the shared range, or rejects it.
 ; @returns {Number|String} The step, "" when out of range or not a number.
 GestureCoerceSensitivity(Value) {
-	global GESTURE_SENSITIVITY_OPTIONS
 	if !IsNumber(Value)
 		return ""
 	Parsed := Value + 0
-	if (Parsed < GESTURE_SENSITIVITY_OPTIONS[1] || Parsed > GESTURE_SENSITIVITY_OPTIONS[GESTURE_SENSITIVITY_OPTIONS.Length])
+	; The range is the shared value schema declaration (1 to 60 mm); the menu
+	; choices stay inside it (tools/test/test-value-schema.cjs).
+	if !ValueCheckValue(ValueCheckEntryFor("gestures.sensitivities.*"), Parsed)["ok"]
 		return ""
 	return Parsed
 }

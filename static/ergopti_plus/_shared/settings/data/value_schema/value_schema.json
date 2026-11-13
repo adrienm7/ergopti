@@ -233,6 +233,29 @@
 			"default_from": {
 				"manifest": "llm.trigger.min_request_interval_ms"
 			}
+		},
+		"shortcuts.caps_word.idle_timeout_seconds": {
+			"file": "config.toml",
+			"type": "decimal",
+			"unit": "s",
+			"min": 0,
+			"max": 3600,
+			"special": [
+				{
+					"value": 0,
+					"label_key": "value_check.special.never"
+				}
+			],
+			"default_from": {
+				"manifest": "shortcuts.caps_word.idle_timeout_seconds"
+			}
+		},
+		"gestures.sensitivities.*": {
+			"file": "config.toml",
+			"type": "decimal",
+			"unit": "mm",
+			"min": 1,
+			"max": 60
 		}
 	}
 }

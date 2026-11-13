@@ -81,9 +81,8 @@ _CapsWordAutoOffIsBoolean(Value) {
 ; @returns {Boolean}
 CapsWordAutoOffValidateIdleTimeout(Value, &Reason := "") {
 	Reason := ""
-	Kind := Type(Value)
-	; NaN compares unequal to itself; an infinity survives no subtraction.
-	if (Kind != "Integer" && Kind != "Float") || Value != Value || (Value - Value) != 0 || Value < 0 {
+	; Type and range are the shared value schema declaration (0 to 3600 s).
+	if !ValueCheckValue(ValueCheckEntryFor(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS), Value)["ok"] {
 		Reason := "invalid_idle_timeout"
 		return false
 	}

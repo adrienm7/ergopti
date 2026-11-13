@@ -197,7 +197,7 @@ function replayVectors(V) {
 // ==========================================
 // ==========================================
 
-function manifestDefault(manifest, key) {
+function manifestRow(manifest, key) {
 	const segments = key.split('.');
 	const id = segments.pop();
 	let node = manifest.features;
@@ -209,7 +209,11 @@ function manifestDefault(manifest, key) {
 			if (node.length === 0) node = undefined;
 		} else node = node && node[segment];
 	}
-	const row = Array.isArray(node) ? node.find((item) => item.id === id) : null;
+	return (Array.isArray(node) && node.find((item) => item.id === id)) || null;
+}
+
+function manifestDefault(manifest, key) {
+	const row = manifestRow(manifest, key);
 	return row ? row.default : undefined;
 }
 
@@ -296,8 +300,39 @@ function checkDeclarations(V, en) {
 				check(result.ok, `${where}: its default ${value} is refused (${result.reason})`);
 			}
 		}
+		// A menu that offers presets must offer only values the load admits.
+		const row =
+			entry.default_from && entry.default_from.manifest
+				? manifestRow(manifest, entry.default_from.manifest)
+				: null;
+		for (const preset of (row && row.preset_values) || []) {
+			const result = V.checkValue(entry, preset);
+			check(result.ok, `${where}: its menu preset ${preset} is refused (${result.reason})`);
+		}
 	}
 	return schema;
+}
+
+// The gesture step choices live in the shared Lua owner and its AHK copy;
+// their ends are the declared range, so neither can drift from the other.
+function checkGestureChoices(V, schema) {
+	const entry = schema.settings['gestures.sensitivities.*'];
+	const sources = [
+		['_shared/gestures/engine/sensitivity.lua', /local OPTIONS = \{([^}]*)\}/],
+		['windows/modules/gestures/raw_touchpad.ahk', /GESTURE_SENSITIVITY_OPTIONS := \[([^\]]*)\]/]
+	];
+	for (const [file, pattern] of sources) {
+		const found = pattern.exec(fs.readFileSync(path.join(SP, file), 'utf8'));
+		check(found, `${file}: the gesture step choices are found`);
+		if (!found) continue;
+		const values = found[1].split(',').map((item) => Number(item.trim()));
+		check(
+			values.length > 1 && values[0] === entry.min && values[values.length - 1] === entry.max,
+			`${file}: the gesture step choices span the declared ${entry.min}..${entry.max} mm`
+		);
+		for (const value of values)
+			check(V.checkValue(entry, value).ok, `${file}: the gesture step ${value} is admitted`);
+	}
 }
 
 // The JSON schema of the generated templates must not admit another range.
@@ -428,6 +463,7 @@ async function main() {
 	replayVectors(V);
 	const schema = checkDeclarations(V, en);
 	checkConfigSchema(schema);
+	checkGestureChoices(V, schema);
 	checkLocales(schema, en);
 	checkPorts();
 	checkBrowserCopy();
