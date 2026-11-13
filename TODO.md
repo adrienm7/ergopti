@@ -85,9 +85,9 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
       `_shared/settings/data/value_schema/value_schema.json` and its check in JS, Lua (macOS, Linux) and AHK, pinned
       by shared vectors, with the localized refusal text in 21 locales. Next blocks wire one family each: tap-hold
       timings, then hotstrings delays, LLM settings, the rest; the one-shot timeout after worker A lands 0 = no
-      limit. Decided by the agent on 2026-11-13, to review by the maintainer: `lone_modifier_tap_max_ms` gets a
-      10000 ms maximum and `mod_combos.simultaneous_threshold_ms` becomes a whole number from 1 to 1000 ms (macOS
-      Karabiner needs a whole number; no maximum existed).
+      limit. Confirmed by the maintainer on 2026-11-13: `lone_modifier_tap_max_ms` gets a 10000 ms maximum and
+      `mod_combos.simultaneous_threshold_ms` becomes a whole number from 1 to 1000 ms on the three OS. Block 2
+      (tap-hold timings wired at entry, load and boundary on the three OS) is on the branch.
 - [ ] **Direct XKB and KLC compilers.** Replace the compiled `.keylayout` as the intermediate form for Linux and
       Windows: compile the Ergopti TOML source straight to XKB and to KLC, using each format's full capability
       (XKB levels 3 and 5 on any key and sided modifiers; KLC Kana/Roya/Loya bits), so sided-modifier layers are

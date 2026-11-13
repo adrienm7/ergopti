@@ -1157,8 +1157,9 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			if not overwrite_corrupt and value == neutral then value = nil end
 			target[key] = value
 		end
-		local function assign_timing(target, section, key, value, neutral, read_leaf)
-			local _, outdated = (read_leaf or timing_leaf)(target, key, neutral, user_config_path, section)
+		local function assign_timing(target, section, key, value, neutral, read_leaf, declaration, scale)
+			local _, outdated = (read_leaf or timing_leaf)(target, key, neutral, user_config_path, section,
+				declaration, scale)
 			if not overwrite_corrupt and outdated and not explicit[section .. "." .. key] then
 				if value ~= neutral then
 					candidate_refusal = "candidate has no explicit repair owner for " .. section .. "." .. key
@@ -1261,7 +1262,8 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			local tap_holds = table_at(document, ConfigKeys.KEY.TAP_HOLDS)
 			assign_boolean(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "enabled", state.tap_holds_enabled,
 				Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED), tap_holds_switch)
-			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
+			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "timeout_ms", state.tap_hold_timeout_ms,
+				TAP_HOLD_TIMEOUT_MS_DEFAULT, nil, GLOBAL_DELAY_KEY, 0.001)
 			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, ConfigKeys.LEAF.STICKY_TIMEOUT_MS, state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
 			-- 0 is the strict tap-hold, a choice of its own: only the default is elided.
 			if state.lone_modifier_tap_max_ms ~= nil and not pcall(LoneTap.validate, state.lone_modifier_tap_max_ms) then
@@ -1293,7 +1295,9 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			else
 				mod_combos.enabled = state.mod_combos_enabled
 			end
-			assign_timing(mod_combos, ConfigKeys.KEY.MOD_COMBOS, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS, state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
+			assign_timing(mod_combos, ConfigKeys.KEY.MOD_COMBOS, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS,
+				state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT, nil,
+				ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, 1)
 			assign_boolean(mod_combos, ConfigKeys.KEY.MOD_COMBOS, "symmetric", state.combo_symmetric,
 				COMBO_SYMMETRIC_DEFAULT, combinations_symmetric)
 			if not preserve_array(mod_combos.config, { ConfigKeys.KEY.MOD_COMBOS, "config" },
