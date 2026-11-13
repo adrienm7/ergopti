@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-11-12. Latest stable: [v1.0.9](https://github.com/adrienm7/ergopti/releases/tag/v1.0.9).
+Updated: 2026-11-13. Latest stable: [v1.0.9](https://github.com/adrienm7/ergopti/releases/tag/v1.0.9).
 Conventions and tags: [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
 (`git show 932e70d583:TODO.md` is the long form before the 2026-11-12 cleanup).
 
@@ -10,27 +10,81 @@ This file lists features and fixes. The checks only real hardware can answer are
 [TODO-tests-macos.md](TODO-tests-macos.md), [TODO-tests-windows.md](TODO-tests-windows.md) and
 [TODO-tests-linux.md](TODO-tests-linux.md).
 
-## Resume here (2026-11-13, read first)
+## Resume here (2026-11-13 evening, read first)
 
-If the coordinating session stopped (weekly quota), any agent can continue from this section alone. Follow
-[AGENTS.md](AGENTS.md); never push `dev` or `main` without the maintainer's go in the current conversation.
+Any agent can continue from this section alone: the maintainer answered every open question on 2026-11-13 and
+wants the whole list done without them. Follow [AGENTS.md](AGENTS.md) and the skills it routes.
 
-- **Folder migration by OS (structure plan, the priority).** Plan: [docs/design/structure-plan.md](docs/design/structure-plan.md)
-  (item « Structure plan » under « Remaining code work »). The work runs overnight on branch
-  `claude/ergopti-todo-structure-phase2`, not on `dev`; if it had to be rebased it continues on
-  `claude/ergopti-todo-structure-phase2-night` (never force-pushed). Read the branch's
-  `docs/plans/structure-migration-resume.md` first: base `dev` commit, steps done with their proof, the step in
-  progress, the next command, known traps, how to regenerate `move-map.tsv`. One step per commit with
-  `tools/audit/structure/apply-step.cjs` (`--check-all` clean first); a step is done when local gates and CI on the
-  three OS show only the reds `dev` already has. Land on `dev` only with the maintainer's go, in small linear
-  blocks (decision of 2026-11-13: no merge commits, rebase the branch on `dev`). State at 17:05 Paris
-  (2026-11-13): S01 and S02 are on `dev` (42f8c1327, proof-10 CI run 43430776650). Next block S03-S05 is built on
-  top of it; the full chain still has about 2,000 Lua test failures, handled by the approved shared module
-  predicate (see the resume file's decisions).
-- **Reds `dev` already has (2026-11-12 evening), the baseline a step is compared with.** Windows Unit tests
-  (meta, `desktop-ci-evidence`); Windows Build (AV-surface ceilings, item below); Linux E2E desktop-webview,
-  updater, platform-metrics, input-display; Common Shared ui (App Cloner generated literals); Common Packaging and
-  boot (Linux uninstall EX_UNAVAILABLE, Arch desktop entry); macOS release Darwin receiver.
+### How to work alone
+
+- **Push rights.** `dev` may be pushed only when the maintainer's starting message in your conversation says so
+  (the 2026-11-13 hand-off message does). Before each push: `git fetch origin dev && git rebase origin/dev`, then
+  `git push origin HEAD:refs/heads/dev`. Never force-push, never a merge commit on `dev` (rebase branches, do not
+  merge `dev` into them), never `main`, never a tag or release, never a `Dev-Prerelease: yes` trailer (a plain
+  push to `dev` publishes nothing). No `Co-Authored-By` or `Claude-Session` trailers. Do not touch
+  `remap-runtime-v16.3.0-ergopti.6`, `vendor/remap-runtime/manifest.json` or the ci-seed tags.
+- **Before each commit:** `node tools/lint/format.cjs --check` (needs Ruff 0.15.8 first on `PATH`) and
+  `node tools/lint/lint-conventions.js --fail-on-violations`; never bypass the pre-commit hook.
+- **A change is done** when local gates pass and CI on the three OS (ci.yml, `os_lanes=all`, Windows allowed)
+  shows only the reds listed below; then land it on `dev` in a small linear block.
+- **New design questions:** pick the safest option that follows AGENTS.md, write « decided by the agent on
+  <date>, to review by the maintainer » on the item, and keep going. Do not stop to wait.
+- **Do not end a turn while work remains.** Wait for CI with a background poll and work on the next item meanwhile.
+- **Never** rewrite the « To confirm on the Windows PC » section, never commit a non-anonymized field report, never
+  cancel a CI run you did not start, never use `git stash`, `reset` or `clean` as shortcuts.
+- Keep this section current at each landing (state, next item).
+
+### Order of work
+
+1. **Folder migration by OS (structure plan).** Plan: [docs/design/structure-plan.md](docs/design/structure-plan.md).
+   Work branch `claude/ergopti-todo-structure-phase2-night` (linear on `dev`; the older `…-phase2` is frozen).
+   Read its `docs/plans/structure-migration-resume.md` first: base commit, steps done with proofs, next command,
+   traps, maintainer decisions. One step per commit with `tools/audit/structure/apply-step.cjs`. State at 21:00
+   Paris (2026-11-13): S01 and S02 are on `dev` (landed 16:50, 42f8c1327, CI run 43430776650). S03–S05 proof 16
+   (run 43481259457) failed and is being triaged. 33 steps remain; the approved shared module predicate handles
+   the Lua module-prefix sweeps. Land in blocks of a few steps.
+2. **The maintainer decisions of 2026-11-13 below** (section « Maintainer decisions of 2026-11-13, to implement »).
+3. **« Remaining code work »**, then the feature sections, then « CI acceptance ». Items that need real hardware
+   or a release stay for the maintainer; say so on the item and move on.
+
+### Reds `dev` already has (2026-11-12 evening), the baseline a change is compared with
+
+Windows Unit tests (meta, `desktop-ci-evidence`); Windows Build (AV-surface ceilings, item below); Linux E2E
+desktop-webview, updater, platform-metrics, input-display; Common Shared ui (App Cloner generated literals); Common
+Packaging and boot (Linux uninstall EX_UNAVAILABLE, Arch desktop entry); macOS release Darwin receiver. Known
+flakes: macOS Intel Managed Ollama Go test `TestCancellationAndConcurrentClosePhysicallyRetirePeer` (passes on
+rerun); a macOS cold-bootstrap job whose runner is lost (no log).
+
+### Maintainer decisions of 2026-11-13, to implement
+
+- [ ] **One-shot modifiers (OSM-002 and beyond).** A one-shot timeout of 0 is refused at entry on every OS (it
+      would never work); an unlimited timeout stays allowed. Generalize one-shot to every modifier (Shift, Ctrl,
+      Alt, AltGr, Kana, Cmd/Win) on Windows, macOS and Linux, so one key can hold AltGr and tap a one-shot AltGr.
+      Shared defaults, menu entries in every locale, tests per OS.
+- [ ] **Direct XKB and KLC compilers.** Replace the compiled `.keylayout` as the intermediate form for Linux and
+      Windows: compile the Ergopti TOML source straight to XKB and to KLC, using each format's full capability
+      (XKB levels 3 and 5 on any key and sided modifiers; KLC Kana/Roya/Loya bits), so sided-modifier layers are
+      no longer dropped. What a format truly cannot express goes in the per-target omission report and is emulated
+      by the driver. The existing layouts stay byte-for-byte regression fixtures.
+- [ ] **Layout editor in its own window on the three OS.** Move the unified editor out of the layout manager
+      window into a separate window (macOS, Linux and Windows), and give the Windows WebView2 host
+      `source_open`/`source_save`/`source_editor` so Windows also replaces the old composer.
+- [ ] **XKB and KLC downloads generated by the local host.** The app's editor page no longer sends the user to the
+      site for these two files: the host generates them with the shared code, offline.
+- [ ] **COSMIC focus: support `zcosmic_toplevel_info` v1 and v2+** (v2+ announces windows through
+      ext-foreign-toplevel-list); choose by what the compositor offers, with tests for both.
+- [ ] **GNOME layout switch through the Ergopti GNOME Shell extension** (the one planned for focused-app identity),
+      instead of rewriting the `sources` list; keep a clear refusal when the extension is absent.
+- [ ] **GTK 3 Compose:** enable IBus for Compose when no input method is active; never replace an active fcitx5;
+      keep the inlined single-character rules as the safety net, and state the remaining limit in the menu.
+- [ ] **UPD-2 on AHK confirmed:** manual checks, changelog/Versions windows, channel and interval settings and the
+      update prompt run while paused, as on macOS and Linux; background checks keep their pause drop.
+- Validated as they are: structured import keeps action/state names and modifier tokens; the editor page compiles
+  and the host never recompiles; macOS ANSI swaps are declared per layout; Unicode names inlined in the app and
+  lazy on the site; KMD-3 Linux `awake_ms`; MRT-004 `core.json` fence; resting-thumb bounds (tighten from the next
+  Mac report); custom logs folder named `ergopti_plus` renamed to `Ergopti`; a superseded site deployment stays
+  red; macOS marks a keyless API entry when its key is read; the navigation-owner DLL fingerprint derived by the
+  migration (byte identity to confirm on the Windows PC, see TODO-tests-windows.md).
 - **Hardware checks** are in [TODO-tests-macos.md](TODO-tests-macos.md),
   [TODO-tests-windows.md](TODO-tests-windows.md) and [TODO-tests-linux.md](TODO-tests-linux.md).
 
@@ -604,8 +658,5 @@ Each closes on a named green hosted or native run, recorded here.
 
 ## Maintainer decisions pending
 
-- [ ] **One-shot Shift unlimited timeout (OSM-002).** The macOS menu can persist an unlimited or zero timeout; decide
-      whether an unlimited one-shot timeout is allowed on every OS or refused at entry.
-
-- [ ] **Review the coordinator's decisions of 2026-11-11 and 2026-11-12.** The items closed with « decided by the
-      coordinator …, to review by the maintainer » are in `git show 932e70d583:TODO.md` (search « decided by the coordinator »).
+None. The questions answered on 2026-11-13 (OSM-002, the coordinator's decisions of 2026-11-11 and 2026-11-12) are
+under « Maintainer decisions of 2026-11-13, to implement » at the top.

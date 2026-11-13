@@ -133,3 +133,6 @@ Account and tester actions (maintainer, from the PC):
       (Settings > Apps and « Remove »), in source and compiled mode.
 
 - [ ] Metrics export and purge on Windows (`KL_RunMetricsMaintenance`): only source contracts check that path.
+
+- [ ] Navigation-owner DLL after the folder migration (2026-11-13): its manifest fingerprint was derived by the
+      migration without a rebuild; run `-UpdateTracked` with the pinned MSVC and check the DLL is byte-identical.
