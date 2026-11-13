@@ -13,7 +13,7 @@
 _KBSP_ChildSource() {
 	global _DriverDir
 	Source := _KFPO_ChildSource()
-	Tail := "#Include " . _DriverDir . "\tests\fixtures\keystats_fire_publication_owner_body.ahk`n"
+	Tail := "#Include " . _DriverDir . "\tests\fixtures\metrics\fire_publication_owner_body.ahk`n"
 	Source := StrReplace(Source, Tail, "", true, &Replaced)
 	AssertEqual(1, Replaced, "Only the original fixture tail is replaced; real fire and append bodies stay intact")
 	PrivacyOwner := _DriverProductionFileForSymbol("MF_ShouldFilter", _DriverDir)

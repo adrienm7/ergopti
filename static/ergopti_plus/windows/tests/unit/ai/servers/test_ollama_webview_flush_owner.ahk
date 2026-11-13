@@ -26,7 +26,7 @@ _OWFP_ChildSource() {
 	ScriptOwner := _DriverProductionFileForSymbol("WebView_RunScriptAsync")
 	AssertTrue(ScriptOwner != "" && _DriverFuncBody("WebView_RunScriptAsync") != "",
 		"the deferred script callback must retain its actual helper owner")
-	Fixture := _DriverDir . "\tests\fixtures\ollama_webview_flush_owner_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\ai\ollama_webview_flush_owner_body.ahk"
 	AssertTrue(FileExist(Fixture) != "", "the isolated flush fixture must exist")
 	return '#Requires AutoHotkey v2.0' . "`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
 		. "#Include " . Owner . "`n"

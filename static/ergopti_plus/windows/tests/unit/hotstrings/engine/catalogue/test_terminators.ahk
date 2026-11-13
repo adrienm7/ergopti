@@ -525,7 +525,7 @@ _MKTB_ChildSource() {
 		AssertTrue(IsObject(Definition), "the native fixture dependency must exist: " . Symbol)
 		Code .= _DriverExtractDefinedBody(&NativeFixture, Definition) . "`n"
 	}
-	return Code . FileRead(_DriverDir . "\tests\fixtures\magic_key_terminator_boot_body.ahk", "UTF-8")
+	return Code . FileRead(_DriverDir . "\tests\fixtures\layouts\magic_key_terminator_boot_body.ahk", "UTF-8")
 }
 
 _MKTB_WriterProfilerGraph() {

@@ -27,14 +27,14 @@ _CRCT_ChildSource() {
 		Code .= _DriverFuncBody(Name) . "`n"
 	; Reuse canonical fixture-native readers and custody helpers as whole bodies.
 	; Its top-level Main, CB_Write decorator and physical send code are excluded.
-	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\sendinstant_clipboard_owner_body.ahk")
+	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\hotstrings\sendinstant_clipboard_owner_body.ahk")
 	for Name in ["_SICO_Require", "_SICO_Publish", "_SICO_Wait", "_SICO_Identity", "_SICO_Sample",
 			"_SICO_AddOriginalFormat", "_SICO_MarkerMatches", "_SICO_Settle", "_SICO_RestoreIncoming"] {
 		Body := _DriverExtractFunctionBody(&Fixture, Name)
 		AssertTrue(Body != "", "Every reused actual native helper must have a nonempty body: " . Name)
 		Code .= Body . "`n"
 	}
-	return Code . "#Include " . _DriverDir . "\tests\fixtures\clipboard_clear_receipt_owner_body.ahk`n"
+	return Code . "#Include " . _DriverDir . "\tests\fixtures\clipboard\clear_receipt_owner_body.ahk`n"
 }
 
 _CRCT_Complete(State, Code, Output, ErrorText) {
@@ -60,7 +60,7 @@ _CRCT_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _CRCT_ChildSource()) != 0)
 		_TestPrint("# clear-receipt-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\clipboard_clear_receipt_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\clipboard\clear_receipt_owner_body.ahk")))
 		for Spec in [{Role: "writer", State: Writer}, {Role: "subject", State: Subject}] {
 			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 				["/ErrorStdOut=UTF-8", Script, Spec.Role, Directory, Mode], _CRCT_Complete.Bind(Spec.State))

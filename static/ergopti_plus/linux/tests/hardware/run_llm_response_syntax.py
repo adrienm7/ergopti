@@ -68,7 +68,7 @@ def main():
             [
                 runtime,
                 "-e",
-                'io.write(require("core.text.engine.json").encode(require("tests.fixtures.llm_response_syntax_contract").vectors))',
+                'io.write(require("core.text.engine.json").encode(require("tests.fixtures.ai.response_syntax_contract").vectors))',
             ]
         )
     )

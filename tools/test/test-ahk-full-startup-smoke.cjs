@@ -596,7 +596,7 @@ async function main() {
 			owner: path.join(__dirname, 'test-ahk-full-startup-smoke.cjs'),
 			fixture_helper: path.join(__dirname, 'lib/ahk-startup-fixture.cjs'),
 			entry: ENTRY,
-			observer: path.join(WINDOWS, 'tests/fixtures/startup_full_save_observer.ahk'),
+			observer: path.join(WINDOWS, 'tests/fixtures/core/startup_full_save_observer.ahk'),
 			interpreter: ahk
 		},
 		official
@@ -654,11 +654,14 @@ async function main() {
 				'\tState .= "|" . HSE_RegistryByGroup.Has(Category . ".wanted") . "|" . HSE_RegistryByGroup.Has(Category . ".hidden")\n' +
 				'\tFileAppend(State, EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\extension-receipt.txt", "UTF-8")\n}\n' +
 				fs
-					.readFileSync(path.join(WINDOWS, 'tests/fixtures/startup_full_save_observer.ahk'), 'utf8')
+					.readFileSync(
+						path.join(WINDOWS, 'tests/fixtures/core/startup_full_save_observer.ahk'),
+						'utf8'
+					)
 					.replace(/^\uFEFF/, '') +
 				fs
 					.readFileSync(
-						path.join(WINDOWS, 'tests/fixtures/startup_config_types_observer.ahk'),
+						path.join(WINDOWS, 'tests/fixtures/core/startup_config_types_observer.ahk'),
 						'utf8'
 					)
 					.replace(/^\uFEFF/, ''),

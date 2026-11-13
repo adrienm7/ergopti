@@ -410,7 +410,7 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 	global _DriverDir, _SharedDir, _VendorDir
 	Observed := [], Control := Map(), Polls := 0
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-		"-File", _DriverDir . "\tests\fixtures\screen_brightness_provider.ps1",
+		"-File", _DriverDir . "\tests\fixtures\core\screen_brightness_provider.ps1",
 		"-Worker", _VendorDir . "\ergopti_brightness_worker.ps1",
 		"-FixturePolicyPath", _SharedDir . "\shortcuts\data\actions\brightness.json",
 		"-Action", "brightness_up", "-Mode", Mode]

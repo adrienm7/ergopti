@@ -13,7 +13,7 @@ local Remote = require("ai.engine.api.api_remote")
 local Http = require("core.network.adapters.http_client")
 local origin = assert(os.getenv("LLM_RESPONSE_ORIGIN"))
 local root = assert(os.getenv("LLM_RESPONSE_ROOT"))
-local corpus = require("tests.fixtures.llm_response_syntax_contract")
+local corpus = require("tests.fixtures.ai.response_syntax_contract")
 assert(#corpus.vectors == 54, "every independent response vector executes")
 local native_post, receipt = Http.post
 Http.post = function(url, headers, body, callback, options)

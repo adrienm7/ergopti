@@ -1,4 +1,4 @@
-﻿; tests/fixtures/ollama_stream_http_peer.ahk
+﻿; tests/fixtures/ai/ollama_stream_http_peer.ahk
 
 ; ==============================================================================
 ; MODULE: Streaming HTTP Status Peer

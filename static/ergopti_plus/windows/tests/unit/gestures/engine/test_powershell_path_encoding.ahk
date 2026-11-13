@@ -52,7 +52,7 @@ _GPSE_Source() {
 	Text := FSReadStrict(Owner)
 	AssertTrue(RegExMatch(Text, "m)^global GESTURE_AUTO_SUCCESS_TOKEN :=[^\n]*$", &Declaration) > 0)
 	Source .= Declaration[0] . "`n"
-	return Chr(0xFEFF) . Source . "#Include " . _DriverDir . "\tests\fixtures\gesture_powershell_path_body.ahk`n"
+	return Chr(0xFEFF) . Source . "#Include " . _DriverDir . "\tests\fixtures\gestures\powershell_path_body.ahk`n"
 }
 
 _GPSE_Environment(Directory) {

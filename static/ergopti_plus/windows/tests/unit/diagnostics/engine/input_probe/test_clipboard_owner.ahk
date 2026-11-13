@@ -31,7 +31,7 @@ _IPCOT_ChildSource() {
 	Code .= "LoggerWarn(*) => 0`nLoggerError(*) => 0`nLoggerDebug(*) => 0`n"
 	Code .= "global _IPCO_LATE_GETTER_PRESENT := " . (Present ? 1 : 0) . "`n"
 	Code .= "#Include " . Owner . "`n" . Clock . "`n" . Hold . "`n" . Release . "`n"
-	return Code . "#Include " . _DriverDir . "\tests\fixtures\input_probe_clipboard_owner_body.ahk`n"
+	return Code . "#Include " . _DriverDir . "\tests\fixtures\core\input_probe_clipboard_owner_body.ahk`n"
 }
 
 _IPCOT_Complete(State, Code, Output, ErrorText) {
@@ -54,7 +54,7 @@ _IPCOT_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _IPCOT_ChildSource()) != 0)
 		_TestPrint("# input-probe-clipboard-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\input_probe_clipboard_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\core\input_probe_clipboard_owner_body.ahk")))
 		for Spec in [{Role: "writer", State: Writer}, {Role: "subject", State: Subject}] {
 			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 				["/ErrorStdOut=UTF-8", Script, Spec.Role, Directory, Mode], _IPCOT_Complete.Bind(Spec.State))

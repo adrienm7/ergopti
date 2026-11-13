@@ -17,7 +17,7 @@ _LPPT_ChildSource() {
 		AssertTrue(Owner != "", "Every reached poll/logger/tick owner must resolve: " . Symbol)
 		Source .= "#Include " . Owner . "`n"
 	}
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\layout_poll_pause_owner_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\layouts\poll_pause_owner_body.ahk`n"
 }
 
 _LPPT_Complete(State, Code, Output, ErrorText) {
@@ -39,7 +39,7 @@ _LPPT_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _LPPT_ChildSource()) != 0)
 		_TestPrint("# layout-poll-pause-owner-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\layout_poll_pause_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\layouts\poll_pause_owner_body.ahk")))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _LPPT_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private child must start")

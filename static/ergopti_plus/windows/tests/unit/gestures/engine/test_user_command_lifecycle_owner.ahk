@@ -25,7 +25,7 @@ _UCLC_Source() {
 		AssertTrue(Body != "", "The actual command graph needs its genuine function: " . Symbol)
 		Source .= Body . "`n"
 	}
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\user_command_lifecycle_owner_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\hotstrings\user_command_lifecycle_owner_body.ahk`n"
 }
 
 _UCLC_Case(Mode) {

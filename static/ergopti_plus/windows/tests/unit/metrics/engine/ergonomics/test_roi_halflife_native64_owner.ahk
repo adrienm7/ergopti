@@ -91,7 +91,7 @@ _RHL_ChildSource(Mode := "") {
 			"The child must use the actual capture gate class KLCollection")
 		Source .= GateClass[0] . "`n" . _DriverFuncBody("KL_CaptureHeld") . "`n"
 	}
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\roi_halflife_native64_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\metrics\roi_halflife_native64_body.ahk`n"
 }
 
 _RHL_Complete(State, Code, Output, ErrorText) {

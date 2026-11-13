@@ -29,7 +29,7 @@ _APST_ChildSource() {
 	}
 	AssertEqual(4, Owners.Count, "Each selected public/lifecycle/codec/policy owner is independently included")
 	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
-	Fixture := _DriverDir . "\tests\fixtures\action_picker_startup_owner_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\core\action_picker_startup_owner_body.ahk"
 	AssertTrue(FileExist(PromiseOwner) && FileExist(Fixture))
 	return "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 		. "#Include " . PromiseOwner . "`n" . Includes . "#Include " . Fixture . "`n"

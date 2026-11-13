@@ -36,7 +36,7 @@ _TSCOT_ChildSource() {
 	Code := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 	Code .= "LoggerWarn(*) => 0`nLoggerError(*) => 0`nLoggerDebug(*) => 0`nLoggerInfo(*) => 0`n"
 	Code .= Clock . "`n" . ClipboardSource . "`n" . SenderSource . "`n"
-	return Code . "#Include " . _DriverDir . "\tests\fixtures\textsend_clipboard_owner_body.ahk`n"
+	return Code . "#Include " . _DriverDir . "\tests\fixtures\core\textsend_clipboard_owner_body.ahk`n"
 }
 
 _TSCOT_Complete(State, Code, Output, ErrorText) {
@@ -59,7 +59,7 @@ _TSCOT_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _TSCOT_ChildSource()) != 0)
 		_TestPrint("# textsend-clipboard-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\textsend_clipboard_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\core\textsend_clipboard_owner_body.ahk")))
 		for Spec in [{Role: "writer", State: Writer}, {Role: "subject", State: Subject}] {
 			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 				["/ErrorStdOut=UTF-8", Script, Spec.Role, Directory, Mode], _TSCOT_Complete.Bind(Spec.State))

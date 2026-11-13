@@ -128,7 +128,7 @@ helpers.describe("process_runner: asynchronous argv processes", function()
 	if pcall(require, "luv") and package.config:sub(1, 1) == "/" then
 		helpers.it("linux-process-allocation: actual partial handles retire before refusal returns", function()
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_process_allocations.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_process_allocations.lua"
 			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native process allocation fixture must pass")
 		end)

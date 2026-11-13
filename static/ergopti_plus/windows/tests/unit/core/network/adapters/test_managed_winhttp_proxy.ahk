@@ -41,7 +41,7 @@ class _MWP_Proxy {
 		this.Event := DllCall("Kernel32\CreateEventW", "Ptr", 0, "Int", true, "Int", false, "WStr", this.Name, "Ptr")
 		AssertTrue(this.Event && A_LastError != 183, "a unique owned stop event")
 		Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-			_DriverDir . "\tests\fixtures\winhttp_proxy_service.ps1", "-StatePath", this.Path,
+			_DriverDir . "\tests\fixtures\core\winhttp_proxy_service.ps1", "-StatePath", this.Path,
 			"-StopEvent", this.Name, "-Mode", this.Mode]
 		if this.OrderedPac
 			Args.Push("-OrderedPac")

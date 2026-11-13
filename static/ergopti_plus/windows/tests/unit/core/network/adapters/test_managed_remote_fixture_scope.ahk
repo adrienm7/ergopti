@@ -274,8 +274,8 @@ _ManagedRemoteTrustPublisherIndependent() {
 	Handle := 0
 	try {
 		Handle := ShellRunner_SpawnTreeOwned("powershell.exe", ["-NoProfile", "-NonInteractive", "-File",
-			_DriverDir . "\tests\fixtures\managed_remote_trust_diagnostic.ps1", "-SourcePath",
-			_DriverDir . "\tests\fixtures\managed_remote_transport.ps1", "-StatePath", Capture["TmpFile"]],
+			_DriverDir . "\tests\fixtures\core\managed_remote_trust_diagnostic.ps1", "-SourcePath",
+			_DriverDir . "\tests\fixtures\core\managed_remote_transport.ps1", "-StatePath", Capture["TmpFile"]],
 			(Code, Out, Err) => Results.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
 		AssertTrue(Handle.start())
 		Started := A_TickCount
@@ -480,8 +480,8 @@ _ManagedRemoteScopeProducerControl() {
 	global _DriverDir
 	Results := []
 	Handle := ShellRunner_SpawnTreeOwned("powershell.exe", ["-NoProfile", "-NonInteractive", "-File",
-		_DriverDir . "\tests\fixtures\managed_remote_scope_control.ps1", "-SourcePath",
-		_DriverDir . "\tests\fixtures\managed_remote_transport.ps1"],
+		_DriverDir . "\tests\fixtures\core\managed_remote_scope_control.ps1", "-SourcePath",
+		_DriverDir . "\tests\fixtures\core\managed_remote_transport.ps1"],
 		(Code, Out, Err) => Results.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
 	try {
 		AssertTrue(Handle.start())

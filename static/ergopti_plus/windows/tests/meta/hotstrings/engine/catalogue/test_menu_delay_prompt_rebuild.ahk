@@ -64,7 +64,7 @@ _MDPN_Source() {
   AssertTrue(Body != "", "Every production prompt body must be copied whole and unmodified")
   Source .= Body . "`n"
  }
- return Source . "#Include " . _DriverDir . "\tests\fixtures\menu_numeric_prompt_domain_body.ahk`n"
+ return Source . "#Include " . _DriverDir . "\tests\fixtures\menu\numeric_prompt_domain_body.ahk`n"
 }
 _MDPN_Done(State, Code, Output, ErrorText) {
  State.Calls += 1, State.Code := Code, State.Output := Output, State.ErrorText := ErrorText

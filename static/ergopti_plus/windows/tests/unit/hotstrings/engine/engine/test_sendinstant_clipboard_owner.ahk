@@ -41,7 +41,7 @@ _SICOT_ChildSource() {
 	}
 	AssertEqual(3, Count, "Only the three actual native injection callsites may be observed")
 	Code .= ClipboardSource . "`n" . Overlaid . SubStr(Body, Position) . "`n"
-	return Code . "#Include " . _DriverDir . "\tests\fixtures\sendinstant_clipboard_owner_body.ahk`n"
+	return Code . "#Include " . _DriverDir . "\tests\fixtures\hotstrings\sendinstant_clipboard_owner_body.ahk`n"
 }
 
 _SICOT_Complete(State, Code, Output, ErrorText) {
@@ -66,7 +66,7 @@ _SICOT_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SICOT_ChildSource()) != 0)
 		_TestPrint("# sendinstant-clipboard-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\sendinstant_clipboard_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\hotstrings\sendinstant_clipboard_owner_body.ahk")))
 		for Spec in [{Role: "writer", State: Writer}, {Role: "subject", State: Subject}] {
 			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 				["/ErrorStdOut=UTF-8", Script, Spec.Role, Directory, Mode, String(SEND_INSTANT_PASTE_DELAY_MS)], _SICOT_Complete.Bind(Spec.State))
@@ -160,8 +160,8 @@ _SIPRT_ChildSource() {
 	Code := StrReplace(Code, "SetTimer(RestoreCallback, -SEND_INSTANT_PASTE_DELAY_MS)",
 		"_SIPR_ObserveRestoreTimer(RestoreCallback, -SEND_INSTANT_PASTE_DELAY_MS)", true, &Timers)
 	AssertEqual(1, Timers, "The real restore timer registration must delegate unchanged")
-	OldInclude := "#Include " . _DriverDir . "\tests\fixtures\sendinstant_clipboard_owner_body.ahk`n"
-	NewInclude := "#Include " . _DriverDir . "\tests\fixtures\sendinstant_post_receipt_owner_body.ahk`n"
+	OldInclude := "#Include " . _DriverDir . "\tests\fixtures\hotstrings\sendinstant_clipboard_owner_body.ahk`n"
+	NewInclude := "#Include " . _DriverDir . "\tests\fixtures\hotstrings\sendinstant_post_receipt_owner_body.ahk`n"
 	Code := StrReplace(Code, OldInclude, NewInclude, true, &Fixtures)
 	AssertEqual(1, Fixtures, "Only the isolated subject fixture may change")
 	return Code
@@ -186,7 +186,7 @@ _SIPRT_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SIPRT_ChildSource()) != 0)
 		_TestPrint("# sendinstant-clipboard-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\sendinstant_post_receipt_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\hotstrings\sendinstant_post_receipt_owner_body.ahk")))
 		for Spec in [{Role: "writer", State: Writer}, {Role: "subject", State: Subject}] {
 			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 				["/ErrorStdOut=UTF-8", Script, Spec.Role, Directory, Mode, String(SEND_INSTANT_PASTE_DELAY_MS)], _SICOT_Complete.Bind(Spec.State))
@@ -271,8 +271,8 @@ _SISCT_ChildSource() {
 	Code := _SICOT_ChildSource()
 	Code := StrReplace(Code, "CB_SaveAll() {", "_SISC_ActualSaveAll() {", true, &Snapshots)
 	AssertEqual(1, Snapshots, "Only the complete real all-format snapshot may receive an unlocked-return observer")
-	OldInclude := "#Include " . _DriverDir . "\tests\fixtures\sendinstant_clipboard_owner_body.ahk`n"
-	NewInclude := "#Include " . _DriverDir . "\tests\fixtures\sendinstant_snapshot_copy_body.ahk`n"
+	OldInclude := "#Include " . _DriverDir . "\tests\fixtures\hotstrings\sendinstant_clipboard_owner_body.ahk`n"
+	NewInclude := "#Include " . _DriverDir . "\tests\fixtures\hotstrings\sendinstant_snapshot_copy_body.ahk`n"
 	Code := StrReplace(Code, OldInclude, NewInclude, true, &Fixtures)
 	AssertEqual(1, Fixtures, "The public sender, actual native paste and deferred restore remain unchanged")
 	return Code
@@ -297,7 +297,7 @@ _SISCT_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SISCT_ChildSource()) != 0)
 		_TestPrint("# sendinstant-clipboard-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\sendinstant_snapshot_copy_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\hotstrings\sendinstant_snapshot_copy_body.ahk")))
 		for Spec in [{Role: "writer", State: Writer}, {Role: "subject", State: Subject}] {
 			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 				["/ErrorStdOut=UTF-8", Script, Spec.Role, Directory, Mode, String(SEND_INSTANT_PASTE_DELAY_MS)], _SICOT_Complete.Bind(Spec.State))

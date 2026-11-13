@@ -53,7 +53,7 @@ _CALC_AddBinaryFormat(FormatId) {
 _CALC_StartForeignReader(Root) {
 	global _DriverDir
 	Marker := Root . "\reader.held"
-	Run('"' . A_AhkPath . '" "' . _DriverDir . '\tests\fixtures\clipboardall_foreign_reader.ahk" "'
+	Run('"' . A_AhkPath . '" "' . _DriverDir . '\tests\fixtures\clipboard\clipboardall_foreign_reader.ahk" "'
 		. Marker . '" 400', , "Hide", &ReaderPid)
 	Started := A_TickCount
 	while !FileExist(Marker) && ProcessExist(ReaderPid) && TickElapsed(Started) < 10000
@@ -95,7 +95,7 @@ _CALC_Run(Held, ForeignReader := false) {
 		AssertFalse(Type(Captured) == "String" && Captured == "__CB_SAVE_ERROR__")
 		AssertTrue(CB_Write("temporary clipboard lock payload"))
 		Task := ShellRunner_SpawnTreeOwned(A_AhkPath,
-			["/ErrorStdOut=UTF-8", _DriverDir . "\tests\fixtures\clipboardall_lock_observer.ahk", Root, String(FormatId),
+			["/ErrorStdOut=UTF-8", _DriverDir . "\tests\fixtures\clipboard\clipboardall_lock_observer.ahk", Root, String(FormatId),
 				String(ProcessExist())],
 			_CALC_Completed.Bind(State))
 		Retired := false

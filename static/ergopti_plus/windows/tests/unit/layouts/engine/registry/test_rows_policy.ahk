@@ -15,7 +15,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include %A_LineFile%\..\..\..\..\..\fixtures\layout_row_host_character.ahk
+#Include %A_LineFile%\..\..\..\..\..\fixtures\layouts\row_host_character.ahk
 #Include %A_LineFile%\..\..\..\..\..\fixtures\host_capability_probes.ahk
 
 
@@ -138,7 +138,7 @@ _LRPS_ChildSource(BodyName := "layout_row_passthrough_body.ahk", ExtraSource := 
 		Code .= Definition . "`n"
 	}
 	if BodyName == "layout_row_native_flags_body.ahk" || BodyName == "layout_row_external_flags_body.ahk"
-		Code .= "#Include " . _DriverDir . "\tests\fixtures\layout_row_host_character.ahk`n"
+		Code .= "#Include " . _DriverDir . "\tests\fixtures\layouts\row_host_character.ahk`n"
 	Code .= ExtraSource . "`n"
 	Code .= FileRead(_DriverDir . "\tests\fixtures\" . BodyName, "UTF-8")
 	return Code

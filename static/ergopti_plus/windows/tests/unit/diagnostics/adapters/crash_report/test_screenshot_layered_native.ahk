@@ -5,7 +5,7 @@
 _SCLP_Source(Directory) {
 	global _DriverDir
 	Source := _MBPT_ChildSource(Directory)
-	Fixture := "#Include " . _DriverDir . "\tests\fixtures\model_browser_close_pause_owner_body.ahk"
+	Fixture := "#Include " . _DriverDir . "\tests\fixtures\ai\model_browser_close_pause_owner_body.ahk"
 	Position := InStr(Source, Fixture, true, -1)
 	AssertTrue(Position > 0)
 	Source := SubStr(Source, 1, Position - 1)
@@ -13,7 +13,7 @@ _SCLP_Source(Directory) {
 	AssertTrue(Owner != "")
 	TimerOwner := _DriverProductionFileForSymbol("TimerSetCallback", _DriverDir)
 	AssertTrue(TimerOwner != "", "the real screenshot cleanup requires its timer owner")
-	return Source . "#Include " . Owner . "`n#Include " . TimerOwner . "`n#Include " . _DriverDir . "\tests\fixtures\screenshot_layered_native_body.ahk`n"
+	return Source . "#Include " . Owner . "`n#Include " . TimerOwner . "`n#Include " . _DriverDir . "\tests\fixtures\core\screenshot_layered_native_body.ahk`n"
 }
 _SCLP_Complete(State, Code, Output, ErrorText) {
 	State.Calls += 1, State.Code := Code, State.Output := Output, State.ErrorText := ErrorText

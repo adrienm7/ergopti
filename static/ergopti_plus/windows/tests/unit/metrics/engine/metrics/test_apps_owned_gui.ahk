@@ -10,7 +10,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../../../../fixtures/native_owned_button.ahk
+#Include ../../../../fixtures/core/native_owned_button.ahk
 
 class _MAOG_Controller {
 	__New() {

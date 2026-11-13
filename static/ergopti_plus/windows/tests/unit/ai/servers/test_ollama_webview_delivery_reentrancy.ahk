@@ -18,7 +18,7 @@ _ODRP_Complete(State, Code, Output, ErrorText) {
 _ODRP_ChildSource() {
 	global _DriverDir
 	Source := '#Requires AutoHotkey v2.0' . "`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
-	Diagnostic := _DriverDir . "\tests\fixtures\ollama_child_startup_diagnostics.ahk"
+	Diagnostic := _DriverDir . "\tests\fixtures\ai\ollama_child_startup_diagnostics.ahk"
 	AssertTrue(FileExist(Diagnostic) != "", "the private startup observer must exist")
 	Source .= "#Include " . Diagnostic . "`n"
 	Seen := Map()
@@ -34,7 +34,7 @@ _ODRP_ChildSource() {
 			Source .= '_OCSD_Checkpoint("after-owner-' . Seen.Count . '")' . "`n"
 		}
 	}
-	Fixture := _DriverDir . "\tests\fixtures\ollama_webview_delivery_reentrancy_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\ai\ollama_webview_delivery_reentrancy_body.ahk"
 	AssertTrue(FileExist(Fixture) != "", "the private deferred-delivery fixture must exist")
 	return Source . "_OCSD_Stop()`n#Include " . Fixture . "`n"
 }

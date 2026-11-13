@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local Remote = helpers.load_module("ai.engine.api.api_remote")
-local contract = require("tests.fixtures.llm_server_message_contract")
+local contract = require("tests.fixtures.ai.server_message_contract")
 
 helpers.describe("Provider error message byte boundaries", function()
 	assert(#contract.vectors == 45, "every independent provider-message vector executes")

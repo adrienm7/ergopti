@@ -7,8 +7,8 @@
 
 _WPMF_ChildSource() {
 	Code := _WPMR_ChildSource()
-	Code := StrReplace(Code, "\tests\fixtures\wpm_tick_rollover_body.ahk",
-		"\tests\fixtures\wpm_calc_sample_future_body.ahk", true, &Changed)
+	Code := StrReplace(Code, "\tests\fixtures\metrics\wpm_tick_rollover_body.ahk",
+		"\tests\fixtures\metrics\wpm_calc_sample_future_body.ahk", true, &Changed)
 	AssertEqual(1, Changed, "Exactly the canonical fixture include may change")
 	return Code
 }
@@ -27,7 +27,7 @@ _WPMF_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _WPMF_ChildSource()) != 0)
 		_TestPrint("# wpm-calc-sampled-future-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath)) . " timings=" . Timings.Digest
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\wpm_calc_sample_future_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\metrics\wpm_calc_sample_future_body.ahk")))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory, String(Timings.Window), String(Timings.Minimum)], _WPMR_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private WPM child must start")

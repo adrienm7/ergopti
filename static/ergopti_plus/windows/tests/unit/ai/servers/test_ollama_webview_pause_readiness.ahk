@@ -18,7 +18,7 @@ _OPRP_Complete(State, Code, Output, ErrorText) {
 _OPRP_ChildSource() {
 	global _DriverDir
 	Source := '#Requires AutoHotkey v2.0' . "`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
-	Diagnostic := _DriverDir . "\tests\fixtures\ollama_child_startup_diagnostics.ahk"
+	Diagnostic := _DriverDir . "\tests\fixtures\ai\ollama_child_startup_diagnostics.ahk"
 	AssertTrue(FileExist(Diagnostic) != "", "the private startup observer must exist")
 	Source .= "#Include " . Diagnostic . "`n"
 	Seen := Map()
@@ -44,7 +44,7 @@ _OPRP_ChildSource() {
 	AssertTrue(At > 0 && RegExMatch(Create, Pattern, , At + Safety.Len) == 0,
 		"Create must publish one source-authenticated epoch-bound safety callback")
 	Source .= "_OPR_SafetyCallback(captured_epoch) {`n`treturn " . Safety[1] . "`n}`n"
-	Fixture := _DriverDir . "\tests\fixtures\ollama_webview_pause_readiness_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\ai\ollama_webview_pause_readiness_body.ahk"
 	AssertTrue(FileExist(Fixture) != "", "the private paused-readiness fixture must exist")
 	return Source . "_OCSD_Stop()`n#Include " . Fixture . "`n"
 }

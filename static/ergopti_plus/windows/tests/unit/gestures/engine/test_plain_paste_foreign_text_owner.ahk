@@ -19,13 +19,13 @@ _PPSFT_Replace(Source, Old, New) {
 _PPSFT_ChildSource(Client) {
 	global _DriverDir
 	Code := _PPSNT_ChildSource(Client)
-	Suffix := "#Include " . _DriverDir . "\tests\fixtures\plain_paste_snapshot_owner_body.ahk`n"
+	Suffix := "#Include " . _DriverDir . "\tests\fixtures\core\plain_paste_snapshot_owner_body.ahk`n"
 	SuffixStart := StrLen(Code) - StrLen(Suffix) + 1
 	AssertTrue(SuffixStart > 0, "The canonical builder must contain its complete fixture suffix")
 	AssertEqual(Suffix, SubStr(Code, SuffixStart), "The canonical builder must end at its exact fixture boundary")
 	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Suffix))
 	Code := _PPSFT_Replace(Code, "CB_RestoreAll(Saved) {", "_PPSFT_ActualRestoreAll(Saved) {")
-	Library := FileRead(_DriverDir . "\tests\fixtures\plain_paste_snapshot_owner_body.ahk", "UTF-8")
+	Library := FileRead(_DriverDir . "\tests\fixtures\core\plain_paste_snapshot_owner_body.ahk", "UTF-8")
 	Entry := "`ntry {`n`t_PPSN_Require(A_Args.Length == 4"
 	Position := InStr(Library, Entry, true)
 	AssertTrue(Position > 0 && !InStr(Library, Entry, true, Position + 1), "Only the original fixture's final autoexecute entry may be removed")
@@ -59,7 +59,7 @@ _PPSFT_ChildSource(Client) {
 	Library := _PPSFT_Replace(Library, '&& Final.Owner == _PPSN.Writer.Hwnd && Final.Sequence == _PPSN.WriterSequence', '&& _PPSFT_PreservedB(Final)')
 	Library := _PPSFT_Replace(Library, '. " final_unicode="', '. " final_text_match=" . (Final.TextMatches ? 1 : 0) . " final_unicode="')
 	Library := StrReplace(Library, "plain-paste-snapshot", "plain-paste-foreign-text", true)
-	return Code . Library . "`n#Include " . _DriverDir . "\tests\fixtures\plain_paste_foreign_text_owner_body.ahk`n"
+	return Code . Library . "`n#Include " . _DriverDir . "\tests\fixtures\core\plain_paste_foreign_text_owner_body.ahk`n"
 }
 
 _PPSFT_Complete(State, Code, Output, ErrorText) {
@@ -84,7 +84,7 @@ _PPSFT_Case(Client) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _PPSFT_ChildSource(Client)) != 0)
 		_TestPrint("# plain-paste-foreign-text-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\plain_paste_foreign_text_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\core\plain_paste_foreign_text_owner_body.ahk")))
 		for Spec in [{Role: "writer", State: Writer}, {Role: "subject", State: Subject}] {
 			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 				["/ErrorStdOut=UTF-8", Script, Spec.Role, Directory, Client, String(SEND_INSTANT_PASTE_DELAY_MS)], _PPSFT_Complete.Bind(Spec.State))

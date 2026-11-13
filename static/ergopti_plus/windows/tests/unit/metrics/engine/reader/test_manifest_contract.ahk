@@ -1213,7 +1213,7 @@ _KTAC_ChildSource() {
 		Source := RegExReplace(Source, "m)^" . Name . "\(", "_KTAC_Inherited" . Name . "(", &Changed)
 		AssertEqual(1, Changed)
 	}
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\context_clock_ack_owner_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\core\context_clock_ack_owner_body.ahk`n"
 }
 
 _KTAC_Case(Mode) {
@@ -1334,7 +1334,7 @@ _KCTR_ChildSource() {
 	Footer := "#Include " . _DriverDir . "\tests\fixtures\final_context_duration_owner_body.ahk`n"
 	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
 	return SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
-		. "#Include " . _DriverDir . "\tests\fixtures\context_tail_retry_owner_body.ahk`n"
+		. "#Include " . _DriverDir . "\tests\fixtures\core\context_tail_retry_owner_body.ahk`n"
 }
 _KCTR_Case(Mode) {
 	static RetirementDebt := 0

@@ -13,7 +13,7 @@
 _APCF_ChildSource() {
 	global _DriverDir
 	Source := _APST_ChildSource()
-	Footer := "#Include " . _DriverDir . "\tests\fixtures\action_picker_startup_owner_body.ahk`n"
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\core\action_picker_startup_owner_body.ahk`n"
 	Offset := StrLen(Source) - StrLen(Footer) + 1
 	AssertTrue(Offset > 0 && SubStr(Source, Offset) == Footer,
 		"The genuine public picker child must retain its exact fixture footer.")
@@ -24,7 +24,7 @@ _APCF_ChildSource() {
 		Includes .= "#Include " . Owner . "`n"
 	}
 	return SubStr(Source, 1, Offset - 1) . Includes
-		. "#Include " . _DriverDir . "\tests\fixtures\action_picker_confirmation_failure_body.ahk`n"
+		. "#Include " . _DriverDir . "\tests\fixtures\core\action_picker_confirmation_failure_body.ahk`n"
 }
 
 _APCF_Case(Mode) {

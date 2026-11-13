@@ -39,7 +39,7 @@ _SFS_ChildSource() {
 	; shared list is not this probe's subject, so it holds none while the ADD-1
 	; gate of SFD_IsSecureField stays the real one.
 	Source .= 'SFD_SecureApps() {`n`tApps := Map()`n`tApps.CaseSense := "Off"`n`treturn Apps`n}`n'
-	return Cached := Source . FileRead(_DriverDir . "\tests\fixtures\secure_field_native_style_body.ahk", "UTF-8")
+	return Cached := Source . FileRead(_DriverDir . "\tests\fixtures\core\secure_field_native_style_body.ahk", "UTF-8")
 }
 _SFS_Complete(State, Code, Output, ErrorText) {
 	State.Code := Code, State.Output := Output, State.ErrorText := ErrorText

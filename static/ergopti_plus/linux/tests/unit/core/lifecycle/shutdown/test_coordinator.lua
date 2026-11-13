@@ -1402,7 +1402,7 @@ helpers.describe("native signal regression child", function()
 		local uv = require("luv")
 		local executable = assert(uv.exepath(), "native interpreter identity must be available")
 		local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
-		local result = os.execute(quote(executable) .. " " .. quote(helpers.driver_root() .. "/tests/fixtures/native_signal_shutdown.lua"))
+		local result = os.execute(quote(executable) .. " " .. quote(helpers.driver_root() .. "/tests/fixtures/core/native_signal_shutdown.lua"))
 		helpers.assert_true(result == true or result == 0, "native signal ownership child must pass")
 	end)
 end)

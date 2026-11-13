@@ -870,7 +870,7 @@ do
 	local ffi_ok = pcall(require, "ffi")
 	if native_ok and ffi_ok and package.config:sub(1, 1) == "/" then
 		local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
-		local fixture = driver_root .. "/tests/fixtures/native_file_digest_owners.lua"
+		local fixture = driver_root .. "/tests/fixtures/core/native_file_digest_owners.lua"
 		local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
 		assert_true("linux-digest-owner: updater cancellation preserves a real unrelated digest", result == true or result == 0)
 	else

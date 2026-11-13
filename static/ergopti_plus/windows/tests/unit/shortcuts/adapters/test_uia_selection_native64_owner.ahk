@@ -24,7 +24,7 @@ _US64_ChildSource() {
 		}
 		Code .= Definition . "`n"
 	}
-	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\uia_selection_native64_body.ahk")
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\core\uia_selection_native64_body.ahk")
 }
 
 _US64_Completed(State, Code, Output, ErrorText, *) {

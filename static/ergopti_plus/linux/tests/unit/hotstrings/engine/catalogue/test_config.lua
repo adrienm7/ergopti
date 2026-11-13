@@ -41,7 +41,7 @@ helpers.describe("hotstrings_config", function()
           helpers.assert_true(Shell.run("mkfifo " .. Shell.quote(target)))
         end
         local executable = assert(arg and arg[-1], "running Lua interpreter required")
-        local fixture = helpers.driver_root() .. "/tests/fixtures/native_hotstring_path_admission.lua"
+        local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_hotstring_path_admission.lua"
         local command = "timeout 4 " .. Shell.quote(executable) .. " " .. Shell.quote(fixture)
           .. " " .. Shell.quote(dir) .. " " .. Shell.quote(mode)
         local result = os.execute(command)

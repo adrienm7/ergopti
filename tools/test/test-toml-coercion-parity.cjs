@@ -129,7 +129,7 @@ assert(!fs.existsSync(linuxOverridePath), 'Linux has no config_overrides.lua (us
 // The actual AHK consumer interpolates these two tokens in this same fixture.
 // Backslashes must stay literal, while apostrophes rule out single delimiters.
 const literalFixture = fs.readFileSync(
-	path.join(WINDOWS, 'tests', 'fixtures', 'paths_literal_string.toml.template'),
+	path.join(WINDOWS, 'tests', 'fixtures', 'settings', 'paths_literal_string.toml.template'),
 	'utf8'
 );
 const literalPaths = [

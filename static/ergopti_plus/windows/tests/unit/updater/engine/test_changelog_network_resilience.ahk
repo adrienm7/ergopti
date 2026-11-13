@@ -782,7 +782,7 @@ _CNR_ControlledNativePacFixture() {
 	try {
 		Handle := ShellRunner_SpawnTreeOwned("powershell.exe",
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\system_proxy_native.ps1", "-WorkerPath",
+				_DriverDir . "\tests\fixtures\core\system_proxy_native.ps1", "-WorkerPath",
 				_VendorDir . "\ergopti_system_proxy_worker.ps1", "-EntryInputPath", Capture["TmpFile"]],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
 		AssertTrue(Handle.start(), "controlled native PAC fixture must actually start")
@@ -908,8 +908,8 @@ _CNR_ControlledNativePacPaths() {
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\system_proxy_native_paths.ps1", "-NativeFixturePath",
-				_DriverDir . "\tests\fixtures\system_proxy_native.ps1"],
+				_DriverDir . "\tests\fixtures\core\system_proxy_native_paths.ps1", "-NativeFixturePath",
+				_DriverDir . "\tests\fixtures\core\system_proxy_native.ps1"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
 		AssertTrue(Handle.start(), "the source-bound native path fixture must actually start")
 		Started := A_TickCount

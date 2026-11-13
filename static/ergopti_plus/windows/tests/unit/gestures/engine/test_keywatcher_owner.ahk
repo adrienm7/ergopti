@@ -106,9 +106,9 @@ _GKO_Source(OwnerReceipt) {
 	}
 	Source .= 'global GESTURE_ACTIONS := Map("left_click_toggle", {Fn: _GKO_leftAction}, "right_click_toggle", {Fn: _GKO_rightAction})' . "`n"
 
-	Body := FSReadStrict(_DriverDir . "\tests\fixtures\gesture_keywatcher_owner_body.ahk")
+	Body := FSReadStrict(_DriverDir . "\tests\fixtures\gestures\keywatcher_owner_body.ahk")
 	AssertTrue(Body != "", "the isolated native ownership fixture must exist")
-	OwnerReceipt["fixture_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\gesture_keywatcher_owner_body.ahk"))
+	OwnerReceipt["fixture_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\gestures\keywatcher_owner_body.ahk"))
 	return Chr(0xFEFF) . Source . Bound . "`n" . Body
 }
 

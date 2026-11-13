@@ -126,7 +126,7 @@ _KRCTX_ChildSource() {
 		AssertTrue(Body != "", "The complete real ROI path must resolve: " . Symbol)
 		Source .= Body . "`n"
 	}
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\roi_context_word_owner_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\metrics\roi_context_word_owner_body.ahk`n"
 }
 
 _KRCTX_Case(Mode) {

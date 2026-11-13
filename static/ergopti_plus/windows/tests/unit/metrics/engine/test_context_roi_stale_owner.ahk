@@ -16,7 +16,7 @@ _KRSC_ChildSource() {
 		AssertTrue(PolicyOwner != "", "The real ROI policy dependency must resolve")
 		Source .= "#Include " . PolicyOwner . "`n"
 	}
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\context_roi_stale_owner_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\core\context_roi_stale_owner_body.ahk`n"
 }
 _KRSC_Case(Mode) {
 	static RetirementDebt := 0

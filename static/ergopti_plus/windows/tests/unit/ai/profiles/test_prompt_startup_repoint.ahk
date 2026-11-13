@@ -16,14 +16,14 @@ _PRRC_Complete(State, Code, Output, ErrorText) {
 _PRRC_ChildSource() {
 	global _DriverDir
 	Source := _PRST_ChildSource()
-	Tail := "#Include " . _DriverDir . "\tests\fixtures\prompt_startup_owner_body.ahk`n"
+	Tail := "#Include " . _DriverDir . "\tests\fixtures\ai\prompt_startup_owner_body.ahk`n"
 	Offset := StrLen(Source) - StrLen(Tail) + 1
 	AssertTrue(Offset > 0 && SubStr(Source, Offset) == Tail,
 		"The genuine shared child composer must end in its exact original fixture")
 	Owner := _DriverProductionFileForSymbol("WMPresentWindow")
 	AssertTrue(Owner != "", "The same-GUI public path requires the genuine native window-manager owner")
 	return SubStr(Source, 1, Offset - 1) . "#Include " . Owner . "`n"
-		. "#Include " . _DriverDir . "\tests\fixtures\prompt_startup_repoint_body.ahk`n"
+		. "#Include " . _DriverDir . "\tests\fixtures\ai\prompt_startup_repoint_body.ahk`n"
 }
 
 _PRRC_Case() {

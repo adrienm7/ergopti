@@ -145,7 +145,7 @@ _PINS_ChildSource(Owners) {
 			Includes .= "#Include " . Owner . "`n"
 		}
 	}
-	Fixture := _DriverDir . "\tests\fixtures\personal_info_native_close_owner_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\hotstrings\personal_info_native_close_owner_body.ahk"
 	AssertTrue(FileExist(Fixture))
 	Owners["fixture"] := Map("path", Fixture, "sha256", CryptoSha256Bytes(FSReadBytesStrict(Fixture)))
 	return "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"

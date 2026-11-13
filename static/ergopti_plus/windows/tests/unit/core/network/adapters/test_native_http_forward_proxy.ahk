@@ -17,7 +17,7 @@ _NativeHttpForwardProxy_Controls() {
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\native_http_forward_proxy.ps1",
+				_DriverDir . "\tests\fixtures\core\native_http_forward_proxy.ps1",
 				"-RoutesPath", _VendorDir . "\ergopti_network_routes.ps1",
 				"-TransportPath", _VendorDir . "\ergopti_winhttp_transport.ps1",
 				"-PolicyPath", _SharedDir . "\core\network\data\proxy_policy.json",

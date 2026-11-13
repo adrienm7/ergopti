@@ -14,7 +14,7 @@ _NativeWinHttpIpv6Host_Controls() {
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\native_winhttp_ipv6_host.ps1",
+				_DriverDir . "\tests\fixtures\core\native_winhttp_ipv6_host.ps1",
 				"-TransportPath", _VendorDir . "\ergopti_winhttp_transport.ps1"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 16384)
 		AssertTrue(Handle.start(), "The private native IPv6 host oracle must start")

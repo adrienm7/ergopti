@@ -30,7 +30,7 @@ helpers.describe("linux-relative-clock", function()
 	end)
 
 	helpers.it("linux-relative-clock: passive HTTP diagnostics preserve native acknowledgements and callbacks", function()
-		local path = helpers.driver_root() .. "/tests/fixtures/native_relative_timer_siblings.lua"
+		local path = helpers.driver_root() .. "/tests/fixtures/core/native_relative_timer_siblings.lua"
 		local file = assert(io.open(path, "rb"))
 		local source = assert(file:read("*a")); assert(file:close())
 		local marker = "-- Passive private observations"
@@ -81,7 +81,7 @@ local require = function(name) assert(name == "core.timing.engine.native_timer")
 
 
 	helpers.it("linux-relative-clock: HTTP fixture keeps its completion budget and stale-clock counterexample", function()
-		local file = assert(io.open(helpers.driver_root() .. "/tests/fixtures/native_relative_timer_siblings.lua", "rb"))
+		local file = assert(io.open(helpers.driver_root() .. "/tests/fixtures/core/native_relative_timer_siblings.lua", "rb"))
 		local source = assert(file:read("*a")); assert(file:close())
 		local marker = '\tcheck("actual loopback HTTP survives its new deadline '
 		local first = assert(source:find(marker, 1, true))
@@ -133,14 +133,14 @@ local require = function(name) assert(name == "core.timing.engine.native_timer")
 	if pcall(require, "luv") and package.config:sub(1, 1) == "/" then
 		helpers.it("linux-relative-clock: actual sibling deadlines and loop admission survive blocking work", function()
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_relative_timer_siblings.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_relative_timer_siblings.lua"
 			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native sibling timer fixture must pass")
 		end)
 
 		helpers.it("linux-relative-clock: actual timers and child deadlines start after blocking work and inside callbacks", function()
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_relative_timers.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_relative_timers.lua"
 			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native relative timer fixture must pass")
 		end)

@@ -9,7 +9,7 @@ _SFBX_ChildSource() {
 	if Cached != ""
 		return Cached
 	Detector := _SFS_ChildSource()
-	Boundary := InStr(Detector, "; tests/fixtures/secure_field_native_style_body.ahk")
+	Boundary := InStr(Detector, "; tests/fixtures/core/secure_field_native_style_body.ahk")
 	AssertTrue(Boundary > 0, "the shared genuine native detector builder must expose its fixture boundary")
 	Source := SubStr(Detector, 1, Boundary - 1)
 	for Name in ["LLM_Bridge_FeedCharForPrefix", "LLM_Bridge_FeedKeyDownIfActive", "LLM_Bridge_OnBackspace",

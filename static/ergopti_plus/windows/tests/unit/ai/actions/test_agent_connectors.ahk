@@ -616,7 +616,7 @@ _LAGNN_Run(Position) {
 		Created := Creation is Integer && Creation == 1
 		AssertTrue(Created, "SETUP: own the exact native-tool directory")
 		DirCreate(Root . "\agent_tools")
-		FileCopy(_DriverDir . "\tests\fixtures\agent_native_tool_input.ahk", Root . "\agent_tools\Native receiver.ahk")
+		FileCopy(_DriverDir . "\tests\fixtures\ai\agent_native_tool_input.ahk", Root . "\agent_tools\Native receiver.ahk")
 		AssertTrue(FSWriteCreateDurable(Root . "\parent", String(ProcessExist())), "SETUP: parent identity receipt")
 		_ConfigDir := Root
 		_LLM_AgentConnector_Tools := ""
@@ -765,7 +765,7 @@ _LAGICS_Run(DoSecond) {
 	Root := _LLM_Ollama_BuildTempDir(A_Temp, ProcessExist(), Nonce)
 	Created := FSCreateDirectoryExclusiveStrict(Root)
 	AssertTrue((Created is Integer) && Created == 1, "SETUP: exact private directory acquired")
-	State := Map("root", Root, "fixture", _DriverDir . "\tests\fixtures\agent_delayed_ics_reader.ahk",
+	State := Map("root", Root, "fixture", _DriverDir . "\tests\fixtures\ai\agent_delayed_ics_reader.ahk",
 		"target", "", "task", 0, "pid", 0, "done", false, "exit", -1, "stdout", "", "stderr", "")
 	Primary := 0, Joined := true, Passed := false
 	try {

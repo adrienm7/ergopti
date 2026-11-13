@@ -56,7 +56,7 @@ _MAD_Source(Root, OwnerReceipt) {
 		. 'global _VendorDir := _MAD_DriverDir . "\vendor"' . "`n"
 	for Vendor in ["ComVar.ahk", "Promise.ahk", "WebView2.ahk"]
 		Source .= "#Include " . _DriverDir . "\vendor\" . Vendor . "`n"
-	ButtonHelper := _DriverDir . "\tests\fixtures\native_owned_button.ahk"
+	ButtonHelper := _DriverDir . "\tests\fixtures\core\native_owned_button.ahk"
 	AssertTrue(FSStrictExists(ButtonHelper), "the standalone child must include its actual native button transport")
 	Source .= "#Include " . ButtonHelper . "`n"
 	Seen := Map()
@@ -91,13 +91,13 @@ _MAD_Source(Root, OwnerReceipt) {
 	}
 	; Reuse actual test-only custody bodies, without loading that fixture's
 	; auto-execute routine or changing either frozen sender probe.
-	Custody := FSReadStrict(_DriverDir . "\tests\fixtures\webview_metrics_sender_fixture.ahk")
+	Custody := FSReadStrict(_DriverDir . "\tests\fixtures\core\webview_metrics_sender_fixture.ahk")
 	for Name in ["_MVSP_Require", "_MVSP_Hash", "_MVSP_Deadline", "_MVSP_CloseOther", "_MVSP_RetireOtherBrowser", "_MVSP_Close"] {
 		Body := _DriverExtractFunctionBody(&Custody, Name)
 		AssertTrue(Body != "", "the genuine native custody body must exist: " . Name)
 		Source .= Body . "`n"
 	}
-	Body := FSReadStrict(_DriverDir . "\tests\fixtures\webview_metrics_apps_dom_body.ahk")
+	Body := FSReadStrict(_DriverDir . "\tests\fixtures\core\webview_metrics_apps_dom_body.ahk")
 	AssertTrue(Body != "", "the native Apps integration body must exist")
 	return Chr(0xFEFF) . Source . Body
 }
@@ -209,7 +209,7 @@ Test("Metrics Apps native DOM: pick and edit round-trip through real dialogs, st
 _KLWF_Source(Root) {
 	global _DriverDir
 	Code := _MAD_Source(Root, [])
-	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\webview_metrics_apps_dom_body.ahk")
+	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\core\webview_metrics_apps_dom_body.ahk")
 	AssertEqual(Fixture, SubStr(Code, StrLen(Code) - StrLen(Fixture) + 1),
 		"Only the existing test's exact auto-execute body may be replaced")
 	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Fixture))
@@ -297,7 +297,7 @@ _KMCD_Source(Root) {
 	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Fixture))
 	Code .= "#Include " . DispatcherOwner . "`n"
 	return Code
-		. FSReadStrict(_DriverDir . "\tests\fixtures\keystats_calendar_focus_body.ahk")
+		. FSReadStrict(_DriverDir . "\tests\fixtures\metrics\calendar_focus_body.ahk")
 }
 _KMCD_Case(Mode) {
 	static RetirementDebt := 0

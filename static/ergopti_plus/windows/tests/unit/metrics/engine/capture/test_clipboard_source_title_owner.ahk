@@ -13,8 +13,8 @@
 _KCST_ChildSource() {
 	global _DriverDir
 	Source := _KCPO_ChildSource()
-	OldSuffix := "#Include " . _DriverDir . "\tests\fixtures\clipboard_provenance_owner_body.ahk`n"
-	NewSuffix := "#Include " . _DriverDir . "\tests\fixtures\clipboard_source_title_owner_body.ahk`n"
+	OldSuffix := "#Include " . _DriverDir . "\tests\fixtures\clipboard\provenance_owner_body.ahk`n"
+	NewSuffix := "#Include " . _DriverDir . "\tests\fixtures\clipboard\source_title_owner_body.ahk`n"
 	AssertEqual(OldSuffix, SubStr(Source, StrLen(Source) - StrLen(OldSuffix) + 1),
 		"The canonical sibling builder must end in exactly its private fixture include")
 	return SubStr(Source, 1, StrLen(Source) - StrLen(OldSuffix)) . NewSuffix
@@ -39,7 +39,7 @@ _KCST_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KCST_ChildSource()) != 0)
 		_TestPrint("# clipboard-source-title-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\clipboard_source_title_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\clipboard\source_title_owner_body.ahk")))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _KCST_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private child must start")

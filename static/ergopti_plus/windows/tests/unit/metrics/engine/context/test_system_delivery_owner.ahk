@@ -46,7 +46,7 @@ _KSDO_ChildSource() {
 	AssertTrue(RegExMatch(FileRead(GateOwner, "UTF-8"), "ms)^class KLCollection \{.*?^\}", &GateClass) > 0,
 		"The child must use the actual capture gate class KLCollection")
 	Source .= GateClass[0] . "`n" . _DriverFuncBody("KL_CaptureHeld") . "`n"
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\keystats_system_delivery_owner_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\metrics\system_delivery_owner_body.ahk`n"
 }
 
 _KSDO_Complete(State, Code, Output, ErrorText) {

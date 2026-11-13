@@ -19,7 +19,7 @@ _SALTC_Source() {
   AssertTrue(Body != "", "Every deferred function must retain its actual current production body: " . Symbol)
   Source .= Body . "`n"
  }
- return Source . "#Include " . _DriverDir . "\tests\fixtures\system_action_lifecycle_timer_body.ahk`n"
+ return Source . "#Include " . _DriverDir . "\tests\fixtures\core\system_action_lifecycle_timer_body.ahk`n"
 }
 
 _SALTC_Case(Mode) {

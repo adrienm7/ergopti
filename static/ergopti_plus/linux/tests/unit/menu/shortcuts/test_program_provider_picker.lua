@@ -330,7 +330,7 @@ local function contextual_native_fixture(body)
 	end)
 end
 
-local contextual_file = assert(io.open(helpers.driver_root() .. "/../macos/tests/fixtures/contextual_picker_original_prefixes.json", "rb"))
+local contextual_file = assert(io.open(helpers.driver_root() .. "/../macos/tests/fixtures/core/contextual_picker_original_prefixes.json", "rb"))
 local contextual_original = assert(require("core.text.engine.json").decode(contextual_file:read("*a")))
 contextual_file:close()
 helpers.describe("declared Linux tap action page-title receiving", function()

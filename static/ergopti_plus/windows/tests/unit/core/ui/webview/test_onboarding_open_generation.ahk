@@ -35,7 +35,7 @@ _OWOC_Source(Root) {
 		. "#Include " . _DriverDir . "\onboarding\ui\core.ahk`n"
 		. "#Include " . _DriverDir . "\onboarding\ui\translate.ahk`n"
 		. "#Include " . _DriverDir . "\onboarding\ui\webview.ahk`n"
-		. "#Include " . _DriverDir . "\tests\fixtures\onboarding_open_generation_body.ahk`n"
+		. "#Include " . _DriverDir . "\tests\fixtures\onboarding\open_generation_body.ahk`n"
 }
 
 _OWOC_Assets(Root) {

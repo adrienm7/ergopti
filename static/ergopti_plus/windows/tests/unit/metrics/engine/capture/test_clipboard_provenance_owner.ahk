@@ -48,7 +48,7 @@ _KCPO_ChildSource() {
 			"Every reached native policy must use its canonical declaration: " . Spec[2])
 		Source .= Declaration[0] . "`n"
 	}
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\clipboard_provenance_owner_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\clipboard\provenance_owner_body.ahk`n"
 }
 
 _KCPO_Complete(State, Code, Output, ErrorText) {
@@ -70,7 +70,7 @@ _KCPO_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KCPO_ChildSource()) != 0)
 		_TestPrint("# clipboard-provenance-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\clipboard_provenance_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\clipboard\provenance_owner_body.ahk")))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _KCPO_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private child must start")

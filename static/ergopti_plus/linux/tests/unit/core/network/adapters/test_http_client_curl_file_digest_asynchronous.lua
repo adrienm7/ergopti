@@ -22,19 +22,19 @@ helpers.describe("file_digest: asynchronous sha256sum ownership", function()
 	if native_ok and ffi_ok and package.config:sub(1, 1) == "/" then
 		helpers.it("linux-digest-allocation: actual partial handles retire before refusal returns", function()
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_file_digest_allocations.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_file_digest_allocations.lua"
 			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native digest allocation fixture must pass")
 		end)
 		helpers.it("linux-digest-replacement: rejected paths and deadlines preserve the native incumbent", function()
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_file_digest_replacement.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_file_digest_replacement.lua"
 			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native digest replacement fixture must pass")
 		end)
 		helpers.it("linux-digest-owner: actual updater cancellation preserves another native digest", function()
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_file_digest_owners.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_file_digest_owners.lua"
 			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native digest owner fixture must pass")
 		end)

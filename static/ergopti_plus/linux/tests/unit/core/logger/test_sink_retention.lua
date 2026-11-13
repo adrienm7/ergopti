@@ -135,7 +135,7 @@ helpers.describe("log retention purge deletes aged generated files", function()
 	helpers.it("uses local calendar days through both New York DST changes", function()
 		if ON_WINDOWS then return end
 		local root = os.tmpname(); os.remove(root); assert(Shell.run("mkdir -p " .. Shell.quote(root)))
-		local fixture = helpers.driver_root() .. "/tests/fixtures/native_logger_dst_retention.lua"
+		local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_logger_dst_retention.lua"
 		local command = "TZ=America/New_York " .. Shell.quote(assert(arg and arg[-1])) .. " "
 			.. Shell.quote(fixture) .. " " .. Shell.quote(root)
 		local result = os.execute(command)

@@ -677,7 +677,7 @@ _NECP_Run(Delayed) {
 		for Suffix in ["entered", "release", "stop"]
 			Events.Push(_NECP_Event(BaseName . "_" . Suffix))
 		Task := ShellRunner_SpawnTreeOwned(A_AhkPath,
-			["/ErrorStdOut=UTF-8", _DriverDir . "\tests\fixtures\native_editor_cross_process_receiver.ahk",
+			["/ErrorStdOut=UTF-8", _DriverDir . "\tests\fixtures\core\native_editor_cross_process_receiver.ahk",
 				Root, Delayed ? "delay" : "positive", BaseName, String(ProcessExist())],
 			_NECP_Done.Bind(State), , _NECP_Adopt.Bind(State))
 		AssertTrue(Task.start(), "SETUP: start the exact owned receiver process")

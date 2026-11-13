@@ -35,7 +35,7 @@ const {
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
-const WALKER = path.join(WINDOWS, 'tests', 'fixtures', 'tray_rows_walker.ahk');
+const WALKER = path.join(WINDOWS, 'tests', 'fixtures', 'menu', 'tray_rows_walker.ahk');
 const FEATURES = path.join(WINDOWS, '_generated', 'features_manifest.ahk');
 const MENU_MANIFEST = path.join(WINDOWS, '..', '_shared', 'menu', 'data', 'menu_manifest.json');
 const LOCALES = ['fr', 'en'];

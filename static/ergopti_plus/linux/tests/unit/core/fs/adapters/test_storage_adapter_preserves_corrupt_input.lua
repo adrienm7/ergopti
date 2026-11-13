@@ -41,7 +41,7 @@ helpers.describe("storage adapter preserves corrupt input for recovery", functio
 		if not pcall(require, "luv") or package.config:sub(1, 1) ~= "/" then return end
 		local root = make_temp_config_root()
 		local Shell = require("core.process.adapters.shell_runner")
-		local fixture = helpers.driver_root() .. "/tests/fixtures/native_storage_recovery_fifo_race.lua"
+		local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_storage_recovery_fifo_race.lua"
 		local command = "timeout 4 " .. Shell.quote(assert(arg and arg[-1])) .. " " .. Shell.quote(fixture)
 			.. " " .. Shell.quote(root)
 		local result = os.execute(command)

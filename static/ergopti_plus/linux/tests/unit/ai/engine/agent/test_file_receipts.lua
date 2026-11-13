@@ -523,7 +523,7 @@ helpers.describe("agent learning staging ownership", function()
 			local folder = os.tmpname()
 			assert(os.remove(folder)); assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))
 			local okay, detail = xpcall(function()
-				local fixture = helpers.driver_root() .. "/tests/fixtures/native_agent_learning_source.lua"
+				local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_agent_learning_source.lua"
 				local executable = assert(arg and arg[-1])
 				helpers.assert_true(Shell.run("timeout --kill-after=2 5 " .. Shell.quote(executable)
 					.. " " .. Shell.quote(fixture) .. " " .. Shell.quote(folder) .. " " .. Shell.quote(kind) .. " flush"),

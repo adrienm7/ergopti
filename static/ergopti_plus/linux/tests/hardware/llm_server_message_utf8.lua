@@ -14,7 +14,7 @@ local Remote = require("ai.engine.api.api_remote")
 local Http = require("core.network.adapters.http_client")
 local origin = assert(os.getenv("LLM_RESPONSE_ORIGIN"))
 local root = assert(os.getenv("LLM_RESPONSE_ROOT"))
-local vectors = require("tests.fixtures.llm_server_message_contract").vectors
+local vectors = require("tests.fixtures.ai.server_message_contract").vectors
 assert(#vectors == 45)
 local native_post, receipt = Http.post
 Http.post = function(url, headers, body, callback, options)

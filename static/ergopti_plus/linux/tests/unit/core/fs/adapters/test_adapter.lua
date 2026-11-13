@@ -439,7 +439,7 @@ helpers.describe("Linux TOML staging admission", function()
 			helpers.it("(toml-staging-admission) bounds " .. entry .. " " .. kind, function()
 				with_toml_staging(function(_, _, state)
 					local Shell = require("core.process.adapters.shell_runner")
-					local fixture = helpers.driver_root() .. "/tests/fixtures/native_toml_staging.lua"
+					local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_toml_staging.lua"
 					helpers.assert_true(Shell.run("timeout --kill-after=2 5 " .. Shell.quote(assert(arg[-1]))
 						.. " " .. Shell.quote(fixture) .. " " .. Shell.quote(state.folder) .. " " .. Shell.quote(kind) .. " " .. Shell.quote(entry)),
 						"publication must return without borrowing or waiting on a staging endpoint")
@@ -970,7 +970,7 @@ helpers.describe("TOML source read admission", function()
 		helpers.it("linux-toml-read-special: actual FIFO, FIFO symlink and controls never wait", function()
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_toml_fifo_source.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_toml_fifo_source.lua"
 			-- A regression blocks in open(2); the deadline turns it into a failure.
 			local result = os.execute("timeout 20 " .. quote(executable) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native TOML FIFO fixture must finish green")

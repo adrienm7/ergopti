@@ -30,7 +30,7 @@ _TKN_ChildSource() {
 	AssertEqual(1, Owners, "There must be one actual static tap-key producer")
 	AssertEqual(3, StrSplit(Declarations, "::").Length - 1, "All three genuine static suffixes must be retained")
 	; Static declarations follow the fixture's completed auto-execute section.
-	return Cached := Source . FileRead(_DriverDir . "\tests\fixtures\tap_keys_kana_native_body.ahk", "UTF-8")
+	return Cached := Source . FileRead(_DriverDir . "\tests\fixtures\keyboard\tap_keys_kana_native_body.ahk", "UTF-8")
 		. "`n" . Declarations
 }
 _TKN_Complete(State, Code, Output, ErrorText) {

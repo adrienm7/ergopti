@@ -13,7 +13,7 @@ const vm = require('node:vm');
 const fixtureSource = fs.readFileSync(
 	path.join(
 		__dirname,
-		'../../static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1'
+		'../../static/ergopti_plus/windows/tests/fixtures/core/managed_remote_transport.ps1'
 	),
 	'utf8'
 );
@@ -380,7 +380,7 @@ const stagingResult = spawnSync(
 		'-HelperPath',
 		path.join(
 			__dirname,
-			'../../static/ergopti_plus/windows/tests/fixtures/updater_staging_diagnostic.ps1'
+			'../../static/ergopti_plus/windows/tests/fixtures/updater/updater_staging_diagnostic.ps1'
 		),
 		'-OwnedDirectory',
 		stagingOwned
@@ -463,7 +463,7 @@ const tlsPhaseResult = spawnSync(
 		'-FixturePath',
 		path.join(
 			__dirname,
-			'../../static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1'
+			'../../static/ergopti_plus/windows/tests/fixtures/core/managed_remote_transport.ps1'
 		)
 	],
 	{ encoding: 'utf8', windowsHide: true }

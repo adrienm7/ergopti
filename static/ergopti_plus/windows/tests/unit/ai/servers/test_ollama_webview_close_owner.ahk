@@ -27,7 +27,7 @@ _OWCF_ChildSource() {
 			Includes .= "#Include " . Owner . "`n"
 		}
 	}
-	Fixture := _DriverDir . "\tests\fixtures\ollama_webview_close_owner_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\ai\ollama_webview_close_owner_body.ahk"
 	AssertTrue(FileExist(Fixture) != "", "the registered child must retain its actual behavioral fixture")
 	return '#Requires AutoHotkey v2.0' . "`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
 		. Includes

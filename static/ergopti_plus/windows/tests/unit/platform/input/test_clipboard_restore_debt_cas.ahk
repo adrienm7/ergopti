@@ -76,7 +76,7 @@ _CRDC_Run(Mode) {
 		BeforeMutation := CBClipboardOwner.mutation_id
 		Foreign := "independent foreign copy é😀"
 		Task := ShellRunner_SpawnTreeOwned(A_AhkPath,
-			["/ErrorStdOut=UTF-8", _DriverDir . "\tests\fixtures\clipboard_restore_debt_writer.ahk", Root, Mode, Foreign],
+			["/ErrorStdOut=UTF-8", _DriverDir . "\tests\fixtures\clipboard\restore_debt_writer.ahk", Root, Mode, Foreign],
 			_CALC_Completed.Bind(State))
 		Retired := false
 		AssertTrue(Task.start(), "the exact independent clipboard writer must start")

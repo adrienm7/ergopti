@@ -83,7 +83,7 @@ _LMCT_ChildSource() {
 	; The owner's text moves into the private child, so its own relative includes
 	; must keep resolving from where the owner really lives.
 	Source := StrReplace(Source, "%A_LineFile%", Owner)
-	return Code . _LMCT_OverlayTimerOwner(Source) . "`n#Include " . _DriverDir . "\tests\fixtures\layout_manager_command_body.ahk`n"
+	return Code . _LMCT_OverlayTimerOwner(Source) . "`n#Include " . _DriverDir . "\tests\fixtures\layouts\manager_command_body.ahk`n"
 }
 
 _LMCT_Case(Mode) {

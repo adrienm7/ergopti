@@ -7,7 +7,7 @@ _SystemProxy_RetirementProtocolAcceptance() {
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\system_proxy_retirement.ps1", "-WorkerPath",
+				_DriverDir . "\tests\fixtures\core\system_proxy_retirement.ps1", "-WorkerPath",
 				_VendorDir . "\ergopti_system_proxy_worker.ps1"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
 		AssertTrue(Handle.start(), "the owned source-executed protocol fixture must start")

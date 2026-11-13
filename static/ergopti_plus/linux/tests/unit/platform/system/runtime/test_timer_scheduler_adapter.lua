@@ -574,7 +574,7 @@ helpers.describe("linux-timer-finite-admission", function()
 	if native_ok and package.config:sub(1, 1) == "/" then
 		helpers.it("linux-timer-finite-admission: native admission and delivery preserve healthy successors", function()
 			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_timer_finite_admission.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_timer_finite_admission.lua"
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 			local result = os.execute(quote(executable) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native numeric admission fixture must succeed")

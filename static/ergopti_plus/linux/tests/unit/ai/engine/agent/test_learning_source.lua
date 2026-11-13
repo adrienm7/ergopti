@@ -384,7 +384,7 @@ helpers.describe("agent learning native source admission", function()
 			assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))
 			local okay, detail = xpcall(function()
 				local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
-				local fixture = helpers.driver_root() .. "/tests/fixtures/native_agent_learning_source.lua"
+				local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_agent_learning_source.lua"
 				-- A regression waits in open(2). timeout owns and reaps this worker;
 				-- the caller owns its directory even when that deadline expires.
 				local completed = Shell.run("timeout --kill-after=2 5 " .. Shell.quote(executable)

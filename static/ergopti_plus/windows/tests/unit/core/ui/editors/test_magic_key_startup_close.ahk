@@ -21,7 +21,7 @@ _MSUC_ChildSource() {
 		}
 		Code .= Definition . "`n"
 	}
-	return Code . FileRead(_DriverDir . "\tests\fixtures\magic_key_startup_close_body.ahk", "UTF-8")
+	return Code . FileRead(_DriverDir . "\tests\fixtures\layouts\magic_key_startup_close_body.ahk", "UTF-8")
 }
 
 _MSUC_Case(Editor, Mode) {

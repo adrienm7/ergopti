@@ -540,7 +540,7 @@ _KID_ChildSource() {
 		AssertTrue(Body != "", "The actual callback graph requires its genuine definition: " . Symbol)
 		Source .= Body . "`n"
 	}
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\keystats_native_key_char_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\metrics\native_key_char_body.ahk`n"
 }
 
 _KID_Case(Mode) {
@@ -614,10 +614,10 @@ for _KID_Mode in ["letter", "backspace", "enter", "tab"]
 _KPU_ChildSource() {
 	global _DriverDir
 	Source := _KID_ChildSource()
-	Footer := "#Include " . _DriverDir . "\tests\fixtures\keystats_native_key_char_body.ahk`n"
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\metrics\native_key_char_body.ahk`n"
 	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
 	return SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
-		. "#Include " . _DriverDir . "\tests\fixtures\keystats_unicode_packet_owner_body.ahk`n"
+		. "#Include " . _DriverDir . "\tests\fixtures\metrics\unicode_packet_owner_body.ahk`n"
 }
 
 _KPU_Case(Mode, SourceFn := unset) {
@@ -758,10 +758,10 @@ for _KCE_Mode in ["char-only", "modifier-release", "released", "packet-key", "di
 _KSP_ChildSource() {
 	global _DriverDir
 	Source := _KPU_ChildSource()
-	Footer := "#Include " . _DriverDir . "\tests\fixtures\keystats_unicode_packet_owner_body.ahk`n"
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\metrics\unicode_packet_owner_body.ahk`n"
 	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
 	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
-	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\keystats_unicode_packet_owner_body.ahk")
+	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\metrics\unicode_packet_owner_body.ahk")
 	Start := InStr(Fixture, "_KID_Exercise() {")
 	AssertTrue(Start > 0 && InStr(Fixture, "_KID_Exercise() {", , Start + 1) == 0,
 		"The existing native fixture has one exact exercise boundary")
@@ -784,7 +784,7 @@ _KSP_ChildSource() {
 	for Symbol in ["_KL_PublishBufferSnapshot", "_KL_RestoreBufferSnapshot"]
 		Source .= _DriverFuncBody(Symbol) . "`n"
 	Source .= "#Include " . _KID_ClassOwner("KeystatsConst") . "`n"
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\keystats_utf16_packet_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\metrics\utf16_packet_body.ahk`n"
 }
 
 for _KSP_Mode in ["packet-bmp", "packet-astral", "packet-io-flush", "packet-io-detach", "packet-gap-synth", "packet-gap-context", "packet-gap-stop", "packet-gap-private", "packet-gap-inflight"]
@@ -795,14 +795,14 @@ for _KSP_Mode in ["packet-bmp", "packet-astral", "packet-io-flush", "packet-io-d
 _KSB_ChildSource() {
 	global _DriverDir
 	Source := _KPU_ChildSource()
-	Footer := "#Include " . _DriverDir . "\tests\fixtures\keystats_unicode_packet_owner_body.ahk`n"
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\metrics\unicode_packet_owner_body.ahk`n"
 	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
 	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
-	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\keystats_unicode_packet_owner_body.ahk")
+	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\metrics\unicode_packet_owner_body.ahk")
 	Start := InStr(Fixture, "_KID_Exercise() {")
 	AssertTrue(Start > 0 && InStr(Fixture, "_KID_Exercise() {", , Start + 1) == 0)
 	return Source . SubStr(Fixture, 1, Start - 1)
-		. "#Include " . _DriverDir . "\tests\fixtures\keystats_high_backspace_body.ahk`n"
+		. "#Include " . _DriverDir . "\tests\fixtures\metrics\high_backspace_body.ahk`n"
 }
 for _KSB_Mode in ["plain", "high"]
 	Test("Keystats native Backspace after " . _KSB_Mode . " preserves the actual owned Edit (keystats-native-high-backspace)",
@@ -812,7 +812,7 @@ for _KSB_Mode in ["plain", "high"]
 _KSX_ChildSource() {
 	global _DriverDir
 	Source := _KSB_ChildSource()
-	Footer := "#Include " . _DriverDir . "\tests\fixtures\keystats_high_backspace_body.ahk`n"
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\metrics\high_backspace_body.ahk`n"
 	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
 	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
 	for Symbol in ["KL_MarkSynthetic", "KL_ClearSynthetic"] {
@@ -822,7 +822,7 @@ _KSX_ChildSource() {
 			Source .= Body . "`n"
 		}
 	}
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\keystats_revoked_high_backspace_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\metrics\revoked_high_backspace_body.ahk`n"
 }
 for _KSX_Mode in ["synth-revoked", "focus-invalidated", "two-highs"]
 	Test("Keystats native omitted-unit history: " . _KSX_Mode . " preserves both successive Backspaces (keystats-native-revoked-high-backspace)",

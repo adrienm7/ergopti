@@ -1114,7 +1114,7 @@ helpers.describe("native installed-layout record publication", function()
 					environment[#environment + 1] = pair[1] .. "=" .. Shell.quote(folder .. "/" .. pair[2])
 				end
 				assert(Shell.run("mkdir -m 700 -- " .. table.concat(directories, " ")))
-				local fixture = helpers.driver_root() .. "/tests/fixtures/native_layout_registry_record.lua"
+				local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_layout_registry_record.lua"
 				helpers.assert_true(Shell.run(table.concat(environment, " ") .. " timeout --kill-after=2 10 "
 					.. Shell.quote(assert(arg[-1])) .. " " .. Shell.quote(fixture) .. " " .. Shell.quote(folder) .. " " .. Shell.quote(kind)),
 					"the actual public uninstall must retain other installed layouts across native failures")

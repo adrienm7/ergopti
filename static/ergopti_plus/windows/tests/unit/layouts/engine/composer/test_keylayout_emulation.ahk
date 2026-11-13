@@ -524,7 +524,7 @@ Test("transport: a request can write its body to a file, byte for byte (layout-r
 	_KLT_OutputFileCase)
 
 ; The bytes themselves are proven against real WinHTTP by
-; tests/fixtures/winhttp_transport_controls.ps1; this guards the request surface.
+; tests/fixtures/core/winhttp_transport_controls.ps1; this guards the request surface.
 _KLT_OutputFileCase() {
 	Target := A_Temp . "\ergopti_keylayout_output_" . A_TickCount . ".test"
 	Req := CurlAsyncRequest()

@@ -870,8 +870,8 @@ _LDP_Native(Mode, Calls, Lines) {
         Runtime := State.Directory . "\ergopti_allowed_" . Nonce . ".exe"
         FileCopy(A_AhkPath, Runtime, false)
         AssertEqual(CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath)), CryptoSha256Bytes(FSReadBytesStrict(Runtime)))
-        AppScript := _DriverDir . "\tests\fixtures\llm_debounce_privacy_app.ahk"
-        PeerScript := _DriverDir . "\tests\fixtures\llm_debounce_privacy_peer.ahk"
+        AppScript := _DriverDir . "\tests\fixtures\ai\debounce_privacy_app.ahk"
+        PeerScript := _DriverDir . "\tests\fixtures\ai\debounce_privacy_peer.ahk"
         AssertTrue(FileExist(AppScript) && FileExist(PeerScript))
         Pid := 0
         _LLM_CurlArtifactRun(_SR_BuildDirectCommandLine(Runtime, ["/ErrorStdOut", AppScript, AppReady, State.AppStop, Nonce]),

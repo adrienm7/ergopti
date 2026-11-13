@@ -51,7 +51,7 @@ helpers.describe("linux-callback-error-description", function()
 		for _, kind in ipairs({ "object", "string" }) do
 			helpers.it("linux-callback-error-description: completed " .. kind .. " callback retires an overdue watchdog", function()
 				local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
-				local fixture = helpers.driver_root() .. "/tests/fixtures/native_callback_error_description.lua"
+				local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_callback_error_description.lua"
 				local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 				local result = os.execute(quote(executable) .. " " .. quote(fixture) .. " after " .. quote(kind) .. " blocked_callback")
 				helpers.assert_true(result == true or result == 0,
@@ -61,7 +61,7 @@ helpers.describe("linux-callback-error-description", function()
 		for _, kind in ipairs({ "object", "string" }) do
 			helpers.it("linux-callback-error-description: slow setup preserves the " .. kind .. " callback watchdog budget", function()
 				local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
-				local fixture = helpers.driver_root() .. "/tests/fixtures/native_callback_error_description.lua"
+				local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_callback_error_description.lua"
 				local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 				local result = os.execute(quote(executable) .. " " .. quote(fixture) .. " after "
 					.. quote(kind) .. " blocked_callback delayed_setup")
@@ -73,7 +73,7 @@ helpers.describe("linux-callback-error-description", function()
 			for _, scenario in ipairs({ "after", "every", "idle", "periodic", "registered idle", "deferred" }) do
 				helpers.it("linux-callback-error-description: slow admission preserves the " .. scenario .. " " .. kind .. " callback budget", function()
 					local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
-					local fixture = helpers.driver_root() .. "/tests/fixtures/native_callback_error_description.lua"
+					local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_callback_error_description.lua"
 					local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 					local result = os.execute(quote(executable) .. " " .. quote(fixture) .. " " .. quote(scenario)
 						.. " " .. quote(kind) .. " blocked_callback delayed_admission")
@@ -84,7 +84,7 @@ helpers.describe("linux-callback-error-description", function()
 		end
 		helpers.it("linux-callback-error-description: admitted loop without callbacks remains bounded", function()
 			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_callback_error_description.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_callback_error_description.lua"
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 			local result = os.execute(quote(executable) .. " " .. quote(fixture) .. " periodic string no_callback delayed_admission")
 			helpers.assert_true(result == true or result == 0,
@@ -94,7 +94,7 @@ helpers.describe("linux-callback-error-description", function()
 			for _, kind in ipairs({ "object", "string" }) do
 				helpers.it("linux-callback-error-description: actual " .. scenario .. " isolates " .. kind .. " failure", function()
 					local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
-					local fixture = helpers.driver_root() .. "/tests/fixtures/native_callback_error_description.lua"
+					local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_callback_error_description.lua"
 					local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 					local result = os.execute(quote(executable) .. " " .. quote(fixture)
 						.. " " .. quote(scenario) .. " " .. quote(kind))

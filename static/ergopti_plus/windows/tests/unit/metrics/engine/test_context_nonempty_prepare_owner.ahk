@@ -17,7 +17,7 @@ _KCNP_ChildSource() {
 	AssertEqual(1, Includes, "Only the real privacy owner include may be embedded")
 	Source := RegExReplace(Source, "m)^KL_LogWindowSwitch\(Values\*\) \{", "$0`n`t_KCNP_ObserveWindow(Values*)", &ObserverCount)
 	AssertEqual(1, ObserverCount, "Only the existing delegated window logger receives the read-only observer")
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\context_nonempty_prepare_owner_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\core\context_nonempty_prepare_owner_body.ahk`n"
 }
 _KCNP_Case(Mode) {
 	static RetirementDebt := 0

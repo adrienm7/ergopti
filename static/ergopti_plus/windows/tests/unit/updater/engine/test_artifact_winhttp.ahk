@@ -23,7 +23,7 @@ _UpdaterArtifactWinHttp_Controls() {
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\updater_artifact_download_controls.ps1",
+				_DriverDir . "\tests\fixtures\updater\updater_artifact_download_controls.ps1",
 				"-VendorDirectory", _VendorDir,
 				"-SchemaPath", _SharedDir . "\core\network\data\managed_network.json",
 				"-PolicyPath", _SharedDir . "\core\network\data\proxy_policy.json",

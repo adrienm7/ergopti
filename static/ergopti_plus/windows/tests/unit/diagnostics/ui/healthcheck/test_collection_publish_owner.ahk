@@ -91,7 +91,7 @@ _HCPT_Source(Root) {
 		}
 	}
 	Added .= "#Include " . _HCPT_ClassOwner() . "`n"
-	Added .= "#Include " . _DriverDir . "\tests\fixtures\healthcheck_collection_publish_owner_body.ahk`n"
+	Added .= "#Include " . _DriverDir . "\tests\fixtures\core\healthcheck_collection_publish_owner_body.ahk`n"
 	Old := "#Include " . _DriverDir . "\tests\fixtures\error_dialog_startup_owner_body.ahk`n"
 	New := StrReplace(Source, Old, Added, true, &Changed)
 	AssertEqual(1, Changed, "Only the unique donor terminal fixture include may be replaced.")

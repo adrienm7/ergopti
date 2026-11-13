@@ -34,7 +34,7 @@ _APNT_Source(Root) {
 		}
 	}
 	AssertEqual(8, Owners.Count, "The native child must retain every distinct lifecycle/codec/data owner")
-	Fixture := _DriverDir . "\tests\fixtures\action_picker_native_engine_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\core\action_picker_native_engine_body.ahk"
 	AssertTrue(FSStrictExists(Fixture), "The installed-engine child must exist")
 	return Chr(0xFEFF) . Source . "#Include " . Fixture . "`n"
 }

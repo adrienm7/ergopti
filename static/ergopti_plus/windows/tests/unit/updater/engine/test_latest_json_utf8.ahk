@@ -9,7 +9,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../../../fixtures/updater_managed_json_harvest.ahk
+#Include ../../../fixtures/updater/managed_json_harvest.ahk
 
 _ULJ_Fetch(*) {
 	return Updater_FetchLatestJson("main")

@@ -6,7 +6,7 @@ helpers.describe("owned-process-deadline", function()
 		helpers.it("owned-process-deadline: " .. mode .. " preserves a newly armed native budget", function()
 			local Shell = require("core.process.adapters.shell_runner")
 			local executable = assert(require("luv").exepath())
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_owned_deadline.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_owned_deadline.lua"
 			local command = Shell.quote(executable) .. " " .. Shell.quote(fixture) .. " " .. Shell.quote(mode)
 			local status = os.execute(command)
 			helpers.assert_true(status == true or status == 0, "actual child deadline and cleanup must pass: " .. mode)

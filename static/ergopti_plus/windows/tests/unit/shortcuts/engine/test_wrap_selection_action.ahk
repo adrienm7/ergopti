@@ -129,7 +129,7 @@ _WRCF_ChildSource() {
 	}
 	AssertEqual(3, Count, "Only the native paste/direct transports may be decorated with owned-window guards")
 	Code .= Overlaid . SubStr(Body, Position) . "`n"
-	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\wrap_clipboard_render_focus_body.ahk")
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\keyboard\wrap_clipboard_render_focus_body.ahk")
 }
 
 ; WrapTextIfSelected asks the saved custom pairs which delimiters a key owns.
@@ -224,7 +224,7 @@ _WTE_ChildSource() {
 		Code .= Definition . "`n"
 	}
 	Code .= _WRCF_CustomPairSource()
-	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\wrap_trigger_epoch_body.ahk")
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\keyboard\wrap_trigger_epoch_body.ahk")
 }
 
 _WTE_Case(Mode) {
@@ -279,7 +279,7 @@ for _WTE_Mode in ["direct"]
 _GTRF_ChildSource() {
 	global _DriverDir
 	Code := _WRCF_ChildSource()
-	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\wrap_clipboard_render_focus_body.ahk")
+	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\keyboard\wrap_clipboard_render_focus_body.ahk")
 	AssertEqual(Suffix, SubStr(Code, -StrLen(Suffix)), "Only the previous fixture body may be replaced; all real clipboard/send owners remain intact.")
 	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Suffix))
 	Code := StrReplace(Code, "_CB_ReleaseRestoreLock(Lock) {", "_GTRF_ActualReleaseRestoreLock(Lock) {", true, &Releases)
@@ -306,7 +306,7 @@ _GTRF_ChildSource() {
 	}
 	Code .= 'global Keystats := {synth_owners: [], synth_active: 0, synth_type: "none", synth_private: false, scalar_fragment: false, scalar_history: false, scalar_epoch: 1}' . "`n"
 	Code .= 'global _TimingsCache := Map("gestures", Map("synthetic_clear_ms", ' . TimingsGet("gestures", "synthetic_clear_ms") . "))`n"
-	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\gesture_transform_render_focus_body.ahk")
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\gestures\transform_render_focus_body.ahk")
 }
 _GTRF_Case(Mode) {
 	global SEND_INSTANT_PASTE_DELAY_MS
@@ -366,7 +366,7 @@ for _GTRF_Mode in ["current", "redirect"]
 _SCCF_ChildSource() {
 	global _DriverDir
 	Code := _GTRF_ChildSource()
-	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\gesture_transform_render_focus_body.ahk")
+	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\gestures\transform_render_focus_body.ahk")
 	AssertEqual(Suffix, SubStr(Code, -StrLen(Suffix)), "Only the private fixture body changes; every real capture/context/send owner remains intact.")
 	return SubStr(Code, 1, StrLen(Code) - StrLen(Suffix))
 		. FSReadStrict(_DriverDir . "\tests\fixtures\selection_capture_control_focus_body.ahk")
@@ -428,7 +428,7 @@ for _SCCF_Mode in ["current", "redirect"]
 _GTTL_ChildSource() {
 	global _DriverDir
 	Code := _GTRF_ChildSource()
-	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\gesture_transform_render_focus_body.ahk")
+	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\gestures\transform_render_focus_body.ahk")
 	AssertEqual(Suffix, SubStr(Code, -StrLen(Suffix)), "Only the isolated fixture changes; actual capture/send/clipboard owners remain intact")
 	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Suffix))
 	Code := StrReplace(Code, "KL_MarkSynthetic(source, is_private := false) {",
@@ -442,7 +442,7 @@ _GTTL_ChildSource() {
 	Character := _DriverFuncBody("TextCaseTitleCharacter")
 	AssertTrue(Character != "", "The actual title-case character lookup must exist")
 	Title .= "`n" . Character . "`n#Include " . _DriverDir . "\_generated\unicode_title.ahk"
-	return Code . Title . "`n" . FSReadStrict(_DriverDir . "\tests\fixtures\gesture_title_transform_target_body.ahk")
+	return Code . Title . "`n" . FSReadStrict(_DriverDir . "\tests\fixtures\gestures\title_transform_target_body.ahk")
 }
 _GTTL_Case(Mode) {
 	global SEND_INSTANT_PASTE_DELAY_MS
@@ -502,11 +502,11 @@ for _GTTL_Mode in ["current", "redirect"]
 _WFC_ChildSource() {
 	global _DriverDir
 	Code := _GTRF_ChildSource()
-	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\gesture_transform_render_focus_body.ahk")
+	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\gestures\transform_render_focus_body.ahk")
 	AssertEqual(Suffix, SubStr(Code, -StrLen(Suffix)), "Only the unrelated renderer fixture entry may be replaced")
 	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Suffix))
 	Code .= _DriverFuncBody("ErgoptiLayout_Action") . "`n"
-	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\wrap_fresh_selection_body.ahk")
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\keyboard\wrap_fresh_selection_body.ahk")
 }
 _WFC_Case(Mode) {
 	global SEND_INSTANT_PASTE_DELAY_MS

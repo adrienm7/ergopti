@@ -437,9 +437,9 @@ local Record = helpers.load_module("tests.support.touchpad_record")
 
 local PAD = "pointer:/dev/input/event7"
 
---- The recorded trace of tests/fixtures/tap_click_record_synaptics.yml.
+--- The recorded trace of tests/fixtures/keyboard/tap_click_record_synaptics.yml.
 local function tap_trace()
-	local file = assert(io.open(helpers.driver_root() .. "/tests/fixtures/tap_click_record_synaptics.yml", "rb"))
+	local file = assert(io.open(helpers.driver_root() .. "/tests/fixtures/keyboard/tap_click_record_synaptics.yml", "rb"))
 	local trace = assert(Record.decode(file:read("*a")))
 	file:close()
 	return trace

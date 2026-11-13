@@ -18,7 +18,7 @@ _CNOT_Source() {
 		AssertTrue(Owner != "", "The native source needs its genuine helper owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	return Chr(0xFEFF) . Code . "#Include " . _DriverDir . "\tests\fixtures\clipboard_native_open_owner_body.ahk`n"
+	return Chr(0xFEFF) . Code . "#Include " . _DriverDir . "\tests\fixtures\clipboard\native_open_owner_body.ahk`n"
 }
 
 _CNOT_Done(State, Code, Output, ErrorText) {
@@ -36,7 +36,7 @@ _CNOT_Case(Mode) {
 	FSCreateDirectoryExclusiveStrict(Root)
 	Roles := [], Primary := 0, ExportFailure := 0, Retired := true, PreviousCritical := Critical("Off")
 	try {
-		Script := Root . "\roles.ahk", Fixture := _DriverDir . "\tests\fixtures\clipboard_native_open_owner_body.ahk"
+		Script := Root . "\roles.ahk", Fixture := _DriverDir . "\tests\fixtures\clipboard\native_open_owner_body.ahk"
 		AssertTrue(FSWriteCreateDurable(Script, _CNOT_Source()))
 		SourceHash := CryptoSha256Bytes(FSReadBytesStrict(Script)), BodyHash := CryptoSha256Bytes(FSReadBytesStrict(Fixture))
 		for Name in ["observer", "subject"] {

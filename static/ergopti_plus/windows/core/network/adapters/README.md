@@ -28,5 +28,5 @@ patches are inactive preparation; they and their twelve native, E2E, package
 and install checks left the tree with the old handovers and stay in Git at
 `49c62d77a1` (`docs/handovers/2026-10-04-group6-windows/`).
 Real WinHTTP behavior is proven against owned loopback services by
-`tests/fixtures/winhttp_transport_controls.ps1`; this directory does not claim
+`tests/fixtures/core/winhttp_transport_controls.ps1`; this directory does not claim
 that enterprise certificate and authentication acceptance passed.

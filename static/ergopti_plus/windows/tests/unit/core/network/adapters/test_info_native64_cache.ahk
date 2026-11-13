@@ -74,7 +74,7 @@ _NWCT_Program(Directory) {
 	AssertTrue(TickOwner != "", "The adapter's clock helper must have its genuine owner")
 	NetworkSource := _NWCT_Overlay(FSReadStrict(NetworkOwner))
 	CryptoSource := FSReadStrict(CryptoOwner)
-	Fixture := _DriverDir . "\tests\fixtures\network_info_native64_cache_probe.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\core\network_info_native64_cache_probe.ahk"
 	AssertTrue(FSWriteCreateDurable(Directory . "\network_info.ahk", Chr(0xFEFF) . NetworkSource) != 0)
 	AssertTrue(FSWriteCreateDurable(Directory . "\crypto.ahk", Chr(0xFEFF) . CryptoSource) != 0)
 	AssertTrue(FSWriteCreateDurable(Directory . "\probe.ahk", Chr(0xFEFF) . FSReadStrict(Fixture)) != 0)

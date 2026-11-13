@@ -430,7 +430,7 @@ helpers.describe("linux-periodic-finite-admission", function()
 	if native_ok and package.config:sub(1, 1) == "/" then
 		helpers.it("linux-periodic-finite-admission: real libuv owns refusal and retry resources", function()
 			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_periodic_admission.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_event_loop_periodic_admission.lua"
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 			local result = os.execute(quote(executable) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native periodic admission fixture must succeed")
@@ -483,7 +483,7 @@ end)
 if native_ok and package.config:sub(1, 1) == "/" then
 	helpers.it("linux-sleep-completion-receipts: native command wait and refusal receipts are truthful", function()
 		local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
-		local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_sleep_receipts.lua"
+		local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_event_loop_sleep_receipts.lua"
 		local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 		local result = os.execute(quote(executable) .. " " .. quote(fixture))
 		helpers.assert_true(result == true or result == 0, "native wait completion fixture must succeed")
@@ -521,7 +521,7 @@ helpers.describe("event loop backend isolation", function()
   if native_ok and package.config:sub(1, 1) == "/" then
     helpers.it("linux-event-close-ack: installed luv retires its own handles before return", function()
       local executable = assert(arg and arg[-1], "the running Lua interpreter must be identifiable")
-      local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_close_ack.lua"
+      local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_event_loop_close_ack.lua"
       local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
       local result = os.execute(quote(executable) .. " " .. quote(fixture))
       helpers.assert_true(result == true or result == 0, "native close callbacks must be acknowledged")
@@ -529,14 +529,14 @@ helpers.describe("event loop backend isolation", function()
     helpers.it("installed luv dispatches callbacks, closes its handles and waits through child exits", function()
       -- libuv's default loop is process-wide: other tests may own active handles.
       local executable = assert(arg and arg[-1], "the running Lua interpreter must be identifiable")
-      local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop.lua"
+      local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_event_loop.lua"
       local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
       local result = os.execute(quote(executable) .. " " .. quote(fixture))
       helpers.assert_true(result == true or result == 0, "isolated native loop fixture must succeed")
     end)
     helpers.it("installed luv unwinds failed loop startup and permits the next run", function()
       local executable = assert(arg and arg[-1], "the running Lua interpreter must be identifiable")
-      local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_startup.lua"
+      local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_event_loop_startup.lua"
       local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
       local result = os.execute(quote(executable) .. " " .. quote(fixture))
       helpers.assert_true(result == true or result == 0, "isolated native startup ownership must succeed")
@@ -627,7 +627,7 @@ helpers.describe("linux-event-reentry", function()
 	if native_ok and package.config:sub(1, 1) == "/" then
 		helpers.it("linux-event-reentry: installed libuv retains exact run ownership through stop", function()
 			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_reentry.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_event_loop_reentry.lua"
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 			local result = os.execute(quote(executable) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native reentry ownership fixture must succeed")

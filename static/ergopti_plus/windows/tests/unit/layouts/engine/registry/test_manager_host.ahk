@@ -615,7 +615,7 @@ _LMOC_Source(Root) {
 	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
 	Source := StrReplace(Source, "_EDOS_", "_LMOC_")
 	return Source . "#Include " . _DriverDir . "\layouts\ui\layout_manager\init.ahk`n"
-		. "#Include " . _DriverDir . "\tests\fixtures\layout_manager_open_generation_body.ahk`n"
+		. "#Include " . _DriverDir . "\tests\fixtures\layouts\manager_open_generation_body.ahk`n"
 }
 
 _LMOC_Assets(Root) {

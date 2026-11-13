@@ -124,13 +124,13 @@ helpers.describe("network field check: the Linux ports", function()
 	if native_ok and ffi_ok and package.config:sub(1, 1) == "/" then
 		helpers.it("(linux-network-check-native) preserves actual GLib proxy setting bytes", function()
 			local Shell = require("core.process.adapters.shell_runner")
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_gvariant_proxy_settings.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_gvariant_proxy_settings.lua"
 			local status = os.execute(Shell.quote(assert(arg[-1])) .. " " .. Shell.quote(fixture))
 			helpers.assert_true(status == true or status == 0, "actual GLib strings must reach the PAC check unchanged")
 		end)
 		helpers.it("(linux-network-check-native) preserves actual HTTP terminal callback ownership", function()
 			local Shell = require("core.process.adapters.shell_runner")
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_network_check_refusal.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_network_check_refusal.lua"
 			local status = os.execute(Shell.quote(assert(arg[-1])) .. " " .. Shell.quote(fixture))
 			helpers.assert_true(status == true or status == 0, "actual field-check terminal callbacks must remain singular")
 		end)
@@ -504,7 +504,7 @@ helpers.describe("native data FIFO admission", function()
 			assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
 			local path = dir .. (mode == "locale" and "/locale_order.json" or "/source")
 			assert(Shell.run("mkfifo " .. Shell.quote(path)))
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_data_fifo_admission.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_data_fifo_admission.lua"
 			local command = "timeout 4 " .. Shell.quote(assert(arg and arg[-1])) .. " " .. Shell.quote(fixture)
 				.. " " .. Shell.quote(dir) .. " " .. Shell.quote(mode)
 			local result = os.execute(command)

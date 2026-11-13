@@ -62,7 +62,7 @@ _UHLT_Source(Root) {
 	Source .= "#Include " . KeyOwner . "`n"
 	for Symbol in ["AppDirsFolderName", "LoggerSubFilesData"]
 		Source .= "#Include " . _UHLT_Generated(Symbol) . "`n"
-	return Chr(0xFEFF) . Source . "#Include " . _DriverDir . "\tests\fixtures\user_hotstring_loader_lifetime_body.ahk`n"
+	return Chr(0xFEFF) . Source . "#Include " . _DriverDir . "\tests\fixtures\hotstrings\user_hotstring_loader_lifetime_body.ahk`n"
 }
 
 _UHLT_Assets(Root) {

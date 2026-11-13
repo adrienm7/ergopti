@@ -599,4 +599,4 @@ Test("config full save: terminal write failure refuses exit "
 	_CFGFS_TerminalWriteFailureRefusesSettlement)
 
 
-#Include %A_LineFile%\..\..\..\..\..\fixtures\startup_full_save_observer.ahk
+#Include %A_LineFile%\..\..\..\..\..\fixtures\core\startup_full_save_observer.ahk

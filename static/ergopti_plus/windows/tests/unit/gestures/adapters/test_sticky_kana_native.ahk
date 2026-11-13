@@ -3,10 +3,10 @@
 _SKN_ChildSource() {
 	global _DriverDir
 	Source := _SSM_ChildSource()
-	Footer := FSReadStrict(_DriverDir . "\tests\fixtures\sticky_modifier_flags_body.ahk")
+	Footer := FSReadStrict(_DriverDir . "\tests\fixtures\keyboard\sticky_modifier_flags_body.ahk")
 	AssertEqual(Footer, SubStr(Source, -StrLen(Footer)), "Only the unrelated Shift fixture entry may be replaced")
 	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
-	return Source . FSReadStrict(_DriverDir . "\tests\fixtures\sticky_kana_native_body.ahk")
+	return Source . FSReadStrict(_DriverDir . "\tests\fixtures\keyboard\sticky_kana_native_body.ahk")
 }
 _SKN_Complete(State, Code, Output, ErrorText) {
 	State.Code := Code, State.Output := Output, State.ErrorText := ErrorText

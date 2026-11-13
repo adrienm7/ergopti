@@ -975,8 +975,8 @@ _LATRT_Case(Cancel, AliasMode := "") {
         LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
         LoggerSetTestSink(_LATRT_Sink.Bind(State))
 
-        PeerScript := _DriverDir . "\tests\fixtures\llm_thinking_retry_peer.ps1"
-        Services := _DriverDir . "\tests\fixtures\winhttp_test_services.ps1"
+        PeerScript := _DriverDir . "\tests\fixtures\ai\llm_thinking_retry_peer.ps1"
+        Services := _DriverDir . "\tests\fixtures\core\winhttp_test_services.ps1"
         AssertTrue(FSStrictExists(PeerScript) && FSStrictExists(Services), "reviewed native peer files must exist")
         State.Peer := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
             ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", PeerScript,
@@ -1226,8 +1226,8 @@ _LATHTTP_Case(Status) {
     try {
         State.Directory := A_Temp . "\ergopti_llm_classify_" . Nonce . "_" . Mode
         FSCreateDirectoryExclusiveStrict(State.Directory)
-        PeerScript := _DriverDir . "\tests\fixtures\llm_thinking_retry_peer.ps1"
-        Services := _DriverDir . "\tests\fixtures\winhttp_test_services.ps1"
+        PeerScript := _DriverDir . "\tests\fixtures\ai\llm_thinking_retry_peer.ps1"
+        Services := _DriverDir . "\tests\fixtures\core\winhttp_test_services.ps1"
         State.Peer := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
             ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", PeerScript,
                 "-Directory", State.Directory, "-ServicesPath", Services, "-Nonce", Nonce, "-Case", Mode],

@@ -6,7 +6,7 @@ _NativeRelayHopBranches_Controls() {
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\native_relay_hop_branches.ps1",
+				_DriverDir . "\tests\fixtures\core\native_relay_hop_branches.ps1",
 				"-RoutesPath", _VendorDir . "\ergopti_network_routes.ps1",
 				"-PolicyPath", _SharedDir . "\core\network\data\proxy_policy.json"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)

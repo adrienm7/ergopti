@@ -75,7 +75,7 @@ _HCPR_Case(Mode) {
 		_HC_ProbeRun := Run
 		Handle := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\healthcheck_pac_response_peer.ps1", "-Mode", Mode,
+				_DriverDir . "\tests\fixtures\core\healthcheck_pac_response_peer.ps1", "-Mode", Mode,
 				"-Directory", Directory, "-WorkerPath", _VendorDir . "\ergopti_network_pac.ps1",
 				"-PolicyPath", _SharedDir . "\core\network\data\proxy_policy.json"], _HCPR_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The private PAC source/HTTP owner must start")

@@ -1,7 +1,7 @@
 # tools/test/test_managed_remote_retirement.ps1
 # Exercise the actual accept and retirement bodies using owned loopback sockets.
 param(
-    [string]$FixturePath = (Join-Path $PSScriptRoot '../../static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1')
+    [string]$FixturePath = (Join-Path $PSScriptRoot '../../static/ergopti_plus/windows/tests/fixtures/core/managed_remote_transport.ps1')
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest

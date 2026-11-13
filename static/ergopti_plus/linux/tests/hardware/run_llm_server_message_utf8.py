@@ -21,7 +21,7 @@ def main():
             [
                 runtime,
                 "-e",
-                'io.write(require("core.text.engine.json").encode(require("tests.fixtures.llm_server_message_contract").vectors))',
+                'io.write(require("core.text.engine.json").encode(require("tests.fixtures.ai.server_message_contract").vectors))',
             ]
         )
     )

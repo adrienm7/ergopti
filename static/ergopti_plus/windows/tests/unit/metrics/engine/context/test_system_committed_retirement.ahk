@@ -15,12 +15,12 @@ _KSDC_ChildSource() {
 	; Reuse the actual child composition without changing the frozen causal
 	; tests. Only its final fixture is replaced; every production body is shared.
 	Source := _KSDO_ChildSource()
-	Tail := "#Include " . _DriverDir . "\tests\fixtures\keystats_system_delivery_owner_body.ahk`n"
+	Tail := "#Include " . _DriverDir . "\tests\fixtures\metrics\system_delivery_owner_body.ahk`n"
 	TailStart := StrLen(Source) - StrLen(Tail) + 1
 	AssertTrue(TailStart > 0 && SubStr(Source, TailStart) == Tail,
 		"The original real-owner composition must end in its exact fixture include")
 	return SubStr(Source, 1, TailStart - 1)
-		. "#Include " . _DriverDir . "\tests\fixtures\keystats_system_committed_retirement_body.ahk`n"
+		. "#Include " . _DriverDir . "\tests\fixtures\metrics\system_committed_retirement_body.ahk`n"
 }
 
 _KSDC_Complete(State, Code, Output, ErrorText) {

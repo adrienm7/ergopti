@@ -46,7 +46,7 @@ _UpdaterNativeRefusalDiagnostic(ExpectedStage, Receipt) {
 ; The shared failure schema stays unchanged; this private sidecar is observation only.
 _UpdaterNativeObservedStagingScript(OriginalScript) {
 	global _DriverDir
-	Helper := FileRead(_DriverDir . "\tests\fixtures\updater_staging_diagnostic.ps1", "UTF-8")
+	Helper := FileRead(_DriverDir . "\tests\fixtures\updater\updater_staging_diagnostic.ps1", "UTF-8")
 	; The wrapper declares the worker's exact one-line parameter block so that
 	; @PSBoundParameters forwards the transport prefix and fixture readers.
 	if !RegExMatch(OriginalScript, "m)^param\(.*\)$", &Header)

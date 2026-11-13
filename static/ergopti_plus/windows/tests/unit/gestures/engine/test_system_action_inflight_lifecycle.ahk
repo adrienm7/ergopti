@@ -5,7 +5,7 @@
 _SAIL_Source() {
  global _DriverDir
  Source := _SALTC_Source()
- Footer := "#Include " . _DriverDir . "\tests\fixtures\system_action_lifecycle_timer_body.ahk`n"
+ Footer := "#Include " . _DriverDir . "\tests\fixtures\core\system_action_lifecycle_timer_body.ahk`n"
  AssertEqual(Footer, SubStr(Source, -StrLen(Footer)), "The original real-timer composition must retain its exact footer")
  Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
  Owner := _DriverProductionFileForSymbol("GestureSysToggleDarkMode", _DriverDir)
@@ -22,7 +22,7 @@ _SAIL_Source() {
   AssertTrue(Body != "", "Every in-flight action must retain its actual production body: " . Symbol)
   Source .= Body . "`n"
  }
- return Source . "#Include " . _DriverDir . "\tests\fixtures\system_action_inflight_lifecycle_body.ahk`n"
+ return Source . "#Include " . _DriverDir . "\tests\fixtures\core\system_action_inflight_lifecycle_body.ahk`n"
 }
 
 _SAIL_Case(Mode) {
@@ -77,7 +77,7 @@ for _SAIL_Action in ["theme", "quit", "mic", "eject", "ejectnamespace", "ejectit
 _SIB_Source() {
  global _DriverDir
  Source := _SAIL_Source()
- Footer := "#Include " . _DriverDir . "\tests\fixtures\system_action_inflight_lifecycle_body.ahk`n"
+ Footer := "#Include " . _DriverDir . "\tests\fixtures\core\system_action_inflight_lifecycle_body.ahk`n"
  AssertEqual(Footer, SubStr(Source, -StrLen(Footer)), "The existing genuine composition must retain its fixture boundary")
  Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
  Owner := _DriverProductionFileForSymbol("GestureSysCenterMouse", _DriverDir)
@@ -91,7 +91,7 @@ _SIB_Source() {
  }
  LocaleOwner := _DriverProductionFileForSymbol("t", _DriverDir)
  AssertTrue(LocaleOwner != "" && _DriverFuncBody("t") != "", "The isolated display port must correspond to the actual production translator")
- return Source . "#Include " . _DriverDir . "\tests\fixtures\system_action_sibling_lifecycle_body.ahk`n"
+ return Source . "#Include " . _DriverDir . "\tests\fixtures\core\system_action_sibling_lifecycle_body.ahk`n"
 }
 
 _SIB_Case(Mode) {
@@ -146,7 +146,7 @@ for _SIB_Action in ["center", "terminal", "newfile", "newfilecreated", "newfilec
 _SCL_Source() {
  global _DriverDir
  Source := _SAIL_Source()
- Footer := "#Include " . _DriverDir . "\tests\fixtures\system_action_inflight_lifecycle_body.ahk`n"
+ Footer := "#Include " . _DriverDir . "\tests\fixtures\core\system_action_inflight_lifecycle_body.ahk`n"
  AssertEqual(Footer, SubStr(Source, -StrLen(Footer)), "The existing genuine composition must retain its fixture boundary")
  Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
  for Symbol in ["_GestureScheduleConfirmedSystemAction", "_GestureRunConfirmedSystemAction",
@@ -160,7 +160,7 @@ _SCL_Source() {
   AssertTrue(Body != "", "Every confirmed runner, action and target validator must retain its complete genuine body: " . Symbol)
   Source .= Body . "`n"
  }
- return Source . "#Include " . _DriverDir . "\tests\fixtures\system_action_confirmed_lifecycle_body.ahk`n"
+ return Source . "#Include " . _DriverDir . "\tests\fixtures\core\system_action_confirmed_lifecycle_body.ahk`n"
 }
 
 _SCL_Case(Mode) {

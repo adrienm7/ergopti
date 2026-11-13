@@ -13,8 +13,8 @@
 _HCLT_Source(Root) {
 	global _DriverDir
 	Source := _HCPT_Source(Root)
-	Old := "#Include " . _DriverDir . "\tests\fixtures\healthcheck_collection_publish_owner_body.ahk`n"
-	New := "#Include " . _DriverDir . "\tests\fixtures\healthcheck_collection_lifetime_body.ahk`n"
+	Old := "#Include " . _DriverDir . "\tests\fixtures\core\healthcheck_collection_publish_owner_body.ahk`n"
+	New := "#Include " . _DriverDir . "\tests\fixtures\core\healthcheck_collection_lifetime_body.ahk`n"
 	Source := StrReplace(Source, Old, New, true, &Changed)
 	AssertEqual(1, Changed, "Only the genuine donor's terminal fixture include may change.")
 	return Source

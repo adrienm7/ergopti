@@ -7,7 +7,7 @@ _ManagedRoutes_NativeAcceptance() {
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\managed_routes_native.ps1", "-RoutesPath",
+				_DriverDir . "\tests\fixtures\core\managed_routes_native.ps1", "-RoutesPath",
 				_VendorDir . "\ergopti_network_routes.ps1", "-PolicyPath",
 				_SharedDir . "\core\network\data\proxy_policy.json", "-UpdaterDefaultsPath",
 				_SharedDir . "\updater\data\defaults.json"],

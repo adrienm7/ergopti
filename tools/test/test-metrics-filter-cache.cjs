@@ -3540,7 +3540,7 @@ assert.equal(passed, 765, 'all native app-filter modes and every locale transiti
 
 const nativeWordProjection = JSON.parse(
 	fs.readFileSync(
-		path.resolve(root, '../../windows/tests/fixtures/metrics_word_projection.json'),
+		path.resolve(root, '../../windows/tests/fixtures/metrics/metrics_word_projection.json'),
 		'utf8'
 	)
 );
@@ -3624,7 +3624,7 @@ assert.equal(
 
 const nativeAccuracyProjection = JSON.parse(
 	fs.readFileSync(
-		path.resolve(root, '../../windows/tests/fixtures/metrics_accuracy_projection.json'),
+		path.resolve(root, '../../windows/tests/fixtures/metrics/metrics_accuracy_projection.json'),
 		'utf8'
 	)
 );
@@ -3883,7 +3883,7 @@ assert.equal(passed, 1074, 'all native-empty-map badge, scope and refresh contro
 
 const nativeUnicodeProjection = JSON.parse(
 	fs.readFileSync(
-		path.resolve(root, '../../windows/tests/fixtures/metrics_unicode_projection.json'),
+		path.resolve(root, '../../windows/tests/fixtures/metrics/metrics_unicode_projection.json'),
 		'utf8'
 	)
 );
@@ -3950,7 +3950,7 @@ assert.equal(
 
 const nativeCaseProjection = JSON.parse(
 	fs.readFileSync(
-		path.resolve(root, '../../windows/tests/fixtures/metrics_case_projection.json'),
+		path.resolve(root, '../../windows/tests/fixtures/metrics/metrics_case_projection.json'),
 		'utf8'
 	)
 );
@@ -4056,7 +4056,7 @@ assert.equal(
 
 const nativeAppPairsProjection = JSON.parse(
 	fs.readFileSync(
-		path.resolve(root, '../../windows/tests/fixtures/metrics_app_pairs_projection.json'),
+		path.resolve(root, '../../windows/tests/fixtures/metrics/metrics_app_pairs_projection.json'),
 		'utf8'
 	)
 );

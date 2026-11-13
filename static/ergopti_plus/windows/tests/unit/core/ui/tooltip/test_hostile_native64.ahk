@@ -108,7 +108,7 @@ _HUHT_ChildSource() {
 			Body := _HUHT_Tokens(Body, "SetTimer", "_HUCT_Timer", 2)
 		Code .= Body . "`n"
 	}
-	Fixture := _DriverDir . "\tests\fixtures\tooltip_hostile_native64_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\core\tooltip_hostile_native64_body.ahk"
 	AssertTrue(FileExist(Fixture), "The delivered child fixture must exist")
 	return Code . "#Include " . Fixture . "`n"
 }

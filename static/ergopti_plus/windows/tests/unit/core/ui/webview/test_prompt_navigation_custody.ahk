@@ -12,7 +12,7 @@
 _PNVT_ChildSource() {
 	global _DriverDir
 	Source := _PRST_ChildSource()
-	Tail := "#Include " . _DriverDir . "\tests\fixtures\prompt_startup_owner_body.ahk`n"
+	Tail := "#Include " . _DriverDir . "\tests\fixtures\ai\prompt_startup_owner_body.ahk`n"
 	Offset := StrLen(Source) - StrLen(Tail) + 1
 	AssertTrue(Offset > 0 && SubStr(Source, Offset) == Tail,
 		"The canonical admitted child must expose its exact fixture footer.")
@@ -25,7 +25,7 @@ _PNVT_ChildSource() {
 	return SubStr(Source, 1, Offset - 1) . Owners
 		. "#Include " . _DriverDir . "\vendor\ComVar.ahk`n"
 		. "#Include " . _DriverDir . "\vendor\WebView2.ahk`n"
-		. "#Include " . _DriverDir . "\tests\fixtures\prompt_navigation_custody_body.ahk`n"
+		. "#Include " . _DriverDir . "\tests\fixtures\ai\prompt_navigation_custody_body.ahk`n"
 }
 
 _PNVT_Case(Mode) {

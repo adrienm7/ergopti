@@ -149,7 +149,7 @@ _GPO_Source(Owners) {
 	Owners["registry_block_sha256"] := CryptoSha256(Block)
 	Owners["registry_bare_functions"] := BareFunctions
 	Source .= Block . "`n" . Bound . "`n"
-	Fixture := _DriverDir . "\tests\fixtures\gesture_pause_admission_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\gestures\pause_admission_body.ahk"
 	Owners["fixture_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(Fixture))
 	return Chr(0xFEFF) . Source . FSReadStrict(Fixture)
 }

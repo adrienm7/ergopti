@@ -81,7 +81,7 @@ local function observe(family, target, mode)
 		end
 		local receipt = base .. "/receipt.json"
 		operation = require("core.process.adapters.owned_process").start(assert(uv.exepath()), {
-			root .. "/tests/fixtures/native_shared_loader.lua", root, driver, family, target, mode, receipt,
+			root .. "/tests/fixtures/core/native_shared_loader.lua", root, driver, family, target, mode, receipt,
 		}, { owner = base, timeout_ms = CHILD_TIMEOUT_MS }, function() end)
 		local deadline = uv.hrtime() + CHILD_TIMEOUT_MS * 2 * 1000000
 		while not operation:is_settled() and uv.hrtime() < deadline do uv.run("nowait"); uv.sleep(1) end

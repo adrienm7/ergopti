@@ -1322,7 +1322,7 @@ try {
 		fs.readFileSync(
 			path.join(
 				repository,
-				'static/ergopti_plus/macos/tests/fixtures/keyboard_slot_selection_original_presentation.json'
+				'static/ergopti_plus/macos/tests/fixtures/layouts/keyboard_slot_selection_original_presentation.json'
 			),
 			'utf8'
 		)
@@ -1503,7 +1503,7 @@ try {
 		fs.readFileSync(
 			path.join(
 				repository,
-				'static/ergopti_plus/macos/tests/fixtures/contextual_picker_original_prefixes.json'
+				'static/ergopti_plus/macos/tests/fixtures/core/contextual_picker_original_prefixes.json'
 			),
 			'utf8'
 		)

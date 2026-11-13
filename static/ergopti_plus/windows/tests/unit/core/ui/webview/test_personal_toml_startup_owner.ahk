@@ -29,7 +29,7 @@ _PTST_ChildSource() {
 	}
 	AssertEqual(5, Owners.Count, "The public/path/lifecycle/codec owners must all be genuine whole files")
 	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
-	Fixture := _DriverDir . "\tests\fixtures\personal_toml_startup_owner_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\hotstrings\personal_toml_startup_owner_body.ahk"
 	AssertTrue(FileExist(PromiseOwner) && FileExist(Fixture))
 	return "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 		. "#Include " . PromiseOwner . "`n" . Includes . "#Include " . Fixture . "`n"

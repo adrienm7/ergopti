@@ -202,12 +202,12 @@ helpers.describe("shell_runner.run_async (linux)", function()
 	if pcall(require, "luv") and package.config:sub(1, 1) == "/" then
 		helpers.it("linux-shell-family-retirement: actual leaders and pipe-independent descendants retire before publication", function()
 			local Shell = require("core.process.adapters.shell_runner")
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_shell_group_retirement.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_shell_group_retirement.lua"
 			local result = os.execute(Shell.quote(assert(arg[-1])) .. " " .. Shell.quote(fixture))
 			helpers.assert_true(result == true or result == 0, "actual process families must retire before shell callbacks")
 		end)
 		helpers.it("linux-shell-async-admission: actual children and handles retire on five explicit native refusal seams", function()
-			local fixture = helpers.driver_root() .. "/tests/fixtures/native_shell_async_admission.lua"
+			local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_shell_async_admission.lua"
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native ShellRunner admission fixture must pass")

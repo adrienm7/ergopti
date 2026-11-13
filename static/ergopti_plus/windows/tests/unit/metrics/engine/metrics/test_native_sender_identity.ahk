@@ -18,7 +18,7 @@ _MVSP_NativeSender(Mode := "") {
 	global _DriverDir
 	static Serial := 0, RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "a prior unretired native probe forbids another browser launch")
-	Fixture := _DriverDir . "\tests\fixtures\webview_metrics_sender_fixture.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\core\webview_metrics_sender_fixture.ahk"
 	Host := _DriverProductionFileForSymbol("KLWV_OnWebMessage")
 	AssertTrue(Host != "" && FSStrictExists(Fixture), "the actual host and standalone native fixture must exist")
 	FixtureHash := CryptoSha256Bytes(FSReadBytesStrict(Fixture))

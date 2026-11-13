@@ -243,7 +243,7 @@ class _ManagedRemoteFixtureOwner {
 		this.DefineProp("RootStoreScope", {Get: (*) => Scope})
 		this.Identity := _ManagedRemoteFixtureGuid()
 		this.Prefix := "Local\ErgoptiPlus.ManagedNetworkFixture." . this.Identity
-		this.Script := _DriverDir . "\tests\fixtures\managed_remote_transport.ps1"
+		this.Script := _DriverDir . "\tests\fixtures\core\managed_remote_transport.ps1"
 		this.Events := Map()
 		this.Handle := 0
 		this.NativeState := 0

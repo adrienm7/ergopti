@@ -72,7 +72,7 @@ _PRST_ChildSource() {
 	Code .= StateDefinition[0] . "`n"
 	Code .= "global Features := ManifestBuildFeaturesMap()`n"
 	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
-	Fixture := _DriverDir . "\tests\fixtures\prompt_startup_owner_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\ai\prompt_startup_owner_body.ahk"
 	AssertTrue(FileExist(PromiseOwner) && FileExist(Fixture))
 	return Code . "#Include " . PromiseOwner . "`n#Include " . Fixture . "`n"
 }

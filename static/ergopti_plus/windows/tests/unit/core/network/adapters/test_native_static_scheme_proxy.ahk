@@ -7,7 +7,7 @@ _NativeStaticSchemeProxy_Controls() {
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\native_static_scheme_proxy.ps1",
+				_DriverDir . "\tests\fixtures\core\native_static_scheme_proxy.ps1",
 				"-RoutesPath", _VendorDir . "\ergopti_network_routes.ps1",
 				"-PolicyPath", _SharedDir . "\core\network\data\proxy_policy.json",
 				"-UpdaterDefaultsPath", _SharedDir . "\updater\data\defaults.json"],

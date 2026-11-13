@@ -29,7 +29,7 @@ _PWST_ChildSource() {
 	}
 	AssertEqual(4, Owners.Count, "Each selected public/lifecycle/codec/window owner is independently included")
 	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
-	Fixture := _DriverDir . "\tests\fixtures\paths_editor_startup_owner_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\settings\paths_editor_startup_owner_body.ahk"
 	AssertTrue(FileExist(PromiseOwner) && FileExist(Fixture))
 	return "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 		. "#Include " . PromiseOwner . "`n" . Includes . "#Include " . Fixture . "`n"

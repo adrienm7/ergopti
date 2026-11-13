@@ -43,10 +43,10 @@ _KCPB_BindPasteClock(Source) {
 _KCPB_ChildSource(Clocked := false) {
 	global _DriverDir
 	Source := _KCPO_ChildSource()
-	Original := "#Include " . _DriverDir . "\tests\fixtures\clipboard_provenance_owner_body.ahk`n"
+	Original := "#Include " . _DriverDir . "\tests\fixtures\clipboard\provenance_owner_body.ahk`n"
 	Parts := StrSplit(Source, Original)
 	AssertEqual(2, Parts.Length, "The original child must contain exactly one fixture include")
-	Source := Parts[1] . "#Include " . _DriverDir . "\tests\fixtures\clipboard_paste_burst_owner_body.ahk`n" . Parts[2]
+	Source := Parts[1] . "#Include " . _DriverDir . "\tests\fixtures\clipboard\paste_burst_owner_body.ahk`n" . Parts[2]
 	return Clocked ? _KCPB_BindPasteClock(Source) : Source
 }
 
@@ -69,7 +69,7 @@ _KCPB_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KCPB_ChildSource(InStr(Mode, "clock-") == 1)) != 0)
 		_TestPrint("# clipboard-paste-burst-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\clipboard_paste_burst_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\clipboard\paste_burst_owner_body.ahk")))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _KCPB_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private child must start")

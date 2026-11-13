@@ -73,7 +73,7 @@ _USWD_Source() {
 			Source .= "#Include " . Owner . "`n"
 		}
 	}
-	Fixture := _DriverDir . "\tests\fixtures\uia_suspend_worker_debt_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\core\uia_suspend_worker_debt_body.ahk"
 	AssertTrue(FileExist(Fixture) != "", "the private suspend composition must exist")
 	return Source . "#Include " . Fixture . "`n"
 }

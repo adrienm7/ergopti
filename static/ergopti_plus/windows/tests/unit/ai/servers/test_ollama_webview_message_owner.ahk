@@ -24,7 +24,7 @@ _OWMO_ChildSource() {
 	IdentityOwner := _DriverProductionFileForSymbol("WebView_SameCore")
 	AssertTrue(IdentityOwner != "" && _DriverFuncBody("WebView_SameCore") != "",
 		"the child must include its actual shared Core-identity owner")
-	Fixture := _DriverDir . "\tests\fixtures\ollama_webview_message_owner_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\ai\ollama_webview_message_owner_body.ahk"
 	AssertTrue(FileExist(Fixture) != "", "the registered child must retain its actual behavioral fixture")
 	return '#Requires AutoHotkey v2.0' . "`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
 		. "#Include " . Owner . "`n"

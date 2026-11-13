@@ -20,7 +20,7 @@ _MESC_ChildSource() {
 		}
 		Code .= Definition . "`n"
 	}
-	return Code . FileRead(_DriverDir . "\tests\fixtures\magic_key_capture_settlement_body.ahk", "UTF-8")
+	return Code . FileRead(_DriverDir . "\tests\fixtures\layouts\magic_key_capture_settlement_body.ahk", "UTF-8")
 }
 
 _MESC_Complete(State, Code, Output, ErrorText) {

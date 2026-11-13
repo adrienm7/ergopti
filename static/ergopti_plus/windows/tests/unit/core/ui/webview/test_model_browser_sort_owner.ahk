@@ -13,8 +13,8 @@
 _MBSO_ChildSource(Directory) {
 	global _DriverDir
 	Code := _MBPT_ChildSource(Directory)
-	Previous := "#Include " . _DriverDir . "\tests\fixtures\model_browser_close_pause_owner_body.ahk`n"
-	Fixture := _DriverDir . "\tests\fixtures\model_browser_sort_owner_body.ahk"
+	Previous := "#Include " . _DriverDir . "\tests\fixtures\ai\model_browser_close_pause_owner_body.ahk`n"
+	Fixture := _DriverDir . "\tests\fixtures\ai\model_browser_sort_owner_body.ahk"
 	AssertTrue(FileExist(Fixture), "The private sorting body must be present")
 	AssertTrue(SubStr(Code, StrLen(Code) - StrLen(Previous) + 1) == Previous,
 		"Only the canonical component projection's final fixture include may change")

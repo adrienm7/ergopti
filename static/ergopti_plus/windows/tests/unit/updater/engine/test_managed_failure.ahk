@@ -244,7 +244,7 @@ _UMF_ActualOwnedFileReceipt() {
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\updater_download_receipts.ps1", "-HelperPath",
+				_DriverDir . "\tests\fixtures\updater\updater_download_receipts.ps1", "-HelperPath",
 				_VendorDir . "\ergopti_updater_download.ps1"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)))
 		Assert(Handle.start(), "native filesystem receipt fixture must actually start")

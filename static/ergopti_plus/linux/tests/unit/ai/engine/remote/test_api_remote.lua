@@ -384,7 +384,7 @@ end)
 
 
 helpers.describe("Remote completion strict JSON admission", function()
-	local contract = require("tests.fixtures.llm_response_syntax_contract")
+	local contract = require("tests.fixtures.ai.response_syntax_contract")
 	assert(#contract.vectors == 54, "every independent strict-admission vector executes")
 	for _, vector in ipairs(contract.vectors) do
 		helpers.it("structured syntax: " .. vector.name, function()

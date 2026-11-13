@@ -59,7 +59,7 @@ _WPMR_ChildSource() {
 			Body := _WPMR_ClockSource(Body, Symbol)
 		Code .= Body . "`n"
 	}
-	return Code . "#Include " . _DriverDir . "\tests\fixtures\wpm_tick_rollover_body.ahk`n"
+	return Code . "#Include " . _DriverDir . "\tests\fixtures\metrics\wpm_tick_rollover_body.ahk`n"
 }
 
 ; Initialize the real registry even during a single-case replay, then restore
@@ -131,7 +131,7 @@ _WPMR_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _WPMR_ChildSource()) != 0)
 		_TestPrint("# wpm-tick-rollover-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath)) . " timings=" . Timings.Digest
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\wpm_tick_rollover_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\metrics\wpm_tick_rollover_body.ahk")))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory, String(Timings.Window), String(Timings.Minimum)], _WPMR_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private WPM child must start")

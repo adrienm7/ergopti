@@ -13,7 +13,7 @@
 _GCFO_Source(Owners) {
 	global _DriverDir
 	Code := _GPO_Source(Owners)
-	OldBody := FSReadStrict(_DriverDir . "\tests\fixtures\gesture_pause_admission_body.ahk")
+	OldBody := FSReadStrict(_DriverDir . "\tests\fixtures\gestures\pause_admission_body.ahk")
 	Start := StrLen(Code) - StrLen(OldBody) + 1
 	AssertTrue(Start > 0 && SubStr(Code, Start) == OldBody, "the complete original fixture suffix must be exact")
 	Code := SubStr(Code, 1, Start - 1)
@@ -46,7 +46,7 @@ _GCFO_Source(Owners) {
 	}
 	Owners["cycle_owner_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(CycleOwner))
 	Owners["cycle_enumeration_bindings"] := Bindings
-	Fixture := _DriverDir . "\tests\fixtures\gesture_cycle_pause_owner_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\gestures\cycle_pause_owner_body.ahk"
 	Owners["fixture_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(Fixture))
 	return Code . Cycle . "`n#Include " . Fixture . "`n"
 }

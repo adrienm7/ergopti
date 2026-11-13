@@ -30,7 +30,7 @@ _MBSTO_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Directory . "\64bit\WebView2Loader.dll", "passive availability marker") != 0)
 		Owner := _DriverProductionFileForSymbol("LLM_ModelBrowser_Show")
 		AssertTrue(Owner != "", "The public browser must resolve to its actual whole production owner")
-		Fixture := _DriverDir . "\tests\fixtures\model_browser_startup_owner_body.ahk"
+		Fixture := _DriverDir . "\tests\fixtures\ai\model_browser_startup_owner_body.ahk"
 		AssertTrue(FileExist(Fixture), "The native child fixture must exist")
 		Includes := "", Seen := Map()
 		for Symbol in ["LLM_GetModelIndex", "JsonStringLiteral", "FSRead", "WMPresentWindow"] {

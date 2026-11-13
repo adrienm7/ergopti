@@ -23,7 +23,7 @@ local function observe(entry, mode)
 			.. " XDG_DATA_HOME=" .. Shell.quote(root .. "/xdg data")
 			.. " XDG_STATE_HOME=" .. Shell.quote(root .. "/xdg state")
 			.. " " .. Shell.quote(assert(require("luv").exepath())) .. " "
-			.. Shell.quote(driver .. "/tests/fixtures/config_directory_target.lua") .. " "
+			.. Shell.quote(driver .. "/tests/fixtures/settings/directory_target.lua") .. " "
 			.. Shell.quote(driver) .. " " .. Shell.quote(root) .. " " .. Shell.quote(entry) .. " " .. Shell.quote(mode) .. " 2>&1"
 		local pipe = assert(io.popen(command, "r")); local output = assert(pipe:read("*a"))
 		local success, _, code = pipe:close()

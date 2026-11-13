@@ -50,7 +50,7 @@ _GPCOT_ChildSource() {
 	AssertEqual(2, Count, "Only the two actual native SendFinalResult injection callsites may be observed")
 	Code .= ClipboardSource . "`n" . Overlaid . SubStr(Body, Position) . "`n"
 	Code .= "_PPCO_Invoke() => GesturePastePlain()`n"
-	return Code . "#Include " . _DriverDir . "\tests\fixtures\plain_paste_clipboard_owner_body.ahk`n"
+	return Code . "#Include " . _DriverDir . "\tests\fixtures\core\plain_paste_clipboard_owner_body.ahk`n"
 }
 
 _GPCOT_Complete(State, Code, Output, ErrorText) {
@@ -75,7 +75,7 @@ _GPCOT_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _GPCOT_ChildSource()) != 0)
 		_TestPrint("# plain-paste-clipboard-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\plain_paste_clipboard_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\core\plain_paste_clipboard_owner_body.ahk")))
 		for Spec in [{Role: "writer", State: Writer}, {Role: "subject", State: Subject}] {
 			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 				["/ErrorStdOut=UTF-8", Script, Spec.Role, Directory, Mode, String(SEND_INSTANT_PASTE_DELAY_MS), "gesture"], _GPCOT_Complete.Bind(Spec.State))

@@ -467,7 +467,7 @@ helpers.describe("native agent connector shutdown", function()
 			helpers.it("(agent-connector-shutdown-native) actual " .. mode .. " helper lifetime", function()
 				local uv = require("luv")
 				local quote = require("core.text.engine.utils_core").shell_quote
-				local fixture = helpers.driver_root() .. "/tests/fixtures/native_agent_connector_shutdown.lua"
+				local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_agent_connector_shutdown.lua"
 				local result = os.execute(quote(assert(uv.exepath())) .. " " .. quote(fixture) .. " " .. quote(mode))
 				helpers.assert_true(result == true or result == 0, "native connector lifetime must retire all physical resources")
 			end)

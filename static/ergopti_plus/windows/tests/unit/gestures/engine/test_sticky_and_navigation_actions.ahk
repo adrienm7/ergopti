@@ -71,7 +71,7 @@ _SNA_NativeChildSource() {
 		Code .= Body . "`n"
 	}
 	Code .= 'global _ALTGR_KANA_FIXUP := false, _ALTGR_LAYOUT_PROBE := Map("altgr_vk", 0)' . "`n"
-	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\sticky_nontext_probe_body.ahk")
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\keyboard\sticky_nontext_probe_body.ahk")
 }
 _SNA_NativeCase(Mode) {
 	static RetirementDebt := 0
@@ -153,7 +153,7 @@ _SSM_ChildSource() {
 		Code .= Body . "`n"
 	}
 	Code .= 'global _ALTGR_KANA_FIXUP := false, _ALTGR_LAYOUT_PROBE := Map("altgr_vk", 0)' . "`n"
-	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\sticky_modifier_flags_body.ahk")
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\keyboard\sticky_modifier_flags_body.ahk")
 }
 _SSM_Case(Mode) {
 	static RetirementDebt := 0

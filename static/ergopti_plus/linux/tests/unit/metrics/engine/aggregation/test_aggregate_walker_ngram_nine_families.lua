@@ -734,7 +734,7 @@ helpers.describe("native JSON fallback completion", function()
 					environment[#environment + 1] = pair[1] .. "=" .. Shell.quote(folder .. "/" .. pair[2])
 				end
 				assert(Shell.run("mkdir -m 700 -- " .. table.concat(directories, " ")))
-				local fixture = helpers.driver_root() .. "/tests/fixtures/native_keystats_json_fallback.lua"
+				local fixture = helpers.driver_root() .. "/tests/fixtures/core/native_keystats_json_fallback.lua"
 				helpers.assert_true(Shell.run(table.concat(environment, " ") .. " timeout --kill-after=2 10 "
 					.. Shell.quote(assert(arg[-1])) .. " " .. Shell.quote(fixture) .. " " .. Shell.quote(folder) .. " " .. Shell.quote(kind)),
 					"public flush must preserve the prior summary and retry cumulative events without SQLite")

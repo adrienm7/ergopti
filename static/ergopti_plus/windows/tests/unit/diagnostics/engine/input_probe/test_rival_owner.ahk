@@ -46,7 +46,7 @@ _IPR_ChildSource() {
 	}
 	return "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 		. "#Include " . TickOwner . "`n#Include " . PresenterOwner . "`n#Include " . TimerOwner . "`n" . AdapterIncludes . Body . "`n"
-		. "#Include " . _DriverDir . "\tests\fixtures\input_probe_rival_owner_body.ahk`n"
+		. "#Include " . _DriverDir . "\tests\fixtures\core\input_probe_rival_owner_body.ahk`n"
 }
 
 _IPR_Complete(State, Code, Output, ErrorText) {
@@ -68,7 +68,7 @@ _IPR_Case(Mode) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _IPR_ChildSource()) != 0)
 		_TestPrint("# input-probe-rival-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\input_probe_rival_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\core\input_probe_rival_owner_body.ahk")))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _IPR_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private child must start")

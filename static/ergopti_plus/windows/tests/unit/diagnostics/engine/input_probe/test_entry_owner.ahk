@@ -56,7 +56,7 @@ _IPET_ChildSource() {
 		AssertTrue(IsObject(_DriverFindFunctionDefinition(&Source, Symbol)), "The complete native probe route must exist: " . Symbol)
 	Observed := _IPET_Overlay(Source, &Count)
 	return Code . Observed . "`nglobal _IPES_ObservedSites := " . Count
-		. "`n#Include " . _DriverDir . "\tests\fixtures\input_probe_entry_owner_body.ahk`n"
+		. "`n#Include " . _DriverDir . "\tests\fixtures\core\input_probe_entry_owner_body.ahk`n"
 }
 
 _IPET_Case(Mode, Source := 0) {
@@ -146,7 +146,7 @@ _IPHT_Case(Mode) {
 	AssertTrue(Owner != "", "The native hotkey test requires the genuine complete adapter")
 	Source := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n"
 		. "#Include " . Owner . "`n#Include " . _DriverDir
-		. "\tests\fixtures\input_probe_hotkey_owner_body.ahk`n"
+		. "\tests\fixtures\core\input_probe_hotkey_owner_body.ahk`n"
 	_IPET_Case(Mode, Source)
 }
 

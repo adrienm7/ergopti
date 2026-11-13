@@ -41,7 +41,7 @@ _WinHttpTransport_Controls() {
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\winhttp_transport_controls.ps1",
+				_DriverDir . "\tests\fixtures\core\winhttp_transport_controls.ps1",
 				"-TransportPath", _VendorDir . "\ergopti_winhttp_transport.ps1",
 				"-SchemaPath", _SharedDir . "\core\network\data\managed_network.json"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 16384)
@@ -77,7 +77,7 @@ _WinHttpManagedRedirect_Controls() {
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\managed_redirect_controls.ps1",
+				_DriverDir . "\tests\fixtures\core\managed_redirect_controls.ps1",
 				"-WorkerPath", _VendorDir . "\ergopti_managed_http_worker.ps1", "-SharedPath", _SharedDir],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 16384)
 		AssertTrue(Handle.start(), "The genuine managed redirect fixture must start")

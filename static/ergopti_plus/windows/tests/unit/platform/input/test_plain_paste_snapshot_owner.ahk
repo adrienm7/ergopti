@@ -49,7 +49,7 @@ _PPSNT_ChildSource(Client) {
 	AssertEqual(2, Count, "Only the two actual native SendFinalResult injection callsites may be observed")
 	Code .= ClipboardSource . "`n" . Overlaid . SubStr(Body, Position) . "`n"
 	Code .= "_PPSN_Invoke() => " . (Client == "gesture" ? "GesturePastePlain" : "GesturePastePlain") . "()`n"
-	return Code . "#Include " . _DriverDir . "\tests\fixtures\plain_paste_snapshot_owner_body.ahk`n"
+	return Code . "#Include " . _DriverDir . "\tests\fixtures\core\plain_paste_snapshot_owner_body.ahk`n"
 }
 
 _PPSNT_Complete(State, Code, Output, ErrorText) {
@@ -74,7 +74,7 @@ _PPSNT_Case(Client) {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _PPSNT_ChildSource(Client)) != 0)
 		_TestPrint("# plain-paste-snapshot-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\plain_paste_snapshot_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\core\plain_paste_snapshot_owner_body.ahk")))
 		for Spec in [{Role: "writer", State: Writer}, {Role: "subject", State: Subject}] {
 			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 				["/ErrorStdOut=UTF-8", Script, Spec.Role, Directory, Client, String(SEND_INSTANT_PASTE_DELAY_MS)], _PPSNT_Complete.Bind(Spec.State))

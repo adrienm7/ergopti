@@ -628,7 +628,7 @@ _ArtifactOwnedCloseProgressControls() {
 		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
 				_DriverDir . "\tests\fixtures\owned_close_progress_controls.ps1", "-FixturePath",
-				_DriverDir . "\tests\fixtures\managed_remote_transport.ps1", "-ProxyPath",
+				_DriverDir . "\tests\fixtures\core\managed_remote_transport.ps1", "-ProxyPath",
 				_DriverDir . "\tests\fixtures\artifact_ntlm_proxy.ps1"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)))
 		AssertTrue(Handle.start(), "actual owned close methods component process starts")
@@ -658,7 +658,7 @@ _ArtifactQueuedTlsShutdownControls() {
 		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
 				_DriverDir . "\tests\fixtures\owned_close_progress_controls.ps1", "-FixturePath",
-				_DriverDir . "\tests\fixtures\managed_remote_transport.ps1", "-QueuedShutdown", "-ProxyPath",
+				_DriverDir . "\tests\fixtures\core\managed_remote_transport.ps1", "-QueuedShutdown", "-ProxyPath",
 				_DriverDir . "\tests\fixtures\artifact_ntlm_proxy.ps1"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)))
 		AssertTrue(Handle.start(), "actual owned close methods component process starts")

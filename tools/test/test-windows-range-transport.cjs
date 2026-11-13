@@ -22,7 +22,7 @@ const errors = [];
 try {
 	const fixture = path.resolve(
 		__dirname,
-		'../../static/ergopti_plus/windows/tests/fixtures/webview_range_transport_fixture.ahk'
+		'../../static/ergopti_plus/windows/tests/fixtures/core/webview_range_transport_fixture.ahk'
 	);
 	const result = spawnSync(ahk, ['/ErrorStdOut', fixture, path.join(root, 'native')], {
 		windowsHide: true,

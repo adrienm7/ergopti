@@ -10,7 +10,7 @@ _WPMG_Source(Directory, Canon) {
 	TickMs := Integer(Timing[1])
 	AssertTrue(TickMs > 0, "the real WPM update interval must arm the timer")
 	Source := _MBPT_ChildSource(Directory)
-	Fixture := "#Include " . _DriverDir . "\tests\fixtures\model_browser_close_pause_owner_body.ahk"
+	Fixture := "#Include " . _DriverDir . "\tests\fixtures\ai\model_browser_close_pause_owner_body.ahk"
 	Position := InStr(Source, Fixture, true, -1)
 	AssertTrue(Position > 0, "the actual boot component must expose its final fixture boundary")
 	Source := SubStr(Source, 1, Position - 1)
@@ -24,7 +24,7 @@ _WPMG_Source(Directory, Canon) {
 		Source .= "WPMWidgetConst." . Field . " := " . Literal . "`n"
 	}
 	Source .= "WPMWidgetConst.TICK_MS := " . TickMs . "`n"
-	Source .= "#Include " . _DriverDir . "\tests\fixtures\wpm_graph_native_reentry_body.ahk`n"
+	Source .= "#Include " . _DriverDir . "\tests\fixtures\metrics\wpm_graph_native_reentry_body.ahk`n"
 	return Source
 }
 _WPMG_Complete(State, Code, Output, ErrorText) {

@@ -117,7 +117,7 @@ _MBPT_WriterDiagnosticOwner(Directory) {
 	AssertTrue(FSWriteCreateDurable(Target, Chr(0xFEFF) . Private) != 0)
 	PrivateHash := CryptoSha256Bytes(FSReadBytesStrict(Target))
 	AssertTrue(PrivateHash != "")
-	Helper := _DriverDir . "\tests\fixtures\model_browser_writer_exception_diagnostics.ahk"
+	Helper := _DriverDir . "\tests\fixtures\ai\model_browser_writer_exception_diagnostics.ahk"
 	HelperHash := CryptoSha256Bytes(FSReadBytesStrict(Helper))
 	AssertTrue(HelperHash != "")
 	_TestPrint("# model-browser-writer-diagnostic source_owner=" . Owner . " original_raw_sha256=" . RawHash
@@ -188,7 +188,7 @@ _MBPT_ChildSource(Directory) {
 	NativeGui := _DriverFuncBody("Gui_Create")
 	AssertTrue(NativeGui != "", "The native model browser requires its genuine GUI factory")
 	Code .= NativeGui . "`n"
-	Fixture := _DriverDir . "\tests\fixtures\model_browser_close_pause_owner_body.ahk"
+	Fixture := _DriverDir . "\tests\fixtures\ai\model_browser_close_pause_owner_body.ahk"
 	AssertTrue(FileExist(Fixture))
 	return Code . "#Include " . Fixture . "`n"
 }
