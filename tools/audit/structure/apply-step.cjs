@@ -67,7 +67,9 @@ function newPathToken(row, movedRepo) {
 	else if (r.form === 'embedded') out = r.keep + r.newRepo.slice(PREFIX.length);
 	else if (r.form === 'shared-alias') out = r.keep + r.newRepo.slice(`${PREFIX}_shared/`.length);
 	else if (r.form === 'tree') out = r.newRepo.slice(PREFIX.length);
-	else if (r.form === 'shared') out = r.newRepo.slice(`${PREFIX}_shared/`.length);
+	// Paths.shared("../macos/adapters/x.sh") climbs out of _shared: the new
+	// spelling is the target relative to _shared, never a sliced prefix.
+	else if (r.form === 'shared') out = path.posix.relative(`${PREFIX}_shared`, r.newRepo);
 	else if (r.form === 'root') {
 		// Relative to the root of the referencing file's tree, which may not be
 		// the target's: driver_root .. "/../_shared/data/x" keeps its "../_shared".
