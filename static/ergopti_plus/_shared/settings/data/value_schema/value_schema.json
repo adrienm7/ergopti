@@ -289,6 +289,19 @@
 		"personal_info.letters.*": {
 			"file": "personal_info.toml",
 			"type": "string"
+		},
+		"updater.check_interval_seconds": {
+			"file": "config.toml",
+			"type": "integer",
+			"unit": "s",
+			"min": 0,
+			"max": 2147483647,
+			"special": [
+				{
+					"value": 0,
+					"label_key": "value_check.special.never"
+				}
+			]
 		}
 	}
 }

@@ -392,9 +392,12 @@ local function _read_persisted_interval(path)
 	local section = config[CONFIG_SECTION]
 	local raw = type(section) == "table" and section[CONFIG_INTERVAL_KEY] or nil
 	if raw == nil then return DEFAULT_INTERVAL_SEC end
-	if type(raw) ~= "number" or raw < 0 or raw == math.huge or raw ~= math.floor(raw) then
-		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds; using %ds.",
-			tostring(raw), DEFAULT_INTERVAL_SEC)
+	-- The shared value schema's declaration: a whole number of seconds, 0 = never.
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.UPDATER_CHECK_INTERVAL_SECONDS), raw)
+	if not checked.ok then
+		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is refused (%s, %s..%s s); using %ds.",
+			tostring(raw), checked.reason, tostring(checked.min), tostring(checked.max), DEFAULT_INTERVAL_SEC)
 		return DEFAULT_INTERVAL_SEC
 	end
 	local seconds, code, snapped = Schedule.snap_interval(raw, TIMING)
@@ -2041,9 +2044,15 @@ end
 --- @param seconds number
 --- @return boolean Whether the active interval matches the request.
 function M.set_check_interval(seconds)
-	local s = tonumber(seconds)
-	if not s or s < 0 then return false end
-	local wanted = math.floor(s)
+	-- The consuming boundary: a string, a fraction, NaN, an infinity or a value
+	-- out of the declared range never reaches config.toml or the timer.
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.UPDATER_CHECK_INTERVAL_SECONDS), seconds)
+	if not checked.ok then
+		Logger.error(LOG, "Check interval '%s' refused (%s).", tostring(seconds), checked.reason)
+		return false
+	end
+	local wanted = checked.value
 	if wanted == _check_interval then return true end
 	if type(_config_path) ~= "string" or _config_path == "" then
 		Logger.error(LOG, "Check interval %ds cannot be saved: the updater has no config path (init not run).", wanted)

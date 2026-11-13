@@ -76,7 +76,9 @@ _USCI_LogsOnRejection() {
 	Lines := []
 	LoggerSetTestSink((Line) => InStr(Line, "[WARN") ? Lines.Push(Line) : 0)
 	try {
-		for Index, Invalid in ["soon", -5] {
+		; A fraction is no longer truncated and the shared value schema's maximum
+		; applies (value-validation).
+		for Index, Invalid in ["soon", -5, 300.5, 2147483648, "0x10"] {
 			UPDATER_CHECK_INTERVAL := 60
 			State := {Writes: 0, Notices: 0, MenuSchedules: 0}
 			Assert(!_USCI_Call(Invalid, State), "an invalid cadence is refused")

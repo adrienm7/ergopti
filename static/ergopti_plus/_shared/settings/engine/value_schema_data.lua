@@ -34,6 +34,7 @@ return {
 		["TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS"] = "tap_holds.lone_modifier_tap_max_ms",
 		["TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS"] = "tap_hold.keys.*.time_activation_seconds",
 		["TAP_HOLD_TIME_ACTIVATION_SECONDS"] = "tap_hold.time_activation_seconds",
+		["UPDATER_CHECK_INTERVAL_SECONDS"] = "updater.check_interval_seconds",
 	},
 	["settings"] = {
 		["gestures.sensitivities.*"] = {
@@ -311,6 +312,17 @@ return {
 			} },
 			["type"] = "integer",
 			["unit"] = "ms",
+		},
+		["updater.check_interval_seconds"] = {
+			["file"] = "config.toml",
+			["max"] = 2147483647,
+			["min"] = 0,
+			["special"] = { {
+				["label_key"] = "value_check.special.never",
+				["value"] = 0,
+			} },
+			["type"] = "integer",
+			["unit"] = "s",
 		},
 	},
 }

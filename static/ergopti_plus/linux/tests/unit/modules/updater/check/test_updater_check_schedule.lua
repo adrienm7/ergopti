@@ -306,10 +306,24 @@ helpers.describe("updater (linux): the check schedule follows the persisted reco
 		end)
 	end)
 
-	helpers.it("snaps an enormous finite interval without raising", function()
+	-- Past the shared value schema's maximum the default applies (value-validation);
+	-- up to it, a long interval still snaps to the longest preset.
+	helpers.it("uses the default for an enormous finite interval without raising", function()
 		with_manager({ now = T0, config = "[updater]\ncheck_interval_seconds = 1e100\n" }, function(ctx)
+			helpers.assert_eq(ctx.M.get_check_interval(), ctx.M.TIMING.default_check_interval_sec)
+		end)
+		with_manager({ now = T0, config = "[updater]\ncheck_interval_seconds = 2147483647\n" }, function(ctx)
 			local presets = ctx.M.TIMING.check_interval_presets
-			helpers.assert_eq(ctx.M.get_check_interval(), presets[#presets - 1].seconds)
+			helpers.assert_eq(ctx.M.get_check_interval(), presets[#presets - 1].seconds, "the declared maximum snaps")
+		end)
+	end)
+
+	helpers.it("the setter refuses what the value schema refuses (value-validation)", function()
+		with_manager({ now = T0, config = "[updater]\ncheck_interval_seconds = 3600\n" }, function(ctx)
+			for _, refused in ipairs({ "21600", 0 / 0, 1 / 0, 300.5, -1, 2147483648 }) do
+				helpers.assert_eq(ctx.M.set_check_interval(refused), false, "refused: " .. tostring(refused))
+				helpers.assert_eq(ctx.M.get_check_interval(), 3600, "the interval is kept: " .. tostring(refused))
+			end
 		end)
 	end)
 
