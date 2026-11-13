@@ -558,6 +558,15 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### Linux (container proofs of 2026-11-10)
 
+- [ ] **Legacy Linux updater probes (remove later).** Installed Linux updaters before the structure move (v1.0.9 …
+      v1.0.10-dev.175) admit a staged tarball only with `_shared/data/locales/en.json` and a `_shared/lua/` folder;
+      `tools/build/add-linux-legacy-update-probes.sh` adds both to the release tarball (decided by the coordinator on
+      2026-11-13, to review by the maintainer; proved locally by the real v1.0.9 installer applying a post-move
+      tarball). Remove that step, its call and `test-linux-legacy-update-probes.cjs` once the first release whose
+      updater finds a staged shared root by `build_stamp.txt` (5d0b2fc481) has been out for one full release cycle.
+      The structure step that moves `linux/infra/version.lua` (also required by v1.0.9) fails this build until it
+      adds that probe too. macOS only loses the boot-health probation if `macos/infra/updater_boot_ready.lua` moves;
+      Windows replaces one exe and probes nothing.
 - [ ] **GNOME input source switch.** GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`: on a
       `sources` change it keeps its in-memory MRU and activates its first entry, and a non-interactive activation
       writes no `mru-sources`. Done 2026-11-11 in `adapters/input_source_switch.lua`, decided by the coordinator on
