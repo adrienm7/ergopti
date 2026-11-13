@@ -793,6 +793,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-windows-tool-paths.cjs"],
 			"repro": "npm run test:structure-windows-tool-paths"
+		},
+		{
+			"id": "js-0526",
+			"ordinal": 645,
+			"name": "structure plan recounts a bare Python climb in a moving file",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-python-anchor.cjs"],
+			"repro": "npm run test:structure-python-anchor"
 		}
 	]
 }
