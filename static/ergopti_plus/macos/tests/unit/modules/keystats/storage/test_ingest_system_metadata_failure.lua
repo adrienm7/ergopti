@@ -18,7 +18,7 @@ local function child()
  end
  local helpers = require('tests.helpers'); local logger = helpers.make_logger_stub()
  package.loaded['infra.logger'] = logger
- package.loaded['modules.keystats.text_cipher'] = { encrypt = function(_, _, value) return value end }
+ package.loaded['modules.keystats.text_cipher'] = { is_enabled = function() return false end, encrypt = function(_, _, value) return value end }
  local entry = { type='system_event', timestamp='2026-10-17 12:00:00', action='manifest_increment', app='Editor', stat='hs_suggested', amount=3 }
  local good = { type='typing', timestamp='2026-10-17 11:59:00', app='Editor', text='a', events={ {'a',100,{}} } }
  local fail = true
