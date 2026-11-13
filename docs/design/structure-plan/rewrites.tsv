@@ -7342,6 +7342,61 @@ S01	source-check	:find('/_shared/modules/network/proxy_policy%.json$'	:find('/_s
 S01	source-check	:find('/_shared/modules/network/route_origins%.json$'	:find('/_shared/core/network/data/route_origins%.json$'	1	repo-test:1
 S01	source-check	:find('/_shared/modules/timings/constants%.toml$'	:find('/_shared/core/timing/data/constants%.toml$'	1	repo-test:1
 S01	source-check	:match("/modules/network/route_origins%.json$"	:match("/core/network/data/route_origins%.json$"	2	repo-test:2
+S01	tree-list	(adapters|platform|infra|suite)	(adapters|platform|infra|suite|clipboard|core|apps|layouts|tray|hotstrings|shortcuts|metrics|gestures|updater|settings|diagnostics|keyboard|ai|menu|tap_hold|onboarding)	1	driver-test:1
+S01	tree-list	(ahk|lua)	(ahk|lua|settings|tap_hold|shortcuts|diagnostics|core|apps|platform|keyboard|hotstrings|menu|gestures|metrics|layouts|ai|onboarding|tests|tray|updater)	3	ahk-include:1,build:1,tooling:1
+S01	tree-list	(ahk|lua|cjs|js|mjs)	(ahk|lua|cjs|js|mjs|settings|tap_hold|shortcuts|diagnostics|core|apps|platform|keyboard|hotstrings|menu|gestures|metrics|layouts|ai|onboarding|tests|tray|updater)	1	repo-test:1
+S01	tree-list	(js|cjs|mjs|lua|ahk|c|h)	(js|cjs|mjs|lua|ahk|c|h|settings|tap_hold|shortcuts|diagnostics|core|apps|platform|keyboard|hotstrings|menu|gestures|metrics|layouts|ai|onboarding|tests|tray|updater)	1	repo-test:1
+S01	tree-list	(lua|ahk)	(lua|ahk|settings|tap_hold|shortcuts|diagnostics|core|apps|platform|keyboard|hotstrings|menu|gestures|metrics|layouts|ai|onboarding|tests|tray|updater)	17	repo-test:17
+S01	tree-list	(lua|ahk|cjs|js)	(lua|ahk|cjs|js|settings|tap_hold|shortcuts|diagnostics|core|apps|platform|keyboard|hotstrings|menu|gestures|metrics|layouts|ai|onboarding|tests|tray|updater)	1	repo-test:1
+S01	tree-list	(lua|ahk|js)	(lua|ahk|js|settings|tap_hold|shortcuts|diagnostics|core|apps|platform|keyboard|hotstrings|menu|gestures|metrics|layouts|ai|onboarding|tests|tray|updater)	3	repo-test:2,tooling:1
+S01	tree-list	(lua|ahk|json)	(lua|ahk|json|settings|tap_hold|shortcuts|diagnostics|core|apps|platform|keyboard|hotstrings|menu|gestures|metrics|layouts|ai|onboarding|tests|tray|updater)	1	repo-test:1
+S01	tree-list	(lua|ahk|js|cjs|mjs)	(lua|ahk|js|cjs|mjs|settings|tap_hold|shortcuts|diagnostics|core|apps|platform|keyboard|hotstrings|menu|gestures|metrics|layouts|ai|onboarding|tests|tray|updater)	1	repo-test:1
+S01	tree-list	(lua|ahk|js|json|toml)	(lua|ahk|js|json|toml|settings|tap_hold|shortcuts|diagnostics|core|apps|platform|keyboard|hotstrings|menu|gestures|metrics|layouts|ai|onboarding|tests|tray|updater)	1	repo-test:1
+S01	tree-list	(lua|ahk|py|cjs|js)	(lua|ahk|py|cjs|js|settings|tap_hold|shortcuts|diagnostics|core|apps|platform|keyboard|hotstrings|menu|gestures|metrics|layouts|ai|onboarding|tests|tray|updater)	1	repo-test:1
+S01	tree-list	(modules|lib|ui)	(modules|lib|ui|shortcuts|settings|diagnostics|hotstrings|layouts|ai|core|menu|updater|metrics|keyboard|gestures|platform|apps|onboarding|tap_hold)	1	repo-test:1
+S01	tree-list	(platform|adapters|vendor|tests|docs)	(platform|adapters|vendor|tests|docs|clipboard|core|apps|layouts|tray|hotstrings|shortcuts|metrics|keyboard|tap_hold|onboarding|diagnostics|ai|updater|settings)	1	repo-test:1
+S01	tree-list	[
+	'adapters',
+	'infra',
+	'modules',
+	'platform',
+	'ui',
+	'data',
+	'_generated',
+	'tests'
+]	[
+	'adapters',
+	'infra',
+	'modules',
+	'platform',
+	'ui',
+	'data',
+	'_generated',
+	'tests', 'apps', 'core', 'metrics', 'diagnostics', 'hotstrings', 'layouts', 'updater', 'shortcuts', 'settings', 'ai', 'menu', 'keyboard', 'clipboard', 'tray', 'gestures', 'tap_hold', 'onboarding'
+]	1	tooling:1
+S01	tree-list	["ahk", "native"]	["ahk", "native", "settings", "tap_hold", "core"]	1	driver-test:1
+S01	tree-list	["infra", "modules", "platform", "ui"]	["infra", "modules", "platform", "ui", "shortcuts", "settings", "diagnostics", "hotstrings", "layouts", "ai", "core", "menu", "updater", "metrics", "keyboard", "gestures", "tap_hold", "tray", "apps", "onboarding", "clipboard"]	1	driver-test:1
+S01	tree-list	["infra", "modules", "platform"]	["infra", "modules", "platform", "gestures", "core", "updater", "settings", "diagnostics", "hotstrings", "keyboard", "layouts", "ai", "menu", "metrics", "shortcuts", "tap_hold", "tray", "onboarding", "apps", "clipboard"]	2	driver-test:2
+S01	tree-list	["infra", "modules", "ui"]	["infra", "modules", "ui", "shortcuts", "settings", "diagnostics", "hotstrings", "layouts", "ai", "core", "menu", "updater", "metrics", "keyboard", "gestures", "platform", "tap_hold", "apps", "onboarding", "clipboard", "tray"]	1	repo-test:1
+S01	tree-list	["infra", "ui", "modules", "platform", "adapters"]	["infra", "ui", "modules", "platform", "adapters", "shortcuts", "settings", "diagnostics", "hotstrings", "layouts", "ai", "core", "menu", "updater", "metrics", "keyboard", "clipboard", "apps", "tray", "gestures", "tap_hold", "onboarding"]	2	driver-test:2
+S01	tree-list	["modules", "infra", "platform", "adapters", "ui"]	["modules", "infra", "platform", "adapters", "ui", "shortcuts", "settings", "diagnostics", "hotstrings", "layouts", "ai", "core", "menu", "updater", "metrics", "keyboard", "clipboard", "apps", "tray", "gestures", "tap_hold", "onboarding"]	1	driver-test:1
+S01	tree-list	["modules", "infra", "platform"]	["modules", "infra", "platform", "gestures", "core", "updater", "settings", "diagnostics", "hotstrings", "keyboard", "layouts", "ai", "menu", "metrics", "shortcuts", "tap_hold", "tray", "onboarding", "apps", "clipboard"]	1	driver-test:1
+S01	tree-list	["native", "ahk"]	["native", "ahk", "settings", "tap_hold", "core"]	1	driver-test:1
+S01	tree-list	['adapters', 'infra', 'modules', 'platform', 'ui']	['adapters', 'infra', 'modules', 'platform', 'ui', 'shortcuts', 'settings', 'diagnostics', 'hotstrings', 'layouts', 'ai', 'core', 'menu', 'updater', 'metrics', 'keyboard', 'clipboard', 'apps', 'tray', 'gestures', 'tap_hold', 'onboarding']	1	repo-test:1
+S01	tree-list	['adapters', 'infra', 'modules', 'ui', 'tests', 'platform']	['adapters', 'infra', 'modules', 'ui', 'tests', 'platform', 'shortcuts', 'settings', 'diagnostics', 'hotstrings', 'layouts', 'ai', 'core', 'menu', 'updater', 'metrics', 'keyboard', 'clipboard', 'apps', 'tray', 'gestures', 'tap_hold', 'onboarding']	1	repo-test:1
+S01	tree-list	['ahk', 'ahk']	['ahk', 'ahk', 'settings', 'tap_hold']	1	tooling:1
+S01	tree-list	['core', 'tests', 'keymap']	['core', 'tests', 'keymap', 'settings', 'layouts']	1	repo-test:1
+S01	tree-list	['core', 'tests']	['core', 'tests', 'settings']	1	repo-test:1
+S01	tree-list	['lua', 'ahk']	['lua', 'ahk', 'settings', 'tap_hold', 'shortcuts', 'diagnostics', 'core', 'apps', 'platform', 'keyboard', 'hotstrings', 'menu', 'gestures', 'metrics', 'layouts', 'ai', 'onboarding', 'tests', 'tray', 'updater']	1	tooling:1
+S01	tree-list	['modules', 'infra']	['modules', 'infra', 'gestures', 'core', 'updater', 'settings', 'platform', 'diagnostics', 'hotstrings', 'keyboard', 'layouts', 'ai', 'menu', 'metrics', 'shortcuts', 'tap_hold', 'onboarding', 'apps', 'clipboard', 'tray']	1	repo-test:1
+S01	tree-list	['tests', '__pycache__', 'bin', 'vendor']	['tests', '__pycache__', 'bin', 'vendor', 'install']	1	repo-test:1
+S01	tree-list	{ "adapters", "infra", "modules", "platform", "ui" }	{ "adapters", "infra", "modules", "platform", "ui", "shortcuts", "settings", "diagnostics", "hotstrings", "layouts", "ai", "core", "menu", "updater", "metrics", "keyboard", "clipboard", "apps", "tray", "gestures", "tap_hold", "onboarding" }	11	driver-test:11
+S01	tree-list	{ "adapters", "infra", "modules", "ui" }	{ "adapters", "infra", "modules", "ui", "shortcuts", "settings", "diagnostics", "hotstrings", "layouts", "ai", "core", "menu", "updater", "metrics", "keyboard", "platform", "clipboard", "apps", "tray", "gestures", "tap_hold", "onboarding" }	1	repo-test:1
+S01	tree-list	{ "adapters", "modules", "platform" }	{ "adapters", "modules", "platform", "clipboard", "core", "apps", "layouts", "tray", "hotstrings", "shortcuts", "metrics", "diagnostics", "gestures", "ai", "updater", "keyboard", "tap_hold", "onboarding", "settings" }	1	driver-test:1
+S01	tree-list	{ "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui" }	{ "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui", "apps", "core", "diagnostics", "layouts", "keyboard", "menu", "settings", "onboarding" }	1	lua-require:1
+S01	tree-list	{ "infra", "modules", "platform" }	{ "infra", "modules", "platform", "gestures", "core", "updater", "settings", "diagnostics", "hotstrings", "keyboard", "layouts", "ai", "menu", "metrics", "shortcuts", "tap_hold", "tray", "onboarding", "apps", "clipboard" }	1	driver-test:1
+S01	tree-list	{ "modules", "infra", "adapters", "platform", "ui" }	{ "modules", "infra", "adapters", "platform", "ui", "shortcuts", "settings", "diagnostics", "hotstrings", "layouts", "ai", "core", "menu", "updater", "metrics", "keyboard", "clipboard", "apps", "tray", "gestures", "tap_hold", "onboarding" }	1	driver-test:1
+S01	tree-list	{ "modules", "infra", "platform" }	{ "modules", "infra", "platform", "gestures", "core", "updater", "settings", "diagnostics", "hotstrings", "keyboard", "layouts", "ai", "menu", "metrics", "shortcuts", "tap_hold", "tray", "onboarding", "apps", "clipboard" }	1	driver-test:1
 S02	folder-edit		const adapterFile = path.join(
 		AHK_ADAPTERS_DIR,
 		pascalToUpperSnake(portName).toLowerCase() + '.ahk'
