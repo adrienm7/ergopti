@@ -212,7 +212,7 @@ local function resolve_settings(document, mark)
 			settings.idle_timeout_seconds = idle
 			if mark then mark("shortcuts", "caps_word", ConfigKeys.LEAF.IDLE_TIMEOUT_SECONDS) end
 		else
-			ConfigOutdated.report(IDLE_PATH, "the value is not a non-negative number of seconds", Logger)
+			ConfigOutdated.report(IDLE_PATH, "the value is not a number of seconds in the declared range (0 = never)", Logger)
 		end
 	end
 

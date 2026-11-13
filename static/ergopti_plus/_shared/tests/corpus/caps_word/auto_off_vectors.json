@@ -76,8 +76,24 @@
 			"idle_ms": 2500
 		},
 		{
+			"name": "the declared maximum delay, one hour",
+			"idle": 3600,
+			"terminators": ["space"],
+			"pointer": "all_true",
+			"valid": true,
+			"idle_ms": 3600000
+		},
+		{
 			"name": "negative delay",
 			"idle": -1,
+			"terminators": ["space"],
+			"pointer": "all_true",
+			"valid": false,
+			"reason": "invalid_idle_timeout"
+		},
+		{
+			"name": "delay past the declared maximum of 3600 s",
+			"idle": 3601,
 			"terminators": ["space"],
 			"pointer": "all_true",
 			"valid": false,

@@ -521,6 +521,29 @@ function requireValue(schema, key, value) {
 				"default_from": {
 					"manifest": "llm.trigger.min_request_interval_ms"
 				}
+			},
+			"shortcuts.caps_word.idle_timeout_seconds": {
+				"file": "config.toml",
+				"type": "decimal",
+				"unit": "s",
+				"min": 0,
+				"max": 3600,
+				"special": [
+					{
+						"value": 0,
+						"label_key": "value_check.special.never"
+					}
+				],
+				"default_from": {
+					"manifest": "shortcuts.caps_word.idle_timeout_seconds"
+				}
+			},
+			"gestures.sensitivities.*": {
+				"file": "config.toml",
+				"type": "decimal",
+				"unit": "mm",
+				"min": 1,
+				"max": 60
 			}
 		}
 	};
@@ -543,7 +566,9 @@ function requireValue(schema, key, value) {
 		"LLM_GENERATION_MAX_WORDS": "llm.generation.max_words",
 		"LLM_PROFILES_NUM_PREDICTIONS": "llm.profiles.num_predictions",
 		"LLM_TRIGGER_DEBOUNCE_MS": "llm.trigger.debounce_ms",
-		"LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS": "llm.trigger.min_request_interval_ms"
+		"LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS": "llm.trigger.min_request_interval_ms",
+		"SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS": "shortcuts.caps_word.idle_timeout_seconds",
+		"GESTURES_SENSITIVITIES_ANY": "gestures.sensitivities.*"
 	};
 
 	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });

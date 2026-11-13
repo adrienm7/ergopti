@@ -8,6 +8,7 @@
 return {
 	["version"] = 1,
 	["keys"] = {
+		["GESTURES_SENSITIVITIES_ANY"] = "gestures.sensitivities.*",
 		["HOTSTRINGS_CASCADE_MAX_ARROWS"] = "hotstrings.cascade_max_arrows",
 		["HOTSTRINGS_CONFIG_ANY_ANY_DELAY"] = "hotstrings_config.*.*.delay",
 		["HOTSTRINGS_CONFIG_ANY_ANY_PRIORITY"] = "hotstrings_config.*.*.priority",
@@ -24,11 +25,19 @@ return {
 		["LLM_TRIGGER_DEBOUNCE_MS"] = "llm.trigger.debounce_ms",
 		["LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS"] = "llm.trigger.min_request_interval_ms",
 		["MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS"] = "mod_combos.simultaneous_threshold_ms",
+		["SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS"] = "shortcuts.caps_word.idle_timeout_seconds",
 		["TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS"] = "tap_holds.lone_modifier_tap_max_ms",
 		["TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS"] = "tap_hold.keys.*.time_activation_seconds",
 		["TAP_HOLD_TIME_ACTIVATION_SECONDS"] = "tap_hold.time_activation_seconds",
 	},
 	["settings"] = {
+		["gestures.sensitivities.*"] = {
+			["file"] = "config.toml",
+			["max"] = 60,
+			["min"] = 1,
+			["type"] = "decimal",
+			["unit"] = "mm",
+		},
 		["hotstrings.cascade_max_arrows"] = {
 			["default_from"] = {
 				["manifest"] = "hotstrings.cascade_max_arrows",
@@ -204,6 +213,20 @@ return {
 			["min"] = 1,
 			["type"] = "integer",
 			["unit"] = "ms",
+		},
+		["shortcuts.caps_word.idle_timeout_seconds"] = {
+			["default_from"] = {
+				["manifest"] = "shortcuts.caps_word.idle_timeout_seconds",
+			},
+			["file"] = "config.toml",
+			["max"] = 3600,
+			["min"] = 0,
+			["special"] = { {
+				["label_key"] = "value_check.special.never",
+				["value"] = 0,
+			} },
+			["type"] = "decimal",
+			["unit"] = "s",
 		},
 		["tap_hold.keys.*.time_activation_seconds"] = {
 			["entry_scale"] = 1000,

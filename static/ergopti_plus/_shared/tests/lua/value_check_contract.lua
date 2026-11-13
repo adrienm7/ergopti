@@ -145,6 +145,17 @@ function M.register(helpers, shared_path)
 			end
 			helpers.assert_true(count > 0, "value_schema.json declares no setting")
 		end)
+		helpers.it("value-check: the gesture step coercer admits exactly the declared 1..60 mm", function()
+			local Sensitivity = require("gestures.engine.sensitivity")
+			helpers.assert_eq(Sensitivity.coerce(1), 1)
+			helpers.assert_eq(Sensitivity.coerce(60), 60)
+			-- A hand-edited text number keeps reading as before.
+			helpers.assert_eq(Sensitivity.coerce("7.25"), 7.25)
+			helpers.assert_eq(Sensitivity.coerce(0.5), nil)
+			helpers.assert_eq(Sensitivity.coerce(61), nil)
+			helpers.assert_eq(Sensitivity.coerce("fast"), nil)
+			helpers.assert_eq(Sensitivity.coerce(0 / 0), nil)
+		end)
 	end)
 end
 

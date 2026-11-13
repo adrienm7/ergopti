@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local M = {}
+local ValueCheck = require("settings.engine.value_check")
 local OPTIONS = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0,
 	7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0, 40.0, 50.0, 60.0 }
 
@@ -24,8 +25,10 @@ end
 --- @return number|nil sensitivity
 function M.coerce(value)
 	local number = tonumber(value)
-	if type(number) ~= "number" or number < OPTIONS[1] or number > OPTIONS[#OPTIONS]
-		or number ~= number then return nil end
+	-- The range is the shared value schema declaration (1 to 60 mm); the
+	-- menu choices above stay inside it (tools/test/test-value-schema.cjs).
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.GESTURES_SENSITIVITIES_ANY), number)
+	if not checked.ok then return nil end
 	return number
 end
 

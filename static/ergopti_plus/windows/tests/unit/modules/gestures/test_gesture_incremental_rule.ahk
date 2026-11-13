@@ -181,6 +181,8 @@ _GIR_SensitivityChoices() {
 	AssertEqual(7.25, GestureCoerceSensitivity("7.25"), "a hand-edited value inside the range")
 	AssertEqual("", GestureCoerceSensitivity(0.5), "below the range")
 	AssertEqual("", GestureCoerceSensitivity(61), "above the range")
+	AssertEqual(1, GestureCoerceSensitivity(1), "the declared minimum is admitted")
+	AssertEqual(60, GestureCoerceSensitivity(60), "the declared maximum is admitted")
 	AssertEqual("", GestureCoerceSensitivity("fast"), "not a number")
 }
 Test("incremental rule: the sensitivity choices are the shared ones (incremental-step-vectors)", _GIR_SensitivityChoices)

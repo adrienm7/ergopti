@@ -30,6 +30,7 @@ local M = {}
 local utf8_lib = (type(utf8) == "table" and utf8.codes and utf8.char) and utf8 or require("core.lifecycle.engine.compat.utf8")
 local Catalogue = require("layouts.engine.layers.terminators_catalogue")
 local TableUtil = require("core.text.engine.table_util")
+local ValueCheck = require("settings.engine.value_check")
 
 local MS_PER_SECOND = 1000
 
@@ -74,15 +75,16 @@ function M.is_terminator_key(key)
 end
 
 --- Validates the stored inactivity delay.
---- A positive delay that rounds to 0 ms would expire at once here and mean
---- "never" on the AHK port, so it is refused instead of quantized.
+--- Its type and range are the shared value schema declaration (0 to 3600 s,
+--- 0 = never). A positive delay that rounds to 0 ms would expire at once here
+--- and mean "never" on the AHK port, so it is refused instead of quantized.
 --- @param value any Candidate number of seconds (0 = never).
 --- @return boolean valid
 --- @return string|nil reason Stable refusal reason.
 function M.validate_idle_timeout(value)
-	if type(value) ~= "number" or value ~= value or value == math.huge or value < 0 then
-		return false, "invalid_idle_timeout"
-	end
+	local checked = ValueCheck.check_value(
+		ValueCheck.declaration(ValueCheck.KEY.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS), value)
+	if not checked.ok then return false, "invalid_idle_timeout" end
 	if value > 0 and value * MS_PER_SECOND < 0.5 then return false, "invalid_idle_timeout" end
 	return true
 end

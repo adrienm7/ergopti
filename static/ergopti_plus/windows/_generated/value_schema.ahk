@@ -18,6 +18,12 @@ ValueSchemaData() {
 	if IsObject(Data)
 		return Data
 	Data := Map("version", 1, "settings", Map(
+		"gestures.sensitivities.*", Map(
+			"file", "config.toml",
+			"type", "decimal",
+			"unit", "mm",
+			"min", 1,
+			"max", 60),
 		"hotstrings.cascade_max_arrows", Map(
 			"file", "config.toml",
 			"type", "integer",
@@ -161,6 +167,17 @@ ValueSchemaData() {
 			"max", 1000,
 			"default_from", Map(
 				"manifest", "mod_combos.simultaneous_threshold_ms")),
+		"shortcuts.caps_word.idle_timeout_seconds", Map(
+			"file", "config.toml",
+			"type", "decimal",
+			"unit", "s",
+			"min", 0,
+			"max", 3600,
+			"special", [Map(
+				"value", 0,
+				"label_key", "value_check.special.never")],
+			"default_from", Map(
+				"manifest", "shortcuts.caps_word.idle_timeout_seconds")),
 		"tap_hold.keys.*.time_activation_seconds", Map(
 			"file", "tap_hold.toml",
 			"type", "decimal",
