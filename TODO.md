@@ -371,10 +371,16 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       so the pause function lands in `expected_source` and Linux E2E
       desktop-webview fails (« original publisher clears only the known third slot », line 252). Drop the argument,
       then confirm with that E2E job.
-- [ ] **Windows global restore and the preferences source (found 2026-11-12).** On macOS the remap save wrote
+- [x] **Windows global restore and the preferences source (found 2026-11-12).** On macOS the remap save wrote
       `config.toml` without handing the bytes to the preferences, so « Restore recommended values » refused at the
       shortcuts participant (fixed in 3e209162 by `Preferences.replace_source`). Check whether the AHK global restore
       cohort has the same handoff gap now that `[tap_holds]` and `[mod_combos]` live in `config.toml`.
+      Checked 2026-11-13 by worker I: no such gap on Windows, so no code change. The AHK scopes keep no loaded
+      source to compare with: `ConfigScopeCommitOperations` (`infra/config_scope.ahk`, `Build()`) reads `config.toml`
+      fresh at commit time, checks drift against that image and publishes under its expected-old hash, and
+      `ConfigGlobalScopeApply` puts the tap-hold owner in the same cohort, so no participant hands bytes to the next.
+      Covered by `test_config_scope_manifest.ahk` (`scope-hash-precondition`, « inventory source drift refuses
+      before any backup »). Decided by the agent on 2026-11-13, to review by the maintainer.
 - [ ] **ci-acceptance-3 commits not yet on `dev` (2026-11-12).** On `claude/ergopti-todo-ci-acceptance-3`: the
       keyboard-source evidence (cf44fb4e, aef8ae05, da7cf001, 84e97e47: conflicts in `ci-macos.yml` and
       `test-macos-tsm-refusal.cjs` against the tap-hold series, rebase them), the TODO receipts 8886f2ba and
