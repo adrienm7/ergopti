@@ -163,6 +163,7 @@
 		"test:structure-windows-tool-paths": "node ./tools/test/test-structure-windows-tool-paths.cjs",
 		"test:structure-python-anchor": "node ./tools/test/test-structure-python-anchor.cjs",
 		"test:structure-regex-tail-paths": "node ./tools/test/test-structure-regex-tail-paths.cjs",
+		"test:structure-scope-overlap": "node ./tools/test/test-structure-scope-overlap.cjs",
 		"test:shared-literal-inventory": "node ./tools/test/test-shared-literal-inventory.cjs",
 		"test:stub-interception": "node ./tools/test/test-stubs-intercept-something.cjs",
 		"test:action-emit-per-os": "node ./tools/test/test-action-emit-is-per-os.cjs",
