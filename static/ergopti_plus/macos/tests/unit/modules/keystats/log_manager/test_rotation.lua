@@ -277,7 +277,7 @@ end)
 local function with_rollover_owner(callback)
 	return helpers.with_stub_scope({
 		"modules.keystats.rotation", "adapters.ledger_append", "infra.logger",
-		"modules.keystats.timestamp", "adapters.timer_scheduler", "error_description", "number_policy",
+		"modules.keystats.timestamp", "adapters.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	}, function()
 		local real_open, real_date = io.open, os.date
 		local controls = {

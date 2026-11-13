@@ -16,7 +16,7 @@
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.gesture_actions_fixture")
-local ProfileSelector = require("llm.profile_selector")
+local ProfileSelector = require("ai.engine.settings.profile_selector")
 local it = Fixture.it
 
 --- Runs a callback with a keymap bridge that records prompt requests.

@@ -10,7 +10,7 @@
 ; healthcheck/git crash-report pipeline (SetTimer(_ErgoptiDeferredCrashReport...))
 ; on EVERY single occurrence, backing up the one thread that also serves every
 ; keystroke. The user-facing surface is the error window, whose own policy
-; (_shared/modules/diagnostics/error_policy.json) deduplicates what it shows,
+; (_shared/diagnostics/data/error_policy.json) deduplicates what it shows,
 ; so the handler raises no toast of its own.
 ;
 ; The fix mirrors HookDispatcher.Dispatch's own _err_cache pattern: a

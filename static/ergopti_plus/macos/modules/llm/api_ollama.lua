@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local M = {}
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 local Logger  = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local Notifications = require("infra.notifications")
@@ -15,8 +15,8 @@ local i18n    = require("infra.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
-local Ports = require("llm.request_plan.ports")
-local TokenBudget = require("llm.request_plan.token_budget")
+local Ports = require("ai.engine.request_plan.ports")
+local TokenBudget = require("ai.engine.request_plan.token_budget")
 -- Independent inference, availability, and warmup owners prevent one semantic
 -- operation from superseding another merely because both use HTTP
 local _infer_client  = require("adapters.http_client").new()
@@ -34,10 +34,10 @@ local ShellRunner    = require("adapters.shell_runner")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
 local ManagedDaemon = require("adapters.managed_ollama_daemon")
-local RuntimeChoice = require("core.llm.ollama_runtime_choice")
+local RuntimeChoice = require("core.lifecycle.engine.core.ollama_runtime_choice")
 local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local LOG            = "llm.api_ollama"
-local LocalModelPolicy = require("llm.local_model_policy")
+local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
 
 --- The think field of an Ollama chat body: false, or the effort level of a
 --- family that ignores false (thinking_off.json through thinking_families,
@@ -49,7 +49,7 @@ local function ollama_think(model_name)
 end
 
 -- Ollama bind address. The default port is the single source in
--- _shared/modules/llm/defaults.json (llm_ollama_owned_port, surfaced via DEFAULT_STATE); a user
+-- _shared/ai/data/defaults.json (llm_ollama_owned_port, surfaced via DEFAULT_STATE); a user
 -- override owned by OllamaEndpoint wins so a port collision can be resolved
 -- without editing any file. Host stays loopback.
 --- Reads a valid user port override from persistent storage, or nil when unset.
@@ -59,7 +59,7 @@ local function read_ollama_port_override()
 end
 
 --- Resolves the Ollama port: a valid user override wins, otherwise the canonical
---- default from _shared/modules/llm/defaults.json (DEFAULT_STATE.llm_ollama_owned_port). init is
+--- default from _shared/ai/data/defaults.json (DEFAULT_STATE.llm_ollama_owned_port). init is
 --- required lazily to avoid the init <-> api_ollama require cycle.
 --- @return integer
 local function resolve_ollama_port()
@@ -102,7 +102,7 @@ local _ollama_start_acquisition_depth = 0
 local _ollama_server_retirement_depth = 0
 local _ollama_launch_cleanup_observers = {}
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
--- Retry policy lives in _shared/modules/llm/inference.json so the AHK twin can read
+-- Retry policy lives in _shared/ai/data/inference.json so the AHK twin can read
 -- the same numbers. ``max_mult`` is the upper bound on attempts as a
 -- multiple of requested_predictions; ``retry_temp_step`` is added on top of
 -- the diversity step for the 2nd attempt; ``retry_extra_tokens`` gives the
@@ -2111,7 +2111,7 @@ function M.request_raw(model_name, system_prompt, full_text, tail_text, temperat
 		temperature, max_tokens, 1, false, nil, on_fail, ApiCommon.new_dedup_stats(), on_raw, force_chat)
 end
 
---- Posts one prebuilt request body (llm/vision.lua build_request, format
+--- Posts one prebuilt request body (ai/engine/prediction/vision.lua build_request, format
 --- "ollama") to the local server's /api/chat, whatever backend the AI menu uses
 --- for text. The body carries private text or a screenshot: neither it nor the
 --- answer is logged, only the server's own error.
@@ -2231,7 +2231,7 @@ local function request_prebuilt(client, label, body, on_text, on_fail, continuat
 						return
 					end
 					Logger.info(LOG, "%s answer of the local server received in %dms (%d char(s)).", label, ms, #text)
-					require("perf_budget").judge(Logger, LOG, "llm.local", ms,
+					require("core.logger.engine.perf_budget").judge(Logger, LOG, "llm.local", ms,
 						function() return require("infra.timings").ms("budgets", "llm_local_request_ms") end)
 					if not request_current() then
 						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")

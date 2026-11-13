@@ -11,8 +11,8 @@
 
 local M = {}
 
-local WindowTitles = require("window_titles")
-local Logger = require("logger.shim")
+local WindowTitles = require("core.ui.engine.window_titles")
+local Logger = require("core.logger.engine.shim")
 local Modal = require("ui.modal")
 local NativeDialog = require("ui.native_dialog")
 local TextPrompt = require("ui.text_prompt")
@@ -37,7 +37,7 @@ local function _fill(template, placeholder, value)
 end
 
 local function shell_quote(value)
-	return require("text_utils").shell_quote(value or "")
+	return require("core.text.engine.utils_core").shell_quote(value or "")
 end
 
 --- Normalises a child-process exit status across interpreters.
@@ -225,8 +225,8 @@ local function slot_binding_rows(slot_label, bound, binding, assign)
 	local function pick() open_action_picker(slot_label, bound, binding, assign) end
 	local function clear() assign("none") end
 	local rows = ManifestMenu.template_rows("slot_binding_frame", {
-		[require("config_keys").COMMAND.SLOT_BINDING_PICK] = pick,
-		[require("config_keys").COMMAND.SLOT_BINDING_CLEAR] = clear,
+		[require("settings.engine.keys").COMMAND.SLOT_BINDING_PICK] = pick,
+		[require("settings.engine.keys").COMMAND.SLOT_BINDING_CLEAR] = clear,
 	}, {
 		["slot_binding_has_action"] = function() return bound ~= "none" end,
 	}, {})

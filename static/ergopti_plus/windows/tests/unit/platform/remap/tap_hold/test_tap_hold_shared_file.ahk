@@ -67,7 +67,7 @@ _THSF_ReadsPair(Name, Wanted) {
 	Dir := _THSF_CorpusDir()
 	TapHoldPath := Dir . "\" . Name . ".toml"
 	ConfigPath := Dir . "\" . Name . ".config.toml"
-	TH := LoadTapHoldToml(TapHoldPath, _SharedDir . "\tap_hold\defaults.toml")
+	TH := LoadTapHoldToml(TapHoldPath, _SharedDir . "\tap_hold\data\defaults.toml")
 	AssertEqual(Wanted["global_seconds"], TapHoldGlobalDuration(TH), Name . ": the global delay")
 	Keys := Wanted.Get("keys", Map())
 	AssertEqual(Keys.Count, TH["keys"].Count, Name . ": the keys Windows reads")
@@ -211,7 +211,7 @@ _THSF_WriterKeepsOtherDriversOwned(TargetPath) {
 			. "[tap_hold.keys.left_option]`nhold_modifier = " . Chr(34) . "alt" . Chr(34) . "`n`n"
 			. "[tap_hold.keys.caps_lock]`nhold_action = " . Chr(34) . "hyper" . Chr(34) . "`nenabled = false`n"
 		AssertEqual(1, FSWriteCreateDurable(TargetPath, Source))
-		TapHold := LoadTapHoldToml(TargetPath, _SharedDir . "\tap_hold\defaults.toml")
+		TapHold := LoadTapHoldToml(TargetPath, _SharedDir . "\tap_hold\data\defaults.toml")
 		Result := WriteTapHoldHold("caps_lock", _THSF_ModifierHold("ctrl"))
 		Assert((Result is Integer) && Result == 1, "the Windows hold is published")
 		Document := TOML_ParseDocument(FSReadUtf8Exact(TargetPath))
@@ -251,7 +251,7 @@ _THSF_LoaderWarnsOtherDriversLeaves() {
 		FileDelete(Path)
 	FileAppend(Content, Path, "UTF-8-RAW")
 	try {
-		TH := LoadTapHoldToml(Path, _SharedDir . "\tap_hold\defaults.toml")
+		TH := LoadTapHoldToml(Path, _SharedDir . "\tap_hold\data\defaults.toml")
 		AssertEqual("copy", TH["keys"]["left_ctrl"]["tap_action"], "a Cmd hold keeps the key's tap")
 		AssertEqual("", TH["keys"]["left_ctrl"]["hold_modifier"], "a Cmd hold holds nothing here")
 		; The ring buffer is bounded and full in a long run: keep this file's lines.
@@ -279,7 +279,7 @@ _THSF_MacThumbKeysFollowThePosition() {
 	global _SharedDir
 	Dir := _SharedDir . "\tests\corpus\tap_hold_spellings"
 	Expected := TOML_ParseDocument(FSReadUtf8Exact(Dir . "\expected.toml"))
-	TH := LoadTapHoldToml(Dir . "\mac_thumb.toml", _SharedDir . "\tap_hold\defaults.toml")
+	TH := LoadTapHoldToml(Dir . "\mac_thumb.toml", _SharedDir . "\tap_hold\data\defaults.toml")
 	Keys := Expected["reads"]["mac_thumb"]["linux"]["keys"]
 	for KeyId, Fields in Keys {
 		AssertTrue(TH["keys"].Has(KeyId), KeyId . " is read from its Mac thumb id")

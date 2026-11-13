@@ -30,7 +30,7 @@ local M = {}
 
 local Logger    = require("infra.logger")
 local PacedJson = require("infra.paced_json")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "metrics_typing.projection"
 

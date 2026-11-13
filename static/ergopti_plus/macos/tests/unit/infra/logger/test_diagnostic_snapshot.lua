@@ -14,12 +14,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
-local json     = require("json")
+local json     = require("core.text.engine.json")
 local Logger   = require("infra.logger")
 helpers.admit_logger_privacy(Logger)
-local Snapshot = require("diagnostics.snapshot")
+local Snapshot = require("diagnostics.engine.snapshot")
 
 local Paths    = require("infra.paths")
 
@@ -36,7 +36,7 @@ end
 --- Reads the shared snapshot contract.
 --- @return table
 local function read_contract()
-	local path = assert(Paths.shared("modules/logger/diagnostic_snapshot.json"), "shared tree unreachable")
+	local path = assert(Paths.shared("core/logger/data/diagnostic_snapshot.json"), "shared tree unreachable")
 	local fh = assert(io.open(path, "r"))
 	local raw = fh:read("*a")
 	fh:close()
@@ -191,7 +191,7 @@ helpers.describe("Runtime diagnostics: previously invisible events now log", fun
 	helpers.it("menu feature toggles and menu prime failures are logged", function()
 		-- The toggle line lives in the module both menus share (PAR-45); the
 		-- macOS menu must still route its toggles through it.
-		local shared_path = assert(package.searchpath("feature_notice", package.path), "feature_notice is not on the path")
+		local shared_path = assert(package.searchpath("menu.engine.feature_notice", package.path), "feature_notice is not on the path")
 		local shared_file = assert(io.open(shared_path, "rb"))
 		local shared_src = shared_file:read("*a")
 		shared_file:close()
@@ -209,7 +209,7 @@ helpers.describe("Runtime diagnostics: previously invisible events now log", fun
 	end)
 
 	helpers.it("a process exit is logged by program name only", function()
-		local RuntimeLog = require("diagnostics.runtime_log")
+		local RuntimeLog = require("diagnostics.engine.runtime_log")
 		helpers.assert_eq("osascript",
 			RuntimeLog.program_name("/usr/bin/osascript -e 'set the clipboard to \"secret\"'"))
 		-- The task completion names the program once, for the exit record and its

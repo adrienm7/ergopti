@@ -4,7 +4,7 @@
 ; MODULE: Locale (string loading)
 ; DESCRIPTION:
 ; Loads UI string translations from the shared JSON locale files in
-; ``_shared/data/locales/<code>.json`` (through a self-healing .tsv fast-cache)
+; ``_shared/core/i18n/data/locales/<code>.json`` (through a self-healing .tsv fast-cache)
 ; and exposes a single ``t(key)`` accessor returning the localised string for a
 ; dot-notation key, with the ``★`` placeholder substituted by the configured
 ; MagicKey. Mirror of ``macos/infra/locale.lua``: this is the string-LOADING +
@@ -13,7 +13,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Shared source of truth: the same JSON files feed the Hammerspoon driver,
-;    so ``_shared/data/locales/`` is the one place UI strings are defined.
+;    so ``_shared/core/i18n/data/locales/`` is the one place UI strings are defined.
 ; 2. Lazy load + self-healing cache: only the active locale is parsed at boot;
 ;    the EN/FR fallbacks are warmed off the critical path. Each locale is served
 ;    from a flat .tsv regenerated whenever the .json is newer (~23x faster than
@@ -72,10 +72,10 @@ global _I18N_TSV_SENTINEL := "#!ergopti-i18n-cache-v3 count="
 ; =================================
 
 ; Resolve the absolute path to a locale JSON file given a locale code.
-; Uses _SharedDir (computed in ErgoptiPlus.ahk) to reach _shared/data/locales/.
+; Uses _SharedDir (computed in ErgoptiPlus.ahk) to reach _shared/core/i18n/data/locales/.
 _I18nLocalePath(Code) {
 	global _SharedDir
-	return _SharedDir . "\data\locales\" . Code . ".json"
+	return _SharedDir . "\core\i18n\data\locales\" . Code . ".json"
 }
 
 ; Invert _I18nWriteTsvCache's value escaping in a single left-to-right scan so
@@ -432,7 +432,7 @@ I18nLookup(Key) {
 
 ; Joins a translated label to its value the way the active locale spells it
 ; (French spaces the colon, Chinese and Japanese use a full-width one). The Lua
-; drivers have the same rule in _shared/lua/locale/label_value.lua.
+; drivers have the same rule in _shared/core/i18n/engine/label_value.lua.
 ; A lookup answering with the key itself has no catalogue behind it: the row
 ; keeps its value, and t() already reported the raw key. All 21 locales hold the
 ; key (tools/test/test-french-punctuation.cjs).

@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Tooltip Style (Linux)
 --- DESCRIPTION:
---- Reads _shared/modules/tooltip/constants.toml into the tables the renderer
+--- Reads _shared/core/ui/data/tooltip/constants.toml into the tables the renderer
 --- draws with. It is the twin of macOS's ui/tooltip/config.lua and of the
 --- Windows ui_style.ahk, and the three read the same file.
 ---
@@ -15,7 +15,7 @@
 --- raise; this one now does too.
 ---
 --- FOLLOW THE TOML, NOT SPEC.md:
---- _shared/modules/tooltip/SPEC.md sources screen_margin from [positioning];
+--- _shared/core/ui/data/tooltip/SPEC.md sources screen_margin from [positioning];
 --- the TOML declares it under [layout]. The TOML is what every driver reads, so
 --- it is what this module reads — and no gate pins the prose against the data,
 --- so the drift is worth stating rather than silently working around.
@@ -23,11 +23,11 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Paths = require("infra.paths")
-local TomlReader = require("toml_codec.reader")
-local LlmLine = require("tooltip.llm_line")
-local KeyNames = require("keycodes.key_names")
+local TomlReader = require("core.text.engine.toml_codec.reader")
+local LlmLine = require("core.ui.engine.tooltip.llm_line")
+local KeyNames = require("platform.input.keycodes.key_names")
 
 local LOG = "ui.tooltip.config"
 
@@ -51,7 +51,7 @@ local _sections = nil
 local function sections()
 	if _sections then return _sections end
 
-	local path = Paths.shared("modules/tooltip/constants.toml")
+	local path = Paths.shared("core/ui/data/tooltip/constants.toml")
 	local parsed = TomlReader.parse(path)
 	if type(parsed) ~= "table" or type(parsed.sections) ~= "table" then
 		error("[tooltip.config] shared tooltip constants not readable: " .. tostring(path))
@@ -186,7 +186,7 @@ local _llm_line = nil
 ---   next, cursor, label } }
 function M.llm_line()
 	if _llm_line then return _llm_line end
-	-- The shortcut column's modifiers (_shared/lua/tooltip/llm_line.lua), named
+	-- The shortcut column's modifiers (_shared/core/ui/engine/tooltip/llm_line.lua), named
 	-- by the shared key name table in the active language (« Ctrl+Maj+3 »).
 	local shortcut_spec = LlmLine.shortcut_spec(require_key("llm_ui", "shortcut_modifier_order"),
 		require_key("llm_ui", "shortcut_joiner_linux"), function(name)

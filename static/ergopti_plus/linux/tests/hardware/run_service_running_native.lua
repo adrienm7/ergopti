@@ -3,9 +3,9 @@
 local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver_root = assert(self_path:match("^(.*)/tests/hardware/[^/]+$"),
 	"launch with an absolute script path")
-local shared_root = driver_root .. "/../_shared/lua"
+local shared_root = driver_root .. "/../_shared"
 package.path = driver_root .. "/?.lua;" .. shared_root .. "/?.lua;" .. package.path
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 
 local uv = require("luv")
 local callbacks = {}
@@ -19,8 +19,8 @@ local previous = package.loaded.luv
 package.loaded.luv = native
 local Native = require("adapters.owned_process")
 package.loaded.luv = previous
-local Worker = require("native_worker_owner")
-local Port = require("llm.process_port")
+local Worker = require("core.lifecycle.engine.native_worker_owner")
+local Port = require("ai.engine.policy.process_port")
 local port, passed = Port.new(Worker, Native, uv, 25), 0
 local function await(predicate)
 	local deadline = uv.hrtime() + 5000000000

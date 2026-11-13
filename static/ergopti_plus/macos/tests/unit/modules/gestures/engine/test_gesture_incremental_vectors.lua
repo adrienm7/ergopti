@@ -4,7 +4,7 @@
 --- MODULE: Incremental Step Vectors (macOS)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/gestures/incremental_steps.json, which the
---- Linux and Windows suites replay too, through _shared/lua/gestures/incremental,
+--- Linux and Windows suites replay too, through _shared/gestures/incremental,
 --- the step rule the engine counts with (Geometry.incrementalSteps).
 ---
 --- ROOT CAUSE ENCODED:
@@ -13,6 +13,6 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-require("test.incremental_steps_contract")(helpers, json, helpers.shared(""))
+require("tests.lua.incremental_steps_contract")(helpers, json, helpers.shared(""))

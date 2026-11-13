@@ -39,13 +39,13 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		}
 	}
 
-	/// static/ergopti_plus/_shared/data/locales, found from this file.
+	/// static/ergopti_plus/_shared/core/i18n/data/locales, found from this file.
 	private static let localesDirectory: String = {
 		var url = URL(fileURLWithPath: #filePath)
 		for _ in 0..<5 {
 			url.deleteLastPathComponent()
 		}
-		return url.appendingPathComponent("_shared/data/locales").path
+		return url.appendingPathComponent("_shared/core/i18n/data/locales").path
 	}()
 
 	private static func localization(_ code: String) throws -> LauncherLocalization {

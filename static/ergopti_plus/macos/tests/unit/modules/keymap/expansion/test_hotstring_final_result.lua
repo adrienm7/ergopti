@@ -23,7 +23,7 @@ local function load_corpus()
 	local file = assert(io.open(path, "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw), "final_result_vectors.json must be valid JSON")
+	return assert(require("core.text.engine.json").decode(raw), "final_result_vectors.json must be valid JSON")
 end
 
 --- Builds a live registry and expander with the OS-facing collaborators stubbed.
@@ -44,7 +44,7 @@ local function fresh_engine(rules, max_arrows)
 		end
 	end
 	package.loaded["infra.text_utils"] = nil
-	package.loaded["text_utils"]       = nil
+	package.loaded["core.text.engine.utils_core"]       = nil
 
 	local Registry = require("modules.keymap.registry")
 	local Expander = require("modules.keymap.expander")

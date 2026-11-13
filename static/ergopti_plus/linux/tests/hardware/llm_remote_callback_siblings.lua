@@ -11,7 +11,7 @@
 local uv = require('luv')
 local Remote = require('modules.llm.api_remote')
 local Http = require('adapters.http_client')
-local Logger = require('logger.shim')
+local Logger = require('core.logger.engine.shim')
 local origin = assert(os.getenv('LLM_WRAPPER_ORIGIN'))
 
 -- Snapshot actual public callback tuples before their protected caller assertions.

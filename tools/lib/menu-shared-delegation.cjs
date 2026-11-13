@@ -8,10 +8,10 @@ const path = require('path');
 const { scriptTokens, stripComments } = require('./script-source.cjs');
 
 const MODULES = new Set([
-	'menu.personal_files',
-	'menu.programmable_hotstrings',
-	'hotstrings.section_order',
-	'keymap.magic_key_source'
+	'menu.engine.personal_files',
+	'menu.engine.programmable_hotstrings',
+	'hotstrings.engine.section_order',
+	'layouts.engine.layers.magic_key_source'
 ]);
 const values = (source) => scriptTokens(source, '.lua');
 const same = (tokens, index, expected) =>
@@ -247,10 +247,13 @@ function delegatedMenuSources(
 				continue;
 			const module = tokens[i + 4].value;
 			if (!MODULES.has(module)) continue;
-			if (module === 'keymap.magic_key_source' && !magicRendererPort(native.src, tokens[i].value))
+			if (
+				module === 'layouts.engine.layers.magic_key_source' &&
+				!magicRendererPort(native.src, tokens[i].value)
+			)
 				continue;
 			const shared = readFile(path.join(sharedRoot, module.replaceAll('.', '/') + '.lua'));
-			if (module === 'hotstrings.section_order') {
+			if (module === 'hotstrings.engine.section_order') {
 				const src = require('./menu-hotstring-order-binding.cjs').hotstringOrderMenuSource(
 					native.src,
 					shared

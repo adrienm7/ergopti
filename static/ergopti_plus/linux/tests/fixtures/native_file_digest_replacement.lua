@@ -11,7 +11,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_file_digest_replacement%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
 local ffi = require("ffi")
 ffi.cdef("int mkfifo(const char *pathname, unsigned int mode);")
@@ -87,7 +87,7 @@ local replacements = {
 	{ name = "zero deadline", timeout_ms = 0 },
 	{ name = "infinite deadline", timeout_ms = math.huge },
 	{ name = "NaN deadline", timeout_ms = 0 / 0 },
-	{ name = "over-ceiling deadline", timeout_ms = require("number_policy").MAX_TIMER_DELAY_MS + 2 },
+	{ name = "over-ceiling deadline", timeout_ms = require("core.text.engine.number_policy").MAX_TIMER_DELAY_MS + 2 },
 	{ name = "text deadline", timeout_ms = "invalid" },
 	{ name = "boolean deadline", timeout_ms = false },
 }
@@ -143,7 +143,7 @@ check("accepted ceiling deadline replaces the previous native FIFO digest", func
 	assert(file:write("abc"))
 	assert(file:close())
 	paths[#paths + 1] = path
-	assert(Digest.sha256(path, { timeout_ms = require("number_policy").MAX_TIMER_DELAY_MS },
+	assert(Digest.sha256(path, { timeout_ms = require("core.text.engine.number_policy").MAX_TIMER_DELAY_MS },
 		function(result, err) value, reason, callbacks = result, err, callbacks + 1 end))
 	assert(await(function() return not uv.loop_alive() end))
 	assert(old_callbacks == 0 and callbacks == 1 and value == ABC_SHA256 and reason == nil)

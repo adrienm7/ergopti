@@ -6,7 +6,7 @@
 --- Encapsulates SQLite interactions for the Linux keystats persistence layer.
 --- Uses the `sqlite3` CLI binary (available on every Linux distro) via io.popen
 --- — zero C-library vendoring required. Bootstraps the canonical schema from
---- _shared/data/db/schema.sql and provides INSERT helpers for the core event
+--- _shared/metrics/data/db/schema.sql and provides INSERT helpers for the core event
 --- and aggregate tables consumed by the shared metrics dashboard.
 ---
 --- This module is the Linux counterpart to macOS's modules/keystats/sqlite_writer.lua
@@ -34,30 +34,30 @@
 --- ==============================================================================
 
 local M = {}
-local Errors = require("adapter_errors")
-local TextUtils = require("text_utils")
+local Errors = require("diagnostics.engine.adapter_errors")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger        = require("logger.shim")
+local Logger        = require("core.logger.engine.shim")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 local TextCipher    = require("modules.keystats.text_cipher")
-local MigrationPlan = require("keystats.text_migration")
-local EventIdPolicy = require("sqlite.event_id_policy")
-local Json          = require("json")
-local NativePath    = require("native_path")
-local MediaStore    = require("keystats.media_store")
-local AppCategoryStore = require("keystats.app_category_store")
+local MigrationPlan = require("metrics.engine.privacy.text_migration_core")
+local EventIdPolicy = require("core.fs.engine.sqlite.event_id_policy")
+local Json          = require("core.text.engine.json")
+local NativePath    = require("core.fs.engine.native_path")
+local MediaStore    = require("metrics.engine.media.store")
+local AppCategoryStore = require("metrics.engine.apps.category_store")
 local RegularFileReader = require("infra.regular_file_reader")
-local ErrorDescription = require("error_description")
-local Queries = require("keystats.queries")
-local LocalTime = require("keystats.local_time")
-local TokenEncoding = require("keystats.token_encoding")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
+local Queries = require("metrics.engine.queries")
+local LocalTime = require("metrics.engine.local_time")
+local TokenEncoding = require("metrics.engine.privacy.token_encoding")
 local PrivateSqlite = nil
 
 -- How many session durations one application-day keeps. Read from the shared
 -- accumulator rather than restated, because the walk caps the array it hands
 -- over with the same number and two independent caps would disagree the day
 -- either is tuned.
-local SESSION_DURATIONS_CAP = require("keystats.aggregator_helpers").SESSION_DURATIONS_CAP
+local SESSION_DURATIONS_CAP = require("metrics.engine.aggregator.helpers").SESSION_DURATIONS_CAP
 
 local LOG = "modules.keystats.sqlite_writer"
 
@@ -291,7 +291,7 @@ local function _read_schema()
 	-- on where the driver is installed. Started from anywhere but one exact
 	-- directory, the keystats came up with no schema at all.
 	local Paths = require("infra.paths")
-	local schema_path = Paths.shared("data/db/schema.sql")
+	local schema_path = Paths.shared("metrics/data/db/schema.sql")
 	if not schema_path then
 		Logger.error(LOG, "Cannot locate the shared tree — schema.sql is unreachable.")
 		return nil
@@ -323,7 +323,7 @@ end
 --- creates the current triggers. A fresh store has the column from schema.sql.
 --- @return boolean True once every raw table has the column.
 local function _ensure_utc_offset_column()
-	local UtcOffsetColumn = require("keystats.utc_offset_column")
+	local UtcOffsetColumn = require("metrics.engine.utc_offset_column")
 	local output = _query_output(UtcOffsetColumn.missing_query())
 	if output == nil then
 		Logger.error(LOG, "Cannot read which raw metrics tables lack the UTC offset column.")
@@ -345,9 +345,9 @@ end
 --- The purge tombstone triggers (purge_schema.sql) join the same startup
 --- transaction, so a store bootstrapped before them applies a tombstone too.
 local function _ensure_media_schema()
-	local schema = _read_media_resource("data/db/media_schema.sql")
-	local purge = _read_media_resource("data/db/purge_schema.sql")
-	local catalogue = _read_media_resource("data/keycodes/metrics_media_keys.json")
+	local schema = _read_media_resource("metrics/data/db/media_schema.sql")
+	local purge = _read_media_resource("metrics/data/db/purge_schema.sql")
+	local catalogue = _read_media_resource("layouts/data/keycodes/metrics_media_keys.json")
 	if schema == nil or purge == nil or catalogue == nil then return false end
 	local ok, policy, transaction = pcall(function()
 		return MediaStore.policy(Json.decode(catalogue)), MediaStore.schema_transaction(schema .. "\n" .. purge)
@@ -410,7 +410,7 @@ local function _ensure_linux_device_schema()
 	-- they made every legacy store they reached look user-extended, so the
 	-- upgrade was refused for good. They are this schema's own: the rebuild
 	-- drops them and _ensure_media_schema, next in the same open, creates them.
-	local purge = _read_media_resource("data/db/purge_schema.sql")
+	local purge = _read_media_resource("metrics/data/db/purge_schema.sql")
 	if purge == nil then return false end
 	local owned_triggers, owned_names, drops = {}, {}, {}
 	for name in purge:gmatch("CREATE TRIGGER IF NOT EXISTS ([%w_]+)") do
@@ -1183,7 +1183,7 @@ end
 --- rows, through the one statement both Lua drivers share.
 --- @param events table Array of { ts, date, kind, app, meta }.
 _raw_sql.clipboard = function(device_id, events, first_id)
-	local ClipboardEvents = require("keystats.clipboard_events")
+	local ClipboardEvents = require("metrics.engine.capture.clipboard_events")
 	local statements = {}
 	for i, ev in ipairs(events) do
 		assert(ClipboardEvents.KINDS[ev.kind] and type(ev.meta) == "table", "Invalid clipboard event")
@@ -1217,10 +1217,10 @@ local function _kind_meta_rows(statement, kinds)
 end
 
 --- Window geometry, state and monitor changes as the Windows events_window_topo rows.
-_raw_sql.window_topo = _kind_meta_rows("events.window_topo", require("keystats.window_topology").KINDS)
+_raw_sql.window_topo = _kind_meta_rows("events.window_topo", require("metrics.engine.system.window_topology").KINDS)
 
 --- Capture-program presence as the Windows events_av rows.
-_raw_sql.av = _kind_meta_rows("events.av", require("keystats.capture_presence").KINDS)
+_raw_sql.av = _kind_meta_rows("events.av", require("metrics.engine.capture_presence").KINDS)
 
 --- Renders the portable trigger ROI payload without dropping its typed metadata.
 --- @param events table Array of { ts, date, kind, app, meta }.
@@ -1575,7 +1575,7 @@ end
 -- so the three drivers cap at the same place; the schema's own comment says the
 -- trimming belongs to the ingest pipeline, which is here.
 local TITLE_CAP_PER_APP_DAY =
-	require("keystats.aggregator_helpers").TITLE_CAP_PER_APP_DAY
+	require("metrics.engine.aggregator.helpers").TITLE_CAP_PER_APP_DAY
 
 --- Upserts one window title's counters for an application-day.
 ---

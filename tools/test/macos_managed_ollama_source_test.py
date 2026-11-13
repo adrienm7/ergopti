@@ -131,8 +131,7 @@ class Hooks(unittest.TestCase):
         )
         declared = json.loads(
             (
-                REPOSITORY
-                / "static/ergopti_plus/_shared/modules/llm/managed_ollama_environment.json"
+                REPOSITORY / "static/ergopti_plus/_shared/ai/data/managed_ollama_environment.json"
             ).read_text(encoding="utf-8")
         )
         self.assertEqual(declared["serve_environment"].get("OLLAMA_NO_CLOUD"), "1")
@@ -183,7 +182,9 @@ class Hooks(unittest.TestCase):
             self.assertEqual(
                 path.read_bytes(),
                 (
-                    REPOSITORY / "static/ergopti_plus/_shared/go/native_http" / path.name
+                    REPOSITORY
+                    / "static/ergopti_plus/_shared/core/network/native/go/native_http"
+                    / path.name
                 ).read_bytes(),
             )
         probe = (self.candidate / "ergopti_native_http_capability.go").read_text()

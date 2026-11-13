@@ -8,9 +8,9 @@
 --- delivery are controlled: DUMMY is an artificial callback sample, not evdev.
 --- ==============================================================================
 
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
-local Json = require("json")
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
+local Json = require("core.text.engine.json")
 local Clock = require("infra.monotonic")
 local Timings = require("infra.timings")
 local Window = require("adapters.window_info")

@@ -1,6 +1,6 @@
 --- tests/unit/modules/llm/prediction/test_prediction_comparisons.lua
 local helpers = require("tests.helpers")
-local Parser = helpers.load_with_stubs("llm.parser")
+local Parser = helpers.load_with_stubs("ai.engine.api.parser_core")
 
 helpers.describe("prediction comparisons", function()
 	helpers.it("preserves comparison operators while removing generated HTML tags", function()

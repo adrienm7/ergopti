@@ -19,10 +19,10 @@ local helpers, Engine, DOWN, UP, SHIFT, CTRL, CAPS, KEY_A, trail =
 	Fixture.KEY_A, Fixture.trail
 local Loader = require("platform.remap.tap_hold_loader")
 local Manifest = require("infra.manifest_reader")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local SPACE = 57
-local DEFAULTS_PATH = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS_PATH = require("infra.paths").shared("tap_hold/data/defaults.toml")
 
 -- The keys of the field report, each with the shipped 200 ms threshold.
 local KEYS = {
@@ -71,7 +71,7 @@ local function fresh_writer()
 		reload = function() state.reloads = state.reloads + 1; return true end,
 		is_tap_action = function(id) return id == "copy" end,
 		canonical_hold = function(kind, id)
-			return require("tap_hold.hold_options").canonical(kind, id, Loader.load(DEFAULTS_PATH, nil).hold_picker)
+			return require("tap_hold.engine.hold_options").canonical(kind, id, Loader.load(DEFAULTS_PATH, nil).hold_picker)
 		end,
 	})
 	return writer, path, state, dir .. "/config.toml"
@@ -192,8 +192,8 @@ helpers.describe("tap-hold storage: the window in config.toml (lone-tap-window)"
 		helpers.assert_eq((pcall(writer.render_scope, "recommended", {}, rows, preset)), false,
 			"a manifest row is a config.toml row")
 		local cleared = writer.render_scope("clear",
-			require("toml_codec").decode("[tap_hold]\nlone_modifier_tap_max_ms = 0\n"), {}, preset)
-		local decoded = require("toml_codec").decode(cleared)
+			require("core.text.engine.toml_codec").decode("[tap_hold]\nlone_modifier_tap_max_ms = 0\n"), {}, preset)
+		local decoded = require("core.text.engine.toml_codec").decode(cleared)
 		helpers.assert_nil(decoded.tap_hold and decoded.tap_hold.lone_modifier_tap_max_ms)
 		discard(path)
 	end)
@@ -204,7 +204,7 @@ helpers.describe("tap-hold menu choices: the manifest's one list (lone-tap-windo
 	-- The three menus used to hold their own copy of the list (duplicate-constant
 	-- ratchet); they read the feature's preset_values now.
 	helpers.it("offers the feature's preset_values, Off first, and refuses a feature without them", function()
-		local LoneTap = require("tap_hold.lone_tap")
+		local LoneTap = require("tap_hold.engine.lone_tap")
 		local feature = Manifest.find_entry_by_path(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
 		helpers.assert_type(feature.preset_values, "table", "the generated manifest carries the presets")
 		local choices = LoneTap.choices(feature)

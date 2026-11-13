@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: reload_gate shared policy contract
 --- DESCRIPTION:
---- reload_gate (_shared/lua) is the single source of truth both drivers consult
+--- reload_gate (_shared) is the single source of truth both drivers consult
 --- to decide whether an auto-reload must be held because the working tree is
 --- still being written (macos-reload-during-git-pull). This pins its two policies
 --- directly: the source-agnostic adaptive settle (a lone edit reloads fast, a
@@ -14,8 +14,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["reload_gate"] = nil
-local reload_gate = require("reload_gate")
+package.loaded["core.lifecycle.engine.reload.gate"] = nil
+local reload_gate = require("core.lifecycle.engine.reload.gate")
 
 local function fs_from(existing, contents)
 	return {

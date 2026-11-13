@@ -56,8 +56,8 @@ function sharedRel(...segments) {
 
 // The tray-menu source (the [menu] tables) and the feature manifest, under
 // _shared/. Every reader names these constants instead of the literal paths.
-const MENU_SOURCE_REL = 'modules/menu/menu.toml';
-const FEATURES_MANIFEST_REL = 'modules/features/manifest.toml';
+const MENU_SOURCE_REL = 'menu/data/menu.toml';
+const FEATURES_MANIFEST_REL = 'settings/data/features/manifest.toml';
 
 module.exports = {
 	REPO_ROOT,

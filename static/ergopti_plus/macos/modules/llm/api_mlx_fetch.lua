@@ -23,13 +23,13 @@ local M = {}
 local Logger         = require("infra.logger")
 local ApiCommon      = require("modules.llm.api_common")
 local Profiles       = require("modules.llm.profiles")
-local TokenBudget = require("llm.request_plan.token_budget")
+local TokenBudget = require("ai.engine.request_plan.token_budget")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
 
--- Retry policy comes from _shared/modules/llm/inference.json (see api_common.lua),
+-- Retry policy comes from _shared/ai/data/inference.json (see api_common.lua),
 -- read from the canonical source so the fan-out retry budget is never hardcoded
 -- or duplicated.
 local _RETRY_MAX_MULT, _RETRY_TEMP_STEP, _RETRY_EXTRA_TOKENS = ApiCommon.get_retry_policy()

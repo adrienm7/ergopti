@@ -17,7 +17,7 @@
 --- 2. Argument vectors, never a shell: a Finder path with a quote or a `$` in
 ---    it reaches xattr and chmod verbatim.
 --- 3. The Finder selection is read as the recompilable AppleScript list that
----    `osascript -ss` prints and parsed by _shared/lua/file_selection, which
+---    `osascript -ss` prints and parsed by _shared/core/fs/engine, which
 ---    refuses a report it cannot read exactly instead of acting on part of it.
 --- 4. Confirmation is not asked here: modules/gestures/actions.lua asks for
 ---    every action the catalogue declares `confirm = true` before it runs, and
@@ -36,8 +36,8 @@ local MouseControl = require("adapters.mouse_control")
 local FileSystem = require("adapters.file_system")
 local TccGrant = require("adapters.tcc_grant")
 local WindowInfo = require("adapters.window_info")
-local FileSelection = require("file_selection")
-local AppParameter = require("app_parameter")
+local FileSelection = require("core.fs.engine.file_selection")
+local AppParameter = require("apps.engine.parameter")
 
 local LOG = "gestures.system_actions"
 
@@ -299,7 +299,7 @@ local function with_frontmost(label, on_front, parent, acted_from)
 end
 
 --- Opens an application by name, path or bundle identifier.
---- @param value string A valid app parameter (_shared/lua/app_parameter).
+--- @param value string A valid app parameter (_shared/apps/engine).
 --- @param parent string|nil
 --- @return boolean started
 function M.open_app(value, parent)

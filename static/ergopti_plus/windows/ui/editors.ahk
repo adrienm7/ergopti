@@ -408,7 +408,7 @@ _MagicKeySourceCapturePoll(State, IH) {
 ; List provider of the Layout menu's `magic_key_source` row (ui/menu/menu_init.ahk).
 ; One row naming the key in effect; its submenu captures the next key pressed,
 ; restores the automatic key or lists every candidate with the key in effect
-; ticked — the rows the Lua drivers build (_shared/lua/keymap/magic_key_source.lua).
+; ticked — the rows the Lua drivers build (_shared/layouts/engine/layers/magic_key_source.lua).
 MagicKeySourceMenuRows() {
 	global ScriptInformation
 	Current := ScriptInformation["MagicKeySource"]

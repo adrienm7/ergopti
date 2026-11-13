@@ -14,10 +14,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Contract = require("test.legacy_folder_migration_contract")
+local Contract = require("tests.lua.settings.legacy_folder_migration_contract")
 local Migration = require("adapters.legacy_folder_migration")
-local Core = require("legacy_folder_migration")
-local AppDirs = require("app_dirs")
+local Core = require("settings.engine.migration.legacy_folder_migration_core")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 Contract.run(helpers, helpers.shared(""))
 

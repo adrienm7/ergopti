@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Programmable Hotstrings (macOS)
 --- DESCRIPTION:
---- Binds the shared programmable-hotstring lifecycle (_shared/lua/
---- dynamic_hotstrings/user_code_driver.lua) to this driver: user callbacks are
+--- Binds the shared programmable-hotstring lifecycle (_shared/
+--- hotstrings/engine/dynamic/user_code_driver.lua) to this driver: user callbacks are
 --- deferred outside the event tap through its consumed-input owner. Every
 --- driver output requires the original source, cursor and lifecycle receipt.
 ---
@@ -18,7 +18,7 @@
 --- 3. A report raised inside a running callback is deferred until it returns
 ---    (defer_report), so the notification cannot re-enter the tap.
 --- ==============================================================================
-local Driver = require("dynamic_hotstrings.user_code_driver")
+local Driver = require("hotstrings.engine.dynamic.user_code_driver")
 local FileSystem = require("adapters.file_system")
 local SyntheticInput = require("adapters.synthetic_input")
 local ConfigPaths = require("infra.config_paths")
@@ -86,7 +86,7 @@ end
 
 return Driver.new({
 	logger = Logger,
-	log = "dynamic_hotstrings.user_code",
+	log = "hotstrings.engine.dynamic.user_code_core",
 	platform = "macos",
 	-- Resolved at call time: a collaborator replaced after load is still the one used.
 	read = function(path) return FileSystem.read_with_status(path) end,

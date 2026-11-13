@@ -5,7 +5,7 @@
  * MODULE: Shared TOML Codec Purity Guard
  * DESCRIPTION:
  * Regression guard for audit SS-2. The shared TOML codec
- * (_shared/lua/toml_codec/*) is the single implementation meant to load on EVERY
+ * (_shared/core/text/engine/toml_codec/*) is the single implementation meant to load on EVERY
  * Lua runtime — the macOS Hammerspoon driver, the Linux daemon, LuaJIT test
  * runners, and the Node/Lua build scripts. A hard `require("infra.logger")` /
  * `require("infra.i18n")` (macOS-driver-only packages) in reader.lua / writer.lua
@@ -26,7 +26,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CODEC_DIR = path.join(ROOT, 'static/ergopti_plus/_shared/lua/toml_codec');
+const CODEC_DIR = path.join(ROOT, 'static/ergopti_plus/_shared/core/text/engine/toml_codec');
 const FILES = ['reader.lua', 'writer.lua', 'codec.lua', 'init.lua'];
 
 // A HARD require is the call form `require("infra.foo")` / `require('hs')`.
@@ -70,10 +70,10 @@ for (const f of FILES) {
 // modules degrade to print()/key-passthrough off macOS instead of crashing.
 for (const f of ['reader.lua', 'writer.lua']) {
 	const src = fs.readFileSync(path.join(CODEC_DIR, f), 'utf8');
-	if (src.includes('require("logger.shim")')) {
+	if (src.includes('require("core.logger.engine.shim")')) {
 		pass(`${f}: keeps the logger.shim neutral fallback`);
 	} else {
-		fail(`${f}: must fall back to require("logger.shim") when lib.logger is absent`);
+		fail(`${f}: must fall back to require("core.logger.engine.shim") when lib.logger is absent`);
 	}
 }
 

@@ -29,7 +29,7 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const PAGE = path.join(SHARED, 'ui', 'error_dialog');
-const LOCALES = path.join(SHARED, 'data', 'locales');
+const LOCALES = path.join(SHARED, 'core', 'i18n', 'data', 'locales');
 
 const failures = [];
 const fail = (message) => failures.push(message);

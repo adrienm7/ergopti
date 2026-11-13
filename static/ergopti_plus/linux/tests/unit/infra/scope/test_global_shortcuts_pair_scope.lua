@@ -6,7 +6,7 @@
 -- Requiring it inside a fixture and erasing it on teardown reopens libuv state.
 local NativeLoop = require("luv")
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 local Scope = require("infra.shortcuts_scope")
 local path, backup = "/controlled/config.toml", "/controlled/combination.bak"
 local pair, binding = "caps_lock_then_tab", "combination__caps_lock_then_tab"
@@ -46,7 +46,7 @@ local function with_owner(body, managed, prepare)
 		}
 		if managed then
 			local Loader=require("platform.remap.tap_hold_loader")
-			local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
+			local defaults=require("infra.paths").shared("tap_hold/data/defaults.toml")
 			local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 			package.loaded["platform.remap.tap_hold_manager"]=nil
 			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}

@@ -8,7 +8,7 @@
 --- The page never reaches the network on Linux: this handler fetches the
 --- release list through the shared curl adapter (bounded, proxy variables
 --- honoured by curl), trying the GitHub API first and the public Atom feed
---- second (_shared/lua/updater/release_sources.lua), then pushes the result or
+--- second (_shared/updater/engine/release_sources.lua), then pushes the result or
 --- a translated error key back through window.__hostBridgeResponse.
 ---
 --- The page's subscription banner posts set_channel; the updater manager, the
@@ -17,7 +17,7 @@
 --- pushed to an open page the same way.
 ---
 --- A release's « Install this version » button posts install_release: the
---- shared sequence (_shared/lua/updater/release_install.lua) backs the
+--- shared sequence (_shared/updater/engine/release_install.lua) backs the
 --- configuration up (modules/updater/config_backup.lua), finds the release in
 --- the list this bridge last fetched from the GitHub API, then downloads,
 --- verifies and installs it through the updater manager's update path and
@@ -30,21 +30,21 @@
 local M = {}
 M.bridge_name = "changelog_bridge"
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.changelog"
 
 -- Read canonical version from the single-source module (SSoT).
 local Version = require("infra.version")
 local Installation = require("infra.installation")
 local Shell = require("adapters.shell_runner")
-local Json = require("json")
-local Base64 = require("compat.base64")
-local ReleaseSources = require("updater.release_sources")
-local RepositoryUrl = require("updater.repository_url")
-local Parser = require("updater.release_parser")
-local ReleaseInstall = require("updater.release_install")
-local VersionOrder = require("updater.version")
-local NetworkFailure = require("network.failure")
+local Json = require("core.text.engine.json")
+local Base64 = require("core.lifecycle.engine.compat.base64")
+local ReleaseSources = require("updater.engine.release_sources")
+local RepositoryUrl = require("updater.engine.repository_url")
+local Parser = require("updater.engine.release_parser")
+local ReleaseInstall = require("updater.engine.release_install")
+local VersionOrder = require("updater.engine.version_core")
+local NetworkFailure = require("core.network.engine.failure")
 local Paths = require("infra.paths")
 local FileSystem = require("adapters.file_system")
 
@@ -181,9 +181,9 @@ end
 load_sources = function()
 	if _sources then return _sources, nil end
 	local ok_paths, Paths = pcall(require, "infra.paths")
-	local path = ok_paths and Paths.shared("modules/updater/defaults.json") or nil
+	local path = ok_paths and Paths.shared("updater/data/defaults.json") or nil
 	if not path then return nil, "shared updater defaults path is unavailable" end
-	local raw, status = require("toml_codec.writer").read_classified(path)
+	local raw, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 	if status ~= "ok" then return nil, "shared updater defaults are unreadable" end
 	local ok_json, decoded = pcall(Json.decode, raw)
 	if not ok_json then return nil, "shared updater defaults are not valid JSON" end
@@ -446,7 +446,7 @@ end
 
 local function failure_contract()
 	if _failure_contract then return _failure_contract end
-	local path = Paths.shared("modules/network/managed_network.json")
+	local path = Paths.shared("core/network/data/managed_network.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	assert(type(raw) == "string", "the canonical managed network policy is unreadable")
 	_failure_contract = NetworkFailure.new(Json.decode(raw))

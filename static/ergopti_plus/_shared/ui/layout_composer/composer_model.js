@@ -556,7 +556,7 @@ var LayoutComposer = (function () {
 	 * @param {string} id - Its registry id.
 	 * @param {string} text - The .keylayout content.
 	 * @param {string} convention - Its keycode_convention ("iso" | "ansi").
-	 * @param {object} table - Parsed _shared/modules/layouts/mac_keycodes.json.
+	 * @param {object} table - Parsed _shared/layouts/data/mac_keycodes.json.
 	 * @returns {object} The source.
 	 * @throws {ComposerError} On a malformed layout or an unknown convention.
 	 */
@@ -780,7 +780,7 @@ var LayoutComposer = (function () {
 	// ======================================
 	// ======= 4b/ Number-row options =======
 	// ======================================
-	// The same rule as the Windows policy (_shared/modules/features/number_row_policy.ahk),
+	// The same rule as the Windows policy (_shared/settings/data/features/number_row_policy.ahk),
 	// held to the same corpus (_shared/tests/corpus/layouts/number_row_policy.json).
 
 	/** What one level of a row key holds: "d" its own digit, "s" another character or a dead key, "n" nothing. */

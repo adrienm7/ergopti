@@ -666,10 +666,10 @@ class Receiver:
             isinstance(original.get("assets"), dict) and bool(original["assets"]),
             "receiving_catalogue_assets",
         )
-        policy_path = "static/ergopti_plus/_shared/python/managed_ollama_runtime.py"
+        policy_path = "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py"
         policy = load("ollama_receiving_catalogue_policy", self.root / policy_path)
         inputs.admit(self.root / policy_path)
-        contract = (payload / "_shared/modules/llm/managed_ollama_runtime.json").read_bytes()
+        contract = (payload / "_shared/ai/data/managed_ollama_runtime.json").read_bytes()
         original_bytes = self.options.catalogue.read_bytes()
         require(
             hashlib.sha256(original_bytes).hexdigest() == self.input_hashes["catalogue"],
@@ -731,30 +731,30 @@ class Receiver:
     def payload(self, app):
         payload = app / "Contents/Resources/static/ergopti_plus"
         relatives = [
-            "_shared/data/http/redirect_policy.json",
-            "_shared/modules/network/proxy_policy.json",
-            "_shared/python/network_proxy_policy.py",
-            "_shared/modules/llm/managed_ollama_runtime.json",
-            "_shared/python/managed_ollama_runtime.py",
-            "_shared/python/managed_source_alias.py",
+            "_shared/core/network/data/http/redirect_policy.json",
+            "_shared/core/network/data/proxy_policy.json",
+            "_shared/core/network/adapters/python_network_proxy_policy.py",
+            "_shared/ai/data/managed_ollama_runtime.json",
+            "_shared/ai/adapters/python/managed_ollama_runtime.py",
+            "_shared/ai/adapters/python/managed_source_alias.py",
             "macos/platform/source_alias_owner.py",
             "macos/platform/suspended_image_owner.py",
             "macos/platform/ollama_bootstrap_owner.py",
-            "_shared/python/managed_ollama_bootstrap.py",
-            "_shared/modules/llm/managed_ollama_bootstrap.json",
-            "_shared/python/managed_ollama_pull.py",
-            "_shared/modules/llm/managed_python_release.json",
+            "_shared/ai/adapters/python/managed_ollama_bootstrap.py",
+            "_shared/ai/data/managed_ollama_bootstrap.json",
+            "_shared/ai/adapters/python/managed_ollama_pull.py",
+            "_shared/ai/data/managed_python_release.json",
             "macos/platform/network/native_http.py",
             "macos/platform/network/native_ollama_api.py",
             "macos/modules/llm/managed_bootstrap_http.py",
             "macos/modules/llm/managed_ollama_runtime.py",
             "macos/modules/llm/managed-python-release.sh",
             "macos/modules/llm/managed-python-downloads.json",
-            "_shared/data/identifiers.sh",
+            "_shared/core/text/data/identifiers.sh",
         ]
         for relative in relatives:
             self.copy_source("static/ergopti_plus/" + relative, payload / relative)
-        catalogue = payload / "_shared/modules/llm/managed_ollama_release.json"
+        catalogue = payload / "_shared/ai/data/managed_ollama_release.json"
         self.receiving_catalogue(catalogue, payload)
         return payload
 
@@ -923,7 +923,7 @@ class Receiver:
         self.prepare_phase = "environment"
         policy = load(
             "ollama_fixture_proxy_policy",
-            self.http_payload / "_shared/python/network_proxy_policy.py",
+            self.http_payload / "_shared/core/network/adapters/python_network_proxy_policy.py",
         )
         environment = dict(os.environ)
         for name in policy.ProxyPolicy().system_lookup_environment_exclusions + (
@@ -1003,7 +1003,8 @@ class Receiver:
             self.api_payload / "macos/platform/network/native_ollama_api.py",
         )
         self.pull = load(
-            "ollama_fixture_pull_owner", self.api_payload / "_shared/python/managed_ollama_pull.py"
+            "ollama_fixture_pull_owner",
+            self.api_payload / "_shared/ai/adapters/python/managed_ollama_pull.py",
         )
         self.alias_native = load(
             "ollama_alias_acquisition", self.http_payload / "macos/platform/source_alias_owner.py"
@@ -1017,7 +1018,7 @@ class Receiver:
             self.http_payload / "macos/platform/ollama_bootstrap_owner.py",
         )
         self.bootstrap_policy = self.bootstrap_native.BootstrapPolicy(
-            self.http_payload / "_shared/modules/llm/managed_ollama_bootstrap.json",
+            self.http_payload / "_shared/ai/data/managed_ollama_bootstrap.json",
             policy.ProxyPolicy(),
         )
         qualification_source = "tools/diagnostics/macos_qualified_outgoing_worker.py"
@@ -1145,7 +1146,9 @@ class Receiver:
             "session_path": str(self.session_path),
             "remaining_ms": min(30000, int((deadline - time.monotonic()) * 1000)),
             "home": str(self.home.resolve(strict=True)),
-            "network_policy": str(self.http_payload / "_shared/modules/network/proxy_policy.json"),
+            "network_policy": str(
+                self.http_payload / "_shared/core/network/data/proxy_policy.json"
+            ),
             "host": "127.0.0.1:" + str(self.port),
             **self.bootstrap_owner.fields(),
             **self.outgoing_context.fields(progress=progress),

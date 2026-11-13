@@ -31,9 +31,9 @@ function emittedPacket() {
 	const shared = SHARED.replace(/\\/g, '/');
 	const lua = process.env.LUA || 'lua';
 	const program = [
-		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/lua/?.lua;${shared}/lua/?/init.lua;${macos}/tests/stubs/?.lua;`)} .. package.path`,
+		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;${macos}/tests/stubs/?.lua;`)} .. package.path`,
 		'local packet = require("tests.support.mlx_truststore_fixture").capture()',
-		'io.write(require("json").encode(packet))'
+		'io.write(require("core.text.engine.json").encode(packet))'
 	].join('; ');
 	const result = spawnSync(lua, ['-e', program], {
 		cwd: MACOS,

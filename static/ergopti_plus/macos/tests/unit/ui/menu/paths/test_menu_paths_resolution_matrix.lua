@@ -25,7 +25,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 --- Every named path the driver asks for. Kept as data so a new key added to
 --- M.get() without a row here is visible as a count mismatch below.

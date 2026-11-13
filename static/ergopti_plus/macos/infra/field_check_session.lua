@@ -18,9 +18,9 @@
 --- 3. Everything a step creates is removed by the step.
 --- ==============================================================================
 
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 local Logger = require("infra.logger")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 local M = {}
 

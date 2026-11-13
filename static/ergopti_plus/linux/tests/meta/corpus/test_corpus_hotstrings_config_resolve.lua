@@ -29,7 +29,7 @@
 
 local helpers = require("tests.helpers")
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local CORPUS_RELATIVE = "tests/corpus/hotstrings/config_resolve_vectors.json"
 

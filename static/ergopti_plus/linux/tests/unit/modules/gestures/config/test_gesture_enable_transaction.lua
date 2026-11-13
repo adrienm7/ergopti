@@ -9,14 +9,14 @@
 
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
-local TomlCodec = require("toml_codec")
+local TomlCodec = require("core.text.engine.toml_codec")
 
 local MODULES = {
 	"modules.gestures.manager",
 	"modules.gestures.touchpad_finder",
 	"modules.gestures.mt_decoder",
 	"adapters.evdev_reader",
-	"logger.shim",
+	"core.logger.engine.shim",
 }
 
 --- Runs one manager instance over deterministic device, decoder, and log fakes.
@@ -44,7 +44,7 @@ local function with_manager(open_fails, init_opts, body, no_touchpad)
 		return real_open(path, slot)
 	end
 
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["adapters.evdev_reader"] = reader
 	package.loaded["modules.gestures.touchpad_finder"] = {
 		read_resolution = function() return nil end,
@@ -91,7 +91,7 @@ helpers.describe("gestures: enabling after disabled boot", function()
 		local code = string.format([[package.path = %q
 local paths = require("infra.paths")
 local original = paths.shared
-paths.shared = function(name) if name == "modules/actions/modifier_chords.json" then return %q end; return original(name) end
+paths.shared = function(name) if name == "shortcuts/data/actions/modifier_chords.json" then return %q end; return original(name) end
 local manager = require("modules.gestures.manager")
 assert(type(manager.get_action_names()) == "table")
 ]], package.path, path)

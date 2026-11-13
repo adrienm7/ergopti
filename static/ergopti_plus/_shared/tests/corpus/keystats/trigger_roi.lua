@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 return function(helpers)
-	local Roi = require("keystats.trigger_roi")
+	local Roi = require("metrics.engine.privacy.trigger_roi")
 	local function context(window, app, title)
 		return { app = app or "Editor", window = window or 1, title = title or "Document", timestamp = "2026-11-07 10:00:00.000" }
 	end
@@ -38,7 +38,7 @@ return function(helpers)
 		-- A registry rebuild indexes every trigger (4 300 at boot); decoding each
 		-- character through the pure-Lua compat.utf8 cost 55 ms per rebuild.
 		helpers.it("indexes ASCII triggers without the pure-Lua UTF-8 decoder", function()
-			local Utf8 = require("compat.utf8")
+			local Utf8 = require("core.lifecycle.engine.compat.utf8")
 			local calls = { len = 0, codes = 0, char = 0 }
 			local saved = {}
 			for name in pairs(calls) do
@@ -61,7 +61,7 @@ return function(helpers)
 			local path = require("infra.paths").shared("tests/corpus/keystats/roi_lowercase_vectors.json")
 			local handle = assert(io.open(path, "rb"))
 			local bytes = assert(handle:read("*a")); assert(handle:close())
-			local corpus = assert(require("json").decode(bytes))
+			local corpus = assert(require("core.text.engine.json").decode(bytes))
 			local function check(vector)
 				local input, expected = vector[1], vector[2]
 				local index = Roi.trigger_index({ { trigger = input } })

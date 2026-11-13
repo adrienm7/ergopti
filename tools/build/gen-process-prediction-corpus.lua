@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Generates the cross-driver golden corpus for the LLM semantic-diff parser
 --- (process_prediction) by running the SHARED Lua implementation
---- (_shared/lua/llm/parser.lua) — the canonical source after the parser lift — as
+--- (_shared/ai/engine/api/parser_core.lua) — the canonical source after the parser lift — as
 --- the oracle over a curated set of input vectors. The emitted corpus
 --- (_shared/tests/corpus/llm/process_prediction_vectors.json) is consumed by both
 --- the macOS Lua suite and the AHK suite, which assert their parser produces the
@@ -35,11 +35,11 @@ end
 
 local ROOT = repo_root()
 
--- Resolve the repo's _shared/lua so the shared modules resolve regardless of cwd.
-local SHARED_LUA = ROOT .. "/static/ergopti_plus/_shared/lua"
+-- Resolve the repo's _shared so the shared modules resolve regardless of cwd.
+local SHARED_LUA = ROOT .. "/static/ergopti_plus/_shared"
 package.path = SHARED_LUA .. "/?.lua;" .. SHARED_LUA .. "/?/init.lua;" .. package.path
 
-local parser = require("llm.parser")
+local parser = require("ai.engine.api.parser_core")
 
 local E_ACUTE = string.char(0xC3, 0xA9)
 local HAN = string.char(0xE6, 0xBC, 0xA2)

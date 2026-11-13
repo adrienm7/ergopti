@@ -47,7 +47,7 @@ local function with_empty_server_owner(scenario)
 	local native, owner, receipt, acquired, scratch, fresh_bridge
 	local ok, err = pcall(function()
 		local driver = helpers.driver_root():gsub("/+$", "")
-		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared/lua"
+		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared"
 		require("tests.support.module_isolation").purge(driver, shared)
 		helpers.load_with_stubs("infra.logger")
 		scratch = assert(os.tmpname())

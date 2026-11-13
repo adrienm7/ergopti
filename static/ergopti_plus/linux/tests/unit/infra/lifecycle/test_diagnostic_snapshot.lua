@@ -18,9 +18,9 @@ local it          = helpers.it
 local assert_eq   = helpers.assert_eq
 local assert_true = helpers.assert_true
 
-local json     = require("json")
+local json     = require("core.text.engine.json")
 local Paths    = require("infra.paths")
-local Snapshot = require("diagnostics.snapshot")
+local Snapshot = require("diagnostics.engine.snapshot")
 
 
 
@@ -34,7 +34,7 @@ local Snapshot = require("diagnostics.snapshot")
 --- Reads the shared snapshot contract.
 --- @return table
 local function read_contract()
-	local path = Paths.shared("modules/logger/diagnostic_snapshot.json")
+	local path = Paths.shared("core/logger/data/diagnostic_snapshot.json")
 	assert_true(path ~= nil, "the shared tree must be reachable")
 	local fh = assert(io.open(path, "r"))
 	local raw = fh:read("*a")
@@ -237,7 +237,7 @@ VERSION_ID='42'
 		assert_eq("3/5", values.features_enabled)
 		assert_eq("812", values.boot_ms)
 		-- The logs folder always ends in the application folder (default or override).
-		assert_true(type(values.logs_dir) == "string" and values.logs_dir:find(require("app_dirs").linux.folder_name, 1, true) ~= nil,
+		assert_true(type(values.logs_dir) == "string" and values.logs_dir:find(require("core.fs.engine.app_dirs").linux.folder_name, 1, true) ~= nil,
 			"logs_dir must name the resolved logs folder: " .. tostring(values.logs_dir))
 		assert_eq("4242", Collector.pid(env))
 	end)
@@ -245,7 +245,7 @@ VERSION_ID='42'
 	it("emits one INFO line carrying every shared field", function()
 		local contract = read_contract()
 		local lines = {}
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local previous_level = Logger.get_level()
 		Logger.set_level(10)
 		Logger.ring_buffer_clear()
@@ -309,7 +309,7 @@ end)
 --- Captures only snapshot log output while preserving the real collector.
 --- @param body function Receives the collector and emitted formatted lines.
 local function with_prepared_snapshot(body)
-	local Collector, Logger = require("infra.diagnostic_snapshot"), require("logger.shim")
+	local Collector, Logger = require("infra.diagnostic_snapshot"), require("core.logger.engine.shim")
 	local original, lines = Logger.info, {}
 	Logger.info = function(tag, _, message)
 		if tag == Snapshot.MODULE then lines[#lines + 1] = message end

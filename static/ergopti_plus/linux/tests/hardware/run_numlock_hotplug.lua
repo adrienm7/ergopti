@@ -12,14 +12,14 @@
 ---     luajit tests/hardware/run_numlock_hotplug.lua remove
 --- ==============================================================================
 
-require('compat.utf8').install()
+require('core.lifecycle.engine.compat.utf8').install()
 local Hook=require('adapters.keyboard_hook')
 local Names=require('infra.device_names')
 local Reader=require('adapters.evdev_reader')
 local Finder=require('modules.hotstrings.device_finder')
 local Layout=require('adapters.keyboard_layout')
 local Clock=require('infra.monotonic')
-local Json=require('json')
+local Json=require('core.text.engine.json')
 local mode=assert(arg[1]);assert(mode=='add' or mode=='remove')
 local names,paths,keyboards,caps,chars,rows={},{},{},{},{},{}
 local ownerA

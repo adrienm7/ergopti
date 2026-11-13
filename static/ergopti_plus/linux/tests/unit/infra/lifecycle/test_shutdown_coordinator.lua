@@ -435,7 +435,7 @@ helpers.describe("shutdown coordinator: startup preparation token", function()
 	end)
 	helpers.it("(startup-late-grab) preserves the first parked diagnostic and emergency reason", function()
 		local reason, emergency
-		local factory = helpers.load_module_with_dependency("infra.shutdown_coordinator", "logger.shim", {
+		local factory = helpers.load_module_with_dependency("infra.shutdown_coordinator", "core.logger.engine.shim", {
 			start = function(_, _, value) reason = value end, done = function() end,
 		})
 		local coordinator = factory.new({ pre_wait = {}, keyboard_hook = {
@@ -752,7 +752,7 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 	end)
 
 	helpers.it("throwing diagnostics cannot erase an acquired native cleanup barrier", function()
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local previous = logger.error
 		local closed = false
 		local coordinator, state = fixture({ name = "runtime", wait_for_ack = true,
@@ -1615,12 +1615,12 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		modules["infra.script_scope"] = { adopt_configured = function() return {} end }
 		-- Main writes a pre-sink fatal record only when startup is refused.
 		modules["infra.bootstrap_log"] = { append = function(reason) error("isolated Main must not refuse startup: " .. tostring(reason)) end }
-		modules["compat.utf8"] = { install = function() return false end }
+		modules["core.lifecycle.engine.compat.utf8"] = { install = function() return false end }
 		-- Main reserves WebKit's collector signal before anything else it loads.
 		modules["infra.signal_handlers"] = { reserve_webkit_gc_signal = function() return true end }
 		-- Main moves the legacy folders first; the isolated Main moves none.
 		modules["infra.legacy_folder_migration"] = require("tests.support.legacy_folder_migration_stub")
-		modules["logger.shim"] = { info = noop, error = noop, warn = noop, debug = noop, success = noop }
+		modules["core.logger.engine.shim"] = { info = noop, error = noop, warn = noop, debug = noop, success = noop }
 		modules["infra.logger_sink"] = { install = function() return true end }
 		modules["modules.keystats.keystats"] = { stop = function() return true end }
 		modules["modules.llm.agent_learning"] = { flush = noop }

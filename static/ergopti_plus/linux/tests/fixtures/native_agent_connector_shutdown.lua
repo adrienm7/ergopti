@@ -11,9 +11,9 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_agent_connector_shutdown%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
-local uv, Json = require("luv"), require("json")
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
+local uv, Json = require("luv"), require("core.text.engine.json")
 local scratch = assert(uv.fs_mkdtemp("/tmp/ergopti-agent-lifetime-XXXXXX"))
 for name, value in pairs({ XDG_CONFIG_HOME = scratch .. "/.config", XDG_DATA_HOME = scratch .. "/.local/share",
 	XDG_STATE_HOME = scratch .. "/.local/state", ERGOPTI_AGENT_SHUTDOWN_PROBE_DIR = scratch }) do

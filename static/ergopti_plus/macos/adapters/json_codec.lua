@@ -32,7 +32,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "adapters.json_codec"
 

@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Refuses an ErgoptiPlus.app built with ERGOPTI_DEV_SOURCE=1. Its launcher runs
  * the Lua of one repository clone (Info.plist key dev_source.plist_key of
- * _shared/data/identifiers.json), so it must never be archived, receipted,
+ * _shared/core/text/data/identifiers.json), so it must never be archived, receipted,
  * installed by CI or published.
  *
  * USAGE: node tools/build/macos-dev-source-guard.cjs <ErgoptiPlus.app>
@@ -22,8 +22,8 @@ const { shared } = require('../lib/paths.cjs');
 
 /** The launcher Info.plist key a developer source build carries. */
 function developerSourceKey() {
-	const key = JSON.parse(fs.readFileSync(shared('data/identifiers.json'), 'utf8')).dev_source
-		?.plist_key;
+	const key = JSON.parse(fs.readFileSync(shared('core/text/data/identifiers.json'), 'utf8'))
+		.dev_source?.plist_key;
 	if (typeof key !== 'string' || !/^[A-Za-z][A-Za-z0-9]*$/.test(key))
 		throw new Error('identifiers.json declares no valid dev_source.plist_key.');
 	return key;

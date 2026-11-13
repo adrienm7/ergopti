@@ -25,8 +25,8 @@ local text_utils = require("infra.text_utils")
 -- the buffer traversal is not — macOS slices a byte string, the core an array of
 -- codepoints, and neither has to convert for the other.
 local HotstringCore = require("infra.hotstring_engine")
-local Cascade = require("hotstring_engine.cascade")
-local InjectionPlan = require("hotstring_engine.injection_plan")
+local Cascade = require("hotstrings.engine.matcher.cascade")
+local InjectionPlan = require("hotstrings.engine.matcher.injection_plan")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
 local HotPath    = require("infra.hotpath_profiler")
@@ -39,7 +39,7 @@ local TooltipRenderer  = require("adapters.tooltip_renderer")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
 local Terminators      = require("modules.keymap.terminators")
 local CapsWordOutput   = require("infra.capsword_output")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.

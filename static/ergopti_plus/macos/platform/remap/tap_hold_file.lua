@@ -3,10 +3,10 @@
 --- ==============================================================================
 --- MODULE: Shared Tap-Hold File (macOS)
 --- DESCRIPTION:
---- Binds the shared tap_hold.toml (_shared/tap_hold/SCHEMA.md) to the Karabiner
+--- Binds the shared tap_hold.toml (_shared/tap_hold/data/SCHEMA.md) to the Karabiner
 --- model platform/remap/config.lua merges: a read decodes the file, migrates
---- it in memory (_shared/tap_hold/migrations.toml) and translates it with
---- _shared/lua/tap_hold/shared_file.lua; a save writes back only the leaves the
+--- it in memory (_shared/tap_hold/data/migrations.toml) and translates it with
+--- _shared/tap_hold/engine/shared_file.lua; a save writes back only the leaves the
 --- model changed, stamped with the current version. The switch, the timings and
 --- the key combinations are config.toml rows (read_config, config_rows). It also
 --- carries an old config_karabiner.toml over once (import_legacy), before the
@@ -28,17 +28,17 @@ local Logger = require("infra.logger")
 local Paths = require("infra.paths")
 local TomlCodec = require("infra.toml.codec")
 local JsonCodec = require("adapters.json_codec")
-local SharedFile = require("tap_hold.shared_file")
-local Migrate = require("tap_hold.migrate")
-local KeyCatalog = require("tap_hold.key_catalog")
-local Outdated = require("config_outdated")
+local SharedFile = require("tap_hold.engine.shared_file")
+local Migrate = require("tap_hold.engine.migrate")
+local KeyCatalog = require("tap_hold.engine.key_catalog")
+local Outdated = require("settings.engine.migration.outdated")
 
 local LOG = "karabiner"
 
 -- The macOS column of the key catalogue, and of the legacy imports.
 local PLATFORM = "hs"
 
-local _DATA_DIR = (require("native_path").directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./") .. "data/"
+local _DATA_DIR = (require("core.fs.engine.native_path").directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./") .. "data/"
 
 local _context, _registry, _retired = nil, nil, nil
 
@@ -85,7 +85,7 @@ end
 --- @return table See shared_file.hs_context.
 function M.context()
 	if _context == nil then
-		local defaults = shipped_toml(Paths.shared("tap_hold/defaults.toml"))
+		local defaults = shipped_toml(Paths.shared("tap_hold/data/defaults.toml"))
 		local picker = defaults.tap_hold and defaults.tap_hold.hold_picker or {}
 		local aliases = {}
 		for _, field in ipairs({ "modifier_aliases", "left_modifier_aliases" }) do
@@ -94,7 +94,7 @@ function M.context()
 		_retired = KeyCatalog.retired_delays(defaults)
 		local catalogue_ids = {}
 		for _, entry in ipairs(defaults.tap_hold.catalog.keys) do catalogue_ids[#catalogue_ids + 1] = entry.id end
-		_context = SharedFile.hs_context(SharedFile.parse_spec(shipped_toml(Paths.shared("tap_hold/shared_file.toml"))), {
+		_context = SharedFile.hs_context(SharedFile.parse_spec(shipped_toml(Paths.shared("tap_hold/data/shared_file.toml"))), {
 			catalogue = KeyCatalog.for_platform(defaults, PLATFORM),
 			catalogue_ids = catalogue_ids,
 			tap_hold_keys = shipped_json(_DATA_DIR .. "tap_hold_keys.json"),
@@ -117,7 +117,7 @@ end
 --- The validated migration registry, read once.
 --- @return table See migrate.parse_registry.
 function M.registry()
-	if _registry == nil then _registry = Migrate.load_registry(Paths.shared("tap_hold/migrations.toml")) end
+	if _registry == nil then _registry = Migrate.load_registry(Paths.shared("tap_hold/data/migrations.toml")) end
 	return _registry
 end
 
@@ -207,7 +207,7 @@ end
 --- @param tap_hold_path string The tap_hold.toml path.
 --- @return string
 function M.config_toml_path_for(tap_hold_path)
-	return (require("native_path").directory_prefix(tap_hold_path) or "") .. "config.toml"
+	return (require("core.fs.engine.native_path").directory_prefix(tap_hold_path) or "") .. "config.toml"
 end
 
 --- The config-owned part of the Karabiner model from a decoded config.toml
@@ -314,7 +314,7 @@ local function edited_source(source, document, shapes)
 	local ops = edit_operations(old, document, table_test(old_shapes), table_test(shapes))
 	if ops == nil then return nil end
 	if #ops == 0 then return source end
-	local plan = require("config_migrate").plan_operations(source, ops)
+	local plan = require("settings.engine.migration.migrate").plan_operations(source, ops)
 	if plan.outcome ~= "migrated" and plan.outcome ~= "current" then return nil end
 	local reread_ok, reread = pcall(TomlCodec.decode, plan.candidate)
 	if not reread_ok or not same_value(reread, document) then return nil end
@@ -388,7 +388,7 @@ end
 function M.import_legacy(target, file_system)
 	local spec = M.registry().legacy_imports[PLATFORM]
 	assert(spec and spec.translate == "karabiner", "the macOS legacy import is not declared")
-	local legacy = (require("native_path").directory_prefix(target) or "") .. spec.source
+	local legacy = (require("core.fs.engine.native_path").directory_prefix(target) or "") .. spec.source
 	local raw, status = file_system.read_with_status(legacy)
 	if status == "absent" then return true, "none" end
 	if status ~= "ok" then

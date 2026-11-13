@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Locale (macOS)
 --- DESCRIPTION:
---- Thin wrapper around _shared/lua/locale/core.lua. Injects macOS-specific
+--- Thin wrapper around _shared/core/i18n/engine/core.lua. Injects macOS-specific
 --- dependencies (JsonCodec.decode, Paths.shared, Logger) and re-exports the
 --- shared surface. All locale logic lives in the shared module — this file
 --- only wires the platform layer.
@@ -23,14 +23,14 @@ local Paths   = require("infra.paths")
 
 -- Always start from a clean locale.core — tests may have left mock state
 -- in the module cache (Core.init is idempotent and won't overwrite it).
-package.loaded["locale.core"] = nil
-local Core    = require("locale.core")
+package.loaded["core.i18n.engine.core"] = nil
+local Core    = require("core.i18n.engine.core")
 
 -- Wire the shared module at require-time so callers never call init().
 Core.init({
 	json_decode = JsonCodec.decode,
 	resolve_locale_path = function(code)
-		local path = Paths.shared("data/locales/" .. code .. ".json")
+		local path = Paths.shared("core/i18n/data/locales/" .. code .. ".json")
 		if path and path ~= "" then
 			-- Verify the file exists — fail-fast if not found
 			local f = io.open(path, "r")

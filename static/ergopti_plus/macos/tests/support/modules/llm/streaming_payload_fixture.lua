@@ -14,13 +14,13 @@ local OWNED = {
 	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
 	"adapters.shell_runner", "adapters.timer_scheduler", "adapters.http_client", "adapters.file_system",
 	"infra.logger", "infra.notifications", "infra.timings", "infra.text_utils",
-	"llm.prompt_builder", "llm.rewrite", "modules.keystats",
-	"adapters.json_codec", "adapters.storage", "compat.utf8", "infra.toml.reader", "json",
-	"llm.parser", "logger", "logger.shim", "text_utils", "toml_codec.basic_string",
-	"toml_codec.bom", "toml_codec.key_path", "toml_codec.reader", "toml_codec.record_scanner",
-	"adapters.managed_ollama_daemon", "adapters.owned_program_runner", "app_dirs", "config_defaults",
-	"core.llm.managed_ollama_daemon_receipt", "core.llm.ollama_runtime_choice", "hotstrings.personal_files",
-	"infra.manifest_reader", "llm.local_model_policy", "llm.profile_selector", "modules.llm.network_env",
+	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
+	"adapters.json_codec", "adapters.storage", "core.lifecycle.engine.compat.utf8", "infra.toml.reader", "core.text.engine.json",
+	"ai.engine.api.parser_core", "core.logger.engine", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
+	"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
+	"adapters.managed_ollama_daemon", "adapters.owned_program_runner", "core.fs.engine.app_dirs", "settings.engine.publication.defaults",
+	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.ollama_runtime_choice", "hotstrings.engine.catalogue.personal_files",
+	"infra.manifest_reader", "ai.engine.ollama.local_model_policy", "ai.engine.settings.profile_selector", "modules.llm.network_env",
 	"modules.llm.ollama_binary", "modules.llm.ollama_server_command", "modules.llm.opaque_network_admission",
 	"modules.llm.profiles", "modules.llm.progressive_reveal", "platform.remap.lease_helper",
 }
@@ -181,12 +181,12 @@ local function assert_private_payload(backend)
 	with_stream(backend, function(h)
 		local function inspect(path)
 			local CommandLines = require("tests.support.command_lines")
-			local quote = require("text_utils").shell_quote
+			local quote = require("core.text.engine.utils_core").shell_quote
 			local program = "import json,os,stat,sys; s=os.lstat(sys.argv[1]); "
 				.. "print(json.dumps({'permissions':stat.S_IMODE(s.st_mode),'regular':stat.S_ISREG(s.st_mode),"
 				.. "'device':str(s.st_dev),'inode':str(s.st_ino)}))"
 			local lines = CommandLines.read("python3 -c " .. quote(program) .. " " .. quote(path) .. " 2>&1")
-			return assert(require("json").decode(table.concat(lines, "\n")))
+			return assert(require("core.text.engine.json").decode(table.concat(lines, "\n")))
 		end
 		h.on_allocation = function(path) allocated = inspect(path) end
 		h.on_payload = function(path) observed = inspect(path) end

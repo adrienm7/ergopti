@@ -8,10 +8,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { render } = require('../codegen/codegen-managed-bootstrap.cjs');
 const root = path.resolve(__dirname, '../..');
-const shared = path.join(root, 'static/ergopti_plus/_shared/modules');
-const bootstrap = fs.readFileSync(path.join(shared, 'llm/managed_ollama_bootstrap.json'));
-const proxy = fs.readFileSync(path.join(shared, 'network/proxy_policy.json'));
-const serveEnvironment = fs.readFileSync(path.join(shared, 'llm/managed_ollama_environment.json'));
+const shared = path.join(root, 'static/ergopti_plus/_shared');
+const bootstrap = fs.readFileSync(path.join(shared, 'ai/data/managed_ollama_bootstrap.json'));
+const proxy = fs.readFileSync(path.join(shared, 'core/network/data/proxy_policy.json'));
+const serveEnvironment = fs.readFileSync(
+	path.join(shared, 'ai/data/managed_ollama_environment.json')
+);
 const generated = fs.readFileSync(
 	path.join(
 		root,
@@ -298,7 +300,7 @@ for (const [area, field, value] of [
 }
 
 // Go default setup discovers a real module and every compile-time embed input.
-const goRoot = path.join(root, 'static/ergopti_plus/_shared/go/native_http');
+const goRoot = path.join(root, 'static/ergopti_plus/_shared/core/network/native/go/native_http');
 const goSource = ['network_bootstrap.go', 'serve_environment.go']
 	.map((name) => fs.readFileSync(path.join(goRoot, name), 'utf8'))
 	.join('\n');
@@ -357,7 +359,7 @@ assert.throws(() =>
 	)
 );
 const nativeContract = JSON.parse(
-	fs.readFileSync(path.join(shared, 'llm/managed_ollama_runtime.json'))
+	fs.readFileSync(path.join(shared, 'ai/data/managed_ollama_runtime.json'))
 );
 const shipping = /^go(\d+)\.(\d+)\.\d+$/.exec(nativeContract.go_version);
 assert.ok(shipping && (Number(shipping[1]) > 1 || Number(shipping[2]) >= 22));

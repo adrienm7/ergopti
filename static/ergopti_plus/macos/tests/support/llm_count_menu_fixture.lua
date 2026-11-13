@@ -15,10 +15,10 @@ return function(callback, options)
 	local ok, err = xpcall(function()
 		for name in pairs(package.loaded) do
 			if name:match("^ui%.menu%.menu_llm") or name:match("^modules%.llm")
-				or name == "menu.renderer" then package.loaded[name] = nil end
+				or name == "menu.engine.renderer" then package.loaded[name] = nil end
 		end
 		helpers.load_with_stubs("infra.toml.codec")
-		local file = assert(io.open(helpers.shared("modules/llm/defaults.json"), "r"))
+		local file = assert(io.open(helpers.shared("ai/data/defaults.json"), "r"))
 		local raw = file:read("*a"); file:close()
 		local defaults, state = hs.json.decode(raw), hs.json.decode(raw)
 		state.llm_enabled, state.llm_backend, state.llm_model = true, options.backend or "ollama", ""
@@ -36,7 +36,7 @@ return function(callback, options)
 		local outcome = true
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = noop }
-		local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
+		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
 		local real_strings = hs.json.decode(locale_file:read("*a")); locale_file:close()
 		local function real_caption(key)
 			return options.real_model_selector or key:match("^menu%.profiles%.") or key:match("^llm%.profile%.")

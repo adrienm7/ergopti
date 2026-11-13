@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Update Check Window Session (shared Lua, macOS suite)
 --- DESCRIPTION:
---- The session behind the shared update-check window (_shared/lua/updater/
+--- The session behind the shared update-check window (_shared/updater/engine/
 --- check_session.lua), run over recording ports: it shows "checking" for the
 --- subscribed channel, then the answer; Update installs only the release the
 --- answer offered; a switch goes only to a channel the answer listed and checks
@@ -14,8 +14,8 @@
 local helpers = require("tests.helpers")
 
 local function load_session()
-	package.loaded["updater.check_session"] = nil
-	return require("updater.check_session")
+	package.loaded["updater.engine.check_session"] = nil
+	return require("updater.engine.check_session")
 end
 
 --- Builds a session over recording ports. ctx: session, pushed, checks,
@@ -71,7 +71,7 @@ local AVAILABLE = {
 	others = { { channel = "main", tag = "v1.0.0" } },
 }
 
-helpers.describe("updater.check_session: the update-check window's session", function()
+helpers.describe("updater.engine.check_session: the update-check window's session", function()
 	helpers.it("shows checking for the subscribed channel, then the answer", function()
 		local ctx = build()
 		helpers.assert_true(ctx.session.start())

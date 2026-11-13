@@ -4,7 +4,7 @@
 --- MODULE: The Shared Tap-Hold File On Linux
 --- DESCRIPTION:
 --- Every driver keeps its tap-hold keys in one tap_hold.toml
---- (_shared/tap_hold/SCHEMA.md) and the manifest rows (the switch, the timings,
+--- (_shared/tap_hold/data/SCHEMA.md) and the manifest rows (the switch, the timings,
 --- the key combinations) in config.toml. The cross-driver corpus
 --- (_shared/tests/corpus/tap_hold_shared_file) holds, per driver, the pair its
 --- writers produce: <name>.toml pinned here byte for byte for Linux, and
@@ -16,9 +16,9 @@
 local helpers = require("tests.helpers")
 local Loader = require("platform.remap.tap_hold_loader")
 local Paths = require("infra.paths")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
-local DEFAULTS = Paths.shared("tap_hold/defaults.toml")
+local DEFAULTS = Paths.shared("tap_hold/data/defaults.toml")
 local CORPUS = Paths.shared("tests/corpus/tap_hold_shared_file") .. "/"
 -- Every pair of the corpus the Linux readers read; windows_written once the
 -- Windows writer pins its own.
@@ -28,7 +28,7 @@ for _, name in ipairs({ "windows_written" }) do
 	if probe then probe:close(); PAIRS[#PAIRS + 1] = name end
 end
 
-require("test.tap_hold_shared_file_contract").register(helpers, { driver = "linux", shared_root = Paths.shared_root() })
+require("tests.lua.keyboard.tap_hold_shared_file_contract").register(helpers, { driver = "linux", shared_root = Paths.shared_root() })
 
 --- Reads a whole file, nil when it is absent.
 local function read(path)
@@ -56,7 +56,7 @@ local function with_writer(body)
 		reload = function() return true end,
 		is_tap_action = function(id) return id == "copy" or id == "backspace" end,
 		canonical_hold = function(kind, id)
-			return require("tap_hold.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
+			return require("tap_hold.engine.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
 		end,
 	})
 	local ok, err = pcall(body, writer, dir .. "/tap_hold.toml", dir .. "/config.toml")
@@ -151,14 +151,14 @@ helpers.describe("The shared tap_hold.toml on Linux (tap-hold-shared-file)", fun
 	end
 
 	helpers.it("a [tap_hold] leaf config.toml owns is warned once and never read (tap-hold-shared-file)", function()
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_warn, warnings = Logger.warn, {}
 		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 		local path = os.tmpname()
 		local ok, err = pcall(function()
 			write(path, '[_meta]\nschema_version = 1\n[tap_hold]\nenabled = true\nlone_modifier_tap_max_ms = 0\n')
 			local loaded = Loader.load(DEFAULTS, path)
-			helpers.assert_eq(loaded.enabled, require("infra.manifest_reader").default_for(require("config_keys").KEY.TAP_HOLDS_ENABLED),
+			helpers.assert_eq(loaded.enabled, require("infra.manifest_reader").default_for(require("settings.engine.keys").KEY.TAP_HOLDS_ENABLED),
 				"the switch comes from config.toml only")
 			helpers.assert_eq(loaded.lone_tap_max_ms, Loader.LONE_TAP_DEFAULT_MS, "the window comes from config.toml only")
 			helpers.assert_eq(#warnings, 2, table.concat(warnings, "\n"))
@@ -170,7 +170,7 @@ helpers.describe("The shared tap_hold.toml on Linux (tap-hold-shared-file)", fun
 	end)
 
 	helpers.it("another driver's key is left alone, a macOS hold is named once (tap-hold-shared-file)", function()
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_warn, warnings = Logger.warn, {}
 		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 		local path = os.tmpname()

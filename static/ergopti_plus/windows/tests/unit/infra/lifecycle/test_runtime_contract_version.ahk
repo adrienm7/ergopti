@@ -4,7 +4,7 @@
 ; MODULE: AutoHotkey runtime contract version test
 ; DESCRIPTION:
 ; The release exe is compiled on the interpreter named by
-; _shared/modules/updater/windows_release_toolchain.json. The AHK suites ran on a
+; _shared/updater/data/windows_release_toolchain.json. The AHK suites ran on a
 ; 2.0.19 the CI job downloaded on its own while the driver's hook behaviours
 ; (prefix keys firing on press or release, modifier key-up suppression, the
 ; SendLevel key-up correlation) were measured on 2.0.26, and those rules changed
@@ -20,7 +20,7 @@
 
 ; The runtime version the release contract pins, read from the shared file.
 _RCV_ContractRuntimeVersion() {
-	Path := A_ScriptDir . "\..\..\_shared\modules\updater\windows_release_toolchain.json"
+	Path := A_ScriptDir . "\..\..\_shared\updater\data\windows_release_toolchain.json"
 	Text := FileRead(Path, "UTF-8")
 	if !RegExMatch(Text, 's)"runtime"\s*:\s*\{[^}]*"version"\s*:\s*"([^"]+)"', &Match)
 		throw ValueError("The release contract names no runtime version.", -1, Path)

@@ -14,7 +14,7 @@ const titles = require('../codegen/codegen-window-titles.cjs');
 const audit = path.resolve(__dirname, '../lint/audit-gui-titles.cjs');
 const repository = path.resolve(__dirname, '../..');
 const sharedManifest = JSON.parse(fs.readFileSync(path.join(repository, titles.SOURCE), 'utf8'));
-const localeDirectory = path.join(repository, 'static/ergopti_plus/_shared/data/locales');
+const localeDirectory = path.join(repository, 'static/ergopti_plus/_shared/core/i18n/data/locales');
 const localeNames = fs.readdirSync(localeDirectory).filter((name) => name.endsWith('.json'));
 assert.equal(localeNames.length, 21, 'every shipped locale participates in the title policy');
 /**
@@ -1212,14 +1212,14 @@ try {
 	put('tools/lint/audit-gui-titles.cjs', fs.readFileSync(audit));
 	for (const platform of ['windows', 'macos', 'linux']) put(sourcePath(platform), '');
 	put(
-		'static/ergopti_plus/_shared/data/locales/en.json',
+		'static/ergopti_plus/_shared/core/i18n/data/locales/en.json',
 		JSON.stringify({
 			'common.error_title': 'Error',
 			'editor.personal_info.window_title': 'Personal information'
 		})
 	);
 	put(
-		'static/ergopti_plus/_shared/data/locales/fr.json',
+		'static/ergopti_plus/_shared/core/i18n/data/locales/fr.json',
 		JSON.stringify({
 			'common.error_title': 'Erreur',
 			'editor.personal_info.window_title': 'ErgoptiPlus — Informations personnelles'

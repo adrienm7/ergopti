@@ -164,7 +164,7 @@ assert(
 	'Native helper compression retains its original maximum-deflate contract'
 );
 
-const defaults = JSON.parse(fs.readFileSync(shared('modules/updater/defaults.json'), 'utf8'));
+const defaults = JSON.parse(fs.readFileSync(shared('updater/data/defaults.json'), 'utf8'));
 assert.deepEqual(Archives.resolveArchives(defaults), [
 	{ name: 'ErgoptiPlus.app.tar.xz', format: 'tar.xz' },
 	{ name: 'ErgoptiPlus.app.zip', format: 'zip' }

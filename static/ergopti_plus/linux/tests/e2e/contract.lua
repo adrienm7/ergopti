@@ -73,7 +73,7 @@ function M.load_corpus(path, decode)
 
 	local decoder = decode
 	if not decoder then
-		local ok_json, json_or_error = pcall(require, "json")
+		local ok_json, json_or_error = pcall(require, "core.text.engine.json")
 		if not ok_json then return nil, "cannot load shared JSON decoder: " .. tostring(json_or_error) end
 		decoder = json_or_error.decode
 	end

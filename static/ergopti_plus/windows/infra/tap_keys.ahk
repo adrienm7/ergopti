@@ -39,7 +39,7 @@
 ; =======================================
 
 ; The tap keys in menu order, with their scancodes. Pinned to
-; _shared/modules/actions/tap_keys.json by tools/test/test-tap-keys-single-source.cjs,
+; _shared/shortcuts/data/actions/tap_keys.json by tools/test/test-tap-keys-single-source.cjs,
 ; which also checks the hotkeys name the same scancodes.
 global TAP_KEY_ORDER := ["number_row_left", "number_row_right_1", "number_row_right_2"]
 global TAP_KEY_SCANCODES := Map(

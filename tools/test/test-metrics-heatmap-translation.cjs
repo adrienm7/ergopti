@@ -147,7 +147,7 @@ console.log(
 const assertMedia = require('node:assert/strict');
 const vmMedia = require('node:vm');
 const mediaUi = p.join(ROOT, 'static/ergopti_plus/_shared/ui');
-const mediaLocaleRoot = p.join(ROOT, 'static/ergopti_plus/_shared/data/locales');
+const mediaLocaleRoot = p.join(ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locales');
 const MEDIA_EXPECTED = [
 	['media.play_pause', 'sg_actions.track_play'],
 	['media.next_track', 'sg_actions.track_next'],

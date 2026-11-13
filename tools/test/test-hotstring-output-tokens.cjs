@@ -6,13 +6,13 @@
  * DESCRIPTION:
  * Checks _shared/tests/corpus/hotstrings/output_token_vectors.json against a
  * reference implementation of its documented rule over the vocabulary
- * _shared/modules/actions/send_keys.json, checks that the tokens the editors
+ * _shared/shortcuts/data/actions/send_keys.json, checks that the tokens the editors
  * advertise are all in it, and checks that each driver suite replays the corpus.
  *
  * WHY:
  * The editor promised {Left} and the shipped magic-key pack holds {U+XXXX}, while
  * Windows and Linux typed both as text and macOS typed the second. The grammar is
- * implemented twice (_shared/lua/send_input, windows/infra/send_input_parameter.ahk);
+ * implemented twice (_shared/platform/input, windows/infra/send_input_parameter.ahk);
  * the corpus is what keeps them equal, and it pins nothing if no suite replays it.
  * ==============================================================================
  */
@@ -26,7 +26,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const CORPUS_RELATIVE = ['tests', 'corpus', 'hotstrings', 'output_token_vectors.json'];
 const CORPUS = path.join(SP, '_shared', ...CORPUS_RELATIVE);
-const VOCABULARY = path.join(SP, '_shared', 'modules', 'actions', 'send_keys.json');
+const VOCABULARY = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'send_keys.json');
 
 const errors = [];
 let checks = 0;
@@ -143,7 +143,7 @@ for (const name of help ? help[1].match(/[A-Za-z]+/g) : []) {
 
 // Every {U+XXXX} the shipped packs hold is a token of the grammar, not text.
 const magic = fs.readFileSync(
-	path.join(SP, '_shared', 'modules', 'hotstrings', 'magickey.toml'),
+	path.join(SP, '_shared', 'hotstrings', 'data', 'catalogue', 'magickey.toml'),
 	'utf8'
 );
 for (const match of magic.matchAll(/output = "(\{U\+[0-9A-Fa-f]+\})"/g)) {

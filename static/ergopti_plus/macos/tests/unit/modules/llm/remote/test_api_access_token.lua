@@ -17,12 +17,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.path
+package.path = SHARED .. "?.lua;" .. SHARED .. "?/init.lua;" .. package.path
 
-local Exchange = require("llm.api_token_exchange")
+local Exchange = require("ai.engine.api.token_exchange")
 
 --- Finds one upvalue, searching nested closures.
 local function find_upvalue(fn, target, seen)

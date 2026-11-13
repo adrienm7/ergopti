@@ -30,27 +30,27 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Transaction = require("config_scope_transaction")
-local FencedTransaction = require("config_scope_fenced_transaction")
-local Writer = require("toml_codec.writer")
-local LeafRows = require("toml_codec.leaf_rows")
-local KeyPath = require("toml_codec.key_path")
-local Codec = require("toml_codec")
-local Planner = require("hotstrings.scope_overrides")
-local PersonalFiles = require("hotstrings.personal_files")
+local Transaction = require("settings.engine.scope.transaction")
+local FencedTransaction = require("settings.engine.scope.fenced_transaction")
+local Writer = require("core.text.engine.toml_codec.writer")
+local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
+local KeyPath = require("core.text.engine.toml_codec.key_path")
+local Codec = require("core.text.engine.toml_codec")
+local Planner = require("hotstrings.engine.scope_overrides")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 
 -- The category personal.toml loads as (ui/hotstring_editor/bridge.lua).
 local PERSONAL_CATEGORY = "personal"
-local ScopeFile = require("config_scope_file")
+local ScopeFile = require("settings.engine.scope.file")
 local Shell = require("adapters.shell_runner")
-local Logger = require("logger.shim")
-local ConfigKeys = require("config_keys")
+local Logger = require("core.logger.engine.shim")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "infra.hotstrings_scope"
 local REPEAT_PATH = ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED
-local BASE_DELAY_PATH = require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY
-local NativePath = require("native_path")
-local TableUtil = require("table_util")
+local BASE_DELAY_PATH = require("settings.engine.keys").KEY.HOTSTRINGS_EXPANSION_DELAY
+local NativePath = require("core.fs.engine.native_path")
+local TableUtil = require("core.text.engine.table_util")
 local _owner, _sequence = nil, 0
 require("infra.scope_registry").register("hotstrings_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
@@ -353,7 +353,7 @@ end
 --- @param ports table|nil dynamic and preview runtime owners the daemon holds.
 --- @return table participant See config_scope_composition.
 function M.participant(ports)
-	return require("config_scope_participant").synchronous({
+	return require("settings.engine.scope.participant").synchronous({
 		apply = function(mode) return M.apply(mode, ports) end,
 		owner = function() return _owner end,
 	})

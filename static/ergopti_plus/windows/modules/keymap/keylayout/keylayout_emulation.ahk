@@ -134,7 +134,7 @@ LayoutEmulationRows(SharedRoot := unset) {
 	if Rows is Map
 		return Rows
 	Root := IsSet(SharedRoot) ? SharedRoot : _SharedDir
-	Registry := JsonParse(FSReadStrict(Root . "\data\keycodes\physical_keys.json"))
+	Registry := JsonParse(FSReadStrict(Root . "\layouts\data\keycodes\physical_keys.json"))
 	Built := Map()
 	for Row, Codes in LayoutRowsPolicyKeys(Registry) {
 		Names := []
@@ -371,7 +371,7 @@ _KLE_ComboKey(Shift, Caps, Option) {
 /**
  * AHK scan code -> macOS key code of every key of the shared table, read
  * through a layout's keycode convention.
- * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @param {Map} KeycodeTable - Parsed _shared/layouts/data/mac_keycodes.json.
  * @param {string} Convention - Registry keycode_convention ("iso" | "ansi").
  * @returns {Map}
  * @throws {ValueError} On an unknown convention.
@@ -395,7 +395,7 @@ KeylayoutEmulation_KeyCodes(KeycodeTable, Convention) {
  * @param {string} Id - Registry id.
  * @param {string} Text - .keylayout content.
  * @param {string} Convention - Registry keycode_convention ("iso" | "ansi").
- * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @param {Map} KeycodeTable - Parsed _shared/layouts/data/mac_keycodes.json.
  * @returns {Integer} Number of keys emulated.
  * @throws {ValueError} On a malformed layout or keycode table; the previous
  *   layout, if any, stays loaded.
@@ -413,7 +413,7 @@ KeylayoutEmulation_Load(Id, Text, Convention, KeycodeTable) {
  * @param {string} Id - Registry id.
  * @param {string} Text - .keylayout content.
  * @param {string} Convention - Registry keycode_convention ("iso" | "ansi").
- * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @param {Map} KeycodeTable - Parsed _shared/layouts/data/mac_keycodes.json.
  * @returns {Integer} Number of keys the emulation would take.
  * @throws {Error} Where Load would refuse the layout.
  */
@@ -891,7 +891,7 @@ _KLE_PendingDeadKeyCriterion(*) {
  * Registers the emulation hotkeys of every key of the shared keycode table.
  * They stay inert until a layout is loaded. Must run before the Ergopti
  * layers register theirs (see the module header).
- * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @param {Map} KeycodeTable - Parsed _shared/layouts/data/mac_keycodes.json.
  * @param {Func} HotkeyFn - The Hotkey built-in, or a stand-in taking Name, Callback, Options.
  * @param {Func} HotIfFn - The HotIf built-in, or a stand-in taking an optional Criterion.
  * @param {Func|Integer} ForegroundFn Foreground layout reader; native by default.
@@ -1923,7 +1923,7 @@ _KLE_SourceBoot(ConfigDir, Deps) {
 		if !SourceEmulation_HasRecords(Model)
 			return 0
 		Registry := Deps.Has("physical_keys") ? Deps["physical_keys"]
-			: JsonParse(FSReadStrict(_SharedDir . "\data\keycodes\physical_keys.json"))
+			: JsonParse(FSReadStrict(_SharedDir . "\layouts\data\keycodes\physical_keys.json"))
 		Count := KeylayoutEmulation_SourceLoad(Model, Registry, Deps.Get("source_hotkey", Hotkey),
 			Deps.Get("source_hotif", HotIf))
 	} catch as Err {

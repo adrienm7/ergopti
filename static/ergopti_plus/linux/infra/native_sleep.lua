@@ -21,7 +21,7 @@
 
 local M = {}
 
-local NumberPolicy = require("number_policy")
+local NumberPolicy = require("core.text.engine.number_policy")
 
 local EINTR = 4 -- Linux errno for a signal-interrupted wait.
 

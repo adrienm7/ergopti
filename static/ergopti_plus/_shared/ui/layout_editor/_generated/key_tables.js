@@ -2,9 +2,9 @@
 
 // ==========================================
 // AUTO-GENERATED — do not edit manually
-// Source: static/ergopti_plus/_shared/modules/layouts/mac_keycodes.json
-// Source: static/ergopti_plus/_shared/data/keycodes/physical_keys.json
-// Source: static/ergopti_plus/_shared/data/keycodes/hid_usages.json
+// Source: static/ergopti_plus/_shared/layouts/data/mac_keycodes.json
+// Source: static/ergopti_plus/_shared/layouts/data/keycodes/physical_keys.json
+// Source: static/ergopti_plus/_shared/layouts/data/keycodes/hid_usages.json
 // Run: npm run codegen:layout-editor-tables:js
 // ==========================================
 

@@ -61,10 +61,7 @@ function loadPage() {
 
 const page = loadPage();
 const luaSources = Object.fromEntries(
-	page.Lua.MODULES.map((name) => [
-		name,
-		fs.readFileSync(shared('lua', page.Lua.modulePath(name)), 'utf8')
-	])
+	page.Lua.MODULES.map((name) => [name, fs.readFileSync(shared(page.Lua.modulePath(name)), 'utf8')])
 );
 const assets = {
 	lua: page.Lua.create(page.fengari, luaSources),

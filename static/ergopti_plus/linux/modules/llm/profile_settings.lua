@@ -8,18 +8,18 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Manifest = require("infra.manifest_reader")
-local Selector = require("llm.profile_selector")
+local Selector = require("ai.engine.settings.profile_selector")
 local ModelProfile = require("modules.llm.model_profile")
-local RegistryCodec = require("llm.profile_registry_codec")
-local AppOverrides = require("llm.app_profile_overrides")
-local Json = require("json")
-local Codec = require("toml_codec")
-local ConfigKeys = require("config_keys")
+local RegistryCodec = require("ai.engine.settings.profile_registry_codec")
+local AppOverrides = require("ai.engine.policy.app_profile_overrides")
+local Json = require("core.text.engine.json")
+local Codec = require("core.text.engine.toml_codec")
+local ConfigKeys = require("settings.engine.keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 local LOG = "modules.llm.profile_settings"

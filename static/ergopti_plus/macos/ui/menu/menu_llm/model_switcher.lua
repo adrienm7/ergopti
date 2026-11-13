@@ -28,7 +28,7 @@ local notifications = require("infra.notifications")
 local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
 local TimerScheduler = require("adapters.timer_scheduler")
-local Tone          = require("llm.tone")
+local Tone          = require("ai.engine.prediction.tone")
 
 local LOG = "model_switcher"
 

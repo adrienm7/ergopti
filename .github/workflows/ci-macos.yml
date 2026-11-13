@@ -505,8 +505,8 @@ jobs:
           import re
           import tempfile
           from pathlib import Path
-          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
-          official = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())
+          contract = json.loads(Path('static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json').read_text())
+          official = json.loads(Path('static/ergopti_plus/_shared/ai/data/ollama_release.json').read_text())
           architecture = {'arm64': 'arm64', 'x86_64': 'amd64'}[platform.machine()]
           assert platform.system() == 'Darwin'
           assert architecture == os.environ['ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE']
@@ -529,7 +529,7 @@ jobs:
               'ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE': str(root / identity['filename']),
               'ERGOPTI_OLLAMA_OFFICIAL_URL': 'https://github.com/ollama/ollama/releases/download/v' + official['version'] + '/' + identity['filename'],
               'ERGOPTI_OLLAMA_ASSET': str(root / 'assets' / contract['assets']['macos-' + architecture]['filename']),
-              'ERGOPTI_OLLAMA_CATALOGUE': str(root / 'staged/_shared/modules/llm/managed_ollama_release.json'),
+              'ERGOPTI_OLLAMA_CATALOGUE': str(root / 'staged/_shared/ai/data/managed_ollama_release.json'),
           }
           with (root / 'public-inputs.json').open('x', encoding='utf-8') as stream:
               json.dump({'contract': contract, 'official_identity': identity, 'architecture': architecture, 'tested_sha': os.environ['GITHUB_SHA'], 'inputs': values}, stream, sort_keys=True)
@@ -1545,8 +1545,8 @@ jobs:
           import re
           import tempfile
           from pathlib import Path
-          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
-          official = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())
+          contract = json.loads(Path('static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json').read_text())
+          official = json.loads(Path('static/ergopti_plus/_shared/ai/data/ollama_release.json').read_text())
           architecture = {'arm64': 'arm64', 'x86_64': 'amd64'}[platform.machine()]
           assert platform.system() == 'Darwin'
           assert architecture == os.environ['ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE']
@@ -1563,7 +1563,7 @@ jobs:
               'ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE': str(root / identity['filename']),
               'ERGOPTI_OLLAMA_OFFICIAL_URL': 'https://github.com/ollama/ollama/releases/download/v' + official['version'] + '/' + identity['filename'],
               'ERGOPTI_OLLAMA_ASSET': str(root / 'assets' / contract['assets']['macos-' + architecture]['filename']),
-              'ERGOPTI_OLLAMA_CATALOGUE': str(root / 'staged/_shared/modules/llm/managed_ollama_release.json'),
+              'ERGOPTI_OLLAMA_CATALOGUE': str(root / 'staged/_shared/ai/data/managed_ollama_release.json'),
           }
           with (root / 'public-inputs.json').open('x', encoding='utf-8') as stream:
               json.dump({'contract': contract, 'official_identity': identity, 'architecture': architecture, 'tested_sha': os.environ['GITHUB_SHA'], 'inputs': values}, stream, sort_keys=True)
@@ -1616,8 +1616,8 @@ jobs:
           import json
           import os
           from pathlib import Path
-          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
-          identity = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())['assets'][contract['official_asset_key']]
+          contract = json.loads(Path('static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json').read_text())
+          identity = json.loads(Path('static/ergopti_plus/_shared/ai/data/ollama_release.json').read_text())['assets'][contract['official_asset_key']]
           archive = Path(os.environ['ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE'])
           assert archive.stat().st_size == identity['bytes']
           with archive.open('rb') as stream:
@@ -2562,8 +2562,8 @@ jobs:
           import json
           import os
           from pathlib import Path
-          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
-          official = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())
+          contract = json.loads(Path('static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json').read_text())
+          official = json.loads(Path('static/ergopti_plus/_shared/ai/data/ollama_release.json').read_text())
           identity = official['assets'][contract['official_asset_key']]
           root = Path(os.environ['RUNNER_TEMP']) / 'managed-ollama-package'
           values = {
@@ -2630,8 +2630,8 @@ jobs:
           import json
           import os
           from pathlib import Path
-          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
-          identity = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())['assets'][contract['official_asset_key']]
+          contract = json.loads(Path('static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json').read_text())
+          identity = json.loads(Path('static/ergopti_plus/_shared/ai/data/ollama_release.json').read_text())['assets'][contract['official_asset_key']]
           archive = Path(os.environ['ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE'])
           assert archive.stat().st_size == identity['bytes']
           with archive.open('rb') as stream:
@@ -2772,7 +2772,7 @@ jobs:
           name: assets-managed-ollama-catalogue
           if-no-files-found: error
           retention-days: 7
-          path: build/macos/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared/modules/llm/managed_ollama_release.json
+          path: build/macos/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared/ai/data/managed_ollama_release.json
 
       - name: Upload the independent CI archive source
         if: ${{ steps.stage-admission.outcome == 'success' }}
@@ -3115,7 +3115,7 @@ jobs:
       - uses: actions/setup-go@v5
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}
         with:
-          go-version-file: static/ergopti_plus/_shared/go/native_http/go.mod
+          go-version-file: static/ergopti_plus/_shared/core/network/native/go/native_http/go.mod
           check-latest: false
           cache: false
 
@@ -3205,7 +3205,7 @@ jobs:
       - uses: actions/setup-go@v5
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
         with:
-          go-version-file: static/ergopti_plus/_shared/go/native_http/go.mod
+          go-version-file: static/ergopti_plus/_shared/core/network/native/go/native_http/go.mod
           check-latest: false
           cache: false
 

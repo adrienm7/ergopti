@@ -137,7 +137,7 @@ local function with_fixture(callback)
 		helpers.provide_timings()
 		package.loaded["infra.paths"] = {
 			shared_llm_path = function(name)
-				return helpers.shared("modules/llm/" .. tostring(name))
+				return helpers.shared("ai/data/" .. tostring(name))
 			end,
 		}
 		package.loaded["modules.llm"] = { get_backend = function() return "mlx" end }

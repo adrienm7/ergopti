@@ -3,12 +3,12 @@
 --- ==============================================================================
 --- MODULE: AI Menu Configuration Guard (macOS binding)
 --- DESCRIPTION:
---- Binds the shared AI configuration guard (_shared/lua/llm/config_guard.lua)
+--- Binds the shared AI configuration guard (_shared/ai/engine/policy/config_guard.lua)
 --- to this driver's native row fields (`fn`, `menu`) and logger. The rule
 --- itself, one cause per state and rechecked retained clicks, lives there.
 --- ==============================================================================
 
-local Shared = require("llm.config_guard")
+local Shared = require("ai.engine.policy.config_guard")
 local Logger = require("infra.logger")
 
 local LOG = "ui.menu.menu_llm.config_guard"

@@ -17,14 +17,14 @@ NATIVE_CPATH = None
 PROBE = """
 local driver = arg[4]
 package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;'
-  .. driver .. '/../_shared/lua/?.lua;' .. driver .. '/../_shared/lua/?/init.lua;' .. package.path
-require('compat.utf8').install()
+  .. driver .. '/../_shared/?.lua;' .. driver .. '/../_shared/?/init.lua;' .. package.path
+require('core.lifecycle.engine.compat.utf8').install()
 local mode, database, resource = arg[1], arg[2], arg[3]
 local paths = require('infra.paths')
 local shared = paths.shared
 if mode == 'schema_fifo' then
   paths.shared = function(name)
-    if name == 'data/db/schema.sql' then return resource end
+    if name == 'metrics/data/db/schema.sql' then return resource end
     return shared(name)
   end
 end

@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local M = {}
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local available, native = pcall(require, "luv")
 if not available then native = nil end
 

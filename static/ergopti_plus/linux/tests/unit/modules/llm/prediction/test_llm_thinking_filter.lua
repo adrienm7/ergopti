@@ -67,7 +67,7 @@ end
 -- ==================================================
 
 helpers.describe("llm thinking filter — whole-chunk cases", function()
-	local Parser = helpers.load_module("llm.parser")
+	local Parser = helpers.load_module("ai.engine.api.parser_core")
 
 	helpers.it("passes text through untouched when there is no tag", function()
 		helpers.assert_eq(run_stream(Parser, { "hello ", "world" }), "hello world")
@@ -107,7 +107,7 @@ end)
 -- ======================================================
 
 helpers.describe("llm thinking filter — chunk boundaries", function()
-	local Parser = helpers.load_module("llm.parser")
+	local Parser = helpers.load_module("ai.engine.api.parser_core")
 
 	helpers.it("catches a tag split at every possible offset", function()
 		local full = "before<think>hidden reasoning</think>the answer"
@@ -152,7 +152,7 @@ helpers.describe("llm thinking filter — engine wiring", function()
 	end)
 
 	helpers.it("the engine requires the shared parser", function()
-		helpers.assert_contains(src, 'require("llm.parser")',
+		helpers.assert_contains(src, 'require("ai.engine.api.parser_core")',
 			"Linux must load the shared parser — not loading it is the root cause")
 	end)
 

@@ -31,7 +31,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local Manifest = require("infra.manifest_reader")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "layout"
 
@@ -227,7 +227,7 @@ function M.keyboard_form(snapshot)
 	assert(snapshot.active_error == nil, "the active registry input-source ownership is ambiguous")
 	if snapshot.active == "" then return "ansi" end
 	local entry = type(snapshot.installed) == "table" and snapshot.installed[snapshot.active] or nil
-	if entry == nil then entry = require("layouts.registry").find_entry(snapshot.index, snapshot.active) end
+	if entry == nil then entry = require("layouts.engine.registry.registry_core").find_entry(snapshot.index, snapshot.active) end
 	assert(type(entry) == "table" and entry.id == snapshot.active,
 		"the active registry layout metadata is unavailable")
 	local form = entry.keycode_convention

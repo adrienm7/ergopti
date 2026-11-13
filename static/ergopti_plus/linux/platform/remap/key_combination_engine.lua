@@ -2,7 +2,7 @@
 
 --- Native effect ownership for the shared ordered-pair policy. The underlying
 --- tap-hold engine retains modifier reference counts and live layer ownership.
-local Policy = require("tap_hold.key_combinations")
+local Policy = require("tap_hold.engine.key_combinations")
 local Engine = require("platform.remap.tap_hold_engine")
 local ConfigOwner = require("modules.shortcuts.key_combinations")
 local AiActions = require("modules.shortcuts.ai_actions")

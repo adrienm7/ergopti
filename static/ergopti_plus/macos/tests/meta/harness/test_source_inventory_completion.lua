@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Discovery = require("test.runner_discovery")
+local Discovery = require("tests.lua.core.runner_discovery")
 local CommandLines = require("tests.support.command_lines")
 
 helpers.describe("source inventory completion", function()

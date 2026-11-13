@@ -5,7 +5,7 @@
  * MODULE: Pinned Timing Copies Single-Source Guard
  * DESCRIPTION:
  * Some Windows timing constants are still declared as AHK literals although the
- * shared timing registry (_shared/modules/timings/constants.toml) holds the same
+ * shared timing registry (_shared/core/timing/data/constants.toml) holds the same
  * value: a `static` class constant or a top-level `global` that AHK v2
  * initialises before boot loads the registry. This gate pins each such copy to
  * its registry key, so the registry — the documented single source — can never
@@ -46,7 +46,7 @@ const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const REGISTRY_PATH = '_shared/modules/timings/constants.toml';
+const REGISTRY_PATH = '_shared/core/timing/data/constants.toml';
 const MS_PER_SEC = 1000;
 
 const KEYSTATS = 'windows/modules/keystats/';
@@ -179,7 +179,7 @@ const SOURCE_PINS = [
 	{
 		section: 'limits',
 		key: 'process_output_bytes',
-		file: '_shared/lua/llm/process_limits.lua',
+		file: '_shared/ai/engine/policy/process_limits.lua',
 		pattern: /\bmax_output_bytes\s*=\s*(\d+)\b/g
 	},
 	{

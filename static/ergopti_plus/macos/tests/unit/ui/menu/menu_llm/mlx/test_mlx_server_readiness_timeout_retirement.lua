@@ -10,7 +10,7 @@
 --- =============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local MODULE_NAMES = {
 	"infra.notifications",

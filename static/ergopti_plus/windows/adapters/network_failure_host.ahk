@@ -26,7 +26,7 @@ _ManagedNetworkWindows_HasStoredNul(Text) {
 ; bytes and validates them before constructing its renderer invocation.
 _ManagedNetworkWindows_LocaleScript() {
 	global _SharedDir, _I18nLocale
-	Raw := FileRead(_SharedDir . "\data\locales\" . _I18nLocale . ".json", "UTF-8")
+	Raw := FileRead(_SharedDir . "\core\i18n\data\locales\" . _I18nLocale . ".json", "UTF-8")
 	if !(JsonParse(Raw) is Map)
 		throw TypeError("The managed failure locale is invalid")
 	return "window._i18n_strings=" . Raw . ";window.i18n_apply(window._i18n_strings);"
@@ -48,7 +48,7 @@ ManagedNetworkFailureWindows_Init(Policy := unset, Ports := 0) {
 	}
 	try {
 		if !IsSet(Policy)
-			Policy := JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))
+			Policy := JsonParse(FileRead(_SharedDir . "\core\network\data\managed_network.json", "UTF-8"))
 		if !(Ports is Map) {
 			Ports := Map("pause_admitted", () => !A_IsSuspended,
 				"proxy_available", _ManagedNetworkWindows_ProxyAvailable,

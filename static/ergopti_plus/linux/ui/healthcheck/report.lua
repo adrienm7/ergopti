@@ -30,14 +30,14 @@
 
 local M = {}
 
-local Logger      = require("logger.shim")
-local IssueLink   = require("diagnostics.issue_link")
-local Redact      = require("diagnostics.redact")
-local Share       = require("healthcheck.share")
-local ReportRunner = require("healthcheck.report")
-local ConfigKeys = require("config_keys")
+local Logger      = require("core.logger.engine.shim")
+local IssueLink   = require("diagnostics.engine.reports.issue_link")
+local Redact      = require("diagnostics.engine.reports.redact")
+local Share       = require("diagnostics.engine.healthcheck.share")
+local ReportRunner = require("diagnostics.engine.healthcheck.report")
+local ConfigKeys = require("settings.engine.keys")
 
-local LOG = "healthcheck.report"
+local LOG = "diagnostics.engine.healthcheck.report"
 local EEXIST = 17 -- Linux exclusive-create collision receipt.
 
 

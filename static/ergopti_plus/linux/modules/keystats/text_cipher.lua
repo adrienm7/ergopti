@@ -4,8 +4,8 @@
 --- MODULE: Typed-Text Cipher (Linux)
 --- DESCRIPTION:
 --- Supplies the ports of the shared cipher policy
---- (_shared/lua/keystats/text_cipher.lua), which runs the shared at-rest codec
---- (_shared/lua/keystats/text_crypto.lua) against the columns that hold literal
+--- (_shared/metrics/engine/privacy/text_cipher_core.lua), which runs the shared at-rest codec
+--- (_shared/metrics/engine/privacy/text_crypto.lua) against the columns that hold literal
 --- typed text, using a key derived once from this machine's ID.
 ---
 --- FEATURES & RATIONALE:
@@ -27,11 +27,11 @@
 
 local M = {}
 
-local Logger  = require("logger.shim")
+local Logger  = require("core.logger.engine.shim")
 local Crypto  = require("adapters.crypto")
 local OpenSSL = require("infra.openssl_command")
 local NativeCipher = require("infra.openssl_cipher")
-local TextCrypto = require("keystats.text_crypto")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
 local LOG = "modules.keystats.text_cipher"
 
@@ -160,7 +160,7 @@ local function decrypt_value(key, iv, payload)
 	return plaintext
 end
 
-local Cipher = require("keystats.text_cipher").new({
+local Cipher = require("metrics.engine.privacy.text_cipher_core").new({
 	logger = Logger,
 	log = LOG,
 	sha256 = Crypto.sha256,

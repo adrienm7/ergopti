@@ -490,12 +490,12 @@ def main():
         assert os.uname().machine in ("x86_64", "amd64"), (
             "frozen official amd64 expectations required"
         )
-        catalogue = repository / "static/ergopti_plus/_shared/modules/llm/models.json"
+        catalogue = repository / "static/ergopti_plus/_shared/ai/data/models.json"
         assert canonical_model(json.loads(catalogue.read_text())), (
             "canonical model identity required"
         )
         pins = json.loads(
-            (repository / "static/ergopti_plus/_shared/modules/llm/ollama_release.json").read_text()
+            (repository / "static/ergopti_plus/_shared/ai/data/ollama_release.json").read_text()
         )
         assert pins["version"] == "0.40.6" and pins["assets"]["linux-amd64"] == {
             "filename": "ollama-linux-amd64.tar.zst",
@@ -530,10 +530,12 @@ def main():
             ERGOPTI_MODEL_RECEIPT_DIR=str(root),
         )
         subjects = set((repository / "static/ergopti_plus/linux").rglob("*.lua"))
-        subjects.update((repository / "static/ergopti_plus/_shared/lua").rglob("*.lua"))
-        subjects.update((repository / "static/ergopti_plus/_shared/modules").rglob("*.json"))
-        subjects.update((repository / "static/ergopti_plus/_shared/modules").rglob("*.toml"))
-        subjects.update((repository / "static/ergopti_plus/_shared/data/locales").glob("*.json"))
+        subjects.update((repository / "static/ergopti_plus/_shared").rglob("*.lua"))
+        subjects.update((repository / "static/ergopti_plus/_shared").rglob("*.json"))
+        subjects.update((repository / "static/ergopti_plus/_shared").rglob("*.toml"))
+        subjects.update(
+            (repository / "static/ergopti_plus/_shared/core/i18n/data/locales").glob("*.json")
+        )
         subjects.update(
             [
                 Path(__file__).resolve(),

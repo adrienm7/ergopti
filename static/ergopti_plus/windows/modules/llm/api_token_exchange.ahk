@@ -6,7 +6,7 @@
 ; IBM watsonx wants an IAM access token exchanged from the user's API key, Google
 ; Vertex AI an OAuth access token refreshed from the user's credentials or signed
 ; for with a service-account key. Windows port of the pure
-; _shared/lua/llm/api_token_exchange.lua and of the access lease of macOS and
+; _shared/ai/engine/api/token_exchange.lua and of the access lease of macOS and
 ; Linux's api_remote.lua, replaying _shared/tests/corpus/llm/api_token_exchange_vectors.json.
 ;
 ; FEATURES & RATIONALE:
@@ -330,7 +330,7 @@ _LLM_TokenExchange_FillKey(Key, Fields, Placeholder) {
  * The message a refusing token service gives, in the field its error format
  * uses (OAuth error_description and error, IAM errorMessage, Google's
  * error.message), flattened to one line and cut on a whole character at the
- * token_exchange.max_service_message_bytes of _shared/modules/llm/inference.json.
+ * token_exchange.max_service_message_bytes of _shared/ai/data/inference.json.
  * @param {Any} Decoded The decoded JSON body.
  * @returns {String} The message, "" when the service gives none.
  */

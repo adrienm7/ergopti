@@ -11,15 +11,15 @@ local helpers, Sandbox, Toml, Json, Base64, with_idle_live_owner, with_config, p
 helpers.describe("ordered child template native list and conditional include contract", function()
 	local function with_frame(body)
 		local path = helpers.driver_root():gsub("/$", "") .. "/../_shared/tests/corpus/menus/profile_frame_template_api.json"
-		local Menu = assert(require("menu.renderer").new({
+		local Menu = assert(require("menu.engine.renderer").new({
 			platform = "linux",
 			manifest_path = function() return path end,
-			json_decode = require("json").decode,
+			json_decode = require("core.text.engine.json").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end },
 			logger = helpers.make_logger_stub(),
 		}))
 		local handle = assert(io.open(path, "rb"))
-		local oracle = require("json").decode(handle:read("*a")); handle:close()
+		local oracle = require("core.text.engine.json").decode(handle:read("*a")); handle:close()
 		local state = { ready = true, present = true, calls = 0, phases = {} }
 		local function native_action() state.calls = state.calls + 1; return false end
 		local builtin = { label = "Builtin native", checked = true, action = native_action }
@@ -197,9 +197,9 @@ helpers.describe("explicit inert presentation omission preserves actual native d
 		local state = { calls = 0, getters = 0, errors = {}, phases = {} }
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...) state.errors[#state.errors + 1] = string.format(fmt, ...) end
-		local Menu = assert(require("menu.renderer").new({
+		local Menu = assert(require("menu.engine.renderer").new({
 			platform = "linux", manifest_path = function() return path end,
-			json_decode = require("json").decode,
+			json_decode = require("core.text.engine.json").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end }, logger = logger,
 		}))
 		local builtin = { label = "Builtin native", action = function() state.calls = state.calls + 1; return false end }
@@ -310,8 +310,8 @@ helpers.describe("inert presentation platform membership cannot invoke implicit 
 		local callbacks, errors = 0, {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		local Menu = assert(require("menu.renderer").new({ platform = "linux",
-			manifest_path = function() return path end, json_decode = require("json").decode,
+		local Menu = assert(require("menu.engine.renderer").new({ platform = "linux",
+			manifest_path = function() return path end, json_decode = require("core.text.engine.json").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end }, logger = logger }))
 		Menu.get_array("presentation")[1].platforms = setmetatable({ "ahk" }, {
 			__index = function(_, index) callbacks = callbacks + 1; if index == 2 then return "linux" end end,
@@ -338,8 +338,8 @@ helpers.describe("selected inert include inspects only physical identities befor
 			local callbacks, errors = 0, {}
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-			local Menu = assert(require("menu.renderer").new({ platform = "linux",
-				manifest_path = function() return path end, json_decode = require("json").decode,
+			local Menu = assert(require("menu.engine.renderer").new({ platform = "linux",
+				manifest_path = function() return path end, json_decode = require("core.text.engine.json").decode,
 				i18n = { get = function(key) return key end, section = function(key) return key end }, logger = logger }))
 			Menu.get_array("frame")[1].row_id = "safe"
 			local target = Menu.get_array("presentation")
@@ -376,8 +376,8 @@ helpers.describe("invalid inert selector refuses before identity comparison", fu
 		local callbacks, providers, errors = 0, 0, {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		local Menu = assert(require("menu.renderer").new({ platform = "linux",
-			manifest_path = function() return path end, json_decode = require("json").decode,
+		local Menu = assert(require("menu.engine.renderer").new({ platform = "linux",
+			manifest_path = function() return path end, json_decode = require("core.text.engine.json").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end }, logger = logger }))
 		local meta = { __eq = function() callbacks = callbacks + 1; return true end }
 		Menu.get_array("frame")[1].row_id = setmetatable({}, meta)
@@ -418,8 +418,8 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 				local names = { "infra.manifest_menu", "infra.i18n", "ui.menu.builder", "ui.prompt_editor.bridge" }
 				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 				local ok, err = xpcall(function()
-					local document = read("modules/menu/menu_manifest.json")
-					local header_captions = read("data/locales/en.json")
+					local document = read("menu/data/menu_manifest.json")
+					local header_captions = read("core/i18n/data/locales/en.json")
 					local i18n = setmetatable({ get = function(key)
 						if key == "menu.builder.active_brand" or key == "menu.builder.title_paused" then
 							return header_captions[key]
@@ -430,9 +430,9 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 					-- frames whatever get currently answers, like the native one.
 					i18n.section = function(key) return i18n.decorate_section(i18n.get(key)) end
 					package.loaded["infra.i18n"] = i18n
-					package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
-						platform = "linux", manifest_path = function() return shared("modules/menu/menu_manifest.json") end,
-						json_decode = function() return document end, i18n = i18n, logger = require("logger.shim"),
+					package.loaded["infra.manifest_menu"] = assert(require("menu.engine.renderer").new({
+						platform = "linux", manifest_path = function() return shared("menu/data/menu_manifest.json") end,
+						json_decode = function() return document end, i18n = i18n, logger = require("core.logger.engine.shim"),
 					}))
 					local redraws, editors, opened = 0, 0, nil
 					package.loaded["ui.prompt_editor.bridge"] = { open = function(existing, on_save, opts)
@@ -609,10 +609,10 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 	end
 	helpers.it("all 21 original fixed captions reach the actual complete Linux frame without ported Mac-only rows", function()
 		with_frame({ custom = true }, function(f)
-			local languages = read("data/locale_order.json").order
+			local languages = read("core/i18n/data/locale_order.json").order
 			helpers.assert_eq(#languages, 21)
 			for _, language in ipairs(languages) do
-				local values = read("data/locales/" .. language .. ".json")
+				local values = read("core/i18n/data/locales/" .. language .. ".json")
 				f.i18n.get = function(key) return values[key] or key end
 				local rows = assert(f.rows())
 				for _, id in ipairs({ "auto_detect", "builtin_heading", "custom_heading", "clone", "create" }) do

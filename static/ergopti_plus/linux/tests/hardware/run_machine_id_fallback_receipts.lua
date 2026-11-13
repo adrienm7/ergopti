@@ -13,9 +13,9 @@
 
 local uv = require("luv")
 local Cipher = require("modules.keystats.text_cipher")
-local Codec = require("keystats.text_crypto")
+local Codec = require("metrics.engine.privacy.text_crypto")
 local Writer = require("modules.keystats.sqlite_writer")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 assert(uv.getuid() ~= 0, "cipher validation must run as an ordinary user")
 local function first_line(path)
 	local file = assert(io.open(path, "r"))

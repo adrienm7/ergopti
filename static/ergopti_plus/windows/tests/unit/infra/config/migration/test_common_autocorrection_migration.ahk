@@ -13,7 +13,7 @@
 _CAO_Policy() {
 	global _SharedDir
 	return _ConfigMigrateParse(FSReadStrict(_SharedDir
-		. "\data\hotstrings\common_autocorrection_migration.toml"), "independent override policy")["migration"]["ops"]
+		. "\hotstrings\data\autocorrection\common_autocorrection_migration.toml"), "independent override policy")["migration"]["ops"]
 }
 
 _CAO_Bytes(Name) {

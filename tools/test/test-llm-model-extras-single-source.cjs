@@ -5,7 +5,7 @@
  * MODULE: API Model-Extras And Thinking-Off Single-Source Guard
  * DESCRIPTION:
  * Per-model body fields live in exactly ONE place —
- * _shared/modules/llm/api_providers.json: providers.<id>.model_extras, and
+ * _shared/ai/data/api_providers.json: providers.<id>.model_extras, and
  * providers.<id>.thinking_dialect, how each provider carries the reasoning
  * controls of the model families of thinking_off.json (e.g.
  * reasoning_effort:none for the qwen3 family, which covers Cerebras'
@@ -36,8 +36,8 @@ const SSOT_FILE = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
-	'llm',
+	'ai',
+	'data',
 	'api_providers.json'
 );
 
@@ -53,9 +53,9 @@ const SHIPPED = [
 // Other shipped sources that build or complete request bodies: they may not
 // restate a rule field either.
 const BODY_SOURCES = [
-	'static/ergopti_plus/_shared/lua/llm/thinking_off.lua',
-	'static/ergopti_plus/_shared/modules/llm/thinking_off.ahk',
-	'static/ergopti_plus/_shared/lua/llm/vision.lua',
+	'static/ergopti_plus/_shared/ai/engine/policy/thinking_off.lua',
+	'static/ergopti_plus/_shared/ai/data/thinking_off.ahk',
+	'static/ergopti_plus/_shared/ai/engine/prediction/vision.lua',
 	'static/ergopti_plus/windows/modules/llm/vision.ahk',
 	'static/ergopti_plus/windows/modules/llm/vision_action.ahk',
 	'static/ergopti_plus/windows/modules/llm/agent_action.ahk',
@@ -251,7 +251,7 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/ui',
 	'static/ergopti_plus/linux/modules',
 	'static/ergopti_plus/linux/infra',
-	'static/ergopti_plus/_shared/lua/llm',
+	'static/ergopti_plus/_shared/ai/engine',
 	'static/ergopti_plus/windows/modules/llm'
 ];
 

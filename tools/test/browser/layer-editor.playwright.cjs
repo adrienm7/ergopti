@@ -20,7 +20,7 @@ const http = require('node:http');
 const { chromium, webkit } = require('playwright');
 const { shared } = require('../../lib/paths.cjs');
 
-const PRESET = fs.readFileSync(shared('keymap', 'layers.recommended.toml'), 'utf8');
+const PRESET = fs.readFileSync(shared('layouts', 'data', 'layers.recommended.toml'), 'utf8');
 const GEOMETRY = JSON.parse(fs.readFileSync(shared('ui', 'apps.manifest.json'), 'utf8')).apps
 	.layer_editor;
 const ROWS = [
@@ -39,7 +39,9 @@ async function loadPage(browser, origin, os, colorScheme, size, locale) {
 		if (!request.url().startsWith(origin + '/'))
 			errors.push(`unexpected request: ${request.url()}`);
 	});
-	const strings = JSON.parse(fs.readFileSync(shared('data', 'locales', `${locale}.json`), 'utf8'));
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', `${locale}.json`), 'utf8')
+	);
 	await page.addInitScript(
 		({ os, strings, locale }) => {
 			window._i18n_strings = strings;

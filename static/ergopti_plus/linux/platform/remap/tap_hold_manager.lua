@@ -21,18 +21,18 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger = require("logger.shim")
-local NativePath = require("native_path")
+local Logger = require("core.logger.engine.shim")
+local NativePath = require("core.fs.engine.native_path")
 local Config = require("platform.remap.tap_hold_loader")
 local Engine = require("platform.remap.tap_hold_engine")
 local Combinations = require("modules.shortcuts.key_combinations")
 local AiActions = require("modules.shortcuts.ai_actions")
 local original_combination_constructor = Combinations.new
 local original_combination_instance_current = Combinations.instance_is_current
-local BindingIdentity = require("config_binding_identity")
-local BindingPublication = require("config_binding_publication")
+local BindingIdentity = require("settings.engine.publication.binding_identity")
+local BindingPublication = require("settings.engine.publication.binding_publication")
 local original_combination_catalogue = BindingIdentity.combination_binding_catalogue
 local original_engine_constructor = Engine.new
 local original_config_load, original_config_document = Config.load, Config.load_document
@@ -42,14 +42,14 @@ local PairModule = require("platform.remap.key_combination_engine")
 local CombinationEngine = { new = PairModule.new }
 local original_pair_constructor = CombinationEngine.new
 local Timings = require("infra.timings")
-local HoldOptions = require("tap_hold.hold_options")
+local HoldOptions = require("tap_hold.engine.hold_options")
 local EmitActions = require("_generated.gesture_emit_actions")
 local ScriptActions = require("modules.shortcuts.script_actions")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local NavLayer = require("platform.remap.nav_layer")
-local Outdated = require("config_outdated")
-local Codec = require("toml_codec")
+local Outdated = require("settings.engine.migration.outdated")
+local Codec = require("core.text.engine.toml_codec")
 
 local LOG = "platform.remap.tap_hold_manager"
 local MS_PER_SECOND = 1000
@@ -79,7 +79,7 @@ local function nav_ports_current()
 		or rawget(NavLayer, "load") ~= original_nav_load
 		or type(original_nav_capture) ~= "function" or rawget(NavLayer, "capture_source_observation") ~= original_nav_capture
 		or not rawequal(package.loaded["infra.paths"], Paths) or rawget(Paths, "shared_root") ~= original_shared_root
-		or not rawequal(package.loaded["toml_codec"], Codec) or rawget(Codec, "decode") ~= original_codec_decode
+		or not rawequal(package.loaded["core.text.engine.toml_codec"], Codec) or rawget(Codec, "decode") ~= original_codec_decode
 		or not rawequal(package.loaded["platform.remap.tap_hold_engine"], Engine) or getmetatable(Engine) ~= nil
 		or not rawequal(package.loaded["platform.remap.key_combination_engine"], PairModule)
 		or rawget(PairModule, "new") ~= original_pair_constructor then return false end
@@ -276,10 +276,10 @@ function M.observe_copy_activity()
 end
 
 --- Reads what the one-shot Shift types for a character, from the table the
---- Windows driver reads too (_shared/tap_hold/one_shot_shift.json).
+--- Windows driver reads too (_shared/tap_hold/data/one_shot_shift.json).
 --- @return table { results = { [char] = result }, magic_key_result = string }
 local function _read_one_shot()
-	local path = Paths.shared("tap_hold/one_shot_shift.json")
+	local path = Paths.shared("tap_hold/data/one_shot_shift.json")
 	local fh = require("infra.regular_file_reader").open_source(path)
 	if not fh then error("the one-shot Shift results are unreadable: " .. tostring(path), 0) end
 	local read_ok, raw = pcall(fh.read, fh, "*a")
@@ -381,7 +381,7 @@ function M.published_binding_catalogue()
 	if not BindingPublication.owner_is_current("combination", "platform.remap.tap_hold_manager", M)
 		or rawget(M, "managed_combination_catalogue_current") ~= original_logical_catalogue_current
 		or not original_logical_catalogue_current(_combinations)
-		or not rawequal(package.loaded["config_binding_identity"], BindingIdentity)
+		or not rawequal(package.loaded["settings.engine.publication.binding_identity"], BindingIdentity)
 		or getmetatable(BindingIdentity) ~= nil
 		or rawget(BindingIdentity, "combination_binding_catalogue") ~= original_combination_catalogue then return nil end
 	local issuer = managed_owners[_combinations]

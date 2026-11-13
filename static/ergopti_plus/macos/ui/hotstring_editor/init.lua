@@ -24,7 +24,7 @@ local Logger        = require("infra.logger")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local Paths         = require("infra.paths")
-local Chord         = require("chord")
+local Chord         = require("keyboard.engine.chord")
 local Hotkeys       = require("adapters.hotkey_registrar")
 local FileSystem    = require("adapters.file_system")
 local DeferredWork  = require("infra.deferred_work")
@@ -83,7 +83,7 @@ local _is_focused      = false
 local _pending_mode    = "menu"
 local _file_ready      = false
 local _source_snapshot = nil
--- Personal source-default priority, read from _shared/modules/hotstrings/priority.json by
+-- Personal source-default priority, read from _shared/hotstrings/data/catalogue/priority.json by
 -- the caller (init.lua) and forwarded to the UI as the priority field's
 -- placeholder — never hardcoded here.
 local _default_priority = nil
@@ -305,7 +305,7 @@ local function load_js_data(open_mode)
 	
 	-- Personal source-default priority surfaced as the priority field's placeholder
 	-- (what a blank entry inherits). Prefer the value the caller read from
-	-- _shared/modules/hotstrings/priority.json; fall back to the engine value (kept in sync
+	-- _shared/hotstrings/data/catalogue/priority.json; fall back to the engine value (kept in sync
 	-- with that same file by the parity gate). Never hardcoded here.
 	local default_priority = _default_priority
 	if type(default_priority) ~= "number"
@@ -716,7 +716,7 @@ end
 --- @param keymap_mod table Reference to the keymap module for hotkey reloading.
 --- @param update_menu_fn function Callback to refresh the main menu UI.
 --- @param default_priority number|nil Personal source-default priority, read from
----        _shared/modules/hotstrings/priority.json by the caller (shown as the field placeholder).
+---        _shared/hotstrings/data/catalogue/priority.json by the caller (shown as the field placeholder).
 function M.init(toml_path, keymap_mod, update_menu_fn, default_priority)
 	_toml_path   = toml_path
 	_keymap      = keymap_mod

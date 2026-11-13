@@ -28,7 +28,7 @@ const OUT_BEHAVIORS = 'src/routes/ergopti-plus/behavior-inventory.json';
 const OUT_BEHAVIOR_MD = 'docs/behavior-inventory.md';
 const OS = { windows: 'ahk', macos: 'hs', linux: 'linux' };
 
-const OUT_HIDDEN_REASONS = 'static/ergopti_plus/_shared/modules/menu/hidden_row_reasons.json';
+const OUT_HIDDEN_REASONS = 'static/ergopti_plus/_shared/menu/data/hidden_row_reasons.json';
 
 // The reason of every hidden restricted menu row, keyed by `section` or `section.row`.
 function loadHiddenReasons() {
@@ -304,7 +304,7 @@ function render(
 		'',
 		'This supplementary catalogue covers explicitly reviewed behaviors that need no separate setting or action. It is not an exhaustive product inventory or a native application delivery certificate. A declared behavior may have a documented limitation. Application Undo and automatic Backspace restoration are distinct.',
 		'',
-		'Edit `_shared/modules/features/behaviors.json` after reviewing the named owners, then run `npm run codegen:feature-inventory`. Any changed owner file blocks generation until its source receipt is explicitly reviewed; generation never updates review hashes. These conservative whole-file hashes detect source drift, not semantic correctness or an unlisted capability.',
+		'Edit `_shared/settings/data/features/behaviors.json` after reviewing the named owners, then run `npm run codegen:feature-inventory`. Any changed owner file blocks generation until its source receipt is explicitly reviewed; generation never updates review hashes. These conservative whole-file hashes detect source drift, not semantic correctness or an unlisted capability.',
 		'',
 		'| Behavior | Windows | macOS | Linux |',
 		'| --- | --- | --- | --- |'
@@ -364,7 +364,7 @@ function outputs() {
 			lang,
 			JSON.parse(
 				fs.readFileSync(
-					path.join(ROOT, `static/ergopti_plus/_shared/data/locales/${lang}.json`),
+					path.join(ROOT, `static/ergopti_plus/_shared/core/i18n/data/locales/${lang}.json`),
 					'utf8'
 				)
 			)
@@ -372,24 +372,27 @@ function outputs() {
 	);
 	const actions = toml.parse(
 		fs.readFileSync(
-			path.join(ROOT, 'static/ergopti_plus/_shared/modules/actions/actions.toml'),
+			path.join(ROOT, 'static/ergopti_plus/_shared/shortcuts/data/actions/actions.toml'),
 			'utf8'
 		)
 	);
 	const menu = JSON.parse(
 		fs.readFileSync(
-			path.join(ROOT, 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'),
+			path.join(ROOT, 'static/ergopti_plus/_shared/menu/data/menu_manifest.json'),
 			'utf8'
 		)
 	);
 	const layers = toml.parse(
 		fs.readFileSync(
-			path.join(ROOT, 'static/ergopti_plus/_shared/keymap/layer_actions.toml'),
+			path.join(ROOT, 'static/ergopti_plus/_shared/layouts/data/layer_actions.toml'),
 			'utf8'
 		)
 	);
 	const tapHolds = toml.parse(
-		fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/tap_hold/defaults.toml'), 'utf8')
+		fs.readFileSync(
+			path.join(ROOT, 'static/ergopti_plus/_shared/tap_hold/data/defaults.toml'),
+			'utf8'
+		)
 	);
 	const model = loadFeatureModel();
 	return render(

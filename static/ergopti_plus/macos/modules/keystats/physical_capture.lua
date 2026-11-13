@@ -13,7 +13,7 @@ local Transport = require("modules.keystats.physical_transport")
 local Protocol = require("modules.keystats.physical_protocol")
 local Wire = require("modules.keystats.physical_wire")
 local Clock = require("modules.keystats.physical_clock")
-local Lifetime = require("keystats.physical_subscription_lifetime")
+local Lifetime = require("metrics.engine.capture.physical_subscription_lifetime")
 local LOG = "keystats.physical_capture"
 local OWNER = "modules.keystats.physical_capture"
 local dependencies, session, managed_source

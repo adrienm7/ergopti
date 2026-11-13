@@ -61,7 +61,7 @@ BundledApps_Environment() {
 	global _SharedDir
 	return Map("compiled", A_IsCompiled, "script_path", A_ScriptFullPath, "ahk_path", A_AhkPath,
 		"entry", A_ScriptDir . "\apps\bundled_app_entry.ahk",
-		"locales_dir", _SharedDir . "\data\locales", "locale", I18nGetLocale())
+		"locales_dir", _SharedDir . "\core\i18n\data\locales", "locale", I18nGetLocale())
 }
 
 /**

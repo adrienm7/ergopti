@@ -247,7 +247,7 @@ FIELD_CHECK = re.compile(r"\bcheck=(?P<id>[a-z0-9_]+) verdict=(?P<verdict>[a-z_]
 RELOAD_REQUEST = re.compile(
     r"^(?:Controlled )?[Rr]eload requested\b(?! \u2014 re-scanning)|^Reloading\b"
 )
-# The overrun warning every driver writes (_shared/lua/perf_budget.lua).
+# The overrun warning every driver writes (_shared/core/logger/engine/perf_budget.lua).
 OVER_BUDGET = re.compile(r"^Over budget: [\w.:-]+ took \d+ ms \(budget \d+ ms\)\.$")
 LEASE_TOTALS = re.compile(r"(?P<count>\d+) Karabiner lease failure\(s\)")
 
@@ -347,7 +347,7 @@ def toml_key(section, key):
     )
 
 
-TIMINGS = "static/ergopti_plus/_shared/modules/timings/constants.toml"
+TIMINGS = "static/ergopti_plus/_shared/core/timing/data/constants.toml"
 # A prefix ending with ":" covers every metric of that family.
 BUDGETS = (
     ("boot.total", TIMINGS, toml_key("budgets", "boot_total_ms"), False),
@@ -359,7 +359,7 @@ BUDGETS = (
     ("llm.ttft", TIMINGS, toml_key("budgets", "prediction_display_ms"), False),
     (
         "hotpath:",
-        "static/ergopti_plus/_shared/modules/timings/constants.toml",
+        "static/ergopti_plus/_shared/core/timing/data/constants.toml",
         r"(?ms)^\[logger\]\s*$(?:(?!^\[).)*?^hotpath_slow_ms\s*=\s*(\d+(?:\.\d+)?)",
         False,
     ),

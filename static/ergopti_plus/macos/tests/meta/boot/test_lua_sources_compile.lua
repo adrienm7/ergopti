@@ -20,7 +20,7 @@
 ---
 --- THE INVARIANT PINNED HERE:
 --- Every .lua file under the driver's production roots (init.lua, infra/, modules/,
---- ui/, adapters/) and under the shared Lua tree (_shared/lua/) must PARSE.
+--- ui/, adapters/) and under the shared Lua tree (_shared/) must PARSE.
 --- `loadfile` compiles the chunk to a function without executing it, so this
 --- check needs no hs runtime, no filesystem side effects, and no OS access — it
 --- only proves the source is syntactically valid Lua. A missing or malformed
@@ -33,7 +33,7 @@
 
 local helpers = require("tests.helpers")
 local CommandLines = require("tests.support.command_lines")
-local shell_quote = require("text_utils").shell_quote
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 
 -- driver_root() ends with a trailing slash (e.g. ".../macos/").
 local DRIVER_ROOT = helpers.driver_root()
@@ -57,7 +57,7 @@ local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "platform",
 	DRIVER_ROOT .. "vendor",
 	DRIVER_ROOT .. "_generated",
-	helpers.shared("lua"),
+	helpers.shared(""),
 }
 
 

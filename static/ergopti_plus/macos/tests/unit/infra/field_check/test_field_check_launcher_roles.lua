@@ -102,7 +102,7 @@ helpers.describe("launcher roles probe", function()
 	helpers.it("sends exactly the request the worker admits", function()
 		local ports, world = make_ports()
 		run(ports)
-		local request = require("json").decode(world.worker_call.input)
+		local request = require("core.text.engine.json").decode(world.worker_call.input)
 		local keys = {}
 		for key in pairs(request) do keys[#keys + 1] = key end
 		table.sort(keys)

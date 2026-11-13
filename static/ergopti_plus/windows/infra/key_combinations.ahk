@@ -955,7 +955,7 @@ KeyCombinationFireAltGrSuffix(Passthrough, Ports := 0) {
 ; =============================================
 ; =============================================
 
-; The pure third-slot policy that _shared/lua/tap_hold/key_combinations.lua owns
+; The pure third-slot policy that _shared/tap_hold/engine/key_combinations.lua owns
 ; on macOS and Linux: which pair a press of two keys within the simultaneous
 ; delay selects. _shared/tests/corpus/tap_hold/key_combination_chords.json holds
 ; the cases. The engine that buffers a first key for it is section 6.

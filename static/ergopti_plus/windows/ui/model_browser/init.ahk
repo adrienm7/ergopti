@@ -970,13 +970,13 @@ _LLM_MBW_SessionCall(SessionEpoch, Callback, Params*) {
 /**
  * Builds the selector payload and injects it via injectModels(). The rows come
  * from the shared model index (projected field by field as
- * _shared/lua/llm/model_catalogue.lua projects them on macOS and Linux, pinned
+ * _shared/ai/engine/local_servers/model_catalogue.lua projects them on macOS and Linux, pinned
  * by tools/test/test-model-selector-page.cjs), the installed-tag cache, the API
  * entries and the local servers' rows. Each row's actions are the tray's own
  * closures, held in _LLM_MBW_Rows for the session; the page names a row, never
  * a command.
  *
- * The catalogue is STATIC (_shared/modules/llm/models.json), so it is ALWAYS
+ * The catalogue is STATIC (_shared/ai/data/models.json), so it is ALWAYS
  * injected in full. The installed state reads the asynchronously maintained tag
  * cache: InjectCatalogue runs inside the WebView2 WebMessageReceived (STA COM)
  * callback, and a synchronous /api/tags WinHttp probe against a down daemon
@@ -1710,16 +1710,16 @@ _LLM_MBW_HtmlUrl() {
 	return "https://" . LLM_MBW_VHOST . "/ui/model_browser/index.html?cb=" . A_TickCount
 }
 
-/** Returns the https:// virtual-host URL for _shared/data/locales/ (trailing slash). */
+/** Returns the https:// virtual-host URL for _shared/core/i18n/data/locales/ (trailing slash). */
 _LLM_MBW_LocalesUrl() {
 	global LLM_MBW_VHOST
-	return "https://" . LLM_MBW_VHOST . "/data/locales/"
+	return "https://" . LLM_MBW_VHOST . "/core/i18n/data/locales/"
 }
 
 /** Builds the ExecuteScript call that applies i18n strings (read from disk). */
 _LLM_MBW_I18nApplyScript() {
 	global _SharedDir, _I18nLocale
-	json_path := _SharedDir . "\data\locales\" . _I18nLocale . ".json"
+	json_path := _SharedDir . "\core\i18n\data\locales\" . _I18nLocale . ".json"
 	json_str  := "{}"
 	if FileExist(json_path)
 		try json_str := FileRead(json_path, "UTF-8")

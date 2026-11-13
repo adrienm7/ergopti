@@ -9,4 +9,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.menu_personal_info_source_contract").register(helpers)
+require("tests.lua.menu.personal_info_source_contract").register(helpers)

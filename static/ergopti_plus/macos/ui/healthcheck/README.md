@@ -3,7 +3,7 @@
 ## Purpose
 
 The diagnostics window of the Debug menu. It collects a version 2 snapshot
-(`_shared/modules/diagnostics/schema.json`) and shows it in the shared page
+(`_shared/diagnostics/data/schema.json`) and shows it in the shared page
 (`_shared/ui/healthcheck/`), which renders every section, keeps the preview of
 what is shared and asks the host for each action by message.
 
@@ -34,7 +34,7 @@ Healthcheck.show_window({ state = menu_state })          -- Debug > Diagnostics
 require("ui.healthcheck.report").report_bug({ state = menu_state }) -- Debug > Report a bug (the page's report action, no window)
 ```
 
-Every page message goes through `_shared/lua/healthcheck/actions.lua`: the host
+Every page message goes through `_shared/diagnostics/engine/healthcheck/actions.lua`: the host
 opens only the paths it collected, by field id, and the settings pages the
 schema declares. Everything copied, saved or sent to GitHub is redacted again
-by `_shared/lua/diagnostics/redact.lua`, whatever the page did.
+by `_shared/diagnostics/engine/reports/redact.lua`, whatever the page did.

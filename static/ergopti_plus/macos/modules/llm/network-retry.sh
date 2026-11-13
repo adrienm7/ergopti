@@ -20,7 +20,7 @@
 # identify a PAC evaluation failure, and callers must not infer one from it.
 OPAQUE_NETWORK_REFUSAL_EXIT_CODE=78
 # The user's proxy override (Issue #101 point 2; the Lua prelude validates it
-# with network/proxy_override.lua and exports ERGOPTI_PROXY_OVERRIDE). It is
+# with core/network/engine/proxy_override.lua and exports ERGOPTI_PROXY_OVERRIDE). It is
 # applied before the inherited route is captured, so a relay becomes the
 # explicit route every activation below keeps, and no PAC, WPAD or system lookup
 # runs; "direct" drops every relay and the activations never read the system
@@ -230,22 +230,22 @@ managed_bootstrap_launcher_available() {
 PAC_ROUTE_BUDGET_SEC=20
 
 # The shared origin inventory, beside this file in the bundle and the checkout
-# (macos/modules/llm -> _shared/modules/network). A caller may override it.
+# (macos/modules/llm -> _shared/core/network/data). A caller may override it.
 # The folder is resolved inside an if: a failing command substitution in a
 # plain assignment ended every `set -e` caller that sourced this file, with no
 # line saying why, whenever the folder was missing. The unresolved path then
 # stays the default, and route_origins_for_client refuses it when it is used.
 if [ -z "${ROUTE_ORIGINS_FILE:-}" ]; then
-	if ROUTE_ORIGINS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../_shared/modules/network" 2>/dev/null && pwd)"; then
+	if ROUTE_ORIGINS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../_shared/core/network/data" 2>/dev/null && pwd)"; then
 		ROUTE_ORIGINS_FILE="$ROUTE_ORIGINS_DIR/route_origins.json"
 	else
-		ROUTE_ORIGINS_FILE="$(dirname "${BASH_SOURCE[0]}")/../../../_shared/modules/network/route_origins.json"
+		ROUTE_ORIGINS_FILE="$(dirname "${BASH_SOURCE[0]}")/../../../_shared/core/network/data/route_origins.json"
 	fi
 	unset ROUTE_ORIGINS_DIR
 fi
 
 # The origins one download client contacts, redirect targets included, as the
-# shared inventory (_shared/modules/network/route_origins.json) lists them.
+# shared inventory (_shared/core/network/data/route_origins.json) lists them.
 # Prints one origin per line; fails for an unknown client or a missing file.
 route_origins_for_client() {
 	local client="$1" file="${2:-${ROUTE_ORIGINS_FILE:-}}"
@@ -265,7 +265,7 @@ route_origins_for_client() {
 	' "$file"
 }
 
-# Twin of _shared/lua/network/route_plan.lua and _shared/go/route_plan: both
+# Twin of _shared/core/network/engine/route_plan.lua and _shared/core/network/native/go/route_plan: both
 # answer _shared/tests/corpus/network/route_plan_vectors.json. Reads
 # "<https origin><TAB><route>" lines on stdin, one per looked-up origin, where a
 # route is "direct" or an http, https, socks5 or socks5h relay with a port and
@@ -380,7 +380,7 @@ EOF_ROUTE_PLAN
 # Basic, which the daemon sends, and socks or https relays are not signed in.
 # The relay is the one bundled beside the admitted launcher; the probe signs in
 # once, so "required" proves the user's Kerberos ticket before the daemon
-# depends on it. The probe line is read as network/proxy_auth_relay.lua reads it
+# depends on it. The probe line is read as core/network/engine/proxy_auth_relay_core.lua reads it
 # (the shared proxy_auth_relay_probe_vectors.json pins both). A relay that is
 # not bundled starts the daemon under the proxy as named. A refused sign-in
 # starts the daemon without the proxy, as Windows and Linux do, so the models

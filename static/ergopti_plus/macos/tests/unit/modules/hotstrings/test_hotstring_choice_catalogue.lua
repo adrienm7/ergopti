@@ -9,4 +9,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.hotstring_choice_catalogue_contract").run(helpers, require("hotstrings.choice_catalogue"))
+require("tests.lua.hotstrings.choice_catalogue_contract").run(helpers, require("hotstrings.engine.choice_catalogue"))

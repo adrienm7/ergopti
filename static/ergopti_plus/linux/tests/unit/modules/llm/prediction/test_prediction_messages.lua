@@ -13,13 +13,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local ProfileSelector = require("llm.profile_selector")
+local Json = require("core.text.engine.json")
+local ProfileSelector = require("ai.engine.settings.profile_selector")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 --- The built-in profiles, by id, from the shared catalogue.
 local function builtin(id)
-	local fh = assert(io.open("../_shared/modules/llm/profiles.json", "r"))
+	local fh = assert(io.open("../_shared/ai/data/profiles.json", "r"))
 	local profiles = Json.decode(fh:read("*a"))
 	fh:close()
 	for _, profile in ipairs(profiles) do

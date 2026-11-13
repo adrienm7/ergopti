@@ -74,7 +74,7 @@ function M.path(name, getenv)
 	if program:sub(1, 1) == "/" then return program end
 	if not _path_mode_reported then
 		_path_mode_reported = true
-		require("logger.shim").info(LOG, "No private runtime prefix (%s unset): a source run uses curl, sqlite3, "
+		require("core.logger.engine.shim").info(LOG, "No private runtime prefix (%s unset): a source run uses curl, sqlite3, "
 			.. "openssl and zstd from PATH.", M.PREFIX_ENV)
 	end
 	return program

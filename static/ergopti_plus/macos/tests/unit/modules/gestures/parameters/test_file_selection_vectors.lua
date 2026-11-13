@@ -4,7 +4,7 @@
 --- MODULE: File-manager selection parsers replay the shared vectors (macOS)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/file_selection/vectors.json, which the Linux
---- suite replays too, against _shared/lua/file_selection: the Finder selection
+--- suite replays too, against _shared/core/fs/engine: the Finder selection
 --- as `osascript -ss` prints it, and a text/uri-list selection.
 ---
 --- ROOT CAUSE ENCODED:
@@ -15,8 +15,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local FileSelection = require("file_selection")
+local json = require("core.text.engine.json")
+local FileSelection = require("core.fs.engine.file_selection")
 
 local CORPUS = helpers.shared("tests/corpus/file_selection/vectors.json")
 

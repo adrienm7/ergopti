@@ -16,10 +16,10 @@ local restore_family_preferences = require("tests.support.dynamic_hotstrings_fix
 --- @param body function Receives manager, captured injections, and shared engine.
 local function with_manager(body)
 	local saved_manager = package.loaded["modules.dynamic_hotstrings.manager"]
-	local saved_engine = package.loaded["dynamic_hotstrings"]
+	local saved_engine = package.loaded["hotstrings.engine.dynamic.core"]
 	local saved_injector = package.loaded["modules.hotstrings.injector"]
 	package.loaded["modules.dynamic_hotstrings.manager"] = nil
-	package.loaded["dynamic_hotstrings"] = nil
+	package.loaded["hotstrings.engine.dynamic.core"] = nil
 
 	local injections = {}
 	package.loaded["modules.hotstrings.injector"] = {
@@ -33,11 +33,11 @@ local function with_manager(body)
 		local manager = require("modules.dynamic_hotstrings.manager")
 		manager.init({ personal_info_path = "/definitely/missing/personal_info.toml" })
 		manager.set_enabled(true)
-		body(manager, injections, require("dynamic_hotstrings"))
+		body(manager, injections, require("hotstrings.engine.dynamic.core"))
 	end, debug.traceback)
 
 	package.loaded["modules.hotstrings.injector"] = saved_injector
-	package.loaded["dynamic_hotstrings"] = saved_engine
+	package.loaded["hotstrings.engine.dynamic.core"] = saved_engine
 	package.loaded["modules.dynamic_hotstrings.manager"] = saved_manager
 	if not ok then error(err, 0) end
 end
@@ -80,7 +80,7 @@ helpers.describe("dynamic hotstrings: multibyte trigger", function()
 end)
 
 
-require("test.dynamic_word_boundary_contract")(helpers)
+require("tests.lua.dynamic_word_boundary_contract")(helpers)
 
 local function daemon_source()
 	local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
@@ -91,12 +91,12 @@ end
 
 helpers.describe("Linux owned unknown-context reset boundaries", function()
 	helpers.it("four actual reset prefixes cannot donate a beginning-of-word grant", function()
-		local retained = require("dynamic_hotstrings")
+		local retained = require("hotstrings.engine.dynamic.core")
 		local retained_rules = retained.get_rules()
 		local completed, failure = xpcall(function()
 			with_manager(function(_, _, Dynamic)
 				local source = daemon_source()
-				local Core = require("hotstring_engine")
+				local Core = require("hotstrings.engine.matcher")
 				Dynamic.reset_rules()
 				Dynamic.register_date_rules("★")
 				local count = 0
@@ -130,7 +130,7 @@ helpers.describe("Linux owned unknown-context reset boundaries", function()
 				Dynamic.reset_rules()
 			end)
 		end, debug.traceback)
-		helpers.assert_true(rawequal(package.loaded["dynamic_hotstrings"], retained), "the exact prior module owner must survive")
+		helpers.assert_true(rawequal(package.loaded["hotstrings.engine.dynamic.core"], retained), "the exact prior module owner must survive")
 		helpers.assert_true(rawequal(retained.get_rules(), retained_rules), "the exact prior rule array must survive")
 		if not completed then error(failure, 0) end
 	end)
@@ -159,7 +159,7 @@ local BOUNDARY_RESET_CONTEXTS = {
 helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)", function()
 	helpers.it("each reviewed daemon reset leaves the next word start unknown", function()
 		local source = daemon_source()
-		local Core = require("hotstring_engine")
+		local Core = require("hotstrings.engine.matcher")
 		local compile = loadstring or load
 		local count = 0
 		for _, marker in ipairs(UNKNOWN_CONTEXT_MARKERS) do
@@ -298,7 +298,7 @@ helpers.describe("Linux builtin dynamic word-start owners", function()
 				.. "local ch, app_id, tooltip_preview, result, now_ms = '★', 'owned-fixture', nil, nil, 0\n"
 				.. "local opts = { dry_run = false }\n"
 				.. slice .. "\nend", "@actual-dynamic-daemon-parent"))()
-			local engine = require("hotstring_engine").new()
+			local engine = require("hotstrings.engine.matcher").new()
 			-- The daemon's engine wrapper also carries the AI context; this slice only
 			-- needs it to hand the prediction callback the text just typed.
 			engine.ai_context = function() return { text = function() return engine:current_buffer() end } end
@@ -334,7 +334,7 @@ helpers.describe("Linux builtin dynamic word-start owners", function()
 	end)
 	helpers.it("uses the retained engine boundary through full magic-key buffers", function()
 		with_manager(function(manager, injections)
-			local engine = require("hotstring_engine").new()
+			local engine = require("hotstrings.engine.matcher").new()
 			engine:reset(false)
 			for _, char in ipairs({ "d", "a", "t", "e", "★" }) do engine:on_char(char) end
 			local buffer = engine:current_buffer()
@@ -353,7 +353,7 @@ helpers.describe("Linux builtin dynamic word-start owners", function()
 	end)
 	helpers.it("keeps every personal prefix under the genuine ordinary matcher gate", function()
 		local Prefix = require("modules.dynamic_hotstrings.prefix_rules")
-		local Core = require("hotstring_engine")
+		local Core = require("hotstrings.engine.matcher")
 		local entries = Prefix.build({ phone_number = "0612345678", phone_number_clean = "06 12 34 56 78",
 			social_security_number = "1 99 99 99 999 999 99", iban = "FR00 0000 0000 0000" }, function() return true end)
 		local count = 0

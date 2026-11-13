@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Centralizes shared helpers used by every LLM backend (MLX, Ollama, remote API)
 --- — diversity temperature stepping, exact-text deduplication, retry policy.
---- The tunable numbers live in ``static/ergopti_plus/_shared/modules/llm/inference.json``
+--- The tunable numbers live in ``static/ergopti_plus/_shared/ai/data/inference.json``
 --- next to defaults.json so the AHK twin (modules/llm/api_common.ahk) reads
 --- the SAME values: change a knob there and both drivers track it in lockstep.
 ---
@@ -24,8 +24,8 @@ local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
 local FileSystem = require("adapters.file_system")   -- OS-pure file read (port FileSystem)
 local JsonCodec  = require("adapters.json_codec")    -- OS-pure JSON decode (port JsonCodec)
-local Temperature = require("llm.temperature")       -- shared diversity temperature algorithm
-local FailureClass = require("llm.failure_class")     -- shared authentication-failure verdict
+local Temperature = require("ai.engine.policy.temperature")       -- shared diversity temperature algorithm
+local FailureClass = require("ai.engine.policy.failure_class")     -- shared authentication-failure verdict
 local LOG    = "llm.api_common"
 
 
@@ -68,7 +68,7 @@ local FALLBACK = {
 --- ~/.hammerspoon setups alike. Falls back to FALLBACK on any read/parse failure.
 --- @return table The constants table (always non-nil — falls back to FALLBACK).
 local function load_inference_constants()
-	local p = Paths.shared("modules/llm/inference.json")
+	local p = Paths.shared("ai/data/inference.json")
 	if type(p) == "string" and p ~= "" then
 		local fh = io.open(p, "r")
 		if fh then
@@ -95,7 +95,7 @@ local INFERENCE = load_inference_constants()
 --- temperature nil).
 --- @return number The default generation temperature.
 local function load_default_temperature()
-	local p = Paths.shared("modules/llm/defaults.json")
+	local p = Paths.shared("ai/data/defaults.json")
 	if type(p) == "string" and p ~= "" then
 		local raw = FileSystem.read(p)
 		if raw then
@@ -120,7 +120,7 @@ M.DEFAULT_TEMPERATURE = DEFAULT_TEMPERATURE
 --- missing value fails that test with its cause.
 --- @return number
 function M.test_prediction_temperature()
-	local raw = FileSystem.read(Paths.shared("modules/llm/defaults.json"))
+	local raw = FileSystem.read(Paths.shared("ai/data/defaults.json"))
 	local parsed = raw and JsonCodec.decode(raw)
 	local value = type(parsed) == "table" and tonumber(parsed.llm_test_prediction_temperature)
 	if not value then error("defaults.json has no llm_test_prediction_temperature", 0) end
@@ -133,7 +133,7 @@ end
 --- FALLBACK convention above (a corrupt JSON never leaves keep_alive nil).
 --- @return string The default keep-alive window.
 local function load_default_keep_alive()
-	local p = Paths.shared("modules/llm/defaults.json")
+	local p = Paths.shared("ai/data/defaults.json")
 	if type(p) == "string" and p ~= "" then
 		local raw = FileSystem.read(p)
 		if raw then
@@ -216,7 +216,7 @@ end
 -- =========================================
 
 --- Computes request temperature for a prediction variant through the shared
---- algorithm (_shared/lua/llm/temperature.lua), which the Linux engine and the
+--- algorithm (_shared/ai/engine/policy/temperature.lua), which the Linux engine and the
 --- AHK twin's vectors follow too: the step depends on the base unless one is
 --- given, a base below the floor is raised from the second variant on, and the
 --- result is clamped at the policy's maximum.

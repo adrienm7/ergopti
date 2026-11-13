@@ -18,11 +18,11 @@ local Config = require("ui.tooltip.config")
 local AXResponsiveness = require("adapters.accessibility_permission")
 -- The two pieces of tooltip maths that must not differ between drivers, and
 -- are pinned to the same JSON vectors on both.
-local SharedTint   = require("tooltip.tint")
-local SharedLayout = require("tooltip.layout")
+local SharedTint   = require("core.ui.engine.tooltip.tint")
+local SharedLayout = require("core.ui.engine.tooltip.layout")
 
 -- Corner arc radius for ALL tooltip rounding (single + stacked canvases). Read
--- from the shared cross-driver source (_shared/modules/tooltip/constants.toml → Config)
+-- from the shared cross-driver source (_shared/core/ui/data/tooltip/constants.toml → Config)
 -- so macOS and Windows round identically — never hardcode it here.
 local CORNER_RADIUS = Config.layout.corner_radius
 
@@ -239,7 +239,7 @@ end
 
 --- Generates a dark background color while injecting a slight tint hue if permitted.
 ---
---- The maths lives in _shared/lua/tooltip/tint.lua and is shared with Linux.
+--- The maths lives in _shared/core/ui/engine/tooltip/tint.lua and is shared with Linux.
 --- Keeping the hue while imposing one lightness and one saturation is what makes
 --- every category recognisable AND every panel equally readable — darkening each
 --- accent by a fixed amount instead produces visibly different brightnesses side
@@ -382,7 +382,7 @@ end
 --- docstring claimed to catch "any divergence in clamping or positioning". It
 --- pinned the clone; a divergence here was caught by nothing.
 ---
---- Mirrors _shared/modules/tooltip/layout.js resolvePosition + clampToScreen,
+--- Mirrors _shared/core/ui/data/tooltip/layout.js resolvePosition + clampToScreen,
 --- and the Windows _TooltipClampRect.
 --- @param anchor table|nil { type = "caret"|…, x, y, w, h }; nil = screen centre-bottom.
 --- @param canvas table { w, h } The canvas size in layout units.

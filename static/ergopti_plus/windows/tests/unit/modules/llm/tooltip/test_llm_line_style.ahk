@@ -15,7 +15,7 @@
 ; green piece, no typed text, no next words. The parser's own reading now
 ; travels beside the slots to the render, and the retired diff is gone.
 ;
-; The line rule is the Windows port of _shared/lua/tooltip/llm_line.lua; section
+; The line rule is the Windows port of _shared/core/ui/engine/tooltip/llm_line.lua; section
 ; 1 replays the corpus the three drivers share against it.
 ; ==============================================================================
 
@@ -321,7 +321,7 @@ _LLS_DrawMeasuresTheActualPaintedWeight() {
 		; The headless runner does not load UI styles at boot. Paint with the
 		; actual shared typography instead of the empty-family/zero-size sentinels,
 		; which select a legacy stock font that cannot represent the bold spans.
-		Constants := ParseTomlFile(_SharedDir . "\modules\tooltip\constants.toml")
+		Constants := ParseTomlFile(_SharedDir . "\core\ui\data\tooltip\constants.toml")
 		Family := IniCacheGet(Constants, "typography", "font_main_ahk")
 		PointSize := IniCacheGet(Constants, "typography", "font_size_main_ahk")
 		Assert(Family != "_" && Family != "", "the native fixture requires the shared font family")

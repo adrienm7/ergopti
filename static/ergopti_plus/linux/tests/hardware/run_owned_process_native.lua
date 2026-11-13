@@ -3,9 +3,9 @@
 local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver_root = assert(self_path:match("^(.*)/tests/hardware/[^/]+$"),
 	"launch with an absolute script path")
-local shared_root = driver_root .. "/../_shared/lua"
+local shared_root = driver_root .. "/../_shared"
 package.path = driver_root .. "/?.lua;" .. shared_root .. "/?.lua;" .. package.path
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 
 local uv = require("luv")
 local Owner = require("adapters.owned_process")

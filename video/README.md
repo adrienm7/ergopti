@@ -12,17 +12,17 @@ to MP4). The plan of the film, scene by scene, is in
 The project reads the repository instead of duplicating it, so a change to the
 driver or the site shows up at the next render with no synchronisation step:
 
-| On screen                                     | Comes from                                                                      |
-| --------------------------------------------- | ------------------------------------------------------------------------------- |
-| Hotstring editor, model catalogue, dashboards | The driver's real windows (`static/ergopti_plus/_shared/ui/`), rendered live    |
-| Data those windows show                       | `src/lib/js/driverWindowHost.js`, the host module the website uses too          |
-| Dashboard demo data                           | `static/demo/*_prefetch.json` (`tools/dev/gen-demo-metrics.cjs`)                |
-| Figures (2,994 hotstrings, 110 models…)       | The sales page's build-time loader, `src/routes/ergopti-plus/+page.server.js`   |
-| Hotstring outputs (`pex★` → `par exemple`)    | The driver's hotstring TOML files; only the triggers live in `src/data/`        |
-| Tap-holds, action labels, gesture count       | `_shared/tap_hold/defaults.toml`, `actions.toml`, `en.json`, the menu manifest  |
-| Tooltip look and AI line colours              | `_shared/modules/tooltip/constants.toml`                                        |
-| Colours, gradients, radii, fonts              | The site's CSS (`global.css`, `ergopti_name.css`, `ergopti-plus.css`), imported |
-| Music and interface sounds                    | Synthesised by `scripts/make-audio.mjs`; no licensed asset                      |
+| On screen                                     | Comes from                                                                          |
+| --------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Hotstring editor, model catalogue, dashboards | The driver's real windows (`static/ergopti_plus/_shared/ui/`), rendered live        |
+| Data those windows show                       | `src/lib/js/driverWindowHost.js`, the host module the website uses too              |
+| Dashboard demo data                           | `static/demo/*_prefetch.json` (`tools/dev/gen-demo-metrics.cjs`)                    |
+| Figures (2,994 hotstrings, 110 models…)       | The sales page's build-time loader, `src/routes/ergopti-plus/+page.server.js`       |
+| Hotstring outputs (`pex★` → `par exemple`)    | The driver's hotstring TOML files; only the triggers live in `src/data/`            |
+| Tap-holds, action labels, gesture count       | `_shared/tap_hold/data/defaults.toml`, `actions.toml`, `en.json`, the menu manifest |
+| Tooltip look and AI line colours              | `_shared/core/ui/data/tooltip/constants.toml`                                       |
+| Colours, gradients, radii, fonts              | The site's CSS (`global.css`, `ergopti_name.css`, `ergopti-plus.css`), imported     |
+| Music and interface sounds                    | Synthesised by `scripts/make-audio.mjs`; no licensed asset                          |
 
 `scripts/prepare.mjs` runs before every studio session and render. It fails
 when a demonstrated trigger, locale key or source folder no longer exists, so

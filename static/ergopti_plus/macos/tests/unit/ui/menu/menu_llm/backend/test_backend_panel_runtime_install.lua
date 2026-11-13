@@ -378,7 +378,7 @@ helpers.describe("provider checkmark owns its publication (backend-checkmark)", 
 	local modules = {}
 	for _, name in ipairs(OWNED_MODULES) do modules[#modules + 1] = name end
 	for _, name in ipairs({ "ui.menu.menu_llm.model_switcher", "ui.menu.menu_llm.prediction_lock_registry",
-		"ui.menu.menu_llm.profile_label", "adapters.timer_scheduler", "llm.tone" }) do
+		"ui.menu.menu_llm.profile_label", "adapters.timer_scheduler", "ai.engine.prediction.tone" }) do
 		modules[#modules + 1] = name
 	end
 	local function fixture(target, rejects_menu, scenario)

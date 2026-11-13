@@ -29,7 +29,7 @@
 ;    the application handles each exactly as if it had just been struck: after
 ;    the tap, or under the hold.
 ; 5. Scope: only the keys of the shared list ([tap_hold.rollover] in
-;    _shared/tap_hold/defaults.toml) whose tap is the key itself. A modifier
+;    _shared/tap_hold/data/defaults.toml) whose tap is the key itself. A modifier
 ;    key, or a key whose tap runs an action, keeps the hold it takes at
 ;    key-down: its chords and its clicks must not wait.
 ; ==============================================================================
@@ -73,7 +73,7 @@ _TapHoldRollState() {
 _TapHoldReadRollKeys() {
 	global _SharedDir
 	Keys := Map()
-	Path := (IsSet(_SharedDir) ? _SharedDir : "") . "\tap_hold\defaults.toml"
+	Path := (IsSet(_SharedDir) ? _SharedDir : "") . "\tap_hold\data\defaults.toml"
 	try {
 		Sections := TOML_ParseFreshFile(Path)
 		List := Sections.Has("tap_hold.rollover") ? Sections["tap_hold.rollover"].Get("keys", "") : ""

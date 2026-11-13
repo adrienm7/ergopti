@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Runs the real layout owner with a controlled installer completion port.
 --- @param options table { deferred?, failure?, listener? }

@@ -601,9 +601,9 @@ async function run({
 				'/?.lua;' +
 				driver +
 				'/?/init.lua;' +
-				path.join(driver, '../_shared/lua/?.lua') +
+				path.join(driver, '../_shared/?.lua') +
 				';' +
-				path.join(driver, '../_shared/lua/?/init.lua')
+				path.join(driver, '../_shared/?/init.lua')
 		};
 		phase = 'gio-native-build';
 		const compileEnv = { ...env };

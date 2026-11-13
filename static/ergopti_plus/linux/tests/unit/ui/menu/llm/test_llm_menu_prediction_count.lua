@@ -89,9 +89,9 @@ end)
 
 -- The free numeric entry is a complete fixed tail, shared by debounce and all
 -- four generation pickers. Its context and native publication owners stay local.
-local NumericJson = require("json")
-local NumericSandbox = require("test.config_unused_keys_contract").sandbox
-local NumericRenderer = require("menu.renderer")
+local NumericJson = require("core.text.engine.json")
+local NumericSandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local NumericRenderer = require("menu.engine.renderer")
 local NumericRoot = helpers.driver_root() .. "/../_shared/"
 --- Reads an independent corpus or locale as exact physical bytes.
 --- @param path string
@@ -120,18 +120,18 @@ local function with_numeric_menu(options, exercise)
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") or name:match("^infra%.llm_") then package.loaded[name] = nil end
 		end
-		package.loaded["toml_codec.writer"] = nil
-		local writer = require("toml_codec.writer")
+		package.loaded["core.text.engine.toml_codec.writer"] = nil
+		local writer = require("core.text.engine.toml_codec.writer")
 		package.loaded["infra.config_paths"] = { config = function() return path end }
 		local locale = options.locale or "en"
-		local strings = NumericJson.decode(numeric_read(NumericRoot .. "data/locales/" .. locale .. ".json"))
+		local strings = NumericJson.decode(numeric_read(NumericRoot .. "core/i18n/data/locales/" .. locale .. ".json"))
 		local translate = { get = function(key) return strings[key] or key end,
 			section = function(key) return strings[key] or key end, get_locale = function() return locale end }
 		setmetatable(translate, { __index = loaded["infra.i18n"] })
 		package.loaded["infra.i18n"] = translate
 		local renderer = assert(NumericRenderer.new({ platform = options.platform or "linux",
-			manifest_path = function() return NumericRoot .. "modules/menu/menu_manifest.json" end, json_decode = NumericJson.decode,
-			i18n = translate, logger = require("logger.shim") }))
+			manifest_path = function() return NumericRoot .. "menu/data/menu_manifest.json" end, json_decode = NumericJson.decode,
+			i18n = translate, logger = require("core.logger.engine.shim") }))
 		local declaration = renderer.get_array("llm_numeric_custom_rows")
 		if options.mutate then options.mutate(declaration) end
 		package.loaded["infra.manifest_menu"] = renderer
@@ -312,7 +312,7 @@ helpers.describe("tray (linux): declared free numeric tails", function()
 				helpers.assert_eq(NumericSandbox.read_bytes(f.path), f.initial)
 				helpers.assert_eq(f.log.changed, 0)
 				helpers.assert_type(f.writer.write_refusal(f.path), "string")
-				package.loaded["toml_codec.writer"] = nil
+				package.loaded["core.text.engine.toml_codec.writer"] = nil
 				package.loaded["infra.llm_preferences"] = nil
 				helpers.assert_eq(spec.on_save(context.candidate), false,
 					"replacement preference owners cannot adopt the retained request")

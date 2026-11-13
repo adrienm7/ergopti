@@ -20,8 +20,8 @@ local HAS_SQLITE = (function()
 end)()
 
 local Ledger = require("modules.keystats.metrics_ledger")
-local Queries = require("keystats.queries")
-local quote = require("text_utils").shell_quote
+local Queries = require("metrics.engine.queries")
+local quote = require("core.text.engine.utils_core").shell_quote
 
 local DEVICE = "linux-ledger-host"
 
@@ -32,7 +32,7 @@ end
 
 local function schema_sql()
 	local root = helpers.driver_root()
-	local handle = assert(io.open(root .. "/../_shared/data/db/schema.sql", "rb"))
+	local handle = assert(io.open(root .. "/../_shared/metrics/data/db/schema.sql", "rb"))
 	local text = handle:read("*a")
 	handle:close()
 	return text
@@ -94,7 +94,7 @@ local function insert_rows(db, first_id, date)
 		{ "events.hotstring", { app = "kate", kind = "fired", trigger = "btw", replacement = "by the way", h_type = "user",
 			net_saved_chars = 7 } },
 		{ "events.session", { kind = "session_start", duration_ms = 0 } },
-		{ "events.roi", { app = "kate", kind = "new_trigger_candidate", meta_json = require("json").encode({ word = tricky, occurrences = 5 }) } },
+		{ "events.roi", { app = "kate", kind = "new_trigger_candidate", meta_json = require("core.text.engine.json").encode({ word = tricky, occurrences = 5 }) } },
 		{ "events.llm", { app = "kate", kind = "suggested", context = "ctx", predictions_json = "[]", prediction = "p",
 			all_predictions_json = "[]", chosen_index = 0, deletes = 0, deleted_text = "", net_saved_chars = 0, count = 1,
 			prompt_tokens = 1, completion_tokens = 1, total_tokens = 2, est_cost_usd = 0 } },
@@ -107,9 +107,9 @@ local function insert_rows(db, first_id, date)
 	end
 	-- events_clipboard is rendered by the shared clipboard module, outside the catalogue.
 	local clipboard_id = first_id + #rows
-	script[#script + 1] = require("keystats.clipboard_events").insert_sql({ device_id = DEVICE, id = clipboard_id,
+	script[#script + 1] = require("metrics.engine.capture.clipboard_events").insert_sql({ device_id = DEVICE, id = clipboard_id,
 		ts = TS, date = date, kind = "clipboard_paste", app = "kate",
-		meta_json = require("json").encode({ copy_lag_ms = 12, source_app = tricky }) })
+		meta_json = require("core.text.engine.json").encode({ copy_lag_ms = 12, source_app = tricky }) })
 	assert(sqlite(db, table.concat(script, "\n")))
 	-- INSERT OR IGNORE drops a row a CHECK refuses: prove every family landed.
 	local count = assert(sqlite(db, "SELECT (SELECT count(*) FROM events_typing)"
@@ -274,7 +274,7 @@ helpers.describe("Linux metrics ledger export", function()
 	end)
 
 	it("linux-ledger-meta-decode: values survive the line framing and junk is counted", function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local recorded, malformed = Ledger.decode_meta({
 			Json.encode(Ledger.META.date) .. "\t" .. Json.encode("2026-11-05"),
 			Json.encode(Ledger.META.device) .. "\t" .. Json.encode("dev\0ice\nx"),
@@ -330,7 +330,7 @@ helpers.describe("Linux metrics ledger export", function()
 		local store = new_store(dir .. "/metrics.sqlite")
 		local ledger = make_ledger(dir, store)
 		assert(ledger:prepare())
-		local identity = require("json").decode(read(dir .. "/metrics/by_device/" .. DEVICE .. "/device.json"))
+		local identity = require("core.text.engine.json").decode(read(dir .. "/metrics/by_device/" .. DEVICE .. "/device.json"))
 		helpers.assert_eq(identity.device_id, DEVICE)
 		helpers.assert_eq(identity.os, "linux")
 		helpers.assert_eq(identity.host_signature, "machine")

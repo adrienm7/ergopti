@@ -7,8 +7,8 @@
  * Generates `macos/_generated/hid_key_identity.lua`, the table the macOS
  * physical-key stream uses to turn a raw HID (usage page, usage) into the macOS
  * virtual keycode the metrics already store, from the physical-key registry
- * `_shared/data/keycodes/physical_keys.json` and its HID companion
- * `_shared/data/keycodes/hid_usages.json`.
+ * `_shared/layouts/data/keycodes/physical_keys.json` and its HID companion
+ * `_shared/layouts/data/keycodes/hid_usages.json`.
  *
  * FEATURES & RATIONALE:
  * 1. Single source per concern: the registry owns every key's macOS keycode
@@ -42,8 +42,8 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const REGISTRY = path.join(SP, '_shared', 'data', 'keycodes', 'physical_keys.json');
-const HID_USAGES = path.join(SP, '_shared', 'data', 'keycodes', 'hid_usages.json');
+const REGISTRY = path.join(SP, '_shared', 'layouts', 'data', 'keycodes', 'physical_keys.json');
+const HID_USAGES = path.join(SP, '_shared', 'layouts', 'data', 'keycodes', 'hid_usages.json');
 const OUT = path.join(SP, 'macos', '_generated', 'hid_key_identity.lua');
 
 // The largest usage of each page a registry key may carry: the Keyboard/Keypad
@@ -115,7 +115,9 @@ const q = (s) => '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '
 
 const lines = [];
 lines.push('--- _generated/hid_key_identity.lua');
-lines.push('--- AUTO-GENERATED from _shared/data/keycodes/{physical_keys,hid_usages}.json.');
+lines.push(
+	'--- AUTO-GENERATED from _shared/layouts/data/keycodes/{physical_keys,hid_usages}.json.'
+);
 lines.push('--- DO NOT EDIT BY HAND — run `npm run codegen:hid-key-identity:hs` to refresh.');
 lines.push('');
 lines.push('--- ==============================================================================');

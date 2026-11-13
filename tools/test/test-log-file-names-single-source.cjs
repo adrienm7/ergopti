@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Fails when driver code spells a log file-name prefix itself instead of
  * reading it from the generated application-folders data
- * (_shared/modules/paths/app_dirs.toml, emitted by codegen-app-dirs.cjs).
+ * (_shared/core/fs/data/paths/app_dirs.toml, emitted by codegen-app-dirs.cjs).
  *
  * ROOT CAUSE ENCODED:
  * The dated names were rebuilt from literals in about twenty files across the
@@ -36,7 +36,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 
 const registry = toml.parse(
-	fs.readFileSync(path.join(SP, '_shared/modules/paths/app_dirs.toml'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared/core/fs/data/paths/app_dirs.toml'), 'utf8')
 );
 const FILES = registry.logs.files;
 const UNIFIED = FILES.unified_prefix;
@@ -44,7 +44,7 @@ const ERRORS = FILES.errors_prefix;
 
 // The generated owners, which are the only files allowed to spell the names.
 const GENERATED_OWNERS = [
-	'_shared/lua/app_dirs.lua',
+	'_shared/core/fs/engine/app_dirs.lua',
 	'windows/_generated/app_dirs.ahk',
 	'macos/launcher/Sources/ErgoptiPlus/AppDirs.generated.swift'
 ];
@@ -234,7 +234,7 @@ console.log(
 function assertManagedWindowsRuntimeContract() {
 	const assert = require('node:assert/strict');
 	const vm = require('node:vm');
-	const source = fs.readFileSync(path.join(SP, '_shared/modules/paths/app_dirs.toml'), 'utf8');
+	const source = fs.readFileSync(path.join(SP, '_shared/core/fs/data/paths/app_dirs.toml'), 'utf8');
 	const generator = fs.readFileSync(path.join(ROOT, 'tools/codegen/codegen-app-dirs.cjs'), 'utf8');
 	const declared = toml.parse(source);
 	const nativeFunction = 'AppDirsWindowsManagedOllamaFolderName';
@@ -243,7 +243,7 @@ function assertManagedWindowsRuntimeContract() {
 		const writes = new Map();
 		const messages = [];
 		let refusal = false;
-		const sourcePath = path.join(SP, '_shared/modules/paths/app_dirs.toml');
+		const sourcePath = path.join(SP, '_shared/core/fs/data/paths/app_dirs.toml');
 		const filesystem = {
 			readFileSync(filename, encoding) {
 				assert.equal(filename, sourcePath);

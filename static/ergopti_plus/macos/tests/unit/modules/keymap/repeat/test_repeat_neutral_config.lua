@@ -1,7 +1,7 @@
 --- tests/unit/modules/keymap/repeat/test_repeat_neutral_config.lua
 
 local helpers = require("tests.helpers")
-local codec = require("toml_codec")
+local codec = require("core.text.engine.toml_codec")
 
 helpers.describe("neutral repeat configuration", function()
 	helpers.it("requires explicit repeat intent and saves it through the canonical sparse preferences", function()

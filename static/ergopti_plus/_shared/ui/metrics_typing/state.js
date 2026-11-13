@@ -403,7 +403,7 @@ const HALF_HEIGHT_KEYS = {
 
 // =================================================================================
 // Single source of truth for keycode → finger / hand / home assignments is
-// `static/ergopti_plus/_shared/data/keycodes/azerty.json` (DC-1). KEYCODE_DATA
+// `static/ergopti_plus/_shared/layouts/data/keycodes/azerty.json` (DC-1). KEYCODE_DATA
 // itself is generated from it by `npm run codegen:keycode-data:js` into
 // _generated/keycode_data.js, loaded via a <script> tag immediately before this
 // file in index.html — the global KEYCODE_DATA it declares is used below. The

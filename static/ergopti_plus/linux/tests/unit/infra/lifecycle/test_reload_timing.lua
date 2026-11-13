@@ -9,15 +9,15 @@
 --- the delivered log lines the field log analyser reads (linux-reload-budget).
 --- ==============================================================================
 
-local helpers = require("tests.support.logger_fixture").helpers({ "infra.reload_timing", "perf_budget" })
+local helpers = require("tests.support.logger_fixture").helpers({ "infra.reload_timing", "core.logger.engine.perf_budget" })
 
 --- Loads a fresh module whose stamp lives in a private folder, with the real logger.
 --- @param budget_ms number The driver_reload_ms the judge reads.
 --- @return table timing, table lines, table clock, function cleanup
 local function fixture(budget_ms)
-	package.loaded["logger"] = nil
-	package.loaded["logger.shim"] = nil
-	local logger = require("logger")
+	package.loaded["core.logger.engine"] = nil
+	package.loaded["core.logger.engine.shim"] = nil
+	local logger = require("core.logger.engine")
 	local lines = {}
 	logger.set_sink(function(line) lines[#lines + 1] = line end)
 	logger.set_level(20)

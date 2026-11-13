@@ -6,11 +6,11 @@
 --- Replays _shared/tests/corpus/action_parameters/wrap_pair_vectors.json, which
 --- the macOS and Windows suites replay too, through the gesture validator and
 --- the shortcuts manager's resolver over the real shared catalogue
---- (_shared/modules/wrap_symbols/wrap_symbols.json).
+--- (_shared/keyboard/data/wrap_symbols/wrap_symbols.json).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/action_parameters/wrap_pair_vectors.json"
 

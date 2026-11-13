@@ -14,7 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- A gestures facade whose store records what it is given.
 --- @param stored table Receives { binding, action, value } rows.
@@ -99,12 +99,12 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 			"ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }
 		local label = 'Application "quoted" %s'
 		for _, code in ipairs(locales) do
-			local file = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "r"))
+			local file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. code .. ".json"), "r"))
 			local strings = Json.decode(file:read("*a")); file:close()
 			local template = strings["dialog.gestures.param_title"]
 			local first = assert(template:find("{1}", 1, true))
 			local expected = template:sub(1, first - 1) .. label .. template:sub(first + 3)
-			helpers.with_stub_scope({ "ui.menu.shortcut_utils", "infra.dialog_util", "infra.i18n", "window_titles" }, function()
+			helpers.with_stub_scope({ "ui.menu.shortcut_utils", "infra.dialog_util", "infra.i18n", "core.ui.engine.window_titles" }, function()
 				local scripts = {}
 				helpers.load_with_stubs("infra.dialog_util", { osascript = { applescript = function(script)
 					scripts[#scripts + 1] = script
@@ -127,9 +127,9 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 
 	helpers.it("uses the shared caption policy before escaping or removing the prefix", function()
 		for _, policy in ipairs({ 'Other "product" C:\\', "" }) do
-			helpers.with_stub_scope({ "infra.dialog_util", "window_titles" }, function()
+			helpers.with_stub_scope({ "infra.dialog_util", "core.ui.engine.window_titles" }, function()
 				local observed = {}
-				package.loaded["window_titles"] = { compose = function(title)
+				package.loaded["core.ui.engine.window_titles"] = { compose = function(title)
 					observed[#observed + 1] = title
 					return policy .. title
 				end }

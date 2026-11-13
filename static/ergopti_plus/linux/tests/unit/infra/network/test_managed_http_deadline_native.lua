@@ -10,12 +10,12 @@
 --- One registered envelope contains the complete original four native controls.
 local helpers = require("tests.helpers")
 helpers.it("managed_http: actual luv complete four-control inventory", function()
-    local cleanup_logger = require("logger.shim")
+    local cleanup_logger = require("core.logger.engine.shim")
     local saved_error = cleanup_logger.error
     local ok, detail = pcall(function()
 local uv = require("luv")
 local Clock = require("infra.monotonic")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local logs = {}
 Logger.error = function(_, message) logs[#logs + 1] = message end
 local Deadline = helpers.fresh_module("infra.managed_http_deadline")

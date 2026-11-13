@@ -48,7 +48,7 @@ end
 
 helpers.describe("Action picker exact close successor", function()
 	helpers.it("(picker-private-exception) withholds callback data from the log", function()
-		local logger, lines = require("logger.shim"), {}
+		local logger, lines = require("core.logger.engine.shim"), {}
 		local original = logger.error
 		logger.error = function(_, fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
 		local ok, err = pcall(function()

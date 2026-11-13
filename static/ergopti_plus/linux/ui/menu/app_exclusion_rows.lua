@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 --- A translated string, or its key when the catalogue cannot answer.
 --- @param key string

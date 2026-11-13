@@ -3,11 +3,11 @@
 --- Native prompts and acknowledged local API selections for the shared menu.
 local M = {}
 local Servers = require("modules.llm.local_servers")
-local Menu = require("llm.local_server_menu")
+local Menu = require("ai.engine.local_servers.menu")
 local Remote = require("modules.llm.api_remote")
 local Entries = require("modules.llm.api_entries")
 local I18n = require("infra.i18n")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "ui.menu.local_server_rows"
 local function format(key, ...)
 	local values = { ... }

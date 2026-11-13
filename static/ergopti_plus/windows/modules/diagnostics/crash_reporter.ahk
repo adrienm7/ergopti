@@ -23,7 +23,7 @@
 ;    (LoggerCrashReportsDir), beside the daily log that explains them, and
 ;    follow a LogsDirPath override.
 ; 5. One document with macOS and Linux: the fields, their order and defaults, the
-;    file name and the cap of _shared/lua/crash_report.lua, replayed from
+;    file name and the cap of _shared/diagnostics/engine/reports/crash_report.lua, replayed from
 ;    _shared/tests/corpus/diagnostics/crash_report_vectors.json. What only this
 ;    driver knows (the AHK error object's parts, the hardware, the held modifiers)
 ;    follows the shared fields, so a reader never branches on the driver.
@@ -42,13 +42,13 @@
 ; ============================
 
 ; The number of reports kept in the crash folder, newest first.
-; Single source of the value: _shared/lua/crash_report.lua MAX_REPORTS, pinned by
+; Single source of the value: _shared/diagnostics/engine/reports/crash_report.lua MAX_REPORTS, pinned by
 ; the shared vectors.
 global CRASH_REPORT_MAX_REPORTS := 20
 
 ; The fields of a report, in the order they are written, with their defaults: what
 ; a driver that cannot know a field records. The same table as FIELDS in
-; _shared/lua/crash_report.lua, pinned by the shared vectors.
+; _shared/diagnostics/engine/reports/crash_report.lua, pinned by the shared vectors.
 global CRASH_REPORT_FIELDS := [
 	["version", "unknown"], ["driver", "unknown"], ["timestamp", ""], ["module", ""],
 	["error_msg", ""], ["stack_trace", ""], ["os_version", "unknown"], ["hs_version", "unknown"],
@@ -123,7 +123,7 @@ CrashReport_Build(ErrorObj) {
 	; already degraded, so a second redundant run only widens the input-dead window.
 	HC := ""
 	try HC := HealthCheck_Run()
-	; The version 2 snapshot's sections (_shared/modules/diagnostics/schema.json).
+	; The version 2 snapshot's sections (_shared/diagnostics/data/schema.json).
 	; _HealthCheck_Collect substitutes an EMPTY Map when a collector throws, so
 	; every read below goes through .Get.
 	Sections := (HC is Map && HC.Has("sections")) ? HC["sections"] : Map()

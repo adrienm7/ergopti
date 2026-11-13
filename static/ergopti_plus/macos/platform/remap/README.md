@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This module generates ErgoptiPlus complex modifications and merges them into the user's existing `karabiner.json`. It also persists the ErgoptiPlus remapping preferences stored in the shared `tap_hold.toml` (`_shared/tap_hold/SCHEMA.md`; an old `config_karabiner.toml` is carried over once).
+This module generates ErgoptiPlus complex modifications and merges them into the user's existing `karabiner.json`. It also persists the ErgoptiPlus remapping preferences stored in the shared `tap_hold.toml` (`_shared/tap_hold/data/SCHEMA.md`; an old `config_karabiner.toml` is carried over once).
 
 Its tap-holds and chords are configured under the same "Tap-Holds" menu
 Windows uses.

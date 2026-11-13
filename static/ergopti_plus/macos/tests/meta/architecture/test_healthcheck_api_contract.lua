@@ -135,7 +135,7 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 	local failures = {}
 	local ok_run, snap
 	local scope = {
-		"infra.logger", "logger", "modules.llm", "ui.healthcheck", "ui.healthcheck.core", "ui.healthcheck.helpers",
+		"infra.logger", "core.logger.engine", "modules.llm", "ui.healthcheck", "ui.healthcheck.core", "ui.healthcheck.helpers",
 	}
 	for _, name in ipairs(HS_READERS) do scope[#scope + 1] = name end
 	helpers.with_stub_scope(scope, function()

@@ -10,7 +10,7 @@
 # checkout install loses those hotstrings.
 
 # The registry folder below a driver root: the "folder" of the registry settings
-# in _shared/modules/layouts/defaults.json, which
+# in _shared/layouts/data/defaults.json, which
 # tools/test/test-linux-install-layout-registry.cjs keeps equal to this value.
 LAYOUT_REGISTRY_FOLDER="static/layouts/registry"
 LAYOUT_REGISTRY_INDEX="index.json"

@@ -1,8 +1,8 @@
 --- tests/unit/modules/llm/runtime/test_process_limits.lua
 
 local helpers = require("tests.helpers")
-local Worker = require("native_worker_owner")
-local Port = require("llm.finite_process_port")
+local Worker = require("core.lifecycle.engine.native_worker_owner")
+local Port = require("ai.engine.policy.finite_process_port")
 local function expect(value, reason) assert(value, reason) end
 local function test(name, body) helpers.it(name, body) end
 
@@ -76,7 +76,7 @@ local function fixture()
 end
 
 test("canonical process defaults preserve independent literal policy", function()
-	local Limits = require("llm.process_limits")
+	local Limits = require("ai.engine.policy.process_limits")
 	local first, second = Limits.defaults(), Limits.defaults()
 	expect(first.worker_retry_ms == 25 and first.group_recheck_ms == 25 and first.max_output_bytes == 65536, "independent existing defaults")
 	first.worker_retry_ms, first.group_recheck_ms, first.max_output_bytes = 1, 1, 1

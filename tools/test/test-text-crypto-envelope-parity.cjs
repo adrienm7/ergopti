@@ -12,7 +12,7 @@
  * back garbage instead of failing cleanly.
  *
  * ROOT CAUSE ENCODED:
- * The Lua codec (_shared/lua/keystats/text_crypto.lua) is the single source of
+ * The Lua codec (_shared/metrics/engine/privacy/text_crypto.lua) is the single source of
  * truth. The Windows driver re-implements the same constants in AutoHotkey
  * (keystats_text_cipher.ahk) because it uses CNG instead of openssl. Two copies
  * of a wire format is two places for it to drift; this gate pins the AHK copy to
@@ -42,7 +42,7 @@ function read(rel) {
 
 // ── The canonical values, parsed from the shared Lua codec ───────────────────
 
-const lua = read('_shared/lua/keystats/text_crypto.lua');
+const lua = read('_shared/metrics/engine/privacy/text_crypto.lua');
 
 /** Pulls `M.NAME = "value"` or `M.NAME = number` out of the Lua source. */
 function luaConst(src, name) {
@@ -137,9 +137,9 @@ for (const rel of [
 	'macos/modules/keystats/text_cipher.lua'
 ]) {
 	const src = read(rel);
-	if (src && !src.includes('keystats.text_crypto')) {
+	if (src && !src.includes('metrics.engine.privacy.text_crypto')) {
 		errors.push(
-			`${rel}: must build on the shared codec require("keystats.text_crypto"), not re-type the format.`
+			`${rel}: must build on the shared codec require("metrics.engine.privacy.text_crypto"), not re-type the format.`
 		);
 	}
 }
@@ -149,7 +149,7 @@ for (const rel of [
 // shared Lua list is the source; the AutoHotkey mirror must seal the same fields
 // under the same flag, or one driver's journal keeps typed text in clear.
 
-const seal = read('_shared/lua/keystats/journal_seal.lua');
+const seal = read('_shared/metrics/engine/journal/seal.lua');
 const journal = read('windows/modules/keystats/keystats_journal.ahk');
 if (seal && journal) {
 	const luaFields = (seal.match(/M\.FIELDS\s*=\s*\{([^}]*)\}/) || [])[1];

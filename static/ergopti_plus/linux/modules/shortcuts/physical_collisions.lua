@@ -2,8 +2,8 @@
 
 --- Joins four captured Linux claim families and configured Magic Key/wrap-symbol/prediction consumers to the original physical-chord source.
 --- This preflight is partial; it never publishes all-owner or output readiness.
-local Policy = require("shortcuts.physical_conflicts")
-local ConfigKeys = require("config_keys")
+local Policy = require("shortcuts.engine.physical_conflicts")
+local ConfigKeys = require("settings.engine.keys")
 local M = {}
 local conflicts = Policy.conflicts
 
@@ -26,7 +26,7 @@ function M.new(keyboard, taps, combinations, manager, capture)
 			if type(methods[index]) ~= "function" or getmetatable(owner) ~= nil
 				or rawget(owner, "capture_collision_inventory") ~= methods[index] then return false end
 		end
-		return rawequal(package.loaded["shortcuts.physical_conflicts"], Policy) and Policy.conflicts == conflicts
+		return rawequal(package.loaded["shortcuts.engine.physical_conflicts"], Policy) and Policy.conflicts == conflicts
 			and keyboard.physical_slot_descriptor == descriptor and keyboard.physical_native_code == native_code
 			and keyboard.collision_identity == identity and type(native_code) == "function" and type(identity) == "function"
 			and capture.chord_sources == source and capture.chord_source_view == view and capture.chord_source_current == sealed

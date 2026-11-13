@@ -22,7 +22,7 @@
  * 2. Forms caught: pkill, killall and pgrep with an Ollama pattern (including
  *    the `[o]llama` self-match trick), taskkill /IM, Stop-Process -Name,
  *    ProcessClose on a name, and an lsof listener sweep on the default Ollama
- *    port read from _shared/modules/llm/defaults.json.
+ *    port read from _shared/ai/data/defaults.json.
  * 3. Mutation control: the detector flags the historical macOS line and each
  *    other form, and accepts a PID kill, the MLX sweep and a comment.
  * ==============================================================================
@@ -40,7 +40,7 @@ const SCOPES = ['macos', 'linux', 'windows', '_shared'];
 const EXTENSIONS = new Set(['.lua', '.sh', '.py', '.ahk', '.ps1', '.swift']);
 const SKIPPED_DIRECTORIES = new Set(['tests', 'node_modules', '.git']);
 const OLLAMA_PORT = JSON.parse(
-	fs.readFileSync(path.join(PRODUCT, '_shared', 'modules', 'llm', 'defaults.json'), 'utf8')
+	fs.readFileSync(path.join(PRODUCT, '_shared', 'ai', 'data', 'defaults.json'), 'utf8')
 ).llm_ollama_port;
 // `[o]llama` keeps pgrep/pkill from matching their own command line.
 const NAME = String.raw`\[?o\]?llama`;

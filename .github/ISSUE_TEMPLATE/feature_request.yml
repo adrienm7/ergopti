@@ -1,7 +1,7 @@
 # .github/ISSUE_TEMPLATE/feature_request.yml
 #
 # The form ErgoptiPlus opens from Debug > Suggest a feature, with the fields of
-# static/ergopti_plus/_shared/modules/diagnostics/issue_templates.json
+# static/ergopti_plus/_shared/diagnostics/data/issue_templates.json
 # prefilled by their `id` (pinned by tools/test/test-issue-templates.cjs).
 
 name: Feature request

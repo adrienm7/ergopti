@@ -4,7 +4,7 @@
 ; MODULE: Incremental Swipe Rules (Windows ports)
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/gestures/incremental_steps.json, which the
-; macOS and Linux suites replay through _shared/lua/gestures/incremental.lua,
+; macOS and Linux suites replay through _shared/gestures/engine/incremental.lua,
 ; through modules/gestures/incremental.ahk, constants included; replays the
 ; boundary vectors of _shared/tests/corpus/gestures/direction_vectors.json
 ; through modules/gestures/direction.ahk; and pins the Windows sensitivity

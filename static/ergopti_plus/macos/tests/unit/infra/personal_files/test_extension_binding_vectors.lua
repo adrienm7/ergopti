@@ -13,17 +13,17 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Extensions = require("hotstrings.extensions")
+local Json = require("core.text.engine.json")
+local Extensions = require("hotstrings.engine.extensions")
 
 local handle = assert(io.open(helpers.shared("tests/corpus/layouts/extension_binding_vectors.json"), "rb"))
 local vectors = Json.decode(handle:read("*a"))
 handle:close()
 
-require("test.extension_binding_contract")(helpers, Extensions, vectors)
+require("tests.lua.extension_binding_contract")(helpers, Extensions, vectors)
 
 local magic_handle = assert(io.open(helpers.shared("tests/corpus/layouts/extension_magic_key_vectors.json"), "rb"))
 local magic_vectors = Json.decode(magic_handle:read("*a"))
 magic_handle:close()
 
-require("test.extension_magic_key_contract")(helpers, Extensions, magic_vectors)
+require("tests.lua.extension_magic_key_contract")(helpers, Extensions, magic_vectors)

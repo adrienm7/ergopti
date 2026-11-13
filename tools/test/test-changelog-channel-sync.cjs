@@ -33,9 +33,11 @@ const { byTag, runPage } = require('./support/changelog-page-dom.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
-const EN = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+const EN = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+);
 const REGISTRY = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'updater', 'channels.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'updater', 'data', 'channels.json'), 'utf8')
 );
 const IDS = REGISTRY.channels.map((channel) => channel.id);
 const MOST_STABLE = IDS[0];

@@ -9,9 +9,9 @@
 
 local root = assert(os.getenv("ERGOPTI_TEST_DRIVER_ROOT"))
 local private = assert(os.getenv("ERGOPTI_DIAGNOSTIC_DESKTOP_PROBE_DIR"))
-package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
-local uv, Json = require("luv"), require("json")
+package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
+local uv, Json = require("luv"), require("core.text.engine.json")
 local mode = assert(arg[1])
 local baseline = os.getenv("ERGOPTI_DESKTOP_BASELINE_ROOT")
 if baseline then

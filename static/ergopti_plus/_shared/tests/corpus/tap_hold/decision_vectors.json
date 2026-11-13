@@ -1,6 +1,6 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/tap_hold_decisions.v1.json",
-	"description": "Cross-driver corpus for the tap-versus-hold DECISION: which keystrokes reach applications for a timed stream of physical presses and releases on keys bound to a tap and a hold. vectors.json pins the configuration accessors; this file pins what the engines decide. Keys are [tap_hold.catalog] ids of _shared/tap_hold/defaults.toml plus the ordinary letters a and j. A binding names a tap (a key the tap types, or one_shot_shift; none types the key itself), a hold modifier and a threshold in milliseconds. Each event is [down|up, key, at_ms]. `strokes` lists, in order, every key press of a non-modifier key that applications receive, prefixed with the modifiers down at that moment in the [tap_hold.hold_picker] order (ctrl, shift, alt, alt_gr, win), whichever side holds them. `hold_presses`, when present, lists the modifier keys, by side, that the hold of the first bound key puts down. The expectations are the Windows and Linux semantics (the Linux engine follows the Windows hotkeys). A driver that decides otherwise is listed under `divergences` with what it does and why, so the difference stays visible and a change on either side fails a consumer. `lone_tap_max_ms`, when a vector sets it, is tap_holds.lone_modifier_tap_max_ms: how long a key whose hold is a modifier, pressed alone, still types its tap; absent, it is 0, the strict tap-hold.",
+	"description": "Cross-driver corpus for the tap-versus-hold DECISION: which keystrokes reach applications for a timed stream of physical presses and releases on keys bound to a tap and a hold. vectors.json pins the configuration accessors; this file pins what the engines decide. Keys are [tap_hold.catalog] ids of _shared/tap_hold/data/defaults.toml plus the ordinary letters a and j. A binding names a tap (a key the tap types, or one_shot_shift; none types the key itself), a hold modifier and a threshold in milliseconds. Each event is [down|up, key, at_ms]. `strokes` lists, in order, every key press of a non-modifier key that applications receive, prefixed with the modifiers down at that moment in the [tap_hold.hold_picker] order (ctrl, shift, alt, alt_gr, win), whichever side holds them. `hold_presses`, when present, lists the modifier keys, by side, that the hold of the first bound key puts down. The expectations are the Windows and Linux semantics (the Linux engine follows the Windows hotkeys). A driver that decides otherwise is listed under `divergences` with what it does and why, so the difference stays visible and a change on either side fails a consumer. `lone_tap_max_ms`, when a vector sets it, is tap_holds.lone_modifier_tap_max_ms: how long a key whose hold is a modifier, pressed alone, still types its tap; absent, it is 0, the strict tap-hold.",
 	"version": "1.0.0",
 	"vectors": [
 		{
@@ -338,7 +338,7 @@
 			"divergences": {
 				"macos": {
 					"strokes": ["space", "a"],
-					"reason": "Documented in [tap_hold.rollover] of _shared/tap_hold/defaults.toml: Karabiner cannot decide from the order of the releases, so the next key-down types the typing key's own tap."
+					"reason": "Documented in [tap_hold.rollover] of _shared/tap_hold/data/defaults.toml: Karabiner cannot decide from the order of the releases, so the next key-down types the typing key's own tap."
 				}
 			}
 		},

@@ -2,7 +2,7 @@
 
 --- Independent retained-permission controls; native adapters remain deliberately absent.
 local helpers = require("tests.helpers")
-local History = require("keystats.physical_permission_history")
+local History = require("metrics.engine.capture.physical_permission_history")
 
 local function fixture(capacity)
 	local f = { capture = {}, clock = {}, observers = {}, next_revision = {}, emitted = {}, failures = {}, current = true,
@@ -378,7 +378,7 @@ helpers.describe("dormant retained physical permission history", function()
 		local f = fixture(); f.ready()
 		f.observe("pause", 20, { complete = true, allowed = false })
 		f.observe("pause", 30, { complete = true, allowed = true })
-		local interval = require("keystats.physical_interval")
+		local interval = require("metrics.engine.capture.physical_interval")
 		local previous = interval.permits
 		interval.permits = function() return true end
 		local ok, decision = pcall(f.owner.resolve_interval, f.capture, f.clock, 16, 35)

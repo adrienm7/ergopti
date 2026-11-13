@@ -45,5 +45,5 @@ mount --bind "$root/dbus" /var/lib/dbus
 fallback_mounted=true
 mount -o remount,bind,ro /var/lib/dbus
 setpriv --reuid "$task_uid" --regid "$task_gid" --clear-groups \
-    env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' \
+    env LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;' \
     luajit tests/hardware/run_machine_id_fallback_receipts.lua

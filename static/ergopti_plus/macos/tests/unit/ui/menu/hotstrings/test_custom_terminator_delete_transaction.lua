@@ -55,19 +55,19 @@ local function with_fixture(outcome, callback)
 	return helpers.with_stub_scope({
 		"adapters.file_system", "infra.fs_dir", "infra.logger", "infra.preferences",
 		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "infra.manifest_reader",
-		"infra.notifications", "modules.hotstrings.hotstrings_config", "keymap.terminators",
+		"infra.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "ui.menu.preferences_transaction",
 	}, function()
 		local Preferences = helpers.load_with_stubs("infra.preferences")
 		local FileSystem = require("adapters.file_system")
 		local Transaction = require("ui.menu.preferences_transaction")
-		local Terminators = require("keymap.terminators")
+		local Terminators = require("layouts.engine.layers.terminators")
 		local calls = { removes = 0, writes = 0, saves = 0, updates = 0, notices = 0, rollbacks = 0 }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return "button.delete" end }
-		local command_renderer = assert(require("menu.renderer").new({
+		local command_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("adapters.json_codec").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end },
 			logger = require("infra.logger"),
@@ -245,7 +245,7 @@ helpers.describe("custom delimiter deletion acknowledgement", function()
 			helpers.assert_eq(runtime_has_definition(fixture), false)
 			helpers.assert_eq(#fixture.state.custom_terminators, 0)
 			helpers.assert_eq(fixture.state.terminator_states[KEY], nil)
-			local decoded = require("toml_codec").decode(fixture.read())
+			local decoded = require("core.text.engine.toml_codec").decode(fixture.read())
 			helpers.assert_eq(decoded.foreign.keep, "untouched")
 			helpers.assert_eq(decoded.hotstrings.terminators, {})
 			helpers.assert_true(fixture.read():find('[foreign]\nkeep = "untouched"\n', 1, true) ~= nil,

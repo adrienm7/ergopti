@@ -27,7 +27,7 @@ module.exports = function (sources, manifest, menuSources) {
 		])
 	];
 	const agentFile = 'linux/ui/menu/agent_rows.lua';
-	const identityImport = 'local AppIdentity = require("llm.app_identity")';
+	const identityImport = 'local AppIdentity = require("ai.engine.policy.app_identity")';
 	assert.equal(
 		sources[agentFile].split(identityImport).length - 1,
 		1,
@@ -240,7 +240,7 @@ module.exports = function (sources, manifest, menuSources) {
 	);
 	// The save failure notice is read from its one owner, never a foreign module.
 	cases.push([
-		'local SaveFailure = require("config_save_failure")',
+		'local SaveFailure = require("settings.engine.publication.save_failure")',
 		'local SaveFailure = require("foreign_save_failure")',
 		'foreign save failure notice owner'
 	]);

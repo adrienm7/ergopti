@@ -18,9 +18,9 @@
 --- ==============================================================================
 
 local state, seconds = assert(arg[1], "a state directory"), tonumber(arg[2]) or 30
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 Logger.set_level("info")
 -- The driver routes its lines to a file sink; this host prints them for the proof.
 Logger.set_sink(function(line) io.stdout:write(line, "\n"); io.stdout:flush() end)

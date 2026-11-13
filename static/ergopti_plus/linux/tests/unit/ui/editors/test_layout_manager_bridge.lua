@@ -4,7 +4,7 @@
 --- MODULE: Layout Manager Bridge (Linux)
 --- DESCRIPTION:
 --- The Linux host of the layout manager page wires the shared controller
---- (_shared/lua/layouts/manager_bridge.lua) to the WebKitGTK window, the Linux
+--- (_shared/layouts/engine/manager_bridge.lua) to the WebKitGTK window, the Linux
 --- registry client and xdg-open (layout-manager-bridge). These tests inject
 --- each authority and pin the wiring: pushes reach the layout_manager window as
 --- window.<function>(<json>), the strings are the ones strings.json declares,
@@ -302,7 +302,7 @@ local function with_empty_layout(callback)
 end
 
 -- Independent pre-migration captions; the generated status declaration is the subject.
-local EmptyLayoutJson = require("json")
+local EmptyLayoutJson = require("core.text.engine.json")
 local function read_empty_layout_json(path)
 	local file = assert(io.open(path, "rb"))
 	local value = assert(EmptyLayoutJson.decode(file:read("*a")))
@@ -346,7 +346,7 @@ helpers.describe("the shared empty native-layout status", function()
 	for locale, expected in pairs(EmptyLayoutCorpus.captions) do
 		helpers.it("(layout-empty-status) renders the real empty provider in " .. locale, function()
 			with_empty_layout(function(build, state, binding)
-				local catalogue = read_empty_layout_json(require("infra.paths").shared("data/locales/" .. locale .. ".json"))
+				local catalogue = read_empty_layout_json(require("infra.paths").shared("core/i18n/data/locales/" .. locale .. ".json"))
 				helpers.assert_eq(catalogue[EmptyLayoutCorpus.row.i18n], expected)
 				require("infra.i18n").get = function(key) return catalogue[key] or key end
 				local rows = build()

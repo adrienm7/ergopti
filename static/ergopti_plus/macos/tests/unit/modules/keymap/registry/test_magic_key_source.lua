@@ -12,8 +12,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Shared = require("keymap.magic_key_source")
+local Json = require("core.text.engine.json")
+local Shared = require("layouts.engine.layers.magic_key_source")
 
 local PATH = "hotstrings.magic_key_source"
 local KEYCODE_J = 38
@@ -32,14 +32,14 @@ local RESET_MODULES = {
 }
 
 local function registry()
-	local handle = assert(io.open(helpers.shared("data/keycodes/physical_keys.json"), "rb"))
+	local handle = assert(io.open(helpers.shared("layouts/data/keycodes/physical_keys.json"), "rb"))
 	local decoded = Json.decode(handle:read("*a"))
 	handle:close()
 	return decoded
 end
 
 local Manifest = require("infra.manifest_reader")
-require("test.magic_key_source_contract")(helpers, Shared, {
+require("tests.lua.layouts.magic_key_source_contract")(helpers, Shared, {
 	entry = Manifest.find_entry_by_path(PATH),
 	registry = registry(),
 	field = "hs",
@@ -220,14 +220,14 @@ end)
 
 helpers.describe("magic key source: config.toml", function()
 	helpers.it("(magic-key-source) a stored key reaches the menu state, an outdated one is offered", function()
-		helpers.with_fresh_modules({ "logger.shim", "config_outdated", "infra.preferences" }, function()
+		helpers.with_fresh_modules({ "core.logger.engine.shim", "settings.engine.migration.outdated", "infra.preferences" }, function()
 			local warnings = {}
 			local shim = helpers.make_logger_stub()
 			shim.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
-			package.loaded["logger.shim"] = shim
-			helpers.load_with_stubs("config_outdated")
+			package.loaded["core.logger.engine.shim"] = shim
+			helpers.load_with_stubs("settings.engine.migration.outdated")
 			local Preferences = helpers.load_with_stubs("infra.preferences")
-			local TomlCodec = require("toml_codec")
+			local TomlCodec = require("core.text.engine.toml_codec")
 
 			local chosen = "[hotstrings]\nmagic_key_source = \"Semicolon\"\n"
 			helpers.assert_eq(Preferences.flatten_document(TomlCodec.decode(chosen)).magic_key_source, "Semicolon")
@@ -237,7 +237,7 @@ helpers.describe("magic key source: config.toml", function()
 				"an outdated key reads as absent, never as another key")
 			helpers.assert_eq(#warnings, 1, table.concat(warnings, " | "))
 			helpers.assert_true(warnings[1]:find("'hotstrings.magic_key_source'", 1, true) ~= nil, warnings[1])
-			local scan = require("config_unused_keys").find_in_source(stale, Preferences.mark_config_reads)
+			local scan = require("settings.engine.migration.unused_keys").find_in_source(stale, Preferences.mark_config_reads)
 			helpers.assert_eq(#scan.keys, 1, "the cleanup offers the outdated key")
 			helpers.assert_eq(scan.keys[1].section .. "." .. scan.keys[1].key, PATH)
 		end)
@@ -260,8 +260,8 @@ helpers.describe("magic key source: acknowledged tap dispatcher", function()
   fixture.with_fixture(function()
    local sys, spy = fixture.make_sys_screenshot_spies()
    local Tap = require("modules.shortcuts.tap_keys")
-   local f = assert(io.open(helpers.shared("modules/actions/modifier_chords.json"), "rb"))
-   local actions = require("actions.assignable").build(require("_generated.action_catalogue"), Json.decode(f:read("*a")), "macos"); f:close()
+   local f = assert(io.open(helpers.shared("shortcuts/data/actions/modifier_chords.json"), "rb"))
+   local actions = require("shortcuts.engine.actions.assignable").build(require("_generated.action_catalogue"), Json.decode(f:read("*a")), "macos"); f:close()
    assert(Tap.apply_configuration({shortcuts={tap_keys={number_row_left="send_text"}}}, function(id) return actions[id] == true end))
    local ran, admitted = 0, true
    sys.bind_tap_keys(function() return admitted end, function(code, keyboard_type)

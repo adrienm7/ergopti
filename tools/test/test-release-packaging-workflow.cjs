@@ -51,8 +51,8 @@ const windowsToolchainContractPath = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
 	'updater',
+	'data',
 	'windows_release_toolchain.json'
 );
 const windowsToolchainContract = JSON.parse(fs.readFileSync(windowsToolchainContractPath, 'utf8'));
@@ -684,7 +684,10 @@ if (windowsSmokeStep !== null) {
 	} else {
 		const { spawnSync } = require('node:child_process');
 		const TOML = require('smol-toml');
-		const catalogPath = path.join(root, 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml');
+		const catalogPath = path.join(
+			root,
+			'static/ergopti_plus/_shared/core/fs/data/paths/app_dirs.toml'
+		);
 		const catalog = TOML.parse(fs.readFileSync(catalogPath, 'utf8'));
 		const expected = {
 			base: catalog.logs.windows.base,
@@ -1666,12 +1669,12 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 			saved_profile: { sha256: '9'.repeat(64), preserved_records: 5, schema_version: 20 },
 			extracted_assets: [
 				{
-					path: 'static/ergopti_plus/_shared/core/config_schema/migrations.toml',
+					path: 'static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml',
 					bytes: 74264,
 					sha256: '37a89fb1add8e022aee1440147687017c6280023313945c0c9affc3b07f09402'
 				},
 				{
-					path: 'static/ergopti_plus/_shared/data/locales/en.json',
+					path: 'static/ergopti_plus/_shared/core/i18n/data/locales/en.json',
 					bytes: 299858,
 					sha256: '86baa730998670f61b51712f2ded7f03983697f3452b9e64ea60f597a0028af7'
 				}
@@ -1968,7 +1971,7 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 	} = require('./fixtures/archive-contract-filesystem.cjs');
 	const producerPath = path.resolve(__dirname, '../build/macos-release-archives.cjs');
 	const defaultsBytes = fs.readFileSync(
-		require('../lib/paths.cjs').shared('modules/updater/defaults.json'),
+		require('../lib/paths.cjs').shared('updater/data/defaults.json'),
 		'utf8'
 	);
 	function verifyCIArchiveOwnedContracts(fs, owner) {
@@ -2542,7 +2545,7 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 		);
 		const bindings = plain.resolveArchives(
 			JSON.parse(
-				fs.readFileSync(require('../lib/paths.cjs').shared('modules/updater/defaults.json'), 'utf8')
+				fs.readFileSync(require('../lib/paths.cjs').shared('updater/data/defaults.json'), 'utf8')
 			)
 		);
 		const basename = bindings[0].name.slice(0, -('.' + bindings[0].format).length);

@@ -58,7 +58,7 @@ helpers.describe("CapsWord auto-off settings owner", function()
 	helpers.it("applies a valid state and keeps the previous one on refusal", function()
 		helpers.with_stub_scope({ "infra.capsword_auto_off", "infra.logger" }, function()
 			local Owner, errors = fresh_owner()
-			local Policy = require("caps_word.auto_off")
+			local Policy = require("keyboard.engine.caps_word_auto_off")
 			local state = default_state(Owner)
 			state[Owner.IDLE_KEY] = 5
 			state[Owner.TERMINATORS_KEY] = { "nbsp" }

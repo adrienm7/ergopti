@@ -37,7 +37,7 @@ helpers.describe("dynamic hotstrings manager", function()
 
     helpers.it("linux-dynamic-init-cancel: refuses reinitialization when programmable cancellation fails", function()
       local UserCode = require("modules.dynamic_hotstrings.user_code")
-      local Engine = require("dynamic_hotstrings")
+      local Engine = require("hotstrings.engine.dynamic.core")
       local old_invalidate, old_reset = UserCode.invalidate, Engine.reset_rules
       local old_manager = package.loaded["modules.dynamic_hotstrings.manager"]
       local manager = helpers.load_module("modules.dynamic_hotstrings.manager")
@@ -140,7 +140,7 @@ assert(next(manager.get_info()) == nil)
         helpers.assert_eq(dh.get_info().street_address, original)
         helpers.assert_true(dh.save_info({ street_address = original, city = "Paris" }))
         local saved = assert(io.open(path, "rb"))
-        local decoded = require("toml_codec").decode(saved:read("*a")); saved:close()
+        local decoded = require("core.text.engine.toml_codec").decode(saved:read("*a")); saved:close()
         helpers.assert_eq(decoded.info.street_address, original)
         helpers.assert_eq(decoded.info.city, "Paris")
       end)
@@ -155,10 +155,10 @@ assert(next(manager.get_info()) == nil)
       fh:write('[info]\n__proto__ = "before"\n\n[letters]\na = "__proto__"\n'); fh:close()
       local ok, err = pcall(function()
         helpers.assert_true(dh.init({ trigger_char = "★", personal_info_path = path }))
-        local values = assert(require("json").decode('{"__proto__":"after"}'))
+        local values = assert(require("core.text.engine.json").decode('{"__proto__":"after"}'))
         helpers.assert_true(dh.save_info(values))
         local saved = assert(io.open(path, "rb"))
-        local decoded = require("toml_codec").decode(saved:read("*a")); saved:close()
+        local decoded = require("core.text.engine.toml_codec").decode(saved:read("*a")); saved:close()
         helpers.assert_eq(decoded.info["__proto__"], "after")
       end)
       os.remove(path); os.remove(path .. ".tmp")
@@ -182,7 +182,7 @@ assert(next(manager.get_info()) == nil)
           "init without an explicit path must follow the configuration-directory override")
         helpers.assert_true(dh.save_info({ first_name = "Saved" }))
         local saved = assert(io.open(path, "r"))
-        local decoded = require("toml_codec").decode(saved:read("*a"))
+        local decoded = require("core.text.engine.toml_codec").decode(saved:read("*a"))
         saved:close()
         helpers.assert_eq(decoded.info.first_name, "Saved")
       end)
@@ -211,7 +211,7 @@ assert(next(manager.get_info()) == nil)
           "refreshing edited fields must not override the category master state")
 
         local saved = assert(io.open(path, "r"))
-        local decoded = require("toml_codec").decode(saved:read("*a"))
+        local decoded = require("core.text.engine.toml_codec").decode(saved:read("*a"))
         saved:close()
         helpers.assert_eq(decoded.info.first_name, "Grace")
         helpers.assert_eq(decoded.letters.p, "first_name")
@@ -269,7 +269,7 @@ assert(next(manager.get_info()) == nil)
         helpers.assert_true(fired)
         helpers.assert_eq(injected, "mardi 31 décembre 2024", "a single expansion cannot mix calendar dates")
         calls = 0
-        local dates = require("dynamic_hotstrings").today_date_strings()
+        local dates = require("hotstrings.engine.dynamic.core").today_date_strings()
         helpers.assert_eq(dates.iso, "2024_12_31")
         helpers.assert_eq(dates.fr, "31/12/2024")
         helpers.assert_eq(dates.long_fr, "mardi 31 décembre 2024")
@@ -321,7 +321,7 @@ assert(next(manager.get_info()) == nil)
   helpers.describe("shared engine integration", function()
 
     helpers.it("shared dynamic_hotstrings engine loads and has expected API", function()
-      local ok, Engine = pcall(require, "dynamic_hotstrings")
+      local ok, Engine = pcall(require, "hotstrings.engine.dynamic.core")
       helpers.assert_true(ok, "shared engine loads")
       if ok then
         helpers.assert_true(type(Engine.add_rule)           == "function", "add_rule")
@@ -333,7 +333,7 @@ assert(next(manager.get_info()) == nil)
     end)
 
     helpers.it("date rule 'td' matches in the shared engine", function()
-      local Engine = require("dynamic_hotstrings")
+      local Engine = require("hotstrings.engine.dynamic.core")
       Engine.reset_rules()
       Engine.register_date_rules("\\")
       local match = Engine.match_buffer("td", nil, nil, true)
@@ -362,7 +362,7 @@ assert(next(manager.get_info()) == nil)
 
       -- Spy on the logger the manager holds (require returns the cached table) so
       -- the exact field count reported by the init summary line is observable
-      local logger    = require("logger.shim")
+      local logger    = require("core.logger.engine.shim")
       local orig_info = logger.info
       local captured  = {}
       logger.info = function(_tag, fmt, ...)
@@ -690,7 +690,7 @@ assert(next(manager.get_info()) == nil)
       fh:write("[info\nfirst_name = \"Adrien\"\n")
       fh:close()
 
-      local logger     = require("logger.shim")
+      local logger     = require("core.logger.engine.shim")
       local orig_error = logger.error
       local errors     = {}
       logger.error = function(_tag, fmt, ...)
@@ -722,7 +722,7 @@ assert(next(manager.get_info()) == nil)
       fh:write('" = "first_name"\n')
       fh:close()
 
-      local logger = require("logger.shim")
+      local logger = require("core.logger.engine.shim")
       local original_error = logger.error
       local errors = {}
       logger.error = function(_tag, fmt, ...)
@@ -759,7 +759,7 @@ assert(next(manager.get_info()) == nil)
       }, "\n"))
       fh:close()
 
-      local logger = require("logger.shim")
+      local logger = require("core.logger.engine.shim")
       local original_error = logger.error
       local errors = {}
       logger.error = function(_tag, fmt, ...)

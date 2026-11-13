@@ -30,7 +30,7 @@ _LRP_Corpus() {
 _LRP_SharedCorpus() {
 	global _SharedDir, LAYOUT_ROWS_POLICY_IDS
 	Corpus := _LRP_Corpus()
-	Registry := JsonParse(FSReadUtf8Exact(_SharedDir . "\data\keycodes\physical_keys.json"))
+	Registry := JsonParse(FSReadUtf8Exact(_SharedDir . "\layouts\data\keycodes\physical_keys.json"))
 	Rows := LayoutRowsPolicyKeys(Registry)
 	AssertEqual(4, LAYOUT_ROWS_POLICY_IDS.Length, "four row switches")
 	for Row in LAYOUT_ROWS_POLICY_IDS {
@@ -127,7 +127,7 @@ _LRPS_ChildSource(BodyName := "layout_row_passthrough_body.ahk", ExtraSource := 
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
 	Code .= "#Include " . _DriverDir . "\infra\json.ahk`n"
 	Code .= "#Include " . _DriverDir . "\adapters\file_system.ahk`n"
-	Code .= "#Include " . _SharedDir . "\modules\features\layout_rows_policy.ahk`n"
+	Code .= "#Include " . _SharedDir . "\settings\data\features\layout_rows_policy.ahk`n"
 	Owner := _DriverProductionFileForSymbol("_LayoutRowPassthrough")
 	AssertTrue(Owner != "", "the genuine row sender must have one production owner")
 	Code .= "#Include " . Owner . "`n"
@@ -285,7 +285,7 @@ _LRPE_ChildSource() {
 	AssertTrue(At > 0, "the actual static edge criterion must be found")
 	AssertEqual(0, RegExMatch(Source, Pattern, , At + Criterion.Len), "the edge cohort must have one real static criterion")
 	Extra := "#Include " . _DriverDir . "\adapters\key_state.ahk`n"
-	Extra .= "#Include " . _SharedDir . "\modules\features\number_row_policy.ahk`n"
+	Extra .= "#Include " . _SharedDir . "\settings\data\features\number_row_policy.ahk`n"
 	for Name in ["KeylayoutEmulation_IsActive", "KeylayoutEmulation_LayerIsActive",
 		"KeylayoutEmulation_NumberRowLevels", "TapHoldKanaAltGrHeld"] {
 		Definition := _DriverFuncBody(Name)
@@ -346,7 +346,7 @@ _LRPN_ChildSource() {
 		Includes := Resolved
 	}
 	Extra := Includes
-	Extra .= "#Include " . _SharedDir . "\modules\features\number_row_policy.ahk`n"
+	Extra .= "#Include " . _SharedDir . "\settings\data\features\number_row_policy.ahk`n"
 	; The extracted digit emitters share their real native/recorder selector.
 	; Only its final SendEvent boundary is the child's passive output port.
 	for Name in ["KeylayoutEmulation_KeyCodes", "KeylayoutEmulation_IsActive", "KeylayoutEmulation_LayerIsActive",

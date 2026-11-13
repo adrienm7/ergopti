@@ -187,11 +187,11 @@ Test("input probe: no logger call carries the typed text", _IPT_LogCallsCarryNoC
 ; ===========================================
 
 _IPT_EnglishStrings() {
-	return JsonParse(FileRead(_SharedDir . "\data\locales\en.json", "UTF-8"))
+	return JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\en.json", "UTF-8"))
 }
 
 _IPT_MenuRows() {
-	Root := JsonParse(FileRead(_SharedDir . "\modules\menu\menu_manifest.json", "UTF-8"))
+	Root := JsonParse(FileRead(_SharedDir . "\menu\data\menu_manifest.json", "UTF-8"))
 	Rows := Map()
 	for Row in Root["debug_tests_menu"] {
 		if Row.Has("id")

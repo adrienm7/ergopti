@@ -168,7 +168,17 @@ const driverCount = (session) => session.processes().length;
 function englishLocale() {
 	return JSON.parse(
 		fs.readFileSync(
-			path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json'),
+			path.join(
+				live.ROOT,
+				'static',
+				'ergopti_plus',
+				'_shared',
+				'core',
+				'i18n',
+				'data',
+				'locales',
+				'en.json'
+			),
 			'utf8'
 		)
 	);
@@ -188,7 +198,15 @@ const squash = (text) => text.replace(/\s+/g, ' ').trim();
  * @returns {{section: string, line: string}|null}
  */
 function shippedRule(relative, trigger) {
-	const file = path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'hotstrings');
+	const file = path.join(
+		live.ROOT,
+		'static',
+		'ergopti_plus',
+		'_shared',
+		'hotstrings',
+		'data',
+		'catalogue'
+	);
 	let section = '';
 	for (const line of fs.readFileSync(path.join(file, relative), 'utf8').split(/\r?\n/)) {
 		const header = /^\[\[([a-z0-9_]+)\]\]/.exec(line);
@@ -290,7 +308,8 @@ function oldestVersion() {
 			'static',
 			'ergopti_plus',
 			'_shared',
-			'core',
+			'settings',
+			'data',
 			'config_schema',
 			'migrations.toml'
 		),
@@ -987,7 +1006,17 @@ const CHECKS = [
 			// common.label_value ("{1}: {2}" in English), not a hardcoded " : ".
 			const locale = JSON.parse(
 				fs.readFileSync(
-					path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json'),
+					path.join(
+						live.ROOT,
+						'static',
+						'ergopti_plus',
+						'_shared',
+						'core',
+						'i18n',
+						'data',
+						'locales',
+						'en.json'
+					),
 					'utf8'
 				)
 			);
@@ -1156,7 +1185,17 @@ const CHECKS = [
 			const seen = fields(await session.run('window_titles'));
 			const locale = JSON.parse(
 				fs.readFileSync(
-					path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json'),
+					path.join(
+						live.ROOT,
+						'static',
+						'ergopti_plus',
+						'_shared',
+						'core',
+						'i18n',
+						'data',
+						'locales',
+						'en.json'
+					),
 					'utf8'
 				)
 			);
@@ -1427,7 +1466,17 @@ const CHECKS = [
 			// common.label_value ("{1}: {2}" in English), not a hardcoded " : ".
 			const locale = JSON.parse(
 				fs.readFileSync(
-					path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json'),
+					path.join(
+						live.ROOT,
+						'static',
+						'ergopti_plus',
+						'_shared',
+						'core',
+						'i18n',
+						'data',
+						'locales',
+						'en.json'
+					),
 					'utf8'
 				)
 			);
@@ -1731,7 +1780,7 @@ const CHECKS = [
 		title:
 			'An unstamped tap_hold.toml: exact backup, v1 stamp, retired delays gone, comments kept, once',
 		async run(context) {
-			const version = registryVersion('tap_hold/migrations.toml');
+			const version = registryVersion('tap_hold/data/migrations.toml');
 			const session = context.newSession('taphold');
 			const old = [
 				'# my tap-holds',
@@ -1777,7 +1826,7 @@ const CHECKS = [
 		id: 'old-config-migration',
 		title: 'The oldest supported config.toml climbs the registry at boot and keeps its actions',
 		async run(context) {
-			const version = registryVersion('core/config_schema/migrations.toml');
+			const version = registryVersion('settings/data/config_schema/migrations.toml');
 			// Spellings Windows 1.0.9 wrote: the registry's oldest supported version.
 			const old = [
 				'# from an old build',
@@ -1870,8 +1919,9 @@ const CHECKS = [
 					'static',
 					'ergopti_plus',
 					'_shared',
-					'modules',
-					'timings',
+					'core',
+					'timing',
+					'data',
 					'constants.toml'
 				),
 				'utf8'

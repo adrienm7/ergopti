@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 local Destination = require("tests.support.text_destination_receipt")
 local with_sender = require("tests.support.text_sender_fixture")
-require("logger")
+require("core.logger.engine")
 
 local function tick(f, delay)
 	for index, timer in ipairs(f.timers) do

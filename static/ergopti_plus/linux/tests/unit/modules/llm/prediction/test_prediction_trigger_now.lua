@@ -38,7 +38,7 @@ local function fixture(state)
 	local seen = { fired = {}, notices = {}, infos = {} }
 	local logger = helpers.make_logger_stub()
 	logger.info = function(_, fmt, ...) seen.infos[#seen.infos + 1] = string.format(fmt, ...) end
-	replace("logger.shim", logger)
+	replace("core.logger.engine.shim", logger)
 	replace("modules.llm.profiles", {
 		init = function() end,
 		is_enabled = function() return state.enabled ~= false end,

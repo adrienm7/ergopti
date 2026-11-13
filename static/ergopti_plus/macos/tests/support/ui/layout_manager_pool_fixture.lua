@@ -14,7 +14,7 @@ local References = require("tests.support.ui.usercontent_reference_fixture")
 --- Runs one canonical layout module through successive window leases.
 --- @param scenario function Receives the real host and pinned native observations.
 local function with_layout(scenario)
-	return helpers.with_fresh_modules({ "ui.layout_manager", "layouts.manager_bridge", "infra.deferred_work",
+	return helpers.with_fresh_modules({ "ui.layout_manager", "layouts.engine.manager_bridge", "infra.deferred_work",
 		"adapters.file_system", "modules.keymap.layout_registry" }, function()
 		return References(function(_, h)
 			local builder = package.loaded["ui.ui_builder"]

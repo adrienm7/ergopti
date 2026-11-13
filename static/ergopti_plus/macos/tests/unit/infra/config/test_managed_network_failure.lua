@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Reads one corpus resource through the existing macOS test path owner.
 --- @param relative string Shared resource path.
@@ -21,5 +21,5 @@ local function read(relative)
 end
 
 helpers.describe("shared managed network failure contract", function()
-	require("test.managed_network_contract").register(read, helpers)
+	require("tests.lua.core.managed_network_contract").register(read, helpers)
 end)

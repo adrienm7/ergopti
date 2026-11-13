@@ -6,7 +6,7 @@
 --- Owns the full lifecycle of AI-assisted text predictions: request dispatch,
 --- streaming ingestion, deduplication, display, and state management. Extracted
 --- from modules/keymap/llm_bridge so all LLM-specific logic is consolidated
---- under modules/llm/ and the keymap bridge can focus on hotstring preview and
+--- under ai/data/ and the keymap bridge can focus on hotstring preview and
 --- keystroke routing. App exclusion logic is also handled here as a private
 --- helper, keeping it alongside the prediction pipeline that consumes it.
 ---
@@ -30,13 +30,13 @@ local WarmupController = require("modules.llm.warmup_controller")
 local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
-local InfoBar = require("llm.request_plan.info_bar")
+local InfoBar = require("ai.engine.request_plan.info_bar")
 local PredictionTooltipPort = require("adapters.prediction_tooltip_port")
-local LivePlan = require("llm.request_plan.live")
-local AppProfileOverrides = require("llm.app_profile_overrides")
-local Rewrite          = require("llm.rewrite")
-local RequestSettings  = require("llm.request_settings")
-local PromptAction     = require("llm.prompt_action")
+local LivePlan = require("ai.engine.request_plan.live")
+local AppProfileOverrides = require("ai.engine.policy.app_profile_overrides")
+local Rewrite          = require("ai.engine.prediction.rewrite")
+local RequestSettings  = require("ai.engine.settings.request_settings")
+local PromptAction     = require("ai.engine.prediction.prompt_action")
 local Logger           = require("infra.logger")
 local Timings          = require("infra.timings")
 local TimerScheduler   = require("adapters.timer_scheduler")
@@ -48,7 +48,7 @@ local i18n             = require("infra.i18n")
 local Keycodes         = require("infra.keycodes")
 local tooltip          = require("ui.tooltip")
 local keystats        = require("modules.keystats")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
@@ -116,7 +116,7 @@ local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 --- with made-up numbers that no other driver uses.
 --- @return table { debounce_sec = number, min_words = number }
 local function load_live_config()
-	local path = Paths.shared("modules/llm/live.json")
+	local path = Paths.shared("ai/data/live.json")
 	local raw = path and FileSystem.read(path) or nil
 	local decoded = raw and JsonCodec.decode(raw) or nil
 	local config, reason = LivePlan.config(decoded)
@@ -232,10 +232,10 @@ local chain_pending = false
 -- (llm.trigger.min_request_interval_ms, shared with Linux); an explicit request
 -- is never held. It is one value for every backend.
 local request_floor_sec = LLM_DEFAULTS.llm_min_request_interval
--- The debounce and rate-floor decisions (_shared/lua/llm/request_plan): this
+-- The debounce and rate-floor decisions (_shared/ai/engine/request_plan): this
 -- engine feeds the plan events and the clock, and owns the native timers and
 -- the backend calls. The plan also holds when the last request went out.
-local _plan = require("llm.request_plan.debounce").new(function()
+local _plan = require("ai.engine.request_plan.debounce").new(function()
 	return request_floor_sec * 1000
 end)
 
@@ -1348,7 +1348,7 @@ local function start_inactivity_timer(delay_override, ends_word)
 		return false
 	end
 	descriptor.authorized = true
-	local labels = require("llm.request_plan.debounce").REASON
+	local labels = require("ai.engine.request_plan.debounce").REASON
 	if arm.why == labels.override or arm.why == labels.word_end then
 		Logger.trace(LOG, "Inactivity timer started (override: %.3fs).", delay)
 	else
@@ -1806,7 +1806,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 		local lookup_ok, live_profile = xpcall(function()
 			if live.translation_target ~= nil then
 				local translation = require("modules.llm.selection_translation")
-				return require("llm.translate").prediction_profile(live.translation_target,
+				return require("ai.engine.prediction.translate").prediction_profile(live.translation_target,
 					translation.config(), translation.locale_names(), i18n.get_locale())
 			end
 			return core_llm.find_profile(live.profile_id)
@@ -2335,7 +2335,7 @@ function M.request_prompt_prediction(value)
 	local lookup_ok, profile = xpcall(function()
 		if parsed.translation_target ~= nil then
 			local translation = require("modules.llm.selection_translation")
-			return require("llm.translate").prediction_profile(parsed.translation_target,
+			return require("ai.engine.prediction.translate").prediction_profile(parsed.translation_target,
 				translation.config(), translation.locale_names(), i18n.get_locale())
 		end
 		return core_llm.find_profile(parsed.profile_id)
@@ -2520,7 +2520,7 @@ function M.request_chat_answer(label, system_prompt, user_text, max_tokens, on_r
 end
 
 --- The AI menu's « Test a prediction »: one prediction on a sample context, showing
---- the answer or why it could not run (llm/test_prediction.lua). It goes straight
+--- the answer or why it could not run (ai/engine/prediction/test_prediction.lua). It goes straight
 --- to the backend, past the prediction cache: the notice is plain text, whereas a
 --- prediction tooltip is a text the user could accept into the focused document.
 --- It sends its own high temperature: the same sample at the low generation
@@ -2535,7 +2535,7 @@ function M.test_prediction()
 			if reason == "empty_context" then return nil end
 			return reason
 		end
-		M._test_prediction = require("llm.test_prediction").new({
+		M._test_prediction = require("ai.engine.prediction.test_prediction").new({
 			text = function(key) return i18n.get(key) end,
 			refusal = function()
 				local reason = live_refusal()
@@ -2719,7 +2719,7 @@ function M.start_live_prompt(value)
 	local lookup_ok, profile = xpcall(function()
 		if parsed.translation_target ~= nil then
 			local translation = require("modules.llm.selection_translation")
-			return require("llm.translate").prediction_profile(parsed.translation_target,
+			return require("ai.engine.prediction.translate").prediction_profile(parsed.translation_target,
 				translation.config(), translation.locale_names(), i18n.get_locale())
 		end
 		return core_llm.find_profile(parsed.profile_id)
@@ -3137,7 +3137,7 @@ function M.init(core_state, ports)
 		Logger.error(LOG, "M.init(): ports must be a table (got %s).", type(ports))
 		return false
 	end
-	local Ports = require("llm.request_plan.ports")
+	local Ports = require("ai.engine.request_plan.ports")
 	local timer_port = Ports.check("TimerScheduler", ports.TimerScheduler or TimerScheduler)
 	-- The backends build their own HTTP clients; only an injected one is checked here.
 	local http_port = ports.HttpClient ~= nil and Ports.check("HttpClient", ports.HttpClient) or nil

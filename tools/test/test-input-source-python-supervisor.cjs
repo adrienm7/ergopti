@@ -22,7 +22,7 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..', '..');
 const MODEL_TIMEOUT_MS = require('smol-toml').parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/_shared/modules/timings/constants.toml'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/core/timing/data/constants.toml'),
 		'utf8'
 	)
 ).ui.input_source_operation_timeout_ms;

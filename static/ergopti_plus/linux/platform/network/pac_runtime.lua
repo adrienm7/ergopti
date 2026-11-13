@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Runs a proxy auto-config script in the system Duktape engine, the one
 --- libproxy and glib-pacrunner already load, with the shared PAC helpers that
---- the Windows worker embeds (_shared/modules/network/pac_helpers.js). GIO and
+--- the Windows worker embeds (_shared/core/network/data/pac_helpers.js). GIO and
 --- libproxy 0.5 keep only the "METHOD host" entries of a PAC answer, so
 --- "PROXY a; DIRECT" reached the driver as `a` alone; this module returns the
 --- complete ordered list so the caller can walk it, as Windows and macOS do.
@@ -32,7 +32,7 @@ local M = {}
 
 -- The engine SONAME is the one the native runtime catalogue ships.
 local Catalogue = require("_generated.native_runtime")
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 -- The loaded engine and its declared ABI, once per module instance.
 local _engine = nil

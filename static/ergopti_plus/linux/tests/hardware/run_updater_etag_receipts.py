@@ -20,9 +20,9 @@ import urllib.parse
 # The driver's cache folder under XDG_CACHE_HOME, read from the one declaration;
 # boot creates it and the updater only sends conditional requests when it exists.
 FOLDER = tomllib.loads(
-    (pathlib.Path(__file__).resolve().parents[3] / "_shared/modules/paths/app_dirs.toml").read_text(
-        encoding="utf-8"
-    )
+    (
+        pathlib.Path(__file__).resolve().parents[3] / "_shared/core/fs/data/paths/app_dirs.toml"
+    ).read_text(encoding="utf-8")
 )["app"]["linux_folder_name"]
 
 
@@ -257,7 +257,7 @@ def main():
                         "ERGOPTI_NATIVE_UPDATER_URL": f"https://127.0.0.1:{server.server_port}/{mode}",
                         "XDG_CONFIG_HOME": str(case_root / "config"),
                         "XDG_CACHE_HOME": str(case_root / "cache"),
-                        "LUA_PATH": "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                        "LUA_PATH": "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                     }
                 )
                 try:

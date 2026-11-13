@@ -19,7 +19,7 @@
 ; receipts or independently authored scripts; none launches during discovery.
 _RPP_Catalogue() {
 	global _SharedDir
-	Raw := FSReadUtf8ExactBounded(_SharedDir . "\modules\actions\program_providers.json", 65536)
+	Raw := FSReadUtf8ExactBounded(_SharedDir . "\shortcuts\data\actions\program_providers.json", 65536)
 	Assert(Raw is String, "provider tests read the actual bounded canonical catalogue")
 	return Raw
 }

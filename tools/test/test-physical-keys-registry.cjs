@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Physical-Key Registry Completeness and Parity
  * DESCRIPTION:
- * `_shared/data/keycodes/physical_keys.json` names every key, mouse button and
+ * `_shared/layouts/data/keycodes/physical_keys.json` names every key, mouse button and
  * wheel direction a layer can bind by its W3C KeyboardEvent.code, and records
  * the identifier each driver uses for that physical position: the AutoHotkey
  * scan code, the Linux evdev code, the macOS virtual keycode, the
@@ -28,7 +28,7 @@
  *    width on both form factors.
  * 4. Parity with every existing hand copy, each an independent oracle written
  *    before the registry: evdev.json, linux/infra/evdev_codes.lua,
- *    _shared/lua/keycodes/init.lua, azerty.json, heatmap_win.js SC_TO_KC, the
+ *    _shared/platform/input/keycodes/core.lua, azerty.json, heatmap_win.js SC_TO_KC, the
  *    Karabiner legacy_layer_keys.json and the native tap-hold input keys. Each scan is
  *    floored so a parser that stops matching cannot pass over nothing.
  * 5. HID usages (hid_usages.json, beside the registry and read only by the macOS
@@ -48,8 +48,8 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const REGISTRY = path.join(SP, '_shared', 'data', 'keycodes', 'physical_keys.json');
-const HID_USAGES = path.join(SP, '_shared', 'data', 'keycodes', 'hid_usages.json');
+const REGISTRY = path.join(SP, '_shared', 'layouts', 'data', 'keycodes', 'physical_keys.json');
+const HID_USAGES = path.join(SP, '_shared', 'layouts', 'data', 'keycodes', 'hid_usages.json');
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -322,7 +322,7 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 
 // --- 4.1 evdev.json: evdev code -> US character.
 {
-	const evdev = JSON.parse(read('_shared/data/keycodes/evdev.json'));
+	const evdev = JSON.parse(read('_shared/layouts/data/keycodes/evdev.json'));
 	let n = 0;
 	for (const [num, ch] of Object.entries(evdev.layouts.qwerty.unshifted)) {
 		const hit = find((k) => k.kind === 'key' && k.evdev === Number(num));
@@ -361,7 +361,9 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	// ScrollLock is deliberately not a bindable registry position: HID names it
 	// as an unregistered PC key. Its Linux input-event-codes.h ABI is still 70.
 	const KERNEL_ONLY = { SCROLLLOCK: { code: 'ScrollLock', evdev: 70, usage: 0x47 } };
-	const unregisteredHid = JSON.parse(read('_shared/data/keycodes/hid_usages.json')).unregistered;
+	const unregisteredHid = JSON.parse(
+		read('_shared/layouts/data/keycodes/hid_usages.json')
+	).unregistered;
 
 	/** Compares every parsed named constant without exempting kernel-only locks. */
 	function namedEvdevErrors(values) {
@@ -439,9 +441,9 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	if (n < 35) fail(`evdev_codes.lua: only ${n} codes compared (floor 35)`);
 }
 
-// --- 4.3 _shared/lua/keycodes/init.lua: macOS keycodes named in code.
+// --- 4.3 _shared/platform/input/keycodes/core.lua: macOS keycodes named in code.
 {
-	const src = read('_shared/lua/keycodes/init.lua');
+	const src = read('_shared/platform/input/keycodes/core.lua');
 	const NAMED = {
 		BACKSPACE: 'Backspace',
 		RETURN: 'Enter',
@@ -468,7 +470,7 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 
 // --- 4.4 azerty.json: the heatmap's Apple ISO keycodes.
 {
-	const azerty = JSON.parse(read('_shared/data/keycodes/azerty.json'));
+	const azerty = JSON.parse(read('_shared/layouts/data/keycodes/azerty.json'));
 	const NAMED = {
 		return: 'Enter',
 		space: 'Space',
@@ -821,7 +823,9 @@ for (const [code, entry] of Object.entries(unregistered)) {
 			);
 	}
 	const fKeys = {};
-	for (const m of read('_shared/lua/keycodes/init.lua').matchAll(/^M\.F(\d+)_\w+\s*=\s*(\d+)/gm))
+	for (const m of read('_shared/platform/input/keycodes/core.lua').matchAll(
+		/^M\.F(\d+)_\w+\s*=\s*(\d+)/gm
+	))
 		fKeys['F' + m[1]] = Number(m[2]);
 	const UNREGISTERED = {
 		PrintScreen: [0x46, fKeys.F13],
@@ -851,9 +855,9 @@ for (const [code, entry] of Object.entries(unregistered)) {
 // --- 5.6 fn/globe has no registry position, so the macOS keycode it resolves to
 // is the shared keycodes constant, which must be the heatmap's fn keycode.
 {
-	const src = read('_shared/lua/keycodes/init.lua');
+	const src = read('_shared/platform/input/keycodes/core.lua');
 	const fnConst = /^M\.FUNCTION\s*=\s*(\d+)/m.exec(src);
-	const azerty = JSON.parse(read('_shared/data/keycodes/azerty.json'));
+	const azerty = JSON.parse(read('_shared/layouts/data/keycodes/azerty.json'));
 	const fnHeatmap = azerty.keys.find((entry) => entry.qwerty === 'fn');
 	if (!fnConst) fail('keycodes/init.lua: M.FUNCTION (the fn/globe keycode) is missing');
 	else if (!fnHeatmap || fnHeatmap.kc !== Number(fnConst[1]))

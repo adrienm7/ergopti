@@ -19,7 +19,7 @@
 --- Four hand-written lists is four chances for one to drift, and the drift is
 --- silent in the worst direction: a field that stops being classified as a
 --- secret does not error, it starts being shown. So the answer lives in
---- _shared/modules/personal_info/fields.toml and the vectors below are the
+--- _shared/hotstrings/data/personal_info/fields.toml and the vectors below are the
 --- shared corpus, replayed unmodified.
 ---
 --- WHY THE PHONE NUMBER IS A TEST CASE AND NOT AN OMISSION:
@@ -30,7 +30,7 @@
 
 local helpers = require("tests.helpers")
 
-local Mask = helpers.load_module("personal_info.mask")
+local Mask = helpers.load_module("hotstrings.engine.personal_info.mask")
 
 --- The shared corpus, decoded.
 --- @return table
@@ -46,7 +46,7 @@ local function corpus()
 			.. "vectors asserts nothing at all")
 	local raw = fh:read("*a")
 	fh:close()
-	local json = require("json")
+	local json = require("core.text.engine.json")
 	local ok, decoded = pcall(json.decode, raw)
 	helpers.assert_true(ok and type(decoded) == "table", "the corpus must decode")
 	return decoded
@@ -180,7 +180,7 @@ helpers.describe("preview masking: display only", function()
 		-- record was strictly poorer than its firing record — it dropped even
 		-- is_private — so the layer that puts a value on screen had no way to know
 		-- it was a secret.
-		local Engine = helpers.load_module("hotstring_engine")
+		local Engine = helpers.load_module("hotstrings.engine.matcher")
 		local engine = Engine.new()
 		-- A plain lowercase trigger on purpose: what is under test is that `field`
 		-- survives the engine, not that an IBAN prefix matches — mixing the two
@@ -219,7 +219,7 @@ end)
 
 --- The bubble must read identically on all three drivers, and that is a claim
 --- about output, not about intent — macOS and Linux render it in Lua, Windows in
---- AutoHotkey. _shared/modules/personal_info/preview_vectors.toml is where the
+--- AutoHotkey. _shared/hotstrings/data/personal_info/preview_vectors.toml is where the
 --- answer lives; this driver proves it satisfies it, and the other two are held
 --- to the same file rather than to a description of it.
 ---
@@ -229,13 +229,13 @@ end)
 helpers.describe("preview masking: the shared cross-driver vectors", function()
 
 	local Paths = require("infra.paths")
-	local Reader = require("toml_codec")
+	local Reader = require("core.text.engine.toml_codec")
 	local Fields = helpers.load_module("infra.personal_info_fields")
 
 	--- Reads the vector file through the same resolver the driver uses.
 	--- @return table Array of { field, input, preview, why }.
 	local function load_vectors()
-		local path = Paths.shared("modules/personal_info/preview_vectors.toml")
+		local path = Paths.shared("hotstrings/data/personal_info/preview_vectors.toml")
 		helpers.assert_not_nil(path, "the shared tree must resolve or this asserts nothing")
 		local handle = io.open(path, "r")
 		helpers.assert_not_nil(handle, "preview_vectors.toml must be readable: " .. tostring(path))

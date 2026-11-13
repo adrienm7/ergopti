@@ -37,7 +37,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/collect-macos-field-report.sh';
 const SPEC_PATH = 'static/ergopti_plus/macos/data/field_run.json';
 const CHECKS_PATH = 'static/ergopti_plus/macos/infra/field_check_checks.lua';
-const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.sh';
+const IDENTIFIERS = 'static/ergopti_plus/_shared/core/text/data/identifiers.sh';
 const SHELL_CHECKS = 'tools/dev/macos-field-shell-checks.sh';
 const PRIVACY_PANES = 'static/ergopti_plus/macos/data/privacy_panes.json';
 const FIELD_GIT = 'tools/dev/field-report-git.sh';
@@ -57,11 +57,12 @@ const ANALYSER_SOURCES = JSON.parse(
 		encoding: 'utf8'
 	}).stdout
 ).sources;
-const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml';
+const BUNDLED_SAMPLE =
+	'static/ergopti_plus/_shared/hotstrings/data/catalogue/french/autocorrection.toml';
 // The folders and log names come from their shared declarations.
 const FIELD_PATHS = 'tools/dev/field-report-paths.py';
-const APP_DIRS = 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml';
-const SUB_FILES = 'static/ergopti_plus/_shared/modules/logger/sub_files.toml';
+const APP_DIRS = 'static/ergopti_plus/_shared/core/fs/data/paths/app_dirs.toml';
+const SUB_FILES = 'static/ergopti_plus/_shared/core/logger/data/sub_files.toml';
 // The readiness budget covers the boot's Accessibility wait, read from its owner.
 const ACCESSIBILITY_WAIT = 'static/ergopti_plus/macos/infra/accessibility_wait.lua';
 

@@ -1,5 +1,5 @@
 {
-	"_comment": "Shared oracle for _shared/lua/llm/context_buffer.lua, replayed by the Linux and macOS suites. Each case applies ops in order to a fresh buffer and checks the final text and codepoint length; 'cleared' lists the result of each navigated op.",
+	"_comment": "Shared oracle for _shared/ai/engine/policy/context_buffer.lua, replayed by the Linux and macOS suites. Each case applies ops in order to a fresh buffer and checks the final text and codepoint length; 'cleared' lists the result of each navigated op.",
 	"capacity": 2048,
 	"cases": [
 		{

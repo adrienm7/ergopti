@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 --- Loads the adapter over a fresh file path and a scripted clock.
 --- @return table breadcrumb, string path, table clock

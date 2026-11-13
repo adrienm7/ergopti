@@ -108,9 +108,9 @@ _EDOT_Assets(Root) {
 	; Exclusive native creation requires each parent before its children.
 	for Subdir in ["config", "logs", "vendor", "vendor\64bit", "shared"]
 		FSCreateDirectoryExclusiveStrict(Root . "\" . Subdir)
-	Inputs := ["modules\diagnostics\schema.json", "modules\diagnostics\redaction.json", "modules\diagnostics\issue_templates.json",
-		"modules\diagnostics\error_policy.json", "modules\diagnostics\recent_issues.json", "modules\diagnostics\day_log.json",
-		"modules\updater\defaults.json", "data\locales\en.json", "data\locales\fr.json"]
+	Inputs := ["diagnostics\data\schema.json", "diagnostics\data\redaction.json", "diagnostics\data\issue_templates.json",
+		"diagnostics\data\error_policy.json", "diagnostics\data\recent_issues.json", "diagnostics\data\day_log.json",
+		"updater\data\defaults.json", "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json"]
 	_EDOT_CreateParents(Root . "\shared", Inputs)
 	for Relative in Inputs {
 		Original := _SharedDir . "\" . Relative, Copy := Root . "\shared\" . Relative
