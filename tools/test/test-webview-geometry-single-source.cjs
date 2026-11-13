@@ -405,10 +405,7 @@ const WINDOWS_APPS = {
 		file: 'ui/layout_manager/editor_window.ahk',
 		// The layout editor's own window, opened through WebViewHost.TryOpen under
 		// its manifest id, as the layer editor is.
-		checks: () => [
-			/WebViewHost\.TryOpen\(\s*LAYOUT_EDITOR_WINDOW_APP_ID\b/,
-			/LAYOUT_EDITOR_WINDOW_APP_ID := "layout_editor_window"/
-		]
+		checks: () => [/WebViewHost\.TryOpen\(\s*"layout_editor_window"/]
 	},
 	layer_editor: {
 		file: 'ui/layer_editor/init.ahk',

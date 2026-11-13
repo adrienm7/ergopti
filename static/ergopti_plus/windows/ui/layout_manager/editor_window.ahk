@@ -11,7 +11,8 @@
 ; same rules.
 ;
 ; FEATURES & RATIONALE:
-; 1. WebViewHost singleton under the manifest id layout_editor_window: a
+; 1. WebViewHost singleton under the manifest id layout_editor_window (named in
+;    the one TryOpen call, which reads its size from apps.manifest.json): a
 ;    second request brings the open editor to the front and keeps its unsaved
 ;    work.
 ; 2. On ready the page receives initData (its strings, the platform, the
@@ -32,9 +33,6 @@
 ; ======= 1/ State and actions =======
 ; ====================================
 ; ====================================
-
-; The page's id in _shared/ui/apps.manifest.json.
-global LAYOUT_EDITOR_WINDOW_APP_ID := "layout_editor_window"
 
 ; The only actions the page may send (the page declares the same list;
 ; tools/test/test-layout-manager-page.cjs pins both).
@@ -112,8 +110,7 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
  * @returns {Boolean} Whether the window is shown.
  */
 LayoutEditorWindow_Open(*) {
-	global LAYOUT_EDITOR_WINDOW_APP_ID
-	Host := WebViewHost.TryOpen(LAYOUT_EDITOR_WINDOW_APP_ID, Map(
+	Host := WebViewHost.TryOpen("layout_editor_window", Map(
 		"Title", t("layout_editor.title"),
 		"OnReady", _LayEdWin_OnReady,
 		"OnMessage", _LayEdWin_OnMessage))
