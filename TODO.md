@@ -585,7 +585,7 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### Linux (container proofs of 2026-11-10)
 
-- [ ] **GNOME input source switch.** GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`: on a
+- [x] **GNOME input source switch.** GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`: on a
       `sources` change it keeps its in-memory MRU and activates its first entry, and a non-interactive activation
       writes no `mru-sources`. Done 2026-11-11 in `adapters/input_source_switch.lua`, decided by the coordinator on
       2026-11-11 overnight, to review by the maintainer: the switch writes `sources` as the target alone, waits
@@ -603,7 +603,16 @@ between workers) green alone. All live checks pass, typed by the harness.
       the registry's date with the shell's start, registers both slots and answers `needs_relogin` without touching
       the setting; after the next login every build alternates live. [Proof](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md).
       2026-11-13: the daemon's runtime switch no longer writes `sources` (see « GNOME layout switch through the Ergopti
-      GNOME Shell extension » above); what is left here is the installer's activation of a newly installed layout.
+      GNOME Shell extension » above). Done 2026-11-13 (worker D): the installer switches the running Shell the same
+      way. `apply-wayland` (`_gnome_select`) writes the lists with the slot first for the next login, then activates
+      the slot through the extension once the Shell lists it (a bounded poll, no settle time: `--gnome-settle-ms` and
+      `gnome_input_source_settle_ms` are removed), and answers `gnome_extension_missing` with the setting put back
+      when the extension does not run; `apply_gnome` (W1 to W3, install) asks the extension too and otherwise says the
+      layout is active at the next login (the extension activates listed sources only, so an id the Shell has not
+      read never falls back to `us`). Proved on a headless GNOME Shell 46 as an unprivileged user:
+      `run_input_sources_live.sh gnome tests/hardware/run_user_layout_wayland_live.lua` holds W1 to W3 (7 checks
+      over the new login), and `gnome-no-extension` names the extension; `test_wayland_live_replace.py` models the
+      Shell with a fake extension. Linux only.
 
 ### Linux performance (2026-11-11, branch `claude/ergopti-todo-linux-perf`)
 

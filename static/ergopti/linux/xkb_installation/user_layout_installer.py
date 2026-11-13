@@ -47,6 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from desktop_activation import (  # noqa: E402
     GNOME_SHELL_PROCESS,
+    WAYLAND_GNOME_EXTENSION_MISSING,
     WAYLAND_NEEDS_RELOGIN,
     WAYLAND_SELECT_REFUSED,
     WAYLAND_SESSION_UNSUPPORTED,
@@ -553,7 +554,6 @@ def apply_wayland(
     languages: List[str],
     root: Path,
     home: Path,
-    gnome_settle_ms: int,
     environ: Optional[Dict[str, str]] = None,
 ) -> dict:
     """Replaces a layout live on a GNOME or KDE Wayland session.
@@ -626,7 +626,13 @@ def apply_wayland(
             "GNOME Shell reads %s only at login: log out and back in, then apply again"
             % (root / "rules" / "evdev.xml"),
         )
-    applied, code = select_live_slot(slot, slots, selection, root, gnome_settle_ms / 1000, environ)
+    applied, code = select_live_slot(slot, slots, selection, root, environ)
+    if code == WAYLAND_GNOME_EXTENSION_MISSING:
+        return _live_refusal(
+            code,
+            "the Ergopti GNOME Shell extension (focus@ergopti.fr) is not running: it switches"
+            " GNOME's layout; a new login loads it after an install or an update",
+        )
     if not applied:
         return _live_refusal(code, "not loaded: " + code)
     # The other slot is no longer selected, so rewriting it is invisible to the
@@ -661,8 +667,6 @@ def parse_arguments(argv: List[str]) -> argparse.Namespace:
     wayland_parser.add_argument("--display-name", required=True)
     wayland_parser.add_argument("--source-dir", required=True, type=Path)
     wayland_parser.add_argument("--language", action="append", default=[])
-    # The daemon passes the shared timing registry's gnome_input_source_settle_ms.
-    wayland_parser.add_argument("--gnome-settle-ms", required=True, type=int)
     for name in ("uninstall", "activate", "apply-x11"):
         command = commands.add_parser(name)
         command.add_argument("--layout-id", required=True)
@@ -691,8 +695,6 @@ def main(argv: Optional[List[str]] = None) -> int:
         elif args.command == "apply-x11":
             report = apply_x11(args.layout_id, root)
         elif args.command == "apply-wayland":
-            if args.gnome_settle_ms <= 0:
-                raise InstallError(EXIT_ARGUMENTS, "--gnome-settle-ms must be positive")
             report = apply_wayland(
                 args.layout_id,
                 args.display_name,
@@ -700,7 +702,6 @@ def main(argv: Optional[List[str]] = None) -> int:
                 args.language,
                 root,
                 home,
-                args.gnome_settle_ms,
             )
         else:
             report = activate(args.layout_id, root)

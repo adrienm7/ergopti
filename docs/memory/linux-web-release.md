@@ -807,11 +807,15 @@ reliably. The daemon therefore asks the `focus@ergopti.fr` extension
 own switcher does. A GDBus `UnknownMethod`/`UnknownObject` answer means the
 extension is not running (Flatpak, turned off, or an updated copy not loaded
 before the next login): report `gnome_extension_missing`, never fall back to
-rewriting `sources`. Action: keep the extension's constants pinned to
-`input_source_switch.lua` by `test_compositor_focus_assets.lua`, and prove a
-change with `tests/hardware/run_input_sources_live.sh gnome` and
-`gnome-no-extension` (needs gnome-shell, python3-dbusmock, xwayland and a
-world-writable `/tmp/.X11-unix`).
+rewriting `sources`. The installer (`desktop_activation.gnome_extension_activate`)
+uses the same call; the Shell lists a written source in its own time, so poll
+until it does, and an id its registry does not know is never listed (no "us"
+fallback). Action: keep the extension's constants pinned to
+`input_source_switch.lua` and `desktop_activation.py` by their tests, and prove
+a change with `tests/hardware/run_input_sources_live.sh gnome` (and the
+`run_user_layout_wayland_live.lua` script) and `gnome-no-extension`, as an
+unprivileged user (the installer refuses root; needs gnome-shell,
+python3-dbusmock, xwayland and a world-writable `/tmp/.X11-unix`).
 
 ### project-a-keymap-that-compiles-can-still-have-dead-layers
 
