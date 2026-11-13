@@ -112,6 +112,24 @@ function run() {
 		/S: npm run gen failed/
 	);
 	assert.ok(source.indexOf('runGenerators(key') < source.indexOf('settleCodegen(key'));
+	// On a tree S01 already rearranged, the next step is still S02: its commit
+	// named it S01, its rank among the steps left.
+	const Plan = require('../audit/structure/plan.cjs');
+	const tsv = 'old\tnew\tstep\nstatic/ergopti_plus/a/x.lua\tstatic/ergopti_plus/b/x.lua\tS01\n';
+	const done = Plan.committedSteps(
+		`${tsv}static/ergopti_plus/core/crypto/y.lua\tstatic/ergopti_plus/core/crypto/z/y.lua\tS02\n`,
+		(f) => f === 'static/ergopti_plus/b/x.lua' || f === 'static/ergopti_plus/core/crypto/y.lua'
+	);
+	assert.equal(done.stepped, true);
+	const left = Plan.steps(new Map([['core/crypto/y.lua', 'core/crypto/z/y.lua']]), done);
+	assert.deepEqual(
+		left.map((s) => s.id),
+		['S02']
+	);
+	assert.throws(
+		() => Plan.steps(new Map([['core/other.lua', 'core/z/other.lua']]), done),
+		/does not number it/
+	);
 	console.log(
 		'[OK] the phase 2 runner refuses without its go and owns the follow-ups of each step.'
 	);
