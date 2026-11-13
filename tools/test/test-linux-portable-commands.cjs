@@ -393,6 +393,11 @@ const PROGRAMS = {
 	curl: inPrep('\\bcurl\\b', 'curl'),
 	python3: inPrep('python3', 'the Python the fixtures spawn'),
 	luajit: inPrep('luajit', 'the production interpreter'),
+	// ImageMagick's convert: the screen-capture resize fixture proves a real
+	// write failure against it on the Ubuntu desktop-webview lane only.
+	convert: why('ImageMagick, for the screen-capture resize fixture; installed by CI', HOST, {
+		proof: { file: CI_LINUX, token: 'ubuntu_apt\\.py.* imagemagick\\b' }
+	}),
 	// Declared runtime dependencies (packages and install.sh).
 	xclip: declaredByDeb('xclip', 'clipboard on X11', DRIVER_HOST),
 	'notify-send': declaredByInstaller('notify-send', 'desktop notifications'),
