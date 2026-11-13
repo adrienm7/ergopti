@@ -1347,6 +1347,40 @@ function joinedPaths(text) {
  * literal per segment, except where the run was one path argument
  * (shared_json("data/x.json", true) keeps a single argument before `true`).
  */
+/**
+ * path.join(DRIVERS, driver, 'infra', 'paths.lua'): literal pieces after a
+ * variable that stands for a driver. They name a file under every driver that
+ * holds one there, and follow only when all of those move it alike.
+ * @returns {{kind: string, rendered: string, oldRepo: string, newRepo: string}|null}
+ */
+function driverPieceJoin(j, byRepoPath) {
+	const named = (j.before || '')
+		.split(',')
+		.map((a) => a.trim())
+		.filter(Boolean);
+	if (named.length < 2 || /^["'`]/.test(named[named.length - 1]) || j.parts.length < 2) return null;
+	const rest = path.posix.normalize(j.parts.join('/'));
+	if (!/\.[A-Za-z0-9]+$/.test(rest) || rest.startsWith('..')) return null;
+	const holders = Census.DRIVERS.filter((d) => EXISTING.has(`${PREFIX}${d}/${rest}`));
+	if (holders.length === 0) return null;
+	const places = new Set(
+		holders.map((d) => {
+			const old = `${PREFIX}${d}/${rest}`;
+			const target = byRepoPath.has(old) ? byRepoPath.get(old) : old;
+			return target ? path.posix.relative(`${PREFIX}${d}`, target) : null;
+		})
+	);
+	if (places.size !== 1 || places.has(null)) return null;
+	const rel = [...places][0];
+	if (rel === rest) return null;
+	return {
+		kind: 'join',
+		rendered: renderJoin(j, rel),
+		oldRepo: `${PREFIX}${holders[0]}/${rest}`,
+		newRepo: `${PREFIX}${holders[0]}/${rel}`
+	};
+}
+
 function renderJoin(j, rel) {
 	// A lone literal that already holds a separator, or one followed by a
 	// flag rather than a further piece, is one path argument.
@@ -2199,7 +2233,9 @@ function scanFile(file, text, ctx) {
 		}
 	if (/\.(c?js|mjs|lua|py)$/.test(file))
 		for (const j of joinedPaths(text)) {
-			const hit = resolveJoinedPath(j, byRepoPath, byRepoDir, successors, jsEnv);
+			const hit =
+				resolveJoinedPath(j, byRepoPath, byRepoDir, successors, jsEnv) ||
+				driverPieceJoin(j, byRepoPath);
 			if (!hit) continue;
 			// shared('lua', name): the root switch drops the 'lua' piece, so a
 			// join onto the old root is respelled by the switch, not refused.
