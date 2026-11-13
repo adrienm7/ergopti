@@ -42,12 +42,14 @@ and the Windows agent deletes it with its `A_IsSuspended` gates (choice B,
 
 ## Third pass (2026-11-13, worker H)
 
-| Sequence                                                       | Before                                                                | Regression                                                                                     |
-| -------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Pause, then switch Gestures on or off (macOS)                  | Refused; the slot rows greyed                                         | `test_menu_gestures_pause_gate`, `test_switch_under_suspension` (`edd1-paused-writes`)         |
-| Pause, then restore or clear gestures (Linux)                  | `gestures.apply_scope` refused « gesture configuration is paused »    | `test_gesture_scope` (the real menu's clear while paused, the switch while paused stays inert) |
-| Pause, then edit a tap-hold key's tap or delay (Linux)         | `capture_configuration_edit` and the menu's guard refused             | `test_tap_hold_edit_owner` (committed while paused, installed on resume)                       |
-| Pause, then the programmable hotstrings switch, delay, example | The shared policy refused through its `paused` port (macOS and Linux) | shared `user_hotstring_menu_contract`, macOS `test_user_code_native` (`edd1-paused-writes`)    |
+| Sequence                                                                                                                                                | Before                                                                | Regression                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Pause, then switch Gestures on or off (macOS)                                                                                                           | Refused; the slot rows greyed                                         | `test_menu_gestures_pause_gate`, `test_switch_under_suspension` (`edd1-paused-writes`)                |
+| Pause, then restore or clear gestures (Linux)                                                                                                           | `gestures.apply_scope` refused « gesture configuration is paused »    | `test_gesture_scope` (the real menu's clear while paused, the switch while paused stays inert)        |
+| Pause, then edit a tap-hold key's tap or delay (Linux)                                                                                                  | `capture_configuration_edit` and the menu's guard refused             | `test_tap_hold_edit_owner` (committed while paused, installed on resume)                              |
+| Pause, then the programmable hotstrings switch, delay, example                                                                                          | The shared policy refused through its `paused` port (macOS and Linux) | shared `user_hotstring_menu_contract`, macOS `test_user_code_native` (`edd1-paused-writes`)           |
+| Pause, then switch Shortcuts on or off (macOS)                                                                                                          | Refused                                                               | `test_shortcuts_toggle_pause_gated`, `test_feature_toggle_keeps_script_control`, `test_bindings_debt` |
+| Pause, then a hotstring section, a language or extension « all sections », a section order, the preview rows, the delays or the settings window (macOS) | Greyed or refused                                                     | the hotstrings menu suites (`edd1-paused-writes`), `menu-hotstring-language-binding.cjs` proofs       |
 
 macOS records the Gestures switch with `gestures.set_enabled_under_suspension`: OFF
 releases the native runtime at once, ON publishes only the flag and the start
@@ -61,23 +63,31 @@ once when switched on while paused; its hotstrings stay inert because the
 paused driver types nothing (decided by the agent on 2026-11-13, to review by
 the maintainer).
 
+The macOS Shortcuts switch records its intent under ScriptControl's claim
+(`shortcuts.set_feature_intent_under_pause`): OFF publishes the feature claim,
+ON drops it, and nothing binds under the pause. ScriptControl's resume inverse
+for a layer that was OFF at pause time is now
+`shortcuts.resume_bindings_after_pause`, which starts the layer only when the
+switch turned it ON during the pause. A macOS hotstring section switched while
+paused changes the registry at once; the keymap's processing stays paused, so
+nothing expands until resume.
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
 paused driver act at once instead of « on resume », or the change needs its
 source proofs reworked first:
 
-- macOS Shortcuts: the switch, each shortcut's toggle, the slot rows and the
-  wrap rows bind or unbind OS hotkeys at once.
+- macOS Shortcuts: the slot rows and the wrap rows bind or unbind OS hotkeys
+  at once (each shortcut's own row runs while paused: `Bindings.enable`
+  records only the preference behind the pause fence).
 - macOS and Linux AI menus: the parent row, the enable switch and the
   privacy and trigger rows read the pause through shared policies.
 - The personal hotstrings editor row and the word expander rows on macOS and
   Linux: their shared corpus (`personal_editor_command.json`) and contract
   still pin the pause, so all drivers move together.
-- macOS hotstrings submenus (`menu_hotstrings*.lua`): the section, bulk,
-  delay and personal rows still grey; `tools/lib/menu-hotstring-language-binding.cjs`
-  and `test-menu-manifest.cjs` prove those pause locals structurally and must
-  be reworked with them.
+- macOS hotstrings submenus: the personal legacy shortcut row (it binds a
+  hotkey), with the personal editor and word expander rows above.
 - macOS magic key source capture: it listens to a physical key press.
 - The audit that every typing feature (layout emulation first) is inert while
   paused, and that a setting changed while paused applies on resume.
