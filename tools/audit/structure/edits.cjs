@@ -177,8 +177,8 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		// is requalified there.
 		file: 'static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk',
 		moves: 'windows/platform/remap/tap_hold_loader.ahk',
-		from: '	return Resolved\n}\n\n\n\n\n; =========================================',
-		to: '	return Resolved\n}\n\n\n\n\n\n; ========================================='
+		from: '\treturn Resolved\n}\n\n\n\n\n; =========================================',
+		to: '\treturn Resolved\n}\n\n\n\n\n\n; ========================================='
 	},
 	{
 		// windows/platform was never in the convention lint's scan; S34 moves this
@@ -187,8 +187,9 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		// receipt pinning it is requalified there.
 		file: 'static/ergopti_plus/windows/platform/remap/tap_hold_writer.ahk',
 		moves: 'windows/platform/remap/tap_hold_writer.ahk',
-		from: '#Include ../../adapters/native_number.ahk\n\n; ===',
-		to: '#Include ../../adapters/native_number.ahk\n\n\n\n\n\n; ==='
+		// Anchored after the include, which earlier steps respell.
+		from: 'native_number.ahk\n\n; ===========================\n; ======',
+		to: 'native_number.ahk\n\n\n\n\n\n; ===========================\n; ======'
 	},
 	{
 		// The ledger's family contracts leave one folder for two, and lose the
