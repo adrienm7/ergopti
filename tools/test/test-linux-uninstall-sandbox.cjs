@@ -513,7 +513,7 @@ try {
 	const bare = path.join(sandbox, 'bare');
 	fs.mkdirSync(path.join(packaged, 'install'), { recursive: true });
 	fs.mkdirSync(bare);
-	for (const helper of ['desktop_entry.sh', 'config_home.sh']) {
+	for (const helper of ['desktop_entry.sh', 'config_home.sh', 'ownership_schema.sh']) {
 		fs.copyFileSync(
 			path.join(path.dirname(script), 'install', helper),
 			path.join(packaged, 'install', helper)
@@ -581,7 +581,11 @@ try {
 			}
 		});
 	const terminal = packagedRun('--yes');
-	assert.equal(terminal.status, 69, 'a missing package manager is EX_UNAVAILABLE');
+	assert.equal(
+		terminal.status,
+		69,
+		'a missing package manager is EX_UNAVAILABLE: ' + terminal.stderr
+	);
 	assert.equal(terminal.stderr.trim(), 'missing-program apt-get', 'the program is named on stderr');
 	const menu = packagedRun('--yes', '--gui', 'Title', 'Body', 'Install {1} first');
 	assert.equal(menu.status, 69);
