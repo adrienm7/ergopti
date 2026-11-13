@@ -59,6 +59,24 @@ function run() {
 	const jsOut = Apply.rewriteText(js, jsRows, new Map(), JS);
 	assert.ok(jsOut.includes("package.loaded['core.fs.adapters.file_system']"), jsOut);
 
+	// A tool on one driver's files names them under its root: the exemption
+	// list of the Linux shared-path guard ('infra/paths.lua') kept its old
+	// entry after S04 moved the resolver, and the guard flagged the resolver.
+	const GUARD = 'tools/test/zz_probe_guard.cjs';
+	const guard =
+		"const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');\n" +
+		"const EXEMPT = new Set(['infra/paths.lua', 'ui/webkit_host.lua']);\n";
+	const guardMap = new Map([
+		['linux/infra/paths.lua', 'linux/core/fs/engine/paths.lua'],
+		['linux/ui/webkit_host.lua', 'linux/ui/webkit_host.lua']
+	]);
+	const guardRows = Plan.scanFile(GUARD, guard, Plan.referenceContext(guardMap));
+	const guardOut = Apply.rewriteText(guard, guardRows, new Map(), GUARD);
+	assert.ok(
+		guardOut.includes("new Set(['core/fs/engine/paths.lua', 'ui/webkit_host.lua'])"),
+		guardOut
+	);
+
 	console.log('[OK] a Lua tool that requires a module only one driver has loads that driver.');
 }
 
