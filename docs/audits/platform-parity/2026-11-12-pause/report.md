@@ -72,6 +72,12 @@ switch turned it ON during the pause. A macOS hotstring section switched while
 paused changes the registry at once; the keymap's processing stays paused, so
 nothing expands until resume.
 
+Typing-inertness audit, Linux WPM (worker H, 2026-11-13): the WPM widget and
+the tray readout kept ticking while paused, so a pause right after typing left
+a fading speed on screen and a key typed while paused brought the widget back.
+Windows and macOS hide both. The daemon tick now passes the live pause and
+both surfaces hide (`(wpm-pause-hides)` in `test_wpm_readouts`).
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
