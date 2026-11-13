@@ -2528,6 +2528,8 @@ function attributeSteps(plan, refs) {
 }
 
 /** The kinds a step cannot apply mechanically: phase 2 refuses them. */
+/** A Go module path of this repository (go.mod `module` and its imports). */
+const GO_MODULE_PATH = /\bgithub\.com\/adrienm7\/ergopti\/[\w./-]*/g;
 const REFUSED_KINDS = new Set(['dir-split', 'lua-prefix-split', 'join-split', 'folder-edit-stale']);
 /** The kinds the step applies but a reviewer reads. */
 const REVIEWED_KINDS = new Set([
@@ -2845,6 +2847,7 @@ module.exports = {
 	foreignBaseBefore,
 	isListedModuleSite,
 	isLuaLogTagSite,
+	GO_MODULE_PATH,
 	EXISTING,
 	referenceContext,
 	scanFile,
