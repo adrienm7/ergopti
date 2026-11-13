@@ -74,7 +74,7 @@ local function transformed_by(action_name, selected)
 	package.loaded[names.manager] = nil
 
 	local ok, err = pcall(function()
-		require("tests.support.text_owner_fixture").with(function(guard)
+		require("tests.support.core.text_owner_fixture").with(function(guard)
 			local manager = require(names.manager)
 			manager.init({ persist = false, capture_text_owner = guard.capture_text_owner })
 			local handlers = manager.action_handlers()

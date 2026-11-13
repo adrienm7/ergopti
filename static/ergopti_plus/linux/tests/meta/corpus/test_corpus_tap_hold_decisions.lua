@@ -17,7 +17,7 @@ local Catalog = require("tap_hold.engine.key_catalog")
 local Timings = require("core.timing.engine.timings")
 local EvdevCodes = require("platform.input.evdev_codes")
 local Engine = require("tap_hold.engine.engine")
-local Fixture = require("tests.support.platform.remap.tap_hold.tap_hold_engine_fixture")
+local Fixture = require("tests.support.keyboard.engine.tap_hold_engine_fixture")
 local Contract = require("tests.lua.keyboard.tap_hold_decision_contract")
 
 local SHARED = helpers.driver_root() .. "/../_shared"

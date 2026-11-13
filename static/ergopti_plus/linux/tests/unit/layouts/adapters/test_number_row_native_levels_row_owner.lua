@@ -1,7 +1,7 @@
 --- tests/unit/layouts/adapters/test_number_row_native_levels_row_owner.lua
 
-package.loaded["tests.support.adapters.layout.number_row_native_levels_fixture"] = nil
-local Fixture = require("tests.support.adapters.layout.number_row_native_levels_fixture")
+package.loaded["tests.support.layouts.adapters.number_row_native_levels_fixture"] = nil
+local Fixture = require("tests.support.layouts.adapters.number_row_native_levels_fixture")
 local h, symbols, rows =
 	Fixture.h, Fixture.symbols, Fixture.rows
 
@@ -425,7 +425,7 @@ end
 
 -- Whole Hook controlled lifecycle under explicit intent; no connected rights.
 do
- local Fixture = require('tests.support.input_owner_fixture')
+ local Fixture = require('tests.support.core.input_owner_fixture')
  local function intent_options(session, mode)
   local options = {}; for key, value in pairs(session.start_options) do options[key] = value end
   options.numberRowMode = mode

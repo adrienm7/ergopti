@@ -1,7 +1,7 @@
 --- tests/unit/menu/ui/keyboard_layout/test_layout_scope.lua
 
 local helpers = require("tests.helpers")
-local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
+local LayoutFixture = require("tests.support.layouts.legacy_caption_fixture")
 local Codec = require("core.text.engine.toml_codec")
 local FileSystem = require("core.fs.adapters.file_system")
 

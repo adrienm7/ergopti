@@ -11,9 +11,9 @@ local shared = root .. "/../_shared"
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
 local uv, Json = require("luv"), require("core.text.engine.json")
-local Preferences = require("tests.support.metrics_preferences_fixture")
-local Fixture = require("tests.support.keystats_native_fixture")
-local Consent = require("tests.support.metrics_consent_fixture")
+local Preferences = require("tests.support.metrics.preferences_fixture")
+local Fixture = require("tests.support.metrics.native_fixture")
+local Consent = require("tests.support.metrics.consent_fixture")
 local Shell = require("core.process.adapters.shell_runner")
 local Clock = require("core.logger.engine.monotonic")
 local Calendar = require("metrics.engine.calendar")

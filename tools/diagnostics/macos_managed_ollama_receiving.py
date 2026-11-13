@@ -808,7 +808,7 @@ class Receiver:
                 "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/" + name, destination
             )
         self.copy_source(
-            "static/ergopti_plus/macos/tests/support/native_http_fixture_main.swift", main
+            "static/ergopti_plus/macos/tests/support/core/native_http_fixture_main.swift", main
         )
         # SwiftPM provides this production Clang module to the release
         # launcher. The standalone TLS worker must import the same headers.
@@ -866,7 +866,7 @@ class Receiver:
                 "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedBootstrapPolicy.generated.swift",
                 bootstrap_policy,
             ),
-            ("static/ergopti_plus/macos/tests/support/native_http_fixture_main.swift", main),
+            ("static/ergopti_plus/macos/tests/support/core/native_http_fixture_main.swift", main),
         ]:
             inputs.append((self.root / relative, destination, self.source_hashes[relative]))
         module_map = compatibility_module / "module.modulemap"

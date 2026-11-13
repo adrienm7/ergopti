@@ -5,8 +5,8 @@ local helpers = require("tests.helpers")
 local corpus = assert(loadfile(helpers.driver_root() .. "/../_shared/tests/corpus/keystats/trigger_roi.lua"))()
 corpus(helpers)
 
-local Home = require("tests.support.keystats_home_fixture")
-local Native = require("tests.support.keystats_native_fixture")
+local Home = require("tests.support.metrics.home_fixture")
+local Native = require("tests.support.metrics.native_fixture")
 local Json = require("core.text.engine.json")
 
 local function context(window)
@@ -17,7 +17,7 @@ local function unknown() return false end
 
 local function start(collector)
 	helpers.assert_true(collector.init(Home.options({ sqlite_path = Home.fresh_db() })))
-	require("tests.support.metrics_consent_fixture").enable(collector)
+	require("tests.support.metrics.consent_fixture").enable(collector)
 	return require("metrics.engine.journal.sqlite_writer")
 end
 

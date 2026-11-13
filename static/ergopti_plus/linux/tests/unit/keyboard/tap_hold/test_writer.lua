@@ -170,7 +170,7 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 
 	helpers.it("sets a tap in the shared schema and reloads the engine", function()
 		local writer, path, state = fresh_writer()
-		write_file(path, require("tests.support.tap_hold_fixture").with_preset())
+		write_file(path, require("tests.support.keyboard.tap_hold_fixture").with_preset())
 		helpers.assert_true(writer.set_tap("left_shift", "paste"))
 		helpers.assert_true(read_file(path):find("[tap_hold.keys.left_shift]", 1, true) ~= nil)
 		helpers.assert_eq(effective(path).keys.left_shift.tap_action, "paste")
@@ -817,7 +817,7 @@ helpers.describe("tap-hold delay model: global default, sticky per-key delays, r
 
 	helpers.it("a global change moves a key without its own delay and never one with it; a reset follows the global again", function()
 		local writer, path = fresh_writer()
-		write_file(path, require("tests.support.tap_hold_fixture").with_preset())
+		write_file(path, require("tests.support.keyboard.tap_hold_fixture").with_preset())
 		local default = effective(path).global_seconds
 		helpers.assert_true(writer.set_threshold("caps_lock", 0.5))
 		helpers.assert_true(writer.set_global_threshold(0.3))
@@ -836,7 +836,7 @@ helpers.describe("tap-hold delay model: global default, sticky per-key delays, r
 
 	helpers.it("a delay an earlier build copied into the file is not the user's; a delay the user sets afterwards is", function()
 		local writer, path = fresh_writer()
-		write_file(path, require("tests.support.tap_hold_fixture").with_preset(
+		write_file(path, require("tests.support.keyboard.tap_hold_fixture").with_preset(
 			'[tap_hold.keys.caps_lock]\ntime_activation_seconds = 0.35\n'
 			.. '[tap_hold.keys.left_ctrl]\ntime_activation_seconds = 0.45\n'))
 		local loaded = effective(path)

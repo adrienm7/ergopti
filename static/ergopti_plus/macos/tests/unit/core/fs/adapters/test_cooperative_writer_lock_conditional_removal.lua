@@ -7,8 +7,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.adapters.file_system.cooperative_writer_lock_fixture"] = nil
-local Fixture = require("tests.support.adapters.file_system.cooperative_writer_lock_fixture")
+package.loaded["tests.support.core.fs.cooperative_writer_lock_fixture"] = nil
+local Fixture = require("tests.support.core.fs.cooperative_writer_lock_fixture")
 local with_fixture = Fixture.with_fixture
 
 

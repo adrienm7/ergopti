@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.script_control_callback_fixture")
+local Fixture = require("tests.support.settings.script_control_callback_fixture")
 
 helpers.describe("HS-016 script-control callbacks are visible and truthful", function()
 	helpers.it("contains a throwing extra on the real deferred sentinel path", function()

@@ -12,8 +12,8 @@
 --- through a recorder and judge the event mask with the hook's own grab policy.
 --- ==============================================================================
 
-package.loaded["tests.support.adapters.synthetic_input.uinput_writer_fixture"] = nil
-local Fixture = require("tests.support.adapters.synthetic_input.uinput_writer_fixture")
+package.loaded["tests.support.platform.input.synthetic_input.uinput_writer_fixture"] = nil
+local Fixture = require("tests.support.platform.input.synthetic_input.uinput_writer_fixture")
 local helpers, recorder = Fixture.helpers, Fixture.recorder
 local Finder = require("hotstrings.engine.device_finder")
 local KeyboardSource = require("tests.hardware.layouts.keyboard_source_writer")

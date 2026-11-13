@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_adoption = require("tests.support.modules.llm.processes.mlx_adoption_fixture")
+local with_adoption = require("tests.support.ai.engine.processes.mlx_adoption_fixture")
 
 --- Pauses A at its replacement diagnostic while a real manager transition runs.
 --- @param mode string Controlled reentry at the diagnostic sink.

@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
-local Fixture = require("tests.support.text_owner_fixture")
+local ClipboardTargets = require("tests.support.platform.input.synthetic_input.clipboard_targets")
+local Fixture = require("tests.support.core.text_owner_fixture")
 
 --- Loads Main's actual wrap callback and its publication wiring.
 --- @param environment table

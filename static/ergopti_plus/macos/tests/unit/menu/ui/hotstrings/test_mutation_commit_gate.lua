@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
+local CaptionFixture = require("tests.support.hotstrings.personal_menu_caption_fixture")
 
 local FAILURE_OUTCOMES = { "false", "nil", "throw" }
 

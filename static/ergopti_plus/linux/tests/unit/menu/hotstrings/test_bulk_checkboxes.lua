@@ -355,7 +355,7 @@ helpers.describe("aggregate menu preserves actual private choices and native pub
 				end }
 				local ok, err = pcall(function()
 					local Config = helpers.load_module("hotstrings.engine.catalogue.config")
-					local Choices = require("tests.support.hotstring_choices")
+					local Choices = require("tests.support.hotstrings.choices")
 					local source = '[category_enabled]\nhotstrings = false\n[hotstrings]\n'
 						.. 'groups = { autocorrection = false, rolls = false, en_typos = false }\n'
 						.. '[private]\nfuture = "retained foreign source"\n'

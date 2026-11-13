@@ -72,7 +72,7 @@ helpers.describe("dashboard and onboarding focus ownership", function()
 		helpers.it("(webview-focus-owner) dashboard retirement revokes focus, delete refused=" .. tostring(refused), function()
 			with_window("metrics.ui.metrics_apps", function(dashboard, state)
 				helpers.assert_true(dashboard.show())
-				require("tests.support.webview_focus_fixture").check(state.view,
+				require("tests.support.core.webview_focus_fixture").check(state.view,
 					function() return dashboard.show() end,
 					function() state.refused = refused; helpers.assert_eq(dashboard.close(), not refused) end,
 					state.view.options)
@@ -80,9 +80,9 @@ helpers.describe("dashboard and onboarding focus ownership", function()
 		end)
 		helpers.it("(webview-focus-owner) onboarding retirement revokes focus, delete refused=" .. tostring(refused), function()
 			with_window("onboarding.ui", function(onboarding, state)
-				require("tests.support.onboarding_shared_data").install()
+				require("tests.support.onboarding.shared_data").install()
 				helpers.assert_true(onboarding.run("/virtual/config.toml"))
-				require("tests.support.webview_focus_fixture").check(state.view,
+				require("tests.support.core.webview_focus_fixture").check(state.view,
 					function() return onboarding.run("/virtual/config.toml") end,
 					function()
 						if refused then
@@ -98,7 +98,7 @@ helpers.describe("dashboard and onboarding focus ownership", function()
 	end
 	helpers.it("(webview-focus-owner) onboarding constructor close revokes factory focus", function()
 		with_window("onboarding.ui", function(onboarding, state)
-			require("tests.support.onboarding_shared_data").install()
+			require("tests.support.onboarding.shared_data").install()
 			state.close_during_create = true
 			helpers.assert_eq(onboarding.run("/virtual/config.toml"), false)
 			helpers.assert_eq(state.view.options.is_current(), false)
@@ -110,7 +110,7 @@ end)
 -- These use the genuine controller and existing native fixture ports, not AppKit.
 local function with_onboarding_reuse(callback)
 	with_window("onboarding.ui", function(onboarding, state)
-		require("tests.support.onboarding_shared_data").install()
+		require("tests.support.onboarding.shared_data").install()
 		local builder = package.loaded["core.ui.ui.builder"]
 		local show = builder.show_webview
 		local owners = {}

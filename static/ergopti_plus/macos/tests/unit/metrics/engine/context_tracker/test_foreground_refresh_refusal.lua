@@ -2,7 +2,7 @@
 
 --- Native foreground refusal revokes the actual public persistence sink on resume.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keystats.context_tracker.foreground_refusal_fixture")
+local Fixture = require("tests.support.metrics.engine.context_tracker.foreground_refusal_fixture")
 
 local function assert_sink(runtime, expected)
 	local accepted, count = runtime.sink()

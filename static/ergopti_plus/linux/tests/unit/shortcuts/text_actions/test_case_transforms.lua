@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local TextOwnerFixture = require("tests.support.text_owner_fixture")
+local TextOwnerFixture = require("tests.support.core.text_owner_fixture")
 
 local function with_manager(selected, body)
 	local names = {
@@ -36,7 +36,7 @@ local function with_manager(selected, body)
 	package.loaded[names.injector] = { inject = function(_, text) state.injected[#state.injected + 1] = text; return { ok = true } end }
 	package.loaded[names.keystats] = { record_shortcut = function() return true end }
 	-- No keyboard is captured here: a CapsWord session locks a fake CapsLock.
-	package.loaded[names.hook] = require("tests.support.caps_word_lock_hook_fake").new()
+	package.loaded[names.hook] = require("tests.support.keyboard.caps_word_lock_hook_fake").new()
 	package.loaded[names.manager] = nil
 
 	local ok, err = pcall(function()

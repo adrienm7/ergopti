@@ -24,8 +24,8 @@
 --- /proc/bus/input/devices, and that has no business on the keystroke path.
 --- ==============================================================================
 
-package.loaded["tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture"] = nil
-local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture")
+package.loaded["tests.support.platform.input.keyboard_hook.device_watchdog_fixture"] = nil
+local Fixture = require("tests.support.platform.input.keyboard_hook.device_watchdog_fixture")
 local helpers =
 	Fixture.helpers
 
@@ -35,7 +35,7 @@ local helpers =
 helpers.describe("managed source cohort consumed retirement", function()
 	helpers.it("withdraws a spent original arm before any keyboard reacquisition or publication", function()
 		local calls = 0
-		require("tests.support.input_owner_fixture").with_session({ on_capture_reacquired = function()
+		require("tests.support.core.input_owner_fixture").with_session({ on_capture_reacquired = function()
 			calls = calls + 1; return true
 		end }, function(s)
 			s.pair(); helpers.assert_eq(s.armed, true)
@@ -59,7 +59,7 @@ end)
 
 helpers.describe("managed source cohort original map authority", function()
 	helpers.it("does not mint ownership from a foreign slot already reopened before the watchdog", function()
-		require("tests.support.input_owner_fixture").with_session({ on_capture_reacquired = function() return true end }, function(s)
+		require("tests.support.core.input_owner_fixture").with_session({ on_capture_reacquired = function() return true end }, function(s)
 			local slot = "keyboard:" .. s.paths.b
 			assert(s.reader.close("keyboard:" .. s.paths.a)); assert(s.reader.close(slot))
 			assert(s.reader.open(s.paths.b, slot)); assert(s.reader.grab(slot))
@@ -78,7 +78,7 @@ end)
 helpers.describe("managed source cohort pointer acquisition refusal", function()
 	helpers.it("does not drop an owned pointer cleanup cohort when a replacement open fails", function()
 		local options = { on_capture_reacquired = function() return true end }
-		require("tests.support.input_owner_fixture").with_session(options, function(s)
+		require("tests.support.core.input_owner_fixture").with_session(options, function(s)
 			local finder = package.loaded["hotstrings.engine.device_finder"]
 			assert(s.hook.stop() ~= false)
 			finder.find_devices = function() return { s.paths.a }, { s.paths.b } end

@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local load_dashboard = require("tests.support.metrics_typing_fixture")
-local Scope = require("tests.support.metrics_typing_scope")
+local load_dashboard = require("tests.support.metrics.typing_fixture")
+local Scope = require("tests.support.metrics.typing_scope")
 local safe_read = require("tests.support.file_system_write_stub").read_with_status
 
 local PAYLOAD = '{"manifest":{},"app_icons":{},"initial_data":null,"kc_layout":{}}'

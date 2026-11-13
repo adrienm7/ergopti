@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.keystats_provenance_fixture")
+local Fixture = require("tests.support.metrics.provenance_fixture")
 
 local M = {}
 

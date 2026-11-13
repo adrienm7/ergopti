@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OutputFixture = require("tests.support.toml_output_fixture")
+local OutputFixture = require("tests.support.settings.toml_output_fixture")
 
 local function with_frame(body, paused)
 	local translator = require("core.i18n.engine.i18n")

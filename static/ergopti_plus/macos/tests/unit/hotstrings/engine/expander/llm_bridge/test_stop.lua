@@ -32,7 +32,7 @@ local helpers = require("tests.helpers")
 -- ========================================
 
 local function noop() end
-local with_bridge_fixture = require("tests.support.llm_bridge_fixture").with_bridge_fixture
+local with_bridge_fixture = require("tests.support.ai.bridge_fixture").with_bridge_fixture
 
 
 

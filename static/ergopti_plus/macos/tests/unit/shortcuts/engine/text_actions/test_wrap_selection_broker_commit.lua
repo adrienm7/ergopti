@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Destination = require("tests.support.text_destination_receipt")
-local Fixture = require("tests.support.synthetic_input_fixture")
+local Destination = require("tests.support.core.text_destination_receipt")
+local Fixture = require("tests.support.core.synthetic_input_fixture")
 
 
 --- Runs the actual wrap owner over a controllable native broker and pasteboard.

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.llm.backends.ai_runtime_selection_install_fixture")
+local Fixture = require("tests.support.ai.engine.backends.runtime_selection_install_fixture")
 
 helpers.describe("Ollama bootstrap framing (ollama-bootstrap-chunks)", function()
 	helpers.it("recognizes a failure marker at every byte boundary", function()

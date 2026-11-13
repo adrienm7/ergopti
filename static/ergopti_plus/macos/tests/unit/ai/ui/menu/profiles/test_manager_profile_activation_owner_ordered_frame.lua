@@ -9,8 +9,8 @@
 -- =============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.menu_llm.profiles.profiles_manager_profile_activation_owner_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.menu_llm.profiles.profiles_manager_profile_activation_owner_fixture")
+package.loaded["tests.support.ai.ui.profiles.manager_profile_activation_owner_fixture"] = nil
+local Fixture = require("tests.support.ai.ui.profiles.manager_profile_activation_owner_fixture")
 local with_profiles_fixture = Fixture.with_profiles_fixture
 
 

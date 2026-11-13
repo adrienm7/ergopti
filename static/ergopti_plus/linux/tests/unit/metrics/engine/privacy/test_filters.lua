@@ -30,7 +30,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local it = require("tests.support.metrics_preferences_fixture").it
+local it = require("tests.support.metrics.preferences_fixture").it
 local Fakes = helpers.load_module("tests.fakes")
 
 local DRIVER_ROOT = helpers.driver_root()
@@ -325,7 +325,7 @@ helpers.describe("keystats privacy — focus and titles obey the same gate", fun
 				return true
 			end,
 		}, { __index = function() return function() return true end end })
-		require("tests.support.sqlite_flush_fake").attach(package.loaded["metrics.engine.journal.sqlite_writer"])
+		require("tests.support.core.sqlite_flush_fake").attach(package.loaded["metrics.engine.journal.sqlite_writer"])
 		local ok, err = pcall(function()
 			local kl = fresh_keystats()
 			kl.on_app_focus("code", 1000)

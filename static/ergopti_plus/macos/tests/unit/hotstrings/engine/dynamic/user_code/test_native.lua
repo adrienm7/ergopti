@@ -7,7 +7,7 @@
 --- owners, including native focus identity and consumed-input cancellation debt.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local SyntheticStack = require("tests.support.synthetic_input_stack")
+local SyntheticStack = require("tests.support.core.synthetic_input_stack")
 
 local OWNED = {
 	"hotstrings.engine.expander", "hotstrings.engine.expander.state", "hotstrings.engine.expander.expander", "ai.engine.bridge",

@@ -141,7 +141,7 @@ end)
 -- and streaming handler, so the noise gate they share is the one judged: an
 -- uppercase completion must reach the tooltip at document start and after a
 -- sentence end, and only mid-sentence is it dropped as noise.
-local load_pipeline = require("tests.support.prediction_pipeline").load
+local load_pipeline = require("tests.support.ai.prediction_pipeline").load
 
 --- Dispatches one request over a buffer and answers it with one completion.
 --- @param buffer string Typed context the engine reads.

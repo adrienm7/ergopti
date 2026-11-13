@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Pipeline = require("tests.support.prediction_pipeline")
+local Pipeline = require("tests.support.ai.prediction_pipeline")
 local Selector = require("ai.engine.settings.profile_selector")
 local Rewrite = require("ai.engine.prediction.rewrite")
 

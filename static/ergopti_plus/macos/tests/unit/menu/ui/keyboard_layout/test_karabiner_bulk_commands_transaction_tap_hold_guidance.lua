@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.keyboard_layout.karabiner_bulk_commands_transaction_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.keyboard_layout.karabiner_bulk_commands_transaction_fixture")
+package.loaded["tests.support.menu.ui.keyboard_layout.karabiner_bulk_commands_transaction_fixture"] = nil
+local Fixture = require("tests.support.menu.ui.keyboard_layout.karabiner_bulk_commands_transaction_fixture")
 local SAVED_DIALOGS = Fixture.SAVED_DIALOGS
 local SAVED_PATHS = Fixture.SAVED_PATHS
 local build_guardian_menu = Fixture.build_guardian_menu

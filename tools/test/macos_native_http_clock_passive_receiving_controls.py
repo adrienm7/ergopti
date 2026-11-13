@@ -28,7 +28,7 @@ OWNING = load("passive_owning_ports", "tools/test/macos_native_http_receiving_fa
 WIRE = OWNING.WIRE
 CLIENT = load(
     "passive_actual_client",
-    "static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py",
+    "static/ergopti_plus/macos/tests/support/core/native_http_wire_client_receiving.py",
 )
 
 

@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Home = require("tests.support.keystats_home_fixture")
+local Home = require("tests.support.metrics.home_fixture")
 local Fakes = helpers.load_module("tests.fakes")
 local Calendar = require("metrics.engine.calendar")
 
@@ -43,14 +43,14 @@ local function with_keystats(options, body)
 		end,
 	}
 	setmetatable(writer, { __index = Fakes.sqlite_writer() })
-	require("tests.support.sqlite_flush_fake").attach(writer)
+	require("tests.support.core.sqlite_flush_fake").attach(writer)
 	local writer_name, module_name = "metrics.engine.journal.sqlite_writer", "metrics.engine.keystats"
 	local previous_writer, previous_module = package.loaded[writer_name], package.loaded[module_name]
 	package.loaded[writer_name], package.loaded[module_name] = writer, nil
 	local ok, err = pcall(function()
 		local keystats = require(module_name)
 		keystats.init({ sqlite_path = Home.fresh_db() })
-		require("tests.support.metrics_consent_fixture").enable(keystats)
+		require("tests.support.metrics.consent_fixture").enable(keystats)
 		keystats.reset_session()
 		keystats.on_app_focus("org.gnome.Rhythmbox", 1000)
 		body(keystats, calls, function(open) media_open = open end)

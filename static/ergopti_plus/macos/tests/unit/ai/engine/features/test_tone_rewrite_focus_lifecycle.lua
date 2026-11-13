@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local FIFO = require("tests.support.modules.llm.selection_translation_fifo")
-local Response = require("tests.support.modules.llm.selection_translation_fixture")
+local FIFO = require("tests.support.ai.engine.prediction.selection_translation_fifo")
+local Response = require("tests.support.ai.engine.prediction.selection_translation_fixture")
 local Tone = require("ai.engine.prediction.tone")
 local RESULT = "A formal rewrite"
 local function seconds(key) return require("core.timing.engine.timings").sec("debounce", key) end
@@ -20,8 +20,8 @@ local function seconds(key) return require("core.timing.engine.timings").sec("de
 --- @param scenario function Complete callback and timer scenario.
 local function with_world(scenario)
 	return helpers.with_fresh_modules({
-		"ai.engine.prediction.tone_rewrite", "tests.support.modules.llm.selection_translation_scope",
-		"tests.support.modules.llm.selection_translation_destination",
+		"ai.engine.prediction.tone_rewrite", "tests.support.ai.engine.prediction.selection_translation_scope",
+		"tests.support.ai.engine.prediction.selection_translation_destination",
 	}, function()
 		return FIFO.with_world(function(world)
 			world.tone = require("ai.engine.prediction.tone_rewrite")

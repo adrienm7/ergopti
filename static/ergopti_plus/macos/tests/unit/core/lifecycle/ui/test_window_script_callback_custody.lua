@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_window = require("tests.support.ui.owned_window_close_fixture")
+local with_window = require("tests.support.core.ui.owned_window_close_fixture")
 
 --- Controls only native controller return values and userdata retirement.
 --- @param module_name string Real window host.

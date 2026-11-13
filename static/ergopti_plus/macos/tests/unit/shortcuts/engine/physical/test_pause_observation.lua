@@ -3,7 +3,7 @@
 --- Drives actual pause writers with independent before/after receipt expectations.
 --- Native APIs are adversarial doubles; this does not prove installed macOS input.
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.pause_transaction_fixture")
+local fixture = require("tests.support.settings.pause_transaction_fixture")
 local describe, it = helpers.describe, helpers.it
 local function last(records) return records[#records] end
 

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OutputFixture = require("tests.support.toml_output_fixture")
+local OutputFixture = require("tests.support.settings.toml_output_fixture")
 local SOURCE = '# retained baseline header\n[hotstrings]\nexpansion_delay = 0.1\n[hotstrings.delays]\nllm_prediction = 0.3 # independent delay\n[foreign]\nfuture = "kept" # retained\n'
 local FOREIGN_SOURCE = SOURCE .. '# independently changed source\n'
 

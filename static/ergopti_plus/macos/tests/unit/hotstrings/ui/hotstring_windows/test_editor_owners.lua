@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 -- ===================================
 -- ===================================
 
-local with_editor = require("tests.support.hotstring_editor_fixture").with_editor
+local with_editor = require("tests.support.hotstrings.editor_fixture").with_editor
 
 --- Delivers a well-formed empty document through a captured native callback.
 --- @param callback function Captured bridge.

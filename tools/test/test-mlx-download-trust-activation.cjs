@@ -23,7 +23,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const MACOS = path.join(ROOT, 'static/ergopti_plus/macos');
 const SHARED = path.join(ROOT, 'static/ergopti_plus/_shared');
 const CORPUS = path.join(SHARED, 'tests/corpus/network/mlx_truststore_activation_vectors.json');
-const RECEIVER = path.join(MACOS, 'tests/support/mlx_truststore_receiving.py');
+const RECEIVER = path.join(MACOS, 'tests/support/ai/mlx_truststore_receiving.py');
 
 /** Receive complete Python and owner metadata from the original Lua producer. */
 function emittedPacket() {
@@ -32,7 +32,7 @@ function emittedPacket() {
 	const lua = process.env.LUA || 'lua';
 	const program = [
 		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;${macos}/tests/stubs/?.lua;`)} .. package.path`,
-		'local packet = require("tests.support.mlx_truststore_fixture").capture()',
+		'local packet = require("tests.support.ai.mlx_truststore_fixture").capture()',
 		'io.write(require("core.text.engine.json").encode(packet))'
 	].join('; ');
 	const result = spawnSync(lua, ['-e', program], {

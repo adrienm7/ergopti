@@ -593,7 +593,7 @@ end)
 
 -- These controls use actual Hook/Reader/Writer/native pair consumers through the
 -- explicitly controlled constructor. They provide no kernel or physical proof.
-local InputOwnerFixture = require("tests.support.input_owner_fixture")
+local InputOwnerFixture = require("tests.support.core.input_owner_fixture")
 local function input_rows(session)
 	local result = {}; for _, row in ipairs(session.rows) do result[#result + 1] = row[1] .. ":" .. row[2] end
 	return table.concat(result, " ")
@@ -1212,7 +1212,7 @@ helpers.describe("cold installed input authority bootstrap (controlled ports)", 
 end)
 
 helpers.describe("consumed source withdrawal exact native inverse settlement (controlled transport)", function()
-	local Fixture = require("tests.support.input_owner_fixture")
+	local Fixture = require("tests.support.core.input_owner_fixture")
 	local function arm(s)
 		s.pair(); helpers.assert_true(s.armed); s.edge("a", 58, 0, 110)
 	end
@@ -1315,7 +1315,7 @@ end)
 
 
 helpers.describe("same-device third slot through original production consumers (controlled transport)",function()
-	local Fixture = require("tests.support.input_owner_fixture")
+	local Fixture = require("tests.support.core.input_owner_fixture")
 	local function source(extra)
 		return '[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n' .. (extra or "")
 	end
@@ -1601,7 +1601,7 @@ end)
 
 helpers.describe("acknowledged buffered Reader cohort replacement (controlled transport)",function()
 	helpers.it("closes newly Hook-owned readers after remove and successful re-add",function()
-		local Fixture=require("tests.support.input_owner_fixture")
+		local Fixture=require("tests.support.core.input_owner_fixture")
 		Fixture.with_manager_session({before_manager=function(s)
 			s.bytes='[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
 		end},function(s)
@@ -1635,7 +1635,7 @@ helpers.describe("acknowledged buffered Reader cohort replacement (controlled tr
 end)
 
 helpers.describe("generated Linux defaults received by original native combination constructors (controlled transport)",function()
- local Fixture=require("tests.support.input_owner_fixture")
+ local Fixture=require("tests.support.core.input_owner_fixture")
  local function with_public(options,body)
   options=options or {};options.public_chords=true
   local before=options.before_manager
@@ -1728,7 +1728,7 @@ end)
 
 
 helpers.describe("original managed saved configuration enrollment (controlled transport)",function()
- local Fixture=require("tests.support.input_owner_fixture")
+ local Fixture=require("tests.support.core.input_owner_fixture")
  local function public(body,options)
   options=options or {};options.public_chords=true
   options.before_manager=function(s)
@@ -1948,7 +1948,7 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
 end)
 
 helpers.describe("relative-loader simultaneous source admission (controlled transport)", function()
-	local Fixture = require("tests.support.input_owner_fixture")
+	local Fixture = require("tests.support.core.input_owner_fixture")
 	local function bytes(path)
 		local file = assert(io.open(path, "rb"))
 		local source = assert(file:read("*a")); assert(file:close())
@@ -2024,7 +2024,7 @@ end)
 
 
 helpers.describe("original Manager pair action after genuine Logger callback (controlled transport)", function()
-	local Fixture = require("tests.support.input_owner_fixture")
+	local Fixture = require("tests.support.core.input_owner_fixture")
 	local function logger_session(mode)
 		local previous_logger, previous_shim = package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"]
 		-- Fresh genuine core: no replacement debug method or invented effect ACK.
@@ -2079,7 +2079,7 @@ end)
 
 helpers.describe("original Manager terminal pair identity (controlled transport)", function()
 	helpers.it("(pair-manager-identity-rejoin) rejects real restored aliases without invoking __eq", function()
-		local Fixture = require("tests.support.input_owner_fixture")
+		local Fixture = require("tests.support.core.input_owner_fixture")
 		for _, role in ipairs({ "combinations", "engine" }) do
 			local previous_logger, previous_shim = package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"]
 			package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = nil, nil

@@ -12,8 +12,8 @@
 --- produced; without it, they are absent.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.hotstrings.catalogue.ergopti_extension_hotstrings_fixture"] = nil
-local Fixture = require("tests.support.modules.hotstrings.catalogue.ergopti_extension_hotstrings_fixture")
+package.loaded["tests.support.hotstrings.engine.ergopti_extension_hotstrings_fixture"] = nil
+local Fixture = require("tests.support.hotstrings.engine.ergopti_extension_hotstrings_fixture")
 local helpers, Paths, Extensions, exists, load, mapping, distance_reference, user_folder, write, one_entry_pack, load_with_user_folder, with_offline_shipped_probe, with_exact_loader_ports =
 	Fixture.helpers, Fixture.Paths, Fixture.Extensions, Fixture.exists, Fixture.load, Fixture.mapping, Fixture.distance_reference, Fixture.user_folder, Fixture.write, Fixture.one_entry_pack, Fixture.load_with_user_folder, Fixture.with_offline_shipped_probe, Fixture.with_exact_loader_ports
 
@@ -232,7 +232,7 @@ helpers.describe("Ergopti extension hotstrings: explicit user source publication
 		local Config = helpers.load_module("hotstrings.engine.catalogue.config")
 		Config._set_override_config_dir_for_test(dir)
 		local engine = require("hotstrings.engine.matcher").new()
-		local Choices = require("tests.support.hotstring_choices")
+		local Choices = require("tests.support.hotstrings.choices")
 		local ok, err = pcall(function()
 			Choices.with_file(Config, '[hotstrings]\ngroups = { distancesreduction = true, rolls = true }\n'
 				.. '[hotstrings.modules]\ndistancesreduction = { qu = true }\nrolls = { mine = true }\n', function(choice_path)
@@ -272,7 +272,7 @@ helpers.describe("Ergopti extension hotstrings: no-follow user source discovery"
 		local Config = helpers.load_module("hotstrings.engine.catalogue.config")
 		Config._set_override_config_dir_for_test(dir)
 		local engine = require("hotstrings.engine.matcher").new()
-		local Choices = require("tests.support.hotstring_choices")
+		local Choices = require("tests.support.hotstrings.choices")
 		local ok, err = pcall(function()
 			Choices.with_file(Config, '[hotstrings]\ngroups = { rolls = true }\n[hotstrings.modules]\nrolls = { hc = true }\n', function(choice_path)
 				local before = Choices.read(choice_path)

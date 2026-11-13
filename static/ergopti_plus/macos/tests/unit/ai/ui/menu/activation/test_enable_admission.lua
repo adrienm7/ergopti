@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_activation = require("tests.support.llm_activation_fixture")
+local with_activation = require("tests.support.ai.activation_fixture")
 local GOOD = { ok = true, status = 200, body = '{"version":"0.17.1"}' }
 local BAD = { ok = false, status = 0, body = "" }
 

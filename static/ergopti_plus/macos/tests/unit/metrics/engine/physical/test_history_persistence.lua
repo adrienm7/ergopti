@@ -125,7 +125,7 @@ write(by_device .. "/device.json", json.encode({ device_id = identity, host_sign
 
 -- Actual source writers own permission receipts; only macOS leaf endpoints below are modeled.
 local helpers = require("tests.helpers")
-local shell = require("tests.support.physical_capture_fixture")
+local shell = require("tests.support.layouts.physical_capture_fixture")
 local state, manager, control, tracker, watchers, session
 local calendar = "2026-10-05 12:00:00.000"
 local observations, timers, refused = {}, {}, {}
@@ -302,7 +302,7 @@ shell.run(function(capture, observed, native)
 		local base=#observed.tasks+1;pending[1]:fire()
 		observed.tasks[base].done(0);observed.tasks[base].settle()
 		observed.tasks[base+1].done(0,"clock\n","");observed.tasks[base+1].settle()
-		local fresh=require("tests.support.physical_stream_frames").new("fresh-"..n,tostring(n+7),{"41"})
+		local fresh=require("tests.support.layouts.physical_stream_frames").new("fresh-"..n,tostring(n+7),{"41"})
 		for k,v in pairs(fresh) do v.coverage="complete";native.frames[k]=v end
 		local stream=observed.tasks[base+2]
 		stream.chunk(nil,"opened\npage\nready\n")
@@ -472,7 +472,7 @@ write(by_device .. "/device.json", json.encode({ device_id = identity, host_sign
 
 -- Actual source writers own permission receipts; only macOS leaf endpoints below are modeled.
 local helpers = require("tests.helpers")
-local shell = require("tests.support.physical_capture_fixture")
+local shell = require("tests.support.layouts.physical_capture_fixture")
 local state, manager, control, tracker, watchers, session
 local calendar = "2026-10-05 12:00:00.000"
 local observations, timers, refused = {}, {}, {}
@@ -562,7 +562,7 @@ shell.run(function(capture, observed, native)
 	local specs = { { id = "41", keys = { {page=7,usage=41,cookie=41}, {page=12,usage=233,cookie=233},
 		{page=12,usage=205,cookie=205}, {page=12,usage=181,cookie=181}, {page=12,usage=182,cookie=182},
 		{page=12,usage=111,cookie=111}, {page=12,usage=112,cookie=112}, {page=12,usage=999,cookie=999} } } }
-	local baseline = require("tests.support.physical_stream_frames").new("production-fixture", "7", specs)
+	local baseline = require("tests.support.layouts.physical_stream_frames").new("production-fixture", "7", specs)
 	for key, value in pairs(baseline) do value.coverage="complete"; native.frames[key]=value end
 	assert(session.start(native.options)); native.verified(); native.clocked(); native.open()
 	for _, event in ipairs({1,2,3}) do observations.caffeinate(event) end

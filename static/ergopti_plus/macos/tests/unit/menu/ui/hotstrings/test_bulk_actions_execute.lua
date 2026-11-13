@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
+local CaptionFixture = require("tests.support.hotstrings.parent_caption_fixture")
 
 local function make_actions()
 	return {

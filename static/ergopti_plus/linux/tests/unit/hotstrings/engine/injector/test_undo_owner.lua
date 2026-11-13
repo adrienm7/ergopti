@@ -8,8 +8,8 @@
 --- The initial expansion ACK is scripted; Undo output and refusal are real Lua.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
-local Fixture = require("tests.support.text_owner_fixture")
+local ClipboardTargets = require("tests.support.platform.input.synthetic_input.clipboard_targets")
+local Fixture = require("tests.support.core.text_owner_fixture")
 
 --- Extracts the actual two callbacks without reproducing their Undo protocol.
 --- @param environment table Controlled callback dependencies.

@@ -27,8 +27,8 @@
 --- them is where a plausible-looking half-answer would survive.
 --- ==============================================================================
 
-package.loaded["tests.support.adapters.layout.keyboard_layout_fixture"] = nil
-local Fixture = require("tests.support.adapters.layout.keyboard_layout_fixture")
+package.loaded["tests.support.layouts.adapters.keyboard_layout_fixture"] = nil
+local Fixture = require("tests.support.layouts.adapters.keyboard_layout_fixture")
 local helpers, AZERTY_DUMP, loaded, cohort_fixture, desktop_cohort =
 	Fixture.helpers, Fixture.AZERTY_DUMP, Fixture.loaded, Fixture.cohort_fixture, Fixture.desktop_cohort
 

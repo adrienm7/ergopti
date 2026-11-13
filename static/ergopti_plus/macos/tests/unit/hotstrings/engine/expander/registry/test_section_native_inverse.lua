@@ -1,7 +1,7 @@
 --- tests/unit/hotstrings/engine/expander/registry/test_section_native_inverse.lua
 --- A native inverse refusal retains the exact section owner for retry.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keymap.registry.registry_mutation_transactions_fixture")
+local Fixture = require("tests.support.hotstrings.registry_mutation_transactions_fixture")
 
 helpers.describe("native section rollback ownership", function()
 	helpers.it("retains the prior view on native refusal and rejects a replaced storage provider", function()

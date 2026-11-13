@@ -7,9 +7,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local load_dashboard = require("tests.support.metrics_typing_fixture")
+local load_dashboard = require("tests.support.metrics.typing_fixture")
 
-local Scope = require("tests.support.metrics_typing_scope")
+local Scope = require("tests.support.metrics.typing_scope")
 
 helpers.describe("typing metrics JavaScript delivery", function()
 	for _, mode in ipairs({ "nil", "throw", "execution_error", "self" }) do

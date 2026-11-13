@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Gesture = require("tests.support.gesture_actions_fixture")
+local Gesture = require("tests.support.gestures.actions_fixture")
 local OWNED = {
 	"core.ui.engine.native_app_switcher_owner",
 	"gestures.engine.action_confirm", "gestures.engine.system_actions",

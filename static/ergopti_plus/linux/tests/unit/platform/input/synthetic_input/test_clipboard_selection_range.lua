@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
+local ClipboardTargets = require("tests.support.platform.input.synthetic_input.clipboard_targets")
 
 --- Runs one transform against a session whose CLIPBOARD and PRIMARY differ.
 --- @param kind string "x11" or "wayland"

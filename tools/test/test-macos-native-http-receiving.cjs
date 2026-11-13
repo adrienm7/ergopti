@@ -35,7 +35,7 @@ const selection = process.platform === 'win32' ? '--policy-only' : '--protocol-o
 const expectedCases = process.platform === 'win32' ? 2 : 10;
 const result = spawnSync(
 	pythonExecutable(),
-	['static/ergopti_plus/macos/tests/support/native_http_receiving_test.py', selection],
+	['static/ergopti_plus/macos/tests/support/core/native_http_receiving_test.py', selection],
 	{ cwd: root, encoding: 'utf8', timeout: 60000 }
 );
 assert.equal(result.error, undefined, 'the receiving interpreter must start');
@@ -51,7 +51,7 @@ process.stdout.write(result.stderr);
 const portableOwners = [['tools/test/macos_managed_http_test_deps_test.py', 3]];
 if (process.platform !== 'win32') {
 	portableOwners.push([
-		'static/ergopti_plus/macos/tests/support/native_http_wire_fixture_test.py',
+		'static/ergopti_plus/macos/tests/support/core/native_http_wire_fixture_test.py',
 		5
 	]);
 }

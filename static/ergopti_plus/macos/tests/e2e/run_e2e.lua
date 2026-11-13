@@ -80,7 +80,7 @@ package.path = table.concat({
 -- Load helpers + stubs (same pattern as tests/run.lua).
 -- ---------------------------------------------------------------------------
 local helpers = require("tests.helpers")
-local SyntheticStack = require("tests.support.synthetic_input_stack")
+local SyntheticStack = require("tests.support.core.synthetic_input_stack")
 
 
 

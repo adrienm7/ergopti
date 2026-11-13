@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.menu_llm.profiles.profile_candidate_transaction_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.menu_llm.profiles.profile_candidate_transaction_fixture")
+package.loaded["tests.support.ai.ui.profiles.candidate_transaction_fixture"] = nil
+local Fixture = require("tests.support.ai.ui.profiles.candidate_transaction_fixture")
 local assert_clean_refusal = Fixture.assert_clean_refusal
 local clone = Fixture.clone
 local find_child_row = Fixture.find_child_row

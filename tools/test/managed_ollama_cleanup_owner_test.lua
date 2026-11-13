@@ -3,7 +3,7 @@
 local root = assert(arg[1])
 package.path = root .. "/static/ergopti_plus/macos/?.lua;" .. root .. "/static/ergopti_plus/macos/?/init.lua;"
 	.. root .. "/static/ergopti_plus/_shared/?.lua;" .. root .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
-local with_fixture = require("tests.support.ollama_pull_fixture").with_fixture
+local with_fixture = require("tests.support.ai.ollama_pull_fixture").with_fixture
 local Json = require("core.text.engine.json")
 local ORIGINAL = "12345678-abcd-4321-abcd-123456789abc"
 local FRESH = "abcdef12-abcd-4321-abcd-123456789abc"

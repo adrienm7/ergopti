@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.menu_llm.settings.settings_transaction_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.menu_llm.settings.settings_transaction_fixture")
+package.loaded["tests.support.ai.ui.settings_transaction_fixture"] = nil
+local Fixture = require("tests.support.ai.ui.settings_transaction_fixture")
 local clone_value = Fixture.clone_value
 local find_item = Fixture.find_item
 local indentation_item = Fixture.indentation_item

@@ -103,7 +103,7 @@ local function with_menu(body, faults)
 			world.taps[#world.taps + 1] = tap
 			return tap
 		end
-		package.loaded["platform.input.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(eventtap.event.properties)
+		package.loaded["platform.input.keyboard_geometry"] = require("tests.support.layouts.keyboard_geometry_ports").new(eventtap.event.properties)
 		world.keycodes = { map = { [KEYCODE_J] = "j", [KEYCODE_SPACE] = "space" } }
 		local Menu = helpers.load_with_stubs("hotstrings.ui.menu.magic_key_source_menu",
 			{ eventtap = eventtap, keycodes = world.keycodes })

@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_editor = require("tests.support.hotstring_editor_fixture").with_editor
+local with_editor = require("tests.support.hotstrings.editor_fixture").with_editor
 
 helpers.describe("hotstring editor JavaScript failures", function()
 	for _, route in ipairs({ "ready", "update" }) do

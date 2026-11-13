@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.synthetic_input_fixture")
+local Fixture = require("tests.support.core.synthetic_input_fixture")
 local USER_DATA = Fixture.USER_DATA
 
 helpers.describe("synthetic input: field-run selftest key class", function()

@@ -9,9 +9,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Scope = require("tests.support.metrics_typing_scope")
+local Scope = require("tests.support.metrics.typing_scope")
 
-local load_dashboard = require("tests.support.metrics_typing_fixture")
+local load_dashboard = require("tests.support.metrics.typing_fixture")
 helpers.describe("typing metrics startup timer transaction", function()
 	Scope.it("refuses before publishing a window when ingest subscription fails", function()
 		for _, case in ipairs({

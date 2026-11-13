@@ -2,9 +2,9 @@
 
 --- Independent exact-session controls; native hardware admission is not claimed.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.physical_capture_fixture")
+local Fixture = require("tests.support.layouts.physical_capture_fixture")
 local Delivery = require("metrics.engine.capture.physical_delivery")
-local Frames = require("tests.support.physical_stream_frames")
+local Frames = require("tests.support.layouts.physical_stream_frames")
 
 local function begin(capture, controls)
 	helpers.assert_eq(capture.init(controls.dependencies), true)

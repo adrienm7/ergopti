@@ -13,7 +13,7 @@
 ; � multi-line lambdas with statements like ``for`` are not portable.
 ; ==============================================================================
 
-#Include ../../../support/logger_errors_sharing_denial.ahk
+#Include ../../../support/core/logger_errors_sharing_denial.ahk
 ; Every case below drives the process-wide logger the rest of the suite shares:
 ; it resets the ring, blanks the sinks and sets a severity threshold. Each case
 ; this file registers runs against a snapshot of that state which is put back

@@ -2,7 +2,7 @@
 
 --- Uses the native observer argument order at actual public persistence boundaries.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keystats.context_tracker.ax_native_callback_fixture")
+local Fixture = require("tests.support.metrics.engine.context_tracker.ax_native_callback_fixture")
 
 local function sink(runtime, expected)
 	local accepted, snapshots = runtime.sink()

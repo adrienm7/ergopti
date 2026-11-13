@@ -19,9 +19,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Publication = require("tests.support.ui.metrics.typing.publication")
+local Publication = require("tests.support.metrics.ui.publication")
 local with_delivery = require("tests.support.typing_delivery_fixture")
-local FakeSqlite = require("tests.support.fake_ngram_sqlite")
+local FakeSqlite = require("tests.support.core.fake_ngram_sqlite")
 
 local PAYLOAD = '{"manifest":{"2026-09-01":{"Code":{"chars":42}}},"app_icons":{},"initial_data":null,"kc_layout":{}}'
 local GENERATED_AT = 1790000000

@@ -6,8 +6,8 @@
 --- Pure Lua — no GTK/WebKit2GTK required.
 --- ==============================================================================
 
-package.loaded["tests.support.ui.editors.ui_bridge_handlers_fixture"] = nil
-local Fixture = require("tests.support.ui.editors.ui_bridge_handlers_fixture")
+package.loaded["tests.support.core.ui.bridge_handlers_fixture"] = nil
+local Fixture = require("tests.support.core.ui.bridge_handlers_fixture")
 
 -- The application folder under every XDG base, from the shared registry.
 local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name

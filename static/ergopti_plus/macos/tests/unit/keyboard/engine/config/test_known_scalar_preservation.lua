@@ -21,14 +21,14 @@ local function with_file(original, body)
 		package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		require("settings.engine.migration.outdated").reset_for_tests()
 		local config = helpers.load_with_stubs("keyboard.engine.runtime.config")
-		local path = require("tests.support.tap_hold_file_text").private_path()
+		local path = require("tests.support.keyboard.tap_hold_file_text").private_path()
 		local function write(text)
 			local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 		end
 		local function read()
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
-		local Text = require("tests.support.tap_hold_file_text")
+		local Text = require("tests.support.keyboard.tap_hold_file_text")
 		local original_config
 		original, original_config = Text.file(original)
 		write(original)
@@ -163,7 +163,7 @@ helpers.describe("obsolete nonstring combination save preservation", function()
 				helpers.assert_eq(#f.warnings, 2)
 				-- [mod_combos] is a config.toml section, named in the config.toml beside it.
 				helpers.assert_contains(table.concat(f.warnings, "\n"), "'mod_combos.config.escape_then_tab' in '"
-					.. require("tests.support.tap_hold_file_text").config_path(f.path) .. "'")
+					.. require("tests.support.keyboard.tap_hold_file_text").config_path(f.path) .. "'")
 				state.tap_hold_config.tab = { tap = "copy", hold = "none" }
 				helpers.assert_eq(f.config.save_user_config(state, f.path), true, "obsolete combination cannot refuse unrelated edits")
 				helpers.assert_eq(f.decode(f.read()), { karabiner = { integration_enabled = false },

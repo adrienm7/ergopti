@@ -3,7 +3,7 @@
 --- Real keystats callbacks own the real input timestamp and independent holds.
 
 local helpers = require("tests.helpers")
-local fixtures = require("tests.support.keystats_provenance_fixture")
+local fixtures = require("tests.support.metrics.provenance_fixture")
 local Model = require("metrics.engine.wpm_widget_model")
 
 helpers.describe("keystats WPM activity", function()

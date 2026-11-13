@@ -2,7 +2,7 @@
 
 --- A retired reattachment cannot unlink a different download's session.
 local helpers = require("tests.helpers")
-local fixture_support = require("tests.support.mlx_download_fixture")
+local fixture_support = require("tests.support.ai.mlx_download_fixture")
 
 helpers.describe("MLX reattached session ownership", function()
 	helpers.it("keeps a replacement session when the old download completes", function()

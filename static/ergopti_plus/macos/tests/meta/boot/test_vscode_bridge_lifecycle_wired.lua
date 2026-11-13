@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.tooltip_renderer_fixture")
+local Fixture = require("tests.support.core.tooltip_renderer_fixture")
 
 helpers.describe("retired VS Code bridge", function()
 	helpers.it("never activates a retired bridge but preserves loaded-owner shutdown", function()

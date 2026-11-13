@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.modules.llm.processes.mlx_cleanup_fixture")
+local fixture = require("tests.support.ai.engine.processes.mlx_cleanup_fixture")
 local ROWS = {
 	{ pid = 101, comm = "/Users/Example/Library/Application Support/mlx/bin/python3.12", ucomm = "python3.12",
 		args = '"/Users/Example/Library/Application Support/mlx/bin/python3.12" -m mlx_lm server --port 3460' },

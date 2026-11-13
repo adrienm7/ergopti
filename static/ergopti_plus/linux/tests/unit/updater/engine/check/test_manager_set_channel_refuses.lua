@@ -1,7 +1,7 @@
 --- tests/unit/updater/engine/check/test_manager_set_channel_refuses.lua
 
-package.loaded["tests.support.modules.updater.check.updater_manager_fixture"] = nil
-local Fixture = require("tests.support.modules.updater.check.updater_manager_fixture")
+package.loaded["tests.support.updater.engine.manager_fixture"] = nil
+local Fixture = require("tests.support.updater.engine.manager_fixture")
 local helpers, Fakes, etag_response, with_config, read_config =
 	Fixture.helpers, Fixture.Fakes, Fixture.etag_response, Fixture.with_config, Fixture.read_config
 
@@ -16,7 +16,7 @@ helpers.describe("updater.engine.manager", function()
 	local function with_native_download_model(body)
 		local previous = M
 		local ok, failure = xpcall(function()
-			require("tests.support.updater_native_model").with_fixture(function(fresh, prepare)
+			require("tests.support.updater.native_model").with_fixture(function(fresh, prepare)
 				M = fresh
 				body(prepare)
 			end)
@@ -276,7 +276,7 @@ helpers.describe("updater.engine.manager", function()
 				end,
 				cancel = function() return true end,
 			}
-			fresh._http_client = require("tests.support.release_http_fixture").attach(fresh._http_client)
+			fresh._http_client = require("tests.support.updater.release_http_fixture").attach(fresh._http_client)
 			fresh._file_digest = { cancel = function() return true end }
 			for index = 1, 3 do
 				local count = 0

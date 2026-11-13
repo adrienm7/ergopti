@@ -7,7 +7,7 @@
 --- replacement. Per-DOWN currency reads only RAM and never calls the barrier.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.text_owner_fixture")
+local fixture = require("tests.support.core.text_owner_fixture")
 
 helpers.describe("ordinary text destination ownership", function()
 	helpers.it("keeps one current owner without probing for each DOWN", function()

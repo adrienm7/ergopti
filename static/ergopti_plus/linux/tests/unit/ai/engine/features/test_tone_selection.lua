@@ -21,14 +21,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ProfilesFixture = require("tests.support.llm_profiles_fixture")
+local ProfilesFixture = require("tests.support.ai.profiles_fixture")
 local Fakes = require("tests.fakes")
 local Json = require("core.text.engine.json")
 local EvdevCodes = require("platform.input.evdev_codes")
 
 -- The Left arrow's kernel code (input-event-codes.h KEY_LEFT)
 local KEY_LEFT = 105
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 local Rewrite = require("ai.engine.prediction.rewrite")
 
 local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", token = "k", model = "", base_url = "" }
@@ -538,7 +538,7 @@ helpers.describe("tone actions: refusals and dropped answers", function()
 	helpers.it("drops a pending tone answer after choosing another API entry (ai-pass2-entry)", function()
 		scenario({ selection = "merci pour ton aide" }, function(world)
 			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), true)
-			local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(require("ai.ui.menu.backend_rows"),
+			local rows = require("tests.support.menu.ui.llm.api_page_rows").rows(require("ai.ui.menu.backend_rows"),
 				world.engine, {}, nil)
 			local selected = false
 			for _, row in ipairs(rows) do
@@ -743,7 +743,7 @@ helpers.describe("active API entry deletion", function()
 	helpers.it("ai-pass2-remove retires the active request before deleting its entry", function()
 		scenario({ selection = "merci pour ton aide" }, function(world)
 			helpers.assert_true(world.engine.shift_tone(require("ai.engine.prediction.tone").MORE_FORMAL, false))
-			local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(require("ai.ui.menu.backend_rows"),
+			local rows = require("tests.support.menu.ui.llm.api_page_rows").rows(require("ai.ui.menu.backend_rows"),
 				world.engine, { confirm = function() return true end }, nil)
 			local removed = false
 			for _, row in ipairs(rows) do

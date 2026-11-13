@@ -11,7 +11,7 @@
 --- session whose counters never reached the log.
 --- ==============================================================================
 
-local helpers = require("tests.support.logger_fixture").helpers({
+local helpers = require("tests.support.core.logger_fixture").helpers({
 	"core.logger.engine.perf_counters", "core.logger.engine.boot_profiler", "metrics.engine.perf.phase_stats", "core.logger.engine.sink",
 })
 

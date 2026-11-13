@@ -27,8 +27,8 @@ require("platform.input.keycodes.key_names") -- pure, with its data: the gesture
 require("shortcuts.engine.actions.sticky_label") -- pure: the gesture actions name their sticky holds with it
 require("gestures.engine.incremental") -- pure: the gesture geometry steps an incremental swipe with it
 require("gestures.engine.contact_join") -- pure: the gesture geometry judges a third contact with it
-local World = require("tests.support.modules.llm.selection_translation_fixture")
-local Scope = require("tests.support.modules.llm.selection_translation_scope")
+local World = require("tests.support.ai.engine.prediction.selection_translation_fixture")
+local Scope = require("tests.support.ai.engine.prediction.selection_translation_scope")
 local SharedLogger = require("core.logger.engine")
 local NATIVE_GLOBALS = {
 	"ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME", "ERGOPTI_TOUCH_DEVICES",
@@ -103,11 +103,11 @@ local function check_scope(cold, forced)
 		-- These are fixture preconditions, not a whole-cache rollback. The inner
 		-- scope itself must restore its cold dependency and a pre-existing owner.
 		helpers.with_fresh_modules({ "ai.engine.settings.profiles", "ai.engine.local_servers.mlx_stream_retirement", "diagnostics.adapters.event_provenance",
-			"core.text.engine.json", "ai.engine.prediction.translate", "core.lifecycle.engine.compat.utf8", "tests.support.modules.llm.selection_translation_destination" }, function()
+			"core.text.engine.json", "ai.engine.prediction.translate", "core.lifecycle.engine.compat.utf8", "tests.support.ai.engine.prediction.selection_translation_destination" }, function()
 			local profile = {}
 			package.loaded["ai.engine.settings.profiles"] = profile
 			for _, name in ipairs({ "ai.engine.local_servers.mlx_stream_retirement", "diagnostics.adapters.event_provenance",
-				"core.text.engine.json", "ai.engine.prediction.translate", "core.lifecycle.engine.compat.utf8", "tests.support.modules.llm.selection_translation_destination" }) do
+				"core.text.engine.json", "ai.engine.prediction.translate", "core.lifecycle.engine.compat.utf8", "tests.support.ai.engine.prediction.selection_translation_destination" }) do
 				helpers.assert_nil(package.loaded[name], "the transitive fixture owner must start cold: " .. name)
 			end
 			local before = snapshot()

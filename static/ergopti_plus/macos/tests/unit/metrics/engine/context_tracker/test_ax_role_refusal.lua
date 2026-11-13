@@ -2,7 +2,7 @@
 
 --- Exercises native role refusals through the real public pause/resume and sink.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keystats.context_tracker.ax_role_refusal_fixture")
+local Fixture = require("tests.support.metrics.engine.context_tracker.ax_role_refusal_fixture")
 
 --- Requires the actual output gate and synthetic snapshot sink to agree.
 ---@param runtime table Existing real public runtime.

@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_activation = require("tests.support.llm_activation_fixture")
+local with_activation = require("tests.support.ai.activation_fixture")
 
 local OWNED_MODULES = {
 	"core.logger.engine.logger",

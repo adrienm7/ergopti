@@ -8,8 +8,8 @@
 --- process group, and exactly one terminal callback survives late events.
 --- ==============================================================================
 
-package.loaded["tests.support.adapters.network.http_client_curl_fixture"] = nil
-local Fixture = require("tests.support.adapters.network.http_client_curl_fixture")
+package.loaded["tests.support.core.network.http_client_curl_fixture"] = nil
+local Fixture = require("tests.support.core.network.http_client_curl_fixture")
 local helpers, fresh_client, EXECUTABLE_IDENTITY, private_client, exact_core_client, exact_options, native_write_out, retired_leader_with_live_descendant, complete_owned_leader, nonzero_signals, assert_successor_blocked =
 	Fixture.helpers, Fixture.fresh_client, Fixture.EXECUTABLE_IDENTITY, Fixture.private_client, Fixture.exact_core_client, Fixture.exact_options, Fixture.native_write_out, Fixture.retired_leader_with_live_descendant, Fixture.complete_owned_leader, Fixture.nonzero_signals, Fixture.assert_successor_blocked
 

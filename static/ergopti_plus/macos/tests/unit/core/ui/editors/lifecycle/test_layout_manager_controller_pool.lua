@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.layout_manager_pool_fixture")
+local Fixture = require("tests.support.core.ui.layout_manager_pool_fixture")
 
 helpers.describe("layout manager bounds native controller ownership", function()
 	for _, kind in ipairs({ "explicit", "user" }) do

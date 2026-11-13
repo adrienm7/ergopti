@@ -92,12 +92,12 @@ for index, fixture in ipairs(fixtures) do
 	Keystats.record_shortcut("owned-events", "owned-action", 1000)
 	instant = instant + (fixture.advance or 0)
 	assert(os.date("%Y-%m-%d") == local_day, "fixture must not change the flush calendar day")
-	require("tests.support.sqlite_flush_native").flush(Keystats)
+	require("tests.support.core.sqlite_flush_native").flush(Keystats)
 	local hotstrings, shortcuts, typing = rows("events_hotstring"), rows("events_shortcut"), rows("events_typing")
 	local before, revision = packed(), assert(Writer.get_revision())
 	local manifest = Reader.read_manifest(path)
 	local dashboard = Keystats.get_dashboard_payload({ include_prefetch = false }).metrics_manifest
-	require("tests.support.sqlite_flush_native").flush(Keystats)
+	require("tests.support.core.sqlite_flush_native").flush(Keystats)
 	print("native " .. fixture.name .. " local=" .. local_day .. "; typing=" .. typing[1] .. "; hotstring=" .. hotstrings[1] .. "; shortcut=" .. shortcuts[1])
 	check(fixture.name .. ": public raw days agree with local aggregates and retain UTC instants/IDs", function()
 		assert(#hotstrings == 1 and #shortcuts == 1 and #typing == 1)
@@ -147,7 +147,7 @@ for index, fixture in ipairs(fixtures) do
 			assert(all[1] == "11|11|1|11" and Writer.get_meta("linux_next_event_id") == "12")
 		end)
 		Keystats.record_hotstring("owned-events", "private-owned", "xyz", 1000, "static", 0, true)
-		require("tests.support.sqlite_flush_native").flush(Keystats)
+		require("tests.support.core.sqlite_flush_native").flush(Keystats)
 		check("private public logging retains aggregate counts and withholds raw hotstring content", function()
 			assert(#rows("events_hotstring") == 3, "private output must not append a raw hotstring row")
 			assert(Reader.read_manifest(path)[local_day]["owned-events"].hs_chars == 6)
@@ -157,7 +157,7 @@ for index, fixture in ipairs(fixtures) do
 		Keystats.record_hotstring("owned-events", "suppressed", "unused", 1000, "static", 0, false)
 		Keystats.record_shortcut("owned-events", "suppressed-action", 1000)
 		Keystats.unsuppress()
-		require("tests.support.sqlite_flush_native").flush(Keystats)
+		require("tests.support.core.sqlite_flush_native").flush(Keystats)
 		check("suppressed public producers cannot append raw rows", function() assert(packed() == accepted) end)
 	end
 	os.date, os.time = native_date, native_time

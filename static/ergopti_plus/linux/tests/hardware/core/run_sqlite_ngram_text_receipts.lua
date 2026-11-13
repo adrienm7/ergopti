@@ -42,7 +42,7 @@ end
 
 check("real synthetic output survives flush and the public range payload", function()
 	Keystats.record_synthetic_output("owned-synthetic-app", "a\0b", "other", 1000)
-	require("tests.support.sqlite_flush_native").flush(Keystats)
+	require("tests.support.core.sqlite_flush_native").flush(Keystats)
 	local rows = assert(Writer.query_rows("SELECT hex(token),c FROM ngram_chars WHERE app='owned-synthetic-app' ORDER BY hex(token);"))
 	assert(table.concat(rows, ",") == "00|1,61|1,62|1", "real flush did not persist the exact original characters")
 	local payload = Keystats.get_range_payload(today, today, { "owned-synthetic-app" })

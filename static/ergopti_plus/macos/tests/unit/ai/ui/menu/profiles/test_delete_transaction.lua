@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 
-local Fixture = require("tests.support.profile_delete_fixture")
+local Fixture = require("tests.support.settings.profile_delete_fixture")
 local with_delete_fixture = Fixture.with_delete_fixture
 
 helpers.describe("HS-033 profile deletion transaction", function()

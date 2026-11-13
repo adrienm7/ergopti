@@ -11,7 +11,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../../../support/llm_menu_fixture_state.ahk
+#Include ../../../support/ai/menu_fixture_state.ahk
 global _LMT_WriterResult := 1
 global _LMT_WriterCalls := 0
 global _LMT_ApplyCalls := 0

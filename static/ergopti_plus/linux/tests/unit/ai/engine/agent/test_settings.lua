@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ActualScenario = require("tests.support.agent_scenario")
+local ActualScenario = require("tests.support.ai.agent_scenario")
 local i18n = require("core.i18n.engine.i18n")
 
 helpers.it("refuses fractional agent count limits", function()

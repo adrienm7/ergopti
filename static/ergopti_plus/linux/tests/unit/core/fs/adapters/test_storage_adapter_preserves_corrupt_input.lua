@@ -19,8 +19,8 @@
 --- fields come back nil) against the bespoke codec and passes against core/text/engine/json.lua.
 --- ==============================================================================
 
-package.loaded["tests.support.adapters.storage.storage_adapter_fixture"] = nil
-local Fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
+package.loaded["tests.support.core.fs.storage_adapter_fixture"] = nil
+local Fixture = require("tests.support.core.fs.storage_adapter_fixture")
 
 -- The application folder under every XDG base, from the shared registry.
 local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name

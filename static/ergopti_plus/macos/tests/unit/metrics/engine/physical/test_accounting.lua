@@ -3,7 +3,7 @@
 --- Verifies the physical-stream aggregation boundary independently of logical text.
 local helpers = require("tests.helpers")
 
-local with_events = require("tests.support.physical_accounting_scope").run
+local with_events = require("tests.support.layouts.physical_accounting_scope").run
 
 helpers.describe("physical accounting (hs274)", function()
 	helpers.it("preserves physical streaks across logical text with no physical credit", function()

@@ -28,7 +28,7 @@
 
 local helpers = require("tests.helpers")
 
-local Fixture = require("tests.support.metrics_preferences_fixture")
+local Fixture = require("tests.support.metrics.preferences_fixture")
 
 -- Restored rather than cleared. A test that reaches into package.loaded owes
 -- the files after it the state it found — clearing instead cost a CI run once,

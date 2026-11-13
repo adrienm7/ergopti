@@ -28,8 +28,8 @@
 --- driver owes is that they appear at all.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.hotstrings.menu.shortcuts_menu_dispatch_fixture"] = nil
-local Fixture = require("tests.support.modules.hotstrings.menu.shortcuts_menu_dispatch_fixture")
+package.loaded["tests.support.hotstrings.engine.menu.shortcuts_menu_dispatch_fixture"] = nil
+local Fixture = require("tests.support.hotstrings.engine.menu.shortcuts_menu_dispatch_fixture")
 local helpers, shortcuts_menu, find_row, with_shortcut_locale =
 	Fixture.helpers, Fixture.shortcuts_menu, Fixture.find_row, Fixture.with_shortcut_locale
 

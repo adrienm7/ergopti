@@ -79,17 +79,17 @@ for _, item in ipairs(invalid) do
 	-- passes here. A fixed 1000 ms made the flush end the session only on a host
 	-- up for more than the session timeout, so a freshly booted runner differed.
 	Keystats.on_keydown("a", math.floor(Monotonic.now_ms()), "owned-cursor-app")
-	require("tests.support.sqlite_flush_native").flush(Keystats)
-	require("tests.support.sqlite_flush_native").flush(Keystats)
+	require("tests.support.core.sqlite_flush_native").flush(Keystats)
+	require("tests.support.core.sqlite_flush_native").flush(Keystats)
 	check("native " .. item[1] .. " cursor refuses without mutation", function()
 		assert(assert(Writer.query_rows("SELECT hex(value) FROM meta WHERE key='linux_next_event_id';"))[1] == hex(item[2]),
 			"invalid or exhausted cursor was rewritten")
 		assert(number("SELECT count(*) FROM events_typing;") == 0, "invalid cursor acknowledged raw typing")
 		assert(number("SELECT count(*) FROM ngram_chars;") == 0, "refused raw stream acquired derived metrics")
 	end)
-	assert(require("tests.support.sqlite_flush_native").control(Writer, "UPDATE meta SET value='41' WHERE key='linux_next_event_id';"))
-	require("tests.support.sqlite_flush_native").flush(Keystats)
-	require("tests.support.sqlite_flush_native").flush(Keystats)
+	assert(require("tests.support.core.sqlite_flush_native").control(Writer, "UPDATE meta SET value='41' WHERE key='linux_next_event_id';"))
+	require("tests.support.core.sqlite_flush_native").flush(Keystats)
+	require("tests.support.core.sqlite_flush_native").flush(Keystats)
 	check("native " .. item[1] .. " cursor recovery retains pending typing once", function()
 		local rows = assert(Writer.query_rows("SELECT id,text FROM events_typing ORDER BY id;"))
 		assert(#rows == 1 and rows[1] == "41|a", "refusal consumed pending typing or acknowledged an unusable ID")

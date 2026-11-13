@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.llm.streaming_payload_fixture")
+local Fixture = require("tests.support.ai.engine.streaming_payload_fixture")
 local with_stream = Fixture.with_stream
 local CommandLines = require("tests.support.command_lines")
 local shell_quote = require("core.text.engine.utils_core").shell_quote
@@ -50,7 +50,7 @@ helpers.describe("streaming retains its private temporary file", function()
 	for _, control in ipairs({ "absolute", "name", "missing", "empty" }) do
 		helpers.it("honors configured Lua " .. control .. " without bare fallback (stream-private-interpreter)", function()
 			local root = helpers.driver_root() .. "../../.."
-			local fixture = helpers.driver_root() .. "tests/support/modules/llm/stream_payload_interpreter_fixture.py"
+			local fixture = helpers.driver_root() .. "tests/support/ai/engine/api/stream_payload_interpreter_fixture.py"
 			local lines = CommandLines.read("python3 " .. shell_quote(fixture)
 				.. " " .. shell_quote(root .. "/tools/diagnostics/macos_stream_payload_mode_test.py")
 				.. " " .. shell_quote(helpers.driver_root())

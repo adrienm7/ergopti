@@ -26,8 +26,8 @@
 
 -- The cases replace these entries; the module end puts them back.
 local restore_loaded = require("tests.helpers").keep_loaded({ "hotstrings.engine.device_finder" })
-package.loaded["tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture"] = nil
-local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture")
+package.loaded["tests.support.platform.input.keyboard_hook.device_watchdog_fixture"] = nil
+local Fixture = require("tests.support.platform.input.keyboard_hook.device_watchdog_fixture")
 local helpers, tick_until_check, aggregate_consumer_session =
 	Fixture.helpers, Fixture.tick_until_check, Fixture.aggregate_consumer_session
 
@@ -303,7 +303,7 @@ end)
 
 -- Controlled actual Reader/Hook lifecycle; no kernel or physical claim.
 helpers.describe("native source state restoration", function()
-	local Fixture = require("tests.support.input_owner_fixture")
+	local Fixture = require("tests.support.core.input_owner_fixture")
 
 	for _, code in ipairs({ 42, 29 }) do
 		helpers.it("(linux-native-reconciliation) keeps a modal-consumed modifier out of matcher text " .. code, function()
@@ -404,7 +404,7 @@ end)
 
 helpers.describe("managed source cohort reconciliation", function()
 	helpers.it("authenticates pre-event input and cleanup currencies separately", function()
-require('tests.support.input_owner_fixture').with_session({}, function(s)
+require('tests.support.core.input_owner_fixture').with_session({}, function(s)
  local r = s.reader
  local capture, current, retire = r.capture_source_owner, r.source_owner_current, r.retire_source
  local lease, observer = assert(capture('keyboard:' .. s.paths.a))
@@ -457,7 +457,7 @@ end)
 
 helpers.describe("managed source cohort reconciliation", function()
 	helpers.it("renews genuine keyboard leases after descriptor ABA", function()
-require('tests.support.input_owner_fixture').with_session({ recycle_descriptor = true }, function(s)
+require('tests.support.core.input_owner_fixture').with_session({ recycle_descriptor = true }, function(s)
  local slot = 'keyboard:' .. s.paths.a
  local original_fd = s.descriptor('a')
  local previous = assert(s.reader.capture_source_owner(slot))
@@ -480,7 +480,7 @@ end)
 
 helpers.describe("managed source cohort reconciliation", function()
 	helpers.it("renews pointer cleanup leases without creating pointer input rights", function()
-require('tests.support.input_owner_fixture').with_session({ recycle_descriptor = true }, function(s)
+require('tests.support.core.input_owner_fixture').with_session({ recycle_descriptor = true }, function(s)
  local finder = assert(package.loaded['hotstrings.engine.device_finder'])
  assert(s.hook.stop() ~= false)
  finder.find_devices = function() return { s.paths.a }, { s.paths.b } end
@@ -517,7 +517,7 @@ end)
 
 
 helpers.describe("managed source cohort callback boundaries", function()
-	local Fixture = require("tests.support.input_owner_fixture")
+	local Fixture = require("tests.support.core.input_owner_fixture")
 	local function reconcile(s)
 		assert(s.reader.close("keyboard:" .. s.paths.a))
 		for _ = 1, s.hook.DEVICE_CHECK_TICKS do s.hook.check_device() end
@@ -652,7 +652,7 @@ end)
 
 
 helpers.describe("managed source cohort retained authority", function()
-	local Fixture = require("tests.support.input_owner_fixture")
+	local Fixture = require("tests.support.core.input_owner_fixture")
 	local function tick(s)
 		for _ = 1, s.hook.DEVICE_CHECK_TICKS do s.hook.check_device() end
 	end
@@ -701,7 +701,7 @@ end)
 
 helpers.describe("managed source cohort provider chronology", function()
 	helpers.it("preserves a provider-reopened source instead of acquiring its foreign lifetime", function()
-		local Fixture = require("tests.support.input_owner_fixture")
+		local Fixture = require("tests.support.core.input_owner_fixture")
 		Fixture.with_session({ on_capture_reacquired = function() return true end }, function(s)
 			local finder = package.loaded["hotstrings.engine.device_finder"]
 			local original = finder.find_devices
@@ -729,7 +729,7 @@ helpers.describe("managed source cohort provider and logger reentry", function()
 	for _, mode in ipairs({ "provider", "logger" }) do
 		local callback_kind = mode
 		helpers.it("blocks actual " .. callback_kind .. " reentry before final cohort publication", function()
-			local Fixture = require("tests.support.input_owner_fixture")
+			local Fixture = require("tests.support.core.input_owner_fixture")
 			Fixture.with_session({ on_capture_reacquired = function() return true end }, function(s)
 				local finder, logger = package.loaded["hotstrings.engine.device_finder"], require("core.logger.engine.shim")
 				local find, success = finder.find_devices, logger.success

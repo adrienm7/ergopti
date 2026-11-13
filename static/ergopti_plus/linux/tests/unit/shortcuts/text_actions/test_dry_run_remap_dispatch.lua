@@ -67,7 +67,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 			if name == "tap_hold.toml" then return tap_path end
 			return original_route(name)
 		end
-		require("tests.support.text_owner_fixture").with(function(guard)
+		require("tests.support.core.text_owner_fixture").with(function(guard)
 			-- CapsWord keeps its real Manager/Hook lock transaction. Only XKB's
 			-- desktop boundary is stateful here: KEY_CAPSLOCK toggles its Lock.
 			local capture, caps_locked
@@ -81,7 +81,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 					process = function(code, value) if code == 58 and value == 1 then caps_locked = not caps_locked end end,
 				}
 			end
-			require("tests.support.input_owner_fixture").with_session({ public_chords = true, source_ids = { "a" }, keys = {}, capture = capture }, function(session)
+			require("tests.support.core.input_owner_fixture").with_session({ public_chords = true, source_ids = { "a" }, keys = {}, capture = capture }, function(session)
 				assert(session.hook.set_remapper(nil))
 				local world = { reads = 0, writes = 0, lifecycle = 0, resets = 0, errors = {} }
 				local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))

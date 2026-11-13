@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.gesture_actions_fixture")
+local Fixture = require("tests.support.gestures.actions_fixture")
 local it = Fixture.it
 
 --- @param keys table calls.keys entries { mods, key }.

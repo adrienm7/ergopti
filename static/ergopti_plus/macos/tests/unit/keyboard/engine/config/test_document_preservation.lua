@@ -27,14 +27,14 @@ local function with_file(source, body, raw, config_raw)
 	helpers.with_stub_scope({ "keyboard.engine.runtime.config", "tap_hold.engine.file", "core.fs.adapters.file_system", "core.text.engine.toml.codec", "core.text.engine.toml_codec" }, function()
 		local Config = helpers.load_with_stubs("keyboard.engine.runtime.config")
 		local Files, Codec = require("core.fs.adapters.file_system"), require("core.text.engine.toml.codec")
-		local path = require("tests.support.tap_hold_file_text").private_path()
+		local path = require("tests.support.keyboard.tap_hold_file_text").private_path()
 		local function write(text)
 			local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 		end
 		local function read()
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
-		local Text = require("tests.support.tap_hold_file_text")
+		local Text = require("tests.support.keyboard.tap_hold_file_text")
 		local source_config = config_raw
 		if not raw then source, source_config = Text.file(source) end
 		write(source)

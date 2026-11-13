@@ -16,8 +16,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.keyboard_layout.menu_keyboard_layout_reaches_tray_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.keyboard_layout.menu_keyboard_layout_reaches_tray_fixture")
+package.loaded["tests.support.menu.ui.keyboard_layout.reaches_tray_fixture"] = nil
+local Fixture = require("tests.support.menu.ui.keyboard_layout.reaches_tray_fixture")
 local switch_row = Fixture.switch_row
 local with_switch_frame = Fixture.with_switch_frame
 

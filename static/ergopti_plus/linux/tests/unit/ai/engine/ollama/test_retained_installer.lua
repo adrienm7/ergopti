@@ -1,7 +1,7 @@
 --- static/ergopti_plus/linux/tests/unit/ai/engine/ollama/test_retained_installer.lua
 --- Receives the actual live retained installer; original path fixtures stay exact.
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.ollama_retained_fixture")
+local fixture = require("tests.support.ai.ollama_retained_fixture")
 helpers.describe("Retained Linux Ollama installer", function()
  helpers.it("ordinary live transaction uses retained download same-FD adoption and extract only", function()
   local f = fixture(); local op = f.start(); f.through(9)

@@ -1,7 +1,7 @@
 --- tests/unit/layouts/adapters/test_number_row_native_levels_shared_typed_facts.lua
 
-package.loaded["tests.support.adapters.layout.number_row_native_levels_fixture"] = nil
-local Fixture = require("tests.support.adapters.layout.number_row_native_levels_fixture")
+package.loaded["tests.support.layouts.adapters.number_row_native_levels_fixture"] = nil
+local Fixture = require("tests.support.layouts.adapters.number_row_native_levels_fixture")
 local h, Native, codes, digits, symbols, rows, with_native_row_producer =
 	Fixture.h, Fixture.Native, Fixture.codes, Fixture.digits, Fixture.symbols, Fixture.rows, Fixture.with_native_row_producer
 

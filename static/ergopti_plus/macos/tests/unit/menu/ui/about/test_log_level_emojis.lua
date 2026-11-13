@@ -177,7 +177,7 @@ local function check_log_commit(receipt)
 	local saved_hs = _G.hs
 	local storage_owner, previous_storage_set
 	local ok, detail = pcall(function()
-		local fixture = require("tests.support.menu_boot_fixture").boot()
+		local fixture = require("tests.support.menu.boot_fixture").boot()
 		local actions = fixture.global_actions()
 		local logger, storage = require("core.logger.engine.logger"), require("core.fs.adapters.storage")
 		storage_owner, previous_storage_set = storage, storage.set

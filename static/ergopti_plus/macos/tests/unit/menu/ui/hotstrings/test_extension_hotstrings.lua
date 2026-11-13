@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
+local CaptionFixture = require("tests.support.hotstrings.parent_caption_fixture")
 local ExtensionTranslator = require("core.i18n.engine.i18n")
 local shipped = require("core.text.engine.toml_codec.codec").decode(require("tests.support.source_file").read(
 	helpers.driver_root() .. "../../layouts/registry/ergopti/manifest.toml")).extension

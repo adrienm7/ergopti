@@ -30,7 +30,7 @@ local function run_case(family, change, route)
 	local file = assert(io.open(path, "wb"))
 	assert(file:write('[info]\nfirst_name = "ok"\n[letters]\np = "first_name"\n')); assert(file:close())
 	local completed, detail = pcall(function()
-		require("tests.support.text_owner_fixture").with(function(guard, state, _, policy, watch)
+		require("tests.support.core.text_owner_fixture").with(function(guard, state, _, policy, watch)
 			local fixture = require("tests.support.dynamic_hotstrings_fixture")
 			local preference_path
 			restore_preferences, preference_path = fixture.route()
@@ -79,7 +79,7 @@ local function run_case(family, change, route)
 				moved = true; state.path = "/field/successor"; watch.barrier()
 				helpers.assert_true(guard.blocks_text(), "the original guard must observe the successor field")
 			end
-			require("tests.support.input_owner_fixture").with_session({ capture = capture, keys = {}, position_bits = true,
+			require("tests.support.core.input_owner_fixture").with_session({ capture = capture, keys = {}, position_bits = true,
 				on_char = function(char, ...)
 					characters[#characters + 1] = char; return callback(char, ...)
 				end,

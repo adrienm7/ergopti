@@ -17,8 +17,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.llm.backends.local_openai_backends_fixture"] = nil
-local Fixture = require("tests.support.modules.llm.backends.local_openai_backends_fixture")
+package.loaded["tests.support.ai.engine.backends.local_openai_backends_fixture"] = nil
+local Fixture = require("tests.support.ai.engine.backends.local_openai_backends_fixture")
 local models_answer = Fixture.models_answer
 local with_backend = Fixture.with_backend
 

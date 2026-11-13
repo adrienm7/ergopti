@@ -2,8 +2,8 @@
 --- Actual Text and Apps owners share one native board: a family that borrows the
 --- clipboard is never snapshotted by another family as the user's original.
 local helpers = require("tests.helpers")
-local World = require("tests.support.modules.shortcuts.apps_fifo_capture_fixture")
-local Destination = require("tests.support.text_destination_receipt")
+local World = require("tests.support.shortcuts.apps_fifo_capture_fixture")
+local Destination = require("tests.support.core.text_destination_receipt")
 
 --- Runs one scenario with the actual Text owner composed into the Apps world.
 local function with_text_and_apps(body)

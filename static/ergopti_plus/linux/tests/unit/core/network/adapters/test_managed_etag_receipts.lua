@@ -122,7 +122,7 @@ end)
 
 -- Metadata controls use actual preflight/public wrappers without starting a child.
 local Prepared = require("tests.support.prepared_native_ports")
-local Public = require("tests.support.managed_http_native_ports")
+local Public = require("tests.support.core.managed_http_native_ports")
 local initial = "https://etag-fixture.invalid/start"
 
 helpers.describe("explicit cold ETag affinity admission", function()

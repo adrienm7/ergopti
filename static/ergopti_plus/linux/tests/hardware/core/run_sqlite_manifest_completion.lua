@@ -44,7 +44,7 @@ check("healthy empty native projection acknowledges completion", function()
 	assert(next(manifest) == nil and complete == true)
 end)
 Keystats.record_synthetic_output("owned-cache", "abc", "llm", 1000)
-require("tests.support.sqlite_flush_native").flush(Keystats)
+require("tests.support.core.sqlite_flush_native").flush(Keystats)
 local date = assert(Writer.query_rows("SELECT date FROM agg_app_day LIMIT 1;"))[1]
 local app = assert(Writer.query_rows("SELECT app FROM agg_app_day LIMIT 1;"))[1]
 assert(Writer.upsert_errors("owned-extra", { date = date, app = app, bs_total = 7 }))

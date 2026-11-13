@@ -30,8 +30,8 @@
 --- environment.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.keystats.storage.sqlite_reader_projection_fixture"] = nil
-local Fixture = require("tests.support.modules.keystats.storage.sqlite_reader_projection_fixture")
+package.loaded["tests.support.metrics.engine.storage.sqlite_reader_projection_fixture"] = nil
+local Fixture = require("tests.support.metrics.engine.storage.sqlite_reader_projection_fixture")
 local helpers, Json, EXPECTED, with_stubbed_sqlite, queried =
 	Fixture.helpers, Fixture.Json, Fixture.EXPECTED, Fixture.with_stubbed_sqlite, Fixture.queried
 

@@ -52,7 +52,7 @@ end
 
 --- One fetch of the first page against a scripted answer.
 local function fetch(manager, result)
-	manager._http_client = require("tests.support.release_http_fixture").attach({
+	manager._http_client = require("tests.support.updater.release_http_fixture").attach({
 		get = function(_, _, _, callback) callback(result) return true end,
 		cancel = function() return true end,
 	})

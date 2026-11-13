@@ -3,7 +3,7 @@
 --- Actual source-owned remapping over the controlled native-transport fixture.
 --- These checks do not claim kernel or physical-device qualification.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.input_owner_fixture")
+local Fixture = require("tests.support.core.input_owner_fixture")
 local function both(s)
 	s.edge("a", 58, 1, 0); s.edge("b", 58, 1, 10)
 	helpers.assert_eq(s.rows, { { 29, 1 } })
@@ -734,7 +734,7 @@ end)
 
 helpers.describe("physical magic key post-output failure", function()
 	helpers.it("does not replay the physical key after the injected character was delivered", function()
-		local SourceFixture = require("tests.support.modules.hotstrings.magic_key.magic_key_source_fixture")
+		local SourceFixture = require("tests.support.hotstrings.engine.magic_key_source_fixture")
 		SourceFixture.with_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source)
 			local session, entered, seen, dispatched = nil, false, nil, false
 			local ok, err = pcall(function()

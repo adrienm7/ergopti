@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local Fixture = require("tests.support.logger_async_sink_fixture")
+local Fixture = require("tests.support.core.logger_async_sink_fixture")
 
 helpers.describe("logger: today's log paths", function()
 	helpers.it("(logger-today-paths) follow the calendar date past midnight", function()

@@ -1,7 +1,7 @@
 --- tests/unit/shortcuts/engine/text_actions/fifo/test_copy_capture_handoff.lua
 --- Actual copy capture waits for Quartz handoff and joins its cancelled transaction.
 local helpers = require("tests.helpers")
-local World = require("tests.support.modules.shortcuts.apps_fifo_capture_fixture")
+local World = require("tests.support.shortcuts.apps_fifo_capture_fixture")
 helpers.describe("Apps copy capture native FIFO handoff", function()
 	helpers.it("keeps a user copy made just before capture clears", function()
 		World.with_world({ change_before_clear = true }, function(w)

@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keystats.ngram_completion_fixture")
+local Fixture = require("tests.support.metrics.engine.ngram_completion_fixture")
 
 local function key(family) return family.code == "kc" and "12" or "a" end
 

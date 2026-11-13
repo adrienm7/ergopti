@@ -7,8 +7,8 @@
 --- constructors. Controlled capabilities do not prove native resource cleanup.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.llm.runtime.runtime_engine_acquisition_fixture"] = nil
-local Fixture = require("tests.support.modules.llm.runtime.runtime_engine_acquisition_fixture")
+package.loaded["tests.support.ai.engine.runtime.engine_acquisition_fixture"] = nil
+local Fixture = require("tests.support.ai.engine.runtime.engine_acquisition_fixture")
 local helpers, test, with_owner, runtime_fixture, with_managed_responses =
 	Fixture.helpers, Fixture.test, Fixture.with_owner, Fixture.runtime_fixture, Fixture.with_managed_responses
 

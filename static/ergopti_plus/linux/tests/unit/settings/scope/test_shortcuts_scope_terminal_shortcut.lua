@@ -2,8 +2,8 @@
 
 --- Exercises the actual shortcut readers, dispatchers and parameter owner.
 
-package.loaded["tests.support.infra.scope.shortcuts_scope_fixture"] = nil
-local Fixture = require("tests.support.infra.scope.shortcuts_scope_fixture")
+package.loaded["tests.support.settings.scope.shortcuts_scope_fixture"] = nil
+local Fixture = require("tests.support.settings.scope.shortcuts_scope_fixture")
 local helpers, declared_parent, Sandbox, Codec, Manifest, SOURCE, with_scope, SLOTS, CHORDS_SOURCE, CHORD_PARAMETER =
 	Fixture.helpers, Fixture.declared_parent, Fixture.Sandbox, Fixture.Codec, Fixture.Manifest, Fixture.SOURCE, Fixture.with_scope, Fixture.SLOTS, Fixture.CHORDS_SOURCE, Fixture.CHORD_PARAMETER
 

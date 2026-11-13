@@ -14,9 +14,9 @@ local function with_windows(scenario)
 	helpers.with_stub_scope({ "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work", "core.logger.engine.logger",
 		"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.i18n.engine.locale", "core.text.engine.json", "core.i18n.engine.core",
 		"core.ui.engine.webview.i18n_seed", "core.ui.engine.webview.presentation", "core.ui.engine.window_titles",
-		"tests.support.webview_recursive_close_fixture" }, function()
+		"tests.support.core.webview_recursive_close_fixture" }, function()
 		local h = { windows = {}, retained = {}, deferred = {}, errors = {}, notification_depth = 0, closed = 0 }
-		local constructor = require("tests.support.webview_recursive_close_fixture")(h)
+		local constructor = require("tests.support.core.webview_recursive_close_fixture")(h)
 		local logger = helpers.make_logger_stub()
 		logger.error = function(...) if h.on_error then h.on_error(...) end end
 		package.loaded["core.logger.engine.logger"] = logger

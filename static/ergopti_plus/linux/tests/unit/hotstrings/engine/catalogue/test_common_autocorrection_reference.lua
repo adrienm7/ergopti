@@ -139,7 +139,7 @@ helpers.describe("common autocorrection failed override admission", function()
 			Config._set_override_config_dir_for_test(directory)
 			local ok, detail = pcall(function()
 				Writer.publish_if_unchanged = function() return false, "independent migration refusal" end
-				require("tests.support.hotstring_choices").with_file(Config, source, function(config_path)
+				require("tests.support.hotstrings.choices").with_file(Config, source, function(config_path)
 					helpers.assert_true(Config.init(engine, directory .. "/missing-packs"))
 					local _, accepted, reason = Config.load_all()
 					if selection.refused then
@@ -155,7 +155,7 @@ helpers.describe("common autocorrection failed override admission", function()
 						helpers.assert_true(#published > 0)
 						for _, mapping in ipairs(published) do helpers.assert_true(mapping.group ~= "autocorrection") end
 					end
-					helpers.assert_eq(require("tests.support.hotstring_choices").read(config_path), source,
+					helpers.assert_eq(require("tests.support.hotstrings.choices").read(config_path), source,
 						"admission refusal never changes desired activation choices")
 				end)
 				handle = assert(io.open(override_path, "rb")); local bytes = handle:read("*a"); assert(handle:close())
@@ -187,7 +187,7 @@ helpers.describe("common autocorrection shipped split engine", function()
 			local scratch = os.tmpname(); os.remove(scratch)
 			Config._set_override_config_dir_for_test(scratch)
 			local ok, detail = pcall(function()
-				require("tests.support.hotstring_choices").with_file(Config, source, function()
+				require("tests.support.hotstrings.choices").with_file(Config, source, function()
 					helpers.assert_true(Config.init(engine, scratch .. "/packs"))
 					Config.load_all()
 					local owned = {}
@@ -261,7 +261,7 @@ helpers.describe("common autocorrection migrated runtime policies", function()
 		local choices = '[hotstrings.groups]\nautocorrection = true\n[hotstrings.modules.autocorrection]\n'
 			.. 'names = true\nabbreviations = true\ntechnical_terms = true\n'
 		local ok, detail = pcall(function()
-			require("tests.support.hotstring_choices").with_file(Config, choices, function()
+			require("tests.support.hotstrings.choices").with_file(Config, choices, function()
 				helpers.assert_true(Config.init(engine, directory .. "/missing-packs"))
 				local _, accepted = Config.load_all(); helpers.assert_eq(accepted, true)
 				helpers.assert_eq(read_file(path), expected, "actual conditional native initialization owns the full independent image")
@@ -340,7 +340,7 @@ helpers.describe("common autocorrection classified cold startup", function()
 				end
 				return load_catalogue(paths, ...)
 			end
-			require("tests.support.hotstring_choices").with_file(Config, source, function(config_path)
+			require("tests.support.hotstrings.choices").with_file(Config, source, function(config_path)
 				helpers.assert_true(Config.init(engine, directory .. "/missing-packs"))
 				local count, accepted, reason, receipt = Config.load_all(nil, true)
 				helpers.assert_eq(accepted, true); helpers.assert_nil(reason)
@@ -358,7 +358,7 @@ helpers.describe("common autocorrection classified cold startup", function()
 				helpers.assert_true(Config.get_categories() == previous_categories)
 				helpers.assert_eq(expand("(1)★").replacement, "➀", "live refusal retains the full existing image")
 				helpers.assert_eq(read_file(path), original)
-				helpers.assert_eq(require("tests.support.hotstring_choices").read(config_path), source,
+				helpers.assert_eq(require("tests.support.hotstrings.choices").read(config_path), source,
 					"cold refusal preserves persisted desired family choices")
 				Writer.publish_if_unchanged = publish; Loader.load_catalogue = load_catalogue
 				helpers.assert_true(Config.init(engine, directory .. "/missing-packs"))

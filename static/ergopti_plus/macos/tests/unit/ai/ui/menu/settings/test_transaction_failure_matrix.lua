@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.menu_llm.settings.settings_transaction_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.menu_llm.settings.settings_transaction_fixture")
+package.loaded["tests.support.ai.ui.settings_transaction_fixture"] = nil
+local Fixture = require("tests.support.ai.ui.settings_transaction_fixture")
 local ENTRY_SPECS = Fixture.ENTRY_SPECS
 local FAILURE_SPECS = Fixture.FAILURE_SPECS
 local SIBLING_FAILURES = Fixture.SIBLING_FAILURES

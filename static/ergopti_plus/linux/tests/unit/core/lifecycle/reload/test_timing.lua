@@ -9,7 +9,7 @@
 --- the delivered log lines the field log analyser reads (linux-reload-budget).
 --- ==============================================================================
 
-local helpers = require("tests.support.logger_fixture").helpers({ "core.timing.engine.reload_timing", "core.logger.engine.perf_budget" })
+local helpers = require("tests.support.core.logger_fixture").helpers({ "core.timing.engine.reload_timing", "core.logger.engine.perf_budget" })
 
 --- Loads a fresh module whose stamp lives in a private folder, with the real logger.
 --- @param budget_ms number The driver_reload_ms the judge reads.

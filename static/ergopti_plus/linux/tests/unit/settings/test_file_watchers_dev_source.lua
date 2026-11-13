@@ -10,8 +10,8 @@
 --- ordinary daemon arms nothing of the kind.
 --- ==============================================================================
 
-package.loaded["tests.support.infra.config.file_watchers_fixture"] = nil
-local Fixture = require("tests.support.infra.config.file_watchers_fixture")
+package.loaded["tests.support.settings.file_watchers_fixture"] = nil
+local Fixture = require("tests.support.settings.file_watchers_fixture")
 local helpers, CAN_STAT = Fixture.helpers, Fixture.CAN_STAT
 
 --- Builds a source tree outside /tmp (the Lua filter ignores /tmp paths).

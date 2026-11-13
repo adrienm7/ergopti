@@ -1,0 +1,153 @@
+--- tests/support/ai/count_menu_fixture.lua
+
+--- ==============================================================================
+--- MODULE: LLM Count Menu Fixture
+--- DESCRIPTION:
+--- Builds the real menu and renderer while capturing its settings transaction boundary.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+return function(callback, options)
+	options = options or {}
+	local saved, previous_hs = {}, _G.hs
+	for name, value in pairs(package.loaded) do saved[name] = value end
+	local ok, err = xpcall(function()
+		for name in pairs(package.loaded) do
+			if name:match("^ai%.ui%.menu") or name:match("^ai%.engine")
+				or name == "menu.engine.renderer" then package.loaded[name] = nil end
+		end
+		helpers.load_with_stubs("core.text.engine.toml.codec")
+		local file = assert(io.open(helpers.shared("ai/data/defaults.json"), "r"))
+		local raw = file:read("*a"); file:close()
+		local defaults, state = hs.json.decode(raw), hs.json.decode(raw)
+		state.llm_enabled, state.llm_backend, state.llm_model = true, options.backend or "ollama", ""
+		-- The macOS state keeps these in seconds (ai/engine/init.lua), as the real
+		-- Trigger rows read them (real_trigger_panel).
+		for _, table_ in ipairs({ defaults, state }) do
+			table_.llm_debounce = table_.llm_debounce_ms / 1000
+			table_.llm_min_request_interval = table_.llm_min_request_interval_ms / 1000
+		end
+		local noop = function() end
+		local accept = function() return true end
+		local calls = {}
+		local command_deliveries = 0
+		local function unobserved_command() command_deliveries = command_deliveries + 1 end
+		local outcome = true
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
+		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
+		local real_strings = hs.json.decode(locale_file:read("*a")); locale_file:close()
+		local function real_caption(key)
+			return options.real_model_selector or key:match("^menu%.profiles%.") or key:match("^llm%.profile%.")
+		end
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
+			if options.catalogue then return options.catalogue[key] or key end
+			if real_caption(key) then return real_strings[key] or key end
+			if key == "menu.llm.prediction_count_label_one" then return "%d prediction" end
+			if key == "menu.llm.prediction_count_label_other" then return "%d predictions" end
+			return require("tests.helpers").I18N_PLACEHOLDER_FORMATS[key] or key
+		end, section = function(key)
+			if options.catalogue then return options.catalogue[key] or key end
+			return real_caption(key) and real_strings[key] or key
+		end }
+		package.loaded["ai.engine"] = { DEFAULT_STATE = defaults,
+			get_backend = function() return state.llm_backend end, set_backend = accept,
+			get_current_model = function() return "" end,
+			-- What the real Display rows read (real_streaming_panel).
+			streaming_snapshot = function()
+				return { generation = 0, enabled = state.llm_enabled, backend = state.llm_backend,
+					streaming = state.llm_streaming }
+			end }
+		local models = { get_presets = function() return {} end,
+			get_installed_models = function() return {} end,
+			get_actual_model_name = function(name) return name end,
+			get_model_info = function() return {} end, get_model_ram = function() return 0 end }
+		package.loaded["ai.ui.menu.models.manager"] = { new = function() return models end }
+		package.loaded["ai.ui.menu.settings_manager"] = { new = function()
+			return { build_nav_modifier_menu = function() return {} end,
+				build_val_modifier_menu = function() return {} end,
+				setting_snapshot = function(key) return { value = state[key], generation = 0, owner = {} } end,
+				set_context_length = unobserved_command,
+				reset_context_length = unobserved_command,
+				set_min_words = unobserved_command,
+				reset_min_words = unobserved_command,
+				set_max_words = unobserved_command,
+				reset_max_words = unobserved_command,
+				apply_setting_transaction = function(request)
+					calls[#calls + 1] = request
+					return outcome
+				end }
+		end }
+		for _, name in ipairs({ "temperature_panel", "streaming_panel", "trigger_panel" }) do
+			-- A whole-tray walk reads the real Display and Trigger rows (their label-value joins).
+			if not (name == "streaming_panel" and options.real_streaming_panel)
+				and not (name == "trigger_panel" and options.real_trigger_panel) then
+				package.loaded["ai.ui.menu.panels." .. name] = { build = function() return {} end }
+			end
+		end
+		-- The menu itself must build neither panel: the model selector page
+		-- collects them only when it opens (maintainer, 2026-10-27).
+		calls.panel_builds = 0
+		local function counted_build() calls.panel_builds = calls.panel_builds + 1; return nil, nil end
+		package.loaded["ai.ui.menu.panels.backend_panel"] = {
+			is_apple_silicon = function() return false end, build = counted_build }
+		package.loaded["ai.ui.menu.panels.api_panel"] = {
+			build = counted_build,
+			active_entry_caption_text = function() return nil end }
+		package.loaded["ai.ui.menu.models.switcher"] = { new = function()
+			return { switch_model = unobserved_command, disable_model = unobserved_command,
+				get_display_model_name = function(name) return name end,
+				get_model_power_level = function() return 1 end, settle_recovery_debts = accept }
+		end }
+		package.loaded["ai.ui.menu.startup_controller"] = { new = function() return noop end }
+		package.loaded["ai.ui.menu.trigger_orchestrator"] = { new = function()
+			return { bind_hotkey = noop, activate_hotkey = noop,
+				apply_llm_profile_shortcut = noop, restore_shortcuts = accept }
+		end }
+		package.loaded["ai.engine.local_servers.mlx_deps_checker"] = { check_and_install_deps = accept }
+		package.loaded["ai.engine.ollama.deps_checker"] = { check_and_install_deps = accept }
+		package.loaded["menu.engine.manifest_menu"] = nil
+		local core = package.loaded["ai.engine"]
+		core.BUILTIN_PROFILES = require("ai.engine.settings.profiles").BUILTIN_PROFILES
+		calls.profile_constructor_sync = {}
+		core.set_user_profiles = function()
+			calls.profile_constructor_sync[#calls.profile_constructor_sync + 1] = "users"
+			return true
+		end
+		core.set_active_profile = function()
+			calls.profile_constructor_sync[#calls.profile_constructor_sync + 1] = "active"
+			return true
+		end
+		package.loaded["ai.ui.menu.profiles_manager"] = nil
+		local profiles = require("ai.ui.menu.profiles_manager")
+		local genuine_profiles_new = profiles.new
+		profiles.new = function(...)
+			local manager = genuine_profiles_new(...)
+			calls.real_profiles_manager = manager
+			return manager
+		end
+		if options.real_model_selector then
+			package.loaded["ai.ui.menu.models.selector_page"] = nil
+			local page = require("ai.ui.menu.models.selector_page")
+			local genuine_open = page.open
+			calls.page_opens = 0
+			page.open = function(...)
+				calls.page_opens = calls.page_opens + 1
+				calls.page_open_result = genuine_open(...)
+				return calls.page_open_result
+			end
+		end
+		if options.window_toggle then package.loaded["core.ui.ui.window_toggle"] = options.window_toggle end
+		local menu = require("ai.ui.menu").create({ state = state,
+			keymap = { set_llm_model = accept }, script_control = options.script_control,
+			save_prefs = accept, update_menu = accept, active_tasks = {} })
+		helpers.assert_type(menu.build_item, "function")
+		callback(menu, state, calls, function(value) outcome = value end)
+		helpers.assert_eq(command_deliveries, 0, "count-only scenarios never deliver the newly bound setting commands")
+	end, debug.traceback)
+	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(saved) do package.loaded[name] = value end
+	_G.hs = previous_hs
+	if not ok then error(err, 0) end
+end

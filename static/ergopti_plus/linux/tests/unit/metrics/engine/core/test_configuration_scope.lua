@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.metrics_preferences_fixture")
+local Fixture = require("tests.support.metrics.preferences_fixture")
 
 local function with_collector(body)
 	local names = { "metrics.engine.keystats", "metrics.engine.privacy.text_cipher",

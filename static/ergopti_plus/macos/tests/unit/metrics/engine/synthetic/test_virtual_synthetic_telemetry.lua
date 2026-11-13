@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture_module = require("tests.support.keystats_provenance_fixture")
+local fixture_module = require("tests.support.metrics.provenance_fixture")
 
 
 --- @param selector string

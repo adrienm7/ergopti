@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_activation = require("tests.support.llm_activation_fixture")
+local with_activation = require("tests.support.ai.activation_fixture")
 
 helpers.describe("AI enable installs only its backend's runtime (ai-runtime-enable)", function()
 	helpers.it("installs nothing and offers nothing for a remote API backend", function()

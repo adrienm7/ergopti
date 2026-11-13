@@ -2,8 +2,8 @@
 
 --- Exercises the actual shortcut readers, dispatchers and parameter owner.
 
-package.loaded["tests.support.infra.scope.shortcuts_scope_fixture"] = nil
-local Fixture = require("tests.support.infra.scope.shortcuts_scope_fixture")
+package.loaded["tests.support.settings.scope.shortcuts_scope_fixture"] = nil
+local Fixture = require("tests.support.settings.scope.shortcuts_scope_fixture")
 local helpers, Sandbox, with_scope, with_collision_scope, COLLISION_BASE, NO_TAP_HOLDS, with_prediction_preflight =
 	Fixture.helpers, Fixture.Sandbox, Fixture.with_scope, Fixture.with_collision_scope, Fixture.COLLISION_BASE, Fixture.NO_TAP_HOLDS, Fixture.with_prediction_preflight
 

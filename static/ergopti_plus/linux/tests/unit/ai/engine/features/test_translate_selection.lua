@@ -19,11 +19,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ProfilesFixture = require("tests.support.llm_profiles_fixture")
+local ProfilesFixture = require("tests.support.ai.profiles_fixture")
 local Fakes = require("tests.fakes")
 local Json = require("core.text.engine.json")
 local Translate = require("ai.engine.prediction.translate")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 
 local SELECTION = "On se voit demain ?"
 

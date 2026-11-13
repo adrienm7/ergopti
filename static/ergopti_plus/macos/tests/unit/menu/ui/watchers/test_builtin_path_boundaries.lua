@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.menu_config_watcher_fixture")
+local Fixture = require("tests.support.menu.config_watcher_fixture")
 
 helpers.describe("Menu watcher built-in exclusions (menu-built-in-path-boundary)", function()
 	for _, case in ipairs({

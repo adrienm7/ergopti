@@ -29,7 +29,7 @@ local helpers = require("tests.helpers")
 -- ===========================================
 -- ===========================================
 
-local with_fixture = require("tests.support.ui_restore_fixture").with_fixture
+local with_fixture = require("tests.support.core.ui_restore_fixture").with_fixture
 
 
 

@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 
 local held = {}
 

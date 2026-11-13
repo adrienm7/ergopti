@@ -176,8 +176,8 @@ end)
 -- The configuration is a probe, never phase A
 -- ===========================================
 
-package.loaded["tests.support.ui.editors.ui_bridge_handlers_fixture"] = nil
-local Fixture = require("tests.support.ui.editors.ui_bridge_handlers_fixture")
+package.loaded["tests.support.core.ui.bridge_handlers_fixture"] = nil
+local Fixture = require("tests.support.core.ui.bridge_handlers_fixture")
 
 --- Runs a case with the reducer module replaced, restoring everything after.
 --- @param replacement table|nil The healthcheck.configuration stand-in.

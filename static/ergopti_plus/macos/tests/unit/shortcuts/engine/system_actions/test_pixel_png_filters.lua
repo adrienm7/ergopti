@@ -63,7 +63,7 @@ local function copy_capture(mode)
 		helpers.assert_eq(tasks[2].label, "Pixel extractor")
 		helpers.assert_eq(tasks[2].arguments[1], "-c")
 		local command = "python3 -B " .. quote(helpers.driver_root()
-			.. "tests/support/modules/shortcuts/pixel_png_fixture.py")
+			.. "tests/support/shortcuts/pixel_png_fixture.py")
 			.. " " .. quote(tasks[2].arguments[2]) .. " " .. quote(mode)
 			.. " " .. quote(helpers.temp_dir()) .. " 2>&1"
 		local process = assert(io.popen(command, "r"))

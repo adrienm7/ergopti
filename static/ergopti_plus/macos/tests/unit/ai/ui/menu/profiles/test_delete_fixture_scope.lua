@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.profile_delete_fixture")
+local Fixture = require("tests.support.settings.profile_delete_fixture")
 -- The profile menu loads this stateless generated module; loading it before the
 -- first snapshot keeps it out of the "residue" the fixtures must not leave.
 require("settings.engine.keys")

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.metrics.typing.ngram_retirement_fixture")
+local Fixture = require("tests.support.metrics.ui.ngram_retirement_fixture")
 
 helpers.describe("ngram-history-retirement", function()
 	helpers.it("(ngram-history-retirement) commits a healthy extension once", function()

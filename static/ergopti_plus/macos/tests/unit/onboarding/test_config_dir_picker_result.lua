@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local load_fixture = require("tests.support.paths_editor_fixture")
+local load_fixture = require("tests.support.settings.paths_editor_fixture")
 
 
 --- Loads the paths editor behind a scripted osascript result.

@@ -7,8 +7,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_context = require("tests.support.pause_transaction_fixture").with_context
-local Assertions = require("tests.support.pause_transaction_assertions")
+local with_context = require("tests.support.settings.pause_transaction_fixture").with_context
+local Assertions = require("tests.support.settings.pause_transaction_assertions")
 local count_notifications = Assertions.count_notifications
 
 helpers.describe("script-control resume transaction is atomic", function()

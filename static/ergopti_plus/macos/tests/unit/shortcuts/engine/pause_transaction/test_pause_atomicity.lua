@@ -7,8 +7,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_context = require("tests.support.pause_transaction_fixture").with_context
-local Assertions = require("tests.support.pause_transaction_assertions")
+local with_context = require("tests.support.settings.pause_transaction_fixture").with_context
+local Assertions = require("tests.support.settings.pause_transaction_assertions")
 local count_notifications = Assertions.count_notifications
 local has_error_containing = Assertions.has_error_containing
 local assert_reversible_modules_running = Assertions.assert_reversible_modules_running

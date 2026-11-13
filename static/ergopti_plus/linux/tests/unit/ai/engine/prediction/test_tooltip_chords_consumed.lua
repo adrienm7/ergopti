@@ -25,7 +25,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 local EvdevCodes = require("platform.input.evdev_codes")
 local Fakes = require("tests.fakes")
 

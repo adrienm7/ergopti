@@ -115,7 +115,7 @@ helpers.describe("shortcuts.engine.manager", function()
   -- test_keyboard_hook_caps_word_lock and the session's endings by
   -- test_caps_word_auto_off.
   local prior_hook = package.loaded["platform.input.keyboard_hook"]
-  local hook = require("tests.support.caps_word_lock_hook_fake").new()
+  local hook = require("tests.support.keyboard.caps_word_lock_hook_fake").new()
   package.loaded["platform.input.keyboard_hook"] = hook
   M.init({})
 

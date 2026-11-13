@@ -18,8 +18,8 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local Paths = require("core.fs.engine.paths")
-package.loaded["tests.support.modules.llm.backends.local_openai_backends_fixture"] = nil
-local Fixture = require("tests.support.modules.llm.backends.local_openai_backends_fixture")
+package.loaded["tests.support.ai.engine.backends.local_openai_backends_fixture"] = nil
+local Fixture = require("tests.support.ai.engine.backends.local_openai_backends_fixture")
 
 -- A vLLM models listing (vllm/entrypoints/openai/protocol.py ModelList)
 local VLLM_LISTING = { ok = true, status = 200,

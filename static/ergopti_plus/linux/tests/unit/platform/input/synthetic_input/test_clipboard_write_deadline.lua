@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
+local ClipboardTargets = require("tests.support.platform.input.synthetic_input.clipboard_targets")
 local uv, Shell = require("luv"), require("core.process.adapters.shell_runner")
 -- Complete native constructors before replacing the session-specific ports.
 require("clipboard.adapters.clipboard")

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OutputFixture = require("tests.support.toml_output_fixture")
+local OutputFixture = require("tests.support.settings.toml_output_fixture")
 local TARGET, NEIGHBOR = "custom_aot_target", "custom_aot_neighbor"
 local FOREIGN = '# independent foreign sibling\n[[future.rules]]\nname = "one" # future rule comment\nvalue = { nested = [4, 9] }\n'
 	.. '[[future.rules]]\nname = "two"\nvalue = "retain"\n'

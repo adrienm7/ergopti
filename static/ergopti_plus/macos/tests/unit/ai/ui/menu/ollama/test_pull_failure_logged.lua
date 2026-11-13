@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local with_fixture = require("tests.support.ollama_pull_fixture").with_fixture
+local with_fixture = require("tests.support.ai.ollama_pull_fixture").with_fixture
 
 local function joined_errors(fixture)
 	return table.concat(fixture.error_records, " | ")

@@ -21,14 +21,14 @@ local function with_file(original, body)
 		package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		require("settings.engine.migration.outdated").reset_for_tests()
 		local config = helpers.load_with_stubs("keyboard.engine.runtime.config")
-		local path = require("tests.support.tap_hold_file_text").private_path()
+		local path = require("tests.support.keyboard.tap_hold_file_text").private_path()
 		local function write(text)
 			local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 		end
 		local function read()
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
-		local Text = require("tests.support.tap_hold_file_text")
+		local Text = require("tests.support.keyboard.tap_hold_file_text")
 		local original_config
 		original, original_config = Text.file(original)
 		write(original)
@@ -72,7 +72,7 @@ end
 --- @param f table The with_file() context.
 --- @return string
 local function owner_path(f)
-	return require("tests.support.tap_hold_file_text").config_path(f.path)
+	return require("tests.support.keyboard.tap_hold_file_text").config_path(f.path)
 end
 
 helpers.describe("TODO33 Boolean leaf audit", function()

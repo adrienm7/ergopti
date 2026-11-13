@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.menu_llm.settings.settings_transaction_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.menu_llm.settings.settings_transaction_fixture")
+package.loaded["tests.support.ai.ui.settings_transaction_fixture"] = nil
+local Fixture = require("tests.support.ai.ui.settings_transaction_fixture")
 local assert_row_graph_unchanged = Fixture.assert_row_graph_unchanged
 local capture_row_graph = Fixture.capture_row_graph
 local find_item = Fixture.find_item

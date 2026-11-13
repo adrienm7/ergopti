@@ -122,6 +122,6 @@ end)
 
 helpers.describe("Single manual LLM profile selection", function()
 	helpers.it("retires shortcut overrides before persisting the chosen normal profile", function()
-		require("tests.support.ui.menu.llm.manual_profile_selection").assert_selection(helpers)
+		require("tests.support.menu.ui.llm.manual_profile_selection").assert_selection(helpers)
 	end)
 end)

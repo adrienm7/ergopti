@@ -2,7 +2,7 @@
 
 --- Proves clock startup authority and retained native debt before opening capture.
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 
 local function begin(capture, controls)
 	capture.init(controls.dependencies)

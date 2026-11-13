@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.synthetic_input_fixture")
+local Fixture = require("tests.support.core.synthetic_input_fixture")
 
 --- Runs one isolated broker with independently revocable full and cached guards.
 --- @param scenario function Receives native fixture, real adapter and authority.

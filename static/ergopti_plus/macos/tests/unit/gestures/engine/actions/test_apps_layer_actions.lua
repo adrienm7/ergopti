@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.gesture_actions_fixture")
+local Fixture = require("tests.support.gestures.actions_fixture")
 local it = Fixture.it
 
 --- Catalogue id -> the app-navigation function it must run.

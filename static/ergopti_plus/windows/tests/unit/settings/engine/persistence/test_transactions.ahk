@@ -12,7 +12,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../../../../support/wpm_widget_state_contract.ahk
+#Include ../../../../support/metrics/wpm_widget_state_contract.ahk
 
 global _CPT_ConfigFailAt := 0
 global _CPT_ConfigWriteCalls := 0

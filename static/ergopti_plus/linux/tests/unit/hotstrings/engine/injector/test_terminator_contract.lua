@@ -86,7 +86,7 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 			end
 			return true
 		end
-		package.loaded["layouts.adapters.keyboard_layout"] = require("tests.support.layout_cohort_fixture").layout(function(char)
+		package.loaded["layouts.adapters.keyboard_layout"] = require("tests.support.layouts.cohort_fixture").layout(function(char)
 			if char == active_terminator then return keycodes.terminator end
 			return assert(keycodes[char], "unexpected text in terminator replay test")
 		end)
@@ -123,7 +123,7 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 				return true
 			end,
 		}
-		package.loaded["layouts.adapters.keyboard_layout"] = require("tests.support.layout_cohort_fixture").layout(function(char)
+		package.loaded["layouts.adapters.keyboard_layout"] = require("tests.support.layouts.cohort_fixture").layout(function(char)
 			if char == "x" then return 1001 end
 			error("control terminators must bypass the text planner")
 		end)

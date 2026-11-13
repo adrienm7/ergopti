@@ -10,8 +10,8 @@
 --- test_section_opt_in_defaults.lua).
 --- ==============================================================================
 
-package.loaded["tests.support.modules.hotstrings.catalogue.ergopti_extension_hotstrings_fixture"] = nil
-local Fixture = require("tests.support.modules.hotstrings.catalogue.ergopti_extension_hotstrings_fixture")
+package.loaded["tests.support.hotstrings.engine.ergopti_extension_hotstrings_fixture"] = nil
+local Fixture = require("tests.support.hotstrings.engine.ergopti_extension_hotstrings_fixture")
 local helpers, load = Fixture.helpers, Fixture.load
 
 helpers.describe("rolls left_arrow section through the Linux loader (linux-rolls-left-arrow)", function()

@@ -14,8 +14,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.infra.preferences.preferences_keeps_unowned_sections_fixture"] = nil
-local Fixture = require("tests.support.infra.preferences.preferences_keeps_unowned_sections_fixture")
+package.loaded["tests.support.settings.preferences_keeps_unowned_sections_fixture"] = nil
+local Fixture = require("tests.support.settings.preferences_keeps_unowned_sections_fixture")
 local TomlCodec = Fixture.TomlCodec
 
 

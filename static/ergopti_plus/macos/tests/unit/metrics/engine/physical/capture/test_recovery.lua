@@ -123,7 +123,7 @@ end
 do
 --- Independently authored from the actual six-field producer loss contract.
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 local function loss(reason)
  return { version = 1, kind = "lost", coverage = "complete", incarnation = "production-fixture", lease = "7", reason = reason }
 end
@@ -229,7 +229,7 @@ end
 do
 --- Independent managed source controls over actual Accounting/Capture/Transport.
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 local function bind(capture, c)
  helpers.assert_eq(capture.init(c.dependencies), true)
  local owner = {}; local cap = assert(capture.bind_managed_source(owner))
@@ -621,7 +621,7 @@ end
 do
 --- Healthy actual unbound path; optional recovery ports must not query caller metatables.
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 helpers.describe("independent unbound recovery compatibility", function()
  helpers.it("preserves the actual unbound capture path without resolving optional metatable ports", function()
   with_capture(function(capture, observed, c)
@@ -649,7 +649,7 @@ end
 
 do
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 helpers.describe("actual managed notification frame boundaries", function()
  helpers.it("never reopens a selected source after a refused verdict receipt", function()
   with_capture(function(capture, observed, c)
@@ -708,7 +708,7 @@ end
 
 do
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 helpers.describe("actual managed acquisition refusal", function()
  helpers.it("never publishes an old candidate identity when a replacement was not acquired", function()
   with_capture(function(capture, observed, c)
@@ -740,7 +740,7 @@ end
 do
 --- Actual Capture/Transport callback debt; native task settlement is explicitly modeled.
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 helpers.describe("independent actual transport callback retirement", function()
  helpers.it("cannot replace a native lease while its real emission callback remains in flight", function()
   with_capture(function(capture, observed, c)
@@ -789,7 +789,7 @@ end
 do
 --- Actual CaptureScope and stop receipt must retain the actual Transport callback frame.
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 helpers.describe("independent actual transport scope retirement", function()
  helpers.it("does not publish native scope settlement or stop ACK until its emission frame unwinds", function()
   with_capture(function(capture, observed, c)
@@ -835,7 +835,7 @@ end
 
 do
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 helpers.describe("actual dispatch debt retry and error conservation", function()
  helpers.it("cannot settle a repeated explicit lease stop inside the same native-completed writer", function()
   with_capture(function(capture, observed, c)
@@ -909,7 +909,7 @@ do
 local helpers = require("tests.helpers")
 local Transport = require("metrics.engine.capture.physical_transport")
 local Delivery = require("metrics.engine.capture.physical_delivery")
-local Frames = require("tests.support.physical_stream_frames")
+local Frames = require("tests.support.layouts.physical_stream_frames")
 helpers.describe("independent synchronous native stop acknowledgement", function()
  helpers.it("does not ACK settled transport when native terminate settles inside the real emit frame", function()
   local frames = Frames.new("sync-native-fixture", "7", { "41" })

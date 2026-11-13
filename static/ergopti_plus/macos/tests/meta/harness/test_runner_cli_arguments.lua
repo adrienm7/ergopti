@@ -26,7 +26,7 @@ end
 local function run(arguments)
 	local root = helpers.driver_root():gsub("[/\\]$", "")
 	local command = { quote(os.getenv("LUA") or "lua"),
-		quote(root .. "/tests/support/runner_cli_child.lua"), quote(root) }
+		quote(root .. "/tests/support/core/runner_cli_child.lua"), quote(root) }
 	for _, value in ipairs(arguments) do command[#command + 1] = quote(value) end
 	local pipe = assert(io.popen(table.concat(command, " ") .. " 2>&1", "r"))
 	local output = pipe:read("*a")

@@ -28,8 +28,8 @@
 --- that never ran.
 --- ==============================================================================
 
-package.loaded["tests.support.adapters.keyboard_hook.evdev_reader_fixture"] = nil
-local Fixture = require("tests.support.adapters.keyboard_hook.evdev_reader_fixture")
+package.loaded["tests.support.platform.input.keyboard_hook.evdev_reader_fixture"] = nil
+local Fixture = require("tests.support.platform.input.keyboard_hook.evdev_reader_fixture")
 local helpers, recorder, flag_set, encoded =
 	Fixture.helpers, Fixture.recorder, Fixture.flag_set, Fixture.encoded
 

@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_context = require("tests.support.pause_transaction_fixture").with_context
+local with_context = require("tests.support.settings.pause_transaction_fixture").with_context
 
 helpers.describe("script-control: bindings child cleanup debt", function()
 	helpers.it("settles pixel debt while preserving an originally OFF bindings layer", function()

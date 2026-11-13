@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_host = require("tests.support.physical_shortcuts_fade_fixture")
+local with_host = require("tests.support.layouts.physical_shortcuts_fade_fixture")
 
 local function with_closed_window(scenario)
 	with_host(function(host, h)

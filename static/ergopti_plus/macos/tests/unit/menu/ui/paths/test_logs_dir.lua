@@ -15,7 +15,7 @@
 
 local helpers = require("tests.helpers")
 local AppDirs = require("core.fs.engine.app_dirs")
-local load_fixture = require("tests.support.paths_editor_fixture")
+local load_fixture = require("tests.support.settings.paths_editor_fixture")
 
 --- Opens the editor over the fixture and runs `callback` with its observations.
 --- @param callback function Receives (calls, evaluations, pending).

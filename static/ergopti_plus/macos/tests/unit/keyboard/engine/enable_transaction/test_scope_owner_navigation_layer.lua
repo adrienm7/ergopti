@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.platform.remap.enable_transaction.scope_owner_fixture"] = nil
-local Fixture = require("tests.support.platform.remap.enable_transaction.scope_owner_fixture")
+package.loaded["tests.support.keyboard.engine.enable_transaction.scope_owner_fixture"] = nil
+local Fixture = require("tests.support.keyboard.engine.enable_transaction.scope_owner_fixture")
 local KEY = Fixture.KEY
 local LAYERS = Fixture.LAYERS
 local cohort_remap = Fixture.cohort_remap

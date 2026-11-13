@@ -1,6 +1,6 @@
 --- tests/unit/menu/ui/shortcuts/test_physical_shortcut_scope.lua
 
-local helpers=require('tests.helpers');local Fixture=require('tests.support.physical_shortcut_scope_fixture');local Codec=require('core.text.engine.toml_codec')
+local helpers=require('tests.helpers');local Fixture=require('tests.support.layouts.physical_shortcut_scope_fixture');local Codec=require('core.text.engine.toml_codec')
 local source='[shortcuts]\nenabled = true\nkeyboard = { foreign = 17 }\n[gestures]\naction_parameters = { tap_4__open_url="https://apple.com", future={keep=9} }\n[future]\nkeep=7\n'
 local rows={{section='shortcuts.keyboard',key='physical_none_KeyJ',value='send_text'},{section='gestures.action_parameters',key='keyboard__physical_none_KeyJ__send_text',value='★'}}
 helpers.describe('Mac actual physical scope edits',function()

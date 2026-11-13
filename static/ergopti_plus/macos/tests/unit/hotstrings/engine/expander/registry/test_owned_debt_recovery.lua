@@ -2,7 +2,7 @@
 
 --- A refused settings inverse must keep the prior registry view and lease.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keymap.registry.registry_mutation_transactions_fixture")
+local Fixture = require("tests.support.hotstrings.registry_mutation_transactions_fixture")
 
 helpers.describe("section settings owned rollback", function()
  helpers.it("retains the logical state and excludes same-value writers until retry", function()

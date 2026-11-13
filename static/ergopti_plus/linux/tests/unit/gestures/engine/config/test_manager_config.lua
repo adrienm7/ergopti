@@ -6,8 +6,8 @@
 --- enable/disable, menu integration.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.gestures.config.gestures_manager_fixture"] = nil
-local Fixture = require("tests.support.modules.gestures.config.gestures_manager_fixture")
+package.loaded["tests.support.gestures.manager_fixture"] = nil
+local Fixture = require("tests.support.gestures.manager_fixture")
 local helpers, TomlCodec, binding_source_fixture =
 	Fixture.helpers, Fixture.TomlCodec, Fixture.binding_source_fixture
 

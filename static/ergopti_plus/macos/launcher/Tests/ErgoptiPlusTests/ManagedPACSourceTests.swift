@@ -27,7 +27,7 @@ private final class ManagedPACSourceFixture {
 		var repository = URL(fileURLWithPath: #filePath)
 		for _ in 0..<7 { repository.deleteLastPathComponent() }
 		process.executableURL = URL(fileURLWithPath: python)
-		process.arguments = [repository.appendingPathComponent("static/ergopti_plus/macos/tests/support/native_pac_source_fixture.py").path]
+		process.arguments = [repository.appendingPathComponent("static/ergopti_plus/macos/tests/support/core/native_pac_source_fixture.py").path]
 		process.standardInput = input
 		process.standardOutput = output
 		process.standardError = FileHandle.nullDevice

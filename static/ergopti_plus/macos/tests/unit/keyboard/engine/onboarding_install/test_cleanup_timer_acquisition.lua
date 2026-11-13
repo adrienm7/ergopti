@@ -7,8 +7,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.onboarding_install_fixture")
-local Scenario = require("tests.support.onboarding_install_scenarios")
+local Fixture = require("tests.support.onboarding.install_fixture")
+local Scenario = require("tests.support.onboarding.install_scenarios")
 local with_fixture = Fixture.with_fixture
 local advance_to_stage = Scenario.advance_to_stage
 

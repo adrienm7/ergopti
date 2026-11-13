@@ -19,8 +19,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.scope.global_reset_transaction_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.scope.global_reset_transaction_fixture")
+package.loaded["tests.support.menu.ui.global_reset_transaction_fixture"] = nil
+local Fixture = require("tests.support.menu.ui.global_reset_transaction_fixture")
 local assert_fully_restored = Fixture.assert_fully_restored
 local fail = Fixture.fail
 local with_menu_fixture = Fixture.with_menu_fixture

@@ -163,7 +163,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 			end
 			local context = { presets = {}, active_backend = "mlx" }
 			helpers.assert_true(browser.open(context))
-			require("tests.support.webview_focus_fixture").check(state.webviews[1],
+			require("tests.support.core.webview_focus_fixture").check(state.webviews[1],
 				function() return browser.open(context) end,
 				function() state.delete_throws = refused; helpers.assert_eq(browser.close(), not refused) end,
 				state.factory_options)

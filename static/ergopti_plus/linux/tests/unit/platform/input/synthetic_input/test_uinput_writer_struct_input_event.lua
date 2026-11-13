@@ -23,8 +23,8 @@
 --- these assertions make safe to attempt.
 --- ==============================================================================
 
-package.loaded["tests.support.adapters.synthetic_input.uinput_writer_fixture"] = nil
-local Fixture = require("tests.support.adapters.synthetic_input.uinput_writer_fixture")
+package.loaded["tests.support.platform.input.synthetic_input.uinput_writer_fixture"] = nil
+local Fixture = require("tests.support.platform.input.synthetic_input.uinput_writer_fixture")
 local helpers, recorder, le, owned_channel =
 	Fixture.helpers, Fixture.recorder, Fixture.le, Fixture.owned_channel
 

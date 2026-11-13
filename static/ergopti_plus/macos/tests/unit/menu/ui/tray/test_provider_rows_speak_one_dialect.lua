@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
+local CaptionFixture = require("tests.support.hotstrings.personal_menu_caption_fixture")
 
 
 --- Builds the actual packaged About provider over controlled native effect ports.

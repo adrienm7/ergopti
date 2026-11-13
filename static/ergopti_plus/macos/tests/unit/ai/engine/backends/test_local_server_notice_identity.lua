@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local FIXTURE = "tests.support.modules.llm.backends.local_openai_backends_fixture"
+local FIXTURE = "tests.support.ai.engine.backends.local_openai_backends_fixture"
 
 -- The backend also imports its optional keystats parent at require time. Own
 -- that real consumer tree, shared policies and direct injections with the panel;

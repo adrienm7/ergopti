@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture_module = require("tests.support.keystats_provenance_fixture")
+local fixture_module = require("tests.support.metrics.provenance_fixture")
 
 helpers.describe("audit pause fence: keystats public shortcut sink", function()
 	helpers.it("audit pause fence: every public persistence sink is silent while paused", function()

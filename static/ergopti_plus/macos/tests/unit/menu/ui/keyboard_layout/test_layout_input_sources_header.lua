@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
+local LayoutFixture = require("tests.support.layouts.legacy_caption_fixture")
 
 --- Builds the layout row and renders it the way the tray root does.
 --- @param ctx table Menu context.

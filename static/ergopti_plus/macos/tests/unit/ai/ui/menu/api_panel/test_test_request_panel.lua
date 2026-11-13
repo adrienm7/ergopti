@@ -11,8 +11,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.menu_llm.api_panel.api_panel_test_request_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.menu_llm.api_panel.api_panel_test_request_fixture")
+package.loaded["tests.support.ai.ui.api_panel_test_request_fixture"] = nil
+local Fixture = require("tests.support.ai.ui.api_panel_test_request_fixture")
 local fixture_context = Fixture.fixture_context
 local install_doubles = Fixture.install_doubles
 local test_row = Fixture.test_row

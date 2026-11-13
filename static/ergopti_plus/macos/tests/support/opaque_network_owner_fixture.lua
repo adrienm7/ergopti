@@ -28,7 +28,7 @@ end
 --- @return table packet
 function M.capture(network, python, binary, receiver)
 	local packet = {}
-	require("tests.support.ollama_pull_fixture").with_fixture({
+	require("tests.support.ai.ollama_pull_fixture").with_fixture({
 		network_env = network, binary_path = binary,
 	}, function(fixture)
 		helpers.assert_true(fixture.manager.pull_model("model-A", "org/model", nil, nil, {
@@ -39,7 +39,7 @@ function M.capture(network, python, binary, receiver)
 		helpers.assert_eq(fixture.active_tasks.ollama_pull, task)
 		packet.ollama = { executable = task.executable, args = task.args }
 	end)
-	require("tests.support.mlx_download_fixture").with_fixture({
+	require("tests.support.ai.mlx_download_fixture").with_fixture({
 		network_env = network, project_venv_python_escaped = python,
 	}, function(fixture)
 		seed_receiver(fixture, receiver)
@@ -88,7 +88,7 @@ function M.receive(network, bytes, code, mode, receiver, owner)
 	local ok, err = xpcall(function()
 		local fresh = true
 		if owner ~= "mlx" then
-			require("tests.support.ollama_pull_fixture").with_fixture({
+			require("tests.support.ai.ollama_pull_fixture").with_fixture({
 				network_env = network, network_admission = port,
 				start_result = mode ~= "start_refused",
 				complete_during_start = mode == "start_refused" and code or nil,
@@ -111,7 +111,7 @@ function M.receive(network, bytes, code, mode, receiver, owner)
 				record(result.ollama_messages, fixture.notification_records)
 			end)
 		end
-		require("tests.support.mlx_download_fixture").with_fixture({
+		require("tests.support.ai.mlx_download_fixture").with_fixture({
 			network_env = network, network_admission = port, requirement_lifecycle = true,
 			launcher = mode == "start_refused" and { start = "false", complete_on_start = true,
 				complete_code = code, complete_stderr = bytes } or nil,

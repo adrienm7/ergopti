@@ -30,7 +30,7 @@ local function load(source)
 		config = helpers.load_with_stubs("keyboard.engine.runtime.config")
 		local files = require("core.fs.adapters.file_system")
 		local old_read = files.read_with_status
-		local Text = require("tests.support.tap_hold_file_text")
+		local Text = require("tests.support.keyboard.tap_hold_file_text")
 		local path = "sparse-remap-config.toml"
 		local text, config_text = Text.file(source)
 		-- The manifest rows are read from the config.toml beside the file.
@@ -113,7 +113,7 @@ helpers.describe("Remap configuration sparse loading", function()
 			local files = require("core.fs.adapters.file_system")
 			local old_read, old_write = files.read_with_status, files.write_if_unchanged
 			local written
-			local config_path = require("tests.support.tap_hold_file_text").config_path("karabiner.toml")
+			local config_path = require("tests.support.keyboard.tap_hold_file_text").config_path("karabiner.toml")
 			files.read_with_status = function(target)
 				if target == config_path then return config_source, "ok" end
 				return source, "ok"
@@ -193,14 +193,14 @@ helpers.describe("Remap obsolete scalar leaves", function()
 			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			require("settings.engine.migration.outdated").reset_for_tests()
 			local config = helpers.load_with_stubs("keyboard.engine.runtime.config")
-			local path = require("tests.support.tap_hold_file_text").private_path()
+			local path = require("tests.support.keyboard.tap_hold_file_text").private_path()
 			local function write(text)
 				local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 			end
 			local function read()
 				local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 			end
-			local Text = require("tests.support.tap_hold_file_text")
+			local Text = require("tests.support.keyboard.tap_hold_file_text")
 			local original_config
 			if not raw then original, original_config = Text.file(original) end
 			write(original)
@@ -240,7 +240,7 @@ helpers.describe("Remap obsolete scalar leaves", function()
 				helpers.assert_eq(status, "ok")
 				helpers.assert_eq(#f.warnings, 1)
 				-- A config.toml row is named in the config.toml beside tap_hold.toml.
-				local owner = leaf.config and require("tests.support.tap_hold_file_text").config_path(f.path) or f.path
+				local owner = leaf.config and require("tests.support.keyboard.tap_hold_file_text").config_path(f.path) or f.path
 				helpers.assert_contains(f.warnings[1], "'" .. leaf.file .. "' in '" .. owner .. "'")
 				f.load()
 				helpers.assert_eq(#f.warnings, 1, "re-reading the same obsolete entry warns once")

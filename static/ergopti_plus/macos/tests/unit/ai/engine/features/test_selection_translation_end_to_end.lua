@@ -24,7 +24,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.llm.selection_translation_fixture")
+local Fixture = require("tests.support.ai.engine.prediction.selection_translation_fixture")
 local SELECTION, TRANSLATION = Fixture.SELECTION, Fixture.TRANSLATION
 local USER_CLIPBOARD, NAMES = Fixture.USER_CLIPBOARD, Fixture.NAMES
 local with_world, settle = Fixture.with_world, Fixture.settle

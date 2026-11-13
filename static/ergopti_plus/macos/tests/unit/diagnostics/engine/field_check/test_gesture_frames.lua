@@ -57,7 +57,7 @@ helpers.describe("touch frame evidence (gesture-frames-field)", function()
 	helpers.it("the touch watcher counts each frame, stamped or not", function()
 		local Evidence = require("gestures.engine.frame_evidence")
 		Evidence.reset()
-		local with_fixture = require("tests.support.gesture_runtime_fixture").with_fixture
+		local with_fixture = require("tests.support.gestures.runtime_fixture").with_fixture
 		with_fixture({}, function(gestures, runtime, watcher)
 			helpers.assert_eq(gestures.start(), true, "the gesture runtime must start")
 			helpers.assert_true(watcher:running(), "the touch watcher must run")

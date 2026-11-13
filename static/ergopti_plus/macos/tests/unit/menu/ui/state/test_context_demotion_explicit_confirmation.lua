@@ -1,7 +1,7 @@
 --- tests/unit/menu/ui/state/test_context_demotion_explicit_confirmation.lua
 --- An explicit correction of a refused boot value must commit or roll back.
 local helpers = require("tests.helpers")
-local OutputFixture = require("tests.support.toml_output_fixture")
+local OutputFixture = require("tests.support.settings.toml_output_fixture")
 
 helpers.describe("explicit confirmation of a demoted context length", function()
 	for _, outcome in ipairs({ "success", "save_refused", "menu_refused" }) do

@@ -14,8 +14,8 @@ local helpers = require("tests.helpers")
 local it = helpers.it
 
 local Fakes = helpers.load_module("tests.fakes")
-local Home = require("tests.support.keystats_home_fixture")
-local Preferences = require("tests.support.metrics_preferences_fixture")
+local Home = require("tests.support.metrics.home_fixture")
+local Preferences = require("tests.support.metrics.preferences_fixture")
 local Timings = require("core.timing.engine.timings")
 
 local TOPO_MS = Timings.ms("keystats", "topo_tick_ms")
@@ -178,7 +178,7 @@ local function with_recorder(script)
 				is_available = function() return true end,
 				bump_rev = function() return true end,
 			}, { __index = Fakes.sqlite_writer() })
-			require("tests.support.sqlite_flush_fake").attach(fake_writer)
+			require("tests.support.core.sqlite_flush_fake").attach(fake_writer)
 			local names = { "metrics.engine.journal.sqlite_writer", "metrics.engine.keystats" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -186,7 +186,7 @@ local function with_recorder(script)
 			local ok, err = pcall(function()
 				local keystats = require(names[2])
 				keystats.init(Home.options())
-				require("tests.support.metrics_consent_fixture").enable(keystats)
+				require("tests.support.metrics.consent_fixture").enable(keystats)
 				script(keystats, fake_writer)
 			end)
 			for _, name in ipairs(names) do package.loaded[name] = previous[name] end

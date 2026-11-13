@@ -12,8 +12,8 @@
 --- produced; without it, they are absent.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.hotstrings.catalogue.ergopti_extension_hotstrings_fixture"] = nil
-local Fixture = require("tests.support.modules.hotstrings.catalogue.ergopti_extension_hotstrings_fixture")
+package.loaded["tests.support.hotstrings.engine.ergopti_extension_hotstrings_fixture"] = nil
+local Fixture = require("tests.support.hotstrings.engine.ergopti_extension_hotstrings_fixture")
 local helpers, with_exact_loader_ports =
 	Fixture.helpers, Fixture.with_exact_loader_ports
 

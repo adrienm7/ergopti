@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.tooltip_renderer_fixture")
+local Fixture = require("tests.support.core.tooltip_renderer_fixture")
 
 --- Installs an Accessibility double whose every read is unanswered.
 --- @param pid number Frontmost application's pid.

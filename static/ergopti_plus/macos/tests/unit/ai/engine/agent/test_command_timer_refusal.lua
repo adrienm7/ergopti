@@ -2,7 +2,7 @@
 
 --- A command that never schedules must not invalidate a prior agent request.
 local helpers = require("tests.helpers")
-local World = require("tests.support.agent_world")
+local World = require("tests.support.ai.agent_world")
 
 helpers.describe("agent command timer admission", function()
 	helpers.it("retains the in-flight selection when command scheduling is refused", function()

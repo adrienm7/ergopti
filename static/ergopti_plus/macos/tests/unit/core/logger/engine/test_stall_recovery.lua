@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 
-local Fixture = require("tests.support.logger_async_sink_fixture")
+local Fixture = require("tests.support.core.logger_async_sink_fixture")
 
 --- Acknowledges the last batch the fixture socket carried.
 --- @param fixture table Logger asynchronous sink fixture.

@@ -19,8 +19,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.platform.remap.layout.wake_reresolves_layout_actions_fixture"] = nil
-local Fixture = require("tests.support.platform.remap.layout.wake_reresolves_layout_actions_fixture")
+package.loaded["tests.support.keyboard.engine.layout.wake_reresolves_layout_actions_fixture"] = nil
+local Fixture = require("tests.support.keyboard.engine.layout.wake_reresolves_layout_actions_fixture")
 local SYSTEM_DID_WAKE = Fixture.SYSTEM_DID_WAKE
 local load_remap = Fixture.load_remap
 

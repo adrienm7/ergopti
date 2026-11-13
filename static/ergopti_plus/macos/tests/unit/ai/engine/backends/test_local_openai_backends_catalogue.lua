@@ -24,8 +24,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.llm.backends.local_openai_backends_fixture"] = nil
-local Fixture = require("tests.support.modules.llm.backends.local_openai_backends_fixture")
+package.loaded["tests.support.ai.engine.backends.local_openai_backends_fixture"] = nil
+local Fixture = require("tests.support.ai.engine.backends.local_openai_backends_fixture")
 local SERVERS = Fixture.SERVERS
 local answer_sweep = Fixture.answer_sweep
 local completion_answer = Fixture.completion_answer

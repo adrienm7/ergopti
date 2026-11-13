@@ -14,7 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Home = require("tests.support.keystats_home_fixture")
+local Home = require("tests.support.metrics.home_fixture")
 
 helpers.describe("keystats own-home fixture", function()
 	helpers.it("points every default path of the collector inside its directory", function()

@@ -19,7 +19,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local World = require("tests.support.agent_world")
+local World = require("tests.support.ai.agent_world")
 
 local Agent = require("ai.engine.agent.agent")
 

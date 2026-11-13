@@ -7,8 +7,8 @@
 --- one carried context per vector. The AHK replayer is written on the PC.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.keystats.aggregation.aggregate_walker_fixture"] = nil
-local Fixture = require("tests.support.modules.keystats.aggregation.aggregate_walker_fixture")
+package.loaded["tests.support.metrics.engine.aggregate_walker_fixture"] = nil
+local Fixture = require("tests.support.metrics.engine.aggregate_walker_fixture")
 
 local file = assert(io.open(assert(require("core.fs.engine.paths").shared(
 	"tests/corpus/keystats/correction_erased_vectors.json")), "rb"))

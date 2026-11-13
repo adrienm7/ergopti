@@ -15,7 +15,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local ProfileSelector = require("ai.engine.settings.profile_selector")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 
 --- The built-in profiles, by id, from the shared catalogue.
 local function builtin(id)

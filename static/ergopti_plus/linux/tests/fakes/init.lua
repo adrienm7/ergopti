@@ -953,7 +953,7 @@ function M.sqlite_writer(opts)
 		return fake.meta["open_walk:" .. device_id], true
 	end
 
-	require("tests.support.sqlite_flush_fake").attach(fake)
+	require("tests.support.core.sqlite_flush_fake").attach(fake)
 	return fake
 end
 

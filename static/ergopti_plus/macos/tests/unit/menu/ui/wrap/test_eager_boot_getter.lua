@@ -3,7 +3,7 @@
 --- Physical reload feeds the actual menu boot controller before the first menu.
 local helpers = require("tests.helpers")
 local roundtrip = require("tests.support.preferences_roundtrip_fixture")
-local boot = require("tests.support.menu_boot_fixture")
+local boot = require("tests.support.menu.boot_fixture")
 local OWNED = {
 	"ui.menu.init", "menu.ui.builder.state", "settings.ui.menu.preferences_transaction", "menu.ui.transactions.session_demotions",
 	"menu.ui.keyboard.keymap_lifecycle", "menu.ui.transactions.global_actions_transaction", "menu.ui.transactions.recoverable_file_moves",

@@ -138,7 +138,7 @@ local function with_capture_refresh(body)
 	assert(Capture.load("us", "C"))
 	local chars = {}
 	local ok, err = pcall(function()
-		require("tests.support.input_owner_fixture").with_session({ capture = Capture, position_bits = true,
+		require("tests.support.core.input_owner_fixture").with_session({ capture = Capture, position_bits = true,
 			on_char = function(char) chars[#chars + 1] = char end,
 			on_capture_reacquired = function() return true end }, function(s)
 			s.chars = chars

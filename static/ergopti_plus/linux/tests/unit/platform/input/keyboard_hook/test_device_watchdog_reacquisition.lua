@@ -29,8 +29,8 @@ local prior_writer, prior_broker = package.loaded["platform.input.uinput_writer"
 local restore_loaded = require("tests.helpers").keep_loaded({
 	"hotstrings.engine.device_finder", "platform.input.uinput_writer", "platform.input.modifier_broker",
 })
-package.loaded["tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture"] = nil
-local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture")
+package.loaded["tests.support.platform.input.keyboard_hook.device_watchdog_fixture"] = nil
+local Fixture = require("tests.support.platform.input.keyboard_hook.device_watchdog_fixture")
 local helpers, load_hook, fake_node, stub_device_finder, recorder, multi_recorder, tick_until_check =
 	Fixture.helpers, Fixture.load_hook, Fixture.fake_node, Fixture.stub_device_finder, Fixture.recorder, Fixture.multi_recorder, Fixture.tick_until_check
 

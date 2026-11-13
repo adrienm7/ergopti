@@ -26,7 +26,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.menu_config_watcher_fixture")
+local Fixture = require("tests.support.menu.config_watcher_fixture")
 
 
 local BASE_DIR  = "/fake/ergopti"

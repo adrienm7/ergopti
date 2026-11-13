@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.owned_window_close_fixture")
+local Fixture = require("tests.support.core.ui.owned_window_close_fixture")
 local SUBJECTS = { "updater.ui.download_window", "updater.ui.download_window.javascript", "updater.ui.download_window.pending_queue" }
 local FAILURE = { code = 5, domain = "WKErrorDomain" }
 

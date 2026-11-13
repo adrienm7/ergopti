@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture")
+local Fixture = require("tests.support.platform.input.keyboard_hook.device_watchdog_fixture")
 
 --- Runs an isolated controlled input transport; no native authority is issued.
 --- @param mask string Printed kernel EV capability word.
@@ -417,7 +417,7 @@ helpers.describe("keyboard_hook: original fd cleanup authority", function()
 	}) do
 		helpers.it("retires the exact original open after " .. row[1] .. " refuses admission", function()
 			local options = {}
-			require("tests.support.input_owner_fixture").with_session(options, function(s)
+			require("tests.support.core.input_owner_fixture").with_session(options, function(s)
 				assert(s.hook.stop() ~= false)
 				local closes = s.source_closes
 				for key, value in pairs(row[2]) do options[key] = value end
@@ -441,7 +441,7 @@ end)
 helpers.describe("keyboard_hook: fatal native source retirement", function()
 	helpers.it("does not keep capture running after a source close is unacknowledged", function()
 		local options = {}
-		require("tests.support.input_owner_fixture").with_session(options, function(s)
+		require("tests.support.core.input_owner_fixture").with_session(options, function(s)
 			local failed_fd = assert(s.descriptor("b"))
 			options.eof_path = s.paths.b
 			options.fail_reader_close = function(fd) return fd == failed_fd end

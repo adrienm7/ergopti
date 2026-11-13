@@ -145,7 +145,7 @@ local function with_scope(body, source, chord_j_identity)
 				execute_action = function() error("no output during edit admission") end,
 				action_names = gestures.get_executable_action_names,
 				on_text_injected = function() error("no text during edit admission") end,
-				defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
+				defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.keyboard.tap_hold_fixture").config_path(tap_path) }))
 			local Pair = require("shortcuts.engine.key_combinations")
 			local pair_owner = tap_manager.configuration_snapshot().combinations
 			assert(Pair.set_instance(pair_owner))
@@ -186,7 +186,7 @@ local function with_scope(body, source, chord_j_identity)
 	end)
 	if magic_owner then magic_owner._reset_for_test() end
 	if tap_manager then tap_manager._reset_for_test() end
-	if tap_path then os.remove(tap_path); os.remove(require("tests.support.tap_hold_fixture").config_path(tap_path)) end
+	if tap_path then os.remove(tap_path); os.remove(require("tests.support.keyboard.tap_hold_fixture").config_path(tap_path)) end
 	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(loaded) do package.loaded[name] = value end
 	if not ok then error(err, 0) end

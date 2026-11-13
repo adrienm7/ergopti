@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixtures = require("tests.support.keystats_provenance_fixture")
+local Fixtures = require("tests.support.metrics.provenance_fixture")
 local PreferenceManifest = helpers.load_with_stubs("menu.engine.manifest_reader")
 
 --- Starts the real engine with observable persistence and native callback boundaries.

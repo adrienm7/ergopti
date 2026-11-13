@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.synthetic_action_fixture")
+local Fixture = require("tests.support.core.synthetic_action_fixture")
 
 local fixture = Fixture.load("gestures.engine.actions")
 local Actions = fixture.subject

@@ -5,7 +5,7 @@
 --- an old tagged echo can never make a later, identical untagged key synthetic.
 
 local helpers = require("tests.helpers")
-local fixture_module = require("tests.support.keystats_provenance_fixture")
+local fixture_module = require("tests.support.metrics.provenance_fixture")
 
 helpers.describe("keystats: disabled synthetic telemetry and exact ownership", function()
 	helpers.it("records no logical text, WPM sample, source, or flush while disabled", function()

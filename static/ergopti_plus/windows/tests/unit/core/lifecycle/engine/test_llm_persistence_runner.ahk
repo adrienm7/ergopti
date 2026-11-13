@@ -3,7 +3,7 @@
 ; The main registry can resolve dependencies accidentally omitted by the smaller
 ; entry. Execute that entry in a separate native process, with its whole registry
 ; and a private UTF-8 TAP receipt, so parse aborts cannot masquerade as coverage.
-#Include ../../../../support/llm_persistence_runner_contract.ahk
+#Include ../../../../support/ai/persistence_runner_contract.ahk
 
 _LPR_RunCanonicalEntry() {
 	global TEST_REGISTRY, LLM_PERSISTENCE_RUNNER_TIMEOUT_MS

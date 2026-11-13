@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ProfilesFixture = require("tests.support.llm_profiles_fixture")
+local ProfilesFixture = require("tests.support.ai.profiles_fixture")
 local Fakes = helpers.load_module("tests.fakes")
 
 local held = {}

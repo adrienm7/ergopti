@@ -8,7 +8,7 @@
 --- belongs to the separate GTK proof; these cases claim no kernel input coverage.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
+local ClipboardTargets = require("tests.support.platform.input.synthetic_input.clipboard_targets")
 
 --- Runs a complete offer/accept workflow and restores every imported module.
 --- @param action string Transition to deliver, or stable.
@@ -34,7 +34,7 @@ local function scenario(action, phase, body)
 		local policy = require("metrics.engine.keystats")
 		local configuration = assert(policy.configuration_snapshot()); configuration.private_filter_enabled = false
 		assert(policy.apply_configuration(configuration))
-		package.loaded["ai.engine.preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = {
+		package.loaded["ai.engine.preferences"] = require("tests.support.ai.preferences_fixture").new({ initial = {
 			["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
 			["llm.trigger.secure_filter_enabled"] = true,
 		} })

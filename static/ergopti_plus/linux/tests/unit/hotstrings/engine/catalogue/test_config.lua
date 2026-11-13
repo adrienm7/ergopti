@@ -145,7 +145,7 @@ helpers.describe("hotstrings_config", function()
       local previous_config = package.loaded["hotstrings.engine.catalogue.config"]
       local ok, err = pcall(function()
         local cfg = helpers.load_module("hotstrings.engine.catalogue.config")
-        require("tests.support.hotstring_choices").with_file(cfg, nil, function()
+        require("tests.support.hotstrings.choices").with_file(cfg, nil, function()
           local engine = make_engine()
           cfg.init(engine, os.tmpname() .. "_absent_hotstring_directory")
           cfg.load_all()
@@ -194,7 +194,7 @@ helpers.describe("hotstrings_config", function()
   -- ==========================================================================
 
   helpers.describe("group management", function()
-    local Choices = require("tests.support.hotstring_choices")
+    local Choices = require("tests.support.hotstrings.choices")
     local Codec = require("core.text.engine.toml_codec")
 
     --- A config manager over one real catalogue group and a private config.toml.

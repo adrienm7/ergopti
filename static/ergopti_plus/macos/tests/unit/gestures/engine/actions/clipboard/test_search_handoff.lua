@@ -1,7 +1,7 @@
 --- tests/unit/gestures/engine/actions/clipboard/test_search_handoff.lua
 --- Search capture joins the actual queued native copy and preserves result ownership.
 local helpers = require("tests.helpers")
-local World = require("tests.support.modules.gestures.search_fifo_fixture")
+local World = require("tests.support.gestures.search_fifo_fixture")
 helpers.describe("Search copy native FIFO handoff", function()
 	helpers.it("keeps an empty FIFO search healthy", function()
 		World.with_world({}, function(w)

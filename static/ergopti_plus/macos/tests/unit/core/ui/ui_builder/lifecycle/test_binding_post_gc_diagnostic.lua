@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.webview_binding_diagnostic_fixture")
+local Fixture = require("tests.support.core.ui.webview_binding_diagnostic_fixture")
 
 --- Reaches the fresh post boundary without accepting earlier observations.
 --- @param h table Execution fixture.

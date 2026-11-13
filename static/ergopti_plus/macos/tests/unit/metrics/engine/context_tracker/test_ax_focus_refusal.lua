@@ -1,7 +1,7 @@
 --- tests/unit/metrics/engine/context_tracker/test_ax_focus_refusal.lua
 --- Native AX refusal at the real public pause/resume boundary.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keystats.context_tracker.ax_focus_refusal_fixture")
+local Fixture = require("tests.support.metrics.engine.context_tracker.ax_focus_refusal_fixture")
 local function sink(runtime, expected)
  local accepted, snapshots = runtime.sink()
  helpers.assert_eq(runtime.engine.may_persist(), expected, "Confirmed AX focus refusal must close the public persistence gate")

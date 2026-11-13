@@ -25,7 +25,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local it = require("tests.support.metrics_preferences_fixture").it
+local it = require("tests.support.metrics.preferences_fixture").it
 
 local Fakes = helpers.load_module("tests.fakes")
 
@@ -45,7 +45,7 @@ local function with_writer(body)
 	local ok, err = pcall(function()
 		local keystats = require(logger_name)
 		keystats.init({ sqlite_path = "/tmp/ergopti_switch_probe.sqlite" })
-		require("tests.support.metrics_consent_fixture").enable(keystats)
+		require("tests.support.metrics.consent_fixture").enable(keystats)
 		keystats.reset_session()
 		body(keystats)
 	end)

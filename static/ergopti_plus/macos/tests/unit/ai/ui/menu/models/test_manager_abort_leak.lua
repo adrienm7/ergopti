@@ -66,7 +66,7 @@ helpers.describe("models manager: aborted downloads are reset before retry", fun
 			helpers.with_fresh_modules(modules, function()
 				_G.hs = hs_fixture
 				package.loaded["hs"] = hs_fixture
-				require("tests.support.ui.menu.menu_llm.system_probe_stub").install(16, 100)
+				require("tests.support.ai.ui.system_probe_stub").install(16, 100)
 				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 				package.loaded["core.ui.engine.dialog_util"] = {

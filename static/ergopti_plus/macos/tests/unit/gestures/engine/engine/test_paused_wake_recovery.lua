@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_fixture = require("tests.support.gesture_runtime_fixture").with_fixture
+local with_fixture = require("tests.support.gestures.runtime_fixture").with_fixture
 
 
 

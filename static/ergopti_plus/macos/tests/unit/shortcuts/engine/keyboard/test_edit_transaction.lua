@@ -108,7 +108,7 @@ local function with_subject(initial_action, scenario)
 	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["shortcuts.engine.keyboard_shortcuts"] = nil
 
-	require("tests.support.keyboard_config_fixture").install(store, function()
+	require("tests.support.layouts.keyboard_config_fixture").install(store, function()
 		counters.file_writes = counters.file_writes + 1
 		if controls.publication_throws_once then
 			controls.publication_throws_once = false

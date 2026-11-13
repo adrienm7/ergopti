@@ -7,8 +7,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Restore = require("tests.support.ui_restore_fixture")
-local load_dashboard = require("tests.support.metrics_typing_fixture")
+local Restore = require("tests.support.core.ui_restore_fixture")
+local load_dashboard = require("tests.support.metrics.typing_fixture")
 
 helpers.describe("typing dashboard identity (typing-dashboard-single-owner)", function()
 	for _, opened_first in ipairs({ false, true }) do

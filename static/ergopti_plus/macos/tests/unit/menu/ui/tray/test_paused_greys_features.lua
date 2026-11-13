@@ -12,8 +12,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
-local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
+local CaptionFixture = require("tests.support.hotstrings.parent_caption_fixture")
+local LayoutFixture = require("tests.support.layouts.legacy_caption_fixture")
 
 local MENU_MODULES = {
 	keyboard_layout = "layouts.ui.menu.keyboard_layout",
@@ -81,7 +81,7 @@ end
 --- @return string|nil build_error
 local function build_tray(paused)
 	local llm_item = nil
-	require("tests.support.llm_count_menu_fixture")(function(llm_menu)
+	require("tests.support.ai.count_menu_fixture")(function(llm_menu)
 		llm_item = llm_menu.build_item()
 	end)
 	helpers.load_with_stubs("menu.ui.builder.builder")

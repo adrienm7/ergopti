@@ -32,7 +32,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
+local LayoutFixture = require("tests.support.layouts.legacy_caption_fixture")
 
 local DRIVER_ROOT = helpers.driver_root()  -- trailing slash
 

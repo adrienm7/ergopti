@@ -5,7 +5,7 @@
 local helpers = require("tests.helpers")
 local History = require("metrics.engine.capture.physical_permission_history")
 local Accepted = require("metrics.engine.capture.physical_accepted_context")
-local Fixture = require("tests.support.physical_capture_fixture")
+local Fixture = require("tests.support.layouts.physical_capture_fixture")
 
 local function policy(capture_token, clock_token, current)
 	local f = { revisions = {}, observers = {}, retirement = {}, refusals = {} }
@@ -229,7 +229,7 @@ helpers.describe("accepted physical History context", function()
 	end)
 	helpers.it("retains the accepted initial calendar across later calendar changes", function()
 		with_projection(function(f)
-			local Frames = require("tests.support.physical_stream_frames")
+			local Frames = require("tests.support.layouts.physical_stream_frames")
 			local Delivery = require("metrics.engine.capture.physical_delivery")
 			local presses, releases = {}, {}
 			local frames = Frames.new("accepted-calendar", "8", { "41" })

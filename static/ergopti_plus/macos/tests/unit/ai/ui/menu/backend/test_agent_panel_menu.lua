@@ -22,8 +22,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.menu_llm.backend.agent_panel_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.menu_llm.backend.agent_panel_fixture")
+package.loaded["tests.support.ai.ui.agent_panel_fixture"] = nil
+local Fixture = require("tests.support.ai.ui.agent_panel_fixture")
 local base_state = Fixture.base_state
 local mode_corpus = Fixture.mode_corpus
 local row_starting = Fixture.row_starting

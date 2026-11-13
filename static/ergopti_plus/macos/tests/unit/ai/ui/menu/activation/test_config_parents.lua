@@ -14,7 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_activation = require("tests.support.llm_activation_fixture")
+local with_activation = require("tests.support.ai.activation_fixture")
 local ConfigGuard = require("ai.ui.menu.config_guard")
 
 --- Finds the first row whose title starts with a caption.

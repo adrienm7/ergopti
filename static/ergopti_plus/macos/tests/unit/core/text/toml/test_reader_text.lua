@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_virtual_file = require("tests.support.virtual_toml_file_fixture")
+local with_virtual_file = require("tests.support.core.virtual_toml_file_fixture")
 
 helpers.describe("TOML reader text snapshots", function()
 	for _, newline in ipairs({ "\n", "\r\n" }) do

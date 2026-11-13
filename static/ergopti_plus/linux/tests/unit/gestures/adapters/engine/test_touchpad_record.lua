@@ -18,7 +18,7 @@
 local helpers = require("tests.helpers")
 
 local Decoder = helpers.load_module("gestures.engine.mt_decoder")
-local Record = helpers.load_module("tests.support.touchpad_record")
+local Record = helpers.load_module("tests.support.gestures.touchpad_record")
 
 local EV_SYN, EV_KEY, EV_ABS = Decoder.EV_SYN, Decoder.EV_KEY, Decoder.EV_ABS
 local TOOL = { [1] = 0x145, [2] = 0x14d, [3] = 0x14e, [4] = 0x14f, [5] = 0x148 }

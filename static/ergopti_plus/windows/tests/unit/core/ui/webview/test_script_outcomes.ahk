@@ -9,7 +9,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../../../../support/webview_script_fixture.ahk
+#Include ../../../../support/core/webview_script_fixture.ahk
 _WVSO_LocaleOutcome(Reject, View, Lines, Unhandled, Failure) {
 	KLWV.windows := Map("apps", Map("epoch", 51, "webview", View))
 	KLWV_RunScript("apps", "PRIVATE-SCRIPT-CANARY", Reject ? "en" : "fr", 51)

@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local boot = require("tests.support.menu_boot_fixture").boot
+local boot = require("tests.support.menu.boot_fixture").boot
 
 local REPLAY_KEY = "menu_reload_replay"
 

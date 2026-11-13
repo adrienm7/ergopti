@@ -9,8 +9,8 @@
 --- the page's own transactions (ai/ui/menu/backend_rows.lua api_page).
 --- ==============================================================================
 
-package.loaded["tests.support.ui.menu.llm.llm_backend_rows_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.llm.llm_backend_rows_fixture")
+package.loaded["tests.support.menu.ui.llm.backend_rows_fixture"] = nil
+local Fixture = require("tests.support.menu.ui.llm.backend_rows_fixture")
 local helpers, setup, find, exact = Fixture.helpers, Fixture.setup, Fixture.find, Fixture.exact
 
 
@@ -531,7 +531,7 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 					end
 					return rename(from, to)
 				end
-				local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(helpers.load_module("ai.ui.menu.backend_rows"),
+				local rows = require("tests.support.menu.ui.llm.api_page_rows").rows(helpers.load_module("ai.ui.menu.backend_rows"),
 					{ get_backend = function() return "api" end, set_backend = function(kind)
 						backend_calls = backend_calls + 1
 						return kind == "api"
@@ -593,7 +593,7 @@ helpers.describe("AI menu selection through the private writer (ai-menu-selectio
 					end
 					return rename(from, to)
 				end
-				local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(helpers.load_module("ai.ui.menu.backend_rows"),
+				local rows = require("tests.support.menu.ui.llm.api_page_rows").rows(helpers.load_module("ai.ui.menu.backend_rows"),
 					{ get_backend = function() return "api" end,
 						set_backend = function(kind) backend_calls = backend_calls + 1; return kind == "api" end },
 					{ error = function() errors = errors + 1 end },

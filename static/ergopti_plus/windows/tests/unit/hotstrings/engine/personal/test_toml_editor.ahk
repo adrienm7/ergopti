@@ -725,7 +725,7 @@ TestPE_WebViewCarriesStrictCase() {
 Test("Personal editor WebView: strict-case state reaches initData",
 	TestPE_WebViewCarriesStrictCase)
 
-#Include ../../../../support/webview_script_fixture.ahk
+#Include ../../../../support/core/webview_script_fixture.ahk
 _PT102_BOMAndEmpty(Context) {
 	Raw := Chr(0xFEFF) . FSReadUtf8Exact(Context.path)
 	AssertTrue(FSWriteDurable(Context.path, Raw))

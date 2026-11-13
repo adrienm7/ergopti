@@ -13,7 +13,7 @@
 --- the declared pointer kinds), the evdev code -> kind map, the manager's
 --- session (delimiter, unchecked delimiter, no-break space, delay, pointer
 --- kinds), the CapsLock every session locks and every ending unlocks (through
---- a fake hook: tests/support/caps_word_lock_hook_fake.lua) and the daemon and
+--- a fake hook: tests/support/keyboard/caps_word_lock_hook_fake.lua) and the daemon and
 --- hook wiring.
 --- ==============================================================================
 
@@ -60,7 +60,7 @@ local function with_caps_word(source, body)
 				end
 			end
 			-- No keyboard is captured here: the session's CapsLock goes to a fake hook.
-			context.hook = require("tests.support.caps_word_lock_hook_fake").new()
+			context.hook = require("tests.support.keyboard.caps_word_lock_hook_fake").new()
 			package.loaded["platform.input.keyboard_hook"] = context.hook
 			package.loaded["shortcuts.engine.caps_word_auto_off"] = nil
 			package.loaded["shortcuts.engine.manager"] = nil

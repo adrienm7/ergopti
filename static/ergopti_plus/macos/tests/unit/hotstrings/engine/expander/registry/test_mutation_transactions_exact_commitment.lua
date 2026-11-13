@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.keymap.registry.registry_mutation_transactions_fixture"] = nil
-local Fixture = require("tests.support.modules.keymap.registry.registry_mutation_transactions_fixture")
+package.loaded["tests.support.hotstrings.registry_mutation_transactions_fixture"] = nil
+local Fixture = require("tests.support.hotstrings.registry_mutation_transactions_fixture")
 local CaptionFixture = Fixture.CaptionFixture
 local add_group_mapping = Fixture.add_group_mapping
 local fresh_registry = Fixture.fresh_registry

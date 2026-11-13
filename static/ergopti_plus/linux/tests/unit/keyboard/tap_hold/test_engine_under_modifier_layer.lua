@@ -9,8 +9,8 @@
 --- tests pin them event by event.
 --- ==============================================================================
 
-package.loaded["tests.support.platform.remap.tap_hold.tap_hold_engine_fixture"] = nil
-local Fixture = require("tests.support.platform.remap.tap_hold.tap_hold_engine_fixture")
+package.loaded["tests.support.keyboard.engine.tap_hold_engine_fixture"] = nil
+local Fixture = require("tests.support.keyboard.engine.tap_hold_engine_fixture")
 local helpers, Engine, DOWN, UP, REPEAT, SHIFT, CTRL, ALT, CAPS, ENTER, BACKSPACE, KEY_A, KEY_J, RCTRL, DEFAULTS, US_TEXT, one_shot_result, engine, trail =
 	Fixture.helpers, Fixture.Engine, Fixture.DOWN, Fixture.UP, Fixture.REPEAT, Fixture.SHIFT, Fixture.CTRL, Fixture.ALT, Fixture.CAPS, Fixture.ENTER, Fixture.BACKSPACE, Fixture.KEY_A, Fixture.KEY_J, Fixture.RCTRL, Fixture.DEFAULTS, Fixture.US_TEXT, Fixture.one_shot_result, Fixture.engine, Fixture.trail
 

@@ -14,8 +14,8 @@
 --- events that happened to produce text.
 --- ==============================================================================
 
-package.loaded["tests.support.adapters.keyboard_hook.keyboard_hook_xkb_capture_fixture"] = nil
-local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_xkb_capture_fixture")
+package.loaded["tests.support.platform.input.keyboard_hook.xkb_capture_fixture"] = nil
+local Fixture = require("tests.support.platform.input.keyboard_hook.xkb_capture_fixture")
 local helpers, key, with_position_capture =
 	Fixture.helpers, Fixture.key, Fixture.with_position_capture
 

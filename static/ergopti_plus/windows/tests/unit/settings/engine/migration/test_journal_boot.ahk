@@ -388,7 +388,7 @@ _CMJ_GenuinePublishedGenerationSurvivesMutationAndRetirement() {
 Test("config source journal: native published source survives mutation/deletion until genuine cache retirement", _CMJ_GenuinePublishedGenerationSurvivesMutationAndRetirement)
 
 
-#Include ../../../../support/config_journal_fixtures.ahk
+#Include ../../../../support/settings/journal_fixtures.ahk
 
 _CMJFixtureCurrentSource(Source) {
 	HadBom := SubStr(Source, 1, 1) == Chr(0xFEFF)

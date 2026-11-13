@@ -93,7 +93,7 @@ helpers.describe("changelog: only the newest channel request may publish", funct
 		helpers.it("(webview-focus-owner) changelog retirement revokes focus, delete refused=" .. tostring(refused), function()
 			with_changelog(function(changelog, state)
 				helpers.assert_true(changelog.open({ channel = "dev" }))
-				require("tests.support.webview_focus_fixture").check(state.view,
+				require("tests.support.core.webview_focus_fixture").check(state.view,
 					function() return changelog.open({ channel = "dev" }) end,
 					function() state.delete_throws = refused; helpers.assert_eq(changelog.close(), not refused) end,
 					state.view.options)

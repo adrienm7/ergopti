@@ -81,15 +81,15 @@ local function near(observed, expected)
 	return true
 end
 
-local Preferences = require("tests.support.metrics_preferences_fixture")
-local Fixture = require("tests.support.keystats_native_fixture")
+local Preferences = require("tests.support.metrics.preferences_fixture")
+local Fixture = require("tests.support.metrics.native_fixture")
 local APP = "proof-editor"
 
 print("=== the WPM widget's ordering, visibility and colours (display " .. os.getenv("DISPLAY") .. ") ===")
 Preferences.with(function()
 	Fixture.with(function(k)
 		k.init({ sqlite_path = os.tmpname() })
-		require("tests.support.metrics_consent_fixture").enable(k)
+		require("tests.support.metrics.consent_fixture").enable(k)
 		require("tests.support.live_preferences").ensure_directory()
 		Widget.restore()
 		assert(Widget.set_use_source_colors(true) and Widget.set_graph(false) and Widget.reset_position())

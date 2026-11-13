@@ -1,7 +1,7 @@
 --- tests/unit/updater/engine/check/test_manager_etag_failed_second.lua
 
-package.loaded["tests.support.modules.updater.check.updater_manager_fixture"] = nil
-local Fixture = require("tests.support.modules.updater.check.updater_manager_fixture")
+package.loaded["tests.support.updater.engine.manager_fixture"] = nil
+local Fixture = require("tests.support.updater.engine.manager_fixture")
 local helpers, Installer, Fs, etag_response, shell_quote, command_ok, write_file, read_file =
 	Fixture.helpers, Fixture.Installer, Fixture.Fs, Fixture.etag_response, Fixture.shell_quote, Fixture.command_ok, Fixture.write_file, Fixture.read_file
 
@@ -16,7 +16,7 @@ helpers.describe("updater.engine.manager", function()
 	local function with_native_download_model(body)
 		local previous = M
 		local ok, failure = xpcall(function()
-			require("tests.support.updater_native_model").with_fixture(function(fresh, prepare)
+			require("tests.support.updater.native_model").with_fixture(function(fresh, prepare)
 				M = fresh
 				body(prepare)
 			end)
@@ -59,7 +59,7 @@ helpers.describe("updater.engine.manager", function()
 		fresh._http_client = { get = function(_, _, options, callback)
 			requests[#requests + 1] = options; callback(assert(table.remove(responses, 1))); return true
 		end }
-		fresh._http_client = require("tests.support.release_http_fixture").attach(fresh._http_client)
+		fresh._http_client = require("tests.support.updater.release_http_fixture").attach(fresh._http_client)
 		for index = 1, 3 do
 			local callbacks = 0
 			helpers.assert_true(fresh._fetch_releases("main", function(body, status, err)
@@ -110,7 +110,7 @@ helpers.describe("updater.engine.manager", function()
 			end,
 			cancel = function() return true end,
 		}
-		fresh._http_client = require("tests.support.release_http_fixture").attach(fresh._http_client)
+		fresh._http_client = require("tests.support.updater.release_http_fixture").attach(fresh._http_client)
 		fresh.current_version = function() return "local" end
 
 		local results = {}

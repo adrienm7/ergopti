@@ -7,7 +7,7 @@
 --- Each module captures its dependencies when it loads; a module left cached
 --- from an earlier load rendered the Quit row through a renderer double another
 --- test module had installed, and four lifecycle tests failed only in a full run.
---- The test process reloads them (tests/support/menu_part_reload.lua); the root
+--- The test process reloads them (tests/support/menu/part_reload.lua); the root
 --- itself never writes package.loaded.
 --- ==============================================================================
 
@@ -54,7 +54,7 @@ helpers.describe("tray section modules reload with the tray root", function()
 	end)
 
 	helpers.it("refuses a second installation", function()
-		local ok, err = pcall(require("tests.support.menu_part_reload").install)
+		local ok, err = pcall(require("tests.support.menu.part_reload").install)
 		helpers.assert_eq(ok, false, "the searcher is installed once")
 		helpers.assert_true(tostring(err):find("already installed", 1, true) ~= nil, tostring(err))
 	end)

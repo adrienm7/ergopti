@@ -730,7 +730,7 @@ helpers.describe("fixed feature parents: actual Mac component owners (fixed-feat
 			end)
 		end)
 		helpers.it("retains actual Gestures child order, callbacks, check " .. tostring(preference) .. " and pause " .. tostring(posture) .. " (fixed-feature-parent-native)", function()
-			require("tests.support.gesture_runtime_fixture").with_fixture({}, function(gestures)
+			require("tests.support.gestures.runtime_fixture").with_fixture({}, function(gestures)
 				fixed_parent_native_cohort(function(renderer, translator)
 					local module = require("gestures.ui.menu.gestures")
 					local context = {gestures = gestures, state = {gestures = preference}, paused = posture,

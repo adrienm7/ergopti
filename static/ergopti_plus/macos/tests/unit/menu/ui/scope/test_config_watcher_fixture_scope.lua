@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.menu_config_watcher_fixture")
+local Fixture = require("tests.support.menu.config_watcher_fixture")
 local OWNERS = {
 	"menu.ui.builder.watchers", "core.logger.engine.logger", "diagnostics.engine.reports.git_status", "core.lifecycle.engine.reload.gate",
 	"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",

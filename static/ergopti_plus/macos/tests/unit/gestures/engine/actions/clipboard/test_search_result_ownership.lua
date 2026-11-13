@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.gesture_actions_fixture")
+local Fixture = require("tests.support.gestures.actions_fixture")
 require("core.logger.engine")
 
 local function it(name, scenario)

@@ -546,7 +546,7 @@ end)
 
 helpers.describe("physical history consumption by the actual capture owner", function()
 	helpers.it("retains actual scope in clock-ready before ACK and releases only after actual task settlement", function()
-		local Fixture = require("tests.support.physical_capture_fixture")
+		local Fixture = require("tests.support.layouts.physical_capture_fixture")
 		Fixture.run(function(capture, observed, controls)
 			local names = { "metrics.engine.capture.physical_history_session", "shortcuts.adapters.physical_history_context",
 				"shortcuts.adapters.physical_observation_clock", "metrics.engine", "metrics.engine.context_tracker",
@@ -1466,7 +1466,7 @@ local function with_managed_session(options, callback)
 		"metrics.engine.journal.log_manager", "metrics.engine.capture.physical_protocol", "metrics.engine.capture.physical_transport",
 		"metrics.engine.capture.physical_delivery" }
 	helpers.with_fresh_modules(names, function()
-		require("tests.support.physical_capture_fixture").run(function(capture, observed, native)
+		require("tests.support.layouts.physical_capture_fixture").run(function(capture, observed, native)
 			local previous_hs, ticks = hs, 0
 			local d = { observed = observed, mode = native.mode, options = native.options, timers = {},
 				actors = {}, bindings = {}, leases = {}, refusals = {}, native = native }
@@ -2086,7 +2086,7 @@ local function with_managed_session(options, callback)
 		"metrics.engine.journal.log_manager", "metrics.engine.capture.physical_protocol", "metrics.engine.capture.physical_transport",
 		"metrics.engine.capture.physical_delivery" }
 	helpers.with_fresh_modules(names, function()
-		require("tests.support.physical_capture_fixture").run(function(capture, observed, native)
+		require("tests.support.layouts.physical_capture_fixture").run(function(capture, observed, native)
 			local previous_hs, ticks = hs, 0
 			local d = { observed = observed, mode = native.mode, options = native.options, timers = {},
 				actors = {}, bindings = {}, leases = {}, refusals = {}, native = native }

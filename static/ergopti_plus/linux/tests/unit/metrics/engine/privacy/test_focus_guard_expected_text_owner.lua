@@ -7,7 +7,7 @@
 --- A valid current field must never substitute for a different original target.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.text_owner_fixture")
+local fixture = require("tests.support.core.text_owner_fixture")
 
 helpers.describe("expected text destination admission", function()
 	helpers.it("admits the exact original expected native target", function()

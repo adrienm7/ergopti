@@ -163,7 +163,7 @@ end
 --- Opens the real picker and configuration writer over two private folders.
 --- @param body function Scenario using the retained native page and disk sources.
 local function with_configuration_picker(body)
-	require("tests.support.ui.menu.llm.numeric_configuration_fixture").with_configuration(function(f)
+	require("tests.support.menu.ui.llm.numeric_configuration_fixture").with_configuration(function(f)
 		local suffix = "[shortcuts.keyboard]\nprimary_j = \"run_program\"\n[gesture_parameters]\n"
 			.. "keyboard__primary_j__run_program = " .. Json.encode(PRIOR) .. "\n"
 		for _, id in ipairs({ "a", "b" }) do

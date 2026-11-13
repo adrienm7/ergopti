@@ -483,7 +483,7 @@ helpers.describe("SystemMouse mirror owner: positive and synchronous controls", 
 		local handle = fixture.shells[1]
 		local quote = require("core.text.engine.utils").shell_quote
 		local command = "python3 -B " .. quote(helpers.driver_root()
-			.. "tests/support/modules/shortcuts/mirror_configuration_fixture.py")
+			.. "tests/support/shortcuts/mirror_configuration_fixture.py")
 			.. " " .. quote(handle.args[2]) .. " 2>&1"
 		local process = assert(io.popen(command, "r"))
 		local output = assert(process:read("a"))

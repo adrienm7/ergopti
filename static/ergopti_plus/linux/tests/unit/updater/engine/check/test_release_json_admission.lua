@@ -61,7 +61,7 @@ helpers.describe("public updater release JSON admission", function()
 					callback({ ok = true, status = 200, body = vector.body, error_body = "", headers = {} })
 					return true
 				end }
-				M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
+				M._http_client = require("tests.support.updater.release_http_fixture").attach(M._http_client)
 				helpers.assert_true(M.check_for_updates("main", function(available, release, err, result)
 					calls = calls + 1
 					answer = { available = available, release = release, error = err, result = result }
@@ -107,7 +107,7 @@ helpers.describe("updater: an answer that is not the release list (upd1-captive-
 			M.current_version = function() return "1.0.0" end
 			M.release_api_url = function() return "https://example.invalid/releases?per_page=100" end
 			M._fetch_feed = function(callback) feeds = feeds + 1; callback(nil, "feed unavailable in this fixture"); return true end
-			M._http_client = require("tests.support.release_http_fixture").attach({ get = function(_, _, _, callback)
+			M._http_client = require("tests.support.updater.release_http_fixture").attach({ get = function(_, _, _, callback)
 				callback(answer)
 				return true
 			end })

@@ -19,7 +19,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 
 local KEYS = { "ai.engine.preferences", "ai.engine.settings.settings", "ai.engine.api.context" }
 

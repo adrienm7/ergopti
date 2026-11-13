@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.llm.selection_translation_fixture")
+local Fixture = require("tests.support.ai.engine.prediction.selection_translation_fixture")
 local SOURCE, RESULT = "Synthetic selection", "Synthetic translation"
 
 --- Starts a copy without delivering its native timer.

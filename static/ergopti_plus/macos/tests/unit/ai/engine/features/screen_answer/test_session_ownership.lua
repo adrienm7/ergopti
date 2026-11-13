@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Fixture = require("tests.support.modules.llm.screen_answer_fixture")
-local Scope = require("tests.support.modules.llm.selection_translation_scope")
+local Fixture = require("tests.support.ai.engine.prediction.screen_answer_fixture")
+local Scope = require("tests.support.ai.engine.prediction.selection_translation_scope")
 
 local function upvalue(fn, target)
 	for index = 1, 256 do

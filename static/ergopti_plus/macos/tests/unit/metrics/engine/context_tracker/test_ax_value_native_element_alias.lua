@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Native = require("tests.support.modules.keystats.context_tracker.ax_native_callback_fixture")
+local Native = require("tests.support.metrics.engine.context_tracker.ax_native_callback_fixture")
 
 local WINDOW_MS = 100
 

@@ -25,8 +25,8 @@
 --- injector so the recorder cannot drift away from what is actually written.
 --- ==============================================================================
 
-package.loaded["tests.support.adapters.keyboard_hook.keyboard_hook_intercept_passthrough_fixture"] = nil
-local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_intercept_passthrough_fixture")
+package.loaded["tests.support.platform.input.keyboard_hook.intercept_passthrough_fixture"] = nil
+local Fixture = require("tests.support.platform.input.keyboard_hook.intercept_passthrough_fixture")
 local helpers, EV_KEY, ev =
 	Fixture.helpers, Fixture.EV_KEY, Fixture.ev
 

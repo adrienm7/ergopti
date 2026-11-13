@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.keyboard_layout.menu_keyboard_layout_reaches_tray_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.keyboard_layout.menu_keyboard_layout_reaches_tray_fixture")
+package.loaded["tests.support.menu.ui.keyboard_layout.reaches_tray_fixture"] = nil
+local Fixture = require("tests.support.menu.ui.keyboard_layout.reaches_tray_fixture")
 
 helpers.describe("Keyboard layout row build stages", function()
 	helpers.it("records each stage as a phase, in build order", function()

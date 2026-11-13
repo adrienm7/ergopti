@@ -98,7 +98,7 @@ helpers.describe("layout_install: transactional replacement", function()
 		local root = os.tmpname(); os.remove(root)
 		local target, source, launcher = root .. "/target", root .. "/source", root .. "/launcher"
 		local old, new = "Ergopti_v1.0.0.bundle", "Ergopti_v2.0.0.bundle"
-		local fixture = helpers.driver_root() .. "/tests/support/release_rename_physical_port.py"
+		local fixture = helpers.driver_root() .. "/tests/support/updater/release_rename_physical_port.py"
 		local ok, err = xpcall(function()
 			assert(os.execute("mkdir -p " .. quote(target .. "/" .. old) .. " " .. quote(source .. "/" .. new .. "/Contents")))
 			assert(os.execute("mkdir -p " .. quote(target .. "/Ergopti_vcustom.bundle")))
@@ -232,7 +232,7 @@ helpers.describe("layout_install: transactional replacement", function()
 		os.remove(root)
 		local target, source, launcher = root .. "/target", root .. "/source", root .. "/launcher"
 		local old, new = "Ergopti_v1.0.0.bundle", "Ergopti_v2.0.0.bundle"
-		local fixture = helpers.driver_root() .. "/tests/support/release_rename_physical_port.py"
+		local fixture = helpers.driver_root() .. "/tests/support/updater/release_rename_physical_port.py"
 		local ok, err = xpcall(function()
 			assert(os.execute("mkdir -p " .. quote(target .. "/" .. old)
 				.. " " .. quote(source .. "/" .. new .. "/Contents")))

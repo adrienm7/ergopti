@@ -8,8 +8,8 @@
 --- applied live by reload(). A tap action reaches the catalogue executor.
 --- ==============================================================================
 
-package.loaded["tests.support.platform.remap.tap_hold.tap_hold_manager_fixture"] = nil
-local Fixture = require("tests.support.platform.remap.tap_hold.tap_hold_manager_fixture")
+package.loaded["tests.support.keyboard.engine.tap_hold_manager_fixture"] = nil
+local Fixture = require("tests.support.keyboard.engine.tap_hold_manager_fixture")
 local helpers, DEFAULTS, fake_hook, write, manager =
 	Fixture.helpers, Fixture.DEFAULTS, Fixture.fake_hook, Fixture.write, Fixture.manager
 
@@ -63,7 +63,7 @@ helpers.describe("loader currency after the last construction callback",function
     if change then change=false;Loader.load_document=function(...)return original(...)end end
     return original_names()
    end,defaults_path=DEFAULTS,user_path=user_path,
-   config_path=require("tests.support.tap_hold_fixture").config_path(user_path)})
+   config_path=require("tests.support.keyboard.tap_hold_fixture").config_path(user_path)})
   local running,calls=hook.engine,hook.calls
   change=true
   local ok,failure=pcall(function()
@@ -128,7 +128,7 @@ keep = true
 			user_path = os.tmpname(); owned_paths[#owned_paths + 1] = user_path
 			config_path = os.tmpname(); owned_paths[#owned_paths + 1] = config_path
 			-- The combinations' config.toml holds no [tap_holds]: the switch is off.
-			stream(user_path, "wb", require("tests.support.tap_hold_fixture").with_preset("[tap_hold]\nenabled = false\n"))
+			stream(user_path, "wb", require("tests.support.keyboard.tap_hold_fixture").with_preset("[tap_hold]\nenabled = false\n"))
 			stream(config_path, "wb", source)
 			paths.config = function() return config_path end
 			package.loaded[combination_name], package.loaded[owner_name] = nil, nil

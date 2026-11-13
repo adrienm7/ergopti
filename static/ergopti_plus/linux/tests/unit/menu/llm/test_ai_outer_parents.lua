@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Preferences = require("tests.support.llm_preferences_fixture")
+local Preferences = require("tests.support.ai.preferences_fixture")
 
 --- Isolates genuine owners with the independently published available Agent source.
 --- The public-policy cases retain the current top declaration without replacement.

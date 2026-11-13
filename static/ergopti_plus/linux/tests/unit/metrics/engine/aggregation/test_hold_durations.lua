@@ -25,7 +25,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local it = require("tests.support.metrics_preferences_fixture").it
+local it = require("tests.support.metrics.preferences_fixture").it
 
 local Fakes = helpers.load_module("tests.fakes")
 
@@ -45,7 +45,7 @@ local function with_writer(body)
 	local ok, err = pcall(function()
 		local keystats = require(logger_name)
 		keystats.init({ sqlite_path = "/tmp/ergopti_hold_probe.sqlite" })
-		require("tests.support.metrics_consent_fixture").enable(keystats)
+		require("tests.support.metrics.consent_fixture").enable(keystats)
 		keystats.reset_session()
 		body(keystats)
 	end)
@@ -247,7 +247,7 @@ end)
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Preferences = require("tests.support.metrics_preferences_fixture")
+local Preferences = require("tests.support.metrics.preferences_fixture")
 local Fakes = require("tests.fakes")
 local root = helpers.driver_root()
 local file = assert(io.open(root .. "/ergopti_hotstrings.lua", "r"))
@@ -277,7 +277,7 @@ local function run_hold(transition, expected, options)
 	local ok, err = pcall(function()
 		local logger = require(logger_name)
 		logger.init({ sqlite_path = os.tmpname() })
-		require("tests.support.metrics_consent_fixture").enable(logger)
+		require("tests.support.metrics.consent_fixture").enable(logger)
 		logger.reset_session()
 		logger.on_app_focus("code", 100)
 		clock.now_ms = function() return now end
@@ -469,7 +469,7 @@ helpers.describe("physical hold exclusion epochs", function()
 		end
 		local first, replacement = function() return {} end, function() return {} end
 		local checked = false
-		require("tests.support.input_owner_fixture").with_session({
+		require("tests.support.core.input_owner_fixture").with_session({
 			before_hook = function(session)
 				local original_start = session.hook.start
 				session.hook.start = function(options)

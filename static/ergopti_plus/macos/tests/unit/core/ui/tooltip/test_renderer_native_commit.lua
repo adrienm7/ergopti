@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.tooltip_renderer_fixture")
+local Fixture = require("tests.support.core.tooltip_renderer_fixture")
 
 
 

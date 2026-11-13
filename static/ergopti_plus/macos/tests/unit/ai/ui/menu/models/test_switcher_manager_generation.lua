@@ -82,7 +82,7 @@ local function build_mlx_requirements_manager(task_records, start_records)
 	install_common_stubs()
 	package.loaded["core.fs.engine.dir"] = {entries = function() return {} end}
 	package.loaded["ai.engine.api.mlx"] = {get_port = function() return 8080 end}
-	package.loaded["ai.engine.local_servers.mlx_deps_checker"] = { import_probe = require("tests.support.modules.llm.mlx_import_probe").read }
+	package.loaded["ai.engine.local_servers.mlx_deps_checker"] = { import_probe = require("tests.support.ai.engine.mlx_import_probe").read }
 	package.loaded["ai.ui.menu.models.manager_mlx_hf"] = {
 		install = function(ctx)
 			ctx.obj.get_mlx_repo = function(name) return "fixture/" .. tostring(name) end
@@ -586,7 +586,7 @@ helpers.describe("model manager generation fences", function()
 		with_fixture(modules, hs_fixture, function()
 			install_common_stubs()
 			local prompts, downloads, cancellations = 0, 0, 0
-			require("tests.support.ui.menu.menu_llm.system_probe_stub").install(16, 100)
+			require("tests.support.ai.ui.system_probe_stub").install(16, 100)
 			package.loaded["core.ui.engine.dialog_util"] = {block_alert = function()
 				prompts = prompts + 1
 				return "menu.llm.btn_download"

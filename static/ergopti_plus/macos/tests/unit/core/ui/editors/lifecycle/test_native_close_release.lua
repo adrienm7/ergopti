@@ -25,7 +25,7 @@ local function with_native_editor(name, scenario)
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
 		"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
-		"tests.support.native_webview_close_fixture", "core.text.engine.utils_core", "lfs", "core.fs.engine.module_source_identity",
+		"tests.support.core.native_webview_close_fixture", "core.text.engine.utils_core", "lfs", "core.fs.engine.module_source_identity",
 		"core.text.engine.toml_codec.writer", "core.text.engine.toml_codec.bom", "core.lifecycle.engine.compat.utf8", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.record_scanner",
 		"settings.engine.migration.migrate", "core.text.engine.toml_codec.leaf_rows", "core.fs.engine.module_source_directory", "core.text.engine.toml_codec.reader",
 		"core.text.engine.toml_codec.basic_string", "diagnostics.engine.operation_reporter", "core.fs.adapters.file_system",
@@ -33,7 +33,7 @@ local function with_native_editor(name, scenario)
 		"hotstrings.engine.priority", "core.text.engine.toml.record_editor", "hotstrings.engine.extensions",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, callbacks = {} }
-		local construct = require("tests.support.native_webview_close_fixture")(h)
+		local construct = require("tests.support.core.native_webview_close_fixture")(h)
 		local function new_window()
 			local view = construct()
 			function view:evaluateJavaScript() assert(not self.disposed); return self end

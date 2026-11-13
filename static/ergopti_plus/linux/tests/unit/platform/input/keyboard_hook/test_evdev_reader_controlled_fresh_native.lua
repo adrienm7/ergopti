@@ -30,8 +30,8 @@
 
 -- The cases replace these entries; the module end puts them back.
 local restore_loaded = require("tests.helpers").keep_loaded({ "platform.input.evdev_reader" })
-package.loaded["tests.support.adapters.keyboard_hook.evdev_reader_fixture"] = nil
-local Fixture = require("tests.support.adapters.keyboard_hook.evdev_reader_fixture")
+package.loaded["tests.support.platform.input.keyboard_hook.evdev_reader_fixture"] = nil
+local Fixture = require("tests.support.platform.input.keyboard_hook.evdev_reader_fixture")
 local helpers, recorder, encoded, controlled_held_reader =
 	Fixture.helpers, Fixture.recorder, Fixture.encoded, Fixture.controlled_held_reader
 

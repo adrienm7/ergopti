@@ -28,8 +28,8 @@
 --- is why they are the cases below rather than "it produces some bigrams".
 --- ==============================================================================
 
-package.loaded["tests.support.modules.keystats.aggregation.aggregate_walker_fixture"] = nil
-local Fixture = require("tests.support.modules.keystats.aggregation.aggregate_walker_fixture")
+package.loaded["tests.support.metrics.engine.aggregate_walker_fixture"] = nil
+local Fixture = require("tests.support.metrics.engine.aggregate_walker_fixture")
 local helpers, it, Walker, key, typed, count_of =
 	Fixture.helpers, Fixture.it, Fixture.Walker, Fixture.key, Fixture.typed, Fixture.count_of
 

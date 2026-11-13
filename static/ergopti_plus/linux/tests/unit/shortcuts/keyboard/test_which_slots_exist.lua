@@ -26,8 +26,8 @@
 --- "@", and a shortcut that fired on that would be unusable.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.shortcuts.keyboard.keyboard_shortcuts_fixture"] = nil
-local Fixture = require("tests.support.modules.shortcuts.keyboard.keyboard_shortcuts_fixture")
+package.loaded["tests.support.shortcuts.keyboard_shortcuts_fixture"] = nil
+local Fixture = require("tests.support.shortcuts.keyboard_shortcuts_fixture")
 local helpers, Sandbox, Codec, load_over_config, drop_config, chord =
 	Fixture.helpers, Fixture.Sandbox, Fixture.Codec, Fixture.load_over_config, Fixture.drop_config, Fixture.chord
 

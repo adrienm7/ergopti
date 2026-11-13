@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.llm.selection_translation_fixture")
-local FIFO = require("tests.support.modules.llm.selection_translation_fifo")
+local Fixture = require("tests.support.ai.engine.prediction.selection_translation_fixture")
+local FIFO = require("tests.support.ai.engine.prediction.selection_translation_fifo")
 local function seconds(key) return require("core.timing.engine.timings").sec("debounce", key) end
 
 local function accepted(world)

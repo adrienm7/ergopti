@@ -16,7 +16,7 @@ const SWIFT = Object.freeze([
 		'ManagedCertificateAuthorities.swift',
 		'ManagedBootstrapPolicy.generated.swift'
 	].map((name) => MAC + 'launcher/Sources/ErgoptiPlus/' + name),
-	MAC + 'tests/support/native_http_fixture_main.swift'
+	MAC + 'tests/support/core/native_http_fixture_main.swift'
 ]);
 const HEADERS = Object.freeze(
 	[
@@ -39,11 +39,11 @@ const RUNTIME = Object.freeze([
 	'static/ergopti_plus/_shared/core/network/data/proxy_policy.json'
 ]);
 const OWNERS = Object.freeze([
-	MAC + 'tests/support/native_http_fixture_builder.py',
-	MAC + 'tests/support/native_http_wire_fixture.py',
+	MAC + 'tests/support/core/native_http_fixture_builder.py',
+	MAC + 'tests/support/core/native_http_wire_fixture.py',
 	'tools/diagnostics/macos_owned_process.py'
 ]);
-const RECEIVER = MAC + 'tests/support/native_http_wire_client_receiving.py';
+const RECEIVER = MAC + 'tests/support/core/native_http_wire_client_receiving.py';
 const INPUTS = Object.freeze([...SWIFT, ...HEADERS, ...RUNTIME, ...OWNERS, RECEIVER]);
 const LOADERS = Object.freeze([
 	'.github/workflows/ci.yml',

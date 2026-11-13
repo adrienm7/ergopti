@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
+local ClipboardTargets = require("tests.support.platform.input.synthetic_input.clipboard_targets")
 
 local function with_stage(body, options)
 	options = options or {}

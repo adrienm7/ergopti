@@ -129,7 +129,7 @@ end
 --- @param fn   function   Body to run inside the sandbox.
 --- @return table Capture: { path, mode, content }.
 local function with_sandbox(opts, fn)
-	return require("tests.support.modules.diagnostics.crash_admission").with_admission(function()
+	return require("tests.support.diagnostics.crash_admission").with_admission(function()
 		opts = opts or {}
 		local real_open, real_exec, real_popen = io.open, os.execute, io.popen
 		local Writer = require("core.fs.engine.regular_file_writer")

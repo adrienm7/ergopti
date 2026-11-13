@@ -8,7 +8,7 @@ helpers.describe("instrumentation fixture logger ownership", function()
 	helpers.it("(logger-fixture-identity) restores aliases and instrumentation after an assertion fails", function()
 		local core, shim = package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"]
 		local instrument = package.loaded["core.logger.engine.perf_counters"]
-		local ok, failure = pcall(require("tests.support.logger_fixture").with, { "core.logger.engine.perf_counters" }, function()
+		local ok, failure = pcall(require("tests.support.core.logger_fixture").with, { "core.logger.engine.perf_counters" }, function()
 			package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = nil, nil
 			require("core.logger.engine.shim")
 			helpers.load_module("core.logger.engine.perf_counters")

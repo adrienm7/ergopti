@@ -10,7 +10,7 @@
 --- matcher, and a character repeated out of a private expansion stays private.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.text_owner_fixture")
+local Fixture = require("tests.support.core.text_owner_fixture")
 
 local STAR = "★"
 

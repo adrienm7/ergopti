@@ -11,8 +11,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.menu_llm.api_panel.api_panel_test_request_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.menu_llm.api_panel.api_panel_test_request_fixture")
+package.loaded["tests.support.ai.ui.api_panel_test_request_fixture"] = nil
+local Fixture = require("tests.support.ai.ui.api_panel_test_request_fixture")
 local fixture_context = Fixture.fixture_context
 local install_doubles = Fixture.install_doubles
 local with_api_add_locale = Fixture.with_api_add_locale
@@ -63,7 +63,7 @@ helpers.describe("API Add: retained native admission", function()
 		end
 		return action, ctx, remote, observed, entry, notices
 	end
-	local BridgeFixture = require("tests.support.llm_bridge_fixture")
+	local BridgeFixture = require("tests.support.ai.bridge_fixture")
 	for _, provider_id in ipairs({ "openai", "openai_compat" }) do
 		helpers.it("publishes accepted API fields through real quarantined cleanup " .. provider_id .. " (api-add-quarantined-config)", function()
 			helpers.with_fresh_modules(owned, function()

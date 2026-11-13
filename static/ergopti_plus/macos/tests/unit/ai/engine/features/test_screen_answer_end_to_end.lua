@@ -80,7 +80,7 @@ local function completion_body(content)
 	})
 end
 
-local Fixture = require("tests.support.modules.llm.screen_answer_fixture")
+local Fixture = require("tests.support.ai.engine.prediction.screen_answer_fixture")
 local build_world, trigger, list_local_models = Fixture.build_world, Fixture.trigger, Fixture.list_local_models
 
 --- Answers one captured request as the provider would.

@@ -21,14 +21,14 @@ local function with_file(original, body)
 		package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		require("settings.engine.migration.outdated").reset_for_tests()
 		local config = helpers.load_with_stubs("keyboard.engine.runtime.config")
-		local path = require("tests.support.tap_hold_file_text").private_path()
+		local path = require("tests.support.keyboard.tap_hold_file_text").private_path()
 		local function write(text)
 			local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 		end
 		local function read()
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
-		local Text = require("tests.support.tap_hold_file_text")
+		local Text = require("tests.support.keyboard.tap_hold_file_text")
 		local original_config
 		original, original_config = Text.file(original)
 		write(original)
@@ -96,14 +96,14 @@ helpers.describe("Array remap dictionaries", function()
 					helpers.assert_eq(state.mod_combos_config.esc_tab, { tap = "none", hold = "none", combo = "none" })
 					helpers.assert_eq(#f.warnings, 1)
 					-- [mod_combos] is a config.toml section, named in the config.toml beside it.
-					local owner = vector.config and require("tests.support.tap_hold_file_text").config_path(f.path) or f.path
+					local owner = vector.config and require("tests.support.keyboard.tap_hold_file_text").config_path(f.path) or f.path
 					helpers.assert_contains(f.warnings[1], "'" .. vector.file .. "' in '" .. owner .. "'")
 					helpers.assert_eq(f.read(), f.original, "read-only admission retains exact bytes")
 					state.enabled = false
 					helpers.assert_true(f.config.save_user_config(state, f.path))
 					local codec = require("core.text.engine.toml.codec")
 					local stored, shapes = codec.decode_with_shapes(f.read())
-					local model, is_array = require("tests.support.tap_hold_file_text").decode_pair(f.path)
+					local model, is_array = require("tests.support.keyboard.tap_hold_file_text").decode_pair(f.path)
 					local preserved = obsolete(model, vector)
 					helpers.assert_eq(preserved, array.value)
 					helpers.assert_true(is_array(preserved), "source remains an array, including empty arrays")
@@ -155,7 +155,7 @@ helpers.describe("Array remap dictionaries", function()
 				if vector.section == "tap_holds" then state.tap_hold_timeout_ms = 1234
 				else state.simultaneous_threshold_ms = 1234 end
 				helpers.assert_true(f.config.save_user_config(state, f.path))
-				local stored, is_array = require("tests.support.tap_hold_file_text").decode_pair(f.path)
+				local stored, is_array = require("tests.support.keyboard.tap_hold_file_text").decode_pair(f.path)
 				helpers.assert_eq(obsolete(stored, vector), {})
 				helpers.assert_true(is_array(obsolete(stored, vector)))
 				helpers.assert_eq(stored[vector.section][vector.section == "tap_holds" and "timeout_ms"
@@ -187,7 +187,7 @@ helpers.describe("Array remap dictionaries", function()
 			helpers.assert_eq(state.mod_combos_config.esc_tab.hold, "ctrl")
 			state.enabled = false
 			helpers.assert_true(f.config.save_user_config(state, f.path))
-			local stored, is_array = require("tests.support.tap_hold_file_text").decode_pair(f.path)
+			local stored, is_array = require("tests.support.keyboard.tap_hold_file_text").decode_pair(f.path)
 			helpers.assert_eq(stored.tap_holds.config.escape, { tap = "copy", future = { {}, { "retained" } } })
 			helpers.assert_eq(stored.mod_combos.config.esc_tab, { hold = "ctrl", future = { { choices = {} } } })
 			helpers.assert_true(is_array(stored.tap_holds.config.escape.future[1]))

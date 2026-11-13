@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.hotstrings_config_window_fixture")
+local Fixture = require("tests.support.hotstrings.config_window_fixture")
 
 local FIELDS = {
 	{ action = "delay", field = "delay", value = 0.42 },

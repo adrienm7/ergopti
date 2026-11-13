@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local support = require("tests.support.tooltip_watcher_fixture")
+local support = require("tests.support.core.tooltip_watcher_fixture")
 
 local corpus_path = helpers.shared("tests/corpus/tooltip/llm_line_vectors.json")
 

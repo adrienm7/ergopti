@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local it = require("tests.support.metrics_preferences_fixture").it
-local NativeFixture = require("tests.support.keystats_native_fixture")
+local it = require("tests.support.metrics.preferences_fixture").it
+local NativeFixture = require("tests.support.metrics.native_fixture")
 local keystats
 
 local path = helpers.driver_root() .. "/../_shared/tests/corpus/metrics/collection_session_vectors.json"
@@ -65,7 +65,7 @@ helpers.describe("metrics suspend and session reset corpus: the shared contract 
 				keystats = collector
 				os.remove(SQLITE_PATH)
 				keystats.init({ sqlite_path = SQLITE_PATH })
-				require("tests.support.metrics_consent_fixture").enable(keystats)
+				require("tests.support.metrics.consent_fixture").enable(keystats)
 				local clock = { now = 1000 }
 				for _, op in ipairs(vector.ops) do apply(op, clock, vector.id) end
 				keystats.resume_collection()

@@ -203,7 +203,7 @@ helpers.describe("app category file: the keystats edit path", function()
 					return true
 				end,
 			}, { __index = Fakes.sqlite_writer() })
-			require("tests.support.sqlite_flush_fake").attach(fake_writer)
+			require("tests.support.core.sqlite_flush_fake").attach(fake_writer)
 			local reader = {
 				read_legacy_category_scores = function() return legacy end,
 				read_manifest = function() return {}, true end,

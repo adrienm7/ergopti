@@ -109,7 +109,7 @@ helpers.describe("updater: a manual check answers the update-check window (Linux
 		local real_client = M._http_client
 		local answers = {}
 		M._http_client = { get = function(_, _, _, callback) callback({ ok = false, status = 0, error = "timeout" }); return true end }
-		M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
+		M._http_client = require("tests.support.updater.release_http_fixture").attach(M._http_client)
 		local ok, err = pcall(M._fetch_releases, "dev", function(...) answers[#answers + 1] = { ... } end)
 		M._http_client = real_client
 		helpers.assert_true(ok, tostring(err))
@@ -125,7 +125,7 @@ helpers.describe("updater: a manual check answers the update-check window (Linux
 				rate_limit = { remaining = "0", reset = "86400" } })
 			return true
 		end }
-		M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
+		M._http_client = require("tests.support.updater.release_http_fixture").attach(M._http_client)
 		local ok, err = pcall(M._fetch_releases, "dev", function(...) answers[#answers + 1] = { ... } end)
 		M._http_client = real_client
 		helpers.assert_true(ok, tostring(err))

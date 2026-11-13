@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.onboarding_delivery_fixture")
+local fixture = require("tests.support.onboarding.delivery_fixture")
 
 helpers.describe("onboarding configuration import transaction", function()
 	for _, route in ipairs({ "ready", "loadExistingConfig" }) do

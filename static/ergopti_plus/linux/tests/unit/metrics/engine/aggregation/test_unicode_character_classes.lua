@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local it = require("tests.support.metrics_preferences_fixture").it
+local it = require("tests.support.metrics.preferences_fixture").it
 local Walker = helpers.load_module("metrics.engine.aggregate_walker")
 
 helpers.describe("linux-unicode-character-classes", function()

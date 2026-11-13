@@ -2,7 +2,7 @@
 
 --- Actual-file source-kind retention and exact prepared-row publication ownership.
 local helpers = require("tests.helpers")
-local output = require("tests.support.toml_output_fixture")
+local output = require("tests.support.settings.toml_output_fixture")
 local function read(path)
 	local handle = assert(io.open(path, "rb")); local bytes = assert(handle:read("*a")); assert(handle:close()); return bytes
 end

@@ -10,8 +10,8 @@
 --- where no configuration scope could reach them.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.hotstrings.terminators.terminator_settings_fixture"] = nil
-local Fixture = require("tests.support.modules.hotstrings.terminators.terminator_settings_fixture")
+package.loaded["tests.support.hotstrings.engine.terminator_settings_fixture"] = nil
+local Fixture = require("tests.support.hotstrings.engine.terminator_settings_fixture")
 local helpers, Codec, custom_command_expected, SOURCE, with_settings, has_custom, menu_controls, custom_delete_row, observe_add_command, delay_settings_command_expected =
 	Fixture.helpers, Fixture.Codec, Fixture.custom_command_expected, Fixture.SOURCE, Fixture.with_settings, Fixture.has_custom, Fixture.menu_controls, Fixture.custom_delete_row, Fixture.observe_add_command, Fixture.delay_settings_command_expected
 

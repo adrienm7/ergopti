@@ -2,7 +2,7 @@
 
 --- Selects unavailable stream accounting without inventing a runtime or lease.
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 
 local function bind(capture, controls)
 	helpers.assert_eq(capture.init(controls.dependencies), true)
@@ -281,7 +281,7 @@ end)
 
 --- Independently frozen control for retained final accounting settlement debt.
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 helpers.describe("unavailable source retained final settlement debt", function()
 	helpers.it("does not report settled while final Accounting.release is refused", function()
 		with_capture(function(capture, observed, controls)

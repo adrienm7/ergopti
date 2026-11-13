@@ -16,7 +16,7 @@ package.path = table.concat({ root .. "/?.lua", root .. "/?/init.lua",
     root .. "/../_shared/?.lua", root .. "/../_shared/?/init.lua", package.path }, ";")
 require("tests.lua.core.runner_home").isolate()
 _G.hs = require("tests.stubs.hs")
-local fixture = require("tests.support.modules.llm.streaming_payload_fixture")
+local fixture = require("tests.support.ai.engine.streaming_payload_fixture")
 local observations = {}
 for _, backend in ipairs({ "mlx", "ollama" }) do
     observations[backend] = fixture.assert_private_payload(backend)

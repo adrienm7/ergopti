@@ -57,7 +57,7 @@ for i, fixture in ipairs(fixtures) do
 		Keystats.init({ sqlite_path = path, log_dir = root .. "/logs" })
 		assert(Keystats.is_enabled() and Writer.is_available())
 		Keystats.record_synthetic_output("owned-calendar", "aa", "other", 1000)
-		require("tests.support.sqlite_flush_native").flush(Keystats)
+		require("tests.support.core.sqlite_flush_native").flush(Keystats)
 		local rows = assert(Writer.query_rows("SELECT date,app,c FROM ngram_chars WHERE token='a';"))
 		assert(#rows == 1 and rows[1]:match("|2$"))
 		assert(Writer.upsert_ngrams("owned-history", fixture.previous, "owned-calendar", { h = { c = 7 } }, "ngram_chars"))

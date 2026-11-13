@@ -97,7 +97,7 @@ helpers.describe("Ctrl+Caps Lock evidence sources (capslock-chord-field)", funct
 		package.loaded["shortcuts.engine.keyboard_shortcuts"] = nil
 		package.loaded["keyboard.engine.keys.capslock_chord_evidence"] = nil
 		local Evidence = require("keyboard.engine.keys.capslock_chord_evidence")
-		require("tests.support.keyboard_config_fixture").install(
+		require("tests.support.layouts.keyboard_config_fixture").install(
 			{ secondary_capslock = "script_pause_toggle", primary_a = "script_pause_toggle" })
 		local subject = require("shortcuts.engine.keyboard_shortcuts")
 		helpers.assert_eq(subject.start(), true)

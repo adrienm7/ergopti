@@ -18,8 +18,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.llm.backends.ai_runtime_selection_install_fixture"] = nil
-local Fixture = require("tests.support.modules.llm.backends.ai_runtime_selection_install_fixture")
+package.loaded["tests.support.ai.engine.backends.runtime_selection_install_fixture"] = nil
+local Fixture = require("tests.support.ai.engine.backends.runtime_selection_install_fixture")
 local MANAGED_BIN = Fixture.MANAGED_BIN
 local MANAGED_DIR = Fixture.MANAGED_DIR
 local fake_fs = Fixture.fake_fs

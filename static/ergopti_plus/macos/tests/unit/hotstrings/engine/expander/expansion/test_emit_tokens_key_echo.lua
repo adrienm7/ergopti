@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local SyntheticStack = require("tests.support.synthetic_input_stack")
+local SyntheticStack = require("tests.support.core.synthetic_input_stack")
 
 
 --- Emits tokens through the production adapter inside an eventtap callback.

@@ -22,7 +22,7 @@
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
 local Json = require("core.text.engine.json")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 local Rewrite = require("ai.engine.prediction.rewrite")
 local PromptBuilder = require("ai.engine.prediction.prompt_builder_core")
 

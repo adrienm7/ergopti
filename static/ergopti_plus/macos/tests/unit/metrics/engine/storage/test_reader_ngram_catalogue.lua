@@ -40,7 +40,7 @@ helpers.describe("macOS n-gram reads: the shared catalogue", function()
 	helpers.it("reads cross-device days even when the local timezone skipped a calendar date", function()
 		helpers.with_stub_scope({"metrics.engine.reader.sqlite_reader", "core.logger.engine.logger"}, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-			local fake = require("tests.support.fake_ngram_sqlite").new({ngram_chars = {
+			local fake = require("tests.support.core.fake_ngram_sqlite").new({ngram_chars = {
 				{date = "2011-12-29", app = "Code", token = "a", c = 1},
 				{date = "2011-12-30", app = "Code", token = "a", c = 1},
 				{date = "2011-12-31", app = "Code", token = "a", c = 1},

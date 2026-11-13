@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 
 helpers.describe("LLM navigation settings", function()
 	helpers.it("reads the manifest default and matches the exact held chord", function()

@@ -6,8 +6,8 @@
 --- through false/nil/throw rollback settlement.
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.llm.backends.dependency_bootstrap_pause_ownership_fixture"] = nil
-local Fixture = require("tests.support.modules.llm.backends.dependency_bootstrap_pause_ownership_fixture")
+package.loaded["tests.support.ai.engine.backends.dependency_bootstrap_pause_ownership_fixture"] = nil
+local Fixture = require("tests.support.ai.engine.backends.dependency_bootstrap_pause_ownership_fixture")
 local get_upvalue = Fixture.get_upvalue
 local load_fixture = Fixture.load_fixture
 local set_upvalue = Fixture.set_upvalue

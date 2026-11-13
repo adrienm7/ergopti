@@ -12,8 +12,8 @@
 --- handed to the character path; every other press stays the application's.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.hotstrings.magic_key.magic_key_source_fixture"] = nil
-local Fixture = require("tests.support.modules.hotstrings.magic_key.magic_key_source_fixture")
+package.loaded["tests.support.hotstrings.engine.magic_key_source_fixture"] = nil
+local Fixture = require("tests.support.hotstrings.engine.magic_key_source_fixture")
 local helpers, KEY_J, with_source, wire, run_due, caller_cohort, native_caption_corpus, with_magic_notice, magic_notice_cache_snapshot, assert_magic_notice_cache_restored, capture_pause_controller, with_collision_source =
 	Fixture.helpers, Fixture.KEY_J, Fixture.with_source, Fixture.wire, Fixture.run_due, Fixture.caller_cohort, Fixture.native_caption_corpus, Fixture.with_magic_notice, Fixture.magic_notice_cache_snapshot, Fixture.assert_magic_notice_cache_restored, Fixture.capture_pause_controller, Fixture.with_collision_source
 

@@ -10,8 +10,8 @@
 --- which started a process the daemon never supervised.
 --- ==============================================================================
 
-package.loaded["tests.support.ui.menu.shortcuts.tap_hold_menu_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.shortcuts.tap_hold_menu_fixture")
+package.loaded["tests.support.menu.ui.tap_hold_menu_fixture"] = nil
+local Fixture = require("tests.support.menu.ui.tap_hold_menu_fixture")
 local helpers, WRITER, build, restore, key_rows, find =
 	Fixture.helpers, Fixture.WRITER, Fixture.build, Fixture.restore, Fixture.key_rows, Fixture.find
 

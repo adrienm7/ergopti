@@ -20,10 +20,10 @@ local function with_windows(scenario)
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
 		"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
-		"tests.support.native_webview_close_fixture",
+		"tests.support.core.native_webview_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, script_refs = {}, deferred = {}, closed = 0 }
-		local new_window = require("tests.support.native_webview_close_fixture")(h)
+		local new_window = require("tests.support.core.native_webview_close_fixture")(h)
 		h.dialog = helpers.load_with_stubs("onboarding.ui.permission_dialog", {
 			webview = { new = new_window, windowMasks = { titled = 1, closable = 2, utility = 16 },
 				usercontent = { new = function()

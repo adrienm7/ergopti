@@ -20,7 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 
 local function install_insecure_focus()
 	local previous = package.loaded["platform.focus.secure_field_detector"]
@@ -141,7 +141,7 @@ helpers.describe("prediction_engine.predict: applications the trigger is switche
 		local triggers = helpers.load_module("ai.engine.settings.trigger_settings")
 		triggers._reset()
 		local ok, err = pcall(function()
-			require("tests.support.llm_preferences_fixture").with(function()
+			require("tests.support.ai.preferences_fixture").with(function()
 				helpers.assert_true(triggers.set_disabled_apps({ "Firefox" }))
 				local pe = helpers.load_module("ai.engine.prediction.engine")
 				pe.init({ focus_id = function() return "owned-prediction-window" end })

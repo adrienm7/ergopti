@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
+local ClipboardTargets = require("tests.support.platform.input.synthetic_input.clipboard_targets")
 local Atspi = require("platform.focus.atspi_focus")
 local Detector = require("platform.focus.secure_field_detector")
 local FocusGuard = require("metrics.engine.focus_guard")
@@ -139,7 +139,7 @@ local function with_runtime(body)
 	if not ok then error(problem, 0) end
 end
 
-local with_native_injector = require("tests.support.infra.preferences.user_hotstring_native_fixture").with
+local with_native_injector = require("tests.support.settings.user_hotstring_native_fixture").with
 
 --- Runs actual global and dynamic scope owners around the native callback fixture.
 local function with_configuration_scope(f, body)

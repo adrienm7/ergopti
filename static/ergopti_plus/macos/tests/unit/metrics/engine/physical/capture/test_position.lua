@@ -2,7 +2,7 @@
 
 --- Receives the real capture wrappers over original supervised task fixtures.
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 local function press(controls, sequence, down)
 	controls.frames.batch = { version = 1, kind = "batch", coverage = "complete", incarnation = "production-fixture", lease = "7",
 		records = { { sequence = tostring(sequence), device = "41", timestamp = tostring(sequence + 10),

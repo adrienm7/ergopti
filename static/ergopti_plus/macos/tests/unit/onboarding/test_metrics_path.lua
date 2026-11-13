@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.onboarding_delivery_fixture")
+local fixture = require("tests.support.onboarding.delivery_fixture")
 local with_delivery = fixture.with_delivery
 
 

@@ -138,7 +138,7 @@ helpers.describe("physical detached arming handshake", function()
 		if cases then return cases end
 		local quote = require("core.text.engine.utils").shell_quote
 		local output = require("tests.support.command_lines").read("python3 -B "
-			.. quote(helpers.driver_root() .. "tests/support/modules/updater/release_arming_fixture.py")
+			.. quote(helpers.driver_root() .. "tests/support/updater/release_arming_fixture.py")
 			.. " " .. quote(helpers.driver_root()) .. " " .. quote(helpers.temp_dir())
 			.. " --hostile-interpreter 2>&1")
 		cases = assert(require("core.text.engine.json").decode_lossless(table.concat(output, "\n")))

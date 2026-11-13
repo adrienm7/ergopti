@@ -423,14 +423,14 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		local script = Installer.SWAP_SCRIPT:gsub("/usr/bin/open", open):gsub("/bin/ps ", no_processes .. " ")
 		-- A wait of a few ticks keeps the silent successor case short.
 		script = script:gsub('%[ "%$ready_ticks" %-gt %d+ %]', '[ "$ready_ticks" -gt 3 ]')
-		script = require("tests.support.release_swap_ports").observe(script, dir)
+		script = require("tests.support.updater.release_swap_ports").observe(script, dir)
 		if opts.publication_refused then
-			local move = fake(dir, "move", '[ "$2" = ' .. quote(staged) .. ' ] && exit 45\nexec ' .. require("tests.support.release_swap_ports").command() .. ' --release-rename move "$2" "$3"')
+			local move = fake(dir, "move", '[ "$2" = ' .. quote(staged) .. ' ] && exit 45\nexec ' .. require("tests.support.updater.release_swap_ports").command() .. ' --release-rename move "$2" "$3"')
 			script = script:gsub('%"%$launcher%" %"%$rename_flag%" move', function() return move .. " --" end)
 		end
 		local pid = opts.pid or "999999999"
 		local acknowledgement = dir .. "/arming-receipt"
-		local status, output = sh(require("tests.support.release_swap_ports").command() .. " --release-rename lock " .. quote(app)
+		local status, output = sh(require("tests.support.updater.release_swap_ports").command() .. " --release-rename lock " .. quote(app)
 			.. " " .. quote(script) .. " " .. pid .. " " .. quote(staged) .. " " .. quote(previous)
 			.. " 3>" .. quote(acknowledgement))
 		helpers.assert_eq(read(acknowledgement), opts.previous and "" or "ARMED\n",
@@ -692,7 +692,7 @@ helpers.describe("release_installer: filesystem publication admission", function
 	helpers.it("executes real filesystem refusals and preserves every owned original", function()
 		local dir = scratch()
 		local ok, err = xpcall(function()
-			local probe = helpers.driver_root() .. "tests/support/release_swap_physical_probe.py"
+			local probe = helpers.driver_root() .. "tests/support/updater/release_swap_physical_probe.py"
 			local source = dir .. "/release-swap-source.lua"
 			write(source, assert(helpers.read_driver_unit("M.SWAP_SCRIPT = table.concat({")))
 			local status, output = sh("python3 -B " .. quote(probe) .. " controls " .. quote(source) .. " " .. quote(dir .. "/controls"))
@@ -714,7 +714,7 @@ helpers.describe("release_installer: concurrent filesystem publication", functio
 	helpers.it("refuses racing destinations and serializes detached installers before arming (release-exclusive-publication)", function()
 		local dir = scratch()
 		local ok, err = xpcall(function()
-			local probe = helpers.driver_root() .. "tests/support/release_swap_concurrent_probe.py"
+			local probe = helpers.driver_root() .. "tests/support/updater/release_swap_concurrent_probe.py"
 			local status, output = sh("python3 -B " .. quote(probe) .. " " .. quote(helpers.driver_root()) .. " " .. quote(dir))
 			helpers.assert_eq(status, 0, output)
 			local receipt = assert(require("core.text.engine.json").decode(output))
@@ -758,7 +758,7 @@ helpers.describe("release_installer: complete literal extraction", function()
 					local evaluated = assert(loadfile(path))()
 					helpers.assert_eq(evaluated.SWAP_SCRIPT, authority.expected,
 						"the control must be valid Lua that changes the actual worker bytes")
-					local status, output = sh("python3 -B " .. quote(helpers.driver_root() .. "tests/support/release_swap_physical_probe.py")
+					local status, output = sh("python3 -B " .. quote(helpers.driver_root() .. "tests/support/updater/release_swap_physical_probe.py")
 						.. " emit " .. quote(path))
 					helpers.assert_true(status ~= 0, "the extractor must refuse the complete changed expression: " .. output)
 				end
@@ -777,7 +777,7 @@ helpers.describe("release_installer: complete literal extraction", function()
 			local expected, replacements = original:gsub(suffix_pattern, function() return changed_suffix end)
 			helpers.assert_eq(replacements, 2, "both worker launch paths consume the executable authority")
 			helpers.assert_eq(evaluated.SWAP_SCRIPT, expected)
-			local status, output = sh("python3 -B " .. quote(helpers.driver_root() .. "tests/support/release_swap_physical_probe.py")
+			local status, output = sh("python3 -B " .. quote(helpers.driver_root() .. "tests/support/updater/release_swap_physical_probe.py")
 				.. " emit " .. quote(path))
 			helpers.assert_eq(status, 0, output)
 			helpers.assert_eq(output, evaluated.SWAP_SCRIPT, "the extractor must read a changed declared suffix rather than a fallback")
@@ -792,7 +792,7 @@ helpers.describe("release_installer: explicit native script observation", functi
 	helpers.it("executes only the explicit script observer without discovering Lua (release-native-script-scope)", function()
 		local dir = scratch()
 		local ok, err = xpcall(function()
-			local probe = helpers.driver_root() .. "tests/support/release_swap_concurrent_probe.py"
+			local probe = helpers.driver_root() .. "tests/support/updater/release_swap_concurrent_probe.py"
 			local command = "LUA=" .. quote(dir .. "/missing-lua") .. " python3 -B " .. quote(probe)
 				.. " " .. quote(helpers.driver_root()) .. " " .. quote(dir)
 			local status, output = sh(command .. " --emission-source strict-source")
@@ -812,7 +812,7 @@ helpers.describe("release_installer: explicit native script observation", functi
 	helpers.it("binds both extracted scripts and complete argv to actual Lua emission (release-native-script-scope)", function()
 		local dir = scratch()
 		local ok, err = xpcall(function()
-			local probe = helpers.driver_root() .. "tests/support/release_swap_concurrent_probe.py"
+			local probe = helpers.driver_root() .. "tests/support/updater/release_swap_concurrent_probe.py"
 			local status, output = sh("python3 -B " .. quote(probe) .. " " .. quote(helpers.driver_root())
 				.. " " .. quote(dir) .. " --emission-controls")
 			helpers.assert_eq(status, 0, output)

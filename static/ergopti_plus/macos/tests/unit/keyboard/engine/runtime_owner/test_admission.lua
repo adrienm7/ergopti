@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.platform.remap.runtime_owner_fixture")
+local Fixture = require("tests.support.keyboard.runtime_owner_fixture")
 
 --- Runs admission to its settlement.
 --- @param owner table Owner module.

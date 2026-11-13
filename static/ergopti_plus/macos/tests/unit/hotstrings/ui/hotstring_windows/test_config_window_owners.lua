@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 -- ===================================
 -- ===================================
 
-local with_window = require("tests.support.hotstrings_config_window_fixture").with_window
+local with_window = require("tests.support.hotstrings.config_window_fixture").with_window
 
 helpers.describe("hotstrings configuration native owners", function()
 	for _, phase in ipairs({ "before", "after" }) do

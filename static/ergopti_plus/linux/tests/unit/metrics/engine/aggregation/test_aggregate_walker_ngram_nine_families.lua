@@ -28,8 +28,8 @@
 --- is why they are the cases below rather than "it produces some bigrams".
 --- ==============================================================================
 
-package.loaded["tests.support.modules.keystats.aggregation.aggregate_walker_fixture"] = nil
-local Fixture = require("tests.support.modules.keystats.aggregation.aggregate_walker_fixture")
+package.loaded["tests.support.metrics.engine.aggregate_walker_fixture"] = nil
+local Fixture = require("tests.support.metrics.engine.aggregate_walker_fixture")
 local helpers, it, Fakes, Walker, Timings, PAUSE_MS, SESSION_GAP_MS, key, typed, count_of =
 	Fixture.helpers, Fixture.it, Fixture.Fakes, Fixture.Walker, Fixture.Timings, Fixture.PAUSE_MS, Fixture.SESSION_GAP_MS, Fixture.key, Fixture.typed, Fixture.count_of
 
@@ -276,7 +276,7 @@ helpers.describe("ngram walker: a real flush writes every family", function()
 		local ok, err = pcall(function()
 			local kl = require(logger_name)
 			kl.init({ sqlite_path = "/tmp/ergopti_ngram_probe.sqlite" })
-			require("tests.support.metrics_consent_fixture").enable(kl)
+			require("tests.support.metrics.consent_fixture").enable(kl)
 			kl.reset_session()
 			kl.on_app_focus("app.test", 1000)
 			local at = 1000
@@ -336,7 +336,7 @@ helpers.describe("ngram walker: each character is stored once", function()
 		local ok, err = pcall(function()
 			local kl = require(logger_name)
 			kl.init({ sqlite_path = "/tmp/ergopti_ngram_once.sqlite" })
-			require("tests.support.metrics_consent_fixture").enable(kl)
+			require("tests.support.metrics.consent_fixture").enable(kl)
 			kl.reset_session()
 			kl.on_app_focus("app.test", 1000)
 			local at = 1000
@@ -371,7 +371,7 @@ helpers.describe("keystats: a JSON summary cannot acknowledge raw SQLite history
 		local ok, err = pcall(function()
 			local kl = require(logger_name)
 			kl.init({ sqlite_path = "/tmp/ergopti_fallback.sqlite", log_dir = dir })
-			require("tests.support.metrics_consent_fixture").enable(kl)
+			require("tests.support.metrics.consent_fixture").enable(kl)
 			kl.reset_session()
 			kl.on_app_focus("app.test", 1000)
 			for index, char in ipairs({ "s", "a", "l", "u", "t" }) do kl.on_keydown(char, 1000 + index * 100, "app.test") end

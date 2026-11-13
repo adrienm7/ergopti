@@ -1,8 +1,8 @@
 --- tests/unit/hotstrings/engine/expander/registry/test_section_projection_read_only.lua
 --- A readable source must not activate a stale cache when backup creation fails.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keymap.registry.registry_mutation_transactions_fixture")
-local OutputFixture = require("tests.support.toml_output_fixture")
+local Fixture = require("tests.support.hotstrings.registry_mutation_transactions_fixture")
+local OutputFixture = require("tests.support.settings.toml_output_fixture")
 
 helpers.describe("section projection backup admission", function()
 	helpers.it("refuses a read-only backup without changing the cache or the live group", function()

@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 local Live = require("layouts.engine.emulation.number_row_live")
 local Build = require("layouts.engine.registry.rows_build")
-local FakeMac = require("tests.support.layout_rows_fake_mac")
+local FakeMac = require("tests.support.layouts.rows_fake_mac")
 
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"
 

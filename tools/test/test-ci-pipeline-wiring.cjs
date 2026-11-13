@@ -8214,7 +8214,7 @@ function checkNativePacSourceReceipts() {
 		}
 		for (const relative of [
 			'static/ergopti_plus/_shared/core/network/data/proxy_policy.json',
-			'static/ergopti_plus/macos/tests/support/native_pac_source_fixture.py',
+			'static/ergopti_plus/macos/tests/support/core/native_pac_source_fixture.py',
 			'tools/diagnostics/native_pac_source_evidence.cjs',
 			'tools/diagnostics/swift_xctest_evidence.cjs'
 		])

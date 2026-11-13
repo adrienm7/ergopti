@@ -990,17 +990,17 @@ const RUNTIME_PREFIXES = [
 		names: ['api_ollama', 'api_remote']
 	},
 	{
-		file: 'macos/tests/support/llm_count_menu_fixture.lua',
+		file: 'macos/tests/support/ai/count_menu_fixture.lua',
 		old: 'ui.menu.menu_llm.',
 		names: ['temperature_panel', 'streaming_panel', 'trigger_panel']
 	},
 	{
-		file: 'macos/tests/support/physical_shortcut_registrar_fixture.lua',
+		file: 'macos/tests/support/layouts/physical_shortcut_registrar_fixture.lua',
 		old: 'modules.shortcuts.actions.',
 		names: ['text', 'apps', 'system']
 	},
 	{
-		file: 'macos/tests/support/physical_shortcut_scope_fixture.lua',
+		file: 'macos/tests/support/layouts/physical_shortcut_scope_fixture.lua',
 		old: 'modules.shortcuts.actions.',
 		names: ['text', 'apps', 'system']
 	},

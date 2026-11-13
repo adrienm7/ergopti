@@ -12,8 +12,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.adapters.runtime.timer_scheduler_fixture"] = nil
-local Fixture = require("tests.support.adapters.runtime.timer_scheduler_fixture")
+package.loaded["tests.support.platform.system.timer_scheduler_fixture"] = nil
+local Fixture = require("tests.support.platform.system.timer_scheduler_fixture")
 
 --- Returns an error object whose formatter raises and records each call.
 --- @param calls table Counter table.

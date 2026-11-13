@@ -19,7 +19,7 @@ local function offering(count, apply_ok)
 	-- The chord is read once, from a throwaway store holding nothing: the
 	-- shipped default. The engine keeps the real store it predicts with.
 	local previous_storage = package.loaded["ai.engine.preferences"]
-	package.loaded["ai.engine.preferences"] = require("tests.support.llm_preferences_fixture").new()
+	package.loaded["ai.engine.preferences"] = require("tests.support.ai.preferences_fixture").new()
 	local Navigation = helpers.load_module("ai.engine.settings.navigation_settings")
 	Navigation._reset()
 	Navigation.get()

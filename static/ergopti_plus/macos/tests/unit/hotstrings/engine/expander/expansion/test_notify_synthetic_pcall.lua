@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local SyntheticStack = require("tests.support.synthetic_input_stack")
+local SyntheticStack = require("tests.support.core.synthetic_input_stack")
 
 package.loaded["core.logger.engine.logger"] = nil
 local _ = helpers.load_with_stubs("core.logger.engine.logger")

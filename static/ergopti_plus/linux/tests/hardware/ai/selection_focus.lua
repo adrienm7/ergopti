@@ -52,14 +52,14 @@ assert(Clipboard.write(CLIPBOARD_SEED), "native clipboard control must be seeded
 local clipboard_read_ok, clipboard_content = Clipboard.read_checked()
 assert(clipboard_read_ok and clipboard_content == CLIPBOARD_SEED, "native clipboard control must be readable")
 local Watch = require("platform.focus.atspi_focus_watch").new()
-package.loaded["ai.engine.preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = {
+package.loaded["ai.engine.preferences"] = require("tests.support.ai.preferences_fixture").new({ initial = {
 	["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
 	["llm.trigger.secure_filter_enabled"] = true, ["llm.trigger.url_bar_filter_enabled"] = true,
 } })
 -- Every case re-initializes the engine, which first retires the previous
 -- Profiles inventory: without these ports each re-initialization was refused
 -- and the next case ran on the first case's scheduler and pacing clock.
-package.loaded["ai.engine.settings.profiles"] = require("tests.support.llm_profiles_fixture").without_inventory({
+package.loaded["ai.engine.settings.profiles"] = require("tests.support.ai.profiles_fixture").without_inventory({
 	init = function() end, is_enabled = function() return true end,
 })
 package.loaded["ai.engine.settings.api_entries"] = { active = function()

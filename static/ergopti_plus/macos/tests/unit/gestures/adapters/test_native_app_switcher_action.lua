@@ -2,7 +2,7 @@
 
 --- Actual product registry source admission and per-parent native lifecycle.
 local h = require("tests.helpers")
-local Fixture = require("tests.support.gesture_actions_fixture")
+local Fixture = require("tests.support.gestures.actions_fixture")
 local eq = h.assert_eq
 local function action_scope(fresh, body)
 	return h.with_stub_scope({ "settings.engine.preferences.preferences", "gestures.adapters.native_app_switcher_action" }, function()

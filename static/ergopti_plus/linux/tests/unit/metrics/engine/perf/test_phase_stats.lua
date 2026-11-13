@@ -9,7 +9,7 @@
 --- phases the macOS driver already records.
 --- ==============================================================================
 
-local helpers = require("tests.support.logger_fixture").helpers({
+local helpers = require("tests.support.core.logger_fixture").helpers({
 	"metrics.engine.perf.phase_stats", "core.process.adapters.shell_runner", "menu.ui.builder.timed_build", "core.text.engine.toml.reader", "core.logger.engine.boot_profiler",
 	"core.logger.engine.perf_counters", "core.text.engine.toml_codec.reader",
 })

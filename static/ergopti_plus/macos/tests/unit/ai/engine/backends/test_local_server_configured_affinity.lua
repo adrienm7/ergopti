@@ -30,7 +30,7 @@ local function isolated(scenario)
 		-- The four servers these cases drive run; every other catalogue server is
 		-- stopped, so a longer catalogue changes no case.
 		local scan_overrides = {}
-		require("tests.support.modules.llm.backends.local_server_scan_fake").install(api, scan_overrides)
+		require("tests.support.ai.engine.backends.local_server_scan_fake").install(api, scan_overrides)
 		local servers = require("ai.engine.local_servers.local_servers")
 		local driven = { omlx = true, lmstudio = true, llamacpp = true, jan = true }
 		for _, id in ipairs(servers.ORDER) do
@@ -298,7 +298,7 @@ helpers.describe("Actual AI menu local discovery context (local-configured-nativ
 	helpers.it("passes the exact live native pause port to local discovery rows (local-configured-native-owner)", function()
 		local paused, captured = false, nil
 		local native_pause = function() return paused end
-		require("tests.support.llm_count_menu_fixture")(function(menu)
+		require("tests.support.ai.count_menu_fixture")(function(menu)
 			local panel = require("ai.ui.menu.panels.local_server_panel")
 			panel.rows = function(ctx) captured = ctx; return {} end
 			local backend = require("ai.ui.menu.panels.backend_panel")

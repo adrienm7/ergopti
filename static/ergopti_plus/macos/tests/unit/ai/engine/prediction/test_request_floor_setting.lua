@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Pipeline = require("tests.support.prediction_pipeline")
+local Pipeline = require("tests.support.ai.prediction_pipeline")
 
 --- Returns the native timer list of the stub the scheduler captured.
 --- @return table timers

@@ -24,7 +24,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_activation = require("tests.support.llm_activation_fixture")
+local with_activation = require("tests.support.ai.activation_fixture")
 
 local OLLAMA_URL = "http://127.0.0.1:11435"
 

@@ -7,7 +7,7 @@
 --- hotstring engine while the post-caret helper deliberately remains in flight.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.adapters.synthetic_input.selection_write_fixture")
+local Fixture = require("tests.support.platform.input.synthetic_input.selection_write_fixture")
 
 helpers.describe("Main selected payload cache boundary", function()
 	helpers.it("invalidates old buffer and Undo before the post-caret wait without clearing later input", function()

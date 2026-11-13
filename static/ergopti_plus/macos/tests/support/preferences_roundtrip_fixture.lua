@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local output_fixture = require("tests.support.toml_output_fixture")
+local output_fixture = require("tests.support.settings.toml_output_fixture")
 local M = {}
 
 --- Saves and loads real preferences before invoking semantic assertions.

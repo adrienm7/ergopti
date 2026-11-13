@@ -133,7 +133,7 @@ local function with_tap_holds(body)
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local user_path = os.tmpname()
-	local config_path = require("tests.support.tap_hold_fixture").write(user_path, nil)
+	local config_path = require("tests.support.keyboard.tap_hold_fixture").write(user_path, nil)
 	local ok, err = pcall(function()
 		local Manager = require("tap_hold.engine.manager")
 		Manager.init({

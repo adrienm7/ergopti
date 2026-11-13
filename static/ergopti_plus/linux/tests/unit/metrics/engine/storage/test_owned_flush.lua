@@ -3,7 +3,7 @@
 --- Logical ownership regressions. Native SQLite/pipe/process receipts are covered
 --- by run_sqlite_owned_flush_receipts.lua; these ports deliberately stage ACKs.
 local helpers = require("tests.helpers")
-local it = require("tests.support.metrics_preferences_fixture").it
+local it = require("tests.support.metrics.preferences_fixture").it
 local Fakes = require("tests.fakes")
 local function assert_false(value) helpers.assert_eq(value, false) end
 require("core.logger.engine.monotonic") -- Load the genuine clock before temporary native ports.
@@ -97,7 +97,7 @@ helpers.describe("native metrics fixture construction deadlines", function()
 			it("native-fixture-deadline: " .. action .. " observes constructor " .. constructor .. " after blocking work", function()
 				local uv = require("luv")
 				helpers.assert_eq(debug.getinfo(uv.fs_stat, "S").what, "C", "the actual native provider is required")
-				local native = require("tests.support.keystats_native_fixture")
+				local native = require("tests.support.metrics.native_fixture")
 				local batch = require("core.fs.engine.sqlite_batch_process")
 				local original_start = assert(batch.start)
 				local operation_ms = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
@@ -119,7 +119,7 @@ helpers.describe("native metrics fixture construction deadlines", function()
 					native.with(function(owner)
 						collector = owner
 						owner.init({ sqlite_path = database })
-						require("tests.support.metrics_consent_fixture").enable(owner)
+						require("tests.support.metrics.consent_fixture").enable(owner)
 						owner.on_keydown("x", 1000, "fixture-deadline")
 						armed = true
 						if action == "reset" then
@@ -162,7 +162,7 @@ end)
 helpers.describe("native metrics fixture retirement observation", function()
 	it("native-fixture-retirement: observes a real timed-out child until physical retirement", function()
 		local uv = require("luv")
-		local native = require("tests.support.keystats_native_fixture")
+		local native = require("tests.support.metrics.native_fixture")
 		local batch = require("core.fs.engine.sqlite_batch_process")
 		local operation_ms = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 		local original_spawn, original_timer_start, original_start = uv.spawn, uv.timer_start, batch.start
@@ -218,7 +218,7 @@ helpers.describe("native metrics fixture retirement observation", function()
 			native.with(function(owner)
 				collector = owner
 				owner.init({ sqlite_path = directory .. "/metrics.sqlite" })
-				require("tests.support.metrics_consent_fixture").enable(owner)
+				require("tests.support.metrics.consent_fixture").enable(owner)
 				owner.on_keydown("x", 1000, "fixture-retirement")
 				armed = true
 			end)
@@ -268,7 +268,7 @@ helpers.describe("native metrics fixture retirement observation", function()
 				run = function(mode) helpers.assert_eq(mode, "nowait"); return false end,
 				sleep = function(ms) helpers.assert_eq(ms, 1); now = now + budget / 4 end,
 			}
-			local module_name = "tests.support.keystats_native_fixture"
+			local module_name = "tests.support.metrics.native_fixture"
 			local previous = package.loaded[module_name]
 			local called, ok, detail = pcall(function()
 				local fixture = helpers.load_module_with_dependency(module_name, "luv", modeled_uv)
@@ -325,7 +325,7 @@ helpers.describe("native metrics fixture finite observation contract", function(
 				run = function(mode) helpers.assert_eq(mode, "nowait"); return false end,
 				sleep = function(ms) helpers.assert_eq(ms, 1) end,
 			}
-			local module_name = "tests.support.keystats_native_fixture"
+			local module_name = "tests.support.metrics.native_fixture"
 			local previous = package.loaded[module_name]
 			local called, ok, detail = pcall(function()
 				local native = helpers.load_module_with_dependency(module_name, "luv", modeled_uv)
@@ -379,7 +379,7 @@ local function with_collector(body, launch)
 	local ok, err = xpcall(function()
 		collector = require(keystats_name)
 		collector.init({ sqlite_path = "/tmp/owned-flush-logical.sqlite" })
-		require("tests.support.metrics_consent_fixture").enable(collector)
+		require("tests.support.metrics.consent_fixture").enable(collector)
 		body(collector, operations, writer)
 	end, debug.traceback)
 	package.loaded[writer_name], package.loaded[keystats_name], package.loaded[metrics_name] = old_writer, old_keystats, old_metrics
@@ -390,7 +390,7 @@ helpers.describe("logical-sqlite-flush-fake-contract", function()
 	it("logical-sqlite-flush-fake-contract: inherited unknown methods cannot claim private file debt", function()
 		local unknown = function() return true end
 		local writer = setmetatable({}, { __index = function() return unknown end })
-		require("tests.support.sqlite_flush_fake").attach(writer)
+		require("tests.support.core.sqlite_flush_fake").attach(writer)
 		helpers.assert_eq(type(rawget(writer, "has_private_file_debt")), "function",
 			"the logical fixture must declare its native resource capability explicitly")
 		assert_false(writer.has_private_file_debt())
@@ -402,7 +402,7 @@ helpers.describe("logical-sqlite-flush-fake-contract", function()
 		local checks = 0
 		local debt = function() checks = checks + 1; return true end
 		local writer = { has_private_file_debt = debt }
-		require("tests.support.sqlite_flush_fake").attach(writer)
+		require("tests.support.core.sqlite_flush_fake").attach(writer)
 		helpers.assert_true(rawequal(writer.has_private_file_debt, debt))
 		helpers.assert_true(writer.has_private_file_debt())
 		helpers.assert_eq(checks, 1, "a modeled native refusal must remain observable")
@@ -757,7 +757,7 @@ helpers.describe("linux-open-session-crash-recovery", function()
 			local uv = require("luv")
 			collector.init({ sqlite_path = "/tmp/open-walk-logical.sqlite",
 				metrics_dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-open-walk-XXXXXX")) .. "/metrics" })
-			require("tests.support.metrics_consent_fixture").enable(collector)
+			require("tests.support.metrics.consent_fixture").enable(collector)
 			body(collector)
 		end, debug.traceback)
 		package.loaded[writer_name], package.loaded[keystats_name] = old_writer, old_keystats
@@ -1247,7 +1247,7 @@ helpers.describe("one-click rendered reset with native SQLite", function()
 	it("reset-one-click-native: one menu action finishes after COMMIT without a refusal ERROR", function()
 		local database = os.tmpname()
 		os.remove(database)
-		local native = require("tests.support.keystats_native_fixture")
+		local native = require("tests.support.metrics.native_fixture")
 		local logger, i18n = require("core.logger.engine.shim"), require("core.i18n.engine.i18n")
 		local previous_info, previous_error = logger.info, logger.error
 		local startup = "onboarding.ui.menu_start_at_login"
@@ -1265,7 +1265,7 @@ helpers.describe("one-click rendered reset with native SQLite", function()
 		local ok, err = pcall(function()
 			native.with(function(k)
 				k.init({ sqlite_path = database })
-				require("tests.support.metrics_consent_fixture").enable(k)
+				require("tests.support.metrics.consent_fixture").enable(k)
 				k.on_keydown("a", math.floor(require("core.logger.engine.monotonic").now_ms()), "owned")
 				local menu = helpers.load_module("menu.ui.builder.builder").build({ keystats = k })
 				local reset
@@ -1347,11 +1347,11 @@ helpers.describe("owned reset native bridge", function()
 	it("reset-one-click-native: the real async writer sends one complete page reply", function()
 		local database = os.tmpname()
 		os.remove(database)
-		local native = require("tests.support.keystats_native_fixture")
+		local native = require("tests.support.metrics.native_fixture")
 		local ok, err = pcall(function()
 			native.with(function(k)
 				k.init({ sqlite_path = database })
-				require("tests.support.metrics_consent_fixture").enable(k)
+				require("tests.support.metrics.consent_fixture").enable(k)
 				k.on_keydown("a", math.floor(require("core.logger.engine.monotonic").now_ms()), "owned")
 				local bridge = helpers.load_module("metrics.ui.metrics_apps.bridge")
 				bridge._reset()
@@ -1535,12 +1535,12 @@ helpers.describe("dashboard export and purge through the owning writer", functio
 	end)
 end)
 
-require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: native stop commits admitted zero-count groups", function()
-	local Home = require("tests.support.keystats_home_fixture")
-	local Native = require("tests.support.keystats_native_fixture")
+require("tests.support.metrics.home_fixture").it("owned-flush-empty-ngram: native stop commits admitted zero-count groups", function()
+	local Home = require("tests.support.metrics.home_fixture")
+	local Native = require("tests.support.metrics.native_fixture")
 	Native.with(function(collector)
 		helpers.assert_true(collector.init(Home.options({ sqlite_path = Home.fresh_db() })))
-		require("tests.support.metrics_consent_fixture").enable(collector)
+		require("tests.support.metrics.consent_fixture").enable(collector)
 		local now = require("core.logger.engine.monotonic").now_ms()
 		for index = 1, 10 do collector.record_hotstring("Editor", "😀", "😀😀", now + index, "static", 1, index == 10) end
 		Native.flush(collector)
@@ -1559,9 +1559,9 @@ require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: nati
 	end)
 end)
 
-require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: native transactions refuse malformed no-op groups", function()
-	local Home = require("tests.support.keystats_home_fixture")
-	require("tests.support.keystats_native_fixture").with(function(collector)
+require("tests.support.metrics.home_fixture").it("owned-flush-empty-ngram: native transactions refuse malformed no-op groups", function()
+	local Home = require("tests.support.metrics.home_fixture")
+	require("tests.support.metrics.native_fixture").with(function(collector)
 		helpers.assert_true(collector.init(Home.options({ sqlite_path = Home.fresh_db() })))
 		local writer = require("metrics.engine.journal.sqlite_writer")
 		local now = require("core.logger.engine.monotonic").now_ms

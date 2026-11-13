@@ -17,10 +17,10 @@ local Config = helpers.load_module("tap_hold.engine.loader")
 local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 --- Loads the defaults with a user file holding `text`, its switch and timings
---- in the config.toml beside it (tests/support/tap_hold_fixture.lua).
+--- in the config.toml beside it (tests/support/keyboard/tap_hold_fixture.lua).
 local function load(text)
 	local path = os.tmpname()
-	local config_path = require("tests.support.tap_hold_fixture").write(path, text)
+	local config_path = require("tests.support.keyboard.tap_hold_fixture").write(path, text)
 	local loaded = Config.load(DEFAULTS, path, config_path)
 	os.remove(path)
 	os.remove(config_path)
@@ -142,7 +142,7 @@ assert(result.enabled == false and next(result.keys) == nil)
 		local path = os.tmpname()
 		local ok, err = pcall(function()
 			local fh = assert(io.open(path, "w"))
-			fh:write(require("tests.support.tap_hold_fixture").with_preset(
+			fh:write(require("tests.support.keyboard.tap_hold_fixture").with_preset(
 				'[tap_hold.keys.retired_key]\nhold_layer = "nav"\n'
 					.. '[tap_hold.keys.left_shift]\nretired_field = 1\ntime_activation_seconds = 0.3\n'))
 			fh:close()

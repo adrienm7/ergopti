@@ -138,7 +138,7 @@ helpers.describe("wpm_menubar: update_menubar() crashes are caught (F-HIGH-11)",
 	end
 
 	helpers.it("restarts and renders after a transient stats failure (wpm-stats-recovery)", function()
-		require("tests.support.wpm_menubar_fixture")(function(Menubar, state)
+		require("tests.support.metrics.wpm_menubar_fixture")(function(Menubar, state)
 			local keystats = package.loaded["metrics.engine"]
 			keystats.get_live_stats = function() error("simulated keystats failure") end
 			helpers.assert_eq(Menubar.start(), false)

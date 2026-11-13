@@ -12,8 +12,8 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shar
 	.. root .. "/../_shared/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
-local Fixture = require("tests.support.keystats_native_fixture")
-local Preferences = require("tests.support.metrics_preferences_fixture")
+local Fixture = require("tests.support.metrics.native_fixture")
+local Preferences = require("tests.support.metrics.preferences_fixture")
 local dir = assert(uv.fs_mkdtemp(assert(uv.os_tmpdir()) .. "/system-bind-recovery-XXXXXX"))
 local database = dir .. "/metrics.sqlite"
 -- A private ledger folder: the baseline below is written for the device this

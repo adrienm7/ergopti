@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.adapters.network.http_client_timeout_transaction_fixture"] = nil
-local Fixture = require("tests.support.adapters.network.http_client_timeout_transaction_fixture")
+package.loaded["tests.support.core.network.http_client_timeout_transaction_fixture"] = nil
+local Fixture = require("tests.support.core.network.http_client_timeout_transaction_fixture")
 local load_client = Fixture.load_client
 local make_exact_stop_timer = Fixture.make_exact_stop_timer
 local make_exact_task_http = Fixture.make_exact_task_http

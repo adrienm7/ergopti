@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_window = require("tests.support.ui.direct_native_window_fixture")
+local with_window = require("tests.support.core.ui.direct_native_window_fixture")
 
 helpers.describe("direct diagnostics windows retire their native roots", function()
 	helpers.it("healthcheck retires exact ownership before a reentrant close diagnostic", function()

@@ -1,7 +1,7 @@
 --- tests/unit/keyboard/engine/layout/test_read_native_retirement.lua
 --- A SIGTERM acceptance is not the exact native exit receipt of a layout read.
 local helpers = require("tests.helpers")
-local World = require("tests.support.platform.remap.layout_retirement_fixture")
+local World = require("tests.support.keyboard.engine.layout_retirement_fixture")
 
 helpers.describe("layout watcher joins native read retirement", function()
 	helpers.it("stops cleanly after an acknowledged successful read", function()

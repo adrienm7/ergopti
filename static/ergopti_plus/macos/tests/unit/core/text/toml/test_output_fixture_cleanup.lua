@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.toml_output_fixture")
+local fixture = require("tests.support.settings.toml_output_fixture")
 
 --- Exercises a terminal boundary without leaving artifacts on a failing test.
 --- @param mode string Callback or cleanup failure mode.

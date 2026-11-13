@@ -21,8 +21,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.menu_llm.mlx.mlx_requirement_pause_join_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.menu_llm.mlx.mlx_requirement_pause_join_fixture")
+package.loaded["tests.support.ai.ui.mlx_requirement_pause_join_fixture"] = nil
+local Fixture = require("tests.support.ai.ui.mlx_requirement_pause_join_fixture")
 local build_manager = Fixture.build_manager
 local build_prediction_locks = Fixture.build_prediction_locks
 local install_subject_stubs = Fixture.install_subject_stubs

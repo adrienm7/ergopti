@@ -7,9 +7,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keystats.today_completion_fixture")
+local Fixture = require("tests.support.metrics.engine.today_completion_fixture")
 local Json = require("core.text.engine.json")
-local ReadLogs = require("tests.support.ui.metrics.typing.read_completion_logs")
+local ReadLogs = require("tests.support.metrics.ui.read_completion_logs")
 
 local function contains(evaluations, fragment)
 	for _, call in ipairs(evaluations) do

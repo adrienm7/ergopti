@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local load_dashboard = require("tests.support.metrics_typing_fixture")
-local Scope = require("tests.support.metrics_typing_scope")
+local load_dashboard = require("tests.support.metrics.typing_fixture")
+local Scope = require("tests.support.metrics.typing_scope")
 
 local function with_save(mode, callback)
 	local previous_open, previous_rename, previous_remove = io.open, os.rename, os.remove

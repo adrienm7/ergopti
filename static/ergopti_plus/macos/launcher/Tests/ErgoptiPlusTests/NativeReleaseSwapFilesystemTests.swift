@@ -167,7 +167,7 @@ final class NativeReleaseSwapFilesystemTests: XCTestCase {
 			}
 		}
 		let driver = Self.payloadURL.appendingPathComponent("macos")
-		let probe = driver.appendingPathComponent("tests/support/release_swap_concurrent_probe.py")
+		let probe = driver.appendingPathComponent("tests/support/updater/release_swap_concurrent_probe.py")
 		let executable = try nativeExecutable()
 		let result = try run("/usr/bin/env", arguments: ["python3", "-B", probe.path,
 			driver.path, root.appendingPathComponent("controls").path, "--native-launcher", executable.path,
@@ -258,7 +258,7 @@ final class NativeReleaseSwapFilesystemTests: XCTestCase {
 		try Data().write(to: mount.appendingPathComponent(".metadata_never_index"))
 		let driver = Self.payloadURL.appendingPathComponent("macos")
 		let source = driver.appendingPathComponent("updater/engine/release_installer.lua")
-		let probe = driver.appendingPathComponent("tests/support/release_swap_physical_probe.py")
+		let probe = driver.appendingPathComponent("tests/support/updater/release_swap_physical_probe.py")
 		let controls = root.appendingPathComponent("controls")
 		// A failed observer may have left a descendant or stage: retain the image and root.
 		observerOwnershipUnproven = true

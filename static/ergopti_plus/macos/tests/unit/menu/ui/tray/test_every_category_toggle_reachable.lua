@@ -20,7 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
+local CaptionFixture = require("tests.support.hotstrings.parent_caption_fixture")
 
 -- The menu modules menu/ui/init.lua loads, under the keys Builder.generate reads.
 local MENU_MODULES = {
@@ -114,7 +114,7 @@ end
 local function build_tray(on, extra)
 	local llm_item = nil
 	-- Reachability requires the real activation fixture to own a ready transaction.
-	require("tests.support.llm_activation_fixture")("ollama", { true }, nil, function(_action, state, calls)
+	require("tests.support.ai.activation_fixture")("ollama", { true }, nil, function(_action, state, calls)
 		state.llm_enabled = on
 		local ManifestMenu = package.loaded["menu.engine.manifest_menu"]
 		local previous_build = ManifestMenu.build

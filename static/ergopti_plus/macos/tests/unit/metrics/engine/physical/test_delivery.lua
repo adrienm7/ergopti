@@ -3,8 +3,8 @@
 --- Exercises decoded native delivery without claiming production capture coverage.
 local helpers = require("tests.helpers")
 local Delivery = require("metrics.engine.capture.physical_delivery")
-local AccountingScope = require("tests.support.physical_accounting_scope")
-local Frames = require("tests.support.physical_stream_frames")
+local AccountingScope = require("tests.support.layouts.physical_accounting_scope")
+local Frames = require("tests.support.layouts.physical_stream_frames")
 local Identity = require("metrics.engine.capture.physical_key_identity")
 
 -- HID usage pages and usages the identity scenarios press.

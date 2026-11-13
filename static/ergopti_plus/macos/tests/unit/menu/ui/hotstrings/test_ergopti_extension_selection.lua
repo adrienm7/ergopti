@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
+local CaptionFixture = require("tests.support.hotstrings.parent_caption_fixture")
 require("tests.lua.ergopti_extension_selection_contract").run(helpers, require("menu.engine.manifest_reader").features())
 
 --- Provides the real files beneath a shipped scanner root.

@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local provenance_fixture = require("tests.support.keystats_provenance_fixture")
+local provenance_fixture = require("tests.support.metrics.provenance_fixture")
 
 -- Own the real tracker dependency caches across construction, callbacks and teardown.
 local function scoped_tracker_case(callback)

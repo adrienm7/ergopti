@@ -7,8 +7,8 @@
 --- on the maintainer's Windows machine (nor on CI), the database-path methods
 --- are tested with the expectation that is_available() returns false.
 
-package.loaded["tests.support.modules.keystats.storage.keystats_sqlite_writer_fixture"] = nil
-local Fixture = require("tests.support.modules.keystats.storage.keystats_sqlite_writer_fixture")
+package.loaded["tests.support.metrics.engine.storage.sqlite_writer_fixture"] = nil
+local Fixture = require("tests.support.metrics.engine.storage.sqlite_writer_fixture")
 local helpers, it, sw, is_media_schema_startup, with_writer_read_receipts, with_category_commands, with_ngram_sql, with_meta_value_output, with_burst_histogram_statement, with_local_day_clock =
 	Fixture.helpers, Fixture.it, Fixture.sw, Fixture.is_media_schema_startup, Fixture.with_writer_read_receipts, Fixture.with_category_commands, Fixture.with_ngram_sql, Fixture.with_meta_value_output, Fixture.with_burst_histogram_statement, Fixture.with_local_day_clock
 
@@ -604,7 +604,7 @@ helpers.describe("linux-sqlite-local-event-days", function()
 				with_local_day_clock(function()
 					local keystats = require(keystats_name)
 					keystats.init({ sqlite_path = "/tmp/owned-local-day-unit.sqlite" })
-					require("tests.support.metrics_consent_fixture").enable(keystats)
+					require("tests.support.metrics.consent_fixture").enable(keystats)
 					keystats.record_hotstring("owned", "q", "abc", 1000, "static", 0, false)
 					keystats.record_shortcut("owned", "owned-action", 1000)
 					keystats.flush()

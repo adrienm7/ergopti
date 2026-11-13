@@ -26,8 +26,8 @@ local function with_handoff_fixture(body)
 	local saved_open, saved_remove, saved_date = io.open, os.remove, os.date
 	local keycode_owner, saved_keycode_map
 	local outcome = table.pack(xpcall(function()
-		package.loaded["tests.support.profile_delete_fixture"] = nil
-		local Fixture = require("tests.support.profile_delete_fixture")
+		package.loaded["tests.support.settings.profile_delete_fixture"] = nil
+		local Fixture = require("tests.support.settings.profile_delete_fixture")
 		Fixture.with_trigger_fixture({ real_registrar = true }, function(fixture)
 			-- Own only this fixture's map slot; retain every raw entry and its metatable.
 			-- The canonical mac_keycodes.json registry defines KeyA=0 and KeyB=11.

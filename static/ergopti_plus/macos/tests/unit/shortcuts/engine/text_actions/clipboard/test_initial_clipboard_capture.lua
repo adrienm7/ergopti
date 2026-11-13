@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.shortcuts.initial_clipboard_fixture")
+local Fixture = require("tests.support.shortcuts.initial_clipboard_fixture")
 
 helpers.describe("initial-clipboard-capture", function()
 	for _, kind in ipairs({ "plain", "wrap", "transform" }) do

@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_picker = require("tests.support.ui.usercontent_reference_fixture")
+local with_picker = require("tests.support.core.ui.usercontent_reference_fixture")
 
 --- Reuses the native reference contract without replacing the dialog receiver.
 --- @param scenario function Receives the real dialog and native observations.

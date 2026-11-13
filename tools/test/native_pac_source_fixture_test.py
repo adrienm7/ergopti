@@ -14,7 +14,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "static/ergopti_plus/macos/tests/support/native_pac_source_fixture.py"
+SOURCE = ROOT / "static/ergopti_plus/macos/tests/support/core/native_pac_source_fixture.py"
 SPEC = importlib.util.spec_from_file_location("pac_source_fixture", SOURCE)
 PEERS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PEERS)

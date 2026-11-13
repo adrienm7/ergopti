@@ -26,8 +26,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.keystats.aggregation.hs274_duplicate_count_fixture"] = nil
-local Fixture = require("tests.support.modules.keystats.aggregation.hs274_duplicate_count_fixture")
+package.loaded["tests.support.metrics.engine.hs274_duplicate_count_fixture"] = nil
+local Fixture = require("tests.support.metrics.engine.hs274_duplicate_count_fixture")
 local Accounting = Fixture.Accounting
 
 

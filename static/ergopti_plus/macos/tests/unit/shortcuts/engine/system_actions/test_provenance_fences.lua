@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.system_actions_fixture")
+local fixture = require("tests.support.core.system_actions_fixture")
 local with_fixture = fixture.with_fixture
 local fire_latest_timer = fixture.fire_latest_timer
 local fire_post_callback_actions = fixture.fire_post_callback_actions

@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 require("core.logger.engine")
 local json = require("core.text.engine.json")
 local Rewrite = require("ai.engine.prediction.rewrite")
-local Scope = require("tests.support.modules.llm.selection_translation_scope")
+local Scope = require("tests.support.ai.engine.prediction.selection_translation_scope")
 
 local ENTRY_ID = "tone-cerebras"
 local MODEL = "qwen-3.8-27b"
@@ -204,7 +204,7 @@ local function build_world(selection)
 		end,
 		getAll = function() return {} end,
 	}
-	require("tests.support.modules.llm.selection_translation_destination").attach(world, {
+	require("tests.support.ai.engine.prediction.selection_translation_destination").attach(world, {
 		name = "ToneApp", bundleID = "test.tone", path = "/Applications/Tone.app",
 	})
 	package.loaded["shortcuts.engine.script_control"] = nil
@@ -376,7 +376,7 @@ local function case(name, scenario)
 	helpers.it(name, function()
 		return helpers.with_fresh_modules({
 			"ai.engine.prediction.tone_rewrite", "diagnostics.adapters.event_provenance", "ai.engine.prediction.translate",
-			"tests.support.modules.llm.selection_translation_destination",
+			"tests.support.ai.engine.prediction.selection_translation_destination",
 		}, function()
 			return Scope.run(scenario)
 		end)

@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_finish = require("tests.support.onboarding_finish_fixture").with_finish
+local with_finish = require("tests.support.onboarding.finish_fixture").with_finish
 
 -- A valid finish payload whose rows reach the writer.
 local ANSWERS = {

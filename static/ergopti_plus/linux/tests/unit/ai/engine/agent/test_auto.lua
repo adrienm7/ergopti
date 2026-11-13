@@ -10,7 +10,7 @@
 --- dismissing raises it, and it survives a restart in the XDG state folder.
 ---
 --- The real engine, agent settings, connectors, learning store and remote
---- client run; only the boundaries are scripted (tests/support/agent_scenario.lua).
+--- client run; only the boundaries are scripted (tests/support/ai/agent_scenario.lua).
 ---
 --- ROOT CAUSE ENCODED:
 --- The automatic mode must never cover another tooltip, never triage a
@@ -22,7 +22,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Scenario = require("tests.support.agent_scenario")
+local Scenario = require("tests.support.ai.agent_scenario")
 local Agent = require("ai.engine.agent.agent")
 local Json = require("core.text.engine.json")
 

@@ -38,7 +38,7 @@
 
 local helpers = require("tests.helpers")
 
-local Record = helpers.load_module("tests.support.touchpad_record")
+local Record = helpers.load_module("tests.support.gestures.touchpad_record")
 
 local MANAGER, READER, FINDER = "gestures.engine.manager", "platform.input.evdev_reader", "gestures.adapters.touchpad_finder"
 local EMITTER, LOGGER = "gestures.engine.combo_emitter", "core.logger.engine.shim"

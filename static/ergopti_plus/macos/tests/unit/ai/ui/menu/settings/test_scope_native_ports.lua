@@ -2,8 +2,8 @@
 
 --- Verifies the actual shortcut registrar, prediction engine and menu provider.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.profile_delete_fixture")
-local with_activation = require("tests.support.llm_activation_fixture")
+local Fixture = require("tests.support.settings.profile_delete_fixture")
+local with_activation = require("tests.support.ai.activation_fixture")
 
 helpers.describe("LLM scope native ports", function()
 	helpers.it("captures and restores actual dormant chords after preferences drift", function()

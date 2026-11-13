@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_fixture = require("tests.support.ollama_pull_fixture").with_fixture
+local with_fixture = require("tests.support.ai.ollama_pull_fixture").with_fixture
 local Json = require("core.text.engine.json")
 local NONCE = "12345678-abcd-4321-abcd-123456789abc"
 

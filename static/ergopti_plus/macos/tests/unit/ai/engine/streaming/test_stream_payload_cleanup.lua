@@ -2,7 +2,7 @@
 
 --- Replays admitted payload cleanup through both real public streaming fetch paths.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.llm.stream_payload_cleanup_fixture")
+local Fixture = require("tests.support.ai.engine.api.stream_payload_cleanup_fixture")
 
 helpers.describe("streaming payload cleanup admission and retirement", function()
 	for _, backend in ipairs({ "ollama", "mlx" }) do

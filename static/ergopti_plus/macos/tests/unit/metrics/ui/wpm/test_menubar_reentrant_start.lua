@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_menubar = require("tests.support.wpm_menubar_fixture")
+local with_menubar = require("tests.support.metrics.wpm_menubar_fixture")
 
 helpers.describe("WPM menubar reentrant startup", function()
 	helpers.it("retires a constructor that returns after stop and successor start", function()

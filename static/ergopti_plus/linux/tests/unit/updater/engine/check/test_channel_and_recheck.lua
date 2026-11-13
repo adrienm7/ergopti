@@ -125,7 +125,7 @@ helpers.describe("updater: a found release stays found", function()
 				return true
 			end,
 		}
-		M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
+		M._http_client = require("tests.support.updater.release_http_fixture").attach(M._http_client)
 		M.check_for_updates(nil, function(available, release, err)
 			result = { available = available, release = release, err = err }
 		end)

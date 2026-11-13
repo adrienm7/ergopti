@@ -28,7 +28,7 @@ local KEYCODES = Json.decode(read(helpers.shared("layouts/data/mac_keycodes.json
 local ERGOL = read(REGISTRY_DIR .. "ergol/ergol.keylayout")
 local SOURCE = { id = "ergol", keyboard_name = "Ergo-L", text = ERGOL, convention = "ansi" }
 
-local fake_mac = require("tests.support.layout_rows_fake_mac").new
+local fake_mac = require("tests.support.layouts.rows_fake_mac").new
 
 helpers.describe("layout rows build: a live replace with no logout (layout-rows-build)", function()
 	helpers.it("installs, selects and reads back a build, then retires the previous one", function()

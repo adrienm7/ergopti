@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local receiver = require("tests.support.mlx_truststore_fixture")
-local support = require("tests.support.mlx_download_fixture")
+local receiver = require("tests.support.ai.mlx_truststore_fixture")
+local support = require("tests.support.ai.mlx_download_fixture")
 
 helpers.describe("MLX downloader system trust admission", function()
 	helpers.it("admits the managed receiver before emitting the native downloader", function()

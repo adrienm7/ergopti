@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_stream = require("tests.support.modules.llm.streaming_payload_fixture").with_stream
+local with_stream = require("tests.support.ai.engine.streaming_payload_fixture").with_stream
 
 helpers.describe("streaming requires an acknowledged complete payload", function()
 	for _, backend in ipairs({ "mlx", "ollama" }) do

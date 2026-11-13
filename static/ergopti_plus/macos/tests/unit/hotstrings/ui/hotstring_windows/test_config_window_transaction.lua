@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local PersonalFixture = require("tests.support.hotstrings_config_window_fixture")
+local PersonalFixture = require("tests.support.hotstrings.config_window_fixture")
 
 local SENTINEL = "[_meta]\ndelay = 0.33\n"
 

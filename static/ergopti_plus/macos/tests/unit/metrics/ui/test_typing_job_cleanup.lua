@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Scope = require("tests.support.metrics_typing_scope")
-local load_dashboard = require("tests.support.metrics_typing_fixture")
+local Scope = require("tests.support.metrics.typing_scope")
+local load_dashboard = require("tests.support.metrics.typing_fixture")
 
 --- Loads real projection jobs behind independently observable timer ownership.
 --- @return table dashboard

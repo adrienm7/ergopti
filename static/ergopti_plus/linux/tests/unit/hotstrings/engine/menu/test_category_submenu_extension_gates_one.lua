@@ -24,8 +24,8 @@
 --- switch the category on.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.hotstrings.menu.category_submenu_fixture"] = nil
-local Fixture = require("tests.support.modules.hotstrings.menu.category_submenu_fixture")
+package.loaded["tests.support.hotstrings.engine.menu.category_submenu_fixture"] = nil
+local Fixture = require("tests.support.hotstrings.engine.menu.category_submenu_fixture")
 local helpers, fake_config =
 	Fixture.helpers, Fixture.fake_config
 

@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.llm.screen_answer_fixture")
-local Scope = require("tests.support.modules.llm.selection_translation_scope")
+local Fixture = require("tests.support.ai.engine.prediction.screen_answer_fixture")
+local Scope = require("tests.support.ai.engine.prediction.selection_translation_scope")
 
 local function with_world(scenario)
 	return helpers.with_fresh_modules({ "ai.engine.prediction.screen_answer", "ai.engine.ollama.local_model_offer",

@@ -1548,7 +1548,7 @@ helpers.describe("menu certification: current disabled public Agent policy", fun
 					"menu.ui.builder.builder", "ai.ui.menu.agent_rows", "ai.ui.menu.parent" }) do
 					package.loaded[name] = nil
 				end
-				require("tests.support.llm_preferences_fixture").with(function()
+				require("tests.support.ai.preferences_fixture").with(function()
 					local engine = require("ai.engine.prediction.engine")
 					local context = { llm = engine, paused = state == "paused",
 						on_quit = function() end, on_menu_changed = function() end }

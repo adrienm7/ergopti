@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Choices = require("tests.support.hotstring_choices")
+local Choices = require("tests.support.hotstrings.choices")
 
 local CATEGORIES = {
 	french_autocorrection = { id = "french_autocorrection", sections_order = { "accents", "minus" },

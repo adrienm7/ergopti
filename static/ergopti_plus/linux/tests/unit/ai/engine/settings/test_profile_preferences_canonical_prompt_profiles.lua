@@ -1,7 +1,7 @@
 --- tests/unit/ai/engine/settings/test_profile_preferences_canonical_prompt_profiles.lua
 
-package.loaded["tests.support.modules.llm.settings.profile_preferences_canonical_fixture"] = nil
-local Fixture = require("tests.support.modules.llm.settings.profile_preferences_canonical_fixture")
+package.loaded["tests.support.ai.engine.profile_preferences_canonical_fixture"] = nil
+local Fixture = require("tests.support.ai.engine.profile_preferences_canonical_fixture")
 local helpers, Sandbox, Toml, Json, Base64, with_idle_live_owner, with_config, profile =
 	Fixture.helpers, Fixture.Sandbox, Fixture.Toml, Fixture.Json, Fixture.Base64, Fixture.with_idle_live_owner, Fixture.with_config, Fixture.profile
 

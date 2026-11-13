@@ -4,7 +4,7 @@
 --- MODULE: AI Agent Local Model (macOS)
 --- DESCRIPTION:
 --- Runs the agent on the local backend (Ollama) over the real runner, shared
---- logic, prediction engine and local transport (tests/support/agent_world.lua):
+--- logic, prediction engine and local transport (tests/support/ai/agent_world.lua):
 --- the model a System names must be one the local server lists before any
 --- chat request is sent, a missing one is named with a Download button that
 --- hands it to the AI menu's download owner, and a failed answer logs the
@@ -19,7 +19,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local World = require("tests.support.agent_world")
+local World = require("tests.support.ai.agent_world")
 
 local CONFIG = World.CONFIG
 local SELECTION = World.SELECTION

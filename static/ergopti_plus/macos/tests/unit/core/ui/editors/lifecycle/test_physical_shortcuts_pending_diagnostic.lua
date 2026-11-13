@@ -17,11 +17,11 @@ local function with_host(scenario)
 		"shortcuts.engine.physical_slots", "shortcuts.engine.physical_availability", "core.ui.ui.builder", "core.ui.ui.webview_close_owner",
 		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.engine.webview.i18n_seed", "core.fs.adapters.file_system",
 		"core.ui.engine.window_titles", "core.text.engine.json", "core.fs.adapters.json_codec", "core.timing.engine.deferred_work", "core.events.timer_scheduler",
-		"core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.engine.webview.presentation", "tests.support.webview_recursive_close_fixture",
+		"core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.engine.webview.presentation", "tests.support.core.webview_recursive_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, errors = {}, notification_depth = 0,
 			bridges = {}, script_refs = {}, retired = 0, received = 0, logs = {}, timers = {}, timer_attempts = 0, retirement_callbacks = {} }
-		local make = require("tests.support.webview_recursive_close_fixture")(h)
+		local make = require("tests.support.core.webview_recursive_close_fixture")(h)
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, format, ...)
 			h.logs[#h.logs + 1] = string.format(format, ...)

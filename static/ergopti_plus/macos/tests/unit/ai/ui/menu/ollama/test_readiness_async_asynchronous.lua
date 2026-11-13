@@ -10,8 +10,8 @@
 -- =============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.menu_llm.ollama.ollama_readiness_async_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.menu_llm.ollama.ollama_readiness_async_fixture")
+package.loaded["tests.support.ai.ui.ollama_readiness_async_fixture"] = nil
+local Fixture = require("tests.support.ai.ui.ollama_readiness_async_fixture")
 local MODULES = Fixture.MODULES
 local accept_model_download = Fixture.accept_model_download
 local foreground_fixture = Fixture.foreground_fixture

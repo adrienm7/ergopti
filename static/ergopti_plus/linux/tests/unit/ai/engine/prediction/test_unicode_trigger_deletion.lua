@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
-local ProfilesFixture = require("tests.support.llm_profiles_fixture")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local ProfilesFixture = require("tests.support.ai.profiles_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 
 --- Runs one trigger against the real prediction parser and an observable text sink.
 --- @param trigger string Trigger accepted by the public configuration API.

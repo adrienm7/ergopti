@@ -29,7 +29,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.synthetic_action_fixture")
+local Fixture = require("tests.support.core.synthetic_action_fixture")
 
 -- The remap menu stores the sticky auto-cancel delay in milliseconds; any
 -- positive value exercises the path, so this one is named for what it is.

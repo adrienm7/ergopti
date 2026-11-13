@@ -253,7 +253,7 @@ helpers.describe("Metrics parent refusal preserves existing WPM lifecycle reconc
 		helpers.assert_eq(context.parent_getters,0);helpers.assert_eq(context.parent_projections,0)
 	end)
 	helpers.it("parent refusal retains then cancels the genuine WPM owner's exact timer", function()
-		require("tests.support.wpm_menubar_fixture")(function(native, observed)
+		require("tests.support.metrics.wpm_menubar_fixture")(function(native, observed)
 			helpers.assert_eq(native.start(),true)
 			local token = observed.timers[1]
 			local active = load_menu({native_menubar=native,keystats_menubar_wpm=true,

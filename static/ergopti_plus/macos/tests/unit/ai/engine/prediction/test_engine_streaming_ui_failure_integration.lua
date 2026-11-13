@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 
-local load_fixture = require("tests.support.prediction_pipeline").load
+local load_fixture = require("tests.support.ai.prediction_pipeline").load
 
 helpers.describe("prediction pipeline fixture isolation", function()
 	helpers.it("owns fresh nested defaults on each load", function()

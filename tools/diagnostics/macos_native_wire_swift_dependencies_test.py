@@ -16,15 +16,15 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = Path(os.environ.get("ERGOPTI_RECEIVING_REPOSITORY", ROOT))
-RELATIVE = "static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py"
-BUILDER = "static/ergopti_plus/macos/tests/support/native_http_fixture_builder.py"
+RELATIVE = "static/ergopti_plus/macos/tests/support/core/native_http_wire_client_receiving.py"
+BUILDER = "static/ergopti_plus/macos/tests/support/core/native_http_fixture_builder.py"
 # Independent recipe fixture: do not regenerate this list from the builder.
 RECIPE_INPUTS = (
     "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift",
     "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedPACSource.swift",
     "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedCertificateAuthorities.swift",
     "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedBootstrapPolicy.generated.swift",
-    "static/ergopti_plus/macos/tests/support/native_http_fixture_main.swift",
+    "static/ergopti_plus/macos/tests/support/core/native_http_fixture_main.swift",
     "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
     "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedProgramCompatibility.h",
     "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/LoopbackListenerCompatibility.h",
@@ -40,7 +40,7 @@ RECIPE_INPUTS = (
     "static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py",
     "static/ergopti_plus/_shared/core/network/data/proxy_policy.json",
     BUILDER,
-    "static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py",
+    "static/ergopti_plus/macos/tests/support/core/native_http_wire_fixture.py",
     "tools/diagnostics/macos_owned_process.py",
 )
 

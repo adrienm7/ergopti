@@ -8,7 +8,7 @@
 
 local helpers = require("tests.helpers")
 local WarningContract = require("tests.support.dialog_warning_contract")
-local Fixture = require("tests.support.keystats_provenance_fixture")
+local Fixture = require("tests.support.metrics.provenance_fixture")
 local OWNERS = {
 	"core.events.clock",
 	"core.timing.engine.timings",

@@ -17,8 +17,8 @@
 --- without a default model.
 --- ==============================================================================
 
-package.loaded["tests.support.ui.menu.llm.llm_backend_rows_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.llm.llm_backend_rows_fixture")
+package.loaded["tests.support.menu.ui.llm.backend_rows_fixture"] = nil
+local Fixture = require("tests.support.menu.ui.llm.backend_rows_fixture")
 local helpers, setup, find = Fixture.helpers, Fixture.setup, Fixture.find
 local Json = require("core.text.engine.json")
 

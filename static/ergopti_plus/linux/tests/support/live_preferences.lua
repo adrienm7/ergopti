@@ -21,8 +21,8 @@ function M.daemon()
 	local _, status = Files.read_with_status(Paths.config("config.toml"))
 	assert(status == "absent", "the live daemon fixture requires a fresh configuration")
 	-- Any config.toml is a configured driver, so the setup wizard stays closed.
-	-- The tap-hold switch is a config.toml row (tests/support/tap_hold_fixture.lua).
-	local config = require("tests.support.tap_hold_fixture").config()
+	-- The tap-hold switch is a config.toml row (tests/support/keyboard/tap_hold_fixture.lua).
+	local config = require("tests.support.keyboard.tap_hold_fixture").config()
 	-- The AI probe's rewrite runs from a chord, as a user would bind it. Chords
 	-- only fire while the shortcuts feature is on, which it is not by default:
 	-- without it the daemon holds the chord back as it does during a pause.
@@ -35,7 +35,7 @@ function M.daemon()
 	Hotstrings.init(require("hotstrings.engine.engine").new(), "tests/e2e/fixtures/daemon_keys.toml")
 	Hotstrings.load_all()
 	assert(Hotstrings.set_all_sections("daemon_keys", true), "the live catalogue must be explicitly selected")
-	assert(Files.write(Paths.config("tap_hold.toml"), require("tests.support.tap_hold_fixture").with_preset()),
+	assert(Files.write(Paths.config("tap_hold.toml"), require("tests.support.keyboard.tap_hold_fixture").with_preset()),
 		"the live tap-hold fixture must explicitly import its preset")
 	local preset = require("layouts.engine.layers.editor").read_shipped(require("core.fs.engine.paths").shared("layouts/data/layers.recommended.toml"))
 	assert(Files.write(directory .. "/layers.toml", preset), "the live navigation fixture must explicitly import its preset")

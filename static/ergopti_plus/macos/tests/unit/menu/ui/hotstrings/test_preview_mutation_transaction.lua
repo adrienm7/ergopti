@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OutputFixture = require("tests.support.toml_output_fixture")
+local OutputFixture = require("tests.support.settings.toml_output_fixture")
 local KEY = "preview_colored_tooltips"
 local SOURCE = '# retained foreign header\n[hotstrings]\npreview_colored_tooltips = true\n[foreign]\nfuture = "kept" # retained\n'
 

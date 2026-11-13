@@ -6,7 +6,7 @@
 local helpers = require("tests.helpers")
 local prefs   = helpers.load_with_stubs("settings.engine.preferences.preferences")
 local codec   = helpers.load_with_stubs("core.text.engine.toml.codec")
-local with_count_menu = require("tests.support.llm_count_menu_fixture")
+local with_count_menu = require("tests.support.ai.count_menu_fixture")
 
 local function contract_path()
 	return helpers.shared("ai/data/menu_persistence_contract.json")

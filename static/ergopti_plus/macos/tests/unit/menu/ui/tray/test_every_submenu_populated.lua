@@ -18,8 +18,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
-local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
+local CaptionFixture = require("tests.support.hotstrings.parent_caption_fixture")
+local LayoutFixture = require("tests.support.layouts.legacy_caption_fixture")
 
 -- The menu modules menu/ui/init.lua loads, under the keys Builder.generate reads.
 local MENU_MODULES = {
@@ -117,7 +117,7 @@ end
 local function build_tray(observe_layout, catalogue)
 	-- The real LLM row, built by its own module over the doubles its suite uses.
 	local llm_item = nil
-	require("tests.support.llm_count_menu_fixture")(function(llm_menu)
+	require("tests.support.ai.count_menu_fixture")(function(llm_menu)
 		llm_item = llm_menu.build_item()
 	end, { catalogue = catalogue, real_streaming_panel = true, real_trigger_panel = true })
 

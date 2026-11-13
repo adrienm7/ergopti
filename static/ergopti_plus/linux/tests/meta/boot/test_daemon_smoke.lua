@@ -172,7 +172,7 @@ end
 --- @param mode string Native restart boundary outcome.
 --- @param body function Receives disk, owner and native-dispatch observations.
 local function with_paths_restart(mode, body)
-  require("tests.support.ui.menu.llm.numeric_configuration_fixture").with_configuration(function(f)
+  require("tests.support.menu.ui.llm.numeric_configuration_fixture").with_configuration(function(f)
     local function write(path, bytes)
       local file = assert(io.open(path, "wb")); assert(file:write(bytes)); assert(file:close())
     end
@@ -744,7 +744,7 @@ helpers.describe("daemon startup-capture-publication", function()
 			helpers.assert_true(begin ~= nil and ending ~= nil and ending > begin, "the actual admission block must exist")
 			local block = source:sub(begin, ending - 1)
 			local calls, retired, closed, pending = {}, false, false, mode == "pending" or mode == "debt" or mode == "runner-rebound"
-			local layout = require("tests.support.layout_cohort_fixture").layout(function() return 30 end)
+			local layout = require("tests.support.layouts.cohort_fixture").layout(function() return 30 end)
 			local publication = layout.publish_current_capture
 			local loop = { run = function(opts) calls[#calls + 1] = "loop"; opts.onIdle() end, stop = function() end }
 			if mode ~= "success" and mode ~= "late-rebound" and mode ~= "late-stop" then
@@ -846,7 +846,7 @@ helpers.describe("daemon managed reacquisition publisher", function()
 			local block = source:sub(first, last - 1) .. "\nreturn publish_reacquired_capture"
 			local name = "layouts.adapters.keyboard_layout"
 			local saved = package.loaded[name]
-			local layout = require("tests.support.layout_cohort_fixture").layout(function() return 30 end)
+			local layout = require("tests.support.layouts.cohort_fixture").layout(function() return 30 end)
 			local publication, ready = layout.publish_current_capture, layout.is_ready
 			local opts, calls = { keymap = "/controlled/exact-selected.xkb" }, {}
 			local original_override = opts.keymap

@@ -7,7 +7,7 @@
 --- native observations. Controlled ports do not claim compositor atomicity.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.adapters.synthetic_input.selection_write_fixture")
+local fixture = require("tests.support.platform.input.synthetic_input.selection_write_fixture")
 
 helpers.describe("staged selected output exact range", function()
 	for _, text in ipairs({ "ok", "☃", "é", "👩‍💻" }) do

@@ -10,7 +10,7 @@
 --- is typed.
 ---
 --- The real engine, agent settings, connectors and remote client run; only the
---- boundaries are scripted (tests/support/agent_scenario.lua).
+--- boundaries are scripted (tests/support/ai/agent_scenario.lua).
 ---
 --- ROOT CAUSE ENCODED:
 --- The agent's shared core existed with no Linux caller: the three catalogue
@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Scenario = require("tests.support.agent_scenario")
+local Scenario = require("tests.support.ai.agent_scenario")
 local Agent = require("ai.engine.agent.agent")
 
 local SELECTION = "On se voit jeudi 14h avec Paul pour le devis"

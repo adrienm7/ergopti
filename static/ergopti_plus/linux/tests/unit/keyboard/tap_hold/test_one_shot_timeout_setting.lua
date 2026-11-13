@@ -11,8 +11,8 @@
 --- one-shot deadline follows it (one-shot-timeout-setting).
 --- ==============================================================================
 
-package.loaded["tests.support.platform.remap.tap_hold.tap_hold_engine_fixture"] = nil
-local Fixture = require("tests.support.platform.remap.tap_hold.tap_hold_engine_fixture")
+package.loaded["tests.support.keyboard.engine.tap_hold_engine_fixture"] = nil
+local Fixture = require("tests.support.keyboard.engine.tap_hold_engine_fixture")
 local helpers, Engine = Fixture.helpers, Fixture.Engine
 local Loader = require("tap_hold.engine.loader")
 local Timings = require("core.timing.engine.timings")

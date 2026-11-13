@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_picker = require("tests.support.ui.usercontent_reference_fixture")
+local with_picker = require("tests.support.core.ui.usercontent_reference_fixture")
 
 helpers.describe("action picker bounds retained native controllers", function()
 	for _, close_kind in ipairs({ "explicit", "user" }) do

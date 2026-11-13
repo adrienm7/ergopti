@@ -2,7 +2,7 @@
 
 --- Exercises native focus refusal at the real prediction backend dispatch edge.
 local helpers = require("tests.helpers")
-local Pipeline = require("tests.support.prediction_pipeline")
+local Pipeline = require("tests.support.ai.prediction_pipeline")
 
 -- These are the real pipeline's transitive modules and its explicit facade
 -- injections. The existing fixture and all production entry points stay intact.
@@ -132,7 +132,7 @@ helpers.describe("Prediction dispatch under native AX focus refusal", function()
 	helpers.it("refuses backend dispatch for an exclusion restored as a string", function()
 		with_pipeline(function(fixture, controls)
 			controls.mode = "ordinary"
-			require("tests.support.toml_output_fixture").with_output(function(path)
+			require("tests.support.settings.toml_output_fixture").with_output(function(path)
 				local file = assert(io.open(path, "wb"))
 				assert(file:write('[llm.trigger]\ndisabled_apps = ["test.fixture"]\n'))
 				file:close()

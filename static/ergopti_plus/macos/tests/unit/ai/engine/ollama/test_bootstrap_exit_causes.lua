@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.llm.backends.ai_runtime_selection_install_fixture")
+local Fixture = require("tests.support.ai.engine.backends.runtime_selection_install_fixture")
 
 --- Runs one bootstrap that exits with `code` and no marker.
 --- @param code integer Exit code.

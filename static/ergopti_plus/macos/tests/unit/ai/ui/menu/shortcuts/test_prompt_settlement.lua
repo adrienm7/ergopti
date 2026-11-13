@@ -29,7 +29,7 @@ local SHORTCUT_OWNERS = {
 	"core.fs.engine.native_path",
 }
 
-local Fixture = require("tests.support.profile_delete_fixture")
+local Fixture = require("tests.support.settings.profile_delete_fixture")
 local with_delete_fixture = Fixture.with_delete_fixture
 
 --- Loads the real shared shortcut prompt around a deterministic dialog result.

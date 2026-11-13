@@ -2,7 +2,7 @@
 --- Actual shared facade forwards the original captured budget to retained delivery.
 local helpers = require("tests.helpers")
 local Phase = require("ai.engine.ollama.install_phase")
-local fixture = require("tests.support.ollama_retained_fixture")
+local fixture = require("tests.support.ai.ollama_retained_fixture")
 helpers.describe("Retained Ollama installation phase", function()
  local function start(f)
   f.operation = Phase.start(f.ports, f.options, function(result) f.completions[#f.completions + 1] = result end)

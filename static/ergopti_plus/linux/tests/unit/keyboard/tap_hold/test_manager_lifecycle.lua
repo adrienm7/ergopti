@@ -8,8 +8,8 @@
 --- applied live by reload(). A tap action reaches the catalogue executor.
 --- ==============================================================================
 
-package.loaded["tests.support.platform.remap.tap_hold.tap_hold_manager_fixture"] = nil
-local Fixture = require("tests.support.platform.remap.tap_hold.tap_hold_manager_fixture")
+package.loaded["tests.support.keyboard.engine.tap_hold_manager_fixture"] = nil
+local Fixture = require("tests.support.keyboard.engine.tap_hold_manager_fixture")
 local helpers, DEFAULTS, fake_hook, write, manager =
 	Fixture.helpers, Fixture.DEFAULTS, Fixture.fake_hook, Fixture.write, Fixture.manager
 
@@ -28,7 +28,7 @@ helpers.describe("tap-hold manager", function()
 		local opts = { keyboard_hook = hook, execute_action = function() end,
 			action_names = require("gestures.engine.manager").get_executable_action_names,
 			on_text_injected = function() end, defaults_path = DEFAULTS, user_path = user_path,
-			config_path = require("tests.support.tap_hold_fixture").config_path(user_path) }
+			config_path = require("tests.support.keyboard.tap_hold_fixture").config_path(user_path) }
 		local first = Manager.init(opts)
 		hook.set_remapper = install
 		local called, retried = pcall(Manager.init, opts)
@@ -48,7 +48,7 @@ helpers.describe("tap-hold manager", function()
 		assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
 		local code = string.format([[package.path = %q
 require("core.lifecycle.engine.compat.utf8").install()
-local fixture = require("tests.support.platform.remap.tap_hold.tap_hold_manager_fixture")
+local fixture = require("tests.support.keyboard.engine.tap_hold_manager_fixture")
 local manager, hook, _, user_path = fixture.manager()
 local original = hook.engine
 local paths = require("core.fs.engine.paths")
@@ -247,7 +247,7 @@ os.remove(user_path)
 			Manager.init({ keyboard_hook = hook, execute_action = Gestures.execute_action,
 				action_names = Gestures.get_executable_action_names, on_text_injected = function() end,
 				defaults_path = DEFAULTS, user_path = user_path,
-				config_path = require("tests.support.tap_hold_fixture").config_path(user_path) })
+				config_path = require("tests.support.keyboard.tap_hold_fixture").config_path(user_path) })
 			local code = require("tap_hold.engine.engine").KEY_CODES.tab
 			hook.engine:process(code, 1, 0)
 			local _, tap, binding = hook.engine:process(code, 0, 100)
@@ -626,7 +626,7 @@ helpers.describe("tap-hold manager: taps this driver cannot run", function()
 			on_text_injected = function() end,
 			defaults_path = DEFAULTS,
 			user_path = user_path,
-			config_path = require("tests.support.tap_hold_fixture").config_path(user_path),
+			config_path = require("tests.support.keyboard.tap_hold_fixture").config_path(user_path),
 		})
 		local function close()
 			Logger.warn = real_warn
@@ -759,7 +759,7 @@ end)
 
 
 helpers.describe("native OneShot Manager route", function()
-	local Fixture = require("tests.support.input_owner_fixture")
+	local Fixture = require("tests.support.core.input_owner_fixture")
 	local PREFIX = "29:1,29:0,29:1,29:0"
 	local function rows(s)
 		local result = {}; for _, row in ipairs(s.rows) do result[#result + 1] = row[1] .. ":" .. row[2] end
@@ -1705,7 +1705,7 @@ helpers.describe("OneShot daemon Manager bootstrap", function()
 			if not ok then error(manager, 0) end
 			options.cached_manager = manager
 		end
-		require("tests.support.input_owner_fixture").with_manager_session(options, function(s)
+		require("tests.support.core.input_owner_fixture").with_manager_session(options, function(s)
 			helpers.assert_eq(s.manager, options.cached_manager, "setup must use the genuinely preloaded module")
 			helpers.assert_eq(s.owner.get_action("caps_lock_then_tab"), "one_shot_shift")
 			s.pair(); helpers.assert_true(type(s.arm_deadline()) == "number")
@@ -1727,7 +1727,7 @@ helpers.describe("OneShot construction-original text source", function()
 			local function replace(s) s.hook.key_text = function() calls = calls + 1; return "b" end end
 			local options = {}
 			if timing == "before_manager" then options.before_manager = replace end
-			require("tests.support.input_owner_fixture").with_manager_session(options, function(s)
+			require("tests.support.core.input_owner_fixture").with_manager_session(options, function(s)
 				require("layouts.adapters.keyboard_layout")._set_table_for_test({
 					a = { keycode = 30, level = 1, mods = {} }, A = { keycode = 30, level = 2, mods = { "shift" } },
 					b = { keycode = 48, level = 1, mods = {} }, B = { keycode = 48, level = 2, mods = { "shift" } },
@@ -1749,7 +1749,7 @@ end)
 -- Cross-source choices use the layer and configuration at each physical DOWN.
 do
 local helpers = require('tests.helpers')
-local Fixture = require('tests.support.input_owner_fixture')
+local Fixture = require('tests.support.core.input_owner_fixture')
 helpers.describe('independent multi-source review', function()
   for _, first in ipairs({'a','b'}) do
     helpers.it('uses current instant config after native under layer: '..first, function()
@@ -1788,7 +1788,7 @@ end
 
 do
 local helpers = require('tests.helpers')
-local Fixture = require('tests.support.input_owner_fixture')
+local Fixture = require('tests.support.core.input_owner_fixture')
 helpers.describe('native choice while another source holds a tap-hold', function()
   for _, first in ipairs({'a', 'b'}) do
   helpers.it('passes the unmapped key through the active layer: '..first, function()
@@ -1810,7 +1810,7 @@ end
 
 do
 local helpers = require('tests.helpers')
-local Fixture = require('tests.support.input_owner_fixture')
+local Fixture = require('tests.support.core.input_owner_fixture')
 helpers.describe('source-specific swallowed navigation key', function()
   helpers.it('does not repeat or tap a second left alt under the active layer', function()
     local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.left_alt]\ntap_action = "backspace"\nhold_layer = "nav"\n'
@@ -1827,7 +1827,7 @@ end
 
 do
 local helpers = require('tests.helpers')
-local Fixture = require('tests.support.input_owner_fixture')
+local Fixture = require('tests.support.core.input_owner_fixture')
 helpers.describe('source-specific native to hold', function()
   for _, first in ipairs({'a', 'b'}) do
     helpers.it('preserves the later hold and earlier native key: '..first, function()
@@ -1849,7 +1849,7 @@ end
 
 do
 local helpers = require('tests.helpers')
-local Fixture = require('tests.support.input_owner_fixture')
+local Fixture = require('tests.support.core.input_owner_fixture')
 helpers.describe('source choice output refusal', function()
   helpers.it('retires capture when the later native DOWN cannot be acknowledged', function()
     local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.left_alt]\nhold_layer = "nav"\n[tap_hold.keys.escape]\ntap_action = "paste"\nhold_modifier = "ctrl"\n'
@@ -1868,7 +1868,7 @@ end
 
 do
 local helpers = require('tests.helpers')
-local Fixture = require('tests.support.input_owner_fixture')
+local Fixture = require('tests.support.core.input_owner_fixture')
 helpers.describe('source choice on source loss', function()
   helpers.it('keeps the surviving hold until its own release after native source loss', function()
     local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.space]\nhold_layer = "nav"\n[tap_hold.keys.escape]\ntap_action = "paste"\nhold_modifier = "ctrl"\n'
@@ -1888,7 +1888,7 @@ end
 
 do
 local helpers = require('tests.helpers')
-local Fixture = require('tests.support.input_owner_fixture')
+local Fixture = require('tests.support.core.input_owner_fixture')
 helpers.describe('plain combination candidate ownership', function()
   for _, code in ipairs({58,15}) do
   for _, first in ipairs({'a','b'}) do
@@ -1914,7 +1914,7 @@ end
 
 do
 local helpers = require('tests.helpers')
-local Fixture = require('tests.support.input_owner_fixture')
+local Fixture = require('tests.support.core.input_owner_fixture')
 helpers.describe('plain candidate repress with a peer still held', function()
   helpers.it('keeps each native reference and does not borrow the other keyboard', function()
     Fixture.with_manager_session({tap_hold_text='[tap_hold]\nenabled = true\ninherit_defaults = false\n',action_names={'copy','one_shot_shift'}}, function(s)
@@ -1933,7 +1933,7 @@ end
 
 do
 local helpers = require('tests.helpers')
-local Fixture = require('tests.support.input_owner_fixture')
+local Fixture = require('tests.support.core.input_owner_fixture')
 helpers.describe('repressed chord with a surviving peer', function()
   helpers.it('does not trigger a chord until the native peer releases', function()
     Fixture.with_manager_session({public_chords=true,tap_hold_text='[tap_hold]\nenabled = true\ninherit_defaults = false\n',action_names={'copy','one_shot_shift'},before_manager=function(s)

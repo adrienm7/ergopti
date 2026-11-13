@@ -671,7 +671,7 @@ helpers.describe("private chosen-ID remaining native consumer assignments", func
 			package.loaded["shortcuts.engine.tap_keys"] = nil
 			package.loaded["platform.input.keyboard_geometry"] = nil
 			local geometry = require("platform.input.keyboard_geometry")
-			require("tests.support.keyboard_geometry").initialize(geometry)
+			require("tests.support.layouts.keyboard_geometry").initialize(geometry)
 			local tap = require("shortcuts.engine.tap_keys")
 			helpers.assert_eq(tap.set_action("number_row_left", "run_program", function() return true end), true)
 			persist_chosen(actions, preferences, path, gesture_port, "tap_key__number_row_left")

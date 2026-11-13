@@ -224,7 +224,8 @@ try {
 						'onboarding',
 						'shortcuts',
 						'tap_hold',
-						'updater'
+						'updater',
+						'core'
 					])
 		);
 		reset();

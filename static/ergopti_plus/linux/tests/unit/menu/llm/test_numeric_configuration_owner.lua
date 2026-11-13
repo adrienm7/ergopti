@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.menu.llm.numeric_configuration_fixture")
+local Fixture = require("tests.support.menu.ui.llm.numeric_configuration_fixture")
 
 local function setting_row(f, key, changed, prefix_match)
 	local i18n = require("core.i18n.engine.i18n")

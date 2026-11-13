@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_virtual_file = require("tests.support.virtual_toml_file_fixture")
+local with_virtual_file = require("tests.support.core.virtual_toml_file_fixture")
 
 local recipes = {
 	function(q) return '[[s]]\n' .. q .. ' = { output = "A" }' end,

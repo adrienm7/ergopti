@@ -21,8 +21,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.menu_llm.mlx.mlx_requirement_pause_join_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.menu_llm.mlx.mlx_requirement_pause_join_fixture")
+package.loaded["tests.support.ai.ui.mlx_requirement_pause_join_fixture"] = nil
+local Fixture = require("tests.support.ai.ui.mlx_requirement_pause_join_fixture")
 local build_manager = Fixture.build_manager
 local build_prediction_locks = Fixture.build_prediction_locks
 local install_subject_stubs = Fixture.install_subject_stubs
@@ -373,7 +373,7 @@ helpers.describe("MLX import probe failure names a working action (mlx-runtime-b
 				end,
 			}
 			package.loaded["ai.engine.local_servers.mlx_deps_checker"] = {
-				import_probe = require("tests.support.modules.llm.mlx_import_probe").read,
+				import_probe = require("tests.support.ai.engine.mlx_import_probe").read,
 				is_task_running = function() return runtime.running == true end,
 				runtime_installed = function() return runtime.installed == true end,
 				has_failed = function() return runtime.failed == true end,
@@ -482,7 +482,7 @@ helpers.describe("A partial MLX venv is detected from its probe's own error (mlx
 				end,
 			}
 			package.loaded["ai.engine.local_servers.mlx_deps_checker"] = {
-				import_probe = require("tests.support.modules.llm.mlx_import_probe").read,
+				import_probe = require("tests.support.ai.engine.mlx_import_probe").read,
 				is_task_running = function() return false end,
 				runtime_installed = function() return true end,
 				has_failed = function() return false end,
@@ -553,7 +553,7 @@ helpers.describe("MLX interpreter comes from the runtime owner (mlx-venv-single-
 			with_fixture(function(native)
 				install_subject_stubs(native)
 				package.loaded["ai.engine.local_servers.mlx_deps_checker"] = {
-					import_probe = require("tests.support.modules.llm.mlx_import_probe").read,
+					import_probe = require("tests.support.ai.engine.mlx_import_probe").read,
 					venv_dir = function() return venv end,
 				}
 

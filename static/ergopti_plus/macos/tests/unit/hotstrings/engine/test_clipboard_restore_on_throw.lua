@@ -51,7 +51,7 @@ helpers.describe("clipboard: a write that throws must not keep the user's clipbo
 			"core.events.timer_scheduler", "diagnostics.adapters.event_provenance", "core.fs.adapters.storage",
 			"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 		}, function()
-			local f = require("tests.support.synthetic_input_fixture").make({ deliver_trigger = false })
+			local f = require("tests.support.core.synthetic_input_fixture").make({ deliver_trigger = false })
 			local original = { ["public.utf8-plain-text"] = "USER CLIPBOARD", ["public.html"] = "<b>original</b>" }
 			local clipboard, writes, restores, notifications, count = original, 0, 0, 0, 0
 			f.hs_overrides.pasteboard = {

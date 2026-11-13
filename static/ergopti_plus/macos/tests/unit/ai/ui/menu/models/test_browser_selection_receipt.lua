@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.owned_window_close_fixture")
+local Fixture = require("tests.support.core.ui.owned_window_close_fixture")
 
 --- Opens the actual browser as the selector page owner does.
 --- @param mode string First selection receipt: false, true or throw.

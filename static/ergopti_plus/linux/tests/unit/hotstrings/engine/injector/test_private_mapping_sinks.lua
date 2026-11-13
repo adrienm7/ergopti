@@ -82,7 +82,7 @@ local function flush_expansion(is_private)
 	-- method added to the writer does not surface here as a nil call inside the
 	-- code under test.
 	setmetatable(fake_writer, { __index = Fakes.sqlite_writer() })
-	require("tests.support.sqlite_flush_fake").attach(fake_writer)
+	require("tests.support.core.sqlite_flush_fake").attach(fake_writer)
 
 	local writer_name = "metrics.engine.journal.sqlite_writer"
 	local logger_name = "metrics.engine.keystats"
@@ -93,7 +93,7 @@ local function flush_expansion(is_private)
 	local ok, err = pcall(function()
 		local kl = require(logger_name)
 		kl.init({ sqlite_path = "/tmp/ergopti_private_sinks.sqlite" })
-		require("tests.support.metrics_consent_fixture").enable(kl)
+		require("tests.support.metrics.consent_fixture").enable(kl)
 		kl.reset_session()
 		kl.on_app_focus("app.test", 1000)
 		kl.record_hotstring("app.test", "FR7630", IBAN, 1100, "static", 6, is_private)
@@ -210,13 +210,13 @@ helpers.describe("private mapping: the synthetic character record", function()
 			upsert_scancodes = function() return true end,
 		}
 		setmetatable(package.loaded[writer_name], { __index = Fakes.sqlite_writer() })
-		require("tests.support.sqlite_flush_fake").attach(package.loaded[writer_name])
+		require("tests.support.core.sqlite_flush_fake").attach(package.loaded[writer_name])
 		package.loaded[logger_name] = nil
 
 		local ok, err = pcall(function()
 			local kl = require(logger_name)
 			kl.init({ sqlite_path = "/tmp/ergopti_llm_delta.sqlite" })
-			require("tests.support.metrics_consent_fixture").enable(kl)
+			require("tests.support.metrics.consent_fixture").enable(kl)
 			kl.reset_session()
 			kl.on_app_focus("app.test", 1000)
 			kl.record_synthetic_output("app.test", "une completion", "llm", 1100, 0, 4)

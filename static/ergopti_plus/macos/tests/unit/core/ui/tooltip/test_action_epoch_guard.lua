@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local TooltipContext = require("tests.support.tooltip_context_watchers")
+local TooltipContext = require("tests.support.core.tooltip_context_watchers")
 
 local restore_context = function() end
 

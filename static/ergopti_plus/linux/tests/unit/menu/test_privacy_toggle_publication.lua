@@ -45,7 +45,7 @@ local function with_private_config(body)
 	local ok, err = xpcall(function()
 		local collector = helpers.fresh_module("metrics.engine.keystats")
 		-- A fresh builder does not reload its section modules, so they are reloaded here.
-		require("tests.support.menu_part_reload").forget_parts()
+		require("tests.support.menu.part_reload").forget_parts()
 		local menu = helpers.fresh_module("menu.ui.builder.builder")
 		assert(collector.set_enabled(true))
 		body(collector, menu)
@@ -111,7 +111,7 @@ helpers.describe("metrics privacy menu publication", function()
 				.. " refused=" .. tostring(refused), function()
 				local value, rebuilds, writes = initial, 0, 0
 				-- A fresh builder does not reload its section modules, so they are reloaded here.
-				require("tests.support.menu_part_reload").forget_parts()
+				require("tests.support.menu.part_reload").forget_parts()
 				local menu = helpers.fresh_module("menu.ui.builder.builder")
 				local context = { keystats = {
 					is_enabled = function() return true end,

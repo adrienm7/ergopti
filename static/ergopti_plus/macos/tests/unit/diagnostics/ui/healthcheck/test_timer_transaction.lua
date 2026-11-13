@@ -148,7 +148,7 @@ helpers.describe("healthcheck window focus ownership", function()
 	helpers.it("(webview-focus-owner) healthcheck refused deletion permanently revokes deferred focus", function()
 		local healthcheck = load_healthcheck({ cancel = function() return true end })
 		local view = hs.webview.new()
-		require("tests.support.webview_focus_fixture").check(view,
+		require("tests.support.core.webview_focus_fixture").check(view,
 			function() return healthcheck.show_window() end,
 			function()
 				view.delete = function() error("native deletion refused") end
@@ -158,7 +158,7 @@ helpers.describe("healthcheck window focus ownership", function()
 
 	helpers.it("(webview-focus-owner) healthcheck native close revokes initial deferred focus", function()
 		local healthcheck, context = load_healthcheck({ cancel = function() return true end })
-		require("tests.support.webview_focus_fixture").check(hs.webview.new(),
+		require("tests.support.core.webview_focus_fixture").check(hs.webview.new(),
 			function() return healthcheck.show_window() end,
 			function() context.window_callback("closing") end)
 	end)

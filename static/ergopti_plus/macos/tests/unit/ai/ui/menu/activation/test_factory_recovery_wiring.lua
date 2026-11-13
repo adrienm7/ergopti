@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_activation = require("tests.support.llm_activation_fixture")
+local with_activation = require("tests.support.ai.activation_fixture")
 
 helpers.describe("LLM Factory Recovery Wiring", function()
 	helpers.it("(local-model-service-consent) forwards retained consent through the actual menu installer", function()

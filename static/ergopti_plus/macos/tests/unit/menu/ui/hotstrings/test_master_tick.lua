@@ -19,8 +19,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
-local output_fixture = require("tests.support.toml_output_fixture")
+local CaptionFixture = require("tests.support.hotstrings.parent_caption_fixture")
+local output_fixture = require("tests.support.settings.toml_output_fixture")
 
 local Answers = require("onboarding.engine.answers")
 

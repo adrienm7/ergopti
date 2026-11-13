@@ -65,7 +65,7 @@ local function scenario(options, body)
 			cancelled = 0, offers = {}, overlay_showing = false, controls = 0, moves = 0, outputs = 0 }
 		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_sink(function() end); package.loaded["core.logger.engine.shim"] = logger
-		local preferences = require("tests.support.llm_preferences_fixture").new({ initial = {
+		local preferences = require("tests.support.ai.preferences_fixture").new({ initial = {
 			["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
 			["llm.profiles.active"] = "basic", ["llm.profiles.num_predictions"] = options.count or 1,
 			["llm.trigger.secure_filter_enabled"] = true, ["llm.trigger.debounce_ms"] = 500,
@@ -709,7 +709,7 @@ do
 			put("clipboard.adapters.selection_transaction", { new = function() return { cancel = yes, stop = yes } end })
 			put("clipboard.adapters.clipboard", { read_primary = function() error("no selection read is permitted") end })
 			put("core.ui.engine.display_server", { is_x11 = yes, is_wayland = no, kind = function() return "x11" end })
-			local layout = put("layouts.adapters.keyboard_layout", require("tests.support.layout_cohort_fixture").layout(function() return 30 end))
+			local layout = put("layouts.adapters.keyboard_layout", require("tests.support.layouts.cohort_fixture").layout(function() return 30 end))
 			layout.refresh, layout.is_ready, layout.publish_current_capture = yes, yes, yes
 			local injector = put("hotstrings.engine.injector", {
 			  _is_injecting = no, _queue_char = function() error("unexpected queued text") end,
@@ -722,7 +722,7 @@ do
 			    return { ok = true }
 			  end,
 			})
-			local preferences = require("tests.support.llm_preferences_fixture").new({ initial = {
+			local preferences = require("tests.support.ai.preferences_fixture").new({ initial = {
 			  ["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false, ["llm.profiles.active"] = "basic",
 			  ["llm.profiles.num_predictions"] = 1, ["llm.trigger.secure_filter_enabled"] = true,
 			  ["llm.trigger.debounce_ms"] = 500, ["llm.trigger.instant_on_word_end"] = false,

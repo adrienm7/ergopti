@@ -12,8 +12,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.platform.remap.layout.activation_layout_barrier_fixture"] = nil
-local Fixture = require("tests.support.platform.remap.layout.activation_layout_barrier_fixture")
+package.loaded["tests.support.keyboard.engine.layout.activation_layout_barrier_fixture"] = nil
+local Fixture = require("tests.support.keyboard.engine.layout.activation_layout_barrier_fixture")
 local complete_replacement = Fixture.complete_replacement
 local contains = Fixture.contains
 local count_value = Fixture.count_value

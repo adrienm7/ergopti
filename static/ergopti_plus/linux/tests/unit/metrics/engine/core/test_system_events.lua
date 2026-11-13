@@ -12,8 +12,8 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
-local Home = require("tests.support.keystats_home_fixture")
-local Preferences = require("tests.support.metrics_preferences_fixture")
+local Home = require("tests.support.metrics.home_fixture")
+local Preferences = require("tests.support.metrics.preferences_fixture")
 
 --- Registers one case that owns its home and its metrics preferences: the
 --- collector's paths and the metrics flag stay inside the case.
@@ -38,7 +38,7 @@ local function with_recorder(transitions, script)
 		is_available = function() return true end,
 		bump_rev = function() return true end,
 	}, { __index = Fakes.sqlite_writer() })
-	require("tests.support.sqlite_flush_fake").attach(fake_writer)
+	require("tests.support.core.sqlite_flush_fake").attach(fake_writer)
 	local names = { "metrics.engine.journal.sqlite_writer", "metrics.engine.keystats", "metrics.engine.system.metrics" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -66,7 +66,7 @@ local function with_recorder(transitions, script)
 	local ok, err = pcall(function()
 		local keystats = require(names[2])
 		keystats.init(Home.options())
-		require("tests.support.metrics_consent_fixture").enable(keystats)
+		require("tests.support.metrics.consent_fixture").enable(keystats)
 		keystats.reset_session()
 		script(keystats, fake_writer)
 	end)
@@ -365,7 +365,7 @@ for _, failure in ipairs({ "migration", "registration", "migration_throw", "regi
 			is_available = function() return true end,
 			close_db = function() closes = closes + 1; return true end,
 		}, { __index = Fakes.sqlite_writer() })
-		require("tests.support.sqlite_flush_fake").attach(writer)
+		require("tests.support.core.sqlite_flush_fake").attach(writer)
 		local start = writer.start_flush
 		writer.start_flush = function(...) starts = starts + 1; return start(...) end
 		package.loaded[names[1]], package.loaded[names[2]] = writer, nil
@@ -383,7 +383,7 @@ for _, failure in ipairs({ "migration", "registration", "migration_throw", "regi
 			helpers.assert_eq(resumes, 0, "an unadmitted store cannot resume historical conversion")
 			helpers.assert_eq(keystats.migrate_stored_text(), false)
 			helpers.assert_eq(conversions, 0, "an unadmitted store cannot start historical conversion")
-			require("tests.support.metrics_consent_fixture").enable(keystats)
+			require("tests.support.metrics.consent_fixture").enable(keystats)
 			keystats.on_keydown("a", 1000, "owned-app")
 			helpers.assert_eq(keystats.get_app_stats()["owned-app"] == nil, blocked, "rejected stores cannot capture unpersistable events")
 			keystats.flush()
@@ -396,7 +396,7 @@ for _, failure in ipairs({ "migration", "registration", "migration_throw", "regi
 				"failed device registration cannot mutate n-gram encoding")
 			failure = "none"
 			helpers.assert_true(keystats.init(Home.options()), "healthy retry must restore admission")
-			require("tests.support.metrics_consent_fixture").enable(keystats)
+			require("tests.support.metrics.consent_fixture").enable(keystats)
 			keystats.on_keydown("b", 2000, "recovered-app")
 			helpers.assert_true(keystats.get_app_stats()["recovered-app"] ~= nil, "capture resumes after successful retry")
 		end)

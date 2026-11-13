@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.keyboard_layout.karabiner_bulk_commands_transaction_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.keyboard_layout.karabiner_bulk_commands_transaction_fixture")
+package.loaded["tests.support.menu.ui.keyboard_layout.karabiner_bulk_commands_transaction_fixture"] = nil
+local Fixture = require("tests.support.menu.ui.keyboard_layout.karabiner_bulk_commands_transaction_fixture")
 local COMMAND_CASES = Fixture.COMMAND_CASES
 local CONFIRMATION = Fixture.CONFIRMATION
 local PICKER_ACTION_CASES = Fixture.PICKER_ACTION_CASES

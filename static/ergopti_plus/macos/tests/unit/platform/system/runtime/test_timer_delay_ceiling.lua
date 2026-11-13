@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.adapters.runtime.timer_scheduler_fixture"] = nil
-local Fixture = require("tests.support.adapters.runtime.timer_scheduler_fixture")
+package.loaded["tests.support.platform.system.timer_scheduler_fixture"] = nil
+local Fixture = require("tests.support.platform.system.timer_scheduler_fixture")
 
 --- Loads a fresh scheduler and records every Logger.error it writes.
 --- @param timer_stub table hs.timer stub.

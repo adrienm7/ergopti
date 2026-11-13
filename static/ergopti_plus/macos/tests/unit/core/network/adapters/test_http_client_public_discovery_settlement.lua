@@ -75,7 +75,7 @@ local function isolated(scenario)
 			read_with_status = function(path) return SourceFile.read(path), "ok" end,
 		}
 		local api = require("ai.engine.api.remote")
-		require("tests.support.modules.llm.backends.local_server_scan_fake").install(api)
+		require("tests.support.ai.engine.backends.local_server_scan_fake").install(api)
 		local servers = require("ai.engine.local_servers.local_servers")
 		local clients = upvalue(api._probe_local_target, "_local_probe_clients")
 		local scheduler = package.loaded["core.events.timer_scheduler"]

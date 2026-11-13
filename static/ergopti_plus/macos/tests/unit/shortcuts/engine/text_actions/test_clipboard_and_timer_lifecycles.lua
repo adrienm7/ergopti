@@ -20,7 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Destination = require("tests.support.text_destination_receipt")
+local Destination = require("tests.support.core.text_destination_receipt")
 
 
 --- Clones an all-type clipboard snapshot.

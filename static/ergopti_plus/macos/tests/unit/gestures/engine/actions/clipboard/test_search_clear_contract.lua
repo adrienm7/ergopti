@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.gesture_actions_fixture")
+local Fixture = require("tests.support.gestures.actions_fixture")
 local function it(name, callback)
 	helpers.it(name, function()
 		helpers.with_stub_scope({ "platform.focus.window_manager", "core.ui.engine.native_app_switcher_owner" }, function()

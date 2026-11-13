@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.onboarding_install_fixture")
+local Fixture = require("tests.support.onboarding.install_fixture")
 
 local function snapshot()
 	local result = {}

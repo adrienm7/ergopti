@@ -11,8 +11,8 @@
 --- real scope owner, then clicks them in the real tray.
 --- ==============================================================================
 
-package.loaded["tests.support.infra.scope.shortcuts_scope_fixture"] = nil
-local Fixture = require("tests.support.infra.scope.shortcuts_scope_fixture")
+package.loaded["tests.support.settings.scope.shortcuts_scope_fixture"] = nil
+local Fixture = require("tests.support.settings.scope.shortcuts_scope_fixture")
 local helpers, declared_parent, Sandbox, Codec, with_scope =
 	Fixture.helpers, Fixture.declared_parent, Fixture.Sandbox, Fixture.Codec, Fixture.with_scope
 

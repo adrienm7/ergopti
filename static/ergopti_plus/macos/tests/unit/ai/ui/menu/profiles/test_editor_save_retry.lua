@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.menu.menu_llm.profiles.profile_editor_retry_fixture")
+local Fixture = require("tests.support.ai.ui.profiles.editor_retry_fixture")
 
 --- Opens one profile editor through its normal menu action and native navigation.
 --- @param kind string edit, clone or create.

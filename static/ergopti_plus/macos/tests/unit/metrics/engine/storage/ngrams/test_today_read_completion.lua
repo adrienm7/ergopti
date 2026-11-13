@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keystats.today_completion_fixture")
+local Fixture = require("tests.support.metrics.engine.today_completion_fixture")
 
 helpers.describe("today-read-completion", function()
 	for _, paced in ipairs({ false, true }) do

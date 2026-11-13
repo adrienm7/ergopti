@@ -1,6 +1,6 @@
 --- macos/tests/unit/menu/ui/shortcuts/test_physical_shortcut_preflight.lua
 
-local helpers=require('tests.helpers');local Fixture=require('tests.support.physical_shortcut_registrar_fixture');local Codec=require('core.text.engine.toml_codec')
+local helpers=require('tests.helpers');local Fixture=require('tests.support.layouts.physical_shortcut_registrar_fixture');local Codec=require('core.text.engine.toml_codec')
 local source='[shortcuts]\nenabled = true\nkeyboard = { foreign = 17 }\n[gestures]\naction_parameters = { tap_4__open_url="https://apple.com", future={keep=9} }\n[future]\nkeep=7\n'
 -- Ctrl+G is held by its role-named slot (the fixed hotkey retired with schema v20),
 -- so the logical-chord collision comes from that slot and no static owner remains.

@@ -19,7 +19,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local TooltipSupport = require("tests.support.tooltip_watcher_fixture")
+local TooltipSupport = require("tests.support.core.tooltip_watcher_fixture")
 
 local KEYCODE_A = 0
 local KEYCODE_F19 = 80

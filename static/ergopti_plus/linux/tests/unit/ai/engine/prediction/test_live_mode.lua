@@ -20,10 +20,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ProfilesFixture = require("tests.support.llm_profiles_fixture")
+local ProfilesFixture = require("tests.support.ai.profiles_fixture")
 local Fakes = require("tests.fakes")
 local Json = require("core.text.engine.json")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 local EvdevCodes = require("platform.input.evdev_codes")
 
 local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", token = "k", model = "", base_url = "" }

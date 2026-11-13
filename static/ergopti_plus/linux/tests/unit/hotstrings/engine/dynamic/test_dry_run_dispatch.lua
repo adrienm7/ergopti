@@ -73,7 +73,7 @@ local function exercise(kind, dry_run, options)
 	end]], marker))
 	local restore_preferences, injector, capture, user, atspi
 	local ok, reason = pcall(function()
-		require("tests.support.text_owner_fixture").with(function(guard, state, detector, policy)
+		require("tests.support.core.text_owner_fixture").with(function(guard, state, detector, policy)
 			local preference_path
 			restore_preferences, preference_path = require("tests.support.dynamic_hotstrings_fixture").route()
 			local paths = require("settings.engine.paths")
@@ -111,7 +111,7 @@ local function exercise(kind, dry_run, options)
 			assert(capture.load("controlled actual XKB adapter", "C"))
 			local document, commits, handler = "", 0
 			local calls = { manager = 0, inject = 0, fields = 0, user = 0, source = 0 }
-			require("tests.support.input_owner_fixture").with_session({ capture = capture, keys = {}, position_bits = true,
+			require("tests.support.core.input_owner_fixture").with_session({ capture = capture, keys = {}, position_bits = true,
 				on_char = function(...) return handler(...) end,
 				after_sync = function(_, code, value)
 					if value ~= 1 then return end

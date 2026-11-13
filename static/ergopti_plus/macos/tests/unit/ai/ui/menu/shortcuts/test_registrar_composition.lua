@@ -13,9 +13,9 @@
 
 local helpers = require("tests.helpers")
 
-local Fixture = require("tests.support.profile_delete_fixture")
+local Fixture = require("tests.support.settings.profile_delete_fixture")
 local with_trigger_fixture = Fixture.with_trigger_fixture
-local Seeds = require("tests.support.profile_shortcut_seeds")
+local Seeds = require("tests.support.settings.profile_shortcut_seeds")
 local seed_family = Seeds.seed_family
 local seed_inactive_family = Seeds.seed_inactive_family
 

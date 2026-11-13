@@ -5,7 +5,7 @@
 --- carried by immutable event tags and remains independent of that context sync.
 
 local helpers = require("tests.helpers")
-local provenance_fixture = require("tests.support.keystats_provenance_fixture")
+local provenance_fixture = require("tests.support.metrics.provenance_fixture")
 
 local VAULT_APP = "1Password"
 local ORDINARY_APP = "TextEdit"

@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_activation = require("tests.support.llm_activation_fixture")
+local with_activation = require("tests.support.ai.activation_fixture")
 
 local function assert_rejected_activation(backend)
 	with_activation(backend, { false }, nil, function(action, state, calls)

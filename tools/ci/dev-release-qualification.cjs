@@ -409,7 +409,7 @@ function validateStableNativePolicy(value, spec, scopes = spec.scopes) {
 				!model &&
 				!shortcuts &&
 				row.command !==
-					'static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py'
+					'static/ergopti_plus/macos/tests/support/core/native_http_wire_client_receiving.py'
 			)
 				refuse('Invalid exact ' + label + ' HTTP wire command.');
 		}

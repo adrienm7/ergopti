@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local load_fixture = require("tests.support.paths_editor_fixture")
+local load_fixture = require("tests.support.settings.paths_editor_fixture")
 
 local function with_editor(callback)
 	helpers.with_fresh_modules({ "core.timing.engine.deferred_work" }, function()

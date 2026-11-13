@@ -256,7 +256,7 @@ assert ast.literal_eval(loop.iter) == (
     "ManagedHTTPWorker.swift", "ManagedPACSource.swift",
     "ManagedCertificateAuthorities.swift", "ManagedBootstrapPolicy.generated.swift",
 )
-assert expression(swift_inputs.right) == "(MAC + 'tests/support/native_http_fixture_main.swift',)"
+assert expression(swift_inputs.right) == "(MAC + 'tests/support/core/native_http_fixture_main.swift',)"
 
 stage = function(builder, "OwnedFixtureBuild", "_stage")
 assert expression(assignment(stage.body, "content").value) == "_source(original)"

@@ -4,7 +4,7 @@
 --- Rendering an effective WPM or a held source cannot refresh that key's clock.
 
 local helpers = require("tests.helpers")
-local with_widget = require("tests.support.wpm_widget_fixture")
+local with_widget = require("tests.support.metrics.wpm_widget_fixture")
 
 helpers.describe("WPM widget physical input visibility", function()
 	helpers.it("(wpm-pointer-parity) hides for a single move after a key, including inside the former throttle", function()

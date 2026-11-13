@@ -12,7 +12,7 @@ local function expect(value, message) assert(value, message) end
 local function test(name, body) helpers.it(name .. " (ollama-install)", body) end
 helpers.load_module("ai.engine.ollama.archive_installer")
 local Phase = helpers.load_module("ai.engine.ollama.install_phase")
-local fixture = helpers.load_module("tests.support.ollama_archive_fixture")
+local fixture = helpers.load_module("tests.support.ai.ollama_archive_fixture")
 local function phase()
 	local f = fixture(); f.remaining, f.budget_current, f.cancel_listeners = 1000, true, {}
 	f.files.current = function() return f.ancestry_current ~= false end

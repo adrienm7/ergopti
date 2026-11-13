@@ -39,7 +39,7 @@ end
 --- Returns the list of requested URLs.
 local function script(manager, api_result, feed_result)
 	local urls = {}
-	manager._http_client = require("tests.support.release_http_fixture").attach({
+	manager._http_client = require("tests.support.updater.release_http_fixture").attach({
 		get = function(url, _, _, callback)
 			urls[#urls + 1] = url
 			if url:find("api.github.com", 1, true) then callback(api_result) else callback(feed_result) end

@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local Fixture = require("tests.support.hotstrings_config_window_fixture")
+local Fixture = require("tests.support.hotstrings.config_window_fixture")
 local Metadata = require("hotstrings.engine.catalogue.personal_metadata")
 
 -- Check each real delegation edge instead of accepting a detached editor call.

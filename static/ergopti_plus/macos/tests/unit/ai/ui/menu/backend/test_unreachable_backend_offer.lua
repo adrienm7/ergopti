@@ -152,7 +152,7 @@ local function with_offer(scenario)
 		-- The four servers these cases drive run; every other catalogue server is
 		-- stopped, so a longer catalogue changes no case.
 		local stopped = {}
-		require("tests.support.modules.llm.backends.local_server_scan_fake").install(api, stopped)
+		require("tests.support.ai.engine.backends.local_server_scan_fake").install(api, stopped)
 		local LocalServers = require("ai.engine.local_servers.local_servers")
 		local driven = { omlx = true, lmstudio = true, llamacpp = true, jan = true }
 		for _, id in ipairs(LocalServers.ORDER) do

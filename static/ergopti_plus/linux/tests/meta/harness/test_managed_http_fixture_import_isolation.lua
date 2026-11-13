@@ -13,7 +13,7 @@ local driver = helpers.driver_root()
 -- The shared proxy policy the managed fixtures load beside their target.
 local POLICY_MODULE = "core.network.engine.proxy_policy_core"
 local fixtures = {
-    { path = "tests/support/managed_http_native_ports.lua", exported = true, target = "core.network.adapters.http_client", policy = true,
+    { path = "tests/support/core/managed_http_native_ports.lua", exported = true, target = "core.network.adapters.http_client", policy = true,
       names = { "luv", "core.network.adapters.http_client", "core.network.adapters.curl_http_client", "core.network.adapters.system_proxy", "core.network.engine.proxy_policy", "core.network.engine.managed_http", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.fs.engine.paths" } },
     { path = "tests/unit/core/network/adapters/test_managed_http_public.lua", target = "core.network.adapters.http_client", policy = true,
       names = { "luv", "core.network.adapters.http_client", "core.network.adapters.curl_http_client", "core.network.adapters.system_proxy", "core.network.engine.proxy_policy", "core.network.engine.managed_http", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.fs.engine.paths" } },

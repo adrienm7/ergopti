@@ -20,8 +20,8 @@
 ---    sequence produces one UTF-8 result instead of two unrelated characters.
 --- ==============================================================================
 
-package.loaded["tests.support.adapters.layout.xkb_capture_fixture"] = nil
-local Fixture = require("tests.support.adapters.layout.xkb_capture_fixture")
+package.loaded["tests.support.layouts.adapters.xkb_capture_fixture"] = nil
+local Fixture = require("tests.support.layouts.adapters.xkb_capture_fixture")
 local helpers, with_original_direct_producer =
 	Fixture.helpers, Fixture.with_original_direct_producer
 

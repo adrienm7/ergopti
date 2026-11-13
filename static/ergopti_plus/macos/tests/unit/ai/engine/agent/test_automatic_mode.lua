@@ -4,7 +4,7 @@
 --- MODULE: AI Agent Automatic Mode and Learning (macOS)
 --- DESCRIPTION:
 --- Runs the automatic mode of the agent over the real runner, shared logic,
---- prediction engine and remote backend (tests/support/agent_world.lua): a
+--- prediction engine and remote backend (tests/support/ai/agent_world.lua): a
 --- pause in the typing sends the sentence to System 1, a triage above the
 --- threshold of its intent in the application wakes System 2, and its
 --- actions are offered. Accepting one lowers that threshold, dismissing one
@@ -22,7 +22,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local World = require("tests.support.agent_world")
+local World = require("tests.support.ai.agent_world")
 
 local Agent = require("ai.engine.agent.agent")
 

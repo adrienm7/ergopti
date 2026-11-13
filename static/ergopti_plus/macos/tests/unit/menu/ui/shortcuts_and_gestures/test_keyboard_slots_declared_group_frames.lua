@@ -21,8 +21,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.ui.menu.shortcuts_and_gestures.menu_keyboard_slots_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.shortcuts_and_gestures.menu_keyboard_slots_fixture")
+package.loaded["tests.support.menu.ui.keyboard_slots_fixture"] = nil
+local Fixture = require("tests.support.menu.ui.keyboard_slots_fixture")
 local fresh = Fixture.fresh
 local it = Fixture.it
 local make_ctx = Fixture.make_ctx

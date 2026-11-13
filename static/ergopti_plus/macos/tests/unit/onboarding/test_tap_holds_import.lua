@@ -20,7 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.onboarding_finish_fixture")
+local Fixture = require("tests.support.onboarding.finish_fixture")
 local with_finish = Fixture.with_finish
 
 local RELOAD, NOTICE, TIMEOUT = "onboarding.reload", "onboarding.notice", "onboarding.tap_holds_import_timeout"

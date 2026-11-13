@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.keymap.registry.registry_mutation_transactions_fixture"] = nil
-local Fixture = require("tests.support.modules.keymap.registry.registry_mutation_transactions_fixture")
+package.loaded["tests.support.hotstrings.registry_mutation_transactions_fixture"] = nil
+local Fixture = require("tests.support.hotstrings.registry_mutation_transactions_fixture")
 local assert_dynamic_personal_scope = Fixture.assert_dynamic_personal_scope
 local dynamic_personal_scope_fixture = Fixture.dynamic_personal_scope_fixture
 local with_menu_diagnostics = Fixture.with_menu_diagnostics

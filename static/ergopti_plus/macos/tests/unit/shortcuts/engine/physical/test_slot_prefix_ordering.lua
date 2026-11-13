@@ -60,7 +60,7 @@ helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 			package.loaded["gestures.engine.actions"] = {
 				is_assignable = function(action) return action == "send_text" or action == "none" end,
 			}
-			require("tests.support.keyboard_config_fixture").install({
+			require("tests.support.layouts.keyboard_config_fixture").install({
 				primary_shift_a="send_text", primary_a="send_text", secondary_shift_a="send_text", secondary_a="send_text",
 			})
 			package.loaded["shortcuts.engine.keyboard_shortcuts"] = nil

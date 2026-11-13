@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local Output = require("updater.engine.archive_output")
-local make_fixture = require("tests.support.ollama_pinned_artifact_fixture")
+local make_fixture = require("tests.support.ai.ollama_pinned_artifact_fixture")
 local DIGEST = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 
 local function controlled(options, body)

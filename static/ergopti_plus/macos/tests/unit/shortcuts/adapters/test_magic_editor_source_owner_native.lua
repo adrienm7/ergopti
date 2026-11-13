@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.shortcuts.magic_editor.magic_editor_source_owner_fixture"] = nil
-local Fixture = require("tests.support.modules.shortcuts.magic_editor.magic_editor_source_owner_fixture")
+package.loaded["tests.support.shortcuts.magic_editor_source_owner_fixture"] = nil
+local Fixture = require("tests.support.shortcuts.magic_editor_source_owner_fixture")
 local with_fixture = Fixture.with_fixture
 
 

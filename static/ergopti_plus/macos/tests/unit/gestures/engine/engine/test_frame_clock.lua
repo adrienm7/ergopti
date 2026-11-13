@@ -84,7 +84,7 @@ end)
 
 helpers.describe("the touch watcher hands the engine each frame's capture stamp (three-finger-swipe-stuck)", function()
 	helpers.it("forwards the device stamp and drops an unusable one", function()
-		local with_fixture = require("tests.support.gesture_runtime_fixture").with_fixture
+		local with_fixture = require("tests.support.gestures.runtime_fixture").with_fixture
 		with_fixture({}, function(gestures, runtime, watcher)
 			helpers.assert_eq(gestures.start(), true, "the gesture runtime must start")
 			helpers.assert_true(watcher:running(), "the touch watcher must run")

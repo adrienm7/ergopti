@@ -8,7 +8,7 @@ local function with_unavailable_cipher(saved, body)
 		"metrics.engine.privacy.text_cipher", "metrics.engine.privacy.text_migration", "metrics.engine.keystats" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	local preferences = require("tests.support.metrics_preferences_fixture").new({
+	local preferences = require("tests.support.metrics.preferences_fixture").new({
 		initial = { ["metrics.encrypt"] = saved, ["metrics.enabled"] = true },
 	})
 	local writer = require("tests.fakes").sqlite_writer()

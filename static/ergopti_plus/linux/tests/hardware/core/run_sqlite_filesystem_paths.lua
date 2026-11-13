@@ -161,7 +161,7 @@ check("public software keystats events flush into the selected literal database"
 	local now = require("core.logger.engine.monotonic").now_ms()
 	Keystats.on_keydown("a", now, "public-owned-app")
 	Keystats.on_keydown("b", now + 100, "public-owned-app")
-	require("tests.support.sqlite_flush_native").flush(Keystats)
+	require("tests.support.core.sqlite_flush_native").flush(Keystats)
 	Writer.close_db()
 	assert(Writer.open_db(root .. "/file:public.sqlite"))
 	local rows = assert(Writer.query_rows("SELECT text FROM events_typing WHERE app='public-owned-app';"))

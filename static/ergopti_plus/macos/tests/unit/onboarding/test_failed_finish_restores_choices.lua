@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.onboarding_finish_fixture")
+local Fixture = require("tests.support.onboarding.finish_fixture")
 
 local OLD_DIR = "/old-config/"
 local NEW_DIR = "/new-config/"

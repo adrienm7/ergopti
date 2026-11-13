@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local Shell = require("core.process.adapters.shell_runner")
 local Config = require("hotstrings.engine.catalogue.config")
-local Choices = require("tests.support.hotstring_choices")
+local Choices = require("tests.support.hotstrings.choices")
 
 --- Owns independent source, settings and override files for one native observation.
 --- @param choices string Canonical starting configuration bytes.

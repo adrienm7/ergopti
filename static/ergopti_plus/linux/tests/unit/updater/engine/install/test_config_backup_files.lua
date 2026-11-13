@@ -419,7 +419,7 @@ helpers.describe("config-backup-native-metadata", function()
 end)
 
 helpers.describe("installer-native-publication", function()
-	local Fixture = require("tests.support.modules.updater.installer_native_fixture")
+	local Fixture = require("tests.support.updater.engine.installer_native_fixture")
 	local uv = require("luv")
 	for _, mode in ipairs({ "directory", "empty-directory", "directory-link", "file", "absent" }) do
 		helpers.it("(installer-native-publication) exact directory move handles " .. mode, function()
@@ -690,7 +690,7 @@ assert((owner ~= nil) == %s, "backup rules admission disagrees with actual sourc
 end)
 
 helpers.describe("installer-native-exit-receipt", function()
-	local Fixture = require("tests.support.modules.updater.installer_native_fixture")
+	local Fixture = require("tests.support.updater.engine.installer_native_fixture")
 	local uv = require("luv")
 	local Shell = require("core.process.adapters.shell_runner")
 

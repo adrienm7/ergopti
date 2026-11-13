@@ -275,7 +275,7 @@ local function actual_frame_fixture(source)
 	package.loaded["core.fs.adapters.file_system"] = FileSystem
 	package.loaded["gestures.engine.engine"] = nil
 	package.loaded["gestures.engine.conflicts"] = nil
-	local recording = require("tests.support.synthetic_action_fixture").load("gestures.engine.actions")
+	local recording = require("tests.support.core.synthetic_action_fixture").load("gestures.engine.actions")
 	local actions = recording.subject
 	local core, initialize = nil, actions.init
 	actions.init = function(candidate)

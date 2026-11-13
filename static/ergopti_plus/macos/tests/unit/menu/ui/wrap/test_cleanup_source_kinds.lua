@@ -2,7 +2,7 @@
 
 --- Explicit cleanup retains admitted Wrap source kinds through the real file writer.
 local helpers = require("tests.helpers")
-local output = require("tests.support.toml_output_fixture")
+local output = require("tests.support.settings.toml_output_fixture")
 local function read(path)
 	local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close()); return bytes
 end

@@ -1,8 +1,8 @@
 --- tests/unit/menu/ui/state/test_context_length_boot.lua
 --- Loaded context limits must agree with runtime and preserve refused TOML.
 local helpers = require("tests.helpers")
-local OutputFixture = require("tests.support.toml_output_fixture")
-local Pipeline = require("tests.support.prediction_pipeline")
+local OutputFixture = require("tests.support.settings.toml_output_fixture")
+local Pipeline = require("tests.support.ai.prediction_pipeline")
 
 helpers.describe("boot projection of persisted AI context length", function()
 	for _, case in ipairs({ { value = "5000", refused = true }, { value = '"5000"', refused = false, ignored = true },

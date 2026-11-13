@@ -27,7 +27,7 @@ local function with_source(source, body)
 		local files = require("core.fs.adapters.file_system")
 		-- The source is stated in the Karabiner model; the file holds its
 		-- shared tap_hold.toml text, read back through the same translation.
-		local Text = require("tests.support.tap_hold_file_text")
+		local Text = require("tests.support.keyboard.tap_hold_file_text")
 		local config_path = Text.config_path("owned-remap-config.toml")
 		-- Both files in memory: the manifest rows are the config.toml beside it.
 		local disk = {}

@@ -8,8 +8,8 @@
 
 -- The cases replace these entries; the module end puts them back.
 local restore_loaded = require("tests.helpers").keep_loaded({ "updater.ui.changelog.bridge" })
-package.loaded["tests.support.ui.editors.ui_bridge_handlers_fixture"] = nil
-local Fixture = require("tests.support.ui.editors.ui_bridge_handlers_fixture")
+package.loaded["tests.support.core.ui.bridge_handlers_fixture"] = nil
+local Fixture = require("tests.support.core.ui.bridge_handlers_fixture")
 local helpers, build_mock_state, make_spies, with_opened_spies =
 	Fixture.helpers, Fixture.build_mock_state, Fixture.make_spies, Fixture.with_opened_spies
 

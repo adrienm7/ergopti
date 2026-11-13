@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 local Delivery = require("metrics.engine.capture.physical_delivery")
 local Transport = require("metrics.engine.capture.physical_transport")
-local Frames = require("tests.support.physical_stream_frames")
+local Frames = require("tests.support.layouts.physical_stream_frames")
 
 local function fixture(overrides)
 	local observed = { writes = {}, presses = {}, errors = {}, stops = 0, settled = 0 }

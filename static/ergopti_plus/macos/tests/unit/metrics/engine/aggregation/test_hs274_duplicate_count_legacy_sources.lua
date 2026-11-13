@@ -26,8 +26,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.keystats.aggregation.hs274_duplicate_count_fixture"] = nil
-local Fixture = require("tests.support.modules.keystats.aggregation.hs274_duplicate_count_fixture")
+package.loaded["tests.support.metrics.engine.hs274_duplicate_count_fixture"] = nil
+local Fixture = require("tests.support.metrics.engine.hs274_duplicate_count_fixture")
 local Accounting = Fixture.Accounting
 local KEYCODE_CAPS_LOCK = Fixture.KEYCODE_CAPS_LOCK
 local KEYCODE_LEFT_COMMAND = Fixture.KEYCODE_LEFT_COMMAND
@@ -355,7 +355,7 @@ helpers.describe("HS-274 held modifier source settlement (wp3)", function()
 		Accounting.run(function(scenario)
 			scenario.flags_changed(55, { cmd = true })
 			scenario.mode.select_stream(Accounting.STREAM_OWNER)
-			local fixture = require("tests.support.keystats_provenance_fixture").load_keystats()
+			local fixture = require("tests.support.metrics.provenance_fixture").load_keystats()
 			local mode = require("metrics.engine.capture.physical_accounting_mode")
 			helpers.assert_true(not rawequal(mode, scenario.mode))
 			helpers.assert_true(not rawequal(fixture.state, scenario.state))

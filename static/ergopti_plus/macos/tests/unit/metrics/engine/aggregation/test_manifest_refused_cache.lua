@@ -141,7 +141,7 @@ end)
 local APP_OWNERS = {
 	"metrics.engine.reader.sqlite_reader", "metrics.ui.metrics_typing.projection", "core.timing.engine.paced_json",
 	"core.logger.engine.logger", "hs.sqlite3", "hs.json", "core.text.engine.json", "metrics.ui.metrics_apps", "tests.stubs.hs", "hs", "hs.fs",
-	"tests.support.metrics_delivery_fixture", "tests.support.dashboard_window_fixture", "core.ui.ui.builder",
+	"tests.support.metrics.delivery_fixture", "tests.support.dashboard_window_fixture", "core.ui.ui.builder",
 	"core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work", "settings.engine.paths",
 	"core.fs.adapters.file_system", "core.events.timer_scheduler", "core.ui.adapters.webview_result",
 	"metrics.engine.journal.log_manager", "metrics.engine.context_tracker",
@@ -153,7 +153,7 @@ local APP_OWNERS = {
 local function with_apps(callback)
 	helpers.with_stub_scope(APP_OWNERS, function()
 		package.loaded["settings.engine.paths"] = { get_config_dir = function() return "/virtual/" end }
-		require("tests.support.metrics_delivery_fixture")(true,
+		require("tests.support.metrics.delivery_fixture")(true,
 			function(dashboard, _, evaluations, _, _, pending)
 				_G.hs.application.find = function() return nil end
 				local state = fixture()

@@ -232,7 +232,7 @@ helpers.describe("known zero-dispatch native transaction", function()
 end)
 helpers.describe("updater receiving model storage isolation", function()
  helpers.it("restores a warmed real storage owner after the receiving scenario (test_production_dispatch_refusal)", function()
-  require("tests.support.modules.updater.storage_isolation").check(scenario)
+  require("tests.support.updater.engine.storage_isolation").check(scenario)
  end)
 end)
 return tests

@@ -8,7 +8,7 @@
 --- ==============================================================================
 local Errors = require("diagnostics.engine.adapter_errors")
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.text_owner_fixture")
+local fixture = require("tests.support.core.text_owner_fixture")
 
 helpers.describe("Main retains the ordinary expansion target", function()
 	helpers.it("does not expand when its delay configuration raises (delay-resolution-refusal)", function()

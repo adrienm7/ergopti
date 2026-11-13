@@ -9,8 +9,8 @@
 --- Fails if the category name appears in a captured log line.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.hotstrings.catalogue.ergopti_extension_hotstrings_fixture"] = nil
-local Fixture = require("tests.support.modules.hotstrings.catalogue.ergopti_extension_hotstrings_fixture")
+package.loaded["tests.support.hotstrings.engine.ergopti_extension_hotstrings_fixture"] = nil
+local Fixture = require("tests.support.hotstrings.engine.ergopti_extension_hotstrings_fixture")
 local helpers, user_folder, write, one_entry_pack, load_with_user_folder =
 	Fixture.helpers, Fixture.user_folder, Fixture.write, Fixture.one_entry_pack, Fixture.load_with_user_folder
 

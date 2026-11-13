@@ -26,7 +26,7 @@ local Fakes = require("tests.fakes")
 local Json = require("core.text.engine.json")
 local Base64 = require("core.lifecycle.engine.compat.base64")
 local Vision = require("ai.engine.prediction.vision")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 
 -- The bytes the fake capture writes: a PNG signature and a body
 local IMAGE = "\137PNG\r\n\26\nfake screen pixels"

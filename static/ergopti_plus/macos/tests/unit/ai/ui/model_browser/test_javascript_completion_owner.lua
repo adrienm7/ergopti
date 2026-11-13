@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.owned_window_close_fixture")
+local Fixture = require("tests.support.core.ui.owned_window_close_fixture")
 
 local FAILURE = { code = 5, domain = "WKErrorDomain" }
 

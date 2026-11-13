@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.shortcuts.script_control.script_control_fixture"] = nil
-local Fixture = require("tests.support.modules.shortcuts.script_control.script_control_fixture")
+package.loaded["tests.support.shortcuts.script_control_fixture"] = nil
+local Fixture = require("tests.support.shortcuts.script_control_fixture")
 local SC = Fixture.SC
 
 

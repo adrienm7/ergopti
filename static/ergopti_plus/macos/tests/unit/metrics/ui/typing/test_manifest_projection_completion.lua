@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.metrics.typing.manifest_completion_fixture")
+local Fixture = require("tests.support.metrics.ui.manifest_completion_fixture")
 local Json = require("core.text.engine.json")
 
 local function project(state, reader, projection)

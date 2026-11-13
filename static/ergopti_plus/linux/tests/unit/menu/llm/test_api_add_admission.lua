@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.menu.llm.api_add_admission_fixture")
+local Fixture = require("tests.support.menu.ui.llm.api_add_admission_fixture")
 
 --- Verifies a refused transaction preserved both native file and selected entry.
 --- @param state table Actual menu/engine/private source fixture.

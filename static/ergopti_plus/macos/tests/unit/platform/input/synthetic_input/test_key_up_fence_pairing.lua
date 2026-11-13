@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.synthetic_input_fixture")
+local Fixture = require("tests.support.core.synthetic_input_fixture")
 
 local KEY_DOWN = Fixture.KEY_DOWN
 local KEY_UP = Fixture.KEY_UP

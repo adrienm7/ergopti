@@ -48,7 +48,7 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, err = pcall(function()
 			local Config = require("hotstrings.engine.catalogue.config")
-			local Choices = require("tests.support.hotstring_choices")
+			local Choices = require("tests.support.hotstrings.choices")
 			local source = '[hotstrings]\nmagic_key_source = "KeyJ"\n'
 				.. 'groups = { magickey = true, french_distancesreduction = true }\n'
 				.. '[hotstrings.modules.magickey]\nreplace = false\ntext_expansion_symbols = true\n'

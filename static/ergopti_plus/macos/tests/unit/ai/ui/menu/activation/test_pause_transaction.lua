@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_activation = require("tests.support.llm_activation_fixture")
+local with_activation = require("tests.support.ai.activation_fixture")
 
 helpers.describe("LLM Activation Pause Transaction", function()
 	helpers.it("stages an MLX bootstrap continuation until real ScriptControl commits RESUMED", function()

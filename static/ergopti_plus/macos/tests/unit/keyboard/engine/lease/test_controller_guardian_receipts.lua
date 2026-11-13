@@ -7,8 +7,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.platform.remap.lease.lease_controller_fixture"] = nil
-local Fixture = require("tests.support.platform.remap.lease.lease_controller_fixture")
+package.loaded["tests.support.keyboard.engine.lease_controller_fixture"] = nil
+local Fixture = require("tests.support.keyboard.engine.lease_controller_fixture")
 local with_fixture = Fixture.with_fixture
 
 

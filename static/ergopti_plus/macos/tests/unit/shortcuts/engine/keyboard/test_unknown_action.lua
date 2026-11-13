@@ -67,7 +67,7 @@ local function with_subject(store, scenario)
 	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["shortcuts.engine.keyboard_shortcuts"] = nil
 
-	require("tests.support.keyboard_config_fixture").install(store)
+	require("tests.support.layouts.keyboard_config_fixture").install(store)
 
 	local subject
 	local ok, err = xpcall(function()

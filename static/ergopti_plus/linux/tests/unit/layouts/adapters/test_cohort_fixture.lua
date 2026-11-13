@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.layout_cohort_fixture")
+local Fixture = require("tests.support.layouts.cohort_fixture")
 
 helpers.describe("controlled layout cohort fixture", function()
 	helpers.it("keeps actual planner receipts distinct from native acknowledgement", function()

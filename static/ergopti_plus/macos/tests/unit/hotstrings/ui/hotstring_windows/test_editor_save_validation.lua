@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_editor = require("tests.support.hotstring_editor_fixture").with_editor
+local with_editor = require("tests.support.hotstrings.editor_fixture").with_editor
 
 --- Produces the same document shape emitted by the shared frontend.
 --- @return table document Fresh valid save payload.

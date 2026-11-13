@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_activation = require("tests.support.llm_activation_fixture")
+local with_activation = require("tests.support.ai.activation_fixture")
 
 helpers.describe("LLM Factory Identity Transaction", function()
 	for _, mode in ipairs({ "false", "nil", "throw" }) do

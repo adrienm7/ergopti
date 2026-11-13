@@ -18,7 +18,7 @@
 
 local helpers = require("tests.helpers")
 local json = require("core.text.engine.json")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/action_parameters/llm_prompt_vectors.json"
 local ACTION = "llm_prompt_prediction"

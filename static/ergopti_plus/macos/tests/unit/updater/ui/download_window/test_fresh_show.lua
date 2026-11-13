@@ -41,7 +41,7 @@ local TITLE = "Téléchargement du modèle"
 local SUB   = "Étape 2 sur 4"
 
 
-local make_webview_overrides = require("tests.support.download_window_fixture").make_webview_overrides
+local make_webview_overrides = require("tests.support.updater.download_window_fixture").make_webview_overrides
 
 
 --- Loads a pristine ui.download_window under the stub set.

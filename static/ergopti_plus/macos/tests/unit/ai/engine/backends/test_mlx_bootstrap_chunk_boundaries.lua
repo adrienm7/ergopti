@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.llm.backends.ai_runtime_selection_install_fixture")
+local Fixture = require("tests.support.ai.engine.backends.runtime_selection_install_fixture")
 
 helpers.describe("MLX bootstrap framing (mlx-bootstrap-chunks)", function()
 	helpers.it("opens progress for a fragmented sync marker", Fixture.scoped(function()

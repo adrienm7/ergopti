@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Preferences = require("tests.support.llm_preferences_fixture")
+local Preferences = require("tests.support.ai.preferences_fixture")
 local ConfigGuard = helpers.load_module("ai.ui.menu.config_guard")
 
 helpers.describe("Linux AI configuration guard (ai-submenus-newer-config-2026-10-23)", function()

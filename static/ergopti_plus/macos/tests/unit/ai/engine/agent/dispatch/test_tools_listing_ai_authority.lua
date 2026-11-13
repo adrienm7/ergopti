@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local World = require("tests.support.agent_world")
-local Scope = require("tests.support.modules.llm.selection_translation_scope")
+local World = require("tests.support.ai.agent_world")
+local Scope = require("tests.support.ai.engine.prediction.selection_translation_scope")
 require("core.logger.engine")
 
 local OWNED = {

@@ -89,7 +89,7 @@ local OWNED_MODULES = {
 	"shortcuts.engine.physical_slots",
 	"tap_hold.engine.key_combinations",
 	"tests.stubs.hs",
-	"tests.support.menu_boot_fixture",
+	"tests.support.menu.boot_fixture",
 	"core.text.engine.toml_codec",
 	"core.text.engine.toml_codec.basic_string",
 	"core.text.engine.toml_codec.bom",
@@ -157,7 +157,7 @@ local function with_menu(body)
 		end
 		local fixture, Menu, Scheduler
 		local ok, failure = xpcall(function()
-			fixture = require("tests.support.menu_boot_fixture").boot({
+			fixture = require("tests.support.menu.boot_fixture").boot({
 				before_start = function()
 					-- The minimal boot fixture omits this declared healthy UI default.
 					local initial_state = package.loaded["settings.engine.preferences.preferences"].build_initial_state()

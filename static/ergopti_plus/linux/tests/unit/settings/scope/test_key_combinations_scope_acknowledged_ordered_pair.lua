@@ -3,8 +3,8 @@
 --- Actual canonical pair and parameter owners through the shared publisher.
 --- File and native delivery ports are controlled; no physical input is claimed.
 
-package.loaded["tests.support.infra.scope.key_combinations_scope_fixture"] = nil
-local Fixture = require("tests.support.infra.scope.key_combinations_scope_fixture")
+package.loaded["tests.support.settings.scope.key_combinations_scope_fixture"] = nil
+local Fixture = require("tests.support.settings.scope.key_combinations_scope_fixture")
 local NativeLoop, helpers, Codec, Scope, path, backup, pair, binding, parameter, source, edits, with_owner, failed, next_scope, with_menu, find_menu =
 	Fixture.NativeLoop, Fixture.helpers, Fixture.Codec, Fixture.Scope, Fixture.path, Fixture.backup, Fixture.pair, Fixture.binding, Fixture.parameter, Fixture.source, Fixture.edits, Fixture.with_owner, Fixture.failed, Fixture.next_scope, Fixture.with_menu, Fixture.find_menu
 

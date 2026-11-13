@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_adoption = require("tests.support.modules.llm.processes.mlx_adoption_fixture")
+local with_adoption = require("tests.support.ai.engine.processes.mlx_adoption_fixture")
 
 --- Proves the following public stop still sees the successor's exact capability.
 --- @param obj table Real server manager.

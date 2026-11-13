@@ -11,8 +11,8 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shar
 	.. root .. "/../_shared/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
 local uv, Json = require("luv"), require("core.text.engine.json")
-local Fixture = require("tests.support.keystats_native_fixture")
-local Preferences = require("tests.support.metrics_preferences_fixture")
+local Fixture = require("tests.support.metrics.native_fixture")
+local Preferences = require("tests.support.metrics.preferences_fixture")
 local Clock = require("core.logger.engine.monotonic")
 local Timings = require("core.timing.engine.timings")
 local Calendar = require("metrics.engine.calendar")
@@ -57,7 +57,7 @@ local function scenario(name, body)
 			local database = directory .. "/" .. name .. ".sqlite"
 			databases[#databases + 1] = database
 			k.init({ sqlite_path = database })
-			require("tests.support.metrics_consent_fixture").enable(k)
+			require("tests.support.metrics.consent_fixture").enable(k)
 			local writer = require("metrics.engine.journal.sqlite_writer")
 			local function rows(sql) return assert(writer.query_rows(sql)) end
 			body(k, writer, rows)

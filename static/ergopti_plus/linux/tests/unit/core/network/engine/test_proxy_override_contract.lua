@@ -21,7 +21,7 @@ end
 Contract.register(read, helpers)
 
 helpers.it("proxy dialog refuses an externally changed proxy and preserves other settings", function()
-    local fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
+    local fixture = require("tests.support.core.fs.storage_adapter_fixture")
     fixture.storage_cohort_fixture('{"network.proxy_override":"direct","other":1}', function(storage, _, path, _, write, read_file)
         local names = { "core.network.proxy_override", "menu.ui.builder.dialogs", "core.i18n.engine.i18n" }
         local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -49,7 +49,7 @@ end)
 
 helpers.it("proxy edit refuses a source changed during staged publication", function()
     if _VERSION ~= "Lua 5.1" then return end -- The Linux LuaJIT port uses the intercepted stdio descriptor.
-    local fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
+    local fixture = require("tests.support.core.fs.storage_adapter_fixture")
     fixture.storage_cohort_fixture('{"network.proxy_override":"direct","other":1}', function(storage, _, path, _, write, read_file)
         local _, receipt = storage.capture_string_edit("network.proxy_override")
         helpers.assert_not_nil(receipt)
@@ -95,7 +95,7 @@ helpers.it("proxy edit refuses a source changed during staged publication", func
 end)
 
 helpers.it("proxy edit receipt refuses a same-value intervening write and publication errors", function()
-    local fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
+    local fixture = require("tests.support.core.fs.storage_adapter_fixture")
     fixture.storage_cohort_fixture('{"network.proxy_override":"direct","other":1}', function(storage, files, path, _, _, read_file)
         local key = "network.proxy_override"
         local value, receipt = storage.capture_string_edit(key)
@@ -116,7 +116,7 @@ helpers.it("proxy edit receipt refuses a same-value intervening write and public
 end)
 
 helpers.it("proxy dialog preserves unrelated external changes and refuses unreadable storage", function()
-    local fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
+    local fixture = require("tests.support.core.fs.storage_adapter_fixture")
     for _, mode in ipairs({ "other", "wrong_type", "invalid_before", "invalid_during" }) do
         local source = mode == "invalid_before" and '{invalid'
             or mode == "wrong_type" and '{"network.proxy_override":false,"other":1}'
@@ -160,7 +160,7 @@ end)
 
 helpers.it("external process writes during the open proxy dialog", function()
     if package.config:sub(1, 1) == "\\" then return end
-    local fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
+    local fixture = require("tests.support.core.fs.storage_adapter_fixture")
     local shell = require("core.process.adapters.shell_runner")
     for _, mode in ipairs({ "conflict", "other" }) do
         fixture.storage_cohort_fixture('{"network.proxy_override":"direct","other":1}', function(_, _, path, _, _, read_file)
@@ -196,7 +196,7 @@ helpers.it("external process writes during the open proxy dialog", function()
 end)
 
 helpers.it("existing storage API retains the historical number of results", function()
-    local fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
+    local fixture = require("tests.support.core.fs.storage_adapter_fixture")
     fixture.storage_cohort_fixture('{"network.proxy_override":"direct","other":1}', function(storage)
         helpers.assert_eq(select("#", storage.get("other")), 1)
         helpers.assert_eq(select("#", storage.set("other", 2)), 1)
@@ -208,7 +208,7 @@ end)
 
 helpers.it("proxy dialog refuses a real unreadable source before or during editing", function()
     if package.config:sub(1, 1) == "\\" then return end
-    local fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
+    local fixture = require("tests.support.core.fs.storage_adapter_fixture")
     local uv = require("luv")
     if uv.getuid() == 0 then return end
     for _, mode in ipairs({ "before", "during" }) do

@@ -5,8 +5,8 @@ local helpers = require("tests.helpers")
 local Delivery = require("metrics.engine.capture.physical_delivery")
 local Clock = require("metrics.engine.capture.physical_clock")
 local Context = require("metrics.engine.capture.physical_context")
-local Frames = require("tests.support.physical_stream_frames")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local Frames = require("tests.support.layouts.physical_stream_frames")
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 local ORIGINAL_DATE = "2026-10-04 23:59:59.500"
 
 local function copy(entry)

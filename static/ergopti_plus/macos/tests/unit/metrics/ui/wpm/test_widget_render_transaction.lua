@@ -8,9 +8,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_menubar = require("tests.support.wpm_menubar_fixture")
+local with_menubar = require("tests.support.metrics.wpm_menubar_fixture")
 
-local with_widget = require("tests.support.wpm_widget_fixture")
+local with_widget = require("tests.support.metrics.wpm_widget_fixture")
 
 helpers.describe("WPM widget render lifecycle", function()
 	helpers.it("retains a canvas after deletion failure and retries on stop", function()

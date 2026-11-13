@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local Fixture = require("tests.support.logger_async_sink_fixture")
+local Fixture = require("tests.support.core.logger_async_sink_fixture")
 
 helpers.describe("logger: native asynchronous sink ownership", function()
 	helpers.it("classifies complete managed authority, complete absence, and every partial set", function()

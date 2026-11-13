@@ -33,7 +33,7 @@
 
 local helpers = require("tests.helpers")
 
-local Fixture = require("tests.support.metrics_preferences_fixture")
+local Fixture = require("tests.support.metrics.preferences_fixture")
 
 -- What was in package.loaded before this file displaced it. RESTORED rather than
 -- cleared, and that distinction cost a CI run: clearing left the next test file

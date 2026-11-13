@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.pause_transaction_fixture")
+local Fixture = require("tests.support.settings.pause_transaction_fixture")
 local OWNERS = {
 	"shortcuts.engine.script_control",
 	"core.logger.engine.logger",

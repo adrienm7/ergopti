@@ -112,7 +112,7 @@ end)
 
 
 -- Actual catalogues contain headings and actions, never the retired boundary tokens.
-local catalogue_scope = require("tests.support.layout_legacy_caption_fixture").scoped
+local catalogue_scope = require("tests.support.layouts.legacy_caption_fixture").scoped
 helpers.describe("real script-action catalogue projection", function()
 	for _, language in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
 		helpers.it("preserves every genuine script action and heading in " .. language, catalogue_scope(function()

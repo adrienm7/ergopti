@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture_support = require("tests.support.mlx_download_fixture")
+local fixture_support = require("tests.support.ai.mlx_download_fixture")
 local with_fixture = fixture_support.with_fixture
 local assert_cancelled = fixture_support.assert_cancelled
 

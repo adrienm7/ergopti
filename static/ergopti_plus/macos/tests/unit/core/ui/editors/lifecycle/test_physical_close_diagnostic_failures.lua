@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.physical_close_diagnostic_fixture")
+local Fixture = require("tests.support.core.ui.physical_close_diagnostic_fixture")
 
 helpers.describe("physical diagnostic retains incomplete native observations", function()
 	helpers.it("keeps the healthy two-phase close contract unchanged", function()

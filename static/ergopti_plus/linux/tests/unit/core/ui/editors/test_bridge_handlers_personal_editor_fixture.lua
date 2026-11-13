@@ -6,8 +6,8 @@
 --- Pure Lua — no GTK/WebKit2GTK required.
 --- ==============================================================================
 
-package.loaded["tests.support.ui.editors.ui_bridge_handlers_fixture"] = nil
-local Fixture = require("tests.support.ui.editors.ui_bridge_handlers_fixture")
+package.loaded["tests.support.core.ui.bridge_handlers_fixture"] = nil
+local Fixture = require("tests.support.core.ui.bridge_handlers_fixture")
 local helpers, OPENING_SOURCE, OPENING_FOREIGN, opening_model, with_opening_file =
 	Fixture.helpers, Fixture.OPENING_SOURCE, Fixture.OPENING_FOREIGN, Fixture.opening_model, Fixture.with_opening_file
 

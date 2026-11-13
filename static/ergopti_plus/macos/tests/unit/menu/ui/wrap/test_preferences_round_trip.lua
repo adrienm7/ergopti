@@ -2,7 +2,7 @@
 
 --- Actual-file Wrap publication and typed-source preservation regressions.
 local helpers = require("tests.helpers")
-local output = require("tests.support.toml_output_fixture")
+local output = require("tests.support.settings.toml_output_fixture")
 local roundtrip = require("tests.support.preferences_roundtrip_fixture")
 local function read(path)
 	local handle = assert(io.open(path, "rb"))

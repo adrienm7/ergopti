@@ -239,7 +239,7 @@ end)
 check("saved ON without EVP keeps real collector SQL closed and recovers retained input once", function()
 	require("core.lifecycle.engine.compat.utf8").install()
 	writer.close_db() -- The next owner opens a distinct database and schema.
-	local preferences = require("tests.support.metrics_preferences_fixture").new({ initial = {
+	local preferences = require("tests.support.metrics.preferences_fixture").new({ initial = {
 		["metrics.encrypt"] = true, ["metrics.enabled"] = true,
 	} })
 	package.loaded["metrics.engine.preferences"] = preferences
@@ -249,7 +249,7 @@ check("saved ON without EVP keeps real collector SQL closed and recovers retaine
 	assert(K.init({ sqlite_path = root .. "/collector.sqlite", log_dir = root .. "/logs" }) ~= false)
 	assert(K.is_encrypt_enabled() and cipher.is_enabled() and K.get_privacy_state().encrypt)
 	K.on_keydown("a", typed_at(1000), "synthetic-app")
-	local Drain = require("tests.support.sqlite_flush_native")
+	local Drain = require("tests.support.core.sqlite_flush_native")
 	assert(K.flush() == false and not Drain.wait(K))
 	assert(K._pending_buffer_count_for_test() == 1 and K.has_flush_debt())
 	assert(assert(writer.query_rows("SELECT count(*) FROM events_typing;"))[1] == "0")

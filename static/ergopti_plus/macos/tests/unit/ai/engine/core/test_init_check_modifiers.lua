@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.llm.core.init_fixture"] = nil
-local Fixture = require("tests.support.modules.llm.core.init_fixture")
+package.loaded["tests.support.ai.engine.init_fixture"] = nil
+local Fixture = require("tests.support.ai.engine.init_fixture")
 local Core = Fixture.Core
 
 

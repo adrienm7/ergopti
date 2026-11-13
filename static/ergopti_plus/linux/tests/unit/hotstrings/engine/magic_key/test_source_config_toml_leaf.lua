@@ -12,8 +12,8 @@
 --- handed to the character path; every other press stays the application's.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.hotstrings.magic_key.magic_key_source_fixture"] = nil
-local Fixture = require("tests.support.modules.hotstrings.magic_key.magic_key_source_fixture")
+package.loaded["tests.support.hotstrings.engine.magic_key_source_fixture"] = nil
+local Fixture = require("tests.support.hotstrings.engine.magic_key_source_fixture")
 local helpers, Shared, PATH, KEY_J, KEY_C, with_source, wire, run_due =
 	Fixture.helpers, Fixture.Shared, Fixture.PATH, Fixture.KEY_J, Fixture.KEY_C, Fixture.with_source, Fixture.wire, Fixture.run_due
 
@@ -398,7 +398,7 @@ end)
 
 
 helpers.describe("magic replacement: the Ergopti extension control", function()
-	local Choices = require("tests.support.hotstring_choices")
+	local Choices = require("tests.support.hotstrings.choices")
 	-- A second category (rolls) stays on, so closing the magic key alone leaves
 	-- the Hotstrings switch on: an off switch greys the whole submenu.
 	local SOURCE = '[hotstrings]\ngroups = { magickey = true, rolls = true }\n'

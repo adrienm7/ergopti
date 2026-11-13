@@ -11,7 +11,7 @@
 --- The Curl port records admission metadata, not actual native execution.
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Ports = require("tests.support.managed_http_native_ports")
+local Ports = require("tests.support.core.managed_http_native_ports")
 
 local function identity()
 	return { device = 11, inode = 73, size = 71, mtime_sec = 123, mtime_nsec = 456, ctime_sec = 789, ctime_nsec = 12 }

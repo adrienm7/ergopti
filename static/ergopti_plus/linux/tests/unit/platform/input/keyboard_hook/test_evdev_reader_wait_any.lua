@@ -9,8 +9,8 @@
 --- instead of mistaking "could not wait" for "waited and nothing came".
 --- ==============================================================================
 
-package.loaded["tests.support.adapters.keyboard_hook.evdev_reader_fixture"] = nil
-local Fixture = require("tests.support.adapters.keyboard_hook.evdev_reader_fixture")
+package.loaded["tests.support.platform.input.keyboard_hook.evdev_reader_fixture"] = nil
+local Fixture = require("tests.support.platform.input.keyboard_hook.evdev_reader_fixture")
 local helpers, recorder = Fixture.helpers, Fixture.recorder
 
 --- A recorder whose multi-descriptor wait logs the descriptors and answers `ready`.

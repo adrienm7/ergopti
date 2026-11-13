@@ -1,7 +1,7 @@
 --- tests/unit/updater/engine/check/test_manager_resolves_complete_standalone.lua
 
-package.loaded["tests.support.modules.updater.check.updater_manager_fixture"] = nil
-local Fixture = require("tests.support.modules.updater.check.updater_manager_fixture")
+package.loaded["tests.support.updater.engine.manager_fixture"] = nil
+local Fixture = require("tests.support.updater.engine.manager_fixture")
 local helpers, Installer, etag_response, Json, shell_quote, command_ok, write_file, read_file =
 	Fixture.helpers, Fixture.Installer, Fixture.etag_response, Fixture.Json, Fixture.shell_quote, Fixture.command_ok, Fixture.write_file, Fixture.read_file
 
@@ -16,7 +16,7 @@ helpers.describe("updater.engine.manager", function()
 	local function with_native_download_model(body)
 		local previous = M
 		local ok, failure = xpcall(function()
-			require("tests.support.updater_native_model").with_fixture(function(fresh, prepare)
+			require("tests.support.updater.native_model").with_fixture(function(fresh, prepare)
 				M = fresh
 				body(prepare)
 			end)
@@ -384,7 +384,7 @@ helpers.describe("updater bounded pagination", function()
 			cb(response)
 			return true
 		end }
-		M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
+		M._http_client = require("tests.support.updater.release_http_fixture").attach(M._http_client)
 		for _ = 1, 2 do
 			M._fetch_releases("dev", function(body, _, err)
 				completions = completions + 1
@@ -417,7 +417,7 @@ helpers.describe("updater bounded pagination", function()
 				end,
 				cancel = function() return true end,
 			}
-			M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
+			M._http_client = require("tests.support.updater.release_http_fixture").attach(M._http_client)
 			M._file_digest = { cancel = function() return true end }
 			M._fetch_releases("dev", function(body, _, err)
 				completions = completions + 1
@@ -435,7 +435,7 @@ end)
 
 
 helpers.describe("installer-backup-ownership", function()
-	local NativeFixture = require("tests.support.modules.updater.installer_native_fixture")
+	local NativeFixture = require("tests.support.updater.engine.installer_native_fixture")
 	local uv = require("luv")
 	helpers.it("(installer-backup-ownership) a pre-existing backup namespace is never deleted", function()
 		local installer = helpers.load_module("updater.engine.installer")
@@ -458,7 +458,7 @@ helpers.describe("installer-backup-ownership", function()
 end)
 
 helpers.describe("installer-backup-ownership native receipts", function()
-	local NativeFixture = require("tests.support.modules.updater.installer_native_fixture")
+	local NativeFixture = require("tests.support.updater.engine.installer_native_fixture")
 	local uv = require("luv")
 	local Shell = require("core.process.adapters.shell_runner")
 	local function receipt(fixture)
@@ -702,7 +702,7 @@ helpers.describe("installer rollback root ownership", function()
 	for _, expected_smoke in ipairs({ false, true }) do
 		helpers.it("(installer-smoke-root-ownership) " .. (expected_smoke and "successful" or "failed") .. " real smoke cannot accept or retire a foreign replacement root", function()
 			local installer = helpers.load_module("updater.engine.installer")
-			local Fixture = require("tests.support.modules.updater.installer_native_fixture")
+			local Fixture = require("tests.support.updater.engine.installer_native_fixture")
 			local uv = require("luv")
 			local fixture = Fixture.create(installer)
 			local foreign_identity, smoke_ran
@@ -736,7 +736,7 @@ helpers.describe("installer rollback root ownership", function()
 end)
 
 helpers.describe("installer rollback capture admission", function()
-	local Fixture = require("tests.support.modules.updater.installer_native_fixture")
+	local Fixture = require("tests.support.updater.engine.installer_native_fixture")
 	local uv = require("luv")
 
 	helpers.it("(installer-smoke-root-ownership) ordinary failed real smoke restores the previous root", function()

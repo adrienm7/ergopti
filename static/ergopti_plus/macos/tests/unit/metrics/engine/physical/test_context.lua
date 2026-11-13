@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 local Context = require("metrics.engine.capture.physical_context")
 local Delivery = require("metrics.engine.capture.physical_delivery")
-local Frames = require("tests.support.physical_stream_frames")
+local Frames = require("tests.support.layouts.physical_stream_frames")
 
 local function rejects(callback, message)
 	local ok, err = pcall(callback)

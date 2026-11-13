@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local SyntheticStack = require("tests.support.synthetic_input_stack")
+local SyntheticStack = require("tests.support.core.synthetic_input_stack")
 
 
 local function load_fixture(keystats)

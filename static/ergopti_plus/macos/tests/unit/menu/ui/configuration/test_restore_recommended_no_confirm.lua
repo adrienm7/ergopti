@@ -273,7 +273,7 @@ helpers.describe("restore-recommended-no-confirm: the menu's scope wiring (macOS
 			package.loaded["hotstrings.engine.catalogue.config"] = {
 				get_override_path = function() return "/virtual/hotstrings_config.toml" end,
 			}
-			local fixture = require("tests.support.menu_boot_fixture").boot()
+			local fixture = require("tests.support.menu.boot_fixture").boot()
 			local actions = fixture.global_actions()
 			-- After the boot, whose stub loader sweeps every ui.menu module: the
 			-- owners are required on the first click.

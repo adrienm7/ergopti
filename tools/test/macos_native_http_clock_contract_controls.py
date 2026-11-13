@@ -10,7 +10,7 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py"
+SOURCE = ROOT / "static/ergopti_plus/macos/tests/support/core/native_http_wire_client_receiving.py"
 spec = importlib.util.spec_from_file_location("portable_clock_native_receiver", SOURCE)
 CLIENT = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(CLIENT)

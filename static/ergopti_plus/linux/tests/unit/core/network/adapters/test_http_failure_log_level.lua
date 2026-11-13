@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Ports = require("tests.support.managed_http_native_ports")
+local Ports = require("tests.support.core.managed_http_native_ports")
 local Logger = require("core.logger.engine.shim")
 local Json = require("core.text.engine.json")
 
@@ -93,7 +93,7 @@ helpers.describe("request-specific HTTP transport failure diagnostics", function
 		end)
 	end
 	helpers.it("keeps a direct native request without an admitted route receipt at ERROR", function()
-		local native, state = require("tests.support.adapters.network.http_client_curl_fixture").fresh_client()
+		local native, state = require("tests.support.core.network.http_client_curl_fixture").fresh_client()
 		local before = Logger.session_issues()
 		local ok, err = xpcall(function()
 			local operation = native.get_owned("http://127.0.0.1:11434/api/tags", {},
@@ -148,7 +148,7 @@ helpers.describe("request-specific HTTP transport failure diagnostics", function
 			end)
 		end)
 		helpers.it("captures " .. initial .. " before the first timeout collaborator mutates caller metadata", function()
-			local native, state = require("tests.support.adapters.network.http_client_curl_fixture").fresh_client()
+			local native, state = require("tests.support.core.network.http_client_curl_fixture").fresh_client()
 			local options = { owner = "early-query", failure_log_level = captured }
 			local default_timeout = native.default_timeout_ms
 			native.default_timeout_ms = function()
@@ -186,7 +186,7 @@ helpers.describe("request-specific HTTP transport failure diagnostics", function
 				helpers.assert_eq(#state.handles, 0)
 				helpers.assert_eq(#state.deadlines, 0)
 				issues(before, 0, 0)
-				local native, native_state = require("tests.support.adapters.network.http_client_curl_fixture").fresh_client()
+				local native, native_state = require("tests.support.core.network.http_client_curl_fixture").fresh_client()
 				local admitted, refusal = native.preflight("http://127.0.0.1:11434/api/tags", {}, nil,
 					{ failure_log_level = invalid, method = "GET", buffered = true })
 				helpers.assert_eq(admitted, false)

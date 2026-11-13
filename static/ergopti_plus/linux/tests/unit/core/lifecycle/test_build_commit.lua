@@ -228,7 +228,7 @@ end)
 
 describe("Build commit: the crash dump names the build and the config dir", function()
 	it("writes the resolved commit and the configuration directory", function()
-		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
+		require("tests.support.diagnostics.crash_admission").with_output(function(redact, parts)
 			local ConfigPaths = require("settings.engine.paths")
 			local Reporter = helpers.load_module("diagnostics.engine.reports.crash_reporter")
 			with_module("diagnostics.engine.reports.snapshot", {
@@ -247,7 +247,7 @@ describe("Build commit: the crash dump names the build and the config dir", func
 	end)
 
 	it("a resolver failure is written as its reason and the dump survives", function()
-		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
+		require("tests.support.diagnostics.crash_admission").with_output(function(redact, parts)
 			local Reporter = helpers.load_module("diagnostics.engine.reports.crash_reporter")
 			with_module("diagnostics.engine.reports.snapshot", {
 				resolve_commit = function() error("stamp read exploded") end,

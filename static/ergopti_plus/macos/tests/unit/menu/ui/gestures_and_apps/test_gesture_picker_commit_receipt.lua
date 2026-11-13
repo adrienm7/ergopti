@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local NativeFixture = require("tests.support.ui.usercontent_reference_fixture")
+local NativeFixture = require("tests.support.core.ui.usercontent_reference_fixture")
 
 local OWNED_MODULES = {
 	"gestures.ui.menu.gestures", "gestures.engine", "menu.ui.builder.utils",

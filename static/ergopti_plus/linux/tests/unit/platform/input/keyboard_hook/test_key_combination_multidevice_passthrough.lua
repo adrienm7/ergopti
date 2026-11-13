@@ -50,7 +50,7 @@ local function with_manager(route, body)
 			return original(name)
 		end
 		local chars = {}
-		require("tests.support.input_owner_fixture").with_session({ public_chords = true, keys = {}, position_bits = true,
+		require("tests.support.core.input_owner_fixture").with_session({ public_chords = true, keys = {}, position_bits = true,
 			on_char = function(char) chars[#chars + 1] = char end }, function(s)
 			assert(s.hook.set_remapper(nil))
 			local layout = require("layouts.adapters.keyboard_layout")

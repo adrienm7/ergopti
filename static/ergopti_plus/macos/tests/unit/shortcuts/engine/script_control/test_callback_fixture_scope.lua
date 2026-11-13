@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.script_control_callback_fixture")
+local Fixture = require("tests.support.settings.script_control_callback_fixture")
 
 local OWNERS = {
 	"core.logger.engine.logger", "core.ui.engine.notifications", "platform.input.keycodes", "core.i18n.engine.i18n", "core.fs.engine.paths",

@@ -2,7 +2,7 @@
 
 --- Confirms that observed public writers retain their real native handler/delegate.
 local helpers=require("tests.helpers")
-local Fixture=require("tests.support.keystats_provenance_fixture")
+local Fixture=require("tests.support.metrics.provenance_fixture")
 local OWNERS = {
 	"metrics.engine.capture.physical_lifecycle_observation", "shortcuts.adapters.physical_observation_clock", "hs", "tests.stubs.hs", "core.logger.engine.logger", "menu.engine.manifest_reader", "settings.engine.paths",
 	"core.ui.engine.dialog_util", "core.lifecycle.engine.shutdown.teardown_transaction", "modules.keystats.init",

@@ -61,7 +61,7 @@ local function with_action(route, mode, action, body)
 		local routes = require("settings.engine.paths")
 		local config_route = routes.config
 		routes.config = function(name) return name == "config.toml" and path or config_route(name) end
-		require("tests.support.text_owner_fixture").with(function(guard)
+		require("tests.support.core.text_owner_fixture").with(function(guard)
 			local world = { keys = {}, held = {}, reads = 0, writes = 0, lifecycle = 0, errors = {} }
 			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 			logger.set_sink(function() end)

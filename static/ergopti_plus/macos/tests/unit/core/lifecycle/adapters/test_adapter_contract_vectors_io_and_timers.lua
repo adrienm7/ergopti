@@ -33,8 +33,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.adapters.contracts.adapter_contract_vectors_fixture"] = nil
-local Fixture = require("tests.support.adapters.contracts.adapter_contract_vectors_fixture")
+package.loaded["tests.support.core.lifecycle.adapter_contract_vectors_fixture"] = nil
+local Fixture = require("tests.support.core.lifecycle.adapter_contract_vectors_fixture")
 
 
 

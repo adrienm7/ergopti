@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local h = require("tests.helpers")
-local Scenario = require("tests.support.ui.healthcheck.desktop_scenario")
+local Scenario = require("tests.support.diagnostics.ui.desktop_scenario")
 
 h.describe("desktop-report actual Main confirmation owner", function()
 	h.it("desktop-report cold shutdown never imports a desktop launcher", function()

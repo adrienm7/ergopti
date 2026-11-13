@@ -62,7 +62,7 @@ local function write_file(path, content)
 	fh:close()
 end
 
-local Text = require("tests.support.tap_hold_file_text")
+local Text = require("tests.support.keyboard.tap_hold_file_text")
 
 --- A tap_hold.toml path of its own: the config.toml beside it is this test's.
 local function private_path()

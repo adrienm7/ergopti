@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.synthetic_input_fixture")
+local Fixture = require("tests.support.core.synthetic_input_fixture")
 local make_fixture = Fixture.make
 local USER_DATA = Fixture.USER_DATA
 local SOURCE_PID = Fixture.SOURCE_PID

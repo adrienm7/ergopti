@@ -55,7 +55,7 @@ local function load_with(kind, answers, env, group, native_dump)
 	end, native_calls = native_calls }
 	-- A controlled map acknowledgement owns the parser's inverse data and
 	-- receipt. This checks source order without granting native source currency.
-	package.loaded["layouts.adapters.xkb_capture"] = require("tests.support.layout_cohort_fixture").capture(function(text)
+	package.loaded["layouts.adapters.xkb_capture"] = require("tests.support.layouts.cohort_fixture").capture(function(text)
 		return package.loaded["layouts.adapters.keyboard_layout"].build(text, group)
 	end, group)
 	local Shell = helpers.load_module("core.process.adapters.shell_runner")

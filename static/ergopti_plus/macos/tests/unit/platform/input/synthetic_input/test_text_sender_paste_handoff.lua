@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local with_sender = require("tests.support.text_sender_fixture")
+local with_sender = require("tests.support.core.text_sender_fixture")
 
 helpers.describe("text sender retains paste payload through native handoff", function()
 	helpers.it("preserves a user copy made while the snapshot is read", function()

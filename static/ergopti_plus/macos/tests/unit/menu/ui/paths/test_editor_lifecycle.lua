@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 
 
-local load_fixture = require("tests.support.paths_editor_fixture")
+local load_fixture = require("tests.support.settings.paths_editor_fixture")
 
 
 helpers.describe("paths editor owns its boot lifecycle", function()
@@ -27,7 +27,7 @@ helpers.describe("paths editor owns its boot lifecycle", function()
 			local editor, calls = load_fixture(view)
 			helpers.assert_true(editor.init("/Applications/ErgoptiPlus.app/", function() end))
 			helpers.assert_true(editor.open_editor())
-			require("tests.support.webview_focus_fixture").check(view,
+			require("tests.support.core.webview_focus_fixture").check(view,
 				function() return editor.open_editor() end,
 				function() calls.bridge_callback({ body = { action = "cancel" } }); helpers.assert_eq(deleted, 1) end,
 				calls.options)

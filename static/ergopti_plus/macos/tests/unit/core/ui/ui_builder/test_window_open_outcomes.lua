@@ -123,7 +123,7 @@ local function with_onboarding(controls, callback)
 			return bridge
 		end
 		local onboarding = require("onboarding.ui")
-		require("tests.support.onboarding_shared_data").install()
+		require("tests.support.onboarding.shared_data").install()
 		callback(onboarding, state)
 	end)
 end

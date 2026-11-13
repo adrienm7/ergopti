@@ -221,7 +221,7 @@ end
 do
 --- Actual engine writer/snapshot controls with the existing modeled OS fixture.
 local h = require("tests.helpers")
-local Fixture = require("tests.support.keystats_provenance_fixture")
+local Fixture = require("tests.support.metrics.provenance_fixture")
 local NAMES = {
 	"diagnostics.adapters.event_provenance", "layouts.adapters.input_source_broker", "platform.input.keyboard_hook",
 	"shortcuts.adapters.physical_observation_clock", "core.process.adapters.lifecycle", "platform.input.synthetic_input",
@@ -371,7 +371,7 @@ end
 
 do
 local h = require("tests.helpers")
-local Pause = require("tests.support.pause_transaction_fixture")
+local Pause = require("tests.support.settings.pause_transaction_fixture")
 h.describe("initial native ledger observations", function()
  h.it("observes initial unpaused pause ledger without committing a resume", function()
   h.with_stub_scope({"metrics.engine.capture.physical_lifecycle_observation", "shortcuts.adapters.physical_observation_clock"}, function()

@@ -16,8 +16,8 @@
 --- module-level state (_on_reload, _pump_entries, _reload_deadline)
 --- resets between test cases.
 
-package.loaded["tests.support.infra.config.file_watchers_fixture"] = nil
-local Fixture = require("tests.support.infra.config.file_watchers_fixture")
+package.loaded["tests.support.settings.file_watchers_fixture"] = nil
+local Fixture = require("tests.support.settings.file_watchers_fixture")
 local helpers, reload_gate, native_ok, native_luv, make_temp_dir, make_non_tmp_dir, write_file, touch_file, rm_dir, sleep_sec, CAN_STAT, activation_fixture =
 	Fixture.helpers, Fixture.reload_gate, Fixture.native_ok, Fixture.native_luv, Fixture.make_temp_dir, Fixture.make_non_tmp_dir, Fixture.write_file, Fixture.touch_file, Fixture.rm_dir, Fixture.sleep_sec, Fixture.CAN_STAT, Fixture.activation_fixture
 

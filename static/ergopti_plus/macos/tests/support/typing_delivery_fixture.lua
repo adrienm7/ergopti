@@ -7,8 +7,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local load_dashboard = require("tests.support.metrics_typing_fixture")
-local Scope = require("tests.support.metrics_typing_scope")
+local load_dashboard = require("tests.support.metrics.typing_fixture")
+local Scope = require("tests.support.metrics.typing_scope")
 
 return function(callback)
 	return Scope.run(function()

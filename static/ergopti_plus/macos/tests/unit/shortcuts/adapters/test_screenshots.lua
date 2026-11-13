@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.system_actions_fixture")
+local fixture = require("tests.support.core.system_actions_fixture")
 local with_fixture = fixture.with_fixture
 local as_physical = fixture.as_physical
 local make_sys_screenshot_spies = fixture.make_sys_screenshot_spies

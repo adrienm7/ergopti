@@ -2,7 +2,7 @@
 
 --- Trusted public resume refreshes coarse privacy before persistence admission.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keystats.context_tracker.private_resume_fixture")
+local Fixture = require("tests.support.metrics.engine.context_tracker.private_resume_fixture")
 local ORDINARY, PRIVATE = "Ordinary fixture page", "Fixture page - Incognito"
 
 local function assert_sink(runtime, expected)

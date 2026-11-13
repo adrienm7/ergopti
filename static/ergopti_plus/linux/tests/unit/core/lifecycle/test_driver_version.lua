@@ -205,7 +205,7 @@ end)
 
 describe("Driver version: the crash dump names the version and the app dir", function()
 	it("writes both lines although the daemon passes no context", function()
-		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
+		require("tests.support.diagnostics.crash_admission").with_output(function(redact, parts)
 			local Paths = require("core.fs.engine.paths")
 			local Version = require("updater.engine.version")
 			local Reporter = helpers.load_module("diagnostics.engine.reports.crash_reporter")

@@ -388,7 +388,7 @@ helpers.describe("log_manager append transaction ownership", function()
 			local Delivery = require("metrics.engine.capture.physical_delivery")
 			local Clock = require("metrics.engine.capture.physical_clock")
 			local Context = require("metrics.engine.capture.physical_context")
-			local Frames = require("tests.support.physical_stream_frames")
+			local Frames = require("tests.support.layouts.physical_stream_frames")
 			local convert = Clock.new({ version = 1, domain = "mach_absolute_time", numer = 125, denom = 3 })
 			local history = Context.new(4, function() return "2026-10-04 23:59:59.500" end)
 			history.observe(0, { allowed = true, app = "Original", epoch = 1000 })
@@ -491,7 +491,7 @@ helpers.describe("log_manager append transaction ownership", function()
 			history.observe(2000000000, { allowed = false })
 			local convert = require("metrics.engine.capture.physical_clock").new({
 				version = 1, domain = "mach_absolute_time", numer = 1, denom = 1 })
-			local Frames = require("tests.support.physical_stream_frames")
+			local Frames = require("tests.support.layouts.physical_stream_frames")
 			local receiver = require("metrics.engine.capture.physical_delivery").new({ batch_limit = 2,
 				admit = function() return "sink-test" end,
 				context = function(ticks) return history.resolve(convert(ticks)) end,
@@ -613,7 +613,7 @@ helpers.describe("log_manager append transaction ownership", function()
 		with_fixture(function()
 			return load_log_manager_fixture(0, false)
 		end, function(fixture)
-			local Frames = require("tests.support.physical_stream_frames")
+			local Frames = require("tests.support.layouts.physical_stream_frames")
 			local receiver = require("metrics.engine.capture.physical_delivery").new({
 				batch_limit = 2,
 				admit = function() return "sink-test" end,

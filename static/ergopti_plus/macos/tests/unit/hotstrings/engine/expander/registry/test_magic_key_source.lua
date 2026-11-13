@@ -74,7 +74,7 @@ local function load_keymap()
 		return tap
 	end
 	local keymap = helpers.load_with_stubs("hotstrings.engine.expander", { eventtap = eventtap })
-	require("tests.support.keyboard_geometry").initialize(require("platform.input.keyboard_geometry"))
+	require("tests.support.layouts.keyboard_geometry").initialize(require("platform.input.keyboard_geometry"))
 	return keymap, taps[1]
 end
 
@@ -128,7 +128,7 @@ end)
 helpers.describe("magic key source: the two keys ISO boards swap", function()
 	helpers.it("(magic-key-source) Backquote and IntlBackslash keep distinct physical positions", function()
 		helpers.with_fresh_modules({ "hotstrings.engine.expander.magic_key_source", "platform.input.keyboard_geometry" }, function()
-			require("tests.support.keyboard_geometry").initialize(require("platform.input.keyboard_geometry"))
+			require("tests.support.layouts.keyboard_geometry").initialize(require("platform.input.keyboard_geometry"))
 			local Source = require("hotstrings.engine.expander.magic_key_source")
 			local on = function() return true end
 			for _, code in ipairs({ "Backquote", "IntlBackslash" }) do
@@ -256,7 +256,7 @@ helpers.describe("magic key source: acknowledged tap dispatcher", function()
   Registry.is_group_enabled = function(name) return name == "magickey" end
   Registry.is_section_enabled = function(group, section) return group == "magickey" and section == "replace" end
   assert(keymap.set_magic_key_source("Backquote"))
-  local fixture = require("tests.support.system_actions_fixture")
+  local fixture = require("tests.support.core.system_actions_fixture")
   fixture.with_fixture(function()
    local sys, spy = fixture.make_sys_screenshot_spies()
    local Tap = require("shortcuts.engine.tap_keys")

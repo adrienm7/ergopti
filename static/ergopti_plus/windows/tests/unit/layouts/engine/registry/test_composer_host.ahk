@@ -320,7 +320,7 @@ _LCH_BootCase() {
 }
 
 
-#Include ../../../../support/layout_schema_kind_fixtures.ahk
+#Include ../../../../support/layouts/schema_kind_fixtures.ahk
 
 ; Keep the shipped composition and real compiled keylayout as positive peers;
 ; only the schema member token changes, including decoded duplicate identity.

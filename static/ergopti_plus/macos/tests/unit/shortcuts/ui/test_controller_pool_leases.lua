@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_picker = require("tests.support.ui.usercontent_reference_fixture")
+local with_picker = require("tests.support.core.ui.usercontent_reference_fixture")
 
 --- Builds the real helper without adding production-only introspection ports.
 --- @param callback function Receives a fresh pool and native observations.

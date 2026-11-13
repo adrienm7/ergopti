@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local load_pipeline = require("tests.support.prediction_pipeline").load
+local load_pipeline = require("tests.support.ai.prediction_pipeline").load
 
 
 

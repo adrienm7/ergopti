@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_context = require("tests.support.pause_transaction_fixture").with_context
+local with_context = require("tests.support.settings.pause_transaction_fixture").with_context
 
 helpers.describe("script-control resume transaction is atomic", function()
 	helpers.it("stop retains and retries an exact admission release refusal", function()

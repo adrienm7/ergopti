@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui_restore_fixture")
+local Fixture = require("tests.support.core.ui_restore_fixture")
 local STATE_KEY = "ergopti.ui_restore_state"
 
 helpers.describe("UI restore storage boundaries (ui-restore-storage-commit)", function()

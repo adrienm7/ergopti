@@ -11,7 +11,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shar
 	.. root .. "/../_shared/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
-local Fixture = require("tests.support.keystats_native_fixture")
+local Fixture = require("tests.support.metrics.native_fixture")
 local Private
 local directory = assert(uv.fs_mkdtemp(assert(uv.os_tmpdir()) .. "/sqlite-private-XXXXXX"))
 assert(uv.fs_chmod(directory, 493)) -- 0755 is intentional user-selected directory policy.
@@ -38,7 +38,7 @@ end
 -- descriptor remains live until process exit and never earns a shutdown ACK.
 if arg[2] == "close-refusal" then
 	Private = require("core.fs.engine.private_sqlite_file")
-	require("tests.support.metrics_preferences_fixture").with(function()
+	require("tests.support.metrics.preferences_fixture").with(function()
 		local writer = require("metrics.engine.journal.sqlite_writer")
 		local collector = require("metrics.engine.keystats")
 		local open, close = uv.fs_open, uv.fs_close
@@ -67,10 +67,10 @@ if arg[2] == "close-refusal" then
 end
 
 local ok, failure = xpcall(function()
-	require("tests.support.metrics_preferences_fixture").with(function()
+	require("tests.support.metrics.preferences_fixture").with(function()
 		Fixture.with(function(k)
 			k.init({ sqlite_path = database, log_dir = directory })
-			require("tests.support.metrics_consent_fixture").enable(k)
+			require("tests.support.metrics.consent_fixture").enable(k)
 			local writer = require("metrics.engine.journal.sqlite_writer")
 			assert(writer.is_available())
 			assert(uv.fs_stat(database).mode % 4096 == 384, "new SQLite database must be private under ambient umask")

@@ -9,7 +9,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../../../../support/webview_script_fixture.ahk
+#Include ../../../../support/core/webview_script_fixture.ahk
 _WVRO_RangeOutcome(Mode, View, Lines, Unhandled, Failure) {
 	Path := _CTU_NewPath()
 	Entry := Map("epoch", 51, "webview", View)

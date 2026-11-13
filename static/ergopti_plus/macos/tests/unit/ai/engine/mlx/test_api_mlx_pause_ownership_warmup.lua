@@ -15,8 +15,8 @@ local helpers = require("tests.helpers")
 -- Only a cold launch opens the PGID window these guard cases exercise; a stop
 -- or adoption reset arms no PGID timeout (mlx-stop-no-pgid-wait).
 local COLD_LAUNCH = { awaiting_pgid = true }
-package.loaded["tests.support.modules.llm.mlx.api_mlx_pause_ownership_fixture"] = nil
-local Fixture = require("tests.support.modules.llm.mlx.api_mlx_pause_ownership_fixture")
+package.loaded["tests.support.ai.engine.api_mlx_pause_ownership_fixture"] = nil
+local Fixture = require("tests.support.ai.engine.api_mlx_pause_ownership_fixture")
 local init_idle_real_warmup_controller = Fixture.init_idle_real_warmup_controller
 local install_script_control_dependencies = Fixture.install_script_control_dependencies
 local native_result = Fixture.native_result

@@ -7,7 +7,7 @@
 --- through synchronous injection, reentrant cancellation and physical cleanup.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.adapters.synthetic_input.selection_write_fixture")
+local fixture = require("tests.support.platform.input.synthetic_input.selection_write_fixture")
 
 helpers.describe("selected writes retain field and action authority", function()
 	for _, text in ipairs({ "ok", "☃" }) do

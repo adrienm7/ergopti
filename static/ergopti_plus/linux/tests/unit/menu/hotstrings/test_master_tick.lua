@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Choices = require("tests.support.hotstring_choices")
+local Choices = require("tests.support.hotstrings.choices")
 
 local Answers = require("onboarding.engine.answers")
 

@@ -2,7 +2,7 @@
 
 --- Proves explicit capture ownership without activating a default boot path.
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 
 helpers.describe("dormant physical capture owner", function()
 	helpers.it("initializes once without spawning or changing legacy accounting", function()

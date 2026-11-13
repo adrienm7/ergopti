@@ -11,8 +11,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.llm.mlx.api_mlx_pause_ownership_fixture"] = nil
-local Fixture = require("tests.support.modules.llm.mlx.api_mlx_pause_ownership_fixture")
+package.loaded["tests.support.ai.engine.api_mlx_pause_ownership_fixture"] = nil
+local Fixture = require("tests.support.ai.engine.api_mlx_pause_ownership_fixture")
 local requests_matching = Fixture.requests_matching
 local with_real_mlx_stack = Fixture.with_real_mlx_stack
 

@@ -11,8 +11,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OutputFixture = require("tests.support.toml_output_fixture")
-local load_fixture_preferences = require("tests.support.infra.preferences.preferences_keeps_unowned_sections_fixture").load_preferences
+local OutputFixture = require("tests.support.settings.toml_output_fixture")
+local load_fixture_preferences = require("tests.support.settings.preferences_keeps_unowned_sections_fixture").load_preferences
 
 local SOURCE = table.concat({
 	"[hotstrings.groups]",

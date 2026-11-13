@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.synthetic_input_fixture")
+local Fixture = require("tests.support.core.synthetic_input_fixture")
 local M = {}
 local OWNED = {
 	"clipboard.adapters.clipboard", "diagnostics.adapters.event_provenance", "ai.adapters.python_interpreter",

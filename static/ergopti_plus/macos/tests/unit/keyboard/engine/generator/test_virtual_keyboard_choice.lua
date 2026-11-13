@@ -20,8 +20,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.platform.remap.generator.generator_fixture"] = nil
-local Fixture = require("tests.support.platform.remap.generator.generator_fixture")
+package.loaded["tests.support.keyboard.engine.generator_fixture"] = nil
+local Fixture = require("tests.support.keyboard.engine.generator_fixture")
 local Generator = Fixture.Generator
 local NONE_ACTION = Fixture.NONE_ACTION
 local make_state = Fixture.make_state

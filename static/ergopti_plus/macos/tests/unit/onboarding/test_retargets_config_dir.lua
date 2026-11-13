@@ -141,7 +141,7 @@ helpers.describe("onboarding commit() honours the retarget", function()
 	helpers.it("(onboarding-retarget-behavior) finish writes to the newly persisted resolver destination", function()
 		helpers.with_fresh_modules({ "core.text.engine.toml.writer", "core.fs.adapters.file_system", "settings.ui.menu.paths",
 			"core.ui.engine.notifications" }, function()
-			return require("tests.support.onboarding_finish_fixture").with_migration_reader(function()
+			return require("tests.support.onboarding.finish_fixture").with_migration_reader(function()
 			local destination, persisted, writes, notified = OLD_CONFIG_PATH, 0, {}, 0
 			package.loaded["settings.ui.menu.paths"] = {
 				persist_config_dir_for_wizard = function(directory)
@@ -167,7 +167,7 @@ helpers.describe("onboarding commit() honours the retarget", function()
 			}
 			package.loaded["core.ui.engine.notifications"] = { notify = function() notified = notified + 1; return true end }
 			require("tests.support.dashboard_window_fixture")("onboarding.ui", function(onboarding, state)
-				require("tests.support.onboarding_shared_data").install()
+				require("tests.support.onboarding.shared_data").install()
 				package.loaded["core.i18n.engine.i18n"].persist_locale = function() return true end
 				helpers.assert_true(onboarding.run(OLD_CONFIG_PATH))
 				state.receiver({ body = { action = "finish", answers = {
@@ -283,7 +283,7 @@ end)
 
 
 helpers.describe("the controlled onboarding migration context retains no native grant", function()
-	local Context = require("tests.support.onboarding_finish_fixture")
+	local Context = require("tests.support.onboarding.finish_fixture")
 
 	helpers.it("uses the real registry and custom reader without admitting the virtual destination", function()
 		helpers.with_fresh_modules({ "core.fs.adapters.file_system" }, function()

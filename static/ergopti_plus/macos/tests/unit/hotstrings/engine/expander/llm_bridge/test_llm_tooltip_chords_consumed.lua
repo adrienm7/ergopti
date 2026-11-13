@@ -22,8 +22,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local support = require("tests.support.tooltip_watcher_fixture")
-local with_bridge_fixture = require("tests.support.llm_bridge_fixture").with_bridge_fixture
+local support = require("tests.support.core.tooltip_watcher_fixture")
+local with_bridge_fixture = require("tests.support.ai.bridge_fixture").with_bridge_fixture
 
 local with_fixture = support.with_fixture
 local CASES = support.CASES

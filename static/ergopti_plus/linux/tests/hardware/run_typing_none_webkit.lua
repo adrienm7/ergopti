@@ -45,7 +45,7 @@ end
 print("OWNED_PROFILE " .. profile)
 local J=require('core.text.engine.json'); local K=require('metrics.engine.keystats'); local W=require('metrics.engine.journal.sqlite_writer')
 -- Flushes are asynchronous owned SQLite batches; wait for their physical ACK.
-local Drain=require('tests.support.sqlite_flush_native')
+local Drain=require('tests.support.core.sqlite_flush_native')
 local root=assert(os.getenv('XDG_CONFIG_HOME')); assert(uv.fs_mkdir(root..'/ergopti',448))
 local config=assert(io.open(root..'/ergopti/config.toml','w')); assert(config:write('[metrics]\nenabled = true\n') and config:close())
 K.init({sqlite_path=root..'/metrics.sqlite',log_dir=root..'/logs'}); assert(K.is_enabled() and W.is_available())

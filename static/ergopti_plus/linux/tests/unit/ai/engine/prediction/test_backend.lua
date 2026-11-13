@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
-local ProfilesFixture = require("tests.support.llm_profiles_fixture")
+local ProfilesFixture = require("tests.support.ai.profiles_fixture")
 
 local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", token = "k", model = "", base_url = "" }
 
@@ -77,7 +77,7 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	}
 	local stored = { ["llm.models.selected"] = backend }
 	for key, value in pairs(stored_settings or {}) do stored[key] = value end
-	package.loaded["ai.engine.preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = stored })
+	package.loaded["ai.engine.preferences"] = require("tests.support.ai.preferences_fixture").new({ initial = stored })
 	-- Settings caches what it read; a fresh copy reads this storage.
 	package.loaded["ai.engine.settings.settings"] = nil
 	package.loaded["ai.engine.settings.trigger_settings"] = nil

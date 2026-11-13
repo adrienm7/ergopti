@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 
-local make_webview_overrides = require("tests.support.download_window_fixture").make_webview_overrides
+local make_webview_overrides = require("tests.support.updater.download_window_fixture").make_webview_overrides
 
 helpers.describe("download_window: setModel() routes through js_str() (F-LOW-16)", function()
 	helpers.it("a model name containing a backslash and a quote is safely escaped", function()

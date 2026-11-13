@@ -8,9 +8,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.metrics.typing.manifest_completion_fixture")
+local Fixture = require("tests.support.metrics.ui.manifest_completion_fixture")
 local Json = require("core.text.engine.json")
-local ReadLogs = require("tests.support.ui.metrics.typing.read_completion_logs")
+local ReadLogs = require("tests.support.metrics.ui.read_completion_logs")
 
 local function contains(evaluations, fragment)
 	for _, call in ipairs(evaluations) do if call.code:find(fragment, 1, true) then return true end end

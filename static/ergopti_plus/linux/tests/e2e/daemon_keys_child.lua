@@ -159,7 +159,7 @@ end
 
 package.preload["layouts.adapters.keyboard_layout"] = function()
 	-- The layout is controlled; opaque plan custody is actual KeyboardLayout logic.
-	return require("tests.support.layout_cohort_fixture").layout(code_for)
+	return require("tests.support.layouts.cohort_fixture").layout(code_for)
 end
 
 local scripted_writer, injected_refusal = nil, false

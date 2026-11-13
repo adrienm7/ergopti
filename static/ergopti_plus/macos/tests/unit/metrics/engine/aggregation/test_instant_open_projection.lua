@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local FakeSqlite = require("tests.support.fake_ngram_sqlite")
+local FakeSqlite = require("tests.support.core.fake_ngram_sqlite")
 
 local TODAY = "2026-09-30"
 

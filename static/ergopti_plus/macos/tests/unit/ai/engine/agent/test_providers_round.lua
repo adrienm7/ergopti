@@ -4,7 +4,7 @@
 --- MODULE: AI Agent over Jev, Backboard and the Prediction Tooltip (macOS)
 --- DESCRIPTION:
 --- Runs the automatic mode over the real runner, shared logic, prediction
---- engine and remote backend (tests/support/agent_world.lua), with the HTTP
+--- engine and remote backend (tests/support/ai/agent_world.lua), with the HTTP
 --- transport faked:
 --- - System 1 through a decisions provider (TypeSafe's Jev) posts Jev's choice
 ---   question about the app and the sentence to the provider's full endpoint,
@@ -27,7 +27,7 @@
 
 local helpers = require("tests.helpers")
 local json = require("core.text.engine.json")
-local World = require("tests.support.agent_world")
+local World = require("tests.support.ai.agent_world")
 
 local Agent = require("ai.engine.agent.agent")
 local Formats = require("ai.engine.api.remote_formats")

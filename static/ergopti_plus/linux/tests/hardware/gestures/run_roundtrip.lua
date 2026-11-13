@@ -33,7 +33,7 @@
 local Decoder = require("gestures.engine.mt_decoder")
 local Finder = require("gestures.adapters.touchpad_finder")
 local Reader = require("platform.input.evdev_reader")
-local Record = require("tests.support.touchpad_record")
+local Record = require("tests.support.gestures.touchpad_record")
 
 local UINPUT_PATH = "/dev/uinput"
 local DEVICE_NAME = "Ergopti Roundtrip Touchpad"

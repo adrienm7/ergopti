@@ -9,8 +9,8 @@
 local root = assert(arg[1])
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
-local Fixture = require("tests.support.keystats_native_fixture")
-local Preferences = require("tests.support.metrics_preferences_fixture")
+local Fixture = require("tests.support.metrics.native_fixture")
+local Preferences = require("tests.support.metrics.preferences_fixture")
 local Calendar = require("metrics.engine.calendar")
 local Monotonic = require("core.logger.engine.monotonic")
 local helpers = require("tests.helpers")
@@ -46,7 +46,7 @@ local function scenario(day, body)
 		Preferences.with(function()
 			Fixture.with(function(k)
 				k.init({ sqlite_path = path, log_dir = path .. ".logs" })
-				require("tests.support.metrics_consent_fixture").enable(k)
+				require("tests.support.metrics.consent_fixture").enable(k)
 				local writer = require("metrics.engine.journal.sqlite_writer")
 				local function advance(ms) elapsed = elapsed + ms end
 				local function rows(sql) return assert(writer.query_rows(sql)) end

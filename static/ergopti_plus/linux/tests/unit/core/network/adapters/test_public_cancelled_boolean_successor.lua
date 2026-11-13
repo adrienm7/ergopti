@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Ports = require("tests.support.managed_http_native_ports")
+local Ports = require("tests.support.core.managed_http_native_ports")
 local URL = "http://127.0.0.1:9000/fixed"
 local function options() return { owner = "public-cancelled-boolean", timeout_ms = 1000 } end
 local WIRE = "fixed body\nERGOPTI_HTTP_STATUS:200\n"

@@ -1,0 +1,289 @@
+--- tests/support/ai/ollama_pull_fixture.lua
+
+--- ==============================================================================
+--- MODULE: Original Ollama Pull Owner Fixture
+--- DESCRIPTION:
+--- Owns the original single-slot fixture once, shared by unchanged regression
+--- cases and actual emitted-wrapper receiving. Network and binary ports retain
+--- their original defaults unless a receiver supplies its independent values.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+local MODULES = {
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.fs.engine.dir",
+	"core.ui.engine.notifications",
+	"core.text.engine.utils",
+	"ai.engine.ollama.binary",
+	"ai.engine.ollama.server_command",
+	"ai.engine.api.network_env",
+	"ai.engine.api.opaque_network_admission",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
+	"core.network.adapters.http_client",
+	"updater.ui.download_window",
+	"core.ui.ui.builder",
+	"core.fs.engine.paths", "core.timing.engine.timings",
+	"core.timing.engine.deferred_work",
+	"updater.ui.download_window.javascript",
+	"ai.ui.menu.requirement_operation_registry",
+	"ai.ui.menu.models.manager_ollama",
+}
+
+local function with_fixture(options, callback)
+	options = options or {}
+	local saved_hs = _G.hs
+	local saved = {}
+	for _, name in ipairs(MODULES) do saved[name] = package.loaded[name] end
+	package.loaded["core.fs.engine.dir"] = nil
+
+	local pulls = {}
+	local progress = { shows = 0, completes = 0, aborts = 0, retry_starts = 0 }
+	local notifications = 0
+	local notification_records = {}
+	-- Every one-shot timer the manager scheduled, for a test to deliver.
+	local timers = {}
+	local error_records = {}
+	local http_callback
+	local terminate_mode = options.terminate_mode or "self"
+
+	local noop = function() end
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.logger.engine.logger"] = {
+		debug = noop,
+		start = noop,
+		success = noop,
+		done = noop,
+		info = noop,
+		warn = noop,
+		error = function(_, fmt, ...)
+			error_records[#error_records + 1] = select("#", ...) > 0 and string.format(fmt, ...) or tostring(fmt)
+		end,
+		callback = function(_, _, fn, ...)
+			if type(fn) ~= "function" then return false, nil end
+			return xpcall(fn, debug.traceback, ...)
+		end,
+	}
+	package.loaded["core.ui.engine.notifications"] = {
+		notify = function(...)
+			notifications = notifications + 1
+			notification_records[#notification_records + 1] = table.pack(...)
+			return true
+		end,
+	}
+	package.loaded["core.text.engine.utils"] = nil
+	package.loaded["ai.engine.ollama.binary"] = {
+		resolve = function() return options.binary_path or "/fixture/ollama", nil, options.binary_source end,
+	}
+	package.loaded["ai.engine.ollama.server_command"] = {
+		build = function() return "fixture restart" end,
+	}
+	if options.network_admission then package.loaded["ai.engine.api.opaque_network_admission"] = options.network_admission end
+	package.loaded["ai.engine.api.network_env"] = options.network_env or {
+		prelude = function() return "", nil end,
+		opaque_prelude = function() return "", nil end,
+	}
+	package.loaded["core.process.adapters.shell_runner"] = { spawn = function() return nil end }
+	package.loaded["core.events.timer_scheduler"] = {
+		awake_time = function() return 0 end,
+		after = function(_, fn)
+			local handle = { callback = fn, timer = {}, observers = {} }
+			timers[#timers + 1] = handle
+			return handle, true
+		end,
+		cancel = function(handle)
+			handle.timer = nil
+			local observers = handle.observers or {}
+			handle.observers = {}
+			for _, observer in ipairs(observers) do observer() end
+			return true
+		end,
+		onSettled = function(handle, observer)
+			if handle.timer == nil then observer() else
+				handle.observers[#handle.observers + 1] = observer
+			end
+			return true
+		end,
+	}
+	package.loaded["core.network.adapters.http_client"] = {
+		new = function()
+			local client = { settled = false, observers = {} }
+			function client.post(_, _, _, done)
+				http_callback = function(status, body, headers)
+					local result = done({ status = status, body = body, headers = headers })
+					if not client.settled then
+						client.settled = true
+						local observers = client.observers
+						client.observers = {}
+						for _, observer in ipairs(observers) do observer() end
+					end
+					return result
+				end
+				return true
+			end
+			function client.cancel()
+				client.settled = true
+				local observers = client.observers
+				client.observers = {}
+				for _, observer in ipairs(observers) do observer() end
+				return true
+			end
+			function client.onSettled(observer)
+				if client.settled then observer() else
+					client.observers[#client.observers + 1] = observer
+				end
+				return true
+			end
+			return client
+		end,
+	}
+	package.loaded["updater.ui.download_window"] = {
+		session_id = function() return progress.shows end,
+		is_active = function() return progress.shows > 0 end,
+		show = function(opts)
+			progress.shows = progress.shows + 1
+			progress.terminal_cmd = opts.terminal_cmd
+			progress.on_abort = opts.on_abort
+			progress.on_cancel = opts.on_cancel
+			progress.on_retry_start = opts.on_retry_start
+			progress.on_retry = opts.on_retry
+			if options.show_replaced then progress.shows = progress.shows + 1 end
+			return options.show_result ~= false
+		end,
+		update = function(pct, bytes_done, bytes_total, line)
+			progress.updates = (progress.updates or 0) + 1
+			progress.last_update = { pct = pct, done = bytes_done, total = bytes_total, line = line }
+		end,
+		complete = function() progress.completes = progress.completes + 1; return true end,
+	}
+	package.loaded["core.process.adapters.task_lifecycle"] = {
+		native = function(label, executable, on_done, on_stream, args)
+			if label == "Ollama model pull" and options.construct_result == false then
+				return nil
+			end
+			local task = {
+				label = label,
+				executable = executable,
+				args = args,
+				on_done = on_done,
+				on_stream = on_stream,
+				terminate_calls = 0,
+				running = false,
+			}
+			function task:start()
+				self.running = options.start_result ~= false
+				if options.complete_during_start ~= nil then on_done(options.complete_during_start, "", options.complete_stderr or "") end
+				return options.start_result ~= false
+			end
+			function task:terminate()
+				self.terminate_calls = self.terminate_calls + 1
+				local mode = type(terminate_mode) == "function" and terminate_mode(self) or terminate_mode
+				if mode == "throw" then error("fixture terminate refusal") end
+				if mode == "false" then return false end
+				if mode == "nil" then return nil end
+				return self
+			end
+			function task:isRunning() return self.running end
+			if label == "Ollama model pull" then pulls[#pulls + 1] = task end
+			return task
+		end,
+		start = function(task) return task:start() == true end,
+	}
+
+	-- Its loader reads the shared tree through hs.fs, which this fixture omits
+	package.loaded["ai.engine.api.thinking_families"] = { ollama_think = function() return false end }
+	_G.hs = {
+		execute = function() return "", true end,
+		http = {
+			asyncPost = function(_, _, _, cb) http_callback = cb; return true end,
+		},
+		json = { encode = function() return "{}" end },
+		timer = {
+			doAfter = function(_, fn) return { callback = fn } end,
+			secondsSinceEpoch = function() return 0 end,
+		},
+		urlevent = { openURL = noop },
+	}
+	package.loaded["ai.ui.menu.models.manager_ollama"] = nil
+	local real_window, native_window
+	if options.real_window then
+		helpers.provide_timings()
+		package.loaded["core.fs.engine.paths"] = { shared = function()
+			return helpers.driver_root() .. "../_shared"
+		end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
+		package.loaded["updater.ui.download_window.javascript"] = nil
+		package.loaded["core.ui.ui.builder"] = {
+			get_app_geometry = function() return { width = 460, height = 380 } end,
+			show_webview = function(opts)
+				native_window = { codes = {}, opts = opts }
+				function native_window:evaluateJavaScript(code)
+					self.codes[#self.codes + 1] = code
+					return self
+				end
+				function native_window:delete() end
+				opts.on_webview_created(native_window)
+				return native_window
+			end,
+		}
+		_G.hs.webview = { usercontent = { new = function()
+			return { setCallback = function() end }
+		end } }
+		_G.hs.screen = { mainScreen = function()
+			return { frame = function() return { x = 0, y = 0, w = 1440, h = 900 } end }
+		end }
+		_G.hs.drawing = { windowLevels = { normal = 0, floating = 1 } }
+		package.loaded["updater.ui.download_window"] = nil
+		real_window = require("updater.ui.download_window")
+	end
+
+	local active_tasks = {}
+	local state = { llm_model = "old-model" }
+	local effects = { runtime = 0, display = 0, saves = 0 }
+	local manager = require("ai.ui.menu.models.manager_ollama").new({
+		active_tasks = active_tasks,
+		state = state,
+		keymap = {
+			set_llm_model = function() effects.runtime = effects.runtime + 1; return true end,
+			set_llm_display_model_name = function() effects.display = effects.display + 1; return true end,
+		},
+		mark_download_aborted = function()
+			progress.aborts = progress.aborts + 1
+			return true
+		end,
+		clear_download_abort = function()
+			progress.retry_starts = progress.retry_starts + 1
+			return true
+		end,
+		save_prefs = function() effects.saves = effects.saves + 1; return true end,
+	}, {}, function() return 8 end)
+
+	local ok, err = xpcall(function()
+		callback({
+			manager = manager,
+			active_tasks = active_tasks,
+			state = state,
+			effects = effects,
+			pulls = pulls,
+			progress = progress,
+			window = real_window,
+			native_window = function() return native_window end,
+			notifications = function() return notifications end,
+			notification_records = notification_records,
+			timers = timers,
+			error_records = error_records,
+			http_callback = function() return http_callback end,
+			set_terminate_mode = function(mode) terminate_mode = mode end,
+		})
+	end, debug.traceback)
+
+	_G.hs = saved_hs
+	for _, name in ipairs(MODULES) do package.loaded[name] = saved[name] end
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
+	if not ok then error(err, 0) end
+end
+
+return { with_fixture = with_fixture }

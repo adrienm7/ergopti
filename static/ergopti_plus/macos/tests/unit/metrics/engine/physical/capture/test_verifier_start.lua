@@ -2,7 +2,7 @@
 
 --- Keeps original verifier start frames owned through synchronous native settlement.
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 
 helpers.describe("physical verifier start frame retirement", function()
 	for _, outcome in ipairs({ "accepted", "refused", "throws" }) do

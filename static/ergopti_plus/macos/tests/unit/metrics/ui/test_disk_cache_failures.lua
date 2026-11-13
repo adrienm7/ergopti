@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_delivery = require("tests.support.metrics_delivery_fixture")
+local with_delivery = require("tests.support.metrics.delivery_fixture")
 
 helpers.describe("metrics disk cache persistence", function()
 	for _, mode in ipairs({ "throw", "nil", "number" }) do

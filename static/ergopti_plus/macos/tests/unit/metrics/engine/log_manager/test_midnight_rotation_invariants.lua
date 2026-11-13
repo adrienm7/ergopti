@@ -5,7 +5,7 @@
 --- rejected drain, and leave event-local input provenance untouched.
 
 local helpers = require("tests.helpers")
-local provenance_fixture = require("tests.support.keystats_provenance_fixture")
+local provenance_fixture = require("tests.support.metrics.provenance_fixture")
 
 local OLD_DAY = "2026-08-07"
 local NEW_DAY = "2026-08-08"

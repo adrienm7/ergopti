@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keystats.midnight_interval_fixture")
+local Fixture = require("tests.support.metrics.engine.midnight_interval_fixture")
 
 helpers.describe("midnight interval ownership", function()
 	helpers.it("(midnight-interval-ownership) preserves the healthy accepted boundary", function()

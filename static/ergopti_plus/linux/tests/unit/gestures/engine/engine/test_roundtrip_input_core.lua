@@ -8,12 +8,12 @@
 --- on every host until that runner: the input core drops a report in which no
 --- value changed, and a five-finger tap held still reached the decoder as one
 --- frame at five, which the finger_join_frames gate refuses as a graze. This
---- replays the unchanged harness through tests/support/input_core_emulation.lua
+--- replays the unchanged harness through tests/support/core/input_core_emulation.lua
 --- on every host, and proves the emulation drops what the kernel drops.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Emulation = require("tests.support.input_core_emulation")
+local Emulation = require("tests.support.core.input_core_emulation")
 
 local HARNESS = require("core.fs.engine.paths").driver_root() .. "/tests/hardware/gestures/run_roundtrip.lua"
 

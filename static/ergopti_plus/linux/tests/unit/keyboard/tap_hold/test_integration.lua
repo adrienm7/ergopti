@@ -22,8 +22,8 @@ local KEY_A, KEY_J, KEY_K, KEY_U = 30, 36, 37, 22
 --- Starts a hook + manager + writer session on a user file holding `user_text`.
 local function session(user_text)
 	-- The switch and the timings the scenario spells go to config.toml beside it.
-	local config_text = require("tests.support.tap_hold_fixture").config(user_text)
-	user_text = require("tests.support.tap_hold_fixture").with_preset(user_text)
+	local config_text = require("tests.support.keyboard.tap_hold_fixture").config(user_text)
+	user_text = require("tests.support.keyboard.tap_hold_fixture").with_preset(user_text)
 	local Hook = helpers.load_module("platform.input.keyboard_hook")
 	local Manager = helpers.load_module("tap_hold.engine.manager")
 	local Writer = helpers.load_module("tap_hold.engine.writer")
@@ -521,7 +521,7 @@ end)
 --- Runs `body(s)` on the real Manager over the controlled native Reader, with
 --- the real writer on the same user file; s.drive feeds { code, value, at_ms }.
 local function with_native_session(user_text, body)
-	require("tests.support.input_owner_fixture").with_manager_session({ tap_hold_text = user_text, nav_fixture = true },
+	require("tests.support.core.input_owner_fixture").with_manager_session({ tap_hold_text = user_text, nav_fixture = true },
 		function(s)
 			local Writer = helpers.load_module("tap_hold.engine.writer")
 			Writer.init({ path = s.tap_path, reload = s.manager.reload, is_tap_action = s.manager.is_tap_action,

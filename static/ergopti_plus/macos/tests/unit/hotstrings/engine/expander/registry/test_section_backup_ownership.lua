@@ -1,7 +1,7 @@
 --- tests/unit/hotstrings/engine/expander/registry/test_section_backup_ownership.lua
 --- A section settings backup may never be removed based on matching bytes alone.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keymap.registry.registry_mutation_transactions_fixture")
+local Fixture = require("tests.support.hotstrings.registry_mutation_transactions_fixture")
 
 local function scenario(collision)
 	local _, registry = Fixture.fresh_registry()

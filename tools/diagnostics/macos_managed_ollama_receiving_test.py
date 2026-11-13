@@ -33,7 +33,8 @@ RECEIVING = load(
     "registry_receiving", Path(__file__).with_name("macos_managed_ollama_receiving.py")
 )
 WIRE = load(
-    "registry_wire", ROOT / "static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py"
+    "registry_wire",
+    ROOT / "static/ergopti_plus/macos/tests/support/core/native_http_wire_fixture.py",
 )
 MODEL = load("registry_model", ROOT / "tools/diagnostics/ollama_native_tiny_gguf.py")
 

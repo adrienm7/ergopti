@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Preferences = require("tests.support.llm_preferences_fixture")
+local Preferences = require("tests.support.ai.preferences_fixture")
 
 helpers.describe("Linux AI menu: per-application profile overrides", function()
 	helpers.it("app-profile rows: map the last application, list it, clear it", function()

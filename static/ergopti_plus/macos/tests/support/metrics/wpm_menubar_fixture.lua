@@ -1,0 +1,70 @@
+--- tests/support/metrics/wpm_menubar_fixture.lua
+
+--- ==============================================================================
+--- MODULE: WPM Menubar Fixture
+--- DESCRIPTION:
+--- Owns distinct native items and timer handles across reentrant lifecycle calls.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local WPMModel = require("metrics.engine.wpm_widget_model")
+local TomlCodec = require("core.text.engine.toml_codec")
+local Paths = require("core.fs.engine.paths")
+
+-- The real canon, read before any stub replaces the paths it lives at.
+local CANON = assert(WPMModel.load(Paths.shared("metrics/data/wpm_widget/constants.toml"), TomlCodec.decode))
+
+return function(callback)
+	local original_hs = _G.hs
+	local ok, err = xpcall(function()
+		helpers.with_fresh_modules({ "metrics.ui.wpm.menubar", "metrics.ui.wpm.shared", "metrics.ui.wpm.widget",
+			"core.ui.ui.tooltip", "metrics.engine", "core.logger.engine.logger", "core.events.timer_scheduler" }, function()
+			local state = { items = {}, timers = {}, logs = {} }
+			local logger = helpers.make_logger_stub()
+			for _, level in ipairs({ "debug", "info", "error" }) do
+				logger[level] = function(_, message)
+					state.logs[#state.logs + 1] = { level = level, message = message }
+					if state.on_log then state.on_log(level, message) end
+				end
+			end
+			package.loaded["core.logger.engine.logger"] = logger
+			package.loaded["metrics.engine"] = { get_live_stats = function() return { wpm = 10 } end }
+			package.loaded["metrics.ui.wpm.widget"] = { _load_shared_const = function() return { source_color_duration = 1 } end }
+			package.loaded["metrics.ui.wpm.shared"] = { get_active_source = function() return "none" end,
+				format_mpm_label = function() return "10" end, canon = function() return CANON end }
+			package.loaded["core.ui.ui.tooltip"] = { is_visible = function() return false end }
+			package.loaded["core.events.timer_scheduler"] = {
+				every = function(_, run)
+					local timer = { timer = {}, run = run }
+					state.timers[#state.timers + 1] = timer
+					return timer, true
+				end,
+				cancel = function(timer) timer.timer = nil; return true end,
+			}
+			local module = helpers.load_with_stubs("metrics.ui.wpm.menubar", {
+				timer = { absoluteTime = function() return 0 end },
+				styledtext = { new = function(text) return text end },
+				menubar = { new = function()
+					if state.new_failure == "nil" then return nil end
+					if state.new_failure == "throw" then error("PRIVATE_DETAIL") end
+					local item = { deleted = false, titles = 0 }
+					item.delete = function(self)
+						if state.delete_failure then error("delete refused") end
+						self.deleted = true
+					end
+					item.setTitle = function(self)
+						helpers.assert_eq(self.deleted, false, "retired native item must not receive titles")
+						self.titles = self.titles + 1
+						return self
+					end
+					state.items[#state.items + 1] = item
+					if state.on_new then state.on_new() end
+					return item
+				end },
+			})
+			callback(module, state)
+		end)
+	end, debug.traceback)
+	_G.hs = original_hs
+	if not ok then error(err, 0) end
+end

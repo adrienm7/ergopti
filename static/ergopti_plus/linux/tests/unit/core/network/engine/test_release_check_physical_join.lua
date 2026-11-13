@@ -5,7 +5,7 @@
 --- modeled allocation/publication; these controls prove no native runtime IO.
 local helpers = require("tests.helpers")
 local Managed = require("core.network.engine.managed_http")
-local Model = require("tests.support.updater_native_model")
+local Model = require("tests.support.updater.native_model")
 
 local function release_body(manager, count)
  local entries = {}

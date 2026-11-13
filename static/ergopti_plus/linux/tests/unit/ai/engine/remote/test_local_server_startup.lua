@@ -26,7 +26,7 @@ local function isolated(body)
 	for _, id in ipairs(catalogue.server_order) do
 		if not driven[id] then stopped[id] = { running = false, pids = {} } end
 	end
-	require("tests.support.modules.llm.local_server_scan_fake").install(stopped)
+	require("tests.support.ai.engine.local_server_scan_fake").install(stopped)
 	local path = os.tmpname(); os.remove(path)
 	package.loaded["core.network.adapters.http_client"] = { get_owned = function(url, headers, options, callback)
 		local call = { url = url, headers = headers, options = options, callback = callback, listeners = {}, cancelled = 0 }

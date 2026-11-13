@@ -318,7 +318,7 @@ helpers.describe("injector: source currency before new DOWN and owned cleanup UP
 	helpers.it("does not forward the original magic source after a partial output stops its capture", function()
 		cohort_fixture(function(capture, layout, state)
 			output_fixture(capture, layout, state, function(injector, rows)
-				local fixture = require("tests.support.modules.hotstrings.magic_key.magic_key_source_fixture")
+				local fixture = require("tests.support.hotstrings.engine.magic_key_source_fixture")
 				fixture.with_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(source)
 					local previous = package.loaded["platform.input.keyboard_hook"]
 					local hook = helpers.load_module("platform.input.keyboard_hook")

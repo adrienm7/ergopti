@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local Transcript = require("tests.lua.ai.engine_transcript")
-local World = require("tests.support.llm_engine_transcript_world")
+local World = require("tests.support.ai.engine_transcript_world")
 
 Transcript.run(helpers,
 	helpers.driver_root() .. "/../_shared/tests/corpus/llm/request_plan_engine_transcripts.json",

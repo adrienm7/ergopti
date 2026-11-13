@@ -36,7 +36,7 @@ local function with_fixture(source, body)
 		local preferences = require("settings.engine.preferences.preferences")
 		preferences.load("config")
 		package.loaded["platform.input.keyboard_geometry"] = nil
-		require("tests.support.keyboard_geometry").initialize(require("platform.input.keyboard_geometry"))
+		require("tests.support.layouts.keyboard_geometry").initialize(require("platform.input.keyboard_geometry"))
 		local taps = require("shortcuts.engine.tap_keys")
 		local assignable = function(action) return action == "send_text" or action == "screen_capture" end
 		body(taps, preferences, control, assignable)

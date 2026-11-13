@@ -11,8 +11,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.onboarding_install_fixture")
-local Scenario = require("tests.support.onboarding_install_scenarios")
+local Fixture = require("tests.support.onboarding.install_fixture")
+local Scenario = require("tests.support.onboarding.install_scenarios")
 
 helpers.describe("Karabiner DMG download route (net-001-remap-route)", function()
 	helpers.it("downloads behind the network route, over https only", function()

@@ -24,7 +24,7 @@ local KEY_A, KEY_J = 30, 36
 --- user's tap_hold.toml holding `user_text`. drive(events) feeds
 --- { code, value, at_ms } events and returns what the desktop receives.
 local function with_session(user_text, body)
-	local Fixture = require("tests.support.input_owner_fixture")
+	local Fixture = require("tests.support.core.input_owner_fixture")
 	Fixture.with_manager_session({ tap_hold_text = user_text, nav_fixture = true,
 		action_names = { "one_shot_shift" } }, function(s)
 		body(function(events)

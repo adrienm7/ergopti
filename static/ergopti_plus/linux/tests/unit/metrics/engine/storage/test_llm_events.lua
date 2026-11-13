@@ -11,8 +11,8 @@
 --- recorder buffers the events and flushes them once.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.keystats.storage.keystats_sqlite_writer_fixture"] = nil
-local Fixture = require("tests.support.modules.keystats.storage.keystats_sqlite_writer_fixture")
+package.loaded["tests.support.metrics.engine.storage.sqlite_writer_fixture"] = nil
+local Fixture = require("tests.support.metrics.engine.storage.sqlite_writer_fixture")
 local helpers = Fixture.helpers
 local Fakes = helpers.load_module("tests.fakes")
 local Json = require("core.text.engine.json")
@@ -177,14 +177,14 @@ helpers.describe("keystats llm events: the recorder buffers and flushes them onc
 			is_available = function() return true end,
 			bump_rev = function() return true end,
 		}, { __index = Fakes.sqlite_writer() })
-		require("tests.support.sqlite_flush_fake").attach(fake_writer)
+		require("tests.support.core.sqlite_flush_fake").attach(fake_writer)
 		local writer_name, keystats_name = "metrics.engine.journal.sqlite_writer", "metrics.engine.keystats"
 		local previous_writer, previous_keystats = package.loaded[writer_name], package.loaded[keystats_name]
 		package.loaded[writer_name], package.loaded[keystats_name] = fake_writer, nil
 		local ok, err = pcall(function()
 			local keystats = require(keystats_name)
 			keystats.init({ sqlite_path = "/tmp/ergopti_keystats_llm_mock.sqlite" })
-			require("tests.support.metrics_consent_fixture").enable(keystats)
+			require("tests.support.metrics.consent_fixture").enable(keystats)
 			keystats.reset_session()
 			keystats.record_llm_event("org.mozilla.firefox", "generation", { count = 2, prompt_tokens = 5, completion_tokens = 7, total_tokens = 12 })
 			keystats.record_llm_event("org.mozilla.firefox", "suggested", { count = 2 })

@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OutputFixture = require("tests.support.toml_output_fixture")
+local OutputFixture = require("tests.support.settings.toml_output_fixture")
 
 helpers.describe("gesture sensitivity preference admission", function()
 	helpers.it("loads supported numbers and leaves an extreme value outdated", function()

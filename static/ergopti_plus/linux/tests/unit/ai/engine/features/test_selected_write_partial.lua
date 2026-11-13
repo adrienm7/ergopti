@@ -7,8 +7,8 @@
 --- payload cannot learn, retry or reuse its consumed read receipt.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.adapters.synthetic_input.selection_write_fixture")
-local Preferences = require("tests.support.llm_preferences_fixture")
+local Fixture = require("tests.support.platform.input.synthetic_input.selection_write_fixture")
+local Preferences = require("tests.support.ai.preferences_fixture")
 local Fakes = require("tests.fakes")
 
 local function scenario(mode, body)

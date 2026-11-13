@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.llm.ollama.api_ollama_fixture"] = nil
-local Fixture = require("tests.support.modules.llm.ollama.api_ollama_fixture")
+package.loaded["tests.support.ai.engine.api_ollama_fixture"] = nil
+local Fixture = require("tests.support.ai.engine.api_ollama_fixture")
 local ApiOllama = Fixture.ApiOllama
 local get_upvalue = Fixture.get_upvalue
 local set_upvalue = Fixture.set_upvalue

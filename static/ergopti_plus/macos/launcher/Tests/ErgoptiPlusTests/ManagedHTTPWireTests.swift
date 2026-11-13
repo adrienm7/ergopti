@@ -26,7 +26,7 @@ final class ManagedWireFixture {
 		var repository = URL(fileURLWithPath: #filePath)
 		for _ in 0..<7 { repository.deleteLastPathComponent() }
 		process.executableURL = URL(fileURLWithPath: python)
-		process.arguments = [repository.appendingPathComponent("static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py").path]
+		process.arguments = [repository.appendingPathComponent("static/ergopti_plus/macos/tests/support/core/native_http_wire_fixture.py").path]
 		process.standardInput = input
 		process.standardOutput = output
 		// Fixture restoration facts must survive without entering the JSON reply pipe.

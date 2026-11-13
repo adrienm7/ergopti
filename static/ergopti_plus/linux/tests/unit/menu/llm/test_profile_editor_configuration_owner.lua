@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.ui.menu.llm.numeric_configuration_fixture")
+local Fixture = require("tests.support.menu.ui.llm.numeric_configuration_fixture")
 
 local function find(rows, title)
 	for _, row in ipairs(rows or {}) do

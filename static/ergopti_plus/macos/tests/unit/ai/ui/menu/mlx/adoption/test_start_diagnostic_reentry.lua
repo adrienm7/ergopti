@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_adoption = require("tests.support.modules.llm.processes.mlx_adoption_fixture")
+local with_adoption = require("tests.support.ai.engine.processes.mlx_adoption_fixture")
 
 --- Counts real manager native-construction requests, excluding readiness probes.
 --- @param state table Recording fixture.

@@ -16,7 +16,7 @@ local LONG_TEXT = string.rep("borrowed clipboard output ", 12)
 --- @param body function Receives the board record and the loaded fixture.
 local function with_board(body)
 	helpers.with_stub_scope(STUBS, function()
-		local f = require("tests.support.synthetic_input_fixture").make({ deliver_trigger = false })
+		local f = require("tests.support.core.synthetic_input_fixture").make({ deliver_trigger = false })
 		local original = { ["public.utf8-plain-text"] = "USER CLIPBOARD", ["public.html"] = "<b>original</b>" }
 		local board = { contents = original, reads = 0, writes = 0, count = 0 }
 		f.hs_overrides.pasteboard = {

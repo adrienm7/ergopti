@@ -309,7 +309,7 @@ helpers.describe("wpm readouts: the live speed", function()
 
 	helpers.it("is fed by the Linux keystats's typing, expansions and completions", function()
 		local keystats = helpers.load_module("metrics.engine.keystats")
-		require("tests.support.metrics_consent_fixture").enable(keystats)
+		require("tests.support.metrics.consent_fixture").enable(keystats)
 		keystats.reset_session()
 		for index = 0, 29 do keystats.on_keydown("a", 1000 + index * 150, "app", 30) end
 		keystats.record_hotstring("app", "adn", "au début", 5600, "magickey", 3, false)
@@ -323,8 +323,8 @@ helpers.describe("wpm readouts: the live speed", function()
 	end)
 
 	helpers.it("(wpm-pointer-parity) orders a raw key and mouse inside the same millisecond", function()
-		require("tests.support.keystats_native_fixture").with(function(keystats)
-			require("tests.support.metrics_consent_fixture").enable(keystats)
+		require("tests.support.metrics.native_fixture").with(function(keystats)
+			require("tests.support.metrics.consent_fixture").enable(keystats)
 			local clock = require("core.logger.engine.monotonic")
 			local previous = clock.now_ms
 			clock.now_ms = function() return 10000.9 end
@@ -345,8 +345,8 @@ helpers.describe("wpm readouts: the live speed", function()
 	end)
 
 	helpers.it("(wpm-source-parity) real keystats preserves independent holds and the physical clock", function()
-		require("tests.support.keystats_native_fixture").with(function(keystats)
-			require("tests.support.metrics_consent_fixture").enable(keystats)
+		require("tests.support.metrics.native_fixture").with(function(keystats)
+			require("tests.support.metrics.consent_fixture").enable(keystats)
 			local hold = require("core.timing.engine.timings").ms("ui", "wpm_color_hold_ms")
 			local start = 10000
 			keystats.on_keydown("a", start, "app", 30)
@@ -370,10 +370,10 @@ helpers.describe("wpm readouts: the live speed", function()
 			helpers.assert_eq(keystats.get_live_stats(start + hold * 2).last_input_time, nil)
 			helpers.assert_eq(#keystats.get_live_stats(start + hold * 2).source_holds, 0)
 			keystats.record_synthetic_output("app", "AI", "llm", start + hold * 3, 0, 0)
-			require("tests.support.metrics_preferences_fixture").with(function()
+			require("tests.support.metrics.preferences_fixture").with(function()
 				helpers.assert_true(keystats.set_enabled(false))
 			end)
-			require("tests.support.metrics_consent_fixture").enable(keystats)
+			require("tests.support.metrics.consent_fixture").enable(keystats)
 			helpers.assert_eq(#keystats.get_live_stats(start + hold * 3).source_holds, 0,
 				"turning collection back on cannot revive old colour")
 		end)
@@ -427,7 +427,7 @@ local function with_storage(initial, body)
 	package.loaded["metrics.ui.wpm.widget"] = nil
 	package.loaded["metrics.ui.wpm.tray_readout"] = nil
 	local ok, err = pcall(function()
-		require("tests.support.metrics_preferences_fixture").with(function(preferences)
+		require("tests.support.metrics.preferences_fixture").with(function(preferences)
 			body(store, preferences)
 		end, { initial = initial })
 	end)

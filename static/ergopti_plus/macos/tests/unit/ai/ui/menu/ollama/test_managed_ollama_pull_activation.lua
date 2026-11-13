@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_fixture = require("tests.support.ollama_pull_fixture").with_fixture
+local with_fixture = require("tests.support.ai.ollama_pull_fixture").with_fixture
 local OWNED = "/fixture/owned-runtime"
 local PYTHON = "/fixture/native-python"
 local ARGUMENTS = { "-I", "/fixture/managed_ollama_pull.py", "--maximum-bytes", "4096" }

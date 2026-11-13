@@ -16,7 +16,7 @@
 
 local helpers = require("tests.helpers")
 
-local Fixture = require("tests.support.menu_config_watcher_fixture")
+local Fixture = require("tests.support.menu.config_watcher_fixture")
 
 helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (macos-reload-during-git-pull)", function()
 	helpers.it("holds the reload while git writes the tree, then fires exactly once when it settles", function()

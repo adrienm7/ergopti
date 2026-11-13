@@ -21,7 +21,7 @@ local Cipher = require("metrics.engine.privacy.text_cipher")
 local AES = require("core.network.engine.openssl_cipher")
 local K = require("metrics.engine.keystats")
 local W = require("metrics.engine.journal.sqlite_writer")
-local Drain = require("tests.support.sqlite_flush_native")
+local Drain = require("tests.support.core.sqlite_flush_native")
 local checks = 0
 local function pass(name) checks = checks + 1; print("PASS " .. name) end
 local function scalar(sql) return tonumber(assert(W.query_rows(sql))[1]) end

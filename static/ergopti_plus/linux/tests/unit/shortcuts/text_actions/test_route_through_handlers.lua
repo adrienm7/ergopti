@@ -78,7 +78,7 @@ end
 --- @param log table Recording fixture and its real shortcut owner.
 --- @param body function Action assertions.
 local function with_destination(log, body)
-	require("tests.support.text_owner_fixture").with(function(guard)
+	require("tests.support.core.text_owner_fixture").with(function(guard)
 		log.shortcuts.init({ persist = false, capture_text_owner = guard.capture_text_owner })
 		body()
 	end)

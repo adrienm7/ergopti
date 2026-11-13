@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local FIFO = require("tests.support.modules.llm.selection_translation_fifo")
+local FIFO = require("tests.support.ai.engine.prediction.selection_translation_fifo")
 local Tone = require("ai.engine.prediction.tone")
 
 local FLOWS = {
@@ -25,8 +25,8 @@ local FLOWS = {
 local function with_keychain(scenario, backboard)
 	return helpers.with_fresh_modules({
 		"ai.engine.prediction.tone_rewrite", "ai.engine.local_servers.mlx_stream_retirement", "diagnostics.adapters.event_provenance",
-		"tests.support.modules.llm.selection_translation_scope",
-		"tests.support.modules.llm.selection_translation_destination",
+		"tests.support.ai.engine.prediction.selection_translation_scope",
+		"tests.support.ai.engine.prediction.selection_translation_destination",
 	}, function()
 		return FIFO.with_world(function(world)
 			world.tone = require("ai.engine.prediction.tone_rewrite")

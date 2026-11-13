@@ -34,14 +34,14 @@ local function with_keystats(body)
 		is_available = function() return true end,
 		bump_rev = function() return true end,
 	}, { __index = Fakes.sqlite_writer() })
-	require("tests.support.sqlite_flush_fake").attach(fake_writer)
+	require("tests.support.core.sqlite_flush_fake").attach(fake_writer)
 	local writer_name, keystats_name = "metrics.engine.journal.sqlite_writer", "metrics.engine.keystats"
 	local previous_writer, previous_keystats = package.loaded[writer_name], package.loaded[keystats_name]
 	package.loaded[writer_name], package.loaded[keystats_name] = fake_writer, nil
 	local ok, err = pcall(function()
 		local keystats = require(keystats_name)
 		keystats.init({ sqlite_path = "/tmp/ergopti_keystats_clipboard_mock.sqlite" })
-		require("tests.support.metrics_consent_fixture").enable(keystats)
+		require("tests.support.metrics.consent_fixture").enable(keystats)
 		keystats.reset_session()
 		body(keystats, fake_writer)
 	end)

@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.system_actions_fixture")
+local fixture = require("tests.support.core.system_actions_fixture")
 local load_system = fixture.load_system
 local with_fixture = fixture.with_fixture
 local as_physical = fixture.as_physical

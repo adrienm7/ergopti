@@ -19,7 +19,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.platform.remap.runtime_owner_fixture")
+local Fixture = require("tests.support.keyboard.runtime_owner_fixture")
 
 --- Builds an admitted owner.
 --- @param tweak function|nil Receives the world before the owner starts.

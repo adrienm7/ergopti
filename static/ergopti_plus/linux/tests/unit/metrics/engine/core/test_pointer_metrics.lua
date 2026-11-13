@@ -140,7 +140,7 @@ local function recorded(script)
 		is_available = function() return true end,
 		bump_rev = function() return true end,
 	}, { __index = Fakes.sqlite_writer() })
-	require("tests.support.sqlite_flush_fake").attach(fake_writer)
+	require("tests.support.core.sqlite_flush_fake").attach(fake_writer)
 	local writer_name, keystats_name = "metrics.engine.journal.sqlite_writer", "metrics.engine.keystats"
 	local previous_writer, previous_keystats = package.loaded[writer_name], package.loaded[keystats_name]
 	package.loaded[writer_name], package.loaded[keystats_name] = fake_writer, nil
@@ -150,7 +150,7 @@ local function recorded(script)
 		local keystats = require(keystats_name)
 		keystats.init({ sqlite_path = "/tmp/ergopti_keystats_pointer_mock.sqlite" })
 		keystats.bind_pointer_position(read_cursor, tick)
-		require("tests.support.metrics_consent_fixture").enable(keystats)
+		require("tests.support.metrics.consent_fixture").enable(keystats)
 		keystats.reset_session()
 		script(setmetatable({ record_pointer = following(keystats.record_pointer) }, { __index = keystats }), fake_writer)
 		keystats.flush()
@@ -198,7 +198,7 @@ helpers.describe("pointer metrics: the recorder writes them with the typing row"
 			keystats.on_app_focus("owned-app", 1000)
 			move(keystats.record_pointer, 1, 1); helpers.assert_true(keystats.flush())
 			helpers.assert_true(keystats.init({ sqlite_path = "/tmp/ergopti_other_pointer_mock.sqlite" }))
-			require("tests.support.metrics_consent_fixture").enable(keystats)
+			require("tests.support.metrics.consent_fixture").enable(keystats)
 			keystats.on_app_focus("owned-app", 1000)
 			for _ = 1, 2 do move(keystats.record_pointer, 1, 1); helpers.assert_true(keystats.flush()) end
 		end)
@@ -433,7 +433,7 @@ end)
 -- =================================================================
 -- =================================================================
 
-local Record = helpers.load_module("tests.support.touchpad_record")
+local Record = helpers.load_module("tests.support.gestures.touchpad_record")
 
 local PAD = "pointer:/dev/input/event7"
 

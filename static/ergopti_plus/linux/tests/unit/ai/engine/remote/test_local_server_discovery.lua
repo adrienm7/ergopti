@@ -31,7 +31,7 @@ local function isolated(body)
 	for _, id in ipairs(CATALOGUE.server_order) do
 		if not DRIVEN[id] then scan_overrides[id] = { running = false, pids = {} } end
 	end
-	require("tests.support.modules.llm.local_server_scan_fake").install(scan_overrides)
+	require("tests.support.ai.engine.local_server_scan_fake").install(scan_overrides)
 	-- Native scheduling is covered independently by test_local_server_startup.
 	package.loaded["core.events.loop"] = { defer = function(fn) fn(); return true end }
 	local path = os.tmpname(); os.remove(path)

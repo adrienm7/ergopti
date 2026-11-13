@@ -53,7 +53,7 @@ local function with_subject(assignments, scenario)
 			stop = function() return not controls.stop_refuses end,
 			reason = function() return nil end,
 		}
-		require("tests.support.keyboard_config_fixture").install(assignments, function()
+		require("tests.support.layouts.keyboard_config_fixture").install(assignments, function()
 			observed.writes = observed.writes + 1
 			observed.callback_during_write = observed.latest.execute(observed.latest.action, "keyboard__magic_editor")
 			if controls.publication_refuses then error("owned publication refused") end

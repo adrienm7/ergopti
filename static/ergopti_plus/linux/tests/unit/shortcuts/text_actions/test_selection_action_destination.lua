@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
-local fixture = require("tests.support.text_owner_fixture")
+local ClipboardTargets = require("tests.support.platform.input.synthetic_input.clipboard_targets")
+local fixture = require("tests.support.core.text_owner_fixture")
 
 --- Executes Main's actual initialization call while isolating configuration I/O.
 --- @param shortcuts table Real shortcuts manager.

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Publication = require("tests.support.ui.metrics.typing.publication")
+local Publication = require("tests.support.metrics.ui.publication")
 local with_delivery = require("tests.support.typing_delivery_fixture")
 
 --- Fires a live continuation and its real paced projection, then accepts delivery.

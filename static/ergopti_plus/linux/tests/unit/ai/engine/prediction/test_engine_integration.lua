@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 
 local REFUSED_STORAGE_MODULES = { "core.network.adapters.http_client", "ai.engine.settings.enable_admission",
   "ai.engine.preferences", "ai.engine.settings.profiles", "ai.engine.prediction.engine" }
@@ -247,7 +247,7 @@ helpers.describe("prediction_engine integration", function()
       for name, value in pairs(package.loaded) do previous_loaded[name] = value end
       local previous_popen = io.popen
       local ok, err = xpcall(function()
-        local Fixture = require("tests.support.modules.llm.runtime.runtime_engine_acquisition_fixture")
+        local Fixture = require("tests.support.ai.engine.runtime.engine_acquisition_fixture")
         Fixture.with_managed_responses(function(world, prediction)
           local pf, notifications, projected = world.profiles, 0, nil
           local completed, failure = xpcall(function()

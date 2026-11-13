@@ -124,7 +124,7 @@ _TestResultsBeginRun()
 ; AppState — must come before test_stubs.ahk because the stubs reference
 ; AppState fields directly, and before any infra/ file that reads AppState.
 #Include ../core/lifecycle/engine/app_state.ahk
-#Include support/native_cli_diagnostics.ahk
+#Include support/core/native_cli_diagnostics.ahk
 #Include support/receiving_profile.ahk
 
 ; Stubs second — they define ScriptInformation, Features, SendNewResult,
@@ -542,7 +542,7 @@ InstallSendNoOps()
 #Include unit/hotstrings/engine/engine/test_domain_expander.ahk
 #Include unit/core/text/toml/test_loader.ahk
 #Include unit/core/text/toml/test_helpers_roundtrip.ahk
-#Include support/hotstring_registry_scope.ahk
+#Include support/hotstrings/registry_scope.ahk
 #Include unit/hotstrings/engine/catalogue/test_cache.ahk
 #Include unit/hotstrings/engine/catalogue/test_language_packs.ahk
 #Include unit/settings/test_menu_languages_and_global_separator.ahk
@@ -1682,7 +1682,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/shortcuts/engine/test_wrap_symbols_global_transaction.ahk
 #Include unit/shortcuts/engine/test_wrap_symbols_single_symbol.ahk
 ; ── Cross-driver corpus consumers ──
-#Include support/toml_corpus_values.ahk
+#Include support/settings/toml_corpus_values.ahk
 #Include meta/corpus/test_corpus_hotstrings.ahk
 #Include meta/hotstrings/engine/preview/test_matches_engine.ahk
 #Include meta/hotstrings/engine/prefix/test_buffer_tracks_engine.ahk

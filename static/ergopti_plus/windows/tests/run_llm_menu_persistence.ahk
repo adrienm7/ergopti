@@ -4,7 +4,7 @@ SetWorkingDir(A_ScriptDir)
 #Warn VarUnset, Off
 global _AHK_DRY_RUN := false
 global _ConfigBootReadFailed := false
-#Include support/llm_persistence_runner_contract.ahk
+#Include support/ai/persistence_runner_contract.ahk
 #Include test_framework.ahk
 #Include test_stubs.ahk
 ; Native sources use a private test context, never a user's driver paths.
@@ -44,8 +44,8 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../settings/engine/scope/scope.ahk
 #Include ../metrics/engine/filters.ahk
 #Include ../metrics/engine/shortcuts.ahk
-#Include support/wpm_widget_state_contract.ahk
-#Include support/config_journal_fixtures.ahk
+#Include support/metrics/wpm_widget_state_contract.ahk
+#Include support/settings/journal_fixtures.ahk
 #Include ../ai/engine/settings/models.ahk
 #Include ../ai/engine/defaults.ahk
 #Include ../_generated/llm_profiles_data.ahk

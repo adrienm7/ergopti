@@ -7,8 +7,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local support = require("tests.support.tooltip_watcher_fixture")
-local TooltipContext = require("tests.support.tooltip_context_watchers")
+local support = require("tests.support.core.tooltip_watcher_fixture")
+local TooltipContext = require("tests.support.core.tooltip_context_watchers")
 local OWNERS = {
 	"hs", "tests.stubs.hs", "core.ui.ui.tooltip.config", "core.ui.ui.tooltip.renderer",
 	"core.ui.ui.tooltip.llm", "core.ui.ui.tooltip.hotstring", "core.ui.ui.tooltip", "ui.tooltip.init",

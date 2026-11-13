@@ -944,7 +944,7 @@ Test("layout catalogue: raw preservation compares exact JSON string identities (
 #Include test_catalogue_refresh_owner.ahk
 
 
-#Include ../../../../support/layout_schema_kind_fixtures.ahk
+#Include ../../../../support/layouts/schema_kind_fixtures.ahk
 
 ; Real native installed metadata must not publish an incompatible source kind
 ; as a valid empty catalogue. The read leaves its exact private file untouched.

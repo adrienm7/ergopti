@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local support = require("tests.support.tooltip_watcher_fixture")
+local support = require("tests.support.core.tooltip_watcher_fixture")
 local with_fixture = support.with_fixture
 local CASES = support.CASES
 local hardware_key_event = support.hardware_key_event

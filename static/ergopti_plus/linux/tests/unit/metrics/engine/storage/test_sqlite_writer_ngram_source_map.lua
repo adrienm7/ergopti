@@ -7,8 +7,8 @@
 --- on the maintainer's Windows machine (nor on CI), the database-path methods
 --- are tested with the expectation that is_available() returns false.
 
-package.loaded["tests.support.modules.keystats.storage.keystats_sqlite_writer_fixture"] = nil
-local Fixture = require("tests.support.modules.keystats.storage.keystats_sqlite_writer_fixture")
+package.loaded["tests.support.metrics.engine.storage.sqlite_writer_fixture"] = nil
+local Fixture = require("tests.support.metrics.engine.storage.sqlite_writer_fixture")
 local helpers, it, with_writer_read_receipts, with_ngram_sql =
 	Fixture.helpers, Fixture.it, Fixture.with_writer_read_receipts, Fixture.with_ngram_sql
 

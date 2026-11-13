@@ -742,7 +742,7 @@ function M.launcher_environment(app_root, home)
 	local AppDirs = require("core.fs.engine.app_dirs")
 	local logs = home .. "/" .. AppDirs.macos.relative
 	return {
-		ERGOPTI_KEYBOARD_GEOMETRY_V1 = require("tests.support.keyboard_geometry").launcher_value(),
+		ERGOPTI_KEYBOARD_GEOMETRY_V1 = require("tests.support.layouts.keyboard_geometry").launcher_value(),
 		ERGOPTI_LAUNCHER_PID = "4242",
 		ERGOPTI_LAUNCHER_BUNDLE_ID = "com.ergoptiplus.app",
 		ERGOPTI_LOG_PORT = "49321",

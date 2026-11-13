@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_delivery = require("tests.support.metrics_delivery_fixture")
+local with_delivery = require("tests.support.metrics.delivery_fixture")
 
 local function revisions(code)
 	local manifest, categories = code:match("manifest_revision:(%d+),categories_revision:(%d+)")

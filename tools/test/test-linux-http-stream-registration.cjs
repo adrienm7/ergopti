@@ -53,7 +53,7 @@ const SOURCES = [
 	'static/ergopti_plus/linux/ai/engine/api/api_ollama.lua',
 	'static/ergopti_plus/linux/ai/engine/ollama/local_model_probe.lua',
 	'static/ergopti_plus/linux/ai/engine/ollama/local_model_offer.lua',
-	'static/ergopti_plus/linux/tests/support/adapters/network/http_client_curl_fixture.lua',
+	'static/ergopti_plus/linux/tests/support/core/network/http_client_curl_fixture.lua',
 	'static/ergopti_plus/linux/tests/unit/core/network/adapters/test_http_client_curl_captured_owned_source.lua',
 	'static/ergopti_plus/linux/tests/unit/core/network/adapters/test_http_client_curl_file_digest_asynchronous.lua',
 	'static/ergopti_plus/linux/tests/unit/core/network/adapters/test_http_client_curl_native_post_redirect.lua',

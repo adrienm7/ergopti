@@ -22,8 +22,8 @@
 --- asserted is the command that would run, not the presence of a table key.
 --- ==============================================================================
 
-package.loaded["tests.support.modules.shortcuts.actions.action_handlers_declared_fixture"] = nil
-local Fixture = require("tests.support.modules.shortcuts.actions.action_handlers_declared_fixture")
+package.loaded["tests.support.shortcuts.action_handlers_declared_fixture"] = nil
+local Fixture = require("tests.support.shortcuts.action_handlers_declared_fixture")
 local helpers, with_recorded_shell, with_unavailable_webview, joined, run_every_action =
 	Fixture.helpers, Fixture.with_recorded_shell, Fixture.with_unavailable_webview, Fixture.joined, Fixture.run_every_action
 

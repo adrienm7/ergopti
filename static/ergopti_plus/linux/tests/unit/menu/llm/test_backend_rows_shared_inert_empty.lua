@@ -9,8 +9,8 @@
 --- nothing (ai/ui/menu/backend_rows.lua api_page).
 --- ==============================================================================
 
-package.loaded["tests.support.ui.menu.llm.llm_backend_rows_fixture"] = nil
-local Fixture = require("tests.support.ui.menu.llm.llm_backend_rows_fixture")
+package.loaded["tests.support.menu.ui.llm.backend_rows_fixture"] = nil
+local Fixture = require("tests.support.menu.ui.llm.backend_rows_fixture")
 local helpers, setup, find, with_real_api_add = Fixture.helpers, Fixture.setup, Fixture.find, Fixture.with_real_api_add
 
 
@@ -58,7 +58,7 @@ helpers.describe("Atomic non-chat addition (ai-menu-nonchat-add)", function()
 					return rename(from, to)
 				end
 				local answers = { "inert-key", "jev-latest" }
-				local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(helpers.load_module("ai.ui.menu.backend_rows"),
+				local rows = require("tests.support.menu.ui.llm.api_page_rows").rows(helpers.load_module("ai.ui.menu.backend_rows"),
 					{ get_backend = function() return "api" end, set_backend = function() error("non-chat addition must preserve the backend") end },
 					{ prompt = function() return table.remove(answers, 1) end, error = function() end },
 					function() changes = changes + 1 end)

@@ -19,7 +19,7 @@
 local helpers = require("tests.helpers")
 local AppDirs = require("core.fs.engine.app_dirs")
 
-local Fixture = require("tests.support.logger_async_sink_fixture")
+local Fixture = require("tests.support.core.logger_async_sink_fixture")
 
 local FOLDER = "/tmp/ergopti_logs_dir_resolver/" .. AppDirs.macos.folder_name .. "/"
 

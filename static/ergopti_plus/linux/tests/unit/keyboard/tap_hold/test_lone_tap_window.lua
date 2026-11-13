@@ -12,8 +12,8 @@
 --- engine, 0 included, and an invalid one is refused for the manifest default.
 --- ==============================================================================
 
-package.loaded["tests.support.platform.remap.tap_hold.tap_hold_engine_fixture"] = nil
-local Fixture = require("tests.support.platform.remap.tap_hold.tap_hold_engine_fixture")
+package.loaded["tests.support.keyboard.engine.tap_hold_engine_fixture"] = nil
+local Fixture = require("tests.support.keyboard.engine.tap_hold_engine_fixture")
 local helpers, Engine, DOWN, UP, SHIFT, CTRL, CAPS, KEY_A, trail =
 	Fixture.helpers, Fixture.Engine, Fixture.DOWN, Fixture.UP, Fixture.SHIFT, Fixture.CTRL, Fixture.CAPS,
 	Fixture.KEY_A, Fixture.trail

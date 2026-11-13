@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 
 local Detector = helpers.load_module("gestures.engine.tap_detector")
-local Record = helpers.load_module("tests.support.touchpad_record")
+local Record = helpers.load_module("tests.support.gestures.touchpad_record")
 
 local EV_SYN, EV_KEY, EV_ABS = 0, 1, 3
 local SLOT, TRACKING, POS_X, POS_Y = 0x2f, 0x39, 0x35, 0x36

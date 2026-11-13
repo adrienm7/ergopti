@@ -17,7 +17,7 @@ local Metrics = require("metrics.engine.system.metrics")
 local W = require("metrics.engine.journal.sqlite_writer")
 -- Metrics flushes are asynchronous owned SQLite batches: a read must wait for
 -- the physical acknowledgement, as every native SQLite fixture does.
-local Drain = require("tests.support.sqlite_flush_native")
+local Drain = require("tests.support.core.sqlite_flush_native")
 local phase, database, receipt = assert(arg[1]), assert(arg[2]), assert(arg[3])
 local date = os.date("%Y-%m-%d")
 local checks, failures = 0, 0

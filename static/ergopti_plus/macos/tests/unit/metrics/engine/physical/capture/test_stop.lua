@@ -2,7 +2,7 @@
 
 --- Proves exact-session stop notification without loading any production runtime.
 local helpers = require("tests.helpers")
-local with_capture = require("tests.support.physical_capture_fixture").run
+local with_capture = require("tests.support.layouts.physical_capture_fixture").run
 
 local function start(capture, controls, phase)
 	capture.init(controls.dependencies)

@@ -8,9 +8,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keystats.ngram_completion_fixture")
+local Fixture = require("tests.support.metrics.engine.ngram_completion_fixture")
 local with_delivery = require("tests.support.typing_delivery_fixture")
-local ReadLogs = require("tests.support.ui.metrics.typing.read_completion_logs")
+local ReadLogs = require("tests.support.metrics.ui.read_completion_logs")
 
 --- Installs only native SQL and JSON ports after the real UI is constructed.
 --- @param callback function Receives the real dashboard and public request controls.

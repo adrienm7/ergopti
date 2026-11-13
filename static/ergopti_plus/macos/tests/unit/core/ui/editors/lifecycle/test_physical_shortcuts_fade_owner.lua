@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 require("core.logger.engine")
 
-local with_host = require("tests.support.physical_shortcuts_fade_fixture")
+local with_host = require("tests.support.layouts.physical_shortcuts_fade_fixture")
 
 helpers.describe("physical shortcut public fade retains its exact native owner", function()
 	helpers.it("keeps the healthy user-close path at one native deletion", function()

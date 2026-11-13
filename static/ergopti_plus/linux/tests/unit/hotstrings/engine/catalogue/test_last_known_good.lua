@@ -104,7 +104,7 @@ helpers.describe("hotstring catalogue: last-known-good sources", function()
 			local loaded = nil
 			local loads = 0
 			local Config = require("hotstrings.engine.catalogue.config")
-			require("tests.support.hotstring_choices").with_file(Config, { probe = true }, function()
+			require("tests.support.hotstrings.choices").with_file(Config, { probe = true }, function()
 				Config.init({
 					load_mappings = function(_, mappings)
 						loads = loads + 1
@@ -172,7 +172,7 @@ helpers.describe("hotstring catalogue: runtime publication acknowledgement", fun
 			end
 			local Config = require("hotstrings.engine.catalogue.config")
 			Config._set_override_config_dir_for_test(os.tmpname() .. "-absent")
-			require("tests.support.hotstring_choices").with_file(Config, { old = true, new = true }, function()
+			require("tests.support.hotstrings.choices").with_file(Config, { old = true, new = true }, function()
 				Config.init(engine, "virtual-catalogue", nil)
 				Config.load_all()
 				local controls = {
@@ -281,11 +281,11 @@ helpers.describe("hotstring choice rollback keeps the published catalogue", func
 		local ok, err = pcall(function()
 			local Config = require("hotstrings.engine.catalogue.config")
 			local Engine = require("hotstrings.engine.matcher").new()
-			require("tests.support.hotstring_choices").with_file(Config, choices, function(path)
+			require("tests.support.hotstrings.choices").with_file(Config, choices, function(path)
 				helpers.assert_true(Config.init(Engine, "virtual.toml"))
 				local _, committed = Config.load_all()
 				helpers.assert_eq(committed, true)
-				local source = require("tests.support.hotstring_choices").read(path)
+				local source = require("tests.support.hotstrings.choices").read(path)
 				Writer.batch_write = function(...)
 					if state.allow_writes then
 						state.writes = state.writes + 1
@@ -320,7 +320,7 @@ helpers.describe("hotstring choice rollback keeps the published catalogue", func
 				helpers.assert_eq(Config.is_section_checked("probe", "main"), selection == "group")
 				helpers.assert_eq(state.reads, 2, "inverse publication must use retained RAM, without another source scan")
 				helpers.assert_eq(state.writes, 1, "rollback must not rewrite the refused choice")
-				helpers.assert_eq(require("tests.support.hotstring_choices").read(path), source)
+				helpers.assert_eq(require("tests.support.hotstrings.choices").read(path), source)
 				helpers.assert_eq(Engine:mapping_state().generation, previous.generation + 2,
 					"candidate and exact inverse both have acknowledged generations")
 			end, choices)
@@ -347,7 +347,7 @@ helpers.describe("hotstring choice rollback keeps the published catalogue", func
 			Engine:reset(); Engine:on_char("x"); Engine:on_char("y")
 			helpers.assert_nil(Engine:on_char("z"))
 			helpers.assert_eq(state.reads, 2, "native retry still uses the original immutable image")
-			helpers.assert_eq(require("tests.support.hotstring_choices").read(path), source)
+			helpers.assert_eq(require("tests.support.hotstrings.choices").read(path), source)
 			local next_owner = {}
 			helpers.assert_eq(Config.acquire(next_owner), true)
 			helpers.assert_eq(Config.release(next_owner), true)
@@ -417,7 +417,7 @@ helpers.describe("hotstring choice rollback keeps the published catalogue", func
 					helpers.assert_eq(request(), false, "a retained candidate is never an acknowledged no-op")
 					helpers.assert_eq(state.writes, 1)
 					helpers.assert_eq(Config.acquire({}), false)
-					helpers.assert_eq(require("tests.support.hotstring_choices").read(path), source)
+					helpers.assert_eq(require("tests.support.hotstrings.choices").read(path), source)
 				end, "[hotstrings]\ngroups = { probe = " .. tostring(before)
 					.. " }\n[hotstrings.modules.probe]\nmain = true\n")
 			end)
@@ -444,7 +444,7 @@ helpers.describe("hotstring choice rollback keeps the published catalogue", func
 				helpers.assert_eq(Config.is_section_checked("probe", "main"), true)
 				Engine:reset(); Engine:on_char("x"); Engine:on_char("y")
 				helpers.assert_eq(Engine:on_char("z").replacement, "candidate")
-				local document = require("core.text.engine.toml_codec").decode(require("tests.support.hotstring_choices").read(path))
+				local document = require("core.text.engine.toml_codec").decode(require("tests.support.hotstrings.choices").read(path))
 				helpers.assert_eq(document.hotstrings.modules.probe.main, true)
 			end, "[hotstrings]\ngroups = { probe = " .. tostring(selection == "section")
 				.. " }\n[hotstrings.modules.probe]\nmain = false\n")
@@ -472,7 +472,7 @@ helpers.describe("hotstring catalogue: removed source lifetime", function()
 			local engine = require("hotstrings.engine.matcher").new()
 			Config._set_override_config_dir_for_test(root)
 			local id = "autocorrection"
-			require("tests.support.hotstring_choices").with_file(Config,
+			require("tests.support.hotstrings.choices").with_file(Config,
 				'[hotstrings]\ngroups = { autocorrection = true }\n[hotstrings.modules]\nautocorrection = { probe = true }\n', function()
 				assert(Config.init(engine, root))
 				local _, published = Config.load_all(); helpers.assert_true(published)
@@ -531,7 +531,7 @@ helpers.describe("hotstring catalogue: unreadable discovery", function()
 			local Config = helpers.load_module("hotstrings.engine.catalogue.config")
 			local engine = require("hotstrings.engine.matcher").new()
 			Config._set_override_config_dir_for_test(root)
-			require("tests.support.hotstring_choices").with_file(Config, { custom = true }, function()
+			require("tests.support.hotstrings.choices").with_file(Config, { custom = true }, function()
 				assert(Config.init(engine, path))
 				local _, published = Config.load_all(nil, true)
 				helpers.assert_true(published)
@@ -558,7 +558,7 @@ helpers.describe("hotstring catalogue: unreadable discovery", function()
 			local engine = require("hotstrings.engine.matcher").new()
 			Config._set_override_config_dir_for_test(root)
 			local id = require("hotstrings.engine.catalogue.personal_files").describe({ "custom.toml" }).id
-			require("tests.support.hotstring_choices").with_file(Config, { [id] = true }, function()
+			require("tests.support.hotstrings.choices").with_file(Config, { [id] = true }, function()
 				assert(Config.init(engine, resolve(nil)))
 				local _, published = Config.load_all(nil, true); helpers.assert_true(published)
 				assert(uv.fs_mkdir(personal, 448))
@@ -588,7 +588,7 @@ helpers.describe("hotstring catalogue: unreadable discovery", function()
 			local Config = helpers.load_module("hotstrings.engine.catalogue.config")
 			local engine = require("hotstrings.engine.matcher").new()
 			Config._set_override_config_dir_for_test(root)
-			require("tests.support.hotstring_choices").with_file(Config, {}, function()
+			require("tests.support.hotstrings.choices").with_file(Config, {}, function()
 				assert(Config.init(engine, root .. "/absent-personal"))
 				local _, published, _, receipt = Config.load_all(nil, true)
 				helpers.assert_true(published, "an absent personal root is optional")
@@ -641,7 +641,7 @@ helpers.describe("hotstring catalogue: unreadable discovery", function()
 			local engine = require("hotstrings.engine.matcher").new()
 			Config._set_override_config_dir_for_test(root)
 			local id = require("hotstrings.engine.catalogue.personal_files").describe({ "private", "owned.toml" }).id
-			require("tests.support.hotstring_choices").with_file(Config, { [id] = true }, function()
+			require("tests.support.hotstrings.choices").with_file(Config, { [id] = true }, function()
 				assert(Config.init(engine, root))
 				Config.set_extra_mappings_provider(function()
 					return { { trigger = "independent", replacement = "KEPT", auto_expand = true, is_case_sensitive_strict = true } }

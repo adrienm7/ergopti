@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local load_fixture = require("tests.support.prediction_pipeline").load
+local load_fixture = require("tests.support.ai.prediction_pipeline").load
 
 local PARTIAL = " and goodbye"
 local RETRY = " see you soon"

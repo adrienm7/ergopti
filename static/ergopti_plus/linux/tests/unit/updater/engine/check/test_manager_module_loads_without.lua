@@ -1,7 +1,7 @@
 --- tests/unit/updater/engine/check/test_manager_module_loads_without.lua
 
-package.loaded["tests.support.modules.updater.check.updater_manager_fixture"] = nil
-local Fixture = require("tests.support.modules.updater.check.updater_manager_fixture")
+package.loaded["tests.support.updater.engine.manager_fixture"] = nil
+local Fixture = require("tests.support.updater.engine.manager_fixture")
 local helpers, with_config, read_config =
 	Fixture.helpers, Fixture.with_config, Fixture.read_config
 
@@ -16,7 +16,7 @@ helpers.describe("updater.engine.manager", function()
 	local function with_native_download_model(body)
 		local previous = M
 		local ok, failure = xpcall(function()
-			require("tests.support.updater_native_model").with_fixture(function(fresh, prepare)
+			require("tests.support.updater.native_model").with_fixture(function(fresh, prepare)
 				M = fresh
 				body(prepare)
 			end)

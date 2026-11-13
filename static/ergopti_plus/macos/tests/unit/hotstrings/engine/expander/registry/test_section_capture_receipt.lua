@@ -1,7 +1,7 @@
 --- tests/unit/hotstrings/engine/expander/registry/test_section_capture_receipt.lua
 --- An unchanged section still requires an authentic Storage capture receipt.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keymap.registry.registry_mutation_transactions_fixture")
+local Fixture = require("tests.support.hotstrings.registry_mutation_transactions_fixture")
 
 helpers.describe("section capture receipt admission", function()
 	for _, kind in ipairs({ "nil", "false", "forged", "stale" }) do

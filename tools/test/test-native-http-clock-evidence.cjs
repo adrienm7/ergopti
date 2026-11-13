@@ -134,7 +134,7 @@ const SWIFT = [
 	'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedPACSource.swift',
 	'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedCertificateAuthorities.swift',
 	'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedBootstrapPolicy.generated.swift',
-	'static/ergopti_plus/macos/tests/support/native_http_fixture_main.swift'
+	'static/ergopti_plus/macos/tests/support/core/native_http_fixture_main.swift'
 ];
 const HEADERS = [
 	'static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h',
@@ -155,11 +155,12 @@ const RUNTIME = [
 	'static/ergopti_plus/_shared/core/network/data/proxy_policy.json'
 ];
 const OWNERS = [
-	'static/ergopti_plus/macos/tests/support/native_http_fixture_builder.py',
-	'static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py',
+	'static/ergopti_plus/macos/tests/support/core/native_http_fixture_builder.py',
+	'static/ergopti_plus/macos/tests/support/core/native_http_wire_fixture.py',
 	'tools/diagnostics/macos_owned_process.py'
 ];
-const RECEIVER = 'static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py';
+const RECEIVER =
+	'static/ergopti_plus/macos/tests/support/core/native_http_wire_client_receiving.py';
 const INPUTS = [...SWIFT, ...HEADERS, ...RUNTIME, ...OWNERS, RECEIVER];
 const DIAGNOSTIC_FILE_LIMIT = 4096;
 const DIAGNOSTIC_TOTAL_LIMIT = 16384;
@@ -379,7 +380,7 @@ function sourceFixture(change = () => {}) {
 		...original,
 		...INPUTS,
 		...evidence.LOADERS,
-		'static/ergopti_plus/macos/tests/support/native_pac_source_fixture.py'
+		'static/ergopti_plus/macos/tests/support/core/native_pac_source_fixture.py'
 	]);
 	for (const relative of files) {
 		const destination = path.join(root, relative);
@@ -1226,7 +1227,10 @@ try {
 	control('missing tracked builder cannot enroll new role', () => {
 		const fixture = sourceFixture((root) =>
 			fs.unlinkSync(
-				path.join(root, 'static/ergopti_plus/macos/tests/support/native_http_fixture_builder.py')
+				path.join(
+					root,
+					'static/ergopti_plus/macos/tests/support/core/native_http_fixture_builder.py'
+				)
 			)
 		);
 		assert.throws(() => evidence.sourceReceipt(fixture.root, fixture.epoch));
@@ -1249,7 +1253,7 @@ try {
 		const fixture = sourceFixture(),
 			owner = path.join(
 				fixture.root,
-				'static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py'
+				'static/ergopti_plus/macos/tests/support/core/native_http_wire_fixture.py'
 			);
 		fs.linkSync(owner, path.join(temporary, 'owner-alias.py'));
 		assert.throws(() => evidence.sourceReceipt(fixture.root, fixture.epoch));
@@ -1458,13 +1462,13 @@ try {
 			assert.equal(full.calls[0], 'tools/diagnostics/macos_owned_process_native_test.py');
 			assert.equal(
 				full.calls[1],
-				'static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only'
+				'static/ergopti_plus/macos/tests/support/core/native_http_receiving_test.py --client-only'
 			);
 			assert.equal(
 				full.calls[2],
 				'-I -B -X pycache_prefix=' +
 					path.join(full.root, 'native-http-clock-arm64-123-2/private-cache') +
-					' static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py'
+					' static/ergopti_plus/macos/tests/support/core/native_http_wire_client_receiving.py'
 			);
 			const failed = workflowDisposition(step.run, 'full', 7, 0);
 			assert.equal(failed.result.status, 1);
@@ -1494,7 +1498,7 @@ try {
 		assert.deepEqual(before.identified_unused_default_cache, {});
 		const source = path.join(
 			fixture.root,
-			'static/ergopti_plus/macos/tests/support/native_http_fixture_builder.py'
+			'static/ergopti_plus/macos/tests/support/core/native_http_fixture_builder.py'
 		);
 		execFileSync(
 			require('../lib/python.cjs').pythonExecutable(),

@@ -27,8 +27,8 @@ local M = {}
 -- home. Idempotent, the runner already isolated.
 require("tests.lua.core.runner_home").isolate()
 -- The fixtures read the French catalogue whatever the session language says
--- (tests/support/session_language.lua); helpers load once per test process.
-require("tests.support.session_language").install()
+-- (tests/support/core/session_language.lua); helpers load once per test process.
+require("tests.support.core.session_language").install()
 -- No fixture may show a real desktop notification: each case resolves the
 -- notifier to a recorder (tests/support/notice_recorder.lua), and a notice that
 -- still reaches notify-send hits a sentinel that fails the run

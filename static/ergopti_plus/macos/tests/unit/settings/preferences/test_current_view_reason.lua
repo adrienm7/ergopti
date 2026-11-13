@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OutputFixture = require("tests.support.toml_output_fixture")
+local OutputFixture = require("tests.support.settings.toml_output_fixture")
 
 --- Runs a body against the real preferences owner and a private config path.
 --- @param source string|nil config.toml bytes, nil for an absent file.

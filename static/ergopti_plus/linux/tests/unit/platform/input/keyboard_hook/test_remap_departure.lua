@@ -4,7 +4,7 @@
 --- These use the actual Hook/Reader/remapper over an explicitly controlled
 --- transport; they do not claim kernel or physical-device coverage.
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.input_owner_fixture")
+local Fixture = require("tests.support.core.input_owner_fixture")
 
 local function select_sources(s, ids)
 	local paths = {}

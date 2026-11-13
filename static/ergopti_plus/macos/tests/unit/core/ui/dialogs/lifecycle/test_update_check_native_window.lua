@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_window = require("tests.support.ui.owned_window_close_fixture")
+local with_window = require("tests.support.core.ui.owned_window_close_fixture")
 
 --- Adds the pinned binding's userdata-metatable retirement to the shared model.
 --- @param scenario function Complete host scenario.

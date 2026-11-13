@@ -5,7 +5,7 @@
 --- physical echo ownership continues to come exclusively from exact event tags.
 
 local helpers = require("tests.helpers")
-local fixture_module = require("tests.support.keystats_provenance_fixture")
+local fixture_module = require("tests.support.metrics.provenance_fixture")
 
 local MALFORMED = string.char(0xF0, 0x28)
 

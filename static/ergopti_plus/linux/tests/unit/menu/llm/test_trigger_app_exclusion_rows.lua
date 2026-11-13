@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Preferences = require("tests.support.llm_preferences_fixture")
+local Preferences = require("tests.support.ai.preferences_fixture")
 
 helpers.describe("Linux AI menu: trigger application exclusions", function()
 	helpers.it("trigger-apps rows: exclude the last application, list it, remove it", function()

@@ -2,7 +2,7 @@
 
 --- Exercises real focus tracker, clipboard owner and deferred synthetic broker.
 local helpers = require("tests.helpers")
-local with_sender = require("tests.support.text_sender_fixture")
+local with_sender = require("tests.support.core.text_sender_fixture")
 require("core.logger.engine")
 
 local function tick(f, delay)

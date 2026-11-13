@@ -304,12 +304,12 @@ local source = assert(handle:read("*a")); assert(handle:close())
 local anchor = "\nlocal function make_vkb("
 local boundary = assert(source:find(anchor, 1, true), "the E2E bootstrap boundary must exist")
 assert(not source:find(anchor, boundary + #anchor, true), "the E2E bootstrap boundary must be unique")
-assert(package.loaded["tests.helpers"] == nil and package.loaded["tests.support.synthetic_input_stack"] == nil)
+assert(package.loaded["tests.helpers"] == nil and package.loaded["tests.support.core.synthetic_input_stack"] == nil)
 local checks = [=[
 local expected_root = ...
 assert(driver_root == expected_root, "the E2E bootstrap must preserve its native driver root")
 assert(helpers == package.loaded["tests.helpers"] and type(helpers.temp_dir) == "function")
-assert(SyntheticStack == package.loaded["tests.support.synthetic_input_stack"] and type(SyntheticStack.load) == "function")
+assert(SyntheticStack == package.loaded["tests.support.core.synthetic_input_stack"] and type(SyntheticStack.load) == "function")
 for _, name in ipairs({"tests.helpers", "tests.support.synthetic_input_stack"}) do
  local resolved = assert(package.searchpath(name, package.path))
  assert(resolved:sub(1, #expected_root + 1) == expected_root .. "/", "the real driver module must come from this checkout")

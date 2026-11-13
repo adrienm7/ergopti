@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.platform.remap.layout.wake_reresolves_layout_actions_fixture"] = nil
-local Fixture = require("tests.support.platform.remap.layout.wake_reresolves_layout_actions_fixture")
+package.loaded["tests.support.keyboard.engine.layout.wake_reresolves_layout_actions_fixture"] = nil
+local Fixture = require("tests.support.keyboard.engine.layout.wake_reresolves_layout_actions_fixture")
 local load_remap = Fixture.load_remap
 
 

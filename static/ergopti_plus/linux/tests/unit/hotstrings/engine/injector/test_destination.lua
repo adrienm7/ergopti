@@ -7,8 +7,8 @@
 --- command/output ports. No native input qualification is claimed by these units.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
-local fixture = require("tests.support.text_owner_fixture")
+local ClipboardTargets = require("tests.support.platform.input.synthetic_input.clipboard_targets")
+local fixture = require("tests.support.core.text_owner_fixture")
 
 --- Runs the complete injection with controlled clipboard I/O and focus changes.
 --- @param boundary string Controlled external transition point, or stable.

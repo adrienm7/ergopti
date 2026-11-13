@@ -974,7 +974,7 @@ function nativeHttpClockPipeline(workflow, expected) {
 			{
 				name: 'Receive actual managed HTTP native clients',
 				if: macRole.condition('launcher-native'),
-				run: 'set -euo pipefail\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\nreceipt="$RUNNER_TEMP/stable-macos-native-http-package.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nif [ "$mode" = deferred ]; then\n    echo "[DEFERRED] macos-native-http: qualified=false; duplicate native wire receiving not executed; owned-process and client-only controls remain mandatory."\nelif [ "$mode" = full ]; then\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\nexit "$status"\n',
+				run: 'set -euo pipefail\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/core/native_http_receiving_test.py --client-only || status=1\nreceipt="$RUNNER_TEMP/stable-macos-native-http-package.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nif [ "$mode" = deferred ]; then\n    echo "[DEFERRED] macos-native-http: qualified=false; duplicate native wire receiving not executed; owned-process and client-only controls remain mandatory."\nelif [ "$mode" = full ]; then\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/core/native_http_wire_client_receiving.py || status=1\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\nexit "$status"\n',
 				'timeout-minutes': 5
 			}
 		],
@@ -994,8 +994,8 @@ function nativeHttpClockPipeline(workflow, expected) {
 	assert.strictEqual(script.split(command).length - 1, 1);
 	for (const mandatory of [
 		`${command} 2>&1 | tee "$clock_root/owned-process.log"\nowned_status=("\${PIPESTATUS[@]}")\n`,
-		'"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only 2>&1 | tee "$clock_root/public-native.log"\npublic_status=("${PIPESTATUS[@]}")\n',
-		'ERGOPTI_NATIVE_CLOCK_EVIDENCE="$clock_root/payload" "$ERGOPTI_NATIVE_HTTP_PYTHON" -I -B -X "pycache_prefix=$clock_root/private-cache" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py 2>&1 | tee "$clock_root/independent-client.log"\nclient_status=("${PIPESTATUS[@]}")\n',
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/core/native_http_receiving_test.py --client-only 2>&1 | tee "$clock_root/public-native.log"\npublic_status=("${PIPESTATUS[@]}")\n',
+		'ERGOPTI_NATIVE_CLOCK_EVIDENCE="$clock_root/payload" "$ERGOPTI_NATIVE_HTTP_PYTHON" -I -B -X "pycache_prefix=$clock_root/private-cache" static/ergopti_plus/macos/tests/support/core/native_http_wire_client_receiving.py 2>&1 | tee "$clock_root/independent-client.log"\nclient_status=("${PIPESTATUS[@]}")\n',
 		'for code in "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}"; do\n    if [ "$code" -ne 0 ]; then status=1; fi\ndone\n',
 		' - "$clock_root/native-statuses.json" "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}" || clock_status=1\n',
 		'node tools/ci/native_http_clock_evidence.cjs judge "$clock_root/source-before.json" "$clock_root/payload" "$clock_root/native-statuses.json" "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}" "${{ env.MACOS_STAGE_ARCHITECTURE }}" "$clock_root/clock-verdict.json" || clock_status=1\n',
@@ -1050,17 +1050,17 @@ check('shared native process ownership controls remain registered and mandatory'
 			job === 'managed-ollama-native' ? nativeHttpFullBody(rawScript, true) : rawScript;
 		if (job === 'managed-ollama-native') {
 			const legacyScript =
-				'set -euo pipefail\nreceipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nif [ "$mode" = deferred ]; then\n    echo "[DEFERRED] macos-native-http: qualified=false; original command not executed."\nelif [ "$mode" = full ]; then\n    set -euo pipefail\n    status=0\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\n    exit "$status"\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\n';
+				'set -euo pipefail\nreceipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nif [ "$mode" = deferred ]; then\n    echo "[DEFERRED] macos-native-http: qualified=false; original command not executed."\nelif [ "$mode" = full ]; then\n    set -euo pipefail\n    status=0\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/core/native_http_receiving_test.py --client-only || status=1\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/core/native_http_wire_client_receiving.py || status=1\n    exit "$status"\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\n';
 			const legacyFull = nativeHttpFullBody(legacyScript);
 			assert.strictEqual(
 				legacyFull,
-				'set -euo pipefail\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\nexit "$status"\n'
+				'set -euo pipefail\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/core/native_http_receiving_test.py --client-only || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/core/native_http_wire_client_receiving.py || status=1\nexit "$status"\n'
 			);
 			// Clock evidence adds capture custody, while all three original commands remain unique.
 			for (const originalCommand of [
 				'"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py',
-				'"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only',
-				'"$ERGOPTI_NATIVE_HTTP_PYTHON" -I -B -X "pycache_prefix=$clock_root/private-cache" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py'
+				'"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/core/native_http_receiving_test.py --client-only',
+				'"$ERGOPTI_NATIVE_HTTP_PYTHON" -I -B -X "pycache_prefix=$clock_root/private-cache" static/ergopti_plus/macos/tests/support/core/native_http_wire_client_receiving.py'
 			])
 				assert.strictEqual(script.split(originalCommand).length, 2);
 
@@ -1768,8 +1768,8 @@ check('profile-bound native HTTP routing preserves mandatory owners and closed r
 	const full = nativeHttpFullBody(script, true);
 	for (const command of [
 		'"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py 2>&1 | tee "$clock_root/owned-process.log"',
-		'"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only 2>&1 | tee "$clock_root/public-native.log"',
-		'"$ERGOPTI_NATIVE_HTTP_PYTHON" -I -B -X "pycache_prefix=$clock_root/private-cache" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py 2>&1 | tee "$clock_root/independent-client.log"'
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/core/native_http_receiving_test.py --client-only 2>&1 | tee "$clock_root/public-native.log"',
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" -I -B -X "pycache_prefix=$clock_root/private-cache" static/ergopti_plus/macos/tests/support/core/native_http_wire_client_receiving.py 2>&1 | tee "$clock_root/independent-client.log"'
 	])
 		assert.strictEqual(full.split(command).length - 1, 1);
 	for (const [before, after] of [

@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_window = require("tests.support.ui.owned_window_close_fixture")
+local with_window = require("tests.support.core.ui.owned_window_close_fixture")
 
 helpers.describe("owned windows release native references on user close", function()
 	for _, module_name in ipairs({ "settings.ui.cleanup", "onboarding.ui", "metrics.ui.metrics_apps",

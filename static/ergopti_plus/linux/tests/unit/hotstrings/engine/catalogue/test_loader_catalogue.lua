@@ -317,7 +317,7 @@ helpers.describe("personal-file discovery: exact owners preserve source and choi
 			local Config = helpers.load_module("hotstrings.engine.catalogue.config")
 			local engine = require("hotstrings.engine.matcher").new()
 			Config._set_override_config_dir_for_test(root)
-			local Choices = require("tests.support.hotstring_choices")
+			local Choices = require("tests.support.hotstrings.choices")
 			Choices.with_file(Config,
 				'[hotstrings]\ngroups = { a__b = true, b = true, "words.old" = true, team = true, "mémoire" = true, rolls = true }\n'
 				.. '[hotstrings.modules]\na__b = { probe = true }\nb = { probe = true }\n"words.old" = { probe = true }\n'
@@ -586,7 +586,7 @@ helpers.describe("literal POSIX backslash filenames", function()
 		local ok, err = pcall(function()
 			local Config = helpers.load_module("hotstrings.engine.catalogue.config")
 			Config._set_override_config_dir_for_test(root)
-			require("tests.support.hotstring_choices").with_file(Config, {}, function()
+			require("tests.support.hotstrings.choices").with_file(Config, {}, function()
 				local engine = require("hotstrings.engine.matcher").new()
 				helpers.assert_true(Config.init(engine, root))
 				local _, published = Config.load_all()

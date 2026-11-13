@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.system_actions_fixture")
+local fixture = require("tests.support.core.system_actions_fixture")
 local with_fixture = fixture.with_fixture
 
 helpers.describe("shortcuts.actions.system: schedule_awake_tick float random bounds (shortcuts-actions-3 regression)", function()

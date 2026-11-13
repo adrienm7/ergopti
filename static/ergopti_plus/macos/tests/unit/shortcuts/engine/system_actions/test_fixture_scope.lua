@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local support = require("tests.support.system_actions_fixture")
+local support = require("tests.support.core.system_actions_fixture")
 local OWNERS = {
 	"hs", "tests.stubs.hs", "shortcuts.engine.actions.system",
 	"shortcuts.engine.actions.screenshot_save", "shortcuts.engine.actions.text",
@@ -142,7 +142,7 @@ helpers.describe("System action fixture isolation", function()
 			end
 			local native = rawget(_G, "hs")
 			local modules = {
-				"tests.support.system_actions_fixture",
+				"tests.support.core.system_actions_fixture",
 				"tests.unit.shortcuts.engine.system_actions.test_actions_system",
 			}
 			for _, suffix in ipairs({ "capslock", "keep_awake", "wrap_decisions", "screenshots",

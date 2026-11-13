@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local function test(name, body) helpers.it(name .. " (ai-enable-admission)", body) end
-local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local PreferencesFixture = require("tests.support.ai.preferences_fixture")
 
 local function with_owner(body, options)
 	options = options or {}
