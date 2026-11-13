@@ -142,6 +142,24 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 		cleanup(Shell)
 	end)
 
+	helpers.it("bounds the Wayland dump, which waits forever on a seat with no keyboard", function()
+		local layout, commands, Shell = load_with("wayland", {
+			{ "dump-keymap-wayland", plausible_keymap() },
+		})
+		with_env({ DISPLAY = ":0" }, function()
+			helpers.assert_true(layout.refresh(nil), "a Wayland dump must load")
+		end)
+		local seconds = math.ceil(require("infra.timings").ms("adapters", "wayland_keymap_dump_timeout_ms") / 1000)
+		local bounded = false
+		for _, cmd in ipairs(commands) do
+			if cmd:find("dump-keymap-wayland", 1, true) then
+				bounded = cmd:find("^timeout " .. seconds .. " xkbcli dump%-keymap%-wayland") ~= nil
+			end
+		end
+		helpers.assert_true(bounded, "the dump runs under timeout " .. seconds)
+		cleanup(Shell)
+	end)
+
 	helpers.it("(xkb-groups) labels a key by the active group when several layouts are loaded", function()
 		-- Group 1 types the plausible letters; group 2 maps K01 to "z".
 		local two_groups = plausible_keymap():gsub("key <K01> { %[ a, A %] };", "key <K01> { [ a, A ], [ z, Z ] };")
