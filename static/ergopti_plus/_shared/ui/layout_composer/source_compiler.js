@@ -583,7 +583,9 @@ var LayoutSourceCompiler = (function () {
 	 * @returns {{canonical: object, convention: 'iso', omitted: object[]}}
 	 */
 	function compileCanonical(source, tables, options) {
-		if (options.platform === 'macos') fail('source_platform', 'macos');
+		// The macOS target reads the .keylayout itself: its compilation is that text.
+		if (TARGETS[options.platform] && TARGETS[options.platform].disabledCharacterCell)
+			fail('source_platform', String(options.platform));
 		const model = compileModel(source, tables, options);
 		const stateOf = stateResolver(source);
 		// strict: what the .keylayout conversion admission refuses in a transition,

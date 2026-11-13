@@ -405,6 +405,12 @@ var LayoutSourceIO = (function () {
 
 	// The native images a host installs beside the .keylayout, by platform: the
 	// Windows host registers the DLLs (the .keylayout serves its emulation).
+	// The converter target a host writes its installed layout from: Linux writes
+	// its XKB from the source compiled straight to the writer's canonical form,
+	// which keeps the levels the .keylayout cannot hold.
+	const HOST_TARGETS = Object.freeze({
+		linux: (doc) => JSON.stringify(LayoutTargetCompiler.hostTarget(doc, tables()))
+	});
 	const NATIVE_IMAGES = Object.freeze({
 		windows: (doc) => {
 			const built = windowsDlls(doc);
@@ -436,10 +442,8 @@ var LayoutSourceIO = (function () {
 		const compiled = LayoutSourceCompiler.targetKeylayout(doc, tables(), platform);
 		const payload = { source: serialize(doc), keylayout: compiled.text };
 		if (!isPreserved(doc)) payload.emulation = JSON.stringify(emulationTable(doc, platform));
-		// Linux writes the installed XKB from the source compiled straight to the
-		// writer's canonical form, which keeps the levels the .keylayout cannot hold.
-		if (platform === 'linux' && !isPreserved(doc))
-			payload.target = JSON.stringify(LayoutTargetCompiler.hostTarget(doc, tables()));
+		const hostTarget = HOST_TARGETS[platform];
+		if (hostTarget && !isPreserved(doc)) payload.target = hostTarget(doc);
 		const images = NATIVE_IMAGES[platform];
 		if (images) Object.assign(payload, images(doc));
 		return payload;
