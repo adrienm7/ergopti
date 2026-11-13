@@ -4,16 +4,16 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 03:00)
+## Where things stand (2026-11-13, 02:45)
 
 - Branch: `claude/ergopti-todo-structure-phase2`, fast-forward only. Base:
   dev `520bb24c`, merged in `ee1aa96f`.
 - Steps landed on dev: none. The migration is not authorized to land yet.
 - **S01 is NOT green on CI yet.** The last proof, run 43311674550 on
   `claude/ergopti-todo-structure-phase2-proof-2` (`244ef275`), had 28 failing
-  jobs. The fixes below are on the branch; a new proof
-  (`claude/ergopti-todo-structure-phase2-proof-3`) is being built from
-  `91b3a046`. About 120 checks are red locally on dev itself (root user, no
+  jobs. The fixes below are on the branch. Proof 3,
+  `claude/ergopti-todo-structure-phase2-proof-3` at `c4cec48e` (built from
+  `2627e45d`), was dispatched to `ci.yml` (`os_lanes=all`) at 02:44. About 120 checks are red locally on dev itself (root user, no
   `pwsh`, no Windows), so **measure S01 by CI, not locally.**
 - S02 (`core/crypto`) applies locally on top of S01 and has no CI run yet.
   Its own new local reds, not yet read: js-0035, js-0241, js-0253, js-0280,
@@ -34,11 +34,12 @@ Fixed on the branch (each with its commit):
   fixtures listed their staging folders apart from their files (`67eb94ff`);
 - contract vector ledger: contracts named by repository path (`a670f896`)
   and the family carried through S01 by a listed edit (`91b3a046`).
+- Linux `native-locale-catalog`: the probe's stand-in for the order file
+  no longer matched since `83ea401b` (a branch commit, not dev); fixed in
+  `2627e45d`. Reproduce as a non-root user (`runuser -u nobody`).
 
 Open, to check on the next proof:
 
-- Linux, every distro: `native-locale-catalog` (CI only; read the artifact
-  `linux-distro-unit-log-<distro>`, the blob host is blocked here).
 - macOS E2E: Managed Ollama, Launcher XCTest, Archive update controls.
 - Windows `control-cli-native-session` (core group) and Windows meta
   `hotif-globals-boot-safe`: probably dev reds; compare with a dev run.
