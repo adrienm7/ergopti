@@ -112,6 +112,16 @@ function run() {
 		assert.ok(varOut.includes(`path.join(DRIVERS, drv.name, ${pieces})`), varOut);
 	}
 
+	// A quoted Lua line that reads a module through a package.loaded alias,
+	// rawget(separator_modules, "infra.i18n"): the Linux menu parts check and
+	// its caption counterexamples kept the old key after S05.
+	const RAW = 'tools/test/zz_probe_linux_menu.cjs';
+	const raw = 'const LINE = \'local x = rawget(separator_modules, "infra.i18n")\';\n';
+	const rawMap = new Map([['linux/infra/i18n.lua', 'linux/core/i18n/engine/i18n.lua']]);
+	const rawRows = Plan.scanFile(RAW, raw, Plan.referenceContext(rawMap));
+	const rawOut = Apply.rewriteText(raw, rawRows, new Map(), RAW);
+	assert.ok(rawOut.includes('rawget(separator_modules, "core.i18n.engine.i18n")'), rawOut);
+
 	console.log('[OK] a Lua tool that requires a module only one driver has loads that driver.');
 }
 
