@@ -43,6 +43,8 @@ const MAP = new Map([
 		'_shared/lua/llm/app_profile_overrides.lua',
 		'_shared/ai/engine/policy/app_profile_overrides.lua'
 	],
+	['linux/keyhub/init.lua', 'linux/hotstrings/engine/expander/init.lua'],
+	['linux/widgets/init.lua', 'linux/gestures/engine/core.lua'],
 	['linux/infra/monotonic.lua', 'linux/infra/monotonic.lua'],
 	['linux/tests/unit/test_probe.lua', 'linux/tests/unit/test_probe.lua']
 ]);
@@ -66,6 +68,10 @@ function run() {
 	);
 
 	const cases = [
+		// An init.lua named with its stem keeps the stem where it lands in an
+		// init.lua, and loses it where it does not (S26 left these unrewritten).
+		['local K = require("keyhub.init")', 'local K = require("hotstrings.engine.expander.init")'],
+		['local G = require("widgets.init")', 'local G = require("gestures.engine.core")'],
 		['local A = require("test.assertions")', 'local A = require("tests.lua.assertions")'],
 		[
 			'src:find(\'\\nrequire%("test%.runner_home"%)%.isolate%(%)\')',
