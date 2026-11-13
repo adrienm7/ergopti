@@ -1,5 +1,5 @@
 {
-	"_comment": "The one declaration of the application's file and bundle names, the code-signing identifiers of the owned runtime's helper and products, its service labels, the external hosts the drivers talk to the developer source-mode names (the launcher Info.plist key a source build carries and the environment variable the launcher hands its runtime) and the field report names the three collectors share (tools/dev/collect-*-field-report.*: the field branch prefix, the report folder and the git config key that remembers the base of a field branch) and the infix of the Linux atomic-write stage names (<file>.<infix>-<pid>-<start>.tmp, linux/infra/stage_owner.lua). tools/codegen/codegen-identifiers.cjs emits _shared/core/text/engine/identifiers.lua from it; Node tools read this file directly. tools/test/test-repo-url-single-source.cjs holds every other driver source to a shrinking baseline of typed copies. The GitHub owner and repository stay in _shared/updater/data/defaults.json, and the distributed notification the macOS launcher sends its runtime to request the controlled exit (Lua and Swift only). and the catalogue a Lua driver shows when the system language has none (locales.system_fallback, as Windows and macOS fall back to English)",
+	"_comment": "The one declaration of the application's file and bundle names, the code-signing identifiers of the owned runtime's helper and products, its service labels, the external hosts the drivers talk to the developer source-mode names (the launcher Info.plist key a source build carries and the environment variable the launcher hands its runtime) and the field report names the three collectors share (tools/dev/collect-*-field-report.*: the field branch prefix, the report folder and the git config key that remembers the base of a field branch) and the infix of the Linux atomic-write stage names (<file>.<infix>-<pid>-<start>.tmp, linux/infra/stage_owner.lua), the Linux desktop names (the Ergopti GNOME Shell extension's layout switch, the Compose state file of the user installer, the COSMIC worker's Wayland protocols). tools/codegen/codegen-identifiers.cjs emits _shared/core/text/engine/identifiers.lua from it; Node tools read this file directly. tools/test/test-repo-url-single-source.cjs holds every other driver source to a shrinking baseline of typed copies. The GitHub owner and repository stay in _shared/updater/data/defaults.json, and the distributed notification the macOS launcher sends its runtime to request the controlled exit (Lua and Swift only). and the catalogue a Lua driver shows when the system language has none (locales.system_fallback, as Windows and macOS fall back to English)",
 	"app": {
 		"name": "ErgoptiPlus",
 		"ahk": "ErgoptiPlus.ahk",
@@ -51,6 +51,15 @@
 	},
 	"linux_stage": {
 		"infix": "ergopti"
+	},
+	"linux_desktop": {
+		"gnome_switch_path": "/org/ergopti/InputSource",
+		"gnome_switch_interface": "org.ergopti.InputSource1",
+		"gnome_extension_missing": "gnome_extension_missing",
+		"compose_state_file": ".ergopti_plus_compose_input_method",
+		"xkb_user_root_env": "ERGOPTI_XKB_USER_ROOT",
+		"wayland_toplevel_list": "ext_foreign_toplevel_list_v1",
+		"wayland_toplevel_handle": "ext_foreign_toplevel_handle_v1"
 	},
 	"locales": {
 		"system_fallback": "en"

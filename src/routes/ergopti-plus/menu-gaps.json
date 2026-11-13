@@ -623,6 +623,22 @@
 		}
 	},
 	{
+		"path": "layout_menu.compose_input_method",
+		"visibility": "hide",
+		"labels": { "fr": "compose_input_method", "en": "compose_input_method" },
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: Compose sequences come from ~/.XCompose, which GTK 3 reads only in part without an input method. macOS and Windows type every character through their own layouts.",
+				"fr": "Linux uniquement : les séquences Compose viennent de ~/.XCompose, que GTK 3 ne lit qu’en partie sans méthode de saisie. macOS et Windows tapent chaque caractère par leurs propres dispositions."
+			},
+			"macos": {
+				"en": "Linux only: Compose sequences come from ~/.XCompose, which GTK 3 reads only in part without an input method. macOS and Windows type every character through their own layouts.",
+				"fr": "Linux uniquement : les séquences Compose viennent de ~/.XCompose, que GTK 3 ne lit qu’en partie sans méthode de saisie. macOS et Windows tapent chaque caractère par leurs propres dispositions."
+			}
+		}
+	},
+	{
 		"path": "layout_menu.layout_bundle",
 		"visibility": "hide",
 		"labels": { "fr": "layout_bundle", "en": "layout_bundle" },
