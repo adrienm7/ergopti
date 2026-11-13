@@ -112,6 +112,16 @@ function run() {
 		/S: npm run gen failed/
 	);
 	assert.ok(source.indexOf('runGenerators(key') < source.indexOf('settleCodegen(key'));
+	// S33 empties windows/adapters: gates that found a driver by its adapters/
+	// folder saw two drivers. A driver is found by its _generated tree.
+	const { driverNames } = require('../lib/driver-roots.cjs');
+	const os = require('node:os');
+	const fsx = require('node:fs');
+	const drivers = fsx.mkdtempSync(path.join(os.tmpdir(), 'ergopti-drivers-'));
+	for (const dir of ['windows/_generated', '_shared/_generated', 'docs', 'old/adapters'])
+		fsx.mkdirSync(path.join(drivers, dir), { recursive: true });
+	assert.deepEqual(driverNames(drivers), ['windows']);
+	fsx.rmSync(drivers, { recursive: true, force: true });
 	// S02 grew the union of driver directories past I1's record: the runner
 	// moves that ratchet with the step, named in the commit like the bounds.
 	assert.match(

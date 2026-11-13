@@ -36,6 +36,7 @@
 const fs = require('fs');
 const path = require('path');
 const { gitPaths } = require('../lib/git-paths.cjs');
+const { isDriverMarkerPath } = require('../lib/driver-roots.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER_PREFIX = 'static/ergopti_plus/';
@@ -133,7 +134,7 @@ const DRIVERS = [
 		trackedPaths
 			.filter((rel) => rel.startsWith(DRIVER_PREFIX))
 			.map((rel) => rel.slice(DRIVER_PREFIX.length).split('/'))
-			.filter((parts) => parts.length >= 3 && parts[1] === 'adapters')
+			.filter(isDriverMarkerPath)
 			.map((parts) => parts[0])
 	)
 ].sort();

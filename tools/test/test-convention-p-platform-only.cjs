@@ -36,6 +36,7 @@ const os = require('os');
 const path = require('path');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('child_process');
+const { isDriverMarkerPath } = require('../lib/driver-roots.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER_PREFIX = 'static/ergopti_plus/';
@@ -195,7 +196,7 @@ const DRIVERS = [
 		trackedFiles
 			.filter((file) => file.startsWith(DRIVER_PREFIX))
 			.map((file) => file.slice(DRIVER_PREFIX.length).split('/'))
-			.filter((parts) => parts.length >= 3 && parts[1] === 'adapters')
+			.filter(isDriverMarkerPath)
 			.map((parts) => parts[0])
 	)
 ].sort();
