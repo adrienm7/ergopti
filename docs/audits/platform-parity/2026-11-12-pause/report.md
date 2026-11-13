@@ -78,9 +78,11 @@ These still refuse or grey while paused. Ungating the menu alone would let a
 paused driver act at once instead of « on resume », or the change needs its
 source proofs reworked first:
 
-- macOS Shortcuts: the slot rows and the wrap rows bind or unbind OS hotkeys
-  at once (each shortcut's own row runs while paused: `Bindings.enable`
-  records only the preference behind the pause fence).
+- macOS Shortcuts: the script-chord slot rows and the keyboard slot rows. The
+  script-control tap stays live during a pause by design, and the keyboard
+  slots' rebinding under `KeyboardShortcuts`' lifecycle pause is not yet
+  traced; each shortcut's own row, the wrap rows, the ChatGPT URL editor and
+  the tap-key rows run while paused.
 - macOS and Linux AI menus: the parent row, the enable switch and the
   privacy and trigger rows read the pause through shared policies.
 - The personal hotstrings editor row and the word expander rows on macOS and
@@ -89,7 +91,10 @@ source proofs reworked first:
 - macOS hotstrings submenus: the personal legacy shortcut row (it binds a
   hotkey), with the personal editor and word expander rows above.
 - macOS magic key source capture: it listens to a physical key press.
-- The audit that every typing feature (layout emulation first) is inert while
-  paused, and that a setting changed while paused applies on resume.
+- The audit that every typing feature is inert while paused, and that a
+  setting changed while paused applies on resume. Layout emulation is done:
+  both Lua drivers gate it on the live pause (`is_active` from
+  `CoreState.processing_paused` on macOS, `script_actions.is_paused` on Linux),
+  pinned by `test_layout_emulation` on each driver.
 - Windows: every `A_IsSuspended` gate is listed in
   [the Windows inventory](windows-inventory.md); none was changed here.
