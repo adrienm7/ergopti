@@ -40,9 +40,29 @@ same commit as each step or checkpoint. Times are Paris time.
   - the shared literal baseline moves with a step, named in its commit
     (`84cebf24`).
 - Proof 19 (S03–S05 on the tip): both Lua suites match the baseline
-  exactly (the logger order leak is gone); proof 21 = proof 20 rebased on dev
-  `ed5adcad`, on CI. Windows AHK changes are unverified
-  locally (no AutoHotkey here); CI is their proof.
+  exactly (the logger order leak is gone). Windows AHK changes are
+  unverified locally (no AutoHotkey here); CI is their proof.
+- **Proof 21 (current): branch `…-proof-21` at `86de9408`, run 43514443381
+  (dispatched 22:52).** It is the night tooling's S03–S05 (core/events,
+  core/fs, core/i18n) replayed on dev `ed5adcad` with every fix above. It
+  proves the block lands: any red outside run 43309556011's list is the
+  steps'. Local JS suite on the same tree: scratchpad `js-p21.json` against
+  `js-night.json`.
+- Next commands:
+  1. When run 43514443381 completes, compare its red jobs with the baseline
+     list below. A flaky-looking red is reported with both run ids.
+  2. If only baseline reds: `git fetch origin dev`, rebase the three step
+     commits onto `origin/dev` (re-run a step if dev added files its moves
+     meet), check 0 merges and 0 trailers, run the format and convention
+     gates, then `git push origin HEAD:refs/heads/dev` and send the
+     coordinator one line (range, run id).
+  3. Otherwise triage with the local suites and fix the tooling, never the
+     stepped output.
+  4. Next block S06–S08 (core/lifecycle, core/logger, core/network): in
+     wt-seq, from the S05 tip,
+     `ERGOPTI_STRUCTURE_PHASE=2 node tools/audit/structure/run-phase2.cjs
+--to core/network --receipt <file>`; simulations show 0 refusals for
+     S06–S16. Then both Lua suites and the JS suite against the baselines.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
   Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
   input-display, platform-metrics; Windows Integration Driver startup (and
