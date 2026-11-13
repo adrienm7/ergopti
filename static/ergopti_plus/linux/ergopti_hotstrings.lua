@@ -3561,10 +3561,12 @@ local function main()
 		if wpm_widget or wpm_tray_readout then
 			local now_ms = Monotonic.now_ms()
 			local live = keystats.get_live_stats(now_ms)
+			-- A paused script shows no speed, as on Windows and macOS.
+			local paused = script_actions.is_paused() == true
 			if wpm_widget then
 				local owner = wpm_widget
 				RuntimeGuard.call("WPM widget tick", function()
-					owner.tick(live, now_ms / 1000)
+					owner.tick(live, now_ms / 1000, paused)
 				end, function()
 					if type(owner.stop) == "function" then owner.stop() end
 					wpm_widget = nil
@@ -3573,7 +3575,7 @@ local function main()
 			if wpm_tray_readout then
 				local owner = wpm_tray_readout
 				RuntimeGuard.call("WPM tray readout tick", function()
-					owner.tick(live, now_ms / 1000)
+					owner.tick(live, now_ms / 1000, paused)
 				end, function()
 					wpm_tray_readout = nil
 				end)

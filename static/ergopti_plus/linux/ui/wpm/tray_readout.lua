@@ -361,18 +361,20 @@ end
 --- Refreshes the readout. Called from the daemon's periodic tick.
 --- @param stats table|nil From keystats.get_live_stats().
 --- @param now_s number Monotonic seconds.
+--- @param paused boolean|nil The script's pause: the readout hides, as on
+---   Windows and macOS.
 --- @return table|nil The frame shown, or nil when hidden.
-function M.tick(stats, now_s)
+function M.tick(stats, now_s, paused)
 	if _restore_debt or not Preferences.admit() then return nil end
 	if not _state.running then return nil end
-	if _state.last_update_s and (now_s - _state.last_update_s) < UPDATE_S then return nil end
+	if paused ~= true and _state.last_update_s and (now_s - _state.last_update_s) < UPDATE_S then return nil end
 	_state.last_update_s = now_s
 	if not settle_pending() then return nil end
 	local canon = Constants.load()
 	if not canon then return nil end
 	local frame = Model.menubar_frame(canon, stats, Widget.frame_options(now_s, _state.use_colors))
 	local Tray = tray()
-	if not Model.menubar_visible(stats, frame.source, Widget.tooltip_visible()) then
+	if paused == true or not Model.menubar_visible(stats, frame.source, Widget.tooltip_visible()) then
 		if _state.handle and Tray then
 			local hidden = clone(_state.presentation or {})
 			hidden.active = false

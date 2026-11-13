@@ -421,11 +421,17 @@ end
 --- at the shared refresh rate however often it is called.
 --- @param stats table|nil From keystats.get_live_stats().
 --- @param now_s number Monotonic seconds.
+--- @param paused boolean|nil The script's pause: the widget hides at once, as
+---   on Windows and macOS.
 --- @return table|nil The frame drawn, for tests and diagnostics.
-function M.tick(stats, now_s)
+function M.tick(stats, now_s, paused)
 	if _restore_debt or not Preferences.admit() then return nil end
 	if not _state.running then return nil end
 	if _hide_pending and not hide() then return nil end
+	if paused == true then
+		if _state.shown then hide() end
+		return nil
+	end
 	if _state.last_draw_s and (now_s - _state.last_draw_s) < UPDATE_S then return nil end
 	_state.last_draw_s = now_s
 	local canon = Constants.load()
