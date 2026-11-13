@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/hook_trace.h
+// static/ergopti_plus/windows/platform/native/hook_trace.h
 /**
  * @file hook_trace.h
  * @brief Explicit opt-in bounded hook diagnostics without source classification.

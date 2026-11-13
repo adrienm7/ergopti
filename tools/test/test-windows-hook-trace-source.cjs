@@ -10,7 +10,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ROOT = path.resolve(__dirname, '../..');
-const NATIVE = 'static/ergopti_plus/windows/native/nav_event_owner/';
+const NATIVE = 'static/ergopti_plus/windows/platform/native/';
 const EXISTING = [
 	'ErgoptiEditor_Begin',
 	'ErgoptiEditor_Poll',

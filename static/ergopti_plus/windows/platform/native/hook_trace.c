@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/hook_trace.c
+// static/ergopti_plus/windows/platform/native/hook_trace.c
 /** @file hook_trace.c @brief Disabled-default bounded hook evidence storage. */
 #include "hook_trace.h"
 #include <string.h>

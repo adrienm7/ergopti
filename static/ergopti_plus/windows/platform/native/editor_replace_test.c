@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/editor_replace_test.c
+// static/ergopti_plus/windows/platform/native/editor_replace_test.c
 /**
  * @file editor_replace_test.c
  * @brief Tests the real asynchronous worker against a hidden native Edit.

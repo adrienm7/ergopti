@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner_test.c
+// static/ergopti_plus/windows/platform/native/nav_event_owner_test.c
 /**
  * @file nav_event_owner_test.c
  * @brief Deterministic regression tests for the native navigation owner.

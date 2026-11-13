@@ -69,7 +69,7 @@ const adapter = fs.readFileSync(path.join(WINDOWS, 'adapters', 'llm_nav_event_ow
 if (!adapter.includes('LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES'))
 	errors.push('the native cycle routes are no longer parked');
 const native = fs.readFileSync(
-	path.join(WINDOWS, 'native', 'nav_event_owner', 'nav_event_owner.c'),
+	path.join(WINDOWS, 'platform', 'native', 'nav_event_owner.c'),
 	'utf8'
 );
 if (!/reinstall/i.test(native)) errors.push('the native owner no longer reasserts its hook');

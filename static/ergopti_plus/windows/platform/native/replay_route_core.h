@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.h
+// static/ergopti_plus/windows/platform/native/replay_route_core.h
 /**
  * @file replay_route_core.h
  * @brief Portable event-time route snapshots for a supplied Windows KLE subset.

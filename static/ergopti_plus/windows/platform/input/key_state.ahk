@@ -26,7 +26,7 @@
 
 
 
-; ERGOPTI_NAV_KEY_REAL_DOWN and ERGOPTI_NAV_KEY_HIDDEN of native/nav_event_owner/nav_event_owner.h.
+; ERGOPTI_NAV_KEY_REAL_DOWN and ERGOPTI_NAV_KEY_HIDDEN of platform/native/nav_event_owner.h.
 global KS_NATIVE_KEY_REAL_DOWN := 0x01
 global KS_NATIVE_KEY_HIDDEN := 0x02
 ; The key's scan code on every layout, including those that map it to Kana.

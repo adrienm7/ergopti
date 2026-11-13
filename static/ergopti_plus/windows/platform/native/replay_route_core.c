@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.c
+// static/ergopti_plus/windows/platform/native/replay_route_core.c
 /**
  * @file replay_route_core.c
  * @brief Authoritative supplied-route matching with immutable event-time recipes.

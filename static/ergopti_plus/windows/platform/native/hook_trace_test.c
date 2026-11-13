@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/hook_trace_test.c
+// static/ergopti_plus/windows/platform/native/hook_trace_test.c
 /**
  * @file hook_trace_test.c
  * @brief Independent raw integer, lifecycle, paging and saturation regressions.

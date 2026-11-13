@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/replay_route_core_test.c
+// static/ergopti_plus/windows/platform/native/replay_route_core_test.c
 /**
  * @file replay_route_core_test.c
  * @brief Independent vectors for event-time replay registration and provenance.

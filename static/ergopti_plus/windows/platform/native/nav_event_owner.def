@@ -1,4 +1,4 @@
-; static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.def
+; static/ergopti_plus/windows/platform/native/nav_event_owner.def
 ; MODULE: Ergopti navigation event owner exports.
 ; DESCRIPTION: Pins undecorated C names for the AutoHotkey DllCall adapter.
 

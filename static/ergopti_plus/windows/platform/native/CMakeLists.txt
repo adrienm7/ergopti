@@ -1,4 +1,4 @@
-# static/ergopti_plus/windows/native/nav_event_owner/CMakeLists.txt
+# static/ergopti_plus/windows/platform/native/CMakeLists.txt
 # MODULE: Ergopti navigation event owner native build.
 # DESCRIPTION: Builds the x64 Win32 DLL and deterministic state-machine test.
 

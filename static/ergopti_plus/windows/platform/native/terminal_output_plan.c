@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.c
+// static/ergopti_plus/windows/platform/native/terminal_output_plan.c
 /** @file terminal_output_plan.c @brief Guarded immutable plans and prefix ACKs. */
 #include "terminal_output_plan.h"
 #include <string.h>
