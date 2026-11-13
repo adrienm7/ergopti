@@ -33,9 +33,6 @@ function M.build(ctx)
 	end
 	return Policy.build({ manifest = Manifest, i18n = I18n.get, get = get,
 		master = function() return current() and native.is_enabled() == true end,
-		paused = function()
-			return ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() ~= false
-		end,
 		set = function(enabled, seconds)
 			if not current() then return false end
 			local committed = Publication.commit(native, enabled, seconds, function()

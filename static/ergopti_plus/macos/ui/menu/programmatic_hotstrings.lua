@@ -35,12 +35,6 @@ function M.build(ctx)
 	end
 	return Policy.build({ manifest = Manifest, i18n = I18n.get, get = get,
 		master = function() return ctx.keymap.is_group_enabled("dynamichotstrings") == true end,
-		paused = function()
-			if ctx.paused == true or type(ctx.script_control) ~= "table"
-				or type(ctx.script_control.is_paused) ~= "function" then return true end
-			local called, paused = pcall(ctx.script_control.is_paused)
-			return not called or paused ~= false
-		end,
 		set = function(enabled, seconds)
 			local old_enabled, old_seconds = ctx.state.dynamichotstrings_user_code_enabled,
 				ctx.state.dynamichotstrings_user_code_time_activation_seconds

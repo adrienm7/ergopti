@@ -20,11 +20,11 @@ function M.run(helpers, manifest, Logger)
 	local Policy = require("menu.engine.programmable_hotstrings")
 	--- @param problem string|nil The source problem the native owner reports.
 	local function fixture(problem)
-		local f = { enabled = false, seconds = 0.5, master = true, paused = false, problem = problem,
+		local f = { enabled = false, seconds = 0.5, master = true, problem = problem,
 			calls = { open = 0, reload = 0, create = 0, set = 0, changed = 0 }, refusals = {} }
 		local ports = { manifest = manifest, i18n = function(key) return key end,
 			get = function() return f.enabled, f.seconds end,
-			master = function() return f.master end, paused = function() return f.paused end,
+			master = function() return f.master end,
 			set = function(enabled, seconds)
 				f.calls.set = f.calls.set + 1
 				if f.refuse then return false end
@@ -133,11 +133,23 @@ function M.run(helpers, manifest, Logger)
 			helpers.assert_true(f.rows[1].menu[2].fn())
 			helpers.assert_eq(f.seconds, 0)
 		end)
-		helpers.it("(user-hotstrings-menu) refuses stale pause/master gates and malformed intervals", function()
+		-- A pause stops typing, not configuration (EDD-1): the policy has no pause
+		-- gate, so the switch, the delay and the example commit while paused.
+		helpers.it("(edd1-paused-writes) switch, delay and example commit without a pause gate", function()
+			local f = fixture("missing")
+			helpers.assert_true(f.rows[1].menu[1].fn(), "the switch commits")
+			helpers.assert_eq(f.enabled, true)
+			f.selected = "250"
+			helpers.assert_true(f.rows[1].menu[2].fn(), "the delay commits")
+			helpers.assert_eq(f.seconds, 0.25)
+			helpers.assert_true(f.rows[4].fn(), "the example is created and loaded")
+			helpers.assert_eq(f.calls.create, 1)
+			helpers.assert_eq(f.calls.set, 3)
+			helpers.assert_true(not f.rows[1].menu[1].disabled and not f.rows[1].menu[2].disabled)
+		end)
+		helpers.it("(user-hotstrings-menu) refuses a stale master gate and malformed intervals", function()
 			local f = fixture()
-			f.paused = true
-			helpers.assert_eq(f.rows[1].menu[1].fn(), false)
-			f.paused, f.master = false, false
+			f.master = false
 			helpers.assert_eq(f.rows[1].menu[1].fn(), false)
 			f.master = true
 			for _, invalid in ipairs({ "bad", "-1", "1.5", "1e999", "3600001" }) do
@@ -150,7 +162,7 @@ function M.run(helpers, manifest, Logger)
 			for _, message in ipairs(f.refusals) do
 				helpers.assert_eq(message, "dialog.value_check.range_integer_unit")
 			end
-			helpers.assert_eq(f.calls.changed, 7, "every refusal redraws the menu, and opens nothing")
+			helpers.assert_eq(f.calls.changed, 6, "every refusal redraws the menu, and opens nothing")
 			helpers.assert_eq(f.calls.open, 0, "a refusal never offers or opens the source")
 		end)
 		for _, changed in ipairs({ "enabled", "seconds" }) do
@@ -206,10 +218,9 @@ function M.run(helpers, manifest, Logger)
 			helpers.assert_eq(f.calls.changed, 1)
 		end)
 		helpers.it("(user-hotstrings-problem) creates the example without enabling it when the option is off or gated", function()
-			for _, gate in ipairs({ "off", "paused", "master" }) do
+			for _, gate in ipairs({ "off", "master" }) do
 				local f = fixture("missing")
 				f.enabled = gate ~= "off"
-				f.paused = gate == "paused"
 				f.master = gate ~= "master"
 				helpers.assert_true(f.rows[4].fn(), gate)
 				helpers.assert_eq(f.calls.create, 1, gate)

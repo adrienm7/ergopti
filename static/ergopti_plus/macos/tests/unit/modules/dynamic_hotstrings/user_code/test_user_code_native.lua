@@ -845,10 +845,12 @@ helpers.describe("programmable native macOS hotstrings", function()
 			end)
 		end)
 	end
-	helpers.it("(user-menu-live-pause) fences retained controls after the real pause owner closes", function()
+	-- A pause stops typing, not configuration (EDD-1): a control rendered before
+	-- the pause still commits once the script is paused.
+	helpers.it("(edd1-paused-writes) retained controls commit after the script pauses", function()
 		with_native(function(f)
 			package.loaded["infra.dialog_util"] = {
-				block_alert = function() error("a refused control opens no dialog") end,
+				block_alert = function() error("a committed control opens no dialog") end,
 			}
 			local paused, saves, updates = false, 0, 0
 			local rows = require("ui.menu.programmatic_hotstrings").build({
@@ -858,10 +860,10 @@ helpers.describe("programmable native macOS hotstrings", function()
 				updateMenu = function() updates = updates + 1 end,
 				save_prefs = function() saves = saves + 1; return true end })
 			paused = true
-			helpers.assert_eq(rows[1].menu[1].fn(), false)
-			helpers.assert_true(f.User.is_enabled())
-			helpers.assert_eq(saves, 0)
-			helpers.assert_eq(updates, 1, "the refusal redraws the menu instead of opening a dialog")
+			helpers.assert_eq(rows[1].menu[1].fn(), true)
+			helpers.assert_eq(f.User.is_enabled(), false, "the switch reaches the native gate")
+			helpers.assert_eq(saves, 1)
+			helpers.assert_eq(updates, 1)
 		end)
 	end)
 	helpers.it("opens source through the actual menu adapter without loading or creating it", function()
