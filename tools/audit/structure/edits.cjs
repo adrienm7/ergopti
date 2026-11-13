@@ -96,6 +96,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '\t\t{ name = "a system package (/usr/lib/ergopti)", chunk = "/usr/lib/ergopti/core/i18n/engine/locale.lua" },\n\t\t{ name = "a relative checkout launch", chunk = "./core/i18n/engine/locale.lua" },'
 	},
 	{
+		// The installed-shaped network runtime tree creates the folder of the one
+		// regular-file reader it copies; S04 moves the reader to core/fs/engine.
+		file: 'tools/test/test-linux-network-runtime.cjs',
+		moves: 'linux/infra/regular_file_reader.lua',
+		from: "\t\tfs.mkdirSync(path.join(driver, 'infra'), { recursive: true });",
+		to: "\t\tfs.mkdirSync(path.join(driver, 'core/fs/engine'), { recursive: true });"
+	},
+	{
 		// The i18n boot check reads the folder that holds i18n.ahk; S05 moves it
 		// out of infra/ into core/i18n/engine, while infra/ keeps other files.
 		file: 'static/ergopti_plus/windows/tests/meta/infra/i18n/test_i18n_fallback_deferred.ahk',
