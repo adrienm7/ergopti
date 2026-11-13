@@ -745,6 +745,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-scope-ancestor.cjs"],
 			"repro": "npm run test:structure-scope-ancestor"
+		},
+		{
+			"id": "js-0520",
+			"ordinal": 639,
+			"name": "structure plan follows a shared file's path under a driver root when every driver moves the file alike",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-shared-driver-paths.cjs"],
+			"repro": "npm run test:structure-shared-driver-paths"
 		}
 	]
 }
