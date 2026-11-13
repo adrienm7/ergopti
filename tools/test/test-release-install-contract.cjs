@@ -190,7 +190,7 @@ function checkLinuxInstallCallers() {
 		`Linux: an update is downloaded or installed from an unreviewed file: ${installs.join(', ')}`
 	);
 	for (const name of ['_complete_background_check', '_evaluate_schedule']) {
-		const body = luaBody('linux', 'modules/updater/manager.lua', name);
+		const body = luaBody('linux', 'updater', 'engine', 'manager.lua', name);
 		expect(body !== '', `Linux: ${name} not found`);
 		expect(
 			!/download_update|download_release|download_offered|install_update|install_release_archive|start_download/.test(
@@ -217,7 +217,7 @@ function checkMacosInstallCallers() {
 		`macOS: Sparkle is asked for an update from an unreviewed file: ${sparkle.join(', ')}`
 	);
 	const autoCheck = fs.readFileSync(
-		path.join(DRIVERS, 'macos', 'modules/updater/auto_check.lua'),
+		path.join(DRIVERS, 'macos', 'updater', 'engine', 'auto_check.lua'),
 		'utf8'
 	);
 	const requests = autoCheck
@@ -232,7 +232,7 @@ function checkMacosInstallCallers() {
 	// window loads it, and calls request() from one function, called only by the
 	// bridge's install_through_updater click.
 	const handoff = fs.readFileSync(
-		path.join(DRIVERS, 'macos', 'modules/updater/feed_handoff.lua'),
+		path.join(DRIVERS, 'macos', 'updater', 'engine', 'feed_handoff.lua'),
 		'utf8'
 	);
 	const handoffRequests = handoff
@@ -248,7 +248,10 @@ function checkMacosInstallCallers() {
 		same(handoffUsers, ['ui/changelog/init.lua']),
 		`macOS: the feed hand-off is loaded from an unreviewed file: ${handoffUsers.join(', ')}`
 	);
-	const versions = fs.readFileSync(path.join(DRIVERS, 'macos', 'ui/changelog/init.lua'), 'utf8');
+	const versions = fs.readFileSync(
+		path.join(DRIVERS, 'macos', 'updater', 'ui', 'changelog', 'init.lua'),
+		'utf8'
+	);
 	const versionLines = versions.split('\n');
 	const handOffDefinition = versions.indexOf('local function hand_off_to_updater(');
 	const handOffEnd = versions.indexOf('\nend\n', handOffDefinition);
@@ -297,7 +300,7 @@ function checkReasonKeys() {
 		[...luaBlock.matchAll(/^\s*([a-z_]+) = "([^"]+)",/gm)].map((m) => [m[1], m[2]])
 	);
 	const ahk = fs.readFileSync(
-		path.join(DRIVERS, 'windows/modules/updater/release_install.ahk'),
+		path.join(DRIVERS, 'windows/updater/engine/release_install.ahk'),
 		'utf8'
 	);
 	const ahkBlock = ahk.slice(

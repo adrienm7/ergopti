@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "static/ergopti_plus/linux/native/archive_output"
+SOURCE = ROOT / "static/ergopti_plus/linux/updater/native"
 
 with tempfile.TemporaryDirectory(prefix="ergopti-native-lifecycle-") as temporary:
     parent = Path(temporary).resolve(strict=True)

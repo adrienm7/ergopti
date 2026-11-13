@@ -37,7 +37,7 @@ local function expect(ok, label)
 	return ok
 end
 
-local Updater = require("modules.updater.manager")
+local Updater = require("updater.engine.manager")
 local Json = require("core.text.engine.json")
 local Redact = require("diagnostics.engine.reports.redact")
 local rules = assert(Json.decode(read(DRIVER .. "/../_shared/diagnostics/data/redaction.json")))
@@ -203,7 +203,7 @@ local accepted = install(archive, function(ok)
 	install_done, installed = true, ok == true
 end, function()
 	return probe_active and not install_done
-		and package.loaded["modules.updater.manager"] == Updater
+		and package.loaded["updater.engine.manager"] == Updater
 		and Updater.install_update_async == install and Updater.get_cached_release == get_release
 		and Updater.get_state == get_state
 		and script_actions.is_paused == is_paused and is_paused() == false
@@ -223,8 +223,8 @@ expect(read(HOME .. "/.local/lib/ergopti.old/_shared/build_stamp.txt") ~= nil, "
 
 -- The restart, from this checkout's restarter: the running daemon's own code.
 package.path = DRIVER .. "/?.lua;" .. DRIVER .. "/?/init.lua;" .. package.path
-package.loaded["modules.updater.restarter"] = nil
-local how = dofile(DRIVER .. "/modules/updater/restarter.lua").restart({
+package.loaded["updater.engine.restarter"] = nil
+local how = dofile(DRIVER .. "/updater/engine/restarter.lua").restart({
 	wrapper = Updater.installed_launcher(), args = { "--verbose" }, cgroup = "0::/test.scope\n",
 })
 expect(how == "relay", "the restart relay is armed")

@@ -83,13 +83,13 @@ end)
 local function with_download_page(run)
 	local names = { "lgi", "core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline",
 		"core.events.loop", "platform.system.notifier", "core.ui.ui.webkit_host", "core.ui.ui.webview_manager",
-		"ui.download_window.bridge", "menu.engine.manifest_reader" }
+		"updater.ui.download_window.bridge", "menu.engine.manifest_reader" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 	local document
 	local ok, detail = xpcall(function()
-		package.loaded["ui.download_window.bridge"] = nil
-		local bridge = require("ui.download_window.bridge")
+		package.loaded["updater.ui.download_window.bridge"] = nil
+		local bridge = require("updater.ui.download_window.bridge")
 		document = require("tests.support.document_fixture").new("download_window", bridge, {})
 		local actual_manager = document.manager
 		local world = { evaluated = {}, cancellations = 0 }

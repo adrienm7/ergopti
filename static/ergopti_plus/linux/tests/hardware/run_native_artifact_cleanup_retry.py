@@ -348,7 +348,7 @@ def main():
         "Canonical fixture parent required"
     )
     inputs_ledger = Ledger()
-    source = Path(args.source_root) / "static/ergopti_plus/linux/native/archive_output"
+    source = Path(args.source_root) / "static/ergopti_plus/linux/updater/native"
     inputs = [
         regular_input(inputs_ledger, source / "archive_publication.c", SOURCE_C, "native-source"),
         regular_input(inputs_ledger, source / "archive_publication.h", SOURCE_H, "native-header"),

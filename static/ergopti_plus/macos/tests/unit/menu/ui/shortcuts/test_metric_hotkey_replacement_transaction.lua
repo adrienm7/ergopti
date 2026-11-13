@@ -117,7 +117,7 @@ local function load_fixture(legacy)
 		start_config_watcher = function() return { stop = function() return true end } end,
 		start_theme_watcher = function() return { stop = function() return true end } end,
 	}
-	package.loaded["modules.updater"] = {
+	package.loaded["updater.engine"] = {
 		get_check_interval = function() return 3600 end,
 		start_background_checks = noop,
 	}
@@ -160,7 +160,7 @@ local function load_fixture(legacy)
 	for _, module_name in ipairs({
 		"gestures.ui.menu.gestures", "shortcuts.ui.menu.shortcuts", "layouts.ui.menu.keyboard_layout",
 		"hotstrings.ui.menu.hotstrings", "metrics.ui.menu.metrics", "tap_hold.ui.menu_tap_holds",
-		"apps.ui.menu.apps", "ui.menu.menu_about",
+		"apps.ui.menu.apps", "updater.ui.menu_about",
 	}) do
 		package.loaded[module_name] = {}
 	end

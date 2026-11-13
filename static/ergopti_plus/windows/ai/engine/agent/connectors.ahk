@@ -18,7 +18,7 @@
 ;    (created when missing). One runs with the action's input as its only
 ;    argument, quoted for the Windows command line, never through a shell
 ;    string built from the input.
-; 4. Every COM, file and process call goes through windows/adapters, behind a
+; 4. Every COM, file and process call goes through windows/updater/adapters, behind a
 ;    seam the test suite replaces. The OS retains a private temporary calendar
 ;    file: opening a handler gives no receipt that it has read the file.
 ; ==============================================================================

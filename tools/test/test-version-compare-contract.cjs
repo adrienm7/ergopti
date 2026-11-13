@@ -6,8 +6,8 @@
  * DESCRIPTION:
  * The semver comparison algorithm is hand-ported into three runtimes — JS
  * (_shared/updater/data/version.js compareVersions), AHK
- * (windows/modules/updater/core.ahk _Updater_CompareVersions) and macOS
- * (macos/modules/updater/init.lua compare_versions). version.js's header has always
+ * (windows/updater/engine/core.ahk _Updater_CompareVersions) and macOS
+ * (macos/updater/engine/init.lua compare_versions). version.js's header has always
  * mandated they agree, but nothing enforced it and the non-semver fallback had
  * already drifted (AHK/JS lexicographic vs macOS fail-closed) — D-1.
  *

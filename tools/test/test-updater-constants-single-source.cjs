@@ -5,7 +5,7 @@
  * MODULE: Updater Constants Single-Source Gate
  * DESCRIPTION:
  * Drift gate: verifies that the owner/repo/timing literals in
- * windows/modules/updater/core.ahk and macos/modules/updater/init.lua agree with the
+ * windows/updater/engine/core.ahk and macos/updater/engine/init.lua agree with the
  * canonical values in _shared/updater/data/defaults.json. A mismatch here
  * means someone edited a per-driver literal without updating the shared JSON
  * (or vice versa).
@@ -39,8 +39,8 @@ const AHK_CORE = path.join(
 	'static',
 	'ergopti_plus',
 	'windows',
-	'modules',
 	'updater',
+	'engine',
 	'core.ahk'
 );
 const LUA_UPDATER = path.join(
@@ -48,8 +48,8 @@ const LUA_UPDATER = path.join(
 	'static',
 	'ergopti_plus',
 	'macos',
-	'modules',
 	'updater',
+	'engine',
 	'init.lua'
 );
 const LINUX_UPDATER = path.join(
@@ -57,8 +57,8 @@ const LINUX_UPDATER = path.join(
 	'static',
 	'ergopti_plus',
 	'linux',
-	'modules',
 	'updater',
+	'engine',
 	'manager.lua'
 );
 
@@ -172,8 +172,8 @@ const AHK_SELF_UPDATE = path.join(
 	'static',
 	'ergopti_plus',
 	'windows',
-	'modules',
 	'updater',
+	'engine',
 	'self_update.ahk'
 );
 const selfUpdateSrc = fs.readFileSync(AHK_SELF_UPDATE, 'utf8');
@@ -196,7 +196,7 @@ if (!startBody) {
 // defaults said the presets "stay driver-specific".
 const presetLiteral = /(?:Code:\s*"|code\s*=\s*")(?:1m|5m|10m|1h|24h|1d|7d|never)"/;
 for (const [label, source] of [
-	['windows/modules/updater/core.ahk', ahkSrc],
+	['windows/updater/engine/core.ahk', ahkSrc],
 	[
 		'windows/menu/ui/builder/menu_init.ahk',
 		fs.readFileSync(
@@ -213,7 +213,7 @@ for (const [label, source] of [
 			'utf8'
 		)
 	],
-	['linux/modules/updater/manager.lua', fs.readFileSync(LINUX_UPDATER, 'utf8')]
+	['linux/updater/engine/manager.lua', fs.readFileSync(LINUX_UPDATER, 'utf8')]
 ]) {
 	if (presetLiteral.test(source)) {
 		fail(
@@ -343,7 +343,7 @@ const macFallback = luaSrc.match(
 	/DEFAULT_GITHUB\s*=\s*\{\s*owner\s*=\s*"([^"]+)",\s*repo\s*=\s*"([^"]+)"\s*\}/
 );
 if (!macFallback) {
-	fail('macos/modules/updater/init.lua: could not find DEFAULT_GITHUB');
+	fail('macos/updater/engine/init.lua: could not find DEFAULT_GITHUB');
 } else {
 	if (macFallback[1] === owner) pass('macOS repository fallback owner matches defaults.json');
 	else fail(`macOS repository fallback owner=${macFallback[1]} does not match defaults.json`);
@@ -358,8 +358,8 @@ const MAC_AUTO_CHECK = path.join(
 	'static',
 	'ergopti_plus',
 	'macos',
-	'modules',
 	'updater',
+	'engine',
 	'auto_check.lua'
 );
 if (/start_background_checks|default_check_interval_sec|boot_check_delay_sec/.test(luaSrc)) {
@@ -368,7 +368,7 @@ if (/start_background_checks|default_check_interval_sec|boot_check_delay_sec/.te
 	);
 } else if (!fs.existsSync(MAC_AUTO_CHECK)) {
 	fail(
-		'macos/modules/updater/auto_check.lua is missing: nothing owns the macOS update-check cadence'
+		'macos/updater/engine/auto_check.lua is missing: nothing owns the macOS update-check cadence'
 	);
 } else {
 	const autoSrc = fs.readFileSync(MAC_AUTO_CHECK, 'utf8');
@@ -386,7 +386,7 @@ if (/start_background_checks|default_check_interval_sec|boot_check_delay_sec/.te
 }
 
 // Linux still owns its updater and therefore retains the complete fallback.
-const LUA_DRIVERS = [{ label: 'linux/modules/updater/manager.lua', file: LINUX_UPDATER }];
+const LUA_DRIVERS = [{ label: 'linux/updater/engine/manager.lua', file: LINUX_UPDATER }];
 
 for (const drv of LUA_DRIVERS) {
 	if (!fs.existsSync(drv.file)) {
@@ -544,7 +544,7 @@ if (fs.existsSync(deadToml)) {
 // manager was never read (NET-004).
 if (/\bDOWNLOAD_TIMEOUT_MS\b/.test(fs.readFileSync(LINUX_UPDATER, 'utf8'))) {
 	fail(
-		'linux/modules/updater/manager.lua keeps a DOWNLOAD_TIMEOUT_MS copy of the archive transfer budget'
+		'linux/updater/engine/manager.lua keeps a DOWNLOAD_TIMEOUT_MS copy of the archive transfer budget'
 	);
 } else {
 	pass('the Linux manager keeps no typed archive transfer budget');
@@ -563,11 +563,11 @@ if (/\bDOWNLOAD_TIMEOUT_MS\b/.test(fs.readFileSync(LINUX_UPDATER, 'utf8'))) {
 		pass('the release archive bounds are declared once in the shared defaults');
 	}
 	const macInstaller = fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/macos/modules/updater/release_installer.lua'),
+		path.join(ROOT, 'static/ergopti_plus/macos/updater/engine/release_installer.lua'),
 		'utf8'
 	);
 	const macStage = fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/macos/adapters/release_stage.sh'),
+		path.join(ROOT, 'static/ergopti_plus/macos/updater/adapters/release_stage.sh'),
 		'utf8'
 	);
 	if (

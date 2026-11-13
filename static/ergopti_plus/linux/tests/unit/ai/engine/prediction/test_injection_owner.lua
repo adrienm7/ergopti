@@ -185,7 +185,7 @@ local function scenario(action, phase, body)
 end
 
 helpers.describe("AI continuation retains its injection authority", function()
-	for _, route in ipairs({ "native", "clipboard", "layouts", "shortcuts" }) do
+	for _, route in ipairs({ "native", "clipboard", "layouts", "shortcuts", "updater" }) do
 		helpers.it("keeps the accepted " .. route .. " prediction out of real trace logs", function()
 			scenario("stable", route, function(accepted, state)
 				helpers.assert_true(accepted and state.completed)
@@ -195,7 +195,7 @@ helpers.describe("AI continuation retains its injection authority", function()
 			end)
 		end)
 	end
-	for _, route in ipairs({ "native", "clipboard", "layouts", "shortcuts" }) do
+	for _, route in ipairs({ "native", "clipboard", "layouts", "shortcuts", "updater" }) do
 		helpers.it("refuses a dry-run " .. route .. " prediction before output", function()
 			scenario("dry-run", route, function(accepted, state)
 				helpers.assert_eq(accepted, false)

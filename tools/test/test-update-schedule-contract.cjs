@@ -54,20 +54,20 @@ const MIN_VECTORS = { due: 15, jitter: 8, snap: 10, sanitize: 6, record: 4, dela
 const PORTS = [
 	{
 		port: '_shared/updater/engine/schedule.lua',
-		test: 'macos/tests/unit/modules/updater/test_update_schedule_vectors.lua',
+		test: 'macos/tests/unit/updater/engine/test_update_schedule_vectors.lua',
 		wiring: null
 	},
 	{
 		port: '_shared/updater/engine/schedule.lua',
-		test: 'linux/tests/unit/modules/updater/vectors/test_update_schedule_vectors.lua',
+		test: 'linux/tests/unit/updater/engine/vectors/test_update_schedule_vectors.lua',
 		wiring: {
 			file: 'linux/tests/test_manifest.lua',
 			needle: '"tests.unit.modules.updater.vectors.test_update_schedule_vectors"'
 		}
 	},
 	{
-		port: 'windows/modules/updater/schedule.ahk',
-		test: 'windows/tests/unit/modules/updater/test_updater_schedule_vectors.ahk',
+		port: 'windows/updater/engine/schedule.ahk',
+		test: 'windows/tests/unit/updater/engine/test_schedule_vectors.ahk',
 		wiring: {
 			file: 'windows/tests/run_all.ahk',
 			needle: '#Include unit/modules/updater/test_updater_schedule_vectors.ahk'

@@ -36,7 +36,7 @@ local OWNED = {
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
 	"core.ui.engine.dialog_util", "core.ui.engine.notifications", "core.timing.engine.deferred_work",
 	"core.process.adapters.shell_runner", "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
-	"ui.download_window", "ai.engine.bootstrap.pty_process_group", "ai.engine.ollama.binary",
+	"updater.ui.download_window", "ai.engine.bootstrap.pty_process_group", "ai.engine.ollama.binary",
 	"ai.engine.ollama.deps_checker", "ai.engine.api.backend_detector",
 	"ai.engine.local_servers.mlx_bootstrap_diagnosis", "ai.engine.local_servers.mlx_deps_checker",
 	"ai.ui.menu.runtime_install_offer", "ai.ui.menu.models.mlx_repair_offer",
@@ -210,7 +210,7 @@ local function load_world(world)
 	local network_path = assert(package.searchpath("ai.engine.api.network_env", package.path))
 	network_path = network_path:gsub("\\", "/")
 	package.loaded["ai.engine.api.network_env"] = assert(loadfile(network_path))()
-	package.loaded["ui.download_window"] = {
+	package.loaded["updater.ui.download_window"] = {
 		is_active = function() return world.window_sessions > 0 end,
 		session_id = function() return world.window_sessions end,
 		show = function() world.window_sessions = world.window_sessions + 1; return true end,

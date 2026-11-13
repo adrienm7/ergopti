@@ -5,14 +5,14 @@
  * MODULE: Source-Tree Scan Coverage Gate
  * DESCRIPTION:
  * Twenty meta-tests and tools enumerate a driver's source by a HARDCODED list of
- * top-level folders — `{ "adapters", "infra", "modules", "ui", "core", "platform", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold" }` and its
+ * top-level folders — `{ "adapters", "infra", "modules", "ui", "core", "platform", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold", "updater" }` and its
  * variants. Adding a new top-level tree makes every one of them quietly stop
  * covering it.
  *
  * This is not hypothetical. Extracting platform/ on 2026-08-02 moved 19 Windows
  * files out of modules/ and infra/, and the AHK suite went from 3626 tests to
  * 3607 with ZERO failures: test_ahk_brace_balance registers one case per file
- * under ["infra", "modules", "ui", "core", "platform", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold"], so nineteen cases simply stopped existing.
+ * under ["infra", "modules", "ui", "core", "platform", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold", "updater"], so nineteen cases simply stopped existing.
  * Nothing reported it. The suite's own floor ("at least one file checked") could
  * not fire, because the other three trees still had files.
  *
@@ -67,7 +67,8 @@ const CANONICAL_TREES = [
 	'metrics',
 	'onboarding',
 	'shortcuts',
-	'tap_hold'
+	'tap_hold',
+	'updater'
 ];
 
 // Folders that legitimately sit beside the canonical trees. `apps`, `launcher`,
@@ -149,7 +150,8 @@ const REQUIRES_PLATFORM = [
 	'metrics',
 	'onboarding',
 	'shortcuts',
-	'tap_hold'
+	'tap_hold',
+	'updater'
 ];
 
 const incomplete = [];

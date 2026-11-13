@@ -21,7 +21,7 @@ fh:close()
 helpers.describe("layout registry installed channel", function()
 	for _, case in ipairs({ { "1.2.3", "main", false }, { "0.0.0-dev.131", "dev", false }, { "local", "dev", true } }) do
 		helpers.it("routes " .. case[1] .. " through its installed owner", function()
-			local owner = "modules.updater.manager"
+			local owner = "updater.engine.manager"
 			local original = package.loaded[owner]
 			local ok, failure = xpcall(function()
 				package.loaded[owner] = { installed_channel = function()

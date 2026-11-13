@@ -44,7 +44,7 @@ local function load_fixture()
 	})
 	transport.owned_http = {}
 	require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"], transport.owned_http)
-	replace("ui.download_window.bridge", {
+	replace("updater.ui.download_window.bridge", {
 		-- The real window refuses a session without a known kind; a model pull
 		-- must name its own
 		show = function(opts)
@@ -244,7 +244,7 @@ helpers.describe("Ollama model download: post-window consent admission", functio
 	helpers.it("rechecks the requesting owner after progress UI before actual HTTP dispatch", function()
 		local Download, transport, window = load_fixture()
 		local current = true
-		local Window = package.loaded["ui.download_window.bridge"]
+		local Window = package.loaded["updater.ui.download_window.bridge"]
 		local original_show = Window.show
 		Window.show = function(opts)
 			local session = original_show(opts)

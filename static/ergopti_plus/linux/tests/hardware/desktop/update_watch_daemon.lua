@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- One daemon generation for run_update_restart_watcher.sh. It does what the
 --- real daemon does around an update, with the real modules: it reports ready
---- through infra/updater_boot_ready.lua, records "<tree> <pid>" in the runs
---- file, and on SIGUSR1 asks modules/updater/restarter.lua to start the
+--- through updater/engine/boot_ready.lua, records "<tree> <pid>" in the runs
+--- file, and on SIGUSR1 asks updater/engine/restarter.lua to start the
 --- installed release under the update watcher, as restart_on_installed_release
 --- in ergopti_hotstrings.lua does; in relay mode it then exits, as the daemon's
 --- shutdown does, and under the unit systemd stops it.
@@ -14,7 +14,7 @@
 --- Behaviour "quit" plays the user who quits the UPDATED daemon during the
 --- watcher's wait, before its ready report: the click reaches the real
 --- core/lifecycle/engine/shutdown/quit_request.lua handler with the ports ergopti_hotstrings.lua gives
---- it (report_update_quit through infra/updater_boot_ready.lua), the admitted
+--- it (report_update_quit through updater/engine/boot_ready.lua), the admitted
 --- Quit requests the shutdown and the process exits without reporting ready.
 --- Arguments: tree name, installation root, runs file, watch log, behaviour
 --- ("daemon" or "quit").
@@ -22,8 +22,8 @@
 
 require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
-local Restarter = require("modules.updater.restarter")
-local BootReady = require("infra.updater_boot_ready")
+local Restarter = require("updater.engine.restarter")
+local BootReady = require("updater.engine.boot_ready")
 
 local tree, root, runs, log, behaviour = assert(arg[1]), assert(arg[2]), assert(arg[3]), assert(arg[4]), assert(arg[5])
 -- Time between the start and the user's click: the tray is up, the boot is not.

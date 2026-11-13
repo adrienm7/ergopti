@@ -14,7 +14,7 @@
 ; "pause = tout éteint" invariant.
 ;
 ; SCOPE: source introspection of ai/ui/model_browser/init.ahk and
-; ui/changelog/init.ahk.
+; updater/ui/changelog/init.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -68,7 +68,7 @@ Test("model browser: _LLM_MBW_OnWebMessage guards A_IsSuspended before select_mo
 
 _WBSG_CheckChangelogGuard() {
 	Body := _DriverFuncBody("_CLW_OnWebMessage")
-	Assert(Body != "", "_CLW_OnWebMessage must exist in ui/changelog/init.ahk")
+	Assert(Body != "", "_CLW_OnWebMessage must exist in updater/ui/changelog/init.ahk")
 
 	CapturePos := InStr(Body, "_Updater_ReadManualBridgeMessage(")
 	ReadPos := CapturePos > 0 ? InStr(Body, "TryGetWebMessageAsString()", , CapturePos) : 0

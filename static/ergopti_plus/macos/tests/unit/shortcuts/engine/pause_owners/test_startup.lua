@@ -499,7 +499,7 @@ helpers.describe("HS-012 real reattached MLX work fence", function()
 			end,
 		}
 		local window_session = 0
-		package.loaded["ui.download_window"] = {
+		package.loaded["updater.ui.download_window"] = {
 			session_id = function() return window_session end,
 			is_active = function() return window_session > 0 end,
 			show = function()

@@ -21,7 +21,7 @@ const { execFileSync } = require('node:child_process');
 
 const DRIVER = 'tools/build/build-linux-driver.sh';
 const BUILDER = 'tools/build/build-linux-native-output.sh';
-const NATIVE_SOURCE = 'static/ergopti_plus/linux/native/archive_output/';
+const NATIVE_SOURCE = 'static/ergopti_plus/linux/updater/native/';
 const OUTPUT = 'linux/install/libergopti_archive_publication.so';
 const INPUTS = [
 	DRIVER,
@@ -83,7 +83,7 @@ function classifyGeneratedNativeArtifacts(sources) {
 		refused();
 	for (const fragment of [
 		'set -euo pipefail',
-		'SOURCE_DIR="${REPO_ROOT}/static/ergopti_plus/linux/native/archive_output"',
+		'SOURCE_DIR="${REPO_ROOT}/static/ergopti_plus/linux/updater/native"',
 		DEFAULT_OUTPUT,
 		'for source_name in archive_publication.c archive_publication.h; do',
 		'[[ -f "${SOURCE_DIR}/${source_name}" && ! -L "${SOURCE_DIR}/${source_name}" ]]',

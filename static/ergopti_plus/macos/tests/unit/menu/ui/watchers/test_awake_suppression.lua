@@ -26,7 +26,7 @@ local OWNED_MODULES = {
 	"core.process.adapters.task_environment",
 	"core.events.timer_scheduler",
 	"tray.adapters.menu",
-	"adapters.update_launcher",
+	"updater.adapters.update_launcher",
 	"core.fs.engine.app_dirs",
 	"keyboard.engine.caps_word_auto_off",
 	"core.lifecycle.engine.compat.utf8",
@@ -79,8 +79,8 @@ local OWNED_MODULES = {
 	"metrics.engine.privacy.text_cipher",
 	"ai.engine",
 	"shortcuts.engine",
-	"modules.updater",
-	"modules.updater.channel",
+	"updater.engine",
+	"updater.engine.channel",
 	"core.fs.engine.native_path",
 	"core.text.engine.number_policy",
 	"core.lifecycle.engine.reload.gate",
@@ -109,7 +109,7 @@ local OWNED_MODULES = {
 	"hotstrings.ui.menu.counter",
 	"ui.menu.init",
 	"menu.ui.keyboard.keymap_lifecycle",
-	"ui.menu.menu_about",
+	"updater.ui.menu_about",
 	"apps.ui.menu.apps",
 	"gestures.ui.menu.gestures",
 	"hotstrings.ui.menu.hotstrings",
@@ -164,7 +164,7 @@ local function with_menu(body)
 					initial_state.menubar_icon = "v1"
 					local host = hs
 					-- The existing boot fixture models this source-run update boundary.
-					package.loaded["modules.updater"].is_local_source = function() return true end
+					package.loaded["updater.engine"].is_local_source = function() return true end
 					host.timer = {
 						absoluteTime = function() return world.awake * 1e9 end,
 						secondsSinceEpoch = function() return world.civil end,

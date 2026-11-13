@@ -134,7 +134,7 @@ package.loaded["menu.ui.builder.watchers"] = {
 		return { stop = function() end }
 	end,
 }
-package.loaded["modules.updater"] = {
+package.loaded["updater.engine"] = {
 	get_check_interval = function() return 3600 end,
 	start_background_checks = function() end,
 }
@@ -150,7 +150,7 @@ for _, module_name in ipairs({
 	"hotstrings.ui.menu.hotstrings",
 	"metrics.ui.menu.metrics",
 	"tap_hold.ui.menu_tap_holds",
-	"ui.menu.menu_about",
+	"updater.ui.menu_about",
 }) do
 	package.loaded[module_name] = {}
 end

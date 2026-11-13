@@ -103,7 +103,7 @@ helpers.describe("mlx_deps_checker: refused native launch settles immediately", 
 		package.loaded["core.fs.engine.paths"] = {
 			find_from_configdir = function() return nil end,
 		}
-		package.loaded["ui.download_window"] = {
+		package.loaded["updater.ui.download_window"] = {
 			show = function() end, hide = function() end, set_step = function() end,
 			set_progress = function() end, set_error = function() end,
 			set_detail = function() end, append_log = function() end,
@@ -146,7 +146,7 @@ end)
 
 helpers.describe("mlx_deps_checker public API", function()
 	local original_logger = package.loaded["core.logger.engine.logger"]
-	local original_window = package.loaded["ui.download_window"]
+	local original_window = package.loaded["updater.ui.download_window"]
 	local original_paths = package.loaded["core.fs.engine.paths"]
 	local original_checker = package.loaded["ai.engine.local_servers.mlx_deps_checker"]
 
@@ -171,7 +171,7 @@ helpers.describe("mlx_deps_checker public API", function()
 		done = function() calls.done = calls.done + 1 end,
 	}
 
-	package.loaded["ui.download_window"] = {
+	package.loaded["updater.ui.download_window"] = {
 		show = function() end,
 		hide = function() end,
 		set_step = function() end,
@@ -218,7 +218,7 @@ helpers.describe("mlx_deps_checker public API", function()
 	end)
 
 	package.loaded["core.logger.engine.logger"] = original_logger
-	package.loaded["ui.download_window"] = original_window
+	package.loaded["updater.ui.download_window"] = original_window
 	package.loaded["core.fs.engine.paths"] = original_paths
 	package.loaded["ai.engine.local_servers.mlx_deps_checker"] = original_checker
 end)
@@ -263,7 +263,7 @@ helpers.describe("mlx_deps_checker: reset_bootstrap_state escapes the failed dea
 		package.loaded["core.fs.engine.paths"] = {
 			find_from_configdir = function() return nil end,
 		}
-		package.loaded["ui.download_window"] = {
+		package.loaded["updater.ui.download_window"] = {
 			show = function() end, hide = function() end, set_step = function() end,
 			set_progress = function() end, set_error = function() end, set_detail = function() end,
 			append_log = function() end, is_active = function() return false end,

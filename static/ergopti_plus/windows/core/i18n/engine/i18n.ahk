@@ -7,7 +7,7 @@
 ; selection + persistence (with a debounced reload) and the language-picker menu.
 ; The string-LOADING + access layer (the self-healing locale cache and the
 ; ``t(key)`` accessor) lives in the sibling ``core/i18n/engine/locale.ahk`` — mirror of the
-; ``macos/infra/{i18n,locale}.lua`` split. This file owns "which locale and how to
+; ``macos/updater/engine/{i18n,locale}.lua`` split. This file owns "which locale and how to
 ; switch it"; locale.ahk owns "load the strings and return one".
 ;
 ; FEATURES & RATIONALE:

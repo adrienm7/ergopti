@@ -267,7 +267,7 @@ function checkSharedBudgets() {
 	);
 	// AHK cannot read JSON at include time; its literals are pinned here.
 	const ahkChangelog = fs.readFileSync(
-		path.join(PLUS, 'windows', 'ui', 'changelog', 'init.ahk'),
+		path.join(PLUS, 'windows', 'updater', 'ui', 'changelog', 'init.ahk'),
 		'utf8'
 	);
 	const ahkHttp = fs.readFileSync(

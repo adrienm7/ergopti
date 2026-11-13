@@ -35,7 +35,7 @@ local owned_paths = {}
 for key, value in pairs(Paths) do owned_paths[key] = value end
 owned_paths.home = function() return root end
 package.loaded["settings.engine.paths"] = owned_paths
-local Manager = require("modules.updater.manager")
+local Manager = require("updater.engine.manager")
 local original_url = Manager.release_api_url()
 local count = assert(original_url:match("per_page=(%d+)"))
 Manager.release_api_url = function() return assert(os.getenv("ERGOPTI_NATIVE_UPDATER_URL")) .. "?per_page=" .. count end

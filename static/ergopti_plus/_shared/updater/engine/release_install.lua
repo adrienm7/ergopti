@@ -9,7 +9,7 @@
 --- install it through the driver's update path and restart. Each phase is
 --- reported to the page; a refusal or a failure ends the sequence visibly and
 --- keeps the backup. The macOS and Linux Versions hosts run it with their own
---- ports; Windows mirrors the same order in windows/modules/updater/release_install.ahk.
+--- ports; Windows mirrors the same order in windows/updater/engine/release_install.ahk.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Only a click starts it: install() is the bridge handler's, and nothing in

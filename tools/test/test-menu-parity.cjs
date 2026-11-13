@@ -1030,7 +1030,7 @@ const OPENS_SUBMENU = {
 			kind: 'compose',
 			native_sources: {
 				ahk: 'windows/menu/ui/builder/menu_init.ahk',
-				hs: 'macos/ui/menu/menu_about.lua',
+				hs: 'macos/updater/ui/menu_about.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		}

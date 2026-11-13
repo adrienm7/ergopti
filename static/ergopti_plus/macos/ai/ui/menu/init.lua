@@ -2046,7 +2046,7 @@ local function create_menu(deps)
 						deps.active_tasks["install"]
 				)
 				if not is_active then return nil end
-				local _dw = package.loaded["ui.download_window"]
+				local _dw = package.loaded["updater.ui.download_window"]
 				local renderer = rawget(package.loaded, "menu.engine.manifest_menu")
 				if type(renderer) ~= "table" or getmetatable(renderer) ~= nil then return nil end
 				local template_owner, render_owner = rawget(renderer, "template_rows"), rawget(renderer, "render_rows")

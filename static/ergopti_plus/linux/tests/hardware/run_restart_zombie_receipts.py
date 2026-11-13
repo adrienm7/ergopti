@@ -17,7 +17,7 @@ import time
 
 
 WORKER = r"""
-local R = require("modules.updater.restarter")
+local R = require("updater.engine.restarter")
 -- The relay holds only the process it was started for: the production reader
 -- captures the target's kernel start tick, as the restart does before dispatch.
 local target = tonumber(os.getenv("ERGOPTI_RELAY_TARGET"))

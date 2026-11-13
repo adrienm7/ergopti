@@ -199,7 +199,7 @@ const luaLauncherId = /^M.LAUNCHER_BUNDLE_ID = Identifiers\.bundle_ids\.launcher
 	? identifiers.bundle_ids.launcher
 	: undefined;
 const updaterEmbeddedId = /^local BUNDLED_ID = Identifiers\.bundle_ids\.hammerspoon$/m.test(
-	read('static/ergopti_plus/macos/modules/updater/init.lua')
+	read('static/ergopti_plus/macos/updater/engine/init.lua')
 )
 	? identifiers.bundle_ids.hammerspoon
 	: undefined;
@@ -208,7 +208,7 @@ if (updaterEmbeddedId !== embeddedId) {
 }
 const rootBoot = read('static/ergopti_plus/macos/init.lua');
 if (
-	!rootBoot.includes('require("modules.updater").is_local_source()') ||
+	!rootBoot.includes('require("updater.engine").is_local_source()') ||
 	!rootBoot.includes('InstanceAdmission.decide(admission_mode, packaged_runtime)')
 ) {
 	errors.push(

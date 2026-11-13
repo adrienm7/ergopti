@@ -72,7 +72,7 @@ exists — a grep-shaped test stayed green over the live bug.
 ## The `hs.` purity ratchet counts comments — a docstring can fail CI
 
 `tests/meta/architecture/test_port_adapter_coverage.lua` counts every **line** matching
-`%f[%w]hs%.` (and `io.open` / `os.execute`) across `macos/modules/` and
+`%f[%w]hs%.` (and `io.open` / `os.execute`) across `macos/updater/engine/` and
 `macos/lib/` only — `adapters/`, `ui/` and root `init.lua` are outside the scan —
 and fails if the total rises above a baseline. It is a raw line scan with **no
 comment stripping** (`:337-358`), so a docstring that names `hs.timer.new`

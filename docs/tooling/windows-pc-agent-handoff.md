@@ -169,7 +169,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
     trigger dispatches nothing) and `:1119` (local-prediction-custody: no
     original transport input published); `test_llm_agent_connectors.ahk:244`
     (Item has no value).
-  - meta: the OS-call purity ratchet for `windows/ui` is at 126 against a
+  - meta: the OS-call purity ratchet for `windows/updater/ui` is at 126 against a
     baseline of 125 (`test_ahk_os_purity_ratchet.ahk:131`);
     `test_discarded_config_is_reported.ahk:122` wants `MenuRenderer_Build` to
     report a dropped `dynamic` manifest item.

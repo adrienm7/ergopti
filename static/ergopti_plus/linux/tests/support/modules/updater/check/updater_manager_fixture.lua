@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local Fakes = helpers.load_module("tests.fakes")
 
-local Installer = helpers.load_module("modules.updater.installer")
+local Installer = helpers.load_module("updater.engine.installer")
 
 local Fs = helpers.load_module("core.fs.adapters.file_system")
 
@@ -36,16 +36,16 @@ local function with_config(initial, body)
 		handle:write(initial)
 		handle:close()
 	end
-	local previous = package.loaded["modules.updater.manager"]
-	package.loaded["modules.updater.manager"] = nil
-	local fresh = require("modules.updater.manager")
+	local previous = package.loaded["updater.engine.manager"]
+	package.loaded["updater.engine.manager"] = nil
+	local fresh = require("updater.engine.manager")
 	local ok, err = pcall(function()
 		fresh.init({ config_path = path })
 		fresh.stop_background_checks()
 		body(fresh, path)
 	end)
 	fresh.stop_background_checks()
-	package.loaded["modules.updater.manager"] = previous
+	package.loaded["updater.engine.manager"] = previous
 	pcall(os.remove, path)
 	if not ok then error(err, 0) end
 end

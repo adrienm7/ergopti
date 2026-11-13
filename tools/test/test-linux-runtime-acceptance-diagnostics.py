@@ -228,8 +228,8 @@ class MainDiagnosticTests(unittest.TestCase):
                 )
             for native_source in (
                 "tools/build/build-linux-native-output.sh",
-                "static/ergopti_plus/linux/native/archive_output/archive_publication.c",
-                "static/ergopti_plus/linux/native/archive_output/archive_publication.h",
+                "static/ergopti_plus/linux/updater/native/archive_publication.c",
+                "static/ergopti_plus/linux/updater/native/archive_publication.h",
             ):
                 destination = repository / native_source
                 destination.parent.mkdir(parents=True, exist_ok=True)

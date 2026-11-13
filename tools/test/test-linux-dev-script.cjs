@@ -56,7 +56,7 @@ function fixture(name) {
 	}
 	fs.writeFileSync(path.join(clone, DRIVER, 'ergopti_hotstrings.lua'), '-- driver\n');
 	for (const source of ['archive_publication.c', 'archive_publication.h']) {
-		fs.writeFileSync(path.join(clone, DRIVER, 'native/archive_output', source), '/* c */\n');
+		fs.writeFileSync(path.join(clone, DRIVER, 'updater/native', source), '/* c */\n');
 	}
 	fs.writeFileSync(
 		path.join(clone, DRIVER, 'install/launch.sh'),
@@ -129,7 +129,7 @@ try {
 		assert.doesNotMatch(calls(paths), /^native /m, 'an up-to-date backend is not rebuilt');
 		const newest = new Date(Date.now() + 120000);
 		fs.utimesSync(
-			path.join(paths.clone, DRIVER, 'native/archive_output/archive_publication.c'),
+			path.join(paths.clone, DRIVER, 'updater/native/archive_publication.c'),
 			newest,
 			newest
 		);

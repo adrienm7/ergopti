@@ -100,7 +100,7 @@ check(Profiles.set_model(MODEL) == true, "the model can be selected")
 
 print("=== 2/ a download through the model browser's path ===")
 local window = { updates = 0 }
-package.loaded["ui.download_window.bridge"] = {
+package.loaded["updater.ui.download_window.bridge"] = {
 	show = function() return 1 end,
 	update = function() window.updates = window.updates + 1; return true end,
 	complete = function(_, succeeded) window.completed = succeeded; return true end,

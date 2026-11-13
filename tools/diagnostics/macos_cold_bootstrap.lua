@@ -41,7 +41,7 @@ guarded(function()
 	-- Presentation alone is replaced; tasks, files, hashes, timers, environment,
 	-- runtime resolution and process ownership remain genuine production ports.
 	local session, visible = 0, false
-	package.loaded["ui.download_window"] = {
+	package.loaded["updater.ui.download_window"] = {
 		show = function() session = session + 1; visible = true; return true end,
 		hide = function() visible = false; return true end,
 		is_active = function() return visible end,

@@ -25,8 +25,8 @@ end
 --- Runs body against a fresh reporter and a scratch token folder.
 --- @param body function Receives the reporter, the folder and a deps builder.
 local function with_reporter(body)
-	package.loaded["infra.updater_boot_ready"] = nil
-	local Ready = require("infra.updater_boot_ready")
+	package.loaded["updater.engine.boot_ready"] = nil
+	local Ready = require("updater.engine.boot_ready")
 	local base = (os.getenv("TMPDIR") or "/tmp"):gsub("/+$", "")
 	local dir = base .. "/ergopti-boot-ready." .. tostring(os.time()) .. tostring(math.random(1e6))
 	assert(os.execute("mkdir -p " .. quote(dir)))
@@ -38,7 +38,7 @@ local function with_reporter(body)
 	end
 	local ok, err = xpcall(body, debug.traceback, Ready, dir, deps, env)
 	os.execute("rm -rf " .. quote(dir))
-	package.loaded["infra.updater_boot_ready"] = nil
+	package.loaded["updater.engine.boot_ready"] = nil
 	if not ok then error(err, 0) end
 end
 
@@ -103,7 +103,7 @@ helpers.describe("updater boot ready (linux-update-successor-ready)", function()
 		local source = assert(helpers.read_module_source("ergopti_hotstrings"))
 		local complete_at = source:find("local boot_ms = BootProfiler.complete()", 1, true)
 		helpers.assert_true(complete_at ~= nil)
-		helpers.assert_true(source:find('require("infra.updater_boot_ready").report("daemon ready")', complete_at, true) ~= nil,
+		helpers.assert_true(source:find('require("updater.engine.boot_ready").report("daemon ready")', complete_at, true) ~= nil,
 			"the daemon reports ready after its boot completes")
 		helpers.assert_true(source:find("successor = root and { root = root } or nil", 1, true) ~= nil,
 			"the restart on an installed release names the installation it watches")
@@ -116,7 +116,7 @@ helpers.describe("updater boot ready (linux-update-successor-ready)", function()
 		local source = assert(file:read("*a")); assert(file:close())
 		local handler = source:match("local function on_term%(sig%)(.-)\n\tend")
 		helpers.assert_true(handler ~= nil, "the TERM handler is found")
-		local reported = handler:find('require("infra.updater_boot_ready").report_quit', 1, true)
+		local reported = handler:find('require("updater.engine.boot_ready").report_quit', 1, true)
 		local requested = handler:find('shutdown.request("signal "', 1, true)
 		helpers.assert_true(reported ~= nil and requested ~= nil and reported < requested,
 			"a logout or service stop during the probation must not roll the update back")

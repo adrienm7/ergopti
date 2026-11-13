@@ -10,7 +10,7 @@
 --- FEATURES & RATIONALE:
 --- 1. It lives in infra/ because infra/ depends on it. personal_hotstrings.lua
 ---    and personal_shortcuts.lua both resolve their file through get(key), and
----    while this code sat in ui/menu/ that made the infrastructure layer import
+---    while this code sat in updater/ui/ that made the infrastructure layer import
 ---    the menu — a dependency pointing exactly the wrong way, and one that made
 ---    the resolver unreachable from anything that must not draw a UI.
 --- 2. ONE writer of paths.toml. Two lived here before, in two files: the

@@ -12,7 +12,7 @@ local ENOENT, EACCES = 2, 13 -- Canonical Linux missing-source and permission re
 -- Real file output is independently exercised by the native causal receipt.
 local function with_fixture(body, cold)
 	local names = { "core.logger.engine.sink", "diagnostics.engine.reports.crash_reporter", "core.logger.engine.shim", "diagnostics.engine.reports.snapshot",
-		"infra.version", "core.fs.engine.paths", "core.fs.adapters.file_system", "core.fs.engine.regular_file_reader", "core.fs.engine.regular_file_writer" }
+		"updater.engine.version", "core.fs.engine.paths", "core.fs.adapters.file_system", "core.fs.engine.regular_file_reader", "core.fs.engine.regular_file_writer" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local open, popen, execute, remove, stderr = io.open, io.popen, os.execute, os.remove, io.stderr
 	local state = { files = {}, notices = {}, stderr = {}, opened = 0, closed = 0, logger_opened = 0 }

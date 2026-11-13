@@ -158,7 +158,7 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		return value
 	}
 
-	/// The archive bounds modules/updater/release_installer.lua passes to the
+	/// The archive bounds updater/engine/release_installer.lua passes to the
 	/// staging script, read from their one declaration in the shared updater defaults.
 	private static func archiveBounds() throws -> (absoluteMs: Int, idleMs: Int) {
 		let defaults = repositoryURL.appendingPathComponent("static/ergopti_plus/_shared/updater/data/defaults.json")
@@ -191,7 +191,7 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		/bin/cp \(quote(payload.path)) "${16}"
 		""".write(to: copier, atomically: true, encoding: .utf8)
 		try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: copier.path)
-		let owner = Self.repositoryURL.appendingPathComponent("static/ergopti_plus/macos/adapters/release_stage.sh")
+		let owner = Self.repositoryURL.appendingPathComponent("static/ergopti_plus/macos/updater/adapters/release_stage.sh")
 		let original = try String(contentsOf: owner, encoding: .utf8)
 		XCTAssertEqual(original.components(separatedBy: "/usr/bin/curl").count, 2, "Only the owned network call is replaced")
 		let script = original.replacingOccurrences(of: "/usr/bin/curl", with: quote(copier.path))

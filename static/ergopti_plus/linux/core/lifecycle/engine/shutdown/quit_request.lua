@@ -24,7 +24,7 @@
 --- 5. No Rollback For A Quit: a daemon that an update watcher started has not
 ---    reported ready yet during the watcher's wait; an admitted Quit tells the
 ---    watcher first, so it keeps the update instead of restoring and starting
----    the previous daemon (infra/updater_boot_ready.lua).
+---    the previous daemon (updater/engine/boot_ready.lua).
 --- ==============================================================================
 
 local QuitAdmission = require("core.lifecycle.engine.shutdown.quit_admission")

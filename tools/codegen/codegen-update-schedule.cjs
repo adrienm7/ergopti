@@ -7,7 +7,7 @@
  * Emits the automatic update-check timing of _shared/updater/data/
  * defaults.json (presets, boot delay, jitter, failure backoff, re-evaluation
  * period and the key of the persisted check record) as the data the Windows
- * schedule port (windows/modules/updater/schedule.ahk) interprets, and the
+ * schedule port (windows/updater/engine/schedule.ahk) interprets, and the
  * archive_transfer download bounds the Windows release download applies.
  *
  * WHY THIS EXISTS:

@@ -24,7 +24,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Installer = require("modules.updater.installer")
+local Installer = require("updater.engine.installer")
 local Budget = require("updater.engine.install_budget")
 local Shell = require("core.process.adapters.shell_runner")
 
@@ -84,7 +84,7 @@ local function tree_digest(root)
 		.. " && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum") or "")
 end
 
-local context = Installer.resolve(INSTALL_ROOT .. "/linux/modules/updater/manager.lua")
+local context = Installer.resolve(INSTALL_ROOT .. "/linux/updater/engine/manager.lua")
 if not check(context.kind == "standalone", "the installed tree resolves as a standalone installation: "
 	.. tostring(context.kind) .. " " .. tostring(context.reason or context.install_root)) then
 	os.exit(1)
@@ -130,7 +130,7 @@ local archive = WORK .. "/candidate.tar.gz"
 assert(Shell.run("tar -C " .. quote(WORK .. "/payload") .. " -czf " .. quote(archive)
 	.. " linux _shared bin install.sh"), "candidate archive failed")
 
-local Ownership = require("modules.updater.ownership_receipt")
+local Ownership = require("updater.engine.ownership_receipt")
 local before_verify = now()
 check(Ownership.verify(INSTALL_ROOT, INSTALL_ROOT) ~= nil, "the installed tree verifies against its receipt")
 local verify_ms = now() - before_verify

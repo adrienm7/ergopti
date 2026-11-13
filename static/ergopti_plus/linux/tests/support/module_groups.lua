@@ -46,7 +46,7 @@ M.GROUPS = {
 		"tests/unit/ai/engine/prediction/test_engine_integration.lua",
 		"tests/unit/ai/test_local_server_detection_native.lua",
 		"tests/unit/ai/engine/runtime/test_owned_ollama_coexistence.lua",
-		"tests/unit/modules/updater/install/test_config_backup_files.lua",
+		"tests/unit/updater/engine/install/test_config_backup_files.lua",
 		"tests/unit/keyboard/tap_hold/test_integration.lua",
 	} },
 	{ name = "meta", prefixes = { "tests/meta/" } },

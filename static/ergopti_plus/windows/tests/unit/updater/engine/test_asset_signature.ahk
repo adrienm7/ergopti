@@ -1,0 +1,237 @@
+﻿; tests/unit/updater/engine/test_asset_signature.ahk
+
+; ==============================================================================
+; MODULE: Update Asset Signature Tests (Windows)
+; DESCRIPTION:
+; The Windows verifier (updater/engine/asset_signature.ahk, CNG ECDSA P-256)
+; replays the vectors shared with the reference tool and the Linux verifier:
+; 1. the valid record verifies, and each tampered record (size, name, digest) is
+;    refused with the same signature;
+; 2. a missing, malformed or truncated signature and an unusable key are closed
+;    refusals, never a pass or a raised error;
+; 3. the policy decides: off reports "not enforced", required refuses everything
+;    that does not verify, and a policy that requires a key without one is
+;    refused at admission.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+
+; ==========================
+; ==========================
+; ======= 1/ Helpers =======
+; ==========================
+; ==========================
+
+_TAS_Vectors() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\updater\asset_signature_vectors.json", "UTF-8"))
+}
+
+_TAS_Record(Vectors, Entry) {
+	return AssetSignature_Record(Vectors["record_header"], Entry["name"], Entry["size"], Entry["sha256"])
+}
+
+_TAS_Policy(Vectors, Enforcement := "required", Key := unset) {
+	return Map("schema_version", 1, "algorithm", "ecdsa-p256-sha256", "signature_bytes", 64,
+		"record_header", Vectors["record_header"], "signature_suffix", ".sig",
+		"public_key_spki_base64", IsSet(Key) ? Key : Vectors["public_key_spki_base64"],
+		"enforcement", Enforcement)
+}
+
+
+
+
+
+; ==============================
+; ==============================
+; ======= 2/ The vectors =======
+; ==============================
+; ==============================
+
+_TAS_ValidVerifies() {
+	V := _TAS_Vectors()
+	Record := _TAS_Record(V, V["valid"])
+	AssertEqual(V["record_header"] . "`n" . V["valid"]["name"] . "`n" . V["valid"]["size"] . "`n" . V["valid"]["sha256"] . "`n", Record)
+	Result := AssetSignature_Verify(V["public_key_spki_base64"], Record, V["valid"]["signature_base64"])
+	AssertTrue(Result["ok"], "the valid vector is refused: " . Result["reason"])
+}
+
+Test("AssetSignature: the shared valid vector verifies through CNG (asset-signature)", _TAS_ValidVerifies)
+
+
+_TAS_TamperedRefused() {
+	V := _TAS_Vectors()
+	Assert(V["tampered"].Length >= 3, "the shared tampered vectors are missing")
+	for Entry in V["tampered"] {
+		Result := AssetSignature_Verify(V["public_key_spki_base64"], _TAS_Record(V, Entry), V["valid"]["signature_base64"])
+		AssertFalse(Result["ok"], Entry["why"] . " must not verify")
+		AssertEqual("mismatch", Result["reason"], Entry["why"])
+	}
+}
+
+Test("AssetSignature: every tampered record is refused with the valid signature (asset-signature)", _TAS_TamperedRefused)
+
+
+_TAS_ClosedRefusals() {
+	V := _TAS_Vectors()
+	Record := _TAS_Record(V, V["valid"])
+	Signature := V["valid"]["signature_base64"]
+	Cases := [["", "no_signature"], ["not base64!", "malformed_signature"], ["AAAA", "malformed_signature"],
+		[SubStr(Signature, 1, StrLen(Signature) - 4), "malformed_signature"], [Signature . "AA==", "malformed_signature"]]
+	for Pair in Cases {
+		Result := AssetSignature_Verify(V["public_key_spki_base64"], Record, Pair[1])
+		AssertFalse(Result["ok"])
+		AssertEqual(Pair[2], Result["reason"])
+	}
+	Result := AssetSignature_Verify("", Record, Signature)
+	AssertEqual("bad_key", Result["reason"], "an empty key")
+	Result := AssetSignature_Verify("AAAA", Record, Signature)
+	AssertEqual("bad_key", Result["reason"], "bytes that are not a public key")
+	AssertEqual("", AssetSignature_Record(V["record_header"], "..\x", 1, V["valid"]["sha256"]), "a path is not an asset name")
+	AssertEqual("", AssetSignature_Record(V["record_header"], "x", -1, V["valid"]["sha256"]))
+	AssertEqual("", AssetSignature_Record(V["record_header"], "x", 1, StrUpper(V["valid"]["sha256"])))
+}
+
+Test("AssetSignature: a missing, malformed or truncated signature is a closed refusal (asset-signature)", _TAS_ClosedRefusals)
+
+
+
+
+
+; =============================
+; =============================
+; ======= 3/ The policy =======
+; =============================
+; =============================
+
+_TAS_PolicyAdmission() {
+	V := _TAS_Vectors()
+	AssertEqual("", AssetSignature_AdmitPolicy(_TAS_Policy(V)))
+	AssertEqual("", AssetSignature_AdmitPolicy(_TAS_Policy(V, "off", "")))
+	AssertEqual("required_without_key", AssetSignature_AdmitPolicy(_TAS_Policy(V, "required", "")))
+	AssertEqual("bad_policy", AssetSignature_AdmitPolicy(_TAS_Policy(V, "maybe")))
+	AssertEqual("bad_policy", AssetSignature_AdmitPolicy(0))
+}
+
+Test("AssetSignature: the policy admits only what it can honour (asset-signature)", _TAS_PolicyAdmission)
+
+
+_TAS_Enforcement() {
+	V := _TAS_Vectors()
+	Asset := Map("name", V["valid"]["name"], "size", V["valid"]["size"], "sha256", V["valid"]["sha256"])
+	Moved := Map("name", V["valid"]["name"], "size", V["valid"]["size"] + 1, "sha256", V["valid"]["sha256"])
+	Signature := V["valid"]["signature_base64"]
+	Required := _TAS_Policy(V)
+	AssertEqual("verified", AssetSignature_Evaluate(Required, Asset, Signature)["verdict"])
+	Missing := AssetSignature_Evaluate(Required, Asset, "")
+	AssertEqual("refused", Missing["verdict"])
+	AssertEqual("no_signature", Missing["reason"])
+	Crossed := AssetSignature_Evaluate(Required, Moved, Signature)
+	AssertEqual("refused", Crossed["verdict"])
+	AssertEqual("mismatch", Crossed["reason"])
+	Off := _TAS_Policy(V, "off")
+	AssertEqual("no_signature", AssetSignature_Evaluate(Off, Asset, "")["reason"])
+	AssertEqual("not_enforced", AssetSignature_Evaluate(Off, Asset, "")["verdict"])
+	AssertEqual("verified", AssetSignature_Evaluate(Off, Asset, Signature)["verdict"])
+	Reported := AssetSignature_Evaluate(Off, Moved, Signature)
+	AssertEqual("not_enforced", Reported["verdict"])
+	AssertEqual("mismatch", Reported["reason"], "a bad signature is reported although the policy is off")
+	Unprovisioned := AssetSignature_Evaluate(_TAS_Policy(V, "off", ""), Asset, "")
+	AssertEqual("policy_off", Unprovisioned["reason"])
+}
+
+Test("AssetSignature: required refuses what does not verify, off only reports it (asset-signature)", _TAS_Enforcement)
+
+
+
+
+
+; ===============================
+; ===============================
+; ======= 3/ The update gate ====
+; ===============================
+; ===============================
+
+; The offered release, publishing the signature asset or not.
+_TAS_Release(V, WithSignature := true) {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	Tag := "v9.9.9"
+	Assets := ""
+	if WithSignature
+		Assets := '{"name":"' . V["valid"]["name"] . '.sig","browser_download_url":"https://github.com/' . UPDATER_GH_OWNER
+			. "/" . UPDATER_GH_REPO . "/releases/download/" . Tag . "/" . V["valid"]["name"]
+			. '.sig","digest":"sha256:' . V["valid"]["sha256"] . '","size":88}'
+	return { Tag: Tag, RawJson: '{"tag_name":"' . Tag . '","assets":[' . Assets . ']}' }
+}
+
+; Runs the gate with the policy and the signature download replaced, and returns
+; its verdict and the fetched URLs.
+_TAS_Gate(V, Policy, Asset, Release, FetchFn) {
+	Fetched := []
+	Fetch(Url, Request) {
+		Fetched.Push(Url)
+		return FetchFn.Call()
+	}
+	Allowed := AssetSignature_AllowsInstall(V["valid"]["name"], Asset, Release, 0, () => Policy, Fetch)
+	return { Allowed: Allowed, Fetched: Fetched }
+}
+
+_TAS_GateDecides() {
+	V := _TAS_Vectors()
+	Good := { Size: V["valid"]["size"], Digest: V["valid"]["sha256"] }
+	Tampered := { Size: V["valid"]["size"] + 1, Digest: V["valid"]["sha256"] }
+	Signed := _TAS_Release(V)
+	Valid := () => V["valid"]["signature_base64"] . "`r`n"
+
+	Verified := _TAS_Gate(V, _TAS_Policy(V), Good, Signed, Valid)
+	AssertTrue(Verified.Allowed, "required: a valid signature installs")
+	AssertEqual(1, Verified.Fetched.Length, "the signature is fetched once")
+	Assert(InStr(Verified.Fetched[1], V["valid"]["name"] . ".sig"), "the policy's suffix names the signature asset")
+	AssertFalse(_TAS_Gate(V, _TAS_Policy(V), Tampered, Signed, Valid).Allowed, "required: another size is refused")
+	AssertFalse(_TAS_Gate(V, _TAS_Policy(V), Good, _TAS_Release(V, false), Valid).Allowed,
+		"required: a release without the signature is refused")
+	AssertFalse(_TAS_Gate(V, _TAS_Policy(V), Good, Signed, () => (Error("offline"))).Allowed,
+		"required: a signature that is not one is refused")
+	Thrower() {
+		throw Error("offline")
+	}
+	AssertFalse(_TAS_Gate(V, _TAS_Policy(V), Good, Signed, Thrower).Allowed, "required: a failed download is refused")
+
+	AssertTrue(_TAS_Gate(V, _TAS_Policy(V, "off"), Tampered, Signed, Valid).Allowed,
+		"off: a bad signature only reports")
+	AssertTrue(_TAS_Gate(V, _TAS_Policy(V, "off"), Good, Signed, Thrower).Allowed,
+		"off: a failed download only reports")
+	Unprovisioned := _TAS_Gate(V, _TAS_Policy(V, "off", ""), Good, Signed, Valid)
+	AssertTrue(Unprovisioned.Allowed, "off without a key installs")
+	AssertEqual(0, Unprovisioned.Fetched.Length, "no key: nothing is fetched")
+
+	AssertFalse(_TAS_Gate(V, Map("enforcement", "off"), Good, Signed, Valid).Allowed,
+		"a policy that cannot be admitted refuses instead of skipping the check")
+	Unreadable() {
+		throw Error("no file")
+	}
+	AssertFalse(AssetSignature_AllowsInstall(V["valid"]["name"], Good, Signed, 0, Unreadable, Valid),
+		"a policy that cannot be read refuses instead of skipping the check")
+}
+
+Test("AssetSignature: the update gate follows the policy before anything downloads (asset-signature)", _TAS_GateDecides)
+
+; The shipped policy stays off until the maintainer provisions the key, and every
+; install path passes the gate before its transaction.
+_TAS_GateWired() {
+	global _SharedDir
+	Policy := JsonParse(FileRead(_SharedDir . "\updater\data\asset_signing.json", "UTF-8"))
+	AssertEqual("", AssetSignature_AdmitPolicy(Policy))
+	Body := _StripFullLineComments(_DriverFuncBody("Updater_DownloadAndInstall"))
+	Gate := InStr(Body, "AssetSignature_AllowsInstall(AssetName, Asset, Release, Request)")
+	Begin := InStr(Body, "_Updater_BeginDownloadTransaction(")
+	Assert(Gate > 0 && Begin > Gate, "the gate runs before the download transaction")
+	Refused := InStr(Body, "if !SignatureAllows", , Gate)
+	Assert(Refused > Gate && Refused < Begin, "a refusal stops the install")
+}
+
+Test("AssetSignature: every install path passes the gate before its transaction (asset-signature)", _TAS_GateWired)

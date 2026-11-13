@@ -28,7 +28,7 @@ local locale_path = assert(Paths.shared("core/i18n/data/locales/en.json"))
 local file = assert(io.open(locale_path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
 assert(#bytes > 100 and require("core.text.engine.json").decode(bytes), "actual shared locale file was not read")
 package.loaded["core.fs.engine.paths"] = Paths
-local Installer = require("modules.updater.installer")
+local Installer = require("updater.engine.installer")
 local context = Installer.resolve(assert(os.getenv("ERGOPTI_NATIVE_MANAGER_SOURCE")))
 assert(context.kind == "standalone", "literal directory bytes prevented native installation classification")
 assert(context.install_root == os.getenv("ERGOPTI_NATIVE_INSTALL_ROOT"))
@@ -90,7 +90,7 @@ def main():
                     "ERGOPTI_NATIVE_SHARED_ROOT": expected_shared,
                     "ERGOPTI_NATIVE_MANAGER_SOURCE": str(manager)
                     if loading == "absolute"
-                    else "linux/modules/updater/manager.lua",
+                    else "linux/updater/engine/manager.lua",
                     "ERGOPTI_NATIVE_INSTALL_ROOT": str(install),
                     "ERGOPTI_NATIVE_INSTALL_PARENT": str(prefix / "lib"),
                     "ERGOPTI_NATIVE_INSTALL_WRAPPER": str(wrapper),

@@ -22,8 +22,8 @@ local MODULES = {
 	"ai.engine",
 	"ai.engine.api.network_env",
 	"ai.engine.api.opaque_network_admission",
-	"ui.download_window",
-	"ui.download_window.javascript",
+	"updater.ui.download_window",
+	"updater.ui.download_window.javascript",
 	"core.ui.ui.builder",
 	"core.fs.engine.paths",
 	"core.timing.engine.deferred_work",
@@ -491,7 +491,7 @@ local function with_fixture(plan, callback)
 					return true
 				end,
 			}
-			package.loaded["ui.download_window"] = {
+			package.loaded["updater.ui.download_window"] = {
 				session_id = function() return controls.window_session or 0 end,
 				is_active = function() return controls.window ~= nil end,
 				show = function(options)
@@ -537,9 +537,9 @@ local function with_fixture(plan, callback)
 					return { frame = function() return { x = 0, y = 0, w = 1440, h = 900 } end }
 				end }
 				_G.hs.drawing = { windowLevels = { normal = 0, floating = 1 } }
-				package.loaded["ui.download_window.javascript"] = nil
-				package.loaded["ui.download_window"] = nil
-				controls.real_window = require("ui.download_window")
+				package.loaded["updater.ui.download_window.javascript"] = nil
+				package.loaded["updater.ui.download_window"] = nil
+				controls.real_window = require("updater.ui.download_window")
 			end
 			-- The download script exports the system network settings first; the
 			-- fixture's file system has no shared policy file to source.

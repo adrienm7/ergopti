@@ -90,7 +90,7 @@ end
 local function _driver_version()
 	-- Required lazily: crash_reporter loads early in init.lua, before the
 	-- updater, and a report must never fail to build over its version field.
-	local ok, Updater = pcall(require, "modules.updater")
+	local ok, Updater = pcall(require, "updater.engine")
 	if ok and type(Updater) == "table" and type(Updater.current_version) == "function" then
 		local ok_version, version = pcall(Updater.current_version)
 		if ok_version and type(version) == "string" and version ~= "" then

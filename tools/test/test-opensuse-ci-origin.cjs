@@ -309,8 +309,8 @@ try {
 	const home = path.join(layout, 'ordinary user home');
 	const inputs = [
 		'static/ergopti_plus/linux/install.sh',
-		'static/ergopti_plus/linux/native/archive_output/archive_publication.c',
-		'static/ergopti_plus/linux/native/archive_output/archive_publication.h',
+		'static/ergopti_plus/linux/updater/native/archive_publication.c',
+		'static/ergopti_plus/linux/updater/native/archive_publication.h',
 		'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
 		'static/layouts/registry/index.json',
 		'package.json',

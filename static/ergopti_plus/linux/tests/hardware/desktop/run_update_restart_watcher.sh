@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # static/ergopti_plus/linux/tests/hardware/desktop/run_update_restart_watcher.sh
 #
-# The update restart watcher of modules/updater/restarter.lua, end to end, under
+# The update restart watcher of updater/engine/restarter.lua, end to end, under
 # a REAL systemd user manager and from a terminal (the detached relay). Each
 # daemon generation is update_watch_daemon.lua, which calls the real restarter
-# and the real infra/updater_boot_ready.lua; the installation trees, the swap
+# and the real updater/engine/boot_ready.lua; the installation trees, the swap
 # to <root>.old and the launchers are files on disk, as the installer leaves
 # them. Three scenarios per mode:
 #   healthy  the new tree's daemon reports ready: the watch log reads
@@ -73,8 +73,8 @@ trap cleanup EXIT
 # A tree: kind "daemon" runs a generation, "quit" one quit before ready, "broken" exits at once.
 make_tree() {
 	local dir="$1" name="$2" kind="$3"
-	mkdir -p "${dir}/bin" "${dir}/linux/infra"
-	cp "${DRIVER}/infra/updater_boot_ready.lua" "${dir}/linux/infra/"
+	mkdir -p "${dir}/bin" "${dir}/linux/updater/engine"
+	cp "${DRIVER}/updater/engine/boot_ready.lua" "${dir}/linux/updater/engine/"
 	echo "${name}" > "${dir}/tree"
 	if [ "${kind}" = broken ]; then
 		printf '#!/bin/sh\nexit 0\n' > "${dir}/bin/ergopti"

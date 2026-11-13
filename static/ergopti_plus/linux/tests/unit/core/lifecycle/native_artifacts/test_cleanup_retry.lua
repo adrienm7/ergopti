@@ -2,7 +2,7 @@
 
 --- Actual Lua registry/lease/target calls with explicitly controlled native ports.
 --- These fixed causal controls do not qualify the C backend, kernel or installer.
-local Output = require("infra.archive_output")
+local Output = require("updater.engine.archive_output")
 local Target = require("core.network.engine.http_output_target")
 local tests = {}
 local function test(name, body) tests[#tests + 1] = { name, body } end

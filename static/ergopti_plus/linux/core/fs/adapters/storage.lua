@@ -1131,7 +1131,7 @@ function M.has(key)
 end
 
 --- The file the store persists to, for the configuration backup that copies
---- it with the configuration folder (modules/updater/config_backup.lua).
+--- it with the configuration folder (updater/engine/config_backup.lua).
 --- @return string Absolute path.
 function M.path()
 	return _STORE_PATH

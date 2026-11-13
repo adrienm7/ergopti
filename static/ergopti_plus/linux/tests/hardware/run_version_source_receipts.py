@@ -13,7 +13,7 @@ import tempfile
 
 WORKER = r"""
 local root = assert(os.getenv("ERGOPTI_VERSION_ROOT"))
-local Version = require("infra.version")
+local Version = require("updater.engine.version")
 local version, source = Version.resolve({ shared_root = root })
 assert(version == os.getenv("ERGOPTI_VERSION_EXPECT"), "unexpected native version: " .. tostring(version))
 assert(source == os.getenv("ERGOPTI_VERSION_SOURCE"), "unexpected native version source: " .. tostring(source))

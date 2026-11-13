@@ -934,9 +934,9 @@ affiche des libellés **vides** dans toutes les webviews partagées.
    `makeHostBridge('<nom>_bridge')` et attend un `init(data)`.
 2. Ajouter l'entrée dans `_shared/ui/apps.manifest.json` (largeur, hauteur, minimums, nom de
    vhost) — c'est la source unique de la géométrie.
-3. Écrire l'hôte par driver. ⚠ Aujourd'hui : `windows/ui/<nom>/init.ahk` +
+3. Écrire l'hôte par driver. ⚠ Aujourd'hui : `windows/updater/ui/<nom>/init.ahk` +
    `<nom>_webview.ahk` (12 hôtes écrits à la main ; la factory `WebViewHost` construite
-   pour les unifier a **zéro appelant**), `macos/ui/<nom>/init.lua` (utilise
+   pour les unifier a **zéro appelant**), `macos/updater/ui/<nom>/init.lua` (utilise
    `ui_builder.get_app_geometry`, échec bruyant si l'entrée manque), et sur Linux un handler
    dans `modules/ui/bridge_handlers/<nom>_bridge.lua` **plus** un appel à
    `webview_manager.show("<nom>")` — sans quoi la fenêtre est inatteignable (c'est le cas de

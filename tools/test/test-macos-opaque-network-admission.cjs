@@ -1367,7 +1367,7 @@ async function receiveSelectedReleaseCorpus() {
 		}
 	}
 	const diagnosticRelative = 'tools/diagnostics/macos_release_stage_route_test.py';
-	const stageRelative = 'static/ergopti_plus/macos/adapters/release_stage.sh';
+	const stageRelative = 'static/ergopti_plus/macos/updater/adapters/release_stage.sh';
 	captureSource(diagnosticRelative);
 	captureSource(stageRelative);
 	captureSource('tools/lib/python.cjs');

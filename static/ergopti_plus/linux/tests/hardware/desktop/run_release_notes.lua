@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: The Update-Check Window's Release Notes Pane (PAR-52), Live
 --- DESCRIPTION:
---- Opens the tray's update-check window (ui/update_check/bridge.lua open())
---- over the real updater (modules/updater/manager.lua) in real WebKit2GTK.
+--- Opens the tray's update-check window (updater/ui/update_check.lua open())
+--- over the real updater (updater/engine/manager.lua) in real WebKit2GTK.
 --- Only the release list comes from a local fixture instead of GitHub, and
 --- `xdg-open` is a recorder first on PATH; the check, the classification,
 --- the session's link policy and the shared page are the shipped ones.
@@ -119,7 +119,7 @@ end
 local function run()
 	Manager.init()
 	if not Manager.native_available() then abort("WebKit2GTK is not available to lgi.") end
-	local Updater = require("modules.updater.manager")
+	local Updater = require("updater.engine.manager")
 	local list = Json.encode({ release("v0.0.0-dev.150"), release("v0.0.0-dev.140") })
 	-- The network and the installed build are the only seams.
 	Updater._fetch_feed = function(callback) callback(nil, "no feed in this proof"); return true end
@@ -127,7 +127,7 @@ local function run()
 	Updater.current_version = function() return "0.0.0-dev.140" end
 	Updater.get_channel = function() return "dev" end
 	print("=== update-check window: release notes pane, session " .. (os.getenv("ERGOPTI_PROOF_SESSION") or "?") .. " ===")
-	check(require("ui.update_check.bridge").open({ updater = Updater }) == true, "the update-check window opens")
+	check(require("updater.ui.update_check").open({ updater = Updater }) == true, "the update-check window opens")
 	local shown = pump_until(function()
 		return eval_sync("String(!document.getElementById('notes').hidden)") == "true"
 	end)

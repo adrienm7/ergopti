@@ -12,8 +12,8 @@ package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
 assert(type(jit) == "table" and jit.os == "Linux", "Actual Linux LuaJIT required")
 local compat = require("core.lifecycle.engine.compat.utf8"); compat.install()
 local uv = require("luv")
-local Manager = require("modules.updater.manager")
-local Installer = require("modules.updater.installer")
+local Manager = require("updater.engine.manager")
+local Installer = require("updater.engine.installer")
 local checked, passed = 0, 0
 local function check(value, name)
  checked = checked + 1

@@ -5,14 +5,14 @@
 ; DESCRIPTION:
 ; The AHK twin of the macOS purity ratchet (test_port_adapter_coverage.lua).
 ; Dependency-Inversion guard: production feature/infra code should reach the OS
-; through windows/adapters/, not via direct DllCall / COM / file built-ins. The
+; through windows/updater/adapters/, not via direct DllCall / COM / file built-ins. The
 ; macOS driver hard-ratchets hs.* and io.open/os.execute; the AHK driver had NO
 ; equivalent guard, so 100+ DllCall and 100+ FileRead calls outside adapters/
 ; were completely unwatched.
 ;
 ; This test counts the direct-OS-call lines outside adapters/ and fails only if
 ; a total INCREASES beyond its captured baseline. New OS access must be routed
-; through windows/adapters/ (or, if truly adapter-worthy, the baseline updated
+; through windows/updater/adapters/ (or, if truly adapter-worthy, the baseline updated
 ; with an explicit note). Lower is better; the long-term target is zero. Comment
 ; lines (leading ``;``) are skipped so a comment mentioning DllCall does not
 ; inflate the count.
@@ -132,7 +132,7 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 		"Direct OS calls in " . Label . " (outside adapters/) rose to " . Total . " (baseline "
 		. Baseline . "): DllCall=" . C["DllCall"] . " COM=" . C["COM"]
 		. " FileIO=" . C["FileIO"]
-		. " — route new OS access through windows/adapters/, do not raise the baseline.")
+		. " — route new OS access through windows/updater/adapters/, do not raise the baseline.")
 }
 
 
@@ -146,7 +146,7 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ; ====================================
 
 ; Baselines captured from this counter's own runs. Drive toward zero by routing
-; OS access through windows/adapters/. NEVER raise a number to make a change
+; OS access through windows/updater/adapters/. NEVER raise a number to make a change
 ; pass — that defeats the guard.
 ;
 ; modules+lib: 2026-06-21 at 256 (DllCall=110, COM=19, FileIO=127), re-measured
@@ -179,7 +179,7 @@ _AOPR_BASELINE_ENTRY := 7
 
 _AOPR_RatchetCore() {
 	global _AOPR_BASELINE_CORE
-	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold"]), _AOPR_BASELINE_CORE)
+	_AOPR_AssertTree("windows/updater + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold", "updater"]), _AOPR_BASELINE_CORE)
 }
 Test("meta: windows/ OS-call purity ratchet — modules + lib", _AOPR_RatchetCore)
 
@@ -188,7 +188,7 @@ Test("meta: windows/ OS-call purity ratchet — modules + lib", _AOPR_RatchetCor
 ; tree the ratchet did not look at.
 _AOPR_RatchetUi() {
 	global _AOPR_BASELINE_UI
-	_AOPR_AssertTree("windows/ui", _AOPR_FilesIn(["ui"]), _AOPR_BASELINE_UI)
+	_AOPR_AssertTree("windows/updater/ui", _AOPR_FilesIn(["ui"]), _AOPR_BASELINE_UI)
 }
 Test("meta: windows/ OS-call purity ratchet — ui", _AOPR_RatchetUi)
 
@@ -323,13 +323,13 @@ _AOPR_FAMILY_BASELINE_ENTRY := 10
 
 _AOPR_FamilyRatchetCore() {
 	global _AOPR_FAMILY_BASELINE_CORE
-	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold"]), _AOPR_FAMILY_BASELINE_CORE)
+	_AOPR_AssertFamilies("windows/updater + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold", "updater"]), _AOPR_FAMILY_BASELINE_CORE)
 }
 Test("meta: windows/ platform-API family ratchet — modules + lib", _AOPR_FamilyRatchetCore)
 
 _AOPR_FamilyRatchetUi() {
 	global _AOPR_FAMILY_BASELINE_UI
-	_AOPR_AssertFamilies("windows/ui", _AOPR_FilesIn(["ui"]), _AOPR_FAMILY_BASELINE_UI)
+	_AOPR_AssertFamilies("windows/updater/ui", _AOPR_FilesIn(["ui"]), _AOPR_FAMILY_BASELINE_UI)
 }
 Test("meta: windows/ platform-API family ratchet — ui", _AOPR_FamilyRatchetUi)
 

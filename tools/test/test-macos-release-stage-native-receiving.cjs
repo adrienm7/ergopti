@@ -42,7 +42,7 @@ const scenarioNames = [
 	'late-after-close',
 	'outer-interruption'
 ];
-const expectedHash = 'bf8a362993f6dde3fa2f0f06266267fb334f2fd568d3d791192e6c2deb67a99c';
+const expectedHash = '23f3529338ba85718edc8dc56dc1e708dfa2927fbba30d9be9f134ed5b444a4f';
 
 /** Install explicit stand-ins only in a fresh controlled child process. */
 function controlledChild() {
@@ -162,7 +162,7 @@ function controlledChild() {
 			}
 		}
 		if (name === 'corpus') {
-			const script = path.join(root, 'static/ergopti_plus/macos/adapters/release_stage.sh');
+			const script = path.join(root, 'static/ergopti_plus/macos/updater/adapters/release_stage.sh');
 			// Synthetic envelope rows exercise only receiving. The independent literal
 			// corpus is copied byte-exact and never executed or regenerated here.
 			const observations = Array.from({ length: 50 }, (_, index) => ({
@@ -240,7 +240,10 @@ function controlledChild() {
 		assert.equal(name, ['corpus', 'TERM', 'INT'][record.acquisitions.length]);
 		if (name === 'corpus') {
 			assert.equal(path.basename(args[8]), 'macos_release_stage_route_test.py');
-			assert.equal(args[9], path.join(root, 'static/ergopti_plus/macos/adapters/release_stage.sh'));
+			assert.equal(
+				args[9],
+				path.join(root, 'static/ergopti_plus/macos/updater/adapters/release_stage.sh')
+			);
 			assert.equal(args[10], path.join(directory, 'corpus.json'));
 		} else {
 			assert.equal(path.basename(args[8]), 'cancellation_worker.py');

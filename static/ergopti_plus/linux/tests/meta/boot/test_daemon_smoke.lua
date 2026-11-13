@@ -201,7 +201,7 @@ local function with_paths_restart(mode, body)
       reload = function() end, quit = function() end })
     local actual_require = require
     local restart = require("core.lifecycle.engine.reload.daemon_restart")
-    local restarter = require("modules.updater.restarter")
+    local restarter = require("updater.engine.restarter")
     local environment = {
       LOG = "test.paths_restart", gestures = gestures,
       privacy_owners = { script_actions = state.controller },

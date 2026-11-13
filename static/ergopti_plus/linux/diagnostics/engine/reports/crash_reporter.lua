@@ -150,7 +150,7 @@ local function _build_facts()
 		return require("settings.engine.paths").get_config_dir()
 	end)
 	local ok_version, version = pcall(function()
-		return require("infra.version").VERSION
+		return require("updater.engine.version").VERSION
 	end)
 	local ok_app, app_dir = pcall(function()
 		return require("core.fs.engine.paths").driver_root()

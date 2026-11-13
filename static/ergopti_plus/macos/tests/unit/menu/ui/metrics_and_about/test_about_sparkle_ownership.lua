@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu_about: Sparkle owns every update mutation", function()
 	helpers.it("contains only the narrow native update command", function()
-		local source = helpers.read_driver_source('require("adapters.update_launcher")')
+		local source = helpers.read_driver_source('require("updater.adapters.update_launcher")')
 		helpers.assert_true(source ~= nil, "menu_about.lua source must be locatable")
 		local code = source:gsub("%-%-[^\n]*", "")
 
@@ -41,7 +41,7 @@ helpers.describe("menu_about: Sparkle owns every update mutation", function()
 
 	helpers.it("leaves no Lua update network or timer owner", function()
 		local source = helpers.read_driver_source("function M.releases_page_url")
-		helpers.assert_true(source ~= nil, "modules/updater/init.lua source must be locatable")
+		helpers.assert_true(source ~= nil, "updater/engine/init.lua source must be locatable")
 		local code = source:gsub("%-%-[^\n]*", "")
 
 		for _, forbidden in ipairs({

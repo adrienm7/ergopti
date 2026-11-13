@@ -29,12 +29,12 @@ local manifest = require("tests.test_manifest")
 local registrations = {}
 for _, name in ipairs(manifest) do registrations[name] = (registrations[name] or 0) + 1 end
 local cohort = {
-	{ "tests.unit.infra.archive.test_archive_output", 26 },
-	{ "tests.unit.infra.archive.test_archive_output_input", 25 },
-	{ "tests.unit.infra.archive.test_fd_sha256", 21 },
-	{ "tests.unit.infra.archive.test_archive_seal", 25 },
-	{ "tests.unit.infra.archive.test_archive_capability_identity", 6 },
-	{ "tests.unit.modules.updater.install.test_transfer_budget", 22 },
+	{ "tests.unit.updater.engine.archive.test_output", 26 },
+	{ "tests.unit.updater.engine.archive.test_output_input", 25 },
+	{ "tests.unit.updater.engine.archive.test_fd_sha256", 21 },
+	{ "tests.unit.updater.engine.archive.test_seal", 25 },
+	{ "tests.unit.updater.engine.archive.test_capability_identity", 6 },
+	{ "tests.unit.updater.engine.install.test_transfer_budget", 22 },
 }
 
 for _, entry in ipairs(cohort) do

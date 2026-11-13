@@ -31,7 +31,7 @@ const RETIRED = 'macos/ui/menu/menu_llm/live_mode_panel.lua';
 const RETIRED_SOURCES = new Set([
 	RETIRED,
 	'macos/ui/menu/menu_llm/models_selector.lua',
-	'macos/ui/menu/remap_switch.lua',
+	'macos/updater/ui/remap_switch.lua',
 	'windows/shortcuts/engine/ctrl.ahk'
 ]);
 const TOOL = 'tools/test/test-native-menu-rows.cjs';
@@ -223,7 +223,8 @@ try {
 						'metrics',
 						'onboarding',
 						'shortcuts',
-						'tap_hold'
+						'tap_hold',
+						'updater'
 					])
 		);
 		reset();

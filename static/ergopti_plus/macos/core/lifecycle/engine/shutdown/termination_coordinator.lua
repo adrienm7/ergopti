@@ -986,7 +986,7 @@ function M.request_user_exit(reason)
 	pcall(Logger.info, LOG, "User exit '%s' requested; hard deadline %.1f s.",
 		reason, _deps.user_exit_deadline_seconds)
 	-- A release swap waiting for this boot keeps the update instead of opening
-	-- the previous app (infra/updater_boot_ready.lua); a failure never blocks the exit.
+	-- the previous app (updater/engine/boot_ready.lua); a failure never blocks the exit.
 	if _deps.report_update_quit then
 		local reported, report_err = pcall(_deps.report_update_quit, reason)
 		if not reported then

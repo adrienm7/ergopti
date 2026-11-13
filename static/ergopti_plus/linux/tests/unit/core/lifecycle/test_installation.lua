@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local Installation = require("core.lifecycle.engine.installation")
-local Version = require("infra.version")
+local Version = require("updater.engine.version")
 
 helpers.describe("installation: installed build or source run (Linux)", function()
 	helpers.it("reads the system package root and an install.sh prefix", function()

@@ -56,7 +56,7 @@ install_from() { # tree log
 }
 VERIFY_SCRIPT="$(mktemp /tmp/ergopti-phys-verify.XXXXXX.lua)"
 cat > "${VERIFY_SCRIPT}" <<'LUA'
-local identity, why = require("modules.updater.ownership_receipt").verify(arg[1], arg[2])
+local identity, why = require("updater.engine.ownership_receipt").verify(arg[1], arg[2])
 print(identity or why)
 os.exit(identity and 0 or 1)
 LUA

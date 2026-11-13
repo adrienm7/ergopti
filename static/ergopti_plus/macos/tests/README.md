@@ -7,7 +7,7 @@ Windows** under plain Lua 5.4 — no external dependencies required.
 ## Layout
 
 The tree mirrors the driver source: a test of `tap_hold/engine/…` lives in
-`tests/unit/<stage>/`, a test of `ui/menu/…` in
+`tests/unit/<stage>/`, a test of `updater/ui/…` in
 `tests/unit/<submenu>/`.
 
 ```

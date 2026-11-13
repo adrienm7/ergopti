@@ -524,15 +524,15 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include menu/engine/manifest.ahk
 #Include menu/engine/manifest_menu.ahk
 #Include ai/engine/defaults.ahk
-#Include modules/updater.ahk
+#Include updater/updater.ahk
 #Include core/lifecycle/engine/shutdown/uninstall.ahk
 #Include onboarding/engine/start_at_login.ahk
-#Include ui/changelog/init.ahk
+#Include updater/ui/changelog/init.ahk
 #Include diagnostics/ui/healthcheck/init.ahk
 #Include diagnostics/engine/field_run/input_probe.ahk
 #Include core/lifecycle/engine/driver_control.ahk
 #Include diagnostics/ui/error_dialog.ahk
-#Include ui/update_check/init.ahk
+#Include updater/ui/update_check.ahk
 #Include diagnostics/engine/reports/crash_reporter.ahk
 #Include core/text/engine/json.ahk
 #Include settings/engine/program_parameter.ahk
@@ -597,8 +597,8 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 BootProfile_Stamp("WebView and metrics UI state initialised")
 #Include core/ui/engine/webview/utils.ahk
 #Include core/network/adapters/failure_host.ahk
-#Include ui/download_window/session.ahk
-#Include ui/download_window/init.ahk
+#Include updater/ui/download_window/session.ahk
+#Include updater/ui/download_window/init.ahk
 #Include diagnostics/ui/console_window.ahk
 #Include metrics/engine/apps/categories.ahk
 #Include metrics/engine/keystats.ahk

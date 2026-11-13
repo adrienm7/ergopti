@@ -8,7 +8,7 @@
 --- request_driver_reload.sh) writes a request and rings SIGUSR1; the running
 --- process, through the production core/lifecycle/engine/driver_control.lua and
 --- core/lifecycle/engine/reload/daemon_restart.lua, writes the pending record (successor null, deadline)
---- and arms the real detached relay of modules/updater/restarter.lua, then exits;
+--- and arms the real detached relay of updater/engine/restarter.lua, then exits;
 --- the relay starts the launcher once that process has gone, and the successor,
 --- a new pid, claims the record and completes it, refuses it with the reason of
 --- its own boot, or reports a timeout when it was ready past the deadline.

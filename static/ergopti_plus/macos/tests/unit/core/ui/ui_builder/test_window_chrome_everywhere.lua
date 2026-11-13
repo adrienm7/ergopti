@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 
 -- Subtrees that ship in the driver. The entry point creates no window; the
 -- cross-driver tools/test/test-app-windows-keep-their-frame.cjs scans it too.
-local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold", "updater" }
 
 -- The driver builds at least the ui_builder windows and the health check window.
 local MIN_WEBVIEW_FILES = 2

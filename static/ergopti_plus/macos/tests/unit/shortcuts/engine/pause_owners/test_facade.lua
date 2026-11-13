@@ -211,7 +211,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 				return { stop = function() return true end }
 			end,
 		}
-		package.loaded["modules.updater"] = {
+		package.loaded["updater.engine"] = {
 			get_check_interval = function() return 3600 end,
 			start_background_checks = noop,
 		}
@@ -238,7 +238,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			"metrics.ui.menu.metrics",
 			"tap_hold.ui.menu_tap_holds",
 			"apps.ui.menu.apps",
-			"ui.menu.menu_about",
+			"updater.ui.menu_about",
 		}) do
 			package.loaded[module_name] = {}
 		end

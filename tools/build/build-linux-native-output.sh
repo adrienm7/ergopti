@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 IFS= read -r -d '' REPO_ROOT < <(CDPATH= cd -Pe -- "${SCRIPT_DIR}/../.." && printf '%s\0' "$PWD")
-SOURCE_DIR="${REPO_ROOT}/static/ergopti_plus/linux/native/archive_output"
+SOURCE_DIR="${REPO_ROOT}/static/ergopti_plus/linux/updater/native"
 OUTPUT_DIR="${REPO_ROOT}/build/linux/linux/bin"
 
 while [[ $# -gt 0 ]]; do

@@ -17,15 +17,15 @@ local function quote(value) return "'" .. tostring(value):gsub("'", "'\\''") .. 
 --- Runs body against a fresh reporter and a scratch token folder.
 --- @param body function Receives the reporter, the folder and an environment table.
 local function with_reporter(body)
-	package.loaded["infra.updater_boot_ready"] = nil
-	local Ready = require("infra.updater_boot_ready")
+	package.loaded["updater.engine.boot_ready"] = nil
+	local Ready = require("updater.engine.boot_ready")
 	local base = (os.getenv("TMPDIR") or "/tmp"):gsub("/+$", "")
 	local dir = base .. "/ergopti-boot-ready." .. tostring(os.time()) .. tostring(math.random(1e6))
 	assert(os.execute("mkdir -p " .. quote(dir)))
 	local env = { ERGOPTI_LAUNCHER_PID = "4242", ERGOPTI_UPDATER_BOOT_READY = dir .. "/ready" }
 	local ok, err = xpcall(body, debug.traceback, Ready, dir, env)
 	os.execute("rm -rf " .. quote(dir))
-	package.loaded["infra.updater_boot_ready"] = nil
+	package.loaded["updater.engine.boot_ready"] = nil
 	if not ok then error(err, 0) end
 end
 
@@ -110,7 +110,7 @@ helpers.describe("updater boot ready (release-successor-boot-ready)", function()
 		helpers.assert_true(unit ~= nil, tostring(err))
 		local complete_at = unit:find("Boot.complete()\n", 1, true)
 		helpers.assert_true(complete_at ~= nil and unit:find(
-			'require("infra.updater_boot_ready").report("boot complete")', complete_at, true) ~= nil,
+			'require("updater.engine.boot_ready").report("boot complete")', complete_at, true) ~= nil,
 			"boot complete reports ready")
 		helpers.assert_true(unit:find('report("waiting for Accessibility")', 1, true) ~= nil,
 			"a new signature's Accessibility wait is a healthy start")
@@ -122,11 +122,11 @@ helpers.describe("updater boot ready (release-successor-boot-ready)", function()
 		helpers.assert_true(unit ~= nil, tostring(err))
 		-- Menu Quit, the Quit action and uninstall go through request_user_exit.
 		helpers.assert_true(unit:find("report_update_quit = function(reason)\n"
-			.. '\t\t\t\treturn require("infra.updater_boot_ready").report_quit(reason)', 1, true) ~= nil,
+			.. '\t\t\t\treturn require("updater.engine.boot_ready").report_quit(reason)', 1, true) ~= nil,
 			"the termination coordinator reports a user exit")
 		local shutdown_at = unit:find("local function shutdown_all_resources", 1, true)
 		helpers.assert_true(shutdown_at ~= nil and unit:find(
-			'require("infra.updater_boot_ready").report_quit("hammerspoon_quit")', shutdown_at, true) ~= nil,
+			'require("updater.engine.boot_ready").report_quit("hammerspoon_quit")', shutdown_at, true) ~= nil,
 			"quitting the launcher or Hammerspoon reports too")
 	end)
 

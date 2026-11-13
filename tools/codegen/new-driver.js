@@ -80,7 +80,8 @@ const DRIVER_SUBDIRS = [
 	'metrics',
 	'onboarding',
 	'shortcuts',
-	'tap_hold'
+	'tap_hold',
+	'updater'
 ];
 
 /** Supported target languages. */

@@ -12,7 +12,7 @@
 --- package whose stamp holds no version, and « commit inconnu » with a logged
 --- WARNING when neither the build stamp nor .git says.
 ---
---- The identity goes through infra/version.lua and the real commit resolver on
+--- The identity goes through updater/engine/version.lua and the real commit resolver on
 --- in-memory fixtures of each .git shape (loose ref, packed ref, detached
 --- HEAD, linked worktree), and the row through the real tray builder.
 --- ==============================================================================
@@ -83,7 +83,7 @@ local CHECKOUTS = {
 
 -- The identity chain, reloaded per case: earlier suites leave logger stubs in
 -- package.loaded, and a module cached under one of them logs nowhere.
-local IDENTITY_MODULES = { "core.logger.engine.shim", "diagnostics.engine.reports.snapshot", "infra.version" }
+local IDENTITY_MODULES = { "core.logger.engine.shim", "diagnostics.engine.reports.snapshot", "updater.engine.version" }
 
 --- Runs body(Version) over a freshly loaded identity chain bound to the real
 --- logger, with every log line captured at DEBUG; restores the chain after.
@@ -100,7 +100,7 @@ local function capture_logs(body)
 	local previous_level = Logger.get_level()
 	Logger.set_level(10)
 	Logger.set_sink(function(line) lines[#lines + 1] = tostring(line) end)
-	local ok, err = pcall(function() body(require("infra.version")) end)
+	local ok, err = pcall(function() body(require("updater.engine.version")) end)
 	Logger.set_sink(nil)
 	Logger.set_level(previous_level)
 	for _, name in ipairs(IDENTITY_MODULES) do package.loaded[name] = saved[name] end
@@ -127,7 +127,7 @@ end
 --- @param identity table
 --- @return string title
 local function version_row(identity)
-	local Version = require("infra.version")
+	local Version = require("updater.engine.version")
 	local real_identity = Version.identity
 	Version.identity = function() return identity end
 	local mb = helpers.load_module("menu.ui.builder.builder")

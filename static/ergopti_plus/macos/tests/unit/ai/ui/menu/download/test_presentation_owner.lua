@@ -74,7 +74,7 @@ helpers.describe("MLX download presentation ownership", function()
 						launch_detached_download(fixture)
 					end
 					if replaced then
-						package.loaded["ui.download_window"].show({ model = "other operation" })
+						package.loaded["updater.ui.download_window"].show({ model = "other operation" })
 					end
 					local updates = #fixture.records.updates
 					fixture.controls.latest("tail"):emit("Downloading weights 50%\n")
@@ -105,7 +105,7 @@ helpers.describe("MLX download presentation ownership", function()
 				if reattached then helpers.assert_true(fixture.controls.reattach())
 				else helpers.assert_true(fixture.controls.pull()) end
 				local retry = fixture.controls.window.on_retry
-				package.loaded["ui.download_window"].show({ model = "other operation" })
+				package.loaded["updater.ui.download_window"].show({ model = "other operation" })
 				helpers.assert_eq(retry(), false)
 				helpers.assert_eq(fixture.records.download_aborts, 0)
 				helpers.assert_eq(#fixture.records.cancels, 0)

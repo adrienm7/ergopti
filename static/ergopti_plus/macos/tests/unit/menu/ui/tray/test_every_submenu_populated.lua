@@ -30,7 +30,7 @@ local MENU_MODULES = {
 	tap_holds       = "tap_hold.ui.menu_tap_holds",
 	gestures        = "gestures.ui.menu.gestures",
 	apps            = "apps.ui.menu.apps",
-	about           = "ui.menu.menu_about",
+	about           = "updater.ui.menu_about",
 }
 
 -- The Hotstrings parent uses its independent English caption; other legacy labels remain key oracles.
@@ -413,7 +413,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		local rows = top_submenu("menu.about.title")
 		helpers.assert_true(type(rows) == "table" and #rows >= 2, "the tray must carry the About submenu")
 		local i18n = require("core.i18n.engine.i18n")
-		local source_run = require("modules.updater").is_local_source()
+		local source_run = require("updater.engine").is_local_source()
 		local label = i18n.get("menu.global.uninstall")
 		if source_run then
 			local reason = i18n.get("menu.about.source_run_reason")

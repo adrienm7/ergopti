@@ -21,7 +21,7 @@ end
 
 local function with_download_window(controls, callback)
 	helpers.with_fresh_modules({
-		"ui.download_window", "core.ui.ui.builder", "core.logger.engine.logger", "core.timing.engine.deferred_work",
+		"updater.ui.download_window", "core.ui.ui.builder", "core.logger.engine.logger", "core.timing.engine.deferred_work",
 		"core.fs.engine.paths", "core.i18n.engine.i18n", "core.text.engine.utils", "hs", "tests.stubs.hs",
 	}, function()
 		local hs_stub = fresh_hs()
@@ -45,7 +45,7 @@ local function with_download_window(controls, callback)
 		hs_stub.webview.usercontent.new = function()
 			return { setCallback = function() end }
 		end
-		callback(require("ui.download_window"), state)
+		callback(require("updater.ui.download_window"), state)
 	end)
 end
 

@@ -210,7 +210,7 @@ function M.hold_tray(deps, texts)
 	local quit = false
 	-- A Quit is no failed start: an update watcher keeps the update.
 	install_degraded_menu(deps, texts, show_details, function()
-		if not pcall(require("infra.updater_boot_ready").report_quit, "the degraded tray Quit") then
+		if not pcall(require("updater.engine.boot_ready").report_quit, "the degraded tray Quit") then
 			Logger.error(LOG, "The update watcher could not be told of the Quit.")
 		end
 		quit = true

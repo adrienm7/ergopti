@@ -123,7 +123,7 @@ if (fs.existsSync(tclPath)) {
 // ─── 5. Linux driver has no equivalent coercion bypass ───────────────
 // The Linux driver uses toml_codec for all TOML parsing — there should
 // be no hand-rolled coercion site in the Linux driver.
-const linuxOverridePath = path.join(LINUX, 'infra', 'config_overrides.lua');
+const linuxOverridePath = path.join(LINUX, 'updater', 'engine', 'config_overrides.lua');
 assert(!fs.existsSync(linuxOverridePath), 'Linux has no config_overrides.lua (uses toml_codec)');
 
 // The actual AHK consumer interpolates these two tokens in this same fixture.

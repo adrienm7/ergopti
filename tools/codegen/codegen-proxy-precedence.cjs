@@ -27,7 +27,7 @@ const { REPO_ROOT, sharedRel } = require('../lib/paths.cjs');
 const SOURCE = sharedRel('core', 'network', 'data', 'proxy_policy.json');
 // network-retry.sh is written by codegen-bootstrap-retry.cjs, which applies project()
 // itself (one generator owns each output); check() below still covers it.
-const SCRIPTS = ['static/ergopti_plus/macos/adapters/release_stage.sh'];
+const SCRIPTS = ['static/ergopti_plus/macos/updater/adapters/release_stage.sh'];
 const OWNED_ELSEWHERE = ['static/ergopti_plus/macos/ai/engine/bootstrap/network-retry.sh'];
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 

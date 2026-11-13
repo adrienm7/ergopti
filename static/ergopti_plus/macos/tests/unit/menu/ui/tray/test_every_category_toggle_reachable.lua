@@ -31,7 +31,7 @@ local MENU_MODULES = {
 	tap_holds       = "tap_hold.ui.menu_tap_holds",
 	gestures        = "gestures.ui.menu.gestures",
 	apps            = "apps.ui.menu.apps",
-	about           = "ui.menu.menu_about",
+	about           = "updater.ui.menu_about",
 }
 
 -- Each feature submenu with a switch on macOS, by its title key, and the key of

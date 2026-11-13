@@ -63,7 +63,7 @@ local Bridge = require("ai.engine.bridge")
 local Profiles = require("ai.engine.settings.profiles")
 local Engine = require("ai.engine.prediction.engine")
 local Download = require("ai.engine.local_servers.model_download")
-local Window = require("ui.download_window.bridge")
+local Window = require("updater.ui.download_window.bridge")
 local Http = require("core.network.adapters.http_client")
 local EventLoop = require("core.events.loop")
 

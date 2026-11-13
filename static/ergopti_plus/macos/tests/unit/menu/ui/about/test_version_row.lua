@@ -23,17 +23,17 @@ local Snapshot = require("diagnostics.engine.snapshot")
 local SHA = "c3005e0b9aaaabbbbccccddddeeeeffff0000111"
 local SHORT = "c3005e0b9"
 local REPO = "/Users/dev/ergopti"
-local SOURCE_DIR = REPO .. "/static/ergopti_plus/macos/infra"
+local SOURCE_DIR = REPO .. "/static/ergopti_plus/macos/updater/engine"
 local SHARED = REPO .. "/static/ergopti_plus/_shared"
 local APP_SHARED = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared"
-local APP_SOURCE = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/infra"
+local APP_SOURCE = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/updater/engine"
 
 -- The modules a case replaces or reloads; restored after each case.
 local FIXTURE_MODULES = {
 	"core.logger.engine.logger",
 	"diagnostics.engine.reports.snapshot",
-	"modules.updater",
-	"ui.menu.menu_about",
+	"updater.engine",
+	"updater.ui.menu_about",
 }
 
 
@@ -115,8 +115,8 @@ local function load_updater(is_local, version)
 	helpers.load_with_stubs("core.logger.engine.logger")
 	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["diagnostics.engine.reports.snapshot"] = nil
-	package.loaded["modules.updater"] = nil
-	local Updater = require("modules.updater")
+	package.loaded["updater.engine"] = nil
+	local Updater = require("updater.engine")
 	Updater.is_local_source = function() return is_local end
 	Updater.current_version = function() return version end
 	return Updater, warnings, errors
@@ -126,8 +126,8 @@ end
 --- @param Updater table The facade whose identity the menu reads.
 --- @return string title
 local function version_row(Updater)
-	package.loaded["ui.menu.menu_about"] = nil
-	local About = helpers.load_with_stubs("ui.menu.menu_about")
+	package.loaded["updater.ui.menu_about"] = nil
+	local About = helpers.load_with_stubs("updater.ui.menu_about")
 	local catalogue = french()
 	require("core.i18n.engine.i18n").get = function(key) return catalogue[key] or key end
 	local owner = { get = function() return "dev" end, set = function() end }

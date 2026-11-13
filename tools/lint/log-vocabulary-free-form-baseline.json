@@ -19,9 +19,9 @@
 		"static/ergopti_plus/windows/ai/engine/prediction/prompt_action.ahk": 8,
 		"static/ergopti_plus/windows/ai/engine/prediction/vision.ahk": 4,
 		"static/ergopti_plus/windows/ai/engine/prediction/vision_action.ahk": 3,
-		"static/ergopti_plus/windows/modules/updater/core.ahk": 2,
+		"static/ergopti_plus/windows/updater/engine/core.ahk": 2,
 		"static/ergopti_plus/windows/keyboard/engine/keys/constants.ahk": 2,
-		"static/ergopti_plus/windows/ui/changelog/init.ahk": 3,
+		"static/ergopti_plus/windows/updater/ui/changelog/init.ahk": 3,
 		"static/ergopti_plus/windows/ai/ui/menu/api_entries.ahk": 12
 	},
 	"phase": {

@@ -38,7 +38,7 @@ const { shared } = require('../lib/paths.cjs');
 const ROOT = path.join(__dirname, '../..');
 const CONTRACTS_PATH = shared('core/ports/contracts.json');
 const AHK_ADAPTERS_DIRS = [
-	path.join(ROOT, 'static/ergopti_plus/windows/adapters'),
+	path.join(ROOT, 'static/ergopti_plus/windows/updater/adapters'),
 	path.join(ROOT, 'static/ergopti_plus/windows/shortcuts/adapters'),
 	path.join(ROOT, 'static/ergopti_plus/windows/layouts/adapters'),
 	path.join(ROOT, 'static/ergopti_plus/windows/hotstrings/adapters'),

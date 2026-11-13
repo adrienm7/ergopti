@@ -34,7 +34,7 @@ local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Directories that ship runtime code. `tests/` is excluded by the walker.
-local SCANNED_DIRS = { "modules", "infra", "adapters", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold" }
+local SCANNED_DIRS = { "modules", "infra", "adapters", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold", "updater" }
 
 -- A file joins the corpus when it runs AppleScript at all — through
 -- hs.osascript, through the /usr/bin/osascript binary, or through the
@@ -304,7 +304,7 @@ helpers.describe("AppleScript escaping: one helper owns the rule, driver-wide", 
 				-- A call whose text already contains applescript_format is compliant:
 				-- the only AppleScript literal inside it is the one that formatter
 				-- produces. This matters for the genuinely nested site in
-				-- ui/download_window, where the OUTER string.format builds a /bin/sh
+				-- updater/ui/download_window, where the OUTER string.format builds a /bin/sh
 				-- command line (its %s filled by shell_quote) and the AppleScript
 				-- literal belongs to the inner call. Scanning the balanced call text
 				-- cannot tell the two apart, so the inner formatter is taken as proof.

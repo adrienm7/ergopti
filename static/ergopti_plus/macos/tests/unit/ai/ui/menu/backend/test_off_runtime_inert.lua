@@ -428,7 +428,7 @@ local OLLAMA_MODULES = {
 	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.network.adapters.http_client",
-	"ui.download_window",
+	"updater.ui.download_window",
 	"ai.ui.menu.requirement_operation_registry",
 	"ai.ui.menu.models.manager_ollama",
 }
@@ -465,7 +465,7 @@ local function with_ollama_manager(enabled, body)
 		}
 		package.loaded["core.process.adapters.shell_runner"] = {}
 		package.loaded["core.network.adapters.http_client"] = {}
-		package.loaded["ui.download_window"] = {}
+		package.loaded["updater.ui.download_window"] = {}
 		package.loaded["core.events.timer_scheduler"] = scheduler
 		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(label, executable, on_done, args)

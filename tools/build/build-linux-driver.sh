@@ -242,7 +242,7 @@ REQUIRED_FILES=(
 	# The localized sentences of the shell scripts and their reader.
 	"linux/install/messages.sh"
 	"linux/_generated/shell_messages/en.msg"
-	"linux/modules/updater/ownership_receipt.lua"
+	"linux/updater/engine/ownership_receipt.lua"
 	"linux/core/i18n/engine/i18n.lua"
 	"linux/core/timing/engine/timings.lua"
 	"linux/core/ui/ui/webkit_host.lua"

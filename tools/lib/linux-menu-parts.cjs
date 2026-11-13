@@ -530,7 +530,7 @@ function composeLinuxMenuRoot(sources) {
 	return { ok: true, source: result, parts: [...composed].map(partFile) };
 }
 
-/** Root plus every part module it or a part binds, read from `<pluginRoot>/linux/ui/menu`. */
+/** Root plus every part module it or a part binds, read from `<pluginRoot>/linux/updater/ui`. */
 function readLinuxMenuSources(pluginRoot) {
 	const read = (file) => fs.readFileSync(path.join(pluginRoot, file), 'utf8');
 	const sources = { [LINUX_MENU_ROOT]: read(LINUX_MENU_ROOT) };

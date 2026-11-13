@@ -256,7 +256,7 @@ function M.settings()
 	if not updater then return nil, updater_err end
 	-- The daemon runs without the updater (Main loads it optionally), so its
 	-- absence is this function's refusal, not a raise that ends the daemon.
-	local loaded, Updater = pcall(require, "modules.updater.manager")
+	local loaded, Updater = pcall(require, "updater.engine.manager")
 	if not loaded or type(Updater) ~= "table" or type(Updater.installed_channel) ~= "function" then
 		return nil, "the updater cannot name the installed channel: " .. tostring(loaded and "no installed_channel" or Updater)
 	end

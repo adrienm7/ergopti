@@ -3,11 +3,11 @@
 --- ==============================================================================
 --- TEST: Driver version comes from the release build stamp (Linux)
 --- DESCRIPTION:
---- infra/version.lua held a fixed "3.0.0" that no build rewrote, while releases
+--- updater/engine/version.lua held a fixed "3.0.0" that no build rewrote, while releases
 --- are published as 0.0.0-dev.N and N.N.N: the tray, the healthcheck, the boot
 --- snapshot and the updater all reported a version that never existed. The
 --- release build now stamps `version=` into the shared tree's build stamp and
---- infra/version.lua resolves it; these tests drive the shared parser, the
+--- updater/engine/version.lua resolves it; these tests drive the shared parser, the
 --- resolver, and the crash dump, which never wrote a version at all because its
 --- only caller passes no context.
 --- ==============================================================================
@@ -103,7 +103,7 @@ end)
 -- =====================================
 
 describe("linux-version-read-admission", function()
-	local Version = require("infra.version")
+	local Version = require("updater.engine.version")
 	local FileSystem = require("core.fs.adapters.file_system")
 	for _, case in ipairs({
 		{ "regular release bytes", "version=1.2.3\n", "1.2.3", "build" },
@@ -129,8 +129,8 @@ describe("linux-version-read-admission", function()
 	end
 end)
 
-describe("Driver version: infra/version.lua resolves the stamp", function()
-	local Version = require("infra.version")
+describe("Driver version: updater/engine/version.lua resolves the stamp", function()
+	local Version = require("updater.engine.version")
 
 	it("a release package reports the stamped version", function()
 		local version, source = Version.resolve({
@@ -178,14 +178,14 @@ describe("Driver version: infra/version.lua resolves the stamp", function()
 		-- the source (the old "3.0.0") would ignore the stamp and fail here.
 		local Paths = require("core.fs.engine.paths")
 		local FileSystem = require("core.fs.adapters.file_system")
-		local restore = helpers.keep_loaded({ "infra.version" })
+		local restore = helpers.keep_loaded({ "updater.engine.version" })
 		local original_root, original_read = Paths.shared_root, FileSystem.read
 		Paths.shared_root = function() return SHARED end
 		FileSystem.read = function(path)
 			if path == STAMP then return "commit=" .. SHA .. "\nversion=0.0.0-dev.913\n" end
 			return nil
 		end
-		local ok, loaded = pcall(helpers.load_module, "infra.version")
+		local ok, loaded = pcall(helpers.load_module, "updater.engine.version")
 		Paths.shared_root, FileSystem.read = original_root, original_read
 		restore()
 		assert_true(ok, tostring(loaded))
@@ -207,7 +207,7 @@ describe("Driver version: the crash dump names the version and the app dir", fun
 	it("writes both lines although the daemon passes no context", function()
 		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
 			local Paths = require("core.fs.engine.paths")
-			local Version = require("infra.version")
+			local Version = require("updater.engine.version")
 			local Reporter = helpers.load_module("diagnostics.engine.reports.crash_reporter")
 			local ok, err = pcall(Reporter.dump, "ergopti_hotstrings", "boom")
 			if not ok then error(err, 0) end

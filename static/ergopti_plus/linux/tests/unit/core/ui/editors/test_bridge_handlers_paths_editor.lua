@@ -176,7 +176,7 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(result.data.defaultConfigDir, "/tmp/ergopti-default")
 			helpers.assert_eq(result.data.logsDir, "/tmp/ergopti-logs")
 			helpers.assert_eq(result.data.defaultLogsDir, "/tmp/ergopti-default-logs")
-			helpers.assert_eq(result.data.version, require("infra.version").VERSION)
+			helpers.assert_eq(result.data.version, require("updater.engine.version").VERSION)
 			helpers.assert_eq(result.data.strings["paths_editor.heading"],
 				"translated:paths_editor.heading")
 			helpers.assert_eq(captured.pushes[1].app, "paths_editor")

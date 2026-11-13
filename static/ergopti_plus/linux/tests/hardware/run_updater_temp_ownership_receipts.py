@@ -26,7 +26,7 @@ import time
 ARCHIVE = b"Synthetic download bytes; this fixture never installs them"
 WORKER = r"""
 local uv = require("luv")
-local Manager = require("modules.updater.manager")
+local Manager = require("updater.engine.manager")
 local ScriptActions = require("shortcuts.engine.script_actions")
 local controller = ScriptActions.new({
  reset = function() assert(Manager.cancel_update()) end,
@@ -40,7 +40,7 @@ assert(not uv.loop_alive(), "Actual updater preparation retained native timer de
 -- Prepare actual runtime libraries before the first native transfer.
 -- These production factories acquire no archive/reader/EVP context or timer.
 -- Keep them reachable through the original operation and native retirement.
-local Output = require("infra.archive_output")
+local Output = require("updater.engine.archive_output")
 local prepared_artifact = assert(Output.native_artifact("ergopti-plus-linux.tar.gz"),
  "Actual native archive runtime preparation unavailable")
 local prepared_output = Output.native()

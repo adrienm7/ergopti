@@ -151,7 +151,7 @@ end
 --- finds it in whichever of these files now holds it.
 --- @return string The root's text, then each module it or a part binds, in binding order.
 function M.read_menu_source()
-	local directory = M.driver_root() .. "/ui/menu/"
+	local directory = M.driver_root() .. "/updater/ui/"
 	local function read(name)
 		local handle = assert(io.open(directory .. name .. ".lua", "rb"))
 		local text = assert(handle:read("*a"))

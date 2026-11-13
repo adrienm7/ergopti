@@ -330,7 +330,7 @@ def build_and_run(repository, hardware, command):
     assert command[2] == str(repository) and 0 < int(command[3]) < 65536
     _boundary_marker("build-admission")
     driver = repository / "static/ergopti_plus/linux"
-    source_directory = driver / "native/archive_output"
+    source_directory = driver / "updater/native"
     script = repository / "tools/build/build-linux-native-output.sh"
     inputs = [
         script,
@@ -541,10 +541,8 @@ def main():
                 Path(__file__).resolve(),
                 hardware / "run_native_subreaper.py",
                 repository / "tools/build/build-linux-native-output.sh",
-                repository
-                / "static/ergopti_plus/linux/native/archive_output/archive_publication.c",
-                repository
-                / "static/ergopti_plus/linux/native/archive_output/archive_publication.h",
+                repository / "static/ergopti_plus/linux/updater/native/archive_publication.c",
+                repository / "static/ergopti_plus/linux/updater/native/archive_publication.h",
             ]
         )
 

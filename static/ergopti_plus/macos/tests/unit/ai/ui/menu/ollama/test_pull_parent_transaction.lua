@@ -33,7 +33,7 @@ local MODULES = {
 	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.network.adapters.http_client",
-	"ui.download_window",
+	"updater.ui.download_window",
 	"ai.ui.menu.profile_label",
 	"ai.ui.menu.models.switcher",
 	"ai.ui.menu.requirement_operation_registry",
@@ -175,7 +175,7 @@ local function with_fixture(save_results, callback)
 					return client
 				end,
 			}
-			package.loaded["ui.download_window"] = {
+			package.loaded["updater.ui.download_window"] = {
 				show = function() return true end,
 				update = function() return true end,
 				complete = function() return true end,

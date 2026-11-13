@@ -42,7 +42,7 @@
 ---    instance's current generation before delivering, so a stale callback
 ---    from a superseded request (e.g. a warmup POST outlived by a real
 ---    inference POST sharing the same instance) is discarded instead of
----    delivering its result to the wrong caller. Mirrors modules/updater/init.lua's
+---    delivering its result to the wrong caller. Mirrors updater/engine/init.lua's
 ---    _poll_generation pattern.
 --- 8. Redirect ownership: requests carrying caller credentials, and every HTTPS
 ---    request, disable the native opaque auto-follow path. Same-origin hops

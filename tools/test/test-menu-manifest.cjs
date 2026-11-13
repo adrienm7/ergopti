@@ -1434,7 +1434,7 @@ function checkUpdateFrequencyControl() {
 			'MenuRenderer_ChoiceRow'
 		],
 		[
-			'macos/ui/menu/menu_about.lua',
+			'macos/updater/ui/menu_about.lua',
 			'local function frequency_picker(',
 			'\nend',
 			'ManifestMenu.choice_row'
@@ -4158,7 +4158,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	for (const [driver, file] of [
 		['ahk', 'windows/menu/ui/builder/menu_init.ahk'],
-		['hs', 'macos/ui/menu/menu_about.lua'],
+		['hs', 'macos/updater/ui/menu_about.lua'],
 		['linux', 'linux/menu/ui/builder/builder.lua']
 	]) {
 		const text = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
@@ -4203,7 +4203,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		for (const platform of ['ahk', 'hs', 'linux']) assert(row.platforms.includes(platform));
 		for (const [platform, path] of [
 			['ahk', 'windows/menu/ui/builder/menu_init.ahk'],
-			['hs', 'macos/ui/menu/menu_about.lua'],
+			['hs', 'macos/updater/ui/menu_about.lua'],
 			['linux', 'linux/menu/ui/builder/builder.lua']
 		])
 			assert.equal(row.native_sources[platform], path);
@@ -5146,7 +5146,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	assert.equal(
 		existsSync(
-			resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_llm/live_mode_panel.lua')
+			resolve(REPO_ROOT, 'static/ergopti_plus/macos/updater/ui/menu_llm/live_mode_panel.lua')
 		),
 		false,
 		'the retired Live provider cannot regain a native owner'
@@ -5925,7 +5925,10 @@ console.log(
 			false,
 			'duplicate native adapter cannot borrow authority'
 		);
-		const foreign = { ...physicalPersonalSources, 'windows/adapters/foreign_native.ahk': original };
+		const foreign = {
+			...physicalPersonalSources,
+			'windows/updater/adapters/foreign_native.ahk': original
+		};
 		delete foreign[nativeFile];
 		assert.equal(
 			physicalPersonalFrameDataPublication(foreign, menu.personal_shortcuts_frame, entry),

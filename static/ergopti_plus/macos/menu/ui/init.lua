@@ -112,7 +112,7 @@ local menu_mods = _branch_rows.wrap({
 	keystats       = safe_require("metrics.ui.menu.metrics",         "metrics menu"),
 	tap_holds       = safe_require("tap_hold.ui.menu_tap_holds",    "tap-holds menu"),
 	apps            = safe_require("apps.ui.menu.apps",            "apps menu"),
-	about           = safe_require("ui.menu.menu_about",           "about/update menu"),
+	about           = safe_require("updater.ui.menu_about",           "about/update menu"),
 })
 
 -- Load core modules
@@ -831,7 +831,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- follows its durable changes. The About menu reads it from ctx.channel_owner.
 	local channel_owner = nil
 	local ok_owner, owner_or_err = pcall(function()
-		return require("modules.updater.channel").new({ state = state, save = save_prefs })
+		return require("updater.engine.channel").new({ state = state, save = save_prefs })
 	end)
 	if ok_owner then
 		channel_owner = owner_or_err
@@ -848,8 +848,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local update_checks = nil
 	if channel_owner then
 		local ok_checks, checks_or_err = pcall(function()
-			if require("modules.updater").is_local_source() then return nil end
-			local AutoCheck = require("modules.updater.auto_check")
+			if require("updater.engine").is_local_source() then return nil end
+			local AutoCheck = require("updater.engine.auto_check")
 			return AutoCheck.start_session({
 				state = state,
 				save = save_prefs,
@@ -1679,7 +1679,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return do_reload("menu") == true
 	end)
 	WindowToggle.set_opener("changelog", function()
-		return require("ui.changelog").open({ channel_owner = channel_owner })
+		return require("updater.ui.changelog").open({ channel_owner = channel_owner })
 	end)
 	WindowToggle.set_opener("healthcheck", function()
 		return require("diagnostics.ui.healthcheck").show_window({ state = state })
@@ -1709,7 +1709,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	ctx.updateMenu   = updateMenu
 	ctx.refresh_icon = function() pcall(update_icon) end
 	-- About's check row completes a release whose restart was refused.
-	require("ui.changelog").set_pending_install_observer(updateMenu)
+	require("updater.ui.changelog").set_pending_install_observer(updateMenu)
 
 	-- Rebuilds and caches the full menubar tree, timing the build so a slow menu
 	-- is visible in the boot/runtime log (the macOS analog of the AHK menu-build
@@ -1895,7 +1895,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- logs after boot. A probe failure is reported, never allowed to unwind
 			-- the menu prime that precedes it.
 			local snapshot_ok, snapshot_err = pcall(function()
-				local Updater = require("modules.updater")
+				local Updater = require("updater.engine")
 				DiagnosticSnapshot.emit_once({
 					version    = Updater.current_version(),
 					boot_ms    = BootProfiler.boot_complete_ms(),

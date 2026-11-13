@@ -231,7 +231,7 @@ end
 LegacyFolderMigration.log(Logger, legacy_folder_report)
 
 -- Single source of the driver version (never a re-typed literal).
-local Version = require("infra.version")
+local Version = require("updater.engine.version")
 local LOG = "ergopti_hotstrings"
 
 
@@ -303,7 +303,7 @@ local prediction_engine = RuntimeGuard.optional_require("ai.engine.prediction.en
 local dyn_hotstrings = RuntimeGuard.optional_require("hotstrings.engine.dynamic.manager")
 
 -- Updater engine (optional — checks GitHub releases, downloads and installs updates).
-local updater = RuntimeGuard.optional_require("modules.updater.manager")
+local updater = RuntimeGuard.optional_require("updater.engine.manager")
 
 -- Gestures manager (optional — trackpad/mouse gesture recognition via libinput).
 local gestures = RuntimeGuard.optional_require("gestures.engine.manager")
@@ -801,7 +801,7 @@ local function restart_on_installed_release(paused)
 	local launch_args = {}
 	for index = 1, #arg do launch_args[index] = arg[index] end
 	local root = updater.installed_root()
-	local how = require("modules.updater.restarter").restart({
+	local how = require("updater.engine.restarter").restart({
 		wrapper = updater.installed_launcher(),
 		args = launch_args,
 		paused = paused,
@@ -878,7 +878,7 @@ privacy_owners.tray_quit = require("core.lifecycle.engine.shutdown.quit_request"
 	writer_active = function() return require("settings.engine.scope.registry").pending() end,
 	publication_pending = function() return hotstrings_config.publication_pending() end,
 	apply_pause_layout = function() require("layouts.engine.emulation.pause_layout_switch").quit_safely() end,
-	report_update_quit = function(reason) require("infra.updater_boot_ready").report_quit(reason) end,
+	report_update_quit = function(reason) require("updater.engine.boot_ready").report_quit(reason) end,
 	schedule = function(seconds, callback)
 		return TimerScheduler.after(seconds, callback).armed == true
 	end,
@@ -912,7 +912,7 @@ local function install_signal_handlers()
 		-- instead of starting the previous daemon, as the macOS shutdown callback
 		-- reports a quit for any termination that is not a reload.
 		if not shutdown.is_requested() then
-			local reported, report_err = pcall(require("infra.updater_boot_ready").report_quit, "signal " .. tostring(sig))
+			local reported, report_err = pcall(require("updater.engine.boot_ready").report_quit, "signal " .. tostring(sig))
 			if not reported then pcall(Logger.error, LOG, "The update watcher could not be told of the signal: %s.", tostring(report_err)) end
 		end
 		shutdown.request("signal " .. tostring(sig))
@@ -3671,7 +3671,7 @@ local function main()
 	if not privacy_owners.startup_checkpoint() then return end
 	local boot_ms = BootProfiler.complete()
 	-- An update watcher that started this daemon keeps it only once it reports ready.
-	require("infra.updater_boot_ready").report("daemon ready")
+	require("updater.engine.boot_ready").report("daemon ready")
 	-- The Reload this boot completes, if any, from its request in the previous daemon.
 	local reload_ms = require("core.timing.engine.reload_timing").complete()
 	if not privacy_owners.startup_checkpoint() then return end

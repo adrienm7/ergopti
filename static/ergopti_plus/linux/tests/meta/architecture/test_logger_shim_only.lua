@@ -11,7 +11,7 @@
 ---
 --- Two facts this docstring previously got wrong, corrected here because a stale
 --- rationale is how the sink bug survived:
---- 1. `linux/infra/` DOES exist (file_watchers, i18n, locale, logger_sink,
+--- 1. `linux/updater/engine/` DOES exist (file_watchers, i18n, locale, logger_sink,
 ---    monotonic, timings, version). The forbidden module is `lib.logger`
 ---    specifically, not the whole namespace.
 --- 2. `logger.shim` is NOT the print-fallback in production. Because _shared
@@ -36,7 +36,7 @@ local DRIVER_ROOT = helpers.driver_root()
 
 -- Production directories to scan — deliberately excludes tests/ (this file
 -- mentions the forbidden pattern in prose) and vendor/ (third-party code).
-local SCAN_DIRS = { "adapters", "modules", "platform", "core", "settings", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold" }
+local SCAN_DIRS = { "adapters", "modules", "platform", "core", "settings", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold", "updater" }
 
 -- The forbidden require, in both quote styles AHK/Lua authors might type.
 local FORBIDDEN_PATTERNS = {

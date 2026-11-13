@@ -121,11 +121,11 @@ function H.collect_versions()
 	local runtime = SystemInfo.runtime_version()
 	return {
 		ergopti_version = read("the ErgoptiPlus version", function()
-			return require("modules.updater").current_version()
+			return require("updater.engine").current_version()
 		end),
 		commit          = commit .. " (" .. source .. ")",
 		channel         = read("the update channel", function()
-			return require("modules.updater").installed_channel()
+			return require("updater.engine").installed_channel()
 		end),
 		runtime         = runtime and ("Hammerspoon " .. runtime) or nil,
 		-- The version the package pins, and whether its CLI is installed: the fork

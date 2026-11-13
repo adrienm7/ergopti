@@ -30,7 +30,7 @@
  * 4. The guard proves it can fail: it is re-run on a copy of each workflow with
  *    one stamp removed and must report it.
  * 5. The Linux build also stamps the release version: the Linux driver has no
- *    other version source (linux/infra/version.lua reads the stamp), and a fixed
+ *    other version source (linux/updater/engine/version.lua reads the stamp), and a fixed
  *    literal there once made every install report a release that never existed.
  *    One assembly serves CI and release, so every build-linux-driver.sh step
  *    must hand ERGOPTI_BUILD_VERSION the version its box receives (empty outside

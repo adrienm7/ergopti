@@ -173,7 +173,7 @@ for (const [name, publisher] of [
 const owner = ahkBody('modules/updater/core.ahk', 'Updater_IsLocalSource');
 expect(/return !A_IsCompiled/.test(owner), 'Updater_IsLocalSource must stay the Windows owner');
 expect(
-	code('windows', 'modules/updater/core.ahk', ahkComment).split('A_IsCompiled').length === 2,
+	code('windows', 'updater', 'engine', 'core.ahk', ahkComment).split('A_IsCompiled').length === 2,
 	'core.ahk reads A_IsCompiled in Updater_IsLocalSource only'
 );
 for (const [file, name] of [
@@ -218,12 +218,14 @@ for (const file of sources('macos', '.lua')) {
 	);
 }
 expect(
-	/function M\.is_local_source\(\)/.test(code('macos', 'modules/updater/init.lua', luaComment)),
+	/function M\.is_local_source\(\)/.test(
+		code('macos', 'updater', 'engine', 'init.lua', luaComment)
+	),
 	'Updater.is_local_source must stay the macOS owner'
 );
 expect(
 	/installed_build"\]\s*=\s*function\(\)\s*return not is_local_source\(\)/.test(
-		code('macos', 'ui/menu/menu_about.lua', luaComment)
+		code('macos', 'updater', 'ui', 'menu_about.lua', luaComment)
 	),
 	'the macOS About menu must answer installed_build from Updater.is_local_source'
 );
@@ -270,7 +272,7 @@ for (const file of [
 }
 expect(
 	/installed_build"\]\s*=\s*function\(\)\s*return not Installation\.is_source_run\(\)/.test(
-		code('linux', 'ui/menu/menu_about.lua', luaComment)
+		code('linux', 'updater', 'ui', 'menu_about.lua', luaComment)
 	),
 	'the Linux About menu must answer installed_build from Installation.is_source_run'
 );

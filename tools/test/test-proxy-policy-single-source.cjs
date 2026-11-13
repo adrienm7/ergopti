@@ -30,7 +30,7 @@ const POLICY = 'static/ergopti_plus/_shared/core/network/data/proxy_policy.json'
 // generated yet. Remove an entry when its copy is replaced by the JSON.
 const KNOWN_COPIES = new Map([
 	[
-		'static/ergopti_plus/macos/adapters/release_stage.sh',
+		'static/ergopti_plus/macos/updater/adapters/release_stage.sh',
 		{
 			count: 1,
 			reason:

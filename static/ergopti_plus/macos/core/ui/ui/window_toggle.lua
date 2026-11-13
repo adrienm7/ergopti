@@ -41,7 +41,7 @@ local PAGES = {
 	layout_manager           = { module = "layouts.ui.layout_manager", open = "open" },
 	layer_editor             = { module = "layouts.ui.layer_editor" },
 	model_browser            = { module = "ai.ui.model_browser" },
-	changelog                = { module = "ui.changelog" },
+	changelog                = { module = "updater.ui.changelog" },
 	healthcheck              = { module = "diagnostics.ui.healthcheck", close = "close_window" },
 }
 M.PAGES = PAGES

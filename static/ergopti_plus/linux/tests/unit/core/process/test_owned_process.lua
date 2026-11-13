@@ -455,7 +455,7 @@ local function feeder_options(mode, cap)
   package.loaded.luv = uv
   package.loaded["core.network.engine.managed_http_deadline"] = { start = function() return timer end }
   package.loaded["core.process.adapters.owned_process"] = process
-  local construct = require("infra.archive_tar_feeder").new
+  local construct = require("updater.engine.archive_tar_feeder").new
   local start = assert(construct({ ffi = { new = function() return { [0] = -1 } end },
    symbols = { allocate_reader = function() reads = reads + 1; return -1 end } }, cap))
   assert(start({ pointer = {}, committed = true }, mode, "/controlled/extract", 3,

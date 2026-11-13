@@ -10,7 +10,7 @@ Paths.home = function() return root end
 -- Boot creates the cache folder (settings/engine/migration/legacy_folder_migration.lua run());
 -- the updater only makes a request conditional when it exists.
 assert(os.execute("mkdir -p '" .. Paths.cache() .. "'"), "the cache folder is prepared like boot does")
-local M = require("modules.updater.manager")
+local M = require("updater.engine.manager")
 M.release_api_url = function()
 	return assert(os.getenv("HTTP_CONDITIONAL_ORIGIN")) .. "/releases?per_page=20"
 end

@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 -- The cases replace these entries; the module end puts them back.
-local restore_loaded = require("tests.helpers").keep_loaded({ "ui.changelog.bridge" })
+local restore_loaded = require("tests.helpers").keep_loaded({ "updater.ui.changelog.bridge" })
 package.loaded["tests.support.ui.editors.ui_bridge_handlers_fixture"] = nil
 local Fixture = require("tests.support.ui.editors.ui_bridge_handlers_fixture")
 local helpers, build_mock_state, make_spies, with_opened_spies =
@@ -340,11 +340,11 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("changelog_bridge", function()
-    local handler = helpers.load_module("ui.changelog.bridge")
+    local handler = helpers.load_module("updater.ui.changelog.bridge")
     local original_handler = handler
     -- The document fixture narrows the timing API; initialize the updater
     -- against the real timing registry before the fixture installs its double.
-    require("modules.updater.manager")
+    require("updater.engine.manager")
     local native_document = require("tests.support.document_fixture").new("changelog", original_handler, build_mock_state())
     handler = native_document.proxy()
     local state = build_mock_state()
@@ -363,7 +363,7 @@ helpers.describe("ui.bridge_handlers", function()
       local result = handler.on_message("ready", state)
       helpers.assert_true(type(result) == "table")
       helpers.assert_eq(result.action, "releases")
-      helpers.assert_eq(result.channel, require("modules.updater.manager").get_channel(),
+      helpers.assert_eq(result.channel, require("updater.engine.manager").get_channel(),
         "the page opens on the subscribed channel")
       helpers.assert_eq(type(result.cache_miss), "boolean")
       helpers.assert_true(type(result.releases) == "table")
@@ -371,9 +371,9 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(type(result.version) == "string")
     end)
     helpers.it("returns cached releases in the exact schema the page renders (lnx-056)", function()
-      local previous = package.loaded["modules.updater.manager"]
-      local real = require("modules.updater.manager")
-      package.loaded["modules.updater.manager"] = setmetatable({
+      local previous = package.loaded["updater.engine.manager"]
+      local real = require("updater.engine.manager")
+      package.loaded["updater.engine.manager"] = setmetatable({
         get_channel = function() return "dev" end,
         get_cached_release = function()
           return {
@@ -383,7 +383,7 @@ helpers.describe("ui.bridge_handlers", function()
         end,
       }, { __index = real })
       local result = handler.on_message({ action = "fetch", channel = "dev" }, state)
-      package.loaded["modules.updater.manager"] = previous
+      package.loaded["updater.engine.manager"] = previous
       helpers.assert_eq(result.channel, "dev")
       helpers.assert_eq(result.cache_miss, false)
       helpers.assert_eq(result.releases[1].tag_name, "v9.8.7")
@@ -450,7 +450,7 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("dl_bridge", function()
-    local handler = helpers.load_module("ui.download_window.bridge")
+    local handler = helpers.load_module("updater.ui.download_window.bridge")
 	helpers.it("linux-model-pull-retry-retirement: progress retries preserve successful settlement", function()
 		local previous_manager = package.loaded["core.ui.ui.webview_manager"]
 		local evaluated, retries = {}, 0
@@ -825,7 +825,7 @@ restore_loaded()
 
 helpers.it("download window refuses FIFO managed network policy without blocking", function()
 	local uv, Paths = require("luv"), require("core.fs.engine.paths")
-	local previous_bridge, previous_manager, original_shared = package.loaded["ui.download_window.bridge"],
+	local previous_bridge, previous_manager, original_shared = package.loaded["updater.ui.download_window.bridge"],
 		package.loaded["core.ui.ui.webview_manager"], Paths.shared
 	local source = assert(original_shared("core/network/data/managed_network.json"))
 	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-download-fifo-XXXXXX"))
@@ -833,8 +833,8 @@ helpers.it("download window refuses FIFO managed network policy without blocking
 	local made = os.execute("mkfifo '" .. path .. "'"); assert(made == 0 or made == true)
 	local shown = 0
 	package.loaded["core.ui.ui.webview_manager"] = { show = function() shown = shown + 1; return false end, hide = function() end }
-	package.loaded["ui.download_window.bridge"] = nil
-	local Bridge = require("ui.download_window.bridge")
+	package.loaded["updater.ui.download_window.bridge"] = nil
+	local Bridge = require("updater.ui.download_window.bridge")
 	Paths.shared = function(relative)
 		if relative == "core/network/data/managed_network.json" then return path end
 		return original_shared(relative)
@@ -844,7 +844,7 @@ helpers.it("download window refuses FIFO managed network policy without blocking
 		code, exited = result, true; process:close()
 	end))
 	local called = pcall(Bridge.show, { kind = "app_update", label = "Update" })
-	Paths.shared, package.loaded["ui.download_window.bridge"], package.loaded["core.ui.ui.webview_manager"] =
+	Paths.shared, package.loaded["updater.ui.download_window.bridge"], package.loaded["core.ui.ui.webview_manager"] =
 		original_shared, previous_bridge, previous_manager
 	os.remove(path); os.remove(dir)
 	while not exited do uv.run("once") end

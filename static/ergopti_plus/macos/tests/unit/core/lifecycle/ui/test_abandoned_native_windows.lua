@@ -16,7 +16,7 @@ require("core.logger.engine")
 --- @param scenario function Receives controller and native observations.
 local function with_window(module_name, scenario)
 	helpers.with_stub_scope({
-		"ui.download_window", "ui.download_window.javascript", "ui.download_window.pending_queue",
+		"updater.ui.download_window", "updater.ui.download_window.javascript", "updater.ui.download_window.pending_queue",
 		"metrics.ui.metrics_typing", "metrics.ui.metrics_typing.projection", "metrics.ui.metrics_typing.snapshot",
 		"core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.events.timer_scheduler", "core.timing.engine.deferred_work", "core.timing.engine.paced_job", "core.timing.engine.paced_json",
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
@@ -60,13 +60,13 @@ local function with_window(module_name, scenario)
 			end },
 		})
 		function h.show(on_abort)
-			if module_name == "ui.download_window" then
+			if module_name == "updater.ui.download_window" then
 				return window.show({ kind = "mlx_model", model = "fixture", on_abort = on_abort })
 			end
 			return window.show()
 		end
 		function h.close()
-			if module_name == "ui.download_window" then return window.hide() end
+			if module_name == "updater.ui.download_window" then return window.hide() end
 			return window.close()
 		end
 		function h.drain()
@@ -77,7 +77,7 @@ local function with_window(module_name, scenario)
 end
 
 helpers.describe("discarded UI windows release native references", function()
-	for _, module_name in ipairs({ "ui.download_window", "metrics.ui.metrics_typing" }) do
+	for _, module_name in ipairs({ "updater.ui.download_window", "metrics.ui.metrics_typing" }) do
 		helpers.it("retires user-closed " .. module_name .. " and opens a healthy successor", function()
 			with_window(module_name, function(window, h)
 				helpers.assert_true(h.show())
@@ -125,7 +125,7 @@ helpers.describe("discarded UI windows release native references", function()
 	end
 
 	helpers.it("keeps the download successor opened inside its native close callback", function()
-		with_window("ui.download_window", function(window, h)
+		with_window("updater.ui.download_window", function(window, h)
 			helpers.assert_true(h.show(function()
 				helpers.assert_nil(next(h.script_refs), "old bridge is released before producer callbacks")
 				helpers.assert_true(h.show())

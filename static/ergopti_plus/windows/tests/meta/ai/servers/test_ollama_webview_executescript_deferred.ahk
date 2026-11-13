@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Ollama WebView ExecuteScript Deferral Meta Test (Pattern 4)
 ; DESCRIPTION:
-; Third instance of the same bug already fixed in ui/changelog/init.ahk and
+; Third instance of the same bug already fixed in updater/ui/changelog/init.ahk and
 ; ai/ui/model_browser/init.ahk: ExecuteScript() (== ExecuteScriptAsync().await())
 ; was called directly inside the WebMessageReceived callback that triggers
 ; it, re-entering the STA apartment and wedging further WebView2 message

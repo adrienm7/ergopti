@@ -9,7 +9,7 @@
  * shell string is not checked by any compiler, linter or suite.
  *
  * ROOT CAUSE ENCODED:
- * The build scripts `cp` from `linux/infra/...` and install to `/usr/lib/ergopti`
+ * The build scripts `cp` from `linux/updater/engine/...` and install to `/usr/lib/ergopti`
  * and `~/.local/lib/ergopti` — a source path that must track a directory rename
  * sitting on lines next to install paths that must NOT. Most of these copies are
  * written `cp -r … 2>/dev/null || true`, so a path that stops existing produces
@@ -252,8 +252,8 @@ for (const [file, before, after] of [
 	assert.throws(() => classifyGeneratedNativeArtifacts(sources), /source recipe refused/);
 }
 for (const input of [
-	'static/ergopti_plus/linux/native/archive_output/archive_publication.c',
-	'static/ergopti_plus/linux/native/archive_output/archive_publication.h'
+	'static/ergopti_plus/linux/updater/native/archive_publication.c',
+	'static/ergopti_plus/linux/updater/native/archive_publication.h'
 ]) {
 	const sources = { ...generated.sources, [input]: null };
 	assert.throws(() => classifyGeneratedNativeArtifacts(sources), /source recipe refused/);

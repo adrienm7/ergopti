@@ -709,7 +709,7 @@ function closedModuleExport(unit, lex, rootPositions) {
 		LlmBackendRows: 'ai.ui.menu.backend_rows',
 		ProgrammableHotstrings: 'hotstrings.ui.menu.programmatic_hotstrings',
 		ProgrammableMenuPolicy: 'menu.engine.programmable_hotstrings',
-		Version: 'infra.version',
+		Version: 'updater.engine.version',
 		Installation: 'core.lifecycle.engine.installation',
 		VersionLabel: 'updater.engine.version_label',
 		Schedule: 'updater.engine.schedule',

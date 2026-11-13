@@ -62,7 +62,7 @@ end
 print("  newest published Ergopti release: " .. ergopti_tags[1])
 
 local Manager = require("core.ui.ui.webview_manager")
-local Updater = require("modules.updater.manager")
+local Updater = require("updater.engine.manager")
 -- Actual script-control pause state, with lifecycle callbacks scoped to the
 -- one native changelog window owned by this fixture.
 local script_actions = require("shortcuts.engine.script_actions").new({

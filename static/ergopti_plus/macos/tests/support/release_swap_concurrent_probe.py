@@ -83,7 +83,7 @@ def command_from(driver, physical, arming, app, staged, pid, emission_source):
         return json.loads(result.stdout)
     if emission_source != "strict-source":
         raise ValueError("An explicit supported release emission source is required")
-    source = (driver / "modules/updater/release_installer.lua").read_text(encoding="utf-8")
+    source = (driver / "updater/engine/release_installer.lua").read_text(encoding="utf-8")
     # This fixture supplies positional script inputs. It does not run arm_swap:
     # the common Lua gate compares this entire vector with the actual Lua call.
     return {
@@ -125,7 +125,7 @@ def emitted(driver, root, emission_source):
         os.getpid(),
         emission_source,
     )
-    source = (driver / "modules/updater/release_installer.lua").read_text(encoding="utf-8")
+    source = (driver / "updater/engine/release_installer.lua").read_text(encoding="utf-8")
     if command["args"][3] != physical.extract_program(source):
         raise RuntimeError("The physical concurrent probe does not match actual swap bytes")
     if command["args"][1] != physical.extract_program(source, "DETACH_SCRIPT"):
@@ -154,7 +154,7 @@ def emission_controls(driver, root):
                 "argv_sha256": command_digest(actual),
             }
         )
-    source = (driver / "modules/updater/release_installer.lua").read_text(encoding="utf-8")
+    source = (driver / "updater/engine/release_installer.lua").read_text(encoding="utf-8")
     marker = "local DETACH_SCRIPT = table.concat({"
     assert source.count(marker) == 1
     head, tail = source.split(marker)
@@ -538,7 +538,7 @@ def main():
                     if args.emission_source == "strict-source"
                     else "actual-arm-swap-lua",
                     "source_sha256": hashlib.sha256(
-                        (args.driver / "modules/updater/release_installer.lua").read_bytes()
+                        (args.driver / "updater/engine/release_installer.lua").read_bytes()
                     ).hexdigest(),
                     "native_launcher": str(args.native_launcher) if args.native_launcher else None,
                     "cases": records,

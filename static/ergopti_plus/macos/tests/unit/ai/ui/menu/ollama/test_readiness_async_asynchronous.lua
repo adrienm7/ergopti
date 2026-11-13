@@ -385,7 +385,7 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 			package.loaded["ai.engine.ollama.server_command"] = {
 				build = function() return "exec /opt/homebrew/bin/ollama serve" end,
 			}
-			package.loaded["ui.download_window"] = {
+			package.loaded["updater.ui.download_window"] = {
 				show = function() return true end,
 				update = function() return true end,
 				complete = function() return true end,

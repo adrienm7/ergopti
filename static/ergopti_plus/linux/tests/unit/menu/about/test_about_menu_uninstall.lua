@@ -217,7 +217,7 @@ end
 --- Native version, startup and transaction boundaries record effects only.
 local function with_about_parent(code, options, body)
 	options = options or {}
-	local names = { "menu.ui.builder.builder", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "infra.version",
+	local names = { "menu.ui.builder.builder", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "updater.engine.version",
 		"core.lifecycle.engine.installation", "onboarding.ui.menu_start_at_login", "menu.ui.transactions.uninstall" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -254,7 +254,7 @@ local function with_about_parent(code, options, body)
 		root.top_level = { parent, boundary, quit }
 		local state = { versions = 0, startup_reads = 0, toggles = 0, changed = 0,
 			quits = 0, pages = {}, removals = {}, enabled = true }
-		package.loaded["infra.version"] = { VERSION = "local", LOCAL = "local", identity = function()
+		package.loaded["updater.engine.version"] = { VERSION = "local", LOCAL = "local", identity = function()
 			state.versions = state.versions + 1
 			if options.reenter then options.reenter(root, parent, state) end
 			return { kind = "release", version = "9.9.9", commit = "frozen123" }

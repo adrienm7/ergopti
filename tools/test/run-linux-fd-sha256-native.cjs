@@ -215,7 +215,7 @@ function qualifyStandalonePaths() {
 				inventory = [];
 			fs.mkdirSync(root, { mode: PRIVATE_DIRECTORY_MODE });
 			for (const relative of [
-				'static/ergopti_plus/linux/infra',
+				'static/ergopti_plus/linux/updater/engine',
 				'static/ergopti_plus/linux/tap_hold/engine',
 				'static/ergopti_plus/linux/shortcuts/engine',
 				'static/ergopti_plus/linux/metrics/engine',

@@ -282,7 +282,7 @@ function M.inject_no_remote_csp(html, app_name)
 	if type(html) ~= "string" then return html or "" end
 	-- The shared policy replaces the page's browser-host CSP (which would block
 	-- every inlined script) and denies network access: the changelog's release
-	-- sources are fetched natively by its bridge (ui/changelog/bridge.lua).
+	-- sources are fetched natively by its bridge (updater/ui/changelog/bridge.lua).
 	local nonce = nil
 	if app_name == "changelog" then
 		nonce = M.native_nonce()

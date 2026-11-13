@@ -25,8 +25,11 @@ const WINDOWS_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 const index = fs.readFileSync(path.join(SHARED_CHANGELOG, 'index.html'), 'utf8');
 const script = fs.readFileSync(path.join(SHARED_CHANGELOG, 'script.js'), 'utf8');
 const markdown = fs.readFileSync(path.join(SHARED_CHANGELOG, '..', 'markdown.js'), 'utf8');
-const bridge = fs.readFileSync(path.join(WINDOWS_ROOT, 'ui', 'changelog', 'init.ahk'), 'utf8');
-const updater = fs.readFileSync(path.join(WINDOWS_ROOT, 'modules', 'updater', 'core.ahk'), 'utf8');
+const bridge = fs.readFileSync(
+	path.join(WINDOWS_ROOT, 'updater', 'ui', 'changelog', 'init.ahk'),
+	'utf8'
+);
+const updater = fs.readFileSync(path.join(WINDOWS_ROOT, 'updater', 'engine', 'core.ahk'), 'utf8');
 
 const failures = [];
 

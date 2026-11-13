@@ -140,7 +140,7 @@ package.loaded['core.ui.ui.builder'] = {
 		return native
 	end,
 }
-local window = helpers.load_with_stubs('ui.download_window', {
+local window = helpers.load_with_stubs('updater.ui.download_window', {
 	webview = { usercontent = { new = function()
 		return { setCallback = function(_, callback) bridge = callback end }
 	end } },

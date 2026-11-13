@@ -30,7 +30,7 @@ local WIRED_MS = {
 	{ "debounce", "terminal_hotstring_key_delay_ms", 20 },
 	-- layouts/engine/input_sources.lua: hard deadline for mutation subprocesses.
 	{ "ui", "input_source_operation_timeout_ms", 10000 },
-	-- ui/menu/*.lua, layouts/ui/layout_manager/init.lua: the hand-off delay before the next window opens.
+	-- updater/ui/*.lua, layouts/ui/layout_manager/init.lua: the hand-off delay before the next window opens.
 	{ "ui", "ui_handoff_ms", 50 },
 	-- keystats/init.lua
 	{ "keystats", "micro_idle_timeout_ms",  30000 },

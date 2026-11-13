@@ -29,7 +29,7 @@ local function with_changelog(callback)
 	local previous_hs = rawget(_G, "hs")
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
-			"ui.changelog",
+			"updater.ui.changelog",
 			"core.ui.ui.builder",
 			"core.fs.adapters.file_system",
 			"core.fs.adapters.json_codec",
@@ -199,7 +199,7 @@ local function with_changelog(callback)
 				end,
 			}
 
-			local changelog = require("ui.changelog")
+			local changelog = require("updater.ui.changelog")
 			-- The install owners are not what these cases exercise: a packaged
 			-- build with no backup, which installs nothing unless a case says so.
 			changelog._deps = {

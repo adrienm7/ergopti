@@ -31,7 +31,7 @@ local MODULE_KEYS = {
 	"menu.ui.builder.state",
 	"menu.ui.keyboard.keymap_lifecycle",
 	"menu.ui.builder.watchers",
-	"modules.updater",
+	"updater.engine",
 	"core.fs.adapters.file_system",
 	"core.fs.adapters.storage",
 	"tray.adapters.menu",
@@ -48,7 +48,7 @@ local MODULE_KEYS = {
 	"metrics.ui.menu.metrics",
 	"tap_hold.ui.menu_tap_holds",
 	"apps.ui.menu.apps",
-	"ui.menu.menu_about",
+	"updater.ui.menu_about",
 	"ai.ui.menu",
 	"ai.engine",
 	"metrics.engine",
@@ -382,7 +382,7 @@ local function with_menu_fixture(options, callback)
 		end,
 		start_theme_watcher = function() return { stop = noop } end,
 	}
-	package.loaded["modules.updater"] = {
+	package.loaded["updater.engine"] = {
 		get_check_interval = function() return 3600 end,
 		start_background_checks = noop,
 	}
@@ -526,7 +526,7 @@ local function with_menu_fixture(options, callback)
 	for _, module_name in ipairs({
 		"gestures.ui.menu.gestures", "shortcuts.ui.menu.shortcuts", "layouts.ui.menu.keyboard_layout",
 		"hotstrings.ui.menu.hotstrings", "metrics.ui.menu.metrics", "tap_hold.ui.menu_tap_holds",
-		"apps.ui.menu.apps", "ui.menu.menu_about",
+		"apps.ui.menu.apps", "updater.ui.menu_about",
 	}) do
 		package.loaded[module_name] = {}
 	end

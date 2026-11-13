@@ -76,7 +76,7 @@ _MetaNoClassGlobalConflict() {
 	ClassNames := Map()
 	GlobalDecls := []   ; array of {name, file} objects
 
-	for Sub in ["infra", "modules", "platform", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold"] {
+	for Sub in ["infra", "modules", "platform", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold", "updater"] {
 		for AbsPath in _MetaListAhkFilesCC(StrReplace(DriverRoot . Sub, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))

@@ -24,7 +24,7 @@
 local M = {}
 
 local Paths   = require("core.fs.engine.paths")
-local Version = require("infra.version")
+local Version = require("updater.engine.version")
 
 -- Where the system packages (.deb, .rpm, PKGBUILD) stage the driver.
 M.SYSTEM_ROOT = "/usr/lib/ergopti"

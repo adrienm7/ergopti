@@ -22,7 +22,7 @@ local MIXIN_MODULES = {
 	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.logger.engine.logger",
-	"ui.download_window",
+	"updater.ui.download_window",
 	"ai.ui.menu.models.manager_mlx_download",
 }
 
@@ -111,7 +111,7 @@ local function install_mixin()
 			end },
 		})
 		local window_calls = { shows = 0, focuses = 0 }
-		package.loaded["ui.download_window"] = {
+		package.loaded["updater.ui.download_window"] = {
 			show = function()
 				window_calls.shows = window_calls.shows + 1
 				return true

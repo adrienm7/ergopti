@@ -28,7 +28,7 @@ local SHORTCUTS_NON_DEFAULT = not require("menu.engine.manifest_reader").default
 -- The update channel the user subscribed to: a registry channel other than the
 -- installed build's, which is what the updater follows when the key is absent.
 local SUBSCRIBED_NON_DEFAULT = (function()
-	local updater = require("modules.updater.manager")
+	local updater = require("updater.engine.manager")
 	for _, id in ipairs(updater.CHANNELS.ids()) do
 		if id ~= updater.installed_channel() then return id end
 	end
@@ -129,14 +129,14 @@ local function driver_state(path)
 
 	-- The updater reads the subscribed channel at init; its background checks
 	-- stop at once, and the previous module comes back so no suite shares this one.
-	local previous_updater = package.loaded["modules.updater.manager"]
-	local updater = helpers.load_module("modules.updater.manager")
+	local previous_updater = package.loaded["updater.engine.manager"]
+	local updater = helpers.load_module("updater.engine.manager")
 	local ok_updater, updater_err = pcall(function()
 		updater.init({ config_path = path })
 		updater.stop_background_checks()
 	end)
 	local update_channel = updater.get_channel()
-	package.loaded["modules.updater.manager"] = previous_updater
+	package.loaded["updater.engine.manager"] = previous_updater
 	if not ok_updater then error(updater_err, 0) end
 
 	local paths = require("settings.engine.paths")
@@ -223,7 +223,7 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 		helpers.assert_eq(#kept.keys, 0, "the updater reads its channel from config.toml")
 		-- An alias is resolved by the registry, so it is read like the id it names.
 		local alias = "stable"
-		helpers.assert_true(require("modules.updater.manager").CHANNELS.resolve(alias) ~= nil,
+		helpers.assert_true(require("updater.engine.manager").CHANNELS.resolve(alias) ~= nil,
 			"the registry must still declare the '" .. alias .. "' alias")
 		helpers.assert_eq(#Engine.find_in_source("[updater]\nchannel = \"" .. alias .. "\"\n",
 			Cleanup.collect).keys, 0, "an alias of a registry channel is read")

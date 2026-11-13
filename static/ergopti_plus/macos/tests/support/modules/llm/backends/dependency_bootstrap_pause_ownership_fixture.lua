@@ -198,7 +198,7 @@ local function load_fixture(options)
 			return true
 		end,
 	}
-	package.loaded["ui.download_window"] = {
+	package.loaded["updater.ui.download_window"] = {
 		is_active = function()
 			local active = fixture.ui_active
 			if fixture.active_query_hook then fixture.active_query_hook() end

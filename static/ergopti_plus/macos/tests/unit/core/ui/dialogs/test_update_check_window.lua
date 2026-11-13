@@ -23,17 +23,17 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
-local STUBS = { "adapters.update_launcher", "ui.changelog", "diagnostics.ui.error_dialog", "diagnostics.ui.log_openers", "core.ui.ui.builder" }
+local STUBS = { "updater.adapters.update_launcher", "updater.ui.changelog", "diagnostics.ui.error_dialog", "diagnostics.ui.log_openers", "core.ui.ui.builder" }
 
 --- Loads the host with recording doubles of the launcher, the Versions window,
 --- the error window and the log opener. ctx: Host, requests, reports, changelogs.
 local function load_host()
 	local ctx = { requests = {}, reports = {}, changelogs = {}, saved = {}, errors = {} }
 	for _, name in ipairs(STUBS) do ctx.saved[name] = package.loaded[name] end
-	package.loaded["adapters.update_launcher"] = {
+	package.loaded["updater.adapters.update_launcher"] = {
 		request_check = function(channel) ctx.requests[#ctx.requests + 1] = channel; return true end,
 	}
-	package.loaded["ui.changelog"] = {
+	package.loaded["updater.ui.changelog"] = {
 		open = function(opts) ctx.changelogs[#ctx.changelogs + 1] = opts.channel end,
 	}
 	package.loaded["diagnostics.ui.error_dialog"] = {
@@ -48,7 +48,7 @@ local function load_host()
 		end,
 		open_http_url = function(url) ctx.urls[#ctx.urls + 1] = url; return true end,
 	}
-	ctx.Host = helpers.load_with_stubs("ui.update_check")
+	ctx.Host = helpers.load_with_stubs("updater.ui.update_check")
 	ctx.logger = require("core.logger.engine.logger")
 	ctx.previous_error = ctx.logger.error
 	ctx.logger.error = function(_, message, ...) ctx.errors[#ctx.errors + 1] = string.format(message, ...) end
@@ -58,7 +58,7 @@ end
 local function restore(ctx)
 	ctx.logger.error = ctx.previous_error
 	for _, name in ipairs(STUBS) do package.loaded[name] = ctx.saved[name] end
-	package.loaded["ui.update_check"] = nil
+	package.loaded["updater.ui.update_check"] = nil
 end
 
 --- A window double recording what the page is sent.
@@ -219,8 +219,8 @@ helpers.describe("update-check window (macOS host)", function()
 			session.start()
 			local notes = view.messages[#view.messages].notes
 			helpers.assert_eq(notes.body, "## Changelog\n- **Fix: A thing**")
-			helpers.assert_eq(notes.owner, require("modules.updater").GH_OWNER)
-			helpers.assert_eq(notes.repo, require("modules.updater").GH_REPO)
+			helpers.assert_eq(notes.owner, require("updater.engine").GH_OWNER)
+			helpers.assert_eq(notes.repo, require("updater.engine").GH_REPO)
 			local url = "https://github.com/" .. notes.owner .. "/" .. notes.repo .. "/releases/tag/v0.0.0-dev.150"
 			session.on_message({ action = "open_url", url = url })
 			helpers.assert_eq(ctx.urls, { url })
@@ -464,7 +464,7 @@ helpers.describe("update-check changelog admission", function()
 				ctx.Host._set_window(view, session)
 				session.start()
 				local calls = 0
-				package.loaded["ui.changelog"].open = function(options)
+				package.loaded["updater.ui.changelog"].open = function(options)
 					calls = calls + 1
 					helpers.assert_eq(options.channel, "dev")
 					helpers.assert_true(rawequal(options.channel_owner, owners.channel_owner))

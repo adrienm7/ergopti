@@ -725,7 +725,7 @@ for (const [relative, minimum] of [
 	['tools/build/build-linux-appimage.sh', 0],
 	['tools/build/appimage-oldest-lts.sh', 0],
 	[
-		'static/ergopti_plus/linux/tests/unit/modules/updater/check/test_updater_manager_module_loads_without.lua',
+		'static/ergopti_plus/linux/tests/unit/updater/engine/check/test_manager_module_loads_without.lua',
 		1
 	]
 ]) {

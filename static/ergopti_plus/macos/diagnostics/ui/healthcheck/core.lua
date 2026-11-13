@@ -727,7 +727,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.update_launcher",
+		id       = "updater.adapters.update_launcher",
 		contract = { "request_check" },
 		wired    = true,
 	},

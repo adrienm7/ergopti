@@ -138,7 +138,7 @@ end
 --- Reaches actual shipped resolution while refusing accidental runtime dependencies.
 --- @param body function Test receiving the real registry and observed native reads.
 local function with_offline_shipped_probe(body)
-	local updater_name, registry_name = "modules.updater.manager", "layouts.engine.registry.registry"
+	local updater_name, registry_name = "updater.engine.manager", "layouts.engine.registry.registry"
 	local previous_updater, previous_preload = package.loaded[updater_name], package.preload[updater_name]
 	local previous_registry = package.loaded[registry_name]
 	local Http, FileSystem = require("core.network.adapters.http_client"), require("core.fs.adapters.file_system")

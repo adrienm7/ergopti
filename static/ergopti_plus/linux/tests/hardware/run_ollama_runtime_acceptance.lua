@@ -113,7 +113,7 @@ Http.download_output_owned = function(url, headers, target, options, callback)
 	archive_operation = operation
 	return operation
 end
-local Digest, Archive = require("core.network.engine.fd_sha256"), require("infra.archive_output")
+local Digest, Archive = require("core.network.engine.fd_sha256"), require("updater.engine.archive_output")
 local original_digest_native, original_artifact_new = Digest.native, Archive.native_ollama_artifact
 local observed_digest_workers, observed_artifact_factories = {}, {}
 -- Observe the real same-FD digest callback; never echo the expected asset hash.
@@ -189,7 +189,7 @@ local Policy = require("ai.engine.ollama.local_model_policy")
 local Api = require("ai.engine.api.api_ollama")
 local Download = require("ai.engine.local_servers.model_download")
 local Offer = require("ai.engine.ollama.local_model_offer")
-local Window = require("ui.download_window.bridge")
+local Window = require("updater.ui.download_window.bridge")
 local model = "granite4:350m-h"
 local model_consents, pull_dispatches, chat_dispatches = 0, 0, 0
 local pull_timeout, pull_terminal, pull_result

@@ -41,8 +41,8 @@ helpers.describe("download_window identifies which operation owns it", function(
 	--- Loads the shared progress window with the webview machinery stubbed out.
 	--- @return table
 	local function load_window()
-		package.loaded["ui.download_window"] = nil
-		return helpers.load_with_stubs("ui.download_window")
+		package.loaded["updater.ui.download_window"] = nil
+		return helpers.load_with_stubs("updater.ui.download_window")
 	end
 
 	helpers.it("exposes a session id", function()

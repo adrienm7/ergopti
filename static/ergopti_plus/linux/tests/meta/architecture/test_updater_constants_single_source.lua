@@ -26,7 +26,7 @@ helpers.describe("updater constants single source (Linux)", function()
 	local defs = Json.decode(raw)
 	helpers.assert_true(type(defs) == "table", "defaults.json must decode to a table")
 
-	local M = helpers.load_module("modules.updater.manager")
+	local M = helpers.load_module("updater.engine.manager")
 
 	helpers.it("GH_OWNER is read from defaults.json github.owner", function()
 		helpers.assert_eq(M.GH_OWNER, defs.github.owner,

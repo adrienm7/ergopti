@@ -24,11 +24,11 @@ local MODULES = {
 	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.network.adapters.http_client",
-	"ui.download_window",
+	"updater.ui.download_window",
 	"core.ui.ui.builder",
 	"core.fs.engine.paths", "core.timing.engine.timings",
 	"core.timing.engine.deferred_work",
-	"ui.download_window.javascript",
+	"updater.ui.download_window.javascript",
 	"ai.ui.menu.requirement_operation_registry",
 	"ai.ui.menu.models.manager_ollama",
 }
@@ -140,7 +140,7 @@ local function with_fixture(options, callback)
 			return client
 		end,
 	}
-	package.loaded["ui.download_window"] = {
+	package.loaded["updater.ui.download_window"] = {
 		session_id = function() return progress.shows end,
 		is_active = function() return progress.shows > 0 end,
 		show = function(opts)
@@ -215,7 +215,7 @@ local function with_fixture(options, callback)
 			return helpers.driver_root() .. "../_shared"
 		end }
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
-		package.loaded["ui.download_window.javascript"] = nil
+		package.loaded["updater.ui.download_window.javascript"] = nil
 		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 460, height = 380 } end,
 			show_webview = function(opts)
@@ -236,8 +236,8 @@ local function with_fixture(options, callback)
 			return { frame = function() return { x = 0, y = 0, w = 1440, h = 900 } end }
 		end }
 		_G.hs.drawing = { windowLevels = { normal = 0, floating = 1 } }
-		package.loaded["ui.download_window"] = nil
-		real_window = require("ui.download_window")
+		package.loaded["updater.ui.download_window"] = nil
+		real_window = require("updater.ui.download_window")
 	end
 
 	local active_tasks = {}

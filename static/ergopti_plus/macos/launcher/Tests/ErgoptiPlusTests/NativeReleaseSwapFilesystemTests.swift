@@ -179,7 +179,7 @@ final class NativeReleaseSwapFilesystemTests: XCTestCase {
 		XCTAssertEqual(report["native_launcher"] as? String, executable.path)
 		XCTAssertEqual(report["emission_source"] as? String, "strict-source")
 		XCTAssertEqual(report["execution_scope"] as? String, "script-only/source-parser")
-		let source = driver.appendingPathComponent("modules/updater/release_installer.lua")
+		let source = driver.appendingPathComponent("updater/engine/release_installer.lua")
 		let sourceDigest = SHA256.hash(data: try Data(contentsOf: source)).map { String(format: "%02x", $0) }.joined()
 		XCTAssertEqual(report["source_sha256"] as? String, sourceDigest)
 
@@ -257,7 +257,7 @@ final class NativeReleaseSwapFilesystemTests: XCTestCase {
 		guard values.volumeIsReadOnly == false else { throw CocoaError(.fileReadCorruptFile) }
 		try Data().write(to: mount.appendingPathComponent(".metadata_never_index"))
 		let driver = Self.payloadURL.appendingPathComponent("macos")
-		let source = driver.appendingPathComponent("modules/updater/release_installer.lua")
+		let source = driver.appendingPathComponent("updater/engine/release_installer.lua")
 		let probe = driver.appendingPathComponent("tests/support/release_swap_physical_probe.py")
 		let controls = root.appendingPathComponent("controls")
 		// A failed observer may have left a descendant or stage: retain the image and root.

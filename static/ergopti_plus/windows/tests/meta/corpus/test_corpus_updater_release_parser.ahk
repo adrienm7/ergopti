@@ -10,7 +10,7 @@
 ; then asserts the output matches the expected golden values.
 ;
 ; The AHK driver cannot require Lua modules, so its parser functions in
-; modules/updater/core.ahk are hand-maintained. This test pins them against the
+; updater/engine/core.ahk are hand-maintained. This test pins them against the
 ; same golden vectors as the macOS and Linux Lua tests so any divergence is
 ; caught. The contract_* vectors carry the shared Lua metadata contract: each
 ; field is the selected release object's own, decoded once by the strict JSON

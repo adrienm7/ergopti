@@ -75,7 +75,7 @@ local function old_action(module_name, receiver)
 end
 
 helpers.describe("script callback cleanup keeps exact native custody", function()
-	for _, module_name in ipairs({ "ui.update_check", "ai.ui.model_browser", "metrics.ui.metrics_apps" }) do
+	for _, module_name in ipairs({ "updater.ui.update_check", "ai.ui.model_browser", "metrics.ui.metrics_apps" }) do
 		helpers.it(module_name .. " preserves an active callback during ordinary same-window reuse", function()
 			with_bridge(module_name, function(_, h)
 				helpers.assert_true(h.show())
@@ -190,7 +190,7 @@ end)
 
 helpers.describe("close logging preserves exact callback ownership", function()
 	helpers.it("update-check close cannot unref a successor admitted by a synchronous log sink", function()
-		with_bridge("ui.update_check", function(_, h)
+		with_bridge("updater.ui.update_check", function(_, h)
 			helpers.assert_true(h.show())
 			local logger = require("core.logger.engine.logger")
 			local original, entered = logger.info, false
@@ -220,7 +220,7 @@ end)
 
 helpers.describe("callback custody covers native option evaluation", function()
 	helpers.it("update-check retires its bound callback when the native geometry getter raises", function()
-		with_bridge("ui.update_check", function(_, h)
+		with_bridge("updater.ui.update_check", function(_, h)
 			local logger, errors = require("core.logger.engine.logger"), {}
 			local original = logger.error
 			logger.error = function(tag, message, ...)

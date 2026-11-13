@@ -11,7 +11,7 @@
 local uv = require("luv")
 local Gtk = require("lgi").require("Gtk", "3.0")
 local Download = require("ai.engine.local_servers.model_download")
-local Window = require("ui.download_window.bridge")
+local Window = require("updater.ui.download_window.bridge")
 local Manager = require("core.ui.ui.webview_manager")
 local Http = require("core.network.adapters.http_client")
 local Json = require("core.text.engine.json")

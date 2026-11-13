@@ -20,7 +20,7 @@ local OWNED = {
 	"ai.ui.menu.models.selector_page", "ai.ui.menu.models.custom_models",
 	"ai.ui.menu.backend_labels", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work",
 	"ai.engine", "ai.engine.api.mlx",
-	"ai.ui.menu.models.mlx_repair_offer", "ai.ui.menu.panels.api_panel", "ui.download_window", "ai.ui.model_browser",
+	"ai.ui.menu.models.mlx_repair_offer", "ai.ui.menu.panels.api_panel", "updater.ui.download_window", "ai.ui.model_browser",
 }
 
 --- One runtime checker double.
@@ -70,7 +70,7 @@ local function with_page(opts, body)
 			text_prompt = function() return "OK", opts.typed_model or "" end }
 		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) fn(); return true end }
 		package.loaded["ai.ui.menu.models.mlx_repair_offer"] = { set_alternative = function() end }
-		package.loaded["ui.download_window"] = { set_percent_listener = function(fn) calls.percent_listener = fn end }
+		package.loaded["updater.ui.download_window"] = { set_percent_listener = function(fn) calls.percent_listener = fn end }
 		package.loaded["ai.ui.model_browser"] = { inject_progress = function(update)
 			calls.progress = calls.progress or {}
 			calls.progress[#calls.progress + 1] = update

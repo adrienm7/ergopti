@@ -208,7 +208,7 @@ local function load_from_shared()
 	local toml_reader = require("core.text.engine.toml.reader")
 
 	-- Locate shared dir by walking up from this file:
-	-- macos/core/ui/ui/tooltip/config.lua → macos/core/ui/ui/tooltip → macos/ui → macos → ergopti_plus → shared
+	-- macos/core/ui/ui/tooltip/config.lua → macos/core/ui/ui/tooltip → macos/updater/ui → macos → ergopti_plus → shared
 	local shared_path = (function()
 		local src = debug.getinfo(1, "S").source:gsub("^@", "")
 		local dir = NativePath.dirname(src) or src

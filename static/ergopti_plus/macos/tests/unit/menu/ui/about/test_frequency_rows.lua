@@ -51,19 +51,19 @@ end
 --- @param local_source boolean|nil True for a local version run from source.
 --- @param state table|nil Menu state (the stored check interval).
 local function build(checks, local_source, state)
-	local Updater = require("modules.updater")
+	local Updater = require("updater.engine")
 	local real_local = Updater.is_local_source
 	Updater.is_local_source = function() return local_source == true end
-	package.loaded["ui.menu.menu_about"] = nil
+	package.loaded["updater.ui.menu_about"] = nil
 	local ok, rows = pcall(function()
-		local About = helpers.load_with_stubs("ui.menu.menu_about")
+		local About = helpers.load_with_stubs("updater.ui.menu_about")
 		return About.build({ channel_owner = fake_owner("dev"), update_checks = checks, state = state or {} }, {
 			start_at_login = function() error("Building About must not change startup.") end,
 			uninstall = function() error("Building About must not uninstall the application.") end,
 		}).submenu
 	end)
 	Updater.is_local_source = real_local
-	package.loaded["ui.menu.menu_about"] = nil
+	package.loaded["updater.ui.menu_about"] = nil
 	if not ok then error(rows, 0) end
 	return rows
 end
@@ -196,7 +196,7 @@ end
 
 --- Builds the actual cadence owner around observable durable and timer ports.
 local function actual_checks(refusal, interval)
-	local AutoCheck = require("modules.updater.auto_check")
+	local AutoCheck = require("updater.engine.auto_check")
 	local config = AutoCheck.load_config()
 	local stored = interval == nil and 3600 or interval
 	local obs = {state = {[AutoCheck.STATE_KEY] = stored, future_setting = 42}, durable = stored,

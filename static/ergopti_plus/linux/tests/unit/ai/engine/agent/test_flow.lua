@@ -559,13 +559,13 @@ helpers.describe("AI agent: real asynchronous model download composition", funct
 	helpers.it("linux-model-consent-continuation: actual engine and pull owner accept progress after modal return", function()
 		Scenario.run({ local_backend = true, selection = SELECTION,
 			stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
-			local names = { "ai.engine.local_servers.model_download", "ui.download_window.bridge" }
+			local names = { "ai.engine.local_servers.model_download", "updater.ui.download_window.bridge" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local updates, completes, admission = 0, 0, nil
 			local controls = {}
 			require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"], controls)
-			package.loaded["ui.download_window.bridge"] = {
+			package.loaded["updater.ui.download_window.bridge"] = {
 				show = function() return 19 end,
 				update = function() updates = updates + 1; return true end,
 				complete = function() completes = completes + 1; return true end,
@@ -641,13 +641,13 @@ helpers.describe("AI agent: existing model pull is focus without new consent cus
 		helpers.it("linux-model-consent-focus: existing same-tag pull on " .. origin .. " origin grants no successor holder", function()
 			Scenario.run({ local_backend = true, selection = SELECTION,
 				stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
-				local names = { "ai.engine.local_servers.model_download", "ui.download_window.bridge" }
+				local names = { "ai.engine.local_servers.model_download", "updater.ui.download_window.bridge" }
 				local saved = {}
 				for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 				local old_done, old_retired, completed, focused, admission = 0, 0, 0, 0, nil
 				local controls = {}
 				require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"], controls)
-				package.loaded["ui.download_window.bridge"] = {
+				package.loaded["updater.ui.download_window.bridge"] = {
 					show = function() return 29 end,
 					update = function() return true end,
 					complete = function() completed = completed + 1; return true end,

@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local DaemonRestart = helpers.load_module("core.lifecycle.engine.reload.daemon_restart")
-local Restarter = helpers.load_module("modules.updater.restarter")
+local Restarter = helpers.load_module("updater.engine.restarter")
 
 local UNIT_CGROUP = "0::/user.slice/user-1000.slice/user@1000.service/app.slice/" .. Restarter.UNIT .. "\n"
 local SESSION_CGROUP = "0::/user.slice/user-1000.slice/session-2.scope\n"

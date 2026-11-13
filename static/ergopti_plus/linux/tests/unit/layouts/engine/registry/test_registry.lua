@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"
-local CHANNEL = require("modules.updater.manager").installed_channel()
+local CHANNEL = require("updater.engine.manager").installed_channel()
 local INDEX_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANNEL .. "/static/layouts/registry/index.json"
 local ERGOL_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANNEL .. "/static/layouts/registry/ergol/ergol.keylayout"
 local PYTHON_MESSAGE = "translated: layouts.linux_needs_python"
@@ -271,7 +271,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		-- Main loads the updater optionally; the daemon key scenarios run without
 		-- it, and the registry's raise once ended the daemon at the first layout.
 		local LayoutRegistry = helpers.load_module("layouts.engine.registry.registry")
-		local name = "modules.updater.manager"
+		local name = "updater.engine.manager"
 		local saved_loaded, saved_preload = package.loaded[name], package.preload[name]
 		package.loaded[name] = nil
 		package.preload[name] = function() error("controlled unavailable updater") end

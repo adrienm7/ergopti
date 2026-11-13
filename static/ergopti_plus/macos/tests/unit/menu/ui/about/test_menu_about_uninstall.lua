@@ -42,11 +42,11 @@ local function submenu(paused, fired, title_key, source_run, startup_enabled)
 	local builder = helpers.load_with_stubs("menu.ui.builder.builder")
 	-- The About module reads the one installed-build owner; it is reloaded so it
 	-- binds the answer this case sets.
-	local Updater = require("modules.updater")
+	local Updater = require("updater.engine")
 	local real_is_local_source = Updater.is_local_source
 	Updater.is_local_source = function() return source_run == true end
-	package.loaded["ui.menu.menu_about"] = nil
-	local About = require("ui.menu.menu_about")
+	package.loaded["updater.ui.menu_about"] = nil
+	local About = require("updater.ui.menu_about")
 	local previous_startup = package.loaded["onboarding.ui.menu_start_at_login"]
 	package.loaded["onboarding.ui.menu_start_at_login"] = { enabled = function() return startup_enabled == true end }
 	local i18n = require("core.i18n.engine.i18n")

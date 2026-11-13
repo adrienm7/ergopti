@@ -522,7 +522,7 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/linux/modules/updater/manager.lua",
+			"source": "static/ergopti_plus/linux/updater/engine/manager.lua",
 			"template": "Wake detected (%ds since the schedule timer was armed for %ds).",
 			"line": "2026-10-30 10:00:00:123 [INFO] [updater] Wake detected (7300s since the schedule timer was armed for 3600s).",
 			"expect": {

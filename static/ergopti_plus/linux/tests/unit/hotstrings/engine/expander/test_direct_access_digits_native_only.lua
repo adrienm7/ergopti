@@ -25,7 +25,7 @@ helpers.describe("layout.direct_access_digits on Linux (linux-direct-access-digi
 	end)
 
 	helpers.it("lets the shared policy apply only the native mode", function()
-		helpers.assert_eq(Policy.capable("linux", "native", false), true)
+		helpers.assert_eq(Policy.capable("linux", "updater", "native", false), true)
 		helpers.assert_eq(Policy.capable("linux", "digits", false), false)
 		helpers.assert_eq(Policy.capable("linux", "symbols", true), false)
 	end)

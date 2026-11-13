@@ -1,7 +1,7 @@
 --- _shared/updater/engine/version_core.lua
 ---
 --- Cross-driver pure version-comparison functions extracted from
---- macos/infra/updater.lua so they can be shared by macOS, Linux, and
+--- macos/updater/engine/updater.lua so they can be shared by macOS, Linux, and
 --- any future driver without duplicating the parsing/comparison logic.
 ---
 --- Canonical algorithm: _shared/updater/data/version.js

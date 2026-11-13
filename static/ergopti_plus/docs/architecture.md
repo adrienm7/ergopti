@@ -35,14 +35,6 @@ graph TD
         P_WindowManager["WindowManager"]
     end
 
-    subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
-        MACOS_update_launcher["UpdateLauncher.lua"]
-    end
-
-    subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
-        WINDOWS_updater_curl_capture["UpdaterCurlCapture.ahk"]
-    end
-
     subgraph Domain["Domain — shared business logic"]
         D_Expander["Expander"]
         D_GestureRecognizer["GestureRecognizer"]
@@ -50,10 +42,6 @@ graph TD
         D_Registry["Registry"]
         D_Terminators["Terminators"]
     end
-
-    %% Port implementations: macOS (Hammerspoon)
-
-    %% Port implementations: Windows (AutoHotkey)
 
     %% Key domain relationships
     D_Expander -->|uses| D_Registry

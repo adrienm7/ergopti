@@ -59,7 +59,7 @@ async function receive() {
 	}
 	const ownerRelative = 'tools/diagnostics/macos_owned_process.py';
 	const corpusRelative = 'tools/diagnostics/macos_release_stage_route_test.py';
-	const stageRelative = 'static/ergopti_plus/macos/adapters/release_stage.sh';
+	const stageRelative = 'static/ergopti_plus/macos/updater/adapters/release_stage.sh';
 	capture(ownerRelative);
 	capture(corpusRelative);
 	capture(stageRelative);

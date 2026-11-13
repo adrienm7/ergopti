@@ -793,7 +793,7 @@ function M.bind(ctx)
 		on_changed = function() M.refresh() end,
 	})
 	_ctx = ctx
-	require("ui.download_window").set_percent_listener(M.on_download_percent)
+	require("updater.ui.download_window").set_percent_listener(M.on_download_percent)
 	-- The MLX repair offer proposes Ollama on a Mac that cannot run MLX: the
 	-- Ollama selection the page runs, collected when the offer is accepted.
 	require("ai.ui.menu.models.mlx_repair_offer").set_alternative(function()

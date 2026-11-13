@@ -392,7 +392,7 @@ helpers.describe("personal-file discovery: exact owners preserve source and choi
 				local home, work = sources["home/team.toml"], sources["work/team.toml"]
 				local operations = {
 					{ path = { "hotstrings", "groups", "team" }, delete = true },
-					{ path = { "hotstrings", "modules", "team", "layouts", "metrics", "shortcuts", "tap_hold" }, delete = true },
+					{ path = { "hotstrings", "modules", "team", "layouts", "metrics", "shortcuts", "tap_hold", "updater" }, delete = true },
 					{ path = { "hotstrings", "groups", home }, value = false },
 					{ path = { "hotstrings", "groups", work }, value = false },
 				}

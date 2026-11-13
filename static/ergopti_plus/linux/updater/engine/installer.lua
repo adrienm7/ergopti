@@ -1,0 +1,818 @@
+--- updater/engine/installer.lua
+
+--- ==============================================================================
+--- MODULE: Standalone Update Installer (Linux)
+--- DESCRIPTION:
+--- Validates a canonical Linux release tarball and replaces the complete
+--- standalone library root as one rollback-capable transaction. Package-managed
+--- and immutable installations are classified by the manager and never enter
+--- this module.
+--- ==============================================================================
+
+local M = {}
+local Errors = require("diagnostics.engine.adapter_errors")
+local TextUtils = require("core.text.engine.utils_core")
+local Shell = require("core.process.adapters.shell_runner")
+
+local Fs = require("core.fs.adapters.file_system")
+local Paths = require("core.fs.engine.paths")
+local Version = require("updater.engine.version_core")
+local Snapshot = require("diagnostics.engine.snapshot")
+local NativePath = require("core.fs.engine.native_path")
+local NoReplaceMove = require("core.fs.engine.no_replace_move")
+local Ownership = require("updater.engine.ownership_receipt")
+local ProgramRunner = require("core.process.adapters.program_runner")
+local uv_loaded, uv = pcall(require, "luv")
+
+local WORK_PREFIX = ".ergopti-update."
+-- How often an owned child (the wrapper smoke, the ownership owner) re-admits
+-- the install deadline while the event loop keeps running; a refused admission
+-- kills its process group.
+local OWNED_CHILD_ADMISSION_POLL_MS = 50
+-- The receipt owner the running (previous) installation ships; it hashes the
+-- whole staged payload, which takes seconds on a real tree.
+local OWNERSHIP_OWNER = "/linux/install/ownership.sh"
+-- The owned child runs the bash owner through the POSIX shell, so bash is found
+-- on PATH exactly as the synchronous `bash owner` command finds it.
+local POSIX_SHELL = "/bin/sh"
+local EXEC_BASH = 'exec bash "$0" "$@"'
+
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 1/ Path and Status Helpers =======
+-- ==========================================
+-- ==========================================
+
+local shell_quote = TextUtils.shell_quote
+
+--- Normalises the variants returned by os.execute across LuaJIT
+--- and Lua 5.4. A numeric non-zero status is failure even though Lua considers
+--- every number truthy.
+--- @param first any First process result.
+--- @param exit_kind string|nil Exit kind.
+--- @param exit_code number|nil Exit code.
+--- @return boolean success
+local function status_ok(first, exit_kind, exit_code)
+	if first == true then
+		return (exit_kind == nil or exit_kind == "exit")
+			and (exit_code == nil or exit_code == 0)
+	end
+	if type(first) == "number" then return first == 0 end
+	return false
+end
+
+M._status_ok = status_ok
+
+local function run_command(command)
+	return status_ok(os.execute(command))
+end
+
+local function capture_command(command)
+	-- LuaJIT can acknowledge pipe closure without retaining a failed child's
+	-- status. Only the canonical checked receipt authorises captured output.
+	local ok, output = Shell.exec_checked(command)
+	if not ok then return nil end
+	return output
+end
+
+local function normalise_path(path)
+	if type(path) ~= "string" or path == "" then return nil end
+	path = Paths.normalize_native_separators(path):gsub("/+", "/")
+	if path:sub(1, 1) ~= "/" then
+		local cwd = Paths.current_directory()
+		if type(cwd) ~= "string" or cwd == "" then return nil end
+		path = cwd:gsub("/+$", "") .. "/" .. path
+	end
+
+	local parts = {}
+	for part in path:gmatch("[^/]+") do
+		if part == ".." then
+			if #parts == 0 then return nil end
+			parts[#parts] = nil
+		elseif part ~= "." and part ~= "" then
+			parts[#parts + 1] = part
+		end
+	end
+	return "/" .. table.concat(parts, "/")
+end
+
+local function dirname(path)
+	if path == "/" then return nil end
+	return NativePath.dirname(path) or "/"
+end
+
+local basename = NativePath.basename
+
+local function is_direct_child(path, parent)
+	return dirname(path) == parent and basename(path) ~= nil
+end
+
+local function default_probe(path, kind)
+	local flag = kind == "dir" and "-d" or "-f"
+	return run_command("test " .. flag .. " " .. shell_quote(path))
+end
+
+--- Resolves the installation that owns the running updater module.
+--- @param source_path string debug source path for manager.lua.
+--- @param probe function|nil Test hook receiving path and "file"/"dir".
+--- @return table context Installation kind and owned paths.
+function M.resolve(source_path, probe)
+	probe = probe or default_probe
+	local source = normalise_path((source_path or ""):gsub("^@", ""))
+	if not source then return { kind = "unmanaged", reason = Errors.UPDATER_SOURCE_PATH_RELATIVE } end
+	if os.getenv("APPIMAGE") or os.getenv("APPDIR") or os.getenv("FLATPAK_ID")
+		or source:match("^/usr/") or source:match("^/app/") or source:match("^/nix/store/") then
+		return { kind = "package", reason = Errors.UPDATER_PACKAGE_OWNED }
+	end
+
+	local script_dir = dirname(source)
+	local driver_root = script_dir and normalise_path(script_dir .. "/../..") or nil
+	if not driver_root or basename(driver_root) ~= "linux" then
+		return { kind = "package", reason = Errors.UPDATER_LAYOUT_NOT_STANDALONE }
+	end
+
+	local install_root = dirname(driver_root)
+	local lib_dir = install_root and dirname(install_root) or nil
+	local prefix = lib_dir and dirname(lib_dir) or nil
+	if not install_root or not prefix or prefix == "/" then
+		return { kind = "unmanaged", reason = Errors.UPDATER_INSTALL_ROOT_UNSAFE }
+	end
+
+	local wrapper = prefix .. "/bin/ergopti-hotstrings"
+	local shared_root = Paths.shared_root_from(driver_root,
+		function(path) return probe(path, "file") end)
+	if not shared_root or not probe(shared_root .. "", "dir")
+		or not probe(wrapper, "file") then
+		return { kind = "unmanaged", reason = Errors.UPDATER_STANDALONE_FILES_ABSENT }
+	end
+
+	return {
+		kind = "standalone",
+		install_root = install_root,
+		parent = dirname(install_root),
+		wrapper = wrapper,
+	}
+end
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Production Operations ========
+-- =========================================
+-- =========================================
+
+local function split_lines(output)
+	local lines = {}
+	for line in tostring(output or ""):gmatch("[^\r\n]+") do
+		lines[#lines + 1] = line
+	end
+	return lines
+end
+
+local function archive_listings_canonical(names, verbose)
+	if type(names) ~= "string" or type(verbose) ~= "string" then return false, "archive listing failed" end
+
+	local seen = {}
+	for _, entry in ipairs(split_lines(names)) do
+		if entry:sub(1, 1) == "/"
+			or entry:find("\\", 1, true)
+			-- Only a complete parent component escapes a root; names such as
+			-- notes..toml are ordinary files produced by tar as well.
+			or ("/" .. entry .. "/"):find("/../", 1, true)
+			or entry:match("^%./") then
+			return false, "archive contains an unsafe path: " .. entry
+		end
+		local top = entry:match("^([^/]+)")
+		if top ~= "linux" and top ~= "_shared" and top ~= "bin"
+			and top ~= "install.sh" then
+			return false, "archive contains an unexpected root: " .. tostring(top)
+		end
+		seen[top] = true
+	end
+
+	for _, required in ipairs({ "linux", "_shared", "bin", "install.sh" }) do
+		if not seen[required] then return false, "archive root is missing " .. required end
+	end
+	for _, line in ipairs(split_lines(verbose)) do
+		local kind = line:sub(1, 1)
+		if kind ~= "-" and kind ~= "d" then
+			return false, "archive links and special files are not accepted"
+		end
+	end
+	return true
+end
+
+local function archive_is_canonical(archive_path)
+	local quoted = shell_quote(archive_path)
+	local names = capture_command("tar -tzf " .. quoted .. " 2>/dev/null")
+	local verbose = capture_command("tar -tvzf " .. quoted .. " 2>/dev/null")
+	return archive_listings_canonical(names, verbose)
+end
+
+local DEFAULT_OPS = {}
+
+function DEFAULT_OPS.make_work_dir(parent)
+	local template = parent .. "/" .. WORK_PREFIX .. "XXXXXX"
+	local output = capture_command("mktemp -d " .. shell_quote(template) .. " 2>/dev/null")
+	if not output then return nil end
+	local path = normalise_path(output:gsub("%s+$", ""))
+	if not path or not is_direct_child(path, parent)
+		or basename(path):sub(1, #WORK_PREFIX) ~= WORK_PREFIX then
+		return nil
+	end
+	return path
+end
+
+function DEFAULT_OPS.validate_archive(archive_path)
+	return archive_is_canonical(archive_path)
+end
+
+function DEFAULT_OPS.extract(archive_path, work_dir)
+	return run_command("tar -xzf " .. shell_quote(archive_path)
+		.. " -C " .. shell_quote(work_dir)
+		.. " --no-same-owner --no-same-permissions 2>/dev/null")
+end
+
+--- Records the new payload before it can replace the user's installation.
+--- @param run_owner function Runs (owner_path, arguments) and returns success.
+--- @param root string Validated staging root containing only release files.
+--- @param previous string Current installation whose launcher is retained.
+--- @return boolean success
+local function record_ownership_with(run_owner, root, previous)
+	-- The running updater owns the receipt format, not the selected release.
+	local schema = Ownership.read_schema(previous)
+	if not schema then return false end
+	if not run_owner(previous .. OWNERSHIP_OWNER, { root .. "/linux", root .. "/_shared", root }) then return false end
+	local manifest = previous .. "/" .. schema.MANIFEST
+	local old, status = Ownership.read_current(manifest)
+	if status == "absent" then return true end
+	if status ~= "ok" then return false end
+	local record = Ownership.parse(old, schema)
+	if not record then return false end
+	return #record.external == 0 or Fs.append(root .. "/" .. schema.MANIFEST, table.concat(record.external))
+end
+
+--- Records the new payload synchronously (the original synchronous install).
+--- @param root string Validated staging root containing only release files.
+--- @param previous string Current installation whose launcher is retained.
+--- @return boolean success
+function DEFAULT_OPS.record_ownership(root, previous)
+	return record_ownership_with(function(owner, arguments)
+		local quoted = {}
+		for index, argument in ipairs(arguments) do quoted[index] = shell_quote(argument) end
+		return run_command("bash " .. shell_quote(owner) .. " " .. table.concat(quoted, " "))
+	end, root, previous)
+end
+
+--- Validates a disposable installation tree through its canonical receipt owner.
+--- @param path string Candidate, failed activation or previous backup path.
+--- @param current string Trusted installation holding the canonical receipt schema.
+--- @return boolean owned
+--- @return string|nil identity Device/inode receipt, unchanged by namespace moves.
+function DEFAULT_OPS.backup_is_owned(path, current)
+	local identity, detail = Ownership.verify(path, current)
+	return identity ~= nil, identity, detail
+end
+
+function DEFAULT_OPS.mkdir(path)
+	return run_command("mkdir -- " .. shell_quote(path) .. " 2>/dev/null")
+end
+
+function DEFAULT_OPS.is_file(path)
+	return default_probe(path, "file")
+end
+
+function DEFAULT_OPS.is_dir(path)
+	return default_probe(path, "dir")
+end
+
+function DEFAULT_OPS.read(path)
+	return Fs.read(path)
+end
+
+function DEFAULT_OPS.exists(path)
+	return default_probe(path, "dir") or default_probe(path, "file")
+end
+
+function DEFAULT_OPS.move(source, destination)
+	-- Every transaction step names an exact vacant destination. A concurrent
+	-- directory must never turn activation or rollback into a nested move.
+	return NoReplaceMove.move(source, destination)
+end
+
+function DEFAULT_OPS.remove_tree(path)
+	return run_command("rm -rf -- " .. shell_quote(path) .. " 2>/dev/null")
+end
+
+function DEFAULT_OPS.remove_file(path)
+	return run_command("rm -f -- " .. shell_quote(path) .. " 2>/dev/null")
+end
+
+function DEFAULT_OPS.smoke(wrapper)
+	return run_command(shell_quote(wrapper) .. " --help >/dev/null 2>&1")
+end
+
+
+--- The interpreter running this daemon, which is the one the installed
+--- launcher starts: bytecode is only valid for the luajit that compiled it.
+--- @return string|nil path
+local function running_interpreter()
+	local ffi = require("ffi")
+	pcall(ffi.cdef, "long readlink(const char *, char *, size_t);")
+	local size = 4096
+	local buffer = ffi.new("char[?]", size)
+	local length = tonumber(ffi.C.readlink("/proc/self/exe", buffer, size))
+	if not length or length <= 0 or length >= size then return nil end
+	return ffi.string(buffer, length)
+end
+
+--- Compiles the activated installation's bytecode package.
+--- @param root string Activated installation root.
+--- @return boolean success
+function DEFAULT_OPS.compile_bytecode(root)
+	local interpreter = running_interpreter()
+	if not interpreter then return false end
+	-- The compiler the activated release ships (core/lifecycle/engine/bytecode_package.lua).
+	local compiler = root .. "/" .. require("core.text.engine.identifiers").bytecode_package.compiler
+	return run_command(shell_quote(interpreter) .. " " .. shell_quote(compiler)
+		.. " " .. shell_quote(root) .. " >/dev/null 2>&1")
+end
+
+M.DEFAULT_OPS = DEFAULT_OPS
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Transaction ==================
+-- =========================================
+-- =========================================
+
+local function validate_context(context)
+	if type(context) ~= "table" or context.kind ~= "standalone" then
+		return false, "installation is not standalone"
+	end
+	local root = normalise_path(context.install_root)
+	local parent = normalise_path(context.parent)
+	local wrapper = normalise_path(context.wrapper)
+	if not root or not parent or not wrapper or parent == "/"
+		or not is_direct_child(root, parent) then
+		return false, "standalone installation paths are unsafe"
+	end
+	return true, { install_root = root, parent = parent, wrapper = wrapper }
+end
+
+local function validate_candidate(work_dir, expected_version, ops)
+	local shared_root = Paths.shared_root_from(work_dir .. "/linux", ops.is_file)
+	local required_files = {
+		work_dir .. "/linux/ergopti_hotstrings.lua",
+		work_dir .. "/linux/updater/engine/version.lua",
+		work_dir .. "/bin/ergopti-hotstrings",
+		work_dir .. "/install.sh",
+	}
+	for _, path in ipairs(required_files) do
+		if not ops.is_file(path) then return false, "staged archive is missing " .. path end
+	end
+	if not shared_root or not ops.is_dir(shared_root .. "") then
+		return false, "staged archive is missing the shared Lua tree"
+	end
+
+	-- The driver version is the release version the release build stamped into
+	-- the shared tree (updater/engine/version.lua reads the same entry at runtime), so the
+	-- staged tree's stamp is what the running daemon will report after the swap.
+	local stamp = ops.read(shared_root .. "/" .. Snapshot.BUILD_STAMP_FILE)
+	local staged_version = stamp and Snapshot.parse_build_version(stamp) or nil
+	if not staged_version
+		or Version.normalize_tag(staged_version) ~= Version.normalize_tag(expected_version) then
+		return false, "staged driver version does not match the selected release"
+	end
+	return true
+end
+
+local function cleanup_work(work_dir, parent, ops)
+	if not work_dir then return true end
+	if not is_direct_child(work_dir, parent)
+		or basename(work_dir):sub(1, #WORK_PREFIX) ~= WORK_PREFIX then
+		return false
+	end
+	return ops.remove_tree(work_dir)
+end
+
+--- Installs one validated archive into a standalone root.
+--- @param options table archive_path, expected_version, context, optional ops.
+--- @return boolean success
+--- @return string|nil detail Failure or cleanup detail.
+local function install_transaction(options, owned_current)
+	options = options or {}
+	local ops = options.ops or DEFAULT_OPS
+	local context_ok, context = validate_context(options.context)
+	if not context_ok then return false, context end
+	if not owned_current and (type(options.archive_path) ~= "string" or options.archive_path == "") then
+		return false, "archive path is absent"
+	end
+	if type(options.expected_version) ~= "string" or options.expected_version == "" then
+		return false, "selected release version is absent"
+	end
+
+	local function forward_current()
+		if not owned_current then return true end
+		local checked, accepted = pcall(owned_current)
+		return checked and accepted == true
+	end
+	if not forward_current() then return false, "local install admission expired" end
+	local archive_ok, archive_error = ops.validate_archive(options.archive_path)
+	if not archive_ok then return false, archive_error end
+	if not forward_current() then return false, "local install admission expired" end
+	local work_dir = ops.make_work_dir(context.parent)
+	if not work_dir then return false, "could not allocate same-filesystem staging" end
+
+	local retained_work = false
+	local function fail(detail)
+		if not retained_work and not cleanup_work(work_dir, context.parent, ops) then
+			detail = detail .. "; staging cleanup failed at " .. work_dir
+		end
+		return false, detail
+	end
+
+	if not forward_current() or not ops.extract(options.archive_path, work_dir) then
+		return fail("archive extraction failed")
+	end
+	if not forward_current() then return fail("local install deadline expired") end
+	local candidate_ok, candidate_error = validate_candidate(work_dir, options.expected_version, ops)
+	if not candidate_ok then return fail(candidate_error) end
+
+	local candidate = work_dir .. "/candidate"
+	if not forward_current() or not ops.mkdir(candidate)
+		or not ops.move(work_dir .. "/linux", candidate .. "/linux")
+		or not ops.move(work_dir .. "/_shared", candidate .. "/_shared")
+		or not ops.move(work_dir .. "/bin", candidate .. "/bin") then
+		return fail("could not assemble the complete candidate root")
+	end
+	if not forward_current() or not ops.record_ownership(candidate, context.install_root) then
+		return fail("could not record the new installation's file ownership")
+	end
+	-- Namespace moves preserve this exact generation; the fixed live path
+	-- alone cannot authorize retiring a root after the smoke child returns.
+	local candidate_owned, candidate_identity = ops.backup_is_owned(candidate, context.install_root)
+	if candidate_owned ~= true or type(candidate_identity) ~= "string" then
+		return fail("could not verify the new installation's file ownership")
+	end
+
+	local backup = context.install_root .. ".old"
+	if not is_direct_child(backup, context.parent) then
+		return fail("backup path escaped the installation parent")
+	end
+	if not forward_current() then return fail("local install deadline expired") end
+	if ops.exists(backup) then
+		local owned, identity = ops.backup_is_owned(backup, context.install_root)
+		if owned ~= true or type(identity) ~= "string" then
+			return fail("previous backup could not be retired")
+		end
+		local retired = work_dir .. "/retired-backup"
+		if not forward_current() or not ops.move(backup, retired) then
+			return fail("previous backup could not be retired")
+		end
+		local captured, captured_identity = ops.backup_is_owned(retired, context.install_root)
+		if captured ~= true or captured_identity ~= identity or not forward_current() then
+			if not ops.move(retired, backup) then
+				-- A raced foreign tree is not staging debris: retain its namespace
+				-- when a concurrent owner prevents the no-replace restoration.
+				retained_work = true
+				return fail("previous backup ownership changed; unverified tree retained at " .. retired)
+			end
+			return fail("previous backup could not be retired")
+		end
+		if not ops.remove_tree(retired) then return fail("previous backup could not be retired") end
+	end
+	if not forward_current() or not ops.move(context.install_root, backup) then
+		return fail("current installation could not be moved to backup")
+	end
+
+	if not forward_current() or not ops.move(candidate, context.install_root) then
+		local restored = ops.move(backup, context.install_root)
+		if not restored then
+			return fail("candidate activation and rollback both failed; backup remains at " .. backup)
+		end
+		return fail("candidate activation failed; previous installation restored")
+	end
+
+	local smoke_ok = forward_current() and ops.smoke(context.wrapper) and forward_current()
+	local active_owned, active_identity = ops.backup_is_owned(context.install_root, backup)
+	if active_owned ~= true or active_identity ~= candidate_identity then
+		return fail("updated installation ownership changed; rollback refused; backup remains at " .. backup)
+	end
+	if not smoke_ok or not forward_current() then
+		local failed_root = work_dir .. "/failed"
+		local displaced = ops.move(context.install_root, failed_root)
+		if displaced then
+			local captured_owned, captured_identity = ops.backup_is_owned(failed_root, backup)
+			if captured_owned ~= true or captured_identity ~= candidate_identity then
+				-- Retain an unverified namespace if another owner prevents the
+				-- no-replace restoration; staging cleanup must never erase it.
+				if not ops.move(failed_root, context.install_root) then
+					retained_work = true
+					return fail("updated installation ownership changed; unverified root retained at " .. failed_root .. "; backup remains at " .. backup)
+				end
+				return fail("updated installation ownership changed; rollback refused; backup remains at " .. backup)
+			end
+		end
+		local restored = displaced and ops.move(backup, context.install_root)
+		if restored then
+			return fail("updated wrapper smoke failed; previous installation restored")
+		end
+		return false, "updated wrapper smoke and rollback failed; backup remains at " .. backup
+			.. "; staging retained at " .. work_dir
+	end
+
+	-- Compiled into the verified, activated root: a staged tree's chunks would
+	-- name the staging path, and the receipt verifier of the release that
+	-- staged it may predate the derived tree. A failure costs boot time only:
+	-- the daemon loads from source and says so.
+	local compiled = ops.compile_bytecode(context.install_root)
+	local work_removed = cleanup_work(work_dir, context.parent, ops)
+	local archive_removed = ops.remove_file(options.archive_path)
+	if not work_removed or not archive_removed then
+		return true, "update installed but temporary cleanup was incomplete"
+	end
+	if not compiled then return true, "update installed but its bytecode package was not compiled" end
+	return true
+end
+
+--- Original synchronous API and all default filesystem operations are retained.
+function M.install(options) return install_transaction(options, nil) end
+
+-- Captured physical operations, not coroutine scheduling, authorize resumption.
+local retained_installs = {}
+
+-- The fixed producer knows this refusal occurred before its first reader. It
+-- still owns an accepted registry reservation, so return an authentic cleanup
+-- operation rather than an unowned nil result or a guessed physical ACK.
+local function refuse_owned_admission(finish, reservation, callback)
+ local operation = { started = true }
+ local work = { constructing = true, received = false, done = false, listeners = {} }
+ retained_installs[work] = true
+ local function publish()
+  if work.publishing or work.constructing or work.unknown or work.done or not work.child or not work.received then return end
+  work.publishing = true
+  local guarded = pcall(function()
+   local checked, physical = pcall(work.methods.is_settled, work.child)
+   if not checked or physical ~= true or work.done or work.constructing or work.unknown then return end
+   if type(work.result) ~= "table" or rawget(work.result, "ok") ~= true then work.unknown = true; return end
+   work.done = true
+   retained_installs[work] = nil
+   pcall(callback, false, "local install admission expired or refused")
+   local listeners = work.listeners; work.listeners = {}
+   for _, listener in ipairs(listeners) do pcall(listener) end
+  end)
+  work.publishing = false
+  if not guarded then work.unknown = true end
+ end
+ local acquired, child = pcall(finish, reservation, true, function(result)
+  if work.received then return end
+  work.received, work.result = true, result
+  publish()
+ end)
+ if acquired and type(child) == "table" then
+  local methods = { is_settled = rawget(child, "is_settled"),
+   cancel = rawget(child, "request_cancel") or rawget(child, "cancel"), on_settled = rawget(child, "on_settled") }
+  if type(methods.is_settled) == "function" and type(methods.cancel) == "function" and type(methods.on_settled) == "function" then
+   work.child, work.methods = child, methods
+   local observed, ack = pcall(methods.on_settled, child, publish)
+   if not observed or ack ~= true then work.unknown = true end
+  else work.unknown = true end
+ else work.unknown = true end -- Unknown finish acquisition cannot stand for physical retirement.
+ work.constructing = false
+ if work.unknown and work.child then pcall(work.methods.cancel, work.child) end
+ function operation:is_settled() return work.done end
+ function operation:on_settled(listener)
+  if type(listener) ~= "function" then return false end
+  if work.done then pcall(listener) else work.listeners[#work.listeners + 1] = listener end
+  return true
+ end
+ function operation:request_cancel()
+  if not work.done and work.child and not work.signalled then
+   work.signalled = true; pcall(work.methods.cancel, work.child)
+  end
+  publish()
+  return true
+ end
+ function operation:cancel() operation.request_cancel(operation); return work.done end
+ publish()
+ return operation
+end
+
+--- Starts one install child (the updated wrapper's `--help` smoke, the
+--- ownership owner) as an owned child of the event loop, for the async installer.
+---
+--- Both ran through `os.execute` on the daemon's event loop: a slow or hung
+--- child stalled input and every timer, past the install deadline it could not
+--- observe (the ownership owner hashes the whole payload: 9 s on a real tree,
+--- with the keyboard grabbed). Here the child runs in its own process group, a
+--- libuv timer re-admits the install deadline while it runs, and a refused
+--- admission kills the group; the result is delivered only once it is gone.
+--- @param executable string Absolute program path.
+--- @param arguments table Dense literal argv after the program.
+--- @param admitted function The install admission (deadline included).
+--- @param done function Receives { ok = boolean }.
+--- @return table operation is_settled, request_cancel and on_settled.
+local function start_owned_child(executable, arguments, admitted, done)
+ local operation, listeners = {}, {}
+ local settled, outcome, timer = false, nil, nil
+ local function settle(result)
+  if settled then return end
+  settled = true
+  pcall(done, result)
+  local pending = listeners; listeners = {}
+  for _, listener in ipairs(pending) do pcall(listener) end
+ end
+ function operation:is_settled() return settled end
+ function operation:on_settled(listener)
+  if type(listener) ~= "function" then return false end
+  if settled then pcall(listener) else listeners[#listeners + 1] = listener end
+  return true
+ end
+ if not uv_loaded or type(uv.new_timer) ~= "function" or not ProgramRunner.supported() then
+  settle({ ok = false })
+  function operation:request_cancel() return true end
+  return operation
+ end
+ local cancelled = false
+ local child = ProgramRunner.spawn(executable, arguments, function(code) outcome = code end, function()
+  return not cancelled and admitted()
+ end)
+ local function retire()
+  if timer then
+   local owned = timer
+   timer = nil
+   pcall(owned.stop, owned)
+   pcall(owned.close, owned)
+  end
+  settle({ ok = outcome == 0 and not cancelled })
+ end
+ local function tick()
+  if child.isSettled() then retire(); return end
+  if cancelled or not admitted() then
+   cancelled = true
+   child.terminate(true)
+   if child.isSettled() then retire() end
+  end
+ end
+ function operation:request_cancel()
+  cancelled = true
+  tick()
+  return true
+ end
+ local made, created = pcall(uv.new_timer)
+ if not made or not created then settle({ ok = false }); return operation end
+ timer = created
+ if not child.start() then
+  -- A refused spawn holds no process; an ambiguous one is still polled.
+  if child.isSettled() then retire(); return operation end
+ end
+ local armed = pcall(timer.start, timer, OWNED_CHILD_ADMISSION_POLL_MS, OWNED_CHILD_ADMISSION_POLL_MS, tick)
+ if not armed then
+  cancelled = true
+  child.terminate(true)
+  if child.isSettled() then retire() end
+ end
+ return operation
+end
+
+--- Runs the original rollback transaction on one private native reservation.
+--- No displayed archive path is opened. The fixed artifact factory owns every
+--- listing/extract reader and cleanup; returned operation methods export no FD.
+function M.install_owned(options, callback)
+ if type(options) ~= "table" or type(callback) ~= "function" then return nil end
+ local factory, reservation = rawget(options, "factory"), rawget(options, "reservation")
+ if type(factory) ~= "table" or reservation == nil then return nil end
+ local valid, feed, finish = rawget(factory, "install_current"), rawget(factory, "install_feed"), rawget(factory, "finish_install")
+ if type(valid) ~= "function" or type(feed) ~= "function" or type(finish) ~= "function" then return nil end
+ local checked, admitted = pcall(valid, reservation)
+ if not checked or admitted ~= true then return refuse_owned_admission(finish, reservation, callback) end
+ local task = { waiting = nil, pumping = false, done = false, unknown = false, listeners = {}, cancelled = false }
+ local operation = { started = true }
+ retained_installs[task] = true
+ local pump
+ local function await(start, cleanup_only)
+  if task.cancelled and not cleanup_only then return { ok = false } end
+  local work = { received = false }
+  task.waiting = work -- Reserve before construction or any native callback.
+  local called, child = pcall(start, function(result)
+   if task.waiting ~= work or work.received then return end
+   work.received, work.result = true, result
+   pump()
+  end)
+  local probe = type(child) == "table" and rawget(child, "is_settled") or nil
+  local signal = type(child) == "table" and (rawget(child, "request_cancel") or rawget(child, "cancel")) or nil
+  local observe = type(child) == "table" and rawget(child, "on_settled") or nil
+  if called and type(probe) == "function" and type(signal) == "function" and type(observe) == "function" then
+   work.operation, work.probe, work.signal = child, probe, signal
+   local registered, ack = pcall(observe, child, pump)
+   if not registered or ack ~= true then task.unknown = true end
+   if task.cancelled or task.unknown then
+    work.signalled = true; pcall(signal, child)
+   end
+  else task.unknown = true end -- Unknown acquisition is retained physical debt.
+  return coroutine.yield()
+ end
+ local function owned_current()
+  if task.done or task.unknown or task.cancelled then return false end
+  local observed, current = pcall(valid, reservation)
+  return observed and current == true and not task.done and not task.unknown and not task.cancelled
+ end
+ local ops = {}
+ for name, fn in next, DEFAULT_OPS do ops[name] = fn end
+ ops.validate_archive = function()
+  local names = await(function(done) return feed(reservation, "names", nil, done, owned_current) end)
+  if type(names) ~= "table" or names.ok ~= true then return false, "archive listing failed" end
+  local verbose = await(function(done) return feed(reservation, "verbose", nil, done, owned_current) end)
+  if type(verbose) ~= "table" or verbose.ok ~= true then return false, "archive listing failed" end
+  return archive_listings_canonical(names.stdout, verbose.stdout)
+ end
+ ops.extract = function(_, work_dir)
+  local result = await(function(done) return feed(reservation, "extract", work_dir, done, owned_current) end)
+  return type(result) == "table" and result.ok == true
+ end
+ ops.remove_file = function()
+  local result = await(function(done) return finish(reservation, false, done) end, true)
+  task.artifact_finished = true
+  return type(result) == "table" and result.ok == true
+ end
+ ops.smoke = function(wrapper)
+  local result = await(function(done) return start_owned_child(wrapper, { "--help" }, owned_current, done) end)
+  return type(result) == "table" and result.ok == true
+ end
+ ops.record_ownership = function(root, previous)
+  return record_ownership_with(function(owner, arguments)
+   local argv = { "-c", EXEC_BASH, owner }
+   for _, argument in ipairs(arguments) do argv[#argv + 1] = argument end
+   local result = await(function(done) return start_owned_child(POSIX_SHELL, argv, owned_current, done) end)
+   return type(result) == "table" and result.ok == true
+  end, root, previous)
+ end
+ local captured = { context = rawget(options, "context"), expected_version = rawget(options, "expected_version"),
+  archive_path = reservation, ops = ops }
+ local thread = coroutine.create(function()
+  local installed, detail = install_transaction(captured, owned_current)
+  if not task.artifact_finished then
+   -- A failed installation retains its authenticated artifact for a fresh
+   -- user retry, but all native readers/consumer debt must retire first.
+   local retired = await(function(done) return finish(reservation, true, done) end, true)
+   if type(retired) ~= "table" or retired.ok ~= true then task.unknown = true; return end
+  end
+  return installed, detail
+ end)
+ pump = function()
+  if task.pumping or task.done or task.unknown then return end
+  task.pumping = true
+  local input
+  while not task.done and not task.unknown do
+   if task.waiting then
+    local work = task.waiting
+    if not work.received or not work.operation then break end
+    local probed, settled = pcall(work.probe, work.operation)
+    if not probed or settled ~= true or task.waiting ~= work or task.unknown then break end
+    task.waiting, input = nil, work.result
+   end
+   local resumed, installed, detail = coroutine.resume(thread, input)
+   input = nil
+   if not resumed then task.unknown = true; break end
+   if coroutine.status(thread) == "dead" then
+    task.done = true
+    retained_installs[task] = nil
+    pcall(callback, installed == true, detail)
+    local listeners = task.listeners
+    task.listeners = {}
+    for _, listener in ipairs(listeners) do pcall(listener) end
+    break
+   end
+   if not task.waiting then task.unknown = true; break end
+  end
+  task.pumping = false
+ end
+ function operation:is_settled() return task.done end
+ function operation:on_settled(listener)
+  if type(listener) ~= "function" then return false end
+  if task.done then pcall(listener) else task.listeners[#task.listeners + 1] = listener end
+  return true
+ end
+ function operation:request_cancel()
+  if task.done then return true end
+  task.cancelled = true
+  local work = task.waiting
+  if work and work.operation and work.signal and not work.signalled then
+   work.signalled = true; pcall(work.signal, work.operation)
+  end
+  pump()
+  return true
+ end
+ function operation:cancel()
+  if not task.done then operation.request_cancel(operation) end
+  return task.done
+ end
+ pump()
+ return operation
+end
+
+return M

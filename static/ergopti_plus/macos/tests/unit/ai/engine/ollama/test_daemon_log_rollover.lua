@@ -239,13 +239,13 @@ helpers.describe("Ollama daemon log rollover", function()
 		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local original_log = Logger.today_log_path
-		local previous_progress = package.loaded["ui.download_window"]
+		local previous_progress = package.loaded["updater.ui.download_window"]
 		local previous_api = package.loaded["ai.engine.api.ollama"]
 		local task_args
 		local task_done
 		local daemon_calls = 0
 
-		package.loaded["ui.download_window"] = {
+		package.loaded["updater.ui.download_window"] = {
 			is_active = function() return false end,
 			show = function() end,
 			set_step = function() end,
@@ -301,7 +301,7 @@ helpers.describe("Ollama daemon log rollover", function()
 		end)
 
 		Logger.today_log_path = original_log
-		package.loaded["ui.download_window"] = previous_progress
+		package.loaded["updater.ui.download_window"] = previous_progress
 		package.loaded["ai.engine.api.ollama"] = previous_api
 		package.loaded["ai.engine.ollama.binary"] = nil
 		if not ok then error(err) end

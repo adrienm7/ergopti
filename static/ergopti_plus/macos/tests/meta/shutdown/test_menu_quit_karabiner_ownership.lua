@@ -120,7 +120,7 @@ local function load_menu_quit_action()
 		start_config_watcher = function() return {} end,
 		start_theme_watcher = function() return {} end,
 	}
-	package.loaded["modules.updater"] = {
+	package.loaded["updater.engine"] = {
 		get_check_interval = function() return 3600 end,
 		start_background_checks = function() end,
 	}
@@ -147,7 +147,7 @@ local function load_menu_quit_action()
 	for _, module_name in ipairs({
 		"gestures.ui.menu.gestures", "shortcuts.ui.menu.shortcuts", "layouts.ui.menu.keyboard_layout",
 		"hotstrings.ui.menu.hotstrings", "ai.ui.menu", "metrics.ui.menu.metrics",
-		"tap_hold.ui.menu_tap_holds", "apps.ui.menu.apps", "ui.menu.menu_about",
+		"tap_hold.ui.menu_tap_holds", "apps.ui.menu.apps", "updater.ui.menu_about",
 		"ai.engine", "metrics.engine", "hotstrings.engine.dynamic", "gestures.engine",
 	}) do
 		package.loaded[module_name] = {}

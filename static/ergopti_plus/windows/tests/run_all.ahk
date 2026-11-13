@@ -324,7 +324,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../layouts/engine/system_layout_install.ahk
 #Include ../core/ui/ui/tooltip/init.ahk
 #Include ../core/ui/adapters/tooltip_renderer.ahk
-#Include ../modules/updater.ahk
+#Include ../updater/updater.ahk
 #Include ../core/lifecycle/engine/shutdown/uninstall.ahk
 #Include ../onboarding/engine/start_at_login.ahk
 ; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
@@ -340,8 +340,8 @@ TestQualificationRegisterParser(JsonParse)
 #Include ../keyboard/engine/layers/sticky_modifiers.ahk
 #Include ../../_shared/core/network/data/failure.ahk
 #Include ../core/network/adapters/failure_host.ahk
-#Include ../ui/download_window/session.ahk
-#Include ../ui/download_window/init.ahk
+#Include ../updater/ui/download_window/session.ahk
+#Include ../updater/ui/download_window/init.ahk
 ; locale.ahk (string loading + t()) is included here because gestures.ahk calls
 ; t() at the top level when building GESTURE_SLOT_LABELS; without it the process
 ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
@@ -467,7 +467,7 @@ InstallSendNoOps()
 #Include unit/core/logger/test_contract.ahk
 #Include unit/diagnostics/ui/healthcheck/test_logging.ahk
 #Include unit/core/lifecycle/engine/test_build_commit.ahk
-#Include unit/modules/updater/test_version_display_strips_build_metadata.ahk
+#Include unit/updater/engine/test_version_display_strips_build_metadata.ahk
 #Include unit/core/logger/test_daily_rotation.ahk
 #Include unit/core/logger/test_volume.ahk
 ; The logs-folder resolver and the Debug menu log openers built on it
@@ -644,53 +644,53 @@ InstallSendNoOps()
 #Include unit/shortcuts/engine/test_capsword_state.ahk
 #Include meta/keyboard/tap_hold/test_suspend_boundary.ahk
 #Include unit/test_updater.ahk
-#Include unit/modules/updater/test_updater_release_fetch.ahk
-#Include unit/modules/updater/test_updater_request_pause.ahk
-#Include unit/modules/updater/test_updater_transport_ownership.ahk
-#Include unit/modules/updater/test_updater_tray_root.ahk
-#Include unit/modules/updater/test_updater_install_deadlines.ahk
-#Include unit/modules/updater/test_updater_channel_bundle.ahk
-#Include unit/modules/updater/test_asset_signature.ahk
-#Include unit/modules/updater/test_updater_managed_failure.ahk
-#Include unit/modules/updater/test_release_install.ahk
-#Include unit/modules/updater/test_config_restore_custody.ahk
+#Include unit/updater/engine/test_release_fetch.ahk
+#Include unit/updater/engine/test_request_pause.ahk
+#Include unit/updater/engine/test_transport_ownership.ahk
+#Include unit/updater/engine/test_tray_root.ahk
+#Include unit/updater/engine/test_install_deadlines.ahk
+#Include unit/updater/engine/test_channel_bundle.ahk
+#Include unit/updater/engine/test_asset_signature.ahk
+#Include unit/updater/engine/test_managed_failure.ahk
+#Include unit/updater/engine/test_release_install.ahk
+#Include unit/updater/engine/test_config_restore_custody.ahk
 #Include unit/core/lifecycle/engine/shutdown/test_uninstall.ahk
 #Include unit/core/lifecycle/engine/shutdown/test_uninstall_source_run.ahk
 #Include unit/core/lifecycle/engine/test_start_at_login.ahk
 #Include unit/core/lifecycle/engine/test_start_at_login_other_source.ahk
 #Include meta/core/lifecycle/engine/shutdown/test_uninstall_shutdown_gate.ahk
-#Include unit/modules/updater/test_updater_channel_registry.ahk
-#Include unit/modules/updater/test_updater_schedule_vectors.ahk
-#Include unit/modules/updater/test_version_label_vectors.ahk
-#Include unit/modules/updater/test_updater_check_interval_snap.ahk
-#Include unit/modules/updater/test_updater_check_schedule.ahk
-#Include unit/modules/updater/test_updater_balloon_click_ownership.ahk
-#Include unit/modules/updater/test_updater_channel_selection.ahk
-#Include unit/modules/updater/test_updater_release_list_budget.ahk
-#Include unit/modules/updater/test_updater_check_only_fallback.ahk
-#Include unit/modules/updater/test_updater_check_session_vectors.ahk
+#Include unit/updater/engine/test_channel_registry.ahk
+#Include unit/updater/engine/test_schedule_vectors.ahk
+#Include unit/updater/engine/test_version_label_vectors.ahk
+#Include unit/updater/engine/test_check_interval_snap.ahk
+#Include unit/updater/engine/test_check_schedule.ahk
+#Include unit/updater/engine/test_balloon_click_ownership.ahk
+#Include unit/updater/engine/test_channel_selection.ahk
+#Include unit/updater/engine/test_release_list_budget.ahk
+#Include unit/updater/engine/test_check_only_fallback.ahk
+#Include unit/updater/engine/test_check_session_vectors.ahk
 #Include unit/core/lifecycle/engine/shutdown/test_quit_admission.ahk
 ; The About row actions; menu_init.ahk is included with the tray root below.
 #Include ../menu/ui/builder/actions.ahk
-#Include unit/modules/updater/test_about_menu_channel_rows.ahk
-#Include unit/modules/updater/test_about_menu_version_row.ahk
-#Include unit/modules/updater/test_changelog_subscribe_channel.ahk
-#Include unit/modules/updater/test_updater_release_notes.ahk
-#Include unit/modules/updater/test_updater_staging_transport.ahk
-#Include unit/modules/updater/test_updater_swap_transaction.ahk
-#Include unit/modules/updater/test_updater_swap_receiving.ahk
-#Include unit/modules/updater/test_updater_swap_cancellation.ahk
-#Include unit/modules/updater/test_updater_swap_shutdown.ahk
-#Include unit/modules/updater/test_updater_swap_recovery.ahk
-#Include unit/modules/updater/test_updater_swap_cleanup.ahk
+#Include unit/updater/engine/test_about_menu_channel_rows.ahk
+#Include unit/updater/engine/test_about_menu_version_row.ahk
+#Include unit/updater/engine/test_changelog_subscribe_channel.ahk
+#Include unit/updater/engine/test_release_notes.ahk
+#Include unit/updater/engine/test_staging_transport.ahk
+#Include unit/updater/engine/test_swap_transaction.ahk
+#Include unit/updater/engine/test_swap_receiving.ahk
+#Include unit/updater/engine/test_swap_cancellation.ahk
+#Include unit/updater/engine/test_swap_shutdown.ahk
+#Include unit/updater/engine/test_swap_recovery.ahk
+#Include unit/updater/engine/test_swap_cleanup.ahk
 #Include unit/gestures/engine/test_emit_actions.ahk
 #Include unit/gestures/engine/test_incremental_rule.ahk
 #Include unit/gestures/adapters/test_touchpad_hid.ahk
 #Include unit/gestures/adapters/test_raw_touchpad_owner.ahk
 #Include unit/gestures/engine/test_swipe_slot_menu.ahk
-#Include unit/modules/updater/test_updater_constants_single_source.ahk
+#Include unit/updater/engine/test_constants_single_source.ahk
 #Include unit/core/lifecycle/engine/test_runtime_contract_version.ahk
-#Include meta/modules/updater/test_updater_load_interval_guard.ahk
+#Include meta/updater/test_load_interval_guard.ahk
 
 ; Shortcuts modules — dispatcher logic is testable without real hotkeys firing;
 ; the module files are #Include'd from within test_shortcuts.ahk itself so the
@@ -986,7 +986,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/ai/profiles/test_prompt_editor_context_epoch.ahk
 ; Changelog host is likewise definitions-only until Changelog_Open is called.
 ; Load it so the request/window epoch can be exercised with deterministic fakes.
-#Include ../ui/changelog/init.ahk
+#Include ../updater/ui/changelog/init.ahk
 _LogBootProgress("menu_llm persist + tests included")
 
 ; Gestures module — included here because its pure logic (assignments, action
@@ -1426,18 +1426,18 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/core/network/adapters/test_managed_remote_cleanup_diagnostics.ahk
 #Include unit/core/network/adapters/test_managed_remote_fixture_scope.ahk
 #Include unit/core/network/adapters/test_managed_remote_readiness_diagnostics.ahk
-#Include unit/modules/updater/test_updater_managed_transport.ahk
-#Include unit/modules/updater/test_updater_managed_transport_diagnostics.ahk
-#Include unit/modules/updater/test_updater_curl_artifact.ahk
-#Include unit/modules/updater/test_updater_curl_capture.ahk
-#Include unit/modules/updater/test_updater_curl_capture_namespace.ahk
-#Include unit/modules/updater/test_updater_curl_capture_move_graph.ahk
+#Include unit/updater/engine/test_managed_transport.ahk
+#Include unit/updater/engine/test_managed_transport_diagnostics.ahk
+#Include unit/updater/engine/test_curl_artifact.ahk
+#Include unit/updater/engine/test_curl_capture.ahk
+#Include unit/updater/engine/test_curl_capture_namespace.ahk
+#Include unit/updater/engine/test_curl_capture_move_graph.ahk
 #Include unit/core/network/adapters/test_managed_remote_sspi.ahk
 #Include unit/core/network/adapters/test_winhttp_transport.ahk
 #Include unit/core/network/adapters/test_native_http_forward_proxy.ahk
 #Include unit/core/network/adapters/test_native_relay_hop_branches.ahk
 #Include unit/core/network/adapters/test_native_ipv6_relay_upstream.ahk
-#Include unit/modules/updater/test_updater_artifact_winhttp.ahk
+#Include unit/updater/engine/test_artifact_winhttp.ahk
 #Include unit/core/network/adapters/test_managed_winhttp_proxy.ahk
 #Include meta/ai/servers/test_remote_connect_timeout_bounded.ahk
 #Include meta/metrics/engine/test_json_64bit_decode.ahk
@@ -1460,7 +1460,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_no_duplicate_defaults.ahk
 #Include meta/suite/test_require_state_pattern.ahk
 #Include meta/metrics/engine/test_pause_guard.ahk
-#Include meta/modules/updater/test_changelog_http_timeout.ahk
+#Include meta/updater/test_changelog_http_timeout.ahk
 #Include meta/platform/system/test_dpapi_decrypt_safe.ahk
 #Include meta/menu/test_dispatcher_critical.ahk
 #Include meta/menu/test_dispatch_epoch.ahk
@@ -1535,7 +1535,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/metrics/engine/ergonomics/test_ergo_roi_count_synth.ahk
 #Include meta/ai/profiles/test_delete_path.ahk
 #Include meta/ai/navigation/test_nav_val_modifiers_wired.ahk
-#Include meta/modules/updater/test_updater_sync_winhttp_blocks.ahk
+#Include meta/updater/test_sync_winhttp_blocks.ahk
 #Include meta/core/fs/test_sqlite_progress_yield.ahk
 #Include meta/metrics/engine/ergonomics/test_agg_app_day_llm_suggested.ahk
 #Include meta/metrics/engine/reader/test_preserves_walker_aggregates.ahk
@@ -1563,7 +1563,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ai/tooltip/test_render_epoch.ahk
 #Include meta/ai/profiles/test_presented_record_single_source.ahk
 #Include meta/ai/servers/test_remote_poll_deadline.ahk
-#Include meta/modules/updater/test_download_integrity_guard.ahk
+#Include meta/updater/test_download_integrity_guard.ahk
 #Include meta/suite/test_no_coauthor_in_commits.ahk
 #Include meta/core/lifecycle/engine/test_bundle_exclusions.ahk
 #Include meta/ai/menu/test_init_order.ahk
@@ -1621,11 +1621,11 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/hotstrings/engine/engine/test_expansion_burst_atomic.ahk
 #Include meta/core/text/test_parsetomlfile_unterminated_array_recovers.ahk
 #Include meta/platform/input/dispatch/test_dispatcher_register_duplicate_label.ahk
-#Include meta/modules/updater/test_updater_cancel_fires_on_json.ahk
-#Include meta/modules/updater/test_updater_download_receive_timeout.ahk
-#Include meta/modules/updater/test_updater_download_reentrancy_guard.ahk
-#Include meta/modules/updater/test_updater_download_requires_consent.ahk
-#Include meta/modules/updater/test_updater_prompt_uses_shared_notes.ahk
+#Include meta/updater/test_cancel_fires_on_json.ahk
+#Include meta/updater/test_download_receive_timeout.ahk
+#Include meta/updater/test_download_reentrancy_guard.ahk
+#Include meta/updater/test_download_requires_consent.ahk
+#Include meta/updater/test_prompt_uses_shared_notes.ahk
 #Include meta/hotstrings/engine/personal/test_load_once.ahk
 #Include meta/ai/menu/test_actions_include.ahk
 #Include meta/ai/menu/test_suspend_bootstrap.ahk
@@ -1881,7 +1881,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/input/test_owned_inputhooks_suspend.ahk
 #Include meta/platform/input/test_blocking_inputhook_suspend_ownership.ahk
 #Include meta/platform/input/dispatch/test_timer_scheduler_registration_transaction.ahk
-#Include meta/modules/updater/test_updater_finalize_nonblocking.ahk
+#Include meta/updater/test_finalize_nonblocking.ahk
 #Include meta/core/lifecycle/engine/test_bundle_upgrade_transaction.ahk
 #Include meta/ai/navigation/test_tab_accept_cancels_timer.ahk
 #Include meta/platform/input/test_textsend_clipboard_thread.ahk
@@ -1896,11 +1896,11 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/menu/test_dispatch_error_propagation.ahk
 #Include meta/core/ui/windows/test_launch_error_msgbox_on_timer_thread.ahk
 #Include meta/platform/focus/uia/test_error_logged.ahk
-#Include meta/modules/updater/test_updater_focus_poll_suspend_guard.ahk
-#Include meta/modules/updater/test_updater_setchannel_cancels_async.ahk
-#Include meta/modules/updater/test_updater_setchannel_blocks_during_download.ahk
-#Include meta/modules/updater/test_updater_setcheckinterval_coerces.ahk
-#Include meta/modules/updater/test_updater_scheduler_off_typing_path.ahk
+#Include meta/updater/test_focus_poll_suspend_guard.ahk
+#Include meta/updater/test_setchannel_cancels_async.ahk
+#Include meta/updater/test_setchannel_blocks_during_download.ahk
+#Include meta/updater/test_setcheckinterval_coerces.ahk
+#Include meta/updater/test_scheduler_off_typing_path.ahk
 #Include meta/core/ui/webview/test_temp_dir_and_com_leak_on_reload.ahk
 #Include meta/hotstrings/engine/engine/test_win_l_lock_resets_context.ahk
 #Include meta/core/network/test_winhttp_no_abort_on_poll_timeout.ahk
@@ -1970,7 +1970,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ai/api/test_llmbridge_stop_order.ahk
 #Include meta/ai/tooltip/test_render_clears_dequeue.ahk
 #Include meta/gestures/test_search_shortcut_run_path_existence_guard.ahk
-#Include meta/modules/updater/test_updater_swap_exit_guard.ahk
+#Include meta/updater/test_swap_exit_guard.ahk
 #Include meta/platform/input/test_keyboard_hook_dispatch_error_logged.ahk
 #Include meta/menu/test_tray_menu_cleared_before_onboarding.ahk
 #Include meta/menu/test_tray_bootstrap_publication_transaction.ahk
@@ -1989,7 +1989,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/metrics/engine/ergonomics/test_walker_batch_drained_on_rollover_and_stop.ahk
 #Include meta/keyboard/tap_hold/test_none_sentinel.ahk
 #Include meta/ai/servers/test_deps_check_epoch_guard.ahk
-#Include meta/modules/updater/test_updater_rebuild_resets_dispatcher.ahk
+#Include meta/updater/test_rebuild_resets_dispatcher.ahk
 #Include meta/keyboard/keys/test_capsword_reset_on_suspend.ahk
 #Include meta/shortcuts/engine/test_capsword_auto_off_single_source.ahk
 #Include meta/keyboard/keys/test_capsword_space_release_timeout.ahk
@@ -2112,10 +2112,10 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/keyboard/tap_hold/test_global_transaction.ahk
 #Include meta/ai/navigation/test_nav_loop_ten.ahk
 #Include meta/ai/api/test_entries_persist_error_logged.ahk
-#Include meta/modules/updater/test_updater_callback_suspend_guard.ahk
+#Include meta/updater/test_callback_suspend_guard.ahk
 #Include meta/keyboard/altgr/test_dispatch_resume_aware.ahk
-#Include meta/modules/updater/test_updater_self_update_bak_rollback.ahk
-#Include meta/modules/updater/test_updater_swap_failure_receipt.ahk
+#Include meta/updater/test_self_update_bak_rollback.ahk
+#Include meta/updater/test_swap_failure_receipt.ahk
 #Include meta/core/lifecycle/engine/test_bundle_resolve_dir_local_appdata.ahk
 #Include meta/hotstrings/engine/personal/test_shortcuts_compiled_include_path.ahk
 #Include meta/hotstrings/engine/personal/test_shortcuts_generator_encoding.ahk
@@ -2162,7 +2162,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/diagnostics/ui/test_healthcheck_collectors_guarded.ahk
 #Include meta/gestures/test_init_lifecycle_pair.ahk
 #Include meta/settings/persistence/test_paths_file_single_writer.ahk
-#Include meta/modules/updater/test_changelog_fetch_status_logged.ahk
+#Include meta/updater/test_changelog_fetch_status_logged.ahk
 #Include meta/platform/system/test_mutex_yield_is_recorded.ahk
 #Include meta/core/lifecycle/engine/reload/test_suspend_deferral_bounded.ahk
 #Include meta/core/lifecycle/engine/shutdown/test_veto_bounded.ahk
@@ -2190,16 +2190,16 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/gestures/test_screenshot_async_run.ahk
 #Include meta/keyboard/keys/test_space_hold_empty_guard.ahk
 #Include meta/ai/navigation/test_profile_hotkey_stable_pred.ahk
-#Include meta/modules/updater/test_updater_download_timeout.ahk
+#Include meta/updater/test_download_timeout.ahk
 #Include meta/gestures/test_mouse_control_physical_cursor.ahk
 #Include meta/diagnostics/adapters/test_crash_prompt_blocking_msgbox.ahk
 #Include meta/keyboard/key_combinations/test_shortcut_groups_register_dispatch.ahk
-#Include meta/modules/updater/test_changelog_fetch_async.ahk
+#Include meta/updater/test_changelog_fetch_async.ahk
 #Include meta/core/network/test_curl_response_size_bound.ahk
 #Include unit/core/network/adapters/test_curl_start_check.ahk
 #Include meta/core/network/test_curl_personal_config_disabled.ahk
-#Include meta/modules/updater/test_curl_staging_failure_cleanup.ahk
-#Include meta/modules/updater/test_changelog_webview_bridge.ahk
+#Include meta/updater/test_curl_staging_failure_cleanup.ahk
+#Include meta/updater/test_changelog_webview_bridge.ahk
 #Include meta/ai/menu/test_model_browser_webview_bridge.ahk
 #Include meta/hotstrings/engine/catalogue/test_deferred_ext_scan_critical_file_io.ahk
 #Include meta/metrics/ui/test_wpm_compact_color_validation.ahk
@@ -2208,9 +2208,9 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/gestures/test_dispatch_logs_failure.ahk
 #Include meta/ai/servers/test_ollama_installer_sync_winhttp_blocks.ahk
 #Include meta/ai/servers/test_ollama_delete_model_async.ahk
-#Include meta/modules/updater/test_updater_download_resilience.ahk
+#Include meta/updater/test_download_resilience.ahk
 #Include meta/platform/input/test_key_state_dllcall_guards.ahk
-#Include meta/modules/updater/test_updater_loadchannel_try_wrap.ahk
+#Include meta/updater/test_loadchannel_try_wrap.ahk
 #Include meta/diagnostics/adapters/test_crash_report_sysinfo_dedup.ahk
 #Include meta/core/logger/test_dedup_exit_flush.ahk
 #Include meta/core/logger/test_repeat_collapsing.ahk
@@ -2259,9 +2259,9 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/core/ui/webview/test_changelog_open_generation.ahk
 #Include unit/core/ui/webview/test_changelog_restore_authority.ahk
 #Include unit/core/ui/windows/test_title_captions.ahk
-#Include ../ui/update_check/init.ahk
-#Include unit/modules/updater/test_updater_result_dialog_states.ahk
-#Include meta/modules/updater/test_updater_manual_check_uses_dialog.ahk
+#Include ../updater/ui/update_check.ahk
+#Include unit/updater/engine/test_result_dialog_states.ahk
+#Include meta/updater/test_manual_check_uses_dialog.ahk
 #Include unit/diagnostics/ui/healthcheck/test_os_name_windows11.ahk
 #Include unit/diagnostics/ui/healthcheck/test_issues_from_errors_file.ahk
 #Include unit/diagnostics/ui/healthcheck/test_report_issue.ahk
@@ -2274,10 +2274,10 @@ _LogBootProgress("keystats modules + tests included")
 ; Same idempotency-guard shape, verified in the 6 sibling WebView2 hosts that
 ; got the identical F7 fix applied.
 #Include meta/core/ui/webview/test_reset_idempotent_siblings.ahk
-#Include meta/modules/updater/test_updater_onjson_callback_catch.ahk
+#Include meta/updater/test_onjson_callback_catch.ahk
 #Include meta/core/ui/webview/test_bridge_suspend_guard.ahk
-#Include meta/modules/updater/test_changelog_close_order.ahk
-#Include meta/modules/updater/test_updater_changelog_install_closegui.ahk
+#Include meta/updater/test_changelog_close_order.ahk
+#Include meta/updater/test_changelog_install_closegui.ahk
 ; MCSetPos/MCGetPos bare-try-no-catch fix (F32).
 #Include meta/gestures/test_mouse_control_error_logging.ahk
 ; TooltipRHide bare-try-no-catch + TooltipRShow OutputDebug-instead-of-Logger fix (F50).
@@ -2310,7 +2310,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/text/test_json_string_decoder_single_source.ahk
 #Include meta/core/text/test_toml_string_codec_single_source.ahk
 #Include meta/hotstrings/engine/magic_key/test_editor_reopen_presents.ahk
-#Include meta/modules/updater/test_update_check_window_presented.ahk
+#Include meta/updater/test_update_check_window_presented.ahk
 #Include meta/hotstrings/engine/catalogue/test_hs_delimiter_dialog_reachable.ahk
 #Include meta/core/ui/windows/test_style_llm_tray_i18n.ahk
 #Include meta/ai/servers/test_ollama_webview_msgsub_retained.ahk
@@ -2348,7 +2348,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/shortcuts/engine/test_wrap_symbols_unreadable_blocks_save.ahk
 #Include unit/settings/engine/persistence/test_unreadable_config_never_persisted.ahk
 #Include meta/core/ui/windows/test_app_picker_sort_safe_selection.ahk
-#Include meta/modules/updater/test_changelog_ready_not_stranded.ahk
+#Include meta/updater/test_changelog_ready_not_stranded.ahk
 #Include meta/hotstrings/engine/catalogue/test_hcw_bulk_writers_republish.ahk
 #Include meta/hotstrings/engine/catalogue/test_hcw_patch_toml_meta_refuses_unread_file.ahk
 #Include meta/diagnostics/ui/test_healthcheck_singleton_destroys_window.ahk
@@ -2377,8 +2377,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/ui/tooltip/test_expiry_timers_keep_preview.ahk
 #Include meta/core/ui/tooltip/test_uia_gate_reachable.ahk
 #Include meta/hotstrings/adapters/test_uia_wrap_resets_both_buffers.ahk
-#Include meta/modules/updater/test_updater_releases_list_cancellable.ahk
-#Include meta/modules/updater/test_updater_worker_terminated_on_exit.ahk
+#Include meta/updater/test_releases_list_cancellable.ahk
+#Include meta/updater/test_worker_terminated_on_exit.ahk
 #Include meta/core/ui/webview/test_reset_guard_class.ahk
 #Include meta/metrics/ui/test_wpm_graph_mode_draggable.ahk
 #Include meta/metrics/ui/test_wpm_rebuilt_surface_is_sized.ahk
@@ -2387,8 +2387,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/core/lifecycle/engine/test_bundle_skip_validation.ahk
 #Include unit/core/lifecycle/engine/test_startup_smoke_receipt.ahk
 #Include unit/shortcuts/engine/test_clipboard_history_paste.ahk
-#Include unit/modules/updater/test_changelog_request_epoch.ahk
-#Include unit/modules/updater/test_changelog_network_resilience.ahk
+#Include unit/updater/engine/test_changelog_request_epoch.ahk
+#Include unit/updater/engine/test_changelog_network_resilience.ahk
 #Include unit/settings/engine/persistence/test_toml_single_writer.ahk
 #Include unit/core/text/toml/test_derived_toml_caches_not_memoised_on_failed_read.ahk
 #Include unit/hotstrings/engine/engine/test_fire_log_callable_replacement.ahk

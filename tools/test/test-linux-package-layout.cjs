@@ -531,7 +531,7 @@ for (const rel of UNIT_SOURCES) {
 // ─── 8. The PKGBUILD ships a driver, not an empty package ───────────────────
 //
 // ROOT CAUSE ENCODED: the PKGBUILD's five copy lines read build/linux/*.lua,
-// build/linux/modules, /adapters, /ui and /vendor — while the builder puts the
+// build/linux/updater/engine, /adapters, /ui and /vendor — while the builder puts the
 // driver under build/linux/LINUX/. Every one of those lines ended
 // `2>/dev/null || true`, so makepkg SUCCEEDED and produced a package containing
 // the shared Lua tree, a wrapper with no LUA_PATH, a .desktop file and a systemd

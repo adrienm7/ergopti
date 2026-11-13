@@ -7,7 +7,7 @@
  * Decides when an automatic update check is due from the wall clock, the
  * persisted check record and the timing of defaults.json. The shared Lua port
  * (_shared/updater/engine/schedule.lua, macOS and Linux) and the AHK port
- * (windows/modules/updater/schedule.ahk) replay schedule_vectors.json with it.
+ * (windows/updater/engine/schedule.ahk) replay schedule_vectors.json with it.
  *
  * FEATURES & RATIONALE:
  * 1. Persisted, not process-relative: the next check follows the last one

@@ -66,7 +66,7 @@ local UNREACHABLE_READINESS = {
 	readiness_timeout = true,
 }
 
-local ok_dw, download_window = pcall(require, "ui.download_window")
+local ok_dw, download_window = pcall(require, "updater.ui.download_window")
 if not ok_dw then download_window = nil end
 
 

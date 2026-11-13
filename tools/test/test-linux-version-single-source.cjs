@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Linux Version Single-Source Guard
  * DESCRIPTION:
- * The Linux driver version has exactly one owner, linux/infra/version.lua
+ * The Linux driver version has exactly one owner, linux/updater/engine/version.lua
  * (M.VERSION), which resolves the `version=` entry a release build stamps into
  * the shared tree — the counterpart to the macOS/Windows BUNDLE_VERSION stamp.
  * Every surface that shows a version reads it from there.
@@ -77,8 +77,8 @@ const CONSUMERS = [
 for (const rel of CONSUMERS) {
 	const raw = read(rel);
 	const code = stripLua(raw);
-	if (!raw.includes('require("infra.version")')) {
-		errors.push(`${rel}: must require("infra.version") for the driver version`);
+	if (!raw.includes('require("updater.engine.version")')) {
+		errors.push(`${rel}: must require("updater.engine.version") for the driver version`);
 	}
 	if (!code.includes('Version.VERSION')) {
 		errors.push(`${rel}: must read the version from Version.VERSION`);

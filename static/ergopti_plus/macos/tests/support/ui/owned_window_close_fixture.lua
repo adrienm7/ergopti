@@ -17,7 +17,7 @@ require("core.logger.engine")
 local function run_window(module_name, scenario)
 	helpers.with_stub_scope({
 		"settings.ui.cleanup", "settings.engine.migration.cleanup_session", "config_cleanup", "onboarding.ui", "onboarding.engine.answers",
-		"ui.update_check", "updater.engine.check_session", "modules.updater", "adapters.update_launcher",
+		"updater.ui.update_check", "updater.engine.check_session", "updater.engine", "updater.adapters.update_launcher",
 		"metrics.ui.metrics_apps", "core.ui.engine.dialog_util", "core.text.engine.toml.writer", "core.text.engine.toml.codec", "menu.engine.manifest_reader",
 		"tests.support.onboarding_shared_data", "core.fs.adapters.file_system", "hs.spaces",
 		"core.text.engine.toml_codec.writer", "settings.engine.migration.unused_keys", "diagnostics.engine.operation_reporter", "core.text.engine.toml_codec.record_list",
@@ -27,9 +27,9 @@ local function run_window(module_name, scenario)
 		"core.ui.engine.notifications", "settings.engine.publication.defaults", "core.text.engine.utils_core", "hotstrings.engine.catalogue.personal_files", "core.lifecycle.engine.compat.utf8",
 		"core.fs.engine.dir", "core.ui.adapters.webview_result", "settings.engine.migration.file_inverse", "onboarding.engine.publication", "settings.engine.paths",
 		"ai.engine.local_servers.model_catalogue", "core.process.adapters.shell_runner", "core.ui.engine.webview.document_csp", "diagnostics.engine.runtime_log",
-		"core.process.adapters.task_environment", "modules.updater.config_backup", "updater.engine.release_sources", "updater.engine.channels",
+		"core.process.adapters.task_environment", "updater.engine.config_backup", "updater.engine.release_sources", "updater.engine.channels",
 		"updater.engine.version_core", "updater.engine.release_install", "updater.engine.release_assets", "core.network.engine.failure", "updater.engine.config_backup_core",
-		"ai.ui.model_browser", "ui.changelog",
+		"ai.ui.model_browser", "updater.ui.changelog",
 		"core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.events.timer_scheduler", "core.timing.engine.deferred_work", "core.timing.engine.paced_job", "core.timing.engine.paced_json",
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
@@ -47,8 +47,8 @@ local function run_window(module_name, scenario)
 			end
 			return view
 		end
-		package.loaded["modules.updater"] = { current_version = function() return "v1.0.0" end }
-		package.loaded["adapters.update_launcher"] = {}
+		package.loaded["updater.engine"] = { current_version = function() return "v1.0.0" end }
+		package.loaded["updater.adapters.update_launcher"] = {}
 		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return true end }
 		package.loaded["metrics.engine.journal.log_manager"] = { on_ingest_done = function() return true end }
 		local window = helpers.load_with_stubs(module_name, {
@@ -80,7 +80,7 @@ local function run_window(module_name, scenario)
 		-- translator; the loader's passthrough would leave it a bare key, refused.
 		if module_name == "settings.ui.cleanup" then package.loaded["core.i18n.engine.i18n"] = nil end
 		if module_name == "onboarding.ui" then require("tests.support.onboarding_shared_data").install() end
-		if module_name == "ui.changelog" then
+		if module_name == "updater.ui.changelog" then
 			local files = require("core.fs.adapters.file_system")
 			local original = files.read
 			files.read = function(path, ...)
@@ -100,10 +100,10 @@ local function run_window(module_name, scenario)
 		end
 		function h.show()
 			if module_name == "ai.ui.model_browser" then return window.open({ presets = {}, active_backend = "mlx" }) end
-			if module_name == "ui.changelog" then return window.open() end
+			if module_name == "updater.ui.changelog" then return window.open() end
 			if module_name == "settings.ui.cleanup" then return window.open({ path = "/virtual/config.toml" }) end
 			if module_name == "onboarding.ui" then return window.run("/virtual/config.toml") end
-			if module_name == "ui.update_check" then return window.open({
+			if module_name == "updater.ui.update_check" then return window.open({
 				channel_owner = { get = function() return "dev" end, set = function() return true end },
 				checks = { check_now = function() return true end },
 			}) end
@@ -112,7 +112,7 @@ local function run_window(module_name, scenario)
 		function h.close()
 			if module_name == "settings.ui.cleanup" then
 				h.script_refs[h.controllers[#h.controllers]]({ body = { action = "close", session = "" } })
-			elseif module_name == "ui.update_check" then
+			elseif module_name == "updater.ui.update_check" then
 				h.script_refs[h.controllers[#h.controllers]]({ body = { action = "close" } })
 			elseif module_name == "onboarding.ui" then
 				-- Invalid answers exercise the real fail_commit close without authorizing a write.

@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local DevSource = helpers.load_module("core.lifecycle.engine.dev_source")
-local Restarter = helpers.load_module("modules.updater.restarter")
+local Restarter = helpers.load_module("updater.engine.restarter")
 
 local ROOT = "/home/dev/ergopti"
 local DRIVER = ROOT .. "/static/ergopti_plus/linux"

@@ -654,7 +654,7 @@ for (const [source, label] of [
 		!/\bComObject\(|\bRun\(|\bRunWait\(|\bFileOpen\(|\bFileAppend\(|\bFileDelete\(|\bDllCall\(/.test(
 			source
 		),
-		`${label} must reach COM, processes and files through windows/adapters`
+		`${label} must reach COM, processes and files through windows/updater/adapters`
 	);
 }
 check(

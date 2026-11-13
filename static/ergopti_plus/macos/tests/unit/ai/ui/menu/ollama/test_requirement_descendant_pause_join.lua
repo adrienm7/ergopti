@@ -66,7 +66,7 @@ local OWNED_MODULES = {
 	"metrics.ui.wpm.widget",
 	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
-	"ui.download_window",
+	"updater.ui.download_window",
 	"ai.ui.menu.requirement_operation_registry",
 	"ai.ui.menu.models.manager_ollama",
 }
@@ -318,7 +318,7 @@ local function with_fixture(callback)
 			}
 
 			local window_session = 0
-			package.loaded["ui.download_window"] = {
+			package.loaded["updater.ui.download_window"] = {
 				session_id = function() return window_session end,
 				is_active = function() return window_session > 0 end,
 				show = function(options)

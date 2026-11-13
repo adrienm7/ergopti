@@ -32,7 +32,7 @@ local FIXTURE_MODULES = {
 	"diagnostics.engine.reports.snapshot",
 	"diagnostics.engine.reports.crash_reporter",
 	"core.logger.engine.logger",
-	"modules.updater",
+	"updater.engine",
 }
 
 
@@ -228,7 +228,7 @@ helpers.describe("build-commit: the crash report of a packaged app", function()
 			helpers.load_with_stubs("core.logger.engine.logger", { configdir = APP_SCRIPTS })
 			package.loaded["settings.engine.paths"] = chosen_config_paths()
 			package.loaded["diagnostics.engine.reports.snapshot"] = stamped_snapshot()
-			package.loaded["modules.updater"] = { current_version = function() return "2.4.0" end }
+			package.loaded["updater.engine"] = { current_version = function() return "2.4.0" end }
 			local saved_info = hs.processInfo
 			hs.processInfo = { version = "1.0.3", bundleID = "com.ergoptiplus.app.hammerspoon" }
 			package.loaded["diagnostics.engine.reports.crash_reporter"] = nil

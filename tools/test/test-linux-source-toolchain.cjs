@@ -48,10 +48,7 @@ try {
 	const builderRelative = 'tools/build/build-linux-native-output.sh';
 	fs.mkdirSync(sourceDirectory, { recursive: true });
 	for (const file of ['archive_publication.c', 'archive_publication.h'])
-		fs.copyFileSync(
-			path.join(driver, 'native/archive_output', file),
-			path.join(sourceDirectory, file)
-		);
+		fs.copyFileSync(path.join(driver, 'updater/native', file), path.join(sourceDirectory, file));
 	const copiedBuilder = path.join(scratch, 'model repository\n', builderRelative);
 	fs.mkdirSync(path.dirname(copiedBuilder), { recursive: true });
 	fs.copyFileSync(path.join(root, builderRelative), copiedBuilder);

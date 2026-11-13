@@ -247,7 +247,7 @@ for (const [index, family] of families.entries()) {
 // parent); in AHK, JSON text built in one function. The think it sends must
 // be an expression, never a literal, and its file must reach the resolver.
 const OLLAMA_ROOTS = [
-	'static/ergopti_plus/macos/modules',
+	'static/ergopti_plus/macos/updater/engine',
 	'static/ergopti_plus/macos/tap_hold/engine',
 	'static/ergopti_plus/macos/shortcuts/engine',
 	'static/ergopti_plus/macos/metrics/adapters',
@@ -259,7 +259,7 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/diagnostics/engine',
 	'static/ergopti_plus/macos/ai/engine',
 	'static/ergopti_plus/macos/settings/engine',
-	'static/ergopti_plus/macos/ui',
+	'static/ergopti_plus/macos/updater/ui',
 	'static/ergopti_plus/macos/tap_hold/ui',
 	'static/ergopti_plus/macos/shortcuts/ui/action_picker',
 	'static/ergopti_plus/macos/shortcuts/ui/menu',
@@ -283,7 +283,7 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/settings/ui',
 	'static/ergopti_plus/macos/core/ui/ui',
 	'static/ergopti_plus/macos/core/network',
-	'static/ergopti_plus/linux/modules',
+	'static/ergopti_plus/linux/updater/engine',
 	'static/ergopti_plus/linux/shortcuts/engine',
 	'static/ergopti_plus/linux/metrics/engine',
 	'static/ergopti_plus/linux/layouts/engine',
@@ -297,7 +297,7 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/linux/ai/engine/ollama',
 	'static/ergopti_plus/linux/ai/engine/prediction',
 	'static/ergopti_plus/linux/ai/engine/settings',
-	'static/ergopti_plus/linux/infra',
+	'static/ergopti_plus/linux/updater/engine',
 	'static/ergopti_plus/linux/tap_hold/engine',
 	'static/ergopti_plus/linux/shortcuts/engine',
 	'static/ergopti_plus/linux/metrics/engine',

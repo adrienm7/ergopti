@@ -95,7 +95,7 @@ helpers.describe("HS-010 Ollama download shared slot", function()
 			helpers.assert_true(start_pull(f, "model-A"))
 			local retry = f.progress.on_retry
 			f.pulls[1].on_done(2)
-			package.loaded["ui.download_window"].show({ kind = "mlx_model", model = "model-B" })
+			package.loaded["updater.ui.download_window"].show({ kind = "mlx_model", model = "model-B" })
 			helpers.assert_eq(retry(), false)
 			helpers.assert_eq(f.progress.shows, 2)
 			helpers.assert_eq(#f.pulls, 1)
@@ -108,7 +108,7 @@ helpers.describe("HS-010 Ollama download shared slot", function()
 				local accepted, terminal = start_pull(f, "model-A")
 				helpers.assert_true(accepted)
 				if outcome == "cancel" then helpers.assert_true(f.progress.on_cancel()) end
-				package.loaded["ui.download_window"].show({ kind = "mlx_model", model = "model-B" })
+				package.loaded["updater.ui.download_window"].show({ kind = "mlx_model", model = "model-B" })
 				local completes, updates = f.progress.completes, f.progress.updates
 				if outcome == "stream" then f.pulls[1].on_stream(nil, "old progress\n", "")
 				else f.pulls[1].on_done(outcome == "success" and 0 or 15) end

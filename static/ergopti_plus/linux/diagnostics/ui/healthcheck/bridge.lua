@@ -30,7 +30,7 @@ M.bridge_name = "healthcheck"
 local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.healthcheck"
 
-local Version = require("infra.version")
+local Version = require("updater.engine.version")
 local Snapshot = require("diagnostics.engine.healthcheck.snapshot")
 local Actions = require("diagnostics.engine.healthcheck.actions")
 local LoggerSink = require("core.logger.engine.sink")
@@ -156,7 +156,7 @@ end
 --- @return table
 local function collect_versions(facts)
 	local commit, source = require("diagnostics.engine.reports.snapshot").resolve_commit()
-	local ok_updater, Updater = pcall(require, "modules.updater.manager")
+	local ok_updater, Updater = pcall(require, "updater.engine.manager")
 	return {
 		ergopti_version = Version.VERSION,
 		commit          = commit .. " (" .. source .. ")",

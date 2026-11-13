@@ -15,7 +15,7 @@ local HttpClient = require("core.network.adapters.http_client")
 local Json = require("core.text.engine.json")
 local NumberPolicy = require("core.text.engine.number_policy")
 local Logger = require("core.logger.engine.shim")
-local DownloadWindow = require("ui.download_window.bridge")
+local DownloadWindow = require("updater.ui.download_window.bridge")
 local WindowSessionId, RetireWindow, CompleteWindow = DownloadWindow.session_id, DownloadWindow.retire, DownloadWindow.complete
 
 local LOG = "ai.engine.local_servers.model_download"

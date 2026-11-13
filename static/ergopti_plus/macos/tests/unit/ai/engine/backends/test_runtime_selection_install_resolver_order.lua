@@ -200,9 +200,9 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 		local window = {}
 		for key, value in pairs(WINDOW_STUB) do window[key] = value end
 		window.set_error = function(message) errors[#errors + 1] = message end
-		package.loaded["ui.download_window"] = window
+		package.loaded["updater.ui.download_window"] = window
 		checker = load_ollama_checker(state)
-		package.loaded["ui.download_window"] = window
+		package.loaded["updater.ui.download_window"] = window
 		helpers.assert_true(Fixture.start_verification(state, checker))
 		state.tasks[1].done(1, "OLLAMA_INSTALLING\nOLLAMA_ERROR_CHECKSUM\n",
 			"[OLLAMA-DEPS] ERROR: Ollama archive SHA-256 checksum mismatch; refusing extraction.\n")

@@ -34,15 +34,15 @@ _TWTL_CheckSharedHost(Path, OldPrefix) {
 }
 
 ; The updater module's two shared-env hosts (changelog window, update prompt)
-; live across sibling files after the modules/updater split -- verify at MODULE scope.
+; live across sibling files after the updater/engine split -- verify at MODULE scope.
 _TWTL_CheckSharedUpdaterModule() {
-	Src := _DriverDirConcat("modules/updater")
+	Src := _DriverDirConcat("updater/engine")
 	Assert(InStr(Src, "WebView_SharedEnvironment(") > 0,
-		"modules/updater module must obtain WebView2 controllers from WebView_SharedEnvironment")
+		"updater/engine module must obtain WebView2 controllers from WebView_SharedEnvironment")
 	Assert(InStr(Src, "ergopti_changelog_wv_") = 0,
-		"modules/updater must NOT create a per-open ergopti_changelog_wv_<tick> folder (replaced by the shared env)")
+		"updater/engine must NOT create a per-open ergopti_changelog_wv_<tick> folder (replaced by the shared env)")
 	Assert(InStr(Src, "ergopti_update_wv_") = 0,
-		"modules/updater must NOT create a per-open ergopti_update_wv_<tick> folder (replaced by the shared env)")
+		"updater/engine must NOT create a per-open ergopti_update_wv_<tick> folder (replaced by the shared env)")
 }
 
 ; Per-launch hosts recover only certified retirement receipts and explicitly
@@ -70,7 +70,7 @@ _TWTL_SharedFolderIsFixed() {
 
 _TWTL_AllHosts() {
 	; Shared-env hosts (leak-free by construction).
-	_TWTL_CheckSharedHost("ui/changelog/init.ahk", "ergopti_changelog_wv_")
+	_TWTL_CheckSharedHost("updater/ui/changelog/init.ahk", "ergopti_changelog_wv_")
 	_TWTL_CheckSharedHost("diagnostics/ui/healthcheck/core.ahk", "ergopti_hc_wv_")
 	_TWTL_CheckSharedHost("ai/ui/model_browser/init.ahk", "ergopti_modelbrowser_wv_")
 	_TWTL_CheckSharedUpdaterModule()

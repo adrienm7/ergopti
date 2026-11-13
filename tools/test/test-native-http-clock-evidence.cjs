@@ -363,7 +363,7 @@ function sourceFixture(change = () => {}) {
 	const root = fs.mkdtempSync(path.join(temporary, 'source-'));
 	const roots = [
 		'static/ergopti_plus/macos/launcher',
-		'static/ergopti_plus/macos/adapters/release_stage.sh',
+		'static/ergopti_plus/macos/updater/adapters/release_stage.sh',
 		'static/ergopti_plus/_shared/updater/data/defaults.json',
 		'tools/build',
 		'tools/diagnostics'

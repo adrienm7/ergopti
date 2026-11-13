@@ -37,7 +37,7 @@ end
 --- @param body function Receives the runtime world, Engine and captured pull.
 local function with_model_pull(body)
 	with_initialization(function(world, engine)
-		local previous_download, previous_window = package.loaded["ai.engine.local_servers.model_download"], package.loaded["ui.download_window.bridge"]
+		local previous_download, previous_window = package.loaded["ai.engine.local_servers.model_download"], package.loaded["updater.ui.download_window.bridge"]
 		local Http = package.loaded["core.network.adapters.http_client"]
 		local previous_post, pulls, completions = Http.post_stream_owned, {}, {}
 		local controlled = require("tests.support.owned_http_fixture").attach({
@@ -48,7 +48,7 @@ local function with_model_pull(body)
 			cancel = function() return true end,
 		})
 		Http.post_stream_owned = controlled.post_stream_owned
-		package.loaded["ui.download_window.bridge"] = {
+		package.loaded["updater.ui.download_window.bridge"] = {
 			show = function() return 1 end, session_id = function() return 1 end,
 			update = function() return true end, focus = function(id) return id == 1 end,
 			complete = function(_, succeeded) completions[#completions + 1] = succeeded; return true end,
@@ -59,7 +59,7 @@ local function with_model_pull(body)
 		local ok, failure = xpcall(function() body(world, engine, pulls, completions) end, debug.traceback)
 		local closed = Download.shutdown()
 		Http.post_stream_owned = previous_post
-		package.loaded["ai.engine.local_servers.model_download"], package.loaded["ui.download_window.bridge"] = previous_download, previous_window
+		package.loaded["ai.engine.local_servers.model_download"], package.loaded["updater.ui.download_window.bridge"] = previous_download, previous_window
 		helpers.assert_true(closed)
 		if not ok then error(failure, 0) end
 	end)

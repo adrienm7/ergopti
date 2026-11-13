@@ -228,7 +228,7 @@ end
 
 --- Loads the real Ollama checker (and resolver) over the fake filesystem.
 local function load_ollama_checker(state, daemon)
-	package.loaded["ui.download_window"] = state.window or WINDOW_STUB
+	package.loaded["updater.ui.download_window"] = state.window or WINDOW_STUB
 	load_api(state, daemon)
 	package.loaded["ai.engine.bootstrap.pty_process_group"] = {
 		create = function() return "/tmp/fixture-pty.py" end,
@@ -252,7 +252,7 @@ local function load_mlx_checker(state)
 	-- policy admission bound to the preceding fake native table.
 	package.loaded["ai.engine.api.network_env"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
-	package.loaded["ui.download_window"] = state.window or WINDOW_STUB
+	package.loaded["updater.ui.download_window"] = state.window or WINDOW_STUB
 	package.loaded["ai.engine.bootstrap.pty_process_group"] = {
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,
@@ -280,7 +280,7 @@ local function start_verification(state, checker, on_complete)
 end
 
 local STUBBED_MODULES = {
-	"ui.download_window", "ai.engine.ollama.binary", "ai.engine.api.ollama",
+	"updater.ui.download_window", "ai.engine.ollama.binary", "ai.engine.api.ollama",
 	"ai.engine.bootstrap.pty_process_group", "core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler", "ai.engine.ollama.deps_checker",
 	"ai.engine.local_servers.mlx_deps_checker", "core.ui.engine.dialog_util", "core.ui.engine.notifications",

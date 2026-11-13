@@ -14,7 +14,7 @@
 --- slots would deliver a wrong/stale result to the wrong caller.
 ---
 --- Fix: core/network/adapters/http_client.lua now stamps every post()/get() call with a
---- monotonic per-instance generation counter (mirroring modules/updater/init.lua's
+--- monotonic per-instance generation counter (mirroring updater/engine/init.lua's
 --- _poll_generation). The wrapped callback captures its own generation and
 --- discards itself if the instance's generation has moved on by the time the
 --- OS-level completion arrives — regardless of callback firing order.

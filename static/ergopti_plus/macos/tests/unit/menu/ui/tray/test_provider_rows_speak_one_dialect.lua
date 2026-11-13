@@ -25,23 +25,23 @@ local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
 --- Shared declarations, decoding, row rendering and update consent remain real.
 local function with_declared_about_provider(offer, body)
 	helpers.with_stub_scope({"menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.fs.engine.paths", "core.logger.engine.logger",
-		"ui.menu.menu_about", "modules.updater", "adapters.update_launcher", "ui.update_check",
-		"onboarding.ui.menu_start_at_login", "ui.changelog"}, function()
+		"updater.ui.menu_about", "updater.engine", "updater.adapters.update_launcher", "updater.ui.update_check",
+		"onboarding.ui.menu_start_at_login", "updater.ui.changelog"}, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local manifest = helpers.load_with_stubs("menu.engine.manifest_menu")
 		local session = { offer = offer, opens = {}, requests = {} }
-		package.loaded["modules.updater"] = {
+		package.loaded["updater.engine"] = {
 			is_local_source = function() return false end,
 			installed_channel = function() return "dev" end,
 			build_identity = function() return {kind = "release", version = "0.0.0-dev.100", commit = "known"} end,
 			releases_page_url = function() return "https://example.invalid/releases" end,
 		}
-		package.loaded["adapters.update_launcher"] = {
+		package.loaded["updater.adapters.update_launcher"] = {
 			request_check = function(channel) session.requests[#session.requests + 1] = channel; return true end,
 		}
-		package.loaded["ui.update_check"] = {open = function(opts) session.opens[#session.opens + 1] = opts; return true end}
+		package.loaded["updater.ui.update_check"] = {open = function(opts) session.opens[#session.opens + 1] = opts; return true end}
 		package.loaded["onboarding.ui.menu_start_at_login"] = {enabled = function() return false end}
-		package.loaded["ui.changelog"] = {open = function() error("A provider build must not open its changelog") end,
+		package.loaded["updater.ui.changelog"] = {open = function() error("A provider build must not open its changelog") end,
 			pending_install = function() return nil end}
 		session.channel = "dev"
 		session.owner = {get = function() return session.channel end, set = function() return false end}
@@ -50,7 +50,7 @@ local function with_declared_about_provider(offer, body)
 		session.refresh = function() end
 		session.manifest = manifest
 		session.translate = require("core.i18n.engine.i18n").get
-		local About = require("ui.menu.menu_about")
+		local About = require("updater.ui.menu_about")
 		session.build = function()
 			return About.build({channel_owner = session.owner, update_checks = session.checks,
 				updateMenu = session.refresh}, {}).submenu
@@ -103,7 +103,7 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 	-- its list provider returns. Selected by declaration rather than by path so
 	-- moving or splitting a module cannot turn this invariant into a path error.
 	local GUARDED = {
-		{ anchor = 'require("adapters.update_launcher")', array = "menu_items" },
+		{ anchor = 'require("updater.adapters.update_launcher")', array = "menu_items" },
 		{ anchor = "local function discover_bundled_apps", array = "provider_rows" },
 	}
 
@@ -319,15 +319,15 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 	end)
 
 	helpers.it("the About submenu keeps its version header and native update action", function()
-		local src = helpers.read_driver_source('require("adapters.update_launcher")')
-		helpers.assert_true(src ~= nil, "ui/menu/menu_about.lua source must be locatable")
+		local src = helpers.read_driver_source('require("updater.adapters.update_launcher")')
+		helpers.assert_true(src ~= nil, "updater/ui/menu_about.lua source must be locatable")
 
 		helpers.assert_true(src:find("label = ver_display", 1, true) ~= nil,
 			"the version header must be a provider row (`label = ver_display`) — as `title` it is "
 			.. "dropped by the renderer and the submenu shows no version at all")
 		helpers.assert_true(declared_about_check_is_visible(),
 			"the Sparkle command must remain a visible provider row")
-		helpers.assert_true(src:find('require("ui.update_check").open(', 1, true) ~= nil,
+		helpers.assert_true(src:find('require("updater.ui.update_check").open(', 1, true) ~= nil,
 			"the visible check row must open the update-check window")
 		helpers.assert_true(src:find("UpdateLauncher.request_check(offered_channel) == true", 1, true) ~= nil,
 			"a row naming a found release must retain its native Sparkle action")

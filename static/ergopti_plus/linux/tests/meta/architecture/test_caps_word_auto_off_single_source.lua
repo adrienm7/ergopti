@@ -20,7 +20,7 @@
 local helpers = require("tests.helpers")
 
 local DRIVER_ROOT = helpers.driver_root()
-local SCAN_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold" }
+local SCAN_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold", "updater" }
 local NATIVE_KEYS = { space = true, tab = true, enter = true, star = true }
 -- The one file allowed to spell the pointer kinds, resolved from its module name.
 local POINTER_MAP = assert(package.searchpath("shortcuts.engine.caps_word_auto_off", package.path))

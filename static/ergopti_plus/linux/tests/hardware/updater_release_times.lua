@@ -7,7 +7,7 @@ local root = assert(os.getenv("UPDATER_TIME_ROOT"))
 local origin = assert(os.getenv("UPDATER_TIME_ORIGIN"))
 local Paths = require("settings.engine.paths")
 Paths.home = function() return root end
-local M = require("modules.updater.manager")
+local M = require("updater.engine.manager")
 -- A checkout's "local" version deliberately skips canonical asset admission.
 local current = "1.0.0"
 M.current_version = function() return current end

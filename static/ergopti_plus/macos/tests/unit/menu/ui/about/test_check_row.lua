@@ -18,18 +18,18 @@ local function build(latest, pending)
 	local recorded = { opens = {}, requests = {}, completions = 0, opened = true, checked = {}, notices = {} }
 	local saved = {
 		notifications = package.loaded["core.ui.engine.notifications"],
-		window = package.loaded["ui.update_check"],
-		launcher = package.loaded["adapters.update_launcher"],
-		changelog = package.loaded["ui.changelog"],
+		window = package.loaded["updater.ui.update_check"],
+		launcher = package.loaded["updater.adapters.update_launcher"],
+		changelog = package.loaded["updater.ui.changelog"],
 	}
 	if pending then
-		package.loaded["ui.changelog"] = {
+		package.loaded["updater.ui.changelog"] = {
 			open = function() error("The completing row must not open the Versions window.") end,
 			pending_install = function() return pending end,
 			complete_pending_install = function() recorded.completions = recorded.completions + 1; return true end,
 		}
 	end
-	package.loaded["ui.update_check"] = {
+	package.loaded["updater.ui.update_check"] = {
 		open = function(opts) recorded.opens[#recorded.opens + 1] = opts; return recorded.opened end,
 	}
 	package.loaded["core.ui.engine.notifications"] = {
@@ -38,14 +38,14 @@ local function build(latest, pending)
 			return true
 		end,
 	}
-	package.loaded["adapters.update_launcher"] = {
+	package.loaded["updater.adapters.update_launcher"] = {
 		request_check = function(channel) recorded.requests[#recorded.requests + 1] = channel; return true end,
 		select_channel = function() return true end,
 	}
-	local Updater = require("modules.updater")
+	local Updater = require("updater.engine")
 	local real_local = Updater.is_local_source
 	Updater.is_local_source = function() return false end
-	package.loaded["ui.menu.menu_about"] = nil
+	package.loaded["updater.ui.menu_about"] = nil
 	local owner = { get = function() return "dev" end, set = function() return true end, subscribe = function() end }
 	local checks = {
 		presets = function() return {} end,
@@ -60,19 +60,19 @@ local function build(latest, pending)
 	}
 	local refresh = function() end
 	local ok, rows = pcall(function()
-		local About = helpers.load_with_stubs("ui.menu.menu_about")
+		local About = helpers.load_with_stubs("updater.ui.menu_about")
 		return About.build({ channel_owner = owner, update_checks = checks, updateMenu = refresh }, {
 			start_at_login = function() error("Building About must not change startup.") end,
 			uninstall = function() error("Building About must not uninstall the application.") end,
 		}).submenu
 	end)
 	Updater.is_local_source = real_local
-	package.loaded["ui.menu.menu_about"] = nil
+	package.loaded["updater.ui.menu_about"] = nil
 	local function restore()
 		package.loaded["core.ui.engine.notifications"] = saved.notifications
-		package.loaded["ui.update_check"] = saved.window
-		package.loaded["adapters.update_launcher"] = saved.launcher
-		package.loaded["ui.changelog"] = saved.changelog
+		package.loaded["updater.ui.update_check"] = saved.window
+		package.loaded["updater.adapters.update_launcher"] = saved.launcher
+		package.loaded["updater.ui.changelog"] = saved.changelog
 	end
 	if not ok then restore(); error(rows, 0) end
 	recorded.owner, recorded.checks, recorded.refresh, recorded.restore = owner, checks, refresh, restore
@@ -162,9 +162,9 @@ end)
 --- Exercises the actual source-only provider through its native-bound renderer.
 --- @param alternative boolean True to independently replace the declared label and reason.
 local function with_source_row(alternative, callback)
-	helpers.with_stub_scope({ "ui.menu.menu_about", "menu.engine.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
-		"core.logger.engine.logger", "core.fs.adapters.json_codec", "modules.updater", "modules.updater.auto_check",
-		"ui.changelog", "adapters.update_launcher", "onboarding.ui.menu_start_at_login", "hs", "tests.stubs.hs" }, function()
+	helpers.with_stub_scope({ "updater.ui.menu_about", "menu.engine.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
+		"core.logger.engine.logger", "core.fs.adapters.json_codec", "updater.engine", "updater.engine.auto_check",
+		"updater.ui.changelog", "updater.adapters.update_launcher", "onboarding.ui.menu_start_at_login", "hs", "tests.stubs.hs" }, function()
 		local native = require("tests.stubs.hs")
 		native.__reset()
 		_G.hs = native
@@ -178,7 +178,7 @@ local function with_source_row(alternative, callback)
 			section = function(key) return labels[key] or key end }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
-		package.loaded["modules.updater"] = {
+		package.loaded["updater.engine"] = {
 			is_local_source = function() return true end,
 			installed_channel = function() return "dev" end,
 			build_identity = function() return { kind = "local", version = "", commit = "known" } end,
@@ -187,11 +187,11 @@ local function with_source_row(alternative, callback)
 		local defaults_file = assert(io.open(helpers.shared("updater/data/defaults.json"), "rb"))
 		local defaults = assert(require("core.fs.adapters.json_codec").decode(assert(defaults_file:read("*a"))))
 		assert(defaults_file:close())
-		package.loaded["modules.updater.auto_check"] = { stored_interval = function()
+		package.loaded["updater.engine.auto_check"] = { stored_interval = function()
 			return defaults.timing.default_check_interval_sec
 		end }
-		package.loaded["ui.changelog"] = { open = effect }
-		package.loaded["adapters.update_launcher"] = { request_check = effect, select_channel = effect }
+		package.loaded["updater.ui.changelog"] = { open = effect }
+		package.loaded["updater.adapters.update_launcher"] = { request_check = effect, select_channel = effect }
 		package.loaded["onboarding.ui.menu_start_at_login"] = { enabled = function() return false end }
 		local renderer = require("menu.engine.manifest_menu")
 		local declaration = renderer.get_array("about_source_menu")
@@ -203,7 +203,7 @@ local function with_source_row(alternative, callback)
 		local title = alternative and labels["common.restore_recommended"] or "menu.about.check_for_updates"
 		local reason = alternative and "Canonical alternate reason" or "Source checkout"
 		local owner = { get = function() return "dev" end, set = effect }
-		local About = require("ui.menu.menu_about")
+		local About = require("updater.ui.menu_about")
 		local rows = About.build({ channel_owner = owner, state = {} }, {
 			start_at_login = effect, uninstall = effect,
 		}).submenu
@@ -311,7 +311,7 @@ helpers.describe("About retained release consent", function()
 	for _, outcome in ipairs({ "false", "nil", "number", "text", "throw" }) do
 		helpers.it("returns strict refusal from the actual launcher port: " .. outcome, function()
 			with_retained_offer({ tag = "v0.0.0-dev.150", channel = "dev" }, function(recorded)
-				package.loaded["adapters.update_launcher"].request_check = function(channel)
+				package.loaded["updater.adapters.update_launcher"].request_check = function(channel)
 					recorded.requests[#recorded.requests + 1] = channel
 					if outcome == "throw" then error("inert launcher refusal") end
 					if outcome == "number" then return 1 end
@@ -332,13 +332,13 @@ end)
 --- Uses the real channel and automatic-check owners to replace or retire an offer.
 --- @param mutation string Public owner operation exercised before the held click.
 local function public_owner_retirement(mutation)
-	helpers.with_stub_scope({ "modules.updater.channel", "modules.updater.auto_check" }, function()
+	helpers.with_stub_scope({ "updater.engine.channel", "updater.engine.auto_check" }, function()
 		with_retained_offer({ tag = "v0.0.0-dev.150", channel = "dev" }, function(recorded)
 			local state, values, saved, tag = { update_channel = "dev" }, {}, {}, "v0.0.0-dev.150"
-			local channel = require("modules.updater.channel").new({ state = state, save = function()
+			local channel = require("updater.engine.channel").new({ state = state, save = function()
 				saved[#saved + 1] = state.update_channel; return true
 			end })
-			local AutoCheck = require("modules.updater.auto_check")
+			local AutoCheck = require("updater.engine.auto_check")
 			local get = function(url, headers, callback)
 				callback({ ok = true, status = 200, headers = {}, body =
 					'[{"tag_name":"' .. tag .. '","prerelease":true,"published_at":"2026-09-02T00:00:00Z","assets":[]}]' })
@@ -443,7 +443,7 @@ helpers.describe("Packaged About check consumes the existing shared command", fu
 			local labels = assert(require("core.fs.adapters.json_codec").decode(file:read("*a"))); assert(file:close())
 			-- The native binding captures its catalogue object at construction.
 			-- Bind each real catalogue before the existing build helper resets stubs.
-			helpers.with_stub_scope({"menu.engine.manifest_menu", "core.i18n.engine.i18n", "ui.menu.menu_about"}, function()
+			helpers.with_stub_scope({"menu.engine.manifest_menu", "core.i18n.engine.i18n", "updater.ui.menu_about"}, function()
 				local native_i18n = require("core.i18n.engine.i18n")
 				native_i18n.get = function(key) return labels[key] or key end
 				package.loaded["menu.engine.manifest_menu"] = nil

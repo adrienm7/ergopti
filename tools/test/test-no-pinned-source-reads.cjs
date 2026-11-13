@@ -23,7 +23,7 @@
  * unit that gets ratcheted.
  *
  * ROOT CAUSE ENCODED:
- * A test that FileReads a quoted "(modules|lib|ui|core|platform|settings|menu|tray|ai|apps|diagnostics|gestures|hotstrings|keyboard|layouts|metrics|onboarding|shortcuts|tap_hold)/…*.ahk" path and does not use
+ * A test that FileReads a quoted "(modules|lib|ui|core|platform|settings|menu|tray|ai|apps|diagnostics|gestures|hotstrings|keyboard|layouts|metrics|onboarding|shortcuts|tap_hold|updater)/…*.ahk" path and does not use
  * a _Driver* helper is location-pinned. This ratchet counts them and fails if
  * the count rises above the frozen baseline. Lower (never raise) the baseline as
  * tests migrate to _DriverFuncBody("Fn") / _DriverSourceConcat(). It is the test

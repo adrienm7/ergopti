@@ -49,7 +49,7 @@ function M.new(engine, profiles)
 	local controller = require("ai.engine.local_servers.runtime_composition").new({
 		source = source, resolver = resolver, installed = installed,
 		file_factory = require("ai.engine.ollama.install_files"),
-		archive_factory = require("infra.archive_output"),
+		archive_factory = require("updater.engine.archive_output"),
 		admission = require("ai.engine.ollama.install_admission"),
 		install_phase = require("ai.engine.ollama.install_phase"), process = process,
 		http = require("core.network.adapters.http_client"), owned_timer = timer, timings = Timings,

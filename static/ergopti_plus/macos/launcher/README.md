@@ -193,7 +193,7 @@ accepted only for the ids in `UpdateChannels.generated.swift`),
 `UpdateChannelFeed` serves Sparkle that channel's appcast from the same
 directory instead, and keeps the choice for the next check. Sparkle schedules
 no check of its own (`SUEnableAutomaticChecks` is false): the Lua driver owns
-the cadence (`modules/updater/auto_check.lua`) and asks for a check when the
+the cadence (`updater/engine/auto_check.lua`) and asks for a check when the
 user clicks the About row or the new-release notification. Release
 finalization replaces only the current channel's asset after the versioned
 release and its signed application archive have been published, then downloads

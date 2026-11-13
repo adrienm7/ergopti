@@ -7,7 +7,7 @@ local root = assert(os.getenv("UPDATER_FLAG_ROOT"))
 local origin = assert(os.getenv("UPDATER_FLAG_ORIGIN"))
 local Paths = require("settings.engine.paths")
 Paths.home = function() return root end
-local M = require("modules.updater.manager")
+local M = require("updater.engine.manager")
 -- A checkout's "local" version deliberately skips canonical asset admission.
 M.current_version = function() return "1.0.0" end
 M.release_api_url = function() return origin .. "/releases?per_page=100" end

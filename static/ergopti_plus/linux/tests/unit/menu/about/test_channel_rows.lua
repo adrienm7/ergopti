@@ -24,7 +24,7 @@ end
 
 --- An updater double over the real shared channel registry.
 local function fake_updater(subscribed)
-	local real = require("modules.updater.manager")
+	local real = require("updater.engine.manager")
 	local calls = { set = {}, checks = 0 }
 	local up = {
 		CHANNELS = real.CHANNELS,
@@ -68,11 +68,11 @@ local function bind_action_owners(items, source_run)
 			item.fn = function(...)
 				local Installation = require("core.lifecycle.engine.installation")
 				local original_owner = Installation.is_source_run
-				local original_progress = package.loaded["ui.download_window.bridge"]
+				local original_progress = package.loaded["updater.ui.download_window.bridge"]
 				local original_webview = package.loaded["core.ui.ui.webview_manager"]
 				local arguments = packed(...)
 				Installation.is_source_run = function() return source_run == true end
-				package.loaded["ui.download_window.bridge"] = { show = function() return nil end }
+				package.loaded["updater.ui.download_window.bridge"] = { show = function() return nil end }
 				local result = packed(pcall(function()
 					-- Keep the real consent/window path, with this click's native SDK
 					-- explicitly unavailable instead of inheriting an earlier GTK owner.
@@ -80,7 +80,7 @@ local function bind_action_owners(items, source_run)
 					return action(unpack_results(arguments, 1, arguments.n))
 				end))
 				Installation.is_source_run = original_owner
-				package.loaded["ui.download_window.bridge"] = original_progress
+				package.loaded["updater.ui.download_window.bridge"] = original_progress
 				package.loaded["core.ui.ui.webview_manager"] = original_webview
 				if not result[1] then error(result[2], 0) end
 				return unpack_results(result, 2, result.n)
@@ -93,7 +93,7 @@ end
 
 --- @param source_run boolean|nil True to build the tray of a local version.
 local function build(up, changed, source_run)
-	local Version = require("infra.version")
+	local Version = require("updater.engine.version")
 	local Installation = require("core.lifecycle.engine.installation")
 	local real_identity = Version.identity
 	local real_is_source_run = Installation.is_source_run
@@ -117,7 +117,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	helpers.it("restores exact click owners after the controlled action raises", function()
 		local Installation = require("core.lifecycle.engine.installation")
 		local original_owner = Installation.is_source_run
-		local original_progress = package.loaded["ui.download_window.bridge"]
+		local original_progress = package.loaded["updater.ui.download_window.bridge"]
 		local original_webview = package.loaded["core.ui.ui.webview_manager"]
 		local original_lgi = package.loaded["lgi"]
 		local original_preload = package.preload["lgi"]
@@ -132,7 +132,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		helpers.assert_eq(ok, false, "the action refusal must reach its caller")
 		helpers.assert_eq(err, "Controlled tray action refusal", "preserve the action failure")
 		helpers.assert_eq(Installation.is_source_run, original_owner, "restore the exact installation owner")
-		helpers.assert_eq(package.loaded["ui.download_window.bridge"], original_progress, "restore the exact progress owner")
+		helpers.assert_eq(package.loaded["updater.ui.download_window.bridge"], original_progress, "restore the exact progress owner")
 		helpers.assert_eq(package.loaded["core.ui.ui.webview_manager"], original_webview, "restore the exact page owner")
 		helpers.assert_eq(package.loaded["lgi"], original_lgi, "restore the exact native SDK cache")
 		helpers.assert_eq(package.preload["lgi"], original_preload, "restore the exact native SDK loader")
@@ -245,9 +245,9 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	-- action in the tray (MUR-001).
 	helpers.it("a release waiting for its restart turns the check row into its completion (release-restart-pending)", function()
 		local up, calls = fake_updater("dev")
-		local previous = package.loaded["ui.changelog.bridge"]
+		local previous = package.loaded["updater.ui.changelog.bridge"]
 		local completions, observer = 0, nil
-		package.loaded["ui.changelog.bridge"] = {
+		package.loaded["updater.ui.changelog.bridge"] = {
 			pending_install = function() return { tag = "v0.0.0-dev.139" } end,
 			complete_pending_install = function() completions = completions + 1; return true end,
 			set_pending_install_observer = function(fn) observer = fn end,
@@ -266,7 +266,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 			observer()
 			helpers.assert_eq(changed.count, 1)
 		end)
-		package.loaded["ui.changelog.bridge"] = previous
+		package.loaded["updater.ui.changelog.bridge"] = previous
 		if not ok then error(err, 0) end
 	end)
 
@@ -402,7 +402,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return false end
 		local ok, started = pcall(function()
-			return helpers.load_module("ui.update_check.bridge").download_offered(manager, release, {})
+			return helpers.load_module("updater.ui.update_check").download_offered(manager, release, {})
 		end)
 		Installation.is_source_run = real_is_source_run
 		helpers.assert_true(ok, tostring(started))
@@ -425,7 +425,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 			install_update_async = function() touched = touched + 1 return true end,
 		}
 		local ok, started = pcall(function()
-			return helpers.load_module("ui.update_check.bridge").download_offered(manager, release, {})
+			return helpers.load_module("updater.ui.update_check").download_offered(manager, release, {})
 		end)
 		Installation.is_source_run = real_is_source_run
 		helpers.assert_true(ok, "the bridge must answer: " .. tostring(started))
@@ -437,7 +437,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	-- user had just picked.
 	helpers.it("a channel row tells an open Versions page", function()
 		local up = fake_updater("dev")
-		local Bridge = require("ui.changelog.bridge")
+		local Bridge = require("updater.ui.changelog.bridge")
 		local previous_push = Bridge._push
 		local pushed = {}
 		Bridge._push = function(payload) pushed[#pushed + 1] = payload; return true end
@@ -520,9 +520,9 @@ helpers.describe("tray (linux): published About channel choices", function()
 	end)
 
 	helpers.it("does not redraw or update Versions after refused preference writes", function()
-		local previous_bridge = package.loaded["ui.changelog.bridge"]
+		local previous_bridge = package.loaded["updater.ui.changelog.bridge"]
 		local pushed = {}
-		package.loaded["ui.changelog.bridge"] = { push_subscribed_channel = function(id) pushed[#pushed + 1] = id end,
+		package.loaded["updater.ui.changelog.bridge"] = { push_subscribed_channel = function(id) pushed[#pushed + 1] = id end,
 			pending_install = function() return nil end, set_pending_install_observer = function() end }
 		local ok, detail = pcall(function()
 			for _, refusal in ipairs(channel_corpus().refusals) do
@@ -544,7 +544,7 @@ helpers.describe("tray (linux): published About channel choices", function()
 				helpers.assert_eq(#pushed, 0)
 			end
 		end)
-		package.loaded["ui.changelog.bridge"] = previous_bridge
+		package.loaded["updater.ui.changelog.bridge"] = previous_bridge
 		if not ok then error(detail, 0) end
 	end)
 end)
@@ -560,7 +560,7 @@ end
 
 --- Exercises the actual manager and menu around durable writer and timer ports.
 local function with_frequency_owner(refusal, body)
-	local names = {"core.events.timer_scheduler", "core.fs.adapters.storage", "modules.updater.manager"}
+	local names = {"core.events.timer_scheduler", "core.fs.adapters.storage", "updater.engine.manager"}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local writer = require("core.text.engine.toml_codec.writer")
@@ -583,8 +583,8 @@ local function with_frequency_owner(refusal, body)
 		cancel = function(handle) obs.cancels = obs.cancels + 1; handle.armed = false; return true end,
 	}
 	package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({initial = {}})
-	package.loaded["modules.updater.manager"] = nil
-	local up = require("modules.updater.manager")
+	package.loaded["updater.engine.manager"] = nil
+	local up = require("updater.engine.manager")
 	up._now = function() return 1700000000 end
 	up.current_version = function() return "1.0.0" end
 	up.check_for_updates = function() obs.requests = obs.requests + 1; return false end
@@ -757,7 +757,7 @@ local function with_source_command(alternative, callback)
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
 		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "hotstrings.engine.magic_key",
 		"hotstrings.engine.preview_settings", "hotstrings.engine.repeat_key", "core.ui.ui.modal", "core.ui.ui.text_prompt",
-		"ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation", "onboarding.ui.menu_start_at_login" }
+		"ai.engine.policy.trigger_policy", "updater.engine.version", "core.lifecycle.engine.installation", "onboarding.ui.menu_start_at_login" }
 	local saved, restore_source = {}, nil
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = {} end
 	local ok, err = xpcall(function()
@@ -779,7 +779,7 @@ local function with_source_command(alternative, callback)
 		assert(type(header_brand) == "string" and header_brand ~= "" and header_brand ~= "menu.builder.active_brand")
 		labels["menu.builder.active_brand"] = header_brand
 		package.loaded["core.fs.engine.paths"] = { shared = function(relative) return driver .. "/../_shared/" .. relative end }
-		package.loaded["infra.version"] = { identity = function()
+		package.loaded["updater.engine.version"] = { identity = function()
 			return {kind = "local", version = "", commit = "known"}
 		end }
 		package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return true end }
@@ -865,9 +865,9 @@ end)
 helpers.describe("Linux About channel durable receipts", function()
 	for _, outcome in ipairs({"false", "nil", "number", "throw", "true"}) do
 		helpers.it("publishes menu and Versions effects only after exact native ACK (channel-ack " .. outcome .. ")", function()
-			local previous_bridge = package.loaded["ui.changelog.bridge"]
+			local previous_bridge = package.loaded["updater.ui.changelog.bridge"]
 			local pushes, calls = 0, 0
-			package.loaded["ui.changelog.bridge"] = {push_subscribed_channel = function() pushes = pushes + 1 end,
+			package.loaded["updater.ui.changelog.bridge"] = {push_subscribed_channel = function() pushes = pushes + 1 end,
 				pending_install = function() return nil end, set_pending_install_observer = function() end}
 			local ok, detail = xpcall(function()
 				local up = fake_updater("main")
@@ -887,7 +887,7 @@ helpers.describe("Linux About channel durable receipts", function()
 				helpers.assert_eq(changed.count, outcome == "true" and 1 or 0)
 				helpers.assert_eq(pushes, outcome == "true" and 1 or 0)
 			end, debug.traceback)
-			package.loaded["ui.changelog.bridge"] = previous_bridge
+			package.loaded["updater.ui.changelog.bridge"] = previous_bridge
 			if not ok then error(detail, 0) end
 		end)
 	end

@@ -340,8 +340,8 @@ local BRIDGE_MODULES = {
 	config_cleanup        = "settings.ui.cleanup",
 	action_picker         = "shortcuts.ui.action_picker.bridge",
 	physical_shortcuts     = "shortcuts.ui.physical_shortcuts.bridge",
-	changelog             = "ui.changelog.bridge",
-	download_window       = "ui.download_window.bridge",
+	changelog             = "updater.ui.changelog.bridge",
+	download_window       = "updater.ui.download_window.bridge",
 	error_dialog          = "diagnostics.ui.error_dialog",
 	healthcheck           = "diagnostics.ui.healthcheck.bridge",
 	hotstring_editor      = "hotstrings.ui.hotstring_editor.bridge",
@@ -363,7 +363,7 @@ local BRIDGE_MODULES = {
 	numeric_prompt        = "core.ui.ui.numeric_prompt",
 	prompt_editor         = "ai.ui.prompt_editor.bridge",
 	token_prompt          = "core.ui.ui.token_prompt",
-	update_check          = "ui.update_check.bridge",
+	update_check          = "updater.ui.update_check",
 }
 
 --- Loads a bridge handler module by pcall-requiring it.

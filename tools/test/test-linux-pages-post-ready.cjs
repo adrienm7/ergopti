@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Linux Pages Post Ready
  * DESCRIPTION:
- * A Linux page bridge (linux/ui/<page>/bridge.lua) that answers the page's
+ * A Linux page bridge (linux/updater/ui/<page>/bridge.lua) that answers the page's
  * "ready" message pushes the page its first state only then: the WebKit host
  * routes no load-finished signal to it, while Windows and macOS also push on
  * navigation. A shared page (_shared/ui/<page>/) that never posts "ready"

@@ -16,7 +16,7 @@ WORKER = r"""
 local path = assert(os.getenv("ERGOPTI_FILE_SOURCE"))
 local value
 if os.getenv("ERGOPTI_FILE_PORT") == "updater" then
-	value = require("modules.updater.installer").DEFAULT_OPS.read(path)
+	value = require("updater.engine.installer").DEFAULT_OPS.read(path)
 else value = require("core.fs.adapters.file_system").read(path) end
 if os.getenv("ERGOPTI_FILE_REGULAR") == "yes" then
 	local expected = assert(io.open(assert(os.getenv("ERGOPTI_FILE_EXPECTED")), "rb"))

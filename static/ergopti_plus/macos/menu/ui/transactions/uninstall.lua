@@ -21,7 +21,7 @@ function M.run(deps)
 	-- On a source run the About row is greyed and names why, so a click that
 	-- still arrives does nothing: logged, with no failure dialog for a removal
 	-- that was never possible.
-	local updater = deps.updater or require("modules.updater")
+	local updater = deps.updater or require("updater.engine")
 	if updater.is_local_source() then
 		logger.info("menu.ui.transactions.uninstall", "Uninstall ignored: this is a local version run from source, with nothing to remove.")
 		return false

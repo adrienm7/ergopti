@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Pure functions for parsing GitHub Releases API JSON payloads. Tags, assets,
 --- notes, publication times and flags decode JSON at their metadata boundaries.
---- Extracted from macos/infra/updater.lua (parse_tag,
+--- Extracted from macos/updater/engine/updater.lua (parse_tag,
 --- parse_notes, parse_asset_url, split_releases_array, parse_prerelease_flag)
 --- and windows/infra/updater/core.ahk (Updater_ParseTagName, Updater_ParseBody,
 --- _Updater_SplitReleasesArray, _Updater_ParsePrerelease) so both drivers

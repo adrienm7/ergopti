@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local function receive(mode)
 	local actual_uv = require("luv")
-	local construct = require("infra.archive_tar_feeder").new
+	local construct = require("updater.engine.archive_tar_feeder").new
 	local names = { "luv", "core.network.engine.managed_http_deadline", "core.process.adapters.owned_process" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local pipe, captured, reads = nil, nil, 0

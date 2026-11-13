@@ -134,11 +134,11 @@ end)
 helpers.describe("Active download shortcut shared frame", function()
 	helpers.it("retains all three actual task predicates and the held focus callback", function()
 		with_activation("ollama", { true }, nil, function(_, _, calls)
-			local predecessor = package.loaded["ui.download_window"]
+			local predecessor = package.loaded["updater.ui.download_window"]
 			local focused = 0
 			local owner = { focus = function() focused = focused + 1 end }
 			local ok, detail = xpcall(function()
-				package.loaded["ui.download_window"] = owner
+				package.loaded["updater.ui.download_window"] = owner
 				helpers.assert_nil(calls.handler.build_download_item())
 				for _, task in ipairs({ "download", "download_tail", "install" }) do
 					calls.root_deps.active_tasks[task] = true
@@ -154,8 +154,8 @@ helpers.describe("Active download shortcut shared frame", function()
 				helpers.assert_eq(calls.saves, 0)
 				helpers.assert_eq(calls.updates, 0)
 			end, debug.traceback)
-			package.loaded["ui.download_window"] = predecessor
-			helpers.assert_eq(rawequal(package.loaded["ui.download_window"], predecessor), true)
+			package.loaded["updater.ui.download_window"] = predecessor
+			helpers.assert_eq(rawequal(package.loaded["updater.ui.download_window"], predecessor), true)
 			if not ok then error(detail, 0) end
 		end)
 	end)
@@ -235,12 +235,12 @@ helpers.describe("actual transient download producer reaches completed root comp
 	for _, task in ipairs({ "download", "download_tail", "install" }) do
 		helpers.it("publishes the exact completed native row and held focus callback: " .. task, function()
 			with_activation("ollama", { true }, nil, function(_, _, calls)
-				local owner_before = package.loaded["ui.download_window"]
+				local owner_before = package.loaded["updater.ui.download_window"]
 				local task_before = calls.root_deps.active_tasks[task]
 				local focused, resumed, observed = 0, 0, nil
 				local native_build = calls.handler.build_download_item
 				local ok, detail = xpcall(function()
-					package.loaded["ui.download_window"] = { focus = function() focused = focused + 1 end }
+					package.loaded["updater.ui.download_window"] = { focus = function() focused = focused + 1 end }
 					calls.root_deps.active_tasks[task] = true
 					-- Observe the actual producer's completed result; this wrapper supplies no invented row.
 					calls.handler.build_download_item = function(...)
@@ -299,7 +299,7 @@ helpers.describe("actual transient download producer reaches completed root comp
 				end, debug.traceback)
 				calls.handler.build_download_item = native_build
 				calls.root_deps.active_tasks[task] = task_before
-				package.loaded["ui.download_window"] = owner_before
+				package.loaded["updater.ui.download_window"] = owner_before
 				if not ok then error(detail, 0) end
 			end)
 		end)
@@ -496,13 +496,13 @@ local function with_download_projection(calls, callback)
 	local source = root.llm_download_shortcut_frame
 	local declaration, platforms = source[1], source[1].platforms
 	local old_id, old_i18n, old_platform = declaration.id, declaration.i18n, platforms[1]
-	local window_before = package.loaded["ui.download_window"]
+	local window_before = package.loaded["updater.ui.download_window"]
 	local task_before = calls.root_deps.active_tasks.download
 	local focused, successor_focused = 0, 0
 	local captured = { template = template, render = render, root = root, source = source,
 		declaration = declaration, platforms = platforms }
 	local ok, detail = xpcall(function()
-		package.loaded["ui.download_window"] = { focus = function() focused = focused + 1 end }
+		package.loaded["updater.ui.download_window"] = { focus = function() focused = focused + 1 end }
 		calls.root_deps.active_tasks.download = true
 		callback(facade, captured, function() return focused, successor_focused end,
 			{ focus = function() successor_focused = successor_focused + 1 end })
@@ -512,7 +512,7 @@ local function with_download_projection(calls, callback)
 	root.llm_download_shortcut_frame = source
 	source[1] = declaration
 	declaration.id, declaration.i18n, platforms[1] = old_id, old_i18n, old_platform
-	package.loaded["ui.download_window"] = window_before
+	package.loaded["updater.ui.download_window"] = window_before
 	calls.root_deps.active_tasks.download = task_before
 	if not ok then error(detail, 0) end
 end
@@ -528,7 +528,7 @@ helpers.describe("Actual download native projection custody", function()
 				end
 				facade.render_rows = function(...)
 					native = captured.render(...)
-					package.loaded["ui.download_window"] = successor
+					package.loaded["updater.ui.download_window"] = successor
 					return native
 				end
 				local item = calls.handler.build_download_item()

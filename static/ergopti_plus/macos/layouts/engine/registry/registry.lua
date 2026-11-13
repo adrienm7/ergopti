@@ -152,7 +152,7 @@ function M.settings()
 	if not layouts then return nil, layouts_err end
 	local updater, updater_err = read_shared_json("updater/data/defaults.json")
 	if not updater then return nil, updater_err end
-	return Registry.resolve(layouts, updater, require("modules.updater").installed_channel())
+	return Registry.resolve(layouts, updater, require("updater.engine").installed_channel())
 end
 
 --- The registry folder shipped with the app: the repository folder in a
@@ -175,7 +175,7 @@ local function default_deps(settings)
 	local Install = require("layouts.engine.registry.install")
 	return {
 		settings = settings,
-		local_source = require("modules.updater").is_local_source(),
+		local_source = require("updater.engine").is_local_source(),
 		-- An asynchronous task (ShellRunner.run), never a blocking shell call: the refresh
 		-- runs on the main thread that also delivers the keys.
 		registry_changes = function(dir, callback)

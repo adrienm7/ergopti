@@ -6,7 +6,7 @@ local M = {}
 function M.register(helpers)
 	local function run(callback)
 		local saved_host = package.loaded["core.ui.ui.webview_manager"]
-		local saved_bridge = package.loaded["ui.download_window.bridge"]
+		local saved_bridge = package.loaded["updater.ui.download_window.bridge"]
 		local s = { writes = {}, retry = 0, cancel = 0, diagnostics = 0, paused = false }
 		local lease = { active = true }; s.lease = lease
 		local host = {}
@@ -34,9 +34,9 @@ function M.register(helpers)
 		function s.reload() lease.active = false; s.successor = { active = true } end
 		local state = { is_paused = function() return s.paused end }
 		package.loaded["core.ui.ui.webview_manager"] = host
-		package.loaded["ui.download_window.bridge"] = nil
+		package.loaded["updater.ui.download_window.bridge"] = nil
 		local ok, err = pcall(function()
-			local Bridge = require("ui.download_window.bridge"); s.bridge = Bridge
+			local Bridge = require("updater.ui.download_window.bridge"); s.bridge = Bridge
 			s.id = Bridge.show({kind="app_update",label="Pinned release",
 				on_retry=function() s.retry=s.retry+1;return true end,
 				on_cancel=function() s.cancel=s.cancel+1;return true end,
@@ -53,7 +53,7 @@ function M.register(helpers)
 			end
 			callback(s)
 		end)
-		package.loaded["core.ui.ui.webview_manager"], package.loaded["ui.download_window.bridge"] = saved_host,saved_bridge
+		package.loaded["core.ui.ui.webview_manager"], package.loaded["updater.ui.download_window.bridge"] = saved_host,saved_bridge
 		if not ok then error(err) end
 	end
 	helpers.describe("Actual network progress retained document ownership",function()

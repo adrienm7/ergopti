@@ -23,7 +23,7 @@ _CWOC_Source(Root) {
 		Source .= "#Include " . Owner . "`n"
 	}
 	return Source . _WebViewChildTimingBinding("webview_page_safety_flush_ms")
-		. "#Include " . _DriverDir . "\ui\changelog\init.ahk`n"
+		. "#Include " . _DriverDir . "\updater\ui\changelog\init.ahk`n"
 		. "#Include " . _DriverDir . "\tests\fixtures\changelog_open_generation_body.ahk`n"
 }
 

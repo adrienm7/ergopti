@@ -28,13 +28,13 @@ local _pending = nil
 function M.restart(opts)
 	assert(type(opts) == "table" and type(opts.reason) == "string" and opts.reason ~= ""
 		and type(opts.args) == "table", "a daemon restart needs a reason and the daemon arguments")
-	local Restarter = opts.restarter or require("modules.updater.restarter")
+	local Restarter = opts.restarter or require("updater.engine.restarter")
 	-- A developer run is a checkout, which the updater rightly calls unmanaged;
 	-- its Reload relays the developer launcher (core/lifecycle/engine/dev_source.lua) instead.
 	local installation = opts.installation
 		or function()
 			return require("core.lifecycle.engine.dev_source").restart_context()
-				or require("modules.updater.manager")._resolve_installation()
+				or require("updater.engine.manager")._resolve_installation()
 		end
 	local under_unit = Restarter.under_unit(opts.cgroup)
 	if under_unit == nil then
@@ -78,7 +78,7 @@ end
 function M.cancel(opts)
 	opts = opts or {}
 	if _pending == nil then return false, "no restart is pending" end
-	local Restarter = opts.restarter or require("modules.updater.restarter")
+	local Restarter = opts.restarter or require("updater.engine.restarter")
 	local cancelled, detail = Restarter.cancel(_pending, { run = opts.run, pid = opts.pid })
 	if cancelled then
 		Logger.info(LOG, "The pending %s restart was cancelled.", _pending)

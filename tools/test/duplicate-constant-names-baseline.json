@@ -64,7 +64,7 @@
 			"linux/hotstrings/ui/hotstrings_config_window/bridge.lua",
 			"linux/hotstrings/ui/menu/hotstrings.lua",
 			"macos/core/network/adapters/http_client.lua",
-			"macos/modules/updater/auto_check.lua"
+			"macos/updater/engine/auto_check.lua"
 		],
 		"divergent": false
 	},

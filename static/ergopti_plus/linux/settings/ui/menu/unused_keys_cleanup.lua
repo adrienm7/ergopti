@@ -61,7 +61,7 @@ function M.collect(decoded, mark)
 	require("ai.engine.preferences").mark_config_read(decoded, require("settings.engine.keys").KEY.LLM_MODELS_SELECTED, mark, function(value)
 		return require("ai.engine.prediction.engine").is_backend(value)
 	end)
-	require("modules.updater.manager").mark_config_reads(decoded, mark)
+	require("updater.engine.manager").mark_config_reads(decoded, mark)
 	require("onboarding.ui.bridge").config_values(decoded, mark)
 end
 

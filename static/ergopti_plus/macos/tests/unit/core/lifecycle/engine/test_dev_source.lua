@@ -101,8 +101,8 @@ helpers.describe("developer source mode: a source run that no update can replace
 		local saved = package.loaded["core.lifecycle.engine.dev_source"]
 		package.loaded["core.lifecycle.engine.dev_source"] = { is_active = function() return true end }
 		local ok, failure = xpcall(function()
-			package.loaded["modules.updater"] = nil
-			local updater = helpers.load_with_stubs("modules.updater", {
+			package.loaded["updater.engine"] = nil
+			local updater = helpers.load_with_stubs("updater.engine", {
 				processInfo = { bundleID = "com.ergoptiplus.app.hammerspoon", version = "1.1.1" },
 			})
 			helpers.assert_true(updater.is_local_source(),
@@ -111,7 +111,7 @@ helpers.describe("developer source mode: a source run that no update can replace
 			helpers.assert_eq(Admission.decide("managed", not updater.is_local_source()), Admission.ADMIT)
 		end, debug.traceback)
 		package.loaded["core.lifecycle.engine.dev_source"] = saved
-		package.loaded["modules.updater"] = nil
+		package.loaded["updater.engine"] = nil
 		if not ok then error(failure, 0) end
 	end)
 
@@ -123,15 +123,15 @@ helpers.describe("developer source mode: a source run that no update can replace
 		local saved = package.loaded["core.lifecycle.engine.dev_source"]
 		package.loaded["core.lifecycle.engine.dev_source"] = { is_active = function() error("root mismatch", 0) end }
 		local ok, failure = xpcall(function()
-			package.loaded["modules.updater"] = nil
-			local updater = helpers.load_with_stubs("modules.updater", {
+			package.loaded["updater.engine"] = nil
+			local updater = helpers.load_with_stubs("updater.engine", {
 				processInfo = { bundleID = "com.ergoptiplus.app.hammerspoon", version = "1.1.1" },
 			})
 			local answered = pcall(updater.is_local_source)
 			helpers.assert_eq(answered, false, "an unanswerable identity is treated as foreign by init.lua")
 		end, debug.traceback)
 		package.loaded["core.lifecycle.engine.dev_source"] = saved
-		package.loaded["modules.updater"] = nil
+		package.loaded["updater.engine"] = nil
 		if not ok then error(failure, 0) end
 	end)
 end)

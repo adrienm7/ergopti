@@ -36,7 +36,7 @@ local CONTRACT = {
 	{ mod = "diagnostics.adapters.boot_fatal",              constants = { "LAUNCHER_LOG_ENV" } },
 	{ mod = "platform.system.info",             fns = { "runtime_version", "arch", "os_version", "keyboard_layout",
 		"elevated" } },
-	{ mod = "modules.updater",                  fns = { "current_version", "installed_channel" } },
+	{ mod = "updater.engine",                  fns = { "current_version", "installed_channel" } },
 	{ mod = "keyboard.adapters.karabiner.ke_paths",          constants = { "CLI" } },
 	{ mod = "core.fs.adapters.file_system",             fns = { "exists" } },
 	{ mod = "shortcuts.engine.script_control", fns = { "is_paused" } },

@@ -185,7 +185,7 @@ helpers.describe("owned application notifications", function()
 		local names = { "platform.focus.application_notifier", "platform.system.notifier", "platform.focus.application_notifier_core",
 			"core.ui.engine.window_titles", "core.process.adapters.shell_runner", "core.logger.engine.shim", "core.i18n.engine.i18n", "core.i18n.engine.locale",
 			"lgi", "core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline", "core.events.loop",
-			"core.ui.ui.webkit_host", "core.ui.ui.webview_manager", "ui.changelog.bridge" }
+			"core.ui.ui.webkit_host", "core.ui.ui.webview_manager", "updater.ui.changelog.bridge" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = { value = package.loaded[name] } end
 		local marker = {}

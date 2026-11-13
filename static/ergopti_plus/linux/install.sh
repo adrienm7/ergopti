@@ -1125,7 +1125,7 @@ _native_output_build_packages() {
 # caller. The canonical builder still verifies compilation and publication.
 _ensure_native_output_toolchain() {
 	if $SKIP_DEPS; then return 0; fi
-	local source="${SRC_DRIVER}/native/archive_output"
+	local source="${SRC_DRIVER}/updater/native"
 	local source_name manager packages package_name
 	for source_name in archive_publication.c archive_publication.h; do
 		[ -f "${source}/${source_name}" ] && [ ! -L "${source}/${source_name}" ] || return 1
@@ -1165,7 +1165,7 @@ if [ "$SRC_DRIVER" = "${NATIVE_OUTPUT_REPO}/static/ergopti_plus/linux" ]; then
 	fi
 	# A failed/uncertain compiler leaves its private stage for explicit cleanup;
 	# no recursive trap can erase an unobserved compiler descendant's resources.
-	if ! bash "$NATIVE_OUTPUT_BUILD" --source-directory "${SRC_DRIVER}/native/archive_output" \
+	if ! bash "$NATIVE_OUTPUT_BUILD" --source-directory "${SRC_DRIVER}/updater/native" \
 		--output-directory "$NATIVE_OUTPUT_STAGE"; then
 		ergopti_msg install.native_build_refused "$NATIVE_OUTPUT_STAGE" >&2
 		exit 1
@@ -1313,7 +1313,7 @@ fi
 
 # A reinstall extracts over the previous tree, so a file the previous version
 # shipped and this one does not stayed behind, unowned: the tree then failed its
-# own receipt (modules/updater/ownership_receipt.lua verify) and, once it was
+# own receipt (updater/engine/ownership_receipt.lua verify) and, once it was
 # <root>.old, the next update could not retire it. Remove each payload file the
 # previous receipt owned and the new one does not, when its bytes still match;
 # a file the user changed is kept, as uninstall.sh keeps it.

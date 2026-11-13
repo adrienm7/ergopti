@@ -200,7 +200,7 @@ function M.run(options)
 				observed.driver_control = control_options
 				return { handle = function() return false end, stop = function() return true end }
 			end }
-		elseif name == "infra.updater_boot_ready" then
+		elseif name == "updater.engine.boot_ready" then
 			-- The update watcher that started this daemon is told once it is ready.
 			return { report = function(reason)
 				observed.boot_ready_reason = reason; record("updater.boot_ready"); return false

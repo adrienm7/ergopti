@@ -1,7 +1,7 @@
 --- tests/support/ollama_pinned_artifact_fixture.lua
 
 --- Controlled native ports for the actual pinned registry, not C/kernel evidence.
-local Output = require("infra.archive_output")
+local Output = require("updater.engine.archive_output")
 local Target = require("core.network.engine.http_output_target")
 local ABC_SHA256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 local function fixture(options)

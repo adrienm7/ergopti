@@ -57,7 +57,7 @@ local function quote_native_network_directory()
 end
 
 -- Optional download-progress webview; absent in headless/unusual layouts.
-local ok_dw, download_window = pcall(require, "ui.download_window")
+local ok_dw, download_window = pcall(require, "updater.ui.download_window")
 if not ok_dw then download_window = nil end
 
 -- Same LOG tag as the parent manager so download log lines stay grouped under

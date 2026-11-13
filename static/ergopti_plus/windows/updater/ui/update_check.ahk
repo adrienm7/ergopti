@@ -1,0 +1,966 @@
+﻿; updater/ui/update_check.ahk
+
+; ==============================================================================
+; MODULE: Update Check Window
+; DESCRIPTION:
+; Hosts the shared update-check page (_shared/ui/update_check/) for the tray's
+; "Check for updates" row: "checking" for the subscribed channel, then the
+; answer (up to date, a release to install, no release on the channel yet, or
+; why the check failed), with one line for every other channel whose latest
+; release was published after the installed build.
+;
+; FEATURES & RATIONALE:
+; 1. The manual check used to answer with tray balloons, and to start the
+;    install prompt on a newer release; the window now carries every answer,
+;    centered, and nothing downloads before its Update button.
+; 2. Update runs the existing install of the offered release
+;    (_Updater_ActivateCachedRelease, then Updater_DownloadAndInstall); a
+;    switch goes through the channel owner (Updater_SetChannel), What's new
+;    opens the Versions window, and a failure's Report reuses the error
+;    window's GitHub report.
+; 5. An offered release carries its body with the repository identity the page's
+;    link policy needs: the page shows the changelog in place, and a clicked link
+;    goes through the allowlist of every manual URL (_Updater_OpenManualUrl). The
+;    native window keeps What's new: its text controls render no Markdown.
+; 3. One window, bound to the manual check it shows and to an epoch: a late
+;    answer of another check, or a message of a closed window, is inert.
+; 4. Without WebView2, or when its WebView cannot be created, the same answer
+;    is a native, centered window with the same texts and buttons.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+; Geometry is resolved at open time by the existing WebViewHost manifest owner.
+
+; Virtual host for the shared page, mapped to _SharedDir like the error window's
+global UC_VHOST             := "ergopti.updatecheck"
+global UC_HOST_ACCESS_ALLOW := 1
+
+; The page's actions, each with the phase it needs ("" = any phase)
+global UC_PAGE_ACTIONS := Map("close", "", "update", "available", "whats_new", "available",
+	"open_url", "available", "switch_channel", "", "report", "error", "open_log", "error")
+
+; The actions that drive the updater, refused while the driver is paused; the
+; others (close, report, open the log) change nothing ErgoptiPlus does, as in
+; the error window
+global UC_UPDATER_ACTIONS := Map("update", true, "whats_new", true, "open_url", true, "switch_channel", true)
+
+; The phases an answer may carry, as the page knows them
+global UC_ANSWER_STATES := Map("up_to_date", true, "available", true, "no_release", true, "error", true)
+
+; The reasons a failed check may give, as locale keys the page translates
+global UC_REASONS := Map(
+	"no_connection", "updater.no_connection",
+	"parse_failed",  "updater.parse_failed",
+	"unexpected",    "update_check.error_unexpected")
+
+; Replaces the window for the tests: called with the state instead of showing it
+global _UC_PresentFn := 0
+
+; The manual check the window shows (its request id), its state (the page's
+; state message as a Map) and the release an "available" answer offers
+global _UC_RequestId := 0
+global _UC_State     := 0
+global _UC_Release   := 0
+
+; The open window: host Gui, WebView2 or the native fallback
+global _UC_Gui         := unset
+global _UC_Controller  := unset
+global _UC_WebView     := unset
+global _UC_MsgSub      := unset
+global _UC_Native      := false
+global _UC_WindowEpoch := 0
+global _UC_ResetDone   := true
+global _UC_RetiredHosts := []
+; A synchronous WebView factory pumps messages while its host must stay alive.
+global _UC_PendingHost := 0
+
+
+
+
+
+; =============================
+; =============================
+; ======= 1/ Public API =======
+; =============================
+; =============================
+
+; Opens the window, or reuses the open one, showing "checking" for the channel
+; of one manual check.
+; @param Request {Object} The manual check's request context.
+; @param Current {String} The installed version.
+; @returns {Boolean} shown
+UpdateCheck_Begin(Request, Current) {
+	ManagedNetworkTerminalFailure.Retire("updater_check")
+	global _UC_RequestId, _UC_Release
+	_UC_RequestId := Request.RequestId
+	_UC_Release := 0
+	return _UpdateCheck_Present(Map("state", "checking", "channel", Request.Channel,
+		"current", Current, "latest", "", "others", []), true)
+}
+
+; Shows the answer of one manual check. The answer of another check (superseded
+; by a later click, or of a window closed meanwhile) is ignored.
+; @param Request {Object} The manual check's request context.
+; @param Answer {Map} { state, current, latest?, others?, reason?, detail?, release? }:
+;   reason names a UC_REASONS entry for an error; release is the offered release
+;   object for "available".
+; @returns {Boolean} shown
+UpdateCheck_ShowResult(Request, Answer) {
+	global _UC_RequestId, _UC_Release, _UC_State, UC_ANSWER_STATES, UC_REASONS
+	Owner := _UpdateCheck_CaptureActionOwner()
+	if (Request.RequestId != Owner.request) {
+		LoggerDebug("UpdateCheck", "Discarded the answer of a superseded update check.")
+		return false
+	}
+	Phase := Answer.Get("state", "")
+	if !UC_ANSWER_STATES.Has(Phase)
+		throw ValueError("Unknown update-check answer: " . Phase)
+	State := Map("state", Phase, "channel", Request.Channel,
+		"current", Answer.Get("current", ""), "latest", Answer.Get("latest", ""),
+		"others", Answer.Get("others", []))
+	if (Phase == "error") {
+		Reason := Answer.Get("reason", "")
+		if !UC_REASONS.Has(Reason)
+			throw ValueError("Unknown update-check failure reason: " . Reason)
+		NetworkKey := ManagedNetworkFailureWindows_MessageKey(Answer.Get("network_report", 0))
+		State["reason_key"] := NetworkKey != "" ? NetworkKey : UC_REASONS[Reason]
+		State["detail"] := NetworkKey != "" ? "" : Answer.Get("detail", "")
+		State["log_path"] := LoggerTodayLogPath()
+	}
+	Release := (Phase == "available") ? Answer["release"] : 0
+	if (Phase == "available") {
+		State["notes"] := _UpdateCheck_ReleaseNotes(Release)
+		if Answer.Get("check_only", false)
+			State["check_only"] := true
+	}
+	LoggerInfo("UpdateCheck", "Update check window: {1} (channel {2}).", Phase, Request.Channel)
+	PreviousCritical := Critical("On")
+	try {
+		if !_UpdateCheck_ActionCurrent(Owner)
+			return false
+		FailureOwner := ManagedNetworkTerminalFailure.Owners.Get("updater_check", 0)
+		_UC_Release := Release
+		_UC_State := State
+	} finally Critical(PreviousCritical)
+	Current := () => _UC_RequestId == Request.RequestId && _UC_State == State && _UC_Release == Release
+	Accepted := _UpdateCheck_Present(State, false, Current)
+	if !Current.Call()
+		return false
+	if Accepted && Phase == "error" && ManagedNetworkFailureWindows_CanonicalReport(Answer.Get("network_report", 0))
+		_UpdateCheck_ShowManagedFailure(Request, State, Answer["network_report"])
+	else if IsObject(FailureOwner)
+		ManagedNetworkTerminalFailure.Retire("updater_check", FailureOwner)
+	return Accepted
+}
+
+; Offers a release a manual check found: the window shows it with its Update
+; button, the only consent that downloads it.
+; @param Release {Object} The published release (Tag, RawJson…).
+; @param Request {Object} The manual check's request context.
+; @returns {Boolean} shown
+UpdateCheck_ShowAvailable(Release, Request) {
+	return UpdateCheck_ShowResult(Request, Map("state", "available",
+		"current", Updater_CurrentVersion(), "latest", Release.Tag,
+		"others", _Updater_RequestOtherChannels(Request), "release", Release))
+}
+
+; Closes the window when it still shows a check that ended without an answer
+; (cancelled at a suspend boundary or by a channel switch).
+; @param Request {Object}
+UpdateCheck_Abandon(Request) {
+	global _UC_RequestId, _UC_ResetDone
+	if (Request.RequestId != _UC_RequestId) || _UC_ResetDone
+		return
+	LoggerInfo("UpdateCheck", "The update check was cancelled; its window closes.")
+	_UpdateCheck_CloseWindow()
+}
+
+
+
+
+
+; ==================================
+; ==================================
+; ======= 2/ The Page's Data =======
+; ==================================
+; ==================================
+
+; What the page's notes pane needs for an offered release.
+; @param Release {Object} The offered release.
+; @returns {Map} { body, owner, repo }
+_UpdateCheck_ReleaseNotes(Release) {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	return Map("body", Release.Body, "owner", UPDATER_GH_OWNER, "repo", UPDATER_GH_REPO)
+}
+
+; The page's state message. Release text is data: an HTML-safe JSON literal, as
+; in the update prompt's seed (_Updater_ReleaseNotesSeed).
+; @param State {Map} The window's state.
+; @returns {String} JSON
+_UpdateCheck_StateJson(State) {
+	Others := ""
+	for Entry in State.Get("others", []) {
+		Others .= (Others == "" ? "" : ",") . '{"channel":' . JsonStringLiteral(Entry["channel"])
+			. ',"tag":' . JsonStringLiteral(Entry["tag"]) . '}'
+	}
+	Json := '{"type":"state","state":' . JsonStringLiteral(State["state"])
+		. ',"channel":' . JsonStringLiteral(State["channel"])
+		. ',"current":' . JsonStringLiteral(State.Get("current", ""))
+		. ',"latest":' . JsonStringLiteral(State.Get("latest", ""))
+		. ',"others":[' . Others . ']'
+	if State.Get("check_only", false)
+		Json .= ',"check_only":true'
+	if State.Has("notes") {
+		Notes := State["notes"]
+		Json .= ',"notes":{"body":' . JsonStringLiteral(Notes["body"], true)
+			. ',"owner":' . JsonStringLiteral(Notes["owner"], true)
+			. ',"repo":' . JsonStringLiteral(Notes["repo"], true) . '}'
+	}
+	if (State["state"] == "error") {
+		Json .= ',"reason_key":' . JsonStringLiteral(State["reason_key"])
+			. ',"log_path":' . JsonStringLiteral(State["log_path"])
+	}
+	return Json . '}'
+}
+
+; A translation with its named placeholders filled, as the page composes it.
+; @param Key {String}
+; @param Values {Map} placeholder name -> value
+; @returns {String}
+_UpdateCheck_Text(Key, Values := 0) {
+	Text := t(Key)
+	if (Values is Map) {
+		for Name, Value in Values
+			Text := StrReplace(Text, "{" . Name . "}", Value)
+	}
+	return Text
+}
+
+; The texts of the native window, composed like the page's: two lines, today's
+; log for a failure, one line per other channel.
+; @param State {Map}
+; @returns {Map} { line1, line2, logged, others: Array of { text, channel } }
+_UpdateCheck_NativeTexts(State) {
+	Phase := State["state"]
+	Channel := _Updater_ChannelLabel(State["channel"])
+	Line1 := "", Line2 := "", Logged := ""
+	switch Phase {
+		case "checking":
+			Line1 := _UpdateCheck_Text("update_check.checking", Map("channel", Channel))
+		case "up_to_date":
+			Line1 := State["current"]
+			Line2 := _UpdateCheck_Text("update_check.is_latest", Map("channel", Channel))
+		case "available":
+			Line1 := State["latest"]
+			Line2 := _UpdateCheck_Text("update_check.available",
+				Map("current", State["current"], "channel", Channel))
+		case "no_release":
+			Line1 := State["current"]
+			Line2 := _UpdateCheck_Text("updater.no_release_on_channel", Map("channel", Channel))
+		case "error":
+			Line1 := t("update_check.error_heading")
+			Line2 := _UpdateCheck_Text(State["reason_key"], Map("channel", Channel,
+				"tag", State.Get("latest", ""), "current", State.Get("current", "")))
+			Logged := _UpdateCheck_Text("update_check.logged_in", Map("path", State["log_path"]))
+	}
+	Others := []
+	if (Phase == "up_to_date" or Phase == "available" or Phase == "no_release") {
+		for Entry in State.Get("others", []) {
+			Others.Push({ text: _UpdateCheck_Text("update_check.also_available",
+				Map("channel", _Updater_ChannelLabel(Entry["channel"]), "tag", Entry["tag"])),
+				channel: Entry["channel"] })
+		}
+	}
+	return Map("line1", Line1, "line2", Line2, "logged", Logged, "others", Others)
+}
+
+
+
+
+
+; ==============================
+; ==============================
+; ======= 3/ The Actions =======
+; ==============================
+; ==============================
+
+; Performs one action of the window, on the answer it holds.
+; @param Name {String} One of UC_PAGE_ACTIONS.
+; @param Channel {String} The channel of a switch line.
+; @param Effects {Map|Integer} Replacements of the effects (tests only): install,
+;   changelog, open_url, set_channel, report, open_log, close, refuse_paused.
+; @param BornSuspended {Boolean} Whether the driver was paused when the click
+;   arrived: an updater action is then refused visibly.
+; @param ActionOwner {Object} Optional exact answer captured at dispatch; direct
+;   synchronous callers capture the current answer at entry.
+; @param Url {String} The clicked link of an open_url action.
+; @returns {Map} { ok, missing, closed }
+UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false, ActionOwner := unset, Url := "") {
+	global UC_PAGE_ACTIONS, UC_UPDATER_ACTIONS
+	Outcome := Map("ok", false, "missing", false, "closed", false)
+	Owner := IsSet(ActionOwner) ? ActionOwner : _UpdateCheck_CaptureActionOwner()
+	if !UC_PAGE_ACTIONS.Has(Name) || !_UpdateCheck_ActionCurrent(Owner)
+		return Outcome
+	State := Owner.state
+	Needs := UC_PAGE_ACTIONS[Name]
+	if (Needs != "" and State["state"] != Needs) {
+		LoggerWarn("UpdateCheck", "Refused the update-check action '{1}' outside the '{2}' phase.", Name, Needs)
+		return Outcome
+	}
+	Effect(Key, Default) => (Effects is Map && Effects.Has(Key)) ? Effects[Key] : Default
+	if (BornSuspended && UC_UPDATER_ACTIONS.Has(Name)) {
+		Effect("refuse_paused", _Updater_RefuseManualWhileSuspended).Call()
+		return Outcome
+	}
+
+	switch Name {
+		case "close":
+			if !_UpdateCheck_ActionCurrent(Owner)
+				return Outcome
+			Effect("close", _UpdateCheck_CloseWindow).Call()
+			Outcome["ok"] := true, Outcome["closed"] := true
+		case "update":
+			if State.Get("check_only", false) {
+				LoggerWarn("UpdateCheck", "Refused an update of a release only the public feed announced.")
+				return Outcome
+			}
+			Install := Effect("install", (Release) => _UpdateCheck_Install(Release, Owner))
+			if !_UpdateCheck_ActionCurrent(Owner)
+				return Outcome
+			if Install.Call(Owner.release) {
+				Outcome["ok"] := true
+				; A synchronous install callback can open a new check. Its window
+				; never inherits the old action's completion/close authority.
+				if _UpdateCheck_ActionCurrent(Owner) {
+					Effect("close", _UpdateCheck_CloseWindow).Call()
+					Outcome["closed"] := true
+				}
+			}
+		case "whats_new":
+			if !_UpdateCheck_ActionCurrent(Owner)
+				return Outcome
+			Effect("changelog", Changelog_Open).Call(State["channel"])
+			Outcome["ok"] := true
+		case "open_url":
+			Opener := Effect("open_url", _UpdateCheck_OpenUrl)
+			if !_UpdateCheck_ActionCurrent(Owner)
+				return Outcome
+			Outcome["ok"] := Opener.Call(Url) ? true : false
+		case "switch_channel":
+			if !_UpdateCheck_Lists(Channel, State) {
+				LoggerWarn("UpdateCheck", "Refused a switch to '{1}': the answer did not list it.", Channel)
+			} else if _UpdateCheck_ActionCurrent(Owner) && Effect("set_channel", Updater_SetChannel).Call(Channel) {
+				Outcome["ok"] := true
+				if _UpdateCheck_ActionCurrent(Owner) {
+					; The channel owner reloads the application on the new channel.
+					Effect("close", _UpdateCheck_CloseWindow).Call()
+					Outcome["closed"] := true
+				}
+			}
+		case "report":
+			Record := Map("kind", "error", "module", "Updater",
+				"message", "Update check failed on channel " . State["channel"] . ": " . State["detail"],
+				"time", FormatTime(, "yyyy-MM-dd HH:mm:ss"))
+			if !_UpdateCheck_ActionCurrent(Owner)
+				return Outcome
+			Outcome["ok"] := Effect("report", ErrorDialog_Report).Call(Record) ? true : false
+		case "open_log":
+			if !_UpdateCheck_ActionCurrent(Owner)
+				return Outcome
+			Outcome["ok"] := Effect("open_log", LogOpeners_OpenTodayLog).Call() ? true : false
+	}
+	return Outcome
+}
+
+; A native button retains the answer it displays, not whatever a timer finds
+; later. Direct synchronous callers capture the same owner at their entry.
+_UpdateCheck_CaptureActionOwner() {
+	global _UC_WindowEpoch, _UC_RequestId, _UC_State, _UC_Release, _UC_ResetDone
+	PreviousCritical := Critical("On")
+	try return {epoch: _UC_WindowEpoch, request: _UC_RequestId, state: _UC_State,
+		release: _UC_Release, reset: _UC_ResetDone}
+	finally Critical(PreviousCritical)
+}
+
+_UpdateCheck_ActionCurrent(Owner) {
+	global _UC_WindowEpoch, _UC_RequestId, _UC_State, _UC_Release, _UC_ResetDone
+	return Type(Owner) == "Object" && Owner.HasOwnProp("epoch") && Owner.HasOwnProp("request")
+		&& Owner.HasOwnProp("state") && Owner.HasOwnProp("release") && Owner.HasOwnProp("reset")
+		&& Owner.state is Map && _UC_WindowEpoch == Owner.epoch && _UC_RequestId == Owner.request
+		&& _UC_State == Owner.state && _UC_Release == Owner.release && _UC_ResetDone == Owner.reset
+}
+
+; Whether the answer lists a channel as having a newer release.
+; @param Channel {String}
+; @param State {Map} Optional captured answer; otherwise the current answer.
+; @returns {Boolean}
+_UpdateCheck_Lists(Channel, State := unset) {
+	global _UC_State
+	Answer := IsSet(State) ? State : _UC_State
+	for Entry in Answer.Get("others", []) {
+		if (Entry["channel"] == Channel)
+			return true
+	}
+	return false
+}
+
+; Opens a link of the release notes through the repository allowlist of every
+; manual URL, which also refuses it while the driver is paused.
+; @param Url {String}
+; @returns {Boolean} opened
+_UpdateCheck_OpenUrl(Url) {
+	return _Updater_OpenManualUrl(() => Url)
+}
+
+; Installs the offered release: the user's click is the consent the tray's
+; "Update to vX" row also gives.
+; @param Release {Object}
+; @param Owner {Object} The exact offered answer retained by the click.
+; @returns {Boolean} started
+_UpdateCheck_Install(Release, Owner) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if !_UpdateCheck_ActionCurrent(Owner) || Release != Owner.release
+		return false
+	if (Type(Release) != "Object") {
+		LoggerError("UpdateCheck", "Update refused: the window holds no offered release.")
+		return false
+	}
+	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return false
+	return _Updater_ActivateCachedRelease(Release, Request) == true
+}
+
+
+
+
+
+; ==============================
+; ==============================
+; ======= 4/ The Window ========
+; ==============================
+; ==============================
+
+; Keeps native title construction independently testable. An ordinary window:
+; it is raised and focused when it opens or a new check re-opens it, never kept
+; above other applications.
+_UpdateCheck_NewWindow() {
+	return Gui_Create("", t("update_check.window_title"))
+}
+
+; Shows a state in the open window, or opens the window.
+; @param State {Map}
+; @param Reopen {Boolean} A new manual check: an open window is presented again.
+; @param Current {Func|0} Optional exact-state publication predicate.
+; @returns {Boolean} shown
+_UpdateCheck_Present(State, Reopen := false, Current := 0) {
+	global _UC_State, _UC_ResetDone, _UC_Native, _UC_WindowEpoch, _UC_PresentFn, _UC_Gui
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(Current) && !Current.Call()
+			return false
+		_UC_State := State
+	} finally Critical(PreviousCritical)
+	if HasMethod(_UC_PresentFn, "Call") {
+		Accepted := _UC_PresentFn.Call(State) ? true : false
+		return Accepted && (!IsObject(Current) || Current.Call())
+	}
+	if !_UC_ResetDone {
+		if _UC_Native
+			_UpdateCheck_BuildNative()
+		else {
+			Epoch := _UC_WindowEpoch
+			Json := _UpdateCheck_StateJson(State)
+			if IsObject(Current) && !Current.Call()
+				return false
+			_UpdateCheck_Send(Epoch, Json)
+		}
+		if IsObject(Current) && !Current.Call()
+			return false
+		; A result updates the window where it is; only the user's new click
+		; brings a covered window back.
+		if Reopen && IsSet(_UC_Gui) && IsObject(_UC_Gui)
+			WMPresentWindow(_UC_Gui)
+		return !IsObject(Current) || Current.Call()
+	}
+	Accepted := _UpdateCheck_Open()
+	return Accepted && (!IsObject(Current) || Current.Call())
+}
+
+; Opens the window: the shared page in WebView2, or its native counterpart.
+; @returns {Boolean} opened
+_UpdateCheck_Open() {
+	global _VendorDir, _SharedDir, _I18nLocale, UC_VHOST, UC_HOST_ACCESS_ALLOW
+	global _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub, _UC_ResetDone, _UC_WindowEpoch, _UC_Native
+	global _UC_PendingHost
+	Owner := _UpdateCheck_CaptureActionOwner()
+	LoggerStart("UpdateCheck", "Opening the update-check window…")
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return false
+	_UC_WindowEpoch += 1
+	Epoch := _UC_WindowEpoch
+	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+		&& !WebView_ShouldUseNativeFallback()
+	if Epoch != _UC_WindowEpoch
+		return false
+	if !UseWV {
+		_UC_Native := true
+		_UC_ResetDone := false
+		_UpdateCheck_BuildNative()
+		LoggerSuccess("UpdateCheck", "Update-check window opened (native, without WebView2).")
+		return Epoch == _UC_WindowEpoch && !_UC_ResetDone
+	}
+	Geo := WebViewHost.AppGeometry("update_check")
+	G := _UpdateCheck_NewWindow()
+	Host := {gui: G, controller: 0, view: 0, subscription: 0, closing: false,
+		building: true, cancelled: false, epoch: Epoch}
+	PreviousCritical := Critical("On")
+	try {
+		if Epoch != _UC_WindowEpoch {
+			Host.cancelled := true
+			_UpdateCheck_QueueHost(Host)
+		} else {
+			_UC_PendingHost := Host
+			_UC_Gui := G
+			_UC_Native := false
+			_UC_ResetDone := false
+		}
+	} finally Critical(PreviousCritical)
+	Failed := false
+	try {
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		G.MarginX := 0, G.MarginY := 0
+		ContentCtl := G.Add("Text", "x0 y0 w" . Geo.w . " h" . Geo.h, "")
+		G.OnEvent("Close", (*) => _UpdateCheck_CloseWindow(Epoch))
+		G.OnEvent("Escape", (*) => _UpdateCheck_CloseWindow(Epoch))
+		G.Show("w" . Geo.w . " h" . Geo.h)
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		Environment := WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll")
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		; Even a cancelled factory's returned controller belongs to this exact
+		; host. Its HWND is retained until that controller can be closed.
+		Host.controller := WebView2.create(ContentCtl.Hwnd, , Environment)
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		Host.view := Host.controller.CoreWebView2
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		try {
+			Settings := Host.view.Settings
+			Settings.AreDevToolsEnabled := false
+			Settings.AreDefaultContextMenusEnabled := false
+			Settings.IsStatusBarEnabled := false
+			Settings.AreBrowserAcceleratorKeysEnabled := false
+		}
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
+		try Host.view.AddScriptToExecuteOnDocumentCreated(
+			"window.__i18n_base='https://" . UC_VHOST . "/core/i18n/data/locales/';window._i18n_locale='" . Locale . "';")
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		Host.subscription := Host.view.WebMessageReceived(_UpdateCheck_OnWebMessage.Bind(Epoch))
+		PreviousCritical := Critical("On")
+		try {
+			if !_UpdateCheck_StartupCurrent(Host)
+				return false
+			_UC_Controller := Host.controller
+			_UC_WebView := Host.view
+			_UC_MsgSub := Host.subscription
+		} finally Critical(PreviousCritical)
+		try Host.view.SetVirtualHostNameToFolderMapping(UC_VHOST, _SharedDir, UC_HOST_ACCESS_ALLOW)
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		try Host.view.Navigate("https://" . UC_VHOST . "/ui/update_check/index.html?cb=" . A_TickCount)
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		try Host.controller.Fill()
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		LoggerSuccess("UpdateCheck", "Update-check window opened.")
+		return _UpdateCheck_StartupCurrent(Host)
+	} catch as Err {
+		Failed := _UpdateCheck_StartupCurrent(Host)
+		LoggerError("UpdateCheck", "WebView2 could not be created for the update-check window: {1}", Err.Message)
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			Host.building := false
+			if Failed && _UpdateCheck_StartupCurrent(Host) {
+				_UC_Gui := unset
+				_UC_Controller := unset
+				_UC_WebView := unset
+				_UC_MsgSub := unset
+			}
+			if !_UpdateCheck_StartupCurrent(Host) || Failed {
+				Host.cancelled := true
+				_UpdateCheck_QueueHost(Host)
+			}
+			if _UC_PendingHost == Host
+				_UC_PendingHost := 0
+		} finally Critical(PreviousCritical)
+		if Host.cancelled && IsObject(Host.gui)
+			try Host.gui.Hide()
+		_UpdateCheck_RetireHosts()
+	}
+	if Failed && IsObject(Host.gui) {
+		; A refused controller close still owns its HWND. Leave its record
+		; retryable; a later presentation may open a separate current host.
+		if Epoch == _UC_WindowEpoch
+			_UC_ResetDone := true
+		return false
+	}
+	return Failed ? _UpdateCheck_FallBackToNative(Epoch, G) : false
+}
+
+_UpdateCheck_StartupCurrent(Host) {
+	global _UC_PendingHost, _UC_Gui, _UC_ResetDone, _UC_WindowEpoch
+	return !Host.cancelled && _UC_PendingHost == Host && !_UC_ResetDone
+		&& Host.epoch == _UC_WindowEpoch && IsSet(_UC_Gui) && _UC_Gui == Host.gui
+}
+
+; Caller holds Critical; native disposal is always deferred to the drain.
+_UpdateCheck_QueueHost(Host) {
+	global _UC_RetiredHosts
+	for Existing in _UC_RetiredHosts
+		if Existing == Host
+			return
+	_UC_RetiredHosts.Push(Host)
+}
+
+; Replaces a WebView2 host whose WebView could not be created (no Evergreen
+; runtime, a boot timeout, another window still booting the shared environment)
+; with the native window. The check and its state stay: the check's answer
+; arrives later, and only a window still showing that check receives it.
+; @param Epoch {Integer} The epoch of the window being opened.
+; @param HostGui {Gui} The WebView2 host, which holds no WebView.
+; @param BuildFn {Func|Integer} Replacement of _UpdateCheck_BuildNative (tests only).
+; @returns {Boolean} opened
+_UpdateCheck_FallBackToNative(Epoch, HostGui, BuildFn := 0) {
+	global _UC_Gui, _UC_ResetDone, _UC_WindowEpoch, _UC_Native, _UC_Controller, _UC_WebView, _UC_MsgSub
+	try HostGui.Destroy()
+	; The environment's boot pumps messages: a window the user closed meanwhile
+	; stays closed, and a window opened since then is not replaced
+	if _UC_ResetDone || (Epoch != _UC_WindowEpoch) {
+		LoggerDone("UpdateCheck", "The update-check window was closed while WebView2 was starting.")
+		return false
+	}
+	_UC_Gui := unset
+	_UC_Controller := unset
+	_UC_WebView := unset
+	_UC_MsgSub := unset
+	_UC_Native := true
+	Build := HasMethod(BuildFn, "Call") ? BuildFn : _UpdateCheck_BuildNative
+	Build.Call()
+	LoggerSuccess("UpdateCheck", "Update-check window opened (native, WebView2 could not be created).")
+	return true
+}
+
+; Builds (or rebuilds) the native window for the current state: every text and
+; button centered, like the page.
+_UpdateCheck_BuildNative() {
+	global _UC_Gui, _UC_State
+	Owner := _UpdateCheck_CaptureActionOwner()
+	Previous := IsSet(_UC_Gui) ? _UC_Gui : 0
+	Texts := _UpdateCheck_NativeTexts(_UC_State)
+	Phase := _UC_State["state"]
+	Geo := WebViewHost.AppGeometry("update_check")
+	Width := Geo.w - 40
+	G := _UpdateCheck_NewWindow()
+	G.MarginX := 20
+	G.MarginY := 16
+	G.SetFont("s12 bold", "Segoe UI")
+	G.Add("Text", "xm w" . Width . " Center", Texts["line1"])
+	G.SetFont("s10 norm", "Segoe UI")
+	if (Texts["line2"] != "")
+		G.Add("Text", "xm y+6 w" . Width . " Center", Texts["line2"])
+	if (Texts["logged"] != "")
+		G.Add("Text", "xm y+8 w" . Width . " Center cGray", Texts["logged"])
+	for Other in Texts["others"] {
+		G.Add("Text", "xm y+10 w" . Width . " Center", Other.text)
+		SwitchButton := G.Add("Button", "xm y+4", t("update_check.switch_channel"))
+		SwitchButton.OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "switch_channel", Other.channel))
+		_UpdateCheck_CenterRow([SwitchButton], Geo.w)
+	}
+	CheckOnly := _UC_State.Get("check_only", false)
+	G.Add("Text", "xm y+10 w" . Width . " Center vStatus", CheckOnly ? t("update_check.check_only") : "")
+	Row := []
+	if (Phase == "available") {
+		WhatsNew := G.Add("Button", "xm y+8", t("update_check.whats_new"))
+		WhatsNew.OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "whats_new", ""))
+		_UpdateCheck_CenterRow([WhatsNew], Geo.w)
+	}
+	if (Phase == "error") {
+		Row.Push(G.Add("Button", "xm y+12", t("healthcheck.toolbar.report")))
+		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "report", ""))
+		Row.Push(G.Add("Button", "x+8 yp", t("update_check.open_log")))
+		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "open_log", ""))
+	}
+	Row.Push(G.Add("Button", (Row.Length ? "x+8 yp" : "xm y+12"), t("common.close")))
+	Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "close", ""))
+	if (Phase == "available" && !CheckOnly) {
+		Row.Push(G.Add("Button", "x+8 yp Default", t("update_check.update")))
+		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "update", ""))
+	}
+	_UpdateCheck_CenterRow(Row, Geo.w)
+	G.OnEvent("Close",  (*) => _UpdateCheck_CloseWindow(Owner.epoch))
+	G.OnEvent("Escape", (*) => _UpdateCheck_CloseWindow(Owner.epoch))
+	; No position: Gui.Show centers the window on the screen; the texts span
+	; the canonical width with the margins, so the native height fits its content
+	G.Show("AutoSize")
+	_UC_Gui := G
+	if Previous {
+		try Previous.Destroy()
+	}
+}
+
+; Gives a row of buttons one width and centers it in the window.
+; @param Buttons {Array}
+; @param Width {Integer} The current manifest-owned width.
+_UpdateCheck_CenterRow(Buttons, Width) {
+	if (Buttons.Length == 0)
+		return
+	Shared := Gui_HarmoniseButtonWidths(Buttons)
+	Gap := 8
+	Total := Buttons.Length * Shared + (Buttons.Length - 1) * Gap
+	X := Max(0, (Width - Total) // 2)
+	for Button in Buttons {
+		Button.Move(X)
+		X += Shared + Gap
+	}
+}
+
+; A click in the native window, on its own stack like a page message. A Gui
+; event bypasses native Suspend: whether the driver was paused is read here.
+_UpdateCheck_NativeClick(Owner, Name, Channel, *) {
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return
+	SetTimer(_UpdateCheck_Act.Bind(Owner.epoch, Name, Channel, A_IsSuspended, 0, Owner), -1)
+}
+
+; Closes the window: the controller first, while its host window lives, then
+; the window.
+_UpdateCheck_CloseWindow(ExpectedEpoch := unset) {
+	global _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub, _UC_ResetDone, _UC_WindowEpoch, _UC_State
+	global _UC_Release, _UC_RequestId, _UC_Native, _UC_RetiredHosts, _UC_PendingHost
+	PreviousCritical := Critical("On")
+	try {
+		if IsSet(ExpectedEpoch) && ExpectedEpoch != _UC_WindowEpoch
+			return false
+		RetryOnly := _UC_ResetDone && !IsSet(_UC_Gui) && !IsSet(_UC_Controller) && _UC_RequestId == 0
+		if !RetryOnly {
+			; Retain references before detaching: native unsubscribe and Close may
+			; pump messages and open a successor, which this stack must never clear.
+			SavedGui := IsSet(_UC_Gui) ? _UC_Gui : 0
+			SavedController := IsSet(_UC_Controller) ? _UC_Controller : 0
+			SavedView := IsSet(_UC_WebView) ? _UC_WebView : 0
+			SavedSub := IsSet(_UC_MsgSub) ? _UC_MsgSub : 0
+			SavedFailure := ManagedNetworkTerminalFailure.Owners.Get("updater_check", 0)
+			if IsObject(_UC_PendingHost) && _UC_PendingHost.gui == SavedGui {
+				Host := _UC_PendingHost
+				Host.cancelled := true
+				_UC_PendingHost := 0
+			} else
+				Host := {gui: SavedGui, controller: SavedController, view: SavedView,
+					subscription: SavedSub, closing: false}
+			_UpdateCheck_QueueHost(Host)
+			_UC_ResetDone := true
+			_UC_WindowEpoch += 1
+			_UC_State := 0
+			_UC_Release := 0
+			_UC_RequestId := 0
+			_UC_Native := false
+			_UC_Gui := unset
+			_UC_Controller := unset
+			_UC_WebView := unset
+			_UC_MsgSub := unset
+		}
+	} finally Critical(PreviousCritical)
+	if RetryOnly
+		return _UpdateCheck_RetireHosts()
+	; The retained host now owns the subscription's last reference.
+	SavedSub := 0
+	if Host.HasOwnProp("building") && Host.building && IsObject(Host.gui)
+		try Host.gui.Hide()
+	if IsObject(SavedFailure)
+		ManagedNetworkTerminalFailure.Retire("updater_check", SavedFailure)
+	Retired := _UpdateCheck_RetireHosts()
+	LoggerInfo("UpdateCheck", "Update-check window closed.")
+	return Retired
+}
+
+; Retain failed COM/native cleanup for a later close instead of destroying a
+; host HWND while its controller still owns it. A reentrant drain skips owners
+; whose native Close is already in flight.
+_UpdateCheck_RetireHosts() {
+	global _UC_RetiredHosts
+	AllRetired := true
+	for Host in _UC_RetiredHosts.Clone() {
+		PreviousCritical := Critical("On")
+		try {
+			if Host.closing || (Host.HasOwnProp("building") && Host.building) {
+				AllRetired := false
+				continue
+			}
+			Host.closing := true
+		} finally Critical(PreviousCritical)
+		try {
+			Host.subscription := 0
+			if IsObject(Host.controller) {
+				Host.controller.Close()
+				Host.controller := 0
+			}
+			Host.view := 0
+			if IsObject(Host.gui) {
+				Host.gui.Destroy()
+				Host.gui := 0
+			}
+			PreviousCritical := Critical("On")
+			try {
+				for Index, Owned in _UC_RetiredHosts {
+					if Owned == Host {
+						_UC_RetiredHosts.RemoveAt(Index)
+						break
+					}
+				}
+			} finally Critical(PreviousCritical)
+		} catch as Err {
+			AllRetired := false
+			LoggerWarn("UpdateCheck", "Window retirement failed; cleanup ownership retained: {1}.", Err.Message)
+		} finally Host.closing := false
+	}
+	return AllRetired
+}
+
+; Sends one message into the window's page.
+; @param Epoch {Integer}
+; @param Json {String}
+_UpdateCheck_Send(Epoch, Json) {
+	global _UC_WebView, _UC_WindowEpoch, _UC_ResetDone, _UC_Native
+	if _UC_ResetDone || _UC_Native || (Epoch != _UC_WindowEpoch) || !IsSet(_UC_WebView)
+		return
+	WebView_RunScriptAsync(_UC_WebView, "if(window.receiveUpdateCheck)window.receiveUpdateCheck(" . Json . ")",
+		"UpdateCheck")
+}
+
+; Receives the page's messages. WebMessageReceived is a COM callback: the
+; message is read here and handled on a fresh stack, bound to its window.
+_UpdateCheck_OnWebMessage(Epoch, Handler, Args) {
+	global _UC_WindowEpoch, _UC_ResetDone
+	if _UC_ResetDone || (Epoch != _UC_WindowEpoch)
+		return
+	; The callback bypasses native Suspend: whether the driver was paused is read
+	; before the COM read can pump messages. The page still loads and closes
+	; while paused; its updater actions are refused (UpdateCheck_Perform)
+	BornSuspended := A_IsSuspended
+	Owner := _UpdateCheck_CaptureActionOwner()
+	try Raw := Args.TryGetWebMessageAsString()
+	catch as Err {
+		LoggerWarn("UpdateCheck", "An update-check message could not be read: {1}.", Err.Message)
+		return
+	}
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return
+	SetTimer(_UpdateCheck_HandleMessage.Bind(Epoch, Raw, BornSuspended, 0, Owner), -1)
+}
+
+; Handles one message of the page, on its own stack.
+; @param Epoch {Integer}
+; @param Raw {String}
+; @param BornSuspended {Boolean} Whether the driver was paused when it arrived.
+; @param Effects {Map|Integer} Replacements of the effects (tests only).
+; @param ActionOwner {Object} Optional exact answer retained before the COM read.
+_UpdateCheck_HandleMessage(Epoch, Raw, BornSuspended := false, Effects := 0, ActionOwner := unset) {
+	global _UC_WindowEpoch, _UC_ResetDone, _UC_State, UC_PAGE_ACTIONS
+	if _UC_ResetDone || (Epoch != _UC_WindowEpoch) || !(_UC_State is Map)
+		return
+	Owner := IsSet(ActionOwner) ? ActionOwner : _UpdateCheck_CaptureActionOwner()
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return
+	if (Raw == "ready") {
+		_UpdateCheck_Send(Epoch, _UpdateCheck_StateJson(_UC_State))
+		return
+	}
+	Name := "", Channel := "", Url := ""
+	try {
+		Message := JsonParse(Raw)
+		if (Message is Map) {
+			Name := Message.Get("action", "")
+			Channel := Message.Get("channel", "")
+			Url := Message.Get("url", "")
+		}
+	}
+	if !(Name is String) || !UC_PAGE_ACTIONS.Has(Name) || !(Channel is String) || !(Url is String) {
+		LoggerWarn("UpdateCheck", "Refused an update-check message that is not one of its actions.")
+		return
+	}
+	_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended, Effects, Owner, Url)
+}
+
+; Performs one action and answers it, in the page or the native window.
+; @param Epoch {Integer}
+; @param Name {String}
+; @param Channel {String}
+; @param BornSuspended {Boolean} Whether the driver was paused at the click.
+; @param Effects {Map|Integer} Replacements of the effects (tests only).
+; @param ActionOwner {Object} Optional exact answer retained by the event source.
+; @param Url {String} The clicked link of an open_url action.
+_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended := false, Effects := 0, ActionOwner := unset, Url := "") {
+	global _UC_WindowEpoch, _UC_ResetDone, _UC_Native, _UC_Gui
+	if _UC_ResetDone || (Epoch != _UC_WindowEpoch)
+		return
+	Owner := IsSet(ActionOwner) ? ActionOwner : _UpdateCheck_CaptureActionOwner()
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return
+	LoggerInfo("UpdateCheck", "Update-check window action: {1}.", Name)
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return
+	try Outcome := UpdateCheck_Perform(Name, Channel, Effects, BornSuspended, Owner, Url)
+	catch as Err {
+		LoggerError("UpdateCheck", "The update-check action '{1}' failed: {2}", Name, Err.Message)
+		Outcome := Map("ok", false, "missing", false, "closed", false)
+	}
+	if Outcome["closed"] || !_UpdateCheck_ActionCurrent(Owner)
+		return
+	if _UC_Native {
+		Status := ""
+		if !Outcome["ok"]
+			Status := t("healthcheck.status.failed")
+		else if (Name == "report")
+			Status := t("notify.report_bug_body")
+		if !_UpdateCheck_ActionCurrent(Owner)
+			return
+		try _UC_Gui["Status"].Text := Status
+		return
+	}
+	_UpdateCheck_Send(Epoch, '{"type":"action","action":' . JsonStringLiteral(Name)
+		. ',"ok":' . (Outcome["ok"] ? "true" : "false")
+		. ',"missing":' . (Outcome["missing"] ? "true" : "false") . '}')
+}
+
+_UpdateCheck_ManagedCurrent(Owner) {
+	global _UC_ResetDone, _UC_WindowEpoch, _UC_RequestId, _UC_State, UPDATER_REQUEST_POLICY_ALLOW
+	return !_UC_ResetDone && _UC_WindowEpoch == Owner.epoch && _UC_RequestId == Owner.request.RequestId
+		&& _UC_State == Owner.state && _UC_State is Map && _UC_State.Get("state", "") == "error"
+		&& _Updater_RequestPolicy(Owner.request) == UPDATER_REQUEST_POLICY_ALLOW
+}
+
+_UpdateCheck_ShowManagedFailure(Request, State, Report, PresentFn := 0) {
+	global _UC_WindowEpoch
+	Owner := {request: Request, state: State, epoch: _UC_WindowEpoch}
+	return ManagedNetworkTerminalFailure.Publish("updater_check", Report, () => _UpdateCheck_ManagedCurrent(Owner),
+		"update_check.window_title", () => _UpdateCheck_RetryManaged(Owner), PresentFn)
+}
+
+_UpdateCheck_RetryManaged(Owner) {
+	if !_UpdateCheck_ManagedCurrent(Owner)
+		return false
+	global _UC_RequestId, _UC_ResetDone
+	BeforeRequest := _UC_RequestId
+	Updater_OneClickUpdate()
+	return !_UC_ResetDone && _UC_RequestId != BeforeRequest
+}

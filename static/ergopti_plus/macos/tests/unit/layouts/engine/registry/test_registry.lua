@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"
-local CHANNEL = require("modules.updater").installed_channel()
+local CHANNEL = require("updater.engine").installed_channel()
 local INDEX_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANNEL .. "/static/layouts/registry/index.json"
 local ERGOL_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANNEL .. "/static/layouts/registry/ergol/ergol.keylayout"
 local LOCAL_DIR = "/cfg/layouts/"

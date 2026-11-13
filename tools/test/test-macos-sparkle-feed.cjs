@@ -43,7 +43,7 @@ const menuSource = fs.readFileSync(
 	'utf8'
 );
 const aboutSource = fs.readFileSync(
-	path.join(root, 'static', 'ergopti_plus', 'macos', 'ui', 'menu', 'menu_about.lua'),
+	path.join(root, 'static', 'ergopti_plus', 'macos', 'updater', 'ui', 'menu_about.lua'),
 	'utf8'
 );
 const menuManifest = JSON.parse(
@@ -56,7 +56,7 @@ const frequencyDeclaration = menuManifest.about_update_frequency_menu?.find(
 	(row) => row.id === 'update_check_interval'
 );
 const autoCheckSource = fs.readFileSync(
-	path.join(root, 'static', 'ergopti_plus', 'macos', 'modules', 'updater', 'auto_check.lua'),
+	path.join(root, 'static', 'ergopti_plus', 'macos', 'updater', 'engine', 'auto_check.lua'),
 	'utf8'
 );
 const errors = [];
@@ -242,7 +242,7 @@ if (
 	);
 }
 if (
-	!menuSource.includes('require("modules.updater.auto_check")') ||
+	!menuSource.includes('require("updater.engine.auto_check")') ||
 	!menuSource.includes('AutoCheck.start_session') ||
 	!aboutSource.includes(
 		'ManifestMenu.choice_row("about_update_frequency_menu", "update_check_interval"'

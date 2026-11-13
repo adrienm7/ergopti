@@ -923,7 +923,7 @@ helpers.describe("shutdown coordinator: signal output ownership", function()
 		})
 		local env = setmetatable({ shutdown = coordinator, privacy_owners = {}, require = function(name)
 			-- A TERM tells a waiting update watcher before the shutdown starts.
-			if name == "infra.updater_boot_ready" then
+			if name == "updater.engine.boot_ready" then
 				return { report_quit = function(reason)
 					state.quit_reports = (state.quit_reports or 0) + 1
 					helpers.assert_true(not coordinator.is_requested(), "the report precedes the shutdown")
@@ -1602,7 +1602,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		local function record(event) state.events[#state.events + 1] = event end
 		local noop = function() end
 		local modules = {}
-		for _, name in ipairs({ "infra.version", "hotstrings.engine.engine", "hotstrings.engine.catalogue.config",
+		for _, name in ipairs({ "updater.engine.version", "hotstrings.engine.engine", "hotstrings.engine.catalogue.config",
 			"hotstrings.engine.injector", "layouts.adapters.keyboard_layout", "hotstrings.engine.magic_key",
 			"hotstrings.engine.magic_key_source", "hotstrings.engine.repeat_key", "shortcuts.engine.keyboard_shortcuts",
 			"hotstrings.engine.device_finder", "platform.input.event", "core.logger.engine.monotonic", "menu.engine.manifest_reader",

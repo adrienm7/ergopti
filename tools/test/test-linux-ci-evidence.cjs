@@ -359,7 +359,7 @@ manager.check_for_updates = function(_, callback)
  assert(count == #rows and callbacks == #rows, 'fixture skipped a scoped request')
  callback(false, nil, answer.error)
 end
-package.preload['modules.updater.manager'] = function() return manager end
+package.preload['updater.engine.manager'] = function() return manager end
 local original_exit = os.exit
 os.exit = function(status)
  assert(manager._http_client.get == original_get, 'authentication wrapper was not released')
@@ -832,7 +832,7 @@ end
 		'manager.check_for_updates = function'
 	);
 	const refusedManagerEnd = managedAuthenticationHarness.indexOf(
-		"package.preload['modules.updater.manager']"
+		"package.preload['updater.engine.manager']"
 	);
 	assert.ok(refusedManagerStart > originalGetEnd && refusedManagerEnd > refusedManagerStart);
 	const refusedManager = `manager.check_for_updates = function(_, callback)
@@ -986,7 +986,7 @@ manager.check_for_updates = function(_, callback)
   return 'callback return preserved'
  end) == true, 'the wrapper changed the transport return')
 end
-package.preload['modules.updater.manager'] = function() return manager end
+package.preload['updater.engine.manager'] = function() return manager end
 local native_exit = os.exit
 os.exit = function(code)
  assert(manager._http_client.get == original_get, 'the probe did not release its observational wrapper')

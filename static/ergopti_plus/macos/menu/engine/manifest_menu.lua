@@ -15,7 +15,7 @@
 --- now supplies: the decoder, the path, the catalogue, and the platform token
 --- that decides which manifest rows this driver may see.
 ---
---- The public surface is unchanged — every consumer under ui/menu/ calls the same
+--- The public surface is unchanged — every consumer under updater/ui/ calls the same
 --- nine functions on the value returned here.
 --- ==============================================================================
 
@@ -43,7 +43,7 @@ local instance, err = Renderer.new({
 
 if not instance then
 	-- Returning nil here would make every `require("menu.engine.manifest_menu")` in
-	-- ui/menu/ fail at its first field access, several frames from the cause.
+	-- updater/ui/ fail at its first field access, several frames from the cause.
 	Logger.error(LOG, "Could not bind the shared menu renderer (%s) — the menu will not build.",
 		tostring(err))
 end

@@ -124,7 +124,7 @@ do
 	local process_info = type(hs.processInfo) == "table" and hs.processInfo or {}
 	local admission_mode = Logger.classify_async_sink_boot_environment()
 	-- An unanswerable identity is treated as foreign: refusing never quits a process
-	local identity_ok, local_source = pcall(function() return require("modules.updater").is_local_source() end)
+	local identity_ok, local_source = pcall(function() return require("updater.engine").is_local_source() end)
 	if not identity_ok then
 		Logger.error("init", "Runtime identity unavailable; treating this Hammerspoon as foreign: %s.",
 			tostring(local_source))
@@ -1110,10 +1110,10 @@ local function shutdown_all_resources()
 	pcall(function() is_reload = reload_guard.is_reloading() == true end)
 	local lease_reason = is_reload and "hammerspoon_reload" or "hammerspoon_quit"
 	-- Quitting the launcher or Hammerspoon outside the menu is a Quit too: a
-	-- release swap waiting for this boot keeps the update (infra/updater_boot_ready.lua).
+	-- release swap waiting for this boot keeps the update (updater/engine/boot_ready.lua).
 	if not is_reload then
 		local reported, report_err = pcall(function()
-			return require("infra.updater_boot_ready").report_quit("hammerspoon_quit")
+			return require("updater.engine.boot_ready").report_quit("hammerspoon_quit")
 		end)
 		if not reported then
 			Logger.error(LOG, "The release swap could not be told of the quit: %s", tostring(report_err))
@@ -1286,7 +1286,7 @@ do
 			reload_deadline_seconds = require("core.timing.engine.timings").sec("ui", "reload_deadline_ms"),
 			record_stage = ReloadBreadcrumb.record,
 			report_update_quit = function(reason)
-				return require("infra.updater_boot_ready").report_quit(reason)
+				return require("updater.engine.boot_ready").report_quit(reason)
 			end,
 			mark_reload = function()
 				reload_guard.mark_started(TimerScheduler.now() * 1000)
@@ -1447,7 +1447,7 @@ do
 			tostring(cfg_path))
 		onboarding_mod.run(cfg_path)
 		-- The boot now waits for the user: a release swap keeps this build.
-		require("infra.updater_boot_ready").report("onboarding")
+		require("updater.engine.boot_ready").report("onboarding")
 		Boot.mark("First-launch guard (onboarding check)")
 		return
 	end
@@ -1574,7 +1574,7 @@ if accessibility_trusted ~= true then
 		return
 	end
 	-- A new signature waits for the user's grant: a release swap keeps this build.
-	require("infra.updater_boot_ready").report("waiting for Accessibility")
+	require("updater.engine.boot_ready").report("waiting for Accessibility")
 	return
 end
 Logger.info(LOG, "Accessibility permission is granted; arming input owners.")
@@ -2492,7 +2492,7 @@ end)
 Boot.mark("Boot complete (post-init deferrals scheduled)")
 Boot.complete()
 -- A release swap that opened this build keeps it only once it reports ready.
-require("infra.updater_boot_ready").report("boot complete")
+require("updater.engine.boot_ready").report("boot complete")
 -- The reload this boot follows, from its reload call to this boot's end.
 if _reload_started_epoch_ms then
 	local reload_ms = TimerScheduler.now() * 1000 - _reload_started_epoch_ms

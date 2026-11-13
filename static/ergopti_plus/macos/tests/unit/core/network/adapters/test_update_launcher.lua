@@ -28,7 +28,7 @@ local function load_subject(open_url, alert)
 	package.loaded["platform.focus.application_notifier"] = {
 		send = function(...) notifications[#notifications + 1] = { ... }; return true end,
 	}
-	local subject = helpers.load_with_stubs("adapters.update_launcher", {
+	local subject = helpers.load_with_stubs("updater.adapters.update_launcher", {
 		urlevent = { openURL = open_url },
 	})
 	return subject, errors, dialogs, notifications
@@ -88,8 +88,8 @@ helpers.describe("update_launcher: exact native updater command", function()
 	end)
 
 	helpers.it("does not send a command when the channel registry is unavailable", function()
-		helpers.with_stub_scope({ "modules.updater" }, function()
-			package.loaded["modules.updater"] = { channels = function() error("registry unavailable") end }
+		helpers.with_stub_scope({ "updater.engine" }, function()
+			package.loaded["updater.engine"] = { channels = function() error("registry unavailable") end }
 			local sent = {}
 			local subject, _, dialogs = load_subject(function(url) sent[#sent + 1] = url; return true end)
 			helpers.assert_eq(subject.request_check("dev"), false)
@@ -176,7 +176,7 @@ local CHECK_FAILED_KEY = "updater.check_request_failed"
 --- @param alert function|nil Modal alert double.
 --- @return table dialogs, table notifications
 local function refuse_with_echoed_keys(open_url, alert)
-	return helpers.with_fresh_modules({ "core.i18n.engine.i18n", "adapters.update_launcher" }, function()
+	return helpers.with_fresh_modules({ "core.i18n.engine.i18n", "updater.adapters.update_launcher" }, function()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		local subject, _, dialogs, notifications = load_subject(open_url, alert)
 		helpers.assert_eq(subject.request_check(), false)

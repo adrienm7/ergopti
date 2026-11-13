@@ -66,36 +66,36 @@
 		"linux": {
 			"count": 30,
 			"sites": [
-				"linux/ui/menu/menu_builder.lua:255 static",
-				"linux/ui/menu/menu_builder.lua:283 static",
-				"linux/ui/menu/menu_builder.lua:289 static",
-				"linux/ui/menu/menu_builder.lua:369 static",
-				"linux/ui/menu/menu_builder.lua:523 static",
-				"linux/ui/menu/menu_builder.lua:561 static",
-				"linux/ui/menu/menu_builder.lua:824 static",
-				"linux/ui/menu/menu_builder.lua:991 static",
-				"linux/ui/menu/menu_builder.lua:1016 separator",
-				"linux/ui/menu/menu_builder.lua:1475 static",
-				"linux/ui/menu/menu_builder.lua:1493 separator",
-				"linux/ui/menu/menu_builder.lua:1497 separator",
-				"linux/ui/menu/menu_builder.lua:1795 static",
-				"linux/ui/menu/menu_builder.lua:2048 static",
-				"linux/ui/menu/menu_builder.lua:2090 static",
-				"linux/ui/menu/menu_builder.lua:2152 static",
-				"linux/ui/menu/menu_builder.lua:2859 static",
-				"linux/ui/menu/menu_builder.lua:2868 static",
-				"linux/ui/menu/menu_builder.lua:3391 static",
-				"linux/ui/menu/menu_builder.lua:3829 static",
-				"linux/ui/menu/menu_builder.lua:3883 static",
-				"linux/ui/menu/menu_builder.lua:3914 static",
-				"linux/ui/menu/menu_builder.lua:3915 static",
-				"linux/ui/menu/menu_builder.lua:4048 static",
-				"linux/ui/menu/menu_builder.lua:4057 static",
-				"linux/ui/menu/menu_builder.lua:4207 static",
-				"linux/ui/menu/menu_builder.lua:4588 static",
-				"linux/ui/menu/menu_builder.lua:4660 static",
-				"linux/ui/menu/menu_builder.lua:4945 separator",
-				"linux/ui/menu/menu_builder.lua:4969 separator"
+				"linux/updater/ui/menu_builder.lua:255 static",
+				"linux/updater/ui/menu_builder.lua:283 static",
+				"linux/updater/ui/menu_builder.lua:289 static",
+				"linux/updater/ui/menu_builder.lua:369 static",
+				"linux/updater/ui/menu_builder.lua:523 static",
+				"linux/updater/ui/menu_builder.lua:561 static",
+				"linux/updater/ui/menu_builder.lua:824 static",
+				"linux/updater/ui/menu_builder.lua:991 static",
+				"linux/updater/ui/menu_builder.lua:1016 separator",
+				"linux/updater/ui/menu_builder.lua:1475 static",
+				"linux/updater/ui/menu_builder.lua:1493 separator",
+				"linux/updater/ui/menu_builder.lua:1497 separator",
+				"linux/updater/ui/menu_builder.lua:1795 static",
+				"linux/updater/ui/menu_builder.lua:2048 static",
+				"linux/updater/ui/menu_builder.lua:2090 static",
+				"linux/updater/ui/menu_builder.lua:2152 static",
+				"linux/updater/ui/menu_builder.lua:2859 static",
+				"linux/updater/ui/menu_builder.lua:2868 static",
+				"linux/updater/ui/menu_builder.lua:3391 static",
+				"linux/updater/ui/menu_builder.lua:3829 static",
+				"linux/updater/ui/menu_builder.lua:3883 static",
+				"linux/updater/ui/menu_builder.lua:3914 static",
+				"linux/updater/ui/menu_builder.lua:3915 static",
+				"linux/updater/ui/menu_builder.lua:4048 static",
+				"linux/updater/ui/menu_builder.lua:4057 static",
+				"linux/updater/ui/menu_builder.lua:4207 static",
+				"linux/updater/ui/menu_builder.lua:4588 static",
+				"linux/updater/ui/menu_builder.lua:4660 static",
+				"linux/updater/ui/menu_builder.lua:4945 separator",
+				"linux/updater/ui/menu_builder.lua:4969 separator"
 			]
 		}
 	},
@@ -384,14 +384,14 @@
 				"windows/shortcuts/engine/utils.ahk",
 				"windows/shortcuts/engine/win.ahk",
 				"windows/shortcuts/engine/take_note.ahk",
-				"windows/modules/updater.ahk",
-				"windows/modules/updater/changelog.ahk",
-				"windows/modules/updater/channels.ahk",
-				"windows/modules/updater/config_backup.ahk",
-				"windows/modules/updater/core.ahk",
-				"windows/modules/updater/release_install.ahk",
-				"windows/modules/updater/schedule.ahk",
-				"windows/modules/updater/self_update.ahk",
+				"windows/updater/updater.ahk",
+				"windows/updater/engine/changelog.ahk",
+				"windows/updater/engine/channels.ahk",
+				"windows/updater/engine/config_backup.ahk",
+				"windows/updater/engine/core.ahk",
+				"windows/updater/engine/release_install.ahk",
+				"windows/updater/engine/schedule.ahk",
+				"windows/updater/engine/self_update.ahk",
 				"windows/keyboard/adapters/remap.ahk",
 				"windows/keyboard/engine/keys/altgr.ahk",
 				"windows/keyboard/engine/keys/altgr_criteria.ahk",
@@ -419,11 +419,11 @@
 				"windows/keyboard/engine/keys/win.ahk",
 				"windows/shortcuts/ui/action_picker/init.ahk",
 				"windows/shortcuts/ui/action_picker_webview.ahk",
-				"windows/ui/changelog/init.ahk",
+				"windows/updater/ui/changelog/init.ahk",
 				"windows/settings/ui/cleanup.ahk",
 				"windows/diagnostics/ui/console_window.ahk",
-				"windows/ui/download_window/init.ahk",
-				"windows/ui/download_window/session.ahk",
+				"windows/updater/ui/download_window/init.ahk",
+				"windows/updater/ui/download_window/session.ahk",
 				"windows/core/ui/ui/editors.ahk",
 				"windows/diagnostics/ui/error_dialog.ahk",
 				"windows/gestures/ui/conflicts.ahk",
@@ -493,7 +493,7 @@
 				"windows/core/ui/ui/tooltip/position_refinement.ahk",
 				"windows/core/ui/ui/tooltip/tooltip_llm.ahk",
 				"windows/menu/ui/tray_menu.ahk",
-				"windows/ui/update_check/init.ahk",
+				"windows/updater/ui/update_check.ahk",
 				"windows/metrics/ui/wpm/init.ahk",
 				"windows/metrics/ui/wpm/config.ahk",
 				"windows/metrics/ui/wpm/display.ahk",
@@ -700,7 +700,7 @@
 				"macos/menu/ui/keyboard/keymap_lifecycle.lua",
 				"macos/ai/ui/menu/scope.lua",
 				"macos/hotstrings/ui/menu/magic_key_source_menu.lua",
-				"macos/ui/menu/menu_about.lua",
+				"macos/updater/ui/menu_about.lua",
 				"macos/apps/ui/menu/apps.lua",
 				"macos/gestures/ui/menu/gestures.lua",
 				"macos/hotstrings/ui/menu/hotstrings.lua",
@@ -757,7 +757,7 @@
 				"macos/hotstrings/ui/menu/programmatic_hotstrings.lua",
 				"macos/layouts/ui/menu/quit_layout.lua",
 				"macos/menu/ui/transactions/recoverable_file_moves.lua",
-				"macos/ui/menu/remap_switch.lua",
+				"macos/updater/ui/remap_switch.lua",
 				"macos/settings/ui/menu/scoped_preferences.lua",
 				"macos/menu/ui/transactions/script_chords_transaction.lua",
 				"macos/menu/ui/transactions/session_demotions.lua",
@@ -964,7 +964,7 @@
 				"linux/keyboard/ui/menu_key_combinations.lua",
 				"linux/ai/ui/menu/backend_rows.lua",
 				"linux/ai/ui/menu/local_server_rows.lua",
-				"linux/ui/menu/menu_builder.lua",
+				"linux/updater/ui/menu_builder.lua",
 				"linux/hotstrings/ui/menu/programmatic_hotstrings.lua",
 				"linux/onboarding/ui/menu_start_at_login.lua",
 				"linux/menu/ui/transactions/uninstall.lua",
@@ -972,158 +972,158 @@
 			],
 			"excerpts": [
 				{
-					"path": "linux/ui/menu/menu_builder.lua",
+					"path": "linux/updater/ui/menu_builder.lua",
 					"sourceSha256": "1cd6e0343cb99b9e4a59d63cca57f31e934a1ba4eed68959b0eb879cc3bb6ff9",
 					"lines": [
 						{
 							"line": 255,
 							"source": "\t\tlabel = i18n_safe(\"dialog.action_picker.label\"),",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:255 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:255 static"
 						},
 						{
 							"line": 283,
 							"source": "\t\t\tlabel = i18n_safe(\"dialog.action_picker.label\") .. \"…\",",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:283 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:283 static"
 						},
 						{
 							"line": 289,
 							"source": "\t\t\tlabel = i18n_safe(\"dialog.action_picker.disabled\"),",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:289 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:289 static"
 						},
 						{
 							"line": 369,
 							"source": "\t\t\tlabel = i18n_safe(\"menu.builder.title_paused\") .. \" — \" .. version,",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:369 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:369 static"
 						},
 						{
 							"line": 523,
 							"source": "\t\t\t\tNotifier.send(i18n_safe(key), { title = i18n_safe(\"dialog.magic_key_source.title\"), level = level })",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:523 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:523 static"
 						},
 						{
 							"line": 561,
 							"source": "\treturn { label = i18n_safe(\"menu.layout.title\"), submenu = rows }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:561 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:561 static"
 						},
 						{
 							"line": 824,
 							"source": "\t\t\tlabel   = i18n_safe(\"menu.hotstrings.enable_all_sections\"),",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:824 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:824 static"
 						},
 						{
 							"line": 991,
 							"source": "\t\t\t\tlabel = i18n_safe(\"menu.hotstrings.no_group_loaded\"), disabled = true,",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:991 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:991 static"
 						},
 						{
 							"line": 1016,
 							"source": "\t\t\tlocal items = { all_sections_row(ids), { separator = true } }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:1016 separator"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:1016 separator"
 						},
 						{
 							"line": 1475,
 							"source": "\t\t\t\t\tlabel = i18n_safe(\"menu.shortcuts.edit_personal_info\"),",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:1475 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:1475 static"
 						},
 						{
 							"line": 1493,
 							"source": "\t\t\t\tsub[#sub + 1] = { separator = true }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:1493 separator"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:1493 separator"
 						},
 						{
 							"line": 1497,
 							"source": "\t\t\t\t\t\tsub[#sub + 1] = { separator = true }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:1497 separator"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:1497 separator"
 						},
 						{
 							"line": 1795,
 							"source": "\t\t\t\t\tlabel    = i18n_safe(\"menu.extensions.none_installed\"),",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:1795 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:1795 static"
 						},
 						{
 							"line": 2048,
 							"source": "\t\treturn { label = i18n_safe(\"menu.hotstrings.title\"), items = status_rows }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:2048 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:2048 static"
 						},
 						{
 							"line": 2090,
 							"source": "\t\treturn { label = i18n_safe(\"menu.llm.title\"), items = status_rows }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:2090 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:2090 static"
 						},
 						{
 							"line": 2152,
 							"source": "\t\t\t\t\ttitle = i18n_safe(\"menu.llm.trigger_menu_title\"),",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:2152 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:2152 static"
 						},
 						{
 							"line": 2859,
 							"source": "\treturn { label = i18n_safe(\"menu.llm.title\"), checked = enabled, submenu = items }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:2859 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:2859 static"
 						},
 						{
 							"line": 2868,
 							"source": "\t\treturn { label = i18n_safe(\"menu.agent.title\"), disabled = true }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:2868 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:2868 static"
 						},
 						{
 							"line": 3391,
 							"source": "\t\treturn { label = i18n_safe(\"menu.shortcuts.title\"), items = status_rows }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:3391 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:3391 static"
 						},
 						{
 							"line": 3829,
 							"source": "\treturn { label = i18n_safe(\"menu.shortcuts.title\"), checked = enabled, submenu = items }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:3829 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:3829 static"
 						},
 						{
 							"line": 3883,
 							"source": "\t\treturn { label = i18n_safe(\"menu.tapholds.title\"), disabled = true }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:3883 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:3883 static"
 						},
 						{
 							"line": 3914,
 							"source": "\t\t\ttitle = i18n_safe(\"tap_hold.picker.title_prefix\") .. _tap_hold_key_label(catalog_entry),",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:3914 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:3914 static"
 						},
 						{
 							"line": 3915,
 							"source": "\t\t\tlabel = i18n_safe(\"dialog.action_picker.label\"),",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:3915 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:3915 static"
 						},
 						{
 							"line": 4048,
 							"source": "\treturn { label = i18n_safe(\"menu.tapholds.title\"), submenu = rows }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:4048 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:4048 static"
 						},
 						{
 							"line": 4057,
 							"source": "\t\treturn { label = i18n_safe(\"menu.gestures.title\"), items = status_rows }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:4057 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:4057 static"
 						},
 						{
 							"line": 4207,
 							"source": "\treturn { label = i18n_safe(\"menu.gestures.title\"), checked = gestures_on, submenu = menu }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:4207 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:4207 static"
 						},
 						{
 							"line": 4588,
 							"source": "\t\t\ttitle = i18n_safe(\"menu.global.uninstall\"),",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:4588 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:4588 static"
 						},
 						{
 							"line": 4660,
 							"source": "\treturn { label = i18n_safe(\"menu.about.title\"), submenu = rows }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:4660 static"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:4660 static"
 						},
 						{
 							"line": 4945,
 							"source": "\t\t\t\trows[#rows + 1] = { separator = true }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:4945 separator"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:4945 separator"
 						},
 						{
 							"line": 4969,
 							"source": "\t\trows[#rows + 1] = { separator = true }",
-							"expectedSite": "linux/ui/menu/menu_builder.lua:4969 separator"
+							"expectedSite": "linux/updater/ui/menu_builder.lua:4969 separator"
 						}
 					]
 				}

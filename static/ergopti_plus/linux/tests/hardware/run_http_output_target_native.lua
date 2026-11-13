@@ -10,7 +10,7 @@
 --- Actual loopback curl, parent-only file writes, original native ownership ACKs.
 --- No proxy/TLS/updater/digest/installer qualification follows from loopback.
 local uv, ffi = require("luv"), require("ffi")
-local Output = require("infra.archive_output")
+local Output = require("updater.engine.archive_output")
 local Target = require("core.network.engine.http_output_target")
 local Core = require("core.network.adapters.curl_http_client")
 local Clock = require("core.logger.engine.monotonic")

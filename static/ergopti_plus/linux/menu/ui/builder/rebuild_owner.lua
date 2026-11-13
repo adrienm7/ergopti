@@ -39,7 +39,7 @@ local MAX_HELD_CLICKS = 8
 local function notify_lost()
 	local I18n = require("core.i18n.engine.i18n")
 	-- A notification, not a menu row: named first so the menu-row census of
-	-- ui/menu/ does not read `title = I18n.get(...)` as a row built here.
+	-- updater/ui/ does not read `title = I18n.get(...)` as a row built here.
 	local title = I18n.get("menu.reload_replay.lost_title")
 	return require("platform.system.notifier").send(I18n.get("menu.reload_replay.lost"), {
 		title = title, level = "warning",

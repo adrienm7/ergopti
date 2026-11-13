@@ -168,7 +168,7 @@ assert.ok(
 	'the macOS root it mirrors exists'
 );
 assert.ok(
-	!fs.existsSync(path.join(SP, 'linux/ui/menu/menu_builder.lua')),
+	!fs.existsSync(path.join(SP, 'linux/updater/ui/menu_builder.lua')),
 	'the pre-split root file is gone'
 );
 const oldRootReaders = [];

@@ -35,7 +35,7 @@ local LOG = "menu.ui.builder.builder"
 -- Single source of the driver version and of the build identity. Every other
 -- import lives in the part module that reads it: the root holds only what the
 -- header, the facade checks and the tray assembly below read.
-local Version = require("infra.version")
+local Version = require("updater.engine.version")
 
 
 -- The shared manifest menu renderer, bound for this driver (infra/manifest_menu).
@@ -224,8 +224,8 @@ local _build_configuration = require("settings.ui.menu.configuration").build
 local _build_language = require("settings.ui.menu.language").build
 local _build_apps = require("apps.ui.menu.apps").build
 
-local _about_update_rows = require("ui.menu.menu_about")._about_update_rows
-local _build_about = require("ui.menu.menu_about").build
+local _about_update_rows = require("updater.ui.menu_about")._about_update_rows
+local _build_about = require("updater.ui.menu_about").build
 
 -- Read by the tests of the About update rows.
 M._about_update_rows = _about_update_rows

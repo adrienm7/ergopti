@@ -252,7 +252,7 @@ function admittedSourceRetirements(driver, traversed) {
  * @returns {Set<string>} The admitted retired source.
  */
 function admittedRemapSwitchRetirement(manifest) {
-	const retired = 'macos/ui/menu/remap_switch.lua';
+	const retired = 'macos/updater/ui/remap_switch.lua';
 	const ids = new Set(['karabiner_integration', 'remove_from_karabiner']);
 	const { scriptTokens } = require('../lib/script-source.cjs');
 	for (const file of sourceFiles(path.join(SP, 'macos'), '.lua'))
@@ -414,7 +414,7 @@ const DRIVERS = ['windows', 'macos', 'linux'];
 // minimum against the immutable pre-migration oracle, not the migration debt.
 const FLOORS = { windows: 20, macos: 20, linux: 20 };
 const LEGACY_PATH = path.join(__dirname, 'fixtures', 'native-menu-census-legacy.json');
-const LEGACY_SHA256 = 'ffb16e570b7e573b6f3b2b31b71e98c7a41afc465861ff6eaf2432844801d9b4';
+const LEGACY_SHA256 = 'ddcf5ffdbbdb9a4f17879458d118c151c62c6efad770bef805ef639603c968b5';
 const legacyBytes = fs.readFileSync(LEGACY_PATH);
 assert.equal(
 	crypto.createHash('sha256').update(legacyBytes).digest('hex'),
@@ -431,7 +431,7 @@ const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
 	macos: Object.freeze([
 		'macos/ui/menu/menu_llm/live_mode_panel.lua',
 		'macos/ui/menu/menu_llm/models_selector.lua',
-		'macos/ui/menu/remap_switch.lua'
+		'macos/updater/ui/remap_switch.lua'
 	]),
 	// ctrl.ahk retired when schema v19 turned the chord switches into keyboard slots.
 	windows: Object.freeze(['windows/shortcuts/engine/ctrl.ahk'])

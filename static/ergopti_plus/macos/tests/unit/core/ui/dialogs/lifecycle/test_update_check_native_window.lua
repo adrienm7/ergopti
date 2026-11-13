@@ -14,7 +14,7 @@ local with_window = require("tests.support.ui.owned_window_close_fixture")
 --- Adds the pinned binding's userdata-metatable retirement to the shared model.
 --- @param scenario function Complete host scenario.
 local function run_host(scenario)
-	with_window("ui.update_check", function(host, h)
+	with_window("updater.ui.update_check", function(host, h)
 		local construct = hs.webview.new
 		h.delete_attempts = 0
 		hs.webview.new = function(...)

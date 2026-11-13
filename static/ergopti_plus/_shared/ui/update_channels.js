@@ -18,7 +18,7 @@
  *    between JavaScript, PCRE and Lua patterns.
  * 2. One vector table: _shared/updater/data/channel_vectors.json is replayed
  *    by this file, the Lua port (_shared/updater/engine/channels.lua) and the AHK
- *    port (windows/modules/updater/channels.ahk).
+ *    port (windows/updater/engine/channels.ahk).
  * 3. Fail fast: a malformed registry throws at creation instead of degrading to
  *    a default channel.
  * 4. Page ready: a plain script (no module syntax), so the Versions page loads

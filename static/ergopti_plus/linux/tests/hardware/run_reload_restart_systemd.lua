@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The systemd half of docs/design/driver-control-pending-record.md, between real
 --- processes. The daemon runs inside a real cgroup named after the unit
---- (ergopti-hotstrings.service), so modules/updater/restarter.lua reads a real
+--- (ergopti-hotstrings.service), so updater/engine/restarter.lua reads a real
 --- /proc/self/cgroup and takes the unit path: it runs
 --- `systemctl --user --no-block restart ergopti-hotstrings.service` and the
 --- daemon does not end itself. The published request tool rings it; the

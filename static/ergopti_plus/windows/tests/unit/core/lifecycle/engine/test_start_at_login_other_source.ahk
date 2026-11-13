@@ -19,7 +19,7 @@ _TestStartupOtherSourceConflict(Scenario) {
 		DirCreate(Directory . "\_shared\updater\data")
 		Script := Driver . "\ErgoptiPlus.ahk"
 		Entry := "#Requires Autohotkey v2.0+" . Chr(10)
-			. "#Include core/lifecycle/engine/bundle.ahk" . Chr(10) . "#Include modules/updater.ahk" . Chr(10)
+			. "#Include core/lifecycle/engine/bundle.ahk" . Chr(10) . "#Include updater/updater.ahk" . Chr(10)
 		FileAppend(Entry, Script, "UTF-8")
 		Version := Scenario == "wrong-version" ? 'global BUNDLE_VERSION := "foreign"'
 			: 'global BUNDLE_VERSION := "__BUNDLE_VERSION__"'
@@ -71,7 +71,7 @@ _TestStartupInterpreterArgument(Scenario) {
 		DirCreate(Driver . "\infra")
 		DirCreate(Directory . "\_shared\updater\data")
 		Script := Driver . "\ErgoptiPlus.ahk"
-		FileAppend("#Requires Autohotkey v2.0+`n#Include core/lifecycle/engine/bundle.ahk`n#Include modules/updater.ahk`n",
+		FileAppend("#Requires Autohotkey v2.0+`n#Include core/lifecycle/engine/bundle.ahk`n#Include updater/updater.ahk`n",
 			Script, "UTF-8")
 		FileAppend('global BUNDLE_VERSION := "__BUNDLE_VERSION__"' . "`n", Driver . "\core\lifecycle\engine\bundle.ahk", "UTF-8")
 		FileAppend('{"github":{"owner":"' . UPDATER_GH_OWNER . '","repo":"' . UPDATER_GH_REPO . '"}}',

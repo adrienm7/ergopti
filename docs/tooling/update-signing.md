@@ -20,8 +20,8 @@ P-256. Windows 10 and later, and OpenSSL 3, are the verifiers; no extra binary.
 
 ## How the Linux updater applies it
 
-`linux/modules/updater/signature_gate.lua` is the only caller of
-`linux/infra/asset_signature.lua`. The transfer fetches `ergopti-plus-linux.tar.gz.sig`
+`linux/updater/engine/signature_gate.lua` is the only caller of
+`linux/updater/engine/asset_signature.lua`. The transfer fetches `ergopti-plus-linux.tar.gz.sig`
 next to the checksum, on the checksum phase deadline, and asks the gate once the
 archive is adopted, with the sealed size and the verified SHA-256. A refusal retires
 the adopted archive through the normal failure path, so nothing is installed.
@@ -40,7 +40,7 @@ cannot be read or admitted refuses the update instead of skipping the check.
 
 `Updater_DownloadAndInstall` is the one path of the tray's update, the update
 prompt and the release installer. It asks `AssetSignature_AllowsInstall`
-(`windows/modules/updater/asset_signature.ahk`) before its transaction starts,
+(`windows/updater/engine/asset_signature.ahk`) before its transaction starts,
 with the size and digest GitHub's release API authenticated; the staging worker
 then enforces that same digest on the downloaded bytes. The table above applies,
 with one difference: no key means nothing is fetched. Step 4 below is also the
@@ -59,9 +59,9 @@ code-signature requirement of the staged app.
 | Policy                        | `_shared/updater/data/asset_signing.json`                            |
 | Signer and reference verifier | `tools/build/update-asset-signature.cjs`                             |
 | Shared vectors                | `_shared/tests/corpus/updater/asset_signature_vectors.json`          |
-| Linux verifier                | `linux/infra/asset_signature.lua` (OpenSSL)                          |
-| Linux updater gate            | `linux/modules/updater/signature_gate.lua`                           |
-| Windows verifier and gate     | `windows/modules/updater/asset_signature.ahk` (CNG)                  |
+| Linux verifier                | `linux/updater/engine/asset_signature.lua` (OpenSSL)                 |
+| Linux updater gate            | `linux/updater/engine/signature_gate.lua`                            |
+| Windows verifier and gate     | `windows/updater/engine/asset_signature.ahk` (CNG)                   |
 | CI signing                    | `Sign the update asset` steps in `ci-windows.yml` and `ci-linux.yml` |
 | CI presence gate              | `ci-release.yml`, "Refuse to publish an incomplete..."               |
 

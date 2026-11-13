@@ -22,7 +22,7 @@ local TextUtils = require("core.text.engine.utils_core")
 
 local Logger        = require("core.logger.engine.shim")
 local Snapshot      = require("diagnostics.engine.snapshot")
-local Version       = require("infra.version")
+local Version       = require("updater.engine.version")
 local ConfigPaths   = require("settings.engine.paths")
 local LoggerSink    = require("core.logger.engine.sink")
 local Paths         = require("core.fs.engine.paths")

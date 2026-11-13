@@ -8,7 +8,7 @@
 --- vector through the shared updater.release_parser module, then asserts the
 --- output matches the expected golden values.
 ---
---- The Linux updater (modules/updater/manager.lua) calls this exact parser in
+--- The Linux updater (updater/engine/manager.lua) calls this exact parser in
 --- production — parse_asset_url() resolves the download URL for the release
 --- asset — so this corpus pins the parser against the same golden vectors as
 --- the macOS and AHK drivers. The asset_realistic_release_wanted_not_first

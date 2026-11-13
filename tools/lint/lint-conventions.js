@@ -736,7 +736,7 @@ console.log('lint-conventions: scanning…');
 
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
-	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/updater/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/shortcuts/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/layouts/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/hotstrings/adapters'),
@@ -776,7 +776,7 @@ const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/lifecycle/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/fs/engine'),
-	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/updater'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/shortcuts'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/metrics/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/layouts/engine'),
@@ -785,7 +785,7 @@ const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/gestures/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/diagnostics/engine/reports'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/ai/engine'),
-	join(REPO_ROOT, 'static/ergopti_plus/windows/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/updater/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/tap_hold/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/shortcuts/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/onboarding/ui'),
@@ -820,13 +820,13 @@ const ahkAll = [
 // all. The conventions are language-wide, not driver-wide.
 //
 // adapters/ was the residue of that fix: linux/shortcuts/adapters made it into the list
-// while macos/adapters and windows/adapters did not, leaving 45 files — the
+// while macos/updater/adapters and windows/updater/adapters did not, leaving 45 files — the
 // entire port layer of two drivers — unchecked while the third was held to the
 // rules. A scan set assembled by hand drifts exactly this way, one directory at
 // a time, and the gap is invisible because the linter still reports a large
 // file count and passes.
 const luaDirs = [
-	join(REPO_ROOT, 'static/ergopti_plus/macos/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/updater/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tap_hold'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/shortcuts/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/onboarding/adapters'),
@@ -847,7 +847,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/fs/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/crypto'),
-	join(REPO_ROOT, 'static/ergopti_plus/macos/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/updater/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/shortcuts/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/onboarding/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/metrics/engine'),
@@ -872,7 +872,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/lifecycle/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/fs/engine'),
-	join(REPO_ROOT, 'static/ergopti_plus/macos/modules'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/updater/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tap_hold/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/shortcuts/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/metrics/adapters'),
@@ -884,7 +884,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/diagnostics/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ai/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/settings/engine'),
-	join(REPO_ROOT, 'static/ergopti_plus/macos/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/updater/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tap_hold/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/shortcuts/ui/action_picker'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/shortcuts/ui/menu'),
@@ -925,7 +925,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/fs/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/crypto'),
-	join(REPO_ROOT, 'static/ergopti_plus/linux/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/updater/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/tap_hold/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/shortcuts/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/metrics/engine'),
@@ -947,7 +947,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/lifecycle/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/fs/engine'),
-	join(REPO_ROOT, 'static/ergopti_plus/linux/modules'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/updater/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/shortcuts/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/metrics/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/layouts/engine'),
@@ -961,7 +961,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/linux/ai/engine/ollama'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/ai/engine/prediction'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/ai/engine/settings'),
-	join(REPO_ROOT, 'static/ergopti_plus/linux/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/updater/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/tap_hold/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/shortcuts/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/onboarding/ui'),

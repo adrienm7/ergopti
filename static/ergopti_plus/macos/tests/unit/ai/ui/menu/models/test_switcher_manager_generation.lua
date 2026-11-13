@@ -336,7 +336,7 @@ helpers.describe("model manager generation fences", function()
 			"ai.engine", "ai.engine.ollama.binary", "ai.engine.ollama.server_command",
 			"core.process.adapters.shell_runner", "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
 			"core.network.adapters.http_client", "ai.ui.menu.requirement_operation_registry",
-			"core.ui.engine.dialog_util", "ui.download_window",
+			"core.ui.engine.dialog_util", "updater.ui.download_window",
 			"ai.ui.menu.profile_label", "ai.ui.menu.models.switcher",
 			"ai.ui.menu.models.manager_ollama",
 		}
@@ -364,7 +364,7 @@ helpers.describe("model manager generation fences", function()
 			package.loaded["ai.engine.ollama.server_command"] = {
 				build = function() return "fixture" end,
 			}
-			package.loaded["ui.download_window"] = {
+			package.loaded["updater.ui.download_window"] = {
 				show = function() end, update = function() end, complete = function() end,
 			}
 			package.loaded["core.process.adapters.shell_runner"] = {
@@ -781,7 +781,7 @@ helpers.describe("model manager generation fences", function()
 		local modules = {
 			"core.fs.adapters.json_codec",
 			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications",
-			"core.process.adapters.task_lifecycle", "core.events.timer_scheduler", "ui.download_window",
+			"core.process.adapters.task_lifecycle", "core.events.timer_scheduler", "updater.ui.download_window",
 			"ai.ui.menu.models.manager_mlx_download", "ai.engine.api.network_env",
 			-- FileSystem captures hs when it loads; bind it to this fixture's probe.
 			"core.fs.adapters.file_system",
@@ -836,7 +836,7 @@ helpers.describe("model manager generation fences", function()
 				package.loaded["core.ui.engine.notifications"] = {
 					notify = function() notifications = notifications + 1 end,
 				}
-				package.loaded["ui.download_window"] = {
+				package.loaded["updater.ui.download_window"] = {
 					show = function() end,
 					update = function() end,
 					complete = function() completions = completions + 1 end,
@@ -1022,7 +1022,7 @@ helpers.describe("model manager generation fences", function()
 		local modules = {
 			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.text.engine.utils",
 			"ai.engine.ollama.binary", "ai.engine.ollama.server_command",
-			"core.process.adapters.task_lifecycle", "ui.download_window",
+			"core.process.adapters.task_lifecycle", "updater.ui.download_window",
 			"ai.ui.menu.models.manager_ollama", "ai.engine.api.network_env",
 			-- FileSystem captures hs when it loads; bind it to this fixture's probe.
 			"core.fs.adapters.file_system",
@@ -1060,7 +1060,7 @@ helpers.describe("model manager generation fences", function()
 			package.loaded["ai.engine.ollama.server_command"] = {
 				build = function() return "fixture" end,
 			}
-			package.loaded["ui.download_window"] = {
+			package.loaded["updater.ui.download_window"] = {
 				session_id = function() return progress_shows end,
 				is_active = function() return progress_shows > 0 end,
 				show = function()

@@ -525,7 +525,7 @@ const OTHERS = [{ channel: 'main', tag: 'v1.2.0' }];
 		'engine',
 		'check_session.lua'
 	);
-	const ahk = read('static', 'ergopti_plus', 'windows', 'ui', 'update_check', 'init.ahk');
+	const ahk = read('static', 'ergopti_plus', 'windows', 'updater', 'ui', 'update_check.ahk');
 	const page = read('static', 'ergopti_plus', '_shared', 'ui', 'update_check', 'script.js');
 
 	const luaReasons = new Map(

@@ -235,7 +235,7 @@ function auditListingSites() {
 					errors.push(
 						`${file} lists section "${literal[1]}": name the feature rows it draws instead, or add the section to LISTED_SECTIONS so each of its rows is checked`
 					);
-			} else if (file.startsWith('windows/ui/') && !VARIABLE_LISTING_SITES.has(file)) {
+			} else if (file.startsWith('windows/updater/ui/') && !VARIABLE_LISTING_SITES.has(file)) {
 				errors.push(`${file} lists a section through ${argument}: say what it lists here`);
 			}
 		}

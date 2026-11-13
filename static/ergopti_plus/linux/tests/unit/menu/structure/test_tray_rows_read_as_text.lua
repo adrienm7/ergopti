@@ -40,7 +40,7 @@ local function every_category_on()
 		-- An updater over the real registries, so About draws its channel and
 		-- frequency rows.
 		updater = (function()
-			local real = require("modules.updater.manager")
+			local real = require("updater.engine.manager")
 			return { CHANNELS = real.CHANNELS, INTERVAL_PRESETS = real.INTERVAL_PRESETS, TIMING = real.TIMING,
 				current_version = function() return "9.9.9" end, get_channel = function() return "stable" end,
 				get_check_interval = function() return real.INTERVAL_PRESETS[1].seconds end,

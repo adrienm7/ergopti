@@ -346,7 +346,7 @@ try {
 			' local bytes = Fs.read(Paths.shared(rel)); assert(type(bytes) == "string" and #bytes > 0, "staged resource: " .. rel)',
 			'end',
 			'local defaults = assert(require("core.text.engine.json").decode(Fs.read(Paths.shared("updater/data/defaults.json"))))',
-			'local factory, refusal = require("infra.archive_output").native_artifact(defaults.release_assets.linux_bundle)',
+			'local factory, refusal = require("updater.engine.archive_output").native_artifact(defaults.release_assets.linux_bundle)',
 			'assert(type(factory) == "table", "staged native backend: " .. tostring(refusal and refusal.capability_reason))',
 			'print("ARCH_STAGED_ROOTS_OK")'
 		].join('\n');

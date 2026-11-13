@@ -37,7 +37,7 @@ const LINT_SCRIPT = path.join(REPO_ROOT, 'tools/lint/lint-conventions.js');
 const assert = require('node:assert/strict');
 const os = require('node:os');
 const FIXTURE_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-banner-owner-'));
-const FIXTURE_DIR = path.join(FIXTURE_ROOT, 'static/ergopti_plus/macos/infra');
+const FIXTURE_DIR = path.join(FIXTURE_ROOT, 'static/ergopti_plus/macos/updater/engine');
 const FIXTURE_PATH = path.join(FIXTURE_DIR, '_zzz_lint_banner_marker_safety_fixture.lua');
 const FIXTURE_LINT = path.join(FIXTURE_ROOT, 'tools/lint/lint-conventions.js');
 

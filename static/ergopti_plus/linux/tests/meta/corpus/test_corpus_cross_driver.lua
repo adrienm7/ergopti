@@ -497,7 +497,7 @@ describe("Corpus: updater/release_parser_vectors.json", function()
 
 	-- The shared updater.release_parser is loaded and every vector is replayed in
 	-- test_corpus_updater_release_parser.lua (the Linux updater calls this parser
-	-- in production via modules/updater/manager.lua). Here we only validate the
+	-- in production via updater/engine/manager.lua). Here we only validate the
 	-- corpus is present and well-formed so the cross-driver contract is visible in
 	-- one place alongside the other corpora.
 	it("corpus vectors have expected shape (id + category fields)", function()
