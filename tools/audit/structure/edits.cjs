@@ -300,6 +300,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "\t\tfs.mkdirSync(shared, { recursive: true });\n\t\tfs.mkdirSync(cwd);\n\t\tfor (const name of ['runtime_probe.lua', 'native_proxy_runtime.lua'])\n\t\t\tfs.copyFileSync(\n\t\t\t\tpath.join(ROOT, DRIVER, 'platform/network', name),\n\t\t\t\tpath.join(driver, 'platform/network', name)\n\t\t\t);\n\t\t// Each shared module is staged under its own folder, whatever its depth.\n\t\tfor (const name of ['core/text/engine/json.lua', 'core/lifecycle/engine/compat/utf8.lua']) {\n\t\t\tfs.mkdirSync(path.dirname(path.join(shared, name)), { recursive: true });\n\t\t\tfs.copyFileSync(path.join(ROOT, SHARED, name), path.join(shared, name));\n\t\t}"
 	},
 	{
+		// The launcher test climbs from the locales folder to _shared by count;
+		// S01 moves the locales two levels deeper, into core/i18n/data.
+		file: 'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/CatalogUpdateUserDriverTests.swift',
+		moves: '_shared/data/locales/en.json',
+		from: '\t\tlet manifestURL = URL(fileURLWithPath: localesDirectory)\n\t\t\t.deletingLastPathComponent().deletingLastPathComponent()\n\t\t\t.appendingPathComponent("ui/apps.manifest.json")',
+		to: '\t\tlet manifestURL = URL(fileURLWithPath: localesDirectory)\n\t\t\t.deletingLastPathComponent().deletingLastPathComponent()\n\t\t\t.deletingLastPathComponent().deletingLastPathComponent()\n\t\t\t.appendingPathComponent("ui/apps.manifest.json")'
+	},
+	{
 		// The XI2 receiver derives the shared Lua root from the logger shim's
 		// path; S01 moves the shim to core/logger/engine under _shared itself.
 		file: 'static/ergopti_plus/linux/tests/hardware/xi2_luajit_receiver.lua',
