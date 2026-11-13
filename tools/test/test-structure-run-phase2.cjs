@@ -134,6 +134,18 @@ function run() {
 		{ encoding: 'utf8', env: { ...process.env, ERGOPTI_STRUCTURE_PHASE: '' } }
 	);
 	assert.equal(parityRefusal.status, 1, 'outside the runner, I1 records are never moved');
+	// S05 brought both drivers' i18n scope_ready to one spelling, a duplicate
+	// the shared literal inventory (Rule A) then counted: the runner moves that
+	// baseline with the step too, and the gate allows it only under the runner.
+	assert.match(
+		source,
+		/'tools\/test\/test-shared-literal-inventory\.cjs', '--update-baseline', '--allow-rise'/
+	);
+	const inventoryGate = fsx.readFileSync(
+		path.join(__dirname, 'test-shared-literal-inventory.cjs'),
+		'utf8'
+	);
+	assert.match(inventoryGate, /process\.env\.ERGOPTI_STRUCTURE_PHASE === '2'/);
 	// On a tree S01 already rearranged, the next step is still S02: its commit
 	// named it S01, its rank among the steps left.
 	const Plan = require('../audit/structure/plan.cjs');
