@@ -4,10 +4,10 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 15:45)
+## Where things stand (2026-11-13, 16:55)
 
 - Branch: `claude/ergopti-todo-structure-phase2`, fast-forward only. Base:
-  dev `520bb24c`, merged in `ee1aa96f`. Tip: `677fc455`.
+  dev `520bb24c`, merged in `ee1aa96f`. Tip: `6992c426`.
 - Steps landed on dev: none. The coordinator lands each green block of steps
   on dev; the first block is S01+S02.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
@@ -51,7 +51,23 @@ same commit as each step or checkpoint. Times are Paris time.
   43430776650): Ai and network green; only extra reds were the macOS Intel
   managed Ollama build (Go test
   `TestCancellationAndConcurrentClosePhysicallyRetirePeer`, passed on proof 9
-  with the same sources) and its runtime job. Failed jobs re-run (attempt 2).
+  with the same sources) and its runtime job. Attempt 2 (failed jobs re-run):
+  both Intel jobs green; the only other red, macOS Install and launch "Cold
+  native bootstrap", stalled 46 min in its build step with no log (job
+  131947368406), while proof 9 passed it in 4 min (job 131893758591). Sent to
+  the coordinator for the flake call and landing at 16:50.
+- S01's output leaves two no-op sweep terms (`^dynamic_hotstrings%.` in
+  Linux `test_dynamic_dry_run_dispatch.lua`, `^logger%.` in macOS
+  `test_resolver_lifecycle_admission.lua`): clean them once S01 is on dev.
+- Since proof 10: the prefix-sweep refusal (`585d7fe1`), the shared
+  `is_driver_module` predicate in both drivers' test helpers with 35 sweeps
+  converted (`1f56b340`; both Lua suites identical to the baseline), no live
+  scope widened to the folder above a scattered one (`1035e4a4`: the CI shard
+  groups' `tests/unit/infra`), and a shared file's path under a driver root
+  follows its file (`6992c426`: the config migration's file-system adapter
+  check, which refused every migration after S04).
+- Proof 12 (S03–S05 on proof 10 plus those commits, in `wt-proof`): building,
+  then both Lua suites against the baseline.
 - Full chain locally (proof 8, S01–S38 from `267cc01a` in `wt-proof`), Lua
   suites against an unstepped tree (`scratchpad/{base,p8}-{macos,linux}-lua.log`):
   1,152 new failing macOS cases in 145 modules, 911 Linux cases in 92
