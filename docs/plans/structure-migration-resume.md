@@ -4,10 +4,10 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 12:20)
+## Where things stand (2026-11-13, 12:55)
 
 - Branch: `claude/ergopti-todo-structure-phase2`, fast-forward only. Base:
-  dev `520bb24c`, merged in `ee1aa96f`. Tip: `b0b78a2b`.
+  dev `520bb24c`, merged in `ee1aa96f`. Tip: `7d880ab7`.
 - Steps landed on dev: none. The coordinator lands each green block of steps
   on dev; the first block is S01+S02.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
@@ -30,12 +30,28 @@ same commit as each step or checkpoint. Times are Paris time.
     helper, the Linux webview manager). Listed edits (`b0b78a2b`). Chains of
     `dir = NativePath.dirname(dir)` and nested `dirname(dirname(…))` were
     already followed by the tooling.
-- Proof 7 (S01+S02 from `efb53e24`, `3c4cf6ad`): run 43413113897, built in `/home/user/wt-proof`
-  (log `scratchpad/proof7-run.log`), then pushed to `…-proof-7` and run with
-  `os_lanes=all`. If its only reds are the baseline's, S01+S02 is the first
-  block to send to the coordinator.
-- `/home/user/wt-seq` holds proof 6 with the four Lua edits applied by hand,
-  to run the macOS and Linux Lua suites locally (`scratchpad/p6fix-*.log`).
+- Proof 7 (S01+S02, `3c4cf6ad`, run 43413113897): 16 red jobs, 5 outside
+  the baseline, all fixed since:
+  - Test infrastructure: the isolated platform gate lacked
+    `tools/lib/driver-roots.cjs` and `_generated` markers (`dd48b0e7`);
+  - Ai and network: the native HTTP worker's historical pin names the moved
+    proxy policy (`119073d0`);
+  - Linux E2E network-ai: a Python f-string LUA_PATH (`a523295c`), Go tests
+    joining `..` from their package folder (`c1c66474`), the network fixture's
+    staged modules (`1d9f811e`);
+  - macOS Launcher XCTest and Archive update controls: a Ruby `require
+"json"` respelled as a Lua module (`a8ebd6dc`), the locales climb in
+    CatalogUpdateUserDriverTests (`7d880ab7`).
+- Proof 9 (S01+S02 from the tip): built in `/home/user/wt-seq` (log
+  `scratchpad/proof9-run.log`), pushed to `…-proof-9`, then `ci.yml` with
+  `os_lanes=all`. Only baseline reds → send the coordinator the range.
+- Later steps, found on proof 6 locally (macOS and Linux Lua suites): init
+  modules named with their stem (`3ef3fc4a`), the macOS keyboard data readers
+  and the Linux tray source reader (`1b0998e0`), a climbing `Paths.shared`
+  argument (`62e49843`), the flush bridge test (`267cc01a`).
+- Proof 8 (S01–S38) is being built in `/home/user/wt-proof` from `267cc01a`
+  (log `scratchpad/proof8-run.log`) for local Lua runs; rebuild it from the
+  tip before its CI run.
 
 ### S01 CI failures (run 43311674550) and their state
 
