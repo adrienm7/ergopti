@@ -364,11 +364,15 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       `config.toml` without handing the bytes to the preferences, so « Restore recommended values » refused at the
       shortcuts participant (fixed in 3e209162 by `Preferences.replace_source`). Check whether the AHK global restore
       cohort has the same handoff gap now that `[tap_holds]` and `[mod_combos]` live in `config.toml`.
-- [ ] **ci-acceptance-3 commits not yet on `dev` (2026-11-12).** On `claude/ergopti-todo-ci-acceptance-3`: the
-      keyboard-source evidence (cf44fb4e, aef8ae05, da7cf001, 84e97e47: conflicts in `ci-macos.yml` and
-      `test-macos-tsm-refusal.cjs` against the tap-hold series, rebase them), the TODO receipts 8886f2ba and
-      ec54b45e, and the MLC-005 relocation rows (4ae1131a, faa1ade6, 13af8690, b74741e8, 14d21718, 365dae29),
-      held until the macOS 26 Install-and-launch rows of run 43292636135 or a later one pass.
+- [x] **ci-acceptance-3 commits not yet on `dev` (2026-11-12).** Closed by worker G on 2026-11-13 (Paris). Checked
+      against `dev` by subject: cf44fb4e, aef8ae05 and da7cf001 were already there; 84e97e47 (number-row selection
+      timeline) and 4ae1131a (launcher helper resolution logged at boot) are now landed. Not landed, on purpose: the
+      MLC-005 relocation rows (faa1ade6, 13af8690, b74741e8, 14d21718, 365dae29). Their gate,
+      [43292636135](https://github.com/adrienm7/ergopti/actions/runs/43292636135) job 131487813938, failed on two real
+      launcher defects, now the item « MLC-005 relocated launcher refused » under macOS; the rows land with that fix.
+      The `ci(probe)` commits were temporary and removed on that branch. The receipts of 8886f2ba and ec54b45e
+      (43243856260 passed with the snapshot bracket; 43276494558 refused on macOS 15 without a `tsm.uiserver` line,
+      which 84e97e47 now prints) belong to « [CI] Native keyboard-source fixture ».
 - [ ] **Windows compiled upgrade exit 1 (closed 2026-11-12 on its credible cause).** ed11665a is the credible cause,
       unproven: the upgrade step was never reached afterwards. Watch for a `startup-smoke: uncaught` line on the
       next failure of Windows Install and launch.
@@ -471,6 +475,17 @@ between workers) green alone. All live checks pass, typed by the harness.
       another user or machine yields an unusable key, and give it the « API key… » re-enter row as macOS and Linux do.
 
 ### macOS
+
+- [ ] **MLC-005 relocated launcher refused (found by worker G on 2026-11-13).** In
+      [43292636135](https://github.com/adrienm7/ergopti/actions/runs/43292636135) (macOS 26, job 131487813938) the
+      launch gate of the relocation rows passed `symlinked_applications` but failed two scenarios on
+      `platform/remap/lease_helper.lua`: `spaced_accented_path` (« bundle-owned ErgoptiPlus helper no longer matches the
+      running launcher »: the exact-path or identity proof refuses an install under « Applications de Léa », then Quit
+      did not end both processes in 10 s) and `translocated` (« ERGOPTI_LAUNCHER_EXECUTABLE differs from the
+      bundle-owned helper »: the launcher exports its translocated path while the Lua tree derives another). Fix both
+      in the launcher/helper proof, then land the rows of branch `claude/ergopti-todo-ci-acceptance-3` (faa1ade6,
+      13af8690, b74741e8, 14d21718, 365dae29) with a green macOS 26 Install-and-launch row. Needs a Mac or the hosted
+      macOS 26 lane; the failed-launch artifact (13983003738) holds the launcher logs.
 
 - **Field report 2026-11-03 (`mac-2026-11-03_102716`), branch `fix/macos-field-2026-11-03`.** Done: ai_local no
   longer lists the owned endpoint without its binary (no ERROR); n-gram history merges paced (458 ms slice); the
