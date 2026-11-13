@@ -70,6 +70,12 @@ function newPathToken(row, movedRepo) {
 	// Paths.shared("../macos/adapters/x.sh") climbs out of _shared: the new
 	// spelling is the target relative to _shared, never a sliced prefix.
 	else if (r.form === 'shared') out = path.posix.relative(`${PREFIX}_shared`, r.newRepo);
+	// A shared file's driver-relative path: the target under its own driver.
+	else if (r.form === 'driver')
+		out = path.posix.relative(
+			`${PREFIX}${r.newRepo.slice(PREFIX.length).split('/')[0]}`,
+			r.newRepo
+		);
 	else if (r.form === 'root') {
 		// Relative to the root of the referencing file's tree, which may not be
 		// the target's: driver_root .. "/../_shared/data/x" keeps its "../_shared".
