@@ -4,10 +4,10 @@
 local helpers = require("tests.helpers")
 
 local STUBS = {
-	"platform.input.text_sender", "adapters.clipboard", "platform.input.synthetic_input",
+	"platform.input.text_sender", "clipboard.adapters.clipboard", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
 	"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
-	"infra.clipboard_borrowers", "modules.keymap.utils",
+	"clipboard.borrowers", "modules.keymap.utils",
 }
 
 local LONG_TEXT = string.rep("borrowed clipboard output ", 12)
@@ -50,7 +50,7 @@ end
 
 --- Registers another family that holds a borrowed clipboard.
 local function borrow_elsewhere()
-	require("infra.clipboard_borrowers").register("other_family", function() return true end)
+	require("clipboard.borrowers").register("other_family", function() return true end)
 end
 
 helpers.describe("Borrowed clipboard output is typed (clipboard-borrowed-output-types)", function()

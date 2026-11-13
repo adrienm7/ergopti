@@ -94,7 +94,7 @@ local OWNED = {
 	"apps.engine.secure_apps_data",
 
 	"adapters.accessibility_permission",
-	"adapters.clipboard",
+	"clipboard.adapters.clipboard",
 	"adapters.event_provenance",
 	"core.fs.adapters.file_system",
 	"adapters.metadata_command_stats",

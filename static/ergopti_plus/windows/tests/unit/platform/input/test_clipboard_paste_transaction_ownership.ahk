@@ -571,7 +571,7 @@ Test("clipboard: caller-owned token survives explicit debt-only retirement (clip
 ; definitions and the complete real ownership registry in one owned native
 ; child; only clipboard contents, the active-app query and sends are passive.
 _PPH_Script(Entry, Mode) {
-	Source := FileRead(_DriverDir . "\adapters\clipboard.ahk", "UTF-8")
+	Source := FileRead(_DriverDir . "\clipboard\adapters\clipboard.ahk", "UTF-8")
 	Boundary := _DriverFindFunctionDefinition(&Source, "CB_Read")
 	AssertTrue(IsObject(Boundary), "the real clipboard registry must precede its OS read adapter")
 	Registry := SubStr(Source, 1, Boundary.Idx - 1)

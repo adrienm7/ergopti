@@ -4,7 +4,7 @@
 ; MODULE: Clipboard SaveAll/RestoreAll Error Sentinel Guard
 ; DESCRIPTION:
 ; Static source guard for the CB_SaveAll/CB_RestoreAll error-sentinel fix in
-; adapters/clipboard.ahk — the sibling of CB_Save/CB_Restore's existing
+; clipboard/adapters/clipboard.ahk — the sibling of CB_Save/CB_Restore's existing
 ; sentinel, guarded by tests/meta/platform/input/test_clipboard_sentinel.ahk.
 ;
 ; ROOT CAUSE ENCODED:
@@ -29,7 +29,7 @@
 
 _TCSAS_SaveAllReturnsSentinel() {
 	Body := _DriverFuncBody("CB_SaveAll")
-	Assert(Body != "", "CB_SaveAll must be defined in adapters/clipboard.ahk")
+	Assert(Body != "", "CB_SaveAll must be defined in clipboard/adapters/clipboard.ahk")
 
 	Assert(InStr(Body, "__CB_SAVE_ERROR__") > 0,
 		'CB_SaveAll must return "__CB_SAVE_ERROR__" on failure so callers can distinguish a lock error from an empty clipboard')
@@ -47,7 +47,7 @@ Test("clipboard: CB_SaveAll returns __CB_SAVE_ERROR__ sentinel on clipboard-lock
 
 _TCSAS_RestoreAllGuardsOnSentinel() {
 	Body := _DriverFuncBody("CB_RestoreAll")
-	Assert(Body != "", "CB_RestoreAll must be defined in adapters/clipboard.ahk")
+	Assert(Body != "", "CB_RestoreAll must be defined in clipboard/adapters/clipboard.ahk")
 
 	Assert(InStr(Body, "__CB_SAVE_ERROR__") > 0,
 		"CB_RestoreAll must check for the __CB_SAVE_ERROR__ sentinel and skip the restore when it is the saved value")

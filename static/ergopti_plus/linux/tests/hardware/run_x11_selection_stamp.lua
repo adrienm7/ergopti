@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: X11 Clipboard Owner Timestamp Receipt
 --- DESCRIPTION:
---- Proves adapters/x11_selection_stamp.lua against a real X server: on a
+--- Proves clipboard/adapters/x11_selection_stamp.lua against a real X server: on a
 --- private Xvfb display, a CLIPBOARD owner started by this script answers the
 --- TIMESTAMP target, and the native read must return the owner's stamp, a new
 --- stamp after the clipboard changes hands, and 0 with no owner. The unit
@@ -104,7 +104,7 @@ local ok, err = pcall(function()
 	-- libX11 reads DISPLAY from the process environment, so run each read in a child.
 	local function read()
 		local pipe = assert(io.popen("DISPLAY=" .. DISPLAY .. " luajit -e '"
-			.. "local S = require(\"adapters.x11_selection_stamp\"); local v, r = S.read(0.5); io.write(tostring(v), \" \", tostring(r))'"))
+			.. "local S = require(\"clipboard.adapters.x11_selection_stamp\"); local v, r = S.read(0.5); io.write(tostring(v), \" \", tostring(r))'"))
 		local out = pipe:read("*a")
 		pipe:close()
 		return out

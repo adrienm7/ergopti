@@ -31,7 +31,7 @@ local HOME = "/home/jdoe"
 local function load_bridge(controls)
 	controls = controls or {}
 	local replaced = { "ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes",
-		"core.ui.ui.webview_manager", "adapters.clipboard", "settings.engine.paths",
+		"core.ui.ui.webview_manager", "clipboard.adapters.clipboard", "settings.engine.paths",
 		"platform.input.keyboard_hook" }
 	local loaded = {}
 	for _, name in ipairs(replaced) do loaded[name] = package.loaded[name] end
@@ -58,7 +58,7 @@ local function load_bridge(controls)
 		end,
 		get_daemon_state = function() return {} end,
 	}
-	package.loaded["adapters.clipboard"] = {
+	package.loaded["clipboard.adapters.clipboard"] = {
 		write = function(text)
 			context.copied[#context.copied + 1] = text
 			return controls.clipboard ~= false
@@ -554,7 +554,7 @@ helpers.describe("diagnostics bridge fixture ownership", function()
 	helpers.it("restores exact collaborators and warm preference paths after a body failure", function()
 		local paths = require("settings.engine.paths")
 		local preferences = require("infra.metrics_preferences")
-		local names = { "settings.engine.paths", "infra.metrics_preferences", "core.ui.ui.webview_manager", "adapters.clipboard",
+		local names = { "settings.engine.paths", "infra.metrics_preferences", "core.ui.ui.webview_manager", "clipboard.adapters.clipboard",
 			"ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes" }
 		local before = {}
 		for _, name in ipairs(names) do before[name] = package.loaded[name] end

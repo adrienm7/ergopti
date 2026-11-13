@@ -36,7 +36,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 			"symbol": "hotstrings.shortcut_resets_word",
-			"sha256": "7d248f08210b1757a14a797b9de86388fcc89d9ae86884797cce2545e6f8e108"
+			"sha256": "1d7277aa3e702d7dfa51c076cae2fa61def96d5c83867af57f54d1ffb5785c07"
 		},
 		{
 			"id": "macos-undo",
@@ -57,7 +57,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "c07030115b749069614b89c19c0a1660584e1d0f3b5c420e6d504f65c77d32aa"
+			"sha256": "dfd3078ce3f706539d2534e63b5545bd77ba4832070de9303debcb33a3de9a42"
 		},
 		{
 			"id": "windows-dead-legacy",
@@ -78,7 +78,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 			"symbol": "local chars = e:getCharacters(false)",
-			"sha256": "7d248f08210b1757a14a797b9de86388fcc89d9ae86884797cce2545e6f8e108"
+			"sha256": "1d7277aa3e702d7dfa51c076cae2fa61def96d5c83867af57f54d1ffb5785c07"
 		},
 		{
 			"id": "linux-dead-capture",

@@ -329,7 +329,7 @@ helpers.describe("Linux system actions", function()
 
 	helpers.it("clear_clipboard writes an empty clipboard (system-actions)", function()
 		local written = {}
-		with_modules({ ["adapters.clipboard"] = {
+		with_modules({ ["clipboard.adapters.clipboard"] = {
 			write = function(text) written[#written + 1] = text return true end,
 		} }, function()
 			with_recorded_shell(function()
@@ -467,7 +467,7 @@ helpers.describe("Linux system actions", function()
 		local combos = {}
 		local ok, err = pcall(function()
 			with_modules({
-				["adapters.clipboard"] = { read_selection_uri_list = function(emit)
+				["clipboard.adapters.clipboard"] = { read_selection_uri_list = function(emit)
 					emit("ctrl+c"); return false, "", "no_file_selection"
 				end },
 				["modules.gestures.combo_emitter"] = { press = function(combo) combos[#combos + 1] = combo; return true end },
@@ -487,7 +487,7 @@ helpers.describe("Linux system actions", function()
 				focused_context = function() return app, "test:file-manager-window" end })
 			local ok, err = pcall(function()
 				with_modules({
-					["adapters.clipboard"] = { read_selection_uri_list = function(emit)
+					["clipboard.adapters.clipboard"] = { read_selection_uri_list = function(emit)
 						if boundary == "before copy" then app = "gnome-terminal-server" end
 						local sent = emit("ctrl+c")
 						if boundary == "before copy" then helpers.assert_eq(sent, false) end
@@ -513,7 +513,7 @@ helpers.describe("Linux system actions", function()
 		local combos = {}
 		with_modules({
 			["modules.shortcuts.open_selection"] = { capture_file_manager = function() return function() return true end end },
-			["adapters.clipboard"] = {
+			["clipboard.adapters.clipboard"] = {
 				read_selection_uri_list = function(emit_combo, sleep_ms)
 					helpers.assert_eq(type(emit_combo), "function")
 					helpers.assert_eq(type(sleep_ms), "function")
@@ -539,7 +539,7 @@ helpers.describe("Linux system actions", function()
 		}) do
 			with_modules({
 				["modules.shortcuts.open_selection"] = { capture_file_manager = function() return function() return true end end },
-				["adapters.clipboard"] = {
+				["clipboard.adapters.clipboard"] = {
 					read_selection_uri_list = function() return report[1], report[2], report[3] end,
 				},
 				["modules.gestures.combo_emitter"] = { press = function() return true end },

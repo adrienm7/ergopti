@@ -164,7 +164,7 @@ _KCP_AllDriverAssignmentsUseOwnedAdapter() {
 	Loop Files, WindowsRoot . "\*.ahk", "FR" {
 		Normalized := StrReplace(A_LoopFileFullPath, "\", "/")
 		if InStr(Normalized, "/tests/") || InStr(Normalized, "/vendor/")
-				|| InStr(Normalized, "/_generated/") || InStr(Normalized, "/adapters/clipboard.ahk")
+				|| InStr(Normalized, "/_generated/") || InStr(Normalized, "/clipboard/adapters/clipboard.ahk")
 			continue
 		Source := FileRead(A_LoopFileFullPath)
 		; Strip full-line comments so documentation examples do not satisfy or

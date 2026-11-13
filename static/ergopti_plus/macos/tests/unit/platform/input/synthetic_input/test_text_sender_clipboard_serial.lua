@@ -39,7 +39,7 @@ helpers.describe("text_sender clipboard path serializes save/restore", function(
 		local restores = {}
 		local timers = {}
 		local clock, count = 0, 0
-		package.loaded["adapters.clipboard"] = {
+		package.loaded["clipboard.adapters.clipboard"] = {
 			_change_count = function() return count end,
 			save    = function() saves = saves + 1; return "ORIGINAL", true end,
 			write = function(_, receipt)
@@ -88,7 +88,7 @@ helpers.describe("text_sender clipboard path serializes save/restore", function(
 		helpers.assert_true(#restores >= 1, "a restore must fire")
 		helpers.assert_eq(restores[#restores], "ORIGINAL")
 
-		package.loaded["adapters.clipboard"]   = nil
+		package.loaded["clipboard.adapters.clipboard"]   = nil
 		package.loaded["platform.input.synthetic_input"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["platform.input.text_sender"] = nil
@@ -99,7 +99,7 @@ end)
 local function load_failure_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
-		"platform.input.text_sender", "adapters.clipboard", "platform.input.synthetic_input",
+		"platform.input.text_sender", "clipboard.adapters.clipboard", "platform.input.synthetic_input",
 		"core.events.timer_scheduler",
 		"core.logger.engine.logger", "core.timing.engine.timings",
 	}) do package.loaded[name] = nil end
@@ -112,7 +112,7 @@ local function load_failure_fixture(options)
 	local clock, count = 0, 0
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.15 end }
-	package.loaded["adapters.clipboard"] = {
+	package.loaded["clipboard.adapters.clipboard"] = {
 		_change_count = function() return count end,
 		save = function() return original, true end,
 		write = function(text, receipt)
@@ -247,7 +247,7 @@ helpers.describe("text_sender clipboard path fails closed at native boundaries",
 			defer_synchronously = true,
 		})
 		-- Keep every restore attempt refused, including any accidental recursive one.
-		package.loaded["adapters.clipboard"].restore = function()
+		package.loaded["clipboard.adapters.clipboard"].restore = function()
 			return false
 		end
 		helpers.assert_eq(f.sender.send(("q"):rep(60), { mode = "clipboard" }), false)

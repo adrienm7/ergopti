@@ -12,7 +12,7 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 
 local function with_sender(callback)
 	helpers.with_stub_scope({
-		"platform.input.text_sender", "adapters.clipboard", "platform.input.synthetic_input",
+		"platform.input.text_sender", "clipboard.adapters.clipboard", "platform.input.synthetic_input",
 		"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
 		"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 		"core.text.engine.toml.reader", "core.text.engine.json", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom",

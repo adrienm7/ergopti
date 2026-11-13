@@ -35,7 +35,7 @@ helpers.describe("shortcut keys: the live layout decides the key", function()
 
 	helpers.it("pastes with the key that types v on Ergopti", function()
 		with_layout(ERGOPTI)
-		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
+		local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		-- A clipboard that holds what was last written: the paste reads it back
@@ -59,14 +59,14 @@ helpers.describe("shortcut keys: the live layout decides the key", function()
 			is_x11 = function() return true end,
 			kind = function() return "x11" end,
 		}
-		package.loaded["adapters.clipboard"] = nil
+		package.loaded["clipboard.adapters.clipboard"] = nil
 		local emitted = {}
 		local channel = { emit = function(code, value)
 			emitted[#emitted + 1] = { code = code, value = value }
 			return true
 		end }
 		local ok, err = pcall(function()
-			require("adapters.clipboard").paste_text("é", channel, function() end)
+			require("clipboard.adapters.clipboard").paste_text("é", channel, function() end)
 		end)
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 		helpers.assert_true(ok, tostring(err))

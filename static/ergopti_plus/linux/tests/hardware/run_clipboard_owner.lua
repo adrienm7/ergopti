@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Multi-Format Clipboard Owner Receipt
 --- DESCRIPTION:
---- Proves adapters/clipboard_owner_worker.lua against a real display server:
+--- Proves clipboard/adapters/owner_worker.lua against a real display server:
 --- the owner takes the clipboard with a text, an HTML and a 300 kB binary
 --- target (above one X11 request, so INCR runs), each target reads back byte
 --- for byte through the session's own clipboard tool, the snapshot file is
@@ -16,7 +16,7 @@
 ---         (a data-control compositor such as sway --backend headless, wl-clipboard)
 --- ==============================================================================
 
-local Worker = dofile("adapters/clipboard_owner_worker.lua")
+local Worker = dofile("clipboard/adapters/owner_worker.lua")
 
 local backend = arg[1]
 assert(backend == "x11" or backend == "wayland", "usage: run_clipboard_owner.lua x11|wayland")
@@ -56,7 +56,7 @@ local file = assert(io.open(path, "wb"))
 file:write(Worker.encode(TARGETS))
 file:close()
 
-local worker = "luajit adapters/clipboard_owner_worker.lua"
+local worker = "luajit clipboard/adapters/owner_worker.lua"
 assert(sh(worker .. " probe " .. backend .. " " .. soname), "the probe passes on this session")
 assert(sh(worker .. " own " .. backend .. " " .. soname .. " " .. path), "the owner takes the selection")
 assert(io.open(path, "rb") == nil, "the owner removes the snapshot file once read")

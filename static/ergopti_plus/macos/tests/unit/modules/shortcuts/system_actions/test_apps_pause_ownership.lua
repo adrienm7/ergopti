@@ -30,7 +30,7 @@ local function fresh_apps()
 		"platform.focus.window_info",
 		"platform.focus.window_manager",
 		"platform.input.synthetic_input",
-		"adapters.clipboard",
+		"clipboard.adapters.clipboard",
 		"core.logger.engine.logger",
 		"core.ui.engine.notifications",
 		"core.i18n.engine.i18n",

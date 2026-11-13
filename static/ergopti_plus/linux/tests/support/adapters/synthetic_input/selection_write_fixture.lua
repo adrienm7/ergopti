@@ -15,8 +15,8 @@ local text_owner = require("tests.support.text_owner_fixture")
 --- @param body function Receives the state and its real selection owner.
 function M.with(body)
 	text_owner.with(function(guard, field)
-		local names = { "adapters.selection_transaction", "platform.focus.atspi_focus", "modules.hotstrings.injector",
-			"adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
+		local names = { "clipboard.adapters.selection_transaction", "platform.focus.atspi_focus", "modules.hotstrings.injector",
+			"clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
 			"platform.input.keyboard_hook", "core.logger.engine.shim", "modules.hotstrings.selected_output", "core.logger.engine.monotonic" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -49,7 +49,7 @@ function M.with(body)
 			end
 			return operation
 		end
-		package.loaded["platform.focus.atspi_focus"], package.loaded["adapters.selection_transaction"] = native, nil
+		package.loaded["platform.focus.atspi_focus"], package.loaded["clipboard.adapters.selection_transaction"] = native, nil
 		local pending
 		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function() return true end,
@@ -84,7 +84,7 @@ function M.with(body)
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
 			local lookup = layout.shortcut_keycode
 			layout.shortcut_keycode = function(...) boundary("lookup"); return lookup(...) end
-			helpers.load_module("adapters.clipboard")
+			helpers.load_module("clipboard.adapters.clipboard")
 			injector = helpers.load_module("modules.hotstrings.injector")
 			injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
 				boundary("emit:" .. code .. ":" .. value)
@@ -98,7 +98,7 @@ function M.with(body)
 			end)
 			state.injector = injector
 			local capture = guard.capture_text_owner
-			state.owner = require("adapters.selection_transaction").new({
+			state.owner = require("clipboard.adapters.selection_transaction").new({
 				focus_id = guard.focused_text_identity, privacy_guard = guard.blocks_text,
 				capture_text_owner = function(focus)
 					state.captured_focus = focus

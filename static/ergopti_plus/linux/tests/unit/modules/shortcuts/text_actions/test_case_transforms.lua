@@ -13,7 +13,7 @@ local TextOwnerFixture = require("tests.support.text_owner_fixture")
 local function with_manager(selected, body)
 	local names = {
 		manager = "modules.shortcuts.manager",
-		clipboard = "adapters.clipboard",
+		clipboard = "clipboard.adapters.clipboard",
 		event_loop = "core.events.loop",
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",
@@ -348,7 +348,7 @@ end)
 local function with_case_menu(body)
 	with_caps_word_menu(function(manager)
 		local observed = { clipboard_calls = 0 }
-		package.loaded["adapters.clipboard"].transform_selection = function(transform)
+		package.loaded["clipboard.adapters.clipboard"].transform_selection = function(transform)
 			observed.clipboard_calls = observed.clipboard_calls + 1
 			observed.replacement = transform(observed.selected or "été")
 			return true
@@ -513,7 +513,7 @@ local function with_helper_menu(body)
 			effects.chords[#effects.chords + 1] = chord
 			return effects.refuse_chord ~= #effects.chords
 		end
-		package.loaded["adapters.clipboard"].read_checked = function()
+		package.loaded["clipboard.adapters.clipboard"].read_checked = function()
 			effects.reads = effects.reads + 1
 			return not effects.refuse_read, "été Straße Москва", "controlled read refusal"
 		end

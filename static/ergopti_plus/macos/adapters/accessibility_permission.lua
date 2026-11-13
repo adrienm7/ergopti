@@ -24,7 +24,7 @@
 ---    lets the next prompt add a switch that matches the running binary.
 --- 5. Other copies: a second copy signed differently shares the bundle
 ---    identifier and can hold the one switch; the wait asks for them before
----    any reset (adapters/accessibility_copies.lua).
+---    any reset (clipboard/adapters/accessibility_copies.lua).
 --- 6. Bounded waits: every Accessibility call runs on the main thread, where
 ---    the keyboard event taps also run. macOS lets a call to an application
 ---    that does not answer wait six seconds; the taps then time out, macOS
@@ -214,7 +214,7 @@ function M.other_copies(on_done)
 	if bundle_id == nil then return false, id_err end
 	local path, path_err = M.bundle_path()
 	if path == nil then return false, path_err end
-	if require("adapters.accessibility_copies").find(bundle_id, path, on_done) ~= true then
+	if require("clipboard.adapters.accessibility_copies").find(bundle_id, path, on_done) ~= true then
 		return false, "the copy probe could not be started"
 	end
 	return true

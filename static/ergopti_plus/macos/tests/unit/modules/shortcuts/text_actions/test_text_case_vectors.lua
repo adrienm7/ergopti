@@ -102,7 +102,7 @@ local function transformed_by(action_name, selected)
 		end,
 	}
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["adapters.clipboard"] = nil
+	package.loaded["clipboard.adapters.clipboard"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil
 	local Text = require("modules.shortcuts.actions.text")
 	helpers.assert_eq(type(Text[action_name]), "function",

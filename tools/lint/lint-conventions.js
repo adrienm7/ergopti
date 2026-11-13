@@ -737,6 +737,7 @@ console.log('lint-conventions: scanning…');
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/clipboard/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/apps/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/ai/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/tray/adapters'),
@@ -800,6 +801,7 @@ const ahkAll = [
 // file count and passes.
 const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/clipboard/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/apps/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ai/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tray/adapters'),
@@ -814,6 +816,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/clipboard'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/apps/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ai/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/menu/engine'),
@@ -839,6 +842,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/network'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tests'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/clipboard/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/apps/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/tray/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/platform/system'),

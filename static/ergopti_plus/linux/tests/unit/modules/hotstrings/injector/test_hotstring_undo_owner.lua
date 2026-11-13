@@ -37,7 +37,7 @@ end
 --- @param body function Receives observations after the control callback.
 local function with_undo(options, body)
 	Fixture.with(function(guard, state)
-		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
+		local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
 			"adapters.keyboard_layout", "modules.hotstrings.injector", "platform.input.keyboard_hook", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -86,7 +86,7 @@ local function with_undo(options, body)
 		local passed, failure = pcall(function()
 			local layout = helpers.load_module("adapters.keyboard_layout")
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
-			helpers.load_module("adapters.clipboard")
+			helpers.load_module("clipboard.adapters.clipboard")
 			injector = helpers.load_module("modules.hotstrings.injector")
 			injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
 				observations.wire[#observations.wire + 1] = code .. ":" .. value

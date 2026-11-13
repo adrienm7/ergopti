@@ -51,7 +51,7 @@ local CONTRACT = {
 	{ mod = "core.network.adapters.http_client",             fns = { "new" } },
 	{ mod = "core.process.adapters.shell_runner",            fns = { "spawn" } },
 	{ mod = "core.fs.adapters.json_codec",              fns = { "decode" } },
-	{ mod = "adapters.clipboard",               fns = { "write" } },
+	{ mod = "clipboard.adapters.clipboard",               fns = { "write" } },
 	{ mod = "platform.system.notifier",                fns = { "send" } },
 	{ mod = "core.i18n.engine.locale",                     fns = { "all" } },
 	{ mod = "menu.engine.manifest_reader",            fns = { "coverage_gaps" } },

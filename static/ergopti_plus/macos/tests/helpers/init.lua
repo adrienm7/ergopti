@@ -373,7 +373,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 		loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	end
 	if module_name == "modules.shortcuts.actions.text" or module_name == "modules.keymap.utils" then
-		loaded["adapters.clipboard"] = nil
+		loaded["clipboard.adapters.clipboard"] = nil
 	end
 	-- Every screen-capture owner shares the flow's once-per-process permission
 	-- prompt. A fresh owner must not inherit the previous fixture's prompt.
@@ -457,7 +457,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 
 	-- Clipboard borrowing admission is process-global: each test starts with no
 	-- borrower registered by a previous test's module instances.
-	loaded["infra.clipboard_borrowers"] = nil
+	loaded["clipboard.borrowers"] = nil
 
 	-- Drop the keyboard-layout install / input-source modules (split out of
 	-- ui/menu/menu_keyboard_layout.lua in audit F4). They hold session caches and

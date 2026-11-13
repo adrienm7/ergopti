@@ -51,7 +51,7 @@ local okay, detail = xpcall(function()
 		.. Shell.quote(root .. "/input") .. " > " .. current .. "\n")
 	assert(uv.fs_chmod(root .. "/wl-paste", 448))
 	assert(uv.fs_chmod(root .. "/wl-copy", 448))
-	local Clipboard = require("adapters.clipboard")
+	local Clipboard = require("clipboard.adapters.clipboard")
 	local paste_key = 47 -- The fixture supplies the already-resolved KEY_V kernel code.
 	local saved = "saved 🌿\n\n"
 	local replacement = "' $HOME $(false) `false`\n\n"

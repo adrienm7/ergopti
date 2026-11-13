@@ -26,7 +26,7 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 		package.cpath = ""
 		package.loaded.luv = setmetatable({}, { __index = function() return blocked end })
 		package.loaded.ffi, package.preload.ffi = nil, blocked
-		for _, name in ipairs({ "core.logger.engine", "core.logger.engine.shim", "core.logger.engine.monotonic", "core.ui.engine.display_server", "core.process.adapters.shell_runner", "adapters.clipboard" }) do
+		for _, name in ipairs({ "core.logger.engine", "core.logger.engine.shim", "core.logger.engine.monotonic", "core.ui.engine.display_server", "core.process.adapters.shell_runner", "clipboard.adapters.clipboard" }) do
 			package.loaded[name] = nil
 		end
 		logger = require("core.logger.engine")
@@ -46,7 +46,7 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 		-- The native multi-format owner is a child process; this fixture stands
 		-- in for its receipt and serves what it was handed as the clipboard.
 		s.target_bytes, s.owner_writes, s.target_reads = owner and owner.bytes or {}, {}, {}
-		package.loaded["adapters.clipboard_owner"] = {
+		package.loaded["clipboard.adapters.owner"] = {
 			available = function() return owner ~= nil and owner.available == true end,
 			write = function(saved_targets)
 				s.owner_writes[#s.owner_writes + 1] = saved_targets
@@ -60,7 +60,7 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 		-- probe tells that empty clipboard from a failed read.
 		s.owner_probes = 0
 		s.disowns = 0
-		package.loaded["adapters.x11_selection_stamp"] = { owned = function()
+		package.loaded["clipboard.adapters.x11_selection_stamp"] = { owned = function()
 			s.owner_probes = s.owner_probes + 1
 			if unowned == nil then error("the owner probe runs only after a failed read", 0) end
 			return unowned.owned
@@ -110,7 +110,7 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 			s.value, s.cleared = text, false
 			return true
 		end)
-		local clip = require("adapters.clipboard")
+		local clip = require("clipboard.adapters.clipboard")
 		local function sleep(ms) s.settles[#s.settles + 1] = ms; return true end
 		local function combo(name)
 			s.emits[#s.emits + 1] = name

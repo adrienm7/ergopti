@@ -1,4 +1,4 @@
---- adapters/unicode_carrier.lua
+--- clipboard/adapters/unicode_carrier.lua
 
 --- ==============================================================================
 --- MODULE: Unicode Text Carrier Key

@@ -1,4 +1,4 @@
---- adapters/selection_transaction.lua
+--- clipboard/adapters/selection_transaction.lua
 
 --- ==============================================================================
 --- MODULE: Native Selection Transaction (Linux)
@@ -88,7 +88,7 @@ function M.new(options)
 		end)
 		if not ok then
 			request.inconclusive, request.revoked, request.snapshot = true, true, nil
-			Logger.error("adapters.selection_transaction", "Selection dispatch threw; native ownership remains inconclusive.")
+			Logger.error("clipboard.adapters.selection_transaction", "Selection dispatch threw; native ownership remains inconclusive.")
 			return false
 		end
 		if operation == nil then active = nil; callback(nil); return false end
@@ -159,7 +159,7 @@ function M.new(options)
 		local built, stage = pcall(construct, text, publication)
 		if not built or type(stage) ~= "table" or getmetatable(stage) ~= nil then
 			write.revoked = true
-			Logger.error("adapters.selection_transaction", "Selected output construction has inconclusive cleanup.")
+			Logger.error("clipboard.adapters.selection_transaction", "Selected output construction has inconclusive cleanup.")
 			return false
 		end
 		local prepare, payload, reselect, close = rawget(stage, "prepare"), rawget(stage, "payload"), rawget(stage, "reselect"), rawget(stage, "close")
@@ -179,7 +179,7 @@ function M.new(options)
 			local receipt_result = { ok = allowed and cleaned, cleanup_ok = cleaned, payload_written = payload_written,
 				failed_phase = result and result.failed_phase or "selection observation" }
 			if payload_written and not receipt_result.ok then
-				Logger.warn("adapters.selection_transaction", "Selected payload may have been written; final selection could not be committed.")
+				Logger.warn("clipboard.adapters.selection_transaction", "Selected payload may have been written; final selection could not be committed.")
 			end
 			callback(receipt_result.ok == true, receipt_result)
 		end

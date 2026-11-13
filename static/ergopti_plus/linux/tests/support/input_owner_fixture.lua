@@ -288,7 +288,7 @@ function M.with_manager_session(options, body)
 		local ConfigPaths = require("settings.engine.paths")
 		local Files = require("core.fs.adapters.file_system")
 		local original_route, original_read = ConfigPaths.config, Files.read_with_status
-		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "platform.remap.nav_layer", "adapters.clipboard" }
+		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "platform.remap.nav_layer", "clipboard.adapters.clipboard" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local folder = os.tmpname(); os.remove(folder)
 		assert(os.execute("mkdir '" .. folder:gsub("'", "'\\''") .. "'"))
@@ -310,7 +310,7 @@ function M.with_manager_session(options, body)
 		end
 		local manager
 		local called, failure = pcall(function()
-			if options.clipboard then package.loaded["adapters.clipboard"] = options.clipboard end
+			if options.clipboard then package.loaded["clipboard.adapters.clipboard"] = options.clipboard end
 			if options.before_manager then options.before_manager(s) end
 			local Layout = h.load_module("adapters.keyboard_layout")
 			Layout._set_table_for_test({ a = { keycode = 30, level = 1, mods = {} }, A = { keycode = 30, level = 2, mods = { "shift" } } })

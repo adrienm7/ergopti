@@ -17,7 +17,7 @@ local function load_fixture(options)
 	Destination.install()
 	options = options or {}
 	for _, name in ipairs({
-		"modules.shortcuts.actions.text", "adapters.clipboard", "platform.input.synthetic_input",
+		"modules.shortcuts.actions.text", "clipboard.adapters.clipboard", "platform.input.synthetic_input",
 		"core.events.timer_scheduler", "core.logger.engine.logger",
 	}) do package.loaded[name] = nil end
 	local original = {

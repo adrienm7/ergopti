@@ -1,4 +1,4 @@
---- adapters/wayland_selection_counter.lua
+--- clipboard/adapters/wayland_selection_counter.lua
 
 --- ==============================================================================
 --- MODULE: Wayland Clipboard Change Counter (Linux)
@@ -26,7 +26,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 
-local LOG = "adapters.wayland_selection_counter"
+local LOG = "clipboard.adapters.wayland_selection_counter"
 local OUTPUT_TAIL_BYTES = 64
 local WATCH_COMMAND = "cat >/dev/null; echo"
 

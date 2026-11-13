@@ -92,10 +92,10 @@ os.remove(user_path)
 	end)
 
 	helpers.it("keeps a delayed copy retry out of a newly focused field", function()
-		local names = { "adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
+		local names = { "clipboard.adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local callback, field = nil, "first"
-		package.loaded["adapters.clipboard"] = { change_counter = function() return 100 end }
+		package.loaded["clipboard.adapters.clipboard"] = { change_counter = function() return 100 end }
 		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, fn) callback = fn; return { armed = true } end,
 			cancel = function() return true end,
@@ -135,10 +135,10 @@ os.remove(user_path)
 	end)
 
 	helpers.it("reports an explicit refusal of the delayed copy retry", function()
-		local names = { "adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
+		local names = { "clipboard.adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local callback, warnings, calls = nil, 0, 0
-		package.loaded["adapters.clipboard"] = { change_counter = function() return 100 end }
+		package.loaded["clipboard.adapters.clipboard"] = { change_counter = function() return 100 end }
 		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, fn) callback = fn; return { armed = true } end,
 			cancel = function() return true end,
@@ -769,10 +769,10 @@ helpers.describe("native OneShot Manager route", function()
 		s.edge("a", 58, 0, 150); s.edge("a", 30, 1, 200); s.edge("a", 30, 2, 210); s.edge("a", 30, 0, 220)
 	end
 	helpers.it("permits a copy retry after a configured pair key is released", function()
-		local names = { "adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
+		local names = { "clipboard.adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local timer
-		package.loaded["adapters.clipboard"] = { change_counter = function() return 100 end }
+		package.loaded["clipboard.adapters.clipboard"] = { change_counter = function() return 100 end }
 		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, callback) timer = callback; return { armed = true } end,
 			cancel = function() return true end,

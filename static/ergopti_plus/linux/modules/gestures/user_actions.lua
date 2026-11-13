@@ -133,7 +133,7 @@ function M.deliver_output(text, output, max_typed, publication)
 		return false
 	end
 	if output == "copy" then
-		local written = require("adapters.clipboard").write(value) == true
+		local written = require("clipboard.adapters.clipboard").write(value) == true
 		if not written then Logger.error(LOG, "The output of a run_command binding could not be copied.") end
 		return written
 	end

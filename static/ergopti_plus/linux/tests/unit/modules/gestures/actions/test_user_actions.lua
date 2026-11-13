@@ -53,7 +53,7 @@ end)
 -- The modules each fixture loads fresh, and the owners it replaces.
 local OWNED = {
 	"modules.gestures.user_actions", "core.logger.engine.shim", "core.i18n.engine.i18n", "core.process.adapters.shell_runner",
-	"platform.focus.application_notifier", "adapters.clipboard", "core.fs.adapters.file_system", "modules.shortcuts.manager",
+	"platform.focus.application_notifier", "clipboard.adapters.clipboard", "core.fs.adapters.file_system", "modules.shortcuts.manager",
 }
 
 --- Runs body with every owner of the user actions recorded.
@@ -74,7 +74,7 @@ local function with_world(body)
 			world.notices[#world.notices + 1] = (text:gsub("|{%d}", ""))
 			return true
 		end }
-		package.loaded["adapters.clipboard"] = { write = function(text) world.clipboard[#world.clipboard + 1] = text; return true end }
+		package.loaded["clipboard.adapters.clipboard"] = { write = function(text) world.clipboard[#world.clipboard + 1] = text; return true end }
 		package.loaded["modules.shortcuts.manager"] = {
 			capture_text_destination = function() return { current = function() return true end, cached = function() return true end } end,
 			insert_text = function(text) world.typed[#world.typed + 1] = text; return true end,

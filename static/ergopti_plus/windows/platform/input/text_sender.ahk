@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; AHK v2 implementation of the TextSender port contract defined in
 ; static/ergopti_plus/_shared/core/ports/TextSender.spec.js. Wraps AHK's SendText,
-; SendInput, and the Clipboard port (adapters/clipboard.ahk) behind the three
+; SendInput, and the Clipboard port (clipboard/adapters/clipboard.ahk) behind the three
 ; canonical functions (TextSend, TextEraseChars, TextPressKey) so domain modules
 ; can inject text and keystrokes without coupling to AHK-specific send APIs.
 ;
@@ -23,7 +23,7 @@
 ;
 ; CLIPBOARD DEPENDENCY:
 ; The clipboard path uses CB_SaveAll / CB_Write / CB_RestoreAll from the Clipboard
-; port adapter (adapters/clipboard.ahk) instead of accessing A_Clipboard directly.
+; port adapter (clipboard/adapters/clipboard.ahk) instead of accessing A_Clipboard directly.
 ; CB_SaveAll/CB_RestoreAll use ClipboardAll() so non-text content (images, files,
 ; RTF) is preserved across the paste cycle. CB_Write is text-only (sets A_Clipboard
 ; to a string) so the paste content itself is always text, which is correct.
@@ -33,7 +33,7 @@
 ; Mirrors TextSender.spec.js CLIPBOARD_THRESHOLD = 1000.
 global TEXT_CLIPBOARD_THRESHOLD := 1000
 
-#Include %A_LineFile%\..\..\..\adapters\editor_replace.ahk
+#Include %A_LineFile%\..\..\..\clipboard\adapters\editor_replace.ahk
 
 ; Metadata only: never retain document, prediction or clipboard text in a log.
 _TextSenderReadClipboardDiagnosticState() {

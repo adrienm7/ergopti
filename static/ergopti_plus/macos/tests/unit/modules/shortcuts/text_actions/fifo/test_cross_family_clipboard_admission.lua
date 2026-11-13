@@ -57,8 +57,8 @@ helpers.describe("Clipboard borrowers share one admission (clipboard-cross-famil
 	end)
 
 	helpers.it("(clipboard-cross-family-admission) the admission ignores the asker and fails closed", function()
-		helpers.with_fresh_modules({ "infra.clipboard_borrowers" }, function()
-			local Borrowers = require("infra.clipboard_borrowers")
+		helpers.with_fresh_modules({ "clipboard.borrowers" }, function()
+			local Borrowers = require("clipboard.borrowers")
 			local held = false
 			Borrowers.register("one", function() return held end)
 			helpers.assert_nil(Borrowers.foreign_holder("two"), "an idle family holds nothing")

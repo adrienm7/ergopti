@@ -63,7 +63,7 @@ end)
 local OWNED = {
 	"modules.gestures.user_actions", "modules.gestures.apple_shortcut_action",
 	"adapters.apple_shortcuts_cli", "adapters.apple_shortcuts", "core.logger.engine.logger", "core.i18n.engine.i18n",
-	"core.ui.engine.notifications", "modules.gestures.actions_aux_owner", "core.fs.adapters.file_system", "adapters.clipboard",
+	"core.ui.engine.notifications", "modules.gestures.actions_aux_owner", "core.fs.adapters.file_system", "clipboard.adapters.clipboard",
 	"platform.input.synthetic_input", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
 	"adapters.apple_shortcuts_native", "modules.shortcuts.actions.text",
 }
@@ -138,7 +138,7 @@ local function with_world(body)
 				return { mode = "file" }, "ok"
 			end,
 		}
-		package.loaded["adapters.clipboard"] = { write = function(text)
+		package.loaded["clipboard.adapters.clipboard"] = { write = function(text)
 			world.clipboard[#world.clipboard + 1] = text
 			return true
 		end }

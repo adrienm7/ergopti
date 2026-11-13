@@ -370,7 +370,7 @@ InstallHotstringHooks()
 #Include ../platform/input/text_sender.ahk
 #Include ../core/network/adapters/http_client.ahk
 #Include ../platform/focus/secure_field_detector.ahk
-#Include ../adapters/clipboard.ahk
+#Include ../clipboard/adapters/clipboard.ahk
 #Include ../infra/input_probe.ahk
 #Include ../core/fs/adapters/storage.ahk
 #Include ../core/process/adapters/lifecycle.ahk

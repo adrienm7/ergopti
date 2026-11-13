@@ -433,7 +433,7 @@ local function url_encode_query(value)
 end
 
 local function primary_selection()
-	local called, ok, value = pcall(function() return require("adapters.clipboard").read_primary() end)
+	local called, ok, value = pcall(function() return require("clipboard.adapters.clipboard").read_primary() end)
 	if not called or ok ~= true or type(value) ~= "string" then return "" end
 	return (value:gsub("%s+$", ""))
 end
@@ -922,7 +922,7 @@ local function _execute_action(action_name, go_next, binding)
 		local ok, err = pcall(system_handler, {
 			-- Handler commands can name the user's files: their stderr stays out of the log.
 			run_background = function(command) return BackgroundCommands.run(command, action_name, true) end,
-			clipboard = require("adapters.clipboard"),
+			clipboard = require("clipboard.adapters.clipboard"),
 			emit_combo = require("modules.gestures.combo_emitter").press,
 			sleep_ms = require("core.events.loop").sleep_ms,
 		})

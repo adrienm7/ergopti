@@ -47,7 +47,7 @@ local Perf       = require("core.logger.engine.perf")
 local HotPath    = require("infra.hotpath_profiler")
 local KeystrokeIntegrity = require("core.logger.engine.keystroke_integrity")
 local KeyEventHealth = require("core.logger.engine.key_event_health")
-local UnicodeCarrier = require("adapters.unicode_carrier")
+local UnicodeCarrier = require("clipboard.adapters.unicode_carrier")
 local EventClock = require("core.events.clock")
 local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
@@ -2225,7 +2225,7 @@ local AUTOREPEAT_PROPERTY = eventtap.event.properties.keyboardEventAutorepeat
 
 --- Feeds one physical key event to the session's pairing counters
 --- (core/logger/engine/key_event_health.lua) and to the held keys synthetic text avoids
---- (adapters/unicode_carrier.lua). Never changes what the key does: every read
+--- (clipboard/adapters/unicode_carrier.lua). Never changes what the key does: every read
 --- is protected and both only write tables.
 --- @param e table Physical keyDown or keyUp event.
 --- @param phase string "down" or "up".
@@ -2921,7 +2921,7 @@ end
 local function build_tap_copy()
 	local TapCopy = require("modules.keymap.tap_copy")
 	local CopyCheck = require("tap_hold.engine.copy_check")
-	local Clipboard = require("adapters.clipboard")
+	local Clipboard = require("clipboard.adapters.clipboard")
 	local log_name = "keymap.tap_copy"
 	local function log(level, fmt, ...) Logger[level](log_name, fmt, ...) end
 	local function warn_user()

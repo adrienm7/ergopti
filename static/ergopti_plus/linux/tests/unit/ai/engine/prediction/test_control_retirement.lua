@@ -60,7 +60,7 @@ local function scenario(options, body)
 		end
 		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
 			"modules.hotstrings.word_reset", "infra.hotstring_preferences", "adapters.keyboard_layout",
-			"modules.hotstrings.injector", "adapters.clipboard" }) do package.loaded[name] = nil end
+			"modules.hotstrings.injector", "clipboard.adapters.clipboard" }) do package.loaded[name] = nil end
 		local state = { text = "", caret = 0, wire = {}, held = {}, requests = {}, submissions = {},
 			cancelled = 0, offers = {}, overlay_showing = false, controls = 0, moves = 0, outputs = 0 }
 		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
@@ -654,7 +654,7 @@ do
 					or name:match("^modules%.hotstrings%.") or name:match("^modules%.shortcuts%.") then package.loaded[name] = nil end
 			end
 			for _, name in ipairs({ "platform.input.keyboard_hook", "platform.input.evdev_reader", "platform.input.modifier_broker",
-				"adapters.keyboard_layout", "platform.focus.secure_field_detector", "adapters.clipboard", "core.events.timer_scheduler",
+				"adapters.keyboard_layout", "platform.focus.secure_field_detector", "clipboard.adapters.clipboard", "core.events.timer_scheduler",
 				"infra.hotstring_preferences", "ai.engine.preferences", "infra.metrics_preferences", "core.logger.engine.monotonic",
 				"settings.engine.paths", "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer",
 				-- Main initialises these owners once; an earlier suite may have loaded them.
@@ -706,8 +706,8 @@ do
 			put("modules.hotstrings.magic_key_source", { init = noop, on_key = no, cancel_capture = yes })
 			put("modules.hotstrings.repeat_key", { is_enabled = no })
 			put("modules.shortcuts.wrap_on_type", { new = function() return { on_key = no, end_selection_window = yes, on_pointer_down = noop } end })
-			put("adapters.selection_transaction", { new = function() return { cancel = yes, stop = yes } end })
-			put("adapters.clipboard", { read_primary = function() error("no selection read is permitted") end })
+			put("clipboard.adapters.selection_transaction", { new = function() return { cancel = yes, stop = yes } end })
+			put("clipboard.adapters.clipboard", { read_primary = function() error("no selection read is permitted") end })
 			put("core.ui.engine.display_server", { is_x11 = yes, is_wayland = no, kind = function() return "x11" end })
 			local layout = put("adapters.keyboard_layout", require("tests.support.layout_cohort_fixture").layout(function() return 30 end))
 			layout.refresh, layout.is_ready, layout.publish_current_capture = yes, yes, yes

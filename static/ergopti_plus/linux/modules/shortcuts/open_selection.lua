@@ -76,10 +76,10 @@ local DEFAULT_DEPS = {
 			if admitted() ~= true then return false end
 			return require("modules.gestures.combo_emitter").press(combo)
 		end
-		return require("adapters.clipboard").read_selection_uri_list(
+		return require("clipboard.adapters.clipboard").read_selection_uri_list(
 			guarded_press, require("core.events.loop").sleep_ms)
 	end,
-	write_clipboard = function(text) return require("adapters.clipboard").write(text) end,
+	write_clipboard = function(text) return require("clipboard.adapters.clipboard").write(text) end,
 	notify_success = function(message)
 		return require("platform.system.notifier").send(message, { level = "success" })
 	end,

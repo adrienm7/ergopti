@@ -18,7 +18,7 @@ local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboa
 --- @param body function
 local function with_session(kind, selection, body)
 	local names = {
-		clipboard = "adapters.clipboard",
+		clipboard = "clipboard.adapters.clipboard",
 		shell = "core.process.adapters.shell_runner",
 		display = "core.ui.engine.display_server",
 	}
@@ -411,7 +411,7 @@ end)
 --- Exercises the production asynchronous range owner with native ACK boundaries.
 --- @param body function
 local function with_native_selection(body)
-	local names = { "adapters.selection_transaction", "platform.focus.atspi_focus", "core.logger.engine.monotonic" }
+	local names = { "clipboard.adapters.selection_transaction", "platform.focus.atspi_focus", "core.logger.engine.monotonic" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { now = 0, focus = "atspi::1.2:/field", allowed = true, starts = 0,
@@ -446,8 +446,8 @@ local function with_native_selection(body)
 		return operation
 	end
 	package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return world.now end }
-	package.loaded["platform.focus.atspi_focus"], package.loaded["adapters.selection_transaction"] = adapter, nil
-	local owner = require("adapters.selection_transaction").new({
+	package.loaded["platform.focus.atspi_focus"], package.loaded["clipboard.adapters.selection_transaction"] = adapter, nil
+	local owner = require("clipboard.adapters.selection_transaction").new({
 		focus_id = function()
 			if world.during_focus then local fn = world.during_focus; world.during_focus = nil; fn() end
 			return world.focus

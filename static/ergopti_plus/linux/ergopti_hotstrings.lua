@@ -585,7 +585,7 @@ local shutdown = ShutdownCoordinator.new({
 			-- Started by the tap-hold manager on Wayland only; absent elsewhere.
 			name = "Wayland clipboard watch",
 			stop = function()
-				local counter = package.loaded["adapters.wayland_selection_counter"]
+				local counter = package.loaded["clipboard.adapters.wayland_selection_counter"]
 				if counter then counter.stop() end
 			end,
 		},
@@ -1973,7 +1973,7 @@ local function main()
 	-- 8.6) Initialise the LLM prediction engine if available. The context
 	-- length is read from its settings, which the menu writes.
 	if prediction_engine then
-		privacy_owners.selection = require("adapters.selection_transaction").new({
+		privacy_owners.selection = require("clipboard.adapters.selection_transaction").new({
 			capture_text_owner = secure_focus_guard.capture_text_owner,
 			focus_id = secure_focus_guard.focused_text_identity,
 			-- Selection reads and writes share the daemon's exact field identity.
@@ -2355,7 +2355,7 @@ local function main()
 				and not input_capture_gate.blocks_text()
 		end,
 		get_pair = function(char) return shortcuts and shortcuts.get_wrap_pair(char) or nil end,
-		read_primary = require("adapters.clipboard").read_primary,
+		read_primary = require("clipboard.adapters.clipboard").read_primary,
 		type_text = function(text, owner, on_payload_attempt)
 			if opts.dry_run then return false end
 			if type(owner) ~= "table" or type(owner.current) ~= "function"

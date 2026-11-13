@@ -309,7 +309,7 @@ end)
 
 helpers.describe("wrap on type (linux): the probe never types into the window", function()
 	helpers.it("reads PRIMARY with no key sent and no clipboard write", function()
-		local names = { shell = "core.process.adapters.shell_runner", display = "core.ui.engine.display_server", clip = "adapters.clipboard" }
+		local names = { shell = "core.process.adapters.shell_runner", display = "core.ui.engine.display_server", clip = "clipboard.adapters.clipboard" }
 		local previous = {}
 		for key, name in pairs(names) do previous[key] = package.loaded[name] end
 		local shell = { commands = {}, writes = 0 }
@@ -758,7 +758,7 @@ local function with_daemon_wrap(body, options)
 		end
 		return chunk()
 	end
-	local manager_name, clipboard_name = "modules.shortcuts.manager", "adapters.clipboard"
+	local manager_name, clipboard_name = "modules.shortcuts.manager", "clipboard.adapters.clipboard"
 	local previous_manager, previous_clipboard = package.loaded[manager_name], package.loaded[clipboard_name]
 	local ok, err = pcall(function()
 		local state = { primary = "baseline", typed = {}, reads = 0, resets = 0, invalidations = 0, automation = 0,

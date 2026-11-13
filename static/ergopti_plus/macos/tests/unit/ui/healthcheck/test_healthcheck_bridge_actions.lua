@@ -30,7 +30,7 @@ local function load_window(controls)
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes", "ui.healthcheck.report",
 		"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work", "core.events.timer_scheduler",
-		"adapters.clipboard", "core.ui.adapters.webview_result",
+		"clipboard.adapters.clipboard", "core.ui.adapters.webview_result",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -57,7 +57,7 @@ local function load_window(controls)
 		after = function() return { timer = {} }, true end,
 		cancel = function() return true end,
 	}
-	package.loaded["adapters.clipboard"] = {
+	package.loaded["clipboard.adapters.clipboard"] = {
 		write = function(text)
 			context.copied[#context.copied + 1] = text
 			context.effects[#context.effects + 1] = "copy"

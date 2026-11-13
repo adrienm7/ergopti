@@ -126,7 +126,7 @@ _DSSS_PreviewBoundariesUseTheConstant() {
 ; convention: every sibling returns its sentinel explicitly.
 _DSSS_ClipboardReadReturnsExplicitEmpty() {
 	Body := _DriverFuncBody("CB_Read")
-	Assert(Body != "", "CB_Read() must exist in adapters/clipboard.ahk")
+	Assert(Body != "", "CB_Read() must exist in clipboard/adapters/clipboard.ahk")
 	Assert(RegExMatch(Body, 'return\s+""') > 0,
 		"CB_Read's catch branch must return an explicit empty string — a bare `return` leaves the documented String contract to an implicit value and reads as an oversight")
 }

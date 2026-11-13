@@ -26,7 +26,7 @@ end
 local function fresh_fixture()
 	Destination.install()
 	for _, name in ipairs({
-		"modules.shortcuts.actions.text", "adapters.clipboard",
+		"modules.shortcuts.actions.text", "clipboard.adapters.clipboard",
 		"platform.input.synthetic_input",
 		"adapters.event_provenance",
 		"core.events.timer_scheduler",

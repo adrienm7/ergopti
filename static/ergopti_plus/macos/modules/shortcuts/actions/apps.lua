@@ -41,8 +41,8 @@ local ShellRunner   = require("core.process.adapters.shell_runner")
 local SyntheticInput = require("platform.input.synthetic_input")
 local TimerScheduler = require("core.events.timer_scheduler")
 local FileSystem    = require("core.fs.adapters.file_system")
-local Clipboard     = require("adapters.clipboard")
-local ClipboardBorrowers = require("infra.clipboard_borrowers")
+local Clipboard     = require("clipboard.adapters.clipboard")
+local ClipboardBorrowers = require("clipboard.borrowers")
 local OpenTarget    = require("shortcuts.engine.open_target")
 
 local LOG = "shortcuts.actions.apps"

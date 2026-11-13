@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"modules.gestures.system_actions",
 	"modules.gestures.actions_aux_owner",
-	"adapters.clipboard",
+	"clipboard.adapters.clipboard",
 	"adapters.mouse_control",
 	"core.fs.adapters.file_system",
 	"adapters.tcc_grant",
@@ -64,7 +64,7 @@ local function with_system(body, options)
 				return not options.refuse_start
 			end,
 		}
-		package.loaded["adapters.clipboard"] = {
+		package.loaded["clipboard.adapters.clipboard"] = {
 			restore = function(saved)
 				record.cleared[#record.cleared + 1] = saved == nil
 				return true

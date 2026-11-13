@@ -41,7 +41,7 @@ local function with_action(session, action, change, body)
 	local names = {
 		"core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
 		"platform.input.keyboard_hook", "platform.input.modifier_broker", "platform.input.uinput_writer",
-		"core.events.loop", "modules.hotstrings.injector", "adapters.clipboard",
+		"core.events.loop", "modules.hotstrings.injector", "clipboard.adapters.clipboard",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
 		"platform.focus.window_info", "core.logger.engine.shim",
 	}
@@ -123,14 +123,14 @@ local function with_action(session, action, change, body)
 				end }
 				local layout = helpers.load_module("adapters.keyboard_layout")
 				layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
-				package.loaded["adapters.clipboard"] = nil
+				package.loaded["clipboard.adapters.clipboard"] = nil
 				injector = helpers.load_module("modules.hotstrings.injector")
 				injector._set_uinput(package.loaded["platform.input.uinput_writer"])
 				injector._set_nanosleep_for_test(function() end)
 			end
-			for _, name in ipairs({ "adapters.clipboard", "modules.shortcuts.manager",
+			for _, name in ipairs({ "clipboard.adapters.clipboard", "modules.shortcuts.manager",
 				"modules.gestures.manager", "modules.gestures.combo_emitter" }) do
-				if action ~= "paste_plain" or name ~= "adapters.clipboard" then package.loaded[name] = nil end
+				if action ~= "paste_plain" or name ~= "clipboard.adapters.clipboard" then package.loaded[name] = nil end
 			end
 			local original = assert(guard.capture_text_owner())
 			local Shortcuts = require("modules.shortcuts.manager")
@@ -244,7 +244,7 @@ end)
 local function observe_compound_action(action, change)
 	local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "platform.input.keyboard_hook",
 		"platform.input.modifier_broker", "platform.input.uinput_writer", "core.events.loop",
-		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
+		"modules.hotstrings.injector", "clipboard.adapters.clipboard", "adapters.keyboard_layout",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
 		"platform.focus.window_info" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -298,7 +298,7 @@ local function observe_compound_action(action, change)
 			local Layout = helpers.load_module("adapters.keyboard_layout")
 			Layout._set_table_for_test({ ["("] = { keycode = 10, level = 2, mods = {"shift"} },
 				[")"] = { keycode = 11, level = 2, mods = {"shift"} } })
-			package.loaded["adapters.clipboard"] = nil
+			package.loaded["clipboard.adapters.clipboard"] = nil
 			injector = helpers.load_module("modules.hotstrings.injector")
 			injector._set_uinput(writer); injector._set_nanosleep_for_test(function() end)
 			for _, name in ipairs({"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter"}) do package.loaded[name] = nil end
@@ -376,7 +376,7 @@ end)
 local function observe_configured_insertion(session, action, route, change)
 	local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "platform.input.keyboard_hook",
 		"platform.input.modifier_broker", "platform.input.uinput_writer", "core.events.loop",
-		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
+		"modules.hotstrings.injector", "clipboard.adapters.clipboard", "adapters.keyboard_layout",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local world = { documents = { ["/field/original"] = "", ["/field/successor"] = "" },
@@ -442,7 +442,7 @@ local function observe_configured_insertion(session, action, route, change)
 			package.loaded["platform.input.uinput_writer"] = writer
 			local layout = helpers.load_module("adapters.keyboard_layout")
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
-			package.loaded["adapters.clipboard"] = nil
+			package.loaded["clipboard.adapters.clipboard"] = nil
 			injector = helpers.load_module("modules.hotstrings.injector")
 			injector._set_uinput(writer)
 			injector._set_nanosleep_for_test(function() retire("settle") end)

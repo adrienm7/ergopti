@@ -171,7 +171,7 @@ end
 
 --- The production side effects; a test replaces any of them.
 local DEFAULT_EFFECTS = {
-	copy = function(text) return require("adapters.clipboard").write(text) == true end,
+	copy = function(text) return require("clipboard.adapters.clipboard").write(text) == true end,
 	save = function(dir, name, text)
 		if not make_dir(dir) then return nil, "cannot create " .. dir end
 		local stem, extension = name:match("^(.*)(%.[^.]+)$")

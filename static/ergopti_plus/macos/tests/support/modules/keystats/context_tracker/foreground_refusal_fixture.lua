@@ -72,7 +72,7 @@ local OWNERS = {
 	"platform.input.keycodes",
 	"core.text.engine.json",
 	-- Optional keymap startup imports survive a rejected parent construction.
-	"adapters.clipboard",
+	"clipboard.adapters.clipboard",
 	"core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec",
 	"platform.input.keyboard_geometry",

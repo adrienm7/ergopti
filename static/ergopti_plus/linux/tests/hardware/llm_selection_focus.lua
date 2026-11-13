@@ -44,7 +44,7 @@ Injector._set_uinput({ is_open = function() return true end, emit = function(cod
 	X11.XSync(display, 0)
 	return true
 end })
-local Clipboard = require("adapters.clipboard")
+local Clipboard = require("clipboard.adapters.clipboard")
 local CLIPBOARD_SEED = "ERGOPTI-NATIVE-SELECTION-CLIPBOARD"
 -- A new Xvfb session has no clipboard owner. The strict stage must snapshot a
 -- known existing owner, rather than guessing that an unavailable read is empty.
@@ -97,7 +97,7 @@ local function await_join()
 	error("native AI privacy context did not join within five seconds")
 end
 
-local Selection = require("adapters.selection_transaction")
+local Selection = require("clipboard.adapters.selection_transaction")
 local selection_owner
 
 local function initialize()

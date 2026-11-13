@@ -1,10 +1,10 @@
---- adapters/clipboard_owner.lua
+--- clipboard/adapters/owner.lua
 
 --- ==============================================================================
 --- MODULE: Multi-Format Clipboard Restore (Linux)
 --- DESCRIPTION:
 --- Puts a saved clipboard back with every format it held, through the native
---- owner child (adapters/clipboard_owner_worker.lua), so a borrower can run on
+--- owner child (clipboard/adapters/owner_worker.lua), so a borrower can run on
 --- a clipboard holding HTML, an image or copied files next to its text, as
 --- Windows (ClipboardAll) and macOS (readAllData) do.
 ---
@@ -24,7 +24,7 @@ local Logger = require("core.logger.engine.shim")
 local Shell = require("core.process.adapters.shell_runner")
 local DisplayServer = require("core.ui.engine.display_server")
 
-local LOG = "adapters.clipboard_owner"
+local LOG = "clipboard.adapters.owner"
 
 -- Seconds the owner may take to read the snapshot and take the selection
 -- before it forks; a stalled display must not hold a borrower longer.
@@ -63,7 +63,7 @@ local function owner_command(mode, path)
 	if not loaded or type(uv.exepath) ~= "function" then return nil end
 	local executable = uv.exepath()
 	if type(executable) ~= "string" or executable:sub(1, 1) ~= "/" then return nil end
-	local worker = require("core.fs.engine.paths").driver_root() .. "/adapters/clipboard_owner_worker.lua"
+	local worker = require("core.fs.engine.paths").driver_root() .. "/clipboard/adapters/owner_worker.lua"
 	local parts = { "timeout", tostring(OWNER_TIMEOUT_S), Shell.quote(executable), Shell.quote(worker), mode, kind,
 		Shell.quote(soname) }
 	if path then parts[#parts + 1] = Shell.quote(path) end
@@ -92,7 +92,7 @@ end
 --- @return boolean taken
 function M.write(targets)
 	assert(type(targets) == "table" and #targets > 0, "clipboard owner needs at least one target")
-	local Worker = require("adapters.clipboard_owner_worker")
+	local Worker = require("clipboard.adapters.owner_worker")
 	local runtime_dir = os.getenv("XDG_RUNTIME_DIR")
 	local made, path = Shell.exec_checked(runtime_dir and runtime_dir ~= ""
 		and "mktemp -p " .. Shell.quote(runtime_dir) .. " ergopti-clipboard.XXXXXX" or "mktemp")

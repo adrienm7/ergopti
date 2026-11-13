@@ -15,7 +15,7 @@ local fixture = require("tests.support.text_owner_fixture")
 --- @param body function Receives result, wire, writes, state and stopped count.
 local function injection(boundary, body)
 	fixture.with(function(guard, state)
-		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
+		local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
 			"adapters.keyboard_layout", "modules.hotstrings.injector", "platform.input.keyboard_hook", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -82,7 +82,7 @@ local function injection(boundary, body)
 				transition("lookup")
 				return shortcut(...)
 			end
-			helpers.load_module("adapters.clipboard")
+			helpers.load_module("clipboard.adapters.clipboard")
 			injector = helpers.load_module("modules.hotstrings.injector")
 			injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
 				if code == 47 and value == 1 then

@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
-local names = { "modules.hotstrings.injector", "adapters.clipboard", "modules.hotstrings.output_transaction",
+local names = { "modules.hotstrings.injector", "clipboard.adapters.clipboard", "modules.hotstrings.output_transaction",
 	"adapters.keyboard_layout", "adapters.xkb_capture", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
 	"core.logger.engine.shim", "platform.input.keyboard_hook", "platform.input.modifier_broker", "platform.input.modifier_custody", "platform.input.uinput_writer" }
 

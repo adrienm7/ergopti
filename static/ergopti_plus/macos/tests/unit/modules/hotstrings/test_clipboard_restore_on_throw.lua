@@ -47,7 +47,7 @@ helpers.describe("clipboard: a write that throws must not keep the user's clipbo
 
 	helpers.it("the sibling that was already fixed still restores", function()
 		helpers.with_stub_scope({
-			"platform.input.text_sender", "adapters.clipboard", "platform.input.synthetic_input",
+			"platform.input.text_sender", "clipboard.adapters.clipboard", "platform.input.synthetic_input",
 			"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
 			"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 		}, function()

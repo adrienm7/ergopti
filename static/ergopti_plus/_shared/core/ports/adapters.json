@@ -6,9 +6,9 @@
 			"macos": "static/ergopti_plus/macos/apps/adapters/launcher.lua"
 		},
 		"Clipboard": {
-			"windows": "static/ergopti_plus/windows/adapters/clipboard.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/clipboard.lua",
-			"linux": "static/ergopti_plus/linux/adapters/clipboard.lua"
+			"windows": "static/ergopti_plus/windows/clipboard/adapters/clipboard.ahk",
+			"macos": "static/ergopti_plus/macos/clipboard/adapters/clipboard.lua",
+			"linux": "static/ergopti_plus/linux/clipboard/adapters/clipboard.lua"
 		},
 		"Crypto": {
 			"windows": "static/ergopti_plus/windows/core/crypto/crypto.ahk",

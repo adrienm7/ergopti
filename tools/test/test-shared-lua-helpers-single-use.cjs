@@ -189,7 +189,7 @@ const ALLOWED = {
 			reason: 'arg[0] has its backslashes rewritten to "/" first, which native_path never does'
 		}
 	},
-	'linux/adapters/clipboard_owner_worker.lua': {
+	'linux/clipboard/adapters/owner_worker.lua': {
 		basename: {
 			count: 1,
 			reason:

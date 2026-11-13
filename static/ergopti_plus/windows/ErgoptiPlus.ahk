@@ -400,7 +400,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 ; WinGet* from the domain modules. Loaded before any infra/ or module/ file
 ; that references adapter functions (e.g. NI_GetSsidHash in keystats_network).
 #Include core/crypto/crypto.ahk
-#Include adapters/clipboard.ahk
+#Include clipboard/adapters/clipboard.ahk
 #Include core/events/timer_scheduler.ahk
 #Include core/fs/adapters/file_system.ahk
 ; Crash-safe multi-file config transitions bind strict Windows-only filesystem

@@ -347,7 +347,7 @@ if os.getenv("ERGOPTI_E2E_GESTURE_PUMP") == "fails" then
 end
 
 if TAP_WRAP ~= "none" or TAP_COLLISION then
-	local Clipboard = require("adapters.clipboard")
+	local Clipboard = require("clipboard.adapters.clipboard")
 	Clipboard.read_primary = function()
 		selection.reads = selection.reads + 1
 		return true, selection.primary

@@ -1,4 +1,4 @@
---- adapters/clipboard.lua
+--- clipboard/adapters/clipboard.lua
 
 --- ==============================================================================
 --- MODULE: Clipboard Adapter (Linux)
@@ -43,7 +43,7 @@ local Shell = require("core.process.adapters.shell_runner")
 local DisplayServer = require("core.ui.engine.display_server")
 local EvdevCodes = require("platform.input.evdev_codes")
 
-local LOG = "adapters.clipboard"
+local LOG = "clipboard.adapters.clipboard"
 
 
 
@@ -147,9 +147,9 @@ local function backend()
 				list_types = string.format(
 					"timeout %d xclip -selection clipboard -t TARGETS -o 2>/dev/null", IO_TIMEOUT_S),
 				-- xclip exits 1 on an ownerless clipboard and on a failed read alike.
-				owned = function() return (require("adapters.x11_selection_stamp").owned()) end,
+				owned = function() return (require("clipboard.adapters.x11_selection_stamp").owned()) end,
 				-- Gives an unowned clipboard back unowned, not as an owned "" entry.
-				clear = function() return (require("adapters.x11_selection_stamp").disown()) == true end,
+				clear = function() return (require("clipboard.adapters.x11_selection_stamp").disown()) == true end,
 				read_target = function(target)
 					return string.format("timeout %d xclip -selection clipboard -t %s -o 2>/dev/null", IO_TIMEOUT_S,
 						Shell.quote(target))
@@ -294,7 +294,7 @@ end
 --- Raw readers may return NUL, but the literal sh -c writer cannot carry it.
 --- The text writers offer a single type: a clipboard holding HTML, an image
 --- or copied files next to its text is saved format by format and restored
---- by the native multi-format owner (adapters/clipboard_owner.lua), as
+--- by the native multi-format owner (clipboard/adapters/owner.lua), as
 --- Windows (ClipboardAll) and macOS (readAllData) restore it. Where that
 --- owner cannot run, refuse before an owner acquires restoration debt or
 --- mutates the clipboard.
@@ -337,7 +337,7 @@ local function read_restorable_snapshot(selected_backend)
 		return true, { text = contents }, nil
 	end
 	-- Format names only: they describe the clipboard, not its content.
-	if not require("adapters.clipboard_owner").available() then
+	if not require("clipboard.adapters.owner").available() then
 		Logger.warn(LOG, "Clipboard also holds %s, and no multi-format owner runs on this session; borrowing refused.",
 			table.concat(lost, ", "))
 		return false, nil, "clipboard_snapshot_not_restorable"
@@ -353,7 +353,7 @@ end
 --- @return boolean
 local function restore_snapshot(selected_backend, snapshot)
 	if snapshot.unowned then return selected_backend.clear() == true end
-	if snapshot.targets then return require("adapters.clipboard_owner").write(snapshot.targets) end
+	if snapshot.targets then return require("clipboard.adapters.owner").write(snapshot.targets) end
 	return write_backend_checked(selected_backend, snapshot.text)
 end
 
@@ -412,18 +412,18 @@ end
 --- CLIPBOARD owner's TIMESTAMP (ICCCM), which a toolkit renews each time it
 --- takes the selection, so copying the same text again still moves it; xclip
 --- reads it, and libX11 directly when xclip is absent
---- (adapters/x11_selection_stamp.lua). Wayland gives clients no timestamp:
+--- (clipboard/adapters/x11_selection_stamp.lua). Wayland gives clients no timestamp:
 --- there the count of selection changes a `wl-paste --watch` child saw
---- (adapters/wayland_selection_counter.lua) stands in, and a compositor with
+--- (clipboard/adapters/wayland_selection_counter.lua) stands in, and a compositor with
 --- no data-control (GNOME) leaves it nil with its reason, the copy unchecked.
 --- @return number|nil counter
 --- @return string|nil reason Why there is none: "unsupported" when the session
 ---   can never have one, "unreadable" when this read failed.
 function M.change_counter()
-	if DisplayServer.is_wayland() then return require("adapters.wayland_selection_counter").read() end
+	if DisplayServer.is_wayland() then return require("clipboard.adapters.wayland_selection_counter").read() end
 	if not DisplayServer.is_x11() then return nil, "unsupported" end
 	if not Shell.has_command("xclip") then
-		return require("adapters.x11_selection_stamp").read(tonumber(COUNTER_TIMEOUT_S))
+		return require("clipboard.adapters.x11_selection_stamp").read(tonumber(COUNTER_TIMEOUT_S))
 	end
 	local ok, output = Shell.exec_checked(string.format(
 		"timeout %s xclip -selection clipboard -t TIMESTAMP -o 2>/dev/null", COUNTER_TIMEOUT_S))

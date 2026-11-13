@@ -489,7 +489,7 @@
 			"os": "macos",
 			"tool": "`/usr/bin/mdfind`",
 			"programs": ["mdfind"],
-			"used_for": "Spotlight's list of the other installed copies the Accessibility dialog names (`macos/adapters/accessibility_copies.lua`)",
+			"used_for": "Spotlight's list of the other installed copies the Accessibility dialog names (`macos/clipboard/adapters/accessibility_copies.lua`)",
 			"today": "System",
 			"current_class": "SYS",
 			"version_needed": "n/a",

@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local uv, Shell = require("luv"), require("core.process.adapters.shell_runner")
 -- Complete native constructors before replacing the session-specific ports.
-require("adapters.clipboard")
+require("clipboard.adapters.clipboard")
 
 local function read(path)
 	local file = io.open(path, "rb")
@@ -29,7 +29,7 @@ end
 --- @param route string Desktop clipboard executable.
 --- @param body function Receives clipboard and the private process state.
 local function with_backend(route, body)
-	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
+	local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-clipboard-bound-XXXXXX"))
@@ -65,14 +65,14 @@ local function with_backend(route, body)
 			is_wayland = function() return route == "wl-copy" end,
 			is_x11 = function() return route ~= "wl-copy" end,
 		}
-		package.loaded["adapters.clipboard"] = nil
+		package.loaded["clipboard.adapters.clipboard"] = nil
 		state.expected = "timeout 1 " .. command
 		state.delay = function(enabled)
 			if enabled then write(root .. "/delayed", "yes") else os.remove(root .. "/delayed") end
 		end
 		state.current = function() return read(root .. "/current") end
 		state.input = function() return read(root .. "/stdin") end
-		body(require("adapters.clipboard"), state)
+		body(require("clipboard.adapters.clipboard"), state)
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 	local cleaned = Shell.run("rm -rf " .. Shell.quote(root))
