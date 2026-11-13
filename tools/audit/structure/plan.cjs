@@ -1597,6 +1597,40 @@ function scanFile(file, text, ctx) {
 				oldRepo: `${PREFIX}${treeGains[0].parent}`
 			});
 		}
+		// One element per line, each the same base joined to a folder name:
+		// { DRIVER_ROOT .. "ui", DRIVER_ROOT .. "adapters", … }. The gained
+		// folder is one more line of the same form after the last of them.
+		const element =
+			/^([ \t]*)([A-Za-z_][\w.]*(?:\(\))?)\s*\.\.\s*(["'])([a-z_]+)(\/?)\3\s*,[ \t]*$/;
+		const lines = text.split('\n');
+		for (let i = 0; i < lines.length; ) {
+			const first = lines[i].match(element);
+			if (!first) {
+				i++;
+				continue;
+			}
+			let j = i + 1;
+			while (j < lines.length) {
+				const next = lines[j].match(element);
+				if (!next || next[2] !== first[2] || next[1] !== first[1]) break;
+				j++;
+			}
+			if (j - i >= 2) {
+				const names = lines.slice(i, j).map((l) => l.match(element)[4]);
+				const to = [...new Set(gainsFor(names).map((g) => g.to))];
+				if (to.length) {
+					const block = lines.slice(i, j).join('\n');
+					const [, indent, base, quote, , slash] = first;
+					const added = to
+						.map((t) => `\n${indent}${base} .. ${quote}${t}${slash}${quote},`)
+						.join('');
+					add('tree-list', block, `${block}${added}`, {
+						oldRepo: `${PREFIX}${treeGains[0].parent}`
+					});
+				}
+			}
+			i = j;
+		}
 		// \.(ahk|lua) is a list of extensions, whatever folders share the names.
 		for (const m of text.matchAll(/(?<!\\\.)\(((?:[a-z_]+\|)+[a-z_]+)\)/g)) {
 			const names = m[1].split('|');
