@@ -332,7 +332,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.open_list_vars`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 - [ ] `sg_actions.open_key_history`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 
-## linux — 69 actions not declared
+## linux — 55 actions not declared
 
 - [ ] `sg_actions.lookup`: macOS only: Look Up opens the system dictionary panel on the word under the pointer. Windows and Linux have no system dictionary panel.
 - [ ] `sg_actions.system_app_switcher`: macOS only: macOS switches between applications, each holding its windows. Windows and Linux switch between windows with Alt+Tab: use the equivalent action. Equivalent actions: `app_switcher`.
@@ -367,20 +367,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.alt_tab_windows`: This system offers the same action under another name: use the equivalent action. Equivalent actions: `win_next`.
 - [ ] `sg_actions.spotlight`: macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead.
 - [ ] `sg_actions.sticky_shift`: This system offers the same action under another name: use the equivalent action. Equivalent actions: `one_shot_shift`.
-- [ ] `sg_actions.sticky_ctrl`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_cmd`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_option`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_cmd_shift`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_cmd_option`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_cmd_ctrl`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_option_shift`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_option_ctrl`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_ctrl_shift`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_cmd_option_shift`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_cmd_option_ctrl`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_cmd_shift_ctrl`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_option_shift_ctrl`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
-- [ ] `sg_actions.sticky_hyper`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
 - [ ] `sg_actions.open_console`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 - [ ] `sg_actions.open_window_spy`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 - [ ] `sg_actions.open_list_vars`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.

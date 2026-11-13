@@ -1270,9 +1270,18 @@ candidate must not mask the repeat (macOS and Linux); Windows still lets it.
 Aligned on Windows (`one_shot_shift`) and macOS (`sticky_shift`): the one-shot
 Shift is a catalogue action any origin can run (gesture, keyboard slot, tap),
 with the shared results, magic-key and title rules; system StickyKeys is not
-its equivalent. Key-combination chords keep refusing it on every OS. Linux
-still offers it on tap-holds and tap keys only (`platform_reason.action_sticky_keys_are_the_systems`)
-until a non-keyboard origin can arm the engine.
+its equivalent. Key-combination chords keep refusing it on every OS.
+
+## Every one-shot modifier exists on every OS (13 November 2026)
+
+Every `sticky_*` action (single modifiers, combined chords such as Ctrl+Shift
+or Win+Ctrl, Hyper) runs on Windows, macOS and Linux; system Sticky Keys is not
+their equivalent. Linux arms them in the tap-hold engine
+(`tap_hold_engine.lua` `arm_sticky`, through `keyboard_hook.arm_action_sticky`):
+the next key that is not a modifier goes down wrapped, once, each modifier
+toggling on its own as on macOS. Their timeout is the one-shot Shift's,
+`[tap_holds] sticky_timeout_ms`, where 0 means no time limit
+(`_shared/tap_hold/engine/one_shot_timeout.lua`, AHK `TapHoldValidOneShotTimeoutMs`).
 
 ## An immediate Backspace restores the trigger on every OS (6 November 2026)
 
