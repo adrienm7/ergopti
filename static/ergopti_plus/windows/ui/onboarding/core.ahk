@@ -33,7 +33,7 @@ global _ob_locale := ONBOARDING_FIRST_RUN_LOCALE
 ; it, and the WebView2 host's singleton guard reads it.
 global _ob_gui := 0
 
-; AltGr passthrough switch — read by ``IsRealAltGrPress`` in modules/keymap/layout/layout_altgr.ahk
+; AltGr passthrough switch — read by ``IsRealAltGrPress`` in layouts/engine/registry/altgr.ahk
 ; AND by ``IsOnboardingActive`` below. While it is set every AltGr combination
 ; and AltGr tap-hold owner is false, so the host Windows layout still produces
 ; its AltGr characters in the wizard's edit boxes (and anywhere else the user

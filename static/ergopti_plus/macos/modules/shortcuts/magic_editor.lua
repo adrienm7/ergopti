@@ -12,8 +12,8 @@ local M = {}
 
 local Policy = require("shortcuts.engine.magic_editor_core")
 local Registrar = require("platform.input.hotkey_registrar")
-local Broker = require("adapters.input_source_broker")
-local Probe = require("adapters.keyboard_source_probe")
+local Broker = require("layouts.adapters.input_source_broker")
+local Probe = require("layouts.adapters.keyboard_source_probe")
 local original_source_id = rawget(Probe, "current_source_id")
 local original_request = rawget(Probe, "request")
 local FileSystem = require("core.fs.adapters.file_system")
@@ -40,7 +40,7 @@ local _cancel_depth = 0
 --- Retains the exact source issuer loaded before any external constructor read.
 --- Replacement values cannot publish signed-source proof through this owner.
 local function probe_current()
-	return rawequal(package.loaded["adapters.keyboard_source_probe"], Probe)
+	return rawequal(package.loaded["layouts.adapters.keyboard_source_probe"], Probe)
 		and getmetatable(Probe) == nil and type(original_source_id) == "function"
 		and type(original_request) == "function"
 		and rawequal(rawget(Probe, "current_source_id"), original_source_id)

@@ -74,7 +74,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 		queues[target][#queues[target] + 1] = InputEvent.encode(ev[1], ev[2], ev[3], nil, ev[4])
 	end
 	local grabs = { [keyboard] = { on = 0, off = 0 }, [pointer] = { on = 0, off = 0 }, [second] = { on = 0, off = 0 } }
-	local doubled, saved = { "hotstrings.engine.device_finder", "adapters.xkb_capture" }, {}
+	local doubled, saved = { "hotstrings.engine.device_finder", "layouts.adapters.xkb_capture" }, {}
 	for _, name in ipairs(doubled) do saved[name] = package.loaded[name] end
 	package.loaded["hotstrings.engine.device_finder"] = {
 		find_devices = function() return { keyboard }, { pointer } end,
@@ -82,7 +82,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 		is_interceptable_key_device = function() return true, nil end,
 		is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 	}
-	package.loaded["adapters.xkb_capture"] = {
+	package.loaded["layouts.adapters.xkb_capture"] = {
 		is_ready = function() return true end,
 		reset_state = function() return true end,
 		process = function() return nil, nil, nil end,

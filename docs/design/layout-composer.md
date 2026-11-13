@@ -166,15 +166,15 @@ page sends (bounds, schema, name, map set) and never trust it.
   (6, 7, 5) and falls back to the Command level when the layout selects none;
   every other layout still types all chords from its Command level, so Ergopti
   and Ergo-L type exactly as before. Boot never downloads `composed`. The host
-  is `windows/ui/layout_manager/composer.ahk`.
+  is `windows/layouts/ui/layout_manager/composer.ahk`.
 - **macOS.** The file is installed as a system input source by the code that
-  installs a registry layout (`macos/modules/keymap/layout_registry.lua`,
+  installs a registry layout (`macos/layouts/engine/registry/registry.lua`,
   `install_local`). Karabiner is not involved: the system types the layout. No
   file of `macos/platform/remap/` is touched. As for an updated registry
   layout, macOS may read a rewritten file only after the input source is
   toggled or the user logs in again.
 - **Linux.** The file goes through the converter the registry layouts use
-  (`static/ergopti/linux/xkb_generation`, `linux/modules/keymap/layout_registry.lua`,
+  (`static/ergopti/linux/xkb_generation`, `linux/layouts/engine/registry/registry.lua`,
   `install_local`, with a one-layout index written next to the copy). XKB has
   one level for every chord modifier (Level5 of `ERGOPTI_SEVEN_LEVEL`), which
   the converter fills from the keyMap the Command modifier selects, here the
@@ -250,7 +250,7 @@ The check never overwrites a user's composition: when one exists it is only
 verified. It selects nothing and reloads nothing. The result is one evidence
 record (`check=composer verdict=... steps=N id=state:value ...`, values from a
 closed grammar, never a path or a name) and a window with a « Copy report »
-button. The steps live in `windows/ui/layout_manager/composer_check.ahk` on
+button. The steps live in `windows/layouts/ui/layout_manager/composer_check.ahk` on
 Windows and in `_shared/layouts/engine/composer/check_core.lua` on macOS and Linux
 (`_shared/tests/lua/layouts/composer_check_contract.lua` replays them over each
 registry).

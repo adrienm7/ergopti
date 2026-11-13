@@ -109,28 +109,28 @@ host platform; `LayoutSourceIO.emulationTable(doc, "windows")`). Bounds and file
 
 **Files and functions.**
 
-1. `windows/ui/layout_manager/init.ahk`: add `source_open`, `source_save`, `nav_save`, `composer_emulate` (and
+1. `windows/layouts/ui/layout_manager/init.ahk`: add `source_open`, `source_save`, `nav_save`, `composer_emulate` (and
    `source_pick` if WebView2's chooser is not enough) to `LAYMGR_ACTIONS`; the three flags in the `initData` that
    `LayoutManager_HandleMessage` pushes on `ready`; `LayoutManager_OpenEditor()` = `LayoutManager_Open()` then, once
    `ready` arrives (`_LayMgrWeb_OnNavigationCompleted` / the page's `ready`), the same answer as `source_open`. Then
    empty `windowsPending` in `tools/test/test-layout-manager-page.cjs`.
-2. `windows/ui/layout_manager/source_store.ahk` (new): the rules of `_shared/layouts/engine/composer/source_store.lua` (file
+2. `windows/layouts/ui/layout_manager/source_store.ahk` (new): the rules of `_shared/layouts/engine/composer/source_store.lua` (file
    name `^[a-z][a-z0-9_]*\.(toml|keylayout)$`, at most `max_name_length`, UTF-8 text at most `max_file_bytes`, folder
    `layout_sources\`, `last_file`), replaying its Lua tests' cases.
-3. `windows/ui/layout_manager/composer.ahk`: `LayoutComposer_Handle` gains the source form of `composer_save` and
+3. `windows/layouts/ui/layout_manager/composer.ahk`: `LayoutComposer_Handle` gains the source form of `composer_save` and
    `composer_emulate`. Both store the three files in `layout_composer\` and delete `composition.json`.
    - `composer_emulate` installs nothing: it writes `[layout] emulated_layout = "composed"` and
      `ergopti_base = true` (the leaves `_LayMgrWeb_SelectionOperations` already writes for a registry choice) and
      reloads the emulation.
    - `composer_save` stages the DLL images the page sent and registers them through the elevated helper (below),
      then switches to the layout.
-4. `windows/modules/keymap/keylayout/keylayout_emulation.ahk`: in `KeylayoutEmulation_Boot`, when the id is the
+4. `windows/layouts/engine/keylayout/emulation.ahk`: in `KeylayoutEmulation_Boot`, when the id is the
    composer's and `read_local` fails, read `layout_composer\layout_source.keylayout` (what `read_composed` does on
    macOS and Linux) instead of logging « save it again »; and perform `layout_source_emulation.json` for what the
    `.keylayout` cannot hold (tap-holds, layer holds, multi-character outputs): an AHK port of
    `_shared/layouts/engine/composer/source_emulation.lua`, tested by replaying `_shared/tests/corpus/layouts/source/
 emulation_vectors.json` like `test-layout-source-emulation.cjs` does.
-5. `windows/ui/layout_manager/kbd_register.ahk` (new): the elevated helper below, `install <staging dir>` and
+5. `windows/layouts/ui/layout_manager/kbd_register.ahk` (new): the elevated helper below, `install <staging dir>` and
    `uninstall <dll>`.
 6. Menu: in `_shared/menu/data/menu.toml` row `open_layout_editor`, drop `platforms`, `unavailable` and `reason_key`
    (and the locale key `platform_reason.layout_editor_is_on_the_website_on_windows`); in `windows/menu/ui/builder/menu_init.ahk`

@@ -33,7 +33,7 @@ local function with_scope(body, source, chord_j_identity)
 			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
 				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "gestures.engine.manager",
 				"infra.shortcuts_scope", "menu.ui.builder.builder", "modules.shortcuts.key_combinations",
-				"platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
+				"platform.remap.tap_hold_manager", "layouts.adapters.xkb_capture", "modules.shortcuts.physical_collisions",
 				"hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }) do
 				package.loaded[name] = nil
 			end
@@ -171,7 +171,7 @@ local function with_scope(body, source, chord_j_identity)
 					return tokens[token] ~= nil and not controls.source_refused
 				end,
 			}
-			package.loaded["adapters.xkb_capture"] = controls.capture
+			package.loaded["layouts.adapters.xkb_capture"] = controls.capture
 			local backup = path .. ".shortcuts-test-backup"
 			local scope = require("infra.shortcuts_scope").new({ path = path, backup_path = backup,
 				files = files })
@@ -285,7 +285,7 @@ helpers.describe("Linux actual physical edit scope", function()
 					end
 				end
 				if seam=="admission_lease" then options.admission=function() reenter();return {master=true,paused=false,inhibited=false} end
-				else package.loaded["adapters.xkb_capture"].source_generation=function() reenter();return 1 end end
+				else package.loaded["layouts.adapters.xkb_capture"].source_generation=function() reenter();return 1 end end
 				for _,callback in ipairs(controls.queued) do callback() end
 				helpers.assert_true(entered,"controlled callback ran")
 				helpers.assert_eq(controls.executed,{},"old frame cannot execute after callback reentry")

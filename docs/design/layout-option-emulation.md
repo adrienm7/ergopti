@@ -27,7 +27,7 @@ named machine before the slice that depends on it starts.
 
 ## 1. What Windows does today (the behaviour all three must type)
 
-Read in `windows/modules/keymap/layout/layout_shift_caps.ahk`,
+Read in `windows/layouts/engine/registry/shift_caps.ahk`,
 `number_row_send.ahk`, `modules/keymap/layout.ahk` and the shared policy
 `_shared/settings/data/features/number_row_policy.ahk`.
 
@@ -203,7 +203,7 @@ Result of the second version (macOS 26.6.2, arm64):
 - A bundle with a made-up identifier was not listed at all.
 
 What the repository already does on this Mac, and why it works: the driver never calls
-`TISEnableInputSource` for a layout. `macos/modules/keymap/input_sources.lua` adds
+`TISEnableInputSource` for a layout. `macos/layouts/engine/input_sources.lua` adds
 `{InputSourceKind = "Keyboard Layout", "KeyboardLayout ID" = <integer id of the
 .keylayout>, "KeyboardLayout Name" = <name>}` to `AppleEnabledInputSources` of
 `com.apple.HIToolbox` (`defaults export`, edit, `defaults import`) and restarts
@@ -247,7 +247,7 @@ Implemented (30 October), macOS:
   `defaultIndex`) is first routed to a verbatim copy of it, so shortcuts keep the layout's
   cells. `tools/test/test-keylayout-row-options.cjs` converts the edited file and requires
   the converter's own output for the same options.
-- `macos/modules/keymap/layout_rows_build.lua` is the sequence above with the preferences
+- `macos/layouts/engine/registry/rows_build.lua` is the sequence above with the preferences
   route in step 4 (P5) instead of `TISEnableInputSource`, and with step 6 as the launcher's
   `--keyboard-source-probe` on the exact selected source (base level; the swap is visible
   there). Builds are `~/Library/Keyboard Layouts/ErgoptiRows-<n>.keylayout`, named

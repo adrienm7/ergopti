@@ -64,7 +64,7 @@ helpers.describe("layout_install: user installation is POSIX-quoted", function()
 		package.loaded["core.fs.adapters.file_system"] = { classify_no_follow = function() return { mode = "directory" }, "ok" end }
 		local ok, err = xpcall(function()
 			local dispatched
-			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+			local install = helpers.load_with_stubs("layouts.engine.registry.install", {
 				execute = function(command) dispatched = command; return "", false end,
 			})
 			local text_utils = require("core.text.engine.utils")

@@ -76,7 +76,7 @@ helpers.describe("direct task callbacks: exceptions reach the file-logger bounda
 		local completion
 		package.loaded["core.logger.engine.logger"] = capturing_logger(errors)
 		package.loaded["core.process.adapters.task_lifecycle"] = nil
-		local InputSources = helpers.load_with_stubs("modules.keymap.input_sources", {
+		local InputSources = helpers.load_with_stubs("layouts.engine.input_sources", {
 			task = { new = function(_, cb)
 				completion = cb
 				return { start = function(self) return self end }

@@ -19,7 +19,7 @@ local ROW = "menu.layout.virtual_keyboard"
 --- @param ctx table Menu context.
 --- @return table rendered submenu rows
 local function tray_rows(ctx)
-	local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+	local layout = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 	local ManifestMenu = LayoutFixture.install(require("core.i18n.engine.i18n"))
 	local item = layout.build(ctx)
 	local row = ManifestMenu.render_rows({ item }, "top_level")[1]
@@ -88,7 +88,7 @@ helpers.describe("layout submenu: the Karabiner virtual keyboard is one choice r
 	end)
 
 	helpers.it("defaults to the manifest's value", function()
-		local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+		local layout = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 		helpers.assert_eq(layout.DEFAULT_STATE.layout_virtual_keyboard,
 			require("menu.engine.manifest_reader").default_for("layout.virtual_keyboard"))
 		helpers.assert_eq(layout.DEFAULT_STATE.layout_virtual_keyboard, "auto")

@@ -69,7 +69,7 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 			s.value, s.cleared = "", true
 			return true
 		end }
-		package.loaded["adapters.keyboard_layout"] = {
+		package.loaded["layouts.adapters.keyboard_layout"] = {
 			shortcut_keycode = function(char, fallback)
 				s.layout_calls = s.layout_calls + 1
 				assert(char == "v" and fallback == 47)

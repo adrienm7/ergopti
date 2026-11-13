@@ -41,7 +41,7 @@ local LLMBridge  = require("ai.engine.bridge")
 local CoreStateM = require("hotstrings.engine.expander.state")
 local TerminatorReplay = require("hotstrings.engine.expander.terminator_replay")
 local MagicKeySource = require("hotstrings.engine.expander.magic_key_source")
-local LayoutEmulation = require("modules.keymap.layout_emulation")
+local LayoutEmulation = require("layouts.engine.registry.emulation")
 local Terminators = require("layouts.engine.layers.terminators")
 local Perf       = require("core.logger.engine.perf")
 local HotPath    = require("infra.hotpath_profiler")
@@ -2979,7 +2979,7 @@ function M.tap_copy_statistics()
 end
 
 --- Starts the eventtap listeners and attaches them to the OS event queue.
---- Starts the layout emulation owner (modules/keymap/layout_emulation.lua) once
+--- Starts the layout emulation owner (layouts/engine/registry/emulation.lua) once
 --- per Lua VM, before the keymap tap: the tap rewrites key-downs through it. The
 --- boot calls it; a layout that cannot be emulated is logged by its owner and
 --- leaves the system layout typing.

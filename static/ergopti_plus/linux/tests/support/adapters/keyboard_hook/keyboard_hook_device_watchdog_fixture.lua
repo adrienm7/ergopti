@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 --- of weakening the fail-closed startup guard.
 --- @return table keyboard_hook
 local function load_hook()
-	local name = "adapters.xkb_capture"
+	local name = "layouts.adapters.xkb_capture"
 	local saved = package.loaded[name]
 	package.loaded[name] = {
 		is_ready = function() return true end,
@@ -181,9 +181,9 @@ local function aggregate_consumer_session(streams, options)
 		close = function() return true end,
 	})
 	assert(writer.open()); session.cap = assert(writer.capture_output()); session.writer = writer
-	local saved_xkb = package.loaded["adapters.xkb_capture"]
+	local saved_xkb = package.loaded["layouts.adapters.xkb_capture"]
 	local held = {}
-	package.loaded["adapters.xkb_capture"] = {
+	package.loaded["layouts.adapters.xkb_capture"] = {
 		is_ready = function() return true end,
 		reset_state = function() held = {}; return true end,
 		modifier_role = function(code)
@@ -199,7 +199,7 @@ local function aggregate_consumer_session(streams, options)
 		caps_locked = function() return false end,
 	}
 	local hook = helpers.load_module("platform.input.keyboard_hook")
-	package.loaded["adapters.xkb_capture"] = saved_xkb
+	package.loaded["layouts.adapters.xkb_capture"] = saved_xkb
 	session.hook = hook
 	if options.engine then assert(hook.set_remapper(options.engine)) end
 	hook.start({ intercept = true, onChar = function(char) session.chars[#session.chars + 1] = char end,
@@ -227,12 +227,12 @@ local function aggregate_consumer_session(streams, options)
 		for _, path in pairs(paths) do os.remove(path) end
 	end
 	function session.inject_text(text)
-		local saved = package.loaded["adapters.xkb_capture"]
-		package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
-		local layout = helpers.load_module("adapters.keyboard_layout")
+		local saved = package.loaded["layouts.adapters.xkb_capture"]
+		package.loaded["layouts.adapters.xkb_capture"] = { caps_locked = function() return false end }
+		local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 		layout._set_table_for_test({ x = { keycode = 45, level = 1, mods = {} } })
 		local injector = helpers.load_module("hotstrings.engine.injector")
-		package.loaded["adapters.xkb_capture"] = saved
+		package.loaded["layouts.adapters.xkb_capture"] = saved
 		injector._set_uinput(writer); injector._set_nanosleep_for_test(function() end)
 		local result = injector.type_directly(text)
 		injector._set_uinput(nil)

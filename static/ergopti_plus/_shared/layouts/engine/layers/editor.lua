@@ -7,7 +7,7 @@
 --- (_shared/ui/layer_editor) do with the page's messages, without any window:
 --- the payload init() receives, the legends of the user's layout, and the
 --- validation and write of a save. The Windows host implements the same
---- contract in windows/ui/layer_editor/init.ahk.
+--- contract in windows/layouts/ui/layer_editor.ahk.
 ---
 --- FEATURES & RATIONALE:
 --- 1. A saved file must load without a single error on every OS. The page only

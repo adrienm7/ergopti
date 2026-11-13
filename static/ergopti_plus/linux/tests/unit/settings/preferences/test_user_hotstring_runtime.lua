@@ -24,7 +24,7 @@ local NativeConfigPaths = require("settings.engine.paths")
 -- Canonical source discovery also loads the installed-layout registry and its
 -- updater/storage readers. They capture paths at require time, so fixture paths
 -- and every such module owner must be scoped together, including false/nil caches.
-local DISCOVERY_OWNERS = { "core.fs.adapters.storage", "modules.updater.manager", "modules.keymap.layout_registry", "core.i18n.engine.i18n" }
+local DISCOVERY_OWNERS = { "core.fs.adapters.storage", "modules.updater.manager", "layouts.engine.registry.registry", "core.i18n.engine.i18n" }
 
 local function drain()
 	for _ = 1, 16 do
@@ -254,7 +254,7 @@ helpers.describe("programmable native Linux runtime", function()
 				helpers.assert_eq(type(storage), "table", "real discovery must never poison the LuaJIT require cache")
 				helpers.assert_eq(type(storage.get), "function")
 				helpers.assert_eq(type(require("modules.updater.manager").installed_channel), "function")
-				helpers.assert_eq(type(require("modules.keymap.layout_registry").settings), "function")
+				helpers.assert_eq(type(require("layouts.engine.registry.registry").settings), "function")
 				helpers.assert_eq(require("core.fs.adapters.storage"), storage, "repeated require retains the actual admitted reader")
 			end)
 		end)

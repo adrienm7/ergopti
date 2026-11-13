@@ -234,7 +234,7 @@ function M.extension_roots()
 		roots[#roots + 1] = shared .. "/../extensions"
 	end
 	-- Resolve lazily: the layout registry itself imports Paths at module load.
-	local LayoutRegistry = require("modules.keymap.layout_registry")
+	local LayoutRegistry = require("layouts.engine.registry.registry")
 	-- The installed-layouts record may have been written by another build or
 	-- cut short by a crash or a sync tool. Its layouts' packs are then missing
 	-- from this load, reported, while the bundled and the user's packs still

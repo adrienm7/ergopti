@@ -20,8 +20,8 @@ handle:close()
 -- Control: the server really holds the name xkbcomp cannot print back.
 assert(printed:find("\\037777777", 1, true), "the fixture layout name is not the corrupted one")
 
-local KeyboardLayout = require("adapters.keyboard_layout")
+local KeyboardLayout = require("layouts.adapters.keyboard_layout")
 assert(KeyboardLayout.refresh(), "the keymap of a layout with a non-ASCII name was refused")
-local generation, reason = require("adapters.xkb_capture").source_generation()
+local generation, reason = require("layouts.adapters.xkb_capture").source_generation()
 assert(generation ~= nil, "the desktop source is not acknowledged: " .. tostring(reason))
 print("a non-ASCII layout name keeps keystroke typing on X11")

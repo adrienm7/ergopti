@@ -50,7 +50,7 @@ const VENDOR_WORDS =
 // code whose names we did not choose. tests/ mirrors the source tree, so a test
 // named after a vendor is a symptom of the source, not a separate offence.
 const EXEMPT =
-	/[/\\](platform|adapters|vendor|tests|docs|core|settings|tray|ai|apps|clipboard|diagnostics|hotstrings|keyboard)[/\\]/;
+	/[/\\](platform|adapters|vendor|tests|docs|core|settings|tray|ai|apps|clipboard|diagnostics|hotstrings|keyboard|layouts)[/\\]/;
 
 // Frozen baseline — driver-tree paths naming an OS or vendor outside the seam.
 // Drive to zero; NEVER raise it.

@@ -10,7 +10,7 @@ local function fixture()
 	local token, leases = {}, {}
 	local receiver = function() error("observer must never invoke receiver") end
 	local domain = { on_message = assert(load([[local ready=false; return function() return ready end]],
-		"@" .. root .. "/macos/ui/layout_manager/init.lua"))() }
+		"@" .. root .. "/macos/layouts/ui/layout_manager/init.lua"))() }
 	local entry = { controller = controller, routes = {} }
 	local lease = { token = token, view = view, receiver = receiver, entry = entry, committed = true }
 	leases[token], entry.routes[view] = lease, lease
@@ -22,7 +22,7 @@ local function fixture()
 		return function(clear)
 			if clear then _webview,_usercontent,_controller,_controller_lease=nil,nil,nil,nil end
 			return _webview,_usercontent,_controller,_controller_lease,ControllerPool
-		end]], "@" .. root .. "/macos/ui/layout_manager/init.lua"))(view, controller, domain, token, pool)
+		end]], "@" .. root .. "/macos/layouts/ui/layout_manager/init.lua"))(view, controller, domain, token, pool)
 	return { open = open }, lease, entry, leases, view, controller, pool
 end
 
@@ -81,11 +81,11 @@ local function dispatch_control(kind)
 	-- config-key-literal-ok: a controller pool name
 	local token, uc = pool.reserve("layout_manager"); assert(rawequal(uc, controller))
 	local domain = { on_message = assert(load([[local ready=true;return function()return ready end]],
-		"@" .. production .. "/macos/ui/layout_manager/init.lua"))() }
+		"@" .. production .. "/macos/layouts/ui/layout_manager/init.lua"))() }
 	local open = assert(load([[
 		local _webview,_usercontent,_controller,_controller_lease,ControllerPool=...
 		return function() return _webview,_usercontent,_controller,_controller_lease,ControllerPool end]],
-		"@" .. production .. "/macos/ui/layout_manager/init.lua"))(view, controller, domain, token, pool)
+		"@" .. production .. "/macos/layouts/ui/layout_manager/init.lua"))(view, controller, domain, token, pool)
 	local host, depth = { open = open }, 0
 	assert(pool.bind(token, function(message)
 		if kind == "nested" and depth == 0 then depth = 1; callback(message); return end

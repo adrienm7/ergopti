@@ -677,14 +677,14 @@ local function _build(loaded, boot)
 		-- config.toml's [tap_holds] sticky_timeout_ms, or the timing registry's default.
 		one_shot_timeout_ms = loaded.one_shot_timeout_ms,
 		key_text = function(code) return _hook.key_text(code) end,
-		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
+		plan_text = function(text) return (require("layouts.adapters.keyboard_layout").plan(text)) end,
 		one_shot_result = _one_shot_result,
 		-- An AI action is unarmed while the AI is off: the key keeps its own tap.
 		tap_blocked = AiActions.blocked,
 		held_modifiers = function() return _hook.held_modifiers() end,
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,
 		held_shortcut_modifier_codes = function() return _hook.held_shortcut_modifier_codes() end,
-		caps_locked = function() return require("adapters.xkb_capture").caps_locked() end,
+		caps_locked = function() return require("layouts.adapters.xkb_capture").caps_locked() end,
 	})
 	local nav_base, nav_wrapped = engine, false
 	assert(rawget(Combinations,"new")==original_combination_constructor and rawget(Engine,"new")==original_engine_constructor

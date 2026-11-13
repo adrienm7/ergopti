@@ -115,7 +115,7 @@ local function with_remap(files, run)
 		"core.text.engine.toml.codec",
 		"keyboard.engine.runtime.config",
 		"keyboard.engine.runtime.generator",
-		"modules.keymap.layout_registry",
+		"layouts.engine.registry.registry",
 		"keyboard.adapters.runtime.managed_rule_removal",
 		"core.text.engine.toml_codec",
 	}, function()
@@ -137,7 +137,7 @@ local function with_remap(files, run)
 		local fs = memory_file_system(files)
 		package.loaded["core.fs.adapters.file_system"] = fs
 
-		package.loaded["modules.keymap.layout_registry"] = require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
+		package.loaded["layouts.engine.registry.registry"] = require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
 
 		local Config    = helpers.load_with_stubs("keyboard.engine.runtime.config")
 		local Generator = helpers.load_with_stubs("keyboard.engine.runtime.generator")

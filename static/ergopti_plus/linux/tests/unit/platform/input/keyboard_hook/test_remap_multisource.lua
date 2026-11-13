@@ -740,7 +740,7 @@ helpers.describe("physical magic key post-output failure", function()
 			local ok, err = pcall(function()
 				Fixture.with_session({ on_consume = function(_, detail) seen = detail; return Source.on_key(detail) end }, function(s)
 					session = s
-					package.loaded["adapters.xkb_capture"].source_generation = function() return 0 end
+					package.loaded["layouts.adapters.xkb_capture"].source_generation = function() return 0 end
 					Source.init({ is_active = function() return true end, replace_on = function() return true end,
 						magic_key = function() return "★" end, can_type = function() return true end,
 						type_text = function()

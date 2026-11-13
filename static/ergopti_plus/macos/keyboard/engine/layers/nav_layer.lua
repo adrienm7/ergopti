@@ -18,7 +18,7 @@
 ---    (KEYBOARD_FORM): the ANSI virtual keyboard (the Automatic choice) passes
 ---    the ISO pair through unswapped, so an output reaches the keycode the
 ---    physical key itself produces (#99). The ISO product swaps the pair, so
----    outputs are renamed for it (modules/keymap/layout.lua product_key_name).
+---    outputs are renamed for it (layouts/engine/layout.lua product_key_name).
 --- 3. F1-F12 reach the function keys in either top-row mode: sent plain while
 ---    macOS uses them as standard keys, with Fn added while it treats the row as
 ---    media keys (Karabiner's system.use_fkeys_as_standard_function_keys).
@@ -46,7 +46,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.logger")
 local NativePath = require("core.fs.engine.native_path")
-local Layout = require("modules.keymap.layout")
+local Layout = require("layouts.engine.layout")
 
 local LOG = "karabiner.nav_layer"
 

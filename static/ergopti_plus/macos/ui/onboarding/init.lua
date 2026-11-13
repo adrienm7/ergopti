@@ -376,7 +376,7 @@ end
 --- force) so the first step renders correctly on open.
 --- The number-row order capability the page asks, as the Linux bridge answers
 --- it: true when a layout of ours types now (the menu's own availability,
---- modules/keymap/number_row_live.lua), else the locale key of why not.
+--- layouts/engine/emulation/number_row_live.lua), else the locale key of why not.
 --- @return boolean|string
 function M._number_row_capability()
 	local called, available, why = pcall(function() return M._number_row_live().available() end)
@@ -389,7 +389,7 @@ function M._number_row_capability()
 end
 
 --- The live number-row owner; a test seam.
-function M._number_row_live() return require("modules.keymap.number_row_live") end
+function M._number_row_live() return require("layouts.engine.emulation.number_row_live") end
 
 --- The number-row order a batch writes, or nil when it writes none.
 --- @param rows table The batch's `{ section, key, value | delete }` rows.

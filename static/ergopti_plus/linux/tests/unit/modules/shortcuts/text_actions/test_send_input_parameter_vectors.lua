@@ -39,7 +39,7 @@ local function routed_gestures()
 	local names = {
 		combo = "gestures.engine.combo_emitter",
 		injector = "hotstrings.engine.injector",
-		layout = "adapters.keyboard_layout",
+		layout = "layouts.adapters.keyboard_layout",
 		keystats = "modules.keystats.keystats",
 	}
 	local log = { codes = {}, injected = {} }

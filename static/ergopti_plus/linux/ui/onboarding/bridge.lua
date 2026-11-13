@@ -204,7 +204,7 @@ end
 --- @param state table Daemon state; state.number_row_live may replace the module under test.
 --- @return boolean|string
 local function number_row_capability(state)
-	local live = type(state) == "table" and state.number_row_live or require("modules.keymap.number_row_live")
+	local live = type(state) == "table" and state.number_row_live or require("layouts.engine.emulation.number_row_live")
 	local called, available, why = pcall(live.available)
 	if called and available == true then return true end
 	if not called then

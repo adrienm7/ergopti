@@ -44,13 +44,13 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 	end)
 
 	helpers.it("« Create or edit a layout… » opens the layout manager straight on the editor (layout-editor-menu)", function()
-		local saved = package.loaded["ui.layout_manager"]
+		local saved = package.loaded["layouts.ui.layout_manager"]
 		local deferred = 0
 		local window = {
 			menu_command = function() return function() end end,
 			editor_menu_command = function() return function() deferred = deferred + 1 end end,
 		}
-		package.loaded["ui.layout_manager"] = window
+		package.loaded["layouts.ui.layout_manager"] = window
 		local ok, err = pcall(function()
 			local row = tray_row(make_ctx())
 			local editor
@@ -61,7 +61,7 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 			helpers.assert_eq(type(editor.fn), "function")
 			editor.fn()
 		end)
-		package.loaded["ui.layout_manager"] = saved
+		package.loaded["layouts.ui.layout_manager"] = saved
 		helpers.assert_true(ok, tostring(err))
 		helpers.assert_eq(deferred, 1, "the row runs the window's editor command")
 	end)
@@ -115,13 +115,13 @@ end)
 --- Captures actual provider data while forwarding its status and rendering to the real binding.
 --- @param callback function Receives the native build, fixture state and binding.
 local function with_empty_layout(callback)
-	helpers.with_stub_scope({ "ui.menu.menu_keyboard_layout", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
-		"core.fs.adapters.json_codec", "menu.engine.renderer", "modules.keymap.layout_registry" }, function()
-		local module = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+	helpers.with_stub_scope({ "layouts.ui.menu.keyboard_layout", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
+		"core.fs.adapters.json_codec", "menu.engine.renderer", "layouts.engine.registry.registry" }, function()
+		local module = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 		install_legacy_layout_formats()
 		local binding = require("menu.engine.manifest_menu")
 		local state = { selections = 0, installed = false }
-		package.loaded["modules.keymap.layout_registry"] = {
+		package.loaded["layouts.engine.registry.registry"] = {
 			picker = function()
 				return { layouts = state.installed and { { id = "native", name = "Native layout" } } or {}, active = "native" }
 			end,
@@ -258,10 +258,10 @@ end)
 --- Uses the actual empty-source list, canonical binding and native row renderer.
 --- Native effect ports are controlled and expose their launch receipt.
 local function with_empty_source_preferences(callback, labels)
-	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
-		"modules.keymap.input_sources", "modules.keymap.layout_install", "core.process.adapters.shell_runner"}, function()
-		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
-		local installer = require("modules.keymap.layout_install")
+	helpers.with_stub_scope({"layouts.ui.menu.keyboard_layout", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
+		"layouts.engine.input_sources", "layouts.engine.registry.install", "core.process.adapters.shell_runner"}, function()
+		local sources = helpers.load_with_stubs("layouts.engine.input_sources")
+		local installer = require("layouts.engine.registry.install")
 		local state = {records = {}, commands = {}, result = true, effects = 0}
 		sources.list_active_keyboard_layouts = function() return state.records end
 		sources.build_kl_name_to_tis_id = function() return {} end
@@ -282,8 +282,8 @@ local function with_empty_source_preferences(callback, labels)
 		if labels then translator.get = function(key) return labels[key] or key end end
 		package.loaded["menu.engine.manifest_menu"] = nil
 		local binding = require("menu.engine.manifest_menu")
-		package.loaded["ui.menu.menu_keyboard_layout"] = nil
-		local module = require("ui.menu.menu_keyboard_layout")
+		package.loaded["layouts.ui.menu.keyboard_layout"] = nil
+		local module = require("layouts.ui.menu.keyboard_layout")
 		callback(function() return module.build(make_ctx()).submenu end, state, binding)
 		helpers.assert_eq(state.effects, 0, "the preferences command never mutates native layout state")
 	end)
@@ -581,7 +581,7 @@ helpers.describe("the complete Layout family retains genuine native record and o
 	end)
 	helpers.it("actual materialized outer parent consumes the declared translated caption", function()
 		with_switch_frame(function(_, fixture, binding, ctx)
-			local module = require("ui.menu.menu_keyboard_layout")
+			local module = require("layouts.ui.menu.keyboard_layout")
 			local root = binding.get_root()
 			local old = root.layout_native_parent[1].i18n
 			root.layout_native_parent[1].i18n = "menu.layout.manage"

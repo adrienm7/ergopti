@@ -24,7 +24,7 @@
 ;    mebibyte, strict UTF-8 (or a UTF-16 byte-order mark) and FindProxyForURL.
 ; 4. Every collaborator is injectable, so the unit suite replays each failure
 ;    without a network, a proxy or a window. The report machinery is the Debug
-;    check family's (ui/layout_manager/composer_check.ahk).
+;    check family's (layouts/ui/layout_manager/composer_check.ahk).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

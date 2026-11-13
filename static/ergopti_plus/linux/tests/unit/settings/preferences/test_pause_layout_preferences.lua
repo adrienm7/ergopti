@@ -15,7 +15,7 @@ local Codec = require("core.text.engine.toml_codec")
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
-		local names = { "settings.engine.paths", "infra.pause_layout_preferences" }
+		local names = { "settings.engine.paths", "layouts.engine.emulation.pause_layout_preferences" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local ok, err = pcall(function()
@@ -23,8 +23,8 @@ local function with_config(source, body)
 				helpers.assert_eq(name, "config.toml")
 				return path
 			end }
-			package.loaded["infra.pause_layout_preferences"] = nil
-			body(require("infra.pause_layout_preferences"), path)
+			package.loaded["layouts.engine.emulation.pause_layout_preferences"] = nil
+			body(require("layouts.engine.emulation.pause_layout_preferences"), path)
 		end)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(err, 0) end

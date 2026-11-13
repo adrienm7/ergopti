@@ -16,7 +16,7 @@ local text_owner = require("tests.support.text_owner_fixture")
 function M.with(body)
 	text_owner.with(function(guard, field)
 		local names = { "clipboard.adapters.selection_transaction", "platform.focus.atspi_focus", "hotstrings.engine.injector",
-			"clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
+			"clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "layouts.adapters.keyboard_layout",
 			"platform.input.keyboard_hook", "core.logger.engine.shim", "hotstrings.engine.selected_output", "core.logger.engine.monotonic" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -80,7 +80,7 @@ function M.with(body)
 		package.loaded["core.logger.engine.shim"] = logger
 		local injector
 		local ok, err = pcall(function()
-			local layout = helpers.load_module("adapters.keyboard_layout")
+			local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
 			local lookup = layout.shortcut_keycode
 			layout.shortcut_keycode = function(...) boundary("lookup"); return lookup(...) end

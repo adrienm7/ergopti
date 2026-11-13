@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local ffi = require("ffi")
-local Capture = require("adapters.xkb_capture")
-local Probe = require("adapters.xkb_source_probe")
+local Capture = require("layouts.adapters.xkb_capture")
+local Probe = require("layouts.adapters.xkb_source_probe")
 local DisplayServer = require("core.ui.engine.display_server")
 
 ffi.cdef([[
@@ -241,7 +241,7 @@ end
 --- Joins the real inverse consumer across actual server group changes.
 --- This observes native maps and plans; it does not inject physical input.
 local function consumer_group_qualification(display)
- local Layout = require("adapters.keyboard_layout")
+ local Layout = require("layouts.adapters.keyboard_layout")
  layout(display, "us,fr")
  group(1)
  check(Layout.refresh(), "native inverse consumer publishes the selected French source")

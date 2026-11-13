@@ -18,7 +18,7 @@ helpers.describe("karabiner.watchers: the layout poll is idle-gated (layout-poll
 	helpers.it("(layout-poll-idle-gate) reads after input, skips while idle, and still reads at the idle bound", function()
 		local spawns, idle = 0, 0
 		local poll_callback
-		package.loaded["adapters.input_source_broker"] = {
+		package.loaded["layouts.adapters.input_source_broker"] = {
 			subscribe = function() return true end,
 			unsubscribe = function() return true end,
 		}
@@ -88,7 +88,7 @@ helpers.describe("karabiner.watchers: the layout poll is idle-gated (layout-poll
 		package.loaded["platform.system.info"] = nil
 		package.loaded["core.process.adapters.shell_runner"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
-		package.loaded["adapters.input_source_broker"] = nil
+		package.loaded["layouts.adapters.input_source_broker"] = nil
 		package.loaded["keyboard.engine.runtime.watchers"] = nil
 		if not ok then error(err, 0) end
 	end)

@@ -636,7 +636,7 @@ require("tests.lua.menu.fixed_feature_parent_contract").register(helpers, "macos
 local function fixed_parent_native_cohort(body)
 	local names = {"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "core.logger.engine.logger",
 		"ui.menu.menu_shortcuts", "gestures.ui.menu.gestures", "ui.menu.menu_tap_holds",
-		"menu.ui.builder.utils", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys"}
+		"menu.ui.builder.utils", "ui.menu.shortcut_utils", "layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys"}
 	local previous = {}; for name, value in pairs(package.loaded) do previous[name] = value end
 	local ok, detail = xpcall(function()
 		return helpers.with_stub_scope(names, function()

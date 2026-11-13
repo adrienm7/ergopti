@@ -4,7 +4,7 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNED = {
 	"keyboard.engine.runtime.watchers", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
-	"adapters.input_source_broker", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
+	"layouts.adapters.input_source_broker", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
 	"core.timing.engine.deferred_work", "diagnostics.engine.runtime_log", "core.logger.engine.logger", "core.timing.engine.timings", "platform.input.keycodes",
 	"platform.input.key_state", "adapters.mouse_control", "platform.input.hotkey_registrar",
 	"keyboard.adapters.karabiner.lease_contract", "keyboard.adapters.karabiner.ke_variables", "keyboard.engine.capsword_auto_off",

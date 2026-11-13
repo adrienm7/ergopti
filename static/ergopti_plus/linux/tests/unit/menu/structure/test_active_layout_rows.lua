@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Rows = require("ui.menu.active_layout_rows")
+local Rows = require("layouts.ui.menu.active_layout_rows")
 
 local CHOICES = {
 	{ id = "xkb:fr", label = "fr", active = false },
@@ -127,9 +127,9 @@ helpers.describe("active layout rows", function()
 			and reason:find(english["menu.layout.manage"], 1, true) ~= nil, "the reason names both install routes")
 		helpers.assert_true(english[system.reason_key]:find(english["menu.layout.manage"], 1, true) ~= nil,
 			"the Windows row tells Linux where to install from")
-		local owner = assert(helpers.read_module_source("ui.menu.menu_layouts"))
+		local owner = assert(helpers.read_module_source("layouts.ui.menu.layouts"))
 		helpers.assert_true(owner:find('providers["active_layouts"]', 1, true) ~= nil, "the provider exists")
-		helpers.assert_true(owner:find('require("ui.menu.active_layout_rows").rows(', 1, true) ~= nil)
+		helpers.assert_true(owner:find('require("layouts.ui.menu.active_layout_rows").rows(', 1, true) ~= nil)
 	end)
 end)
 

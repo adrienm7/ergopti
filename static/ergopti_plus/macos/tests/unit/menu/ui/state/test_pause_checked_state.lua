@@ -96,7 +96,7 @@ end)
 
 helpers.describe("pause: menu_keyboard_layout replace section", function()
 	helpers.it("replace_enabled checked does not depend on hs_paused", function()
-		local src = read_source("ui.menu.menu_keyboard_layout")
+		local src = read_source("layouts.ui.menu.keyboard_layout")
 		-- Count lines that have both `checked` and `not hs_paused`
 		local bad = 0
 		for line in src:gmatch("[^\n]+") do

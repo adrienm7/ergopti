@@ -32,7 +32,7 @@ end
 --- @return table scope Explicit non-native fixture description.
 function M.layout(code_for)
 	assert(type(code_for) == "function", "a controlled code allocator is required")
-	local layout = assert(loadfile(driver .. "/adapters/keyboard_layout.lua"))()
+	local layout = assert(loadfile(driver .. "/layouts/adapters/keyboard_layout.lua"))()
 	local publish = layout._set_table_for_test
 	local plan, resolve = layout.plan, layout.resolve
 	local built = {}

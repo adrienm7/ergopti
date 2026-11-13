@@ -4,7 +4,7 @@
 ; MODULE: DeadKey EndKey Re-Send Guard Meta Test
 ; DESCRIPTION:
 ; Static source guard for the "deadkey-endkey-consumed" audit finding in
-; modules/keymap/layout.ahk.
+; layouts/engine/layout.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; AHK InputHook with EndKeys (Enter, BackSpace, Delete) but without the "V"
@@ -48,7 +48,7 @@ _LDEK_DeadKeyResendEndKey() {
 	Raw := _LDEK_ReadSource("layout.ahk")
 	Src := _LDEK_StripComments(Raw)
 	Body := _DriverFuncBody("DeadKey")
-	Assert(Body != "", "DeadKey(Mapping) must exist in modules/keymap/layout.ahk")
+	Assert(Body != "", "DeadKey(Mapping) must exist in layouts/engine/layout.ahk")
 
 	; Every scalar now ends with EndKey too. Replay only the canonical
 	; reader's explicit named-control result, never a literal scalar unit.
@@ -68,7 +68,7 @@ Test("layout: DeadKey re-sends ih.EndKey after InputHook so EndKeys are not swal
 ; completing chord, never from the live modifier state at replay time.
 _LDEK_DeadKeyReplaysControlModifiers() {
 	Body := _LDEK_StripComments(_DriverFuncBody("DeadKey"))
-	Assert(Body != "", "DeadKey(Mapping) must exist in modules/keymap/layout.ahk")
+	Assert(Body != "", "DeadKey(Mapping) must exist in layouts/engine/layout.ahk")
 	Guard := InStr(Body, 'if Capture.Kind == "control"', true)
 	Prefix := InStr(Body, "InStr(ih.EndMods, Symbol)", true)
 	Replay := InStr(Body, 'SendNewResult(CapturedPrefix . "{" . Capture.Name . "}"', true)
@@ -88,7 +88,7 @@ Test("layout: DeadKey replays a named control with its captured modifiers (OSW-0
 ; returns without typing the accent (maintainer decision, dead-key lifecycle).
 _LDEK_DeadKeyExpiryCancels() {
 	Body := _LDEK_StripComments(_DriverFuncBody("DeadKey"))
-	Assert(Body != "", "DeadKey(Mapping) must exist in modules/keymap/layout.ahk")
+	Assert(Body != "", "DeadKey(Mapping) must exist in layouts/engine/layout.ahk")
 	Assert(RegExMatch(Body, 'if Capture\.Kind == "timeout"\s*\n\s*return\b'),
 		"DeadKey must cancel the pending dead key on expiry, typing nothing (dead-key lifecycle)")
 }

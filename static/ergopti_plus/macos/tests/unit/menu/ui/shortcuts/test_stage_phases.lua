@@ -16,10 +16,10 @@
 local helpers = require("tests.helpers")
 
 local names = {
-	"ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts",
+	"layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts",
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
 	"modules.shortcuts.actions.text", "core.i18n.engine.i18n", "core.logger.engine.logger", "menu.engine.manifest_menu",
-	"core.timing.engine.deferred_work", "adapters.input_source_broker", "menu.ui.builder.utils",
+	"core.timing.engine.deferred_work", "layouts.adapters.input_source_broker", "menu.ui.builder.utils",
 	"core.fs.engine.paths", "menu.engine.renderer", "infra.phase_stats",
 }
 
@@ -39,7 +39,7 @@ helpers.describe("menu_shortcuts: each provider records a named phase (menu-shor
 			package.loaded["modules.shortcuts.actions.text"] = {}
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.timing.engine.deferred_work"] = {}
-			package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
+			package.loaded["layouts.adapters.input_source_broker"] = { subscribe = function() return true end }
 			package.loaded["menu.ui.builder.utils"] = {}
 			package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 			local actual_manifest = require("menu.engine.manifest_menu")

@@ -26,10 +26,10 @@ local LAYOUT = {
 --- @param fail_after integer|nil Refuse every emit after this many.
 --- @return table injector, table channel
 local function load(locked, fail_after)
-	package.loaded["adapters.xkb_capture"] = nil
-	local Capture = require("adapters.xkb_capture")
+	package.loaded["layouts.adapters.xkb_capture"] = nil
+	local Capture = require("layouts.adapters.xkb_capture")
 	Capture.caps_locked = function() return locked end
-	local layout = helpers.load_module("adapters.keyboard_layout")
+	local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 	layout._set_table_for_test(LAYOUT)
 	local channel = { emitted = {} }
 	channel.is_open = function() return true end
@@ -75,14 +75,14 @@ helpers.describe("injector: CapsLock does not invert the replacement", function(
 			"the lock must be released before the first planned key")
 		helpers.assert_true(last_key and caps_at[2] > last_key,
 			"and pressed again after the last one, leaving the user's CapsLock as it was")
-		package.loaded["adapters.xkb_capture"] = nil
+		package.loaded["layouts.adapters.xkb_capture"] = nil
 	end)
 
 	helpers.it("leaves CapsLock alone when it is not locked", function()
 		local injector, channel = load(false)
 		injector.inject(0, "Bo")
 		helpers.assert_eq(caps_presses(channel), 0)
-		package.loaded["adapters.xkb_capture"] = nil
+		package.loaded["layouts.adapters.xkb_capture"] = nil
 	end)
 
 end)

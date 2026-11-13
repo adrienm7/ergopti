@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The steps of the Debug menu's one-click « Test the composed layout » on
 --- macOS and Linux (the Windows host does the same in
---- windows/ui/layout_manager/composer_check.ahk, with the same step identities):
+--- windows/layouts/ui/layout_manager/composer_check.ahk, with the same step identities):
 --- builds the shipped small composition, installs it through the composer's
 --- real save path, verifies the installed copy against its record, asks the
 --- driver whether the host is ready to type the layout, removes the
@@ -21,8 +21,8 @@
 ---    layout and the input source in use stay as they were.
 --- 3. PURE Lua: every operation is injected through env, so the same steps run
 ---    against fixtures in the portable suite and against the real driver
----    through the adapters (macos/modules/keymap/composer_check.lua,
----    linux/modules/keymap/composer_check.lua).
+---    through the adapters (macos/layouts/engine/composer/check.lua,
+---    linux/layouts/engine/composer/check.lua).
 --- 4. Settle once: finish runs exactly once, even if a port calls back twice.
 --- ==============================================================================
 

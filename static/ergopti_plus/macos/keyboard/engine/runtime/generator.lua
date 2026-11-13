@@ -54,7 +54,7 @@ local LoneTap = require("tap_hold.engine.lone_tap")
 local NavLayer = require("keyboard.engine.layers.nav_layer")
 local ScriptChordRules = require("keyboard.engine.layers.script_chord_rules")
 local Defaults = require("keyboard.engine.runtime.defaults")
-local Layout = require("modules.keymap.layout")
+local Layout = require("layouts.engine.layout")
 local TableUtil = require("core.text.engine.table_util")
 local TextUtils = require("core.text.engine.utils_core")
 

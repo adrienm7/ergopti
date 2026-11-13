@@ -23,7 +23,7 @@
 --- for both keys. Any edit to hotstrings_menu/layout_menu in
 --- menu_manifest.json now fails this test, forcing a human to consciously
 --- check whether hotstrings/ui/menu/hotstrings.lua, menu/ui/builder/builder.lua, or
---- ui/menu/menu_keyboard_layout.lua still need updating — turning a
+--- layouts/ui/menu/keyboard_layout.lua still need updating — turning a
 --- previously silent desync into a loud one.
 ---
 --- NOTE: layout_menu's pinned shape does NOT imply macOS renders those entries

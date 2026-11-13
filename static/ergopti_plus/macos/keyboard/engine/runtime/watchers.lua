@@ -32,7 +32,7 @@ local M = {}
 
 local hs             = hs
 local Logger         = require("core.logger.engine.logger")
-local InputSourceBroker = require("adapters.input_source_broker")
+local InputSourceBroker = require("layouts.adapters.input_source_broker")
 local Timings        = require("core.timing.engine.timings")
 local Keycodes       = require("platform.input.keycodes")
 local ShellRunner    = require("core.process.adapters.shell_runner")

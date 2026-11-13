@@ -352,12 +352,12 @@ local BRIDGE_MODULES = {
 	-- the bridge behind it was perfectly healthy. A half-registered name is worse
 	-- than an unregistered one — it looks supported at the only place anyone checks.
 	hotstrings_config_window = "hotstrings.ui.hotstrings_config_window.bridge",
-	layer_editor          = "ui.layer_editor.bridge",
+	layer_editor          = "layouts.ui.layer_editor",
 	metrics_apps          = "ui.metrics_apps.bridge",
 	metrics_typing        = "ui.metrics_typing.bridge",
 	model_browser         = "ai.ui.model_browser.bridge",
 	onboarding            = "ui.onboarding.bridge",
-	layout_manager        = "ui.layout_manager.bridge",
+	layout_manager        = "layouts.ui.layout_manager.bridge",
 	paths_editor          = "settings.ui.paths_editor.bridge",
 	personal_info_editor  = "hotstrings.ui.personal_info_editor.bridge",
 	numeric_prompt        = "core.ui.ui.numeric_prompt",

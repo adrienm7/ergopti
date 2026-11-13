@@ -24,7 +24,7 @@ helpers.describe("empty configuration boot projection", function()
 		helpers.with_fresh_modules({ "modules.keystats.kc_bridge" }, function()
 		package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
 		local metrics = helpers.load_with_stubs("ui.menu.menu_metrics").DEFAULT_STATE
-		local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout").DEFAULT_STATE
+		local layout = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout").DEFAULT_STATE
 		local manifest = require("menu.engine.manifest_reader")
 		-- The state keeps its historical in-memory names; the configuration keys are the shared ones.
 		local state_names = { wpm_menubar_visible = "menubar_wpm", wpm_menubar_colors = "menubar_colors",

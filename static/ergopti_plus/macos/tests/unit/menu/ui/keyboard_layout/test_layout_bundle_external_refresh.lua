@@ -27,10 +27,10 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 		local saved_popen = io.popen
 		local ok, err = xpcall(function()
 			helpers.with_fresh_modules({
-				"modules.keymap.layout_install",
+				"layouts.engine.registry.install",
 				"core.fs.engine.dir",
-				"modules.keymap.input_sources",
-				"ui.menu.menu_keyboard_layout",
+				"layouts.engine.input_sources",
+				"layouts.ui.menu.keyboard_layout",
 				"core.logger.engine.logger",
 				"core.text.engine.utils",
 				"core.i18n.engine.i18n",
@@ -146,10 +146,10 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 					return pipe_for({})
 				end
 
-				local install = require("modules.keymap.layout_install")
+				local install = require("layouts.engine.registry.install")
 				-- Each reader of the installed bundles gets the build's one snapshot.
 				local snapshots = {}
-				package.loaded["modules.keymap.input_sources"] = {
+				package.loaded["layouts.engine.input_sources"] = {
 					list_active_keyboard_layouts = function() return {} end,
 					build_kl_name_to_tis_id = function(installed) snapshots.map = installed; return {} end,
 					resolve_installed_ergopti_version = function(installed) snapshots.version = installed; return nil end,
@@ -178,8 +178,8 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 						return providers.layout_bundle()
 					end,
 				}
-				package.loaded["ui.menu.menu_keyboard_layout"] = nil
-				local Menu = require("ui.menu.menu_keyboard_layout")
+				package.loaded["layouts.ui.menu.keyboard_layout"] = nil
+				local Menu = require("layouts.ui.menu.keyboard_layout")
 
 				local function user_row()
 					local built = Menu.build({

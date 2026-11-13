@@ -16,7 +16,7 @@
 	"windows/infra/hotpath_profiler.ahk": 1,
 	"windows/core/lifecycle/engine/lifecycle.ahk": 1,
 	"windows/hotstrings/engine/dynamic/user_code.ahk": 1,
-	"windows/modules/keymap/layout.ahk": 1,
+	"windows/layouts/engine/layout.ahk": 1,
 	"windows/modules/keystats/keystats.ahk": 1,
 	"windows/ai/engine/ollama/managed_bootstrap.ahk": 1,
 	"windows/modules/shortcuts/win.ahk": 1,

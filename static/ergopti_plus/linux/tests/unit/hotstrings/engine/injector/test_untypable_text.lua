@@ -29,7 +29,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local original_layout = package.loaded["adapters.keyboard_layout"]
+local original_layout = package.loaded["layouts.adapters.keyboard_layout"]
 
 
 -- A layout with no Spanish letters: exactly what a French or US keymap gives a
@@ -89,7 +89,7 @@ end
 --- @param prepare_layout function|nil Installs a controlled planning boundary before capture.
 --- @return table injector
 local function load_injector(channel, prepare_layout)
-	local layout = helpers.load_module("adapters.keyboard_layout")
+	local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 	layout._set_table_for_test(LAYOUT_WITHOUT_SPANISH)
 	if prepare_layout then prepare_layout(layout) end
 	local injector = helpers.load_module("hotstrings.engine.injector")
@@ -103,7 +103,7 @@ end
 helpers.describe("private injection failure receipts", function()
 	helpers.it("(private-injection-errors) never exposes payloads from a failing layout planner", function()
 		local clip, restore = stub_clipboard(false)
-		local layout_before = package.loaded["adapters.keyboard_layout"]
+		local layout_before = package.loaded["layouts.adapters.keyboard_layout"]
 		local logger, lines = require("core.logger.engine.shim"), {}
 		local original = logger.error
 		logger.error = function(_, format, ...) lines[#lines + 1] = string.format(format, ...) end
@@ -124,7 +124,7 @@ helpers.describe("private injection failure receipts", function()
 			helpers.assert_true(not table.concat(lines, "\n"):find(secret, 1, true), "logs must withhold payload")
 		end)
 		logger.error = original
-		package.loaded["adapters.keyboard_layout"] = layout_before
+		package.loaded["layouts.adapters.keyboard_layout"] = layout_before
 		restore()
 		if not ok then error(err, 0) end
 	end)
@@ -544,7 +544,7 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 		end)
 	end
 
-	for _, route in ipairs({ "native", "clipboard" }) do
+	for _, route in ipairs({ "native", "clipboard", "layouts" }) do
 		helpers.it("(injection-route-preflight) retains a complete " .. route .. " route across trigger erasure", function()
 			local clip, restore = stub_clipboard(true)
 			local ch, plans = fake_channel(true), 0
@@ -676,4 +676,4 @@ end)
 
 -- Several cases replace the layout planner; never leave their test function in
 -- the module cache for a later suite to observe.
-package.loaded["adapters.keyboard_layout"] = original_layout
+package.loaded["layouts.adapters.keyboard_layout"] = original_layout

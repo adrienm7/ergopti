@@ -85,9 +85,9 @@ M.COUNT_SIGNALS = {
 	{ step = "log_scope_commits", name = "scope_commit" },
 	-- hotstrings/engine/expander/init.lua: Karabiner's tap-hold command marker that reset the word.
 	{ step = "log_tap_hold_word_resets", name = "tap_hold_reset" },
-	-- modules/keymap/layout_emulation.lua: an emulated layout turned on.
+	-- layouts/engine/registry/emulation.lua: an emulated layout turned on.
 	{ step = "log_layout_emulations_on", name = "emulation_on" },
-	-- modules/keymap/number_row_live.lua: number-row options applied live.
+	-- layouts/engine/emulation/number_row_live.lua: number-row options applied live.
 	{ step = "log_number_row_applies", name = "number_row_apply" },
 	-- core/ui/ui/builder.lua: a page's first load, per system appearance.
 	{ step = "log_pages_dark", name = "page_dark" },

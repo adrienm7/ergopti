@@ -60,7 +60,7 @@ local function with_wrap_controls(options, callback)
 	return helpers.with_stub_scope({
 		"ui.menu.menu_shortcuts", "menu.engine.wrap_mutation", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.fs.engine.paths",
 		"core.logger.engine.logger", "core.ui.engine.dialog_util", "modules.shortcuts.actions.text",
-		"menu.ui.builder.utils", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
+		"menu.ui.builder.utils", "layouts.ui.menu.keyboard_slots", "ui.menu.shortcut_utils",
 		"ui.menu.menu_tap_keys", "menu.engine.manifest_reader",
 	}, function()
 		local renderer = helpers.load_with_stubs("menu.engine.manifest_menu")
@@ -578,7 +578,7 @@ end)
 local function with_shortcut_presentation(language, scenario)
 	local names = {
 		"ui.menu.menu_shortcuts", "menu.engine.manifest_menu", "menu.ui.builder.utils",
-		"ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils", "ui.menu.menu_tap_keys",
+		"layouts.ui.menu.keyboard_slots", "ui.menu.shortcut_utils", "ui.menu.menu_tap_keys",
 		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.renderer", "core.logger.engine.logger",
 		"core.ui.engine.dialog_util", "core.fs.engine.paths", "modules.shortcuts", "menu.engine.row_dialect",
 	}

@@ -54,10 +54,10 @@ end
 
 helpers.describe("Extension packs: discovery roots and scanning", function()
 	helpers.it("(layout-extension-macos) orders bundled, committed layout and user roots through their owners", function()
-		helpers.with_stub_scope({ "core.fs.engine.paths", "settings.engine.paths", "modules.keymap.layout_registry" }, function()
+		helpers.with_stub_scope({ "core.fs.engine.paths", "settings.engine.paths", "layouts.engine.registry.registry" }, function()
 			package.loaded["core.fs.engine.paths"] = { shared_root = function() return "/app/_shared" end }
 			package.loaded["settings.engine.paths"] = { get_config_dir = function() return "/user/" end }
-			package.loaded["modules.keymap.layout_registry"] = {
+			package.loaded["layouts.engine.registry.registry"] = {
 				extension_roots = function() return { "/installed/generation" } end,
 				shipped_extension_root = function() return { pack = "/app/layouts/registry/ergopti" } end,
 			}
@@ -67,10 +67,10 @@ helpers.describe("Extension packs: discovery roots and scanning", function()
 	end)
 
 	helpers.it("(layout-extension-macos) boots without installed layouts' packs when their record is unreadable", function()
-		helpers.with_stub_scope({ "core.fs.engine.paths", "settings.engine.paths", "modules.keymap.layout_registry" }, function()
+		helpers.with_stub_scope({ "core.fs.engine.paths", "settings.engine.paths", "layouts.engine.registry.registry" }, function()
 			package.loaded["core.fs.engine.paths"] = { shared_root = function() return "/app/_shared" end }
 			package.loaded["settings.engine.paths"] = { get_config_dir = function() return "/user/" end }
-			package.loaded["modules.keymap.layout_registry"] = {
+			package.loaded["layouts.engine.registry.registry"] = {
 				extension_roots = function() error("the installed-layouts record has schema version 99", 0) end,
 				-- No Ergopti extension shipped here: only the installed record is at stake.
 				shipped_extension_root = function() return nil end,
@@ -104,7 +104,7 @@ helpers.describe("Extension packs: discovery roots and scanning", function()
 	end)
 
 	helpers.it("(ergopti-hotstrings-ext) counts the shipped Ergopti as installed, and nothing when none shipped", function()
-		local LayoutRegistry = require("modules.keymap.layout_registry")
+		local LayoutRegistry = require("layouts.engine.registry.registry")
 		local settings = { ergopti_family = "ergopti" }
 		local files = { ["/app/registry/ergopti/manifest.toml"] = true }
 		local deps = { settings = settings, bundled_dir = "/app/registry/",

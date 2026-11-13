@@ -6,7 +6,7 @@
 --- Run by run_x11_reapply_live.sh inside its headless GNOME Shell or Plasma X11
 --- session, after the W4 checks. Loads the registry's Bépo live through the
 --- layout manager (layout_registry.apply_rows, the real Python installer's
---- install and apply-x11), which arms modules/keymap/x11_layout_reapply.lua
+--- install and apply-x11), which arms layouts/engine/emulation/x11_layout_reapply.lua
 --- with its production collaborators: the keymap watch worker, the xkbcomp
 --- read and number_row_live. A new keyboard then makes the desktop put its own
 --- layouts back, and the server must hold Bépo again without any other call.
@@ -70,10 +70,10 @@ if not os.execute("command -v xinput >/dev/null 2>&1") then
 end
 
 local runner_python = (capture("command -v python3 2>/dev/null"):gsub("%s+$", ""))
-package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
+package.loaded["layouts.engine.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
 ffi.C.setenv("ERGOPTI_XKB_USER_HOME", assert(os.getenv("HOME")), 1)
-local Registry = require("modules.keymap.layout_registry")
-local Reapply = require("modules.keymap.x11_layout_reapply")
+local Registry = require("layouts.engine.registry.registry")
+local Reapply = require("layouts.engine.emulation.x11_layout_reapply")
 
 print("=== the daemon keeps Bépo against " .. tostring(os.getenv("XDG_CURRENT_DESKTOP")) .. " under X11 ===")
 local registry_dir = "../../layouts/registry/"

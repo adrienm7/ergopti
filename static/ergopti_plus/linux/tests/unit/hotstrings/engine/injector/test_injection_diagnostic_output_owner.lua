@@ -15,7 +15,7 @@ local Fixture = require("tests.support.modifier_broker_fixture")
 --- @param change string Native writer replacement or broker replacement.
 local function scenario(mode, change)
 	local names = { "hotstrings.engine.device_finder", "platform.input.evdev_reader", "platform.input.uinput_writer",
-		"platform.input.keyboard_hook", "adapters.xkb_capture", "adapters.keyboard_layout", "hotstrings.engine.injector", "core.logger.engine.shim" }
+		"platform.input.keyboard_hook", "layouts.adapters.xkb_capture", "layouts.adapters.keyboard_layout", "hotstrings.engine.injector", "core.logger.engine.shim" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local injector, successor, writer
 	local called, failure = pcall(function()
@@ -26,12 +26,12 @@ local function scenario(mode, change)
 			writer = session.writer
 			local Broker = require("platform.input.modifier_broker")
 			local original = assert(Broker.for_channel(writer))
-			local saved_xkb = package.loaded["adapters.xkb_capture"]
-			package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
-			local layout = helpers.load_module("adapters.keyboard_layout")
+			local saved_xkb = package.loaded["layouts.adapters.xkb_capture"]
+			package.loaded["layouts.adapters.xkb_capture"] = { caps_locked = function() return false end }
+			local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 			layout._set_table_for_test({ x = { keycode = 45, level = 1, mods = {} } })
 			injector = helpers.load_module("hotstrings.engine.injector")
-			package.loaded["adapters.xkb_capture"] = saved_xkb
+			package.loaded["layouts.adapters.xkb_capture"] = saved_xkb
 			injector._set_uinput(writer)
 			injector._set_nanosleep_for_test(function() end)
 			local notified, crossed = 0, false

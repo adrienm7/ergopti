@@ -16,7 +16,7 @@ local Input = require("platform.input.event")
 --- @return table session
 function M.new(options)
 	options = options or {}
-	local doubled = { "platform.input.evdev_reader", "platform.input.uinput_writer", "platform.input.keyboard_hook", "adapters.keyboard_layout", "hotstrings.engine.injector", "gestures.engine.combo_emitter" }
+	local doubled = { "platform.input.evdev_reader", "platform.input.uinput_writer", "platform.input.keyboard_hook", "layouts.adapters.keyboard_layout", "hotstrings.engine.injector", "gestures.engine.combo_emitter" }
 	local saved_modules = {}
 	for _, name in ipairs(doubled) do saved_modules[name] = package.loaded[name] end
 	local queues, sources, handles, paths, next_fd = {}, {}, {}, {}, 10
@@ -63,9 +63,9 @@ function M.new(options)
 		end,
 	})
 	assert(Writer.open()); session.writer = Writer; session.cap = assert(Writer.capture_output())
-	local saved = package.loaded["adapters.xkb_capture"]
+	local saved = package.loaded["layouts.adapters.xkb_capture"]
 	local capture_down = {}
-	package.loaded["adapters.xkb_capture"] = {
+	package.loaded["layouts.adapters.xkb_capture"] = {
 		is_ready = function() return true end,
 		reset_state = function() capture_down = {}; return true end,
 		modifier_role = function(code) return require("platform.input.evdev_codes").MODIFIER_OF[code] end,
@@ -78,7 +78,7 @@ function M.new(options)
 		end,
 	}
 	local Hook = helpers.load_module("platform.input.keyboard_hook")
-	package.loaded["adapters.xkb_capture"] = saved
+	package.loaded["layouts.adapters.xkb_capture"] = saved
 	session.hook = Hook
 	if options.engine then assert(Hook.set_remapper(options.engine)) end
 	Hook.start({ intercept = true, onEmitRaw = function(code, value)
@@ -97,12 +97,12 @@ function M.new(options)
 	function session.pump() Hook.pump() end
 	function session.view() return Writer.output_view(session.cap) end
 	function session.inject()
-		local saved_xkb = package.loaded["adapters.xkb_capture"]
-		package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
-		local Layout = helpers.load_module("adapters.keyboard_layout")
+		local saved_xkb = package.loaded["layouts.adapters.xkb_capture"]
+		package.loaded["layouts.adapters.xkb_capture"] = { caps_locked = function() return false end }
+		local Layout = helpers.load_module("layouts.adapters.keyboard_layout")
 		Layout._set_table_for_test({ x = { keycode = 45, level = 1, mods = {} } })
 		local Injector = helpers.load_module("hotstrings.engine.injector")
-		package.loaded["adapters.xkb_capture"] = saved_xkb
+		package.loaded["layouts.adapters.xkb_capture"] = saved_xkb
 		Injector._set_uinput(Writer); Injector._set_nanosleep_for_test(function() end)
 		local result = Injector.type_directly("x")
 		Injector._set_uinput(nil)

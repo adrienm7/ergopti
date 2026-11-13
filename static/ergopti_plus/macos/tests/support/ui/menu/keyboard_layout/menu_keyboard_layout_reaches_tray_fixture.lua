@@ -31,7 +31,7 @@ end
 --- @param ctx table Menu context.
 --- @return table|nil rendered The materialised tray row.
 local function tray_row(ctx)
-	local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+	local layout = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 	install_legacy_layout_formats()
 	local ManifestMenu = require("menu.engine.manifest_menu")
 	local item = layout.build(ctx)
@@ -72,10 +72,10 @@ end
 
 
 local function with_switch_frame(callback, labels, configure)
-	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
-		"core.ui.engine.notifications", "modules.keymap.input_sources", "modules.keymap.layout_install", "modules.keymap.layout_registry"}, function()
-		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
-		local installer = require("modules.keymap.layout_install")
+	helpers.with_stub_scope({"layouts.ui.menu.keyboard_layout", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
+		"core.ui.engine.notifications", "layouts.engine.input_sources", "layouts.engine.registry.install", "layouts.engine.registry.registry"}, function()
+		local sources = helpers.load_with_stubs("layouts.engine.input_sources")
+		local installer = require("layouts.engine.registry.install")
 		local fixture = {records = {{id = "French", name = "French", selected = false}}, saves = 0, updates = 0, effects = 0}
 		sources.list_active_keyboard_layouts = function() return fixture.records end
 		sources.build_kl_name_to_tis_id = function() return fixture.mapping or {} end
@@ -91,7 +91,7 @@ local function with_switch_frame(callback, labels, configure)
 		installer.install_system = forbidden
 		installer.install_user = forbidden
 		if configure then configure(fixture, installer) end
-		package.loaded["modules.keymap.layout_registry"] = {picker = function() return fixture.custom or {layouts = {}, active = ""} end, select = forbidden}
+		package.loaded["layouts.engine.registry.registry"] = {picker = function() return fixture.custom or {layouts = {}, active = ""} end, select = forbidden}
 		local translator = require("core.i18n.engine.i18n")
 		local original_get = translator.get
 		translator.get = function(key)
@@ -102,8 +102,8 @@ local function with_switch_frame(callback, labels, configure)
 		end
 		package.loaded["menu.engine.manifest_menu"] = nil
 		local binding = require("menu.engine.manifest_menu")
-		package.loaded["ui.menu.menu_keyboard_layout"] = nil
-		local module = require("ui.menu.menu_keyboard_layout")
+		package.loaded["layouts.ui.menu.keyboard_layout"] = nil
+		local module = require("layouts.ui.menu.keyboard_layout")
 		local ctx = make_ctx()
 		ctx.save_prefs = function() fixture.saves = fixture.saves + 1; return fixture.save_result ~= false end
 		ctx.updateMenu = function() fixture.updates = fixture.updates + 1 end

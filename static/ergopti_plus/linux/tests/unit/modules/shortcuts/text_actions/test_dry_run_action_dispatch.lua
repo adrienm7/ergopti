@@ -86,7 +86,7 @@ local function with_action(route, mode, action, body)
 			end }
 			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad",
 				open = function() return true end, close = function() return true end }
-			local layout = require("adapters.keyboard_layout")
+			local layout = require("layouts.adapters.keyboard_layout")
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} },
 				O = { keycode = 24, mods = { "shift" } }, K = { keycode = 37, mods = { "shift" } } })
 			injector = require("hotstrings.engine.injector")

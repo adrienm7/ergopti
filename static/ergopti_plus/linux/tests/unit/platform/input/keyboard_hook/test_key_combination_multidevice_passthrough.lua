@@ -53,7 +53,7 @@ local function with_manager(route, body)
 		require("tests.support.input_owner_fixture").with_session({ public_chords = true, keys = {}, position_bits = true,
 			on_char = function(char) chars[#chars + 1] = char end }, function(s)
 			assert(s.hook.set_remapper(nil))
-			local layout = require("adapters.keyboard_layout")
+			local layout = require("layouts.adapters.keyboard_layout")
 			layout._set_table_for_test({ a = { keycode = 30, mods = {} }, A = { keycode = 30, mods = { "shift" } } })
 			s.reloads, s.chars = 0, chars
 			local scripts = require("modules.shortcuts.script_actions").new({

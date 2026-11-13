@@ -6,7 +6,7 @@
 ; « Chiffres en accès direct » end to end on the keyboard layouts of the
 ; machine: the stored choice, the real layout's levels (MapVirtualKeyEx and
 ; ToUnicodeEx on a real HKL), the criteria the number-row hotkeys of
-; modules/keymap/layout.ahk declare, and the real handlers they run, whose
+; layouts/engine/layout.ahk declare, and the real handlers they run, whose
 ; sends the harness records (_SendHook) instead of typing them. A press no
 ; hotkey takes is typed by the layout itself: the harness reads that level from
 ; the same real layout. Layout switches move the foreground layout the

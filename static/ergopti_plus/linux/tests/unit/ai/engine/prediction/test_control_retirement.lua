@@ -59,7 +59,7 @@ local function scenario(options, body)
 			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
 		end
 		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
-			"hotstrings.engine.word_reset", "hotstrings.engine.matcher.preferences", "adapters.keyboard_layout",
+			"hotstrings.engine.word_reset", "hotstrings.engine.matcher.preferences", "layouts.adapters.keyboard_layout",
 			"hotstrings.engine.injector", "clipboard.adapters.clipboard" }) do package.loaded[name] = nil end
 		local state = { text = "", caret = 0, wire = {}, held = {}, requests = {}, submissions = {},
 			cancelled = 0, offers = {}, overlay_showing = false, controls = 0, moves = 0, outputs = 0 }
@@ -110,7 +110,7 @@ local function scenario(options, body)
 			-- The fixture's evdev A=30 and space=57 belong to this physical provider.
 			get_layout = function() return "qwerty" end,
 			emergency_stop = function() state.stopped = true end }
-		local layout = require("adapters.keyboard_layout")
+		local layout = require("layouts.adapters.keyboard_layout")
 		layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} },
 			a = { keycode = 30, mods = {} }, b = { keycode = 48, mods = {} }, [" "] = { keycode = 57, mods = {} } })
 		local characters = { [24] = "o", [37] = "k", [30] = "a", [48] = "b", [57] = " " }
@@ -168,7 +168,7 @@ local function scenario(options, body)
 				end },
 		}, { __index = _G })
 		-- Main requires the emulation per key; a case may stand in for it.
-		if options.emulation then package.loaded["modules.keymap.layout_emulation"] = options.emulation end
+		if options.emulation then package.loaded["layouts.engine.registry.emulation"] = options.emulation end
 		local callbacks = main_callbacks(environment)
 		local overlay = { show = function(rows)
 			state.offers = rows; state.overlay_showing = #rows > 0; return true
@@ -654,11 +654,11 @@ do
 					or name:match("^modules%.hotstrings%.") or name:match("^modules%.shortcuts%.") then package.loaded[name] = nil end
 			end
 			for _, name in ipairs({ "platform.input.keyboard_hook", "platform.input.evdev_reader", "platform.input.modifier_broker",
-				"adapters.keyboard_layout", "platform.focus.secure_field_detector", "clipboard.adapters.clipboard", "core.events.timer_scheduler",
+				"layouts.adapters.keyboard_layout", "platform.focus.secure_field_detector", "clipboard.adapters.clipboard", "core.events.timer_scheduler",
 				"hotstrings.engine.matcher.preferences", "ai.engine.preferences", "infra.metrics_preferences", "core.logger.engine.monotonic",
 				"settings.engine.paths", "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer",
 				-- Main initialises these owners once; an earlier suite may have loaded them.
-				"modules.keymap.pause_layout_switch", "modules.keymap.layout_emulation" }) do package.loaded[name] = nil end
+				"layouts.engine.emulation.pause_layout_switch", "layouts.engine.registry.emulation" }) do package.loaded[name] = nil end
 			local root, key, phase, modifier = helpers.driver_root(), options.key or "u", options.phase or "late", options.modifier or "ctrl"
 			local app = options.app or "gnome-terminal"
 			local action_mode = options.mode or "none"
@@ -709,7 +709,7 @@ do
 			put("clipboard.adapters.selection_transaction", { new = function() return { cancel = yes, stop = yes } end })
 			put("clipboard.adapters.clipboard", { read_primary = function() error("no selection read is permitted") end })
 			put("core.ui.engine.display_server", { is_x11 = yes, is_wayland = no, kind = function() return "x11" end })
-			local layout = put("adapters.keyboard_layout", require("tests.support.layout_cohort_fixture").layout(function() return 30 end))
+			local layout = put("layouts.adapters.keyboard_layout", require("tests.support.layout_cohort_fixture").layout(function() return 30 end))
 			layout.refresh, layout.is_ready, layout.publish_current_capture = yes, yes, yes
 			local injector = put("hotstrings.engine.injector", {
 			  _is_injecting = no, _queue_char = function() error("unexpected queued text") end,

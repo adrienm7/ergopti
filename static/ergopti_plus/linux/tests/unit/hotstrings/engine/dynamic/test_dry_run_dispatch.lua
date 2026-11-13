@@ -98,7 +98,7 @@ local function exercise(kind, dry_run, options)
 				chars[code + 8] = char
 				inverse[char] = { keycode = code, level = 1, mods = {} }
 			end
-			capture = require("adapters.xkb_capture")
+			capture = require("layouts.adapters.xkb_capture")
 			capture._set_backend({ create = function() return {} end, destroy = function() end,
 				capture_group = function() return 0 end,
 				key_sym = function(_, code) local char = chars[code]; return char == "★" and 0x1002605 or char and char:byte() or 0 end,
@@ -124,7 +124,7 @@ local function exercise(kind, dry_run, options)
 				end,
 			}, function(session)
 				assert(session.hook.set_remapper(nil))
-				require("adapters.keyboard_layout")._set_table_for_test(inverse)
+				require("layouts.adapters.keyboard_layout")._set_table_for_test(inverse)
 				injector = require("hotstrings.engine.injector")
 				injector._set_uinput(session.writer)
 				injector._set_nanosleep_for_test(function() end)

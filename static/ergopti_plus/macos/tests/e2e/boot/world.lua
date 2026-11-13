@@ -370,7 +370,7 @@ local HELPER_ROLE_ANSWERS = {
 -- Keyboard layouts a machine can select, under the two names macOS gives one
 -- layout: hs.keycodes reports its localised name, `defaults read
 -- com.apple.HIToolbox AppleSelectedInputSources` its KeyboardLayout Name. They
--- differ for an Ergopti layout (modules/keymap/input_sources.lua).
+-- differ for an Ergopti layout (layouts/engine/input_sources.lua).
 local LAYOUTS = {
 	abc = { localised = "ABC", hitoolbox = "ABC", id = 252, source_id = "com.apple.keylayout.ABC" },
 	french = { localised = "French", hitoolbox = "French", id = 1, source_id = "com.apple.keylayout.French" },

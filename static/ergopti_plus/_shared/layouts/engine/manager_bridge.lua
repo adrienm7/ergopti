@@ -8,7 +8,7 @@
 --- what each one is allowed to touch, and the state pushed back after every
 --- refresh and operation. The window itself (WKWebView, WebKitGTK) stays with
 --- each driver; the Windows host applies the same rules in
---- windows/ui/layout_manager/init.ahk.
+--- windows/layouts/ui/layout_manager/init.ahk.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Allowlist: a page message is an action of M.ACTIONS or nothing. Install

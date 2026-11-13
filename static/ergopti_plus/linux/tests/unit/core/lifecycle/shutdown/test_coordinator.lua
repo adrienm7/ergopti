@@ -680,7 +680,7 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 			},
 			package = { loaded = { ["ai.engine.local_servers.local_servers"] = {
 				shutdown = native_stop("discovery"),
-			}, ["modules.keymap.layout_registry"] = { shutdown = native_stop("layouts") } } }, require = function() return { cleanup = function() end, flush = function() end } end,
+			}, ["layouts.engine.registry.registry"] = { shutdown = native_stop("layouts") } } }, require = function() return { cleanup = function() end, flush = function() end } end,
 			TimerScheduler = { cancelAll = function() return true end }, Logger = { warn = function() end },
 			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
 			event_loop = { stop = function() state.loops = state.loops + 1 end },
@@ -1426,7 +1426,7 @@ helpers.describe("actual Main layout helper retirement", function()
 			dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false,
 			webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,
 			prediction_engine = false,
-			package = { loaded = { ["modules.keymap.layout_registry"] = loaded and layout or nil } },
+			package = { loaded = { ["layouts.engine.registry.registry"] = loaded and layout or nil } },
 			require = function(name)
 				assert(name == "ai.engine.agent.connectors" or name == "ai.engine.agent.learning",
 					"cold shutdown must not import " .. tostring(name))
@@ -1483,9 +1483,9 @@ helpers.describe("actual Main layout helper retirement", function()
 			helpers.assert_true(coordinator.is_pending())
 			local foreign_calls = 0
 			local function foreign_stop() foreign_calls = foreign_calls + 1; return true end
-			if replacement == "module" then env.package.loaded["modules.keymap.layout_registry"] = { shutdown = foreign_stop }
+			if replacement == "module" then env.package.loaded["layouts.engine.registry.registry"] = { shutdown = foreign_stop }
 			elseif replacement == "method" then layout.shutdown = foreign_stop
-			else env.package.loaded["modules.keymap.layout_registry"] = nil end
+			else env.package.loaded["layouts.engine.registry.registry"] = nil end
 			helpers.assert_eq(coordinator.poll(), false, "foreign public exports cannot acknowledge the captured helper")
 			helpers.assert_eq(state.calls, 2)
 			helpers.assert_eq(foreign_calls, 0)
@@ -1603,7 +1603,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		local noop = function() end
 		local modules = {}
 		for _, name in ipairs({ "infra.version", "hotstrings.engine.engine", "hotstrings.engine.catalogue.config",
-			"hotstrings.engine.injector", "adapters.keyboard_layout", "hotstrings.engine.magic_key",
+			"hotstrings.engine.injector", "layouts.adapters.keyboard_layout", "hotstrings.engine.magic_key",
 			"hotstrings.engine.magic_key_source", "hotstrings.engine.repeat_key", "modules.shortcuts.keyboard_shortcuts",
 			"hotstrings.engine.device_finder", "platform.input.event", "core.logger.engine.monotonic", "menu.engine.manifest_reader",
 			"settings.engine.scope.script_settings", "core.timing.engine.timings", "modules.shortcuts.script_actions", "diagnostics.engine.reports.crash_reporter",

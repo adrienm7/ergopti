@@ -97,7 +97,7 @@ end
 
 --- The keyboard-layout part of one scope: the rows of config.toml through the
 --- synchronous owner, then the layout typing them, built and selected live
---- (modules/keymap/number_row_live.lua). The request settles only once that
+--- (layouts/engine/emulation/number_row_live.lua). The request settles only once that
 --- layout was read back (docs/design/layout-option-emulation.md, section 5); a
 --- choice with no layout of ours to apply it to is stored and acknowledged with
 --- its reason. A layout the system did not take reverts the rows, so the file

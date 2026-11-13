@@ -25,7 +25,7 @@
 ;    ResetNumberOfRepetitions in keyboard/engine/layers/nav_layer_helpers.ahk.
 ; 3. last_sent_key_time tracking (write + size-bounded pruning) lives only in
 ;    AppState_TouchLastSentKey in hotstrings/engine/matcher/send.ahk, called by
-;    the layout emulation (UpdateLastSentCharacter, modules/keymap/layout.ahk)
+;    the layout emulation (UpdateLastSentCharacter, layouts/engine/layout.ahk)
 ;    and by the prefix watcher for every character it observes.
 ;
 ; RULE: do not reintroduce a parallel state container here. If a future refactor

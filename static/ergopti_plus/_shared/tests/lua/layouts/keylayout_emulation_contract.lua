@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Replays the cross-OS keystroke oracle against `layouts.keylayout_emulation`:
 --- keylayout_vectors.json, which the Windows emulation replays too
---- (windows/tests/unit/modules/keymap/test_keylayout_emulation.ahk), so the
+--- (windows/tests/unit/layouts/engine/composer/test_keylayout_emulation.ahk), so the
 --- three drivers type the same text for the same physical keys, and
 --- emulation_vectors.json, the [layout] options around it. Both Lua drivers
 --- register it with their own paths.

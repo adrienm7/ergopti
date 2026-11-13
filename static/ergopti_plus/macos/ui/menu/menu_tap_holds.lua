@@ -1292,7 +1292,7 @@ function M.build(ctx)
 		-- Required on the click: the editor loads the layer data and its window
 		-- stack, which a menu build has no use for.
 		[ConfigKeys.COMMAND.EDIT_NAV_LAYER] = function()
-			return require("ui.layer_editor").open({ karabiner = karabiner })
+			return require("layouts.ui.layer_editor").open({ karabiner = karabiner })
 		end,
 	}
 

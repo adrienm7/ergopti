@@ -59,7 +59,7 @@ field_linux_ensure_python() {
 		local uv = require("luv")
 		local Pins = require("_generated.native_runtime").managed_python
 		local outcome
-		require("modules.keymap.layout_registry").install_python(function(bytes)
+		require("layouts.engine.registry.registry").install_python(function(bytes)
 			io.write(string.format("  ⬇️ Installing Ergopti'"'"'s Python %s (%d MB) for the composer check: "
 				.. "running this collector is the consent.\n", Pins.version, math.ceil(bytes / 1048576)))
 			io.flush()

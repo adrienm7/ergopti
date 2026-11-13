@@ -42,7 +42,7 @@ local RESERVED_CODES = { [42] = true, [54] = true, [29] = true, [97] = true, [56
 local RELOADED = {
 	"ai.engine.prediction.engine", "ai.engine.settings.settings", "ai.engine.settings.profile_settings",
 	"ai.engine.settings.display_settings", "ai.engine.settings.trigger_settings", "ai.engine.settings.navigation_settings",
-	"ai.engine.api.api_remote", "hotstrings.engine.injector", "hotstrings.engine.selected_output", "adapters.keyboard_layout", "adapters.xkb_capture",
+	"ai.engine.api.api_remote", "hotstrings.engine.injector", "hotstrings.engine.selected_output", "layouts.adapters.keyboard_layout", "layouts.adapters.xkb_capture",
 }
 local FAKED = {
 	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "ai.engine.settings.api_entries",
@@ -146,9 +146,9 @@ local function scenario(opts, body)
 		}
 
 		-- The injector types on a recording uinput channel over a fake layout
-		require("adapters.xkb_capture").caps_locked = function() return false end
+		require("layouts.adapters.xkb_capture").caps_locked = function() return false end
 		local layout, char_of = build_layout()
-		require("adapters.keyboard_layout")._set_table_for_test(layout)
+		require("layouts.adapters.keyboard_layout")._set_table_for_test(layout)
 		local channel = {
 			is_open = function() return true end,
 			emit = function(code, value)

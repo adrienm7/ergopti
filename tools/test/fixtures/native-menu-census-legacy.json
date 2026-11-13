@@ -47,10 +47,10 @@
 				"macos/hotstrings/ui/menu/hotstrings.lua:518 separator",
 				"macos/hotstrings/ui/menu/custom.lua:259 static",
 				"macos/hotstrings/ui/menu/management.lua:713 static",
-				"macos/ui/menu/menu_keyboard_slots.lua:152 static",
-				"macos/ui/menu/menu_keyboard_slots.lua:153 static",
-				"macos/ui/menu/menu_keyboard_slots.lua:218 static",
-				"macos/ui/menu/menu_keyboard_slots.lua:219 static",
+				"macos/layouts/ui/menu/keyboard_slots.lua:152 static",
+				"macos/layouts/ui/menu/keyboard_slots.lua:153 static",
+				"macos/layouts/ui/menu/keyboard_slots.lua:218 static",
+				"macos/layouts/ui/menu/keyboard_slots.lua:219 static",
 				"macos/ai/ui/menu/init.lua:1955 static",
 				"macos/ai/ui/menu/init.lua:2003 native",
 				"macos/ai/ui/menu/models/manager_mlx_hf.lua:830 static",
@@ -327,18 +327,18 @@
 				"windows/modules/keylogger/keylogger_webview_range_mount.ahk",
 				"windows/modules/keylogger/keylogger_webview_range_script.ahk",
 				"windows/modules/keylogger/keylogger_window_topology.ahk",
-				"windows/modules/keymap/keylayout/keylayout_emulation.ahk",
-				"windows/modules/keymap/keylayout/keylayout_parser.ahk",
-				"windows/modules/keymap/keylayout/keylayout_tables.ahk",
-				"windows/modules/keymap/keylayout/layout_catalogue.ahk",
-				"windows/modules/keymap/keylayout/layout_extension.ahk",
-				"windows/modules/keymap/keylayout/layout_registry.ahk",
-				"windows/modules/keymap/layout.ahk",
-				"windows/modules/keymap/layout/accented_shortcuts.ahk",
-				"windows/modules/keymap/layout/layout_altgr.ahk",
-				"windows/modules/keymap/layout/layout_ergopti.ahk",
-				"windows/modules/keymap/layout/layout_shift_caps.ahk",
-				"windows/modules/keymap/layout_poll_helper.ahk",
+				"windows/layouts/engine/keylayout/emulation.ahk",
+				"windows/layouts/engine/keylayout/parser.ahk",
+				"windows/layouts/engine/keylayout/tables.ahk",
+				"windows/layouts/engine/keylayout/catalogue.ahk",
+				"windows/layouts/engine/keylayout/extension.ahk",
+				"windows/layouts/engine/keylayout/registry.ahk",
+				"windows/layouts/engine/layout.ahk",
+				"windows/layouts/engine/accented_shortcuts.ahk",
+				"windows/layouts/engine/registry/altgr.ahk",
+				"windows/layouts/engine/registry/ergopti.ahk",
+				"windows/layouts/engine/registry/shift_caps.ahk",
+				"windows/layouts/engine/registry/poll_helper.ahk",
 				"windows/ai/engine/bridge.ahk",
 				"windows/hotstrings/engine/expander/uia_selection_worker.ahk",
 				"windows/hotstrings/engine/expander/uia_selection_worker_entry.ahk",
@@ -437,15 +437,15 @@
 				"windows/hotstrings/ui/hotstrings_config_window/hcw_mutations.ahk",
 				"windows/hotstrings/ui/hotstrings_config_window/init.ahk",
 				"windows/hotstrings/ui/hotstrings_config_window/webview.ahk",
-				"windows/ui/layer_editor/init.ahk",
-				"windows/ui/layout_manager/init.ahk",
+				"windows/layouts/ui/layer_editor.ahk",
+				"windows/layouts/ui/layout_manager/init.ahk",
 				"windows/diagnostics/ui/log_openers.ahk",
 				"windows/menu/ui/builder/actions.ahk",
 				"windows/gestures/ui/menu/gestures.ahk",
 				"windows/hotstrings/ui/menu/switches.ahk",
 				"windows/hotstrings/ui/menu/hotstrings.ahk",
 				"windows/menu/ui/builder/menu_init.ahk",
-				"windows/ui/menu/menu_layout.ahk",
+				"windows/layouts/ui/menu/layout.ahk",
 				"windows/ai/ui/menu/_index.ahk",
 				"windows/ai/ui/menu/actions.ahk",
 				"windows/ai/ui/menu/aux_ownership.ahk",
@@ -706,8 +706,8 @@
 				"macos/hotstrings/ui/menu/hotstrings.lua",
 				"macos/hotstrings/ui/menu/custom.lua",
 				"macos/hotstrings/ui/menu/management.lua",
-				"macos/ui/menu/menu_keyboard_layout.lua",
-				"macos/ui/menu/menu_keyboard_slots.lua",
+				"macos/layouts/ui/menu/keyboard_layout.lua",
+				"macos/layouts/ui/menu/keyboard_slots.lua",
 				"macos/ai/ui/menu/activation_pause_owner.lua",
 				"macos/ai/ui/menu/panels/agent_panel.lua",
 				"macos/ai/ui/menu/panels/api_panel.lua",
@@ -755,7 +755,7 @@
 				"macos/menu/ui/transactions/preview_transaction.lua",
 				"macos/menu/ui/transactions/program_parameter_transaction.lua",
 				"macos/hotstrings/ui/menu/programmatic_hotstrings.lua",
-				"macos/ui/menu/quit_layout.lua",
+				"macos/layouts/ui/menu/quit_layout.lua",
 				"macos/menu/ui/transactions/recoverable_file_moves.lua",
 				"macos/ui/menu/remap_switch.lua",
 				"macos/settings/ui/menu/scoped_preferences.lua",
@@ -839,28 +839,28 @@
 					]
 				},
 				{
-					"path": "macos/ui/menu/menu_keyboard_slots.lua",
+					"path": "macos/layouts/ui/menu/keyboard_slots.lua",
 					"sourceSha256": "35131be4ee551bcbb679bad1f7a43d03a72f4049d2e4eb077bdbf5a7f3e59a9d",
 					"lines": [
 						{
 							"line": 152,
 							"source": "\t\ttitle   = i18n.get(\"dialog.keyboard_shortcut.title_prefix\") .. KbShortcuts.get_keyboard_slot_label(slot_id),",
-							"expectedSite": "macos/ui/menu/menu_keyboard_slots.lua:152 static"
+							"expectedSite": "macos/layouts/ui/menu/keyboard_slots.lua:152 static"
 						},
 						{
 							"line": 153,
 							"source": "\t\tlabel   = i18n.get(\"dialog.action_picker.label\"),",
-							"expectedSite": "macos/ui/menu/menu_keyboard_slots.lua:153 static"
+							"expectedSite": "macos/layouts/ui/menu/keyboard_slots.lua:153 static"
 						},
 						{
 							"line": 218,
 							"source": "\t\ttitle   = i18n.get(\"dialog.keyboard_shortcut.title_prefix\"),",
-							"expectedSite": "macos/ui/menu/menu_keyboard_slots.lua:218 static"
+							"expectedSite": "macos/layouts/ui/menu/keyboard_slots.lua:218 static"
 						},
 						{
 							"line": 219,
 							"source": "\t\tlabel   = i18n.get(\"dialog.keyboard_shortcut.prompt\"),",
-							"expectedSite": "macos/ui/menu/menu_keyboard_slots.lua:219 static"
+							"expectedSite": "macos/layouts/ui/menu/keyboard_slots.lua:219 static"
 						}
 					]
 				},

@@ -309,7 +309,7 @@ helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pai
 			return {}
 		end)
 		package.loaded["ui.menu.shortcut_utils"] = {}
-		package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
+		package.loaded["layouts.ui.menu.keyboard_slots"] = { provide_rows = function() return {} end }
 		package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "★" end }
 		package.loaded["ui.menu.menu_shortcuts"] = nil
 		local MenuShortcuts = require("ui.menu.menu_shortcuts")

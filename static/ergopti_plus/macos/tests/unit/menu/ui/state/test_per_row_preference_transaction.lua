@@ -32,7 +32,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 		"menu.ui.builder.utils",
 		"menu.engine.manifest_menu",
 		"ui.menu.shortcut_utils",
-		"ui.menu.menu_keyboard_slots",
+		"layouts.ui.menu.keyboard_slots",
 		"menu.engine.manifest_reader",
 	}, function()
 		local enabled = true
@@ -86,7 +86,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 				return lists.keyboard_slots()
 			end)
 		package.loaded["ui.menu.shortcut_utils"] = {}
-		package.loaded["ui.menu.menu_keyboard_slots"] = {
+		package.loaded["layouts.ui.menu.keyboard_slots"] = {
 			provide_rows = function(_, _, fixed_by_prefix) return fixed_by_prefix.primary_ end,
 		}
 		package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "star" end }

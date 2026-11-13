@@ -39,7 +39,7 @@ end
 --- @param body function Receives the observations after dispatch.
 local function with_action(session, action, change, body)
 	local names = {
-		"core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
+		"core.process.adapters.shell_runner", "core.ui.engine.display_server", "layouts.adapters.keyboard_layout",
 		"platform.input.keyboard_hook", "platform.input.modifier_broker", "platform.input.uinput_writer",
 		"core.events.loop", "hotstrings.engine.injector", "clipboard.adapters.clipboard",
 		"modules.shortcuts.manager", "gestures.engine.manager", "gestures.engine.combo_emitter",
@@ -91,7 +91,7 @@ local function with_action(session, action, change, body)
 				is_x11 = function() return session == "x11" end,
 				is_wayland = function() return session == "wayland" end,
 			}
-			package.loaded["adapters.keyboard_layout"] = { shortcut_keycode = function(_, fallback)
+			package.loaded["layouts.adapters.keyboard_layout"] = { shortcut_keycode = function(_, fallback)
 				retire("layout"); return fallback
 			end }
 			package.loaded["platform.input.keyboard_hook"] = {}
@@ -121,7 +121,7 @@ local function with_action(session, action, change, body)
 				package.loaded["platform.focus.window_info"] = { focused_app_id = function()
 					retire("metrics"); return "owned-editor"
 				end }
-				local layout = helpers.load_module("adapters.keyboard_layout")
+				local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 				layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
 				package.loaded["clipboard.adapters.clipboard"] = nil
 				injector = helpers.load_module("hotstrings.engine.injector")
@@ -244,7 +244,7 @@ end)
 local function observe_compound_action(action, change)
 	local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "platform.input.keyboard_hook",
 		"platform.input.modifier_broker", "platform.input.uinput_writer", "core.events.loop",
-		"hotstrings.engine.injector", "clipboard.adapters.clipboard", "adapters.keyboard_layout",
+		"hotstrings.engine.injector", "clipboard.adapters.clipboard", "layouts.adapters.keyboard_layout",
 		"modules.shortcuts.manager", "gestures.engine.manager", "gestures.engine.combo_emitter",
 		"platform.focus.window_info" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -295,7 +295,7 @@ local function observe_compound_action(action, change)
 				end,
 			}
 			package.loaded["platform.input.uinput_writer"] = writer
-			local Layout = helpers.load_module("adapters.keyboard_layout")
+			local Layout = helpers.load_module("layouts.adapters.keyboard_layout")
 			Layout._set_table_for_test({ ["("] = { keycode = 10, level = 2, mods = {"shift"} },
 				[")"] = { keycode = 11, level = 2, mods = {"shift"} } })
 			package.loaded["clipboard.adapters.clipboard"] = nil
@@ -376,7 +376,7 @@ end)
 local function observe_configured_insertion(session, action, route, change)
 	local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "platform.input.keyboard_hook",
 		"platform.input.modifier_broker", "platform.input.uinput_writer", "core.events.loop",
-		"hotstrings.engine.injector", "clipboard.adapters.clipboard", "adapters.keyboard_layout",
+		"hotstrings.engine.injector", "clipboard.adapters.clipboard", "layouts.adapters.keyboard_layout",
 		"modules.shortcuts.manager", "gestures.engine.manager", "gestures.engine.combo_emitter" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local world = { documents = { ["/field/original"] = "", ["/field/successor"] = "" },
@@ -440,7 +440,7 @@ local function observe_configured_insertion(session, action, route, change)
 				end,
 			}
 			package.loaded["platform.input.uinput_writer"] = writer
-			local layout = helpers.load_module("adapters.keyboard_layout")
+			local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
 			package.loaded["clipboard.adapters.clipboard"] = nil
 			injector = helpers.load_module("hotstrings.engine.injector")

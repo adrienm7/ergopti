@@ -192,7 +192,7 @@ local function load_keystats(options)
 		end,
 		isRunning = function() return options.keyboard_running ~= false end,
 	}
-	package.loaded["adapters.input_source_broker"] = {
+	package.loaded["layouts.adapters.input_source_broker"] = {
 		subscribe = function()
 			ctx.input_subscribe_calls = ctx.input_subscribe_calls + 1
 			return options.input_subscribe_result ~= false

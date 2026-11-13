@@ -12,9 +12,9 @@ local with_window = require("tests.support.dashboard_window_fixture")
 local function with_delivery(callback, native_timers)
 	helpers.with_fresh_modules({ "settings.ui.menu.paths", "core.text.engine.toml.codec", "core.text.engine.toml.writer",
 		"core.fs.adapters.file_system", "settings.engine.paths", "keyboard.engine", "core.text.engine.json",
-		"modules.keymap.number_row_live" }, function()
+		"layouts.engine.emulation.number_row_live" }, function()
 		-- No layout of ours types in the fixture: the number-row order is greyed.
-		package.loaded["modules.keymap.number_row_live"] = {
+		package.loaded["layouts.engine.emulation.number_row_live"] = {
 			available = function() return false, "no_source_layout" end,
 		}
 		-- Distinctive rule: a wizard that derived the path itself cannot match it.

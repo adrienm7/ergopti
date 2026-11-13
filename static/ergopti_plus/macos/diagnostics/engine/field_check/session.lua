@@ -250,7 +250,7 @@ local AWK = "/usr/bin/awk"
 M.SLOW_SEGMENTS_LOGGED = 5
 -- Line kinds whose worst line is broken down into its largest stage and its forks.
 M.SLOW_KINDS = { "ingest", "prefs", "probe", "diagnostics" }
--- The keyboard-layout row's build phases (ui/menu/menu_keyboard_layout.lua).
+-- The keyboard-layout row's build phases (layouts/ui/menu/keyboard_layout.lua).
 M.LAYOUT_MENU_PHASE_PREFIX = "menu_keyboard_layout."
 
 -- One pass over the day log, printing a summary only: a task's output is read

@@ -118,7 +118,7 @@ check("production layout digest collaborator forwards its owner and completes it
 		end
 		error("production collaborator not found: " .. name)
 	end
-	local Registry = require("modules.keymap.layout_registry")
+	local Registry = require("layouts.engine.registry.registry")
 	local resolve = upvalue(Registry.refresh, "resolve_deps")
 	local deps = upvalue(resolve, "default_deps")
 	local factory = upvalue(deps, "file_sha256")

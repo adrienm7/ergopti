@@ -38,7 +38,7 @@ local ok, err = xpcall(function()
 	assert(x.XkbLockGroup(display, 0x100, 1) ~= 0)
 	x.XSync(display, 0)
 	assert(state() == 1, "precondition requires the second group")
-	local Switch = require("adapters.input_source_switch")
+	local Switch = require("layouts.adapters.input_source_switch")
 	local port = Switch.native_port()
 	port.backend = function() return Switch.X11 end
 	local switcher = Switch.new(port)

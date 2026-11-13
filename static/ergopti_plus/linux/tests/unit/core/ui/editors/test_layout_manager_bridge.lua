@@ -18,7 +18,7 @@ local INDEX = { layouts = { { id = "ergol", name = "Ergo-L", homepage = "https:/
 --- The bridge with every authority injected.
 --- @return table bridge, table state, table daemon_state
 local function bridge()
-	local Bridge = helpers.load_module("ui.layout_manager.bridge")
+	local Bridge = helpers.load_module("layouts.ui.layout_manager.bridge")
 	Bridge._reset()
 	local state = { pushes = {}, hidden = {}, commands = {}, calls = {} }
 	local daemon_state = {
@@ -228,9 +228,9 @@ end)
 
 helpers.describe("layout editor menu row (Linux)", function()
 	helpers.it("« Create or edit a layout… » shows the window straight on the editor (layout-editor-menu)", function()
-		local saved = { bridge = package.loaded["ui.layout_manager.bridge"], builder = package.loaded["menu.ui.builder.builder"] }
+		local saved = { bridge = package.loaded["layouts.ui.layout_manager.bridge"], builder = package.loaded["menu.ui.builder.builder"] }
 		local calls = {}
-		package.loaded["ui.layout_manager.bridge"] = {
+		package.loaded["layouts.ui.layout_manager.bridge"] = {
 			open_editor = function() calls[#calls + 1] = "open_editor"; return true end,
 		}
 		package.loaded["menu.ui.builder.builder"] = nil
@@ -253,7 +253,7 @@ helpers.describe("layout editor menu row (Linux)", function()
 			helpers.assert_eq(type(row.fn), "function")
 			row.fn()
 		end)
-		package.loaded["ui.layout_manager.bridge"], package.loaded["menu.ui.builder.builder"] = saved.bridge, saved.builder
+		package.loaded["layouts.ui.layout_manager.bridge"], package.loaded["menu.ui.builder.builder"] = saved.bridge, saved.builder
 		helpers.assert_true(ok, tostring(err))
 		helpers.assert_eq(calls, { "show layout_manager", "open_editor" })
 	end)
@@ -262,12 +262,12 @@ end)
 --- Captures actual provider data while forwarding its status and rendering to the real binding.
 --- @param callback function Receives the native build, fixture state and binding.
 local function with_empty_layout(callback)
-	local names = { "menu.ui.builder.builder", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "modules.keymap.layout_registry" }
+	local names = { "menu.ui.builder.builder", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "layouts.engine.registry.registry" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local ok, err = xpcall(function()
 		local state = { selections = 0, installed = false }
-		package.loaded["modules.keymap.layout_registry"] = {
+		package.loaded["layouts.engine.registry.registry"] = {
 			snapshot = function()
 				return { installed = state.installed and { { id = "native", name = "Native layout" } } or {}, active = "native" }
 			end,

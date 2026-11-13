@@ -75,7 +75,8 @@ const DRIVER_SUBDIRS = [
 	'diagnostics',
 	'gestures',
 	'hotstrings',
-	'keyboard'
+	'keyboard',
+	'layouts'
 ];
 
 /** Supported target languages. */

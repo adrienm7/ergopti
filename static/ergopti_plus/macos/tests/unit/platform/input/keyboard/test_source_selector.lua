@@ -17,8 +17,8 @@ local EXECUTABLE = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 --- @param options table Native file observation controls.
 --- @param body function fn(selector, resolution_count).
 local function with_fixture(options, body)
-	helpers.with_stub_scope({ "adapters.input_source_selector", "keyboard.adapters.karabiner.lease_helper" }, function()
-		local selector = helpers.load_with_stubs("adapters.input_source_selector", {
+	helpers.with_stub_scope({ "layouts.adapters.input_source_selector", "keyboard.adapters.karabiner.lease_helper" }, function()
+		local selector = helpers.load_with_stubs("layouts.adapters.input_source_selector", {
 			fs = {
 				symlinkAttributes = function(path)
 					if path ~= EXECUTABLE then return nil end

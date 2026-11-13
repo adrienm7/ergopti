@@ -18,7 +18,7 @@ local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_devi
 local function with_device(mask, body, options)
 	options = options or {}
 	local names = { "hotstrings.engine.device_finder", "platform.input.keyboard_hook", "platform.input.evdev_reader",
-		"adapters.xkb_capture", "adapters.keyboard_layout", "platform.input.uinput_writer" }
+		"layouts.adapters.xkb_capture", "layouts.adapters.keyboard_layout", "platform.input.uinput_writer" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	local node, hook, reader = Fixture.fake_node("controlled hybrid capabilities")
@@ -28,8 +28,8 @@ local function with_device(mask, body, options)
 		-- Hook's private CapsWord constructor also loads Layout. Build that
 		-- dependency with its real producer before the controlled XKB is installed,
 		-- and restore both exact cache entries after this isolated transport ends.
-		helpers.load_module("adapters.xkb_capture")
-		helpers.load_module("adapters.keyboard_layout")
+		helpers.load_module("layouts.adapters.xkb_capture")
+		helpers.load_module("layouts.adapters.keyboard_layout")
 		local actual = helpers.load_module("hotstrings.engine.device_finder")
 		local function snapshot()
 			return actual.parse_devices(table.concat({
@@ -216,7 +216,7 @@ helpers.describe("keyboard_hook: explicit pinned hybrid capture", function()
 	for _, cold in ipairs({ true, false }) do
 		local mode = cold and "cold" or "warm"
 		helpers.it("restores the " .. mode .. " Layout cache after controlled Hook construction", function()
-			local layout_name, capture_name = "adapters.keyboard_layout", "adapters.xkb_capture"
+			local layout_name, capture_name = "layouts.adapters.keyboard_layout", "layouts.adapters.xkb_capture"
 			local old_layout, old_capture = package.loaded[layout_name], package.loaded[capture_name]
 			local called, detail = pcall(function()
 				package.loaded[layout_name], package.loaded[capture_name] = nil, nil

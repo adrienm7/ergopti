@@ -151,7 +151,7 @@ helpers.describe("keyboard_hook.while_released: native refusal never blocks a gr
 		local paths = { os.tmpname(), os.tmpname() }
 		for _, path in ipairs(paths) do local file = assert(io.open(path, "w")); file:close() end
 		local saved_finder = package.loaded["hotstrings.engine.device_finder"]
-		local saved_xkb = package.loaded["adapters.xkb_capture"]
+		local saved_xkb = package.loaded["layouts.adapters.xkb_capture"]
 		package.loaded["hotstrings.engine.device_finder"] = {
 			find_devices = function() return paths, {} end,
 			is_key_device = function() return true end,
@@ -159,7 +159,7 @@ helpers.describe("keyboard_hook.while_released: native refusal never blocks a gr
 			is_interceptable_key_device = function() return true end,
 			is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 		}
-		package.loaded["adapters.xkb_capture"] = {
+		package.loaded["layouts.adapters.xkb_capture"] = {
 			is_ready = function() return true end, reset_state = function() return true end,
 			process = function() end, modifier_role = function() end,
 		}
@@ -190,7 +190,7 @@ helpers.describe("keyboard_hook.while_released: native refusal never blocks a gr
 		Reader.grab = original_grab
 		pcall(Hook.stop); Reader._reset_backend()
 		package.loaded["hotstrings.engine.device_finder"] = saved_finder
-		package.loaded["adapters.xkb_capture"] = saved_xkb
+		package.loaded["layouts.adapters.xkb_capture"] = saved_xkb
 		for _, path in ipairs(paths) do os.remove(path) end
 		if not ok then error(failure, 0) end
 	end)
@@ -226,7 +226,7 @@ helpers.describe("keyboard_hook.while_released: running observe dialogs", functi
 	local function with_observe(options, check)
 		local InputEvent = require("platform.input.event")
 		local Reader
-		local names = { "hotstrings.engine.device_finder", "adapters.xkb_capture",
+		local names = { "hotstrings.engine.device_finder", "layouts.adapters.xkb_capture",
 			"platform.focus.window_info", "platform.input.keyboard_hook", "platform.input.evdev_reader" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end

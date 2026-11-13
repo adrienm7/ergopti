@@ -23,7 +23,7 @@ local groups = {
 	["tests/unit"] = { { "modules", "directory" } },
 	["tests/unit"] = { { "keymap", "directory" } },
 	["tests/unit"] = { { "layout", "directory" } },
-	["tests/unit/modules/keymap/layout"] = { { "test_input_sources_bounded_mutations.lua", "file" } },
+	["tests/unit/layouts/engine"] = { { "test_input_sources_bounded_mutations.lua", "file" } },
 }
 
 provider.fs_scandir = function(path, ...)

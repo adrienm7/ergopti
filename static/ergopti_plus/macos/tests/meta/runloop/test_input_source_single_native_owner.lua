@@ -55,7 +55,7 @@ local function strip_comments(source)
 end
 
 helpers.describe("inputSourceChanged single native owner", function()
-	helpers.it("only adapters.input_source_broker calls the global setter", function()
+	helpers.it("only layouts.adapters.input_source_broker calls the global setter", function()
 		local files = list_lua_files(DRIVER_ROOT)
 		helpers.assert_true(#files > 200,
 			"the production source walk must not be vacuous")
@@ -72,7 +72,7 @@ helpers.describe("inputSourceChanged single native owner", function()
 		end
 		helpers.assert_eq(1, #owners,
 			"the setter-only native slot must have exactly one production owner")
-		helpers.assert_true(owners[1]:match("/adapters/input_source_broker%.lua$") ~= nil,
-			"the native owner must be adapters.input_source_broker, got " .. tostring(owners[1]))
+		helpers.assert_true(owners[1]:match("/layouts/adapters/input_source_broker%.lua$") ~= nil,
+			"the native owner must be layouts.adapters.input_source_broker, got " .. tostring(owners[1]))
 	end)
 end)

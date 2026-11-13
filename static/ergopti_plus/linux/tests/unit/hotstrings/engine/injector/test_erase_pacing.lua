@@ -21,10 +21,10 @@ local LAYOUT = {
 --- Loads the injector over a recording channel and a recording pause.
 --- @return table injector, table pauses
 local function load()
-	package.loaded["adapters.xkb_capture"] = nil
-	local Capture = require("adapters.xkb_capture")
+	package.loaded["layouts.adapters.xkb_capture"] = nil
+	local Capture = require("layouts.adapters.xkb_capture")
 	Capture.caps_locked = function() return false end
-	local layout = helpers.load_module("adapters.keyboard_layout")
+	local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 	layout._set_table_for_test(LAYOUT)
 	local channel = { emitted = {} }
 	channel.is_open = function() return true end
@@ -42,7 +42,7 @@ local function load()
 end
 
 local function done()
-	package.loaded["adapters.xkb_capture"] = nil
+	package.loaded["layouts.adapters.xkb_capture"] = nil
 	package.loaded["hotstrings.engine.injector"] = nil
 end
 

@@ -384,7 +384,7 @@ helpers.describe("linux actions: modifier chords", function()
 	--- Runs `body` with a fake open uinput device, a hook holding nothing and
 	--- a layout answering `shortcut_keycode`, and restores all three.
 	local function with_fake_device(shortcut_keycode, body)
-		local names = { "platform.input.uinput_writer", "platform.input.keyboard_hook", "adapters.keyboard_layout",
+		local names = { "platform.input.uinput_writer", "platform.input.keyboard_hook", "layouts.adapters.keyboard_layout",
 			"gestures.engine.combo_emitter", "gestures.engine.manager" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -395,7 +395,7 @@ helpers.describe("linux actions: modifier chords", function()
 			held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return {} end,
 		}
-		package.loaded["adapters.keyboard_layout"] = { shortcut_keycode = shortcut_keycode }
+		package.loaded["layouts.adapters.keyboard_layout"] = { shortcut_keycode = shortcut_keycode }
 		helpers.load_module("gestures.engine.combo_emitter")
 		local Gestures = helpers.load_module("gestures.engine.manager")
 		local ok, err = pcall(body, writer, Gestures)

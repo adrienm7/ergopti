@@ -241,7 +241,7 @@ helpers.describe("keyboard hook + tap-hold engine: the pointer during a tap", fu
 			[pointer] = { InputEvent.encode(ev_type, code, value, nil, 2000) },
 		}
 		local saved = {}
-		for _, name in ipairs({ "hotstrings.engine.device_finder", "adapters.xkb_capture" }) do
+		for _, name in ipairs({ "hotstrings.engine.device_finder", "layouts.adapters.xkb_capture" }) do
 			saved[name] = package.loaded[name]
 		end
 		package.loaded["hotstrings.engine.device_finder"] = {
@@ -251,7 +251,7 @@ helpers.describe("keyboard hook + tap-hold engine: the pointer during a tap", fu
 			is_interceptable_key_device = function() return true, nil end,
 			is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 		}
-		package.loaded["adapters.xkb_capture"] = {
+		package.loaded["layouts.adapters.xkb_capture"] = {
 			is_ready = function() return true end,
 			reset_state = function() return true end,
 			process = function() return nil, nil, nil end,
@@ -376,7 +376,7 @@ helpers.describe("keyboard hook + tap-hold engine: a modifier the XKB options mo
 	--- is `caps_sym`, with Tab set as shipped (tap alt_tab_monitor, hold alt)
 	--- and the engine told of the modifiers as the tap-hold manager tells it.
 	local function drive_live(caps_sym, events)
-		local Capture = helpers.load_module("adapters.xkb_capture")
+		local Capture = helpers.load_module("layouts.adapters.xkb_capture")
 		local syms = { [CAPS] = caps_sym, [29] = SYM.Control_L, [56] = SYM.Alt_L }
 		Capture._set_backend({
 			create = function() return { held = {} } end,
@@ -495,7 +495,7 @@ helpers.describe("keyboard hook + tap-hold engine: a hold taken past the thresho
 			nodes[name], queues[path] = path, {}
 		end
 		local clock_ms = 0
-		local stubbed = { "hotstrings.engine.device_finder", "adapters.xkb_capture", "core.logger.engine.monotonic" }
+		local stubbed = { "hotstrings.engine.device_finder", "layouts.adapters.xkb_capture", "core.logger.engine.monotonic" }
 		local saved = {}
 		for _, name in ipairs(stubbed) do saved[name] = package.loaded[name] end
 		package.loaded["hotstrings.engine.device_finder"] = {
@@ -505,7 +505,7 @@ helpers.describe("keyboard hook + tap-hold engine: a hold taken past the thresho
 			is_interceptable_key_device = function() return true, nil end,
 			is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 		}
-		package.loaded["adapters.xkb_capture"] = {
+		package.loaded["layouts.adapters.xkb_capture"] = {
 			is_ready = function() return true end,
 			reset_state = function() return true end,
 			process = function() return nil, nil, nil end,

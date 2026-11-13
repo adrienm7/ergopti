@@ -8,7 +8,7 @@
 --- installed-layout record entry built from the compiled file, which layouts
 --- the page may compose from, and the open, save and remove operations over
 --- the driver's own install, uninstall and select ports. The Windows host does
---- the same in windows/ui/layout_manager/composer.ahk.
+--- the same in windows/layouts/ui/layout_manager/composer.ahk.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The page is never trusted: the declaration and the compiled .keylayout

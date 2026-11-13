@@ -29,7 +29,7 @@ local KEY_1 = 2
 local function load(opts)
 	opts = opts or {}
 	local state = { locks = opts.locks ~= false, initial = opts.locked == true }
-	local Capture = helpers.load_module("adapters.xkb_capture")
+	local Capture = helpers.load_module("layouts.adapters.xkb_capture")
 	Capture._set_backend({
 		create = function() return { caps = state.initial } end,
 		destroy = function() end,

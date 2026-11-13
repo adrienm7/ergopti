@@ -14,7 +14,7 @@
 ;    that master clears the keys Map so ``TapHoldIsConfigured`` returns false
 ;    for every physical key.
 ; 3. A registry layout the driver emulates (``Features["layout"]["emulated_layout"]``,
-;    modules/keymap/keylayout/) replaces the Ergopti emulation, so the features
+;    layouts/engine/keylayout/) replaces the Ergopti emulation, so the features
 ;    the manifest declares with superseded_reason_key are turned off the same
 ;    way: here, on every path that rebuilds Features, and never in the saved
 ;    configuration. The menu greys their rows with that reason.

@@ -20,7 +20,7 @@ end
 --- @return table observation Native objects and weak receiver/domain references.
 local function current(host, root)
 	assert(type(host) == "table" and type(host.open) == "function")
-	assert(debug.getinfo(host.open, "S").source == "@" .. root .. "/macos/ui/layout_manager/init.lua",
+	assert(debug.getinfo(host.open, "S").source == "@" .. root .. "/macos/layouts/ui/layout_manager/init.lua",
 		"foreign LayoutManager owner")
 	local view = upvalue(host.open, "_webview")
 	local controller = upvalue(host.open, "_usercontent")

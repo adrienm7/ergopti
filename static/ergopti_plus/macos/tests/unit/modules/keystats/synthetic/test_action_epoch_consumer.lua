@@ -21,7 +21,7 @@ local RESET_MODULES = {
 	"modules.keystats.context_tracker", "modules.keystats.kc_bridge",
 	"modules.keystats.watchers", "core.process.adapters.lifecycle",
 	"platform.input.keyboard_hook", "diagnostics.adapters.event_provenance",
-	"platform.input.synthetic_input", "adapters.input_source_broker",
+	"platform.input.synthetic_input", "layouts.adapters.input_source_broker",
 	"core.logger.engine.logger", "core.timing.engine.timings",
 	"menu.engine.manifest_reader", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
 	"metrics.engine.metrics", "hotstrings.engine.expander",
@@ -248,7 +248,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 		init_hardware_watchers = function() return true end,
 		stop_hardware_watchers = function() return true end,
 	})
-	package.loaded["adapters.input_source_broker"] = {
+	package.loaded["layouts.adapters.input_source_broker"] = {
 		subscribe = function() return true end,
 		unsubscribe = function() return true end,
 	}
@@ -416,7 +416,7 @@ local function load_fixture()
 		init_hardware_watchers = function() return true end,
 		stop_hardware_watchers = function() return true end,
 	})
-	package.loaded["adapters.input_source_broker"] = {
+	package.loaded["layouts.adapters.input_source_broker"] = {
 		subscribe = function() return true end,
 		unsubscribe = function() return true end,
 	}

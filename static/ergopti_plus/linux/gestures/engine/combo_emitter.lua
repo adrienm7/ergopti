@@ -220,7 +220,7 @@ function M.parse(combo)
 	if type(combo) ~= "string" or combo == "" then return nil, "empty combo" end
 
 	local mods, keys, level_mods = {}, {}, {}
-	local ok_layout, KeyboardLayout = pcall(require, "adapters.keyboard_layout")
+	local ok_layout, KeyboardLayout = pcall(require, "layouts.adapters.keyboard_layout")
 	for part in combo:gmatch("[^+%s]+") do
 		local code = KEYSYM_TO_CODE[part]
 		-- A character is pressed where the live layout types it, not where US

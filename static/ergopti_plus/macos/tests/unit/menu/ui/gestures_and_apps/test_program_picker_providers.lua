@@ -102,7 +102,7 @@ local function with_provider(kind, options, body)
 		package.loaded["gestures.engine.actions_aux_owner"] = { program_available = function() return true end }
 		package.loaded["modules.shortcuts.input_source_conflict"] = { check = function(_, _, callback) callback({}); return true end }
 		package.loaded["core.process.adapters.shell_runner"] = {}
-		package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
+		package.loaded["layouts.adapters.input_source_broker"] = { subscribe = function() return true end }
 		package.loaded["modules.shortcuts.bindings"] = { reconcile_tap_keys = function()
 			if fixture.action == selected then return receipt(options.reconcile) end
 			return true
@@ -122,7 +122,7 @@ local function with_provider(kind, options, body)
 			get_keyboard_slot_label = function(id) return id end,
 			get_keyboard_slot_chord = function() return { "cmd" }, "1" end,
 		}
-		for _, name in ipairs({ "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts" }) do package.loaded[name] = nil end
+		for _, name in ipairs({ "ui.menu.shortcut_utils", "layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts" }) do package.loaded[name] = nil end
 		state = { shortcuts = true, script_control_shortcuts = { script_altgr_enter = "none" } }
 		local ctx = { gestures = gestures, state = state, shortcuts = {},
 			save_prefs = function()
@@ -141,7 +141,7 @@ local function with_provider(kind, options, body)
 			function() return fixture.action end, ctx.save_prefs)
 		ctx.commit_program_parameter = owner.apply
 		if kind == "keyboard" then
-			rows = require("ui.menu.menu_keyboard_slots").provide_rows(ctx)
+			rows = require("layouts.ui.menu.keyboard_slots").provide_rows(ctx)
 			rows[1].items[1].action()
 		elseif kind == "tap" then
 			rows = require("ui.menu.menu_tap_keys").provide_rows(ctx)

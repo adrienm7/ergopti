@@ -21,14 +21,14 @@ BUSINESS_SCOPE = "registry snapshot and refresh controlled; no TIS, install, sel
 IDENTITY_SCOPE = "private read-only dispatch stack; raw native name and exact webView observed"
 WEAK_SCOPE = "per-window lease receiver and domain; pooled dispatcher retained"
 DEPENDENCIES = (
-    "static/ergopti_plus/macos/ui/layout_manager/init.lua",
+    "static/ergopti_plus/macos/layouts/ui/layout_manager/init.lua",
     "static/ergopti_plus/macos/core/ui/ui/webview_controller_pool.lua",
     "static/ergopti_plus/macos/core/ui/ui/builder.lua",
     "static/ergopti_plus/macos/core/ui/ui/webview_close_owner.lua",
     "static/ergopti_plus/macos/core/events/timer_scheduler.lua",
     "static/ergopti_plus/macos/core/timing/engine/deferred_work.lua",
     "static/ergopti_plus/_shared/layouts/engine/manager_bridge.lua",
-    "static/ergopti_plus/macos/modules/keymap/layout_registry.lua",
+    "static/ergopti_plus/macos/layouts/engine/registry/registry.lua",
     "static/ergopti_plus/_shared/ui/layout_manager/strings.json",
     "static/ergopti_plus/_shared/ui/layout_manager/index.html",
     "static/ergopti_plus/_shared/ui/layout_manager/script.js",

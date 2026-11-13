@@ -125,7 +125,7 @@ const partOnlyCases = [
 	[
 		'a part reads a name a later part declares',
 		partOnly(
-			'linux/ui/menu/menu_layouts.lua',
+			'linux/layouts/ui/menu/layouts.lua',
 			'local function _build_layouts(ctx)',
 			'local function _layouts_reads_later() return PrivacyPolicy end\nlocal function _build_layouts(ctx)'
 		)
@@ -143,7 +143,7 @@ const partOnlyCases = [
 		partOnly(
 			'linux/menu/ui/builder/dialogs.lua',
 			'local LOG = "ui.menu.menu_dialogs"',
-			'local layouts_probe = require("ui.menu.menu_layouts").layouts_probe\nlocal LOG = "ui.menu.menu_dialogs"'
+			'local layouts_probe = require("layouts.ui.menu.layouts").layouts_probe\nlocal LOG = "ui.menu.menu_dialogs"'
 		)
 	]
 ];

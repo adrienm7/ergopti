@@ -25,9 +25,9 @@ if A_AhkVersion != "2.0.26" || A_PtrSize != 8 {
 }
 
 #Include %A_LineFile%\..\..\test_framework.ahk
-#Include %A_LineFile%\..\..\..\modules\keymap\keylayout\keylayout_parser.ahk
-#Include %A_LineFile%\..\..\..\modules\keymap\keylayout\keylayout_tables.ahk
-#Include %A_LineFile%\..\..\..\modules\keymap\keylayout\keylayout_emulation.ahk
+#Include %A_LineFile%\..\..\..\layouts\engine\keylayout\parser.ahk
+#Include %A_LineFile%\..\..\..\layouts\engine\keylayout\tables.ahk
+#Include %A_LineFile%\..\..\..\layouts\engine\keylayout\emulation.ahk
 #Include %A_LineFile%\..\..\..\ai\adapters\nav_event_owner.ahk
 #Include %A_LineFile%\..\..\..\core\ui\adapters\terminal_output_custody.ahk
 #Include %A_LineFile%\..\..\unit\ai\nav_event_owner\test_terminal_route_metadata.ahk

@@ -257,7 +257,7 @@ function M.open(options)
 			commit=function(rows,receipt) return scope.edit(rows,receipt) end,
 			close=function() return close(candidate) end,
 			picker=function(binding,action,on_confirm)
-				local items = require("ui.menu.menu_keyboard_slots").build_action_items(gestures)
+				local items = require("layouts.ui.menu.keyboard_slots").build_action_items(gestures)
 				local fields = require("ui.menu.shortcut_utils").picker_parameter_fields(gestures,items,binding)
 				fields.title, fields.current, fields.items = I18n.get("physical_shortcuts.window_title"),action,items
 				return require("ui.action_picker").open(fields,function(id,parameter)

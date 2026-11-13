@@ -37,7 +37,7 @@ local function with_wrap(options, body)
 	require("core.text.engine.toml_codec.writer")
 	require("settings.engine.migration.file_inverse")
 	Fixture.with(function(guard, focus, _, _, watch)
-		local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
+		local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "layouts.adapters.keyboard_layout",
 			"hotstrings.engine.injector", "platform.input.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type",
 			"gestures.engine.user_actions", "core.logger.engine.shim" }
 		local saved = {}
@@ -102,7 +102,7 @@ local function with_wrap(options, body)
 		local ok, err = pcall(function()
 			shortcuts = helpers.load_module("modules.shortcuts.manager")
 			shortcuts.init({ enabled = true, persist = false }); assert(shortcuts.set_wrap_on_type_enabled(true))
-			local layout = helpers.load_module("adapters.keyboard_layout")
+			local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 			layout._set_table_for_test({}) -- This wrap must use the real clipboard path.
 			local key_v = layout.shortcut_keycode
 			layout.shortcut_keycode = function(...) transition("paste-lookup"); return key_v(...) end

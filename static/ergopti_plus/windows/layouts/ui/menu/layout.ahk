@@ -1,0 +1,492 @@
+﻿; layouts/ui/menu/layout.ahk
+
+; ==============================================================================
+; MODULE: Tray Menu / Layout Submenu
+; DESCRIPTION:
+; Builds the Layout category entries (base layout features and AltGr layer features) straight into the parent menu from the manifest.
+;
+; Split out of menu/ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
+; index: it declares the shared menu globals and #Include-s this file. Every
+; function here is hoisted into the global namespace, so load order across the
+; menu/*.ahk files is irrelevant.
+; ==============================================================================
+
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+
+
+
+
+/**
+ * Reports the enabled emulation; selection belongs to the shared layout manager.
+ * macOS and Linux's same list provider selects native input sources instead.
+ * @param {Map} FeaturesSource Feature preferences; the live map when omitted.
+ * @param {Integer} Enabled Layout category gate; the live gate when omitted.
+ * @param {Map} Index Registry metadata; the current catalogue when omitted.
+ * @returns {Array} One disabled status row without a selection callback.
+ */
+_LAY_CustomLayoutRows(FeaturesSource := unset, Enabled := unset, Index := unset) {
+	global Features
+	if !IsSet(FeaturesSource)
+		FeaturesSource := Features
+	if !IsSet(Enabled)
+		Enabled := IsCategoryGated("Layout")
+	Active := Enabled ? LayoutManager_ActiveId(FeaturesSource) : ""
+	Name := ""
+	if Active != "" {
+		if !IsSet(Index) {
+			Index := LayoutCatalogue_Last()["index"]
+			if !(Index is Map)
+				Index := LayoutCatalogue_BundledIndex()
+		}
+		Entry := LayoutCatalogue_Entry(Index, Active)
+		; A previously selected layout absent from the current catalogue remains
+		; identified explicitly; it must never be reported as no emulation.
+		Name := (Entry is Map) ? Entry.Get("name", Active) : Active
+	}
+	Label := Name == "" ? t("menu.layout.emulated_none") : Format(t("menu.layout.emulated_status"), Name)
+	if (Active != "" && KeylayoutEmulation_FailedId() == Active)
+		Label .= " — " . t("menu.layout.emulation_failed")
+	return [Map("label", Label, "disabled", true)]
+}
+
+/**
+ * Layout > « Disposition à émuler »: the same choices as macOS and Linux
+ * (_shared/layouts/engine/emulation/menu.lua): none, the built-in Ergopti
+ * variants, then the registry layouts the app lists or the layout manager
+ * installed. A choice goes through the layout manager's acknowledged handoff,
+ * which restarts the driver on the new selection. A registry layout that is not
+ * installed is installed first: the boot never installs (decided on 2026-11-12,
+ * as macOS and Linux), so an uninstalled layout stays chosen, named « cannot be
+ * emulated », until it is chosen again here or installed in the layout manager.
+ * @param {Map} FeaturesSource Feature preferences; the live map when omitted.
+ * @param {Func} SelectFn Port with LayoutManager_Select's contract.
+ * @param {Map} Index Registry metadata; the current catalogue when omitted.
+ * @param {Map} Installed Installed-layout record; read from disk when omitted.
+ * @param {Func} ErrorFn Port: ErrorFn(Message) tells a refused selection.
+ * @param {Func} InstallFn Port: InstallFn(Id, OnDone) installs a registry layout,
+ *   OnDone(Ok, Detail*); LayoutCatalogue_Install by default.
+ * @param {String} FailedId The selected id the boot could not emulate;
+ *   KeylayoutEmulation_FailedId() by default.
+ * @param {Func} AfterFn Port: AfterFn(Id, Action, OnDone) reloads the emulation
+ *   after an install; _LayMgrWeb_After by default.
+ * @returns {Array} One submenu row holding the choices.
+ */
+_LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset, Installed := unset, ErrorFn := 0,
+		InstallFn := 0, FailedId := unset, AfterFn := 0) {
+	global Features, _ConfigDir, ERGOPTI_LAYOUT_ID, ERGOPTI_PLUS_LAYOUT_ID
+	if !IsSet(FeaturesSource)
+		FeaturesSource := Features
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := LayoutManager_Select
+	if !HasMethod(ErrorFn, "Call")
+		ErrorFn := (Message) => Ui_MsgBox(Message, t("common.error_title"), "Icon!")
+	if !IsSet(Index) {
+		Index := LayoutCatalogue_Last()["index"]
+		if !(Index is Map)
+			Index := LayoutCatalogue_BundledIndex()
+	}
+	if !IsSet(Installed)
+		Installed := LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))
+	if !HasMethod(InstallFn, "Call")
+		InstallFn := (Id, OnDone) => LayoutCatalogue_Install(Id, LayoutRegistry_LocalDir(_ConfigDir), OnDone)
+	if !IsSet(FailedId)
+		FailedId := KeylayoutEmulation_FailedId()
+	if !HasMethod(AfterFn, "Call")
+		AfterFn := _LayMgrWeb_After
+	ComposerId := LayoutRegistry_Composer()["id"]
+	Current := LayoutManager_ActiveId(FeaturesSource)
+	Registry := Map()
+	for Entry in Index["layouts"]
+		Registry[Entry["id"]] := Entry.Get("name", Entry["id"])
+	for Id, Entry in Installed
+		if !Registry.Has(Id)
+			Registry[Id] := Entry.Get("name", Id)
+	Choices := [["", t("onboarding.layout.emulated_none")],
+		[ERGOPTI_LAYOUT_ID, t("onboarding.layout.emulated_ergopti")],
+		[ERGOPTI_PLUS_LAYOUT_ID, t("onboarding.layout.emulated_ergopti_plus")]]
+	Named := []
+	for Id, Name in Registry
+		if Id != ERGOPTI_LAYOUT_ID && Id != ERGOPTI_PLUS_LAYOUT_ID
+			Named.Push([Id, Name])
+	Named := _LAY_SortByName(Named)
+	for Pair in Named
+		Choices.Push(Pair)
+	; A stored layout absent from the catalogue stays named, never « none ».
+	Shown := ""
+	Found := false
+	for Pair in Choices
+		Found := Found || Pair[1] == Current
+	if !Found
+		Choices.Push([Current, Current])
+	; One call per choice owns its id: a closure over the loop variable would
+	; see its last value.
+	ChooseAction(Id) {
+		; A missing copy, or the chosen one the boot found unusable, is (re)installed:
+		; choosing it again is the repair the boot no longer does on its own.
+		NeedsInstall := Id != "" && Id != ERGOPTI_LAYOUT_ID && Id != ERGOPTI_PLUS_LAYOUT_ID
+			&& Id != ComposerId && (!Installed.Has(Id) || Id == FailedId)
+		return (*) => _LAY_ChooseEmulation(Id, SelectFn, ErrorFn, NeedsInstall ? InstallFn : 0,
+			Id == Current ? AfterFn : 0)
+	}
+	Items := []
+	for Pair in Choices {
+		Checked := Pair[1] == Current
+		if Checked
+			Shown := Pair[2]
+		Items.Push(Map("label", Pair[2], "checked", Checked, "action", ChooseAction(Pair[1])))
+	}
+	; A chosen layout the boot could not emulate stays ticked and named, as macOS
+	; and Linux show their emulation status error.
+	if (Current != "" && FailedId == Current)
+		Shown .= " — " . t("menu.layout.emulation_failed")
+	return [Map("label", LabelValue(t("menu.layout.emulated_layout"), Shown), "items", Items)]
+}
+
+; Registry choices by display name, so the list reads alphabetically.
+_LAY_SortByName(Pairs) {
+	Sorted := []
+	for Pair in Pairs {
+		Position := Sorted.Length + 1
+		while Position > 1 && StrCompare(Pair[2], Sorted[Position - 1][2], "Locale") < 0
+			Position -= 1
+		Sorted.InsertAt(Position, Pair)
+	}
+	return Sorted
+}
+
+; Selects one emulation choice from the menu and tells a refusal. A layout that
+; is not installed is installed first; when it is already the chosen one, the
+; install reloads the emulation instead of selecting it again.
+; @param InstallFn {Func|Integer} InstallFn(Id, OnDone), or 0 when installed.
+; @param AfterFn {Func|Integer} AfterFn(Id, Action, OnDone) for the chosen layout, or 0.
+_LAY_ChooseEmulation(Id, SelectFn, ErrorFn, InstallFn := 0, AfterFn := 0) {
+	try LoggerInfo("Layout", "Choosing the layout to emulate '{1}' from the menu.", Id == "" ? "none" : Id)
+	if HasMethod(InstallFn, "Call") {
+		LoggerInfo("Layout", "'{1}' is not installed; installing it before it is emulated.", Id)
+		InstallFn.Call(Id, _LAY_OnEmulationInstalled.Bind(Id, SelectFn, ErrorFn, AfterFn))
+		return true
+	}
+	if SelectFn.Call(Id)
+		return true
+	ErrorFn.Call(t("menu.layout.emulation_not_saved"))
+	return false
+}
+
+_LAY_OnEmulationInstalled(Id, SelectFn, ErrorFn, AfterFn, Ok, Detail*) {
+	if !Ok {
+		; LayoutCatalogue_Install logged the failure and its reason.
+		ErrorFn.Call(t("menu.layout.install_failed"))
+		return
+	}
+	if HasMethod(AfterFn, "Call") {
+		AfterFn.Call(Id, "install", (Reloaded) => Reloaded ? 0 : ErrorFn.Call(t("menu.layout.install_failed")))
+		return
+	}
+	_LAY_ChooseEmulation(Id, SelectFn, ErrorFn)
+}
+
+/**
+ * Layout > « Input sources »: the layouts installed for the user, the active
+ * one ticked, choosing another switching the foreground window to it, as macOS
+ * lists and selects its input sources.
+ * @param {Func} ChoicesFn Optional port with KLS_Choices' contract.
+ * @param {Func} ActiveFn Optional port with KLS_ActiveId's contract.
+ * @param {Func} SelectFn Optional port with KLS_Select's contract.
+ * @param {Func} ErrorFn Optional port: ErrorFn(Message) tells a refused switch.
+ * @param {Func} OpenFn Optional port with KLS_OpenSettings' contract.
+ * @returns {Array} Provider rows.
+ */
+_LAY_ActiveLayoutRows(ChoicesFn := 0, ActiveFn := 0, SelectFn := 0, ErrorFn := 0, OpenFn := 0) {
+	if !HasMethod(ChoicesFn, "Call")
+		ChoicesFn := KLS_Choices
+	if !HasMethod(ActiveFn, "Call")
+		ActiveFn := KLS_ActiveId
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := KLS_Select
+	if !HasMethod(ErrorFn, "Call")
+		ErrorFn := (Message) => Ui_MsgBox(Message, t("common.error_title"), "Icon!")
+	if !HasMethod(OpenFn, "Call")
+		OpenFn := KLS_OpenSettings
+	Choices := ChoicesFn.Call()
+	if (Choices.Length == 0) {
+		Rows := MenuRenderer_TemplateRows("layout_active_source_empty_commands",
+			Map(MenuCommand.LAYOUT_OPEN_PREFERENCES, (*) => OpenFn.Call()), Map(), Map())
+		return Rows is Array ? Rows : []
+	}
+	Active := ActiveFn.Call()
+	; One call per choice owns its id: a closure over the loop variable would
+	; see its last value.
+	SelectAction(Klid) {
+		return (*) => _LAY_SelectActiveLayout(Klid, SelectFn, ErrorFn)
+	}
+	Rows := []
+	for Choice in Choices
+		Rows.Push(Map("label", Choice["label"], "checked", Choice["id"] == Active,
+			"disabled", Choice["id"] == Active, "action", SelectAction(Choice["id"])))
+	return Rows
+}
+
+; Switches to one installed layout from the menu and tells a refusal.
+_LAY_SelectActiveLayout(Klid, SelectFn, ErrorFn) {
+	try LoggerInfo("Layout", "Switching the keyboard layout to {1} from the menu.", Klid)
+	Result := SelectFn.Call(Klid)
+	if (Result is Integer) && Result == 1
+		return 1
+	ErrorFn.Call(t("menu.layout.select_failed"))
+	return false
+}
+
+; List provider: Ergopti base-layer feature only (ergopti_base).
+;
+; A `list` since 2026-08-07, where both blocks were `dynamic` handlers handed the
+; menu object. Every row here is a manifest feature — label, tick and greying all
+; derived from the declaration by MenuRowFromManifest — so there was never
+; anything for a handler to decide that data could not carry.
+_LAY_LayoutFeatureBaseRows() {
+	return _LAY_FeatureRows(ConfigKey.LAYOUT_ERGOPTI_BASE)
+}
+
+; List provider: the independent Ergopti AltGr layer (ergopti_alt_gr).
+; Built-in variant intent belongs to the existing emulation picker; it has no row.
+; The rows that work on any layout are declared on their own in the manifest's
+; « any layout » section: direct_access_digits, and ctrl_magic_save after the
+; magic-key replace option it depends on.
+;
+; Named, never « the section minus a list »: a row added to the section later
+; fell into that remainder, and the pause switch and its two pickers were drawn
+; here a second time, as raw text rows beside the declared layout_switching ones.
+_LAY_LayoutFeatureAltGrRows() {
+	return _LAY_FeatureRows(ConfigKey.LAYOUT_ERGOPTI_ALT_GR)
+}
+
+/**
+ * The toggle row of one layout feature.
+ * @param {String} Path The feature's canonical path.
+ * @returns {Array} The row, or nothing when the feature does not resolve.
+ */
+_LAY_FeatureRows(Path) {
+	Entry := ManifestFindEntryByPath(Path)
+	if !(Entry is Map)
+		throw Error("The layout feature '" . Path . "' is not declared.")
+	Rows := []
+	Row := MenuRowFromManifest(Entry, "Layout")
+	if Row != ""
+		Rows.Push(Row)
+	return Rows
+}
+
+
+; ── Hotstrings dynamic handlers ────────────────────────────────────────────────
+
+/** Collects the actual live input/configuration owners before any choice write. */
+_LAY_NumberRowRuntime() {
+	global Features, KLE_Model, _TrayRootLifecycleEpoch, _LayoutPollRetry
+	try {
+		Desired := IsSet(Features) && Features is Map ? MasterGateDesiredFeatures(Features) : Map()
+		Mode := Desired.Has("layout") && Desired["layout"] is Map ? NumberRowPolicyMode(Desired["layout"].Get(ConfigLeaf.DIRECT_ACCESS_DIGITS, "")) : ""
+		Caps := GetKeyState("CapsLock", "T")
+		Hkl := NumberRowForegroundLayout()
+		return Map("owner", IsSet(Features) ? Features : 0,
+			"source", IsSet(KLE_Model) && IsObject(KLE_Model) && KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) ? KLE_Model : Hkl,
+			"native_owner", IsSet(_LayoutPollRetry) ? _LayoutPollRetry : 0,
+			"generation", MagicEditorState()["configuration_generation"],
+			"lifecycle", IsSet(_TrayRootLifecycleEpoch) ? _TrayRootLifecycleEpoch : -1,
+			"hkl", Hkl, "platform", "ahk", "mode", Mode,
+			"master", IsCategoryGated("Layout") ? true : false,
+			"paused", A_IsSuspended ? true : false, "blocked", false,
+			"symbols", NumberRowSymbolsCapable(Caps), "caps", Caps,
+			"availability", NumberRowAvailability(Hkl, Caps))
+	} catch {
+		return Map("mode", "", "symbols", false, "blocked", true)
+	}
+}
+
+/** Retains exact source bytes and verifies stored intent agrees with live owners. */
+_LAY_NumberRowSnapshot() {
+	global ConfigurationFile, Features
+	Snapshot := _LAY_NumberRowRuntime()
+	try {
+		Snapshot["path"] := ConfigurationFile
+		Presence := FSStrictExists(ConfigurationFile)
+		Content := Presence ? FSReadUtf8Exact(ConfigurationFile) : ""
+		if !(Content is String)
+			throw TypeError("Number-row source is not readable.")
+		Snapshot["content"] := Content
+		Snapshot["presence"] := Presence
+		Document := TOML_ParseDocumentShared(Content)
+		Desired := MasterGateDesiredFeatures(Features)
+		for Path, Expected in Map(ConfigKey.LAYOUT_DIRECT_ACCESS_DIGITS, Snapshot["mode"],
+			ConfigKey.LAYOUT_EMULATED_LAYOUT, Desired["layout"].Get(ConfigLeaf.EMULATED_LAYOUT, ""),
+			ConfigKey.LAYOUT_ERGOPTI_BASE, Desired["layout"].Get(ConfigLeaf.ERGOPTI_BASE, false),
+			"category_enabled.layout", Snapshot["master"]) {
+			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
+			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
+			if Read["found"] && (Path == ConfigKey.LAYOUT_ERGOPTI_BASE || Path == "category_enabled.layout") && !(Value is TOML_Bool)
+				Snapshot["blocked"] := true
+			if Value is TOML_Bool
+				Value := Value.Value
+			if Read["blocked"] || !ManifestValuesEqual(Value, Expected)
+				Snapshot["blocked"] := true
+		}
+		if !_TOML_WriteSourceMatches(ConfigurationFile, Presence, Content)
+				|| !NumberRowPolicyIntent(Snapshot, _LAY_NumberRowRuntime(), "native")
+			Snapshot["blocked"] := true
+	} catch {
+		Snapshot["blocked"] := true
+	}
+	return Snapshot
+}
+
+/** Publishes through the existing leased sparse feature owner, with strict ACK. */
+_LAY_NumberRowCommit(Expected, Value, WriterFn := 0, RefreshFn := 0, NotifyFn := 0, *) {
+	global Features
+	Current := _LAY_NumberRowSnapshot()
+	if !NumberRowPolicyIntent(Expected, Current, Value)
+		return false
+	; Choosing an already effective intent must not flush a default into an
+	; absent source or claim a persistence acknowledgement for a no-op.
+	if StrCompare(Value, Current["mode"], true) == 0
+		return false
+	try Written := WriteFeatureV2(Features, ConfigKey.LAYOUT_DIRECT_ACCESS_DIGITS, Value, "",
+		_LAY_NumberRowWrite.Bind(Expected, Value, WriterFn), NotifyFn)
+	catch {
+		return false
+	}
+	if !(Written is Integer) || Written != true
+		return false
+	if HasMethod(RefreshFn, "Call")
+		RefreshFn.Call()
+	else
+		RebuildTrayMenu()
+	return true
+}
+
+/** Keeps the raw admitted image through the canonical publisher's own fences. */
+_LAY_NumberRowWrite(Expected, Value, WriterFn, Path, Updates) {
+	Current := _LAY_NumberRowSnapshot()
+	if !NumberRowPolicyIntent(Expected, Current, Current["mode"])
+			|| StrCompare(Expected["path"], Path, true) != 0
+			|| Expected["presence"] != Current.Get("presence", -1)
+			|| StrCompare(Expected["content"], Current.Get("content", ""), true) != 0
+		return false
+	if Updates.Length != 1 || Updates[1].Section != "layout" || Updates[1].Key != ConfigLeaf.DIRECT_ACCESS_DIGITS
+			|| !NumberRowPolicyReady(Current, Value)
+		return false
+	Update := Updates[1]
+	if Update.HasOwnProp("Delete") && Update.Delete {
+		if StrCompare(Value, ManifestDefaultFor(ConfigKey.LAYOUT_DIRECT_ACCESS_DIGITS), true) != 0
+			return false
+	} else if !Update.HasOwnProp("Value") || !(Update.Value is String) || StrCompare(Update.Value, Value, true) != 0
+		return false
+	if HasMethod(WriterFn, "Call")
+		return WriterFn.Call(Path, Updates, Expected["content"], Expected["presence"])
+	return _TOML_BatchWriteImpl(Path, Updates, [], "write", Expected["content"], Expected["presence"])
+}
+
+/** Supplies only shared choice DATA; each retained callback owns its source. */
+_LAY_NumberRowRows(WriterFn := 0, RefreshFn := 0, NotifyFn := 0) {
+	Expected := _LAY_NumberRowSnapshot()
+	Row := MenuRenderer_ChoiceRow("number_row_policy_rows", MenuCommand.NUMBER_ROW_MODE,
+		Map(MenuCommand.NUMBER_ROW_MODE, _LAY_NumberRowChoose.Bind(Expected, WriterFn, RefreshFn, NotifyFn)),
+		Map(ConfigKey.LAYOUT_DIRECT_ACCESS_DIGITS, (*) => Expected["mode"]))
+	if !(Row is Map) || !Row.Has("items") || !(Row["items"] is Array)
+		return []
+	Definition := _MR_GetMenuDef("number_row_policy_rows")
+	if !(Definition is Array) || Definition.Length != 2 || !(Definition[1] is Map)
+			|| !Definition[1].Has("choices") || !(Definition[1]["choices"] is Array)
+			|| Definition[1]["choices"].Length != 3
+			|| Definition[1]["choices"].Length != Row["items"].Length
+		return []
+	for Index, Value in ["native", "digits", "symbols"] {
+		Choice := Definition[1]["choices"][Index]
+		if !(Choice is Map) || !(Row["items"][Index] is Map)
+				|| !(Choice.Get("value", 0) is String) || StrCompare(Choice["value"], Value, true) != 0
+			return []
+	}
+	Availability := Expected.Get("availability", 0)
+	; The layout poll refreshes the menu when a layout change alters this.
+	global _NumberRowMenuSignature
+	if Expected.Has("hkl") && Expected.Has("caps")
+		_NumberRowMenuSignature := NumberRowMenuSignature(Expected["hkl"], Expected["caps"])
+	for Index, Item in Row["items"] {
+		Value := Definition[1]["choices"][Index]["value"]
+		; An ordering that cannot make the row's base level differ from its
+		; Shift level on this layout is greyed with why; the stored choice keeps
+		; its tick and says it is not applied (number-row-availability).
+		Reason := Value != "native" && Availability is Map ? Availability[Value] : ""
+		if Reason != "" {
+			Item["disabled"] := true
+			Item["disabled_reason_key"] := "platform_reason.number_row_" . Reason
+			if StrCompare(Value, Expected["mode"], true) == 0
+				Item["label"] := Item["label"] . t("menu.layout.number_row_not_applied")
+		} else if !NumberRowPolicyReady(Expected, Value) {
+			Item["disabled"] := true
+			if Value == "symbols" && !Expected["symbols"]
+				Item["disabled_reason_key"] := "platform_reason.number_row_source_unavailable"
+			; A closed layout gate makes the stored ordering inert on every layout. It
+			; says so in the words of the edge-keys row below, whatever the foreground
+			; layout could do once the gate opens (number-row-inert-choice).
+			else if !Expected.Get("master", true) && Value != "native"
+					&& StrCompare(Value, Expected["mode"], true) == 0 {
+				Item["disabled_reason_key"] := "platform_reason.number_row_no_ordering"
+				Item["label"] := Item["label"] . t("menu.layout.number_row_not_applied")
+			}
+		}
+	}
+	Edges := _LAY_NumberRowEdgesRow(Definition[2], Expected, RefreshFn)
+	return Edges is Map ? [Row, Edges] : [Row]
+}
+
+; The « also reorder the three edge keys » checkbox, declared after the ordering
+; choice. Greyed with why where the edge keys cannot join the ordering in
+; effect; while it is ticked there, its label says it is not applied. Its
+; state is read live, so a click needs no reload, only the menu refresh.
+; @param {Map} Declaration The shared declaration: "path" and "i18n".
+; @param {Map} Expected The number-row snapshot of this menu.
+; @param {Func} RefreshFn Rebuilds the menu; the tray rebuild when 0.
+; @returns {Map|String} The row, or "" for a malformed declaration.
+_LAY_NumberRowEdgesRow(Declaration, Expected, RefreshFn := 0) {
+	if !(Declaration is Map) || Declaration.Get("type", "") != "check" || Declaration.Get("id", "") != MenuCommand.NUMBER_ROW_EDGES
+			|| Declaration.Get("path", "") != ConfigKey.LAYOUT_NUMBER_ROW_REORDER_EDGES || Declaration.Get("i18n", "") == ""
+		return ""
+	State := NumberRowEdgesState(Expected.Get("hkl", NumberRowForegroundLayout()), Expected.Get("caps", false))
+	; The menu shows what the user stored: a closed layout gate empties the live
+	; boolean, so the choice is read from the intent view, as the ordering row's.
+	Stored := _LAY_NumberRowEdgesStoredChoice()
+	Row := Map("label", t(Declaration["i18n"]), "checked", Stored,
+		"action", _LAY_NumberRowEdgesToggle.Bind(!Stored, RefreshFn))
+	if State["reason"] != "" {
+		Row["disabled"] := true
+		Row["disabled_reason_key"] := "platform_reason.number_row_" . State["reason"]
+		if Stored
+			Row["label"] := Row["label"] . t("menu.layout.number_row_not_applied")
+	}
+	return Row
+}
+
+; The edge-keys choice as stored, whether or not the layout gate lets it act.
+; @returns {Boolean}
+_LAY_NumberRowEdgesStoredChoice() {
+	global Features
+	Desired := IsSet(Features) && Features is Map ? MasterGateDesiredFeatures(Features) : Map()
+	return Desired.Has("layout") && Desired["layout"] is Map && Desired["layout"].Has(ConfigLeaf.NUMBER_ROW_REORDER_EDGES)
+		&& Desired["layout"][ConfigLeaf.NUMBER_ROW_REORDER_EDGES] == true
+}
+
+_LAY_NumberRowEdgesToggle(Value, RefreshFn, *) {
+	global Features
+	Written := WriteFeatureV2(Features, ConfigKey.LAYOUT_NUMBER_ROW_REORDER_EDGES, Value)
+	if !(Written is Integer) || Written != true
+		return false
+	try LoggerInfo("Menu", "The edge keys of the number row are {1} the ordering.", Value ? "added to" : "removed from")
+	if HasMethod(RefreshFn, "Call")
+		RefreshFn.Call()
+	else
+		RebuildTrayMenu()
+	return true
+}
+
+/** Binds optional native ports without erasing the selected canonical value. */
+_LAY_NumberRowChoose(Expected, WriterFn, RefreshFn, NotifyFn, Value) {
+	return _LAY_NumberRowCommit(Expected, Value, WriterFn, RefreshFn, NotifyFn)
+}

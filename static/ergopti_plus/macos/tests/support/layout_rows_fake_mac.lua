@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Layout Rows Fake Mac
 --- DESCRIPTION:
---- The collaborators of modules/keymap/layout_rows_build.lua over an in-memory
+--- The collaborators of layouts/engine/registry/rows_build.lua over an in-memory
 --- Mac: files, the enabled list, the selected layout, and a keyboard probe that
 --- types the selected build's base cells from its own file. Shared by the build's
 --- tests and the field run's layout rows check.

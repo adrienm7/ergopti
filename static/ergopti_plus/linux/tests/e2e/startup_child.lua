@@ -155,7 +155,7 @@ end
 -- ================================
 -- ================================
 
-package.preload["adapters.keyboard_layout"] = function()
+package.preload["layouts.adapters.keyboard_layout"] = function()
 	-- The layout is controlled; opaque plan custody is actual KeyboardLayout logic.
 	return require("tests.support.layout_cohort_fixture").layout(function() return 30 end)
 end

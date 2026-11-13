@@ -10547,12 +10547,12 @@ console.log(
 		assert.deepEqual(generated[section], rows, 'actual generated switching declaration');
 	}
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/layouts/ui/menu/keyboard_layout.lua')
 	);
 	// Linux and Windows bind the same frames from their own rows owners.
 	for (const [file, extension] of [
-		['static/ergopti_plus/linux/ui/menu/pause_layout_rows.lua', '.lua'],
-		['static/ergopti_plus/windows/modules/keymap/pause_layout_switch.ahk', '.ahk']
+		['static/ergopti_plus/linux/layouts/ui/menu/pause_layout_rows.lua', '.lua'],
+		['static/ergopti_plus/windows/layouts/engine/emulation/pause_layout_switch.ahk', '.ahk']
 	]) {
 		const native = readSourceFile(resolve(REPO_ROOT, file));
 		for (const [section, key, port] of [
@@ -10706,7 +10706,7 @@ console.log(
 	const declaration = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	const native = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/layouts/ui/menu/keyboard_layout.lua')
 	);
 	const sections = [
 		'layout_native_record_choice',
@@ -10814,7 +10814,7 @@ console.log(
 	const { nativeLayoutTemplatePublication } = require('../lib/menu-native-layout-binding.cjs');
 	const declaration = parseToml(readSourceFile(MENU_SOURCE_PATH)).menu;
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/layouts/ui/menu/keyboard_layout.lua')
 	);
 	for (const [name, candidate] of [
 		[

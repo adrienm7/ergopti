@@ -35,7 +35,7 @@ const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BUILD_REL = 'tools/build/build_macos_app.sh';
-const MENU_REL = 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua';
+const MENU_REL = 'static/ergopti_plus/macos/layouts/ui/menu/keyboard_layout.lua';
 const DRIVER_REL = 'static/ergopti_plus/macos/';
 const SOURCE_BUNDLES_REL = 'static/ergopti/macos/bundles';
 

@@ -113,8 +113,8 @@ end)
 --- Uses the actual XKB adapter and its opaque inverse receipts over a stateful
 --- software keymap. Reader/Writer keep the controlled native-consumer fixture.
 local function with_capture_refresh(body)
-	local saved = package.loaded["adapters.xkb_capture"]
-	local Capture = helpers.load_module("adapters.xkb_capture")
+	local saved = package.loaded["layouts.adapters.xkb_capture"]
+	local Capture = helpers.load_module("layouts.adapters.xkb_capture")
 	Capture._set_backend({
 		create = function(map) return { map = map, held = {} } end, destroy = function() end,
 		capture_group = function() return 0 end,
@@ -145,7 +145,7 @@ local function with_capture_refresh(body)
 			body(s, Capture)
 		end)
 	end)
-	Capture._reset_backend(); package.loaded["adapters.xkb_capture"] = saved
+	Capture._reset_backend(); package.loaded["layouts.adapters.xkb_capture"] = saved
 	if not ok then error(err, 0) end
 end
 
@@ -360,7 +360,7 @@ local function with_daemon_layout_state(body)
 			webview_manager = manager, keyboard_layout = layout,
 			opts = { layout = "qwerty", keymap = "owned-test-keymap" },
 			script_actions = { is_paused = function() return false end },
-			package = { loaded = { ["adapters.keyboard_layout"] = layout } },
+			package = { loaded = { ["layouts.adapters.keyboard_layout"] = layout } },
 			perform_reload = function() end, restart_on_installed_release = function() return true end,
 			restart_daemon = function() return false end, rebuild_tray_menu = function() end,
 			Logger = { start = function() end, error = function() end, success = function() end }, LOG = "test",

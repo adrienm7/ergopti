@@ -70,7 +70,7 @@ local function load(held, shortcut_modifiers)
 		held_shortcut_modifier_codes = function() return shortcut_modifiers or {} end,
 		held_forwarded_keys = function() return held end,
 	}
-	local layout = helpers.load_module("adapters.keyboard_layout")
+	local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 	layout._set_table_for_test({ ["x"] = { keycode = 45, level = 1, mods = {} } })
 	local channel = { emitted = {} }
 	channel.is_open = function() return true end

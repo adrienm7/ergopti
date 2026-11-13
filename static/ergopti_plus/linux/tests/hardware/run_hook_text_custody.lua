@@ -17,7 +17,7 @@ local Names = require("platform.input.device_names")
 local Input = require("platform.input.event")
 local Reader = require("platform.input.evdev_reader")
 local Finder = require("hotstrings.engine.device_finder")
-local Layout = require("adapters.keyboard_layout")
+local Layout = require("layouts.adapters.keyboard_layout")
 local Monotonic = require("core.logger.engine.monotonic")
 
 local keyboards, paths, chars, rows = {}, {}, {}, {}
@@ -104,7 +104,7 @@ local ok, failure = pcall(function()
 	print("PASS: native injection spends a held key without inventing autorepeat text")
 
 	chars, rows = {}, {}
-	local capture = require("adapters.xkb_capture")
+	local capture = require("layouts.adapters.xkb_capture")
 	emit(1, 58, 1); emit(1, 30, 1)
 	assert(capture.caps_locked() == true, "physical CapsLock did not enter the captured locked state")
 	local locked_replacement = Injector.type_directly("x")
@@ -138,7 +138,7 @@ local ok, failure = pcall(function()
 	emit(1, 42, 1); emit(1, 30, 1); emit(1, 30, 0)
 	local original_refresh, original_family = Layout.refresh, Hook.get_layout()
 	local function selected_map_current()
-		return package.loaded["adapters.keyboard_layout"] == Layout and Layout.refresh == original_refresh
+		return package.loaded["layouts.adapters.keyboard_layout"] == Layout and Layout.refresh == original_refresh
 	end
 	assert(Hook.refresh_capture(original_family, function()
 		assert(Hook.set_layout(original_family))

@@ -554,7 +554,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 ; no-break space (NNBSP, U+202F) followed by ";" and the period key emits a
 ; full no-break space (NBSP, U+00A0) followed by ":" — French typography pairs
 ; ";" with the narrow space and ":" with the full one (the Shift level of the
-; Ergopti .keylayout, read by modules/keymap/layout/layout_ergopti.ahk).
+; Ergopti .keylayout, read by layouts/engine/registry/ergopti.ahk).
 ; The deadkey path can also emit either no-break space. So a case-sensitive
 ; hotstring whose trigger contains a comma must generate its shifted variants
 ; with an nbsp/nnbsp prefix — exactly what the user types via Shift+comma /

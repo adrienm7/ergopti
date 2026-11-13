@@ -137,7 +137,7 @@ end
 -- went green through its private fallback while the daemon, on the very same
 -- machine, found no keymap, refused the keyboard and exited at boot. Asserting
 -- through refresh() is what makes a missing source in the driver fail HERE.
-local KeyboardLayout = require("adapters.keyboard_layout")
+local KeyboardLayout = require("layouts.adapters.keyboard_layout")
 local resolved = KeyboardLayout.refresh(os.getenv("ERGOPTI_TEST_KEYMAP"))
 check(resolved, string.format("the driver resolves the live %s keymap through its own cascade (via %s)",
 	tostring(kind), tostring(KeyboardLayout.source())))

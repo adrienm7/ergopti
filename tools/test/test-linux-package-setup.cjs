@@ -332,6 +332,7 @@ try {
 		const installer = path.join(ROOT, 'static/ergopti_plus/linux/install.sh');
 		const cases = [
 			'linux/infra',
+			'linux/layouts/engine',
 			'linux/keyboard/engine/keys',
 			'linux/hotstrings/engine',
 			'linux/gestures/engine',

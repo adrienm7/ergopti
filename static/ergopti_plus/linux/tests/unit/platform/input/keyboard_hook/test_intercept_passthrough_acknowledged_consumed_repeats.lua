@@ -123,7 +123,7 @@ helpers.describe("keyboard hook: acknowledged consumed repeats", function()
 	end)
 
 	helpers.it("(magic-source-repeat) publishes a qualified origin before the first newly started physical press", function()
-		local names = { "adapters.xkb_capture", "platform.input.evdev_reader", "hotstrings.engine.device_finder" }
+		local names = { "layouts.adapters.xkb_capture", "platform.input.evdev_reader", "hotstrings.engine.device_finder" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local path = os.tmpname()
@@ -236,7 +236,7 @@ helpers.describe("keyboard hook: recovery repeat ownership", function()
 	--- @param mode string Independent native source/lifetime scenario.
 	--- @return table observed Callback epochs, cookies and raw emitted events.
 	local function observe_recovery(mode)
-		local names = { "adapters.xkb_capture", "platform.input.evdev_reader",
+		local names = { "layouts.adapters.xkb_capture", "platform.input.evdev_reader",
 			"hotstrings.engine.device_finder", "platform.input.keyboard_hook" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end

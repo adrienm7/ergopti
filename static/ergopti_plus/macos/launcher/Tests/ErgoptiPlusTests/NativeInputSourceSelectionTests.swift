@@ -30,7 +30,7 @@ final class NativeInputSourceSelectionTests: XCTestCase {
 	private func commandArguments(upgrade: Bool = false, byName: Bool = false,
 		identifiers: [String]) throws -> [String] {
 		let source = try String(contentsOf: Self.repositoryURL.appendingPathComponent(
-			"static/ergopti_plus/macos/adapters/input_source_selector.lua"), encoding: .utf8)
+			"static/ergopti_plus/macos/layouts/adapters/input_source_selector.lua"), encoding: .utf8)
 		let flagName = upgrade ? "UPGRADE_FLAG" : (byName ? "SELECT_BY_NAME_FLAG" : "SELECT_FLAG")
 		let declaration = "local " + flagName + " = \""
 		guard source.components(separatedBy: declaration).count == 2 else {

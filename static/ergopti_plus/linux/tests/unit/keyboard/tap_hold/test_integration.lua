@@ -41,7 +41,7 @@ local function session(user_text)
 	local actions = {}
 	-- The capitals the scenarios type, where a US layout has them: the one-shot
 	-- Shift presses Shift on a key whose Shift level is the capital.
-	local Layout = helpers.load_module("adapters.keyboard_layout")
+	local Layout = helpers.load_module("layouts.adapters.keyboard_layout")
 	Layout._set_table_for_test({
 		A = { keycode = KEY_A, level = 2, mods = { "shift" } },
 		J = { keycode = KEY_J, level = 2, mods = { "shift" } },
@@ -230,7 +230,7 @@ helpers.describe("tap-holds end to end: the shipped defaults", function()
 	-- Windows one-shot reads too (one-shot-results-shared).
 	helpers.it("types the shared one-shot results, and hands the injector what the layout lacks", function()
 		with_session(nil, function(s)
-			local Layout = require("adapters.keyboard_layout")
+			local Layout = require("layouts.adapters.keyboard_layout")
 			Layout._set_table_for_test({
 				["-"] = { keycode = 12, level = 1, mods = {} }, [" "] = { keycode = 57, level = 1, mods = {} },
 				[":"] = { keycode = 39, level = 2, mods = { "shift" } },

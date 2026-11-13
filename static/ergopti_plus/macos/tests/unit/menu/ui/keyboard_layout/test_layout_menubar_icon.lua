@@ -18,7 +18,7 @@ local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 --- @param ctx table Menu context.
 --- @return table rendered submenu rows
 local function tray_rows(ctx)
-	local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+	local layout = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 	local ManifestMenu = LayoutFixture.install(require("core.i18n.engine.i18n"))
 	local item = layout.build(ctx)
 	helpers.assert_true(type(item) == "table", "menu_keyboard_layout.build must return a row")
@@ -99,7 +99,7 @@ helpers.describe("layout submenu: the menubar icon is one choice row", LayoutFix
 	end)
 
 	helpers.it("defaults to the manifest's value", function()
-		local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+		local layout = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 		local Manifest = require("menu.engine.manifest_reader")
 		helpers.assert_eq(layout.DEFAULT_STATE.menubar_icon, Manifest.default_for("ui.menubar_icon"))
 		helpers.assert_eq(layout.DEFAULT_STATE.menubar_icon, "v1")

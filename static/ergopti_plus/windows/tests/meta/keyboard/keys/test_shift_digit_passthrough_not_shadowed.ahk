@@ -6,7 +6,7 @@
 ; Regression guard ensuring RegisterShiftLayer does not shadow the OS-shifted-
 ; digit passthrough hotkeys when direct_access_digits is active.
 ;
-; The bug: modules/keymap/layout.ahk registers +SC002..+SC00B hotkeys as
+; The bug: layouts/engine/layout.ahk registers +SC002..+SC00B hotkeys as
 ; passthrough for OS layouts where digits are behind Shift (AZERTY, bépo,
 ; etc.). RegisterShiftLayer then registers the same +SCxxx chords under an
 ; ergopti_base criterion. AHK picks a criterion variant over a global one
@@ -18,7 +18,7 @@
 ; layout (DigitRowIsSwapped), keeping the two variant sets disjoint so the
 ; passthrough owns the digit row there.
 ;
-; SCOPE: source introspection of modules/keymap/layout/layout_shift_caps.ahk.
+; SCOPE: source introspection of layouts/engine/registry/shift_caps.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -45,7 +45,7 @@ _SDPS_ReadSource(FileName) {
 
 _SDPS_CheckDigitSCsMapExists() {
 	Src := _SDPS_ReadSource("layout_shift_caps.ahk")
-	Assert(Src != "", "modules/keymap/layout/layout_shift_caps.ahk must be readable")
+	Assert(Src != "", "layouts/engine/registry/shift_caps.ahk must be readable")
 
 	Assert(InStr(Src, "_SHIFT_DIGIT_SCS"),
 		"_SHIFT_DIGIT_SCS set must be defined in layout_shift_caps.ahk to mark SC002..SC00B for exclusion")
@@ -60,7 +60,7 @@ _SDPS_CheckDigitSCsMapExists() {
 
 _SDPS_CheckRegisterShiftHasSkipGuard() {
 	Src := _SDPS_ReadSource("layout_shift_caps.ahk")
-	Assert(Src != "", "modules/keymap/layout/layout_shift_caps.ahk must be readable")
+	Assert(Src != "", "layouts/engine/registry/shift_caps.ahk must be readable")
 
 	Body := _DriverFuncBody("RegisterShiftLayer")
 	Assert(Body != "", "RegisterShiftLayer must be present in layout_shift_caps.ahk")
@@ -74,7 +74,7 @@ _SDPS_CheckRegisterShiftHasSkipGuard() {
 
 _SDPS_CheckSkipUsedInsideLoop() {
 	Src := _SDPS_ReadSource("layout_shift_caps.ahk")
-	Assert(Src != "", "modules/keymap/layout/layout_shift_caps.ahk must be readable")
+	Assert(Src != "", "layouts/engine/registry/shift_caps.ahk must be readable")
 
 	Body := _DriverFuncBody("RegisterShiftLayer")
 	Assert(Body != "", "RegisterShiftLayer must be present in layout_shift_caps.ahk")
@@ -111,7 +111,7 @@ Test("meta shift-digit-passthrough: digit-row skip applied inside SHIFTED_LETTER
 
 _SDPS_CheckRegisterCapsLockHasSkipGuard() {
 	Src := _SDPS_ReadSource("layout_shift_caps.ahk")
-	Assert(Src != "", "modules/keymap/layout/layout_shift_caps.ahk must be readable")
+	Assert(Src != "", "layouts/engine/registry/shift_caps.ahk must be readable")
 
 	Body := _DriverFuncBody("RegisterCapsLockLayer")
 	Assert(Body != "", "RegisterCapsLockLayer must be present in layout_shift_caps.ahk")

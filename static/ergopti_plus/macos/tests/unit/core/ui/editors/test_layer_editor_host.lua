@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Navigation Layer Editor Host (macOS)
 --- DESCRIPTION:
---- Drives ui/layer_editor through its bridge the way the shared page does, with
+--- Drives layouts/ui through its bridge the way the shared page does, with
 --- the real shared host logic, loader and TOML codec, and native doubles for the
 --- window, the file adapter and the remap facade.
 ---
@@ -79,8 +79,8 @@ end
 --- @param scenario function(editor, world)
 local function with_editor(scenario)
 	local names = { "core.logger.engine.logger", "core.i18n.engine.i18n", "core.fs.engine.paths", "settings.engine.paths", "core.fs.adapters.file_system",
-		"core.ui.ui.builder", "ui.layer_editor", "keyboard.engine.layers.nav_layer", "platform.input.keycodes",
-		"modules.shortcuts.bindings", "modules.keymap.layout_registry", "modules.keymap.layout_emulation",
+		"core.ui.ui.builder", "layouts.ui.layer_editor", "keyboard.engine.layers.nav_layer", "platform.input.keycodes",
+		"modules.shortcuts.bindings", "layouts.engine.registry.registry", "layouts.engine.registry.emulation",
 		"core.ui.engine.notifications" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -102,7 +102,7 @@ local function with_editor(scenario)
 			shared = function(rel) return helpers.shared(rel) end,
 		}
 		package.loaded["settings.engine.paths"] = { get_config_dir = function() return world.dir end }
-		package.loaded["modules.keymap.layout_registry"] = require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
+		package.loaded["layouts.engine.registry.registry"] = require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
 		-- The owner of the layer's wheel bindings, which Hammerspoon runs.
 		package.loaded["modules.shortcuts.bindings"] = { reconcile_layer_wheel = function()
 			world.wheel_reconciles = world.wheel_reconciles + 1
@@ -179,8 +179,8 @@ local function with_editor(scenario)
 				return slot and slot.hold or "none"
 			end,
 		}
-		package.loaded["ui.layer_editor"] = nil
-		scenario(require("ui.layer_editor"), world)
+		package.loaded["layouts.ui.layer_editor"] = nil
+		scenario(require("layouts.ui.layer_editor"), world)
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	_G.hs = prior_hs
@@ -567,7 +567,7 @@ helpers.describe("macOS navigation layer editor host", function()
 		with_editor(function(editor, world)
 			world.keymap[registry.keys.KeyQ.hs] = "q"
 			world.keymap[registry.keys.KeyW.hs] = "w"
-			package.loaded["modules.keymap.layout_emulation"] = {
+			package.loaded["layouts.engine.registry.emulation"] = {
 				status = function() return { active = true, id = "ergopti" } end,
 				-- KeyW is left to the input source, as a row switched off would be.
 				legend = function(code) return code == "KeyQ" and "è" or nil end,

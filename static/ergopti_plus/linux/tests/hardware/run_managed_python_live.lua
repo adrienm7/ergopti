@@ -17,7 +17,7 @@ local uv = require("luv")
 
 local data_home = assert(os.getenv("XDG_DATA_HOME"), "run with a private XDG_DATA_HOME")
 assert(data_home:match("^/tmp/") or data_home:match("^/var/tmp/"), "XDG_DATA_HOME must be a scratch folder")
-local Registry = require("modules.keymap.layout_registry")
+local Registry = require("layouts.engine.registry.registry")
 local Pins = require("_generated.native_runtime").managed_python
 
 --- Runs the loop until the request settles or its deadline passes.

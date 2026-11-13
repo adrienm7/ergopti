@@ -74,7 +74,7 @@ xkb_symbols "(unnamed)" {
 --- Loads the adapter with a table built from the fixture.
 --- @return table adapter
 local function loaded()
-	local layout = helpers.load_module("adapters.keyboard_layout")
+	local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 	local built = layout.build(AZERTY_DUMP)
 	layout._set_table_for_test(built)
 	return layout
@@ -83,7 +83,7 @@ end
 --- Drives real capture, refresh and planning over a controlled native protocol.
 --- @param body function
 local function cohort_fixture(body)
-	local capture = helpers.load_module("adapters.xkb_capture")
+	local capture = helpers.load_module("layouts.adapters.xkb_capture")
 	local state = { rows = {} }
 	local backend = {
 		create = function() return { identity = "owned-cohort-map", group = 0, groups = 2 } end,
@@ -118,7 +118,7 @@ local function cohort_fixture(body)
 	local file = assert(io.open(path, "w"))
 	file:write("owned-cohort-map")
 	file:close()
-	local layout = helpers.load_module("adapters.keyboard_layout")
+	local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 	local ok, err = pcall(function()
 		helpers.assert_true(layout.refresh(path))
 		body(capture, layout, state, backend, path)

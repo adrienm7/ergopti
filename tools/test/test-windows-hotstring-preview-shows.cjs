@@ -159,7 +159,7 @@ check(
 	'_OnPrefixChar must stamp the character after verifying its control and before feeding the engine'
 );
 
-const layout = stripComments(read(path.join(WIN, 'modules', 'keymap', 'layout.ahk')));
+const layout = stripComments(read(path.join(WIN, 'layouts', 'engine', 'layout.ahk')));
 check(
 	bodyOf(layout, 'UpdateLastSentCharacter').text.includes(`${OWNER}(Character)`),
 	`the layout emulation's UpdateLastSentCharacter must stamp through the same owner, ${OWNER}`

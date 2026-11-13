@@ -203,7 +203,7 @@ local function _row_is_for_linux(row)
 	return false
 end
 
-local _build_layouts = require("ui.menu.menu_layouts").build
+local _build_layouts = require("layouts.ui.menu.layouts").build
 
 local _build_hotstrings = require("hotstrings.ui.menu.hotstrings").build
 

@@ -577,7 +577,7 @@ choice that the current layout makes meaningless is never rewritten. The menu
 keeps its tick, greys it with the reason and suffixes the label with
 `menu.layout.number_row_not_applied` (« — non appliqué »); the choice applies
 again with no user action on a layout where it can, and each switch between
-applied and inert is logged once (`windows/ui/menu/menu_layout.ahk`, pinned by
+applied and inert is logged once (`windows/layouts/ui/menu/layout.ahk`, pinned by
 `test_number_row_symbols.ahk`). Action: a layout-dependent setting you add
 follows the same shape instead of resetting or hiding the user's choice.
 

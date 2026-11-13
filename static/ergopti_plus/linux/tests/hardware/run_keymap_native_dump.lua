@@ -42,9 +42,9 @@ end
 local logger = require("core.logger.engine")
 logger.set_sink(function() end)
 logger.set_level(40)
-local Probe = require("adapters.xkb_source_probe")
-local KeyboardLayout = require("adapters.keyboard_layout")
-local XkbKeymap = require("infra.xkb_keymap")
+local Probe = require("layouts.adapters.xkb_source_probe")
+local KeyboardLayout = require("layouts.adapters.keyboard_layout")
+local XkbKeymap = require("layouts.engine.xkb_keymap")
 
 local failures = 0
 local function check(condition, message)

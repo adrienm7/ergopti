@@ -15,7 +15,7 @@ local function with_editor(scenario)
 	local prior_hs = _G.hs
 	local records = { views = {}, bridges = {}, deletes = 0, errors = {} }
 	local ok, err = xpcall(function()
-		helpers.with_stub_scope({ "ui.layer_editor", "core.ui.ui.builder", "core.logger.engine.logger", "core.i18n.engine.i18n",
+		helpers.with_stub_scope({ "layouts.ui.layer_editor", "core.ui.ui.builder", "core.logger.engine.logger", "core.i18n.engine.i18n",
 			"core.fs.engine.paths", "settings.engine.paths", "core.fs.adapters.file_system", "platform.input.keycodes",
 			"keyboard.engine.layers.nav_layer", "layouts.engine.layers.editor", "layouts.engine.layers.layers" }, function()
 			local logger = helpers.make_logger_stub()
@@ -58,8 +58,8 @@ local function with_editor(scenario)
 					return view
 				end,
 			}
-			package.loaded["ui.layer_editor"] = nil
-			local editor = require("ui.layer_editor")
+			package.loaded["layouts.ui.layer_editor"] = nil
+			local editor = require("layouts.ui.layer_editor")
 			local options = { karabiner = { regenerate = function() return true end } }
 			scenario(editor, records, options)
 		end)

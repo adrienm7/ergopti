@@ -17,7 +17,7 @@ global SubMenus := Map()
 #Include builder/engine.ahk
 #Include ../../gestures/ui/menu/gestures.ahk
 #Include ../../ui/menu/menu_metrics.ahk
-#Include ../../ui/menu/menu_layout.ahk
+#Include ../../layouts/ui/menu/layout.ahk
 #Include ../../hotstrings/ui/menu/hotstrings.ahk
 #Include ../../ui/menu/menu_metrics_actions.ahk
 

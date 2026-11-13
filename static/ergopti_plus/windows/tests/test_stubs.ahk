@@ -136,7 +136,7 @@ global Features := Map(
             "number_row_right_2", "none",
         ),
     ),
-    ; hotstrings/hotstrings.ahk + modules/keymap/layout.ahk read these gates
+    ; hotstrings/hotstrings.ahk + layouts/engine/layout.ahk read these gates
     ; for hotstring registration and AltGr rolls. Each entry is a Map with
     ; at least an "enabled" key; the production loader pulls extra props
     ; (time_activation_seconds, pattern_max_length) from the manifest, but
@@ -332,7 +332,7 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 ; raises "global variable has not been assigned a value".
 global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 
-; Hotstring engine globals normally maintained by modules/keymap/layout.ahk.
+; Hotstring engine globals normally maintained by layouts/engine/layout.ahk.
 ; The LastSentCharacters ring buffer is defined in infra/hotstring_engine.ahk;
 ; tests seed it via _LSCResetFrom([...]) instead of touching it directly.
 global LastSentCharacterKeyTime := Map()
@@ -446,7 +446,7 @@ DeadKey(Mapping) {
     _Stub_DeadKeyCalls.Push(Mapping)
 }
 
-; modules/keymap/layout.ahk reads the Ergopti layout tables at boot, and the
+; layouts/engine/layout.ahk reads the Ergopti layout tables at boot, and the
 ; runner does not include it: every test that builds a layer loads them through
 ; here, once per run, from the registry folder the driver ships.
 _TestEnsureErgoptiLayout() {

@@ -9,7 +9,7 @@ local OWNERS = {
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 	"modules.keystats.kc_bridge", "modules.keystats.watchers", "modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode", "platform.input.synthetic_input", "diagnostics.adapters.event_provenance", "core.process.adapters.lifecycle",
-	"platform.input.keyboard_hook", "adapters.input_source_broker", "core.fs.adapters.storage",
+	"platform.input.keyboard_hook", "layouts.adapters.input_source_broker", "core.fs.adapters.storage",
 	"core.events.timer_scheduler", "modules.keystats.aggregator.events",
 	"modules.keystats.aggregator.state", "modules.keystats.aggregator.core",
 	"modules.keystats.aggregator.physical", "ui.metrics_typing.init",

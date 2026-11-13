@@ -51,7 +51,7 @@ Test("magic key source: layout.ahk registers the magic key through its plan (mag
 
 _MKH_RegistrationCase() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
-	Code := _StripFullLineComments(FileRead(WindowsDir . "\modules\keymap\layout.ahk", "UTF-8"))
+	Code := _StripFullLineComments(FileRead(WindowsDir . "\layouts\engine\layout.ahk", "UTF-8"))
 	Assert(InStr(Code, 'LayoutRegistry_MagicKeyHotkeys(ScriptInformation["MagicKeySourceScan"],') > 0,
 		"the magic key's hotkeys come from LayoutRegistry_MagicKeyHotkeys")
 	Assert(InStr(Code, 'ScriptInformation["MagicKeySourceChosen"]') > 0,

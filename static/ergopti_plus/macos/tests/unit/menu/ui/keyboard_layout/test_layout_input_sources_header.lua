@@ -16,7 +16,7 @@ local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 --- @param ctx table Menu context.
 --- @return table rendered submenu rows
 local function tray_rows(ctx)
-	local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+	local layout = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 	local ManifestMenu = LayoutFixture.install(require("core.i18n.engine.i18n"))
 	local item = layout.build(ctx)
 	helpers.assert_true(type(item) == "table", "menu_keyboard_layout.build must return a row")

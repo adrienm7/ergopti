@@ -34,7 +34,7 @@ local function fresh_harness()
 	}
 	-- The broker captures `local hs = hs` at require-time. Reload it only after
 	-- load_with_stubs installs this harness's setter-only keycodes API.
-	package.loaded["adapters.input_source_broker"] = nil
+	package.loaded["layouts.adapters.input_source_broker"] = nil
 
 	local h = {
 		fail_once = false,
@@ -355,7 +355,7 @@ local function fresh_harness()
 			focusedWindow = function() return h.focused_window end,
 		},
 	})
-	h.input_source_broker = require("adapters.input_source_broker")
+	h.input_source_broker = require("layouts.adapters.input_source_broker")
 	return h
 end
 
@@ -879,7 +879,7 @@ helpers.describe("watchers app-switch teardown is exact and retryable", function
 	helpers.it("(same-name-app-history) tracks distinct bundle identities with the same display name", function()
 		helpers.with_stub_scope({
 			"tests.stubs.hs", "keyboard.engine.runtime.watchers", "hotstrings.engine.expander.control_sentinels",
-			"platform.input.synthetic_input", "adapters.input_source_broker", "core.logger.engine.logger",
+			"platform.input.synthetic_input", "layouts.adapters.input_source_broker", "core.logger.engine.logger",
 			"core.events.timer_scheduler", "core.process.adapters.shell_runner", "platform.input.hotkey_registrar",
 			"platform.input.key_state", "adapters.mouse_control", "core.process.adapters.task_lifecycle",
 			"keyboard.adapters.karabiner.ke_paths", "keyboard.adapters.karabiner.lease_contract", "keyboard.adapters.karabiner.ke_variables",

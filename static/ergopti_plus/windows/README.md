@@ -10,7 +10,7 @@ The Windows implementation of ErgoptiPlus.
 > [`docs/ERGOPTI_PLUS.md`](../../../docs/ERGOPTI_PLUS.md) §2.1 to locate the
 > counterpart of a file — do not assume the same relative path.
 >
-> Two name collisions to know before navigating: `modules/keymap/` is the
+> Two name collisions to know before navigating: `layouts/engine/` is the
 > **physical layout remap** here and the **hotstring expansion engine** on macOS;
 > `settings/engine/registry.ahk` is a **Windows-registry** wrapper while
 > `macos/settings/engine/registry.lua` is the **hotstring registry**.

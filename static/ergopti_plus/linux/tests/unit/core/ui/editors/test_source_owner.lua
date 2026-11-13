@@ -32,7 +32,7 @@ local function with_editor(body)
 	local made = os.execute("mkdir -p -- " .. quote(root .. "/a") .. " " .. quote(root .. "/b"))
 	assert(made == true or made == 0)
 	local text = read(SHARED .. "/tests/corpus/layer_editor/edited_layers.toml")
-	local previous = package.loaded["ui.layer_editor.bridge"]
+	local previous = package.loaded["layouts.ui.layer_editor"]
 	local original_publish = Writer.publish_if_unchanged
 	local f = { selected = root .. "/a", dirs = { a = root .. "/a", b = root .. "/b" },
 		text = text, reloads = 0, closes = 0, pushes = {}, epoch = 1, visible = true }
@@ -68,7 +68,7 @@ local function with_editor(body)
 		},
 	}
 	local called, detail = xpcall(function()
-		f.bridge = helpers.load_module("ui.layer_editor.bridge")
+		f.bridge = helpers.load_module("layouts.ui.layer_editor")
 		f.open = function(expected)
 			local result = f.bridge.on_message("ready", f.state, f.context())
 			if expected ~= "unchecked" then
@@ -84,7 +84,7 @@ local function with_editor(body)
 		body(f)
 	end, debug.traceback)
 	Writer.publish_if_unchanged = original_publish
-	package.loaded["ui.layer_editor.bridge"] = previous
+	package.loaded["layouts.ui.layer_editor"] = previous
 	local removed = os.execute("rm -rf -- " .. quote(root))
 	assert(removed == true or removed == 0)
 	if not called then error(detail, 0) end

@@ -24,7 +24,7 @@ Defines the full physical key remapping for the Ergopti layout: base layer, Shif
 
 ```ahk
 ; Included by ErgoptiPlus.ahk — order matters
-#Include modules/keymap/layout.ahk
+#Include layouts/engine/layout.ahk
 ```
 
 Dead-key state resets automatically when a non-composable key fires. The HKL poll is started by `layout.ahk` auto-execute and runs every `LAYOUT_POLL_INTERVAL_MS` milliseconds.

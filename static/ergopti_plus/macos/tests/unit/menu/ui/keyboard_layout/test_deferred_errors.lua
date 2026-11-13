@@ -11,8 +11,8 @@ local helpers = require("tests.helpers")
 
 local OWNERS = {
 	"core.events.timer_scheduler", "core.timing.engine.deferred_work", "core.logger.engine.logger",
-	"modules.keymap.input_sources", "modules.keymap.layout_install",
-	"ui.menu.menu_keyboard_layout", "menu.engine.manifest_menu",
+	"layouts.engine.input_sources", "layouts.engine.registry.install",
+	"layouts.ui.menu.keyboard_layout", "menu.engine.manifest_menu",
 	"core.ui.engine.notifications", "core.i18n.engine.i18n",
 }
 
@@ -20,8 +20,8 @@ local OWNERS = {
 --- @param site string The continuation whose business callback raises.
 local function exercise_failure(site)
 	helpers.with_stub_scope(OWNERS, function()
-		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
-		local install = require("modules.keymap.layout_install")
+		local sources = helpers.load_with_stubs("layouts.engine.input_sources")
+		local install = require("layouts.engine.registry.install")
 		local errors, native_timers = {}, hs.timer.__timers
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, template, ...)
@@ -62,7 +62,7 @@ local function exercise_failure(site)
 			group_row = renderer.group_row,
 			build = function(_, _, _, _, _, providers) return providers.active_layouts() end,
 		}
-		local menu = require("ui.menu.menu_keyboard_layout").build({
+		local menu = require("layouts.ui.menu.keyboard_layout").build({
 			base_dir = "/tmp/ergopti/",
 			updateMenu = function()
 				refreshed = refreshed + 1

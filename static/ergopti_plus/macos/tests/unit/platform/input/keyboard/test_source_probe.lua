@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local MODULES = {
-	"adapters.keyboard_source_probe", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
+	"layouts.adapters.keyboard_source_probe", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
 	"core.fs.adapters.json_codec", "keyboard.adapters.karabiner.lease_helper", "core.timing.engine.timings", "core.logger.engine.logger",
 }
 local SOURCE = "com.apple.keylayout.US"
@@ -112,7 +112,7 @@ local function fixture(options)
 			return true
 		end,
 	}
-	context.probe = helpers.load_with_stubs("adapters.keyboard_source_probe", {
+	context.probe = helpers.load_with_stubs("layouts.adapters.keyboard_source_probe", {
 		keycodes = {
 			currentSourceID = function()
 				if options.source_throw then error("selected source read refused") end

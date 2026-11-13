@@ -43,7 +43,7 @@ local function load_menu_fixture(shortcuts, enabled, options)
 		return {}
 	end)
 	package.loaded["ui.menu.shortcut_utils"] = {}
-	package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
+	package.loaded["layouts.ui.menu.keyboard_slots"] = { provide_rows = function() return {} end }
 	package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "★" end }
 	package.loaded["ui.menu.menu_shortcuts"] = nil
 	local MenuShortcuts = require("ui.menu.menu_shortcuts")
@@ -365,7 +365,7 @@ local function with_chord_fixture(mode, body)
 		"ui.menu.menu_shortcuts", "menu.ui.transactions.script_chords_transaction", "settings.ui.menu.preferences_transaction",
 		"menu.ui.transactions.global_actions_transaction", "menu.ui.builder.state", "modules.shortcuts",
 		"modules.shortcuts.actions.text", "menu.ui.builder.utils", "ui.menu.shortcut_utils",
-		"ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "menu.engine.manifest_reader",
+		"layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "menu.engine.manifest_reader",
 		"core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local Transaction = require("settings.ui.menu.preferences_transaction")
@@ -461,7 +461,7 @@ local function with_chord_fixture(mode, body)
 				package.loaded["core.ui.engine.dialog_util"] = {}
 				package.loaded["menu.ui.builder.utils"] = {}
 				package.loaded["ui.menu.shortcut_utils"] = {}
-				package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
+				package.loaded["layouts.ui.menu.keyboard_slots"] = { provide_rows = function() return {} end }
 				package.loaded["ui.menu.menu_tap_keys"] = { provide_rows = function() return {} end }
 				local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
 					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,

@@ -32,7 +32,7 @@ local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 local i18n     = require("core.i18n.engine.i18n")
 local dialog   = require("core.ui.engine.dialog_util")
 local TeardownTransaction = require("core.lifecycle.engine.shutdown.teardown_transaction")
-local InputSourceBroker = require("adapters.input_source_broker")
+local InputSourceBroker = require("layouts.adapters.input_source_broker")
 
 local LogManager     = require("modules.keystats.log_manager")
 local HostSignature  = require("modules.keystats.host_signature")

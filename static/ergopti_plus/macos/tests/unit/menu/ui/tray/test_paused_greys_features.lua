@@ -16,7 +16,7 @@ local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture"
 local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 
 local MENU_MODULES = {
-	keyboard_layout = "ui.menu.menu_keyboard_layout",
+	keyboard_layout = "layouts.ui.menu.keyboard_layout",
 	hotstrings      = "hotstrings.ui.menu.hotstrings",
 	keystats       = "ui.menu.menu_metrics",
 	shortcuts       = "ui.menu.menu_shortcuts",

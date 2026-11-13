@@ -72,7 +72,7 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	"menu/ui/tray_menu.ahk", true,
 	"gestures/engine/actions.ahk", true,
 	"ai/engine/ollama/deps_checker.ahk", true,
-	"modules/keymap/layout.ahk", true,
+	"layouts/engine/layout.ahk", true,
 	; _HardwareCapsLockOn — a self-initialising flag, not injected state. It is
 	; seeded from the real toggle at its declaration and thereafter written only
 	; by ToggleCapsLock, so there is no init to guard: a require_state early
@@ -84,7 +84,7 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; _ComposerCheckBusy — a re-entrancy flag, not injected state. It starts false
 	; at its declaration, ComposerCheck_Run sets it for the one running check and
 	; that check's terminal step clears it; there is no init for a guard to wait on.
-	"ui/layout_manager/composer_check.ahk", true,
+	"layouts/ui/layout_manager/composer_check.ahk", true,
 	; _ProxyOverrideDeclaration is a lazy cache of a shipped file and _ProxyOverrideStored
 	; is written with the published value; a reader before boot sees "automatic", the
 	; declared empty value, by design. There is no injected state for a guard to wait on.
@@ -143,7 +143,7 @@ _MetaGuardRatchet() {
 
 	; All four trees that hold production code. modules/ alone was the original
 	; blind spot: the stateful code largely lives elsewhere now.
-	for SubDir in ["modules", "infra", "platform", "adapters", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard"] {
+	for SubDir in ["modules", "infra", "platform", "adapters", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts"] {
 		for AbsPath in _MetaListAhkFilesGuardV2(StrReplace(DriverRoot . SubDir, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))

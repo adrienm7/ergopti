@@ -16,9 +16,9 @@ end
 
 -- These actual Reader/Hook consumers use controlled FFI bytes, not kernel devices.
 local function with_position_capture(options, body)
-	local previous = package.loaded["adapters.xkb_capture"]
-	package.loaded["adapters.xkb_capture"] = nil
-	local Capture = require("adapters.xkb_capture")
+	local previous = package.loaded["layouts.adapters.xkb_capture"]
+	package.loaded["layouts.adapters.xkb_capture"] = nil
+	local Capture = require("layouts.adapters.xkb_capture")
 	local state = { epoch = 7 }
 	local backend = { create = function() return { identity = "controlled-position-map" } end,
 		destroy = function() end, update_key = function() end, key_sym = function(_, code) return code end,
@@ -35,7 +35,7 @@ local function with_position_capture(options, body)
 	local called, detail = pcall(function()
 		require("tests.support.input_owner_fixture").with_session(options, function(session) body(session, state, Capture) end)
 	end)
-	Capture._reset_backend(); package.loaded["adapters.xkb_capture"] = previous
+	Capture._reset_backend(); package.loaded["layouts.adapters.xkb_capture"] = previous
 	if not called then error(detail, 0) end
 end
 

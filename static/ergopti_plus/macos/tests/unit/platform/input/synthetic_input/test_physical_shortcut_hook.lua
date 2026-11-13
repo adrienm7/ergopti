@@ -33,7 +33,7 @@ package.loaded['core.events.timer_scheduler']=Timer
 local Broker={}
 function Broker.subscribe(_,fn) source_callback=fn;if settings.subscribe_stop then settings.owner.stop() end;return not settings.subscribe_refused end
 function Broker.unsubscribe() if settings.unsubscribe_refused then return false end;source_callback=nil;return true end
-package.loaded['adapters.input_source_broker']=Broker
+package.loaded['layouts.adapters.input_source_broker']=Broker
 hs={eventtap={event={types={keyDown=10}}}}
 function hs.eventtap.new(_,fn)
  constructs=constructs+1;callback=fn

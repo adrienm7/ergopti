@@ -8,10 +8,10 @@
 --- compiler, files and libxkbcommon are native. No physical input is exercised.
 --- ==============================================================================
 
-local Rmlvo = require("infra.xkb_rmlvo")
+local Rmlvo = require("layouts.engine.xkb_rmlvo")
 local Shell = require("core.process.adapters.shell_runner")
-local Layout = require("adapters.keyboard_layout")
-local Capture = require("adapters.xkb_capture")
+local Layout = require("layouts.adapters.keyboard_layout")
+local Capture = require("layouts.adapters.xkb_capture")
 local FileSystem = require("core.fs.adapters.file_system")
 
 local _checks, _failures = 0, 0

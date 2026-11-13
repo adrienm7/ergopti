@@ -191,7 +191,7 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    ui/field_check/, so the path is shared on all three. The
 //                    measurement had also carried two paths of slack (38 against
 //                    36); tightened to the measurement.
-const BASELINE_SHARED = 67;
+const BASELINE_SHARED = 68;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
@@ -261,7 +261,7 @@ const BASELINE_SHARED = 67;
 //   and Windows installers are not shell scripts printing to a terminal, so a
 //   counterpart folder there would hold nothing.
 //   63 -> 65 on 2026-11-07, confirmed by the maintainer on 2026-11-08 -
-//   windows/native/keyboard_layout holds the C, header,
+//   windows/layouts/native holds the C, header,
 //   resource and module-definition sources generated from the .keylayout that
 //   the Windows keyboard DLL compiles from, and windows/vendor/keyboard_layout
 //   the elevated installer of that DLL. macOS and Linux install the .keylayout
@@ -273,7 +273,7 @@ const BASELINE_SHARED = 67;
 //   the focused window under Wayland, where no client may ask the compositor.
 //   Windows and macOS read focus through their own native APIs and install no
 //   desktop-shell code, so counterpart folders there would hold nothing.
-const BASELINE_UNION = 93;
+const BASELINE_UNION = 95;
 
 // ── The test trees, measured apart from the architecture ────────────────────
 //
@@ -309,7 +309,7 @@ const testsShared = [...testsUnion]
 // never the other way to make a change pass.
 const BASELINE_TESTS_SHARED = 19;
 // 62 -> 63 on 2026-11-11: the Linux container desktop proofs (tests/hardware/desktop).
-const BASELINE_TESTS_UNION = 77;
+const BASELINE_TESTS_UNION = 79;
 
 if (testsShared.length < BASELINE_TESTS_SHARED) {
 	errors.push(

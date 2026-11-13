@@ -107,7 +107,7 @@ Test("script_altgr: _ScriptAltGrIsPhysical checks SC138 physical key state (altg
 
 _ALDA_LayoutDispatchAbortsOnLatchedPrefix() {
         Body := _DriverFuncBody("AltGrShiftDispatch")
-        Assert(Body != "", "AltGrShiftDispatch must be defined in modules/keymap/layout/layout_altgr.ahk")
+        Assert(Body != "", "AltGrShiftDispatch must be defined in layouts/engine/registry/altgr.ahk")
 
         GuardPos := InStr(Body, '!GetKeyState("SC138", "P")')
         ReturnPos := InStr(Body, "return", false, GuardPos)

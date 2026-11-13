@@ -447,8 +447,8 @@ emulates or installs as for any composition. The host never recompiles: what
 it stores is what the page compiled.
 
 While the composed layout is emulated, the driver's layout emulation
-(`macos/modules/keymap/layout_emulation.lua`,
-`linux/modules/keymap/layout_emulation.lua`) also loads the stored table and
+(`macos/layouts/engine/registry/emulation.lua`,
+`linux/layouts/engine/registry/emulation.lua`) also loads the stored table and
 hands each press to the source emulation first. On Linux the keyboard hook's
 consumption receipt names a `release_callback`, called once on the consumed
 press's key-up: a held custom modifier or a tap-hold key ends there; a real
@@ -461,7 +461,7 @@ tap ends the held keys. A built-in modifier a tap-hold holds is added to the
 keys pressed under it (typed shifted, or sent with it), not to a mouse click.
 The report's `driver_macos` and `driver_linux` list what neither the
 `.keylayout` nor the table carries. The page side belongs to the unified
-editor. Windows has the same host in `windows/ui/layout_manager/composer.ahk`,
+editor. Windows has the same host in `windows/layouts/ui/layout_manager/composer.ahk`,
 which does not accept a source yet.
 
 ## Capability evidence and remaining consumers

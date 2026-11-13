@@ -70,7 +70,7 @@ helpers.describe("keycode single-source: keyboard_hook has no hardcoded layout t
 
 	helpers.it("production capture delegates every event to live XKB state", function()
 		local src = keyboard_hook_source()
-		helpers.assert_true(src:find('require("adapters.xkb_capture")', 1, true) ~= nil,
+		helpers.assert_true(src:find('require("layouts.adapters.xkb_capture")', 1, true) ~= nil,
 			"production capture must bind the stateful XKB adapter")
 		local role_at = src:find("_modifier_role(ev.code)", 1, true)
 		local capture_at = src:find("_capture(ev.code, ev.value)", 1, true)

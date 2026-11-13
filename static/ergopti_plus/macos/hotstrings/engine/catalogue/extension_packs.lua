@@ -128,7 +128,7 @@ end
 function M.roots()
 	local shared = require("core.fs.engine.paths").shared_root()
 	if not shared then error("The shared extension directory cannot be resolved", 0) end
-	local LayoutRegistry = require("modules.keymap.layout_registry")
+	local LayoutRegistry = require("layouts.engine.registry.registry")
 	local roots = { shared .. "/../extensions" }
 	-- The installed-layouts record may have been written by another build or cut
 	-- short by a crash or a sync tool. Its layouts' packs are then missing from

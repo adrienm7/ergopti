@@ -17,7 +17,7 @@ local DISPLACED = {
 	"core.timing.engine.deferred_work",
 	"core.ui.engine.dialog_util",
 	"modules.shortcuts.input_source_conflict",
-	"ui.menu.menu_keyboard_slots",
+	"layouts.ui.menu.keyboard_slots",
 }
 
 --- Loads the menu over a conflict answer, an immediate deferral, a dialog that
@@ -44,9 +44,9 @@ local function with_menu(ids, answer, body)
 		SETTINGS_URL = "x-apple.systempreferences:test",
 		check = function(_, _, on_result) on_result(ids) return true end,
 	}
-	package.loaded["ui.menu.menu_keyboard_slots"] = nil
+	package.loaded["layouts.ui.menu.keyboard_slots"] = nil
 	local ok, err = pcall(function()
-		body(helpers.load_with_stubs("ui.menu.menu_keyboard_slots"), seen)
+		body(helpers.load_with_stubs("layouts.ui.menu.keyboard_slots"), seen)
 	end)
 	for _, name in ipairs(DISPLACED) do package.loaded[name] = prior[name] end
 	package.loaded["core.process.adapters.shell_runner"] = prior_shell_runner

@@ -1,7 +1,7 @@
 --- tests/hardware/run_xkb_semantic_controls.lua
 --- Actual detached libxkbcommon + Hook checks within the source gate's Xvfb owner.
 --- Reader/output are private ports: these cases claim no physical input or GUI.
-local Capture = require("adapters.xkb_capture")
+local Capture = require("layouts.adapters.xkb_capture")
 local Hook = require("platform.input.keyboard_hook")
 local Reader = require("platform.input.evdev_reader")
 local h = require("tests.helpers")

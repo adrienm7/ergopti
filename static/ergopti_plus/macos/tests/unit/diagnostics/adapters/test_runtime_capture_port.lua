@@ -43,7 +43,7 @@ end
 local function load_port(tweak)
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["diagnostics.adapters.runtime_capture_port"] = nil
-	package.loaded["adapters.installed_physical_source"] = nil
+	package.loaded["layouts.adapters.installed_physical_source"] = nil
 	local world = { prepared = {}, started = {}, stops = {}, shutdowns = 0, state = "prepared", retired = false,
 		available = true, start_result = true, prepare_refused = false, closed_value = true }
 	if tweak then tweak(world) end

@@ -200,7 +200,7 @@ helpers.describe("keystats parent requires KC bridge commitment", function()
 		package.loaded["settings.engine.paths"] = { get_config_dir = function() return "." end, metrics_dir = function() return "./metrics" end,
 	metrics_cache_dir = function() return "./metrics_cache" end }
 		for _, name in ipairs({
-			"adapters.input_source_broker", "modules.keystats.log_manager",
+			"layouts.adapters.input_source_broker", "modules.keystats.log_manager",
 			"modules.keystats.context_tracker", "metrics.engine.metrics",
 			"modules.keystats.watchers", "core.process.adapters.lifecycle",
 			"platform.input.keyboard_hook", "diagnostics.adapters.event_provenance",

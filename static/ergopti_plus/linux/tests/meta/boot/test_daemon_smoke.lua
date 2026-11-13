@@ -844,7 +844,7 @@ helpers.describe("daemon managed reacquisition publisher", function()
 			helpers.assert_true(last > first, "the actual original binding must be nonempty")
 			helpers.assert_true(source:sub(last):find("onCaptureReacquired = publish_reacquired_capture", 1, true) ~= nil)
 			local block = source:sub(first, last - 1) .. "\nreturn publish_reacquired_capture"
-			local name = "adapters.keyboard_layout"
+			local name = "layouts.adapters.keyboard_layout"
 			local saved = package.loaded[name]
 			local layout = require("tests.support.layout_cohort_fixture").layout(function() return 30 end)
 			local publication, ready = layout.publish_current_capture, layout.is_ready

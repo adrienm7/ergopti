@@ -494,7 +494,7 @@ local function _build_shortcuts(ctx)
 			Logger.error(LOG, "Tap keys unavailable — the shortcuts submenu loses them.")
 			return {}
 		end
-		local ok_layout, Layout = pcall(require, "adapters.keyboard_layout")
+		local ok_layout, Layout = pcall(require, "layouts.adapters.keyboard_layout")
 		local labels = { get = i18n_safe }
 		-- An action on the key chosen as the physical magic key takes its press;
 		-- the row says so, and so does the log when the assignment is made.

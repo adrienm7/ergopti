@@ -113,24 +113,24 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 #Include ../../keyboard/engine/keys/constants.ahk
 #Include ../../platform/remap/tap_hold_roll.ahk
 ; The number row (test_e2e_number_row.ahk): the modules the number-row hotkeys
-; of modules/keymap/layout.ahk read and run, in run_all.ahk's order. None of
+; of layouts/engine/layout.ahk read and run, in run_all.ahk's order. None of
 ; them registers a hotkey at load; layout.ahk itself, which does, stays out.
 #Include ../../core/fs/adapters/file_system.ahk
 #Include ../../core/lifecycle/engine/master_gates.ahk
 #Include ../../_generated/features_manifest.ahk
 #Include ../../menu/engine/manifest_reader.ahk
-#Include ../../modules/keymap/layout/layout_ergopti.ahk
-#Include ../../modules/keymap/layout/accented_shortcuts.ahk
+#Include ../../layouts/engine/registry/ergopti.ahk
+#Include ../../layouts/engine/accented_shortcuts.ahk
 #Include ../../../_shared/settings/data/features/number_row_policy.ahk
 #Include ../../../_shared/settings/data/features/layout_rows_policy.ahk
-#Include ../../modules/keymap/layout/layout_shift_caps.ahk
-#Include ../../modules/keymap/layout/number_row_send.ahk
-#Include ../../modules/keymap/layout/digit_row_bindings.ahk
-#Include ../../modules/keymap/keylayout/keylayout_parser.ahk
-#Include ../../modules/keymap/keylayout/keylayout_tables.ahk
-#Include ../../modules/keymap/keylayout/keylayout_emulation.ahk
+#Include ../../layouts/engine/registry/shift_caps.ahk
+#Include ../../layouts/engine/emulation/number_row_send.ahk
+#Include ../../layouts/engine/digit_row_bindings.ahk
+#Include ../../layouts/engine/keylayout/parser.ahk
+#Include ../../layouts/engine/keylayout/tables.ahk
+#Include ../../layouts/engine/keylayout/emulation.ahk
 #Include ../../core/crypto/crypto.ahk
-#Include ../../modules/keymap/keylayout/layout_registry.ahk
+#Include ../../layouts/engine/keylayout/registry.ahk
 #Include ../../keyboard/engine/magic_editor.ahk
 
 ; Intercept all Send* calls so they are captured rather than typed to the OS.

@@ -4,7 +4,7 @@
 --- MODULE: Keylayout Emulation (Shared)
 --- DESCRIPTION:
 --- Types a .keylayout on top of whatever system layout is installed: the Lua
---- twin of the Windows emulation (windows/modules/keymap/keylayout/
+--- twin of the Windows emulation (windows/layouts/engine/keylayout/
 --- keylayout_emulation.ahk and keylayout_parser.ahk). A driver hands it each
 --- physical key press, named by its KeyboardEvent.code, with the modifiers
 --- held; it answers what to do with the press: leave it to the OS, type a text

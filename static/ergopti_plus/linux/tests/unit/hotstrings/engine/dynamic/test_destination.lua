@@ -57,7 +57,7 @@ local function run_case(family, change, route)
 			end
 			local symbols = {}
 			for code, text in pairs(text_by_code) do symbols[code + 8] = text end
-			capture = helpers.load_module("adapters.xkb_capture")
+			capture = helpers.load_module("layouts.adapters.xkb_capture")
 			capture._set_backend({ create = function() return {} end, destroy = function() end,
 				capture_group = function() return 0 end,
 				key_sym = function(_, code)
@@ -95,7 +95,7 @@ local function run_case(family, change, route)
 				end,
 			}, function(session)
 				assert(session.hook.set_remapper(nil))
-				local layout = helpers.load_module("adapters.keyboard_layout")
+				local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 				layout._set_table_for_test(plan)
 				injector = helpers.load_module("hotstrings.engine.injector")
 				injector._set_uinput(session.writer)

@@ -241,7 +241,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../keyboard/engine/layers/nav_layer_table.ahk
 ; The layer editor host: validation, the atomic save and the page's messages,
 ; driven by unit/hotstrings/engine/expander/test_layer_editor_host.ahk without a WebView.
-#Include ../ui/layer_editor/init.ahk
+#Include ../layouts/ui/layer_editor.ahk
 #Include ../ui/physical_shortcuts/init.ahk
 #Include ../ui/menu/menu_taphold.ahk
 ; The hotstring gate and « all sections » rows, built over the live Features.
@@ -298,30 +298,30 @@ global _DefaultLogsDir := _LogsDir
 ; guard (test_wrap_symbols_unreadable_blocks_save.ahk) can drive the real
 ; functions instead of scanning their source.
 #Include ../keyboard/engine/wrap_symbols_config.ahk
-#Include ../modules/keymap/layout/layout_altgr.ahk
-#Include ../modules/keymap/layout/layout_ergopti.ahk
-#Include ../modules/keymap/layout/accented_shortcuts.ahk
+#Include ../layouts/engine/registry/altgr.ahk
+#Include ../layouts/engine/registry/ergopti.ahk
+#Include ../layouts/engine/accented_shortcuts.ahk
 #Include ../../_shared/settings/data/features/number_row_policy.ahk
 #Include ../../_shared/settings/data/features/layout_rows_policy.ahk
 #Include ../../_shared/settings/data/features/caps_word_auto_off_policy.ahk
 #Include ../../_shared/settings/data/features/pause_switch_policy.ahk
-#Include ../modules/keymap/layout/layout_shift_caps.ahk
-#Include ../modules/keymap/layout/number_row_send.ahk
+#Include ../layouts/engine/registry/shift_caps.ahk
+#Include ../layouts/engine/emulation/number_row_send.ahk
 ; Registry layout emulation: definitions only (the hotkeys are registered by
 ; KeylayoutEmulation_Register, which the tests call with injected registrars).
-#Include ../modules/keymap/keylayout/keylayout_parser.ahk
-#Include ../modules/keymap/keylayout/keylayout_tables.ahk
-#Include ../modules/keymap/keylayout/keylayout_emulation.ahk
-#Include ../modules/keymap/keylayout/source_emulation.ahk
-#Include ../modules/keymap/keylayout/layout_registry.ahk
-#Include ../modules/keymap/keylayout/layout_catalogue.ahk
-#Include ../modules/keymap/keylayout/layout_extension.ahk
+#Include ../layouts/engine/keylayout/parser.ahk
+#Include ../layouts/engine/keylayout/tables.ahk
+#Include ../layouts/engine/keylayout/emulation.ahk
+#Include ../layouts/engine/keylayout/source_emulation.ahk
+#Include ../layouts/engine/keylayout/registry.ahk
+#Include ../layouts/engine/keylayout/catalogue.ahk
+#Include ../layouts/engine/keylayout/extension.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
-; exercised by meta/modules/keymap/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
-#Include ../modules/keymap/layout_poll_helper.ahk
-#Include ../modules/keymap/layout_registry_watch.ahk
-#Include ../modules/keymap/pause_layout_switch.ahk
-#Include ../modules/keymap/system_layout_install.ahk
+; exercised by meta/layouts/test_quiescence.ahk and consumed by ErgoptiPlus.ahk.
+#Include ../layouts/engine/registry/poll_helper.ahk
+#Include ../layouts/engine/registry/watch.ahk
+#Include ../layouts/engine/emulation/pause_layout_switch.ahk
+#Include ../layouts/engine/system_layout_install.ahk
 #Include ../core/ui/ui/tooltip/init.ahk
 #Include ../core/ui/adapters/tooltip_renderer.ahk
 #Include ../modules/updater.ahk
@@ -375,7 +375,7 @@ InstallHotstringHooks()
 #Include ../core/fs/adapters/storage.ahk
 #Include ../core/process/adapters/lifecycle.ahk
 #Include ../platform/input/key_state.ahk
-#Include ../adapters/keyboard_layout_switch.ahk
+#Include ../layouts/adapters/keyboard_layout_switch.ahk
 #Include ../apps/adapters/launcher.ahk
 #Include ../core/crypto/crypto.ahk
 ; The bundled App Cloner and Encryptor: definitions only (their entry runs nothing at load).
@@ -442,7 +442,7 @@ InstallSendNoOps()
 #Include unit/core/ui/windows/test_native_folder_orchestration.ahk
 #Include unit/core/ui/windows/test_native_file_filter_diagnostics.ahk
 #Include unit/diagnostics/adapters/test_console_window.ahk
-#Include unit/adapters/test_keyboard_layout_switch.ahk
+#Include unit/layouts/test_keyboard_layout_switch.ahk
 #Include unit/apps/test_launcher_native_targets.ahk
 #Include unit/core/ui/windows/test_spotlight_ownership.ahk
 #Include unit/gestures/engine/test_take_note_async_job.ahk
@@ -455,7 +455,7 @@ InstallSendNoOps()
 #Include unit/platform/input/dispatch/test_timer_scheduler.ahk
 #Include unit/platform/input/dispatch/test_timer_delay_ceiling.ahk
 #Include unit/menu/test_tray_pause_greys_features.ahk
-#Include unit/ui/menu/test_active_layout_rows.ahk
+#Include unit/layouts/test_active_layout_rows.ahk
 #Include unit/platform/input/dispatch/test_hook_dispatcher.ahk
 #Include unit/platform/input/test_own_injection_is_not_activity.ahk
 #Include unit/core/logger/test_logger.ahk
@@ -570,7 +570,7 @@ InstallSendNoOps()
 #Include unit/menu/test_manifest_menu_parent_groups.ahk
 #Include unit/core/i18n/test_language_deferred_declared_parent.ahk
 #Include unit/menu/test_manifest_menu_checked_when.ahk
-#Include unit/modules/keymap/test_layout_tables.ahk
+#Include unit/layouts/engine/registry/test_tables.ahk
 #Include unit/modules/shortcuts/test_uia_selection_worker_deadline.ahk
 #Include unit/platform/focus/uia/test_worker_cleanup_debt.ahk
 #Include unit/platform/focus/uia/test_worker_exit_reentry.ahk
@@ -848,39 +848,39 @@ _LLM_Deps_State := "ready"
 #Include unit/ai/navigation/test_tab_accept_policy.ahk
 #Include unit/ai/navigation/test_accept_injects_exact_text.ahk
 #Include unit/modules/shortcuts/test_accented_shortcuts.ahk
-#Include unit/modules/keymap/test_keylayout_emulation.ahk
-#Include unit/modules/keymap/test_keylayout_altgr_characterization.ahk
-#Include unit/modules/keymap/test_keylayout_canonical_source.ahk
+#Include unit/layouts/engine/composer/test_keylayout_emulation.ahk
+#Include unit/layouts/engine/composer/test_keylayout_altgr_characterization.ahk
+#Include unit/layouts/engine/composer/test_keylayout_canonical_source.ahk
 #Include unit/hotstrings/engine/magic_key/test_source_menu.ahk
 #Include unit/hotstrings/engine/magic_key/test_source_hotkeys.ahk
-#Include unit/modules/keymap/test_layout_catalogue.ahk
-#Include unit/modules/keymap/test_layout_registry_download_custody.ahk
-#Include unit/modules/keymap/test_layout_registry_late_poll.ahk
-#Include unit/modules/keymap/test_layout_registry_inline_callback.ahk
-#Include unit/modules/keymap/test_layout_installed_record_corpora.ahk
-#Include unit/modules/keymap/test_layout_extension_runtime.ahk
-#Include unit/modules/keymap/test_layout_extension_menu.ahk
-#Include unit/modules/keymap/test_layout_extension_refresh.ahk
+#Include unit/layouts/engine/registry/test_catalogue.ahk
+#Include unit/layouts/engine/registry/test_download_custody.ahk
+#Include unit/layouts/engine/registry/test_late_poll.ahk
+#Include unit/layouts/engine/registry/test_inline_callback.ahk
+#Include unit/layouts/engine/registry/test_installed_record_corpora.ahk
+#Include unit/layouts/engine/registry/test_extension_runtime.ahk
+#Include unit/layouts/engine/registry/test_extension_menu.ahk
+#Include unit/layouts/engine/registry/test_extension_refresh.ahk
 #Include unit/hotstrings/engine/catalogue/test_ergopti_extension_hotstrings.ahk
-#Include ../ui/layout_manager/init.ahk
-#Include ../ui/layout_manager/composer.ahk
-#Include ../ui/layout_manager/composer_check.ahk
-#Include ../ui/layout_manager/source_store.ahk
-#Include ../ui/layout_manager/kbd_register_core.ahk
+#Include ../layouts/ui/layout_manager/init.ahk
+#Include ../layouts/ui/layout_manager/composer.ahk
+#Include ../layouts/ui/layout_manager/composer_check.ahk
+#Include ../layouts/ui/layout_manager/source_store.ahk
+#Include ../layouts/ui/layout_manager/kbd_register_core.ahk
 #Include ../diagnostics/ui/field_check/network_check.ahk
 #Include ../core/network/proxy_override.ahk
-#Include ../ui/menu/menu_layout.ahk
-#Include unit/modules/keymap/test_layout_manager_host.ahk
-#Include unit/modules/keymap/test_layout_composer_host.ahk
-#Include unit/modules/keymap/test_layout_composer_stage_ownership.ahk
-#Include unit/modules/keymap/test_layout_composer_check.ahk
-#Include unit/modules/keymap/test_layout_source_store.ahk
-#Include unit/modules/keymap/test_layout_composer_source.ahk
+#Include ../layouts/ui/menu/layout.ahk
+#Include unit/layouts/engine/registry/test_manager_host.ahk
+#Include unit/layouts/engine/registry/test_composer_host.ahk
+#Include unit/layouts/engine/registry/test_composer_stage_ownership.ahk
+#Include unit/layouts/engine/registry/test_composer_check.ahk
+#Include unit/layouts/engine/registry/test_source_store.ahk
+#Include unit/layouts/engine/registry/test_composer_source.ahk
 #Include unit/hotstrings/engine/expander/test_kbd_register.ahk
-#Include unit/modules/keymap/test_layout_source_emulation.ahk
+#Include unit/layouts/engine/registry/test_source_emulation.ahk
 #Include unit/diagnostics/ui/test_network_check.ahk
 #Include unit/hotstrings/engine/expander/test_ergopti_keylayout_tables.ahk
-#Include unit/modules/keymap/test_layout_supersession.ahk
+#Include unit/layouts/engine/registry/test_supersession.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
 #Include ../ai/engine/api/parser.ahk
@@ -1468,8 +1468,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ai/menu/test_persistence_transactions.ahk
 #Include meta/ai/api/test_warmup_retry_suspend_guard.ahk
 #Include meta/modules/keystats/ergonomics/test_halflife_tick_suspend_guard.ahk
-#Include meta/modules/keymap/test_layout_poll_suspend_guard.ahk
-#Include meta/modules/keymap/test_layout_poll_native_arming.ahk
+#Include meta/layouts/test_poll_suspend_guard.ahk
+#Include meta/layouts/test_poll_native_arming.ahk
 #Include meta/keyboard/keys/test_lalt_rctrl_accept_suspend_guard.ahk
 #Include meta/keyboard/tap_hold/test_fire_action_suspend_guard.ahk
 #Include meta/keyboard/tap_hold/test_native_dispatch_guard.ahk
@@ -1478,8 +1478,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/keyboard/tap_hold/test_owned_repeat_identities.ahk
 #Include meta/keyboard/layers/test_nav_layer_admits_held_modifiers.ahk
 #Include meta/keyboard/keys/test_lshift_lctrl_rshift_bounded_keywait.ahk
-#Include meta/modules/keymap/test_layout_poll_blacklist_guard.ahk
-#Include meta/modules/keymap/test_layout_quiescence.ahk
+#Include meta/layouts/test_poll_blacklist_guard.ahk
+#Include meta/layouts/test_quiescence.ahk
 #Include meta/keyboard/keys/test_layer_key_under_another_holder.ahk
 #Include unit/hotstrings/engine/expander/test_foreground_keyboard_layout.ahk
 #Include meta/hotstrings/engine/engine/test_hse_register_atomic.ahk
@@ -1966,7 +1966,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ai/menu/test_modelbrowser_sort_callback.ahk
 #Include meta/keyboard/keys/test_space_taphold_configurable.ahk
 #Include meta/hotstrings/engine/catalogue/test_terminators_requires_directive.ahk
-#Include meta/modules/keymap/test_layout_poll_pending_hkl.ahk
+#Include meta/layouts/test_poll_pending_hkl.ahk
 #Include meta/ai/api/test_llmbridge_stop_order.ahk
 #Include meta/ai/tooltip/test_render_clears_dequeue.ahk
 #Include meta/gestures/test_search_shortcut_run_path_existence_guard.ahk
@@ -2125,14 +2125,14 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/keyboard/engine/altgr/test_detection.ahk
 #Include unit/keyboard/engine/altgr/test_family_follows_layout.ahk
 #Include unit/keyboard/engine/altgr/test_probe_real_layouts.ahk
-#Include unit/modules/keymap/test_layout_digit_row_probe.ahk
-#Include unit/modules/keymap/test_number_row_symbols.ahk
-#Include unit/modules/keymap/test_layout_rows_policy.ahk
+#Include unit/layouts/engine/registry/test_digit_row_probe.ahk
+#Include unit/layouts/engine/emulation/test_number_row_symbols.ahk
+#Include unit/layouts/engine/registry/test_rows_policy.ahk
 #Include unit/hotstrings/engine/expander/test_pause_switch_policy.ahk
-#Include unit/modules/keymap/test_pause_layout_switch.ahk
-#Include unit/modules/keymap/test_layout_registry_watch.ahk
-#Include unit/modules/keymap/test_system_layout_install.ahk
-#Include unit/modules/keymap/test_number_row_native_hkl.ahk
+#Include unit/layouts/engine/emulation/test_pause_layout_switch.ahk
+#Include unit/layouts/engine/registry/test_watch.ahk
+#Include unit/layouts/engine/test_system_layout_install.ahk
+#Include unit/layouts/engine/emulation/test_number_row_native_hkl.ahk
 #Include meta/keyboard/altgr/test_kana_taphold_entry.ahk
 #Include meta/keyboard/altgr/test_prefix_arms_on_press.ahk
 #Include unit/keyboard/engine/altgr/test_owner_matrix.ahk
@@ -2401,7 +2401,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/platform/input/dispatch/test_hook_timing_input_privacy.ahk
 #Include unit/platform/input/dispatch/test_hotpath_per_segment_threshold.ahk
 #Include unit/platform/input/dispatch/test_hotpath_nesting_vectors.ahk
-#Include unit/modules/keymap/test_keylayout_canonical_form.ahk
+#Include unit/layouts/engine/composer/test_keylayout_canonical_form.ahk
 #Include unit/modules/keystats/test_keystats_today_fh_flush.ahk
 #Include unit/ai/prediction/test_cache_hit_logs_suggested.ahk
 #Include unit/ai/api/test_keep_alive_from_shared_defaults.ahk

@@ -35,7 +35,7 @@ local BUFFER_EVENT_CAP = 1024
 
 local RESET_MODULES = {
 	"diagnostics.adapters.event_provenance", "core.fs.adapters.file_system",
-	"adapters.input_source_broker", "platform.input.keyboard_hook",
+	"layouts.adapters.input_source_broker", "platform.input.keyboard_hook",
 	"core.process.adapters.lifecycle", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
 	"hs.timer", "settings.engine.paths", "core.ui.engine.dialog_util", "core.i18n.engine.i18n",
@@ -221,7 +221,7 @@ local function load_fixture(options)
 		stop = function() return true end,
 		isRunning = function() return true end,
 	}
-	package.loaded["adapters.input_source_broker"] = {
+	package.loaded["layouts.adapters.input_source_broker"] = {
 		subscribe = function() return true end,
 		unsubscribe = function() return true end,
 	}

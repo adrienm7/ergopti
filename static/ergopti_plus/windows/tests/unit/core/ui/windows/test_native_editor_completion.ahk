@@ -395,7 +395,7 @@ _NEC_NulCannotAcquireOutput(Mode, Field, Position, FromJson, WithCallback := tru
 			LoggerWarn.DeleteProp("Call")
 	}
 }
-for _NEC_NulMode in ["native", "direct", "clipboard", "auto"] {
+for _NEC_NulMode in ["native", "direct", "clipboard", "auto", "layouts"] {
 	for _NEC_NulPosition in ["head", "middle", "tail"] {
 		for _NEC_NulJson in [false, true]
 			Test("TextSender: " . _NEC_NulMode . " rejects " . _NEC_NulPosition . " NUL text from "

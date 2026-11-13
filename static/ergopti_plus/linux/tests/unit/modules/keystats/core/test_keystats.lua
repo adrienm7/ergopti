@@ -1030,7 +1030,7 @@ end)
 -- the logical replacement used for hotstring counters and its event row.
 local function with_replayed_hotstring(options, callback)
   local names = { "modules.keystats.keystats", "modules.keystats.sqlite_writer", "core.fs.adapters.storage",
-    "hotstrings.engine.injector", "platform.input.keyboard_hook", "adapters.keyboard_layout", "adapters.xkb_capture" }
+    "hotstrings.engine.injector", "platform.input.keyboard_hook", "layouts.adapters.keyboard_layout", "layouts.adapters.xkb_capture" }
   local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
   local Monotonic = require("core.logger.engine.monotonic")
   local previous_now, now = Monotonic.now_ms, 10000
@@ -1064,8 +1064,8 @@ local function with_replayed_hotstring(options, callback)
       held_text_modifier_codes = function() return {} end,
       held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,
       emergency_stop = function() world.stopped = true end }
-    package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
-    local layout = helpers.load_module("adapters.keyboard_layout")
+    package.loaded["layouts.adapters.xkb_capture"] = { caps_locked = function() return false end }
+    local layout = helpers.load_module("layouts.adapters.keyboard_layout")
     local codes = { A = 30, D = 32, N = 49, [" "] = 57, ["."] = 52 }
     local keys, text_of = {}, { [28] = "\n", [15] = "\t" }
     for char, code in pairs(codes) do keys[char] = { keycode = code, mods = {} }; text_of[code] = char end

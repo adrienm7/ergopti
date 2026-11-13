@@ -33,7 +33,7 @@ local function load_broker()
 		end
 	end
 	local keycodes = { inputSourceChanged = native_setter }
-	local broker = helpers.load_with_stubs("adapters.input_source_broker", {
+	local broker = helpers.load_with_stubs("layouts.adapters.input_source_broker", {
 		keycodes = keycodes,
 	})
 	context.keycodes = keycodes

@@ -61,15 +61,15 @@ local LABELS = {
 local function bundle_labels(opts)
 	local labels = {}
 	helpers.with_fresh_modules({
-		"modules.keymap.input_sources",
-		"modules.keymap.layout_install",
-		"ui.menu.menu_keyboard_layout",
+		"layouts.engine.input_sources",
+		"layouts.engine.registry.install",
+		"layouts.ui.menu.keyboard_layout",
 		"menu.engine.manifest_menu",
 		"core.ui.engine.notifications",
 		"core.i18n.engine.i18n",
 	}, function()
-		local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
-		local install = require("modules.keymap.layout_install")
+		local input_sources = helpers.load_with_stubs("layouts.engine.input_sources")
+		local install = require("layouts.engine.registry.install")
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return LABELS[key] or key end }
 		package.loaded["core.i18n.engine.i18n"].section = function(key) return LABELS[key] or key end
 		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
@@ -102,8 +102,8 @@ local function bundle_labels(opts)
 				return providers.layout_bundle()
 			end,
 		}
-		package.loaded["ui.menu.menu_keyboard_layout"] = nil
-		local built = require("ui.menu.menu_keyboard_layout").build({
+		package.loaded["layouts.ui.menu.keyboard_layout"] = nil
+		local built = require("layouts.ui.menu.keyboard_layout").build({
 			base_dir = "/tmp/ergopti/",
 			updateMenu = function() end,
 		})
@@ -195,7 +195,7 @@ local function with_layout_fixture(listing, plists, callback)
 	local saved_popen = io.popen
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
-			"modules.keymap.layout_install",
+			"layouts.engine.registry.install",
 			"core.fs.adapters.file_system",
 			"core.fs.engine.dir",
 		}, function()
@@ -224,7 +224,7 @@ local function with_layout_fixture(listing, plists, callback)
 					close = function() return true end,
 				}
 			end
-			local install = helpers.load_with_stubs("modules.keymap.layout_install")
+			local install = helpers.load_with_stubs("layouts.engine.registry.install")
 			callback(install, reads)
 		end)
 	end, debug.traceback)
@@ -281,10 +281,10 @@ end)
 --- Exercises the real list provider, declaration and native row renderer.
 --- Filesystem/TIS mutation ports remain controlled and must not run during builds.
 local function with_no_bundle_status(body, labels)
-	helpers.with_stub_scope({"modules.keymap.input_sources", "modules.keymap.layout_install",
-		"ui.menu.menu_keyboard_layout", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.ui.engine.notifications"}, function()
-		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
-		local installer = require("modules.keymap.layout_install")
+	helpers.with_stub_scope({"layouts.engine.input_sources", "layouts.engine.registry.install",
+		"layouts.ui.menu.keyboard_layout", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.ui.engine.notifications"}, function()
+		local sources = helpers.load_with_stubs("layouts.engine.input_sources")
+		local installer = require("layouts.engine.registry.install")
 		local session = {latest = nil, effects = 0}
 		installer.pick_latest_bundle = function() return session.latest end
 		installer.highest_installed = function() return nil end
@@ -308,8 +308,8 @@ local function with_no_bundle_status(body, labels)
 			if row.id == "layout_bundle" then session.owner = row end
 		end
 		helpers.assert_not_nil(session.owner, "the actual bundle list owner must exist")
-		package.loaded["ui.menu.menu_keyboard_layout"] = nil
-		local owner = require("ui.menu.menu_keyboard_layout")
+		package.loaded["layouts.ui.menu.keyboard_layout"] = nil
+		local owner = require("layouts.ui.menu.keyboard_layout")
 		session.build = function()
 			local item = owner.build({base_dir = "/no/shipped/bundle/", updateMenu = forbid_effect})
 			return renderer.render_rows({item}, "top_level")[1].menu

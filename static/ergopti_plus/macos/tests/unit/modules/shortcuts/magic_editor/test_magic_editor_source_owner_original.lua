@@ -21,7 +21,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 	for _, field in ipairs({ "current_source_id", "request" }) do
 		helpers.it("refuses a replaced original " .. field .. " before constructor allocation", function()
 			with_fixture(function(subject, registrar, _, state, spec)
-				local probe = package.loaded["adapters.keyboard_source_probe"]
+				local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 				local original, foreign_calls = probe[field], 0
 				probe[field] = function(...)
 					foreign_calls = foreign_calls + 1
@@ -43,7 +43,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 
 	helpers.it("rejoins the original request issuer after the native source read", function()
 		with_fixture(function(subject, registrar, _, state, spec)
-			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 			local request, reads, foreign_calls = probe.request, 0, 0
 			local source = state.source_id
 			state.source_id = nil
@@ -72,7 +72,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 
 	helpers.it("rejoins the original request issuer after the final constructor context read", function()
 		with_fixture(function(subject, registrar, _, state, spec)
-			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 			local request, reads, foreign_calls = probe.request, 0, 0
 			spec.context.replace_active = function()
 				reads = reads + 1
@@ -96,7 +96,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 
 	helpers.it("retires the exact original query when request construction substitutes its issuer", function()
 		with_fixture(function(subject, registrar, _, state, spec)
-			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 			local request, entered = probe.request, 0
 			setmetatable(state.requests, { __newindex = function(rows, index, retained)
 				rawset(rows, index, retained)
@@ -119,16 +119,16 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 	for _, boundary in ipairs({ "request", "module", "metatable" }) do
 		helpers.it("refuses an original asynchronous source reply after " .. boundary .. " substitution", function()
 			with_fixture(function(subject, registrar, _, state, spec, respond)
-				local probe = package.loaded["adapters.keyboard_source_probe"]
+				local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 				local request = probe.request
 				helpers.assert_eq(subject.start(spec), true)
 				if boundary == "request" then probe.request = function(...) return request(...) end
 				elseif boundary == "module" then
-					package.loaded["adapters.keyboard_source_probe"] = { current_source_id = probe.current_source_id, request = request }
+					package.loaded["layouts.adapters.keyboard_source_probe"] = { current_source_id = probe.current_source_id, request = request }
 				else setmetatable(probe, {}) end
 				respond()
 				local live = registrar.live_count()
-				package.loaded["adapters.keyboard_source_probe"] = probe
+				package.loaded["layouts.adapters.keyboard_source_probe"] = probe
 				probe.request = request
 				setmetatable(probe, nil)
 				helpers.assert_eq(subject.stop(), true)
@@ -142,7 +142,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 
 	helpers.it("retires the exact late native handle when registration changes the original source issuer", function()
 		with_fixture(function(subject, registrar, native, state, spec, respond)
-			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 			local request, native_bind, late_handle, binds = probe.request, native.hotkey.bind, nil, 0
 			native.hotkey.bind = function(...)
 				binds = binds + 1
@@ -168,7 +168,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 	for _, field in ipairs({ "current_source_id", "request" }) do
 		helpers.it("executes no action after live delivery substitutes original " .. field, function()
 			with_fixture(function(subject, registrar, native, state, spec, respond)
-				local probe = package.loaded["adapters.keyboard_source_probe"]
+				local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 				local original = probe[field]
 				helpers.assert_eq(subject.start(spec), true)
 				respond()
@@ -189,7 +189,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 
 	helpers.it("rejects a revoked issuer before refresh reads the native source", function()
 		with_fixture(function(subject, registrar, native, state, spec, respond)
-			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 			local request, source, reads = probe.request, state.source_id, 0
 			helpers.assert_eq(subject.start(spec), true)
 			respond()
@@ -218,7 +218,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 
 	helpers.it("rejoins the source issuer after the actual asynchronous projection callback", function()
 		with_fixture(function(subject, registrar, _, state, spec, respond)
-			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 			local request, reads = probe.request, 0
 			spec.context.paused = function()
 				reads = reads + 1
@@ -239,7 +239,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 
 	helpers.it("retains the exact refused query cancellation after issuer revocation", function()
 		with_fixture(function(subject, registrar, _, state, spec)
-			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 			local request, entered = probe.request, 0
 			state.cancel_refuses = true
 			setmetatable(state.requests, { __newindex = function(rows, index, retained)
@@ -267,7 +267,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 
 	helpers.it("retains a failed late native delete under revoked source authority", function()
 		with_fixture(function(subject, registrar, native, state, spec, respond)
-			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 			local request, native_bind, late_handle, original_delete = probe.request, native.hotkey.bind
 			native.hotkey.bind = function(...)
 				late_handle = native_bind(...)
@@ -298,7 +298,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 	for _, boundary in ipairs({ "reply", "delivery" }) do
 		helpers.it("rejoins the request issuer after the original native getter during " .. boundary, function()
 			with_fixture(function(subject, registrar, native, state, spec, respond)
-				local probe = package.loaded["adapters.keyboard_source_probe"]
+				local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 				local request, source, reads = probe.request, state.source_id, 0
 				helpers.assert_eq(subject.start(spec), true)
 				if boundary == "delivery" then respond() end
@@ -330,7 +330,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 
 	helpers.it("retires the original query after settlement observer registration substitutes its issuer", function()
 		with_fixture(function(subject, registrar, _, state, spec)
-			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local probe = package.loaded["layouts.adapters.keyboard_source_probe"]
 			local request, registered = probe.request, 0
 			setmetatable(state.requests, { __newindex = function(rows, index, retained)
 				rawset(rows, index, retained)

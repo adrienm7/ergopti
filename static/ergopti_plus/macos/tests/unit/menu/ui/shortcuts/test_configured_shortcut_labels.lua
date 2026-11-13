@@ -12,10 +12,10 @@ local keyboard_binding = require("modules.shortcuts.keyboard_shortcuts").binding
 local tap_binding = require("modules.shortcuts.tap_keys").binding_id
 local script_prefix = require("modules.shortcuts.script_control").BINDING_PREFIX
 local names = {
-	"ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts",
+	"layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts",
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
 	"modules.shortcuts.actions.text", "core.i18n.engine.i18n", "core.logger.engine.logger", "menu.engine.manifest_menu",
-	"core.timing.engine.deferred_work", "adapters.input_source_broker", "menu.ui.builder.utils",
+	"core.timing.engine.deferred_work", "layouts.adapters.input_source_broker", "menu.ui.builder.utils",
 	"core.fs.engine.paths", "menu.engine.renderer",
 }
 
@@ -65,7 +65,7 @@ helpers.describe("configured shortcut row labels", function()
 				}
 				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["core.timing.engine.deferred_work"] = {}
-				package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
+				package.loaded["layouts.adapters.input_source_broker"] = { subscribe = function() return true end }
 				package.loaded["menu.ui.builder.utils"] = {}
 				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 				-- The Shortcuts submenu opens the script chords' group, whose rows
@@ -92,7 +92,7 @@ helpers.describe("configured shortcut row labels", function()
 				if surface == "keyboard" then
 					-- The group opens with its restore, clear and separator; the
 					-- assigned slot is the first row after them.
-					label = require("ui.menu.menu_keyboard_slots").provide_rows(ctx)[1].items[4].label
+					label = require("layouts.ui.menu.keyboard_slots").provide_rows(ctx)[1].items[4].label
 					expected = parameters[keyboard_binding("secondary_a")]
 				elseif surface == "tap" then
 					label = require("ui.menu.menu_tap_keys").provide_rows(ctx)[1].label

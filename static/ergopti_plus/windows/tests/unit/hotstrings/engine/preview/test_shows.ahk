@@ -78,7 +78,7 @@ _HPS_Teardown(Saved) {
 
 ; The timestamp owner the prefix watcher calls. It must load with the engine:
 ; the headless runner, like a driver without the emulation, never includes
-; modules/keymap/layout.ahk.
+; layouts/engine/layout.ahk.
 ; @return {Func} AppState_TouchLastSentKey.
 _HPS_TimestampOwner() {
 	Owner := 0

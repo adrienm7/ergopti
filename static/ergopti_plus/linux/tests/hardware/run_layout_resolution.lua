@@ -37,7 +37,7 @@
 --- Exit 0 = every assertion held. 1 = a failure. 2 = xkbcli is not installed.
 --- ==============================================================================
 
-local KeyboardLayout = require("adapters.keyboard_layout")
+local KeyboardLayout = require("layouts.adapters.keyboard_layout")
 
 -- Below this many typable characters the driver treats a keymap as a failed
 -- parse rather than typing wrong characters from a half-read table. Mirrored from
@@ -242,7 +242,7 @@ end
 -- Desktop synchronization is independently qualified by run_xkb_source_qualification.lua.
 print("--- detached physical source probes in a reconstructed native XKB state ---")
 do
-	local Capture = require("adapters.xkb_capture")
+	local Capture = require("layouts.adapters.xkb_capture")
 	local function plain(rows, code)
 		for _, row in ipairs(rows or {}) do
 			if row.code == code and row.plain then return row end
@@ -372,7 +372,7 @@ print("--- injection under CapsLock (fr) ---")
 do
 	local keymap = compile("fr")
 	if keymap and load_through_driver(keymap) then
-		local Capture = require("adapters.xkb_capture")
+		local Capture = require("layouts.adapters.xkb_capture")
 		local Codes = require("platform.input.evdev_codes")
 		local injector = require("hotstrings.engine.injector")
 		local received = {}
@@ -402,7 +402,7 @@ end
 -- a desktop source receipt, kernel output or physical keyboard delivery.
 print("--- inverse output after a native group switch (us,de) ---")
 do
-	local Capture = require("adapters.xkb_capture")
+	local Capture = require("layouts.adapters.xkb_capture")
 	local map = compile("us,de", "grp:alt_shift_toggle")
 	check(map ~= nil and load_through_driver(map), "the independently compiled US/German native map loads")
 	if map then
@@ -434,7 +434,7 @@ end
 -- These are reconstructed native-library controls, not desktop source authority.
 print("--- cached inverse retirement after native group and capture changes ---")
 do
-	local Capture = require("adapters.xkb_capture")
+	local Capture = require("layouts.adapters.xkb_capture")
 	local map = compile("us,de", "grp:alt_shift_toggle")
 	check(map ~= nil and load_through_driver(map), "the cache witness loads the actual US/German native map")
 	if map then
@@ -456,7 +456,7 @@ end
 -- Native inverse modifier arrays must not expose the enumerator's chord policy.
 print("--- native inverse data ownership ---")
 do
-	local Capture = require("adapters.xkb_capture")
+	local Capture = require("layouts.adapters.xkb_capture")
 	local map = compile("us")
 	if map and load_through_driver(map) then
 		local first = Capture.inverse_table()

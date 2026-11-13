@@ -68,7 +68,7 @@ local function genuine_shared_providers(damage)
 	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu",
 		"menu.ui.builder.builder", "layouts.engine.layers.magic_key_source", "hotstrings.engine.magic_key_source",
 		"hotstrings.engine.matcher.preferences", "modules.shortcuts.tap_keys", "settings.engine.paths",
-		"core.fs.adapters.storage", "modules.keymap.layout_registry", "hotstrings.engine.input_reader",
+		"core.fs.adapters.storage", "layouts.engine.registry.registry", "hotstrings.engine.input_reader",
 		"menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local directory, path, filesystem, directory_created
 	local found, restore = {}, function() end

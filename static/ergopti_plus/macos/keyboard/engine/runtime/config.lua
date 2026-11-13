@@ -33,7 +33,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("core.logger.engine.logger")
-local Layout = require("modules.keymap.layout")
+local Layout = require("layouts.engine.layout")
 local Paths  = require("core.fs.engine.paths")
 local i18n   = require("core.i18n.engine.i18n")
 local KeyNames = require("platform.input.keycodes.key_names")

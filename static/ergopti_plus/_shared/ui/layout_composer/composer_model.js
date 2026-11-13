@@ -17,7 +17,7 @@
  *    registry .keylayout, so the composer's only product is such a file
  *    (docs/design/layout-composer.md); no driver re-implements the composition.
  * 2. The reader follows the rules of the Windows reader
- *    (windows/modules/keymap/keylayout/keylayout_parser.ahk) and the Linux
+ *    (windows/layouts/engine/keylayout/parser.ahk) and the Linux
  *    converter: comments stripped, character references decoded, control
  *    characters type nothing, modifierMap tokens folded, baseMapSet followed;
  *    the shared vectors (_shared/tests/corpus/layouts/keylayout_vectors.json)

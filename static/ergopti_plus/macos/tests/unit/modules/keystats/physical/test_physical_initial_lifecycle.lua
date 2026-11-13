@@ -223,7 +223,7 @@ do
 local h = require("tests.helpers")
 local Fixture = require("tests.support.keystats_provenance_fixture")
 local NAMES = {
-	"diagnostics.adapters.event_provenance", "adapters.input_source_broker", "platform.input.keyboard_hook",
+	"diagnostics.adapters.event_provenance", "layouts.adapters.input_source_broker", "platform.input.keyboard_hook",
 	"adapters.physical_observation_clock", "core.process.adapters.lifecycle", "platform.input.synthetic_input",
 	"settings.engine.paths", "core.ui.engine.dialog_util", "core.logger.engine.logger", "menu.engine.manifest_reader",
 	"metrics.engine.capture.physical_lifecycle_observation", "modules.keystats.context_tracker", "modules.keystats.init",

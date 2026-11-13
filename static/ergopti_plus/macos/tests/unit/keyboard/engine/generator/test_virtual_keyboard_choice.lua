@@ -25,7 +25,7 @@ local Fixture = require("tests.support.platform.remap.generator.generator_fixtur
 local Generator = Fixture.Generator
 local NONE_ACTION = Fixture.NONE_ACTION
 local make_state = Fixture.make_state
-local Layout = require("modules.keymap.layout")
+local Layout = require("layouts.engine.layout")
 local Manifest = require("menu.engine.manifest_reader")
 
 -- What each virtual product makes of a HID usage (IOHIDFamily; Karabiner's

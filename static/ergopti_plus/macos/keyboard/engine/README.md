@@ -49,7 +49,7 @@ reuses for its own file.
   closer of another Karabiner (`keyboard/adapters/karabiner/coexistence.lua`, Karabiner's
   own quit steps, hidden `[karabiner] close_other_instances`, default `true`) and
   the capture port (`diagnostics/adapters/runtime_capture_port.lua` over
-  `adapters/installed_physical_source.lua`). The artifact comes from
+  `layouts/adapters/installed_physical_source.lua`). The artifact comes from
   `vendor/remap-runtime/manifest.json`, which pins `16.3.0-ergopti.6`, the
   hosted `runtime-artifact` job's digest, published under the prerelease
   `remap-runtime-v16.3.0-ergopti.6` and written by the `apply` command of

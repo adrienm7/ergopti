@@ -114,9 +114,9 @@ end
 --- The native protocol is controlled and supplies no physical delivery authority.
 --- @param body function
 local function caller_cohort(body)
-	local saved_capture = package.loaded["adapters.xkb_capture"]
-	local saved_layout = package.loaded["adapters.keyboard_layout"]
-	local capture = helpers.load_module("adapters.xkb_capture")
+	local saved_capture = package.loaded["layouts.adapters.xkb_capture"]
+	local saved_layout = package.loaded["layouts.adapters.keyboard_layout"]
+	local capture = helpers.load_module("layouts.adapters.xkb_capture")
 	local state = { group = 0, native_epoch = 7, observed = true, origin = { generation = 1, ready = true } }
 	local backend = {
 		create = function() return { identity = "caller-source-map", groups = 2 } end,
@@ -143,7 +143,7 @@ local function caller_cohort(body)
 	capture._set_backend(backend)
 	local path = os.tmpname()
 	local file = assert(io.open(path, "w")); file:write("caller-source-map"); file:close()
-	local layout = helpers.load_module("adapters.keyboard_layout")
+	local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 	local called, detail = pcall(function()
 		helpers.assert_true(layout.refresh(path))
 		with_source(nil, function(Source, Preferences)
@@ -170,8 +170,8 @@ local function caller_cohort(body)
 		end)
 	end)
 	capture._reset_backend(); os.remove(path)
-	package.loaded["adapters.xkb_capture"] = saved_capture
-	package.loaded["adapters.keyboard_layout"] = saved_layout
+	package.loaded["layouts.adapters.xkb_capture"] = saved_capture
+	package.loaded["layouts.adapters.keyboard_layout"] = saved_layout
 	if not called then error(detail, 0) end
 end
 

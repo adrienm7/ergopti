@@ -8,7 +8,7 @@
 --- ==============================================================================
 local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
-local Layout = require("adapters.keyboard_layout")
+local Layout = require("layouts.adapters.keyboard_layout")
 local Clipboard = require("clipboard.adapters.clipboard")
 local Broker = require("platform.input.modifier_broker")
 

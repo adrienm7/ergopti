@@ -66,9 +66,9 @@ local function with_recorder(chars, held)
 		code = code + 1
 	end
 
-	local layout = helpers.load_module("adapters.keyboard_layout")
+	local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 	layout._set_table_for_test(layout_table)
-	package.loaded["adapters.keyboard_layout"] = layout
+	package.loaded["layouts.adapters.keyboard_layout"] = layout
 
 	-- Asserted rather than assumed: refresh() clears the table whenever no keymap
 	-- is available, which is every CI runner, so a lost stub is a real way for
@@ -166,12 +166,12 @@ helpers.describe("injector: the type phase", function()
 	end)
 
 	helpers.it("wraps the modifier around the key, not around the string", function()
-		local layout = helpers.load_module("adapters.keyboard_layout")
+		local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 		layout._set_table_for_test({
 			A = { keycode = 30, level = 2, mods = { "shift" } },
 			b = { keycode = 48, level = 1, mods = {} },
 		})
-		package.loaded["adapters.keyboard_layout"] = layout
+		package.loaded["layouts.adapters.keyboard_layout"] = layout
 		local injector = helpers.load_module("hotstrings.engine.injector")
 		local channel, events = recorder()
 		injector._set_uinput(channel)

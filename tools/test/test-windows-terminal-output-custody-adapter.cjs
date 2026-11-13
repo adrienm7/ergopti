@@ -1343,11 +1343,11 @@ function validateKleResetObserver(kle, authored) {
 	assert.match(authored, /_KLTR_Mutate\(this\.Mutation\)/);
 }
 const kleResetSource = fs.readFileSync(
-	path.join(DRIVER, 'modules/keymap/keylayout/keylayout_emulation.ahk'),
+	path.join(DRIVER, 'layouts/engine/keylayout/emulation.ahk'),
 	'utf8'
 );
 const kleResetTests = fs.readFileSync(
-	path.join(DRIVER, 'tests/unit/modules/keymap/test_keylayout_altgr_characterization.ahk'),
+	path.join(DRIVER, 'tests/unit/layouts/engine/composer/test_keylayout_altgr_characterization.ahk'),
 	'utf8'
 );
 validateKleResetObserver(kleResetSource, kleResetTests);

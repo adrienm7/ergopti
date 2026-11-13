@@ -86,7 +86,7 @@ helpers.with_fresh_modules({
 	"core.text.engine.toml.codec",
 	"keyboard.engine.runtime.config",
 	"keyboard.engine.runtime.generator",
-	"modules.keymap.layout_registry",
+	"layouts.engine.registry.registry",
 	"core.text.engine.toml_codec",
 	"adapters.one_shot_shift",
 }, function()
@@ -116,7 +116,7 @@ helpers.with_fresh_modules({
 		read = read_once,
 		read_with_status = function(path) return read_once(path), "ok" end,
 	}
-	package.loaded["modules.keymap.layout_registry"] =
+	package.loaded["layouts.engine.registry.registry"] =
 		require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
 
 	local Config    = helpers.load_with_stubs("keyboard.engine.runtime.config")

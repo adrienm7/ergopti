@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Rows = require("ui.menu.pause_layout_rows")
+local Rows = require("layouts.ui.menu.pause_layout_rows")
 local Renderer = require("menu.engine.manifest_menu")
 
 local CHOICES = { { id = "xkb:fr", label = "fr" }, { id = "xkb:fr+ergopti", label = "fr+ergopti" } }
@@ -121,10 +121,10 @@ helpers.describe("pause layout rows", function()
 
 	helpers.it("reaches the tray through the layout menu's provider", function()
 		local state = world({ enabled = true, on_pause = "xkb:fr+ergopti", on_resume = "" })
-		local names, saved = { "menu.ui.builder.builder", "infra.pause_layout_preferences" }, {}
+		local names, saved = { "menu.ui.builder.builder", "layouts.engine.emulation.pause_layout_preferences" }, {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local ok, err = pcall(function()
-			package.loaded["infra.pause_layout_preferences"] = state.preferences
+			package.loaded["layouts.engine.emulation.pause_layout_preferences"] = state.preferences
 			package.loaded["menu.ui.builder.builder"] = nil
 			local builder, layouts = require("menu.ui.builder.builder"), nil
 			local index = 1

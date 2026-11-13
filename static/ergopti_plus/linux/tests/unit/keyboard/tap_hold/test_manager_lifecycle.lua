@@ -304,7 +304,7 @@ os.remove(user_path)
 	-- (one-shot-results-shared).
 	helpers.it("gives the one-shot Shift the shared results and the magic key's (one-shot-results-shared)", function()
 		local Manager, hook, _, user_path, resets = manager()
-		require("adapters.keyboard_layout")._set_table_for_test(nil)
+		require("layouts.adapters.keyboard_layout")._set_table_for_test(nil)
 		local magic = require("hotstrings.engine.magic_key").get()
 		helpers.assert_true(magic ~= "", "the shipped magic key")
 		hook.key_text = function(code) return ({ [41] = magic, [57] = " ", [52] = "." })[code] end
@@ -352,7 +352,7 @@ os.remove(user_path)
 		package.loaded["hotstrings.engine.injector"] = {
 			inject = function(_, text) injected[#injected + 1] = text; return { ok = true } end,
 		}
-		require("adapters.keyboard_layout")._set_table_for_test(nil)
+		require("layouts.adapters.keyboard_layout")._set_table_for_test(nil)
 		local ok, err = pcall(function()
 			hook.engine:process(97, 1, 0)
 			hook.engine:process(97, 0, 100)
@@ -372,8 +372,8 @@ os.remove(user_path)
 		local Manager, hook, _, user_path = manager()
 		hook.key_text = function(code) return code == 52 and "." or nil end
 		hook.text_mods = { 54 }
-		local saved = package.loaded["adapters.keyboard_layout"]
-		package.loaded["adapters.keyboard_layout"] = {
+		local saved = package.loaded["layouts.adapters.keyboard_layout"]
+		package.loaded["layouts.adapters.keyboard_layout"] = {
 			plan = function() return { { keycode = 57, mods = {} }, { keycode = 39, mods = {} } } end,
 		}
 		local ok, err = pcall(function()
@@ -385,7 +385,7 @@ os.remove(user_path)
 			helpers.assert_eq(table.concat(parts, " "), "54:0 57:1 57:0 39:1 39:0 54:1",
 				"the hand's right Shift is lifted around the result")
 		end)
-		package.loaded["adapters.keyboard_layout"] = saved
+		package.loaded["layouts.adapters.keyboard_layout"] = saved
 		Manager._reset_for_test()
 		os.remove(user_path)
 		if not ok then error(err, 0) end
@@ -1728,7 +1728,7 @@ helpers.describe("OneShot construction-original text source", function()
 			local options = {}
 			if timing == "before_manager" then options.before_manager = replace end
 			require("tests.support.input_owner_fixture").with_manager_session(options, function(s)
-				require("adapters.keyboard_layout")._set_table_for_test({
+				require("layouts.adapters.keyboard_layout")._set_table_for_test({
 					a = { keycode = 30, level = 1, mods = {} }, A = { keycode = 30, level = 2, mods = { "shift" } },
 					b = { keycode = 48, level = 1, mods = {} }, B = { keycode = 48, level = 2, mods = { "shift" } },
 				})

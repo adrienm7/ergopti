@@ -11,19 +11,19 @@ local Fixture = require("tests.support.modifier_broker_fixture")
 
 local function with_stage(body)
 	local names = { "hotstrings.engine.device_finder", "platform.input.evdev_reader", "platform.input.uinput_writer",
-		"platform.input.keyboard_hook", "adapters.xkb_capture", "adapters.keyboard_layout", "hotstrings.engine.injector",
+		"platform.input.keyboard_hook", "layouts.adapters.xkb_capture", "layouts.adapters.keyboard_layout", "hotstrings.engine.injector",
 		"hotstrings.engine.selected_output" }
 	local previous, stage, injector = {}, nil, nil
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local ok, detail = pcall(function()
 		Fixture.with_session(nil, function(session)
-			local saved_xkb = package.loaded["adapters.xkb_capture"]
-			package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
-			local layout = helpers.load_module("adapters.keyboard_layout")
+			local saved_xkb = package.loaded["layouts.adapters.xkb_capture"]
+			package.loaded["layouts.adapters.xkb_capture"] = { caps_locked = function() return false end }
+			local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 			layout._set_table_for_test({ x = { keycode = 45, level = 1, mods = {} } })
 			package.loaded["hotstrings.engine.selected_output"] = nil
 			injector = helpers.load_module("hotstrings.engine.injector")
-			package.loaded["adapters.xkb_capture"] = saved_xkb
+			package.loaded["layouts.adapters.xkb_capture"] = saved_xkb
 			injector._set_uinput(session.writer)
 			injector._set_nanosleep_for_test(function() end)
 			stage = injector.prepare_selected("x", { current = function() return true end, cached = function() return true end })

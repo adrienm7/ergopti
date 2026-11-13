@@ -248,6 +248,7 @@ for (const [index, family] of families.entries()) {
 // be an expression, never a literal, and its file must reach the resolver.
 const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/modules',
+	'static/ergopti_plus/macos/layouts/engine',
 	'static/ergopti_plus/macos/hotstrings/engine',
 	'static/ergopti_plus/macos/gestures/adapters',
 	'static/ergopti_plus/macos/gestures/engine',
@@ -255,6 +256,7 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/ai/engine',
 	'static/ergopti_plus/macos/settings/engine',
 	'static/ergopti_plus/macos/ui',
+	'static/ergopti_plus/macos/layouts/ui',
 	'static/ergopti_plus/macos/keyboard/ui',
 	'static/ergopti_plus/macos/hotstrings/ui/hotstring_editor',
 	'static/ergopti_plus/macos/hotstrings/ui/hotstrings_config_window',
@@ -269,6 +271,7 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/core/ui/ui',
 	'static/ergopti_plus/macos/core/network',
 	'static/ergopti_plus/linux/modules',
+	'static/ergopti_plus/linux/layouts/engine',
 	'static/ergopti_plus/linux/hotstrings/engine',
 	'static/ergopti_plus/linux/gestures/adapters',
 	'static/ergopti_plus/linux/gestures/engine',
@@ -280,6 +283,7 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/linux/ai/engine/prediction',
 	'static/ergopti_plus/linux/ai/engine/settings',
 	'static/ergopti_plus/linux/infra',
+	'static/ergopti_plus/linux/layouts/engine',
 	'static/ergopti_plus/linux/keyboard/engine/keys',
 	'static/ergopti_plus/linux/hotstrings/engine',
 	'static/ergopti_plus/linux/gestures/engine',

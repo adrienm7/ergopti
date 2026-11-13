@@ -10,12 +10,12 @@
 --- ==============================================================================
 
 local ffi = require("ffi")
-local Parser = require("infra.xkb_keymap")
-local Rmlvo = require("infra.xkb_rmlvo")
+local Parser = require("layouts.engine.xkb_keymap")
+local Rmlvo = require("layouts.engine.xkb_rmlvo")
 local Shell = require("core.process.adapters.shell_runner")
 local FileSystem = require("core.fs.adapters.file_system")
-local Layout = require("adapters.keyboard_layout")
-local Capture = require("adapters.xkb_capture")
+local Layout = require("layouts.adapters.keyboard_layout")
+local Capture = require("layouts.adapters.xkb_capture")
 
 ffi.cdef([[
 struct xkb_context *xkb_context_new(int);

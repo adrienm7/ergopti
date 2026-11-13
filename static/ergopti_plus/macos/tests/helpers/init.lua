@@ -460,12 +460,12 @@ function M.load_with_stubs(module_name, hs_overrides)
 	loaded["clipboard.borrowers"] = nil
 
 	-- Drop the keyboard-layout install / input-source modules (split out of
-	-- ui/menu/menu_keyboard_layout.lua in audit F4). They hold session caches and
+	-- layouts/ui/menu/keyboard_layout.lua in audit F4). They hold session caches and
 	-- capture `local hs` at require-time, so a test that stubs hs.task to drive the
 	-- async active-layout probe must get them reloaded under the fresh stub — not a
 	-- cached instance bound to a previous test's hs. Same rationale as text_utils.
-	loaded["modules.keymap.layout_install"] = nil
-	loaded["modules.keymap.input_sources"]  = nil
+	loaded["layouts.engine.registry.install"] = nil
+	loaded["layouts.engine.input_sources"]  = nil
 	loaded["adapters.one_shot_shift"] = nil
 	-- The console owner captures the native API and must follow the current stub.
 	loaded["diagnostics.ui.console_window"] = nil

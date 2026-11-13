@@ -14,8 +14,8 @@ local References = require("tests.support.ui.usercontent_reference_fixture")
 --- Runs one canonical layout module through successive window leases.
 --- @param scenario function Receives the real host and pinned native observations.
 local function with_layout(scenario)
-	return helpers.with_fresh_modules({ "ui.layout_manager", "layouts.engine.manager_bridge", "core.timing.engine.deferred_work",
-		"core.fs.adapters.file_system", "modules.keymap.layout_registry" }, function()
+	return helpers.with_fresh_modules({ "layouts.ui.layout_manager", "layouts.engine.manager_bridge", "core.timing.engine.deferred_work",
+		"core.fs.adapters.file_system", "layouts.engine.registry.registry" }, function()
 		return References(function(_, h)
 			local builder = package.loaded["core.ui.ui.builder"]
 			local create = builder.show_webview
@@ -24,7 +24,7 @@ local function with_layout(scenario)
 			package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 				h.deferred[#h.deferred + 1] = callback; return true
 			end }
-			package.loaded["modules.keymap.layout_registry"] = {
+			package.loaded["layouts.engine.registry.registry"] = {
 				snapshot = function() return { platform = "macos", installed = {} } end,
 				refresh = function(callback) h.refreshes = h.refreshes + 1; callback() end,
 			}
@@ -51,7 +51,7 @@ local function with_layout(scenario)
 				if h.reject_created then return nil end
 				return view
 			end
-			local host = require("ui.layout_manager")
+			local host = require("layouts.ui.layout_manager")
 			function h.current() return h.views[#h.views], h.controllers[#h.controllers] end
 			function h.close()
 				local view, controller = h.current()

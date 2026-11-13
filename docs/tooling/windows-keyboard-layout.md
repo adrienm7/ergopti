@@ -12,7 +12,7 @@ idea (maintainer rule: read it for ideas, never copy its code or templates).
 
 `npm run codegen:windows-keyboard-layout` reads the layout through the shared Lua
 parser and writes `kbdergop.c`, `.h`, `.rc` and `.def` to
-`static/ergopti_plus/windows/native/keyboard_layout/_generated/`. Never edit them:
+`static/ergopti_plus/windows/layouts/native/`. Never edit them:
 change the `.keylayout` or `tools/codegen/lib/windows-keyboard-layout.cjs`, then
 regenerate. The DLL name, language and Windows labels come from
 `_shared/layouts/data/windows_system_layout.json`.

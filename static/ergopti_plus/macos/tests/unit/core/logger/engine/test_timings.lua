@@ -28,9 +28,9 @@ local Timings = require("core.timing.engine.timings")
 local WIRED_MS = {
 	-- hotstrings/engine/expander/expander.lua: safely above one 60 Hz render turn.
 	{ "debounce", "terminal_hotstring_key_delay_ms", 20 },
-	-- modules/keymap/input_sources.lua: hard deadline for mutation subprocesses.
+	-- layouts/engine/input_sources.lua: hard deadline for mutation subprocesses.
 	{ "ui", "input_source_operation_timeout_ms", 10000 },
-	-- ui/menu/*.lua, ui/layout_manager/init.lua: the hand-off delay before the next window opens.
+	-- ui/menu/*.lua, layouts/ui/layout_manager/init.lua: the hand-off delay before the next window opens.
 	{ "ui", "ui_handoff_ms", 50 },
 	-- keystats/init.lua
 	{ "keystats", "micro_idle_timeout_ms",  30000 },

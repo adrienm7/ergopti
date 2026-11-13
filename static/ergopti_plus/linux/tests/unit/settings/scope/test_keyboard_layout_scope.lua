@@ -21,7 +21,7 @@ local SOURCE = '[layout]\ndirect_access_digits = "digits"\nnumber_row_reorder_ed
 
 local function with_scope(body)
 	Sandbox.with_config(SOURCE, function(path)
-		local names = { "settings.engine.paths", "infra.keyboard_layout_scope", "infra.number_row_preferences" }
+		local names = { "settings.engine.paths", "layouts.engine.keyboard_layout_scope", "layouts.engine.emulation.number_row_preferences" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local controls = {}
@@ -36,7 +36,7 @@ local function with_scope(body)
 					return Writer.publish_if_unchanged(target, content, nil, expected)
 				end,
 			}
-			local Scope = require("infra.keyboard_layout_scope")
+			local Scope = require("layouts.engine.keyboard_layout_scope")
 			local owner = Scope.new({ path = path, backup_path = backup, files = files })
 			body(owner, controls, path, backup, Scope)
 		end)
@@ -52,7 +52,7 @@ end
 --- @return table state { loads, answer(ok, code) }
 local function fake_live(options)
 	options = options or {}
-	local Preferences = require("infra.number_row_preferences")
+	local Preferences = require("layouts.engine.emulation.number_row_preferences")
 	local state = { loads = {} }
 	local live = {
 		stored = function() return Preferences.settings() end,

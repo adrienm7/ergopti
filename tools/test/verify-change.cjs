@@ -513,8 +513,8 @@ const RULES = [
 		why: 'physical contextual shortcuts require actual X11 group/keymap receipts; the owned native fixture also guards honest Wayland refusal',
 		match: (f) =>
 			[
-				'static/ergopti_plus/linux/adapters/xkb_capture.lua',
-				'static/ergopti_plus/linux/adapters/xkb_source_probe.lua',
+				'static/ergopti_plus/linux/layouts/adapters/xkb_capture.lua',
+				'static/ergopti_plus/linux/layouts/adapters/xkb_source_probe.lua',
 				'static/ergopti_plus/linux/platform/input/keyboard_hook.lua',
 				'static/ergopti_plus/linux/hotstrings/engine/device_finder.lua',
 				'static/ergopti_plus/linux/hotstrings/engine/magic_key_source.lua',

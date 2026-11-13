@@ -119,8 +119,8 @@ setenv("XDG_CURRENT_DESKTOP", nil)
 -- download on consent has its own live probe (run_managed_python_live.lua), so
 -- the installer runs here on the runner's interpreter instead of asking.
 local runner_python = (capture("command -v python3 2>/dev/null"):gsub("%s+$", ""))
-package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
-local Registry = require("modules.keymap.layout_registry")
+package.loaded["layouts.engine.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
+local Registry = require("layouts.engine.registry.registry")
 
 
 
@@ -319,13 +319,13 @@ end
 -- The menu stores an ordering and the layout manager loads it; the global clear
 -- then composes the real layout participant, which writes config.toml and settles
 -- only once the server holds the layout without the ordering.
-local Live = require("modules.keymap.number_row_live")
+local Live = require("layouts.engine.emulation.number_row_live")
 local stored = await("the menu stores « digits »", function(done) Live.set("order", "digits", done) end)
 check(stored[1] == true, "the menu's choice is stored and loaded: " .. tostring(stored[2]))
 check(levels(server_keymap(), "AE01")[BASE] == "1", "the server types 1 on the bare 1 key")
 
 local GlobalScope = require("settings.engine.scope.global_scope")
-local LayoutScope = require("infra.keyboard_layout_scope")
+local LayoutScope = require("layouts.engine.keyboard_layout_scope")
 local settled_at_once = nil
 local cleared = await("the global clear", function(done)
 	local answered = false

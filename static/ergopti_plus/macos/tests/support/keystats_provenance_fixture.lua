@@ -135,7 +135,7 @@ function M.load_keystats()
 		stop = function() return true end,
 		isRunning = function() return true end,
 	}
-	package.loaded["adapters.input_source_broker"] = {
+	package.loaded["layouts.adapters.input_source_broker"] = {
 		subscribe = function(id, callback)
 			return type(id) == "string" and type(callback) == "function"
 		end,

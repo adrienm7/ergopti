@@ -829,7 +829,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/ui/layout_manager/composer_check.ahk",
+			"source": "static/ergopti_plus/windows/layouts/ui/layout_manager/composer_check.ahk",
 			"template": "\" verdict=\"",
 			"line": "2026-10-30 10:00:00:123 [INFO] [ComposerCheck] Composer check result: check=composer verdict=pass steps=4 layout=pass",
 			"expect": {

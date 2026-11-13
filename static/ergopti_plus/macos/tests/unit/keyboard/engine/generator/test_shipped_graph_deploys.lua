@@ -59,7 +59,7 @@ local function with_generator(existing, json_codec, run, locale_code, layout_id)
 		"core.text.engine.toml.codec",
 		"keyboard.engine.runtime.config",
 		"keyboard.engine.runtime.generator",
-		"modules.keymap.layout_registry",
+		"layouts.engine.registry.registry",
 		"core.i18n.engine.i18n",
 		"core.i18n.engine.locale",
 		"core.i18n.engine.core",
@@ -103,7 +103,7 @@ local function with_generator(existing, json_codec, run, locale_code, layout_id)
 		}
 		if json_codec then package.loaded["core.fs.adapters.json_codec"] = json_codec end
 
-		package.loaded["modules.keymap.layout_registry"] = require("tests.support.active_layout_registry_fixture").new(
+		package.loaded["layouts.engine.registry.registry"] = require("tests.support.active_layout_registry_fixture").new(
 			layout_id or "ergopti", layout_id == "ergol" and "ansi" or "iso")
 
 		local Config    = helpers.load_with_stubs("keyboard.engine.runtime.config")
@@ -318,7 +318,7 @@ helpers.describe("Shipped graph declared input-source convention (iso-consumer-m
 				-- Issue #99: the ANSI product passes the ISO pair through; the ISO
 				-- product swapped it on the maintainer's Apple ISO keyboard.
 				helpers.assert_eq(virtual, "ansi")
-				local snapshot = require("modules.keymap.layout_registry").snapshot()
+				local snapshot = require("layouts.engine.registry.registry").snapshot()
 				local entry = assert(require("layouts.engine.registry.registry_core").find_entry(snapshot.index, scenario.id))
 				local xml = SourceFile.read(helpers.shared("../../layouts/registry/" .. entry.file))
 				-- Independently authored, never the production tables: the usage the

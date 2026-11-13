@@ -650,7 +650,7 @@ function checkAhkStringEscaping(file) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function checkMacOsPathIntegrity() {
-	const kbdMenu = join(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua');
+	const kbdMenu = join(REPO_ROOT, 'static/ergopti_plus/macos/layouts/ui/menu/keyboard_layout.lua');
 	try {
 		const content = readFileSync(kbdMenu, 'utf8');
 		if (content.includes('local BUNDLES_RELDIR = "../macos/bundles/"')) {
@@ -737,6 +737,7 @@ console.log('lint-conventions: scanning…');
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/layouts/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/hotstrings/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/diagnostics/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/clipboard/adapters'),
@@ -773,12 +774,14 @@ const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/layouts/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/hotstrings'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/gestures/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/gestures/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/diagnostics/engine/reports'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/ai/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/layouts/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/hotstrings/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/gestures/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/diagnostics/ui'),
@@ -814,6 +817,7 @@ const ahkAll = [
 // file count and passes.
 const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/layouts/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/keyboard/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/diagnostics/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/clipboard/adapters'),
@@ -831,6 +835,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/layouts/engine/registry'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/keyboard/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/hotstrings/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/gestures/engine'),
@@ -852,6 +857,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/modules'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/layouts/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/hotstrings/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/gestures/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/gestures/engine'),
@@ -859,6 +865,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ai/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/settings/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/layouts/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/keyboard/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/hotstrings/ui/hotstring_editor'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/hotstrings/ui/hotstrings_config_window'),
@@ -874,6 +881,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/network'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tests'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/layouts/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/hotstrings/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/clipboard/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/apps/adapters'),
@@ -888,6 +896,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/layouts/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/keyboard/engine/keys'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/hotstrings/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/gestures/engine'),
@@ -906,6 +915,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/modules'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/layouts/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/hotstrings/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/gestures/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/gestures/engine'),
@@ -917,6 +927,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/linux/ai/engine/prediction'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/ai/engine/settings'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/layouts/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/keyboard/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/hotstrings/ui/hotstring_editor'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/hotstrings/ui/hotstrings_config_window'),

@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The Debug menu's one-click « Test the composed layout »: a click runs the
 --- shared steps (_shared/layouts/engine/composer/check_core.lua) over this driver's
---- composer environment (modules/keymap/composer_check.lua), writes the one
+--- composer environment (layouts/engine/composer/check.lua), writes the one
 --- evidence record to the log and shows the result, one line per step, with a
 --- « Copy report » button.
 ---
@@ -28,6 +28,6 @@ return Window.new({
 	steps = function(env, report, finish)
 		Check.run(env, report, finish)
 	end,
-	env = function() return require("modules.keymap.composer_check").env() end,
+	env = function() return require("layouts.engine.composer.check").env() end,
 	unusable_step = "composer_fixture",
 })

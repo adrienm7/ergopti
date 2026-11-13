@@ -27,7 +27,7 @@ local function with_generator(existing, run)
 	helpers.with_fresh_modules({
 		"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "settings.engine.paths", "platform.input.keycodes", "core.logger.engine.logger",
 		"core.text.engine.toml.codec", "keyboard.engine.runtime.config", "keyboard.engine.runtime.generator",
-		"modules.keymap.layout_registry", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.text.engine.toml_codec",
+		"layouts.engine.registry.registry", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.text.engine.toml_codec",
 	}, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["settings.engine.paths"] = { get_config_dir = function() return "/tmp/ergopti_test" end }
@@ -66,7 +66,7 @@ local function with_generator(existing, run)
 				return false, "the owned writer is conditional"
 			end,
 		}
-		package.loaded["modules.keymap.layout_registry"] =
+		package.loaded["layouts.engine.registry.registry"] =
 			require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
 		local Config = helpers.load_with_stubs("keyboard.engine.runtime.config")
 		local Generator = helpers.load_with_stubs("keyboard.engine.runtime.generator")

@@ -35,7 +35,7 @@
 ---    presses: the keystroke metrics measure keys pressed, not keys held.
 --- 4. Identity by code, characters by live XKB state. Modifiers and named
 ---    control keys come from platform/input/evdev_codes.lua; printable text comes from
----    adapters/xkb_capture.lua, using the server's complete keymap and every
+---    layouts/adapters/xkb_capture.lua, using the server's complete keymap and every
 ---    down/up transition. Static QWERTY/AZERTY tables cannot represent locks,
 ---    groups, AltGr, Compose or compositor customisations.
 --- 5. Nothing blocks. pump() drains what is ready and returns; the descriptor is
@@ -64,7 +64,7 @@ local EvdevCodes = require("platform.input.evdev_codes")
 local Monotonic = require("core.logger.engine.monotonic")
 local Perf = require("core.logger.engine.perf_counters")
 local InputEvent = require("platform.input.event")
-local XkbCapture = require("adapters.xkb_capture")
+local XkbCapture = require("layouts.adapters.xkb_capture")
 local ModifierBroker = require("platform.input.modifier_broker")
 local installed_output_broker = ModifierBroker.for_channel
 local INPUT_OUTPUT_PORT_NAMES = { "capture_output", "capture_output_observer", "output_view", "acquire_transaction", "transaction_view", "transaction_current",
@@ -1527,7 +1527,7 @@ function _number_row.binding(record)
 		or _input_source_owners ~= record.sources or _input_source_observers ~= record.observers
 		or _origin_generation ~= record.origin or _source_reconciliation or not _input_exports_current()
 		or not _running or not _intercept or _capture_options.numberRowMode ~= record.mode
-		or package.loaded["adapters.xkb_capture"] ~= XkbCapture then return false end
+		or package.loaded["layouts.adapters.xkb_capture"] ~= XkbCapture then return false end
 	local output = record.output
 	if not output or package.loaded["platform.input.uinput_writer"] ~= output.writer
 		or ModifierBroker.for_channel ~= installed_output_broker then return false end
@@ -2137,7 +2137,7 @@ for _, name in ipairs({ "capture_pressed_keys", "pressed_keys_view", "pressed_ke
 end
 position_capture.source = rawget(XkbCapture, "source_generation")
 position_capture.source_file = HookModuleSource.sibling(hook_source_label,
-	"platform/input/keyboard_hook.lua", "adapters/xkb_capture.lua", hook_directory)
+	"platform/input/keyboard_hook.lua", "layouts/adapters/xkb_capture.lua", hook_directory)
 
 local function position_runtime(record)
 	if not original_reader_load or not _running or not _intercept or _source_reconciliation
@@ -2149,7 +2149,7 @@ local function position_runtime(record)
 		or not rawequal(package.loaded["platform.input.evdev_reader"], EvdevReader)
 		or not rawequal(package.loaded["keyboard.engine.keys.combination_engine"], InputIssuer)
 		or not _input_exports_current()
-		or not rawequal(package.loaded["adapters.xkb_capture"], XkbCapture)
+		or not rawequal(package.loaded["layouts.adapters.xkb_capture"], XkbCapture)
 		or rawget(XkbCapture, "source_generation") ~= position_capture.source
 		or not rawequal(package.loaded["hotstrings.engine.device_finder"], record.finder)
 		or type(record.finder) ~= "table" or type(record.classify) ~= "function"
@@ -3960,7 +3960,7 @@ function M.refresh_capture(layout, refresh, selected)
 	local inverse, inverse_current = _source_recovery.inverse, _source_recovery.inverse_current
 	local old_capture
 	local function current()
-		return _source_cohort_current(tx) and package.loaded["adapters.xkb_capture"] == XkbCapture
+		return _source_cohort_current(tx) and package.loaded["layouts.adapters.xkb_capture"] == XkbCapture
 			and rawget(XkbCapture, "inverse_table") == inverse and rawget(XkbCapture, "inverse_current") == inverse_current
 			and (not tx.engine or _input_ports.input_owner_current(tx.issuer) == true)
 	end

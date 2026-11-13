@@ -281,10 +281,10 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-windows-keyboard-layout.cjs',
 		outputs: [
-			'static/ergopti_plus/windows/native/keyboard_layout/_generated/kbdergop.c',
-			'static/ergopti_plus/windows/native/keyboard_layout/_generated/kbdergop.h',
-			'static/ergopti_plus/windows/native/keyboard_layout/_generated/kbdergop.rc',
-			'static/ergopti_plus/windows/native/keyboard_layout/_generated/kbdergop.def'
+			'static/ergopti_plus/windows/layouts/native/kbdergop.c',
+			'static/ergopti_plus/windows/layouts/native/kbdergop.h',
+			'static/ergopti_plus/windows/layouts/native/kbdergop.rc',
+			'static/ergopti_plus/windows/layouts/native/kbdergop.def'
 		]
 	},
 	{

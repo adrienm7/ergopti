@@ -289,7 +289,7 @@ local function collect_input(state)
 	input.caps_lock = caps_lock
 	local ok_manager, Manager = pcall(require, "platform.remap.manager")
 	if ok_manager then input.kanata_running = Manager.owns_process() end
-	input.keymap_resolved = require("adapters.keyboard_layout").is_ready() == true
+	input.keymap_resolved = require("layouts.adapters.keyboard_layout").is_ready() == true
 	return input
 end
 

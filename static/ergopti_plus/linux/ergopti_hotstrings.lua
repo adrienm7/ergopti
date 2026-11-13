@@ -244,7 +244,7 @@ local LOG = "ergopti_hotstrings"
 local engine_mod        = require("hotstrings.engine.engine")
 local hotstrings_config = require("hotstrings.engine.catalogue.config")
 local injector          = require("hotstrings.engine.injector")
-local keyboard_layout   = require("adapters.keyboard_layout")
+local keyboard_layout   = require("layouts.adapters.keyboard_layout")
 local MagicKey          = require("hotstrings.engine.magic_key")
 local MagicKeySource    = require("hotstrings.engine.magic_key_source")
 local RepeatKey         = require("hotstrings.engine.repeat_key")
@@ -372,11 +372,11 @@ local shutdown = ShutdownCoordinator.new({
 			-- A quit switches to the pause layout first; the exit waits for it.
 			name = "pause layout switch",
 			stop = function()
-				local switch = package.loaded["modules.keymap.pause_layout_switch"]
+				local switch = package.loaded["layouts.engine.emulation.pause_layout_switch"]
 				return not switch or not switch.is_initialised() or switch.is_settled()
 			end,
 			when_settled = function(callback)
-				local switch = package.loaded["modules.keymap.pause_layout_switch"]
+				local switch = package.loaded["layouts.engine.emulation.pause_layout_switch"]
 				if not switch or not switch.is_initialised() then callback(); return true end
 				switch.when_settled(callback)
 				return true
@@ -454,7 +454,7 @@ local shutdown = ShutdownCoordinator.new({
 				return function()
 					if not resolved then
 						resolved = true
-						registry = package.loaded["modules.keymap.layout_registry"]
+						registry = package.loaded["layouts.engine.registry.registry"]
 						stop = registry and registry.shutdown
 					end
 					return not registry or stop() == true
@@ -877,7 +877,7 @@ privacy_owners.tray_quit = require("core.lifecycle.engine.shutdown.quit_request"
 	abandon_reload = abandon_reload,
 	writer_active = function() return require("settings.engine.scope.registry").pending() end,
 	publication_pending = function() return hotstrings_config.publication_pending() end,
-	apply_pause_layout = function() require("modules.keymap.pause_layout_switch").quit_safely() end,
+	apply_pause_layout = function() require("layouts.engine.emulation.pause_layout_switch").quit_safely() end,
 	report_update_quit = function(reason) require("infra.updater_boot_ready").report_quit(reason) end,
 	schedule = function(seconds, callback)
 		return TimerScheduler.after(seconds, callback).armed == true
@@ -1306,10 +1306,10 @@ local function main()
 
 	-- The desktop layout a pause, a resume and a quit switch to (Layout menu).
 	do
-		local InputSourceSwitch = require("adapters.input_source_switch")
-		require("modules.keymap.pause_layout_switch").init({
+		local InputSourceSwitch = require("layouts.adapters.input_source_switch")
+		require("layouts.engine.emulation.pause_layout_switch").init({
 			switcher = InputSourceSwitch.new(InputSourceSwitch.native_port()),
-			preferences = require("infra.pause_layout_preferences"),
+			preferences = require("layouts.engine.emulation.pause_layout_preferences"),
 		})
 	end
 
@@ -1359,7 +1359,7 @@ local function main()
 				Logger.warn("pause", "Local API discovery still owns native cleanup debt.")
 			end
 			if rebuild_tray_menu then rebuild_tray_menu() end
-			require("modules.keymap.pause_layout_switch").on_pause_change(paused)
+			require("layouts.engine.emulation.pause_layout_switch").on_pause_change(paused)
 			return remapper_paused == true
 		end,
 	})
@@ -1372,7 +1372,7 @@ local function main()
 		return
 	end
 	-- The layout of the live pause state, as macOS applies once its boot settles.
-	require("modules.keymap.pause_layout_switch").start_safely(script_actions.is_paused())
+	require("layouts.engine.emulation.pause_layout_switch").start_safely(script_actions.is_paused())
 
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
@@ -2428,7 +2428,7 @@ local function main()
 		-- a character the layout lacks leaves the key its own.
 		can_type = injector.can_type_directly,
 		input_source_receipt = keyboard_hook.physical_source_receipt,
-		typing_plan = function(text) return require("adapters.keyboard_layout").resolve(text) end,
+		typing_plan = function(text) return require("layouts.adapters.keyboard_layout").resolve(text) end,
 		type_text = function(text)
 			if opts.dry_run then return false end
 			local result = injector.type_directly(text)
@@ -2466,7 +2466,7 @@ local function main()
 	-- layout types there, over the session's own XKB layout, as on Windows.
 	-- Decided right after the physical magic key in the consumption callback.
 	-- Required inline: main() sits at LuaJIT's upvalue limit.
-	require("modules.keymap.layout_emulation").start({
+	require("layouts.engine.registry.emulation").start({
 		injector = injector,
 		is_paused = function() return script_actions.is_paused() end,
 		dispatch_char = function(char, code) on_char(char, code) end,
@@ -2662,7 +2662,7 @@ local function main()
 		local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
 		-- Under an emulated layout a slot follows the emulated letter, as on
 		-- Windows: Ctrl on the key typing « a » is the ctrl+a slot (ILX-001).
-		local emulated_key = require("modules.keymap.layout_emulation").chord_key(detail)
+		local emulated_key = require("layouts.engine.registry.emulation").chord_key(detail)
 		if emulated_key then
 			local offered = {}
 			for field, value in pairs(detail) do offered[field] = value end
@@ -2702,7 +2702,7 @@ local function main()
 				return not opts.dry_run and not script_actions.is_paused() and shortcuts ~= nil
 					and shortcuts.is_enabled() == true and input_capture_gate.blocks_text() ~= true
 			end,
-			emulating = function() return require("modules.keymap.layout_emulation").status().active == true end,
+			emulating = function() return require("layouts.engine.registry.emulation").status().active == true end,
 			defer = function(fn) return event_loop.defer(fn) end,
 			press = function(combo) return (require("gestures.engine.combo_emitter").press(combo)) end,
 		})
@@ -2725,7 +2725,7 @@ local function main()
 		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
 		if consume_bound_chord(detail) then return true end
 		-- The layout emulation, after the actions the user bound on a key.
-		local emulated, emulated_repeat, emulated_release = require("modules.keymap.layout_emulation").on_key(detail)
+		local emulated, emulated_repeat, emulated_release = require("layouts.engine.registry.emulation").on_key(detail)
 		if emulated then
 			-- Typed in the key's place: like a re-emitted key, it ends a selection.
 			wrap_on_type.end_selection_window()
@@ -2834,7 +2834,7 @@ local function main()
 				-- chooses it, and captures one by pressing it.
 				magic_key_source = MagicKeySource,
 				-- Layout > « Layout on pause / resume » lists and saves through it.
-				pause_layout  = require("modules.keymap.pause_layout_switch"),
+				pause_layout  = require("layouts.engine.emulation.pause_layout_switch"),
 				layout        = opts.layout,
 				log_level     = ScriptSettings.current(),
 				-- Applied live rather than logged. The qwerty/azerty label describes
@@ -2848,7 +2848,7 @@ local function main()
 					local switch_started = require("core.logger.engine.perf_counters").trace("layout.switch")
 					local refresh, set_layout, selected_keymap = keyboard_layout.refresh, keyboard_hook.set_layout, opts.keymap
 					local function selected_map_current()
-						return package.loaded["adapters.keyboard_layout"] == keyboard_layout
+						return package.loaded["layouts.adapters.keyboard_layout"] == keyboard_layout
 							and keyboard_layout.refresh == refresh and keyboard_hook.set_layout == set_layout
 							and opts.keymap == selected_keymap
 					end
@@ -3586,7 +3586,7 @@ local function main()
 	local capture_override = opts.keymap
 	local function publish_reacquired_capture()
 		local function current()
-			return package.loaded["adapters.keyboard_layout"] == capture_layout
+			return package.loaded["layouts.adapters.keyboard_layout"] == capture_layout
 				and capture_layout.publish_current_capture == capture_publish
 				and capture_layout.is_ready == capture_ready and opts.keymap == capture_override
 		end

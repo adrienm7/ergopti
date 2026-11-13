@@ -113,7 +113,7 @@ local OWNED_MODULES = {
 	"apps.ui.menu.apps",
 	"gestures.ui.menu.gestures",
 	"hotstrings.ui.menu.hotstrings",
-	"ui.menu.menu_keyboard_layout",
+	"layouts.ui.menu.keyboard_layout",
 	"ai.ui.menu",
 	"ui.menu.menu_metrics",
 	"settings.ui.menu.paths",

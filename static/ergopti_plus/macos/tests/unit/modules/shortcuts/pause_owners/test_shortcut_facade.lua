@@ -233,7 +233,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		for _, module_name in ipairs({
 			"gestures.ui.menu.gestures",
 			"ui.menu.menu_shortcuts",
-			"ui.menu.menu_keyboard_layout",
+			"layouts.ui.menu.keyboard_layout",
 			"hotstrings.ui.menu.hotstrings",
 			"ui.menu.menu_metrics",
 			"ui.menu.menu_tap_holds",

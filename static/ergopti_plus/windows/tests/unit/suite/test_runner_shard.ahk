@@ -122,7 +122,7 @@ Test("runner list: unknown names refuse an otherwise valid replay (runner-list-c
 
 _RSH_ListSelectionIntersections() {
 	Core := "C:\repo\static\ergopti_plus\windows\tests\unit\core\text\test_utils.ahk"
-	Ui := "C:\repo\static\ergopti_plus\windows\tests\unit\ui\menu\test_menu.ahk"
+	Ui := "C:\repo\static\ergopti_plus\windows\tests\unit\layouts\test_menu.ahk"
 	Rows := [{name: "alpha", file: Core, interactive: false},
 		{name: "beta", file: Ui, interactive: false},
 		{name: "gamma", file: Core, interactive: true},

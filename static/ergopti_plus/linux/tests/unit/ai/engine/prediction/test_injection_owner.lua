@@ -22,7 +22,7 @@ local function scenario(action, phase, body)
 			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
 		end
 		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
-			"clipboard.adapters.clipboard", "adapters.keyboard_layout", "hotstrings.engine.injector" }) do package.loaded[name] = nil end
+			"clipboard.adapters.clipboard", "layouts.adapters.keyboard_layout", "hotstrings.engine.injector" }) do package.loaded[name] = nil end
 		local state = { logs = {}, bus = ":1.23", path = "/field/original", role = 61, now = 1000,
 			rows = {}, held = {}, writes = {}, requests = {}, errors = {}, stopped = 0, resets = 0, output = 0, paused = false,
 			owner_captures = 0, apply_admissions = 0, clipboard_reads = 0 }
@@ -120,7 +120,7 @@ local function scenario(action, phase, body)
 			held_text_modifier_codes = function() return {} end, held_shortcut_modifier_codes = function() return {} end,
 			held_forwarded_keys = function() return {} end, emergency_stop = function() state.stopped = state.stopped + 1 end,
 		}
-		local layout = require("adapters.keyboard_layout")
+		local layout = require("layouts.adapters.keyboard_layout")
 		layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} }, [" "] = { keycode = 57, mods = {} } })
 		local shortcut = layout.shortcut_keycode
 		layout.shortcut_keycode = function(...) transition("lookup"); return shortcut(...) end
@@ -185,7 +185,7 @@ local function scenario(action, phase, body)
 end
 
 helpers.describe("AI continuation retains its injection authority", function()
-	for _, route in ipairs({ "native", "clipboard" }) do
+	for _, route in ipairs({ "native", "clipboard", "layouts" }) do
 		helpers.it("keeps the accepted " .. route .. " prediction out of real trace logs", function()
 			scenario("stable", route, function(accepted, state)
 				helpers.assert_true(accepted and state.completed)
@@ -195,7 +195,7 @@ helpers.describe("AI continuation retains its injection authority", function()
 			end)
 		end)
 	end
-	for _, route in ipairs({ "native", "clipboard" }) do
+	for _, route in ipairs({ "native", "clipboard", "layouts" }) do
 		helpers.it("refuses a dry-run " .. route .. " prediction before output", function()
 			scenario("dry-run", route, function(accepted, state)
 				helpers.assert_eq(accepted, false)

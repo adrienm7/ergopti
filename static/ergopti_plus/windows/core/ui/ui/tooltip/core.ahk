@@ -82,14 +82,14 @@ global TOOLTIP_POSITION_WARM_PERIOD_MS := 300
 ; debounce above is a COALESCING timer, not an idle gate: it decides when the
 ; deferred render happens, not whether the user is still mid-burst, and the work
 ; it defers still contends for one shared worker. Same reasoning as
-; UIA_SELECTION_IDLE_REQUIRED_MS in modules/keymap/layout.ahk.
+; UIA_SELECTION_IDLE_REQUIRED_MS in layouts/engine/layout.ahk.
 ;
 ; The visible surface retains its own idle refinement obligation. Showing early
 ; pixels therefore cannot make the UIA stage unreachable when typing stops.
 global TOOLTIP_UIA_IDLE_REQUIRED_MS := 200
 
 ; How long a process stays marked as not answering UIA usefully. Generous
-; re-probe window, mirroring _UIA_NO_TP_TTL_MS in modules/keymap/layout.ahk:
+; re-probe window, mirroring _UIA_NO_TP_TTL_MS in layouts/engine/layout.ahk:
 ; without it a UIA-hostile app pays a full timeout every cache expiry, forever.
 global TOOLTIP_UIA_HOSTILE_TTL_MS := 30000
 global _TooltipUiaHostileCache := Map()

@@ -6,7 +6,7 @@
 ; The native half of a registry watch: a key opened for notification only, an
 ; auto-reset event, RegNotifyChangeKeyValue arming that event for the key and
 ; its subtree, a zero-timeout signal query, and the closing of both handles.
-; modules/keymap/layout_registry_watch.ahk owns the policy around them.
+; layouts/engine/registry/watch.ahk owns the policy around them.
 ;
 ; FEATURES & RATIONALE:
 ; 1. KEY_NOTIFY is the only right a notification needs, so the watch can never

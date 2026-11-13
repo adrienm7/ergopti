@@ -309,7 +309,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.installed_physical_source",
+		id       = "layouts.adapters.installed_physical_source",
 		contract = { "new", "module_path" },
 		-- Built by the owned runtime's capture port and the owned runtime field check.
 		wired    = true,
@@ -412,12 +412,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.keyboard_source_probe",
+		id       = "layouts.adapters.keyboard_source_probe",
 		contract = { "current_source_id", "request" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.input_source_selector",
+		id       = "layouts.adapters.input_source_selector",
 		contract = { "command", "command_named", "upgrade" },
 		wired    = true,
 	},
@@ -491,7 +491,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.keyboard_layout_files",
+		id       = "layouts.adapters.keyboard_layout_files",
 		contract = { "write_new", "remove" },
 		wired    = true,
 	},
@@ -622,7 +622,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.input_source_broker",
+		id       = "layouts.adapters.input_source_broker",
 		contract = { "subscribe", "unsubscribe", "is_subscribed" },
 		wired    = true,
 	},

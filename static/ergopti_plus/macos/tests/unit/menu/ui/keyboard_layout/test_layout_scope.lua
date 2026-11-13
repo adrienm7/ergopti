@@ -7,7 +7,7 @@ local FileSystem = require("core.fs.adapters.file_system")
 
 local function fixture(number_row_source, complete_source)
 	package.loaded["core.fs.adapters.file_system"] = FileSystem
-	local Layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+	local Layout = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 	local state = { layout_pause_switch_enabled = true, layout_on_pause = "French", layout_on_resume = "Ergopti+" }
 	local original = '[layout]\npause_switch_enabled = true\non_pause = "French"\non_resume = "Ergopti+"\nfuture = { preserve = 7 }\n[llm]\nenabled = true\n[metrics]\nenabled = true\n'
 	if complete_source ~= nil then original = complete_source end
@@ -163,7 +163,7 @@ package.loaded["settings.engine.preferences.preferences"] = nil
 
 helpers.describe("layout scope provider", LayoutFixture.scoped(function()
 	helpers.it("dispatches the common commands through the exact scope owner", function()
-		local Layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+		local Layout = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 		local renderer = LayoutFixture.install(require("core.i18n.engine.i18n"))
 		local original, captured = renderer.build
 		renderer.build = function(...)

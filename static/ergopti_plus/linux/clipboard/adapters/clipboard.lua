@@ -9,7 +9,7 @@
 --- WHEN THIS IS USED, AND WHY THAT CHANGED:
 --- The plan this driver was built from expected the clipboard to be the COMMON
 --- path, on the reasoning that accented replacements cannot be typed. That was
---- true of ydotool and is no longer true here: adapters/keyboard_layout.lua
+--- true of ydotool and is no longer true here: layouts/adapters/keyboard_layout.lua
 --- resolves characters against the session's own XKB keymap, so é, ç, «, € and
 --- everything else the user's layout can produce is typed as a real keystroke.
 --- What is left for the clipboard is what the layout genuinely cannot reach —
@@ -512,7 +512,7 @@ end
 --- Resolves the paste shortcut before a caller's final native range observation.
 --- @return integer code Exact layout key or the adapter's canonical US fallback.
 function M.paste_keycode()
-	return require("adapters.keyboard_layout").shortcut_keycode("v", US_KEY_V)
+	return require("layouts.adapters.keyboard_layout").shortcut_keycode("v", US_KEY_V)
 end
 
 --- Emits Ctrl+V through the caller's uinput channel.

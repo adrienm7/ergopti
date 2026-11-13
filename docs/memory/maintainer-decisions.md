@@ -661,7 +661,7 @@ system layout and Ergopti types the selected layout over it, with the same
 options and menu rows as Windows (layers, rows, number-row ordering and edge
 keys, dead keys, AltGr, the shortcut chords' Command level, the magic key).
 macOS and Linux run one shared engine, `_shared/layouts/engine/composer/keylayout_emulation.lua`,
-the twin of `windows/modules/keymap/keylayout/keylayout_emulation.ahk`; the
+the twin of `windows/layouts/engine/keylayout/emulation.ahk`; the
 three replay `_shared/tests/corpus/layouts/keylayout_vectors.json` (the
 cross-OS oracle) and the Lua drivers `emulation_vectors.json` for the options.
 The built-in Ergopti variants are emulated from their registry `.keylayout`
@@ -699,7 +699,7 @@ Plasma keyboard daemon over D-Bus, or setxkbmap; other Wayland compositors show
 system is on every OS: macOS from the `.bundle` rows (`layout_bundle`), Linux
 for the user from the layout manager (install.sh on Xorg), and Windows from
 Layout > « Download the Ergopti system layout installer » (`layout_system_install`,
-`windows/modules/keymap/system_layout_install.ahk`). The Windows installer is
+`windows/layouts/engine/system_layout_install.ahk`). The Windows installer is
 UNSIGNED by decision (2026-11-06), and the row's label says it; since 2026-11-07
 (confirmed 2026-11-08, below) the row opens its download instead of running it. Its keyboard DLL is
 generated from the registry `.keylayout` (`codegen-windows-keyboard-layout.cjs`,
@@ -1365,7 +1365,7 @@ not a settled rewrite. Pinned by `test_common_autocorrection_migration.ahk`
 ## The Windows keyboard DLL folders are genuinely per-driver (2026-11-07, confirmed 2026-11-08)
 
 Proposed by the coordinator on 2026-11-07, confirmed by the maintainer on 2026-11-08.
-`windows/native/keyboard_layout` (the keyboard DLL sources generated from the
+`windows/layouts/native` (the keyboard DLL sources generated from the
 .keylayout) and `windows/vendor/keyboard_layout` (its elevated installer) exist
 on Windows only: macOS and Linux install the .keylayout and XKB files
 themselves and build no DLL. `test-driver-tree-parity.cjs` records them by

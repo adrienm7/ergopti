@@ -89,7 +89,7 @@ helpers.describe("staged selected output exact range", function()
 			local delivered = state.deliver
 			state.on_boundary = function(at)
 				if at == "capture-owner" then
-					local layout = require("adapters.keyboard_layout")
+					local layout = require("layouts.adapters.keyboard_layout")
 					local plan = layout.plan
 					layout.plan = function(...) local offered, why, receipt = plan(...); state.allowed = false; return offered, why, receipt end
 				end

@@ -1251,7 +1251,7 @@ end
 -- source the boot registered stays out of this file's crowded top-level locals.
 local resolve_current_layout_actions
 do
-	local Layout = require("modules.keymap.layout")
+	local Layout = require("layouts.engine.layout")
 	local registered_source = nil -- The user's virtual keyboard choice the boot registered, or nil
 
 	--- Registers the owner of the user's virtual keyboard choice (config.toml
@@ -3648,7 +3648,7 @@ end
 function M.virtual_keyboard_form()
 	if not _state or _state.enabled ~= true then return nil end
 	if _state.virtual_keyboard_type == nil then return nil end
-	local Layout = require("modules.keymap.layout")
+	local Layout = require("layouts.engine.layout")
 	return Layout.arrival_form(_state.virtual_keyboard_type,
 		_state.virtual_keyboard_product or Layout.default_virtual_keyboard_product())
 end

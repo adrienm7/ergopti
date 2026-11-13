@@ -68,7 +68,7 @@ end
 helpers.describe("linux injector: non-consumed terminator replay", function()
 
 	helpers.it("replays Space and punctuation after the replacement (lnx-001)", function()
-		local saved_layout = package.loaded["adapters.keyboard_layout"]
+		local saved_layout = package.loaded["layouts.adapters.keyboard_layout"]
 		local saved_injector = package.loaded["hotstrings.engine.injector"]
 		local codes = require("platform.input.evdev_codes")
 		local rendered, active_terminator
@@ -86,7 +86,7 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 			end
 			return true
 		end
-		package.loaded["adapters.keyboard_layout"] = require("tests.support.layout_cohort_fixture").layout(function(char)
+		package.loaded["layouts.adapters.keyboard_layout"] = require("tests.support.layout_cohort_fixture").layout(function(char)
 			if char == active_terminator then return keycodes.terminator end
 			return assert(keycodes[char], "unexpected text in terminator replay test")
 		end)
@@ -106,13 +106,13 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 
 		injector._set_uinput(nil)
 		injector._set_nanosleep_for_test(nil)
-		package.loaded["adapters.keyboard_layout"] = saved_layout
+		package.loaded["layouts.adapters.keyboard_layout"] = saved_layout
 		package.loaded["hotstrings.engine.injector"] = saved_injector
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("replays Enter and Tab as control keystrokes after text (lnx-002)", function()
-		local saved_layout = package.loaded["adapters.keyboard_layout"]
+		local saved_layout = package.loaded["layouts.adapters.keyboard_layout"]
 		local saved_injector = package.loaded["hotstrings.engine.injector"]
 		local codes = require("platform.input.evdev_codes")
 		local emitted = {}
@@ -123,7 +123,7 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 				return true
 			end,
 		}
-		package.loaded["adapters.keyboard_layout"] = require("tests.support.layout_cohort_fixture").layout(function(char)
+		package.loaded["layouts.adapters.keyboard_layout"] = require("tests.support.layout_cohort_fixture").layout(function(char)
 			if char == "x" then return 1001 end
 			error("control terminators must bypass the text planner")
 		end)
@@ -146,7 +146,7 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 
 		injector._set_uinput(nil)
 		injector._set_nanosleep_for_test(nil)
-		package.loaded["adapters.keyboard_layout"] = saved_layout
+		package.loaded["layouts.adapters.keyboard_layout"] = saved_layout
 		package.loaded["hotstrings.engine.injector"] = saved_injector
 		if not ok then error(err, 0) end
 	end)

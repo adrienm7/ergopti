@@ -36,14 +36,8 @@ graph TD
     end
 
     subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
-        LINUX_input_source_group_worker["InputSourceGroupWorker.lua"]
-        LINUX_input_source_switch["InputSourceSwitch.lua"]
-        LINUX_keyboard_layout["KeyboardLayout.lua"]
         LINUX_window_switch["WindowSwitch.lua"]
         LINUX_wpm_surface["WpmSurface.lua"]
-        LINUX_x11_keymap_watch_worker["X11KeymapWatchWorker.lua"]
-        LINUX_xkb_capture["XkbCapture.lua"]
-        LINUX_xkb_source_probe["XkbSourceProbe.lua"]
     end
 
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
@@ -51,11 +45,6 @@ graph TD
         MACOS_apple_shortcuts["AppleShortcuts.lua"]
         MACOS_apple_shortcuts_cli["AppleShortcutsCli.lua"]
         MACOS_apple_shortcuts_native["AppleShortcutsNative.lua"]
-        MACOS_input_source_broker["InputSourceBroker.lua"]
-        MACOS_input_source_selector["InputSourceSelector.lua"]
-        MACOS_installed_physical_source["InstalledPhysicalSource.lua"]
-        MACOS_keyboard_layout_files["KeyboardLayoutFiles.lua"]
-        MACOS_keyboard_source_probe["KeyboardSourceProbe.lua"]
         MACOS_mouse_control["MouseControl.lua"]
         MACOS_one_shot_shift["OneShotShift.lua"]
         MACOS_physical_context_probe["PhysicalContextProbe.lua"]
@@ -69,8 +58,6 @@ graph TD
     end
 
     subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
-        WINDOWS_keyboard_layout_install["KeyboardLayoutInstall.ahk"]
-        WINDOWS_keyboard_layout_switch["KeyboardLayoutSwitch.ahk"]
         WINDOWS_mouse_control["MouseControl.ahk"]
         WINDOWS_screen_brightness["ScreenBrightness.ahk"]
         WINDOWS_updater_curl_capture["UpdaterCurlCapture.ahk"]

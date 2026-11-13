@@ -284,8 +284,8 @@ end)
 
 helpers.describe("magic key source: physical editor evidence", function()
 	local function with_native(state, body)
-		local previous = package.loaded["adapters.xkb_capture"]
-		package.loaded["adapters.xkb_capture"] = {
+		local previous = package.loaded["layouts.adapters.xkb_capture"]
+		package.loaded["layouts.adapters.xkb_capture"] = {
 			source_generation = function() return state.generation end,
 			direct_sources = function(codes)
 				state.probed = codes
@@ -293,7 +293,7 @@ helpers.describe("magic key source: physical editor evidence", function()
 			end,
 		}
 		local ok, err = pcall(body)
-		package.loaded["adapters.xkb_capture"] = previous
+		package.loaded["layouts.adapters.xkb_capture"] = previous
 		if not ok then error(err, 0) end
 	end
 
@@ -587,11 +587,11 @@ end)
 
 helpers.describe("magic key source: per-press repeat ownership", function()
 	local function observe(mode)
-		local previous = package.loaded["adapters.xkb_capture"]
+		local previous = package.loaded["layouts.adapters.xkb_capture"]
 		local state = { active = true, replace = true, typed_ok = true, group = 0, native_epoch = 1 }
 		local observed
 		local ok, err = pcall(function()
-			local Capture = helpers.load_module("adapters.xkb_capture")
+			local Capture = helpers.load_module("layouts.adapters.xkb_capture")
 			Capture._set_backend({
 				create = function() return {} end, destroy = function() end,
 				source_group = function() return state.group, state.native_epoch end,
@@ -625,7 +625,7 @@ helpers.describe("magic key source: per-press repeat ownership", function()
 			end)
 			Capture._reset_backend()
 		end)
-		package.loaded["adapters.xkb_capture"] = previous
+		package.loaded["layouts.adapters.xkb_capture"] = previous
 		if not ok then error(err, 0) end
 		return observed
 	end

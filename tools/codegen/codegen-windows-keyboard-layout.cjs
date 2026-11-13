@@ -35,15 +35,7 @@ const SPEC_PATH = shared('layouts', 'data', 'windows_system_layout.json');
 const KEYCODES_PATH = shared('layouts', 'data', 'mac_keycodes.json');
 const PHYSICAL_KEYS_PATH = shared('layouts', 'data', 'keycodes', 'physical_keys.json');
 const REGISTRY_DIR = path.join(REPO_ROOT, 'static', 'layouts', 'registry');
-const OUT_DIR = path.join(
-	REPO_ROOT,
-	'static',
-	'ergopti_plus',
-	'windows',
-	'native',
-	'keyboard_layout',
-	'_generated'
-);
+const OUT_DIR = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows', 'layouts', 'native');
 const CANONICAL_SCRIPT = path.join(__dirname, 'lib', 'keylayout_canonical.lua');
 
 /**

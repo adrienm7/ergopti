@@ -8,7 +8,7 @@
 ; thrown from vendor/UIA.ahk's IUIAutomationBase.Prototype.Release/__Delete.
 ;
 ; Root cause (confirmed by an isolated, side-effect-free repro that mirrors
-; vendor/UIA.ahk's exact class shape): modules/keymap/layout.ahk's
+; vendor/UIA.ahk's exact class shape): layouts/engine/layout.ahk's
 ; _UIA_SelectionPollTick calls el.GetPattern("Text") right after an
 ; IsTextPatternAvailable probe on the same focused element. Microsoft's
 ; IUIAutomationElement::GetCurrentPattern legitimately returns S_OK with a NULL

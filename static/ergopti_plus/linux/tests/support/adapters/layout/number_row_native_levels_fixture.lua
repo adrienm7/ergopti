@@ -33,10 +33,10 @@ local function rows()
 end
 
 local function with_native_row_producer(body)
- local prior = package.loaded['adapters.xkb_capture']
+ local prior = package.loaded['layouts.adapters.xkb_capture']
  local prior_native_levels = Native.levels
- package.loaded['adapters.xkb_capture'] = nil
- local capture = require('adapters.xkb_capture')
+ package.loaded['layouts.adapters.xkb_capture'] = nil
+ local capture = require('layouts.adapters.xkb_capture')
  local request = { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 }
  local state = { source_calls = 0, enumerations = 0, transitions = 0, compose = 0 }
  local backend = {
@@ -76,7 +76,7 @@ local function with_native_row_producer(body)
  end)
  capture._reset_backend()
  Native.levels = prior_native_levels
- package.loaded['adapters.xkb_capture'] = prior
+ package.loaded['layouts.adapters.xkb_capture'] = prior
  if not ok then error(reason, 0) end
 end
 

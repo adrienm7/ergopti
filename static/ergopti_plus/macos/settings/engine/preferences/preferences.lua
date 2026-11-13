@@ -90,7 +90,7 @@ local MetricsState = require("infra.metrics_state_keys")
 
 
 --- Top-level TOML section names in the order they appear on disk.
-local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui", "core", "settings", "menu", "ai", "apps", "diagnostics", "keyboard" }
+local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui", "core", "settings", "menu", "ai", "apps", "diagnostics", "keyboard", "layouts" }
 
 --- Maps every flat state key (as used in memory throughout the codebase) to
 --- its on-disk location. Fields:
@@ -195,7 +195,7 @@ local KEY_MAP = {
 	layout_number_row_mode               = { sec = "layout", key = ConfigKeys.LEAF.DIRECT_ACCESS_DIGITS, enum = true },
 	-- Declared for macOS like the ordering it extends: kept, never applied here.
 	layout_number_row_reorder_edges      = { sec = "layout", key = ConfigKeys.LEAF.NUMBER_ROW_REORDER_EDGES },
-	-- The layout emulation (modules/keymap/layout_emulation.lua): the layout it
+	-- The layout emulation (layouts/engine/registry/emulation.lua): the layout it
 	-- types, its two layers and its four rows, as on Windows and Linux.
 	layout_emulated_layout               = { sec = "layout", key = LEAF.EMULATED_LAYOUT          },
 	layout_ergopti_variant               = { sec = "layout", key = LEAF.ERGOPTI_VARIANT, enum = true },

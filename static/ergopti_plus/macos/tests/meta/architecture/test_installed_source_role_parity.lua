@@ -35,8 +35,8 @@ local ROLE = "--installed-physical-source"
 helpers.describe("installed source role: one spelling in three languages", function()
 	helpers.it("is the Lua port's stream role, the bridge's role and the launcher's dispatch", function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.installed_physical_source"] = nil
-		helpers.assert_eq(require("adapters.installed_physical_source").STREAM_ROLE, ROLE)
+		package.loaded["layouts.adapters.installed_physical_source"] = nil
+		helpers.assert_eq(require("layouts.adapters.installed_physical_source").STREAM_ROLE, ROLE)
 		helpers.assert_true(read("launcher/Sources/ErgoptiPlus/InstalledPhysicalSourceBridge.swift")
 			:find('static let role = "' .. ROLE .. '"', 1, true) ~= nil)
 		local main = read("launcher/Sources/ErgoptiPlus/main.swift")

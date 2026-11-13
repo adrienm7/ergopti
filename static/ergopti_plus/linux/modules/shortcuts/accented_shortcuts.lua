@@ -8,7 +8,7 @@
 --- chose: Ctrl+é becomes Ctrl+C on AZERTY, BÉPO or an installed Ergopti
 --- layout, whose accented keys would otherwise reach the application as a
 --- chord nothing binds. Windows defines the contract
---- (windows/modules/keymap/layout/accented_shortcuts.ahk); this follows it.
+--- (windows/layouts/engine/accented_shortcuts.ahk); this follows it.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Layout-driven: the key's plain press is read from the loaded keymap
@@ -211,7 +211,7 @@ function M.on_key(detail, options)
 	-- emulation: an emulated layout decides a chord on its own keys (SCL-002).
 	if options.emulating() == true then return false end
 	local ports = {
-		base_symbol = options.base_symbol or require("adapters.keyboard_layout").base_symbol,
+		base_symbol = options.base_symbol or require("layouts.adapters.keyboard_layout").base_symbol,
 		number_row_mode = options.number_row_mode or require("platform.input.keyboard_hook").number_row_mode,
 		settings = options.settings or M.settings,
 	}

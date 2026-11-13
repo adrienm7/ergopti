@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Keyboard Layout DLL Registration Tests (Windows)
 ; DESCRIPTION:
-; The elevated helper (ui/layout_manager/kbd_register_core.ahk) installs and
+; The elevated helper (layouts/ui/layout_manager/kbd_register_core.ahk) installs and
 ; uninstalls a layout DLL with the steps and the order of the NSIS installer
 ; of tools/lib/kbd-dll/installer.cjs. Every machine-scoped effect goes through
 ; a fake registry and file system here: each test reads the plan of what the

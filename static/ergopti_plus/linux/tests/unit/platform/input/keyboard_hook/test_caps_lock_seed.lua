@@ -40,7 +40,7 @@ local function load(led_byte, failing_code)
 			return string.rep("\0", count)
 		end,
 	})
-	local Capture = helpers.load_module("adapters.xkb_capture")
+	local Capture = helpers.load_module("layouts.adapters.xkb_capture")
 	local updates = {}
 	Capture._set_backend({
 		create = function() return { num = false } end,

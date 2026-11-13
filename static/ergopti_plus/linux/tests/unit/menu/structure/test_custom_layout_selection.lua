@@ -17,12 +17,12 @@ local Json = require("core.text.engine.json")
 --- @param body function Receives the current rendered menu and native settlement.
 local function scenario(options, body)
 	local previous = {}
-	for _, name in ipairs({ "modules.keymap.layout_registry", "menu.ui.builder.builder" }) do
+	for _, name in ipairs({ "layouts.engine.registry.registry", "menu.ui.builder.builder" }) do
 		previous[name] = package.loaded[name]
 		package.loaded[name] = nil
 	end
 	local ok, detail = xpcall(function()
-		local registry = require("modules.keymap.layout_registry")
+		local registry = require("layouts.engine.registry.registry")
 		local file = assert(io.open(helpers.driver_root() .. "/../../layouts/registry/index.json", "rb"))
 		local catalogue = assert(Json.decode(file:read("*a")))
 		assert(file:close())
@@ -43,7 +43,7 @@ local function scenario(options, body)
 					or path == "/fixture/layouts/ergopti.keylayout"
 			end,
 			translate = function(key) return key end,
-			-- Ergopti's own Python is installed (modules/keymap/managed_python.lua).
+			-- Ergopti's own Python is installed (layouts/engine/managed_python.lua).
 			python = function(callback) callback(true, "/fixture/python3") end,
 			run = function(_, args, _, callback)
 				if args[1] == "-c" then callback({ exit_code = 0, stdout = "", stderr = "" })
@@ -54,7 +54,7 @@ local function scenario(options, body)
 		}
 		assert(registry.select("ergol", function(selected) assert(selected) end, deps))
 		local native_snapshot, native_select = registry.snapshot, registry.select
-		package.loaded["modules.keymap.layout_registry"] = {
+		package.loaded["layouts.engine.registry.registry"] = {
 			snapshot = function() return native_snapshot(deps) end,
 			select = function(id, done)
 				world.calls = world.calls + 1
@@ -96,7 +96,7 @@ local function scenario(options, body)
 		body(world)
 	end, debug.traceback)
 	for name, module in pairs(previous) do package.loaded[name] = module end
-	for _, name in ipairs({ "modules.keymap.layout_registry", "menu.ui.builder.builder" }) do
+	for _, name in ipairs({ "layouts.engine.registry.registry", "menu.ui.builder.builder" }) do
 		if previous[name] == nil then package.loaded[name] = nil end
 	end
 	if not ok then error(detail, 0) end

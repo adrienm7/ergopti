@@ -12,7 +12,7 @@
 ; consumer kept reading and writing the plain top-level globals
 ; (NumberOfRepetitions, LastSentCharacterKeyTime, ...) declared in
 ; ErgoptiPlus.ahk, with the write/prune logic living in nav_layer_helpers.ahk
-; and modules/keymap/layout.ahk. The Map was therefore a parallel UNUSED copy of the
+; and layouts/engine/layout.ahk. The Map was therefore a parallel UNUSED copy of the
 ; live state - a single-source-of-truth trap: wiring one caller to the Map
 ; while another stays on the global yields two diverging counters with no
 ; compile error.
@@ -63,7 +63,7 @@ _AOPS_NoDeadAccessors() {
 	Assert(InStr(Src, "AppState_GetNumberOfRepetitions(") == 0,
 		"AppState_GetNumberOfRepetitions must be removed - the live counter lives in NumberOfRepetitions via nav_layer_helpers.ahk (appstate-orphaned-parallel-state)")
 	Assert(InStr(Src, "AppState_TouchLastSentKey(") == 0,
-		"AppState_TouchLastSentKey must be removed - last_sent_key_time is owned by modules/keymap/layout.ahk (appstate-orphaned-parallel-state)")
+		"AppState_TouchLastSentKey must be removed - last_sent_key_time is owned by layouts/engine/layout.ahk (appstate-orphaned-parallel-state)")
 	Assert(InStr(Src, "AppState_Reset(") == 0,
 		"AppState_Reset must be removed - there is no parallel Map left to reset (appstate-orphaned-parallel-state)")
 }
@@ -92,7 +92,7 @@ _AOPS_NoRemappedListViaAppState() {
 	ShortcutSrc := _AOPS_ReadSource("utils.ahk")
 	; Search for the string key used in the removed AppState Map
 	Assert(InStr(LayoutSrc, "remapped_list") == 0,
-		"modules/keymap/layout.ahk must not access AppState[remapped_list] - use RemappedList directly (appstate-orphaned-parallel-state)")
+		"layouts/engine/layout.ahk must not access AppState[remapped_list] - use RemappedList directly (appstate-orphaned-parallel-state)")
 	Assert(InStr(ShortcutSrc, "remapped_list") == 0,
 		"modules/shortcuts/utils.ahk must not access AppState[remapped_list] - use RemappedList directly (appstate-orphaned-parallel-state)")
 }

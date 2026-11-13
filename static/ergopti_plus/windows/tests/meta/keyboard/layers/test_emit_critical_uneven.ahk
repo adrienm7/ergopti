@@ -98,7 +98,7 @@ _RECU_AssertOuterSymbolsRouteViaShiftSend() {
 	for SC in ["SC029", "SC00C", "SC00D"] {
 		for Prefix in ["`n", "`n+"] {
 			Idx := InStr(Src, Prefix . SC . "::")
-			Assert(Idx > 0, SC . ":: hotkey must exist in modules/keymap/layout.ahk")
+			Assert(Idx > 0, SC . ":: hotkey must exist in layouts/engine/layout.ahk")
 			LineEnd := InStr(Src, "`n", , Idx + 1)
 			HotkeyLine := LineEnd ? SubStr(Src, Idx, LineEnd - Idx) : SubStr(Src, Idx, 120)
 			Assert(InStr(HotkeyLine, "_NumberRowEdgeSend(") > 0,

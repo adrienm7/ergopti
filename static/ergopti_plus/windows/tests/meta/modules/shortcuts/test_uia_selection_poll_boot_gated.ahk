@@ -17,7 +17,7 @@
 
 _USPB_PollTickIsBootGatedAndSafe() {
 	Body := _DriverFuncBody("_UIA_SelectionPollTick")
-	Assert(Body != "", "_UIA_SelectionPollTick must exist in modules/keymap/layout.ahk")
+	Assert(Body != "", "_UIA_SelectionPollTick must exist in layouts/engine/layout.ahk")
 
 	; The boot gate must precede the first COM/Features work.
 	GatePos := InStr(Body, '_DriverBootPhase != "ready"')

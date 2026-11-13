@@ -733,7 +733,7 @@ check('the three hosts accept exactly the actions the page sends', () => {
 	const luaActions = [...luaBlock[1].matchAll(/^\t([a-z_]+) = true,$/gm)].map((m) => m[1]).sort();
 	assert.deepEqual(luaActions, page, 'the macOS and Linux hosts accept another list');
 	const ahk = fs.readFileSync(
-		path.resolve(SHARED, '../windows/ui/layout_manager/init.ahk'),
+		path.resolve(SHARED, '../windows/layouts/ui/layout_manager/init.ahk'),
 		'utf8'
 	);
 	const ahkBlock = /global LAYMGR_ACTIONS := Map\(([\s\S]*?)\)\n/.exec(ahk);
@@ -789,7 +789,7 @@ check('« Install and use » forwards the Windows layout DLL images the page wro
 
 check('every host names the shortcut menu file the page counts', () => {
 	const ahk = fs.readFileSync(
-		path.resolve(SHARED, '../windows/ui/layout_manager/init.ahk'),
+		path.resolve(SHARED, '../windows/layouts/ui/layout_manager/init.ahk'),
 		'utf8'
 	);
 	assert.ok(

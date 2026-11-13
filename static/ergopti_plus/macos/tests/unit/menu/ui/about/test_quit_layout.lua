@@ -30,7 +30,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("quit layout: the target is the pause layout", function()
 	local function with_layout(body)
-		local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+		local layout = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 		local saved = layout.set_layout_by_kl_name_async
 		local calls = {}
 		layout.set_layout_by_kl_name_async = function(name, on_done)
@@ -79,7 +79,7 @@ end)
 --- @param apply function|nil The fake apply_quit_layout, nil for no menu.
 --- @return table step, table errors
 local function make_step(apply)
-	local QuitLayout = helpers.load_with_stubs("ui.menu.quit_layout")
+	local QuitLayout = helpers.load_with_stubs("layouts.ui.menu.quit_layout")
 	local errors = {}
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end

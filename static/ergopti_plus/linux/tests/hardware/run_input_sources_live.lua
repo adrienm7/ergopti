@@ -5,10 +5,10 @@
 --- DESCRIPTION:
 --- Run by run_input_sources_live.sh inside a headless desktop session (GNOME
 --- Shell Wayland, KWin Wayland or X11, openbox on Xvfb, sway). Drives the
---- production chain: adapters/input_source_switch.lua with its native port
+--- production chain: layouts/adapters/input_source_switch.lua with its native port
 --- (gsettings, the KDE keyboard daemon through gdbus, setxkbmap), the menu's
---- rows (ui/menu/active_layout_rows.lua), and the pause switch
---- (modules/keymap/pause_layout_switch.lua) with the real preferences reader
+--- rows (layouts/ui/menu/active_layout_rows.lua), and the pause switch
+--- (layouts/engine/emulation/pause_layout_switch.lua) with the real preferences reader
 --- on a private config.toml.
 ---
 --- Every switch is checked against the desktop itself, never against the
@@ -73,15 +73,15 @@ local function write_config(on_pause, on_resume)
 	handle:close()
 end
 
-local InputSourceSwitch = require("adapters.input_source_switch")
-local PauseSwitch = require("modules.keymap.pause_layout_switch")
-local Rows = require("ui.menu.active_layout_rows")
+local InputSourceSwitch = require("layouts.adapters.input_source_switch")
+local PauseSwitch = require("layouts.engine.emulation.pause_layout_switch")
+local Rows = require("layouts.ui.menu.active_layout_rows")
 
 local function new_switch()
 	PauseSwitch._reset_for_test()
 	PauseSwitch.init({
 		switcher = InputSourceSwitch.new(InputSourceSwitch.native_port()),
-		preferences = require("infra.pause_layout_preferences"),
+		preferences = require("layouts.engine.emulation.pause_layout_preferences"),
 	})
 	return PauseSwitch.switcher()
 end

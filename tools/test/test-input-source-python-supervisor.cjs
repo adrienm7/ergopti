@@ -33,8 +33,8 @@ const INPUT_SOURCES = path.join(
 	'static',
 	'ergopti_plus',
 	'macos',
-	'modules',
-	'keymap',
+	'layouts',
+	'engine',
 	'input_sources.lua'
 );
 const PY_CANDIDATES = ['python3', 'python'];

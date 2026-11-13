@@ -516,14 +516,14 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
-				"static/ergopti_plus/linux/infra/layout_emulation_preferences.lua",
+				"static/ergopti_plus/linux/layouts/engine/registry/emulation.lua",
+				"static/ergopti_plus/linux/layouts/engine/registry/emulation_preferences.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/ui/menu/menu_layouts.lua",
+				"static/ergopti_plus/linux/layouts/ui/menu/layouts.lua",
 				"static/ergopti_plus/_shared/layouts/engine/composer/keylayout_emulation.lua",
 				"static/ergopti_plus/_shared/layouts/engine/emulation/settings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_emulation.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_keylayout_emulation.lua"
+				"static/ergopti_plus/linux/tests/unit/layouts/engine/registry/test_emulation.lua",
+				"static/ergopti_plus/linux/tests/unit/layouts/engine/composer/test_keylayout_emulation.lua"
 			],
 			"members": [
 				"layout.emulated_layout",
@@ -556,7 +556,7 @@
 			"intentional": true,
 			"evidence": [
 				"static/ergopti_plus/linux/modules/shortcuts/accented_shortcuts.lua",
-				"static/ergopti_plus/linux/ui/menu/menu_layouts.lua",
+				"static/ergopti_plus/linux/layouts/ui/menu/layouts.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_accented_shortcuts.lua"
 			]
@@ -1094,7 +1094,7 @@
 			"evidence": [
 				"static/ergopti_plus/_shared/shortcuts/engine/magic_editor_core.lua",
 				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
-				"static/ergopti_plus/linux/adapters/xkb_source_probe.lua",
+				"static/ergopti_plus/linux/layouts/adapters/xkb_source_probe.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_magic_editor_policy.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_shortcuts_which_slots_exist.lua",
 				"static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua"
@@ -1109,7 +1109,7 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_number_row_policy.lua",
+				"static/ergopti_plus/linux/tests/unit/layouts/engine/emulation/test_number_row_policy.lua",
 				"static/ergopti_plus/_shared/tests/lua/layouts/number_row_policy_contract.lua",
 				"static/ergopti_plus/linux/menu/ui/builder/builder.lua"
 			]
@@ -1123,7 +1123,7 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_number_row_policy.lua",
+				"static/ergopti_plus/linux/tests/unit/layouts/engine/emulation/test_number_row_policy.lua",
 				"static/ergopti_plus/_shared/tests/lua/layouts/number_row_policy_contract.lua",
 				"static/ergopti_plus/linux/menu/ui/builder/builder.lua"
 			]
@@ -1152,14 +1152,14 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/infra/pause_layout_preferences.lua",
-				"static/ergopti_plus/linux/modules/keymap/pause_layout_switch.lua",
-				"static/ergopti_plus/linux/adapters/input_source_switch.lua",
-				"static/ergopti_plus/linux/ui/menu/pause_layout_rows.lua",
+				"static/ergopti_plus/linux/layouts/engine/emulation/pause_layout_preferences.lua",
+				"static/ergopti_plus/linux/layouts/engine/emulation/pause_layout_switch.lua",
+				"static/ergopti_plus/linux/layouts/adapters/input_source_switch.lua",
+				"static/ergopti_plus/linux/layouts/ui/menu/pause_layout_rows.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_pause_layout_preferences.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_pause_layout_switch.lua",
-				"static/ergopti_plus/linux/tests/unit/adapters/layout/test_input_source_switch.lua",
+				"static/ergopti_plus/linux/tests/unit/layouts/engine/emulation/test_pause_layout_switch.lua",
+				"static/ergopti_plus/linux/tests/unit/layouts/adapters/test_input_source_switch.lua",
 				"static/ergopti_plus/linux/tests/unit/menu/structure/test_pause_layout_rows.lua"
 			]
 		},
@@ -1172,14 +1172,14 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/infra/pause_layout_preferences.lua",
-				"static/ergopti_plus/linux/modules/keymap/pause_layout_switch.lua",
-				"static/ergopti_plus/linux/adapters/input_source_switch.lua",
-				"static/ergopti_plus/linux/ui/menu/pause_layout_rows.lua",
+				"static/ergopti_plus/linux/layouts/engine/emulation/pause_layout_preferences.lua",
+				"static/ergopti_plus/linux/layouts/engine/emulation/pause_layout_switch.lua",
+				"static/ergopti_plus/linux/layouts/adapters/input_source_switch.lua",
+				"static/ergopti_plus/linux/layouts/ui/menu/pause_layout_rows.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_pause_layout_preferences.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_pause_layout_switch.lua",
-				"static/ergopti_plus/linux/tests/unit/adapters/layout/test_input_source_switch.lua",
+				"static/ergopti_plus/linux/tests/unit/layouts/engine/emulation/test_pause_layout_switch.lua",
+				"static/ergopti_plus/linux/tests/unit/layouts/adapters/test_input_source_switch.lua",
 				"static/ergopti_plus/linux/tests/unit/menu/structure/test_pause_layout_rows.lua"
 			]
 		},
@@ -1192,14 +1192,14 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/infra/pause_layout_preferences.lua",
-				"static/ergopti_plus/linux/modules/keymap/pause_layout_switch.lua",
-				"static/ergopti_plus/linux/adapters/input_source_switch.lua",
-				"static/ergopti_plus/linux/ui/menu/pause_layout_rows.lua",
+				"static/ergopti_plus/linux/layouts/engine/emulation/pause_layout_preferences.lua",
+				"static/ergopti_plus/linux/layouts/engine/emulation/pause_layout_switch.lua",
+				"static/ergopti_plus/linux/layouts/adapters/input_source_switch.lua",
+				"static/ergopti_plus/linux/layouts/ui/menu/pause_layout_rows.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_pause_layout_preferences.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_pause_layout_switch.lua",
-				"static/ergopti_plus/linux/tests/unit/adapters/layout/test_input_source_switch.lua",
+				"static/ergopti_plus/linux/tests/unit/layouts/engine/emulation/test_pause_layout_switch.lua",
+				"static/ergopti_plus/linux/tests/unit/layouts/adapters/test_input_source_switch.lua",
 				"static/ergopti_plus/linux/tests/unit/menu/structure/test_pause_layout_rows.lua"
 			]
 		},

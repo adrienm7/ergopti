@@ -370,7 +370,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   `test_local_server_panel_view_preparation.ahk`. (7) `LocalServerPortsDescriptor`
   accepts the `vllm`/`tabbyapi` descriptors and ignores the `fingerprint` key.
 - Layout catalogue in a source run (2026-10-31): `LayoutCatalogue_Refresh`
-  (`windows/modules/keymap/keylayout/layout_catalogue_refresh.ahk`) still shows
+  (`windows/layouts/engine/keylayout/catalogue_refresh.ahk`) still shows
   the shipped registry whenever `Updater_IsLocalSource()` is true. Port the
   macOS/Linux rule: in a source run, run
   `git --no-optional-locks -C <registry folder> status --porcelain --untracked-files=all -- .`
@@ -407,7 +407,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   `windows/tests/runners/` with their `#Include` paths and every caller
   (`package.json` scripts, `tools/test/*.cjs`, the Windows CI lane, the docs
   that name them).
-- PAR-76 R23: rewrite `windows/modules/keymap/keylayout/keylayout_parser.ahk` to
+- PAR-76 R23: rewrite `windows/layouts/engine/keylayout/parser.ahk` to
   the canonical form `_shared/layouts/engine/composer/keylayout.lua` reads (this also
   closes the ".keylayout raw grammar" note above), and replay
   `_shared/tests/corpus/keylayout/` whole.
@@ -555,7 +555,7 @@ the web composer now read single-quoted attribute values and refuse a tag of
 an element they walk (`key`, `keyMap`, `action`, `when`…) that their grammar
 cannot read, instead of skipping it and losing keys. Two fixtures pin it in
 `_shared/tests/corpus/keylayout/edge_cases.json` (the last two vectors).
-`windows/modules/keymap/keylayout/keylayout_parser.ahk` needs the same two
+`windows/layouts/engine/keylayout/parser.ahk` needs the same two
 rules and a test replaying those vectors.
 
 ## Seven more local AI servers (31 October)

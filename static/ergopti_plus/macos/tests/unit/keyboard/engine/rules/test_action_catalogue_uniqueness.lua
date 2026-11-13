@@ -17,7 +17,7 @@ local function with_config_fixture(callback)
 			"keyboard.engine.runtime.action_catalogue",
 			"keyboard.engine.runtime.config",
 			"keyboard.engine.runtime.defaults",
-			"modules.keymap.layout",
+			"layouts.engine.layout",
 			"gestures.engine.actions",
 			"core.fs.adapters.file_system",
 			"core.i18n.engine.i18n",
@@ -62,7 +62,7 @@ local function with_config_fixture(callback)
 				simultaneous_threshold_ms = 100,
 				combo_symmetric = false,
 			}
-			package.loaded["modules.keymap.layout"] = {
+			package.loaded["layouts.engine.layout"] = {
 				keyboard_form = function() return "ansi" end,
 				-- The first load names keys for the shipped virtual keyboard product.
 				default_virtual_keyboard_product = function() return "ansi" end,

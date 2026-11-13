@@ -66,7 +66,7 @@ function M.participants(ctx)
 	end
 	-- The layout rows, acknowledged once the session holds the layout that carries them.
 	if ctx.config then
-		registry.keyboard_layout = require("infra.keyboard_layout_scope").participant()
+		registry.keyboard_layout = require("layouts.engine.keyboard_layout_scope").participant()
 	end
 	if ctx.llm then registry.llm = require("ai.engine.scope").participant() end
 	if ctx.keystats then registry.metrics = require("infra.metrics_scope").participant() end

@@ -1,6 +1,6 @@
 --- tests/hardware/run_xkb_dead_symbols.lua
 
-local Capture = require('adapters.xkb_capture')
+local Capture = require('layouts.adapters.xkb_capture')
 local h=require('tests.helpers')
 local function map(layout)
  return 'xkb_keymap { xkb_keycodes { include "evdev+aliases(qwerty)" }; xkb_types { include "complete" }; xkb_compatibility { include "complete" }; xkb_symbols { include "pc+'..layout..'+inet(evdev)" }; xkb_geometry { include "pc(pc105)" }; };'

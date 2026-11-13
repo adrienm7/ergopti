@@ -131,7 +131,7 @@ helpers.describe("karabiner.watchers: layout refresh is async (HS-197)", functio
 		}
 		local notification_callback
 		local poll_callback
-		package.loaded["adapters.input_source_broker"] = {
+		package.loaded["layouts.adapters.input_source_broker"] = {
 			subscribe = function(_id, callback)
 				notification_callback = callback
 				return true
@@ -227,5 +227,5 @@ end)
 -- into whichever module the runner loads next
 package.loaded["core.process.adapters.shell_runner"] = nil
 package.loaded["core.events.timer_scheduler"] = nil
-package.loaded["adapters.input_source_broker"] = nil
+package.loaded["layouts.adapters.input_source_broker"] = nil
 package.loaded["keyboard.engine.runtime.watchers"] = nil

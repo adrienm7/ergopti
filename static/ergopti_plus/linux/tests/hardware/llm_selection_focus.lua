@@ -38,7 +38,7 @@ ffi.cdef([[typedef struct _XDisplay Display;
 local X11, XTest = ffi.load("libX11.so.6"), ffi.load("libXtst.so.6")
 local display = assert(X11.XOpenDisplay(nil), "native X11 output connection required")
 local Injector = require("hotstrings.engine.injector")
-require("adapters.keyboard_layout")._set_table_for_test({ v = { keycode = 47, mods = {} } })
+require("layouts.adapters.keyboard_layout")._set_table_for_test({ v = { keycode = 47, mods = {} } })
 Injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
 	assert(XTest.XTestFakeKeyEvent(display, code + 8, value == 1 and 1 or 0, 0) ~= 0)
 	X11.XSync(display, 0)

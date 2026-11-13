@@ -17,7 +17,7 @@ local Hook=require('platform.input.keyboard_hook')
 local Names=require('platform.input.device_names')
 local Reader=require('platform.input.evdev_reader')
 local Finder=require('hotstrings.engine.device_finder')
-local Layout=require('adapters.keyboard_layout')
+local Layout=require('layouts.adapters.keyboard_layout')
 local Clock=require('core.logger.engine.monotonic')
 local Json=require('core.text.engine.json')
 local mode=assert(arg[1]);assert(mode=='add' or mode=='remove')
@@ -92,8 +92,8 @@ local ok,failure=xpcall(function()
 	assert(Layout.refresh())
 	local mapping=assert(io.popen('xkbcomp -xkb "$DISPLAY" - 2>/dev/null','r'))
 	local text=mapping:read('*a');assert(mapping:close())
-	Sink=assert(loadfile('adapters/xkb_capture.lua'))();assert(Sink.load(text));sink_chars={}
-	Capture=require('adapters.xkb_capture')
+	Sink=assert(loadfile('layouts/adapters/xkb_capture.lua'))();assert(Sink.load(text));sink_chars={}
+	Capture=require('layouts.adapters.xkb_capture')
 	Finder.find_devices=function() return selected,{} end
 	Hook=require('platform.input.keyboard_hook')
 	Hook.start({intercept=true,requireOutputBroker=true,outputBroker=assert(Injector.output_broker()),

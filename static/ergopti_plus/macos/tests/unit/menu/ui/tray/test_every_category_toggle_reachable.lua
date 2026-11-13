@@ -24,7 +24,7 @@ local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture"
 
 -- The menu modules menu/ui/init.lua loads, under the keys Builder.generate reads.
 local MENU_MODULES = {
-	keyboard_layout = "ui.menu.menu_keyboard_layout",
+	keyboard_layout = "layouts.ui.menu.keyboard_layout",
 	hotstrings      = "hotstrings.ui.menu.hotstrings",
 	keystats       = "ui.menu.menu_metrics",
 	shortcuts       = "ui.menu.menu_shortcuts",

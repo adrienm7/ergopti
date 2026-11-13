@@ -135,7 +135,7 @@ _ErgoptiFatalInputCleanup(ReleaseSyntheticFn := 0, CapsLedSyncFn := 0) {
 ; empirically: a try/catch around the exact same construction pattern still
 ; receives the ORIGINAL ValueError normally, but OnError is separately and
 ; unavoidably invoked first for the PropertyError from __Delete). The call site
-; (_UIA_SelectionPollTick in modules/keymap/layout.ahk) already catches the
+; (_UIA_SelectionPollTick in layouts/engine/layout.ahk) already catches the
 ; original ValueError and degrades to "no selection" — this is not a functional
 ; failure, only an unavoidable extra OnError notification for an already-handled
 ; condition. Suppressing the disruptive crash-report/toast for exactly this

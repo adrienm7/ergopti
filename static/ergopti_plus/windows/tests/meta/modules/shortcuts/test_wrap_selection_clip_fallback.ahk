@@ -16,7 +16,7 @@
 
 _WSF_ClipFailDegradesToPlainSymbol() {
 	Body := _DriverFuncBody("WrapTextIfSelected")
-	Assert(Body != "", "WrapTextIfSelected must exist in modules/keymap/layout.ahk")
+	Assert(Body != "", "WrapTextIfSelected must exist in layouts/engine/layout.ahk")
 
 	GuardPos := InStr(Body, "if !SendInstant(")
 	Assert(GuardPos > 0,

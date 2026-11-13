@@ -11,7 +11,7 @@ local h = require("tests.helpers")
 function M.with_session(options, body)
 	options = options or {}
 	local names = { "ffi", "core.logger.engine.monotonic", "platform.input.evdev_reader", "platform.input.uinput_writer", "platform.input.keyboard_hook",
-		"adapters.xkb_capture", "hotstrings.engine.device_finder", "platform.remap.tap_hold_engine",
+		"layouts.adapters.xkb_capture", "hotstrings.engine.device_finder", "platform.remap.tap_hold_engine",
 		"keyboard.engine.keys.combination_engine", "modules.shortcuts.key_combinations", "menu.engine.manifest_reader" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	if options.public_chords ~= true then require("tests.support.key_combination_declaration_fixture").install_unavailable() end
@@ -136,7 +136,7 @@ function M.with_session(options, body)
 			return code == 30 and value ~= 0 and (down[42] and "A" or "a") or nil
 		end,
 	}
-	package.loaded["adapters.xkb_capture"] = options.capture or capture
+	package.loaded["layouts.adapters.xkb_capture"] = options.capture or capture
 	package.loaded["hotstrings.engine.device_finder"] = {
 		find_devices = function()
 			local found = {}; for _, id in ipairs(options.source_ids or { "a", "b" }) do found[#found + 1] = paths[id] end
@@ -288,7 +288,7 @@ function M.with_manager_session(options, body)
 		local ConfigPaths = require("settings.engine.paths")
 		local Files = require("core.fs.adapters.file_system")
 		local original_route, original_read = ConfigPaths.config, Files.read_with_status
-		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "keyboard.engine.layers.nav_layer", "clipboard.adapters.clipboard" }
+		local names = { "platform.remap.tap_hold_manager", "layouts.adapters.keyboard_layout", "keyboard.engine.layers.nav_layer", "clipboard.adapters.clipboard" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local folder = os.tmpname(); os.remove(folder)
 		assert(os.execute("mkdir '" .. folder:gsub("'", "'\\''") .. "'"))
@@ -312,7 +312,7 @@ function M.with_manager_session(options, body)
 		local called, failure = pcall(function()
 			if options.clipboard then package.loaded["clipboard.adapters.clipboard"] = options.clipboard end
 			if options.before_manager then options.before_manager(s) end
-			local Layout = h.load_module("adapters.keyboard_layout")
+			local Layout = h.load_module("layouts.adapters.keyboard_layout")
 			Layout._set_table_for_test({ a = { keycode = 30, level = 1, mods = {} }, A = { keycode = 30, level = 2, mods = { "shift" } } })
 			manager = options.cached_manager or h.load_module("platform.remap.tap_hold_manager")
 			s.actions = {}

@@ -32,7 +32,7 @@ end
 --- @return table h Harness: watchers, changes, and the native drivers.
 local function load_watcher(localised)
 	local h = { localised = localised, changes = {}, reads = {}, debounces = {} }
-	package.loaded["adapters.input_source_broker"] = {
+	package.loaded["layouts.adapters.input_source_broker"] = {
 		subscribe = function(_, callback)
 			h.notify = callback
 			return true
@@ -104,7 +104,7 @@ end
 local function restore_adapters()
 	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["adapters.input_source_broker"] = nil
+	package.loaded["layouts.adapters.input_source_broker"] = nil
 	package.loaded["keyboard.engine.runtime.watchers"] = nil
 end
 

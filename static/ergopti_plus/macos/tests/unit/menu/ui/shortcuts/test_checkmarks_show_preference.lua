@@ -24,7 +24,7 @@ local function build_cmd_rows(bindings, state_shortcuts)
 	return helpers.with_fresh_modules({
 		"ui.menu.menu_shortcuts", "core.timing.engine.deferred_work", "core.fs.engine.dir",
 		"core.ui.engine.dialog_util", "modules.shortcuts", "menu.ui.builder.utils",
-		"menu.engine.manifest_menu", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots",
+		"menu.engine.manifest_menu", "ui.menu.shortcut_utils", "layouts.ui.menu.keyboard_slots",
 		"menu.engine.manifest_reader", "core.i18n.engine.i18n",
 	}, function()
 		local text = package.loaded["modules.shortcuts.actions.text"]
@@ -50,7 +50,7 @@ local function build_cmd_rows(bindings, state_shortcuts)
 			build = function(_, _, _, _, _, lists) return lists.keyboard_slots() end,
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {}
-		package.loaded["ui.menu.menu_keyboard_slots"] = {
+		package.loaded["layouts.ui.menu.keyboard_slots"] = {
 			provide_rows = function(_, _, fixed_by_prefix) return fixed_by_prefix.primary_ end,
 		}
 		package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "star" end }

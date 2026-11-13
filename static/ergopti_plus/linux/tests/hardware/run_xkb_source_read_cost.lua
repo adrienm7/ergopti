@@ -40,7 +40,7 @@ end
 
 -- The probe declares every libX11 and libxkbcommon function used below; a
 -- second declaration here would collide with its own, so it binds first.
-local Probe = require("adapters.xkb_source_probe")
+local Probe = require("layouts.adapters.xkb_source_probe")
 Probe.read("bind the probe's native declarations", 1)
 
 --- The server's current keymap text, as the probe's identity expects it.

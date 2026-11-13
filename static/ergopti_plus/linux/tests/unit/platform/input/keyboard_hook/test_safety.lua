@@ -215,9 +215,9 @@ helpers.describe("injector: a held modifier does not reach the replacement", fun
 		kh._test_drive({ key(codes.KEY_RIGHTSHIFT, 1) }, { onEmitRaw = function() return true end }, true)
 		package.loaded["platform.input.keyboard_hook"] = kh
 
-		local layout = helpers.load_module("adapters.keyboard_layout")
+		local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 		layout._set_table_for_test({ e = { keycode = 18, level = 1, mods = {} } })
-		package.loaded["adapters.keyboard_layout"] = layout
+		package.loaded["layouts.adapters.keyboard_layout"] = layout
 
 		local injector = helpers.load_module("hotstrings.engine.injector")
 		local events = {}

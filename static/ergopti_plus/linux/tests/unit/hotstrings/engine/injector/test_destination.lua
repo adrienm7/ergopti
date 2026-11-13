@@ -16,7 +16,7 @@ local fixture = require("tests.support.text_owner_fixture")
 local function injection(boundary, body)
 	fixture.with(function(guard, state)
 		local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
-			"adapters.keyboard_layout", "hotstrings.engine.injector", "platform.input.keyboard_hook", "core.logger.engine.shim" }
+			"layouts.adapters.keyboard_layout", "hotstrings.engine.injector", "platform.input.keyboard_hook", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local rows, writes, commands, held, stopped = {}, {}, {}, {}, 0
@@ -75,7 +75,7 @@ local function injection(boundary, body)
 		}
 		local injector
 		local ok, detail = pcall(function()
-			local layout = helpers.load_module("adapters.keyboard_layout")
+			local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
 			local shortcut = layout.shortcut_keycode
 			layout.shortcut_keycode = function(...)

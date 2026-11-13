@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local Report = require("diagnostics.engine.field_check.report")
 local Check = require("diagnostics.engine.field_check.layout_rows")
-local Build = require("modules.keymap.layout_rows_build")
+local Build = require("layouts.engine.registry.rows_build")
 local FakeMac = require("tests.support.layout_rows_fake_mac")
 
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"

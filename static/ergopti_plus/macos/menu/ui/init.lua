@@ -106,7 +106,7 @@ local _branch_rows = BranchRows.new()
 local menu_mods = _branch_rows.wrap({
 	gestures        = safe_require("gestures.ui.menu.gestures",        "gestures menu"),
 	shortcuts       = safe_require("ui.menu.menu_shortcuts",       "shortcuts menu"),
-	keyboard_layout = safe_require("ui.menu.menu_keyboard_layout", "keyboard layout menu"),
+	keyboard_layout = safe_require("layouts.ui.menu.keyboard_layout", "keyboard layout menu"),
 	hotstrings      = safe_require("hotstrings.ui.menu.hotstrings",      "hotstrings menu"),
 	llm             = safe_require("ai.ui.menu",             "AI menu"),
 	keystats       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
@@ -1455,7 +1455,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- The layout's own restore rebuilds the typing layout for the new rows.
 			local after = before and layout_scope_rows() or nil
 			if after and (after.order ~= before.order or after.edges ~= before.edges) then
-				require("modules.keymap.number_row_live").apply(after, function(applied, code)
+				require("layouts.engine.emulation.number_row_live").apply(after, function(applied, code)
 					if not applied then
 						Logger.warn(LOG, "The keyboard layout scope stored rows the typing layout does not have yet: %s.",
 							tostring(code))
@@ -1546,7 +1546,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				owners = owners,
 				remap = karabiner,
 				-- The layout rows settle once the layout typing them is selected.
-				layout = { rows = layout_scope_rows, live = require("modules.keymap.number_row_live") },
+				layout = { rows = layout_scope_rows, live = require("layouts.engine.emulation.number_row_live") },
 				backup_path = function(scope)
 					scope_generation = scope_generation + 1
 					return MenuPaths.get("TapHoldConfigPath") .. ".global-" .. scope .. "-"
@@ -1646,19 +1646,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- owner and the menu state exist only here.
 	local WindowToggle = require("core.ui.ui.window_toggle")
 	WindowToggle.set_opener("layer_editor", function()
-		return require("ui.layer_editor").open({ karabiner = karabiner })
+		return require("layouts.ui.layer_editor").open({ karabiner = karabiner })
 	end)
 	-- The layout editor applies a source's navigation layer through the same save.
-	require("ui.layout_manager").set_nav_applier(function(text)
-		return require("ui.layer_editor").apply_text(text, { karabiner = karabiner })
+	require("layouts.ui.layout_manager").set_nav_applier(function(text)
+		return require("layouts.ui.layer_editor").apply_text(text, { karabiner = karabiner })
 	end)
 	-- « Emulate without installing » in the layout editor stores the composed
 	-- layout as the emulated one, as the « Layout to emulate » menu does.
-	require("ui.layout_manager").set_emulation_applier(function(id)
-		if not require("infra.layout_emulation_preferences").choose(state, save_prefs, id) then
+	require("layouts.ui.layout_manager").set_emulation_applier(function(id)
+		if not require("layouts.engine.registry.emulation_preferences").choose(state, save_prefs, id) then
 			return false, "emulate_not_saved", "the layout emulation settings were not saved"
 		end
-		if require("modules.keymap.layout_emulation").reload_if_started() == false then
+		if require("layouts.engine.registry.emulation").reload_if_started() == false then
 			return false, "emulate_failed", "the layout emulation did not reload the composed layout"
 		end
 		if type(updateMenu) == "function" then updateMenu() end
@@ -1667,15 +1667,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- A layout that changed while it is the emulated one reloads the emulation:
 	-- an uninstalled one stays chosen and stops, a reinstalled one resumes
 	-- (maintainer decision, 2026-11-12), and the menu shows its new state.
-	require("ui.layout_manager").set_layout_change_handler(function(id)
-		local Emulation = require("modules.keymap.layout_emulation")
+	require("layouts.ui.layout_manager").set_layout_change_handler(function(id)
+		local Emulation = require("layouts.engine.registry.emulation")
 		if Emulation.status().id ~= id then return end
 		Emulation.reload_if_started()
 		if type(updateMenu) == "function" then updateMenu() end
 	end)
 	-- The extension catalogue is read once per boot: a layout whose extension
 	-- was installed or removed loads or drops its hotstrings through a reload.
-	require("ui.layout_manager").set_extension_reloader(function()
+	require("layouts.ui.layout_manager").set_extension_reloader(function()
 		return do_reload("menu") == true
 	end)
 	WindowToggle.set_opener("changelog", function()

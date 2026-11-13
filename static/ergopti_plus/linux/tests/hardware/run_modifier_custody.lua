@@ -153,7 +153,7 @@ local function run()
 	output_node = assert(await(function() return node_for(Names.VIRTUAL_KEYBOARD) end), "output node publication")
 	assert(Reader.open(output_node, OUTPUT_SLOT), "native output reader")
 	assert(Reader.grab(OUTPUT_SLOT), "output fixture excludes desktop side effects")
-	assert(require("adapters.keyboard_layout").refresh(), "live Xvfb XKB capture and injection map")
+	assert(require("layouts.adapters.keyboard_layout").refresh(), "live Xvfb XKB capture and injection map")
 
 	-- Selection is test-owned; native key-device validation, read, grab, origin
 	-- receipts, held queries, KEY/SYN writes and retirement stay production ports.

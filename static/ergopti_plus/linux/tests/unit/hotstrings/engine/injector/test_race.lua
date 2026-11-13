@@ -82,9 +82,9 @@ end
 --- @param on_backspace function|nil
 --- @return table injector
 local function with_document(doc, on_backspace)
-	local layout = helpers.load_module("adapters.keyboard_layout")
+	local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 	layout._set_table_for_test(LAYOUT)
-	package.loaded["adapters.keyboard_layout"] = layout
+	package.loaded["layouts.adapters.keyboard_layout"] = layout
 
 	local injector = helpers.load_module("hotstrings.engine.injector")
 	injector._set_uinput(virtual_device(doc, on_backspace))

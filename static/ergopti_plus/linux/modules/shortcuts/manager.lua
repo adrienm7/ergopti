@@ -374,7 +374,7 @@ local function send_keystroke(kind, parsed, publication)
 		local result = Injector.inject(0, parsed.char, false, nil, publication)
 		return type(result) == "table" and result.ok == true
 	end
-	local ok_layout, Layout = pcall(require, "adapters.keyboard_layout")
+	local ok_layout, Layout = pcall(require, "layouts.adapters.keyboard_layout")
 	local hit = ok_layout and type(Layout.resolve) == "function" and Layout.resolve(parsed.char) or nil
 	if type(hit) ~= "table" then
 		Logger.error(LOG, "send_shortcut: the loaded keymap has no key for '%s' — nothing pressed.",

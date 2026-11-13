@@ -7,7 +7,7 @@
 ; assignments and their labels are keyboard/engine/tap_keys.ahk.
 ;
 ; FEATURES & RATIONALE:
-; 1. Static, and included before modules/keymap/layout.ahk. AutoHotkey fires the
+; 1. Static, and included before layouts/engine/layout.ahk. AutoHotkey fires the
 ;    earliest-created eligible #HotIf variant of a hotkey, and the digit-row
 ;    emulation declares SC029, SC00C and SC00D too: created later, or at run
 ;    time through Hotkey(), a tap key would never win over it. A #HotIf that

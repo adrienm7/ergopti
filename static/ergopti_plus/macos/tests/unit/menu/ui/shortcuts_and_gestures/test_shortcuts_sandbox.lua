@@ -41,7 +41,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				"menu.engine.renderer",
 				"core.fs.adapters.json_codec",
 				"ui.menu.shortcut_utils",
-				"ui.menu.menu_keyboard_slots",
+				"layouts.ui.menu.keyboard_slots",
 				"ui.menu.menu_tap_keys",
 				"menu.engine.manifest_reader",
 				"hs",
@@ -96,7 +96,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 					end,
 				}
 				package.loaded["ui.menu.shortcut_utils"] = {}
-				package.loaded["ui.menu.menu_keyboard_slots"] = {
+				package.loaded["layouts.ui.menu.keyboard_slots"] = {
 					provide_rows = function() return {} end,
 				}
 				package.loaded["ui.menu.menu_tap_keys"] = {
@@ -184,7 +184,7 @@ local function with_extension_boundary(callback)
 		"core.ui.engine.dialog_util", "modules.shortcuts", "modules.shortcuts.actions.text",
 		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths", "core.fs.adapters.json_codec",
 		"core.fs.adapters.storage", "core.events.timer_scheduler", "menu.engine.renderer", "menu.ui.builder.utils",
-		"menu.engine.manifest_menu", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots",
+		"menu.engine.manifest_menu", "ui.menu.shortcut_utils", "layouts.ui.menu.keyboard_slots",
 		"ui.menu.menu_tap_keys", "menu.engine.manifest_reader", "hs", "tests.stubs.hs",
 	}
 	local saved_hs, saved_pollution = rawget(_G, "hs"), rawget(_G, "extension_boundary_pollution")
@@ -223,7 +223,7 @@ local function with_extension_boundary(callback)
 			package.loaded["modules.shortcuts"] = { DEFAULT_STATE = { shortcuts = true, chatgpt_url = "https://example.test" } }
 			package.loaded["modules.shortcuts.actions.text"] = { WRAP_GROUPS = {}, build_active_wrap_pairs = function() return {} end }
 			package.loaded["ui.menu.shortcut_utils"] = {}
-			package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
+			package.loaded["layouts.ui.menu.keyboard_slots"] = { provide_rows = function() return {} end }
 			package.loaded["ui.menu.menu_tap_keys"] = { provide_rows = function() return {} end }
 			package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "star" end }
 			local native_i18n = require("core.i18n.engine.i18n")

@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
 	"hs", "core.logger.engine.logger", "core.fs.engine.paths", "menu.engine.manifest_reader",
-	"core.fs.adapters.file_system", "adapters.input_source_broker", "adapters.keyboard_source_probe",
+	"core.fs.adapters.file_system", "layouts.adapters.input_source_broker", "layouts.adapters.keyboard_source_probe",
 	"platform.input.hotkey_registrar", "hotstrings.engine.expander.magic_key_source", "modules.shortcuts.magic_editor",
 	"platform.input.keyboard_geometry", "shortcuts.engine.magic_editor_core",
 }
@@ -42,11 +42,11 @@ local function with_fixture(callback)
 				return (state.remap_code == code or (state.remap_codes or {})[code] == true) and active() == true
 			end,
 		}
-		package.loaded["adapters.input_source_broker"] = {
+		package.loaded["layouts.adapters.input_source_broker"] = {
 			subscribe = function(_, observer) state.source_changed = observer; return true end,
 			unsubscribe = function() state.source_changed = nil; return true end,
 		}
-		package.loaded["adapters.keyboard_source_probe"] = {
+		package.loaded["layouts.adapters.keyboard_source_probe"] = {
 			current_source_id = function() return state.source_id end,
 			request = function(request, observer)
 				local retained = { request = request, observer = observer, settled = false }

@@ -20,21 +20,21 @@ derived from it is stored here:
 
 - macOS installs the `.keylayout` as it is, in `~/Library/Keyboard Layouts`,
   and adds it to the enabled input sources
-  (`macos/modules/keymap/layout_registry.lua`). The app ships this folder, so
+  (`macos/layouts/engine/registry/registry.lua`). The app ships this folder, so
   its layouts install offline;
 - Windows (AutoHotkey) parses the `.keylayout` when the layout is loaded or
   changed and emulates it; there is no Windows version of a layout. The
   emulated layout is `[layout] emulated_layout` in `config.toml` (a registry
   id, empty for none), installed with the layout manager: its verified copy
   stays in `<configuration folder>/layouts/` with the entry it was verified
-  against (`installed.json`, `windows/modules/keymap/keylayout/layout_catalogue.ahk`),
+  against (`installed.json`, `windows/layouts/engine/keylayout/catalogue.ahk`),
   and the boot installs it when it is missing. The Windows Ergopti
   emulation itself reads `ergopti.keylayout` and `ergopti_plus.keylayout`
   from the copy of this folder the driver ships
-  (`windows/modules/keymap/layout/layout_ergopti.ahk`), so editing an Ergopti
+  (`windows/layouts/engine/registry/ergopti.ahk`), so editing an Ergopti
   file here changes what Windows types too;
 - Linux converts the `.keylayout` to XKB symbols and an XCompose file on the
-  device (`linux/modules/keymap/layout_registry.lua`), with the converter of
+  device (`linux/layouts/engine/registry/registry.lua`), with the converter of
   `static/ergopti/linux/xkb_generation` that the Linux package ships, and
   installs them in the user XKB tree without sudo
   (`static/ergopti/linux/xkb_installation/user_layout_installer.py`); it needs

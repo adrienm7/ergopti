@@ -1,7 +1,7 @@
 {
 	"provenance": {
 		"head": "db556c2d56e33ddbf85edda277e5aa85df8e95b5",
-		"original_menu_path": "static/ergopti_plus/macos/ui/menu/menu_keyboard_slots.lua",
+		"original_menu_path": "static/ergopti_plus/macos/layouts/ui/menu/keyboard_slots.lua",
 		"original_menu_sha256": "8887506bd54de6d5ef5293bdd175077861f6bdb5228f72ca7ab1dee696fc1990",
 		"original_picker_path": "static/ergopti_plus/macos/ui/action_picker/init.lua",
 		"original_picker_sha256": "d0d55d12918e464a00a88e2bab668e9e525701d4679a58cedd0102f9a4126886",

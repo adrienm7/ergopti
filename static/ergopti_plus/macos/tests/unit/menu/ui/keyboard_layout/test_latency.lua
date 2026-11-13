@@ -49,7 +49,7 @@ end
 --- ===================================================
 
 helpers.describe("menu_keyboard_layout._parse_active_layouts", function()
-	local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+	local kbd = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 
 	local TWO_LAYOUTS = '(\n    {\n    InputSourceKind = "Keyboard Layout";\n    "KeyboardLayout ID" = 1;\n'
 		.. '    "KeyboardLayout Name" = French;\n},\n    {\n    InputSourceKind = "Keyboard Layout";\n'
@@ -86,7 +86,7 @@ end)
 
 helpers.describe("menu_keyboard_layout active-layout open path", function()
 	helpers.it("serves the cache without ANY synchronous hs.execute call", function()
-		local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout", {
+		local kbd = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout", {
 			-- hs.task present → the async refresh uses it, never a blocking hs.execute.
 			task = task_stub_firing('({ "KeyboardLayout Name" = French; })'),
 		})
@@ -114,7 +114,7 @@ helpers.describe("menu_keyboard_layout async refresh", function()
 	helpers.it("updates the cache from the probe stdout via hs.task", function()
 		package.loaded["core.process.adapters.shell_runner"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
-		local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout", {
+		local kbd = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout", {
 			task = task_stub_firing('({ "KeyboardLayout Name" = French; }, { "KeyboardLayout Name" = Ergopti_v2_2_2_plus; })'),
 		})
 		local done = false
@@ -138,8 +138,8 @@ end)
 
 helpers.describe("menu_keyboard_layout.pick_latest_bundle", function()
 	helpers.it("returns a stable result across repeated calls", function()
-		helpers.with_fresh_modules({ "core.fs.engine.dir", "modules.keymap.layout_install", "ui.menu.menu_keyboard_layout" }, function()
-			local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+		helpers.with_fresh_modules({ "core.fs.engine.dir", "layouts.engine.registry.install", "layouts.ui.menu.keyboard_layout" }, function()
+			local kbd = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 			local bundles_dir = helpers.fixtures_dir() .. "bundles/"
 			_G.hs.fs.__set_entries(bundles_dir, { "Ergopti_v2.2.2.bundle" })
 			local first  = kbd.pick_latest_bundle(bundles_dir)

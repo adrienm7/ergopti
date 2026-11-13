@@ -154,7 +154,7 @@ for _, module_name in ipairs({
 }) do
 	package.loaded[module_name] = {}
 end
-package.loaded["ui.menu.menu_keyboard_layout"] = {
+package.loaded["layouts.ui.menu.keyboard_layout"] = {
 	schedule_pause_layout_switch = function(is_paused)
 		layout_states[#layout_states + 1] = is_paused
 	end,

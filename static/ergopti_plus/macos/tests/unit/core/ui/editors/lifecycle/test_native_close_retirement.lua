@@ -19,15 +19,15 @@ local function with_window(module_name, scenario)
 	rawset(_G, "lfs", nil)
 	local outcome = table.pack(xpcall(function()
 		return helpers.with_stub_scope({
-			"ui.layer_editor", "ui.action_picker", "core.ui.ui.webview_controller_pool", "ui.layout_manager", "settings.ui.menu.paths",
-			"settings.engine.paths", "core.process.adapters.program_providers", "apps.engine.program_provider_picker", "modules.keymap.layout_registry",
+			"layouts.ui.layer_editor", "ui.action_picker", "core.ui.ui.webview_controller_pool", "layouts.ui.layout_manager", "settings.ui.menu.paths",
+			"settings.engine.paths", "core.process.adapters.program_providers", "apps.engine.program_provider_picker", "layouts.engine.registry.registry",
 			"layouts.engine.layers.editor", "layouts.engine.layers.layers", "keyboard.engine.layers.nav_layer", "platform.input.keycodes", "core.fs.adapters.file_system",
 			"core.text.engine.utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "layouts.engine.manager_bridge",
 
 			"adapters.apple_shortcuts", "adapters.apple_shortcuts_native", "core.process.adapters.shell_runner", "core.process.adapters.task_environment",
 			"diagnostics.engine.runtime_log", "keyboard.adapters.karabiner.lease_helper", "settings.engine.program_parameter", "shortcuts.engine.user_action_parameter",
 			"shortcuts.engine.brightness_actions", "shortcuts.engine.brightness_actions_data", "settings.engine.migration.migrate", "diagnostics.engine.operation_reporter",
-			"core.fs.engine.dir", "platform.input.keycodes.core", "lfs", "core.fs.engine.module_source_directory", "core.fs.engine.module_source_identity", "modules.keymap.layout",
+			"core.fs.engine.dir", "platform.input.keycodes.core", "lfs", "core.fs.engine.module_source_directory", "core.fs.engine.module_source_identity", "layouts.engine.layout",
 			"core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.leaf_rows",
 			"core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.writer",
 			"core.ui.adapters.webview_result", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.events.timer_scheduler", "core.timing.engine.deferred_work", "core.timing.engine.paced_job", "core.timing.engine.paced_json",
@@ -51,7 +51,7 @@ local function with_window(module_name, scenario)
 				return view
 			end
 			package.loaded["core.process.adapters.program_providers"] = {}
-			package.loaded["modules.keymap.layout_registry"] = { snapshot = function() return { platform = "macos", installed = {} } end }
+			package.loaded["layouts.engine.registry.registry"] = { snapshot = function() return { platform = "macos", installed = {} } end }
 			package.loaded["settings.engine.paths"] = {
 				is_initialized = function() return true end,
 				get_config_dir = function() return "/virtual/config/" end,
@@ -102,7 +102,7 @@ local function with_window(module_name, scenario)
 			end
 			if module_name == "settings.ui.menu.paths" then assert(window.init("/virtual/app/", function() end)) end
 			function h.show()
-				if module_name == "ui.layer_editor" then
+				if module_name == "layouts.ui.layer_editor" then
 					return window.open({ karabiner = { regenerate = function() return true end } })
 				elseif module_name == "ui.action_picker" then
 					return window.open({ title = "Native close fixture", items = {} }, function() return true end)
@@ -110,10 +110,10 @@ local function with_window(module_name, scenario)
 				else return window.open() end
 			end
 			function h.close()
-				if module_name == "ui.layer_editor" or module_name == "ui.action_picker" then return window.close() end
+				if module_name == "layouts.ui.layer_editor" or module_name == "ui.action_picker" then return window.close() end
 				local bridge = h.bridges[#h.bridges]
 				bridge.callback({ name = bridge.name, webView = h.windows[#h.windows],
-					body = { action = module_name == "ui.layout_manager" and "close" or "cancel" } })
+					body = { action = module_name == "layouts.ui.layout_manager" and "close" or "cancel" } })
 				return true
 			end
 			function h.drain()
@@ -127,7 +127,7 @@ local function with_window(module_name, scenario)
 end
 
 helpers.describe("editor close retires native references", function()
-	for _, module_name in ipairs({ "ui.layer_editor", "ui.action_picker", "ui.layout_manager", "settings.ui.menu.paths" }) do
+	for _, module_name in ipairs({ "layouts.ui.layer_editor", "ui.action_picker", "layouts.ui.layout_manager", "settings.ui.menu.paths" }) do
 		helpers.it("retires native user close and reopens " .. module_name, function()
 			with_window(module_name, function(_, h)
 				helpers.assert_true(h.show(), table.concat(h.errors, "\n"))
@@ -168,7 +168,7 @@ end)
 
 --- Decorates only this native layout-manager world with observable GC metatables.
 local function with_refused_layout(scenario)
-	with_window("ui.layout_manager", function(editor, h)
+	with_window("layouts.ui.layout_manager", function(editor, h)
 		h.policy_refuses_after_call = 2
 		local create = hs.webview.new
 		hs.webview.new = function(...)
@@ -271,7 +271,7 @@ end
 --- @param controller table Prior native controller.
 --- @param before integer Acknowledgements before the healthy retry.
 local function assert_prior_callback_retired(module_name, h, controller, before)
-	if module_name == "ui.action_picker" or module_name == "ui.layout_manager" then
+	if module_name == "ui.action_picker" or module_name == "layouts.ui.layout_manager" then
 		helpers.assert_true((h.ack_detaches or 0) > before, "old callback requires exact native acknowledgement")
 		helpers.assert_eq(#h.bridges, 1, "a new pooled lease reuses the same retained native UCC")
 		helpers.assert_type(h.script_refs[controller], "function", "the successor owns the rebound dispatcher")
@@ -279,7 +279,7 @@ local function assert_prior_callback_retired(module_name, h, controller, before)
 end
 
 helpers.describe("editor native message callbacks retire independently of windows", function()
-	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "settings.ui.menu.paths" }) do
+	for _, module_name in ipairs({ "ui.action_picker", "layouts.ui.layout_manager", "settings.ui.menu.paths" }) do
 		for _, mode in ipairs({ "native", "explicit" }) do
 			helpers.it(module_name .. " unrefs its script callback after " .. mode .. " close", function()
 				with_window(module_name, function(_, h)
@@ -289,7 +289,7 @@ helpers.describe("editor native message callbacks retire independently of window
 					close_callback_editor(h, mode)
 					helpers.assert_nil(h.script_refs[controller], "native window GC does not unref UCC callbacks")
 					helpers.assert_true(h.show())
-					local pooled = module_name == "ui.action_picker" or module_name == "ui.layout_manager"
+					local pooled = module_name == "ui.action_picker" or module_name == "layouts.ui.layout_manager"
 					local successor = pooled and h.bridges[1] or h.bridges[2]
 					helpers.assert_type(h.script_refs[successor], "function")
 					previous({ body = { action = "cancel" } })
@@ -341,7 +341,7 @@ helpers.describe("editor native message callbacks retire independently of window
 end)
 
 helpers.describe("editor bridge retirement without a native candidate", function()
-	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "settings.ui.menu.paths" }) do
+	for _, module_name in ipairs({ "ui.action_picker", "layouts.ui.layout_manager", "settings.ui.menu.paths" }) do
 		for _, refusal in ipairs({ "nil", "false" }) do
 			helpers.it(module_name .. " retires a bound bridge when native creation returns " .. refusal, function()
 				with_window(module_name, function(_, h)
@@ -385,7 +385,7 @@ end)
 helpers.describe("layout bridge retirement survives native construction exceptions", function()
 	for _, mode in ipairs({ "frame", "constructor" }) do
 		helpers.it("retires the exact layout callback after a native " .. mode .. " exception", function()
-			with_window("ui.layout_manager", function(_, h)
+			with_window("layouts.ui.layout_manager", function(_, h)
 				local boundary = mode == "frame" and hs.screen or hs.webview
 				local key = mode == "frame" and "mainScreen" or "new"
 				local original = boundary[key]

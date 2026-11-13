@@ -19,8 +19,8 @@ end
 local Shell, Json, uv = require("core.process.adapters.shell_runner"), require("core.text.engine.json"), require("luv")
 local ConfigPaths = require("settings.engine.paths")
 -- Ergopti's own Python is installed: the record fixture never downloads it.
-package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, "python3") end }
-local Registry, Runner = require("modules.keymap.layout_registry"), require("core.process.adapters.runner")
+package.loaded["layouts.engine.managed_python"] = { ensure = function(_, done) done(true, "python3") end }
+local Registry, Runner = require("layouts.engine.registry.registry"), require("core.process.adapters.runner")
 local Reader, Native = require("core.fs.engine.regular_file_reader"), require("core.fs.engine.regular_file_writer")
 local open, rename, reader_open, native_open = io.open, os.rename, Reader.open, Native.open
 local settings = assert(Registry.settings())

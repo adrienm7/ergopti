@@ -37,7 +37,7 @@
 
 ; Move-resilient: scan the shortcuts module dir via the framework helper instead
 ; of a pinned file path. SC029:: is unique within modules/shortcuts (only the tap
-; key lives here; layout.ahk's SC029:: is in modules/keymap, out of scope), so the
+; key lives here; layout.ahk's SC029:: is in layouts/engine, out of scope), so the
 ; first-match extraction below targets the tap key block, which ends at the
 ; next #HotIf of the same file.
 _SAR_FindScreenshotBlock(src) {

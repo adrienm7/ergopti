@@ -221,7 +221,7 @@ end
 --- Proves actual plain sources without selecting one or discarding ambiguity.
 --- @return table source Epoch, status and detached native candidates.
 function M.editor_source()
-	local Capture = require("adapters.xkb_capture")
+	local Capture = require("layouts.adapters.xkb_capture")
 	local source_generation, direct_sources, preference_generation = Capture.source_generation, Capture.direct_sources, Preferences.generation
 	local deps, callbacks = _deps, {}
 	for name, callback in pairs(deps or {}) do if type(callback) == "function" then callbacks[name] = callback end end
@@ -274,7 +274,7 @@ function M.editor_source()
 	-- Rejoin the same owners after those callbacks, then seal already-observed
 	-- native currency without another query. This is no physical delivery lease.
 	local function private_current()
-		if _deps ~= deps or package.loaded["adapters.xkb_capture"] ~= Capture
+		if _deps ~= deps or package.loaded["layouts.adapters.xkb_capture"] ~= Capture
 			or Capture.source_generation ~= source_generation or Capture.direct_sources ~= direct_sources
 			or Preferences.generation ~= preference_generation or preference_generation() ~= preference then return false end
 		for name, callback in pairs(callbacks) do if deps[name] ~= callback then return false end end
@@ -447,7 +447,7 @@ local function repeat_callback_for(detail, code, magic)
 	if detail.physical ~= true or detail.value ~= InputEvent.VALUE_DOWN
 		or type(detail.origin_generation) ~= "number" or detail.origin_generation <= 0
 		or detail.origin_generation % 1 ~= 0 then return nil end
-	local Capture = require("adapters.xkb_capture")
+	local Capture = require("layouts.adapters.xkb_capture")
 	local source_generation = Capture.source_generation()
 	if type(source_generation) ~= "number" or source_generation <= 0 or source_generation % 1 ~= 0 then return nil end
 	local preference_generation, origin_generation = Preferences.generation(), detail.origin_generation

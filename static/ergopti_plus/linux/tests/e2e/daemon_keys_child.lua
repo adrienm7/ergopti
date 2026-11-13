@@ -157,7 +157,7 @@ local function code_for(c)
 	return code_of[c]
 end
 
-package.preload["adapters.keyboard_layout"] = function()
+package.preload["layouts.adapters.keyboard_layout"] = function()
 	-- The layout is controlled; opaque plan custody is actual KeyboardLayout logic.
 	return require("tests.support.layout_cohort_fixture").layout(code_for)
 end
@@ -498,7 +498,7 @@ package.preload["core.events.loop"] = function()
 				end
 				if MAGIC_REPEAT == "tap-paused" then repeat_controller.toggle_pause() end
 			end
-			local Capture = require("adapters.xkb_capture")
+			local Capture = require("layouts.adapters.xkb_capture")
 			local primed, chosen = false, 0
 			-- Count origin publications during this press, excluding boot probes.
 			repeat_state.origins = 0

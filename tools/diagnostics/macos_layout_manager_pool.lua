@@ -15,7 +15,7 @@ function M.run(config, done)
 	local policy = assert(io.open(root .. "/_shared/diagnostics/data/redaction.json", "rb"))
 	local raw_policy = assert(policy:read("*a")); assert(policy:close())
 	Logger.initialize_privacy(raw_policy)
-	assert(package.loaded["ui.layout_manager"] == nil, "LayoutManager already loaded")
+	assert(package.loaded["layouts.ui.layout_manager"] == nil, "LayoutManager already loaded")
 	assert(package.loaded["core.ui.ui.webview_controller_pool"] == nil, "ControllerPool already loaded")
 	assert(rawequal(require("hs.webview"), hs.webview), "native WebView module identity differs")
 	assert(hs.screen.mainScreen(), "native GUI unavailable")
@@ -29,7 +29,7 @@ function M.run(config, done)
 	end
 	native.setCallback = assert(controller_methods.setCallback)
 	local state = { entries = {}, timers = {}, evaluations = {}, errors = {}, finished = false, phase = "starting" }
-	local port = "modules.keymap.layout_registry"
+	local port = "layouts.engine.registry.registry"
 	local saved = package.loaded[port]
 	local Host
 	package.loaded[port] = {
@@ -48,11 +48,11 @@ function M.run(config, done)
 		uninstall = function() error("native diagnostic must not uninstall a layout") end,
 		select = function() error("native diagnostic must not select a layout") end,
 	}
-	Host = require("ui.layout_manager")
+	Host = require("layouts.ui.layout_manager")
 	local UI, Pool = require("core.ui.ui.builder"), require("core.ui.ui.webview_controller_pool")
 	local Scheduler, Result = require("core.events.timer_scheduler"), require("core.ui.adapters.webview_result")
 	require("core.i18n.engine.i18n").init()
-	for fn, suffix in pairs({ [Host.open] = "/macos/ui/layout_manager/init.lua",
+	for fn, suffix in pairs({ [Host.open] = "/macos/layouts/ui/layout_manager/init.lua",
 		[Pool.new] = "/macos/core/ui/ui/webview_controller_pool.lua", [UI.show_webview] = "/macos/core/ui/ui/builder.lua",
 		[Scheduler.activeCount] = "/macos/core/events/timer_scheduler.lua" }) do
 		assert(debug.getinfo(fn, "S").source == "@" .. root .. suffix, "foreign production owner")

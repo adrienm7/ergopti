@@ -712,7 +712,7 @@ end
 --- Reads the actual acknowledged capture-source epoch before physical delivery.
 --- @return number|nil generation Native XKB source generation.
 local function physical_source_generation()
-	local Capture = require("adapters.xkb_capture")
+	local Capture = require("layouts.adapters.xkb_capture")
 	local called, generation = pcall(Capture.source_generation)
 	if called and type(generation) == "number" and generation >= 0 and generation % 1 == 0 then return generation end
 	return nil

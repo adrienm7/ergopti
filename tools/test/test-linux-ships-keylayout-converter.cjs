@@ -34,7 +34,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const CONVERTER_DIR = 'static/ergopti/linux/xkb_generation';
 const BUILD = 'tools/build/build-linux-driver.sh';
-const LUA_MODULE = 'static/ergopti_plus/linux/modules/keymap/layout_registry.lua';
+const LUA_MODULE = 'static/ergopti_plus/linux/layouts/engine/registry/registry.lua';
 const PACKAGED_DIR = 'linux/xkb_generation';
 const INSTALLER_DIR = 'static/ergopti/linux/xkb_installation';
 const INSTALLER = `${INSTALLER_DIR}/user_layout_installer.py`;
@@ -107,7 +107,7 @@ check('the integrity check requires every data file the Lua manager reads', () =
 
 check('the Lua pieces and shared data of the conversion ship', () => {
 	const expected = [
-		'linux/modules/keymap/layout_registry.lua',
+		'linux/layouts/engine/registry/registry.lua',
 		'linux/core/process/adapters/runner.lua',
 		'_shared/layouts/engine/registry/registry_core.lua',
 		'_shared/layouts/engine/composer/catalogue.lua',

@@ -6,8 +6,8 @@ local function key(code, value) return { type = 1, code = code, value = value } 
 local function with_hook(options, body)
 	options = options or {}
 	local journal = {}; for name, value in pairs(package.loaded) do journal[name] = value end
-	for _, name in ipairs({ "adapters.xkb_capture", "platform.input.keyboard_hook", "platform.input.evdev_reader", "platform.input.modifier_broker" }) do package.loaded[name] = nil end
-	local Capture = require("adapters.xkb_capture")
+	for _, name in ipairs({ "layouts.adapters.xkb_capture", "platform.input.keyboard_hook", "platform.input.evdev_reader", "platform.input.modifier_broker" }) do package.loaded[name] = nil end
+	local Capture = require("layouts.adapters.xkb_capture")
 	local target = options.code or 71
 	Capture._set_backend({
 		create = function() return {} end, destroy = function() end,

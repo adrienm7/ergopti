@@ -16,7 +16,7 @@ local M = {}
 
 local LAYOUT_MARKER_PREFIX = "__ergopti_release_layout_key__"
 
--- These are the only physical positions `modules/keymap/layout.lua` can resolve
+-- These are the only physical positions `layouts/engine/layout.lua` can resolve
 -- for printable logical characters. Function, navigation, modifier, and keypad
 -- key codes are deliberately excluded from migration's layout allowance.
 local CANONICAL_LAYOUT_KEY_CODES = {

@@ -196,7 +196,7 @@ const ALLOWED = {
 				'ffi-only child started without the shared Lua root on package.path; its arg[0] has its backslashes rewritten to "/" first'
 		}
 	},
-	'linux/adapters/input_source_group_worker.lua': {
+	'linux/layouts/adapters/input_source_group_worker.lua': {
 		basename: {
 			count: 1,
 			reason:

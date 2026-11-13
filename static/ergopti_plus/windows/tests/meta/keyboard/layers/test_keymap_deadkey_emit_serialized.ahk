@@ -45,7 +45,7 @@
 ; so nothing wraps it. Pinned by shape rather than by scancode so re-registering
 ; the same mistake on another key fails here too.
 _DKE_NoInlineEmitLambdaIsRegistered() {
-	Src := _DriverDirConcat("modules/keymap")
+	Src := _DriverDirConcat("layouts/engine")
 	Assert(Src != "", "the keymap source must be readable")
 	Assert(InStr(Src, "(*) => (InDeadKeySequence ? SendNewResult") == 0,
 		"a dead-key callback must not be registered as a bare lambda on Hotkey() — SendMode is Event driver-wide, so an unserialized emit can interleave with a neighbouring remapped key's SendEvent in the OS input queue and the two characters come out transposed. Route it through a named dispatcher that takes Critical, the way the CapsLock layer already does.")

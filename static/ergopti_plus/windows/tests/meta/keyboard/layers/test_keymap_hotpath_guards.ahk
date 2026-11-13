@@ -63,7 +63,7 @@ _KHG_WrapFeatureReadIsGuarded() {
 
 ; The stale comments claimed the hazard was already avoided.
 _KHG_StaleCriticalCommentsAreCorrected() {
-	Src := _DriverDirConcat("modules/keymap")
+	Src := _DriverDirConcat("layouts/engine")
 	Assert(Src != "", "the keymap source must be readable")
 	Assert(InStr(Src, "WrapTextIfSelected stays OUT of") == 0,
 		"the comment claiming WrapTextIfSelected stays out of Critical must not return — it is called from inside Critical by every AltGr binding, and the Sleep it cited as the reason no longer exists")

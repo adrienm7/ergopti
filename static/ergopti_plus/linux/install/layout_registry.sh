@@ -2,7 +2,7 @@
 # static/ergopti_plus/linux/install/layout_registry.sh
 
 # Ships the layout registry with the installed driver. The daemon reads it below
-# the driver root (modules/keymap/layout_registry.lua bundled_dir): the layout
+# the driver root (layouts/engine/registry/registry.lua bundled_dir): the layout
 # manager installs the Ergopti layouts offline from it, and the Ergopti
 # extension inside it supplies SFB reduction, rolls and the magic key's repeat
 # corrections. The release tarball already carries it below its linux/ tree; a

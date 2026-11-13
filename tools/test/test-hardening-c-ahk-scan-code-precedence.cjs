@@ -539,13 +539,13 @@ for (const level of ALTGR_LEVELS) {
 	else for (const sc of Object.keys(golden.levels[level])) altGr.add(sc.toUpperCase());
 }
 const layoutCode = files
-	.filter((f) => f.replace(/\\/g, '/').endsWith('modules/keymap/layout.ahk'))
+	.filter((f) => f.replace(/\\/g, '/').endsWith('layouts/engine/layout.ahk'))
 	.map((f) => stripComments(fs.readFileSync(f, 'utf8')))
 	.join('\n');
 if (!/^RegisterAltGrLayer\(\)\s*$/m.test(layoutCode))
 	errors.push('modules/keymap/layout.ahk must still register the AltGr layer unconditionally');
 const nativeAltGrProducer = files
-	.filter((f) => f.replace(/\\/g, '/').endsWith('modules/keymap/layout/layout_altgr.ahk'))
+	.filter((f) => f.replace(/\\/g, '/').endsWith('layouts/engine/registry/altgr.ahk'))
 	.map((f) => stripComments(fs.readFileSync(f, 'utf8')))
 	.join('\n')
 	.match(

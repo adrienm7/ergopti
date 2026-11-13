@@ -272,7 +272,7 @@ helpers.describe("layout manager bridge routes the layout editor", function()
 	end)
 
 	helpers.it("forwards both operations through the Linux bridge to its registry", function()
-		local Bridge = helpers.load_module("ui.layout_manager.bridge")
+		local Bridge = helpers.load_module("layouts.ui.layout_manager.bridge")
 		Bridge._reset()
 		local pushes, calls = {}, {}
 		local daemon_state = {

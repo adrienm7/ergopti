@@ -21,7 +21,7 @@ local OWNED_MODULES = {
 	"diagnostics.adapters.event_provenance",
 	"core.fs.adapters.file_system",
 	"core.network.adapters.http_client",
-	"adapters.input_source_broker",
+	"layouts.adapters.input_source_broker",
 	"core.fs.adapters.json_codec",
 	"platform.input.keyboard_hook",
 	"core.fs.adapters.ledger_append",

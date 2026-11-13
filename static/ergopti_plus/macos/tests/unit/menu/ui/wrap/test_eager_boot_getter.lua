@@ -11,7 +11,7 @@ local OWNED = {
 	"core.timing.engine.deferred_work", "settings.engine.preferences.preferences", "hotstrings.ui.hotstring_editor", "menu.ui.builder.builder", "hotstrings.ui.menu.counter",
 	"settings.ui.menu.paths", "settings.engine.factory_reset_journal", "menu.ui.builder.watchers", "modules.updater",
 	"tray.adapters.menu", "platform.input.hotkey_registrar", "core.lifecycle.engine.shutdown.termination_coordinator", "gestures.ui.menu.gestures",
-	"ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout", "hotstrings.ui.menu.hotstrings", "ui.menu.menu_metrics",
+	"ui.menu.menu_shortcuts", "layouts.ui.menu.keyboard_layout", "hotstrings.ui.menu.hotstrings", "ui.menu.menu_metrics",
 	"ui.menu.menu_tap_holds", "apps.ui.menu.apps", "ui.menu.menu_about", "ai.ui.menu", "infra.personal_shortcuts",
 	"hotstrings.engine.dynamic", "gestures.engine", "modules.keystats.text_cipher", "ai.engine",
 	"modules.keystats", "modules.shortcuts", "modules.shortcuts.actions.text", "menu.engine.wrap_mutation",

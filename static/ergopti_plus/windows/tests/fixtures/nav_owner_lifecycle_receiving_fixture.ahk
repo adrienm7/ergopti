@@ -23,9 +23,9 @@ if A_AhkVersion != "2.0.26" || A_PtrSize != 8 {
 	ExitApp(2)
 }
 
-#Include %A_LineFile%\..\..\..\modules\keymap\keylayout\keylayout_parser.ahk
-#Include %A_LineFile%\..\..\..\modules\keymap\keylayout\keylayout_tables.ahk
-#Include %A_LineFile%\..\..\..\modules\keymap\keylayout\keylayout_emulation.ahk
+#Include %A_LineFile%\..\..\..\layouts\engine\keylayout\parser.ahk
+#Include %A_LineFile%\..\..\..\layouts\engine\keylayout\tables.ahk
+#Include %A_LineFile%\..\..\..\layouts\engine\keylayout\emulation.ahk
 #Include %A_LineFile%\..\..\..\ai\adapters\nav_event_owner.ahk
 
 global _VendorDir := A_ScriptDir . "\..\..\vendor"

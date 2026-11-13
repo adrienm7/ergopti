@@ -101,7 +101,7 @@ const OPENS_SUBMENU = {
 			menu: 'keyboard_group_frame',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_keyboard_slots.lua' }
+			native_sources: { hs: 'macos/layouts/ui/menu/keyboard_slots.lua' }
 		},
 		{
 			menu: 'slot_binding_frame',
@@ -143,7 +143,7 @@ const OPENS_SUBMENU = {
 		menu: 'layout_active_source_empty_commands',
 		platforms: ['hs'],
 		kind: 'compose',
-		native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' }
+		native_sources: { hs: 'macos/layouts/ui/menu/keyboard_layout.lua' }
 	},
 	apps_installed: {
 		menu: 'apps_empty_rows',
@@ -1200,9 +1200,9 @@ OPENS_SUBMENU.layout_switching = {
 	platforms: ['ahk', 'hs', 'linux'],
 	kind: 'compose',
 	native_sources: {
-		hs: 'macos/ui/menu/menu_keyboard_layout.lua',
-		linux: 'linux/ui/menu/pause_layout_rows.lua',
-		ahk: 'windows/modules/keymap/pause_layout_switch.ahk'
+		hs: 'macos/layouts/ui/menu/keyboard_layout.lua',
+		linux: 'linux/layouts/ui/menu/pause_layout_rows.lua',
+		ahk: 'windows/layouts/engine/emulation/pause_layout_switch.ahk'
 	}
 };
 OPENS_SUBMENU.layout_pause_picker = {
@@ -1210,9 +1210,9 @@ OPENS_SUBMENU.layout_pause_picker = {
 	platforms: ['ahk', 'hs', 'linux'],
 	kind: 'submenu',
 	native_sources: {
-		hs: 'macos/ui/menu/menu_keyboard_layout.lua',
-		linux: 'linux/ui/menu/pause_layout_rows.lua',
-		ahk: 'windows/modules/keymap/pause_layout_switch.ahk'
+		hs: 'macos/layouts/ui/menu/keyboard_layout.lua',
+		linux: 'linux/layouts/ui/menu/pause_layout_rows.lua',
+		ahk: 'windows/layouts/engine/emulation/pause_layout_switch.ahk'
 	}
 };
 OPENS_SUBMENU.layout_resume_picker = {
@@ -1220,9 +1220,9 @@ OPENS_SUBMENU.layout_resume_picker = {
 	platforms: ['ahk', 'hs', 'linux'],
 	kind: 'submenu',
 	native_sources: {
-		hs: 'macos/ui/menu/menu_keyboard_layout.lua',
-		linux: 'linux/ui/menu/pause_layout_rows.lua',
-		ahk: 'windows/modules/keymap/pause_layout_switch.ahk'
+		hs: 'macos/layouts/ui/menu/keyboard_layout.lua',
+		linux: 'linux/layouts/ui/menu/pause_layout_rows.lua',
+		ahk: 'windows/layouts/engine/emulation/pause_layout_switch.ahk'
 	}
 };
 
@@ -1231,7 +1231,7 @@ const layoutOwner = (menu) => ({
 	menu,
 	platforms: ['hs'],
 	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' },
+	native_sources: { hs: 'macos/layouts/ui/menu/keyboard_layout.lua' },
 	forwarded_template: { hs: 'layout' }
 });
 OPENS_SUBMENU.keyboard_layout = [
@@ -1272,7 +1272,7 @@ OPENS_SUBMENU.layout_system_install = [
 	menu,
 	platforms: ['ahk'],
 	kind: 'compose',
-	native_sources: { ahk: 'windows/modules/keymap/system_layout_install.ahk' }
+	native_sources: { ahk: 'windows/layouts/engine/system_layout_install.ahk' }
 }));
 // Each Linux accented-letter shortcut opens its letter picker frame.
 for (const id of ['e_grave', 'e_circ', 'e_acute', 'a_grave'])
@@ -1280,7 +1280,7 @@ for (const id of ['e_grave', 'e_circ', 'e_acute', 'a_grave'])
 		menu: 'accented_letter_picker_frame',
 		platforms: ['linux'],
 		kind: 'compose',
-		native_sources: { linux: 'linux/ui/menu/menu_layouts.lua' }
+		native_sources: { linux: 'linux/layouts/ui/menu/layouts.lua' }
 	};
 
 // Preserve the existing macOS excluded-applications route and add actual Linux frames.
@@ -4295,7 +4295,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 	const assert = require('node:assert/strict');
 	const proof = require('../lib/menu-native-llm-parent-binding.cjs');
 	const macFile = 'macos/menu/ui/builder/builder.lua';
-	const layoutFile = 'macos/ui/menu/menu_keyboard_layout.lua';
+	const layoutFile = 'macos/layouts/ui/menu/keyboard_layout.lua';
 	const linuxFile = 'linux/menu/ui/builder/builder.lua';
 	const mac = readSourceFile(path.join(SP, macFile));
 	const layout = readSourceFile(path.join(SP, layoutFile));

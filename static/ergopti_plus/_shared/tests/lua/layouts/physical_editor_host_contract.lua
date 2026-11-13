@@ -40,7 +40,7 @@ return function(helpers, Json, shared_path, load_host, platform)
 		local delete_false,clear_false=false,false
 		hs={json=Json,webview={usercontent={new=function()local b={};function b:setCallback(fn)if fn==nil and clear_refuse then error('private refused cleanup')end;if fn==nil and clear_false then return false end;callback=fn;return self end;bridge=b;return b end}}}
 		package.loaded['core.fs.adapters.file_system']={read=function(path)local f=assert(io.open(path));local bytes=f:read('*a');f:close();return bytes end}
-		package.loaded['ui.menu.menu_keyboard_slots']={build_action_items=function()return{}end}
+		package.loaded['layouts.ui.menu.keyboard_slots']={build_action_items=function()return{}end}
 		package.loaded['ui.menu.shortcut_utils']={picker_parameter_fields=function()return{}end}
 		package.loaded['ui.action_picker']={open=function(_,confirm)picker=confirm;return true end}
 		package.loaded['core.ui.ui.builder']={get_app_geometry=function()return{width=720,height=580}end,get_centered_frame=function()return{}end,show_webview=function(options)

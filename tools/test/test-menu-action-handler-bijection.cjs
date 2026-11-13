@@ -631,7 +631,10 @@ function nativeFunctionReferenceKeys(source) {
 // Genuine current native Layout row owners, with independent non-vacuity controls.
 {
 	const { nativeLayoutRowOwnership } = require('../lib/menu-native-layout-binding.cjs');
-	const source = fs.readFileSync(path.join(SP, 'macos/ui/menu/menu_keyboard_layout.lua'), 'utf8');
+	const source = fs.readFileSync(
+		path.join(SP, 'macos/layouts/ui/menu/keyboard_layout.lua'),
+		'utf8'
+	);
 	const english = JSON.parse(
 		fs.readFileSync(path.join(SP, '_shared/core/i18n/data/locales/en.json'), 'utf8')
 	);

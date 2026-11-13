@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Navigation Layer Editor Host Tests
 ; DESCRIPTION:
-; ui/layer_editor/init.ahk answers the shared layer editor page on Windows.
+; layouts/ui/layer_editor.ahk answers the shared layer editor page on Windows.
 ; These tests drive its message handler and save path the way the page does,
 ; with the real loader, the real atomic writer and a real temporary folder.
 ;

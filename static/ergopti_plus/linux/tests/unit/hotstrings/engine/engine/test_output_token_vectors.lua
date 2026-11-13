@@ -54,9 +54,9 @@ local function with_recorder(chars)
 		code_of[char] = code
 		code = code + 1
 	end
-	local layout = helpers.load_module("adapters.keyboard_layout")
+	local layout = helpers.load_module("layouts.adapters.keyboard_layout")
 	layout._set_table_for_test(layout_table)
-	package.loaded["adapters.keyboard_layout"] = layout
+	package.loaded["layouts.adapters.keyboard_layout"] = layout
 	package.loaded["platform.input.keyboard_hook"] = {
 		held_text_modifier_codes = function() return {} end,
 	}

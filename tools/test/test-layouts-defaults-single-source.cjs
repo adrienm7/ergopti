@@ -346,7 +346,10 @@ check('registry configuration ownership excludes pure lookup and decorative refe
 });
 
 check('the actual settings owner refuses withdrawal of either shared defaults input', () => {
-	const source = fs.readFileSync(path.join(SP, 'macos/modules/keymap/layout_registry.lua'), 'utf8');
+	const source = fs.readFileSync(
+		path.join(SP, 'macos/layouts/engine/registry/registry.lua'),
+		'utf8'
+	);
 	assert.strictEqual(constructsLuaRegistrySettings(source), true);
 	assertRegistryDefaults(source, 'actual macOS owner');
 	for (const input of ['layouts/data/defaults.json', 'updater/data/defaults.json']) {
@@ -400,8 +403,7 @@ check("every copy of the registry id rule is the index builder's", () => {
 	assert.ok(/^\^.+\$$/.test(canonical), `the builder's id rule ${canonical} is not anchored`);
 	const copies = {
 		'_shared/layouts/engine/registry/registry_core.lua': /M\.ID_PATTERN\s*=\s*"([^"]+)"/,
-		'windows/modules/keymap/keylayout/layout_registry.ahk':
-			/LAYOUT_REGISTRY_ID_PATTERN\s*:=\s*"([^"]+)"/
+		'windows/layouts/engine/keylayout/registry.ahk': /LAYOUT_REGISTRY_ID_PATTERN\s*:=\s*"([^"]+)"/
 	};
 	for (const [rel, declaration] of Object.entries(copies)) {
 		const match = declaration.exec(fs.readFileSync(path.join(SP, ...rel.split('/')), 'utf8'));
@@ -444,7 +446,7 @@ check("every copy of the registry user agent is the shared client's", () => {
 		'catalogue.lua does not announce itself as the registry client'
 	);
 	const windows = /^global LAYOUT_REGISTRY_USER_AGENT := "([^"]+)"$/m.exec(
-		read('windows/modules/keymap/keylayout/layout_registry.ahk')
+		read('windows/layouts/engine/keylayout/registry.ahk')
 	);
 	assert.ok(windows, 'layout_registry.ahk declares no LAYOUT_REGISTRY_USER_AGENT');
 	assert.strictEqual(
@@ -472,7 +474,7 @@ check('the compiled Windows driver ships the registry folder the Ergopti emulati
 		.filter((entry) => entry.source === entry.dest)
 		.map((entry) => entry.source);
 	const ergopti = fs.readFileSync(
-		path.join(SP, 'windows', 'modules', 'keymap', 'layout', 'layout_ergopti.ahk'),
+		path.join(SP, 'windows', 'layouts', 'engine', 'registry', 'ergopti.ahk'),
 		'utf8'
 	);
 	const ids = [...ergopti.matchAll(/^global ERGOPTI_(?:PLUS_)?LAYOUT_ID := "([a-z_]+)"$/gm)].map(

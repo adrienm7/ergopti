@@ -336,12 +336,12 @@ helpers.describe("Main early pause restoration", function()
 				else chunk = assert(load(text, "Main early pause", "t", environment)) end
 				-- The desktop layout switch is initialised by an earlier Main span.
 				local layout_switches, starts = {}, {}
-				local previous_switch = package.loaded["modules.keymap.pause_layout_switch"]
-				package.loaded["modules.keymap.pause_layout_switch"] = { on_pause_change = function(paused)
+				local previous_switch = package.loaded["layouts.engine.emulation.pause_layout_switch"]
+				package.loaded["layouts.engine.emulation.pause_layout_switch"] = { on_pause_change = function(paused)
 					layout_switches[#layout_switches + 1] = paused
 				end, start_safely = function(paused) starts[#starts + 1] = paused end }
 				local ran, controller = pcall(chunk())
-				package.loaded["modules.keymap.pause_layout_switch"] = previous_switch
+				package.loaded["layouts.engine.emulation.pause_layout_switch"] = previous_switch
 				if not ran then error(controller, 0) end
 				helpers.assert_eq(applications, 1, "startup must apply the normal remapper transition once")
 				helpers.assert_eq(pause_steps, { "roi", "remapper" }, "both acknowledgement outcomes retire the ROI fragment exactly once")

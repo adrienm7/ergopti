@@ -36,7 +36,7 @@ local function compile(emulation, offered)
 		Monotonic = { now_ms = function() return 0 end },
 		_cached_app_id = "editor",
 		require = function(name)
-			if name == "modules.keymap.layout_emulation" then return emulation end
+			if name == "layouts.engine.registry.emulation" then return emulation end
 			return require(name)
 		end,
 	}, { __index = _G })

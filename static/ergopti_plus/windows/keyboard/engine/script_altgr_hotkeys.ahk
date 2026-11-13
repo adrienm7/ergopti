@@ -6,7 +6,7 @@
 ; Registration + dispatch for the script's AltGr chord shortcuts (AltGr+Enter/
 ; BackSpace/Delete/Escape and their Kana-fixup / suspended-state variants).
 ; The hotkeys and their criteria are data (ScriptAltGrChordPlan, in
-; modules/keymap/layout/layout_altgr.ahk); a chord belongs to the driver only
+; layouts/engine/registry/altgr.ahk); a chord belongs to the driver only
 ; while its slot runs an action. #Include'd at the position the entry point
 ; always registered them, so boot order is unchanged.
 ; ==============================================================================

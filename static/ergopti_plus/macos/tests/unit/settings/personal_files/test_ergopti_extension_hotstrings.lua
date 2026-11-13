@@ -54,7 +54,7 @@ local function roots(with_ergopti)
 	local static = static_dir()
 	local out = { static .. "/ergopti_plus/extensions" }
 	if with_ergopti then
-		local LayoutRegistry = require("modules.keymap.layout_registry")
+		local LayoutRegistry = require("layouts.engine.registry.registry")
 		out[#out + 1] = LayoutRegistry.shipped_extension_root({
 			settings = { ergopti_family = "ergopti" },
 			bundled_dir = static .. "/layouts/registry/",

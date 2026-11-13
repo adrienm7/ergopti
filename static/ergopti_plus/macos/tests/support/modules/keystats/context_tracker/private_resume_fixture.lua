@@ -30,7 +30,7 @@ local OWNERS = {
 	"diagnostics.adapters.event_provenance",
 	"core.process.adapters.lifecycle",
 	"platform.input.keyboard_hook",
-	"adapters.input_source_broker",
+	"layouts.adapters.input_source_broker",
 	"core.fs.adapters.storage",
 	"core.events.timer_scheduler",
 	"modules.keystats.aggregator.events",

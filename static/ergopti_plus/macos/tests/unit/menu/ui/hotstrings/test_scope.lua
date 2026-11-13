@@ -86,7 +86,7 @@ local function corpus_path(name)
 		handle:close()
 		return bundled
 	end
-	local shipped = require("modules.keymap.layout_registry").shipped_extension_root({
+	local shipped = require("layouts.engine.registry.registry").shipped_extension_root({
 		settings = { ergopti_family = "ergopti" },
 		bundled_dir = Paths.shared("../../layouts/registry/"),
 		exists = function(path)

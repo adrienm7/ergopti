@@ -34,7 +34,7 @@ helpers.describe("Keyboard layout row build stages", function()
 			"menu_keyboard_layout.magic_key", "menu_keyboard_layout.rows",
 		})
 		-- The field run's menu step reads this list to name the costly stage.
-		local layout = require("ui.menu.menu_keyboard_layout")
+		local layout = require("layouts.ui.menu.keyboard_layout")
 		local declared = {}
 		for _, name in ipairs(layout.PHASES) do declared[name] = true end
 		for _, name in ipairs(stopped) do

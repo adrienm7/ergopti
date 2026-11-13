@@ -398,7 +398,7 @@ end
 --- @param callback function fn({ unpinned = integer|nil, source = boolean, helper_present = boolean,
 ---   active = integer|nil, virtual_hid_version = string|nil }).
 local function owned_readiness(callback)
-	local source_available = require("adapters.installed_physical_source").new().available()
+	local source_available = require("layouts.adapters.installed_physical_source").new().available()
 	require("keyboard.adapters.karabiner.coexistence").new().describe(function(facts)
 		local OwnerPorts = require("diagnostics.adapters.runtime_owner_ports")
 		local readiness = {
@@ -525,7 +525,7 @@ function M.new()
 		app_path = app_path,
 		login_startup_status = login_startup_status,
 		input_monitoring_access = input_monitoring_access,
-		composer_env = function() return (require("modules.keymap.composer_check").env()) end,
+		composer_env = function() return (require("layouts.engine.composer.check").env()) end,
 	}
 	-- The field run's own checks (diagnostics/engine/field_check/probes.lua) read more facts
 	for name, port in pairs(require("diagnostics.adapters.field_probe_ports").new()) do

@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 local names = {
 	"ui.menu.menu_tap_keys", "modules.shortcuts.tap_keys", "core.logger.engine.logger",
-	"adapters.input_source_broker", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
+	"layouts.adapters.input_source_broker", "layouts.ui.menu.keyboard_slots", "ui.menu.shortcut_utils",
 	"ui.action_picker", "modules.shortcuts.bindings", "core.timing.engine.deferred_work",
 }
 
@@ -24,7 +24,7 @@ helpers.describe("tap-key rows follow the input source", function()
 			local source_id, key_name = "com.apple.keyboardlayout.ergopti.plus", "1"
 			local original_source = hs.keycodes.currentSourceID
 			hs.keycodes.currentSourceID = function() return source_id end
-			package.loaded["adapters.input_source_broker"] = {
+			package.loaded["layouts.adapters.input_source_broker"] = {
 				subscribe = function(_, fn) callback = fn; return true end,
 			}
 			package.loaded["modules.shortcuts.tap_keys"] = {

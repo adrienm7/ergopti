@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local kbd     = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+local kbd     = helpers.load_with_stubs("layouts.ui.menu.keyboard_layout")
 
 helpers.describe("menu_keyboard_layout._parse_version", function()
 	helpers.it("parses a standard 'Ergopti_v2.2.1.bundle' name", function()

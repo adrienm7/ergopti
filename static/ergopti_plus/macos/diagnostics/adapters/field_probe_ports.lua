@@ -102,7 +102,7 @@ local LAYOUT_DIRS = { "/Library/Keyboard Layouts" }
 --- The selected source and the enabled ones, as the text-input system holds them.
 --- @return table facts { current = id|nil, enabled_ids = { id }|nil }
 local function input_source_facts()
-	local Probe = require("adapters.keyboard_source_probe")
+	local Probe = require("layouts.adapters.keyboard_source_probe")
 	local layouts = Probe.enabled_layouts()
 	return { current = Probe.current_source_id(), enabled_ids = layouts and layouts.ids or nil }
 end
@@ -615,7 +615,7 @@ local function menu_rebuild()
 	-- The rebuild is synchronous, so each layout phase's total grows by what
 	-- this rebuild spent in it: the slowest names the stage to fix.
 	local PhaseStats = require("infra.phase_stats")
-	local layout = package.loaded["ui.menu.menu_keyboard_layout"]
+	local layout = package.loaded["layouts.ui.menu.keyboard_layout"]
 	local phases = type(layout) == "table" and type(layout.PHASES) == "table" and layout.PHASES or {}
 	local function totals()
 		local values = {}
@@ -915,9 +915,9 @@ end
 --- @return table|nil env
 --- @return string|nil error
 local function layout_rows_env()
-	local Build = require("modules.keymap.layout_rows_build")
-	local InputSources = require("modules.keymap.input_sources")
-	local shipped, shipped_err = require("modules.keymap.layout_registry").shipped_layout(ROWS_SOURCE_ID)
+	local Build = require("layouts.engine.registry.rows_build")
+	local InputSources = require("layouts.engine.input_sources")
+	local shipped, shipped_err = require("layouts.engine.registry.registry").shipped_layout(ROWS_SOURCE_ID)
 	if not shipped then return nil, shipped_err end
 	local deps = Build.default_deps({
 		file_prefix = ROWS_FILE_PREFIX,

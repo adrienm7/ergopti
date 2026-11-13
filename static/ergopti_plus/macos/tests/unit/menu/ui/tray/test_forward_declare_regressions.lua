@@ -30,13 +30,13 @@ local helpers = require("tests.helpers")
 helpers.describe("input_sources: build_kl_name_to_tis_id forward-declared (ui-menu-layout-hot-1 regression)", function()
 
 	-- After the F4 split, build_kl_name_to_tis_id (and its set_input_source call
-	-- site) live in modules/keymap/input_sources.lua, not the menu module.
+	-- site) live in layouts/engine/input_sources.lua, not the menu module.
 	helpers.it("source: 'local build_kl_name_to_tis_id' appears before the call site", function()
-		-- Selected by a declaration unique to modules/keymap/input_sources.lua rather than by
+		-- Selected by a declaration unique to layouts/engine/input_sources.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function resolve_installed_ergopti_version")
-		helpers.assert_true(src ~= nil, "modules/keymap/input_sources.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "layouts/engine/input_sources.lua source must be locatable")
 
 		-- Forward declaration must exist
 		local fwd_pos  = src:find("local build_kl_name_to_tis_id", 1, true)
@@ -59,11 +59,11 @@ helpers.describe("input_sources: build_kl_name_to_tis_id forward-declared (ui-me
 	end)
 
 	helpers.it("source: no 'local function build_kl_name_to_tis_id' (which would shadow the forward decl)", function()
-		-- Selected by a declaration unique to modules/keymap/input_sources.lua rather than by
+		-- Selected by a declaration unique to layouts/engine/input_sources.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function resolve_installed_ergopti_version")
-		helpers.assert_true(src ~= nil, "modules/keymap/input_sources.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "layouts/engine/input_sources.lua source must be locatable")
 
 		-- If 'local function build_kl_name_to_tis_id' exists, the forward-declare
 		-- and the definition are in two different scopes — the call site sees the wrong one.

@@ -44,7 +44,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "4812179a28f93dd1f66bfc913dbb5f119da4b27894b7e1d019e09223726d5f26"
+					"sha256": "0fe360b7e664fb7c21b33212b21fe30f7cc79a8aea65b87bc80b7b962dcb9668"
 				}
 			]
 		}
@@ -75,7 +75,7 @@
 				{
 					"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/inputhook.ahk",
 					"symbol": "_OnPrefixKeyDown",
-					"sha256": "68e4aeaa9eadfba825e9edebc47d791cb91cd857b6b8325286796e81b49f39a6"
+					"sha256": "db79975f477e8aef2ca0d304f2dc031dfe7dd63109bafe23462cb6c469c799d8"
 				},
 				{
 					"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/dispatch.ahk",
@@ -87,7 +87,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "697df5bef091a65faa8b6b846b9123080946468866c7785aa32bbd263b0d3f7e"
+					"sha256": "74cac6f490084301558ce442fd759467b4d018bc43ceeecfa2e53b6858f090f4"
 				},
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua",
@@ -99,7 +99,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "4812179a28f93dd1f66bfc913dbb5f119da4b27894b7e1d019e09223726d5f26"
+					"sha256": "0fe360b7e664fb7c21b33212b21fe30f7cc79a8aea65b87bc80b7b962dcb9668"
 				}
 			]
 		}
@@ -142,7 +142,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "697df5bef091a65faa8b6b846b9123080946468866c7785aa32bbd263b0d3f7e"
+					"sha256": "74cac6f490084301558ce442fd759467b4d018bc43ceeecfa2e53b6858f090f4"
 				}
 			],
 			"linux": [
@@ -154,7 +154,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "4812179a28f93dd1f66bfc913dbb5f119da4b27894b7e1d019e09223726d5f26"
+					"sha256": "0fe360b7e664fb7c21b33212b21fe30f7cc79a8aea65b87bc80b7b962dcb9668"
 				}
 			]
 		}
@@ -180,33 +180,33 @@
 		"evidence": {
 			"windows": [
 				{
-					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+					"file": "static/ergopti_plus/windows/layouts/engine/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "c6f82a850a2fb7548a700a43b6cfe55718e953391d17535cc98a5535cb44e30a"
+					"sha256": "8c940048f2c40c656ca21db9ebcb53100f1e6fe68283643fcdd56423d37b2ab1"
 				},
 				{
-					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+					"file": "static/ergopti_plus/windows/layouts/engine/keylayout/emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "f01add2eacf461ef27a81d4f953c2d8ff18e5f9746a0d6ece49eedb9fc247420"
+					"sha256": "53dfdfe9d9c72c53b7f961d6730471191d3a307bb3b3902b27f1f3ba99e85efe"
 				}
 			],
 			"macos": [
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "697df5bef091a65faa8b6b846b9123080946468866c7785aa32bbd263b0d3f7e"
+					"sha256": "74cac6f490084301558ce442fd759467b4d018bc43ceeecfa2e53b6858f090f4"
 				}
 			],
 			"linux": [
 				{
-					"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+					"file": "static/ergopti_plus/linux/layouts/adapters/xkb_capture.lua",
 					"symbol": "local function resolve_press(keycode)",
-					"sha256": "d46e319cdf2f3cda536af2e2c247361f0c54a64d4f36c0bdcefb6300f4b7dcbd"
+					"sha256": "45908cc8fbde49799ad75653cc660302fa7d81899f2b6235e636a9ed279480e2"
 				},
 				{
 					"file": "static/ergopti_plus/linux/platform/input/keyboard_hook.lua",
 					"symbol": "local function _dispatch_post_remap(ev, source)",
-					"sha256": "50962df025ab9dce350e1b93cb87c3a2b972c24c682b567b1dced288328b79e1"
+					"sha256": "65faddbfd5a64417048d456d7d5c756b76b93f228645efaba10edf9a76052371"
 				}
 			]
 		}
@@ -235,28 +235,28 @@
 		"evidence": {
 			"windows": [
 				{
-					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+					"file": "static/ergopti_plus/windows/layouts/engine/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "c6f82a850a2fb7548a700a43b6cfe55718e953391d17535cc98a5535cb44e30a"
+					"sha256": "8c940048f2c40c656ca21db9ebcb53100f1e6fe68283643fcdd56423d37b2ab1"
 				},
 				{
-					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+					"file": "static/ergopti_plus/windows/layouts/engine/keylayout/emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "f01add2eacf461ef27a81d4f953c2d8ff18e5f9746a0d6ece49eedb9fc247420"
+					"sha256": "53dfdfe9d9c72c53b7f961d6730471191d3a307bb3b3902b27f1f3ba99e85efe"
 				}
 			],
 			"macos": [
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "697df5bef091a65faa8b6b846b9123080946468866c7785aa32bbd263b0d3f7e"
+					"sha256": "74cac6f490084301558ce442fd759467b4d018bc43ceeecfa2e53b6858f090f4"
 				}
 			],
 			"linux": [
 				{
-					"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+					"file": "static/ergopti_plus/linux/layouts/adapters/xkb_capture.lua",
 					"symbol": "local function resolve_press(keycode)",
-					"sha256": "d46e319cdf2f3cda536af2e2c247361f0c54a64d4f36c0bdcefb6300f4b7dcbd"
+					"sha256": "45908cc8fbde49799ad75653cc660302fa7d81899f2b6235e636a9ed279480e2"
 				}
 			]
 		}
@@ -282,33 +282,33 @@
 		"evidence": {
 			"windows": [
 				{
-					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+					"file": "static/ergopti_plus/windows/layouts/engine/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "c6f82a850a2fb7548a700a43b6cfe55718e953391d17535cc98a5535cb44e30a"
+					"sha256": "8c940048f2c40c656ca21db9ebcb53100f1e6fe68283643fcdd56423d37b2ab1"
 				},
 				{
-					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+					"file": "static/ergopti_plus/windows/layouts/engine/keylayout/emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "f01add2eacf461ef27a81d4f953c2d8ff18e5f9746a0d6ece49eedb9fc247420"
+					"sha256": "53dfdfe9d9c72c53b7f961d6730471191d3a307bb3b3902b27f1f3ba99e85efe"
 				}
 			],
 			"macos": [
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "697df5bef091a65faa8b6b846b9123080946468866c7785aa32bbd263b0d3f7e"
+					"sha256": "74cac6f490084301558ce442fd759467b4d018bc43ceeecfa2e53b6858f090f4"
 				}
 			],
 			"linux": [
 				{
-					"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+					"file": "static/ergopti_plus/linux/layouts/adapters/xkb_capture.lua",
 					"symbol": "local function resolve_press(keycode)",
-					"sha256": "d46e319cdf2f3cda536af2e2c247361f0c54a64d4f36c0bdcefb6300f4b7dcbd"
+					"sha256": "45908cc8fbde49799ad75653cc660302fa7d81899f2b6235e636a9ed279480e2"
 				},
 				{
 					"file": "static/ergopti_plus/linux/platform/input/keyboard_hook.lua",
 					"symbol": "local function _dispatch_post_remap(ev, source)",
-					"sha256": "50962df025ab9dce350e1b93cb87c3a2b972c24c682b567b1dced288328b79e1"
+					"sha256": "65faddbfd5a64417048d456d7d5c756b76b93f228645efaba10edf9a76052371"
 				}
 			]
 		}
@@ -334,33 +334,33 @@
 		"evidence": {
 			"windows": [
 				{
-					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+					"file": "static/ergopti_plus/windows/layouts/engine/keylayout/emulation.ahk",
 					"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
-					"sha256": "f01add2eacf461ef27a81d4f953c2d8ff18e5f9746a0d6ece49eedb9fc247420"
+					"sha256": "53dfdfe9d9c72c53b7f961d6730471191d3a307bb3b3902b27f1f3ba99e85efe"
 				}
 			],
 			"macos": [
 				{
-					"file": "static/ergopti_plus/macos/modules/keymap/layout_emulation.lua",
+					"file": "static/ergopti_plus/macos/layouts/engine/registry/emulation.lua",
 					"symbol": "function M.key_down(e, key_code)",
-					"sha256": "c6358fa07f7bee3e8a253dcee1cc0e01c546bf9f11c8f53d67232580ec2108af"
+					"sha256": "72532dcaa31c2677187cbe6ba234b1399be73b60dd2ab75a3c8195e2e6876d28"
 				},
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "697df5bef091a65faa8b6b846b9123080946468866c7785aa32bbd263b0d3f7e"
+					"sha256": "74cac6f490084301558ce442fd759467b4d018bc43ceeecfa2e53b6858f090f4"
 				}
 			],
 			"linux": [
 				{
-					"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
+					"file": "static/ergopti_plus/linux/layouts/engine/registry/emulation.lua",
 					"symbol": "function M.on_key(detail)",
-					"sha256": "847748c05da4b7b658e16972873bf0d2f62d3aaf04bdf85846341d01f601db3f"
+					"sha256": "01a598df8caf972b915e0d17fe65bb2b6e10abc25b7d76a7d2fb6d7f3f08fc2d"
 				},
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "4812179a28f93dd1f66bfc913dbb5f119da4b27894b7e1d019e09223726d5f26"
+					"sha256": "0fe360b7e664fb7c21b33212b21fe30f7cc79a8aea65b87bc80b7b962dcb9668"
 				}
 			]
 		}

@@ -779,7 +779,7 @@ end)
 helpers.describe("original Reader source lifetime (controlled constructor)", function()
 	helpers.it("spends an unchanged title without inventing a synthetic delivery debt", function()
 		InputOwnerFixture.with_session(nil, function(s)
-			package.loaded["adapters.xkb_capture"].peek_text = function(code) return code == 30 and "1" or nil end
+			package.loaded["layouts.adapters.xkb_capture"].peek_text = function(code) return code == 30 and "1" or nil end
 			arm_input(s); s.edge("a", 30, 1, 200); s.edge("a", 30, 0, 250)
 			helpers.assert_eq(s.base:input_arm_state(), nil); helpers.assert_eq(input_rows(s), prefix .. " 30:1 30:0")
 			s.edge("a", 58, 1, 400); s.edge("a", 15, 1, 410); s.edge("a", 15, 0, 500)

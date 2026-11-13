@@ -49,7 +49,7 @@ local OWNED_MODULES = {
 	"core.process.adapters.shell_runner",
 	"core.timing.engine.deferred_work",
 	"keyboard.adapters.karabiner.lease_contract",
-	"modules.keymap.layout",
+	"layouts.engine.layout",
 	"core.fs.adapters.file_system",
 	"core.fs.engine.dir",
 	"diagnostics.adapters.event_provenance",

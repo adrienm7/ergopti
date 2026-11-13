@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Files = require("adapters.keyboard_layout_files")
+local Files = require("layouts.adapters.keyboard_layout_files")
 
 --- The names in a folder.
 local function listing(dir)

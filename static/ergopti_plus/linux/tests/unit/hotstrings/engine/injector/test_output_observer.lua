@@ -17,10 +17,10 @@ local helpers = require("tests.helpers")
 --- Runs a body with an injector over a recording channel and a stub layout.
 --- @param body function body(injector)
 local function with_injector(body)
-	local saved_layout = package.loaded["adapters.keyboard_layout"]
+	local saved_layout = package.loaded["layouts.adapters.keyboard_layout"]
 	local saved_injector = package.loaded["hotstrings.engine.injector"]
 	local keycodes = { ["a"] = 1001, ["."] = 1002, [","] = 1003, [";"] = 1004, ["x"] = 1005 }
-	package.loaded["adapters.keyboard_layout"] = require("tests.support.layout_cohort_fixture").layout(function(char)
+	package.loaded["layouts.adapters.keyboard_layout"] = require("tests.support.layout_cohort_fixture").layout(function(char)
 		return assert(keycodes[char], "unexpected text " .. tostring(char))
 	end)
 	local injector = helpers.load_module("hotstrings.engine.injector")
@@ -31,7 +31,7 @@ local function with_injector(body)
 	injector.set_output_observer(nil)
 	injector._set_uinput(nil)
 	injector._set_nanosleep_for_test(nil)
-	package.loaded["adapters.keyboard_layout"] = saved_layout
+	package.loaded["layouts.adapters.keyboard_layout"] = saved_layout
 	package.loaded["hotstrings.engine.injector"] = saved_injector
 	if not ok then error(err, 0) end
 end

@@ -675,7 +675,7 @@ local function request_exact_lease_revoke(reason, on_done)
 end
 
 -- The once-only quit step that applies the pause layout (ui.menu.quit_layout).
-local quit_layout_step = require("ui.menu.quit_layout").create({
+local quit_layout_step = require("layouts.ui.menu.quit_layout").create({
 	resolve_menu = function() return package.loaded["menu.ui"] end,
 	logger = Logger,
 })
@@ -2476,10 +2476,10 @@ end)
 -- next login (macOS 26): its record is owned from here, and once the boot
 -- settles each recorded layout is confirmed on (and selected when the user
 -- asked to use it) or logged as still off.
-local PendingLayoutActivation = require("modules.keymap.pending_layout_activation")
+local PendingLayoutActivation = require("layouts.engine.pending_layout_activation")
 PendingLayoutActivation.init(PendingLayoutActivation.production_deps())
 hs.timer.doAfter(require("core.timing.engine.timings").sec("ui", "pending_layout_activation_delay_ms"), function()
-	local reported, report_err = xpcall(require("modules.keymap.layout_install").report_duplicate_bundles, debug.traceback)
+	local reported, report_err = xpcall(require("layouts.engine.registry.install").report_duplicate_bundles, debug.traceback)
 	if not reported then
 		Logger.error(LOG, "The duplicate keyboard-layout bundles could not be listed: %s", tostring(report_err))
 	end

@@ -335,7 +335,7 @@ BootProfile_Stamp("UIA include initialised")
 ; TakeNote to tell the Windows 11 Notepad tabs apart. If you want to trim boot
 ; time / memory, you can delete ``vendor\UIA.ahk``: WrapTextIfSelected falls
 ; back to a plain SendNewResult via ``isSet(UIA)`` at the call site (see
-; modules/keymap/layout.ahk), and TakeNote binds a note to a whole Notepad window.
+; layouts/engine/layout.ahk), and TakeNote binds a note to a whole Notepad window.
 ; AHK v2 resolves #Include at parse time, so there is no true runtime lazy-load.
 
 ; The global error net itself is armed far above, before Bundle_Init()'s
@@ -421,7 +421,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/fs/adapters/storage.ahk
 #Include core/process/adapters/lifecycle.ahk
 #Include platform/input/key_state.ahk
-#Include adapters/keyboard_layout_switch.ahk
+#Include layouts/adapters/keyboard_layout_switch.ahk
 #Include apps/adapters/launcher.ahk
 #Include core/network/adapters/info.ahk
 #Include platform/input/keyboard_hook.ahk
@@ -457,8 +457,8 @@ if UIASW_IsWorkerInvocation()
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet). Needs
 ; ParseTomlFile (above); consumed by the reassign-at-boot loaders below.
 #Include core/timing/engine/config.ahk
-#Include modules/keymap/layout/layout_ergopti.ahk
-#Include modules/keymap/layout/accented_shortcuts.ahk
+#Include layouts/engine/registry/ergopti.ahk
+#Include layouts/engine/accented_shortcuts.ahk
 
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps``.
@@ -567,24 +567,24 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include hotstrings/engine/catalogue/cache.ahk
 #Include hotstrings/ui/personal_toml_editor.ahk
 #Include hotstrings/ui/personal_toml_editor_webview.ahk
-#Include modules/keymap/layout/layout_altgr.ahk
+#Include layouts/engine/registry/altgr.ahk
 #Include ../_shared/settings/data/features/number_row_policy.ahk
 #Include ../_shared/settings/data/features/layout_rows_policy.ahk
 #Include ../_shared/settings/data/features/caps_word_auto_off_policy.ahk
 #Include ../_shared/settings/data/features/pause_switch_policy.ahk
-#Include modules/keymap/layout/layout_shift_caps.ahk
-#Include modules/keymap/layout/digit_row_bindings.ahk
-#Include modules/keymap/layout/number_row_send.ahk
+#Include layouts/engine/registry/shift_caps.ahk
+#Include layouts/engine/digit_row_bindings.ahk
+#Include layouts/engine/emulation/number_row_send.ahk
 ; .keylayout reading (registry layout emulation and the Ergopti tables):
 ; definitions only. The hotkeys are registered by KeylayoutEmulation_Boot below
-; and the Ergopti tables are read by modules/keymap/layout.ahk.
-#Include modules/keymap/keylayout/keylayout_parser.ahk
-#Include modules/keymap/keylayout/keylayout_tables.ahk
-#Include modules/keymap/keylayout/keylayout_emulation.ahk
-#Include modules/keymap/keylayout/source_emulation.ahk
-#Include modules/keymap/keylayout/layout_registry.ahk
-#Include modules/keymap/keylayout/layout_catalogue.ahk
-#Include modules/keymap/keylayout/layout_extension.ahk
+; and the Ergopti tables are read by layouts/engine/layout.ahk.
+#Include layouts/engine/keylayout/parser.ahk
+#Include layouts/engine/keylayout/tables.ahk
+#Include layouts/engine/keylayout/emulation.ahk
+#Include layouts/engine/keylayout/source_emulation.ahk
+#Include layouts/engine/keylayout/registry.ahk
+#Include layouts/engine/keylayout/catalogue.ahk
+#Include layouts/engine/keylayout/extension.ahk
 #Include apps/engine/picker.ahk
 #Include settings/engine/shortcuts.ahk
 #Include infra/metrics/metrics_shortcuts.ahk
@@ -648,9 +648,9 @@ if KLPF_IsWorkerInvocation()
 #Include apps/bundled_apps.ahk
 if BundledApp_IsInvocation()
 	BundledApp_Main(_SharedDir)
-; The elevated keyboard layout DLL registration (ui/layout_manager/kbd_register.ahk
+; The elevated keyboard layout DLL registration (layouts/ui/layout_manager/kbd_register.ahk
 ; in a source run) reuses this executable too, and exits from there.
-#Include ui/layout_manager/kbd_register_core.ahk
+#Include layouts/ui/layout_manager/kbd_register_core.ahk
 if KbdRegister_IsInvocation()
 	KbdRegister_Main()
 KLPF_InitializeCleanup()
@@ -1419,14 +1419,14 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/action_picker/init.ahk
 #Include ui/action_picker_webview.ahk
 #Include settings/ui/paths_editor/init.ahk
-#Include ui/layout_manager/init.ahk
-#Include ui/layout_manager/composer.ahk
-#Include ui/layout_manager/composer_check.ahk
-#Include ui/layout_manager/source_store.ahk
+#Include layouts/ui/layout_manager/init.ahk
+#Include layouts/ui/layout_manager/composer.ahk
+#Include layouts/ui/layout_manager/composer_check.ahk
+#Include layouts/ui/layout_manager/source_store.ahk
 #Include diagnostics/ui/field_check/network_check.ahk
 #Include core/network/proxy_override.ahk
 #Include hotstrings/ui/personal_info_editor/init.ahk
-#Include ui/layer_editor/init.ahk
+#Include layouts/ui/layer_editor.ahk
 #Include ui/physical_shortcuts/init.ahk
 
 #Include keyboard/engine/suppressive_inputhook_ownership.ahk
@@ -1437,7 +1437,7 @@ _RegisterScriptAltGrHotkeys()
 ; Update the original static slots in place: creating runtime variants would
 ; move the direct digits behind the static typing tap-hold roll variants.
 DigitRow_RegisterBindings()
-; Before modules/keymap/layout.ahk: AHK fires the earliest-created hotkey variant
+; Before layouts/engine/layout.ahk: AHK fires the earliest-created hotkey variant
 ; whose criterion holds, so the registry layout emulation must register first to
 ; own its keys over every Ergopti layer. A no-op when no registry layout is chosen.
 KeylayoutEmulation_Boot(_ConfigDir)
@@ -1458,7 +1458,7 @@ BootProfile_Mark("LAYOUT: registry emulation registered")
 #Include modules/shortcuts/tap_keys.ahk
 ; The key combinations: their slots are read before the pair hotkeys of
 ; keyboard/adapters/remap.ahk can answer a press.
-#Include modules/keymap/layout.ahk
+#Include layouts/engine/layout.ahk
 BootProfile_Mark("LAYOUT: Ergopti layout registered")
 #Include modules/shortcuts.ahk
 ; After the layout: a slot's letter is the key that types it under the emulation,
@@ -1767,12 +1767,12 @@ global _PENDING_KEYBOARD_HKL := 0
 ; test suite can exercise it without #including this whole entry point (which
 ; registers every hotkey at load). Single source of truth — defined once there,
 ; consumed here and by tests/meta/test_layout_quiescence.ahk.
-#Include modules/keymap/layout_poll_helper.ahk
+#Include layouts/engine/registry/poll_helper.ahk
 ; Sees a keyboard-layout registry change at once and runs the poll's capture.
-#Include modules/keymap/layout_registry_watch.ahk
+#Include layouts/engine/registry/watch.ahk
 ; Layout on pause / resume: run by the lifecycle owner "keyboard-layout".
-#Include modules/keymap/pause_layout_switch.ahk
-#Include modules/keymap/system_layout_install.ahk
+#Include layouts/engine/emulation/pause_layout_switch.ahk
+#Include layouts/engine/system_layout_install.ahk
 
 ; The layout poll's seams onto the reload lifecycle (see LayoutPollTick). Its
 ; reload reports a refused stage without the "save failed" notice, and it asks

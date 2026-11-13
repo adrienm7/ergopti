@@ -30,7 +30,7 @@ local helpers, key, with_position_capture =
 
 helpers.describe("keyboard_hook: live XKB capture stream", function()
 	helpers.it("refuses to open a keyboard before live XKB state is ready", function()
-		local module_name = "adapters.xkb_capture"
+		local module_name = "layouts.adapters.xkb_capture"
 		local saved = package.loaded[module_name]
 		package.loaded[module_name] = {
 			is_ready = function() return false end,
@@ -143,7 +143,7 @@ helpers.describe("keyboard_hook: Right Alt follows the live layout", function()
 	--- Drives Right Alt + Q through the live XKB adapter on a keymap whose
 	--- Right Alt is `ralt_sym`, and reports what the hook made of it.
 	local function drive(ralt_sym, events)
-		local Capture = helpers.load_module("adapters.xkb_capture")
+		local Capture = helpers.load_module("layouts.adapters.xkb_capture")
 		Capture._set_backend(backend(ralt_sym))
 		helpers.assert_true(Capture.load("keymap", "C"), "the double keymap loads")
 		local hook = helpers.load_module("platform.input.keyboard_hook")
@@ -284,7 +284,7 @@ helpers.describe("keyboard_hook: a modifier the XKB options put on another key",
 
 	--- Drives `events` through the live XKB adapter on a keymap with `syms`.
 	local function drive(syms, events)
-		local Capture = helpers.load_module("adapters.xkb_capture")
+		local Capture = helpers.load_module("layouts.adapters.xkb_capture")
 		Capture._set_backend(backend(syms))
 		helpers.assert_true(Capture.load("keymap", "C"), "the double keymap loads")
 		local hook = helpers.load_module("platform.input.keyboard_hook")
@@ -399,7 +399,7 @@ helpers.describe("keyboard_hook: a consumed dead key leaves no Compose pending",
 	end
 
 	local function drive(consume, held)
-		local Capture = helpers.load_module("adapters.xkb_capture")
+		local Capture = helpers.load_module("layouts.adapters.xkb_capture")
 		Capture._set_backend(backend())
 		helpers.assert_true(Capture.load("keymap", "C"), "the double keymap loads")
 		local hook = helpers.load_module("platform.input.keyboard_hook")
@@ -483,7 +483,7 @@ helpers.describe("keyboard_hook: a consumed continuation keeps the received Comp
 	local function drive(events, consumed)
 		local left = {}
 		for code, count in pairs(consumed) do left[code] = count end
-		local Capture = helpers.load_module("adapters.xkb_capture")
+		local Capture = helpers.load_module("layouts.adapters.xkb_capture")
 		Capture._set_backend(backend())
 		helpers.assert_true(Capture.load("keymap", "C"), "the double keymap loads")
 		local hook = helpers.load_module("platform.input.keyboard_hook")
@@ -550,7 +550,7 @@ helpers.describe("xkb_capture: Compose marks restore the sequence before a press
 	local KEY_DEAD, KEY_SHIFT, KEY_E = 26, 42, 18
 
 	local function capture()
-		local Capture = helpers.load_module("adapters.xkb_capture")
+		local Capture = helpers.load_module("layouts.adapters.xkb_capture")
 		local fed = {}
 		Capture._set_backend({
 			create = function() return { compose = "nothing" } end,

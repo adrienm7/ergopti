@@ -152,7 +152,7 @@ elseif ACTION == "select_layout_natively" then
 	-- A missing identifier must complete with failure and leave that source intact.
 	local before_missing = hs.keycodes.currentSourceID()
 	local missing_refused = false
-	require("modules.keymap.input_sources").set_input_source_async(nil, "com.ergopti.e2e.missing", function(ok)
+	require("layouts.engine.input_sources").set_input_source_async(nil, "com.ergopti.e2e.missing", function(ok)
 		missing_refused = ok == false
 	end)
 	idle(1)

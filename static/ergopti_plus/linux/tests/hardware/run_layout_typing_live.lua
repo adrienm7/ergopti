@@ -7,13 +7,13 @@
 --- XKB keymap and reads what real editors received through AT-SPI:
 --- mousepad (GTK 3) and kwrite (Qt 5, KDE Frameworks).
 ---
---- Production code under test: modules/keymap/layout_emulation.lua with its
+--- Production code under test: layouts/engine/registry/emulation.lua with its
 --- production wiring (M.start), the shared emulation engine, the registry's
---- shipped .keylayout files, adapters/keyboard_layout.lua and
---- adapters/xkb_capture.lua on the server's own keymap (libxkbcommon),
+--- shipped .keylayout files, layouts/adapters/keyboard_layout.lua and
+--- layouts/adapters/xkb_capture.lua on the server's own keymap (libxkbcommon),
 --- hotstrings/engine/injector.lua, platform/input/modifier_broker.lua,
 --- platform/input/uinput_writer.lua, modules/shortcuts/accented_shortcuts.lua,
---- gestures/engine/combo_emitter.lua, and modules/keymap/layout_registry.lua
+--- gestures/engine/combo_emitter.lua, and layouts/engine/registry/registry.lua
 --- with the real Python installer for the Bépo user-tree install.
 ---
 --- Replaced edges: the last uinput hop is XTest (tests/hardware/lib/
@@ -248,7 +248,7 @@ package.loaded["platform.input.keyboard_hook"] = {
 		for name, down in pairs(_held) do if down then mods[name] = true end end
 		return mods
 	end,
-	number_row_mode = function() return require("infra.number_row_preferences").settings().order end,
+	number_row_mode = function() return require("layouts.engine.emulation.number_row_preferences").settings().order end,
 	emergency_stop = function(reason) _emergency[#_emergency + 1] = tostring(reason) end,
 }
 
@@ -261,15 +261,15 @@ write(fake_node, "")
 Writer._set_path_for_test(fake_node)
 
 local runner_python = (capture("command -v python3 2>/dev/null"):gsub("%s+$", ""))
-package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
+package.loaded["layouts.engine.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
 
 local Injector = require("hotstrings.engine.injector")
-local KeyboardLayout = require("adapters.keyboard_layout")
-local XkbCapture = require("adapters.xkb_capture")
-local Emulation = require("modules.keymap.layout_emulation")
+local KeyboardLayout = require("layouts.adapters.keyboard_layout")
+local XkbCapture = require("layouts.adapters.xkb_capture")
+local Emulation = require("layouts.engine.registry.emulation")
 local Accented = require("modules.shortcuts.accented_shortcuts")
 local ComboEmitter = require("gestures.engine.combo_emitter")
-local NumberRow = require("infra.number_row_preferences")
+local NumberRow = require("layouts.engine.emulation.number_row_preferences")
 local EvdevCodes = require("platform.input.evdev_codes")
 
 assert(Injector.open_fast_channel(), "the injector's channel did not open on the XTest backend")
@@ -486,7 +486,7 @@ end
 local function french_dead_key(editor)
 	emulate(layout_config("ergopti_plus"))
 	local Shared = require("layouts.engine.composer.keylayout_emulation")
-	local registry = require("modules.keymap.layout_registry")
+	local registry = require("layouts.engine.registry.registry")
 	local shipped = registry.shipped_layout("ergopti_plus")
 	local keycodes = require("core.text.engine.json").decode(read("../_shared/layouts/data/mac_keycodes.json"))
 	local physical = require("core.text.engine.json").decode_lossless(read("../_shared/layouts/data/keycodes/physical_keys.json"))
@@ -558,7 +558,7 @@ end
 
 --- Bépo installed in the user tree: monnaie then cédille types ₢ at once.
 local function bepo_compose()
-	local Registry = require("modules.keymap.layout_registry")
+	local Registry = require("layouts.engine.registry.registry")
 	local registry_dir = "../../layouts/registry/"
 	local index = require("core.text.engine.json").decode(read(registry_dir .. "index.json"))
 	local bepo

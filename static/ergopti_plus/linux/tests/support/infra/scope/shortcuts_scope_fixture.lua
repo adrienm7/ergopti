@@ -156,7 +156,7 @@ local CHORD_PARAMETER = "script__script_altgr_enter__open_url"
 --- Real configuration/claim owners; only the native map observation is modeled.
 local function with_collision_scope(source, tap_config, body, navigation_text)
 	with_scope(function(scope, owners, controls, path)
-		local names = { "platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
+		local names = { "platform.remap.tap_hold_manager", "layouts.adapters.xkb_capture", "modules.shortcuts.physical_collisions",
 			"hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local Manager, tap_path, hook, navigation_dir, navigation_made
@@ -209,7 +209,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 				return accepted, reason
 			end
 			local tokens = setmetatable({}, { __mode = "k" })
-			package.loaded["adapters.xkb_capture"] = {
+			package.loaded["layouts.adapters.xkb_capture"] = {
 				chord_sources = function(requests)
 					controls.source_reads = controls.source_reads + 1
 					local token, rows = {}, {}

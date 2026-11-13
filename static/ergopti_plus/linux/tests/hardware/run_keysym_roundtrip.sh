@@ -90,7 +90,7 @@ fi
 cd "$DRIVER_DIR" || exit 2
 "$LUA_BIN" - "$PROBE_CHARS" <<'LUA_EOF'
 local UinputWriter   = require("platform.input.uinput_writer")
-local KeyboardLayout = require("adapters.keyboard_layout")
+local KeyboardLayout = require("layouts.adapters.keyboard_layout")
 local EvdevCodes     = require("platform.input.evdev_codes")
 
 local MODIFIER_CODES = { shift = EvdevCodes.KEY_LEFTSHIFT, altgr = EvdevCodes.KEY_RIGHTALT }

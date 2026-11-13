@@ -27,15 +27,15 @@ helpers.describe("menu_keyboard_layout: async layout selection", function()
 	helpers.it("waits for the business terminal instead of the dispatch result", function()
 		helpers.with_fresh_modules({
 			"core.timing.engine.deferred_work",
-			"modules.keymap.input_sources",
-			"modules.keymap.layout_install",
-			"ui.menu.menu_keyboard_layout",
+			"layouts.engine.input_sources",
+			"layouts.engine.registry.install",
+			"layouts.ui.menu.keyboard_layout",
 			"menu.engine.manifest_menu",
 			"core.ui.engine.notifications",
 			"core.i18n.engine.i18n",
 		}, function()
-			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
-			local install = require("modules.keymap.layout_install")
+			local input_sources = helpers.load_with_stubs("layouts.engine.input_sources")
+			local install = require("layouts.engine.registry.install")
 			local scheduled = {}
 			package.loaded["core.timing.engine.deferred_work"] = { after = function(delay, callback)
 				scheduled[#scheduled + 1] = { delay = delay, callback = callback }
@@ -69,8 +69,8 @@ helpers.describe("menu_keyboard_layout: async layout selection", function()
 					return providers.active_layouts()
 				end,
 			}
-			package.loaded["ui.menu.menu_keyboard_layout"] = nil
-			local menu = require("ui.menu.menu_keyboard_layout")
+			package.loaded["layouts.ui.menu.keyboard_layout"] = nil
+			local menu = require("layouts.ui.menu.keyboard_layout")
 
 			local refreshes = 0
 			local built = menu.build({
@@ -108,15 +108,15 @@ end)
 local function exercise_bundle_action(operation, business_ok, live)
 	helpers.with_fresh_modules({
 		"core.timing.engine.deferred_work",
-		"modules.keymap.input_sources",
-		"modules.keymap.layout_install",
-		"ui.menu.menu_keyboard_layout",
+		"layouts.engine.input_sources",
+		"layouts.engine.registry.install",
+		"layouts.ui.menu.keyboard_layout",
 		"menu.engine.manifest_menu",
 		"core.ui.engine.notifications",
 			"core.i18n.engine.i18n",
 	}, function()
-		local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
-		local install = require("modules.keymap.layout_install")
+		local input_sources = helpers.load_with_stubs("layouts.engine.input_sources")
+		local install = require("layouts.engine.registry.install")
 		local scheduled = {}
 		local notices = {}
 		local business_done = nil
@@ -175,8 +175,8 @@ local function exercise_bundle_action(operation, business_ok, live)
 				return providers.layout_bundle()
 			end,
 		}
-		package.loaded["ui.menu.menu_keyboard_layout"] = nil
-		local menu = require("ui.menu.menu_keyboard_layout")
+		package.loaded["layouts.ui.menu.keyboard_layout"] = nil
+		local menu = require("layouts.ui.menu.keyboard_layout")
 
 		local refreshes = 0
 		local built = menu.build({
@@ -241,15 +241,15 @@ helpers.describe("menu_keyboard_layout: mixed stable and legacy state", function
 	helpers.it("keeps the legacy cleanup action visible when every stable variant is active", function()
 		helpers.with_fresh_modules({
 			"core.timing.engine.deferred_work",
-			"modules.keymap.input_sources",
-			"modules.keymap.layout_install",
-			"ui.menu.menu_keyboard_layout",
+			"layouts.engine.input_sources",
+			"layouts.engine.registry.install",
+			"layouts.ui.menu.keyboard_layout",
 			"menu.engine.manifest_menu",
 			"core.ui.engine.notifications",
 			"core.i18n.engine.i18n",
 		}, function()
-			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
-			local install = require("modules.keymap.layout_install")
+			local input_sources = helpers.load_with_stubs("layouts.engine.input_sources")
+			local install = require("layouts.engine.registry.install")
 			local stable_id = "com.apple.keyboardlayout.ergopti.plus"
 			install.bundle_variants = function()
 				return { { name = "Ergopti_v2_2_2_plus", tis_id = stable_id,
@@ -279,8 +279,8 @@ helpers.describe("menu_keyboard_layout: mixed stable and legacy state", function
 					return providers.layout_bundle()
 				end,
 			}
-			package.loaded["ui.menu.menu_keyboard_layout"] = nil
-			local built = require("ui.menu.menu_keyboard_layout").build({
+			package.loaded["layouts.ui.menu.keyboard_layout"] = nil
+			local built = require("layouts.ui.menu.keyboard_layout").build({
 				base_dir = "/tmp/ergopti/",
 				updateMenu = function() end,
 			})

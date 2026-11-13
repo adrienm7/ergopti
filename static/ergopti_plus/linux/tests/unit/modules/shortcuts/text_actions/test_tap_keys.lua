@@ -245,7 +245,7 @@ helpers.describe("Linux number-row tap keys (tap-keys)", function()
 
 	helpers.it("the labels follow the loaded keymap, a dead key hinted", function()
 		local TapKeys, log = fresh()
-		local Layout = helpers.load_module("adapters.keyboard_layout")
+		local Layout = helpers.load_module("layouts.adapters.keyboard_layout")
 		local i18n = require("core.i18n.engine.i18n")
 		local ok, err = pcall(function()
 			local function names()

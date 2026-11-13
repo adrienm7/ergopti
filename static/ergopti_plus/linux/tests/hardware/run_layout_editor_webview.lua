@@ -13,7 +13,7 @@
 --- AltGr, ê on the ISO key. Typing is the server's keymap, read key by key.
 --- Before that, « Emulate without installing »: nothing is installed, the
 --- composed layout becomes the emulated one, and the daemon's layout emulation
---- (modules/keymap/layout_emulation.lua, its production collaborators but the
+--- (layouts/engine/registry/emulation.lua, its production collaborators but the
 --- text output) types the source's characters for physical key presses.
 --- Exit 0 = every check held, 1 = a failure, 2 = the machine cannot host it (no
 --- display, WebKit or lgi).
@@ -105,7 +105,7 @@ setenv("DBUS_SESSION_BUS_ADDRESS", bus_address)
 -- The installer runs on the runner's interpreter; Ergopti's own Python download
 -- on consent has its own live probe (run_managed_python_live.lua).
 local runner_python = (capture("command -v python3 2>/dev/null"):gsub("%s+$", ""))
-package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
+package.loaded["layouts.engine.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
 
 
 
@@ -169,7 +169,7 @@ local function run()
 		.. "); 'opened'")
 	check(wait_for(webview, "document.getElementById('le-name') && document.getElementById('le-name').value.length"),
 		"the source opens in the editor")
-	local Registry = require("modules.keymap.layout_registry")
+	local Registry = require("layouts.engine.registry.registry")
 	local function message_text() return eval_sync(webview, "(document.getElementById('le-message') || {}).textContent") end
 	local function settled_after(previous)
 		return wait_for(webview, "(document.getElementById('le-message') || {}).className === 'le-message ok'"
@@ -189,11 +189,11 @@ local function run()
 	local composer_folder = require("settings.engine.paths").get_config_dir() .. "/" .. composer.folder .. "/"
 	check(read(composer_folder .. composer.keylayout_file) ~= nil, "the compiled layout is kept in the composer folder")
 	check((Registry.snapshot().installed or {})[composer.id] == nil, "nothing is installed in the system")
-	local emulated = require("infra.layout_emulation_preferences").settings()
+	local emulated = require("layouts.engine.registry.emulation_preferences").settings()
 	check(emulated.id == composer.id and emulated.base == true, "the composed layout is the emulated one: "
 		.. tostring(emulated.id))
 	-- The daemon's emulation with its production collaborators, the typed text recorded.
-	local LayoutEmulation = require("modules.keymap.layout_emulation")
+	local LayoutEmulation = require("layouts.engine.registry.emulation")
 	local typed = {}
 	local deps = LayoutEmulation.production_deps({ injector = {}, is_paused = function() return false end,
 		dispatch_char = function() end, magic_evdev = function() return nil end, dry_run = false })
@@ -285,7 +285,7 @@ end
 
 local ran, result = pcall(run)
 if Manager then pcall(Manager.shutdown) end
-pcall(function() require("modules.keymap.layout_registry").shutdown() end)
+pcall(function() require("layouts.engine.registry.registry").shutdown() end)
 if _bus_pid then os.execute("kill " .. _bus_pid .. " 2>/dev/null") end
 if _scratch then os.execute("rm -rf " .. quote(_scratch)) end
 if not ran then

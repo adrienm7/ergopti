@@ -535,7 +535,7 @@
 			"function": "InputProbe_HookRecord"
 		},
 		{
-			"file": "static/ergopti_plus/windows/ui/layout_manager/composer_check.ahk",
+			"file": "static/ergopti_plus/windows/layouts/ui/layout_manager/composer_check.ahk",
 			"function": "ComposerCheck_LogLine"
 		}
 	],

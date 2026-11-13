@@ -113,8 +113,8 @@ setenv("XDG_CURRENT_DESKTOP", nil)
 -- download on consent has its own live probe (run_managed_python_live.lua), so
 -- the installer runs here on the runner's interpreter instead of asking.
 local runner_python = (capture("command -v python3 2>/dev/null"):gsub("%s+$", ""))
-package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
-local Registry = require("modules.keymap.layout_registry")
+package.loaded["layouts.engine.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
+local Registry = require("layouts.engine.registry.registry")
 
 
 

@@ -360,7 +360,7 @@ helpers.describe("Ergopti suffix and native-feature relocation", function()
 		local french_directory = assert(french_source:match("^(.*)/[^/]+$"))
 		helpers.assert_eq(exists(french_directory .. "/distancesreduction.toml"), false,
 			"the retired common suffix source cannot provide a fallback")
-		local shipped = require("modules.keymap.layout_registry").shipped_extension_root()
+		local shipped = require("layouts.engine.registry.registry").shipped_extension_root()
 		helpers.assert_type(shipped, "table", "the actual native resolver supplies the shipped extension")
 		local shipped_suffixes = shipped.pack .. "/hotstrings/suffixes_a.toml"
 		helpers.assert_true(exists(shipped_suffixes), "the production extension resolver reaches the moved physical file")

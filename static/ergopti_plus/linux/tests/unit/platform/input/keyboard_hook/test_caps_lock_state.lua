@@ -25,10 +25,10 @@ local LED_CAPSL = 1
 --- @return function restore Puts the real modules back.
 local function load_hook()
 	local saved = {
-		xkb = package.loaded["adapters.xkb_capture"],
+		xkb = package.loaded["layouts.adapters.xkb_capture"],
 		finder = package.loaded["hotstrings.engine.device_finder"],
 	}
-	package.loaded["adapters.xkb_capture"] = {
+	package.loaded["layouts.adapters.xkb_capture"] = {
 		is_ready = function() return true end,
 		reset_state = function() return true end,
 		process = function() return nil, nil, nil end,
@@ -41,7 +41,7 @@ local function load_hook()
 		is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 	}
 	return helpers.load_module("platform.input.keyboard_hook"), function()
-		package.loaded["adapters.xkb_capture"] = saved.xkb
+		package.loaded["layouts.adapters.xkb_capture"] = saved.xkb
 		package.loaded["hotstrings.engine.device_finder"] = saved.finder
 	end
 end

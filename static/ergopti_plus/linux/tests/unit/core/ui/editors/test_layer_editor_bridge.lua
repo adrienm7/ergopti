@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Navigation Layer Editor Bridge (Linux)
 --- DESCRIPTION:
---- Drives ui/layer_editor/bridge.lua the way the shared page does, with the
+--- Drives layouts/ui/layer_editor.lua the way the shared page does, with the
 --- real shared host logic, loader and TOML codec, and doubles for the webview
 --- manager and the remap manager.
 ---
@@ -141,7 +141,7 @@ end
 -- =============================
 
 helpers.describe("Linux navigation layer editor bridge", function()
-	local Bridge = helpers.load_module("ui.layer_editor.bridge")
+	local Bridge = helpers.load_module("layouts.ui.layer_editor")
 
 	helpers.it("is the page's registered bridge", function()
 		local WebkitHost = require("core.ui.ui.webkit_host")
@@ -233,7 +233,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 	helpers.it("sends the loaded keymap's legends and the layer key (layer-editor-current-layout-legends)", function()
 		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 		local corpus = Json.decode(read_file(LEGENDS))
-		local Layout = helpers.load_module("adapters.keyboard_layout")
+		local Layout = helpers.load_module("layouts.adapters.keyboard_layout")
 		local LayerEditor = require("layouts.engine.layers.editor")
 		-- The bridge, loaded over a logger that records its warnings.
 		local warnings = {}
@@ -241,7 +241,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		recorder.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
 		local previous_logger = package.loaded["core.logger.engine.shim"]
 		package.loaded["core.logger.engine.shim"] = recorder
-		local Recorded = helpers.load_module("ui.layer_editor.bridge")
+		local Recorded = helpers.load_module("layouts.ui.layer_editor")
 		package.loaded["core.logger.engine.shim"] = previous_logger
 		for _, case in ipairs(corpus.cases) do
 			local dir = make_config_dir()
@@ -426,7 +426,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 end)
 
 helpers.describe("Linux navigation layer from the layout editor", function()
-	local Bridge = helpers.load_module("ui.layer_editor.bridge")
+	local Bridge = helpers.load_module("layouts.ui.layer_editor")
 
 	helpers.it("saves and applies through the window's save, with no window open (layout-editor-nav-apply)", function()
 		local dir = make_config_dir()

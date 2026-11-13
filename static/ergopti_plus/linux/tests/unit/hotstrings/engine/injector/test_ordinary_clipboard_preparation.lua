@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local names = { "hotstrings.engine.injector", "clipboard.adapters.clipboard", "hotstrings.engine.output_transaction",
-	"adapters.keyboard_layout", "adapters.xkb_capture", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
+	"layouts.adapters.keyboard_layout", "layouts.adapters.xkb_capture", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
 	"core.logger.engine.shim", "platform.input.keyboard_hook", "platform.input.modifier_broker", "platform.input.modifier_custody", "platform.input.uinput_writer" }
 
 local function fixture(options, callback)
@@ -24,12 +24,12 @@ local function fixture(options, callback)
 	local function retire() world.destination = {} end
 	package.loaded["core.logger.engine.shim"] = setmetatable({}, { __index = function() return function() end end })
 	package.loaded["core.ui.engine.display_server"] = { is_wayland = function() return false end, is_x11 = function() return true end }
-	package.loaded["adapters.keyboard_layout"] = {
+	package.loaded["layouts.adapters.keyboard_layout"] = {
 		is_ready = function() return false end, plan = function() error("the controlled layout cannot type the payload") end,
 		plan_current = function() return false end, plan_view = function() return nil end,
 		shortcut_keycode = function(_, fallback) return fallback end,
 	}
-	package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
+	package.loaded["layouts.adapters.xkb_capture"] = { caps_locked = function() return false end }
 	package.loaded["platform.input.keyboard_hook"] = {
 		held_text_modifier_codes = function() return {} end, held_shortcut_modifier_codes = function() return {} end,
 		held_forwarded_keys = function() return {} end, emergency_stop = function()

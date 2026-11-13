@@ -219,7 +219,7 @@ helpers.describe("layout manager bridge: the emulation follows a changed layout"
 		helpers.assert_true(instance.on_message({ action = "install", id = "ergol" }), "an install runs while paused")
 		helpers.assert_true(instance.on_message({ action = "uninstall", id = "ergol" }))
 		helpers.assert_eq(changed, { "ergol", "ergol" })
-		local host = assert(helpers.read_module_source("ui.layout_manager"))
+		local host = assert(helpers.read_module_source("layouts.ui.layout_manager"))
 		helpers.assert_nil(host:find("is_paused", 1, true), "the macOS host reads no pause")
 	end)
 
@@ -253,10 +253,10 @@ helpers.describe("layout manager bridge: the emulation follows a changed layout"
 
 	helpers.it("(lmh-001-002-emulation-reload) the macOS host reloads the emulated layout and the menu", function()
 		local menu = assert(helpers.read_module_source("menu.ui"))
-		helpers.assert_contains(menu, 'require("ui.layout_manager").set_layout_change_handler(function(id)')
+		helpers.assert_contains(menu, 'require("layouts.ui.layout_manager").set_layout_change_handler(function(id)')
 		helpers.assert_contains(menu, "if Emulation.status().id ~= id then return end")
-		local host = assert(helpers.read_module_source("ui.layout_manager"))
-		helpers.assert_contains(menu, 'require("ui.layout_manager").set_extension_reloader(function()')
+		local host = assert(helpers.read_module_source("layouts.ui.layout_manager"))
+		helpers.assert_contains(menu, 'require("layouts.ui.layout_manager").set_extension_reloader(function()')
 		helpers.assert_contains(host, "reload_extensions = function(id) return _extension_reloader ~= nil and _extension_reloader(id) == true end")
 		helpers.assert_contains(host, "if _layout_change_handler then _layout_change_handler(id) end")
 	end)

@@ -65,9 +65,9 @@ local function await(start)
 end
 
 local runner_python = (capture("command -v python3 2>/dev/null"):gsub("%s+$", ""))
-package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
+package.loaded["layouts.engine.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
 ffi.C.setenv("ERGOPTI_XKB_USER_HOME", assert(os.getenv("HOME")), 1)
-local Registry = require("modules.keymap.layout_registry")
+local Registry = require("layouts.engine.registry.registry")
 
 local desktop = os.getenv("XDG_CURRENT_DESKTOP")
 print("=== user-tree layout on " .. tostring(desktop) .. " Wayland (W1 to W3) ===")

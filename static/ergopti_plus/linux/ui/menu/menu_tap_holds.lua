@@ -420,7 +420,7 @@ local function _build_tap_holds(ctx)
 	render_ctx.state_getters["tapholds_enabled"] = function() return feature_on end
 
 	-- The navigation layer editor: the shared page, saved and applied by
-	-- ui/layer_editor/bridge.lua.
+	-- layouts/ui/layer_editor.lua.
 	render_ctx.commands[require("settings.engine.keys").COMMAND.EDIT_NAV_LAYER] = function()
 		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 			Logger.error(LOG, "No webview manager in the menu context — the layer editor cannot open.")

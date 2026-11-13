@@ -15,7 +15,7 @@ local Codec = require("core.text.engine.toml_codec")
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
-		local names = { "settings.engine.paths", "infra.number_row_preferences" }
+		local names = { "settings.engine.paths", "layouts.engine.emulation.number_row_preferences" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local ok, err = pcall(function()
@@ -23,8 +23,8 @@ local function with_config(source, body)
 				helpers.assert_eq(name, "config.toml")
 				return path
 			end }
-			package.loaded["infra.number_row_preferences"] = nil
-			body(require("infra.number_row_preferences"), path)
+			package.loaded["layouts.engine.emulation.number_row_preferences"] = nil
+			body(require("layouts.engine.emulation.number_row_preferences"), path)
 		end)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(err, 0) end

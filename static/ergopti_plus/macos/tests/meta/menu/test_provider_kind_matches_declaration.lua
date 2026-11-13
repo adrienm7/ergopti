@@ -20,7 +20,7 @@
 --- answered. The row is simply absent from the menu.
 ---
 --- WHY THIS TEST EXISTS: that is exactly what happened to the keyboard-layout
---- list. `active_layouts` was declared `dynamic`, ui/menu/menu_keyboard_layout.lua
+--- list. `active_layouts` was declared `dynamic`, layouts/ui/menu/keyboard_layout.lua
 --- passed active_layout_rows() as a list provider, and the layout submenu showed
 --- no layouts at all — for as long as both halves have existed. The manifest now
 --- says `list`, which is what the function actually returns.
@@ -81,7 +81,7 @@ helpers.describe("menu provider kind matches the manifest declaration (macOS)", 
 		local body = src and src:match("local function active_layout_rows%(%)(.-)\n\tend")
 		helpers.assert_true(type(body) == "string" and #body > 0, "the genuine active_layout_rows source must exist")
 		helpers.assert_true(body:find("label%s*=%s*title") == nil, "the nil out-of-scope title assignment remains forbidden")
-		local input = helpers.load_with_stubs("modules.keymap.input_sources")
+		local input = helpers.load_with_stubs("layouts.engine.input_sources")
 		local records = {
 			{id = "fixture.selected", name = "Native sélection %s", selected = true},
 			{id = "fixture.available", name = "Native source {1}", selected = false},
@@ -91,8 +91,8 @@ helpers.describe("menu provider kind matches the manifest declaration (macOS)", 
 		input.resolve_installed_ergopti_version = function() return nil end
 		input.ergopti_in_active_layouts = function() return false end
 		local renderer = LayoutFixture.install(require("core.i18n.engine.i18n"))
-		package.loaded["ui.menu.menu_keyboard_layout"] = nil
-		local Layout = require("ui.menu.menu_keyboard_layout")
+		package.loaded["layouts.ui.menu.keyboard_layout"] = nil
+		local Layout = require("layouts.ui.menu.keyboard_layout")
 		local source_rows, source_refs
 		local genuine_build = renderer.build
 		renderer.build = function(...)
