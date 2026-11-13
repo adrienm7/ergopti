@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: Driver Module Predicate
 --- DESCRIPTION:
---- Tests reset package.loaded between cases. They used to name the folders to
---- clear, name:match("^modules%.") or name:match("^adapters%."), and a module
---- moved to another folder silently escaped the sweep: its state then leaked
+--- Tests reset package.loaded between cases. They used to match the names of
+--- the folders to clear (modules, adapters, infra, ui), and a module moved to
+--- another folder silently escaped the sweep: its state then leaked
 --- into every later case. helpers.is_driver_module reads the folders from the
 --- tree instead. This file proves it covers every production module wherever
 --- it lives, and stubs under those folders, and never a test or shared module.
