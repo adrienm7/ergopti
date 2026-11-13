@@ -471,11 +471,16 @@ end)
 --- rereads the native values; captured callbacks keep their original owners.
 local function with_delay_native(body)
 	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
-		"infra.i18n", "infra.logger", "ui.menu.menu_utils" }, function()
+		"infra.i18n", "infra.logger", "ui.menu.menu_utils", "infra.dialog_util" }, function()
+		-- A refused typed value is shown through the native alert: recorded here.
+		local alerts = {}
+		package.loaded["infra.dialog_util"] = { block_alert = function(title, message)
+			alerts[#alerts + 1] = { title, message }
+		end }
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local native = remap_double()
 		local observed = { value = 1500, receipt = true, calls = {}, refreshes = 0, regenerations = 0,
-			dialog_ok = true, answer = { ["text returned"] = "375.8" } }
+			dialog_ok = true, answer = { ["text returned"] = "375" }, alerts = alerts }
 		native.get_tap_timeout = function(kid) return kid == "left_shift" and observed.value or nil end
 		native.set_tap_timeout = function(kid, value)
 			observed.calls[#observed.calls + 1] = { kid = kid, value = value }
@@ -616,7 +621,7 @@ helpers.describe("the complete macOS per-key delay declaration", function()
 end)
 
 helpers.describe("native per-key delay prompt refusal", function()
-	for _, value in ipairs({ "0.25", "0", "-1", "1e309", "nan" }) do
+	for _, value in ipairs({ "0.25", "0", "-1", "1e309", "nan", "375.8", "10001" }) do
 		helpers.it("refuses " .. value .. " before a native override can be cleared (tap-hold-key-delay)", function()
 			with_delay_native(function(rows, observed)
 				observed.answer = { ["text returned"] = value }
@@ -625,6 +630,7 @@ helpers.describe("native per-key delay prompt refusal", function()
 				helpers.assert_eq(observed.value, 1500)
 				helpers.assert_eq(observed.regenerations, 0)
 				helpers.assert_eq(observed.refreshes, 0)
+				helpers.assert_eq(#observed.alerts, 1, "the refusal names the accepted range, never silent")
 			end)
 		end)
 	end
