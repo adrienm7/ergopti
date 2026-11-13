@@ -736,8 +736,8 @@ function M.arm_one_shot_shift()
 	local remap = package.loaded["platform.remap"]
 	assert(type(remap) == "table" and type(remap.get_sticky_timeout) == "function",
 		"one-shot Shift requires the initialized remap configuration")
-	local timeout_ms = remap.get_sticky_timeout()
-	assert(type(timeout_ms) == "number" and timeout_ms > 0, "invalid one-shot Shift timeout")
+	-- The engine boundary: 0 is no time limit, anything else refused fails fast.
+	local timeout_ms = require("tap_hold.engine.one_shot_timeout").validate(remap.get_sticky_timeout())
 	_one_shot_shift.arm(timeout_ms / 1000)
 	return true
 end

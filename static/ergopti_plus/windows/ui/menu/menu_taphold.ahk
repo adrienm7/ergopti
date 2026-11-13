@@ -76,7 +76,9 @@ _TH_GlobalDelayRows() {
 ; delay): the label carries the value in force; the click asks for a new one.
 ; @returns {Array} One row.
 _TH_OneShotDelayRows() {
-	Label := StrReplace(t("menu.tapholds.sticky_title"), "%s", TapHoldOneShotTimeoutMs() . " ms")
+	CurrentMs := TapHoldOneShotTimeoutMs()
+	Label := StrReplace(t("menu.tapholds.sticky_title"), "%s",
+		CurrentMs == 0 ? t("menu.tapholds.sticky_no_limit") : CurrentMs . " ms")
 	return [Map("label", Label, "action", (*) => _TH_PromptOneShotDelay())]
 }
 
@@ -114,7 +116,7 @@ _TH_PromptOneShotDelay(PromptFn := 0, Path := "", ReloadFn := 0) {
 
 ; Persists the one-shot Shift timeout, then reloads. The registry default is
 ; written as an absent leaf, as macOS does.
-; @param Ms {Integer} A positive whole number of milliseconds.
+; @param Ms {Integer} 0 (no time limit) or a positive whole number of milliseconds.
 ; @param Path {String} The config.toml to write; ConfigurationFile by default.
 ; @param ReloadFn {Func} Replaces the reload in tests.
 ; @returns {Boolean} False when nothing was committed.

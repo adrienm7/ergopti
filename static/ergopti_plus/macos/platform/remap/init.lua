@@ -5118,11 +5118,11 @@ end
 
 --- Sets the sticky modifier timeout and persists it.
 --- Logs an error and returns without saving if the value is invalid.
---- @param ms number Timeout in milliseconds (must be a positive integer).
+--- @param ms number Timeout in milliseconds: 0 (no time limit) or a positive integer.
 function M.set_sticky_timeout(ms)
 	if not require_state("set_sticky_timeout") then return false end
-	local value = tonumber(ms)
-	if not require("core.text.engine.number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
+	local value = ms
+	if not require("tap_hold.engine.one_shot_timeout").is_valid(value) then
 		Logger.error(LOG, "set_sticky_timeout: invalid value '%s' — ignoring.", tostring(ms))
 		return false
 	end

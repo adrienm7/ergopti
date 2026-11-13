@@ -67,6 +67,14 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
       single and combined: Shift, Ctrl, Alt, AltGr, Kana, Win/Cmd, and chords such as Ctrl+Shift or Win+Ctrl; a key
       can tap one modifier's one-shot and hold that modifier (AltGr key: one-shot AltGr on tap, AltGr on hold).
       Shared defaults, tests per OS.
+      Claimed by worker A (branch `claude/ergopti-todo-oneshot`). Progress:
+  - [x] Timeout `0` = no time limit on the three OS: one rule per OS, ready for the shared validation schema
+        (`_shared/tap_hold/engine/one_shot_timeout.lua` for macOS and Linux at entry, load and engine boundary;
+        `TapHoldValidOneShotTimeoutMs` and `TapHoldOneShotHookTimeoutOption` on Windows); prompt says
+        « 0 = no time limit », menu label `menu.tapholds.sticky_no_limit` in 21 locales; negative and
+        fractional values refused.
+  - [ ] Every one-shot on every OS (Linux has no `sticky_*` yet; AltGr and Kana one-shots exist nowhere).
+  - [ ] Tap = one-shot of a modifier, hold = that modifier.
 - [ ] **One validation contract for every user-entered value (maintainer request 2026-11-13).** Every input box,
       editor field and `config.toml`/TOML key on Windows, macOS and Linux declares its type (integer, decimal,
       boolean, enum, string, path), minimum, maximum, whether decimals are allowed and any special value (such as

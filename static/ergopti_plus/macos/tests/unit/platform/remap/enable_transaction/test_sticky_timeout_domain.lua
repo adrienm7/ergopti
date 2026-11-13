@@ -3,8 +3,9 @@
 --- ==============================================================================
 --- MODULE: One-Shot Shift Timeout Domain
 --- DESCRIPTION:
---- The setter must admit exactly what arming and the editor can represent: a
---- positive whole number of milliseconds within the timer ceiling. A fraction
+--- The setter must admit exactly what arming and the editor can represent: 0
+--- (no time limit, decision of 2026-11-13) or a positive whole number of
+--- milliseconds within the timer ceiling. A fraction
 --- that floors to zero, NaN, an infinity and a value beyond the timer ceiling
 --- (the menu's "1e309" and "1e20") were persisted once, then broke arming or
 --- the next edit's integer dialog. A refusal changes neither state nor file.
@@ -19,7 +20,7 @@ helpers.describe("one-shot Shift timeout domain (OSM-002)", function()
 			local remap, calls = fixture.load_enabled_remap()
 			local before = remap.get_sticky_timeout()
 			local saves = #calls.saved_intents
-			local refused = { 0.1, 0.9, 0, -5, 1.5, 0 / 0, math.huge, -math.huge, 1e20, "1e309", "1e20", "abc" }
+			local refused = { 0.1, 0.9, -5, 1.5, "2000", 0 / 0, math.huge, -math.huge, 1e20, "1e309", "1e20", "abc" }
 			for _, candidate in ipairs(refused) do
 				helpers.assert_eq(remap.set_sticky_timeout(candidate), false, "refuses " .. tostring(candidate))
 			end
@@ -28,9 +29,11 @@ helpers.describe("one-shot Shift timeout domain (OSM-002)", function()
 		end)
 	end)
 
-	helpers.it("still admits whole positive milliseconds", function()
+	helpers.it("admits 0 as no time limit and whole positive milliseconds", function()
 		with_fixture(function(fixture)
 			local remap = fixture.load_enabled_remap()
+			helpers.assert_true(remap.set_sticky_timeout(0))
+			helpers.assert_eq(remap.get_sticky_timeout(), 0)
 			helpers.assert_true(remap.set_sticky_timeout(1))
 			helpers.assert_eq(remap.get_sticky_timeout(), 1)
 			helpers.assert_true(remap.set_sticky_timeout(2000))

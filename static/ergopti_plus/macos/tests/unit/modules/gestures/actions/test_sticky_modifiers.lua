@@ -209,10 +209,21 @@ helpers.describe("gestures.sticky_modifiers", function()
 	helpers.it("refuses a delay it was not given rather than inventing one", function()
 		local Sticky, injector = fresh_sticky()
 		helpers.assert_true(not Sticky.toggle({ "shift" }, nil), "a nil delay must be refused")
-		helpers.assert_true(not Sticky.toggle({ "shift" }, 0), "a zero delay must be refused")
+		helpers.assert_true(not Sticky.toggle({ "shift" }, -1), "a negative delay must be refused")
+		helpers.assert_true(not Sticky.toggle({ "shift" }, 0 / 0), "a NaN delay must be refused")
+		helpers.assert_true(not Sticky.toggle({ "shift" }, math.huge), "an infinite delay must be refused")
 		helpers.assert_eq(injector.arm_calls, 0,
 			"nothing may be armed on a guessed delay: the value belongs to the user's remap menu, "
 			.. "and substituting one here would override their choice exactly when the config failed to load")
+	end)
+
+	helpers.it("arms without an auto-cancel timer when the delay is 0, no time limit (one-shot-timeout-setting)", function()
+		local Sticky, injector, timers = fresh_sticky()
+		helpers.assert_true(Sticky.toggle({ "ctrl", "shift" }, 0), "0 is no time limit, a valid delay")
+		helpers.assert_eq(describe(injector.armed_with), "ctrl,shift", "the modifiers reach the injector")
+		helpers.assert_eq(#timers.scheduled, 0, "no auto-cancel timer is armed")
+		injector.on_applied()
+		helpers.assert_eq(describe(Sticky.armed()), "(none)", "the next keystroke still spends the arm")
 	end)
 
 	helpers.it("refuses a modifier no key event carries", function()

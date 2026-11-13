@@ -69,10 +69,10 @@ M.LONE_TAP_FIELD = ConfigKeys.LEAF.LONE_MODIFIER_TAP_MAX_MS
 local LONE_TAP_FIELD = M.LONE_TAP_FIELD
 M.LONE_TAP_DEFAULT_MS = LoneTap.validate(Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
 
--- How long a one-shot Shift waits for its key (config.toml [tap_holds]
--- sticky_timeout_ms): a positive whole number of milliseconds within the timer
--- ceiling, the timing registry's default when absent. No zero or unlimited
--- value: macOS refuses them too.
+-- How long a one-shot modifier waits for its key (config.toml [tap_holds]
+-- sticky_timeout_ms): 0 (no time limit) or a positive whole number of
+-- milliseconds within the timer ceiling, the timing registry's default when
+-- absent. The rule is tap_hold.engine.one_shot_timeout's, as on macOS.
 M.ONE_SHOT_TIMEOUT_FIELD = ConfigKeys.LEAF.STICKY_TIMEOUT_MS
 local ONE_SHOT_TIMEOUT_FIELD = M.ONE_SHOT_TIMEOUT_FIELD
 M.ONE_SHOT_TIMEOUT_DEFAULT_MS = require("infra.timings").ms("tap_hold", "one_shot_shift_timeout_ms")
@@ -81,7 +81,7 @@ M.ONE_SHOT_TIMEOUT_DEFAULT_MS = require("infra.timings").ms("tap_hold", "one_sho
 --- @param ms any
 --- @return boolean
 function M.valid_one_shot_timeout_ms(ms)
-	return type(ms) == "number" and require("core.text.engine.number_policy").within_timer_ceiling(ms) and ms > 0 and ms % 1 == 0
+	return require("tap_hold.engine.one_shot_timeout").is_valid(ms)
 end
 
 local STRING_FIELDS = { "tap_action", "hold_modifier", "hold_layer" }
@@ -388,7 +388,7 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes, confi
 			one_shot_timeout_ms = stored_one_shot
 		else
 			Outdated.report_in_file(config_file, { ConfigKeys.KEY.TAP_HOLDS, ONE_SHOT_TIMEOUT_FIELD },
-				string.format("%s is not a positive whole number of milliseconds; the one-shot timeout stays %d ms",
+				string.format("%s is not 0 (no time limit) or a positive whole number of milliseconds; the one-shot timeout stays %d ms",
 					tostring(stored_one_shot), M.ONE_SHOT_TIMEOUT_DEFAULT_MS))
 		end
 	end

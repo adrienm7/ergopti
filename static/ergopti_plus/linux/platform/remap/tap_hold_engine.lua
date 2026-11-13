@@ -47,6 +47,7 @@
 local EvdevCodes = require("infra.evdev_codes")
 local OneShotShift = require("tap_hold.engine.one_shot_shift_core")
 local LoneTap = require("tap_hold.engine.lone_tap")
+local OneShotTimeout = require("tap_hold.engine.one_shot_timeout")
 local InputEvent = require("infra.input_event")
 
 local M = {}
@@ -256,7 +257,7 @@ function M.new(opts)
 		nav_layer = options.nav_layer or {},
 		tap_min_ms = assert(tonumber(options.tap_min_ms), "tap_min_ms is required"),
 		lone_tap_max_ms = LoneTap.validate(options.lone_tap_max_ms),
-		one_shot_timeout_ms = assert(tonumber(options.one_shot_timeout_ms), "one_shot_timeout_ms is required"),
+		one_shot_timeout_ms = OneShotTimeout.validate(options.one_shot_timeout_ms),
 		tap_blocked = options.tap_blocked,
 		key_text = options.key_text,
 		plan_text = options.plan_text,
@@ -575,7 +576,8 @@ local function arm_one_shot(self, now_ms, guard)
 		local ok, current = pcall(guard)
 		if not ok or current ~= true then return false end
 	end
-	self.one_shot_until = now_ms + self.one_shot_timeout_ms
+	-- 0 is no time limit: the arm waits until a key spends or clears it.
+	self.one_shot_until = OneShotTimeout.deadline(now_ms, self.one_shot_timeout_ms)
 	input_arms[self] = guard and { current = guard, state = "armed" } or nil
 	return true
 end

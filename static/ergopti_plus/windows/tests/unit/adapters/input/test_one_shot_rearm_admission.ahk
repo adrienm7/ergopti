@@ -30,7 +30,7 @@ _OSRA_ChildSource() {
 		AssertTrue(Owner != "", "the real admission dependency must have one owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys",
+	for Name in ["OneShotShift", "OneShotShiftFix", "TapHoldOneShotHookTimeoutOption", "TapHoldValidOneShotTimeoutMs", "TapHoldOneShotTimeoutMs", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys",
 		"TapHoldNewOwner", "TapHoldOwnerCurrent", "TapHoldDispatchTap", "HotstringEndCharOfTap", "TapHoldTapInDispatch", "TapHoldShouldCancelTap", "_TH_TakePressTakenByCombination",
 		"TapHoldReleaseSyntheticKeys", "TapCopyCheckStop", "_TH_MaskMenuModifierRelease", "_TH_SyntheticKeyList",
 		"_TH_SyntheticReleaseStaysWithUser", "_TH_ForgetSyntheticKeyForUser", "_TH_MarkSyntheticKeyReleasePending",

@@ -25,7 +25,8 @@ OneShotShift() {
 		; intercept keystrokes that belong to other applications while AHK is paused
 		if A_IsSuspended
 				return
-		TimeoutSec := (IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) and ONE_SHOT_SHIFT_TIMEOUT_SEC > 0) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
+		; 0 is no time limit: the hook then waits until a key spends it.
+		TimeoutOption := TapHoldOneShotHookTimeoutOption()
 		; Load the shared results before capture, not after its ownership settles.
 		; Full scalar membership must not append an astral magic key's high unit.
 		MagicKey := ScriptInformation["MagicKey"]
@@ -33,7 +34,7 @@ OneShotShift() {
 		if !TapHoldOwnerCurrent(GestureOwner) || A_IsSuspended
 				return
 		NamedKeys := "{BackSpace}{Enter}{Delete}{Escape}{Tab}"
-		ihvText := InputHook("L2 T" . TimeoutSec . " E C", _SIHO_ScalarEndKeys())
+		ihvText := InputHook("L2" . TimeoutOption . " E C", _SIHO_ScalarEndKeys())
 		ihvText.KeyOpt(NamedKeys, "ES") ; Own only ending controls; other nontext keys remain native.
 		Custom := 0
 		if IsSet(_ALTGR_KANA_FIXUP) && _ALTGR_KANA_FIXUP {

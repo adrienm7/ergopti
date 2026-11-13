@@ -8,7 +8,8 @@
 --- keeps it in config.toml ([tap_holds] sticky_timeout_ms, decision of
 --- 2026-11-11): the writer's value is what the loader hands the engine, an
 --- invalid one is refused for the timing registry's default, and the engine's
---- one-shot deadline follows it (one-shot-timeout-setting).
+--- one-shot deadline follows it (one-shot-timeout-setting). 0 is no time limit
+--- (decision of 2026-11-13): written, loaded, and an arm that never expires.
 --- ==============================================================================
 
 package.loaded["tests.support.platform.remap.tap_hold.tap_hold_engine_fixture"] = nil
@@ -65,7 +66,7 @@ helpers.describe("tap-hold storage: the one-shot timeout in config.toml (one-sho
 
 	helpers.it("round-trips the writer's value through the loader (one-shot-timeout-setting)", function()
 		local writer, path, state, config_path = fresh_writer()
-		for _, ms in ipairs({ 3500, 750 }) do
+		for _, ms in ipairs({ 3500, 750, 0, 1 }) do
 			helpers.assert_true(writer.set_one_shot_timeout_ms(ms), "a valid timeout is written")
 			helpers.assert_eq(Loader.load(DEFAULTS_PATH, path, config_path).one_shot_timeout_ms, ms,
 				"the engine runs the stored timeout")
@@ -73,14 +74,14 @@ helpers.describe("tap-hold storage: the one-shot timeout in config.toml (one-sho
 		helpers.assert_true(writer.set_one_shot_timeout_ms(Loader.ONE_SHOT_TIMEOUT_DEFAULT_MS))
 		local stored = require("core.text.engine.toml_codec").decode(assert(io.open(config_path, "r")):read("*a"))
 		helpers.assert_nil(stored.tap_holds and stored.tap_holds.sticky_timeout_ms, "the default is written as an absence")
-		helpers.assert_eq(state.reloads, 3, "each change is in force at once")
+		helpers.assert_eq(state.reloads, 5, "each change is in force at once")
 		helpers.assert_nil(io.open(path, "r"), "tap_hold.toml is not written: the timeout is a config.toml row")
 		discard(path)
 	end)
 
-	helpers.it("refuses zero, negative, fractional and non-numeric timeouts in the writer (one-shot-timeout-setting)", function()
+	helpers.it("refuses negative, fractional and non-numeric timeouts in the writer (one-shot-timeout-setting)", function()
 		local writer, path, state, config_path = fresh_writer()
-		for _, bad in ipairs({ 0, -1, 12.5, "1000", math.huge, 0 / 0 }) do
+		for _, bad in ipairs({ -1, 12.5, "1000", math.huge, 0 / 0, true }) do
 			helpers.assert_eq(writer.set_one_shot_timeout_ms(bad), false, "refused: " .. tostring(bad))
 		end
 		for _, file in ipairs({ path, config_path }) do
@@ -94,11 +95,14 @@ helpers.describe("tap-hold storage: the one-shot timeout in config.toml (one-sho
 
 	helpers.it("reads an invalid stored timeout as the registry default (one-shot-timeout-setting)", function()
 		local config_path = os.tmpname()
-		for _, stored in ipairs({ "0", "-5", "12.5", '"1000"', "true" }) do
+		for _, stored in ipairs({ "-5", "12.5", '"1000"', "true" }) do
 			write_file(config_path, "[tap_holds]\nsticky_timeout_ms = " .. stored .. "\n")
 			helpers.assert_eq(Loader.load(DEFAULTS_PATH, nil, config_path).one_shot_timeout_ms,
 				Loader.ONE_SHOT_TIMEOUT_DEFAULT_MS, "refused: " .. stored)
 		end
+		write_file(config_path, "[tap_holds]\nsticky_timeout_ms = 0\n")
+		helpers.assert_eq(Loader.load(DEFAULTS_PATH, nil, config_path).one_shot_timeout_ms, 0,
+			"0 is read as no time limit, not refused")
 		write_file(config_path, "[tap_hold]\nsticky_timeout_ms = 4000\n")
 		helpers.assert_eq(Loader.load(DEFAULTS_PATH, config_path).one_shot_timeout_ms,
 			Loader.ONE_SHOT_TIMEOUT_DEFAULT_MS, "a timeout left in tap_hold.toml is never read")
@@ -109,6 +113,37 @@ helpers.describe("tap-hold storage: the one-shot timeout in config.toml (one-sho
 		local engine = Engine.new({ keys = {}, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 3500,
 			key_text = Fixture.us_text, plan_text = Fixture.us_plan, one_shot_result = Fixture.one_shot_result })
 		helpers.assert_eq(engine.one_shot_timeout_ms, 3500)
+	end)
+
+	helpers.it("refuses an invalid timeout at the engine boundary (one-shot-timeout-setting)", function()
+		for _, bad in ipairs({ -1, 12.5, "2000", 0 / 0, math.huge }) do
+			helpers.assert_true(not pcall(Engine.new, { keys = {}, tap_min_ms = 50, lone_tap_max_ms = 0,
+				one_shot_timeout_ms = bad, key_text = Fixture.us_text, plan_text = Fixture.us_plan,
+				one_shot_result = Fixture.one_shot_result }), "refused: " .. tostring(bad))
+		end
+	end)
+
+	local function one_shot_engine(timeout_ms)
+		return Engine.new({ keys = { right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } },
+			tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = timeout_ms,
+			key_text = Fixture.us_text, plan_text = Fixture.us_plan, one_shot_result = Fixture.one_shot_result })
+	end
+
+	helpers.it("drops the one-shot past a positive timeout (one-shot-timeout-setting)", function()
+		local e = one_shot_engine(500)
+		e:process(Fixture.RCTRL, Fixture.DOWN, 0)
+		e:process(Fixture.RCTRL, Fixture.UP, 100)
+		helpers.assert_nil(e:process(Fixture.KEY_A, Fixture.DOWN, 700), "past 500 ms the letter passes as it is")
+	end)
+
+	helpers.it("keeps the one-shot armed without a time limit at 0 (one-shot-timeout-setting)", function()
+		local e = one_shot_engine(0)
+		e:process(Fixture.RCTRL, Fixture.DOWN, 0)
+		e:process(Fixture.RCTRL, Fixture.UP, 100)
+		helpers.assert_eq(Fixture.trail((e:process(Fixture.KEY_A, Fixture.DOWN, 3600000))), "42↓ 30↓",
+			"an hour later the letter is still shifted")
+		e:process(Fixture.KEY_A, Fixture.UP, 3600010)
+		helpers.assert_nil(e:process(Fixture.KEY_A, Fixture.DOWN, 3600020), "the one-shot is spent once")
 	end)
 
 	helpers.it("hands the engine the loaded timeout, not the registry constant (one-shot-timeout-setting)", function()

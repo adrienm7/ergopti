@@ -204,7 +204,8 @@ end
 --- Toggles a set of modifiers, Karabiner-style: each one flips independently.
 ---
 --- @param modifiers table Array of modifier names ("cmd", "shift", …).
---- @param timeout_sec number Seconds of inactivity after which the arm is cancelled.
+--- @param timeout_sec number Seconds of inactivity after which the arm is
+---   cancelled; 0 is no time limit (no auto-cancel timer).
 --- @return boolean True when the call was accepted.
 function M.toggle(modifiers, timeout_sec, parent)
 	local scope_id = type(parent) == "string" and parent ~= ""
@@ -223,7 +224,7 @@ function M.toggle(modifiers, timeout_sec, parent)
 	-- No fallback delay on purpose: the value is the one the user set in the
 	-- remap menu, and inventing 3 s here would silently override that choice on
 	-- exactly the boot where the configuration failed to load.
-	if type(timeout_sec) ~= "number" or timeout_sec <= 0 then
+	if type(timeout_sec) ~= "number" or timeout_sec < 0 or timeout_sec >= math.huge or timeout_sec ~= timeout_sec then
 		Logger.error(LOG, "toggle(): no usable auto-cancel delay (%s) — refusing to arm.", tostring(timeout_sec))
 		return false
 	end
@@ -277,6 +278,12 @@ function M.toggle(modifiers, timeout_sec, parent)
 		or not sticky_acquisition_is_current(attempt) then
 		return rollback_sticky_acquisition(
 			attempt, nil, "injector arm rollback")
+	end
+
+	if timeout_sec == 0 then
+		finish_sticky_acquisition(attempt)
+		Logger.trace(LOG, "Sticky modifiers armed (%s), no auto-cancel.", armed_description())
+		return true
 	end
 
 	local timer_candidate = nil

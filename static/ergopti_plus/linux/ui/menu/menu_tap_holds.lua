@@ -240,23 +240,23 @@ local function _build_tap_holds(ctx)
 		return true
 	end
 
-	--- Asks how long a one-shot Shift waits for its key, in milliseconds (macOS's
-	--- sticky delay row): a positive whole number, live once written.
+	--- Asks how long a one-shot modifier waits for its key, in milliseconds
+	--- (macOS's sticky delay row): 0 (no time limit) or a positive whole
+	--- number, live once written. A negative or fractional answer is refused.
 	local function ask_one_shot_delay(current_ms)
 		local guard, setter = edit_guard("set_one_shot_timeout_ms")
 		if not guard then changed(false); return false end
 		local value = prompt_text(i18n_safe("menu.tapholds.sticky_dialog_title"),
 			i18n_safe("menu.tapholds.sticky_dialog_prompt"), tostring(current_ms))
 		if value == nil then return false end
-		local ms = tonumber(value)
-		local Loader = require("platform.remap.tap_hold_loader")
-		if not ms or ms ~= ms or not Loader.valid_one_shot_timeout_ms(math.floor(ms)) then
+		local ms = require("tap_hold.engine.one_shot_timeout").parse(value)
+		if ms == nil then
 			Logger.warn(LOG, "Invalid one-shot timeout '%s' — ignored.", tostring(value))
 			show_error(plain_markup(tostring(value)), i18n_safe("dialog.gestures.param_error_title"))
 			return false
 		end
 		if guard() ~= true then changed(false); return false end
-		local call_ok, persisted = pcall(setter, math.floor(ms), guard)
+		local call_ok, persisted = pcall(setter, ms, guard)
 		if not call_ok or persisted ~= true then
 			changed(false)
 			return false
@@ -365,7 +365,8 @@ local function _build_tap_holds(ctx)
 		["tap_hold_one_shot_delay"] = function()
 			local current_ms = th.one_shot_timeout_ms()
 			return { {
-				label = string.format(i18n_safe("menu.tapholds.sticky_title"), current_ms .. " ms"),
+				label = string.format(i18n_safe("menu.tapholds.sticky_title"), current_ms == 0
+					and i18n_safe("menu.tapholds.sticky_no_limit") or current_ms .. " ms"),
 				action = function() return ask_one_shot_delay(current_ms) end,
 			} }
 		end,

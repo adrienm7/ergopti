@@ -46,8 +46,8 @@ global KEY_REPEAT_INITIAL_DELAY_MS := 0
 ; Interval (ms) between successive BackSpace repeats while the key stays held.
 global KEY_REPEAT_INTERVAL_MS := 0
 
-; Timeout (s) for the OneShotShift InputHook: how long to wait for the next
-; character before giving up and leaving the shift state active.
+; Timeout (s) for the one-shot InputHooks (one-shot Shift and the sticky_*
+; actions): how long to wait for the next key; 0 is no time limit.
 global ONE_SHOT_SHIFT_TIMEOUT_SEC := 0
 
 ; The GLOBAL tap-hold delay (s): what every key waits before its hold fires until
@@ -125,20 +125,31 @@ TapHoldLoneTapReadConfig(Cache) {
 	LoggerInfo("TapHold", "Lone modifier tap window read: {1} ms.", TapHoldLoneTapMaxMs())
 }
 
-; Refuses a one-shot timeout that is not a positive whole number of
-; milliseconds (tap_holds.sticky_timeout_ms, the leaf macOS reads). No zero
-; or unlimited value: macOS refuses them too (decision of 2026-11-06).
+; Refuses a one-shot timeout that is neither 0 (no time limit, decision of
+; 2026-11-13) nor a positive whole number of milliseconds
+; (tap_holds.sticky_timeout_ms, the leaf macOS reads). The one rule on Windows,
+; the AHK port of _shared/tap_hold/engine/one_shot_timeout.lua.
 ; @param Ms {Number} Milliseconds.
 ; @returns {Integer}
 TapHoldValidOneShotTimeoutMs(Ms) {
-	if !(Ms is Integer) || Ms <= 0
-		throw ValueError("tap_holds.sticky_timeout_ms must be a positive whole number of milliseconds.", -1, String(Ms))
+	if !(Ms is Integer) || Ms < 0
+		throw ValueError("tap_holds.sticky_timeout_ms must be 0 (no time limit) or a positive whole number of milliseconds.",
+			-1, (Ms is Object) ? Type(Ms) : String(Ms))
 	return Ms
+}
+
+; The InputHook timeout option of a one-shot wait: " T<seconds>", or nothing
+; when the timeout is 0 (no time limit). Fails fast on a value altered after
+; load, at the boundary where it reaches InputHook.
+; @returns {String}
+TapHoldOneShotHookTimeoutOption() {
+	Ms := TapHoldValidOneShotTimeoutMs(TapHoldOneShotTimeoutMs())
+	return Ms == 0 ? "" : " T" . (Ms / 1000)
 }
 
 ; Reads the one-shot Shift timeout from config.toml at boot, after
 ; TapHoldsLoadTimings(): absent, the timing registry's default stays; a value
-; that is not a positive whole number is reported and the default stays.
+; that is neither 0 nor a positive whole number is reported and the default stays.
 ; @param Cache {Map} The parsed config (IniCacheGet's source).
 TapHoldOneShotTimeoutReadConfig(Cache) {
 	global ONE_SHOT_SHIFT_TIMEOUT_SEC
@@ -167,6 +178,8 @@ TapHoldOneShotTimeoutReadConfig(Cache) {
 ; @returns {Integer}
 TapHoldOneShotTimeoutMs() {
 	global ONE_SHOT_SHIFT_TIMEOUT_SEC
+	if !(ONE_SHOT_SHIFT_TIMEOUT_SEC is Number)
+		throw TypeError("The one-shot timeout in force is not a number.", -1, Type(ONE_SHOT_SHIFT_TIMEOUT_SEC))
 	return Round(ONE_SHOT_SHIFT_TIMEOUT_SEC * 1000)
 }
 

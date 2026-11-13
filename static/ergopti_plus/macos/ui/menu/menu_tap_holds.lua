@@ -794,7 +794,8 @@ local function build_sticky_delay_item(karabiner, update_menu)
 	local timeout_ms = karabiner.get_sticky_timeout()
 
 	return {
-		label = string.format(i18n.get("menu.tapholds.sticky_title"), fmt_delay(timeout_ms)),
+		label = string.format(i18n.get("menu.tapholds.sticky_title"), timeout_ms == 0
+			and i18n.get("menu.tapholds.sticky_no_limit") or fmt_delay(timeout_ms)),
 		action    = function()
 			hs.focus()
 			local prompt = i18n.get("menu.tapholds.sticky_dialog_prompt")
@@ -806,13 +807,14 @@ local function build_sticky_delay_item(karabiner, update_menu)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Sticky delay input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
-			local ms = tonumber(result["text returned"])
-			if not ms or ms <= 0 then
+			-- 0 is no time limit; a negative or fractional answer is refused.
+			local ms = require("tap_hold.engine.one_shot_timeout").parse(result["text returned"])
+			if ms == nil then
 				Logger.warn(LOG, "Invalid sticky delay '%s' — ignored.", tostring(result["text returned"]))
 				return
 			end
 			commit_menu_setting(karabiner, "Sticky timeout", function()
-				return karabiner.set_sticky_timeout(math.floor(ms))
+				return karabiner.set_sticky_timeout(ms)
 			end, update_menu)
 		end,
 	}
