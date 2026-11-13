@@ -256,7 +256,16 @@ function runStep(key, opts) {
 		['tools/test/test-driver-tree-parity.cjs', '--update-baseline', '--allow-rise'],
 		{ env: { ERGOPTI_STRUCTURE_PHASE: '2' } }
 	);
-	receipt.boundsRaised = [bounds.tail, parity.tail]
+	// The shared literal inventory (Rule A) pairs the drivers' copies of one
+	// function by name and body: a step that respells both alike can expose a
+	// duplicate the tree already had, named in the commit like the bounds.
+	const literals = action(
+		'shared literals',
+		process.execPath,
+		['tools/test/test-shared-literal-inventory.cjs', '--update-baseline', '--allow-rise'],
+		{ env: { ERGOPTI_STRUCTURE_PHASE: '2' } }
+	);
+	receipt.boundsRaised = [bounds.tail, parity.tail, literals.tail]
 		.join('\n')
 		.split('\n')
 		.filter((l) => l.startsWith('[RISE] '))
