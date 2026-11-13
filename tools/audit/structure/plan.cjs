@@ -1451,6 +1451,8 @@ function resolveJoinedPath(j, byRepoPath, byRepoDir, successors, env = new Map()
 		}
 		let newRepo = byRepoPath.get(oldRepo) || byRepoDir.get(oldRepo);
 		if (!newRepo) return null;
+		const widened = widenedJoin(oldRepo, byRepoPath, byRepoDir, successors);
+		if (widened !== undefined) return widened;
 		let kind = 'join';
 		if (newRepo === SPLIT) {
 			newRepo = successors.get(oldRepo);
@@ -2935,8 +2937,28 @@ function newFolder(dir, byRepoDir, successors) {
  * new place of that base, so `path.join(DATA, 'locale_order.json')` follows
  * both the file and `DATA = path.join(SHARED, 'data')`.
  */
+/**
+ * A join onto a folder the step scatters, whose nearest new home is a folder
+ * above it (the driver root for linux/ui): following it would widen what the
+ * join names to every sibling. Such a join keeps its name while the folder
+ * keeps files, as the folder rule does. An emptied folder follows its
+ * successor as before: deeper joins built on it are respelled from there.
+ * @returns {null|undefined} null to keep, undefined to resolve as usual.
+ */
+function widenedJoin(full, byRepoPath, byRepoDir, successors) {
+	if (byRepoDir.get(full) !== SPLIT) return undefined;
+	const successor = successors.get(full);
+	if (successor && !full.startsWith(`${successor}/`)) return undefined;
+	for (const p of EXISTING)
+		if (p.startsWith(`${full}/`) && /\.[A-Za-z0-9]+$/.test(p) && (byRepoPath.get(p) || p) === p)
+			return null;
+	return undefined;
+}
+
 function resolveOnBase(j, base, joined, byRepoPath, byRepoDir, successors) {
 	const full = path.posix.normalize(base ? `${base}/${joined}` : joined);
+	const widened = widenedJoin(full, byRepoPath, byRepoDir, successors);
+	if (widened !== undefined) return widened;
 	const newBase = newFolder(base, byRepoDir, successors);
 	let newFull = null;
 	if (EXISTING.has(full)) newFull = byRepoPath.get(full) || newFolder(full, byRepoDir, successors);
