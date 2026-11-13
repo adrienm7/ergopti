@@ -832,12 +832,12 @@ _KLE_AltGrShortcutMods(CtrlHeld, Shift) {
 ; Whether a Ctrl other than AltGr's own is physically held: the right Ctrl, or a
 ; left Ctrl that is not the fake LCtrl a standard AltGr layout adds to every
 ; AltGr press (the press ledger tells the real key from that alias).
-; @param StateFn {Func} (Name) -> physical state; GetKeyState by default.
+; @param StateFn {Func} (Name) -> physical state; KS_IsDown by default.
 ; @param RealFn {Func} (Name) -> 1 real, 0 alias, -1 unknown; KS_RealPressState by default.
 ; @returns {Boolean}
 _KLE_RealCtrlHeld(StateFn := 0, RealFn := 0) {
 	if !HasMethod(StateFn, "Call")
-		StateFn := (Name) => GetKeyState(Name, "P")
+		StateFn := KS_IsDown
 	if !HasMethod(RealFn, "Call")
 		RealFn := KS_RealPressState
 	if StateFn.Call("RCtrl")
@@ -1949,22 +1949,24 @@ _KLE_SourceCriterion(*) {
 
 /**
  * The built-in modifiers held now, as the engine names them.
- * @param {Func} StateFn - GetKeyState, or a stand-in for a test.
+ * Reads through the key-state adapter, the one owner of the physical state.
+ * @param {Func} StateFn - (Name) -> physical state; KS_IsDown, or a stand-in for a test.
+ * @param {Func} CapsFn - () -> Caps Lock toggle; KS_CapsLockToggleState, or a stand-in.
  * @returns {Map}
  */
-KeylayoutEmulation_SourceHeld(StateFn := GetKeyState) {
+KeylayoutEmulation_SourceHeld(StateFn := KS_IsDown, CapsFn := KS_CapsLockToggleState) {
 	Held := Map()
-	if StateFn.Call("LShift", "P") || StateFn.Call("RShift", "P")
+	if StateFn.Call("LShift") || StateFn.Call("RShift")
 		Held["shift"] := true
-	if StateFn.Call("LControl", "P") || StateFn.Call("RControl", "P")
+	if StateFn.Call("LControl") || StateFn.Call("RControl")
 		Held["control"] := true
-	if StateFn.Call("LAlt", "P")
+	if StateFn.Call("LAlt")
 		Held["alt"] := true
-	if StateFn.Call("RAlt", "P")
+	if StateFn.Call("RAlt")
 		Held["alt_right"] := true
-	if StateFn.Call("LWin", "P") || StateFn.Call("RWin", "P")
+	if StateFn.Call("LWin") || StateFn.Call("RWin")
 		Held["meta"] := true
-	if StateFn.Call("CapsLock", "T")
+	if CapsFn.Call()
 		Held["caps_lock"] := true
 	return Held
 }

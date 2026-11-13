@@ -121,7 +121,7 @@ _Onboarding_StartGestureAuto(OnDone) {
 		return false
 	}
 	Pid := 0
-	try Run('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide", &Pid)
+	try GestureRestartRunElevated(ScriptPath, &Pid)
 	catch as err {
 		FSDelete(ScriptPath)
 		_Onboarding_AbortGestureAutoReservation(Epoch)
