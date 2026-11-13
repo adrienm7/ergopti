@@ -10,13 +10,13 @@
 
 local helpers = require("tests.helpers")
 
-local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 
-local Toml = require("toml_codec")
+local Toml = require("core.text.engine.toml_codec")
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local Base64 = require("compat.base64")
+local Base64 = require("core.lifecycle.engine.compat.base64")
 
 --- Binds the actual idle live owner without replacing the profile/save collaborators.
 --- Every native owner is fresh; all module identities/absence are journalled.

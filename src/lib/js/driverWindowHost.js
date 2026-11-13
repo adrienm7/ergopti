@@ -87,7 +87,7 @@ const stringsCache = new Map();
  * @returns {Promise<Record<string, string>>}
  */
 function localeStrings(asset, locale) {
-	const key = asset(`ergopti_plus/_shared/data/locales/${locale}.json`);
+	const key = asset(`ergopti_plus/_shared/core/i18n/data/locales/${locale}.json`);
 	if (!stringsCache.has(key)) {
 		stringsCache.set(
 			key,
@@ -125,7 +125,7 @@ function parseParams(raw) {
  */
 async function injectModelBrowser(win, asset, locale) {
 	win.i18n_apply?.(await localeStrings(asset, locale));
-	const res = await fetch(asset('ergopti_plus/_shared/modules/llm/models.json'));
+	const res = await fetch(asset('ergopti_plus/_shared/ai/data/models.json'));
 	if (!res.ok) throw new Error(`Model catalog unavailable: HTTP ${res.status}`);
 	const catalog = await res.json();
 	const models = [];

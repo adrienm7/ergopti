@@ -51,7 +51,7 @@ _THS_ReportAndImport(Shape, Recommended) {
 	global _SharedDir, _OnboardingCatalogue
 	SavedCatalogue := _OnboardingCatalogue
 	Source := _THS_Source(Shape, Recommended), Fixture := _THS_Fixture(Source)
-	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 	try {
 		Loaded := LoadTapHoldToml(Fixture.tap, Defaults)
 		AssertEqual(Recommended ? "enter" : "escape", TapHoldTapAction(Loaded, "caps_lock"))
@@ -115,7 +115,7 @@ _THS_Scope(Shape, Mode) {
 		return true
 	}
 	try {
-		Defaults := _SharedDir . "\tap_hold\defaults.toml"
+		Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 		TapHold := LoadTapHoldToml(Fixture.tap, Defaults), Before := TapHold
 		AssertEqual("escape", TapHoldTapAction(TapHold, "caps_lock"))
 		Fixture.options["tap_hold_path"] := Fixture.tap
@@ -163,7 +163,7 @@ _THS_Scope(Shape, Mode) {
 
 _THS_InheritanceIntent() {
 	global _SharedDir
-	Fixture := _THS_Fixture(""), Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Fixture := _THS_Fixture(""), Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 	try {
 		for Index, Literal in ["true", "false", "1", "0", '"true"', '"1"'] {
 			Path := Fixture.directory . "\inherit-" . Index . ".toml"
@@ -180,7 +180,7 @@ _THS_InheritanceIntent() {
 
 _THS_InvalidNamespaceRefuses() {
 	global _SharedDir
-	Fixture := _THS_Fixture(""), Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Fixture := _THS_Fixture(""), Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 	try {
 		for Index, Source in ['tap_hold = []`n', '[tap_hold]`nkeys = []`n'] {
 			Path := Fixture.directory . "\invalid-" . Index . ".toml"

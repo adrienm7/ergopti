@@ -33,7 +33,7 @@ helpers.describe("adapters.file_system: conditional removal ownership", function
 	end
 
 	local function writer()
-		return require("toml_codec.writer")
+		return require("core.text.engine.toml_codec.writer")
 	end
 
 	local function expected()
@@ -171,7 +171,7 @@ helpers.describe("adapters.file_system: conditional removal ownership", function
 					if target == path then unlinks = unlinks + 1 end
 					return original_remove(target)
 				end
-				local preset = require("keymap.layer_preset")
+				local preset = require("layouts.engine.layers.preset")
 				local record = { status = preset.IMPORTED, path = path, content = "owned preset" }
 				helpers.assert_eq(preset.undo(record, adapter), false)
 				helpers.assert_eq(type(record.removal_cleanup), "function")
@@ -210,7 +210,7 @@ helpers.describe("adapters.file_system: conditional removal ownership", function
 				end
 				return original_remove(target)
 			end
-			local preset = require("keymap.layer_preset")
+			local preset = require("layouts.engine.layers.preset")
 			local record = { status = preset.IMPORTED, path = path, content = "owned preset" }
 			helpers.assert_eq(preset.undo(record, adapter), false)
 			blocked = false
@@ -240,7 +240,7 @@ helpers.describe("conditional removal composed scope", function()
 				return original_remove(target)
 			end
 			local call_ok, detail = xpcall(function()
-				local owner = require("config_scope_transaction").new({
+				local owner = require("settings.engine.scope.transaction").new({
 					path = path, backup_path = backup, files = adapter,
 					manifest = { scope_plan = function() return {
 						presets = {}, operations = { { section = "scope", key = "enabled", value = true } },
@@ -297,7 +297,7 @@ helpers.describe("navigation-layer cohort native release debt", function()
 						return original_remove(target)
 					end
 					local call_ok, detail = xpcall(function()
-						local preset = require("keymap.layer_preset")
+						local preset = require("layouts.engine.layers.preset")
 						package.loaded["platform.remap.nav_layer"] = {
 							import_recommended = function() return {
 								status = preset.IMPORTED, path = path, content = "owned preset",
@@ -352,7 +352,7 @@ helpers.describe("conditional removal classified read refusal", function()
 				if target == path then unlinks = unlinks + 1 end
 				return original_remove(target)
 			end
-			local call_ok, removed, detail = pcall(require("toml_codec.writer").remove_if_unchanged,
+			local call_ok, removed, detail = pcall(require("core.text.engine.toml_codec.writer").remove_if_unchanged,
 				path, adapter, { status = "ok", content = "owned preset" })
 			io.open, os.remove = original_open, original_remove
 			local observed = assert(original_open(path, "r")); local source = observed:read("*a"); assert(observed:close())

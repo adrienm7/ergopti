@@ -161,7 +161,7 @@ Test("Token exchange: every request of the corpus, byte for byte, signed asserti
 
 _LTE_Catalogue() {
 	global _SharedDir
-	Providers := _LTE_ReadJson("modules\llm\api_providers.json")["providers"]
+	Providers := _LTE_ReadJson("ai\data\api_providers.json")["providers"]
 	for Id in ["watsonx", "vertex"]
 		AssertTrue(LLM_TokenExchange_Parse(Providers[Id]["auth"]) is Map, Id . "'s block is valid")
 	Corpus := _LTE_ExchangeCorpus()

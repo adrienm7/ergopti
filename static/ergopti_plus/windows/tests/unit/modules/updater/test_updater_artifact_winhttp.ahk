@@ -25,9 +25,9 @@ _UpdaterArtifactWinHttp_Controls() {
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
 				_DriverDir . "\tests\fixtures\updater_artifact_download_controls.ps1",
 				"-VendorDirectory", _VendorDir,
-				"-SchemaPath", _SharedDir . "\modules\network\managed_network.json",
-				"-PolicyPath", _SharedDir . "\modules\network\proxy_policy.json",
-				"-DefaultsPath", _SharedDir . "\modules\updater\defaults.json"],
+				"-SchemaPath", _SharedDir . "\core\network\data\managed_network.json",
+				"-PolicyPath", _SharedDir . "\core\network\data\proxy_policy.json",
+				"-DefaultsPath", _SharedDir . "\updater\data\defaults.json"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 16384)
 		AssertTrue(Handle.start(), "the artifact download control fixture process must start")
 		Started := A_TickCount

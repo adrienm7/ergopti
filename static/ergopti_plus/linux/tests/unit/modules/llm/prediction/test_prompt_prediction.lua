@@ -21,10 +21,10 @@
 
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
-local Rewrite = require("llm.rewrite")
-local PromptBuilder = require("llm.prompt_builder")
+local Rewrite = require("ai.engine.prediction.rewrite")
+local PromptBuilder = require("ai.engine.prediction.prompt_builder_core")
 
 local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", token = "k", model = "", base_url = "" }
 local REWRITE_CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/llm/rewrite_vectors.json"
@@ -365,7 +365,7 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 
 	helpers.it("runs a custom prompt by its id", function()
 		scenario({ buffer = "Bonjour Marc", stored = {
-			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("ai.engine.settings.profile_registry_codec").encode({
 				{ id = "user_formal", label = "Formal", system_single = "Continue formally.", batch = false },
 			}),
 		} }, function(world)
@@ -398,7 +398,7 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 
 	helpers.it("custom-profile-shortcut: a configured custom prompt is inert while the AI is off", function()
 		scenario({ buffer = "Bonjour Marc", disabled = true, stored = {
-			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("ai.engine.settings.profile_registry_codec").encode({
 				{ id = "user_formal", label = "Formal", system_single = "Continue formally.", batch = false },
 			}),
 		} }, function(world)
@@ -532,10 +532,10 @@ end)
 -- ============================================
 -- ============================================
 
--- The retry policy of _shared/modules/llm/inference.json, which macOS and
+-- The retry policy of _shared/ai/data/inference.json, which macOS and
 -- Windows already apply: max_multiplier attempts per requested prediction,
 -- and a failed or empty attempt followed by one with more room and warmth.
-local INFERENCE = helpers.driver_root() .. "/../_shared/modules/llm/inference.json"
+local INFERENCE = helpers.driver_root() .. "/../_shared/ai/data/inference.json"
 
 --- The shared retry policy, read from its single source.
 --- @return table

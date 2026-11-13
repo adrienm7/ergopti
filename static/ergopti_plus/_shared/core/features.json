@@ -143,7 +143,7 @@
 		"times: the drivers agreed with each other and only the list disagreed.",
 		"'Metrics' stays the word the user reads in the menu; 'keystats' is the",
 		"word the code uses for the module that captures the keystrokes. A canonical",
-		"entry names a folder, not a label — infra/paths and modules/diagnostics are",
+		"entry names a folder, not a label — infra/paths and diagnostics/data are",
 		"not phrases a user says either."
 	]
 }

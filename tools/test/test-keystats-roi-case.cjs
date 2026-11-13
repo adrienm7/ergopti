@@ -19,12 +19,12 @@ const Codegen = require('../codegen/codegen-keystats-roi-case.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const profile = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/_shared/data/keystats_roi_lowercase.json'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/metrics/data/keystats_roi_lowercase.json'),
 		'utf8'
 	)
 );
 const unicode = fs.readFileSync(
-	path.join(ROOT, 'static/ergopti_plus/_shared/lua/unicode_case/data.lua')
+	path.join(ROOT, 'static/ergopti_plus/_shared/core/text/engine/unicode_case/data.lua')
 );
 const projected = Codegen.project(profile, unicode);
 

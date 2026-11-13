@@ -39,7 +39,7 @@ const path = require('node:path');
 const { GLIBC_CEILING } = require('./check-elf-glibc-ceiling.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const DATA_DIR = path.join(ROOT, 'static/ergopti_plus/_shared/data');
+const DATA_DIR = path.join(ROOT, 'static/ergopti_plus/_shared');
 
 /** The catalogue every other locale mirrors, read for an unshipped language. */
 const CANONICAL_LOCALE = 'en';
@@ -80,14 +80,16 @@ function shellText(text, ceiling) {
  * @returns {{code: string, texts: Record<string, string>}[]} In the canonical order.
  */
 function readLocales(dataDir = DATA_DIR) {
-	const order = JSON.parse(fs.readFileSync(path.join(dataDir, 'locale_order.json'), 'utf8')).order;
+	const order = JSON.parse(
+		fs.readFileSync(path.join(dataDir, 'core/i18n/data/locale_order.json'), 'utf8')
+	).order;
 	if (!Array.isArray(order) || order.length === 0) {
 		throw new Error('locale_order.json declares no locale order');
 	}
 	return order.map((code) => {
 		if (!/^[a-z]{2}$/.test(code)) throw new Error(`Invalid locale code: ${JSON.stringify(code)}`);
 		const catalogue = JSON.parse(
-			fs.readFileSync(path.join(dataDir, 'locales', `${code}.json`), 'utf8')
+			fs.readFileSync(path.join(dataDir, 'core/i18n/data/locales', `${code}.json`), 'utf8')
 		);
 		const texts = {};
 		for (const [role, key] of Object.entries(MESSAGE_KEYS)) {

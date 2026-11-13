@@ -21,7 +21,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "keymap.number_row_live"
 
@@ -56,7 +56,7 @@ function M.available(deps)
 	if not live then return false, "session_unsupported" end
 	local resolved = resolve(deps)
 	local snapshot = resolved.registry.snapshot(resolved.registry_deps)
-	if require("table_util").count(snapshot.installed or {}) == 0 then return false, "no_source_layout" end
+	if require("core.text.engine.table_util").count(snapshot.installed or {}) == 0 then return false, "no_source_layout" end
 	return true, nil
 end
 

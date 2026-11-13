@@ -38,7 +38,7 @@ const SHARED = path.join(DRIVERS, '_shared');
 const INSTALLER = path.join(DRIVER, 'install.sh');
 const HELPER = path.join(DRIVER, 'install', 'layout_registry.sh');
 const OWNERSHIP = path.join(DRIVER, 'install', 'ownership.sh');
-const DEFAULTS = path.join(SHARED, 'modules', 'layouts', 'defaults.json');
+const DEFAULTS = path.join(SHARED, 'layouts', 'data', 'defaults.json');
 const DRIVER_BUILDER = path.join(ROOT, 'tools', 'build', 'build-linux-driver.sh');
 
 // The files the Ergopti extension supplies in place of the shared folder.
@@ -167,13 +167,13 @@ function installedReaderPort(lib) {
 		`assert(fixture_reader.open(${JSON.stringify(path.resolve(lib).replaceAll('\\', '/'))}) == nil, "directories cannot acquire read admission")`,
 		`assert(fixture_reader.open(${JSON.stringify(path.resolve(lib, '../unowned.txt').replaceAll('\\', '/'))}) == nil, "existing foreign fixture files cannot acquire read admission")`,
 		`assert(fixture_reader.open(${JSON.stringify(path.resolve(lib).replaceAll('\\', '/') + '/../unowned.txt')}) == nil, "traversal cannot acquire read admission")`,
-		`local admitted_stream = assert(fixture_reader.open(${JSON.stringify(path.resolve(lib, '_shared/modules/layouts/defaults.json').replaceAll('\\', '/'))}))`,
+		`local admitted_stream = assert(fixture_reader.open(${JSON.stringify(path.resolve(lib, '_shared/layouts/data/defaults.json').replaceAll('\\', '/'))}))`,
 		'assert(type(admitted_stream:read("*a")) == "string"); assert(admitted_stream:close())',
 		'local equivalent_filenames = {',
 		...[
-			path.resolve(lib).replaceAll('\\', '/') + '/linux/../_shared/modules/layouts/defaults.json',
-			path.resolve(lib, '_shared/modules/layouts/defaults.json'),
-			path.resolve(lib, '_shared/modules/layouts/defaults.json').toUpperCase()
+			path.resolve(lib).replaceAll('\\', '/') + '/_shared/layouts/data/defaults.json',
+			path.resolve(lib, '_shared/layouts/data/defaults.json'),
+			path.resolve(lib, '_shared/layouts/data/defaults.json').toUpperCase()
 		].map((filename) => `  ${JSON.stringify(filename)},`),
 		'}',
 		'for _, filename in ipairs(equivalent_filenames) do',
@@ -186,7 +186,7 @@ function installedReaderPort(lib) {
 
 /** The actual copy must contain the exact shared discovery defaults. */
 function assertInstalledReaderInputs(admitted, lib) {
-	const defaults = path.resolve(lib, '_shared/modules/layouts/defaults.json').replaceAll('\\', '/');
+	const defaults = path.resolve(lib, '_shared/layouts/data/defaults.json').replaceAll('\\', '/');
 	if (!admitted.includes(defaults) || !fs.readFileSync(defaults).equals(fs.readFileSync(DEFAULTS)))
 		throw new Error('The installed defaults must be physical and byte-exact before discovery.');
 	fs.writeFileSync(
@@ -215,7 +215,7 @@ if (constants.status !== 0) {
 	if (folder !== settings.folder || index !== settings.index_file) {
 		errors.push(
 			`layout_registry.sh installs to ${folder}/${index}, but the daemon reads ` +
-				`${settings.folder}/${settings.index_file} (_shared/modules/layouts/defaults.json).`
+				`${settings.folder}/${settings.index_file} (_shared/layouts/data/defaults.json).`
 		);
 	}
 }
@@ -337,7 +337,7 @@ function observeUpdaterArchive(block, prefix, refusal, relativeWork = false) {
 		const bundle = path.join(repository, 'build/linux');
 		const files = {
 			'linux/runtime.lua': 'private runtime bytes, never executed',
-			'_shared/data/locales/en.json': '{}\n',
+			'_shared/core/i18n/data/locales/en.json': '{}\n',
 			'bin/ergopti-hotstrings': 'private launcher bytes, never executed',
 			'install.sh': 'private installer bytes, never executed'
 		};
@@ -549,7 +549,7 @@ try {
 					...installedReaderPort(lib),
 					'local root = arg[1]',
 					'package.path = root .. "/linux/?.lua;" .. root .. "/linux/?/init.lua;"',
-					'	.. root .. "/_shared/lua/?.lua;" .. root .. "/_shared/lua/?/init.lua;" .. package.path',
+					'	.. root .. "/_shared/?.lua;" .. root .. "/_shared/?/init.lua;" .. package.path',
 					'local Paths = require("infra.paths")',
 					'local Config = require("modules.hotstrings.hotstrings_config")',
 					'local Loader = require("modules.hotstrings.loader")',
@@ -567,7 +567,7 @@ try {
 					'	end',
 					'end',
 					'local paths = {}',
-					'for _, p in ipairs(Loader.find_toml_files(Paths.shared("modules/hotstrings"))) do',
+					'for _, p in ipairs(Loader.find_toml_files(Paths.shared("hotstrings/data/catalogue"))) do',
 					'	if not p:find("/french/", 1, true) then paths[#paths + 1] = p end',
 					'end',
 					'local catalogue = Loader.load_catalogue(Config.route_bound_sources(paths, found))',

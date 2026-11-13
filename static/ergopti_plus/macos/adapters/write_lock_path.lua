@@ -21,8 +21,8 @@
 
 local M = {}
 
-local NativePath = require("native_path")
-local AppDirs = require("app_dirs")
+local NativePath = require("core.fs.engine.native_path")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 M.SUFFIX = ".ergoptiplus-write-lock-v1"
 -- Relative to the home folder, inside the one Ergopti root.

@@ -55,6 +55,6 @@ def shared_rel(*parts: str) -> str:
             *parts: Path segments under _shared/.
 
     Returns:
-            Repo-relative path string, e.g. "static/ergopti_plus/_shared/data/locales".
+            Repo-relative path string, e.g. "static/ergopti_plus/_shared/core/i18n/data/locales".
     """
     return "/".join((SHARED_REL, *parts))

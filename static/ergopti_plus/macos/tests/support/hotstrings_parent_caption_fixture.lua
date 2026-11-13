@@ -17,7 +17,7 @@ local M = {}
 function M.install(translator)
 	assert(type(translator) == "table" and type(translator.get) == "function"
 		and type(translator.section) == "function", "positive caption fixture needs its actual translator")
-	local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
+	local file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "rb"))
 	local bytes = assert(file:read("*a"))
 	assert(file:close())
 	local source = assert(require("adapters.json_codec").decode(bytes))

@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Loads the module with in-memory collaborators.
 --- @param live table Keyboard names macOS has turned on.

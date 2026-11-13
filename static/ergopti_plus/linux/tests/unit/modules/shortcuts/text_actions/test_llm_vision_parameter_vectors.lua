@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
 local ACTIONS = { "llm_screen_region", "llm_screen_full", "llm_screen_error" }
@@ -51,12 +51,12 @@ local function deep_equal(a, b, where)
 end
 
 local Gestures = helpers.load_module("modules.gestures.manager")
-local Vision = require("llm.vision")
+local Vision = require("ai.engine.prediction.vision")
 local VisionRequest = require("modules.llm.vision_request")
 
 helpers.describe("llm_vision parameter replays the shared vision corpus", function()
 	local corpus = read_json("tests/corpus/llm/vision_vectors.json")
-	local config = read_json("modules/llm/vision.json")
+	local config = read_json("ai/data/vision.json")
 
 	helpers.it("every screen action declares the llm_vision parameter", function()
 		for _, action in ipairs(ACTIONS) do
@@ -128,8 +128,8 @@ helpers.describe("llm_vision parameter replays the shared vision corpus", functi
 end)
 
 helpers.describe("llm_vision parameter: what the binding editors show", function()
-	local providers = read_json("modules/llm/api_providers.json")
-	local config = read_json("modules/llm/vision.json")
+	local providers = read_json("ai/data/api_providers.json")
+	local config = read_json("ai/data/vision.json")
 	local i18n = require("infra.i18n")
 	-- The providers a screen action may name, in catalogue order
 	local vision_ids, excluded = {}, {}
@@ -142,7 +142,7 @@ helpers.describe("llm_vision parameter: what the binding editors show", function
 	end
 
 	-- Local API capabilities extend the ordinary provider list in shared order.
-	local local_catalogue = read_json("modules/llm/local_servers.json")
+	local local_catalogue = read_json("ai/data/local_servers.json")
 	for _, id in ipairs(local_catalogue.server_order) do
 		vision_ids[#vision_ids + 1] = id
 		providers.providers[id] = { label = local_catalogue.servers[id].label, format = "openai" }

@@ -13,7 +13,7 @@
  *
  * The chord itself is NOT part of this contract's vocabulary beyond being a
  * canonical string: what a chord IS belongs to the shared notation core
- * (_shared/lua/chord/init.lua and its AutoHotkey twin windows/infra/chord.ahk).
+ * (_shared/keyboard/engine/chord/init.lua and its AutoHotkey twin windows/infra/chord.ahk).
  * This port only says what a driver must be able to DO with one.
  *
  * FEATURES & RATIONALE:

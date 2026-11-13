@@ -409,7 +409,7 @@ local function arm_quit_watcher()
 		Logger.error(LOG, "hs.distributednotifications is unavailable — no launcher quit request is heard.")
 		return false
 	end
-	local name = require("identifiers").macos_notifications.launcher_quit_request
+	local name = require("core.text.engine.identifiers").macos_notifications.launcher_quit_request
 	local ok, watcher_or_err = xpcall(function()
 		local watcher = notifications.new(function(...)
 			local guarded_ok, err = xpcall(handle_quit_request, debug.traceback, ...)

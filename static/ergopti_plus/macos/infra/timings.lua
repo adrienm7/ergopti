@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: Shared Timings Reader (Hammerspoon)
 --- DESCRIPTION:
---- Binds the shared timings reader (_shared/lua/timings.lua) to this driver: its
+--- Binds the shared timings reader (_shared/core/timing/engine/timings_core.lua) to this driver: its
 --- logger, its shared-path resolver and its TOML parser. The registry,
---- `_shared/modules/timings/constants.toml`, is the single authoritative source
+--- `_shared/core/timing/data/constants.toml`, is the single authoritative source
 --- for every tunable timing in the project (debounces, timeouts, poll
 --- intervals, ...), so the per-module literals can be deleted and the drivers
 --- stay in sync.
@@ -27,7 +27,7 @@ local Logger = require("infra.logger")
 local Paths = require("infra.paths")
 local TomlReader = require("infra.toml.reader")
 
-return require("timings").new({
+return require("core.timing.engine.timings_core").new({
 	logger = Logger,
 	log = "timings",
 	loaded_level = "done",

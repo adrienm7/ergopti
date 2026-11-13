@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local FIFO = require("tests.support.modules.llm.selection_translation_fifo")
-local Tone = require("llm.tone")
+local Tone = require("ai.engine.prediction.tone")
 
 local FLOWS = {
 	{ name = "tone", start = function(w) return w.tone.step(Tone.MORE_FORMAL, false) end,

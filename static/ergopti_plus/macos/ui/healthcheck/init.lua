@@ -4,7 +4,7 @@
 --- MODULE: Healthcheck
 --- DESCRIPTION:
 --- The diagnostics window of the Hammerspoon driver: a snapshot of the runtime
---- state in the version 2 shape of _shared/modules/diagnostics/schema.json,
+--- state in the version 2 shape of _shared/diagnostics/data/schema.json,
 --- shown by the shared page _shared/ui/healthcheck/.
 ---
 --- This is the entry point: requiring "ui.healthcheck" returns the public API

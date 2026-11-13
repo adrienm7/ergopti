@@ -2,7 +2,7 @@
 
 --- Owns dashboard requests across SQLite settlement and native page replacement.
 local M = {}
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.metrics_flush"
 local API = { "get_flush_status", "is_flush_pending", "has_flush_debt", "when_flush_settled" }
 
@@ -51,7 +51,7 @@ end
 --- @return boolean pushed
 function M.push(app, bridge, payload, state, context)
 	if not context or type(context.epoch) ~= "number" or not page_current(app, state, context) then return false end
-	local Json, Base64 = require("json"), require("compat.base64")
+	local Json, Base64 = require("core.text.engine.json"), require("core.lifecycle.engine.compat.base64")
 	local code = string.format("if(window.__hostBridgeResponse)window.__hostBridgeResponse('%s',true,'%s')",
 		bridge, Base64.encode(Json.encode(payload)))
 	if not page_current(app, state, context) then return false end
@@ -68,7 +68,7 @@ end
 function M.call(app, name, args, state, context)
 	assert(type(name) == "string" and name:match("^[%a_][%w_]*$"), "a page function needs a plain name")
 	if not context or type(context.epoch) ~= "number" or not page_current(app, state, context) then return false end
-	local encoded = require("json").encode(args)
+	local encoded = require("core.text.engine.json").encode(args)
 	local code = string.format("if(typeof window.%s==='function')window.%s.apply(null,%s)", name, name, encoded)
 	return manager_for(state).eval_js(app, code) == true
 end

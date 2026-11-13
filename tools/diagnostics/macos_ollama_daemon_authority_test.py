@@ -30,7 +30,10 @@ AUTH = load(
 BOOT = load(
     "native_daemon_bootstrap", ROOT / "static/ergopti_plus/macos/platform/ollama_bootstrap_owner.py"
 )
-PROXY = load("daemon_proxy", SOURCE / "static/ergopti_plus/_shared/python/network_proxy_policy.py")
+PROXY = load(
+    "daemon_proxy",
+    SOURCE / "static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py",
+)
 ALIASES = load(
     "daemon_alias_owner", SOURCE / "static/ergopti_plus/macos/platform/source_alias_owner.py"
 )
@@ -102,7 +105,7 @@ class DaemonAuthorityControls(unittest.TestCase):
 
         self.operation.recheck_source = check_source
         self.policy = BOOT.POLICY.BootstrapPolicy(
-            ROOT / "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json",
+            ROOT / "static/ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json",
             PROXY.ProxyPolicy(),
         )
 
@@ -163,7 +166,7 @@ class DaemonAuthorityControls(unittest.TestCase):
         session_bytes = self.session.path.read_bytes()
         canonical = json.loads(
             (
-                ROOT / "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json"
+                ROOT / "static/ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json"
             ).read_bytes()
         )
         digest = hashlib.sha256(session_bytes).hexdigest()

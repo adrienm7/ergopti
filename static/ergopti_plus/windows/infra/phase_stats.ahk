@@ -6,7 +6,7 @@
 ; Open-named phase timing for work PerfStage's fixed labels do not cover: one phase
 ; per child program (process.<program>), boot sub-stages (boot.stage,
 ; boot.stage_cpu), config parses (toml.parse), tray rebuilds (menu.rebuild). The
-; AutoHotkey port of _shared/lua/phase_stats_core.lua: the same phases and the same
+; AutoHotkey port of _shared/metrics/engine/perf/phase_stats_core.lua: the same phases and the same
 ; evidence line, so one search reads a log from any OS.
 ;
 ; FEATURES & RATIONALE:

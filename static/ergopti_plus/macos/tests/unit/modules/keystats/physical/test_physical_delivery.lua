@@ -330,9 +330,9 @@ end)
 
 --- Creates a shared media policy independently of the native delivery capability.
 local function semantic_policy()
-	local file = assert(io.open(helpers.shared("data/keycodes/metrics_media_keys.json"), "rb"))
+	local file = assert(io.open(helpers.shared("layouts/data/keycodes/metrics_media_keys.json"), "rb"))
 	local text = file:read("*a"); assert(file:close())
-	return require("keystats.media_identity").new(require("json").decode(text))
+	return require("metrics.engine.media.identity").new(require("core.text.engine.json").decode(text))
 end
 
 local MEDIA_DEVICE = "18446744073709551614"

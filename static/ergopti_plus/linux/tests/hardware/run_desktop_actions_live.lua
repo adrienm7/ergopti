@@ -72,7 +72,7 @@ local function trashed() return #output("ls -A " .. Shell.quote(trash) .. " 2>/d
 check(trashed() > 0, "the trash folder holds them")
 -- empty_trash asks first (catalogue confirm): its question is the product's
 -- own GTK dialog host, answered here as a user would, from the keyboard.
-local WindowTitles = require("window_titles")
+local WindowTitles = require("core.ui.engine.window_titles")
 local title = WindowTitles.compose(require("infra.i18n").get("dialog.confirm_action.title"))
 -- xdotool search --name does not match this UTF-8 title: compare each
 -- visible window's name exactly.

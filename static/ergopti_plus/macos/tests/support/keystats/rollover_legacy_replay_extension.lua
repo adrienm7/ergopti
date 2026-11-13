@@ -1,7 +1,7 @@
 --- tests/support/keystats/rollover_legacy_replay_extension.lua
 
 --- Exercises a legacy context whose disposable raw cache lost the canonical row.
-local json = require("json")
+local json = require("core.text.engine.json")
 local function meta(db, key)
  local value
  for row in db:nrows("SELECT value FROM meta WHERE key='" .. key .. "';") do value = row.value end

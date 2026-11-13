@@ -154,7 +154,7 @@ function main() {
 		if (count > (frozen[rel] ?? 0))
 			errors.push(
 				`${rel}:${lines[rel].join(',')}: a sleep spells its duration. Fix: declare a [launcher] ` +
-					'key in _shared/modules/timings/constants.toml, run npm run codegen:registry-constants ' +
+					'key in _shared/core/timing/data/constants.toml, run npm run codegen:registry-constants ' +
 					'and sleep for LauncherTimings.<name>.<unit>.'
 			);
 	}

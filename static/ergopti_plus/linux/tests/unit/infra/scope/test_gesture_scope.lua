@@ -1,9 +1,9 @@
 --- tests/unit/infra/scope/test_gesture_scope.lua
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 
 local SOURCE = '[gestures]\nenabled = true\ntap_3 = "enter"\n[gesture_parameters]\ntap_3__open_url = "https://old.example"\nkeyboard__primary_j__open_url = "https://keyboard.example"\nunknown = "keep"\n[linux.gestures]\ntap_4 = "vol_up"\nunknown = "keep"\n[linux.action_parameters]\ntap_4__open_url = "https://legacy.example"\nkeyboard__primary_k__open_url = "https://keep.example"\n[other]\nvalue = 42\n'
 
@@ -67,7 +67,7 @@ helpers.describe("Linux gesture scope transaction", function()
 
 	helpers.it("gesture-master-rollback: refused publication and reader restoration retain admission", function()
 		with_scope(function(_, gestures, controls, path)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local publish = writer.batch_write
 			local ok, err = pcall(function()
 				writer.batch_write = function()

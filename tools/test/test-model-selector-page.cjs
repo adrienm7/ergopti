@@ -165,9 +165,11 @@ function loadPage(strings) {
 // ======= 2/ Fixtures =====================
 // =========================================
 
-const en = JSON.parse(fs.readFileSync(path.join(SP, '_shared/data/locales/en.json'), 'utf8'));
+const en = JSON.parse(
+	fs.readFileSync(path.join(SP, '_shared/core/i18n/data/locales/en.json'), 'utf8')
+);
 const brands = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared/modules/llm/backends.json'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared/ai/data/backends.json'), 'utf8')
 ).backends;
 
 function backend(id, available, reason_key) {
@@ -948,11 +950,11 @@ for (const backendId of ['ollama', 'mlx']) {
 	}
 }
 const luaCorpus = spawnSync('lua', ['-'], {
-	cwd: path.join(SP, '_shared/lua'),
+	cwd: path.join(SP, '_shared'),
 	encoding: 'utf8',
 	input: `
 package.path = './?.lua;./?/init.lua;' .. package.path
-local M = require('llm.model_identifier')
+local M = require('ai.engine.local_servers.model_identifier')
 for _, c in ipairs({ ${luaCases.join(', ')} }) do
 	if M.valid(c[1], c[2]) ~= c[3] then error(('lua %s %q'):format(c[1], c[2])) end
 end
@@ -967,16 +969,14 @@ assert.equal(luaCorpus.status, 0, luaCorpus.stderr);
 
 // The shared projection emits every field a column reads, from the real catalogue.
 const fields = [...page.context.COLUMNS].filter((c) => c.field).map((c) => c.field);
-const catalogue = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared/modules/llm/models.json'), 'utf8')
-);
+const catalogue = JSON.parse(fs.readFileSync(path.join(SP, '_shared/ai/data/models.json'), 'utf8'));
 const first = catalogue[0].families[0].models[0];
 const luaProbe = spawnSync('lua', ['-'], {
-	cwd: path.join(SP, '_shared/lua'),
+	cwd: path.join(SP, '_shared'),
 	encoding: 'utf8',
 	input: `
 package.path = './?.lua;./?/init.lua;' .. package.path
-local C = require('llm.model_catalogue')
+local C = require('ai.engine.local_servers.model_catalogue')
 local catalogue = { { label = 'P', families = { { label = 'F', models = { {
 	name = ${JSON.stringify(first.name)},
 	parameters = { total = ${JSON.stringify(first.parameters.total)} },

@@ -132,11 +132,11 @@ helpers.describe("notify-send spawn guard (nui-003-spawn-guard)", function()
 
 	helpers.it("leaves native modules loaded when a child builds the recorder", function()
 		if type(jit) ~= "table" then return end
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		-- The recorder is built before luv is loaded, as in a fixture child that
 		-- requires tests.helpers first; reopening luv crashed such a child.
 		local child = [[
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 require("tests.helpers")
 -- A second luv instance crashed once the collector closed the first one's loop.
 collectgarbage("collect")

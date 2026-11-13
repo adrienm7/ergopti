@@ -48,7 +48,7 @@ end
 --- Restores the shared update-check interpreters loaded only by this host.
 --- @param scenario function Complete native scenario.
 local function with_host(scenario)
-	return helpers.with_fresh_modules({ "updater.release_parser", "updater.check_result" }, function()
+	return helpers.with_fresh_modules({ "updater.engine.release_parser", "updater.engine.check_result" }, function()
 		return run_host(scenario)
 	end)
 end

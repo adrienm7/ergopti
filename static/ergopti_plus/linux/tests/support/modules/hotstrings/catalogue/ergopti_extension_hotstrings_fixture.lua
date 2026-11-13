@@ -12,16 +12,16 @@ local helpers = require("tests.helpers")
 
 local Paths      = require("infra.paths")
 
-local Json       = require("json")
+local Json       = require("core.text.engine.json")
 
-local Extension  = require("layouts.extension")
+local Extension  = require("layouts.engine.composer.extension")
 
-local Extensions = require("hotstrings.extensions")
+local Extensions = require("hotstrings.engine.extensions")
 
 --- The registry settings the drivers read, from the shared defaults.
 --- @return table
 local function registry_settings()
-	local fh = assert(io.open(Paths.shared("modules/layouts/defaults.json"), "r"))
+	local fh = assert(io.open(Paths.shared("layouts/data/defaults.json"), "r"))
 	local text = fh:read("*a")
 	fh:close()
 	return Json.decode(text).registry
@@ -59,8 +59,8 @@ local function load(with_ergopti)
 		list_dirs = Loader.list_subdirs, list_files = Loader.find_toml_files, read_file = Loader.read_file,
 	})
 	local paths, language_sources = {}, {}
-	local root = Paths.shared("modules/hotstrings")
-	local Languages = require("hotstrings.languages")
+	local root = Paths.shared("hotstrings/data/catalogue")
+	local Languages = require("hotstrings.engine.languages")
 	for _, pack in ipairs(Config.language_packs()) do
 		for _, stem in ipairs(pack.categories) do
 			local path = root .. "/" .. pack.id .. "/" .. stem .. ".toml"

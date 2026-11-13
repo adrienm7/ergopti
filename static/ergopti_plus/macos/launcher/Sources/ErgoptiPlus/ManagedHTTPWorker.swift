@@ -13,7 +13,7 @@ import SystemConfiguration
 /// One exact, replayable HTTP request. Redirects belong to the caller, so every
 /// redirected URL crosses the same native request boundary again.
 // BEGIN GENERATED NATIVE HTTP FAILURE STAGES
-// Generated from static/ergopti_plus/_shared/modules/network/native_http_failure_stages.json; do not edit this span.
+// Generated from static/ergopti_plus/_shared/core/network/data/native_http_failure_stages.json; do not edit this span.
 enum ManagedHTTPFailureStage: String, CaseIterable {
 	case policyLoad = "native_policy_load"
 	case selectionBound = "native_selection_bound"
@@ -836,7 +836,7 @@ enum ManagedHTTPWorker {
 		}
 		guard let request = ManagedHTTPRequest.parse(input), request.idleTimeout <= idle,
 			request.timeout == budget else { return 64 }
-		let policyURL = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/static/ergopti_plus/_shared/modules/network/proxy_policy.json")
+		let policyURL = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/static/ergopti_plus/_shared/core/network/data/proxy_policy.json")
 		guard let bytes = try? Data(contentsOf: policyURL),
 			let object = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any],
 			let maximum = object["max_selections"] as? NSNumber,

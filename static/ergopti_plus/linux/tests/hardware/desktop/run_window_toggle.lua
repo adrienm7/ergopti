@@ -56,7 +56,7 @@ if not os.getenv("DISPLAY") and not os.getenv("WAYLAND_DISPLAY") then abort("no 
 local ok_lgi, lgi = pcall(require, "lgi")
 if not ok_lgi then abort("lgi is not installed.") end
 local Gtk = lgi.require("Gtk", "3.0")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 
 local cover_script, scratch = assert(arg[1]), assert(arg[2])
 local session = os.getenv("ERGOPTI_PROOF_SESSION") or "unnamed"

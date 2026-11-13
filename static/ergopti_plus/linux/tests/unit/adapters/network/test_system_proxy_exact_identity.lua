@@ -10,7 +10,7 @@
 --- Executes the actual helper with independent native/stdio ports.
 --- These are model receipts, not proof of a real child image or retirement.
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local ExactPorts = require("tests.support.exact_identity_ports")
 local helper = helpers.driver_root() .. "/platform/network/system_proxy_probe.lua"
@@ -87,7 +87,7 @@ local function observe(config)
 	-- The policy is an actual installed file, independent of the modeled curl
 	-- descriptor ledger below. Admit it through the real native reader.
 	package.loaded["infra.regular_file_reader"] = { open_source = function(path)
-		assert(path == shared_root .. "/modules/network/proxy_policy.json")
+		assert(path == shared_root .. "/core/network/data/proxy_policy.json")
 		local fake_luv, fake_ffi = package.loaded.luv, package.loaded.ffi
 		package.loaded.luv, package.loaded.ffi = saved.luv, saved.ffi
 		local result = { pcall(real_reader.open_source, path) }

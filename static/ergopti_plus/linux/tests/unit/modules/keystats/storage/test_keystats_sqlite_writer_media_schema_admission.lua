@@ -210,7 +210,7 @@ helpers.describe("sqlite_writer", function()
     it("seeds every app-time and hotstring metric on the initial upsert", function()
       -- The statement is the catalogue's agg.app_day; the writer passes 0 for a counter it
       -- does not track, so the initial INSERT carries every field and not only the conflict update.
-      local Queries = require("keystats.queries")
+      local Queries = require("metrics.engine.queries")
       local values = {}
       for _, slot in ipairs(Queries.slots("agg.app_day")) do
         values[slot.name] = slot.kind == "s" and "x" or 0
@@ -239,7 +239,7 @@ helpers.describe("sqlite_writer", function()
 			helpers.assert_contains(sql, "(device_id, date, app, token, c, td, cd, e, esrc_json)")
 			local admitted = sql:match(",14,7,2,1,'([^']*)'")
 			helpers.assert_type(admitted, "string", "known and arbitrary source counts must accompany the scalar fields")
-			helpers.assert_eq(require("json").decode(admitted), {
+			helpers.assert_eq(require("core.text.engine.json").decode(admitted), {
 				hotstring = 2, llm = 3, other = 4, ["extension.v2"] = 5,
 			})
 			helpers.assert_contains(sql, "ON CONFLICT(device_id, date, app, token) DO UPDATE SET")
@@ -256,7 +256,7 @@ helpers.describe("sqlite_writer", function()
 		end)
 		helpers.assert_true(src:find('"agg.ngram_scancode"', 1, true) ~= nil,
 			"evdev hardware counts must be rendered through the catalogue")
-		helpers.assert_contains(require("keystats.queries").render("agg.ngram_scancode", "cli_json",
+		helpers.assert_contains(require("metrics.engine.queries").render("agg.ngram_scancode", "cli_json",
 			{ device_id = "d", date = "x", app = "a", scancode = 30, c = 1 }), "INSERT INTO ngram_scancodes",
 			"evdev hardware counts must be persisted in the canonical scancode table")
 	end)
@@ -275,7 +275,7 @@ helpers.describe("sqlite_writer", function()
         "a restart-safe SQLite event sequence is required")
       helpers.assert_true(src:find('"events.typing"', 1, true) ~= nil,
         "raw typing rows must be rendered through the catalogue")
-      helpers.assert_contains(require("keystats.queries").render("events.typing", "cli_json", {
+      helpers.assert_contains(require("metrics.engine.queries").render("events.typing", "cli_json", {
         device_id = "d", id = 1, ts = "t", date = "x", app = "a", is_fullscreen = 0, in_meeting = 0,
         mouse_clicks = 0, mouse_scrolls = 0, mouse_distance_px = 0, text = "", events_json = "[]",
       }), "INSERT OR IGNORE INTO events_typing", "raw typing rows must never be replaced on an ID collision")
@@ -554,7 +554,7 @@ end)
 
 helpers.describe("linux-sqlite-burst-histogram-keys", function()
 	for _, key in ipairs({ "owned\\bucket", "owned\\literal", 'quoted" clé', "LF\nCR\rtab\tcontrol\1\31", "apostrophe's" }) do
-		it("linux-sqlite-burst-histogram-keys: supplied key retains " .. require("json").encode(key), function()
+		it("linux-sqlite-burst-histogram-keys: supplied key retains " .. require("core.text.engine.json").encode(key), function()
 			local row = { date = "2000-01-01", app = "owned-app", length_buckets = { [key] = 2.9 } }
 			with_burst_histogram_statement(row, function(decoded)
 				helpers.assert_eq(decoded[key], 2, "positive counts retain their existing floor")
@@ -641,7 +641,7 @@ helpers.describe("linux-sqlite-local-event-days", function()
 							return previous_popen(command)
 						end
 						local event = explicit and { date = "1999-12-31", ts = "1999-12-31 23:59:59" } or {}
-						local original = require("json").encode(event)
+						local original = require("core.text.engine.json").encode(event)
 						local ok, err = xpcall(function()
 							helpers.assert_true(writer[method]("owned", { event }))
 							local ts = explicit and event.ts or "2026-01-01 23:59:59"
@@ -651,7 +651,7 @@ helpers.describe("linux-sqlite-local-event-days", function()
                             helpers.assert_true(statement:find("'" .. ts .. "','" .. date .. "'", 1, true) ~= nil
                                 or statement:find("'" .. ts .. "', '" .. date .. "'", 1, true) ~= nil,
                                 "the event carries its own timestamp and local day")
-							helpers.assert_eq(require("json").encode(event), original)
+							helpers.assert_eq(require("core.text.engine.json").encode(event), original)
 						end, debug.traceback)
 						io.popen = previous_popen
 						cipher.set_enabled(enabled)

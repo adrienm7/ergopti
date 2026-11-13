@@ -4,8 +4,8 @@
  * ==============================================================================
  * MODULE: Prompt Actions Single-Source Gate
  * DESCRIPTION:
- * The built-in prompt profiles live in _shared/modules/llm/profiles.json. The
- * action catalogue (_shared/modules/actions/actions.toml) offers one
+ * The built-in prompt profiles live in _shared/ai/data/profiles.json. The
+ * action catalogue (_shared/shortcuts/data/actions/actions.toml) offers one
  * ready-made action per built-in profile, `llm_predict_<profile id>`, next to
  * the configurable `llm_prompt_prediction`. This gate keeps the two lists equal
  * and checks every place that must follow a new profile: the picker order, the
@@ -27,12 +27,12 @@ const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const PROFILES = path.join(SP, '_shared', 'modules', 'llm', 'profiles.json');
-const ACTIONS = path.join(SP, '_shared', 'modules', 'actions', 'actions.toml');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const PROFILES = path.join(SP, '_shared', 'ai', 'data', 'profiles.json');
+const ACTIONS = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'actions.toml');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 // The macOS and Linux catalogues load their actions from the shared Lua data.
 const CATALOGUES = [
-	path.join(SP, '_shared', 'lua', 'actions', 'catalogue_data.lua'),
+	path.join(SP, '_shared', 'shortcuts', 'engine', 'actions', 'catalogue_data.lua'),
 	path.join(SP, 'windows', '_generated', 'action_catalogue.ahk')
 ];
 

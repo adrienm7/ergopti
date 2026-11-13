@@ -469,7 +469,7 @@ end)
 
 helpers.describe("parameter transaction keeps physical assignments with their scope owner", function()
 	helpers.it("(action-parameter-physical-scope) recognizes the original shared namespace including malformed slots", function()
-		local physical = require("shortcuts.physical_slots")
+		local physical = require("shortcuts.engine.physical_slots")
 		helpers.assert_eq(physical.is_namespace("physical_none_KeyA"), true)
 		helpers.assert_eq(physical.is_namespace("physical_broken"), true)
 		helpers.assert_eq(physical.is_namespace("primary_1"), false)

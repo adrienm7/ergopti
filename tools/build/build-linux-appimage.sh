@@ -131,14 +131,14 @@ REQUIRED_PAYLOAD=(
   "infra/paths.lua"
   "adapters/tray_menu.lua"
   "ui/webkit_host.lua"
-  "_shared/lua/hotstring_engine/init.lua"
-  "_shared/lua/hotstring_engine/cascade.lua"
-  "_shared/lua/layouts/keylayout.lua"
-  "_shared/lua/json.lua"
-  "_shared/data/keycodes/evdev.json"
-  "_shared/data/locales/fr.json"
-  "_shared/modules/timings/constants.toml"
-  "_shared/modules/llm/defaults.json"
+  "_shared/hotstrings/engine/matcher/init.lua"
+  "_shared/hotstrings/engine/matcher/cascade.lua"
+  "_shared/layouts/engine/composer/keylayout.lua"
+  "_shared/core/text/engine/json.lua"
+  "_shared/layouts/data/keycodes/evdev.json"
+  "_shared/core/i18n/data/locales/fr.json"
+  "_shared/core/timing/data/constants.toml"
+  "_shared/ai/data/defaults.json"
 )
 
 MISSING=0
@@ -166,7 +166,7 @@ echo "  Payload check: all ${#REQUIRED_PAYLOAD[@]} required file(s) present"
 # executable alone is not ELF closure.
 python3 "$SCRIPT_DIR/stage-linux-network-runtime.py" \
   --appdir "$APPDIR" \
-  --catalogue "$PROJECT_ROOT/static/ergopti_plus/_shared/data/linux_native_runtime.json" \
+  --catalogue "$PROJECT_ROOT/static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json" \
   --template "$SCRIPT_DIR/templates/linux-portable-runtime-env.sh"
 
 # Every ELF file the image carries, the driver's own native backend included,
@@ -175,7 +175,7 @@ python3 "$SCRIPT_DIR/stage-linux-network-runtime.py" \
 node "$SCRIPT_DIR/check-elf-glibc-ceiling.cjs" "$APPDIR"
 
 # And every library an ELF file needs is in the image or on the documented
-# recipient list (_shared/data/linux_appimage_recipient_libraries.json): the C
+# recipient list (_shared/updater/data/linux_appimage_recipient_libraries.json): the C
 # library and its loader are the recipient's by design, the baseline being the
 # oldest supported glibc above; anything else the build host linked by accident
 # fails here rather than on a machine that lacks it.
@@ -212,7 +212,7 @@ fi
 set -o pipefail
 
 DRIVER_ROOT="$HERE/usr/lib/ergopti"
-SHARED_LUA="$DRIVER_ROOT/_shared/lua"
+SHARED_LUA="$DRIVER_ROOT/_shared"
 source "$DRIVER_ROOT/network-runtime-env.sh" "$HERE/usr" "$DRIVER_ROOT"
 LUAJIT_BIN="$HERE/usr/bin/luajit"
 
@@ -265,7 +265,7 @@ echo "  Desktop entry: ergopti.desktop"
 # ----------------------------------------------------------------------
 # 8. Application icon
 # ----------------------------------------------------------------------
-install -m 644 "$BUILD_DIR/_shared/assets/ergopti_tray.png" "$APPDIR/ergopti.png"
+install -m 644 "$BUILD_DIR/_shared/tray/data/ergopti_tray.png" "$APPDIR/ergopti.png"
 
 echo "  Application icon: ergopti.png"
 

@@ -33,14 +33,14 @@ local function recording_manager()
 	local logger = helpers.make_logger_stub()
 	logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 	logger.error = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-	local saved = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = logger
+	local saved = package.loaded["core.logger.engine.shim"]
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded[MANAGER] = nil
 	-- The workspace provider captures its shell and display dependencies when
 	-- required. Earlier native fixtures may have replaced either table.
 	package.loaded["modules.gestures.workspace_switcher"] = nil
 	local ok, manager = pcall(require, MANAGER)
-	package.loaded["logger.shim"] = saved
+	package.loaded["core.logger.engine.shim"] = saved
 	if not ok then error(manager, 0) end
 	return manager, warnings
 end
@@ -198,13 +198,13 @@ helpers.describe("action picker items (Linux)", function()
 		-- Reload the chain, and the manager on top of it, so this test switches
 		-- the very core the headings are read from.
 		local saved = {}
-		for _, name in ipairs({ "infra.i18n", "infra.locale", "locale.core", MANAGER }) do
+		for _, name in ipairs({ "infra.i18n", "infra.locale", "core.i18n.engine.core", MANAGER }) do
 			saved[name] = package.loaded[name]
 		end
 		package.loaded["infra.i18n"] = nil
 		package.loaded["infra.locale"] = nil
 		local i18n = require("infra.i18n")
-		local Locale = require("locale.core")
+		local Locale = require("core.i18n.engine.core")
 		recording_manager()
 		local ok, err = pcall(function()
 			for _, code in ipairs({ "de", "en" }) do

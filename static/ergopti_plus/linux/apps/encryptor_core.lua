@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The Linux Encryptor's conversion and its per-file flow, the port of the macOS
 --- Encryptor.app (Scripts/main.applescript and encryptor_convert.sh). The file
---- container is _shared/data/encryptor/format.json, so a file encrypted here
+--- container is _shared/apps/data/encryptor/format.json, so a file encrypted here
 --- opens on macOS and Windows and the other way round.
 ---
 --- FEATURES & RATIONALE:
@@ -24,8 +24,8 @@
 
 local M = {}
 
-local Json = require("json")
-local TextUtils = require("text_utils")
+local Json = require("core.text.engine.json")
+local TextUtils = require("core.text.engine.utils_core")
 
 local quote = TextUtils.shell_quote
 
@@ -42,7 +42,7 @@ local quote = TextUtils.shell_quote
 --- @param path string|nil Absolute path of format.json; the shared tree's by default.
 --- @return table format
 function M.load_format(path)
-	path = path or require("infra.paths").shared("data/encryptor/format.json")
+	path = path or require("infra.paths").shared("apps/data/encryptor/format.json")
 	assert(type(path) == "string", "the shared Encryptor format is unavailable")
 	local file = assert(io.open(path, "rb"), "cannot read " .. path)
 	local raw = file:read("*a")

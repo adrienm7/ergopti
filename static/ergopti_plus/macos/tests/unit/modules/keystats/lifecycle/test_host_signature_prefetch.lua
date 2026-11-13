@@ -169,7 +169,7 @@ local LOG_MANAGER_STUBS = {
 	"modules.keystats.rotation",
 	"modules.keystats.export",
 	"modules.keystats.host_signature",
-	"keystats.metrics",
+	"metrics.engine.metrics",
 	"adapters.file_system",
 	"adapters.timer_scheduler",
 	"modules.keystats.log_manager",
@@ -191,7 +191,7 @@ local function count_sync_ioreg(prefetched)
 			value = function() return prefetched end,
 			status = function() return prefetched and "resolved" or "idle" end,
 		}
-		package.loaded["keystats.metrics"] = {}
+		package.loaded["metrics.engine.metrics"] = {}
 		package.loaded["adapters.file_system"] = {
 			read_with_status = function() return "{broken-device-json", "ok" end,
 		}

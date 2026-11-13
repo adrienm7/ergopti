@@ -10,14 +10,14 @@
 --- silently to nothing.
 ---
 --- The boundary vectors pin the shared classifier both drivers use
---- (_shared/lua/gestures/direction.lua) at its sector edges and its two
+--- (_shared/gestures/engine/direction.lua) at its sector edges and its two
 --- Manhattan minimums. Linux once put the diagonal boundary at a 2:1 ratio
 --- (26.6 degrees) behind a per-axis travel gate and macOS at 25 degrees behind a
 --- Manhattan one, so the same swipe could name another slot on each.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local Decoder = helpers.load_module("modules.gestures.mt_decoder")
 
@@ -77,7 +77,7 @@ end
 
 helpers.describe("gesture direction vectors (Linux)", function()
 	local corpus = assert(Json.decode_lossless(read("tests/corpus/gestures/direction_vectors.json")))
-	local actions = read("modules/actions/actions.toml")
+	local actions = read("shortcuts/data/actions/actions.toml")
 	local threshold = Decoder.SWIPE_MINIMUM_MM * Decoder.FALLBACK_UNITS_PER_MM
 	local scale = { swipe = 4 * threshold, short = threshold / 4 }
 
@@ -102,7 +102,7 @@ helpers.describe("gesture direction vectors (Linux)", function()
 		end
 	end
 
-	local Direction = require("gestures.direction")
+	local Direction = require("gestures.engine.direction")
 	local rule = corpus.boundary_rule
 	-- Large enough for every normalised component (three decimals) to land on a
 	-- whole device unit, so the decoder sees the vector exactly.

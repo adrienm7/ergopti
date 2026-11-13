@@ -1,6 +1,6 @@
 {
 	"schema_version": 1,
-	"captured_from": "static/ergopti_plus/_shared/modules/hotstrings/autocorrection.toml",
+	"captured_from": "static/ergopti_plus/_shared/hotstrings/data/catalogue/autocorrection.toml",
 	"captured_commit": "e9c00eb6252be77ffd2cd6ddb662c6f9564e85d8",
 	"source_sha256": "166201004786d8ab0b95629c86dab65a7d31776c18c0f6664f88b99d6f411684",
 	"category": "autocorrection",

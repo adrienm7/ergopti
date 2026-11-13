@@ -4,7 +4,7 @@
 --- MODULE: The Shared Tap-Hold File On macOS
 --- DESCRIPTION:
 --- macOS keeps its remap keys in the shared tap_hold.toml
---- (_shared/tap_hold/SCHEMA.md) and the manifest's tap-hold rows (the switch,
+--- (_shared/tap_hold/data/SCHEMA.md) and the manifest's tap-hold rows (the switch,
 --- the one-shot and lone-tap timings, the key combinations) in the config.toml
 --- beside it. The writer's pair is pinned by the cross-driver corpus
 --- (_shared/tests/corpus/tap_hold_shared_file): tap_hold.toml byte for byte,
@@ -17,13 +17,13 @@
 local helpers = require("tests.helpers")
 
 local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger",
-	"logger.shim", "toml_codec", "infra.toml.codec" }
+	"core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }
 local CORPUS = helpers.shared() .. "/tests/corpus/tap_hold_shared_file/"
 -- The pairs of the corpus, each <name>.toml and <name>.config.toml.
 local PAIRS = { "macos_written", "linux_written", "windows_written" }
 local STAMP = "20990101-000000"
 
-require("test.tap_hold_shared_file_contract").register(helpers, { driver = "macos", shared_root = helpers.shared() })
+require("tests.lua.keyboard.tap_hold_shared_file_contract").register(helpers, { driver = "macos", shared_root = helpers.shared() })
 
 --- Reads a whole file, nil when it is absent.
 --- @param path string
@@ -43,7 +43,7 @@ end
 
 --- A Lua value as a JSON-free comparable copy (expected.toml is TOML).
 local function decode(text)
-	return require("toml_codec").decode(text)
+	return require("core.text.engine.toml_codec").decode(text)
 end
 
 --- Runs body against a private folder holding the driver's tap_hold.toml.
@@ -54,8 +54,8 @@ local function with_folder(body)
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
-		require("config_outdated").reset_for_tests()
+		package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+		require("settings.engine.migration.outdated").reset_for_tests()
 		local config = helpers.load_with_stubs("platform.remap.config")
 		local dir = os.tmpname()
 		os.remove(dir)
@@ -376,7 +376,7 @@ helpers.describe("The shared tap_hold.toml on macOS (tap-hold-shared-file)", fun
 			helpers.assert_eq({ TapHoldFile.import_legacy(f.path, f.files) }, { true, "imported" })
 			-- The boot then versions config.toml: its v22 step moves the rows on.
 			write(f.config_path, "[_meta]\nschema_version = 21\n")
-			local Engine = require("config_migrate")
+			local Engine = require("settings.engine.migration.migrate")
 			local registry = assert(Engine.validate_registry(decode(table.concat({
 				"[registry]", "current_version = 22", "unstamped_version = 2", "oldest_version = 21",
 				"[steps.v21_to_v22]", "from = 21", "to = 22", 'drivers = ["hs"]', 'reason = "Contract."', "ops = [",

@@ -26,15 +26,15 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local FileSystem = require("adapters.file_system")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")
 local ui_restore    = require("infra.ui_restore")
 local fs_dir        = require("infra.fs_dir")
 local git_status    = require("infra.git_status")
-local reload_gate   = require("reload_gate")
-local RuntimeLog    = require("diagnostics.runtime_log")
+local reload_gate   = require("core.lifecycle.engine.reload.gate")
+local RuntimeLog    = require("diagnostics.engine.runtime_log")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "file_watchers"
@@ -167,7 +167,7 @@ end
 ---   personal_hotstrings_dir: string, personal_info_path: string,
 ---   self_written_files: string[], shared_source_dir: string|nil } — absolute
 ---   paths resolved by the boot script; shared_source_dir is the clone's
----   _shared/lua tree of a developer app, nil otherwise.
+---   _shared tree of a developer app, nil otherwise.
 --- @return boolean committed True only when both required watchers, plus the
 ---   personal watcher when available, are started and their owner is published.
 function M.start(ctx)

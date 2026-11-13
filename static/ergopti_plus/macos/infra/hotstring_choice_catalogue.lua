@@ -7,7 +7,7 @@
 --- hotstring categories and sections this build ships. Boot publishes it once,
 --- after the bundled sources finished loading, and the configuration cleanup
 --- then judges explicit choices against it with the rule the Lua drivers share
---- (_shared/lua/hotstrings/choice_catalogue.lua).
+--- (_shared/hotstrings/engine/choice_catalogue.lua).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Explicit initialization: `publish` takes the judging lookup once and
@@ -22,7 +22,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local Catalogue = require("hotstrings.choice_catalogue")
+local Catalogue = require("hotstrings.engine.choice_catalogue")
 
 local LOG = "infra.hotstring_choice_catalogue"
 

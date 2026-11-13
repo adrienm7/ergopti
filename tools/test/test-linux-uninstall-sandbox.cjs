@@ -41,7 +41,7 @@ try {
 		config,
 		neighbour,
 		path.join(library, 'linux/ergopti_hotstrings.lua'),
-		path.join(library, '_shared/data/locales/en.json'),
+		path.join(library, '_shared/core/i18n/data/locales/en.json'),
 		wrapper
 	]) {
 		fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -93,7 +93,7 @@ try {
 		const configTarget = path.join(sandbox, 'physical-config');
 		const configAlias = path.join(sandbox, 'selected-config');
 		const driver = path.join(otherLibrary, 'linux/ergopti_hotstrings.lua');
-		const locale = path.join(otherLibrary, '_shared/data/locales/en.json');
+		const locale = path.join(otherLibrary, '_shared/core/i18n/data/locales/en.json');
 		const startup = path.join(configTarget, 'autostart/ergopti-hotstrings.desktop');
 		const unit = path.join(configTarget, 'systemd/user/ergopti-hotstrings.service');
 		const personal = path.join(configTarget, 'ergopti/personal.toml');
@@ -114,7 +114,7 @@ try {
 		fs.writeFileSync(
 			path.join(otherLibrary, '.ergopti-owned-files'),
 			row(driver, 'linux/ergopti_hotstrings.lua') +
-				row(locale, '_shared/data/locales/en.json') +
+				row(locale, '_shared/core/i18n/data/locales/en.json') +
 				row(otherWrapper, '@wrapper') +
 				row(startup, '@autostart') +
 				row(unit, '@unit')
@@ -175,7 +175,7 @@ try {
 		wrapper,
 		`#!/bin/bash\nDRIVER_ROOT="${bashPath(library)}/linux"\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`
 	);
-	const manifest = ['linux/ergopti_hotstrings.lua', '_shared/data/locales/en.json']
+	const manifest = ['linux/ergopti_hotstrings.lua', '_shared/core/i18n/data/locales/en.json']
 		.map(
 			(relative) =>
 				`${createHash('sha256')
@@ -218,7 +218,7 @@ try {
 			const otherLibrary = path.join(otherPrefix, 'lib/ergopti');
 			const otherWrapper = path.join(otherPrefix, 'bin/ergopti-hotstrings');
 			const driver = path.join(otherLibrary, 'linux/ergopti_hotstrings.lua');
-			const locale = path.join(otherLibrary, '_shared/data/locales/en.json');
+			const locale = path.join(otherLibrary, '_shared/core/i18n/data/locales/en.json');
 			for (const file of [driver, locale, otherWrapper])
 				fs.mkdirSync(path.dirname(file), { recursive: true });
 			fs.writeFileSync(driver, 'driver');
@@ -232,7 +232,7 @@ try {
 			fs.writeFileSync(
 				path.join(otherLibrary, '.ergopti-owned-files'),
 				row(driver, 'linux/ergopti_hotstrings.lua') +
-					row(locale, '_shared/data/locales/en.json') +
+					row(locale, '_shared/core/i18n/data/locales/en.json') +
 					row(otherWrapper, '@wrapper')
 			);
 			const runtime = path.join(sandbox, 'no-home-runtime');
@@ -451,7 +451,7 @@ try {
 	assert.equal(forwardingPreflight.status, 0, forwardingPreflight.stderr);
 	const personalInside = path.join(library, 'linux/personal.toml');
 	fs.writeFileSync(personalInside, 'personal-inside');
-	fs.writeFileSync(path.join(library, '_shared/data/locales/en.json'), 'user-modified');
+	fs.writeFileSync(path.join(library, '_shared/core/i18n/data/locales/en.json'), 'user-modified');
 	assert.notEqual(run().status, 0, 'EOF is not confirmation');
 	assert.ok(fs.existsSync(library), 'cancel preserves the installation');
 	const removed = run('--yes');
@@ -466,7 +466,7 @@ try {
 		'unlisted personal files inside runtime survive'
 	);
 	assert.equal(
-		fs.readFileSync(path.join(library, '_shared/data/locales/en.json'), 'utf8'),
+		fs.readFileSync(path.join(library, '_shared/core/i18n/data/locales/en.json'), 'utf8'),
 		'user-modified',
 		'modified shipped files survive'
 	);
@@ -610,9 +610,9 @@ try {
 			PATH: `${stubs}:/usr/bin:/bin`
 		};
 		fs.mkdirSync(path.join(nativeDriver, 'install'), { recursive: true });
-		fs.mkdirSync(path.join(nativeShared, 'data/locales'), { recursive: true });
+		fs.mkdirSync(path.join(nativeShared, 'core/i18n/data/locales'), { recursive: true });
 		fs.writeFileSync(path.join(nativeDriver, 'ergopti_hotstrings.lua'), 'native-runtime');
-		fs.writeFileSync(path.join(nativeShared, 'data/locales/en.json'), '{}');
+		fs.writeFileSync(path.join(nativeShared, 'core/i18n/data/locales/en.json'), '{}');
 		for (const helper of [
 			'ownership.sh',
 			'ownership_schema.sh',

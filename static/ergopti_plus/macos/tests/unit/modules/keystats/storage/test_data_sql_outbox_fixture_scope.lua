@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.data_sql_outbox_fixture")
 
 local OWNERS = {
-	"adapters.file_system", "infra.timings", "keystats.metrics",
+	"adapters.file_system", "infra.timings", "metrics.engine.metrics",
 	"modules.keystats.aggregator", "modules.keystats.export",
 	"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "infra.logger",

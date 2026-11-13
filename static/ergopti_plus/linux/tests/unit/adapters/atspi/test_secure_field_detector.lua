@@ -20,8 +20,8 @@ local helpers = require("tests.helpers")
 -- =========================================
 
 helpers.describe("SecureFieldDetector: tri-state verdicts", function()
-	local previous_logger = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	local previous_logger = package.loaded["core.logger.engine.shim"]
+	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 
 	local function fresh(probe)
 		package.loaded["adapters.secure_field_detector"] = nil
@@ -43,7 +43,7 @@ helpers.describe("SecureFieldDetector: tri-state verdicts", function()
 		local warnings = {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local conclusive = false
 		local adapter = fresh(function() if conclusive then return 61, true end return nil, false end)
 		adapter.refresh()
@@ -55,7 +55,7 @@ helpers.describe("SecureFieldDetector: tri-state verdicts", function()
 		conclusive = false
 		adapter.refresh()
 		helpers.assert_eq(#warnings, 2, "a new streak after a conclusive answer warns again")
-		package.loaded["logger.shim"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 	end)
 
 	helpers.it("recognises official ATSPI_ROLE_PASSWORD_TEXT value 40", function()
@@ -97,7 +97,7 @@ helpers.describe("SecureFieldDetector: tri-state verdicts", function()
 		helpers.assert_eq(adapter.isSecureField(), true, "timeout must fail closed")
 	end)
 
-	package.loaded["logger.shim"] = previous_logger
+	package.loaded["core.logger.engine.shim"] = previous_logger
 end)
 
 
@@ -163,8 +163,8 @@ end)
 -- =========================================
 
 helpers.describe("SecureFieldDetector: focus epochs", function()
-	local previous_logger = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	local previous_logger = package.loaded["core.logger.engine.shim"]
+	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 
 	helpers.it("invalidates immediately and rejects stale conclusive results", function()
 		package.loaded["adapters.secure_field_detector"] = nil
@@ -187,7 +187,7 @@ helpers.describe("SecureFieldDetector: focus epochs", function()
 			"fresh ordinary proof re-enables consumers")
 	end)
 
-	package.loaded["logger.shim"] = previous_logger
+	package.loaded["core.logger.engine.shim"] = previous_logger
 end)
 
 
@@ -201,8 +201,8 @@ end)
 -- =========================================
 
 helpers.describe("SecureFieldDetector: secure applications", function()
-	local previous_logger = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	local previous_logger = package.loaded["core.logger.engine.shim"]
+	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 	package.loaded["adapters.secure_field_detector"] = nil
 	local adapter = helpers.load_module("adapters.secure_field_detector")
 
@@ -233,5 +233,5 @@ helpers.describe("SecureFieldDetector: secure applications", function()
 		end
 	end)
 
-	package.loaded["logger.shim"] = previous_logger
+	package.loaded["core.logger.engine.shim"] = previous_logger
 end)

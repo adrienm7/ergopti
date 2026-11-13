@@ -13,13 +13,13 @@ local Shell = require("adapters.shell_runner")
 local Paths = require("infra.paths")
 
 local policies = {
-	{ module = "infra.proxy_policy", path = "modules/network/proxy_policy.json", call = ".load()" },
-	{ module = "infra.proxy_policy", path = "modules/network/proxy_override.json", call = ".override_setting()" },
-	{ module = "infra.route_origins", path = "modules/network/route_origins.json", call = '.client("uv")' },
-	{ module = "infra.http_header_policy", path = "data/http/header_policy.json", call = '.validate("Accept", "text/plain")' },
-	{ module = "infra.http_transport_policy", path = "data/http/transport_policy.json", call = '.resolve("https://example.test")' },
-	{ module = "infra.http_redirect_policy", path = "data/http/redirect_policy.json", call = ".allows_native_follow({})" },
-	{ module = "infra.managed_redirect_policy", path = "data/http/redirect_policy.json", call = ".load()" },
+	{ module = "infra.proxy_policy", path = "core/network/data/proxy_policy.json", call = ".load()" },
+	{ module = "infra.proxy_policy", path = "core/network/data/proxy_override.json", call = ".override_setting()" },
+	{ module = "infra.route_origins", path = "core/network/data/route_origins.json", call = '.client("uv")' },
+	{ module = "infra.http_header_policy", path = "core/network/data/http/header_policy.json", call = '.validate("Accept", "text/plain")' },
+	{ module = "infra.http_transport_policy", path = "core/network/data/http/transport_policy.json", call = '.resolve("https://example.test")' },
+	{ module = "infra.http_redirect_policy", path = "core/network/data/http/redirect_policy.json", call = ".allows_native_follow({})" },
+	{ module = "infra.managed_redirect_policy", path = "core/network/data/http/redirect_policy.json", call = ".load()" },
 }
 
 local function copy(source, target)
@@ -37,7 +37,7 @@ helpers.describe("network-policy-source", function()
 				local base = os.tmpname(); os.remove(base)
 				local driver = base .. "/driver"
 				copy(assert(package.searchpath("infra.paths", package.path)), driver .. "/infra/paths.lua")
-				copy(Paths.shared("data/locales/en.json"), driver .. "/_shared/data/locales/en.json")
+				copy(Paths.shared("core/i18n/data/locales/en.json"), driver .. "/_shared/core/i18n/data/locales/en.json")
 				for _, declaration in ipairs(policies) do
 					copy(Paths.shared(declaration.path), driver .. "/_shared/" .. declaration.path)
 				end

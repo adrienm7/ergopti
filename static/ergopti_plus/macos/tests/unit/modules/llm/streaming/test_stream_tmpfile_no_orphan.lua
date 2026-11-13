@@ -12,8 +12,8 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.modules.llm.streaming_payload_fixture")
 local with_stream = Fixture.with_stream
 local CommandLines = require("tests.support.command_lines")
-local shell_quote = require("text_utils").shell_quote
-local Json = require("json")
+local shell_quote = require("core.text.engine.utils_core").shell_quote
+local Json = require("core.text.engine.json")
 
 helpers.describe("streaming retains its private temporary file", function()
 	for _, backend in ipairs({ "mlx", "ollama" }) do

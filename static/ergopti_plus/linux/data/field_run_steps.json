@@ -1,5 +1,5 @@
 {
-	"_comment": "Linux field run steps: tools/dev/collect-linux-field-report.sh asks the running daemon to run these Debug field checks with no window, then copies the results. The protocol (file names, verdicts, refusal reasons, identifier rules, folders and the keys of each document) is _shared/data/field_run_protocol.json, read by infra/field_run.lua and the collector; this file holds only what is Linux's: the steps, the request deadline bounds and the name of the configuration guard step. Each step's proves line says what its pass shows.",
+	"_comment": "Linux field run steps: tools/dev/collect-linux-field-report.sh asks the running daemon to run these Debug field checks with no window, then copies the results. The protocol (file names, verdicts, refusal reasons, identifier rules, folders and the keys of each document) is _shared/diagnostics/data/field_run_protocol.json, read by infra/field_run.lua and the collector; this file holds only what is Linux's: the steps, the request deadline bounds and the name of the configuration guard step. Each step's proves line says what its pass shows.",
 	"deadline_seconds": { "default": 300, "min": 60, "max": 900 },
 	"guard_step": "config_guard",
 	"steps": [

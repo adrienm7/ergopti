@@ -25,7 +25,7 @@
 
 local M = {}
 
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 local ModifierBroker = require("adapters.modifier_broker")
 
 local VALUE_UP = 0

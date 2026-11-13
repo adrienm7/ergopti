@@ -5,8 +5,8 @@
  * MODULE: Feature Requirements Table Generator
  * DESCRIPTION:
  * Writes docs/design/feature-requirements.md, the feature × OS × requirement
- * table, from the `requires` declarations of _shared/modules/features/manifest.toml
- * and the vocabulary of _shared/modules/features/requirements.toml.
+ * table, from the `requires` declarations of _shared/settings/data/features/manifest.toml
+ * and the vocabulary of _shared/settings/data/features/requirements.toml.
  *
  * FEATURES & RATIONALE:
  * 1. Declarations only: the table shows what the manifest declares. That the

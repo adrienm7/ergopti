@@ -506,9 +506,7 @@ class NetworkCheckDigest(unittest.TestCase):
     def setUp(self):
         self.helper = load("network_check_digest", MACOS / "modules/llm/managed_network_check.py")
         self.release = json.loads(
-            (
-                ROOT / "static/ergopti_plus/_shared/modules/llm/managed_python_release.json"
-            ).read_text()
+            (ROOT / "static/ergopti_plus/_shared/ai/data/managed_python_release.json").read_text()
         )["source"]
 
     def run_check(self, head=200, download=None):
@@ -636,7 +634,7 @@ class HostReachability(unittest.TestCase):
 
     def test_every_declared_host_gets_one_head_in_key_order(self):
         hosts = json.loads(
-            (ROOT / "static/ergopti_plus/_shared/data/identifiers.json").read_text()
+            (ROOT / "static/ergopti_plus/_shared/core/text/data/identifiers.json").read_text()
         )["hosts"]
         lines, requests = self.run_hosts({})
         paths = {"ollama_registry": "v2/"}

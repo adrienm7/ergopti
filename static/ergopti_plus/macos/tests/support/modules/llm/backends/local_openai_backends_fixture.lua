@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 -- The servers these tests drive. Every other catalogue server is stopped in
 -- the fake scan (with_backend), so a longer catalogue changes no scenario.

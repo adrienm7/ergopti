@@ -9,7 +9,7 @@
 ; download would take, then makes one request through the managed WinHTTP
 ; transport. It writes one evidence record and shows one line per step with a
 ; « Copy report » button. macOS and Linux run the same steps in Lua
-; (_shared/lua/network/field_check_network.lua).
+; (_shared/core/network/engine/field_check_network.lua).
 ;
 ; FEATURES & RATIONALE:
 ; 1. Company-proxy failures are the ones a user cannot diagnose alone: the report
@@ -20,7 +20,7 @@
 ;    through CurlAsyncRequest, so its failure receipt (stage, TLS status) is the
 ;    one a real download would get.
 ; 3. The PAC address is handed to the function that fetches it and goes nowhere
-;    else. The PAC verdict mirrors network/pac_check.lua: HTTP 200, at most one
+;    else. The PAC verdict mirrors core/network/engine/pac_check.lua: HTTP 200, at most one
 ;    mebibyte, strict UTF-8 (or a UTF-16 byte-order mark) and FindProxyForURL.
 ; 4. Every collaborator is injectable, so the unit suite replays each failure
 ;    without a network, a proxy or a window. The report machinery is the Debug
@@ -134,7 +134,7 @@ NetworkCheck_PacMaxBytes() {
 	global _SharedDir
 	static Maximum := 0
 	if !Maximum
-		Maximum := JsonParse(FSReadStrict(_SharedDir . "\modules\network\proxy_policy.json"))["native_pac"]["max_script_bytes"]
+		Maximum := JsonParse(FSReadStrict(_SharedDir . "\core\network\data\proxy_policy.json"))["native_pac"]["max_script_bytes"]
 	return Maximum
 }
 

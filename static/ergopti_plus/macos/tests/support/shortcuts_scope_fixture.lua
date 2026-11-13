@@ -6,7 +6,7 @@ local M = {}
 
 local function run_fixture(body, source)
 	local root = helpers.driver_root()
-	require("tests.support.module_isolation").purge(root, root:gsub("[/\\]macos$", "/_shared/lua"))
+	require("tests.support.module_isolation").purge(root, root:gsub("[/\\]macos$", "/_shared"))
 	helpers.load_with_stubs("hs")
 	local controls = { writes = 0, native = {}, keyboard_handles = {} }
 	local files = { config = source or '[shortcuts]\nenabled = true\nchatgpt_url = "https://example.test"\nkeyboard = { primary_a = "send_text", foreign = 17 }\ntap_keys = { number_row_left = "send_text", foreign = 21 }\nscript_control = { chords_enabled = true, script_altgr_enter = "open_url", script_altgr_backspace = "none", script_altgr_escape = "none", future = 42 }\nkeys = { ctrl_g = true, future = true }\n[gestures]\naction_parameters = { keyboard__primary_a__send_text = "keyboard", tap_key__number_row_left__send_text = "tap", script__script_altgr_enter__open_url = "https://example.test", tap_4__open_url = "https://apple.com", future = { keep = 9 } }\n[future]\nkeep = 7\n' }
@@ -49,7 +49,7 @@ local function run_fixture(body, source)
 	package.loaded["infra.keycodes"] = {
 		F18_WAKE_OS = 79, F19_LAYER_NAV_EXITED = 80,
 		F13_KARABINER_RETURN = 106, F14_KARABINER_BACKSPACE = 107, F15_KARABINER_ESCAPE = 108,
-		F18_KARABINER_DELETE = 79, SCRIPT_CHORD_SENTINELS = require("keycodes").SCRIPT_CHORD_SENTINELS,
+		F18_KARABINER_DELETE = 79, SCRIPT_CHORD_SENTINELS = require("platform.input.keycodes.core").SCRIPT_CHORD_SENTINELS,
 		RETURN = 36, BACKSPACE = 51, ESCAPE = 53, FORWARD_DELETE = 117,
 		to_name = function(code) return "f" .. tostring(code) end,
 	}

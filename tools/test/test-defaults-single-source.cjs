@@ -91,7 +91,7 @@ async function main() {
 	const { parse: parseSource } = await import('smol-toml');
 	const tomlOwnData = require('./fixtures/toml-own-data.cjs');
 	const parse = (source) => tomlOwnData(parseSource(source));
-	const source = fs.readFileSync(paths.shared('modules/features/manifest.toml'), 'utf8');
+	const source = fs.readFileSync(paths.shared('settings/data/features/manifest.toml'), 'utf8');
 	const manifest = parse(
 		source.replace(
 			/^\[\[features\.([^\]]+)\]\]$/gm,
@@ -145,7 +145,7 @@ async function main() {
 		'the widget position is not a configuration key'
 	);
 	const wpmCanon = parse(
-		fs.readFileSync(paths.shared('modules/wpm_widget/constants.toml'), 'utf8')
+		fs.readFileSync(paths.shared('metrics/data/wpm_widget/constants.toml'), 'utf8')
 	);
 	assert.deepEqual(wpmCanon.position, {
 		storage_x: 'wpm_widget.pos_x',
@@ -199,14 +199,14 @@ async function main() {
 		'the recommended base delay is the shipped one'
 	);
 	assert.equal(
-		parse(fs.readFileSync(paths.shared('modules/hotstrings/defaults.toml'), 'utf8')).delays
+		parse(fs.readFileSync(paths.shared('hotstrings/data/catalogue/defaults.toml'), 'utf8')).delays
 			.default_sec,
 		undefined,
 		'hotstrings/defaults.toml must not declare the base delay a second time'
 	);
 	assert(
 		!/^hotstring_expansion_ms\s*=/m.test(
-			fs.readFileSync(paths.shared('modules/timings/constants.toml'), 'utf8')
+			fs.readFileSync(paths.shared('core/timing/data/constants.toml'), 'utf8')
 		),
 		'the timing registry must not mirror the base expansion delay: it has no reader'
 	);
@@ -379,7 +379,7 @@ async function main() {
 		'both single and axis gesture defaults must come from the manifest'
 	);
 	const actionCatalogue = parseSource(
-		fs.readFileSync(paths.shared('modules/actions/actions.toml'), 'utf8')
+		fs.readFileSync(paths.shared('shortcuts/data/actions/actions.toml'), 'utf8')
 	);
 	const linuxActions = new Set(
 		Object.entries(actionCatalogue.sg_actions)

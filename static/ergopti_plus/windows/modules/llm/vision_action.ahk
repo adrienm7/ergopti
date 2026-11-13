@@ -134,7 +134,7 @@ LLM_Vision_BackendChoicesText() {
 
 /**
  * The binding value of a picked backend and a typed model, as
- * _shared/lua/llm/vision.lua compose_parameter: an empty model keeps the backend's
+ * _shared/ai/engine/prediction/vision.lua compose_parameter: an empty model keeps the backend's
  * default, and a backend with no default yields "<backend>|", which validation
  * refuses so the user is told a model is required.
  * @param {String} Backend The picked backend id.

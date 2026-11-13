@@ -24,7 +24,16 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const LOCALES = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales');
+const LOCALES = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'i18n',
+	'data',
+	'locales'
+);
 
 // A floor, so a scan that reads nothing cannot pass.
 const MIN_LOCALES = 21;

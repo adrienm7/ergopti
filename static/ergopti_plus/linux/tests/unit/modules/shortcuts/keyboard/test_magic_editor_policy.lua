@@ -8,5 +8,5 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("test.magic_editor_contract")(helpers, require("json"), helpers.driver_root() .. "/../_shared")
-require("test.keyboard_assignment_contract")(helpers)
+require("tests.lua.layouts.magic_editor_contract")(helpers, require("core.text.engine.json"), helpers.driver_root() .. "/../_shared")
+require("tests.lua.layouts.keyboard_assignment_contract")(helpers)

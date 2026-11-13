@@ -8,16 +8,16 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local names = {"llm.bootstrap_budget", "llm.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "logger.shim", "infra.i18n", "llm.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "config_outdated", "toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
+local names = {"ai.engine.bootstrap.budget", "ai.engine.local_servers.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "core.logger.engine.shim", "infra.i18n", "ai.engine.settings.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "settings.engine.migration.outdated", "core.text.engine.toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
 local previous = {}
 for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 local function run_registered()
 -- Exercises actual shared Writer nil-adapter publication with controlled native
 -- file ports. No disk/native qualification or weakened legacy assertion claim.
 local logger={};for _,name in ipairs({'debug','info','warn','error'})do logger[name]=function()end end
-package.loaded['infra.logger']=logger;package.loaded['logger.shim']=logger
+package.loaded['infra.logger']=logger;package.loaded['core.logger.engine.shim']=logger
 package.loaded['infra.i18n']={get=function(key)return key end}
-local Writer = helpers.load_module("toml_codec.writer")
+local Writer = helpers.load_module("core.text.engine.toml_codec.writer")
 local function eq(a,b)assert(a==b,'expected '..tostring(b)..' got '..tostring(a))end
 local function test(name, body) helpers.it(name .. " (ollama-runtime)", body) end
 local function fixture()

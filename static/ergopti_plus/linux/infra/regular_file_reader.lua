@@ -107,7 +107,7 @@ end
 --- @param path string Validated path.
 --- @return boolean
 local function path_test(flag, path)
-	local result = os.execute("test " .. flag .. " " .. require("text_utils").shell_quote(path) .. " 2>/dev/null")
+	local result = os.execute("test " .. flag .. " " .. require("core.text.engine.utils_core").shell_quote(path) .. " 2>/dev/null")
 	return result == true or result == 0
 end
 

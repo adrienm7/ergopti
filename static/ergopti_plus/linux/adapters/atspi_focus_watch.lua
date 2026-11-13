@@ -9,16 +9,16 @@
 --- ==============================================================================
 
 local M = {}
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Monotonic = require("infra.monotonic")
 local Timings = require("infra.timings")
 local OwnedProcess = require("adapters.owned_process")
 local Paths = require("infra.paths")
 local AtspiFocus = require("adapters.atspi_focus")
-local Logger = require("logger.shim")
-local ErrorDescription = require("error_description")
+local Logger = require("core.logger.engine.shim")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local LOG = "adapters.atspi_focus_watch"
-local MAX_FOCUS_OUTPUT_BYTES = require("llm.process_limits").defaults().max_output_bytes
+local MAX_FOCUS_OUTPUT_BYTES = require("ai.engine.policy.process_limits").defaults().max_output_bytes
 local MAX_FRAMES = 128
 
 --- Allocates only daemon-owned FIFO endpoints with close-on-exec descriptors.
@@ -97,7 +97,7 @@ local function native_transport()
 	end
 	function transport.command()
 		local executable = assert(uv.exepath(), "native interpreter identity unavailable")
-		local shared_lua = assert(Paths.shared("lua"), "shared Lua library unavailable")
+		local shared_lua = assert(Paths.shared_root(), "shared Lua library unavailable")
 		return executable, { Paths.driver_root() .. "/adapters/atspi_focus_watch_worker.lua",
 			transport.events_path, tostring(uv.os_getpid()),
 			tostring(Timings.ms("privacy", "focus_settle_ms")), transport.control_path, shared_lua }

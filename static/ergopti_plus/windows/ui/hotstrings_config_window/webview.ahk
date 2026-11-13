@@ -613,7 +613,7 @@ _HCWWeb_JsStr(s) {
 _HCWWeb_I18nSeed() {
 	global HCWWEB_VHOST, _I18nLocale
 	loc := IsSet(_I18nLocale) ? _I18nLocale : "en"
-	return "window.__i18n_base='https://" . HCWWEB_VHOST . "/data/locales/';"
+	return "window.__i18n_base='https://" . HCWWEB_VHOST . "/core/i18n/data/locales/';"
 		. "window._i18n_locale='" . loc . "';"
 }
 

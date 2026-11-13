@@ -7,8 +7,8 @@
 --- ==============================================================================
 
 local root = assert(arg[1])
-package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;"
-	.. root .. "/../_shared/lua/?/init.lua;" .. package.path
+package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;"
+	.. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
 local path = os.tmpname()
 assert(uv.fs_chmod(path, 384))

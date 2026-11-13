@@ -59,7 +59,7 @@ const EXEMPT = /[/\\](platform|adapters|vendor|tests|docs)[/\\]/;
 //             decision: linux/ui/webkit_host.lua is the Linux webview mechanism
 //             and is OS-unique, so it belongs under platform/ once the other two
 //             drivers have a platform/webview/ to be symmetrical with;
-//             _shared/lua/tap_hold/kanata_generator.lua and its golden fixture
+//             _shared/tap_hold/engine/kanata_generator.lua and its golden fixture
 //             are the shared emitter for one of the three remap back-ends, and
 //             Lot 8.4 turns them into one IR plus three named emitters.)
 //          1 (2026-09-24, Linux retired kanata for the in-daemon tap-hold engine

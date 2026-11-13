@@ -9,41 +9,41 @@
 
 local helpers = require("tests.helpers")
 -- Pure shared owners are captured before native fixture dependencies are replaced.
-local ManifestRenderer = require("menu.renderer")
-local json = require("json")
+local ManifestRenderer = require("menu.engine.renderer")
+local json = require("core.text.engine.json")
 
 local MODULES = {
-	"diagnostics.operation_reporter",
+	"diagnostics.engine.operation_reporter",
 	"adapters.hotkey_registrar",
 	"adapters.timer_scheduler",
 	-- The real timer scheduler describes callback failures through this pure owner.
-	"error_description",
+	"diagnostics.engine.reports.error_description",
 	-- The timer scheduler admits delays through this pure owner.
-	"number_policy",
-	"chord",
+	"core.text.engine.number_policy",
+	"keyboard.engine.chord",
 	"infra.app_picker",
 	"infra.dialog_util",
 	"infra.i18n",
 	"infra.logger",
 	"infra.manifest_menu",
 	"infra.notifications",
-	"json",
-	"logger.shim",
-	"menu.renderer",
-	"llm.tone",
+	"core.text.engine.json",
+	"core.logger.engine.shim",
+	"menu.engine.renderer",
+	"ai.engine.prediction.tone",
 	-- The real profiles manager keeps per-application overrides through these
 	-- shared owners (56e8569a); the codec encodes them through compat.base64.
-	"llm.app_identity",
-	"llm.app_profile_overrides",
-	"compat.base64",
+	"ai.engine.policy.app_identity",
+	"ai.engine.policy.app_profile_overrides",
+	"core.lifecycle.engine.compat.base64",
 	-- The overrides owner copies tables through this shared owner.
-	"table_util",
+	"core.text.engine.table_util",
 	-- The trigger orchestrator trims shortcut modifiers through this re-export (ea1da6c3).
 	"infra.text_utils",
 	-- The real JSON codec and text helpers decode UTF-8 through this owner.
-	"compat.utf8",
+	"core.lifecycle.engine.compat.utf8",
 	-- The application identity owner normalizes names through these helpers.
-	"text_utils",
+	"core.text.engine.utils_core",
 	"modules.llm",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.model_switcher",
@@ -236,10 +236,10 @@ local function with_trigger_fixture(options, body)
 
 		if options.real_registrar then
 			package.loaded["adapters.hotkey_registrar"] = nil
-			package.loaded["chord"] = nil
+			package.loaded["keyboard.engine.chord"] = nil
 		else
 			package.loaded["adapters.hotkey_registrar"] = backend.registrar
-			package.loaded["chord"] = {
+			package.loaded["keyboard.engine.chord"] = {
 				format = function(mods, key)
 					if type(mods) ~= "table" or type(key) ~= "string" then return nil, "invalid" end
 					return table.concat(mods, "+") .. "+" .. key
@@ -437,7 +437,7 @@ local function with_delete_fixture(options, body)
 		}
 		local renderer = assert(ManifestRenderer.new({
 			platform = "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 			json_decode = json.decode,
 			i18n = package.loaded["infra.i18n"],
 			logger = package.loaded["infra.logger"],

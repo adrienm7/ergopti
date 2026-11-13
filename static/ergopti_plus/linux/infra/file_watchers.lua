@@ -29,16 +29,16 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
-local TextUtils = require("text_utils")
+local TableUtil = require("core.text.engine.table_util")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Monotonic = require("infra.monotonic")
-local reload_gate = require("reload_gate")
+local reload_gate = require("core.lifecycle.engine.reload.gate")
 local FileSystem = require("adapters.file_system")
-local RuntimeLog = require("diagnostics.runtime_log")
+local RuntimeLog = require("diagnostics.engine.runtime_log")
 local Shell = require("adapters.shell_runner")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local LOG = "file_watchers"
 
 

@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Keeps the tables of docs/design/owned-runtimes.md equal to what
  * tools/codegen/codegen-owned-runtimes.cjs renders from
- * _shared/data/owned_runtimes.json, so the document never shows a decision the
+ * _shared/core/network/data/owned_runtimes.json, so the document never shows a decision the
  * registry does not hold.
  *
  * FEATURES & RATIONALE:

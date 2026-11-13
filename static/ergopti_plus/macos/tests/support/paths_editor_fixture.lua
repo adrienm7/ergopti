@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 --- Loads a pristine paths editor behind an already-initialized resolver and
 --- records native bridge/webview creation.

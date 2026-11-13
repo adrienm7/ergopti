@@ -21,7 +21,7 @@
 local M = {}
 
 local NativeTimer = require("infra.native_timer")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "adapters.tcp_probe"
 local function diagnostic(message) pcall(Logger.error, LOG, message) end
 

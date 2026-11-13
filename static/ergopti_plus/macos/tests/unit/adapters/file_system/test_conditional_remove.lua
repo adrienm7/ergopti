@@ -20,7 +20,7 @@ helpers.describe("FileSystem conditional removal ownership", function()
 					end
 					return original_remove(target)
 				end
-				local removed = require("toml_codec.writer").remove_if_unchanged(path, adapter, { status = "ok", content = "owned" })
+				local removed = require("core.text.engine.toml_codec.writer").remove_if_unchanged(path, adapter, { status = "ok", content = "owned" })
 				helpers.assert_eq(removed, true)
 				helpers.assert_eq(nested, false, "a nested cooperating replacement must not cross the unlink boundary")
 				helpers.assert_eq(adapter.read_with_status(path), nil)
@@ -42,7 +42,7 @@ helpers.describe("FileSystem conditional removal ownership", function()
 				return false
 			end,
 		}
-		helpers.assert_eq(require("toml_codec.writer").remove_if_unchanged("config", adapter, { status = "ok", content = "owned" }), false)
+		helpers.assert_eq(require("core.text.engine.toml_codec.writer").remove_if_unchanged("config", adapter, { status = "ok", content = "owned" }), false)
 		helpers.assert_eq(called, 1)
 		helpers.assert_eq(content, "foreign")
 	end)
@@ -619,7 +619,7 @@ end)
 --- Tests the real native remover and both retained inverse contracts.
 local helpers = require("tests.helpers")
 local with_fixture = require("tests.support.file_system_transaction_fixture").with_fixture
-local Writer = require("toml_codec.writer")
+local Writer = require("core.text.engine.toml_codec.writer")
 local function seed(path, content)
 	local file = assert(io.open(path, "w")); assert(file:write(content)); assert(file:close())
 end

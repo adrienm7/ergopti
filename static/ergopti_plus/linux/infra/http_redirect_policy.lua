@@ -11,7 +11,7 @@
 
 local M = {}
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local Reader = require("infra.regular_file_reader")
 
@@ -28,7 +28,7 @@ local _headers = nil
 --- @return table|nil headers, string|nil error
 local function load_headers()
 	if _headers then return _headers end
-	local path = Paths.shared("data/http/redirect_policy.json")
+	local path = Paths.shared("core/network/data/http/redirect_policy.json")
 	local file = path and Reader.open_source(path)
 	if not file then return nil, "HTTP redirect policy is unavailable" end
 	local bytes = file:read("*a")

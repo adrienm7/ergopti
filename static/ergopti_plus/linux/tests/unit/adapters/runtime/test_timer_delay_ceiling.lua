@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 --- Runs body while recording Logger.error calls on the shared logger table.
 --- @param body function Replay returning reached.
@@ -131,7 +131,7 @@ end
 
 local function non_negative(value) return value >= 0 end
 
-require("test.timer_delay_ceiling_contract").register(helpers, require("infra.paths").shared, {
+require("tests.lua.timer_delay_ceiling_contract").register(helpers, require("infra.paths").shared, {
 	{ name = "linux scheduler after", unit = "seconds", replay = scheduler_replay("after") },
 	{ name = "linux scheduler every", unit = "seconds", replay = scheduler_replay("every") },
 	{ name = "linux native timer start", unit = "milliseconds", replay = native_timer_replay },

@@ -66,7 +66,7 @@ end
 
 helpers.describe("crash_reporter retention (macOS)", function()
 	helpers.it("deletes the oldest reports beyond the shared cap and nothing else", function()
-		local cap = require("crash_report").MAX_REPORTS
+		local cap = require("diagnostics.engine.reports.crash_report").MAX_REPORTS
 		with_fixture(listing_of(cap + 2), function(CrashReporter, state)
 			local path = CrashReporter.save({ timestamp = "2026-10-25T01:02:03Z", error_msg = "boom" })
 			helpers.assert_eq(path, "/virtual/logs/crash_reports/2026-10-25T01-02-03Z.json")
@@ -85,7 +85,7 @@ helpers.describe("crash_reporter retention (macOS)", function()
 	end)
 
 	helpers.it("still returns the saved path when a deletion is refused, and says so", function()
-		with_fixture(listing_of(require("crash_report").MAX_REPORTS + 1), function(CrashReporter, state)
+		with_fixture(listing_of(require("diagnostics.engine.reports.crash_report").MAX_REPORTS + 1), function(CrashReporter, state)
 			state.refuse_remove = true
 			local path = CrashReporter.save({ timestamp = "2026-10-25T01:02:03Z", error_msg = "boom" })
 			helpers.assert_true(path ~= nil, "the report is on disk whatever retention does")
@@ -98,12 +98,12 @@ helpers.describe("crash_reporter retention (macOS)", function()
 		with_fixture({}, function(CrashReporter, state)
 			local path = CrashReporter.save({ timestamp = "2026-10-25T01:02:03Z", error_msg = "boom", stack_trace = "a\nb" })
 			local content = state.files[path]
-			local decoded = require("json").decode(content)
+			local decoded = require("core.text.engine.json").decode(content)
 			helpers.assert_eq(decoded.error_msg, "boom")
 			helpers.assert_eq(decoded.stack_trace, "a\nb")
 			helpers.assert_eq(decoded.os_version, "unknown")
 			local last = 0
-			for _, field in ipairs(require("crash_report").FIELDS) do
+			for _, field in ipairs(require("diagnostics.engine.reports.crash_report").FIELDS) do
 				local at = content:find('"' .. field[1] .. '":', 1, true)
 				helpers.assert_true(at ~= nil and at > last, field[1] .. " is written in the shared order")
 				last = at

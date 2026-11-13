@@ -81,7 +81,7 @@ $script:StartedTick = 1000
 $script:DeadlineMs = 9000
 # The real shared declaration, so a launcher that drops its serve environment
 # fails this model exactly as the production owner would.
-$script:ServeEnvironmentPath = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $Source) '..\..\..\_shared\modules\llm\managed_ollama_environment.json'))
+$script:ServeEnvironmentPath = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $Source) '..\..\..\_shared\ai\data\managed_ollama_environment.json'))
 $script:ServeEnvironmentSha256 = (Get-FileHash -LiteralPath $script:ServeEnvironmentPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $script:Collision = $false
 $script:Foreign = $false
@@ -102,7 +102,7 @@ $script:RouteOriginsSha256 = '0' * 64
 $script:FixtureProxy = $null
 # The real relay contract and route plan module: the decision below reads the
 # probe's answer through them, and only the relay process itself is modeled.
-$script:ProxyRelayContractPath = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $Source) '..\..\..\_shared\modules\network\proxy_auth_relay.json'))
+$script:ProxyRelayContractPath = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $Source) '..\..\..\_shared\core\network\data\proxy_auth_relay.json'))
 $script:ProxyRelayContractSha256 = '1' * 64
 $script:ProxyRelayDialMs = 10000
 $script:ProxyRelayHandshakeMs = 15000

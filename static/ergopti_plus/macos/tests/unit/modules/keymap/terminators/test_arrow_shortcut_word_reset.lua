@@ -622,7 +622,7 @@ end)
 
 -- The tagged F20 Karabiner sends before a tap-hold's own command, and the
 -- untagged F20/F19 it sends when the navigation layer turns on and off
--- (_shared/lua/keymap/control_signals.lua, modules/keymap/control_sentinels.lua).
+-- (_shared/layouts/engine/layers/control_signals.lua, modules/keymap/control_sentinels.lua).
 local KEYCODE_F20 = 90
 local KEYCODE_F19 = 80
 local TAP_HOLD_TAG = { cmd = true, ctrl = true, alt = true, shift = true }

@@ -67,7 +67,7 @@ function targetReport(document, icons) {
 		}
 	}
 	// The macOS and Linux drivers take a source through the layout composer host
-	// (_shared/lua/layouts/composer.lua): its compiled .keylayout is installed and
+	// (_shared/layouts/engine/composer/composer.lua): its compiled .keylayout is installed and
 	// emulated, and its emulation table performs what that file leaves out; a
 	// driver omits what neither carries.
 	for (const [target, platform] of [

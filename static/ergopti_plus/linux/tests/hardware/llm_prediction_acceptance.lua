@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local uv = require('luv')
-require('compat.utf8').install()
+require('core.lifecycle.engine.compat.utf8').install()
 local origin = assert(os.getenv('ERGOPTI_ACCEPT_ORIGIN'))
 package.loaded['adapters.secure_field_detector'] = { isSecureField = function() return false end, isUrlBar = function() return false end }
 package.loaded['infra.llm_preferences'] = require('tests.support.llm_preferences_fixture').new({initial = {

@@ -20,7 +20,7 @@
 ; =====================================
 
 ; Port of the Ollama Ergopti runs itself. The default lives in exactly ONE place —
-; _shared/modules/llm/defaults.json (llm_ollama_owned_port); a user's own Ollama
+; _shared/ai/data/defaults.json (llm_ollama_owned_port); a user's own Ollama
 ; keeps the stock port and is never contacted. The user can move Ergopti's daemon
 ; from the tray menu (persisted under [llm] ollama_port in config.toml), never onto
 ; the stock port. Sentinel 0 — sourced at boot from
@@ -462,7 +462,7 @@ LLM_AuxRetirePrefix(Prefix) {
 	return true
 }
 ; Keep-alive duration sent in /api/chat payloads — canonical value lives in
-; _shared/modules/llm/defaults.json (llm_ollama_keep_alive). Sentinel "" —
+; _shared/ai/data/defaults.json (llm_ollama_keep_alive). Sentinel "" —
 ; sourced at boot from LLM_Defaults by LLM_Ollama_LoadDefaults().
 global LLM_OLLAMA_KEEP_ALIVE := ""
 ; Weak laptops running qwen3.5:0.8b on CPU can exceed 30 s per token batch.
@@ -483,7 +483,7 @@ global LLM_OLLAMA_DELETE_TIMEOUT_MS := 0
 global LLM_OLLAMA_POLL_MS := 0
 
 ; Reassign the LLM backend timing globals (Ollama + remote poll/timeout and the
-; installed-models cache TTL) from the shared registry _shared/modules/timings/constants.toml
+; installed-models cache TTL) from the shared registry _shared/core/timing/data/constants.toml
 ; at boot, so they stay in sync with the macOS driver instead of re-typing the
 ; same literals. AHK v2 runs global initializers before the auto-execute body, so
 ; these start at the sentinel 0 and are sourced here; every read happens at
@@ -502,7 +502,7 @@ LLMApiLoadTimings() {
 }
 
 ; Source the Ollama port default from the shared registry (LLM_Defaults, loaded
-; from _shared/modules/llm/defaults.json) at boot — keeps the port in exactly one
+; from _shared/ai/data/defaults.json) at boot — keeps the port in exactly one
 ; place. Mirrors LLMApiLoadTimings; called right after it in infra/boot.ahk, after
 ; LLM_Defaults_Load(). The per-user override is applied later by LLM_Menu_Init.
 LLM_Ollama_LoadDefaults(SetPortFn := 0) {
@@ -616,8 +616,8 @@ LLM_Ollama_SetPort(port) {
 
 
 
-#Include ../../../../_shared/modules/llm/local_model_policy.ahk
-#Include ../../../../_shared/modules/llm/enable_admission.ahk
+#Include ../../../../_shared/ai/data/local_model_policy.ahk
+#Include ../../../../_shared/ai/data/enable_admission.ahk
 #Include ollama_payload.ahk
 #Include curl_environment.ahk
 #Include ollama_http.ahk

@@ -135,7 +135,7 @@ helpers.describe("macOS shared Debug log choices", function()
 					helpers.assert_eq(row.menu[index].title, level.label)
 					helpers.assert_eq(row.menu[index].checked == true, state.checked[index])
 					if level.value == state.selected then
-						helpers.assert_eq(row.title, require("locale.label_value").compose(require("infra.i18n").get, require("infra.i18n").get("menu.debug.log_level"), level.label))
+						helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(require("infra.i18n").get, require("infra.i18n").get("menu.debug.log_level"), level.label))
 					end
 					helpers.assert_eq(row.menu[index].fn(), true)
 				end
@@ -269,5 +269,5 @@ end
 local debug_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/debug_parent.json"), "rb"))
 local debug_parent_raw = debug_parent_file:read("*a")
 debug_parent_file:close()
-require("test.debug_parent_contract").register(helpers, debug_parent_fixture,
+require("tests.lua.debug_parent_contract").register(helpers, debug_parent_fixture,
 	assert(require("adapters.json_codec").decode(debug_parent_raw)), "hs")

@@ -29,7 +29,7 @@ local ShellRunner    = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
 local RunningApplication = require("adapters.running_application")
 local text_utils     = require("infra.text_utils")
-local WindowTitles   = require("window_titles")
+local WindowTitles   = require("core.ui.engine.window_titles")
 
 -- Absolute path: this process does not inherit the login shell's PATH.
 local OPEN_BIN = "/usr/bin/open"

@@ -6,7 +6,7 @@
 ; Ends CapsWord on its own, as [shortcuts.caps_word] says: after a delay
 ; without a keystroke, on a checked word delimiter, and on a checked pointer
 ; kind. The decisions are the shared policy's
-; (_shared/modules/features/caps_word_auto_off_policy.ahk); this module reads
+; (_shared/settings/data/features/caps_word_auto_off_policy.ahk); this module reads
 ; the settings, maps Windows events to the policy's questions, and owns every
 ; subscription and timer of one active CapsWord.
 ;
@@ -35,7 +35,7 @@
 ; 5. Fixed Exits and Activity: Escape, Delete, the arrows, Home/End, Page
 ;    Up/Down and F1-F12 always end CapsWord, and a modifier pressed alone is no
 ;    keystroke for the delay, as on macOS (decision of 2026-11-06). The names
-;    are the shared policy's FIXED_EXIT_KEYS (_shared/lua/caps_word/auto_off.lua),
+;    are the shared policy's FIXED_EXIT_KEYS (_shared/keyboard/engine/caps_word_auto_off.lua),
 ;    pinned by tools/test/test-capsword-fixed-exits-single-source.cjs.
 ; ==============================================================================
 

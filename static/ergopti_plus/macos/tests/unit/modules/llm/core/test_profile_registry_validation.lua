@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 
 local function with_core(callback)
 	return helpers.with_stub_scope({
-		"modules.llm", "modules.llm.profiles", "llm.profile_selector", "infra.logger",
+		"modules.llm", "modules.llm.profiles", "ai.engine.settings.profile_selector", "infra.logger",
 	}, function()
 		local errors = {}
 		local logger = helpers.make_logger_stub()
@@ -19,7 +19,7 @@ local function with_core(callback)
 		end
 		package.loaded["infra.logger"] = logger
 		package.loaded["modules.llm.profiles"] = nil
-		package.loaded["llm.profile_selector"] = nil
+		package.loaded["ai.engine.settings.profile_selector"] = nil
 		return callback(helpers.load_with_stubs("modules.llm"), errors)
 	end)
 end
@@ -55,7 +55,7 @@ helpers.describe("profile-registry-validation", function()
 		helpers.it("rejects decoded NaN profile id at entry " .. index, function()
 			with_core(function(core, errors)
 				local prefix = index == 2 and '{ id = "candidate" }, ' or ""
-				local decoded = require("toml_codec").decode("profiles = [" .. prefix .. "{ id = nan }]\n")
+				local decoded = require("core.text.engine.toml_codec").decode("profiles = [" .. prefix .. "{ id = nan }]\n")
 				local id = decoded.profiles[index].id
 				helpers.assert_true(type(id) == "number" and id ~= id, "real TOML must provide NaN")
 				helpers.assert_eq(core.set_user_profiles({ { id = "kept", label = "Kept" } }), true)

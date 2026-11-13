@@ -11,7 +11,7 @@
  * hotstring TOMLs. The script had moved to `tools/format_toml.py`, and the hook
  * kept the old path. Nothing noticed, because the hook only reaches that line
  * when a commit actually stages a file matching
- * `_shared/modules/hotstrings/*.toml` — so the breakage sat dormant until the
+ * `_shared/hotstrings/data/catalogue/*.toml` — so the breakage sat dormant until the
  * next such commit, which then failed with a Python "can't open file" and an
  * exit code that aborted the commit outright.
  *

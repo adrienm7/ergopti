@@ -176,7 +176,7 @@ Test("master gates: an absent key-combinations switch keeps the pairs (key-combi
 TestMasterGates_InvalidManifestDoesNotMutateCandidate() {
 	global _SharedDir, CategoryEnabled
 	FixtureRoot := A_Temp . "\ergopti_master_gates_invalid_" . A_TickCount
-	FixturePath := FixtureRoot . "\modules\menu\menu_manifest.json"
+	FixturePath := FixtureRoot . "\menu\data\menu_manifest.json"
 	SavedSharedDir := _SharedDir
 	HadHotstringsGate := CategoryEnabled.Has("Hotstrings")
 	SavedHotstringsGate := HadHotstringsGate ? CategoryEnabled["Hotstrings"] : ""
@@ -186,7 +186,7 @@ TestMasterGates_InvalidManifestDoesNotMutateCandidate() {
 	)
 	TapHoldCandidate := Map("keys", Map("space", Map("tap", "space")))
 	try {
-		DirCreate(FixtureRoot . "\modules\menu")
+		DirCreate(FixtureRoot . "\menu\data")
 		FileAppend("{}", FixturePath, "UTF-8-RAW")
 		_SharedDir := FixtureRoot
 		CategoryEnabled["Hotstrings"] := true
@@ -260,7 +260,7 @@ Test("master gates: the decode memo never hides an invalid, changed or removed m
 TestMasterGates_SharesTheMenuLoadersDecode() {
 	Root := _MM_GetManifestRoot()
 	AssertTrue(Root is Map, "the real manifest is the subject")
-	RealText := FileRead(_SharedDir . "\modules\menu\menu_manifest.json", "UTF-8")
+	RealText := FileRead(_SharedDir . "\menu\data\menu_manifest.json", "UTF-8")
 	Seeded := Map("seeded", true), SeededText := "{ decoded text that is not json " . A_TickCount
 	try {
 		JsonKnownRoot(SeededText, Seeded)

@@ -259,12 +259,12 @@ Test("LLM regression: MakeSetNHandler captures 1/3/10 not last N only",
 ; guards in macos/tests/unit/lib/test_locale_profile_labels.lua and
 ; macos/tests/unit/menu/test_profile_label.lua.
 
-; Resolves ergopti_plus/_shared/data/locales from A_ScriptDir (= windows/tests when the
+; Resolves ergopti_plus/_shared/core/i18n/data/locales from A_ScriptDir (= windows/tests when the
 ; suite is #Include-d by run_all.ahk). Same derivation as test_locale_json_valid.
 _LLMPL_LocaleDir() {
 	SplitPath(A_ScriptDir, , &DriverDir)   ; -> windows
 	SplitPath(DriverDir, , &EpDir)         ; -> ergopti_plus
-	return EpDir . "\_shared\data\locales"
+	return EpDir . "\_shared\core\i18n\data\locales"
 }
 
 ; Key matches the dot-notation profile label keys (llm.profile.<id>.label).

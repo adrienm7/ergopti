@@ -54,7 +54,7 @@
 
 local M = {}
 
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 -- The configuration folder, relative to HOME, the boots read their files from.
 local CONFIG_REL = AppDirs.config.macos_relative
@@ -118,7 +118,7 @@ local function stage_app(repo, root)
 	run("cp -R " .. q(repo .. "/static/ergopti_plus/macos") .. " " .. q(repo .. "/static/ergopti_plus/_shared")
 		.. " " .. q(static .. "/ergopti_plus/"))
 	run("rm -rf " .. q(static .. "/ergopti_plus/macos/tests") .. " " .. q(static .. "/ergopti_plus/macos/launcher")
-		.. " " .. q(static .. "/ergopti_plus/_shared/tests") .. " " .. q(static .. "/ergopti_plus/_shared/lua/test"))
+		.. " " .. q(static .. "/ergopti_plus/_shared/tests") .. " " .. q(static .. "/ergopti_plus/_shared/tests/lua"))
 	run("find " .. q(static .. "/ergopti_plus") .. " -name '*.md' -type f -exec rm -f {} +")
 	for _, logo in ipairs({ "logo_black.png", "logo_simple.png", "logo_simple_disabled.png", "logo_white.png" }) do
 		run("cp " .. q(repo .. "/static/img/logo/" .. logo) .. " " .. q(static .. "/img/logo/"))
@@ -179,7 +179,7 @@ end
 --- @param ctx table Scenario context.
 local function neutral_defaults(ctx)
 	-- Stamped at the oldest version, so the boot climbs the chain as a release file does.
-	local registry = assert(read(ctx.repo .. "/static/ergopti_plus/_shared/core/config_schema/migrations.toml"),
+	local registry = assert(read(ctx.repo .. "/static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml"),
 		"migration registry missing")
 	local version = assert(registry:match("\noldest_version = (%d+)"), "registry has no oldest version")
 	write_home(ctx.home, CONFIG_REL .. "/hammerspoon/config.toml",
@@ -586,12 +586,12 @@ local function navigation_layer(home, json)
 end
 
 --- The keys the shipped recommended layer binds on one OS: its `all` table
---- and that OS's table (_shared/keymap/layers.recommended.toml).
+--- and that OS's table (_shared/layouts/data/layers.recommended.toml).
 --- @param shared string The _shared folder.
 --- @param os_name string "macos" or "linux".
 --- @return integer keys
 local function recommended_layer_keys(shared, os_name)
-	local fh = assert(io.open(shared .. "/keymap/layers.recommended.toml", "rb"), "the shipped layer preset is missing")
+	local fh = assert(io.open(shared .. "/layouts/data/layers.recommended.toml", "rb"), "the shipped layer preset is missing")
 	local keys, count, scope = {}, 0, nil
 	for line in fh:lines() do
 		local header = line:match("^%[layers%.[%w_]+%.([%w_]+)%]")
@@ -674,7 +674,7 @@ function M.run(check, options)
 	end
 	local world = dofile(options.driver .. "/tests/e2e/boot/world.lua")
 	-- Loaded by path: the scenarios make no assumption on the caller's package.path.
-	local json = dofile(options.driver .. "/../_shared/lua/json.lua")
+	local json = dofile(options.driver .. "/../_shared/core/text/engine/json.lua")
 	-- A source checkout may differ from the harness for a safe red/green replay.
 	-- Normal E2E stages the same checkout that supplies its test support.
 	local repo = options.source_repo or options.driver:gsub("/static/ergopti_plus/macos/?$", "")

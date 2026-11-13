@@ -85,7 +85,7 @@ def main():
                 ERGOPTI_VERSION_EXPECT=expected,
                 ERGOPTI_VERSION_SOURCE=source,
                 XDG_CONFIG_HOME=str(root / "config"),
-                LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
             )
             try:
                 result = subprocess.run(

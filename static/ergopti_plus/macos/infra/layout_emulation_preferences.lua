@@ -15,7 +15,7 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local Logger = require("infra.logger")
-local Settings = require("layouts.emulation_settings")
+local Settings = require("layouts.engine.emulation.settings")
 local LOG = "infra.layout_emulation_preferences"
 
 --- The flat state key of one [layout] path.
@@ -25,7 +25,7 @@ end
 
 --- The emulation settings the menu state holds.
 --- @param state table The menu preference state.
---- @return table settings layouts/emulation_settings.lua's resolve result.
+--- @return table settings layouts/engine/emulation/settings.lua's resolve result.
 function M.settings(state)
 	local layout = {}
 	for _, leaf in ipairs(Settings.LEAVES) do

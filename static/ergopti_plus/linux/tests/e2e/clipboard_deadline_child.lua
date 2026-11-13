@@ -11,7 +11,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver = source:match("^(.*)/tests/e2e/clipboard_deadline_child%.lua$") or "."
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. driver .. "/../_shared/lua/?.lua;" .. driver .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. driver .. "/../_shared/?.lua;" .. driver .. "/../_shared/?/init.lua;" .. package.path
 
 local uv = require("luv")
 local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-clipboard-e2e-XXXXXX"))

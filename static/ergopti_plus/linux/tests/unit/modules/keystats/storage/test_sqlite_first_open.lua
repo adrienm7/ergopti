@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 -- Each ABI job must replay its actual interpreter; distribution package names differ.
-local runtime = assert(require("process.interpreter").from_arguments(arg), "native fixtures require interpreter launch metadata")
+local runtime = assert(require("core.process.interpreter").from_arguments(arg), "native fixtures require interpreter launch metadata")
 
 --- Replays a native fixture with only its own interpreter ABI's provider paths.
 --- The no-luv contract intentionally keeps its separate provider-free launcher.
@@ -20,7 +20,7 @@ local runtime = assert(require("process.interpreter").from_arguments(arg), "nati
 --- @param same_abi boolean Whether the parent can lend its native search path.
 --- @return string command Shell-quoted executable with admitted environment.
 local function native_fixture_command(interpreter, same_abi)
-	local quote = require("text_utils").shell_quote
+	local quote = require("core.text.engine.utils_core").shell_quote
 	local provider = same_abi and (" LUA_CPATH=" .. quote(package.cpath)) or ""
 	return "env -u XDG_RUNTIME_DIR -u TMPDIR -u LUA_PATH -u LUA_CPATH" .. provider .. " " .. quote(interpreter) .. " "
 end
@@ -32,7 +32,7 @@ end)()
 
 helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	helpers.it("sqlite-private-identities: preserves unit spacing across native ABI boundaries", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_sqlite_private_identities.lua"
 		local status = os.execute(native_fixture_command(runtime, true) .. quote(fixture) .. " " .. quote(root))
@@ -40,7 +40,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	end)
 
 	helpers.it("sqlite-private-no-luv: preserves the genuine synchronous FFI contract", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		-- The child removes lfs together with luv. Absolute loader coordinates
 		-- preserve canonical constructor admission without a native cwd module.
@@ -51,7 +51,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	end)
 
 	helpers.it("sqlite-private-native-files: retains private bytes under both ambient masks", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_sqlite_private_files.lua"
 		-- Default Integration sessions may omit TMPDIR; libuv owns temp resolution.
@@ -65,7 +65,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	end)
 
 	helpers.it("system-unbound-native-recovery: retains actual samples across first successful database binding", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_system_bind_recovery.lua"
 		local native_runtime = rawget(_G, "jit") and runtime or "luajit"
@@ -77,7 +77,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 
 	helpers.it("refuses special native startup sources without blocking (sqlite-native-file-admission)", function()
 		local fixture = helpers.driver_root() .. "/tests/hardware/test_sqlite_file_admission.py"
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		-- Lend this provider only to the exact interpreter that admitted it.
 		local status = os.execute("python3 " .. quote(fixture) .. " " .. quote("--runtime=" .. runtime)
 			.. " " .. quote("--cpath=" .. package.cpath))
@@ -130,7 +130,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 			local shared = paths.shared
 			local root = os.tmpname()
 			os.remove(root)
-			local quote = require("text_utils").shell_quote
+			local quote = require("core.text.engine.utils_core").shell_quote
 			local made = os.execute("mkdir -p " .. quote(root))
 			helpers.assert_true(made == true or made == 0)
 			local original, replacement = root .. "/original.sqlite", root .. "/replacement.sqlite"
@@ -148,7 +148,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 				end
 				if phase ~= "registry" then
 					paths.shared = function(relative)
-						if relative == "data/keycodes/metrics_media_keys.json" then return bad_catalogue end
+						if relative == "layouts/data/keycodes/metrics_media_keys.json" then return bad_catalogue end
 						return shared(relative)
 					end
 				end
@@ -210,7 +210,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 			local previous_migration = package.loaded["modules.keystats.text_migration"]
 			local writer = helpers.load_module("modules.keystats.sqlite_writer")
 			local migration = helpers.load_module("modules.keystats.text_migration")
-			local key = require("keystats.text_migration_runner").CURSOR_META_KEY
+			local key = require("metrics.engine.privacy.text_migration_runner").CURSOR_META_KEY
 			local path = os.tmpname()
 			local ok, failure = xpcall(function()
 				helpers.assert_true(writer.open_db(path))
@@ -233,7 +233,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	end
 
 	helpers.it("keeps published encryption posture while refusing historical work (migration-public-consumer)", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_text_migration_consumer.lua"
 		-- Reuse admitted JIT providers; a stock-Lua parent cannot export its ABI.
@@ -242,7 +242,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	end)
 
 	helpers.it("retains capture days through native receipts and DST (sqlite-capture-calendar)", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_keystats_calendar.lua"
 		local status = os.execute("TZ=Europe/Paris " .. native_fixture_command(rawget(_G, "jit") and runtime or "luajit", rawget(_G, "jit") ~= nil) .. quote(fixture) .. " " .. quote(root))
@@ -250,7 +250,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	end)
 
 	helpers.it("admits raw system transitions at capture time (system-event-capture-policy)", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_system_event_capture.lua"
 		local receipt = os.tmpname()
@@ -260,7 +260,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	end)
 
 	helpers.it("system-capture-integer-origin: fractional raw clocks preserve canonical native aggregates", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_system_event_capture_origin.lua"
 		local receipt = os.tmpname()
@@ -272,7 +272,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	end)
 
 	helpers.it("retains the actual physical family at input capture (layout-capture-context)", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_keystats_layout_capture.lua"
 		local receipt = os.tmpname()
@@ -538,7 +538,7 @@ helpers.describe("semantic media: native SQLite storage and dashboard parity", f
 		local path = dir .. "/metrics.sqlite"
 		local ok, err = xpcall(function()
 			helpers.assert_true(writer.open_db(path), "actual SQLite CLI must acknowledge opening")
-			local file = assert(io.open(require("infra.paths").shared("data/db/media_schema.sql"), "r"))
+			local file = assert(io.open(require("infra.paths").shared("metrics/data/db/media_schema.sql"), "r"))
 			local schema = assert(file:read("*a"))
 			assert(file:close() == true)
 			helpers.assert_true(writer.exec_sql(schema), "independent fixture provisions the committed additive schema")
@@ -614,9 +614,9 @@ INSERT INTO agg_app_day_media_hold VALUES ('a','2026-10-15','Owned App','media.p
 		fixture(function(writer, reader, path)
 			helpers.assert_eq(type(writer.insert_media_events), "function", "native media storage port must be enrolled")
 			local input = events()
-			local before = require("json").encode(input)
+			local before = require("core.text.engine.json").encode(input)
 			helpers.assert_true(writer.insert_media_events("owned-device", input, 200))
-			helpers.assert_eq(require("json").encode(input), before, "writer must not clear or replace caller-owned pending events")
+			helpers.assert_eq(require("core.text.engine.json").encode(input), before, "writer must not clear or replace caller-owned pending events")
 			helpers.assert_eq(table.concat(assert(writer.query_rows("SELECT COUNT(*) FROM events_system;"))), "12")
 			helpers.assert_eq(table.concat(assert(writer.query_rows("SELECT SUM(c) FROM ngram_media_keys;"))), "7")
 			helpers.assert_eq(table.concat(assert(writer.query_rows("SELECT SUM(count),SUM(tap_count),SUM(hold_count) FROM agg_app_day_media_hold;"))), "5|3|2")
@@ -657,10 +657,10 @@ INSERT INTO agg_app_day_media_hold VALUES ('a','2026-10-15','Owned App','media.p
 		fixture(function(writer)
 			helpers.assert_eq(type(writer.insert_media_events), "function", "native media port API admission")
 			local input = events()
-			local before = require("json").encode(input)
+			local before = require("core.text.engine.json").encode(input)
 			helpers.assert_true(writer.exec_sql("CREATE TRIGGER media_refusal AFTER INSERT ON ngram_media_keys BEGIN SELECT RAISE(FAIL,'owned media refusal'); END;"))
 			helpers.assert_eq(writer.insert_media_events("owned-device", input, 200), false)
-			helpers.assert_eq(require("json").encode(input), before, "failed native write must retain exact pending data")
+			helpers.assert_eq(require("core.text.engine.json").encode(input), before, "failed native write must retain exact pending data")
 			helpers.assert_eq(table.concat(assert(writer.query_rows("SELECT COUNT(*) FROM events_system;"))), "0", "derived refusal must roll back the whole raw batch")
 			helpers.assert_eq(table.concat(assert(writer.query_rows("SELECT COUNT(*) FROM ngram_media_keys;"))), "0")
 			helpers.assert_true(writer.exec_sql("DROP TRIGGER media_refusal;"))
@@ -709,7 +709,7 @@ INSERT INTO agg_app_day_media_hold VALUES ('a','2026-10-15','Owned App','media.p
 		helpers.it("semantic media: retains commit uncertainty after native " .. failure, function()
 			fixture(function(writer, _, path)
 				local input = events()
-				local before = require("json").encode(input)
+				local before = require("core.text.engine.json").encode(input)
 				local original = io.popen
 				local close_calls = 0
 				io.popen = function(command, mode)
@@ -736,7 +736,7 @@ INSERT INTO agg_app_day_media_hold VALUES ('a','2026-10-15','Owned App','media.p
 				helpers.assert_true(ok, "uncertain terminal I/O must become a truthful refusal")
 				helpers.assert_eq(accepted, false)
 				helpers.assert_eq(close_calls, 1)
-				helpers.assert_eq(require("json").encode(input), before)
+				helpers.assert_eq(require("core.text.engine.json").encode(input), before)
 				helpers.assert_eq(writer.close_db(), false, "unknown terminal ownership cannot be acknowledged as clean")
 				helpers.assert_eq(writer.open_db(path), false, "unknown COMMIT cannot authorize replacement/replay")
 				helpers.assert_eq(writer.insert_media_events("owned-device", input, 200), false)

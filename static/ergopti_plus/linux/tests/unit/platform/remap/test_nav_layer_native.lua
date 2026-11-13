@@ -80,11 +80,11 @@ helpers.describe("native navigation layer bindings", function()
 end)
 
 helpers.describe("native navigation source capabilities", function()
-	local Layers = require("keymap.layers")
-	local Toml = require("toml_codec")
+	local Layers = require("layouts.engine.layers.layers")
+	local Toml = require("core.text.engine.toml_codec")
 	local ctx = Layers.load_context({
 		shared_root = helpers.driver_root() .. "/../_shared",
-		json_decode = require("json").decode, toml_decode = Toml.decode,
+		json_decode = require("core.text.engine.json").decode, toml_decode = Toml.decode,
 		read_file = function(path)
 			local file = assert(io.open(path, "rb"))
 			local text = file:read("*a")

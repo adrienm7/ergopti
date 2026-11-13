@@ -2,7 +2,7 @@
 
 --- Replays the shared error window core and checks the Linux bridge delegates to it.
 local helpers = require("tests.helpers")
-local Contract = require("test.error_dialog_core_contract")
+local Contract = require("tests.lua.error_dialog_core_contract")
 Contract.register(helpers, helpers.driver_root() .. "/../_shared")
 Contract.register_host(helpers, "error_dialog/bridge.lua", function()
 	-- ui/error_dialog/bridge, selected by a declaration unique to it.

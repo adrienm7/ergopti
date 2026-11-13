@@ -9,11 +9,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local MODULES = {
 	"adapters.file_system", "adapters.hotkey_registrar", "infra.paths", "infra.logger",
-	"infra.preferences", "infra.config_paths", "infra.manifest_reader", "toml_codec.writer",
+	"infra.preferences", "infra.config_paths", "infra.manifest_reader", "core.text.engine.toml_codec.writer",
 	"modules.gestures.actions", "modules.shortcuts.magic_editor",
 	"modules.shortcuts.keyboard_shortcuts",
 }
@@ -22,7 +22,7 @@ local function with_subject(assignments, scenario)
 	return helpers.with_stub_scope(MODULES, function()
 		local observed = { specs = {}, actions = {}, claims = {}, writes = 0, binds = 0 }
 		local controls = { admission_refuses = false, publication_refuses = false, stop_refuses = false }
-		local file = assert(io.open("../_shared/modules/actions/modifier_chords.json", "rb"))
+		local file = assert(io.open("../_shared/shortcuts/data/actions/modifier_chords.json", "rb"))
 		local catalogue = Json.decode(file:read("*a"))
 		file:close()
 		catalogue.keys = { { id = "c", label = "C" } }
@@ -58,7 +58,7 @@ local function with_subject(assignments, scenario)
 			observed.callback_during_write = observed.latest.execute(observed.latest.action, "keyboard__magic_editor")
 			if controls.publication_refuses then error("owned publication refused") end
 		end)
-		require("toml_codec.writer").set_sparse_defaults("keyboard-fixture-config", require("infra.manifest_reader"))
+		require("core.text.engine.toml_codec.writer").set_sparse_defaults("keyboard-fixture-config", require("infra.manifest_reader"))
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 		local subject = require("modules.shortcuts.keyboard_shortcuts")
 		local context = {

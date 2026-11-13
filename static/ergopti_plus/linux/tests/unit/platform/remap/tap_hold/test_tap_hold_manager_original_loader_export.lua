@@ -225,7 +225,7 @@ keep = true
 			local load = Loader.load
 			local Engine = require("platform.remap.tap_hold_engine")
 			local key_code = Engine.KEY_CODES.tab
-			local PairPolicy = require("tap_hold.key_combinations")
+			local PairPolicy = require("tap_hold.engine.key_combinations")
 			local pair = PairPolicy.pair
 			local caption = snapshot.loaded.catalog[1].key
 			local key = snapshot.loaded.keys.caps_lock
@@ -325,9 +325,9 @@ keep = true
 			helpers.assert_eq(Gestures.get_action_parameter("combination__removed_then_tab", "open_url"), "")
 			helpers.assert_eq(Gestures.get_action_parameter("tap_hold__future_unjudged", "open_url"), "https://unjudged.example")
 			local marks = {}
-			local outdated = require("config_outdated")
+			local outdated = require("settings.engine.migration.outdated")
 			local reports = outdated.collect_reports(function()
-				Gestures.mark_config_reads(require("toml_codec").decode(source), function(...)
+				Gestures.mark_config_reads(require("core.text.engine.toml_codec").decode(source), function(...)
 					marks[table.concat({ ... }, ".")] = true
 				end)
 			end)
@@ -398,15 +398,15 @@ end)
 helpers.describe("ordinary tap actions retain their Manager owner through logging", function()
 	for _, transition in ipairs({ "pause", "disable", "reload", "pause/resume", "benign" }) do
 		helpers.it("revalidates an actual Shift tap across a " .. transition .. " logging callback", function()
-			local names = { "logger", "logger.shim", "platform.remap.nav_layer", "platform.remap.tap_hold_manager" }
+			local names = { "core.logger.engine", "core.logger.engine.shim", "platform.remap.nav_layer", "platform.remap.tap_hold_manager" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local Manager, path, Logger
 			local ok, err = pcall(function()
 				-- A fresh genuine logger preserves another test's sink and level.
-				Logger = helpers.load_module("logger")
+				Logger = helpers.load_module("core.logger.engine")
 				Logger.set_level("DEBUG")
-				package.loaded["logger.shim"] = Logger
+				package.loaded["core.logger.engine.shim"] = Logger
 				local hook, actions
 				Manager, hook, actions, path = manager()
 				local engine, dispatch = hook.engine, hook.on_tap

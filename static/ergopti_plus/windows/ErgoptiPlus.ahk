@@ -369,7 +369,7 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 ; and not a requirement — LoggerSubFilesData() is called at LoggerInit time.
 #Include _generated/logger_sub_files.ahk
 ; Application folder, logs folder and log file names, generated from
-; _shared/modules/paths/app_dirs.toml; functions too, read by the logger.
+; _shared/core/fs/data/paths/app_dirs.toml; functions too, read by the logger.
 #Include _generated/app_dirs.ahk
 ; The Ergopti root and its purpose folders, and the one-time move of the folders
 ; of the builds before the single folder name (run by infra/boot.ahk).
@@ -410,12 +410,12 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/window_info.ahk
 #Include adapters/uia_worker.ahk
 #Include adapters/hotkey_registrar.ahk
-#Include ../_shared/modules/shortcuts/magic_editor.ahk
+#Include ../_shared/shortcuts/data/magic_editor.ahk
 #Include infra/magic_editor.ahk
 #Include adapters/notifier.ahk
 #Include adapters/tray_menu.ahk
 #Include adapters/text_sender.ahk
-#Include ../_shared/modules/network/failure.ahk
+#Include ../_shared/core/network/data/failure.ahk
 #Include adapters/http_client.ahk
 #Include adapters/secure_field_detector.ahk
 #Include adapters/storage.ahk
@@ -437,7 +437,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/notify_icon.ahk
 #Include adapters/tooltip_renderer.ahk
 #Include adapters/shell_runner.ahk
-#Include ../_shared/modules/actions/brightness.ahk
+#Include ../_shared/shortcuts/data/actions/brightness.ahk
 #Include adapters/screen_brightness.ahk
 #Include adapters/crash_report_worker.ahk
 #Include modules/keymap/uia_selection_worker.ahk
@@ -491,7 +491,7 @@ if UIASW_IsWorkerInvocation()
 ; position; modules/hotstrings.ahk's later #Include of it is then a no-op.
 #Include modules/dynamic_hotstrings/user_code.ahk
 ; Generated terminator catalogue (single source of truth — shared with macOS via
-; _shared/core/domain/Terminators.spec.js). Both the tray and config-window delimiter
+; _shared/core/text/data/domain/Terminators.spec.js). Both the tray and config-window delimiter
 ; menus render this catalogue so the word-terminator list never drifts between
 ; drivers. Included before the menus and before HSE_Terminators is instantiated.
 #Include _generated/terminators.ahk
@@ -506,7 +506,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 ; evaluated. Re-listing them here would cause AHK to complain about the same
 ; script being included twice.
 #Include infra/first_boot.ahk
-#Include ../_shared/modules/config/outdated.ahk
+#Include ../_shared/settings/data/outdated.ahk
 #Include platform/remap/tap_hold_loader.ahk
 #Include platform/remap/tap_hold_writer.ahk
 ; Tap-hold timing constants must load HERE, before infra/boot.ahk calls
@@ -568,10 +568,10 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include ui/personal_toml_editor.ahk
 #Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
-#Include ../_shared/modules/features/number_row_policy.ahk
-#Include ../_shared/modules/features/layout_rows_policy.ahk
-#Include ../_shared/modules/features/caps_word_auto_off_policy.ahk
-#Include ../_shared/modules/features/pause_switch_policy.ahk
+#Include ../_shared/settings/data/features/number_row_policy.ahk
+#Include ../_shared/settings/data/features/layout_rows_policy.ahk
+#Include ../_shared/settings/data/features/caps_word_auto_off_policy.ahk
+#Include ../_shared/settings/data/features/pause_switch_policy.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
 #Include modules/keymap/layout/digit_row_bindings.ahk
 #Include modules/keymap/layout/number_row_send.ahk
@@ -662,14 +662,14 @@ KLPF_InitializeCleanup()
 #Include modules/llm/rewrite.ahk
 #Include modules/llm/parser.ahk
 #Include modules/llm/remote_formats.ahk
-#Include ..\_shared\modules\llm\local_server_auth.ahk
-#Include ..\_shared\modules\llm\api_url_template.ahk
-#Include ..\_shared\modules\llm\model_capabilities.ahk
-#Include ..\_shared\modules\llm\thinking_off.ahk
-#Include ..\_shared\modules\llm\local_server_fingerprint.ahk
-#Include ..\_shared\modules\llm\local_server_discovery.ahk
-#Include ..\_shared\modules\llm\local_server_ports.ahk
-#Include ..\_shared\modules\llm\local_server_menu.ahk
+#Include ..\_shared\ai\data\local_server_auth.ahk
+#Include ..\_shared\ai\data\api_url_template.ahk
+#Include ..\_shared\ai\data\model_capabilities.ahk
+#Include ..\_shared\ai\data\thinking_off.ahk
+#Include ..\_shared\ai\data\local_server_fingerprint.ahk
+#Include ..\_shared\ai\data\local_server_discovery.ahk
+#Include ..\_shared\ai\data\local_server_ports.ahk
+#Include ..\_shared\ai\data\local_server_menu.ahk
 #Include modules/llm/local_server_models.ahk
 #Include modules/llm/local_server_port_scan.ahk
 #Include modules/llm/local_servers.ahk
@@ -878,7 +878,7 @@ BootProfile_StageEnd("i18n", "locale " . I18nGetLocale())
 BootProfile_Mark("i18n locale preloaded")
 ConfigNotifyOlderSchemaAtBoot()
 
-; Load tooltip visual constants from _shared/modules/tooltip/constants.toml so the
+; Load tooltip visual constants from _shared/core/ui/data/tooltip/constants.toml so the
 ; runtime values stay in sync with the TOML single source of truth.
 ; Must run after _SharedDir is set (line ~51) and ParseTomlFile is available.
 UiStyle_LoadSharedConst()
@@ -1011,9 +1011,9 @@ HotstringsOverridesBoot()
 HotstringsDelimitersBoot()
 ; Versions the file once, before anything reads it; a file this build cannot
 ; version is left alone and refuses every later write of this session.
-TapHoldMigrateFile(_ConfigDir . _AhkSubDir . "tap_hold.toml", _SharedDir . "\tap_hold\defaults.toml")
+TapHoldMigrateFile(_ConfigDir . _AhkSubDir . "tap_hold.toml", _SharedDir . "\tap_hold\data\defaults.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
-	_SharedDir . "\tap_hold\defaults.toml")
+	_SharedDir . "\tap_hold\data\defaults.toml")
 GestureSystemRetireDismissals()
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",
 	_BootConfigApplied, (TapHold is Map && TapHold.Has("keys")) ? TapHold["keys"].Count : 0))
@@ -1253,7 +1253,7 @@ ReadKeyboardShortcutsConfig()
 
 #Include infra/config_io.ahk
 #Include infra/config_scope.ahk
-#Include ../_shared/modules/hotstrings/scope_overrides.ahk
+#Include ../_shared/hotstrings/data/catalogue/scope_overrides.ahk
 #Include infra/hotstrings/hotstrings_scope.ahk
 #Include infra/config_global_scope.ahk
 _BootMetricsCache := CS_Load()

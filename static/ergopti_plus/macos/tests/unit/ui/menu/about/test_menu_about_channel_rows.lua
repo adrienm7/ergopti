@@ -15,11 +15,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- The real French catalogue, so titles are checked against the shipped template.
 local function french()
-	local handle = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
+	local handle = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
 	local decoded = Json.decode(handle:read("*a"))
 	handle:close()
 	return decoded
@@ -289,7 +289,7 @@ helpers.describe("macOS About channel durable receipts", function()
 			local names = {"modules.updater.channel", "adapters.update_launcher"}
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local real_write = writer.batch_write
 			local path = os.tmpname()
 			local original = "[updater]\nchannel = \"main\"\nfuture_channel_option = 42\n"
@@ -350,7 +350,7 @@ helpers.describe("macOS About channel post-publication refusal", function()
 		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local updater = require("modules.updater")
 		local previous_source = updater.is_local_source
-		local writer = require("toml_codec.writer")
+		local writer = require("core.text.engine.toml_codec.writer")
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb"))
 		assert(file:write('[updater]\nchannel = "main"\nfuture_channel_option = 42\n')); assert(file:close())

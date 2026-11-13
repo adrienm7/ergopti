@@ -26,8 +26,8 @@
 
 local M = {}
 
-local ClickIntent = require("menu.click_intent")
-local Logger = require("logger.shim")
+local ClickIntent = require("menu.engine.click_intent")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "ui.menu.rebuild_owner"
 

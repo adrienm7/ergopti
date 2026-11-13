@@ -4,7 +4,7 @@
 --- MODULE: Linux AI Backend Brands
 --- DESCRIPTION:
 --- The tray's model button reads "<emoji> <model>" from the shared
---- _shared/modules/llm/backends.json (maintainer, 2026-10-27): "🦙 qwen3:4b",
+--- _shared/ai/data/backends.json (maintainer, 2026-10-27): "🦙 qwen3:4b",
 --- "🌐 OpenAI/gpt-4o-mini". These cases read the real shared file, so a second
 --- copy of an emoji in this driver cannot pass.
 --- ==============================================================================
@@ -13,8 +13,8 @@ local helpers = require("tests.helpers")
 
 --- The shared file, decoded independently of the module under test.
 local function shared_brands()
-	local Json = require("json")
-	local path = require("infra.paths").shared("modules/llm/backends.json")
+	local Json = require("core.text.engine.json")
+	local path = require("infra.paths").shared("ai/data/backends.json")
 	local fh = assert(io.open(path, "r"))
 	local root = Json.decode(fh:read("*a"))
 	fh:close()

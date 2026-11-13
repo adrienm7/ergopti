@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.source_read_fixture")
 local Inventory = require("tests.support.runtime_source_inventory")
-local Discovery = require("test.runner_discovery")
+local Discovery = require("tests.lua.core.runner_discovery")
 
 helpers.describe("complete runtime source inventory", function()
 	for _, mode in ipairs({ "open_refusal", "open_throw", "read_refusal", "read_throw", "close_refusal", "close_throw" }) do

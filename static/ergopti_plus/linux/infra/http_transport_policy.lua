@@ -10,7 +10,7 @@
 
 local M = {}
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local Reader = require("infra.regular_file_reader")
 
@@ -28,7 +28,7 @@ local _protocols = nil
 --- @return table|nil schemes, string|nil error
 local function load_schemes()
 	if _schemes then return _schemes end
-	local path = Paths.shared("data/http/transport_policy.json")
+	local path = Paths.shared("core/network/data/http/transport_policy.json")
 	local file = path and Reader.open_source(path)
 	if not file then return nil, "HTTP transport policy is unavailable" end
 	local bytes = file:read("*a")

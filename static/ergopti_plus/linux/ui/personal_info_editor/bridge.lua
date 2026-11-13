@@ -7,11 +7,11 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 M.bridge_name = "hsPersonalInfo"
 
-local Json = require("json")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.hsPersonalInfo"
 local APP_NAME = "personal_info_editor"
 local _opening = nil

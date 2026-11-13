@@ -5,7 +5,7 @@
 --- route metadata. No privileged document owner is fabricated by the test.
 --- This is a pure fixture, not real LGI/WebKit/entropy or native close proof.
 local M = {}
-local Json = require("json")
+local Json = require("core.text.engine.json")
 function M.new(app_name, handler, state)
 	local c = { views = {}, windows = {}, timers = {}, now = 100, scripts = {}, effects = {}, notices = {}, idles = {}, signal_serial = 0 }
 	local saved = {}

@@ -35,8 +35,8 @@ const HEADERS = Object.freeze(
 const RUNTIME = Object.freeze([
 	MAC + 'platform/network/native_http.py',
 	MAC + 'platform/network/managed_http.py',
-	'static/ergopti_plus/_shared/python/network_proxy_policy.py',
-	'static/ergopti_plus/_shared/modules/network/proxy_policy.json'
+	'static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
+	'static/ergopti_plus/_shared/core/network/data/proxy_policy.json'
 ]);
 const OWNERS = Object.freeze([
 	MAC + 'tests/support/native_http_fixture_builder.py',
@@ -262,7 +262,7 @@ function sourceReceipt(repository, epoch) {
 			MAC + 'tests/support',
 			'tools/diagnostics',
 			MAC + 'platform/network',
-			'static/ergopti_plus/_shared/python'
+			'static/ergopti_plus/_shared'
 		],
 		{ cwd: repository, stdio: 'pipe' }
 	)

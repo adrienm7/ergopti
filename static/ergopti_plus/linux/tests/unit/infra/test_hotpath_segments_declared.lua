@@ -21,7 +21,7 @@ local TIMED_ONLY = {
 	["input.latency"] = true, ["layout.switch"] = true, ["config.reload"] = true,
 }
 
-require("test.hotpath_segments_contract").register(helpers, {
+require("tests.lua.core.hotpath_segments_contract").register(helpers, {
 	driver = "linux",
 	directory = require("infra.native_directory"),
 	root = helpers.driver_root(),
@@ -33,7 +33,7 @@ require("test.hotpath_segments_contract").register(helpers, {
 helpers.describe("hot-path segment inventory: linux spans", function()
 	helpers.it("declares every inventory segment as a perf span", function()
 		local spans = helpers.load_module("infra.perf_counters").snapshot().spans
-		for name in pairs(require("hotpath_segments").for_driver("linux")) do
+		for name in pairs(require("metrics.engine.perf.hotpath_segments").for_driver("linux")) do
 			helpers.assert_true(spans[name] ~= nil, "'" .. name .. "' is in the inventory but is not a perf span")
 		end
 	end)

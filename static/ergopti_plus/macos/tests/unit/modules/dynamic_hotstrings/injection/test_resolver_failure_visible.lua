@@ -26,9 +26,9 @@ end
 local function run_scenario()
 	local dependency_names = {
 		"adapters.timer_scheduler",
-		"dynamic_hotstrings",
+		"hotstrings.engine.dynamic.core",
 		"infra.logger",
-		"logger.shim",
+		"core.logger.engine.shim",
 		"modules.diagnostics.hid_diagnostic_mailbox",
 		"modules.dynamic_hotstrings.rules_engine",
 		"modules.keystats",
@@ -51,7 +51,7 @@ local function run_scenario()
 		errors[#errors + 1] = string.format(format_string, ...)
 	end
 	package.loaded["infra.logger"] = Logger
-	package.loaded["logger.shim"] = Logger
+	package.loaded["core.logger.engine.shim"] = Logger
 	-- The resolver test owns only the dynamic-rules consumer. Loading the full
 	-- keystats now arms its independent KC bridge poller during init, which would
 	-- consume this fixture's sole repeating-timer counter before the mailbox does
@@ -89,11 +89,11 @@ local function run_scenario()
 	}
 
 	local ok, err = xpcall(function()
-		package.loaded["dynamic_hotstrings"] = nil
+		package.loaded["hotstrings.engine.dynamic.core"] = nil
 		package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
 		local RulesEngine = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
 		local Mailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
-		local SharedEngine = require("dynamic_hotstrings")
+		local SharedEngine = require("hotstrings.engine.dynamic.core")
 		helpers.assert_true(Mailbox.start())
 		helpers.assert_eq(pump_arm_calls, 1)
 		helpers.assert_true(RulesEngine.start(fake_keymap))

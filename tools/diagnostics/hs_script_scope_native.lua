@@ -27,9 +27,9 @@ function M.run(receipt_path, destination, nonce)
 	assert(_G[GLOBAL_KEY] == nil, "A native Script probe already owns its participant")
 	local owner = { nonce = nonce }
 	_G[GLOBAL_KEY] = owner
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local FileSystem = require("adapters.file_system")
-	local Writer = require("toml_codec.writer")
+	local Writer = require("core.text.engine.toml_codec.writer")
 	local Scope, Runtime, Manifest, I18n, Locale, Logger, Dialog, Preferences, Checkpoint, Storage
 	local info = hs.processInfo
 	local identity = {
@@ -91,7 +91,7 @@ function M.run(receipt_path, destination, nonce)
 	end
 	local okay, failure = xpcall(function()
 		Scope = require("infra.script_scope")
-		Runtime = require("script_scope_runtime")
+		Runtime = require("settings.engine.scope.script_scope_runtime")
 		Manifest = require("infra.manifest_reader")
 		I18n = require("infra.i18n")
 		Locale = require("infra.locale")

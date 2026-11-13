@@ -12,7 +12,7 @@
  * render and export through this one formatter.
  *
  * FEATURES & RATIONALE:
- * 1. The schema (_shared/modules/diagnostics/schema.json) decides the order of
+ * 1. The schema (_shared/diagnostics/data/schema.json) decides the order of
  *    the sections, which fields exist on which driver, how each value is
  *    formatted and which ones are opt-in. Adding a field is a schema edit, a
  *    collector and two locale keys; nothing here names a field except the

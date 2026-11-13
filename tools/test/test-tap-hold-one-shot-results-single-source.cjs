@@ -10,7 +10,7 @@
  * same one-shot Shift, had none of them and shifted the key instead.
  *
  * WHAT IS CHECKED:
- * `_shared/tap_hold/one_shot_shift.json` declares the results; the Windows
+ * `_shared/tap_hold/data/one_shot_shift.json` declares the results; the Windows
  * one-shot takes its results from the shared reader in
  * tap_hold_loader.ahk and spells none itself; the Linux tap-hold manager reads
  * the same file and its engine spells none either.
@@ -24,7 +24,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const DATA = path.join(SP, '_shared', 'tap_hold', 'one_shot_shift.json');
+const DATA = path.join(SP, '_shared', 'tap_hold', 'data', 'one_shot_shift.json');
 const AHK_ONE_SHOT = path.join(SP, 'windows', 'platform', 'remap', 'one_shot_shift.ahk');
 const AHK_LOADER = path.join(SP, 'windows', 'platform', 'remap', 'tap_hold_loader.ahk');
 const LINUX_MANAGER = path.join(SP, 'linux', 'platform', 'remap', 'tap_hold_manager.lua');
@@ -95,20 +95,20 @@ if (body.includes('TapHoldOneShotEndKeys(')) {
 }
 if (!fs.readFileSync(AHK_LOADER, 'utf8').includes('one_shot_shift.json')) {
 	errors.push(
-		'windows/platform/remap/tap_hold_loader.ahk does not read _shared/tap_hold/one_shot_shift.json.'
+		'windows/platform/remap/tap_hold_loader.ahk does not read _shared/tap_hold/data/one_shot_shift.json.'
 	);
 }
 
-if (!fs.readFileSync(LINUX_MANAGER, 'utf8').includes('tap_hold/one_shot_shift.json')) {
+if (!fs.readFileSync(LINUX_MANAGER, 'utf8').includes('tap_hold/data/one_shot_shift.json')) {
 	errors.push(
-		'linux/platform/remap/tap_hold_manager.lua does not read _shared/tap_hold/one_shot_shift.json.'
+		'linux/platform/remap/tap_hold_manager.lua does not read _shared/tap_hold/data/one_shot_shift.json.'
 	);
 }
-if (!fs.readFileSync(MACOS_ADAPTER, 'utf8').includes('tap_hold/one_shot_shift.json')) {
+if (!fs.readFileSync(MACOS_ADAPTER, 'utf8').includes('tap_hold/data/one_shot_shift.json')) {
 	errors.push('macOS must load the same one-shot result table.');
 }
 for (const file of [LINUX_ENGINE, MACOS_OWNER]) {
-	if (!fs.readFileSync(file, 'utf8').includes('require("tap_hold.one_shot_shift")')) {
+	if (!fs.readFileSync(file, 'utf8').includes('require("tap_hold.engine.one_shot_shift_core")')) {
 		errors.push(
 			`${path.relative(SP, file)} must consume the shared one-shot key and Unicode policy.`
 		);

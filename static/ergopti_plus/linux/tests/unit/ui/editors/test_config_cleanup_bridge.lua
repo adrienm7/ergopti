@@ -17,8 +17,8 @@ local function with_bridge(controls, run)
 		eval_js = function(_, script) context.scripts[#context.scripts + 1] = script; return true end,
 	}
 	local stubs = {
-		["logger.shim"] = logger, ["ui.webview_manager"] = manager,
-		["config_cleanup_session"] = { new = function(options)
+		["core.logger.engine.shim"] = logger, ["ui.webview_manager"] = manager,
+		["settings.engine.migration.cleanup_session"] = { new = function(options)
 			local session = { calls = {}, closed = 0, options = options }
 			session.token = "session-" .. (#context.sessions + 1)
 			function session:handle(payload)

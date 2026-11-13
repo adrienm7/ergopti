@@ -31,7 +31,7 @@ end
 --- @param source string|nil Configuration bytes.
 --- @param body function body(rows, context)
 local function with_menu(source, body)
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	local loaded = {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
@@ -41,7 +41,7 @@ local function with_menu(source, body)
 			local context = { path = path, changes = 0, errors = 0 }
 			local i18n = require("infra.i18n")
 			local builder = load_builder({
-				Logger = require("logger.shim"), i18n = i18n.get,
+				Logger = require("core.logger.engine.shim"), i18n = i18n.get,
 				show_error = function() context.errors = context.errors + 1 end,
 				ctx = { commands = {}, state_getters = {},
 					on_menu_changed = function() context.changes = context.changes + 1 end },
@@ -106,7 +106,7 @@ helpers.describe("caps word auto-off menu (Linux)", function()
 			for _, key in ipairs(require("infra.manifest_reader").default_for("shortcuts.caps_word.terminators")) do
 				shipped[key] = true
 			end
-			for _, row in ipairs(require("caps_word.auto_off").terminator_rows()) do
+			for _, row in ipairs(require("keyboard.engine.caps_word_auto_off").terminator_rows()) do
 				if not row.separator then
 					local item = find(rows, c.i18n(row.label_key))
 					helpers.assert_not_nil(item, "a row for the delimiter " .. row.key)

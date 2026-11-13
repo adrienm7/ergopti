@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Healthcheck / Page Actions
 ; DESCRIPTION:
-; AHK port of _shared/lua/healthcheck/actions.lua: validates what the
+; AHK port of _shared/diagnostics/engine/healthcheck/actions.lua: validates what the
 ; diagnostics page asks the host to do before the host does it. The page is a
 ; web page, so a message is untrusted input; the host never opens a path, a URL
 ; or a file name it did not produce or allow itself.

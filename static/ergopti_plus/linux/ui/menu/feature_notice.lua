@@ -10,8 +10,8 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local SharedNotice = require("feature_notice")
+local Logger = require("core.logger.engine.shim")
+local SharedNotice = require("menu.engine.feature_notice")
 
 local LOG = "ui.menu.feature_notice"
 

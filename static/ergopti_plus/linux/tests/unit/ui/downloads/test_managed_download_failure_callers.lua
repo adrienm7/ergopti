@@ -20,7 +20,7 @@ local function isolated(body)
 		if saved[name] == nil then saved[name] = package.loaded[name] or false end
 		package.loaded[name] = value
 	end
-	replace("logger.shim", { debug = function() end, info = function() end, warn = function() end,
+	replace("core.logger.engine.shim", { debug = function() end, info = function() end, warn = function() end,
 		error = function() end, start = function() end, success = function() end, done = function() end })
 	replace("infra.i18n", { get = function(key) return key end })
 	local ok, err = xpcall(function() body(replace) end, debug.traceback)

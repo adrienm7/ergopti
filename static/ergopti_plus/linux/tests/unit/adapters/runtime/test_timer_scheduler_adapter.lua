@@ -560,7 +560,7 @@ end)
 
 helpers.describe("linux-timer-finite-admission", function()
 	helpers.it("linux-timer-finite-admission: shared policy preserves finite magnitude and signed values", function()
-		local policy = require("number_policy")
+		local policy = require("core.text.engine.number_policy")
 		for _, value in ipairs({ 0, -1, 0.125, 1e308 }) do
 			helpers.assert_eq(policy.is_finite(value), true)
 		end

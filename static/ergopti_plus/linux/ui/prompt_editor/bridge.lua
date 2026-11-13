@@ -9,11 +9,11 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 M.bridge_name = "prompt_bridge"
 
-local Json = require("json")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
 
 local APP_NAME = "prompt_editor"
 local LOG = "bridge.prompt_editor"

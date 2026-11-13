@@ -50,7 +50,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Shell = require("adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
 local X11Focus = require("adapters.x11_focus")
@@ -102,7 +102,7 @@ end
 --- @return table|nil
 local function decode_json(raw)
 	if type(raw) ~= "string" or raw == "" then return nil end
-	local ok_mod, json = pcall(require, "json")
+	local ok_mod, json = pcall(require, "core.text.engine.json")
 	if not ok_mod or type(json) ~= "table" or type(json.decode) ~= "function" then
 		Logger.warn(LOG, "No JSON decoder — the compositor query cannot be read.")
 		return nil

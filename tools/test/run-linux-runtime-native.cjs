@@ -18,7 +18,7 @@ const { spawnSync } = require('node:child_process');
 const { findRuntime } = require('./run-linux-lua.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
-const LUA_PATH = './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;';
+const LUA_PATH = './?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;';
 const ABIS = ['luajit', 'lua5.4'];
 const PROBES = [
 	['run_owned_process_native.lua', 10, 'Actual owned processes: 10 passed, 0 failed'],
@@ -148,7 +148,7 @@ function run({
 				path.join(hardware, 'run_http_owned_post_native.py'),
 				driver,
 				'--shared-lua',
-				path.join(driver, '../_shared/lua'),
+				path.join(driver, '../_shared'),
 				'--lua',
 				abi
 			],

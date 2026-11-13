@@ -52,12 +52,12 @@ local function exercise(kind, dry_run, options)
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	for name in pairs(previous) do
 		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-			or name:match("^platform%.") or name == "logger.shim"
-			or name == "dynamic_hotstrings" or name:match("^dynamic_hotstrings%.") then package.loaded[name] = nil end
+			or name:match("^platform%.") or name == "core.logger.engine.shim"
+			or name == "hotstrings.engine.dynamic.core" or name:match("^dynamic_hotstrings%.") then package.loaded[name] = nil end
 	end
 	local directory = os.tmpname()
 	assert(os.remove(directory))
-	local made = os.execute("mkdir -m 700 " .. require("text_utils").shell_quote(directory))
+	local made = os.execute("mkdir -m 700 " .. require("core.text.engine.utils_core").shell_quote(directory))
 	assert(made == true or made == 0)
 	local info_path, source_path, marker = directory .. "/personal_info.toml",
 		directory .. "/personal_dynamic_hotstrings.lua", directory .. "/called"
@@ -143,7 +143,7 @@ local function exercise(kind, dry_run, options)
 				atspi = require("adapters.atspi_focus")
 				atspi._publish_resident_snapshot({ bus = state.bus, path = state.path, role = state.role })
 				atspi._set_command_runner_for_test(function()
-					return true, "FOCUS:" .. require("json").encode({ role = state.role, name = "Document", attributes = {},
+					return true, "FOCUS:" .. require("core.text.engine.json").encode({ role = state.role, name = "Document", attributes = {},
 						native_bus_name = state.bus, native_object_path = state.path, active_scope = true })
 				end)
 				user = require("modules.dynamic_hotstrings.user_code")
@@ -159,10 +159,10 @@ local function exercise(kind, dry_run, options)
 					-- Bare keys: the shared expansion delay reads the held modifiers per key.
 					keyboard_hook = { held_modifiers = function() return {} end },
 					Monotonic = require("infra.monotonic"), WordReset = require("modules.hotstrings.word_reset"),
-					terminators_mod = require("keymap.terminators"), RepeatKey = repeat_key,
+					terminators_mod = require("layouts.engine.layers.terminators"), RepeatKey = repeat_key,
 					MagicKey = require("modules.hotstrings.magic_key"), opts = { dry_run = dry_run },
 					_cached_app_id = "owned-editor", keystats = metrics, engine_mod = engine_mod, engine = engine,
-					dyn_hotstrings = dynamic, injector = injector, Logger = require("logger.shim"), user_hotstring_native = native,
+					dyn_hotstrings = dynamic, injector = injector, Logger = require("core.logger.engine.shim"), user_hotstring_native = native,
 					keyboard_hook = session.hook, tooltip_preview = options.preview,
 				}, { __index = _G })
 				if options.delay ~= nil then

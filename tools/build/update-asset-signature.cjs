@@ -5,7 +5,7 @@
  * MODULE: Update Asset Signatures
  * DESCRIPTION:
  * Signs and verifies the detached signatures of the Windows and Linux update
- * assets (policy: _shared/modules/updater/asset_signing.json). Release CI calls
+ * assets (policy: _shared/updater/data/asset_signing.json). Release CI calls
  * `sign` on the packaged assets and publishes each <asset>.sig beside them; the
  * updaters verify the same record with their OS-native crypto (CNG on Windows,
  * OpenSSL on Linux). This file is the reference implementation the vectors are
@@ -47,8 +47,8 @@ const POLICY_PATH = path.resolve(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
 	'updater',
+	'data',
 	'asset_signing.json'
 );
 

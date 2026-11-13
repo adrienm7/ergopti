@@ -34,7 +34,7 @@ local function probe(status, output)
 		write(executable, "#!/bin/sh\nprintf '%s' " .. Shell.quote(output) .. "\nexit " .. status .. "\n")
 		assert(Shell.run("chmod u+x " .. Shell.quote(executable)))
 		write(worker, "package.path = " .. string.format("%q", package.path) .. "\n"
-			.. "package.loaded['logger.shim'] = { error = function() end, warn = function() end, debug = function() end }\n"
+			.. "package.loaded['core.logger.engine.shim'] = { error = function() end, warn = function() end, debug = function() end }\n"
 			-- The private executable stands in for the owned dialog host.
 			.. "package.loaded['ui.native_dialog'] = { command = function() return "
 			.. string.format("%q", Shell.quote(executable)) .. " end }\n"

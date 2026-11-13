@@ -4,7 +4,7 @@
 ; MODULE: Tap-Holds — One-Shot Shift
 ; DESCRIPTION:
 ; OneShotShift() capitalises the next typed character (or types the result
-; _shared/tap_hold/one_shot_shift.json gives it) and resets immediately after. Also owns
+; _shared/tap_hold/data/one_shot_shift.json gives it) and resets immediately after. Also owns
 ; OneShotShiftFix() (disables the pending shift when used as a chord modifier)
 ; and ToggleCapsLock() (shared by CapsLock and AltGr tap-hold modules).
 ; ==============================================================================

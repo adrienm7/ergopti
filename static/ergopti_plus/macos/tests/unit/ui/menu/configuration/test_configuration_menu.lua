@@ -249,5 +249,5 @@ end
 local configuration_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/configuration_parent.json"), "rb"))
 local configuration_parent_raw = configuration_parent_file:read("*a")
 configuration_parent_file:close()
-require("test.configuration_parent_contract").register(helpers, configuration_parent_fixture,
+require("tests.lua.settings.configuration_parent_contract").register(helpers, configuration_parent_fixture,
 	assert(require("adapters.json_codec").decode(configuration_parent_raw)), "hs")

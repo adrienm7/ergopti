@@ -75,7 +75,7 @@ local function migrate(answers)
 			end,
 		}
 	end
-	local backup = path .. require("keystats.token_encoding").BACKUP_SUFFIX
+	local backup = path .. require("metrics.engine.privacy.token_encoding").BACKUP_SUFFIX
 	local exited, process = false, nil
 	local ok, result = xpcall(function()
 		helpers.assert_true(writer.open_db(path))

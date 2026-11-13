@@ -33,8 +33,8 @@ archive="$1"
 [ -f "$archive" ] || fail "no archive at $archive"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
-. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# shellcheck source=../../static/ergopti_plus/_shared/core/text/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 CORE="$ERGOPTI_SERVICE_LABEL_MACOS_CORE"
 VHID="$ERGOPTI_SERVICE_LABEL_MACOS_VIRTUAL_HID"
 PARENT="/Library/Application Support/ErgoptiPlus"

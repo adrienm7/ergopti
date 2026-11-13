@@ -647,7 +647,7 @@ helpers.describe("TOML codec — inline table with a nested multi-element array"
 	helpers.it("decodes the shared action catalogue, which is what found this", function()
 		-- The real document. A unit case can be satisfied by a fix that still
 		-- fails on the file the bug was found in.
-		local path = helpers.shared("modules/actions/actions.toml")
+		local path = helpers.shared("shortcuts/data/actions/actions.toml")
 		local fh = io.open(path, "r")
 		helpers.assert_true(fh ~= nil, "the shared action catalogue must be readable at " .. tostring(path))
 		local raw = fh:read("*a")

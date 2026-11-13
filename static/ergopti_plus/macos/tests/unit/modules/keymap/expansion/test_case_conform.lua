@@ -30,7 +30,7 @@ local REGISTRY_OWNERSHIP = {
 	"modules.keymap.terminators",
 	"modules.keymap.utils",
 	"infra.text_utils",
-	"text_utils",
+	"core.text.engine.utils_core",
 }
 
 local ENGINE_OWNERSHIP = {
@@ -42,7 +42,7 @@ local ENGINE_OWNERSHIP = {
 	"modules.keymap.terminator_replay",
 	"modules.keymap.utils",
 	"infra.text_utils",
-	"text_utils",
+	"core.text.engine.utils_core",
 	"ui.tooltip",
 	"modules.keystats",
 }

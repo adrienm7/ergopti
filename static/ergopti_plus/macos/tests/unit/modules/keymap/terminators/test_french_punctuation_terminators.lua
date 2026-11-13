@@ -44,7 +44,7 @@ local NBSP = string.char(0xC2, 0xA0)          -- U+00A0
 local NNBSP = string.char(0xE2, 0x80, 0xAF)   -- U+202F
 
 local function terminators()
-	return helpers.load_with_stubs("keymap.terminators", {})
+	return helpers.load_with_stubs("layouts.engine.layers.terminators", {})
 end
 
 

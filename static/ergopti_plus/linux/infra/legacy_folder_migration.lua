@@ -13,7 +13,7 @@
 --- 1. Before Everything: the daemon runs this before the logger sink opens the
 ---    logs folder and before the bootstrap storage is read, because both live in
 ---    folders it moves. Its report is logged once the logger is ready.
---- 2. Shared Rules: what moves and what is refused is _shared/lua/
+--- 2. Shared Rules: what moves and what is refused is _shared/
 ---    legacy_folder_migration.lua; this module only resolves the folders and
 ---    owns the native effects (POSIX test, libuv scandir, mkdir, rmdir) and the
 ---    no-replace rename of infra/no_replace_move.
@@ -24,14 +24,14 @@
 
 local M = {}
 
-local AppDirs = require("app_dirs")
-local Core = require("legacy_folder_migration")
-local NativePath = require("native_path")
+local AppDirs = require("core.fs.engine.app_dirs")
+local Core = require("settings.engine.migration.legacy_folder_migration_core")
+local NativePath = require("core.fs.engine.native_path")
 local NoReplaceMove = require("infra.no_replace_move")
 -- The installer bundles luv; without it a folder is reported as unlistable
 -- (so nothing is merged, and no link can be mistaken for a second folder).
 local uv_loaded, uv = pcall(require, "luv")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 
 local LOG = "infra.legacy_folder_migration"
 

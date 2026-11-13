@@ -161,7 +161,7 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 	/// The archive bounds modules/updater/release_installer.lua passes to the
 	/// staging script, read from their one declaration in the shared updater defaults.
 	private static func archiveBounds() throws -> (absoluteMs: Int, idleMs: Int) {
-		let defaults = repositoryURL.appendingPathComponent("static/ergopti_plus/_shared/modules/updater/defaults.json")
+		let defaults = repositoryURL.appendingPathComponent("static/ergopti_plus/_shared/updater/data/defaults.json")
 		let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: defaults)) as? [String: Any])
 		let transfer = try XCTUnwrap(object["archive_transfer"] as? [String: Any])
 		let phases = try XCTUnwrap(transfer["phase_timeout_ms"] as? [String: Any])

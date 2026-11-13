@@ -174,7 +174,7 @@ Test("NetworkCheck: the PAC verdict follows the managed download's rules (networ
 ; The ceiling is the shared policy's, not a copy: a different value there moves it.
 _TNC_PacCeilingIsThePolicys() {
 	global _SharedDir
-	Policy := JsonParse(FileRead(_SharedDir . "\modules\network\proxy_policy.json", "UTF-8"))
+	Policy := JsonParse(FileRead(_SharedDir . "\core\network\data\proxy_policy.json", "UTF-8"))
 	Maximum := Policy["native_pac"]["max_script_bytes"]
 	AssertTrue(Maximum > 0, "the policy names a PAC ceiling")
 	AssertEqual(Maximum, NetworkCheck_PacMaxBytes())

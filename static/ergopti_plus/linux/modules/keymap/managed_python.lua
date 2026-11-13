@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The Python that runs the user XKB installer: the python-build-standalone
 --- build of the shared managed Python release, pinned in the runtime manifest
---- (_shared/data/linux_native_runtime.json, projected into
+--- (_shared/core/network/data/linux_native_runtime.json, projected into
 --- _generated/native_runtime.lua) and downloaded once, on consent, into the
 --- private data folder. The host's python3 is never run (owned runtimes, PIN).
 ---
@@ -26,7 +26,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "keymap.managed_python"
 

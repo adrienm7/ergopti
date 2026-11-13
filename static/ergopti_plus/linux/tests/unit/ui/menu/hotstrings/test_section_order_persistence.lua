@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 helpers.describe("hotstring-section-order persistence", function()
 	local function with_file(source, test)

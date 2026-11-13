@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("logger")
+require("core.logger.engine")
 
 local EDITORS = {
 	"ui.hotstring_editor", "ui.hotstrings_config_window", "ui.personal_info_editor", "ui.prompt_editor",
@@ -21,16 +21,16 @@ local function with_native_editor(name, scenario)
 		"ui.personal_info_editor", "ui.prompt_editor", "ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler",
 		"adapters.webview_result", "infra.deferred_work", "infra.paths", "infra.fs_dir", "infra.notifications",
 		"infra.toml.reader", "infra.toml.writer", "modules.hotstrings.hotstrings_config",
-		"modules.hotstrings.hotstrings_config_schema", "adapters.hotkey_registrar", "chord",
-		"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
-		"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
-		"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
-		"tests.support.native_webview_close_fixture", "text_utils", "lfs", "module_source_identity",
-		"toml_codec.writer", "toml_codec.bom", "compat.utf8", "toml_codec.key_path", "toml_codec.record_scanner",
-		"config_migrate", "toml_codec.leaf_rows", "module_source_directory", "toml_codec.reader",
-		"toml_codec.basic_string", "diagnostics.operation_reporter", "adapters.file_system",
-		"hotstrings.publication_recovery", "hotstrings.delay_resolver", "hotstrings.personal_files",
-		"hotstring_priority", "infra.toml.record_editor", "hotstrings.extensions",
+		"modules.hotstrings.hotstrings_config_schema", "adapters.hotkey_registrar", "keyboard.engine.chord",
+		"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "adapters.json_codec", "diagnostics.engine.reports.redact",
+		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "infra.launcher_environment", "adapters.log_transport",
+		"core.fs.engine.app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
+		"tests.support.native_webview_close_fixture", "core.text.engine.utils_core", "lfs", "core.fs.engine.module_source_identity",
+		"core.text.engine.toml_codec.writer", "core.text.engine.toml_codec.bom", "core.lifecycle.engine.compat.utf8", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.record_scanner",
+		"settings.engine.migration.migrate", "core.text.engine.toml_codec.leaf_rows", "core.fs.engine.module_source_directory", "core.text.engine.toml_codec.reader",
+		"core.text.engine.toml_codec.basic_string", "diagnostics.engine.operation_reporter", "adapters.file_system",
+		"hotstrings.engine.publication_recovery", "hotstrings.engine.delay_resolver", "hotstrings.engine.catalogue.personal_files",
+		"hotstrings.engine.priority", "infra.toml.record_editor", "hotstrings.engine.extensions",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, callbacks = {} }
 		local construct = require("tests.support.native_webview_close_fixture")(h)
@@ -52,7 +52,7 @@ local function with_native_editor(name, scenario)
 				return { frame = function() return { x = 0, y = 0, w = 1400, h = 900 } end }
 			end },
 		})
-		if name == "ui.hotstring_editor" then editor.init(helpers.shared("modules/hotstrings/defaults.toml"), {}) end
+		if name == "ui.hotstring_editor" then editor.init(helpers.shared("hotstrings/data/catalogue/defaults.toml"), {}) end
 		function h.open() return editor.open({}, function() return true end) end
 		function h.drain() h.drain_native_close() end
 		scenario(editor, h)

@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for the token usage and estimated cost of a remote-provider answer, the figures the dashboard's AI tab reads from events_llm. Replayed by the shared Lua module (_shared/lua/llm/remote_response_classifier.lua, macOS and Linux) and on Windows by test_llm_shared_vectors.ahk.",
+	"description": "Golden vectors for the token usage and estimated cost of a remote-provider answer, the figures the dashboard's AI tab reads from events_llm. Replayed by the shared Lua module (_shared/ai/engine/policy/remote_response_classifier.lua, macOS and Linux) and on Windows by test_llm_shared_vectors.ahk.",
 	"rule": "Each format reads only its own top-level usage map: openai and backboard usage.{prompt_tokens,completion_tokens,total_tokens}, perplexity_agent usage.{input_tokens,output_tokens,total_tokens}, anthropic usage.{input_tokens,output_tokens} with the total their sum, gemini usageMetadata.{promptTokenCount,candidatesTokenCount,totalTokenCount}. A negative, non-numeric or missing count is 0; a zero or missing total is the sum of the admitted prompt and completion counts. A price row is kept when in and out are finite nonnegative numbers (US dollars per million tokens); cost = (prompt * in + completion * out) / 1000000, 0 for an unpriced model.",
 	"usage_vectors": [
 		{

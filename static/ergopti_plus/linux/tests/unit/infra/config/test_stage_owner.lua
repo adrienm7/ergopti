@@ -84,7 +84,7 @@ helpers.describe("CFD-1: per-process stages and their reaping (cfd1-stage-owner)
 	end)
 
 	helpers.it("publishes past a stage a killed process left (cfd1-stage-owner)", function()
-		local Writer = require("toml_codec.writer")
+		local Writer = require("core.text.engine.toml_codec.writer")
 		local dir = os.tmpname()
 		os.remove(dir)
 		assert(os.execute("mkdir -p '" .. dir .. "'"))

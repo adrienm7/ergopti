@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
-local Writer = require("toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local Writer = require("core.text.engine.toml_codec.writer")
 
 -- The leaf these cases toggle. Its neutral value is the manifest default, read
 -- from the one declaration; the explicit choice is the other boolean.
@@ -106,17 +106,17 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 	--- @param content string Initial bytes.
 	--- @param body function body(Preferences, path, errors, warnings)
 	local function with_recorded_log(content, body)
-		local saved = package.loaded["logger.shim"]
+		local saved = package.loaded["core.logger.engine.shim"]
 		local errors, warnings = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-		package.loaded["logger.shim"] = logger
-		require("config_outdated").reset_for_tests()
+		package.loaded["core.logger.engine.shim"] = logger
+		require("settings.engine.migration.outdated").reset_for_tests()
 		local ok, err = pcall(with_preferences, content, function(Preferences, path)
 			body(Preferences, path, errors, warnings)
 		end)
-		package.loaded["logger.shim"] = saved
+		package.loaded["core.logger.engine.shim"] = saved
 		if not ok then error(err, 0) end
 	end
 
@@ -131,7 +131,7 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 			helpers.assert_eq(errors, {})
 			helpers.assert_eq(#warnings, 1, table.concat(warnings, " | "))
 			helpers.assert_true(warnings[1]:find("'hotstrings.preview_star_enabled'", 1, true) ~= nil, warnings[1])
-			local scan = require("config_unused_keys").find_in_source(source, Preferences.mark_config_reads)
+			local scan = require("settings.engine.migration.unused_keys").find_in_source(source, Preferences.mark_config_reads)
 			helpers.assert_eq(#scan.keys, 1)
 			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "hotstrings", "preview_star_enabled" })
 			helpers.assert_true(Preferences.set("hotstrings.preview_star_enabled", STAR_CHOICE),
@@ -146,7 +146,7 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 			helpers.assert_eq(Preferences.get("hotstrings.dynamic.date.enabled"), false)
 			helpers.assert_eq(Preferences.get("hotstrings.trigger_char"), "§")
 			helpers.assert_eq(errors, {})
-			local scan = require("config_unused_keys").find_in_source(source, Preferences.mark_config_reads)
+			local scan = require("settings.engine.migration.unused_keys").find_in_source(source, Preferences.mark_config_reads)
 			helpers.assert_eq(#scan.keys, 1)
 			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "hotstrings", "dynamic" })
 		end)

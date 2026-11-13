@@ -61,7 +61,7 @@
 	"exclude": [
 		{
 			"name": "behavior-review-metadata",
-			"globs": ["static/ergopti_plus/_shared/modules/features/behaviors.json"],
+			"globs": ["static/ergopti_plus/_shared/settings/data/features/behaviors.json"],
 			"why": "Reviewed source-owner declarations feed the website and documentation generator only; the driver never reads this contributor metadata."
 		},
 		{
@@ -71,7 +71,7 @@
 		},
 		{
 			"name": "lua-sources",
-			"globs": ["static/ergopti_plus/_shared/lua/**", "**/*.lua"],
+			"globs": ["**/*.lua", "static/ergopti_plus/_shared/keyboard/engine/chord/vectors.json"],
 			"why": "Modules of the macOS and Linux drivers and the Lua half of extension packs; AutoHotkey neither loads nor reads them."
 		},
 		{
@@ -92,32 +92,41 @@
 		},
 		{
 			"name": "core-specifications",
-			"globs": ["static/ergopti_plus/_shared/core/**"],
-			"except": ["static/ergopti_plus/_shared/core/config_schema/migrations.toml"],
+			"globs": [
+				"static/ergopti_plus/_shared/core/features.json",
+				"static/ergopti_plus/_shared/core/ports/**",
+				"static/ergopti_plus/_shared/core/text/data/domain/**",
+				"static/ergopti_plus/_shared/settings/data/config_schema/**"
+			],
+			"except": ["static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml"],
 			"why": "Port and domain specifications, JSON schemas and config examples consumed by the JS suite and the code generators, whose output is compiled into the exe. The driver reads only the config migrations registry (infra/config_migrate.ahk)."
 		},
 		{
 			"name": "shared-js-algorithms",
-			"globs": ["static/ergopti_plus/_shared/modules/**/*.js"],
+			"globs": [
+				"static/ergopti_plus/_shared/core/network/data/*.js",
+				"static/ergopti_plus/_shared/core/ui/data/tooltip/*.js",
+				"static/ergopti_plus/_shared/updater/data/*.js"
+			],
 			"why": "Canonical JavaScript of the tooltip and updater algorithms. Windows runs AutoHotkey ports of them (ui/tooltip, modules/updater) and no Windows page loads them."
 		},
 		{
 			"name": "other-driver-data",
 			"globs": [
-				"static/ergopti_plus/_shared/assets/**",
-				"static/ergopti_plus/_shared/python/**",
-				"static/ergopti_plus/_shared/modules/llm/managed_python_release.json",
-				"static/ergopti_plus/_shared/data/keycodes/evdev.json",
-				"static/ergopti_plus/_shared/data/keycodes/hid_usages.json",
-				"static/ergopti_plus/_shared/modules/features/linux_evidence.json",
-				"static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json",
-				"static/ergopti_plus/_shared/modules/llm/managed_ollama_release.json"
+				"static/ergopti_plus/_shared/tray/data/**",
+				"static/ergopti_plus/_shared/ai/adapters/python/**",
+				"static/ergopti_plus/_shared/ai/data/managed_python_release.json",
+				"static/ergopti_plus/_shared/layouts/data/keycodes/evdev.json",
+				"static/ergopti_plus/_shared/layouts/data/keycodes/hid_usages.json",
+				"static/ergopti_plus/_shared/settings/data/features/linux_evidence.json",
+				"static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json",
+				"static/ergopti_plus/_shared/ai/data/managed_ollama_release.json"
 			],
 			"why": "The macOS and Linux tray PNGs, shared Python runtime and caches, the macOS MLX Python bootstrap catalogue, the Linux evdev key codes, the HID usages only the macOS codegen reads, and the Linux feature evidence ledger; the Windows tray uses the .ico files and Windows reads key positions from physical_keys.json. The optional native macOS Ollama source and produced asset catalogues are not read by Windows."
 		},
 		{
 			"name": "owned-runtimes-registry",
-			"globs": ["static/ergopti_plus/_shared/data/owned_runtimes.json"],
+			"globs": ["static/ergopti_plus/_shared/core/network/data/owned_runtimes.json"],
 			"why": "The decided owned-runtime rows that generate docs/design/owned-runtimes.md and feed the macOS and Linux spawn inventory test; no driver reads it at run time."
 		},
 		{
@@ -140,8 +149,8 @@
 			"name": "compile-time-sources",
 			"globs": [
 				"static/ergopti_plus/windows/vendor/*.ahk",
-				"static/ergopti_plus/_shared/native/**",
-				"static/ergopti_plus/_shared/go/**"
+				"static/ergopti_plus/_shared/core/network/native/**",
+				"static/ergopti_plus/_shared/core/network/native/go/**"
 			],
 			"why": "AutoHotkey libraries #Included when Ahk2Exe compiles the exe, which already contains them. The programmable-hotstring worker is executed separately by the shipped interpreter and must remain a runtime source. Shared native sources are compiled into platform executables and are never read by the Windows runtime. Shared Go sources are compiled into the optional macOS runtime.",
 			"except": ["static/ergopti_plus/windows/vendor/ergopti_user_hotstrings.ahk"]
@@ -284,8 +293,8 @@
 			"source": "static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1"
 		},
 		{
-			"dest": "static/ergopti_plus/_shared/modules/diagnostics/collection.json",
-			"source": "static/ergopti_plus/_shared/modules/diagnostics/collection.json"
+			"dest": "static/ergopti_plus/_shared/diagnostics/data/collection.json",
+			"source": "static/ergopti_plus/_shared/diagnostics/data/collection.json"
 		},
 		{
 			"source": "static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1",

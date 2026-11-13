@@ -60,8 +60,9 @@ const HOTSTRINGS_DIR = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
-	'hotstrings'
+	'hotstrings',
+	'data',
+	'catalogue'
 );
 
 // A TOML entry line: "TRIGGER" = { output = "…", is_word = …, … }
@@ -101,7 +102,7 @@ const CLEARED_ON_PURPOSE = [
 
 /**
  * The shared word-character rule, transcribed from
- * `_shared/lua/text_utils/init.lua` (`is_hotstring_word_char`). Every non-ASCII
+ * `_shared/core/text/engine/utils_core.lua` (`is_hotstring_word_char`). Every non-ASCII
  * codepoint counts as a word character, deliberately, so accented letters behave
  * like letters without a Unicode category table.
  * @param {string} ch A single codepoint.

@@ -32,7 +32,7 @@ local function auto_raise_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/auto_raise_temperature.json", "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("LLM shared automatic temperature control", function()
@@ -115,7 +115,7 @@ local function show_all_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/show_all_control.json", "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("LLM shared Show-all check", function()
@@ -210,7 +210,7 @@ local function trigger_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/automatic_trigger_controls.json", "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("LLM shared automatic trigger controls", function()
@@ -332,7 +332,7 @@ end)
 
 helpers.describe("shared token streaming policy", function()
 	helpers.it("replays independent capability and admission vectors (shared-token-streaming)", function()
-		local policy = require("llm.display_policy")
+		local policy = require("ai.engine.settings.display_policy")
 		local corpus = token_streaming_corpus()
 		helpers.assert_eq(#corpus.capabilities, 9)
 		helpers.assert_eq(#corpus.cases, 15)

@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Physical Shortcut Editor Session And Window Protocol
 ; DESCRIPTION:
-; Ports of _shared/lua/shortcuts/physical_entries.lua, physical_editor.lua and
+; Ports of _shared/shortcuts/engine/physical_entries.lua, physical_editor.lua and
 ; physical_editor_window.lua for the Windows WebView2 host. The session keeps
 ; the exact native source the page shows; a picker choice is only a draft, and
 ; the native scope owns every publication. The page's JSON is never evidence.

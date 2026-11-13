@@ -33,12 +33,18 @@ def load(name, path):
     return module
 
 
-POLICY = load("ergopti_managed_ollama_policy", SHARED / "python/managed_ollama_runtime.py")
+POLICY = load(
+    "ergopti_managed_ollama_policy", SHARED / "ai/adapters/python/managed_ollama_runtime.py"
+)
 BOOTSTRAP = load(
     "ergopti_managed_ollama_bootstrap", DRIVER / "modules/llm/managed_bootstrap_http.py"
 )
-PROXY = load("ergopti_managed_ollama_proxy", SHARED / "python/network_proxy_policy.py")
-ALIASES = load("ergopti_managed_source_alias", SHARED / "python/managed_source_alias.py")
+PROXY = load(
+    "ergopti_managed_ollama_proxy", SHARED / "core/network/adapters/python_network_proxy_policy.py"
+)
+ALIASES = load(
+    "ergopti_managed_source_alias", SHARED / "ai/adapters/python/managed_source_alias.py"
+)
 
 
 class CurlResponse:
@@ -287,9 +293,9 @@ def inputs():
     if architecture is None:
         raise POLICY.RuntimeRefusal("unavailable")
     host = "macos-" + architecture
-    contract_bytes = (SHARED / "modules/llm/managed_ollama_runtime.json").read_bytes()
+    contract_bytes = (SHARED / "ai/data/managed_ollama_runtime.json").read_bytes()
     try:
-        catalogue_bytes = (SHARED / "modules/llm/managed_ollama_release.json").read_bytes()
+        catalogue_bytes = (SHARED / "ai/data/managed_ollama_release.json").read_bytes()
     except FileNotFoundError as error:
         raise MissingReleaseCatalogue("missing-catalogue") from error
     contract, asset = POLICY.select_asset(contract_bytes, catalogue_bytes, host)

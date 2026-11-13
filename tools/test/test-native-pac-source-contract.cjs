@@ -356,8 +356,11 @@ for data in [previous,current]:
  for url,environment,expected in vectors:assert policy.route(url,environment)==expected
 print('LINUX_POLICY original=3 extended=3 unchanged=true')
 `,
-			path.join(root, 'static/ergopti_plus/_shared/modules/network/proxy_policy.json'),
-			path.join(root, 'static/ergopti_plus/_shared/python/network_proxy_policy.py')
+			path.join(root, 'static/ergopti_plus/_shared/core/network/data/proxy_policy.json'),
+			path.join(
+				root,
+				'static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py'
+			)
 		],
 		{ encoding: 'utf8', timeout: 10000 }
 	);
@@ -757,8 +760,9 @@ check('the launcher Info.plist lets URLSession fetch an http PAC', () => {
 				'static',
 				'ergopti_plus',
 				'_shared',
-				'modules',
+				'core',
 				'network',
+				'data',
 				'proxy_policy.json'
 			),
 			'utf8'

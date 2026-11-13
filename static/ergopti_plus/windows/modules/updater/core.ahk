@@ -26,8 +26,8 @@ global UPDATER_INI_SECTION := "updater"
 
 ; Locale key of the About version row for each build kind, and of the text
 ; shown for a commit that cannot be determined (Updater_VersionRowLabel). The
-; AHK port of _shared/lua/updater/version_label.lua; both are pinned to
-; _shared/modules/updater/version_label_vectors.json.
+; AHK port of _shared/updater/engine/version_label.lua; both are pinned to
+; _shared/updater/data/version_label_vectors.json.
 global UPDATER_VERSION_ROW_KEYS := Map(
 	"release", "menu.about.version_release",
 	"local",   "menu.about.version_local",
@@ -38,7 +38,7 @@ global UPDATER_UNKNOWN_COMMIT_KEY := "menu.about.commit_unknown"
 ; through the shared registry (_Updater_SelectChannelRelease). GitHub's
 ; /releases/latest ignores prereleases and answers 404 while no stable release
 ; exists, which callers reported as an unreachable network. Mirrors
-; update_check.releases_url in _shared/modules/updater/defaults.json (pinned
+; update_check.releases_url in _shared/updater/data/defaults.json (pinned
 ; by tools/test/test-updater-constants-single-source.cjs).
 global UPDATER_RELEASES_API_URL_TEMPLATE := "https://" . Identifiers.Hosts.GITHUB_API . "/repos/{owner}/{repo}/releases?per_page=100"
 ; The public releases Atom feed, read when api.github.com gives no list: a
@@ -52,7 +52,7 @@ global UPDATER_RELEASES_FEED_URL_TEMPLATE := UPDATER_GITHUB_WEB_ROOT . "{owner}/
 global UPDATER_NO_CHANNEL_RELEASE := "[]"
 
 ; Background update-check interval. 0 means "never" (disabled). The default and
-; the presets are the shared ones (_shared/modules/updater/defaults.json, read
+; the presets are the shared ones (_shared/updater/data/defaults.json, read
 ; through modules/updater/schedule.ahk); a saved value outside them snaps to
 ; the nearest preset. Honoured by ``Updater_StartBackgroundChecks``.
 global UPDATER_INI_INTERVAL_KEY    := ConfigLeaf.CHECK_INTERVAL_SECONDS
@@ -1731,7 +1731,7 @@ _Updater_NormalizeTag(Tag) {
 	return (SubStr(Tag, 1, 1) == "v") ? SubStr(Tag, 2) : Tag
 }
 
-; Semver helpers — canonical algorithm in _shared/modules/updater/version.js.
+; Semver helpers — canonical algorithm in _shared/updater/data/version.js.
 ; Parses "2.5.0-dev.3" into decimal strings { Maj, Min, Pat, PreParts } or 0 on failure.
 _Updater_ParseVersion(Tag) {
 	Norm := _Updater_NormalizeTag(Tag)
@@ -1814,7 +1814,7 @@ _Updater_CompareVersions(A, B) {
 
 ; Returns true when Latest is strictly newer than Current (semver comparison).
 ; Handles pre-release tags (e.g. 2.5.0-dev.3 → 2.5.0-dev.4). Canonical
-; vectors live in _shared/modules/updater/version.js:versionTestVectors().
+; vectors live in _shared/updater/data/version.js:versionTestVectors().
 _Updater_IsNewerVersion(Latest, Current) {
 	return _Updater_CompareVersions(Latest, Current) > 0
 }
@@ -2804,7 +2804,7 @@ _Updater_NoChannelReleaseMessage(Channel) {
 
 ; Lists the releases of a GitHub releases Atom feed as the JSON array the update
 ; check reads: tag_name and published_at, newest first as the feed orders them.
-; Port of feed_release_list in _shared/lua/updater/release_sources.lua, replaying
+; Port of feed_release_list in _shared/updater/engine/release_sources.lua, replaying
 ; _shared/tests/corpus/updater/check_only_vectors.json: only an entry whose
 ; alternate link is a release tag of this repository counts, and a tag outside
 ; [A-Za-z0-9._+-] is dropped.

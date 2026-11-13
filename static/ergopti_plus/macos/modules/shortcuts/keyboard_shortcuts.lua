@@ -22,34 +22,34 @@
 local M = {}
 
 local JsonCodec   = require("adapters.json_codec")
-local Chord       = require("chord")
+local Chord       = require("keyboard.engine.chord")
 local Registrar   = require("adapters.hotkey_registrar")
 local FileSystem  = require("adapters.file_system")
 local Paths       = require("infra.paths")
 local Logger      = require("infra.logger")
 local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
-local OperationReporter = require("diagnostics.operation_reporter")
+local OperationReporter = require("diagnostics.engine.operation_reporter")
 local GestActions = nil
-local Codec       = require("toml_codec")
-local Writer      = require("toml_codec.writer")
+local Codec       = require("core.text.engine.toml_codec")
+local Writer      = require("core.text.engine.toml_codec.writer")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
 local Manifest    = require("infra.manifest_reader")
-local ConfigOutdated = require("config_outdated")
-local MagicPolicy = require("shortcuts.magic_editor")
-local KeyboardPublication = require("config_keyboard_publication")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local MagicPolicy = require("shortcuts.engine.magic_editor_core")
+local KeyboardPublication = require("settings.engine.publication.keyboard_publication")
 local KeyboardComposition = KeyboardPublication.compose
 local KeyboardOwnerCurrent = KeyboardPublication.owner_is_current
-local Assignment = require("shortcuts.assignment")
-local SlotRoles = require("shortcuts.slot_roles")
-local PhysicalSlots = require("shortcuts.physical_slots")
+local Assignment = require("shortcuts.engine.assignment")
+local SlotRoles = require("shortcuts.engine.slot_roles")
+local PhysicalSlots = require("shortcuts.engine.physical_slots")
 local PhysicalSlotConstructor = PhysicalSlots.new
-local PhysicalAvailability = require("shortcuts.physical_availability")
+local PhysicalAvailability = require("shortcuts.engine.physical_availability")
 local i18n = require("infra.i18n")
-local KeyNames = require("keycodes.key_names")
+local KeyNames = require("platform.input.keycodes.key_names")
 local AiActions = require("modules.shortcuts.ai_actions")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 local RefusalRetry = require("modules.shortcuts.refusal_retry")
 
 local LOG = "shortcuts.keyboard_shortcuts"
@@ -154,7 +154,7 @@ end
 -- Path to the shared key catalogue. The slot space is prefix × key, and the keys
 -- are the same 40 the gesture actions and the Windows driver already use — a
 -- private list here would be a fourth answer to "which keys exist".
-local KEY_CATALOGUE_PATH = Paths.shared("modules/actions/modifier_chords.json")
+local KEY_CATALOGUE_PATH = Paths.shared("shortcuts/data/actions/modifier_chords.json")
 
 -- The manifest section whose entries are this driver's shipped slot bindings.
 -- tools/test/test-keyboard-slot-recommended-bindings.cjs pins what it holds.
@@ -266,10 +266,10 @@ end
 --- Loads the immutable shared physical registry without a host key fallback.
 local function physical_model()
 	if _physical_model == nil then
-		assert(rawequal(rawget(package.loaded, "shortcuts.physical_slots"), PhysicalSlots)
+		assert(rawequal(rawget(package.loaded, "shortcuts.engine.physical_slots"), PhysicalSlots)
 			and getmetatable(PhysicalSlots) == nil and rawequal(rawget(PhysicalSlots, "new"), PhysicalSlotConstructor),
 			"physical-key constructor ownership changed")
-		local raw = assert(FileSystem.read(Paths.shared("data/keycodes/physical_keys.json")), "physical registry unavailable")
+		local raw = assert(FileSystem.read(Paths.shared("layouts/data/keycodes/physical_keys.json")), "physical registry unavailable")
 		local decoded, detail = JsonCodec.decode(raw)
 		assert(decoded and not detail, "physical registry malformed")
 		_physical_model, _physical_binding_publication = PhysicalSlotConstructor(decoded)
@@ -1374,7 +1374,7 @@ end
 --- Returns a detached complete native publication without reading or binding input.
 --- @return table|nil catalogue Unavailable or withdrawn sources remain unjudged.
 function M.published_binding_catalogue()
-	if not rawequal(rawget(package.loaded, "config_keyboard_publication"), KeyboardPublication)
+	if not rawequal(rawget(package.loaded, "settings.engine.publication.keyboard_publication"), KeyboardPublication)
 		or getmetatable(KeyboardPublication) ~= nil or type(KeyboardComposition) ~= "function"
 		or type(KeyboardOwnerCurrent) ~= "function"
 		or not rawequal(rawget(KeyboardPublication, "compose"), KeyboardComposition)

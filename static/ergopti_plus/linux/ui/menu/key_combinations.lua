@@ -2,12 +2,12 @@
 
 --- Renders shared ordered slots through the actual native picker and publisher.
 --- Same-device chord choices retain the original source and publication owner.
-local SaveFailure = require("config_save_failure")
-local Shared = require("tap_hold.key_combinations")
-local HoldOptions = require("tap_hold.hold_options")
-local KeyCatalog = require("tap_hold.key_catalog")
+local SaveFailure = require("settings.engine.publication.save_failure")
+local Shared = require("tap_hold.engine.key_combinations")
+local HoldOptions = require("tap_hold.engine.hold_options")
+local KeyCatalog = require("tap_hold.engine.key_catalog")
 local Features = require("infra.manifest_reader")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 local M = {}
 
 --- Builds the manifest's ordered-pair group, using a native context's UI ports.
@@ -23,8 +23,8 @@ function M.build(ctx,ui)
 	local t,renderer = ui.get,ui.manifest
 	if type(th)~="table" or type(actions)~="table" then return {} end
 	local keys,holds = th.key_catalog(),th.hold_options()
-	local delay_entry=Features.find_entry_by_path(require("config_keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
-	local symmetry_entry=Features.find_entry_by_path(require("config_keys").KEY.MOD_COMBOS_SYMMETRIC)
+	local delay_entry=Features.find_entry_by_path(require("settings.engine.keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
+	local symmetry_entry=Features.find_entry_by_path(require("settings.engine.keys").KEY.MOD_COMBOS_SYMMETRIC)
 	local chord_declared=type(delay_entry)=="table" and delay_entry.type=="number"
 		and type(symmetry_entry)=="table" and symmetry_entry.type=="boolean"
 		and type(pairs.get_chord)=="function" and type(pairs.chord_settings)=="function"
@@ -122,7 +122,7 @@ function M.build(ctx,ui)
 					local hold_label=chosen and HoldOptions.label(chosen,t,"linux") or t("tap_hold.hold.none")
 					local assigned=tap~=Shared.NONE or hold~=Shared.NONE or chord~=Shared.NONE
 					local sub=renderer.build("key_combination_pair_menu","KeyCombinations",nil,nil,{
-						commands={[require("config_keys").COMMAND.KEY_COMBINATION_CLEAR]=function()
+						commands={[require("settings.engine.keys").COMMAND.KEY_COMBINATION_CLEAR]=function()
 							local rows={{section=Shared.TAP_SECTION,key=pair,delete=true},{section=Shared.HOLD_SECTION,key=pair,delete=true}}
 							if chord_pair then rows[#rows+1]={section="mod_combos.config."..chord_pair,key="combo",delete=true} end
 							return edit(rows,snapshot())
@@ -145,33 +145,33 @@ function M.build(ctx,ui)
 		return rows
 	end
 	local render={commands={},state_getters={key_combinations_enabled=function() return pairs.is_enabled()==true end}}
-	render.commands[require("config_keys").COMMAND.KEY_COMBINATIONS_TOGGLE]=function()
+	render.commands[require("settings.engine.keys").COMMAND.KEY_COMBINATIONS_TOGGLE]=function()
 		local source=snapshot();if not source then return feedback(false) end
 		local desired=not pairs.is_enabled()
 		local committed=feedback(Scope.set_enabled(desired,source))
 		if committed==true then require("ui.menu.feature_notice").feature(t("menu.shortcuts.key_combinations"),desired) end
 		return committed
 	end
-	render.commands[require("config_keys").COMMAND.SCOPE_RESTORE]=function()
+	render.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE]=function()
 		local source=snapshot();if not source then return feedback(false) end
 		return feedback(Scope.apply("recommended",source))
 	end
-	render.commands[require("config_keys").COMMAND.SCOPE_CLEAR]=function()
+	render.commands[require("settings.engine.keys").COMMAND.SCOPE_CLEAR]=function()
 		local source=snapshot();if not source then return feedback(false) end
 		return feedback(Scope.apply("clear",source))
 	end
-	render.state_getters[require("config_keys").COMMAND.COMBO_SYMMETRIC]=function()
+	render.state_getters[require("settings.engine.keys").COMMAND.COMBO_SYMMETRIC]=function()
 		local settings=chord_declared and pairs.chord_settings() or nil
 		return settings~=nil and settings.combo_symmetric==true
 	end
 	if chord_declared then
-	render.commands[require("config_keys").COMMAND.COMBO_SYMMETRIC]=function()
+	render.commands[require("settings.engine.keys").COMMAND.COMBO_SYMMETRIC]=function()
 		local source=snapshot();local settings=chord_declared and pairs.chord_settings() or nil
 		if not source or not settings then return feedback(false) end
 		settings.combo_symmetric=not settings.combo_symmetric
 		return feedback(Scope.set_chord_settings(settings,source))
 	end
-	render.commands[require("config_keys").COMMAND.COPY_TAP_TO_COMBO]=function()
+	render.commands[require("settings.engine.keys").COMMAND.COPY_TAP_TO_COMBO]=function()
 		local source=snapshot();if not source or not chord_declared then return feedback(false) end
 		return feedback(Scope.copy_taps_to_chords(source))
 	end

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-cipher-flush-XXXXXX"))
 for _, key in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. key .. "_HOME", root .. "/" .. key:lower()))
@@ -46,7 +46,7 @@ if rawget(_G, "jit") then
 	assert(AES.available and Cipher.is_available(), "the native LuaJIT fixture requires real EVP AES")
 	assert(Drain.flush(K))
 	local rows = assert(W.query_rows("SELECT text FROM events_typing WHERE app='cipher-refusal';"))
-	assert(#rows == 1 and require("keystats.text_crypto").is_encrypted(rows[1]))
+	assert(#rows == 1 and require("metrics.engine.privacy.text_crypto").is_encrypted(rows[1]))
 	assert(Cipher.decrypt(rows[1]) == "owned-secret")
 	assert(scalar("SELECT SUM(c) FROM ngram_chars WHERE app='cipher-refusal';") == 12)
 	assert(W.get_meta("linux_next_event_id") == cursor, "retry must reuse the original reserved IDs")

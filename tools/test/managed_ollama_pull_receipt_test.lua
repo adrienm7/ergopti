@@ -2,10 +2,10 @@
 --- Portable exact receipt vectors; these do not execute the native SDK worker.
 local source = debug.getinfo(1, "S").source:sub(2)
 local root = assert(source:match("^(.*)/tools/test/managed_ollama_pull_receipt_test%.lua$"))
-local shared = root .. "/static/ergopti_plus/_shared/lua/"
+local shared = root .. "/static/ergopti_plus/_shared/"
 package.path = shared .. "?.lua;" .. package.path
-local Json = require("json")
-local Receipt = require("core.llm.managed_ollama_pull_receipt")
+local Json = require("core.text.engine.json")
+local Receipt = require("core.lifecycle.engine.core.managed_ollama_pull_receipt")
 local NONCE = "12345678-abcd-4321-abcd-123456789abc"
 local count = 0
 local function proof(changes)

@@ -29,7 +29,7 @@ local M = {}
 local hs               = hs
 local Logger           = require("infra.logger")
 local AXResponsiveness = require("adapters.accessibility_permission")
-local SecureApps       = require("secure_apps")
+local SecureApps       = require("apps.engine.secure_apps")
 
 local LOG = "adapters.secure_field_detector"
 

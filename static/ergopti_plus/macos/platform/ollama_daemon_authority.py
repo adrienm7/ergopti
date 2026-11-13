@@ -17,7 +17,8 @@ def load(name, path):
 OWNER = load("ergopti_daemon_session_owner", Path(__file__).with_name("suspended_image_owner.py"))
 POLICY = load(
     "ergopti_shared_daemon_authority",
-    Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_daemon_authority.py",
+    Path(__file__).absolute().parents[2]
+    / "_shared/ai/adapters/python/managed_ollama_daemon_authority.py",
 )
 ImageRefusal = OWNER.ImageRefusal
 
@@ -76,7 +77,8 @@ def read_pair(directory, name, policy, expected_uid, *, progress):
 
     sessions = load(
         "ergopti_daemon_bound_sessions",
-        Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_sessions.py",
+        Path(__file__).absolute().parents[2]
+        / "_shared/ai/adapters/python/managed_ollama_sessions.py",
     )
     if (
         type(name) is not str

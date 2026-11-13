@@ -71,7 +71,7 @@ _UHLT_Assets(Root) {
 		FSCreateDirectoryExclusiveStrict(Root . "\" . Subdir)
 	; The shared inputs' folders come from their own paths, wherever the shared
 	; tree keeps them.
-	Shared := ["modules\hotstrings\user_code.ahk", "modules\diagnostics\redaction.json"]
+	Shared := ["hotstrings\data\catalogue\user_code.ahk", "diagnostics\data\redaction.json"]
 	_EDOT_CreateParents(Root . "\shared", Shared)
 	Pairs := [[_VendorDir . "\ergopti_user_hotstrings.ahk", Root . "\vendor\ergopti_user_hotstrings.ahk"]]
 	for Relative in Shared

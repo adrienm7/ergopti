@@ -33,7 +33,7 @@ local WARMUP_RETRY_DELAY_SEC     = 2
 local WARMUP_STAGE_ACQUIRE_RETRIES = 1
 local PGID_PENDING_TIMEOUT_SEC   = 15.0
 
--- MLX server bind address — single source of truth in _shared/modules/llm/mlx_server.json
+-- MLX server bind address — single source of truth in _shared/ai/data/mlx_server.json
 -- so the port is never hardcoded across api_mlx, the models_manager_mlx launcher,
 -- and the init.lua boot cleanup. Loaded once at module load; every consumer reads
 -- the resolved value via M.get_port() / M.get_host() / M.get_base_url(). The
@@ -86,7 +86,7 @@ local function load_mlx_server_config()
 	-- 1) Shared JSON default (the value shipped with the repo). Resolved through
 	-- the single shared-tree resolver (Paths.shared), which performs the dual-root
 	-- upward walk — robust to packaged .app builds and symlinked setups alike.
-	local p = Paths.shared("modules/llm/mlx_server.json")
+	local p = Paths.shared("ai/data/mlx_server.json")
 	if type(p) == "string" and p ~= "" then
 		local fh = io.open(p, "r")
 		if fh then
@@ -439,7 +439,7 @@ local WARMUP_GIVE_UP_SEC   = 120
 -- for the case where even the retry cycles never converge.
 local DISCOVERY_GIVE_UP_SEC = Timings.sec("llm", "discovery_max_wait_ms") + WARMUP_GIVE_UP_SEC
 
--- The MLX server base URL — single source of truth in _shared/modules/llm/mlx_server.json.
+-- The MLX server base URL — single source of truth in _shared/ai/data/mlx_server.json.
 -- Derived from MLX_HOST/MLX_PORT (loaded at the top of this file). Endpoint route
 -- discovery and the cached working URLs now live in api_mlx_discovery; this URL is
 -- handed to it via ApiMlxDiscovery.init() and refreshed on a port change.

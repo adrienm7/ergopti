@@ -4,7 +4,7 @@
 ; MODULE: Logger Contract Tests
 ; DESCRIPTION:
 ; Validates the AHK Logger against the cross-driver test vectors defined in
-; static/ergopti_plus/_shared/modules/logger/test_vectors.json. Every vector describes an
+; static/ergopti_plus/_shared/core/logger/data/test_vectors.json. Every vector describes an
 ; expected formatted log line; these tests assert that the AHK Logger produces
 ; exactly that output for each variant/module/message combination.
 ;
@@ -172,7 +172,7 @@ _RunLoggerContractTests() {
 	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
 
 	; Resolve path: tests/ → windows/ → ergopti_plus/ → _shared/
-	VectorsPath := A_ScriptDir . "\..\..\_shared\modules\logger\test_vectors.json"
+	VectorsPath := A_ScriptDir . "\..\..\_shared\core\logger\data\test_vectors.json"
 
 	; ── Load and decode the JSON ──
 	JsonBody := ""

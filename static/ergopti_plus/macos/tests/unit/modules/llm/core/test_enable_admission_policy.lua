@@ -8,8 +8,8 @@
 
 local helpers = require("tests.helpers")
 local function test(name, body) helpers.it(name .. " (ai-enable-admission)", body) end
-local Policy = require("llm.enable_admission")
-local Json = require("json")
+local Policy = require("ai.engine.settings.enable_admission_core")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local file = assert(io.open(Paths.shared("tests/corpus/llm/enable_admission.json"), "rb"))
 local corpus = assert(Json.decode_lossless(file:read("*a")))

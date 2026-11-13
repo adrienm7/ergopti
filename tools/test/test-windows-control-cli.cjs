@@ -69,7 +69,7 @@ assert.match(
 );
 const spec = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/_shared/modules/control/driver_control.json'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/diagnostics/data/control/driver_control.json'),
 		'utf8'
 	)
 );

@@ -38,24 +38,24 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local TomlCodec = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
-local BasicString = require("toml_codec.basic_string")
+local Logger = require("core.logger.engine.shim")
+local TomlCodec = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
+local BasicString = require("core.text.engine.toml_codec.basic_string")
 local Engine = require("platform.remap.tap_hold_engine")
 local Manifest = require("infra.manifest_reader")
-local LayerPreset = require("keymap.layer_preset")
+local LayerPreset = require("layouts.engine.layers.preset")
 local Shapes = require("platform.remap.tap_hold_shapes")
-local KeyCatalog = require("tap_hold.key_catalog")
+local KeyCatalog = require("tap_hold.engine.key_catalog")
 local Migration = require("platform.remap.tap_hold_migration")
 local Paths = require("infra.paths")
-local ConfigKeys = require("config_keys")
-local LoneTap = require("tap_hold.lone_tap")
+local ConfigKeys = require("settings.engine.keys")
+local LoneTap = require("tap_hold.engine.lone_tap")
 
 local LOG = "platform.remap.tap_hold_writer"
 
 --- The user file's name in the configuration folder.
-M.FILE_NAME = require("tap_hold.shared_file").FILE_NAME
+M.FILE_NAME = require("tap_hold.engine.shared_file").FILE_NAME
 
 -- The bound of time_activation_seconds: the timing registry's.
 local MAX_THRESHOLD_SECONDS = require("infra.timings").ms("tap_hold", "max_activation_ms") / 1000
@@ -64,7 +64,7 @@ local MAX_THRESHOLD_SECONDS = require("infra.timings").ms("tap_hold", "max_activ
 -- only ever written when the user sets it: no key ships one.
 local OWNED_KEY_FIELDS = { "tap_action", "hold_modifier", "hold_layer", "enabled", ConfigKeys.LEAF.TIME_ACTIVATION_SECONDS }
 
--- The macOS-only hold of the shared file (_shared/tap_hold/SCHEMA.md): a hold
+-- The macOS-only hold of the shared file (_shared/tap_hold/data/SCHEMA.md): a hold
 -- chosen here replaces it, so every driver holds what the user just chose.
 local FOREIGN_HOLD_FIELD = "hold_action"
 
@@ -392,13 +392,13 @@ end
 local function retired_delays()
 	-- init() reads it; the wizard import runs without an init, so it reads on demand.
 	if _retired == nil then
-		_retired = KeyCatalog.load_retired_delays(Paths.shared("tap_hold/defaults.toml"), "linux")
+		_retired = KeyCatalog.load_retired_delays(Paths.shared("tap_hold/data/defaults.toml"), "linux")
 	end
 	return _retired
 end
 
 --- Brings a decoded document to the current file version in place (see
---- _shared/tap_hold/migrations.toml): the per-key delays earlier builds shipped
+--- _shared/tap_hold/data/migrations.toml): the per-key delays earlier builds shipped
 --- are removed once and the stamp is set, so every write publishes a stamped
 --- file and every delay it keeps is the user's own. A current document is
 --- untouched. A file saved by a newer build, or with an unreadable stamp, is
@@ -873,7 +873,7 @@ function M.migrate_file(path)
 			path, outcome, tostring(detail))
 		return outcome, tostring(detail)
 	end
-	local plan = require("config_migrate").plan_operations(text, operations)
+	local plan = require("settings.engine.migration.migrate").plan_operations(text, operations)
 	if plan.outcome ~= "migrated" then
 		Logger.error(LOG, "'%s' cannot be edited in place (%s) — left untouched and never written.",
 			path, tostring(plan.detail or plan.outcome))

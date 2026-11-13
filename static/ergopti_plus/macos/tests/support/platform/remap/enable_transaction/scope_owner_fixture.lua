@@ -90,7 +90,7 @@ end
 
 
 local function preset()
-	local fh = assert(io.open(helpers.shared("keymap/layers.recommended.toml"), "rb"))
+	local fh = assert(io.open(helpers.shared("layouts/data/layers.recommended.toml"), "rb"))
 	local text = fh:read("*a")
 	fh:close()
 	return text

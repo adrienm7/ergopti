@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Update Channel Registry Tests
 ; DESCRIPTION:
-; Replays the shared _shared/modules/updater/channel_vectors.json through the
+; Replays the shared _shared/updater/data/channel_vectors.json through the
 ; AHK port (modules/updater/channels.ahk) over the generated registry data. The
 ; JavaScript matcher and the Lua port replay the same file, so the three
 ; interpreters cannot disagree on which channel owns a release tag, which
@@ -13,7 +13,7 @@
 ; ==============================================================================
 
 _UpdChanTest_Vectors() {
-	Path := A_ScriptDir . "\..\..\_shared\modules\updater\channel_vectors.json"
+	Path := A_ScriptDir . "\..\..\_shared\updater\data\channel_vectors.json"
 	AssertTrue(FileExist(Path) != "", "channel vectors must exist at: " . Path)
 	return JsonParse(FileRead(Path, "UTF-8"))
 }

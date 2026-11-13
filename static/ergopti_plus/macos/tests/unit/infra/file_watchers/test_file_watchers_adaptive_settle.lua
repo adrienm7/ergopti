@@ -23,7 +23,7 @@ local Fixture = require("tests.support.file_watcher_self_write_fixture")
 helpers.describe("infra/file_watchers — adaptive quiescence for bulk writes (macos-reload-during-git-pull)", function()
 	helpers.it("holds a many-file burst until the bulk settle, not the lone-edit settle", function()
 		Fixture.with_watchers(function(w)
-			local reload_gate = require("reload_gate")
+			local reload_gate = require("core.lifecycle.engine.reload.gate")
 			-- A bulk write lands: many distinct .lua files in one FSEvents batch.
 			w.set_clock(1000)
 			local batch = {}
