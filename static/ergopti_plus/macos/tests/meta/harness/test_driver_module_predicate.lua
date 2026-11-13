@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 --- @return string[]
 local function production_names()
 	local root = (helpers.driver_root():gsub("[/\\]$", ""))
-	local paths = assert(require("test.runner_discovery").files(root, function(file)
+	local paths = assert(require("tests.lua.core.runner_discovery").files(root, function(file)
 		return file:match("%.lua$") ~= nil
 	end, { tests = true }))
 	local names = {}
@@ -44,7 +44,7 @@ helpers.describe("driver module predicate (package.loaded sweeps)", function()
 
 	helpers.it("(driver-module-predicate) leaves test modules, shared modules and one-word names alone", function()
 		helpers.assert_true(not helpers.is_driver_module("tests.helpers"))
-		helpers.assert_true(not helpers.is_driver_module("test.runner_discovery"))
+		helpers.assert_true(not helpers.is_driver_module("tests.lua.core.runner_discovery"))
 		helpers.assert_true(not helpers.is_driver_module("hs"))
 		helpers.assert_true(not helpers.is_driver_module(42))
 		local shared = 0
