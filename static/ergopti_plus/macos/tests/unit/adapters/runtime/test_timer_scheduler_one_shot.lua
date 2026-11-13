@@ -26,7 +26,7 @@ local make_timer_stub = Fixture.make_timer_stub
 helpers.describe("TimerScheduler adapter — after()", function()
 	helpers.it("fires callback and marks handle fired", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local fired = false
 		local h, committed = TS.after(1, function() fired = true end)
@@ -40,7 +40,7 @@ helpers.describe("TimerScheduler adapter — after()", function()
 
 	helpers.it("returns an opaque handle with fired=false initially", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local h = TS.after(0.5, function() end)
 		helpers.assert_true(type(h) == "table", "handle must be a table")
@@ -49,7 +49,7 @@ helpers.describe("TimerScheduler adapter — after()", function()
 
 	helpers.it("increments activeCount while handle is live", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		helpers.assert_eq(TS.activeCount(), 0)
 		TS.after(1, function() end)
@@ -59,7 +59,7 @@ helpers.describe("TimerScheduler adapter — after()", function()
 
 	helpers.it("decrements activeCount after firing", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		TS.after(1, function() end)
 		helpers.assert_eq(TS.activeCount(), 1)
@@ -70,7 +70,7 @@ helpers.describe("TimerScheduler adapter — after()", function()
 	helpers.it("does not register a nil native timer as live", function()
 		local timer_stub = make_timer_stub()
 		timer_stub.new = function() return nil end
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local handle, committed = TS.after(1, function() end)
 		helpers.assert_true(committed == false,
@@ -97,7 +97,7 @@ helpers.describe("TimerScheduler adapter — after()", function()
 				end,
 			}
 		end
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local callback_count = 0
 		local handle, committed = TS.after(0, function()
@@ -130,7 +130,7 @@ helpers.describe("TimerScheduler adapter — after()", function()
 			}
 			return native
 		end
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local handle, committed = TS.after(1, function() end)
 
@@ -166,7 +166,7 @@ helpers.describe("TimerScheduler adapter — after()", function()
 			end
 			return native
 		end
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local callback_count = 0
 		local handle, committed = TS.after(0, function()
@@ -215,7 +215,7 @@ helpers.describe("TimerScheduler adapter — after()", function()
 			}
 			return native
 		end
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local callback_count = 0
 		local handle, committed = TS.after(0, function()
@@ -263,7 +263,7 @@ helpers.describe("TimerScheduler adapter — after()", function()
 				stop = function(self) return self end,
 			}
 		end
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local sibling_handle = nil
 		local sibling_committed = nil
@@ -328,7 +328,7 @@ helpers.describe("TimerScheduler adapter — cancel()", function()
 					end,
 					secondsSinceEpoch = function() return 0 end,
 				}
-				local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+				local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 					{ timer = timer_stub })
 				local handle, committed = TS.after(0, function()
 					user_calls = user_calls + 1
@@ -363,7 +363,7 @@ helpers.describe("TimerScheduler adapter — cancel()", function()
 
 	helpers.it("marks handle fired and stops the OS timer", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local called = false
 		local h = TS.after(10, function() called = true end)
@@ -376,7 +376,7 @@ helpers.describe("TimerScheduler adapter — cancel()", function()
 
 	helpers.it("is a no-op on nil", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		-- Must not throw
 		TS.cancel(nil)
@@ -384,7 +384,7 @@ helpers.describe("TimerScheduler adapter — cancel()", function()
 
 	helpers.it("is a no-op on already-fired handle", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local h = TS.after(0, function() end)
 		timer_stub.fire(1)
@@ -395,7 +395,7 @@ helpers.describe("TimerScheduler adapter — cancel()", function()
 
 	helpers.it("decrements activeCount", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local h = TS.after(5, function() end)
 		helpers.assert_eq(TS.activeCount(), 1)
@@ -405,7 +405,7 @@ helpers.describe("TimerScheduler adapter — cancel()", function()
 
 	helpers.it("retains a timer whose native stop throws, then retries it", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local h = TS.after(5, function() end)
 		local original_stop = h.timer.stop
@@ -430,7 +430,7 @@ helpers.describe("TimerScheduler adapter — cancel()", function()
 
 	helpers.it("treats an explicit false native stop as retryable cleanup debt", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local callback_count = 0
 		local h = TS.every(5, function() callback_count = callback_count + 1 end)
@@ -477,7 +477,7 @@ helpers.describe("TimerScheduler adapter — cancel()", function()
 			}
 			return native
 		end
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local callback_count = 0
 		local handle, committed = TS.every(5, function()
@@ -501,7 +501,7 @@ end)
 helpers.describe("TimerScheduler adapter — cancelAll()", function()
 	helpers.it("cancels all live handles", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		TS.after(1, function() end)
 		TS.after(2, function() end)
@@ -513,7 +513,7 @@ helpers.describe("TimerScheduler adapter — cancelAll()", function()
 
 	helpers.it("is safe to call when no timers are active", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		-- Must not throw
 		TS.cancelAll()
@@ -522,7 +522,7 @@ helpers.describe("TimerScheduler adapter — cancelAll()", function()
 
 	helpers.it("continues siblings and retains only failed native stops", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local failed = TS.after(1, function() end)
 		local sibling = TS.after(2, function() end)

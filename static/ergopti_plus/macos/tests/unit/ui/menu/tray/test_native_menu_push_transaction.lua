@@ -186,7 +186,7 @@ local function load_fixture(opts)
 	package.loaded["modules.gestures"] = { SINGLE_SLOTS = { "swipe_left" } }
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
 
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["ui.menu.init"] = nil
 	local Menu = require("ui.menu.init")
 	local program_admission

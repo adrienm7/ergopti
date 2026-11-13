@@ -44,7 +44,7 @@ helpers.describe("rotation — persistent today.log handle (no per-append open/c
 		local opens_after_appends, opens_after_rollover
 		helpers.with_stub_scope({
 			"modules.keystats.rotation", "adapters.ledger_append", "infra.logger",
-			"modules.keystats.timestamp", "adapters.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
+			"modules.keystats.timestamp", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 		}, function()
 			local real_open, real_remove, real_date = io.open, os.remove, os.date
 			local today_opens, today_closes, owner_calls, reset_calls, removes = 0, 0, 0, 0, 0

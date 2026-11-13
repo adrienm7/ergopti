@@ -18,7 +18,7 @@ local LITERAL_LIFETIME_SEC = 0.01
 local function run_scenario(mode)
 	local dependency_names = {
 		"adapters.synthetic_input",
-		"adapters.timer_scheduler",
+		"core.events.timer_scheduler",
 		"infra.manifest_reader",
 		"modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander",
@@ -52,7 +52,7 @@ local function run_scenario(mode)
 	package.loaded["adapters.synthetic_input"] = {
 		current_action_epoch = function() return action_epoch end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		hotstring_time = function() return _G.hs.timer.secondsSinceEpoch() end,
 		after = function(delay, fn)
 			local handle = { delay = delay, fn = fn }

@@ -13,7 +13,7 @@ helpers.describe("dashboard and onboarding focus ownership", function()
 	helpers.it("(metrics-cleanup-authority) refused deletion revokes bridge and data continuations", function()
 		with_window("ui.metrics_apps", function(dashboard, state)
 			local pending, discoveries = {}, 0
-			package.loaded["adapters.timer_scheduler"].after = function(_, callback)
+			package.loaded["core.events.timer_scheduler"].after = function(_, callback)
 				local handle = { timer = {} }
 				pending[#pending + 1] = function() handle.timer = nil; callback() end
 				return handle, true

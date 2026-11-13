@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Scheduler = require("adapters.timer_scheduler")
+local Scheduler = require("core.events.timer_scheduler")
 local checks, failures = 0, 0
 
 --- Runs real libuv events during a bounded observation interval.

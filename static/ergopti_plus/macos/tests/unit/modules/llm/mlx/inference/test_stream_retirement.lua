@@ -17,7 +17,7 @@ local OWNED = {
 	"modules.llm.api_mlx", "modules.llm.api_mlx_fetch", "modules.llm.api_mlx_discovery",
 	"modules.llm.mlx_stream_retirement",
 	"modules.llm.api_mlx_inference", "adapters.shell_runner", "modules.keystats",
-	"infra.logger", "adapters.timer_scheduler", "adapters.http_client",
+	"infra.logger", "core.events.timer_scheduler", "adapters.http_client",
 	"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "ai.engine.api.parser_core", "ai.engine.settings.profile_selector",
 	"adapters.file_system", "adapters.json_codec", "infra.timings",
@@ -38,7 +38,7 @@ local function with_stream(scenario)
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["modules.keystats"] = {}
 			package.loaded["adapters.http_client"] = { new = function() return {} end }
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				now = function() return 0 end,
 				after = function(delay, callback)
 					local handle = { timer = {}, delay = delay, callback = callback }

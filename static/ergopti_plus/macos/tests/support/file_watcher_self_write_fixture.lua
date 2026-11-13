@@ -11,7 +11,7 @@ local M = {}
 local OWNERS = {
 	"infra.file_watchers", "infra.ui_restore", "infra.git_status", "infra.fs_dir",
 	"infra.logger", "infra.i18n", "infra.notifications", "core.lifecycle.engine.reload.gate",
-	"adapters.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "adapters.file_system",
+	"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "adapters.file_system",
 }
 
 M.CONFIG_ROOT = "/fake/config/"

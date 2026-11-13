@@ -19,8 +19,8 @@ local OWNED_MODULES = {
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
 	"infra.key_event_health",
-	"adapters.event_clock",
-	"adapters.timer_scheduler",
+	"core.events.clock",
+	"core.events.timer_scheduler",
 	"infra.logger",
 	"diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy",
@@ -90,7 +90,7 @@ local function with_fixture(callback)
 
 		local Sentinels = require("modules.keymap.control_sentinels")
 		local Keycodes = require("platform.input.keycodes.core")
-		local Timer = require("adapters.timer_scheduler")
+		local Timer = require("core.events.timer_scheduler")
 		local Injector = require("adapters.modifier_injector")
 		local Sticky = require("modules.gestures.sticky_modifiers")
 		Sentinels.set_listener("test.sticky_control", function(signal)

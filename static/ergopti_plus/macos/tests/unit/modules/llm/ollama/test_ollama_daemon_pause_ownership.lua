@@ -162,7 +162,7 @@ local function load_fixture()
 			}
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	package.loaded["adapters.shell_runner"] = shell
 	package.loaded["adapters.storage"] = {
 			-- The real adapter's read and write pair (api_remote's refused thinking fields)

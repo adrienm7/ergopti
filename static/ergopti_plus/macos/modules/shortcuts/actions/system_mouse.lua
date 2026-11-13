@@ -26,7 +26,7 @@ local i18n           = require("infra.i18n")
 local MouseControl   = require("adapters.mouse_control")
 local ShellRunner    = require("adapters.shell_runner")
 local SyntheticInput = require("adapters.synthetic_input")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local PythonInterpreter = require("adapters.python_interpreter")
 
 local LOG = "shortcuts.actions.system"

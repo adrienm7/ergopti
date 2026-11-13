@@ -16,7 +16,7 @@ local function with_editor(scenario)
 	rawset(_G, "lfs", nil)
 	local result = table.pack(xpcall(function()
 		return helpers.with_stub_scope({
-			"ui.prompt_editor", "ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "adapters.webview_result",
+			"ui.prompt_editor", "ui.ui_builder", "ui.webview_close_owner", "core.events.timer_scheduler", "adapters.webview_result",
 			"infra.deferred_work", "infra.paths", "infra.logger", "infra.locale", "infra.log_folders",
 			"core.i18n.engine.core", "core.text.engine.json", "adapters.json_codec", "diagnostics.engine.reports.redact", "core.ui.engine.window_titles",
 			"core.ui.engine.webview.presentation", "infra.launcher_environment", "adapters.log_transport", "core.fs.engine.app_dirs",

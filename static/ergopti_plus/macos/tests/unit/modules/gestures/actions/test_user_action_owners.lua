@@ -24,10 +24,10 @@ local SHORTCUT_ID = "1B2C3D4E-5F60-4718-9A0B-C1D2E3F40516"
 --- @param body function fn(Aux, world)
 local function with_aux(body)
 	helpers.with_fresh_modules({ "modules.gestures.actions_aux_owner", "adapters.shell_runner",
-		"adapters.timer_scheduler", "infra.logger" }, function()
+		"core.events.timer_scheduler", "infra.logger" }, function()
 		local world = { spawned = {}, timers = {} }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, fn)
 				local handle = { delay = delay, observers = {} }
 				-- A fired timer settles: its observers run after its callback

@@ -18,7 +18,7 @@ local OWNED_MODULES = {
 	"platform.remap.watchers",
 	"adapters.hotkey_registrar",
 	"infra.timings",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.config_paths",
 	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",

@@ -197,7 +197,7 @@ helpers.describe("physical AI context retention", function()
 			helpers.assert_eq(keymap.inject_dynamic(5, secret, function() return #secret, secret, secret end,
 				"dynamic", true), true)
 			for c in ("safe"):gmatch(".") do tap.fn(physical_key(c)) end
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local original_time = scheduler.hotstring_time
 			scheduler.hotstring_time = function() return 10000 end
 			state.last_key_time = 10000 - state.WORD_TIMEOUT_SEC - 1

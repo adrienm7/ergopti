@@ -11,7 +11,7 @@ local fs = require("tests.stubs.hs").fs
 local fixture = require("tests.support.kc_bridge_fixture")
 
 local owners = {
-	"infra.logger", "infra.config_paths", "adapters.timer_scheduler",
+	"infra.logger", "infra.config_paths", "core.events.timer_scheduler",
 	"modules.keystats.kc_bridge", "modules.keystats", "tests.stubs.hs",
 }
 helpers.describe("KC fixture cleanup and owner restoration", function()

@@ -1098,7 +1098,7 @@ end)
 helpers.describe("field run ports: configuration guard", function()
 	helpers.it("puts back a changed file, removes a created one and restores a preference", function()
 		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.storage",
-			"infra.config_paths", "adapters.shell_runner", "adapters.timer_scheduler", "platform.remap.lease_controller" }
+			"infra.config_paths", "adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["platform.remap.lease_controller"] = { RUNTIME_SETTING_KEYS = {} }
@@ -1127,7 +1127,7 @@ helpers.describe("field run ports: configuration guard", function()
 				delete = function(key) settings[key] = nil; return true end,
 			}
 			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
-			package.loaded["adapters.timer_scheduler"] = { after = function() end, cancel = function() end }
+			package.loaded["core.events.timer_scheduler"] = { after = function() end, cancel = function() end }
 			package.loaded["adapters.field_run_ports"] = nil
 			local ports = require("adapters.field_run_ports").new("/repo")
 			local snapshot = ports.config_snapshot()
@@ -1156,7 +1156,7 @@ end)
 helpers.describe("field run ports: configuration guard and runtime state", function()
 	helpers.it("never rewinds the Karabiner lease's used-token ledger", function()
 		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.storage",
-			"infra.config_paths", "adapters.shell_runner", "adapters.timer_scheduler", "platform.remap.lease_controller" }
+			"infra.config_paths", "adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.config_paths"] = { get = function(key) return "/cfg/" .. key end }
@@ -1179,7 +1179,7 @@ helpers.describe("field run ports: configuration guard and runtime state", funct
 			}
 			package.loaded["platform.remap.lease_controller"] = { RUNTIME_SETTING_KEYS = { "karabiner.used_tokens.v1" } }
 			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
-			package.loaded["adapters.timer_scheduler"] = { after = function() end, cancel = function() end }
+			package.loaded["core.events.timer_scheduler"] = { after = function() end, cancel = function() end }
 			package.loaded["adapters.field_run_ports"] = nil
 			local ports = require("adapters.field_run_ports").new("/repo")
 			local snapshot = ports.config_snapshot()
@@ -1201,7 +1201,7 @@ helpers.describe("field run ports: the MLX model step", function()
 	--- @return table outcome { verdict, codes, files }
 	local function run_mlx_model(initial, write_ok)
 		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "infra.config_paths",
-			"adapters.shell_runner", "adapters.timer_scheduler", "infra.paths", "infra.field_run",
+			"adapters.shell_runner", "core.events.timer_scheduler", "infra.paths", "infra.field_run",
 			"modules.llm.backend_detector", "modules.llm.mlx_deps_checker", "modules.llm", "ui.menu.menu_llm" }
 		local outcome = {}
 		helpers.with_stub_scope(stubbed, function()
@@ -1226,7 +1226,7 @@ helpers.describe("field run ports: the MLX model step", function()
 				delete = function(path) files[path] = nil; return true end,
 			}
 			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
-			package.loaded["adapters.timer_scheduler"] = { after = function() end, cancel = function() end }
+			package.loaded["core.events.timer_scheduler"] = { after = function() end, cancel = function() end }
 			package.loaded["infra.paths"] = { shared_llm_path = function() return "/shared/models.json" end }
 			package.loaded["infra.field_run"] = {
 				smallest_model = function() return { name = "LFM2.5-350M", download_gb = 0.38 } end,
@@ -1285,14 +1285,14 @@ end)
 helpers.describe("field run ports: Ollama model step", function()
 	helpers.it("waits for the runtime metadata an install just changed instead of skipping", function()
 		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.shell_runner",
-			"adapters.timer_scheduler", "infra.paths", "infra.field_run", "modules.llm.ollama_binary",
+			"core.events.timer_scheduler", "infra.paths", "infra.field_run", "modules.llm.ollama_binary",
 			"modules.llm.api_ollama", "modules.llm.ollama_deps_checker", "ui.menu.menu_llm" }
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["adapters.file_system"] = { read = function() return "{}" end }
 			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
 			local timers = 0
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function(_, callback) timers = timers + 1; callback() end,
 				cancel = function() end,
 			}

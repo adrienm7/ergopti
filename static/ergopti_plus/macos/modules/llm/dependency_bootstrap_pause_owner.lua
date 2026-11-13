@@ -22,7 +22,7 @@
 local M = {}
 
 local Logger         = require("infra.logger")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG = "llm.dependency_bootstrap_pause_owner"
 

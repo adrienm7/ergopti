@@ -380,7 +380,7 @@ end)
 
 helpers.describe("Hotstring preview: its own rows, not the shared window", function()
 	helpers.it("(preview-partial-draw) retains a draw across replacement of its module", function()
-		local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "ui.tooltip.preview" }
+		local names = { "adapters.graphics_renderer", "core.events.timer_scheduler", "ui.tooltip.preview" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 		local replacement, preview, nested, hides = nil, nil, nil, 0
 		local config = { resolve = function() return { delay = 0.25, show_tooltip = true } end }
@@ -395,7 +395,7 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 			end,
 			hide = function() hides = hides + 1; return true end }
 		package.loaded["adapters.graphics_renderer"] = renderer
-		package.loaded["adapters.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
+		package.loaded["core.events.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
 		package.loaded["ui.tooltip.preview"] = nil
 		preview = require("ui.tooltip.preview")
 		preview.init({ style = { positioning = { window_bottom_inset = 0 } }, config = config })
@@ -409,14 +409,14 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 	end)
 
 	helpers.it("(preview-partial-draw) revokes an old LLM offer covered by a failed preview", function()
-		local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "ui.tooltip.preview", "ui.tooltip.llm" }
+		local names = { "adapters.graphics_renderer", "core.events.timer_scheduler", "ui.tooltip.preview", "ui.tooltip.llm" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 		local draws, hides, allow_hide = 0, 0, false
 		local renderer = { is_available = function() return true end,
 			show = function() draws = draws + 1; return draws ~= 2 end,
 			hide = function() hides = hides + 1; return allow_hide end }
 		package.loaded["adapters.graphics_renderer"] = renderer
-		package.loaded["adapters.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
+		package.loaded["core.events.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
 		package.loaded["ui.tooltip.preview"], package.loaded["ui.tooltip.llm"] = nil, nil
 		local preview, overlay = require("ui.tooltip.preview"), require("ui.tooltip.llm")
 		preview.init({ style = { positioning = { window_bottom_inset = 0 } },
@@ -438,7 +438,7 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 	end)
 
 	helpers.it("(preview-partial-draw) fences reentrant owners during the native draw", function()
-		local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "ui.tooltip.preview", "ui.tooltip.llm" }
+		local names = { "adapters.graphics_renderer", "core.events.timer_scheduler", "ui.tooltip.preview", "ui.tooltip.llm" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 		local preview, overlay, hide_result, offer_result, hidden = nil, nil, nil, nil, 0
 		local renderer = {
@@ -451,7 +451,7 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 			hide = function() hidden = hidden + 1; return true end,
 		}
 		package.loaded["adapters.graphics_renderer"] = renderer
-		package.loaded["adapters.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
+		package.loaded["core.events.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
 		package.loaded["ui.tooltip.preview"], package.loaded["ui.tooltip.llm"] = nil, nil
 		preview, overlay = require("ui.tooltip.preview"), require("ui.tooltip.llm")
 		preview.init({ style = { positioning = { window_bottom_inset = 0 } },
@@ -467,7 +467,7 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 	end)
 
 	helpers.it("(preview-partial-draw) restores a preview published inside an older LLM draw", function()
-		local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "ui.tooltip.preview", "ui.tooltip.llm" }
+		local names = { "adapters.graphics_renderer", "core.events.timer_scheduler", "ui.tooltip.preview", "ui.tooltip.llm" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 		local preview, draws, owner = nil, 0, nil
 		local renderer = {
@@ -483,7 +483,7 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 			hide = function() owner = nil; return true end,
 		}
 		package.loaded["adapters.graphics_renderer"] = renderer
-		package.loaded["adapters.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
+		package.loaded["core.events.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
 		package.loaded["ui.tooltip.preview"], package.loaded["ui.tooltip.llm"] = nil, nil
 		preview = require("ui.tooltip.preview")
 		local overlay = require("ui.tooltip.llm")
@@ -501,7 +501,7 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 
 	for _, mode in ipairs({ "false", "throw" }) do
 		helpers.it("(preview-partial-draw) fences the shared surface after " .. mode, function()
-			local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "ui.tooltip.preview", "ui.tooltip.llm" }
+			local names = { "adapters.graphics_renderer", "core.events.timer_scheduler", "ui.tooltip.preview", "ui.tooltip.llm" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 			local draws, hides, visible, allow_hide = 0, 0, false, false
 			local preview, overlay, nested_offer = nil, nil, nil
@@ -520,7 +520,7 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 				end,
 			}
 			package.loaded["adapters.graphics_renderer"] = renderer
-			package.loaded["adapters.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
+			package.loaded["core.events.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
 			package.loaded["ui.tooltip.preview"], package.loaded["ui.tooltip.llm"] = nil, nil
 			preview, overlay = require("ui.tooltip.preview"), require("ui.tooltip.llm")
 			preview.init({ style = { positioning = { window_bottom_inset = 0 } },
@@ -566,11 +566,11 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 		renderer.destroy = function() return true end
 		local held = {
 			["adapters.graphics_renderer"] = package.loaded["adapters.graphics_renderer"] or false,
-			["adapters.timer_scheduler"] = package.loaded["adapters.timer_scheduler"] or false,
+			["core.events.timer_scheduler"] = package.loaded["core.events.timer_scheduler"] or false,
 		}
 		local Fakes = helpers.load_module("tests.fakes")
 		package.loaded["adapters.graphics_renderer"] = renderer
-		package.loaded["adapters.timer_scheduler"] = Fakes.timer_scheduler()
+		package.loaded["core.events.timer_scheduler"] = Fakes.timer_scheduler()
 		package.loaded["ui.tooltip.preview"] = nil
 		local preview = require("ui.tooltip.preview")
 		local state = { hidden = 0 }

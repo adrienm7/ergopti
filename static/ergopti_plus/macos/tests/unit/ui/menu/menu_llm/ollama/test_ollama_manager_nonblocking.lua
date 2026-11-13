@@ -39,7 +39,7 @@ helpers.describe("Ollama manager nonblocking boundaries", function()
 			"readiness curl must be an owned ShellRunner argv task with the bounded timeout"
 		)
 		helpers.assert_true(
-			src:find('require("adapters.timer_scheduler")', 1, true) ~= nil
+			src:find('require("core.events.timer_scheduler")', 1, true) ~= nil
 				and src:find("TimerScheduler.after", 1, true) ~= nil,
 			"readiness retries must use the retained timer adapter instead of raw timer callbacks"
 		)

@@ -22,7 +22,7 @@ local Direction = require("gestures.engine.direction")
 local FrameClock = require("modules.gestures.frame_clock")
 local AccessibilityPermission = require("adapters.accessibility_permission")
 local MouseControl = require("adapters.mouse_control")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local LOG      = "gestures.engine"
 
 local _state      = nil

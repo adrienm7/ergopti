@@ -304,14 +304,14 @@ end)
 --- @param body function Real category callback observations.
 local function with_category_file(committed, body, change_label)
 	helpers.with_stub_scope({ "infra.manifest_menu", "infra.deferred_work",
-		"adapters.timer_scheduler", "adapters.shell_runner", "modules.keymap", "modules.dynamic_hotstrings",
+		"core.events.timer_scheduler", "adapters.shell_runner", "modules.keymap", "modules.dynamic_hotstrings",
 		"ui.menu.menu_hotstrings", "ui.menu.menu_hotstrings_custom" }, function()
 		-- Category file opening neither starts nor inspects these unrelated engines.
 		package.loaded["modules.keymap"] = { DEFAULT_STATE = {} }
 		package.loaded["modules.dynamic_hotstrings"] = { DEFAULT_STATE = {} }
 		local callbacks, launches = {}, {}
 		package.loaded["adapters.shell_runner"] = { open = function(path) launches[#launches + 1] = path; return true end }
-		package.loaded["adapters.timer_scheduler"] = { after = function(_, callback)
+		package.loaded["core.events.timer_scheduler"] = { after = function(_, callback)
 			callbacks[#callbacks + 1] = callback
 			return {}, committed
 		end }
@@ -456,13 +456,13 @@ local function with_personal_info_leaf(body)
 			callbacks[#callbacks + 1], native_timers[#native_timers + 1] = callback, native
 			return native
 		end
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["infra.deferred_work"] = nil
 		package.loaded["infra.manifest_menu"] = nil
 		package.loaded["ui.menu.menu_hotstrings"] = nil
 		local timer
 		local called, detail = xpcall(function()
-			timer = require("adapters.timer_scheduler")
+			timer = require("core.events.timer_scheduler")
 			local renderer = assert(require("infra.manifest_menu"))
 			local hotstrings = require("ui.menu.menu_hotstrings")
 			local ctx = context(true, true)
@@ -497,7 +497,7 @@ helpers.describe("personal-info editor original declared leaf (Mac)", function()
 	helpers.it("personal-info Mac leaf: retains original checkbox, exact native callback and deferred protected opener", function()
 		with_personal_info_leaf(function(f)
 			local template, supplied = f.renderer.template_rows, nil
-			local timer = require("adapters.timer_scheduler")
+			local timer = require("core.events.timer_scheduler")
 			local schedule, delay = timer.after, nil
 			local called, detail = xpcall(function()
 				f.renderer.template_rows = function(key, ...)

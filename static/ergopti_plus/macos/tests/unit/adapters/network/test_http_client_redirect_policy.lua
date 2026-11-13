@@ -77,7 +77,7 @@ local function load_fixture(options)
 	end
 
 	package.loaded["adapters.http_client"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	local HttpClient = helpers.load_with_stubs("adapters.http_client", {
 		http = http,
 		timer = timer,
@@ -298,7 +298,7 @@ helpers.describe("redirect reference resolution", function()
 		{ base = "https://api.example.test/a/./b?old", location = "#new" },
 	}) do
 		helpers.it("refuses " .. case.location .. " as a hop back to the same URL (http-redirect-reference)", function()
-			helpers.with_stub_scope({ "adapters.http_client", "adapters.timer_scheduler" }, function()
+			helpers.with_stub_scope({ "adapters.http_client", "core.events.timer_scheduler" }, function()
 				local client, state = load_fixture()
 				local terminal
 				client.get(case.base or "https://api.example.test/a/b/c?base=kept", {
@@ -330,7 +330,7 @@ helpers.describe("redirect reference resolution", function()
 		{ location = "https://api.example.test/a/b/../models", expected = "https://api.example.test/a/models" },
 	}) do
 		helpers.it("resolves " .. case.location .. " (http-redirect-reference)", function()
-			helpers.with_stub_scope({ "adapters.http_client", "adapters.timer_scheduler" }, function()
+			helpers.with_stub_scope({ "adapters.http_client", "core.events.timer_scheduler" }, function()
 				local client, state = load_fixture()
 				local terminal
 				client.get(case.base or "https://api.example.test/a/b/c?base=kept", {

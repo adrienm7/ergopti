@@ -38,10 +38,10 @@ local function scheduler_fixture()
 		timer_stop = function() return 0 end,
 		close = function() end,
 	}
-	local previous_backend, previous_scheduler = package.loaded.luv, package.loaded["adapters.timer_scheduler"]
-	package.loaded.luv, package.loaded["adapters.timer_scheduler"] = backend, nil
-	local scheduler = require("adapters.timer_scheduler")
-	package.loaded.luv, package.loaded["adapters.timer_scheduler"] = previous_backend, previous_scheduler
+	local previous_backend, previous_scheduler = package.loaded.luv, package.loaded["core.events.timer_scheduler"]
+	package.loaded.luv, package.loaded["core.events.timer_scheduler"] = backend, nil
+	local scheduler = require("core.events.timer_scheduler")
+	package.loaded.luv, package.loaded["core.events.timer_scheduler"] = previous_backend, previous_scheduler
 	return scheduler, arms
 end
 
@@ -84,7 +84,7 @@ end
 local function event_loop_fixture()
 	local naps = {}
 	local fake_sleep = { bind = function() return function(seconds) naps[#naps + 1] = seconds end end }
-	local loop = helpers.load_module_with_dependency("adapters.event_loop", "infra.native_sleep", fake_sleep)
+	local loop = helpers.load_module_with_dependency("core.events.loop", "infra.native_sleep", fake_sleep)
 	return loop, naps
 end
 

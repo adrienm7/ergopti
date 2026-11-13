@@ -30,7 +30,7 @@ helpers.describe("TimerScheduler adapter — every()", function()
 				function timer:stop() running = false; return self end
 				return timer
 			end
-			local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+			local TS = helpers.load_with_stubs("core.events.timer_scheduler", { timer = timer_stub })
 			local calls = 0
 			local handle, committed = TS.every(interval, function() calls = calls + 1 end)
 			helpers.assert_true(committed)
@@ -53,7 +53,7 @@ helpers.describe("TimerScheduler adapter — every()", function()
 			for index = 1, 4 do
 				local invalid = invalid_callbacks[index]
 				local timer_stub = make_timer_stub()
-				local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+				local TS = helpers.load_with_stubs("core.events.timer_scheduler", { timer = timer_stub })
 				local handle, committed = TS[method](1, invalid)
 				helpers.assert_eq(committed, false, method .. " must not claim an unusable callback")
 				helpers.assert_true(handle.fired)
@@ -67,7 +67,7 @@ helpers.describe("TimerScheduler adapter — every()", function()
 	helpers.it("does not register a nil repeating timer as live", function()
 		local timer_stub = make_timer_stub()
 		timer_stub.new = function() return nil end
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local handle, committed = TS.every(1, function() end)
 		helpers.assert_eq(committed, false,
@@ -103,7 +103,7 @@ helpers.describe("TimerScheduler adapter — every()", function()
 			end
 			return native
 		end
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local callback_count = 0
 		local handle, committed = TS.every(1, function()
@@ -152,7 +152,7 @@ helpers.describe("TimerScheduler adapter — every()", function()
 			}
 			return native
 		end
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local callback_count = 0
 		local handle, committed = TS.every(1, function()
@@ -172,7 +172,7 @@ helpers.describe("TimerScheduler adapter — every()", function()
 
 	helpers.it("does not mark handle fired after first firing (repeating)", function()
 		local timer_stub = make_timer_stub()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		local count = 0
 		local h, committed = TS.every(1, function() count = count + 1 end)
@@ -195,7 +195,7 @@ helpers.describe("TimerScheduler adapter — every()", function()
 				logged_error = string.format(message, ...)
 			end,
 		}
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
 		package.loaded["infra.logger"] = previous_logger
 		TS.every(1, function() error("boom") end)
@@ -216,7 +216,7 @@ end)
 
 helpers.describe("TimerScheduler adapter — monotonic clock", function()
 	helpers.it("falls back when the native timer namespace is unavailable (timer-missing-namespace)", function()
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = make_timer_stub() })
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler", { timer = make_timer_stub() })
 		local native_timer = _G.hs.timer
 		_G.hs.timer = nil
 		local ok, err = pcall(function()
@@ -236,7 +236,7 @@ helpers.describe("TimerScheduler adapter — monotonic clock", function()
 			local timer_stub = make_timer_stub()
 			timer_stub.secondsSinceEpoch = function() return sample end
 			timer_stub.absoluteTime = function() error("absolute clock unavailable") end
-			local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+			local TS = helpers.load_with_stubs("core.events.timer_scheduler", { timer = timer_stub })
 			local before = os.time()
 			local now = TS.now()
 			local awake = TS.awake_time()
@@ -252,7 +252,7 @@ helpers.describe("TimerScheduler adapter — monotonic clock", function()
 		local timer_stub = make_timer_stub()
 		timer_stub.secondsSinceEpoch = function() return wall_sec end
 		timer_stub.absoluteTime = function() return awake_ns end
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler", { timer = timer_stub })
 
 		helpers.assert_eq(TS.awake_time(), 5,
 			"awake time must be expressed in monotonic seconds")
@@ -274,7 +274,7 @@ helpers.describe("TimerScheduler adapter — monotonic clock", function()
 			absolute_ns = absolute_ns + 10000000
 			return value
 		end
-		local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+		local TS = helpers.load_with_stubs("core.events.timer_scheduler", { timer = timer_stub })
 
 		local fallback = TS.now_ns()
 		local recovered = TS.now_ns()
@@ -295,7 +295,7 @@ helpers.describe("TimerScheduler constructor rejection", function()
 					if failure == "throw" then error("constructor failed") end
 					return false
 				end
-				local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+				local TS = helpers.load_with_stubs("core.events.timer_scheduler", { timer = timer_stub })
 				local handle, committed = TS[method](1, function() end)
 				local case = method .. "/" .. failure
 				helpers.assert_eq(false, committed, "constructor failure must not commit (" .. case .. ")")

@@ -29,7 +29,7 @@ local function fresh_fixture()
 		"modules.shortcuts.actions.text", "adapters.clipboard",
 		"adapters.synthetic_input",
 		"adapters.event_provenance",
-		"adapters.timer_scheduler",
+		"core.events.timer_scheduler",
 		"infra.logger",
 		"infra.paths",
 		"infra.timings",

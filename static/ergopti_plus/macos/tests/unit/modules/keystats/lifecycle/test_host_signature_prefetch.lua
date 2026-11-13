@@ -171,7 +171,7 @@ local LOG_MANAGER_STUBS = {
 	"modules.keystats.host_signature",
 	"metrics.engine.metrics",
 	"adapters.file_system",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
 }
 
@@ -195,7 +195,7 @@ local function count_sync_ioreg(prefetched)
 		package.loaded["adapters.file_system"] = {
 			read_with_status = function() return "{broken-device-json", "ok" end,
 		}
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		local LogManager = helpers.load_with_stubs("modules.keystats.log_manager", {
 			execute = function(command)
 				if command:find("ioreg", 1, true) then

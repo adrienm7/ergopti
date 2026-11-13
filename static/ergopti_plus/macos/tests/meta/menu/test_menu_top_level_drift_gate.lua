@@ -166,7 +166,7 @@ end
 local function native_language_provider()
 	return helpers.with_stub_scope({
 		"infra.i18n", "infra.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
-		"adapters.storage", "adapters.timer_scheduler",
+		"adapters.storage", "core.events.timer_scheduler",
 	}, function()
 		helpers.load_with_stubs("infra.i18n")
 		rawset(package.loaded, "infra.i18n", nil)
@@ -452,7 +452,7 @@ end)
 helpers.describe("topology fixture owns genuine native Language data", function()
 	helpers.it("retains all original native locale rows and restores its private reader cohort", function()
 		local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
-			"adapters.storage", "adapters.timer_scheduler", "infra.paths", "infra.logger" }
+			"adapters.storage", "core.events.timer_scheduler", "infra.paths", "infra.logger" }
 		local saved, old_hs = {}, rawget(_G, "hs")
 		for _, name in ipairs(names) do saved[name] = rawget(package.loaded, name) end
 		local provider = native_language_provider()
