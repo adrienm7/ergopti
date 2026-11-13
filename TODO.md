@@ -489,6 +489,11 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 - [ ] **Immediate-Backspace restoration after Notepad-paste and terminal expansions.** Those owners emit after the
       keystroke and keep no undo record, so a Backspace right after their expansion does not type the trigger back.
+      Claimed by worker E, then left on 2026-11-13 (decided by the agent, to review by the maintainer): the record is
+      cheap (`_HSE_CommitNotepadOwner` and `_HSE_CommitTerminalOwner` could keep it as `_HSE_RememberUndo` does), but
+      the undo burst must go through the same owned output as the expansion (the clipboard owner of
+      `_HSE_BeginOwnedNotepadTransaction`, the paced capture of `_HSE_BeginOwnedTerminalTransaction`), which only a
+      PC run in Notepad and a terminal can qualify. Until then `HSE_UndoExpansion` keeps refusing both hosts.
 
 - [x] **LogsDirPath under the old folder name.** `infra/legacy_folder_migration.ahk` renames a custom logs folder named
       like the old app folder to `Ergopti`, as macOS and Linux do since 2026-11-11 (shared `renamed` rule).
