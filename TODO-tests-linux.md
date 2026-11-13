@@ -74,3 +74,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       the one-shot wait; a CapsWord menu change applies to the running session. Native one-shot Shift real-device
       output receiving; CapsWord absolute reader and desktop keyboard grouping (moved from the one-shot and
       CapsWord parity follow-ups).
+- [ ] <!-- field-point: direct_xkb_levels --> Direct XKB compiler (2026-11-13, `claude/ergopti-todo-compilers`): the XKB export of
+      `_shared/tests/corpus/layouts/source/direct_levels.toml` installed with the user layout installer types a,
+      α (Right Ctrl, XKB's fifth level), æ (AltGr) and β (Right Ctrl). Proven in a container with xkbcomp and
+      libxkbcommon on the same files; left: a real GNOME or KDE session.

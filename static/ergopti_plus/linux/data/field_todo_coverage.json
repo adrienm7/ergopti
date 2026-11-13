@@ -127,6 +127,16 @@
 				}
 			],
 			"condition": "The Bépo registry layout installed."
+		},
+		{
+			"id": "direct_xkb_levels",
+			"title": "Direct XKB compiler: a sided-modifier layer on XKB's fifth level",
+			"checks": [
+				{
+					"step": "linux_direct_xkb_levels"
+				}
+			],
+			"condition": "A repository checkout with Node and Lua 5.4 on a real desktop (X11 or Wayland)."
 		}
 	]
 }

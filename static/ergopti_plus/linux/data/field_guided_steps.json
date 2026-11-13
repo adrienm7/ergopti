@@ -245,6 +245,13 @@
 			"gesture": "Did the press type the action's text once, with no character of the key itself and no hotstring, tap-hold, layer or magic-key effect, and does the editor still show the slot after you reopen it?",
 			"gesture_seconds": 180,
 			"proves": "The physical slot's output reaches the focused window alone and the editor keeps the saved slot."
+		},
+		{
+			"id": "linux_direct_xkb_levels",
+			"mode": "attest",
+			"gesture": "Run npm run layout-source -- export-xkb static/ergopti_plus/_shared/tests/corpus/layouts/source/direct_levels.toml /tmp/sided-xkb, install it with python3 static/ergopti/linux/xkb_installation/user_layout_installer.py install --layout-id sided --display-name Sided --source-dir /tmp/sided-xkb, select it, then in a text editor type A, Right Ctrl+A, Right Alt+A and Right Ctrl+B. Did you get a, α, æ and β?",
+			"gesture_seconds": 420,
+			"proves": "A layout source compiled straight to XKB keeps a layer held by a sided modifier on XKB's fifth level on a real desktop."
 		}
 	]
 }

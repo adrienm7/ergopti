@@ -136,3 +136,9 @@ Account and tester actions (maintainer, from the PC):
 
 - [ ] Navigation-owner DLL after the folder migration (2026-11-13): its manifest fingerprint was derived by the
       migration without a rebuild; run `-UpdateTracked` with the pinned MSVC and check the DLL is byte-identical.
+
+- [ ] KLC with Kana and Roya columns (2026-11-13, direct KLC compiler): the `export-klc` of
+      `static/ergopti_plus/_shared/tests/corpus/layouts/source/direct_levels.toml` (`npm run layout-source`) writes
+      shift states 8, 9, 16 and 17 with F12 on `VK_KANA` and Caps Lock on `VK_OEM_FJ_ROYA`. Check that MSKLC's
+      `kbdutool` builds it, and that with the DLL installed F12+B types « ka » and Caps Lock+A types ←. The
+      repository KLC reader reads it back (`tools/test/test-layout-source-compiler.cjs`); MSKLC itself was not run.
