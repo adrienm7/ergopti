@@ -89,7 +89,8 @@ function M.register(helpers)
 			declaration_file = "composition.json", max_declaration_bytes = 8192,
 			source_file = "layout_source.toml", max_source_bytes = 262144,
 			emulation_file = "layout_source_emulation.json", max_emulation_bytes = 262144,
-			keylayout_file = "layout_source.keylayout", family = "composed" } }
+			keylayout_file = "layout_source.keylayout", target_file = "layout_source_xkb.json",
+			max_target_bytes = 2097152, family = "composed" } }
 
 		--- A copy of the defaults with one composer field changed.
 		local function with(field, value)
@@ -111,6 +112,9 @@ function M.register(helpers)
 				{ with("emulation_file", "composition.json") }, { with("max_emulation_bytes", 0) },
 				{ with("keylayout_file", nil) }, { with("keylayout_file", "../x.keylayout") },
 				{ with("keylayout_file", "layout_source.toml") }, { with("keylayout_file", "composition.json") },
+				{ with("target_file", nil) }, { with("target_file", "../x.json") },
+				{ with("target_file", "layout_source_emulation.json") }, { with("target_file", "x.toml") },
+				{ with("max_target_bytes", 0) },
 			}) do
 				local value, err = Composer.settings(bad[1])
 				helpers.assert_nil(value)

@@ -288,6 +288,23 @@ var LayoutTargetCompiler = (function () {
 	// ======= 3/ Compilation ======
 	// =============================
 
+	// The writer of each converter platform: its plan, the format its omission
+	// reasons name, the reason of a modifier another one beat, and its report.
+	const WRITERS = Object.freeze({
+		linux: {
+			plan: (source) => xkbPlan(source),
+			format: 'xkb',
+			taken: 'xkb_level5_taken',
+			report: (plan) => ({ level5: plan.level5 })
+		},
+		windows: {
+			plan: (source, tables) => klcPlan(source, tables),
+			format: 'klc',
+			taken: 'klc_modifier_bits_taken',
+			report: (plan) => ({ modifier_bits: plan.bits.map((bit) => Object.assign({}, bit)) })
+		}
+	});
+
 	/**
 	 * Compile a structured source for one converter target.
 	 * @param {object} source - A validated structured source.
@@ -298,32 +315,21 @@ var LayoutTargetCompiler = (function () {
 	 * @returns {{canonical: object, convention: 'iso', omitted: object[], plan: object}}
 	 */
 	function compile(source, tables, platform, strict = true) {
-		const linux = platform === 'linux';
-		if (!linux && platform !== 'windows')
-			throw new LayoutSource.SourceError('source_platform', String(platform));
-		const plan = linux ? xkbPlan(source) : klcPlan(source, tables);
+		const writer = Object.hasOwn(WRITERS, platform) ? WRITERS[platform] : null;
+		if (writer === null) throw new LayoutSource.SourceError('source_platform', String(platform));
+		const plan = writer.plan(source, tables);
 		const compiled = LayoutSourceCompiler.compileCanonical(source, tables, {
 			platform,
 			tokens: plan.tokens,
-			format: linux ? 'xkb' : 'klc',
+			format: writer.format,
 			strict,
-			layerReason: layerReason(
-				source,
-				plan.tokens,
-				plan.refused,
-				linux ? 'xkb_level5_taken' : 'klc_modifier_bits_taken'
-			)
+			layerReason: layerReason(source, plan.tokens, plan.refused, writer.taken)
 		});
-		const report = linux
-			? { level5: plan.level5 }
-			: {
-					modifier_bits: plan.bits.map((bit) => Object.assign({}, bit))
-				};
 		return {
 			canonical: compiled.canonical,
 			convention: compiled.convention,
 			omitted: plan.omitted.concat(compiled.omitted),
-			plan: report
+			plan: writer.report(plan)
 		};
 	}
 
