@@ -17,6 +17,10 @@ try {
 	);
 	fs.writeFileSync(path.join(scripts, 'write_build_stamp.sh'), '#!/bin/bash\nexit 0\n');
 	fs.writeFileSync(
+		path.join(scripts, 'add-linux-legacy-update-probes.sh'),
+		'#!/bin/bash\nexit 0\n'
+	);
+	fs.writeFileSync(
 		path.join(scripts, 'stage-linux-private-runtime.sh'),
 		'#!/bin/bash\nmkdir -p -- "$2"\n'
 	);

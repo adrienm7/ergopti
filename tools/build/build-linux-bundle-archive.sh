@@ -51,6 +51,9 @@ for entry in linux _shared bin install.sh; do
 done
 bash "$SCRIPT_DIR/stage-linux-private-runtime.sh" "$BUILD_DIR/AppDir" "$STAGE/linux/runtime" "$STAGE/linux"
 install -m 644 "$BUILD_DIR/AppDir/usr/lib/ergopti/network-runtime-env.sh" "$STAGE/linux/network-runtime-env.sh"
+# Installed updaters released before the structure move probe the old shared
+# layout; only the tarball self-updates, so only it carries the probes.
+bash "$SCRIPT_DIR/add-linux-legacy-update-probes.sh" "$STAGE"
 
 # Build both artifacts in the private stage. Replacing an existing output by
 # rename avoids truncating a different user file hardlinked to that output.
