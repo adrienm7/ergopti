@@ -475,7 +475,7 @@ helpers.describe("installer-backup-ownership native receipts", function()
 		for _, role in ipairs({ "wrapper", "unit", "autostart" }) do
 			local source = role == "wrapper" and fixture.context.wrapper or fixture.root .. "/external-" .. role
 			if role ~= "wrapper" then NativeFixture.write(source, "external " .. role .. " bytes\n") end
-			rows[role] = assert(require("adapters.crypto").sha256(assert(NativeFixture.read(source)))) .. "\t@" .. role .. "\n"
+			rows[role] = assert(require("core.crypto.crypto").sha256(assert(NativeFixture.read(source)))) .. "\t@" .. role .. "\n"
 			content = content .. rows[role]
 		end
 		NativeFixture.write(manifest, content)

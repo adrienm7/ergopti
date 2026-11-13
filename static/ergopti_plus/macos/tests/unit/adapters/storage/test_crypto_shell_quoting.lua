@@ -23,7 +23,7 @@ local helpers = require("tests.helpers")
 -- ==============================================================
 -- ==============================================================
 
-helpers.describe("adapters.crypto — sha256 never interpolates data into a shell", function()
+helpers.describe("core.crypto.crypto — sha256 never interpolates data into a shell", function()
 	local DIGEST = "deadbeef00112233445566778899aabbccddeeff00112233445566778899aabb"
 
 	--- Loads the adapter over a native hash double that records its exact input.
@@ -33,7 +33,7 @@ helpers.describe("adapters.crypto — sha256 never interpolates data into a shel
 	local function load_crypto(observed, value)
 		observed.execute_calls = 0
 		observed.payloads = {}
-		return helpers.load_with_stubs("adapters.crypto", {
+		return helpers.load_with_stubs("core.crypto.crypto", {
 			execute = function()
 				observed.execute_calls = observed.execute_calls + 1
 				return ""
@@ -94,7 +94,7 @@ local NI
 	local function load_network_info(overrides)
 		-- network_info captures Crypto at require time. Clear that dependency so
 		-- every scenario uses its own hs.hash override instead of a prior test's.
-		package.loaded["adapters.crypto"] = nil
+		package.loaded["core.crypto.crypto"] = nil
 		package.loaded["adapters.shell_runner"] = nil
 		return helpers.load_with_stubs("adapters.network_info", overrides)
 	end

@@ -16,7 +16,7 @@ local Vectors = require("tests.support.sha256_vector_doubles")
 
 local function load_crypto(observed, hash_overrides)
 	package.loaded["infra.logger"] = nil
-	local Crypto = helpers.load_with_stubs("adapters.crypto", {
+	local Crypto = helpers.load_with_stubs("core.crypto.crypto", {
 		execute = Vectors.shell_execute(observed),
 		hash = hash_overrides or Vectors.native_hash(observed),
 	})
@@ -24,7 +24,7 @@ local function load_crypto(observed, hash_overrides)
 end
 
 
-helpers.describe("adapters.crypto: text SHA-256 over the shared byte corpus (crypto-text-nul-2026-10-21)", function()
+helpers.describe("core.crypto.crypto: text SHA-256 over the shared byte corpus (crypto-text-nul-2026-10-21)", function()
 	helpers.it("returns the independent digest of every shared vector", function()
 		local observed = {}
 		local Crypto = load_crypto(observed)
@@ -48,7 +48,7 @@ helpers.describe("adapters.crypto: text SHA-256 over the shared byte corpus (cry
 		local observed = {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, template, ...) logs[#logs + 1] = string.format(template, ...) end
-		helpers.with_fresh_modules({ "adapters.crypto", "infra.logger" }, function()
+		helpers.with_fresh_modules({ "core.crypto.crypto", "infra.logger" }, function()
 			package.loaded["infra.logger"] = logger
 			local saved_hs = _G.hs
 			_G.hs = {
@@ -56,7 +56,7 @@ helpers.describe("adapters.crypto: text SHA-256 over the shared byte corpus (cry
 				hash = { new = function() error("native refusal near PRIVATE-SSID") end },
 			}
 			local ok, failure = pcall(function()
-				local Crypto = require("adapters.crypto")
+				local Crypto = require("core.crypto.crypto")
 				helpers.assert_eq(Crypto.sha256("PRIVATE-SSID"), "")
 			end)
 			_G.hs = saved_hs

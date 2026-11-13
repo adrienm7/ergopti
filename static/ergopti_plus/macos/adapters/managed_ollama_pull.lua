@@ -336,7 +336,7 @@ local function material_census(owner)
 end
 
 local function capture_material(anchor, uid)
-	local Crypto = require("adapters.crypto")
+	local Crypto = require("core.crypto.crypto")
 	local owner = { directory = { path = anchor.directory.path, device = anchor.directory.device,
 		inode = anchor.directory.inode, uid = uid }, directory_removed = false }
 	for _, name in ipairs({ "authority", "window" }) do
@@ -495,7 +495,7 @@ function M.prepare_cleanup(original_task)
 	if not context or context.original_callback_status ~= 78
 		or task_receipts[original_task] == nil or context.cleanup_task ~= nil then return nil, false end
 	local CleanupReceipt = require("core.lifecycle.engine.core.managed_ollama_cleanup_receipt")
-	local Crypto = require("adapters.crypto")
+	local Crypto = require("core.crypto.crypto")
 	local original_raw, anchor_raw = read_reserved(context.original), read_reserved(context.anchor)
 	local proof = CleanupReceipt.original_pending(original_raw, Json.decode, context.nonce)
 	if not proof then return nil, false end

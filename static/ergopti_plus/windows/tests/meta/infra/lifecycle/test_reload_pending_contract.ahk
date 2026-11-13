@@ -78,7 +78,7 @@ _RBL_CallArguments(Src, OpenPos) {
 
 _RBL_EveryBundleLenderTakesTheRefusalBack() {
 	Src := ""
-	for Dir in ["infra", "ui", "modules", "platform", "adapters"]
+	for Dir in ["infra", "ui", "modules", "platform", "adapters", "core"]
 		Src .= "`n" . _StripFullLineComments(_DriverDirConcat(Dir))
 	Assert(StrLen(Src) > 200000,
 		"the driver source trees must be readable for this scan to mean anything")
