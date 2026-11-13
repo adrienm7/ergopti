@@ -58,7 +58,7 @@ local function observe(family, target, mode)
 			timings_dir = timings_dir .. "/" .. part
 			if not uv.fs_stat(timings_dir) then assert(uv.fs_mkdir(timings_dir, 448)) end
 		end
-		write(driver .. "/infra/paths.lua", assert(helpers.read_module_source("infra.paths")))
+		write(driver .. "/core/fs/engine/paths.lua", assert(helpers.read_module_source("core.fs.engine.paths")))
 		write(driver .. "/_shared/core/i18n/data/locales/en.json", read(root .. "/../_shared/core/i18n/data/locales/en.json"))
 		-- The environment loader's shared timings owner reads this installed resource.
 		write(driver .. "/_shared/" .. TIMINGS_SOURCE, read(root .. "/../_shared/" .. TIMINGS_SOURCE))
@@ -149,7 +149,7 @@ for _, case in ipairs({
 		invoke = function(owner) return owner.data() end },
 }) do
 	helpers.it("shared config refuses FIFO in " .. case.name, function()
-		local uv, Paths = require("luv"), require("infra.paths")
+		local uv, Paths = require("luv"), require("core.fs.engine.paths")
 		local original_shared, original_module = Paths.shared, package.loaded[case.module]
 		local source = assert(original_shared(case.path))
 		local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-llm-config-XXXXXX"))

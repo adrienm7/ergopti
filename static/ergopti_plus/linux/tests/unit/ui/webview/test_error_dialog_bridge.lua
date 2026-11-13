@@ -98,7 +98,7 @@ local function load_bridge(controls)
 				return { cancel = function() end }
 			end,
 		},
-		["adapters.storage"] = {
+		["core.fs.adapters.storage"] = {
 			get = function(key, default)
 				if controls.stored ~= nil and key == "script.show_error_dialog" then return controls.stored end
 				return default

@@ -18,7 +18,7 @@ function M.with_roundtrip(state, callback)
 	assert(type(state) == "table", "roundtrip state must be a table")
 	assert(type(callback) == "function", "roundtrip callback must be a function")
 	return helpers.with_stub_scope({
-		"infra.preferences", "infra.logger", "adapters.file_system", "infra.fs_dir",
+		"infra.preferences", "infra.logger", "core.fs.adapters.file_system", "core.fs.engine.dir",
 	}, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		local preferences = helpers.load_with_stubs("infra.preferences")

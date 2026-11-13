@@ -209,14 +209,14 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 
 	helpers.it("draws no empty slot group when the catalogue cannot be read", function()
 		with_unavailable_source(function()
-			local saved_paths = package.loaded["infra.paths"]
+			local saved_paths = package.loaded["core.fs.engine.paths"]
 			local saved_kbd = package.loaded["modules.shortcuts.keyboard_shortcuts"]
-			local real_paths = require("infra.paths")
+			local real_paths = require("core.fs.engine.paths")
 			local blind = setmetatable({ shared = function() return nil end }, { __index = real_paths })
-			package.loaded["infra.paths"] = blind
+			package.loaded["core.fs.engine.paths"] = blind
 			package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 			local ok_kbd, kbd = pcall(require, "modules.shortcuts.keyboard_shortcuts")
-			package.loaded["infra.paths"] = saved_paths
+			package.loaded["core.fs.engine.paths"] = saved_paths
 			local ok, err = pcall(function()
 				helpers.assert_true(ok_kbd, tostring(kbd))
 				kbd._reset()
@@ -278,7 +278,7 @@ local function with_slot_frame(locale, mutation, body)
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local saved_i18n_safe = rawget(_G, "i18n_safe")
 	local ok, raised = pcall(function()
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local json = require("core.text.engine.json")
 		local file = assert(io.open(Paths.shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
 		local catalogue = json.decode(file:read("*a"))
@@ -423,7 +423,7 @@ helpers.describe("Linux rendered AI source refusal", function()
 	helpers.it("disables the genuine toggle row and refuses a retained click after newer-schema boot (ai-readonly-admission)", function()
 		local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 		local Migration = require("settings.engine.migration.migrate")
-		local registry = assert(Migration.load_registry(require("infra.paths").shared(Migration.REGISTRY_PATH)))
+		local registry = assert(Migration.load_registry(require("core.fs.engine.paths").shared(Migration.REGISTRY_PATH)))
 		local source = '[_meta]\nschema_version = ' .. (registry.current + 1)
 			.. '\n[llm]\nenabled = false\n[private]\nkeep = "exact"\n'
 		Sandbox.with_config(source, function(path)

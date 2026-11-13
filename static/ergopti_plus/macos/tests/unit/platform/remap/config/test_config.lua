@@ -311,7 +311,7 @@ helpers.describe("Config: the « Ergopti uses Karabiner » switch", function()
 	end)
 
 	helpers.it("preserves the retired enabled key and the rest of the file until explicit cleanup", function()
-		local file_system = package.loaded["adapters.file_system"]
+		local file_system = package.loaded["core.fs.adapters.file_system"]
 		local codec = package.loaded["infra.toml.codec"]
 		local original_read, original_decode = file_system.read_with_status, codec.decode
 		file_system.read_with_status = function() return "[karabiner]\nenabled = false\n", "ok" end

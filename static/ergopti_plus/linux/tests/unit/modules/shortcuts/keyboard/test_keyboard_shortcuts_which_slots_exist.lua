@@ -762,7 +762,7 @@ for _, case in ipairs({
 		invoke = function(owner) return owner.parse("{Enter}") end },
 }) do
 	helpers.it("shortcut catalogue refuses FIFO: " .. case.name, function()
-		local uv, Paths = require("luv"), require("infra.paths")
+		local uv, Paths = require("luv"), require("core.fs.engine.paths")
 		local original_shared, original_module = Paths.shared, package.loaded[case.module]
 		local source = assert(original_shared(case.path))
 		local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-shortcut-config-XXXXXX"))

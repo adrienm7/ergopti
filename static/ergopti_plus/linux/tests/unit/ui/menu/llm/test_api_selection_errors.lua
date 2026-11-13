@@ -21,7 +21,7 @@ local function isolated(body)
 		assert(uv.os_setenv(name, scratch .. "/" .. name))
 	end
 	for _, name in ipairs({ "ui.menu.llm_backend_rows", "modules.llm.prediction_engine", "modules.llm.api_entries",
-		"modules.llm.api_remote", "infra.llm_preferences", "infra.config_paths", "adapters.storage" }) do
+		"modules.llm.api_remote", "infra.llm_preferences", "infra.config_paths", "core.fs.adapters.storage" }) do
 		package.loaded[name] = nil
 	end
 	local function write(path, content)

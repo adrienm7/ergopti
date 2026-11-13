@@ -14,8 +14,8 @@ local h = require("tests.helpers")
 --- @param body function Assertions against the real module and observed effects.
 --- @param strings table|nil Canonical translation input for the owned renderer.
 local function scenario(choice, body, strings)
-	local names = { "ui.gesture_conflicts", "infra.i18n", "adapters.storage", "adapters.shell_runner",
-		"core.logger.engine.shim", "core.events.loop", "ui.modal", "infra.manifest_menu", "menu.engine.renderer", "infra.paths", "core.text.engine.json" }
+	local names = { "ui.gesture_conflicts", "infra.i18n", "core.fs.adapters.storage", "adapters.shell_runner",
+		"core.logger.engine.shim", "core.events.loop", "ui.modal", "infra.manifest_menu", "menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local saved, store, queued = {}, {}, {}
 	local observed = { shells = 0, modals = 0, dialogs = 0 }
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -24,7 +24,7 @@ local function scenario(choice, body, strings)
 		if key == "gestures.system.slot_unknown_caption" then return "%s — gestures.system.unknown" end
 		return key
 	end, section = function(key) return strings and strings[key] or key end }
-	package.loaded["adapters.storage"] = { get = function(key) return store[key] end,
+	package.loaded["core.fs.adapters.storage"] = { get = function(key) return store[key] end,
 		set = function(key, value) store[key] = value; return true end }
 	package.loaded["adapters.shell_runner"] = {
 		quote = function(value) return "'" .. value .. "'" end,

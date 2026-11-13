@@ -44,7 +44,7 @@ end
 --- @return table shortcuts, table seen
 local function fixture(stored)
 	local seen = { executed = {}, deferred = {}, chatgpt = 0 }
-	replace("adapters.storage", Fakes.storage({ initial = stored }))
+	replace("core.fs.adapters.storage", Fakes.storage({ initial = stored }))
 	config_path = os.tmpname()
 	local lines = { "[shortcuts.keyboard]" }
 	for key, value in pairs(stored or {}) do

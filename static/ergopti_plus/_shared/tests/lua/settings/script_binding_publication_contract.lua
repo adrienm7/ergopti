@@ -45,7 +45,7 @@ function M.register(helpers, driver)
 	end
 	local function shared_file(relative)
 		if driver == "macos" then return helpers.shared(relative) end
-		return require("infra.paths").shared(relative)
+		return require("core.fs.engine.paths").shared(relative)
 	end
 	local vectors = assert(require("core.text.engine.json").decode(bytes(shared_file("tests/corpus/config_binding_identity/script_vectors.json"))))
 	helpers.describe("script-binding: shared identity and native publication", function()
@@ -457,7 +457,7 @@ function M.register_late(helpers, driver)
 		helpers.it("keeps failed actual source completion unjudged and neutralizes only a genuine retry", function()
 			with_file(function(f)
 				local path = driver == "macos" and helpers.shared("shortcuts/data/actions/script_chords.json")
-					or require("infra.paths").shared("shortcuts/data/actions/script_chords.json")
+					or require("core.fs.engine.paths").shared("shortcuts/data/actions/script_chords.json")
 				local restore = driver == "linux" and helpers.route_source_through_stdio(path) or nil
 				local original, closes = io.open, 0
 				io.open = function(candidate, mode)
@@ -589,7 +589,7 @@ function M.register_late(helpers, driver)
 			helpers.it("refuses owner withdrawal before a genuine unchanged native acknowledgement and repairs it", function()
 				with_file(function(f)
 					publish(f.owner)
-					local fs = require("adapters.file_system")
+					local fs = require("core.fs.adapters.file_system")
 					local read, rename, getter, publisher = fs.read_with_status, os.rename, f.owner.published_binding_catalogue, fs.write_if_unchanged_admitted
 					local reads, renames, candidate = 0, 0, nil
 					local before = f.parameters.get_all_action_parameters()
@@ -627,7 +627,7 @@ function M.register_late(helpers, driver)
 						if scenario ~= "late_publication" then publish(f.owner) end
 						helpers.assert_eq(f.parameters.set_action_parameter(current, "open_url", "https://changed.example"), true)
 						local before = f.parameters.get_all_action_parameters()
-						local fs = require("adapters.file_system")
+						local fs = require("core.fs.adapters.file_system")
 						local read, rename, getter = fs.read_with_status, os.rename, f.owner.published_binding_catalogue
 						local reads, renames, fake_calls = 0, 0, 0
 						local okay, detail = xpcall(function()

@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 local M = {}
-local OWNED = { "tests.support.file_system_transaction_fixture", "adapters.file_system", "infra.fs_dir",
-	"infra.logger", "adapters.ledger_append", "infra.timings", "metrics.engine.metrics", "modules.keystats.aggregator",
+local OWNED = { "tests.support.file_system_transaction_fixture", "core.fs.adapters.file_system", "core.fs.engine.dir",
+	"infra.logger", "core.fs.adapters.ledger_append", "infra.timings", "metrics.engine.metrics", "modules.keystats.aggregator",
 	"modules.keystats.export", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "core.events.timer_scheduler", "modules.keystats.timestamp", "lfs",
 	"modules.keystats.physical_accounting_mode", "modules.keystats.physical_wire", "metrics.engine.capture.physical_release",
@@ -73,7 +73,7 @@ function M.with_manager(scenario)
 				local logger = helpers.make_logger_stub()
 				logger.error = function(_, format, ...) state.errors[#state.errors + 1] = string.format(format, ...) end
 				package.loaded["infra.logger"] = logger
-				package.loaded["adapters.file_system"] = adapter
+				package.loaded["core.fs.adapters.file_system"] = adapter
 				package.loaded["infra.timings"] = { sec = function() return 1 end, ms = function() return 5000 end }
 				package.loaded["metrics.engine.metrics"] = {}
 				package.loaded["modules.keystats.aggregator"] = {}
@@ -104,7 +104,7 @@ function M.with_manager(scenario)
 				end
 				function state.restart()
 					state.closed = false
-					package.loaded["adapters.ledger_append"] = nil
+					package.loaded["core.fs.adapters.ledger_append"] = nil
 					package.loaded["modules.keystats.log_manager"] = nil
 					manager = helpers.load_with_stubs("modules.keystats.log_manager")
 					upvalue(upvalue(manager.ingest_once, "_flush_local_data_sql_outbox"), "_paths").data_sql_path = state.path

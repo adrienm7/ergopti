@@ -112,8 +112,8 @@ end
 M._native_adapter_in_layout = native_adapter_in_layout
 
 local function native_configuration_ports(driver)
-	local owner = rawget(package.loaded, "adapters.file_system")
-	if owner == nil then owner = require("adapters.file_system") end
+	local owner = rawget(package.loaded, "core.fs.adapters.file_system")
+	if owner == nil then owner = require("core.fs.adapters.file_system") end
 	if type(owner) ~= "table" then return nil end
 	local issuer = rawget(owner, "configuration_ports")
 	if type(issuer) ~= "function" then return nil end
@@ -264,7 +264,7 @@ end
 
 local function native_ports_live(record)
 	local owner = record.port_owner
-	return owner == nil or rawequal(rawget(package.loaded, "adapters.file_system"), owner)
+	return owner == nil or rawequal(rawget(package.loaded, "core.fs.adapters.file_system"), owner)
 		and rawequal(rawget(owner, "configuration_ports"), record.port_issuer)
 		and rawequal(rawget(owner, "read_with_status"), record.port_reader)
 		and rawequal(rawget(owner, "write_if_unchanged"), record.port_writer)

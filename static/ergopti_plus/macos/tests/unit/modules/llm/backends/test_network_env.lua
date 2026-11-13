@@ -171,15 +171,15 @@ end)
 --- @param stored any
 --- @return table NetworkEnv, function restore
 local function with_override(stored)
-	local saved = package.loaded["adapters.storage"]
-	package.loaded["adapters.storage"] = { get = function(key, default)
+	local saved = package.loaded["core.fs.adapters.storage"]
+	package.loaded["core.fs.adapters.storage"] = { get = function(key, default)
 		if key == "network.proxy_override" then return stored end
 		return default
 	end }
 	package.loaded["modules.llm.network_env"] = nil
 	local NetworkEnv = require("modules.llm.network_env")
 	return NetworkEnv, function()
-		package.loaded["adapters.storage"] = saved
+		package.loaded["core.fs.adapters.storage"] = saved
 		package.loaded["modules.llm.network_env"] = nil
 	end
 end

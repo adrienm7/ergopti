@@ -10,7 +10,7 @@
 local M = {}
 local Core = require("hotstrings.engine.catalogue.personal_adoption")
 M.plan_gates, M.plan_selection = Core.plan_gates, Core.plan_selection
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local available, FileAttributes = pcall(require, "lfs")
 
 --- Returns an exact no-follow physical identity for a regular source file.

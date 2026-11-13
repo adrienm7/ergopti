@@ -89,7 +89,7 @@ end
 local function with_file_command(body, change_label)
 	local saved = package.loaded["infra.manifest_menu"]
 	local ok, err = xpcall(function()
-		local path = require("infra.paths").shared("menu/data/menu_manifest.json")
+		local path = require("core.fs.engine.paths").shared("menu/data/menu_manifest.json")
 		local native_captions = require("infra.i18n")
 		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "linux", manifest_path = function() return path end,

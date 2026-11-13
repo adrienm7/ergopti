@@ -45,8 +45,8 @@ M._children = {}
 
 local DEFAULT_DEPS = {
 	exepath = function() return require("luv").exepath() end,
-	driver_root = function() return require("infra.paths").driver_root() end,
-	locales_dir = function() return require("infra.paths").shared("core/i18n/data/locales") end,
+	driver_root = function() return require("core.fs.engine.paths").driver_root() end,
+	locales_dir = function() return require("core.fs.engine.paths").shared("core/i18n/data/locales") end,
 	locale = function() return require("infra.i18n").get_locale() end,
 	text = function(key) return require("infra.i18n").get(key) end,
 	getenv = os.getenv,

@@ -9,7 +9,7 @@
 
 local M = {}
 local Helper = require("platform.remap.lease_helper")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Crypto = require("core.crypto.crypto")
 local Json = require("core.text.engine.json")
 local Receipt = require("core.lifecycle.engine.core.native_pty_receipt")

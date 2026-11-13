@@ -20,7 +20,7 @@ helpers.describe("keyboard geometry boot ownership", function()
 		helpers.assert_true(position ~= nil, "root boot must explicitly initialize keyboard geometry")
 		helpers.assert_nil(source:find(initialize, position + #initialize, true),
 			"accessibility resume must not initialize a second geometry owner")
-		for _, marker in ipairs({ 'require("adapters.file_system")', 'pcall(require, "platform.remap")',
+		for _, marker in ipairs({ 'require("core.fs.adapters.file_system")', 'pcall(require, "platform.remap")',
 			'require("ui.menu")', "local function finish_boot_after_onboarding()", "shortcuts.start_script_control" }) do
 			local consumer = source:find(marker, 1, true)
 			helpers.assert_true(consumer ~= nil, "the boot guard must retain consumer coverage: " .. marker)

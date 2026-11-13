@@ -9,7 +9,7 @@ local function with_frames(body, paused, mutate)
 	local ok, err = pcall(function()
 		local i18n = require("infra.i18n")
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "linux",
-			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.text.engine.json").decode, i18n = i18n, logger = require("core.logger.engine.shim"),
 		}))
 		local root = renderer.get_root()

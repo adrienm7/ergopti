@@ -20,7 +20,7 @@ local function load_menu_fixture(shortcuts, enabled, options)
 	local noop = function() end
 	helpers.load_with_stubs("infra.logger")
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.fs_dir"] = { entries = function() return {} end }
+	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 	package.loaded["infra.dialog_util"] = {}
 	package.loaded["modules.shortcuts"] = {
 		DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
@@ -360,20 +360,20 @@ end)
 -- menubar. Only the logical native gate is controllable; no Karabiner deployment
 -- or physical input acknowledgement is inferred from that Boolean receipt.
 local function with_chord_fixture(mode, body)
-	return helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger",
-		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "infra.fs_dir", "infra.notifications",
+	return helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger",
+		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "core.fs.engine.dir", "infra.notifications",
 		"ui.menu.menu_shortcuts", "ui.menu.script_chords_transaction", "ui.menu.preferences_transaction",
 		"ui.menu.global_actions_transaction", "ui.menu.menu_state", "modules.shortcuts",
 		"modules.shortcuts.actions.text", "ui.menu.menu_utils", "ui.menu.shortcut_utils",
 		"ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "infra.manifest_reader",
-		"adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
+		"core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 		local Preferences = helpers.load_with_stubs("infra.preferences")
 		local Transaction = require("ui.menu.preferences_transaction")
 		local Global = require("ui.menu.global_actions_transaction")
 		local Chords = require("ui.menu.script_chords_transaction")
 		local MenuState = require("ui.menu.menu_state")
 		local old_rename = os.rename
-		local FileSystem = require("adapters.file_system")
+		local FileSystem = require("core.fs.adapters.file_system")
 		local old_write = FileSystem.write_if_unchanged
 		local failure, inverse_blocked, paused, terminal = mode, false, false, false
 		local called, result = xpcall(function()
@@ -457,15 +457,15 @@ local function with_chord_fixture(mode, body)
 				package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end, decorate_section = function(value) return value end }
 				package.loaded["modules.shortcuts"] = { DEFAULT_STATE = { shortcuts = true, chatgpt_url = "https://example.test" } }
 				package.loaded["modules.shortcuts.actions.text"] = { WRAP_GROUPS = {}, build_active_wrap_pairs = function() return {} end }
-				package.loaded["infra.fs_dir"] = { entries = function() return {} end }
+				package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 				package.loaded["infra.dialog_util"] = {}
 				package.loaded["ui.menu.menu_utils"] = {}
 				package.loaded["ui.menu.shortcut_utils"] = {}
 				package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
 				package.loaded["ui.menu.menu_tap_keys"] = { provide_rows = function() return {} end }
 				local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
-					manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
-					json_decode = require("adapters.json_codec").decode, i18n = package.loaded["infra.i18n"], logger = require("infra.logger") }))
+					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+					json_decode = require("core.fs.adapters.json_codec").decode, i18n = package.loaded["infra.i18n"], logger = require("infra.logger") }))
 				package.loaded["infra.manifest_menu"] = renderer
 				local context = { state = state, shortcuts = {}, script_control = facade, paused = false,
 					commit_script_chords = owner.toggle, save_prefs = function() return global.run_exclusive("Legacy chord save", raw_save) end,
@@ -643,7 +643,7 @@ end)
 helpers.describe("script chord fixture borrowed cache ownership", function()
 	for _, populated in ipairs({ false, true }) do
 		helpers.it("restores borrowed renderer cache " .. (populated and "present" or "absent"), function()
-			local names = { "adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }
+			local names = { "core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }
 			helpers.with_fresh_modules(names, function()
 				local previous, previous_hs = {}, rawget(_G, "hs")
 				for _, name in ipairs(names) do

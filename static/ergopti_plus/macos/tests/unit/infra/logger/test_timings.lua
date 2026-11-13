@@ -139,10 +139,10 @@ helpers.describe("timings: registry load fail-fast", function()
 	--- unreachable, and returns whatever the module raised.
 	--- @return boolean,string The pcall status and the raised message.
 	local function reload_timings_without_shared_tree()
-		local saved_paths   = package.loaded["infra.paths"]
+		local saved_paths   = package.loaded["core.fs.engine.paths"]
 		local saved_timings = package.loaded["infra.timings"]
 
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared          = function() return nil end,
 			shared_root     = function() return nil end,
 			shared_llm_path = function() return nil end,
@@ -154,7 +154,7 @@ helpers.describe("timings: registry load fail-fast", function()
 
 		-- Restore the real modules so later suites are unaffected by this probe.
 		package.loaded["infra.timings"] = saved_timings
-		package.loaded["infra.paths"]   = saved_paths
+		package.loaded["core.fs.engine.paths"]   = saved_paths
 
 		return ok, tostring(err)
 	end

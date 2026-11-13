@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 helpers.describe("gesture warning consent (gesture-conflicts)", function()
 	for _, choice in ipairs({ "menu.gestures.open_settings", "gestures.system.dismiss", "close", "refused" }) do
 		helpers.it("honours the " .. choice .. " button", function()
-			local names = { "ui.gesture_conflict_notice", "infra.dialog_util", "infra.i18n", "adapters.storage",
+			local names = { "ui.gesture_conflict_notice", "infra.dialog_util", "infra.i18n", "core.fs.adapters.storage",
 				"infra.deferred_work", "infra.logger" }
 			local saved, store, timers = {}, {}, {}
 			local saved_shell = package.loaded["adapters.shell_runner"]
@@ -25,7 +25,7 @@ helpers.describe("gesture warning consent (gesture-conflicts)", function()
 				return choice == "refused" and "gestures.system.dismiss" or choice
 			end }
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(key) return store[key] end,
 				set = function(key, value)
 					if choice == "refused" then return false end

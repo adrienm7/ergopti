@@ -14,7 +14,7 @@ local Lease = require("platform.remap.lease_contract")
 local TOKEN = "0123456789abcdef0123456789abcdef"
 local KEYS = { "escape", "tab", "return_or_enter", "spacebar", "delete_or_backspace" }
 
-helpers.with_fresh_modules({ "platform.remap.generator", "adapters.file_system", "infra.logger" }, function()
+helpers.with_fresh_modules({ "platform.remap.generator", "core.fs.adapters.file_system", "infra.logger" }, function()
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	local Generator = helpers.load_with_stubs("platform.remap.generator")
 	local actions = {

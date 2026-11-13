@@ -23,7 +23,7 @@
 --- ==============================================================================
 
 local Logger = require("core.logger.engine.shim")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 -- A missing parser is a broken install: say so instead of a raw stack trace.
 local ok_reader, Reader = pcall(require, "core.text.engine.toml_codec.reader")

@@ -92,7 +92,7 @@ local clone = TableUtil.deep_copy
 -- =========================================
 
 local function storage()
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "core.fs.adapters.storage")
 	if not ok or type(Storage) ~= "table" then return nil end
 	return Storage
 end

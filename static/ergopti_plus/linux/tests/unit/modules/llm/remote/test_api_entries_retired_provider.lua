@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Logger = require("core.logger.engine.shim")
 
 local CLOUD = [[{"provider_order":["cerebras"],"providers":{"cerebras":{"label":"Cerebras","base_url":"https://example.invalid/v1","default_model":"fixture","format":"openai"}}}]]
@@ -70,7 +70,7 @@ local function with_case(options, body)
 	if options.cloud ~= false then write(cloud, options.cloud or CLOUD) end
 	if options.local_source ~= false then write(local_path, options.local_source or LOCAL) end
 	local original_shared, original_open = Paths.shared, io.open
-	local Reader = require("infra.regular_file_reader")
+	local Reader = require("core.fs.engine.regular_file_reader")
 	local original_source_open = Reader.open_source
 	local original_warn, original_error = Logger.warn, Logger.error
 	local warnings, errors = {}, {}

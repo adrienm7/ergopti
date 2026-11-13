@@ -32,7 +32,7 @@ if prepared then
 	assert(os.rename(prepared, stage), "the prepared stage could not take the worker's name")
 	io.write("STAGE=", stage, "\n")
 end
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 local mode = assert(os.getenv("ERGOPTI_NATIVE_STORAGE_MODE"))
 if mode ~= "fresh" then assert(Storage.get("value") == "retained") end
 if mode == "refuse" then
@@ -44,8 +44,8 @@ elseif mode == "limit" then
 else
 	assert(Storage.set("value", "replacement"))
 	assert(Storage.get("value") == "replacement")
-	package.loaded["adapters.storage"] = nil
-	assert(require("adapters.storage").get("value") == "replacement")
+	package.loaded["core.fs.adapters.storage"] = nil
+	assert(require("core.fs.adapters.storage").get("value") == "replacement")
 end
 """
 

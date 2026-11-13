@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 local OWNER_MODULES = { "infra.tap_hold_scope", "infra.shortcuts_scope", "infra.llm_scope", "infra.metrics_scope",
 	"infra.hotstrings_scope", "infra.script_scope" }
 

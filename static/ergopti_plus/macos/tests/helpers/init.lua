@@ -542,7 +542,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- can find _shared/ai/data/api_providers.json and profiles.json during headless
 	-- tests. Without this, io.open fails or returns nil path, causing "not found"
 	-- errors in tests that load api_remote or exercise catalogue-dependent code.
-	loaded["infra.paths"] = {
+	loaded["core.fs.engine.paths"] = {
 		-- Single shared-tree resolver: all three helpers delegate to M.shared so
 		-- the folder name lives in exactly one place (SHARED_REL). Mirrors the
 		-- production Paths.shared contract (nil/"" → the shared root dir).
@@ -757,7 +757,7 @@ end
 --- same name is its twin).
 --- The read goes through SourceFile, so an open, read or close failure raises
 --- naming its phase and path instead of reading as an absent module.
---- @param module_name string Dotted module name, e.g. "infra.fs_dir".
+--- @param module_name string Dotted module name, e.g. "core.fs.engine.dir".
 --- @return string|nil body, string|nil err Body, or nil plus why the module is not found.
 function M.read_module_source(module_name)
 	local path, missing = package.searchpath(module_name, package.path)

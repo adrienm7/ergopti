@@ -30,12 +30,12 @@
 --- ==============================================================================
 
 local Logger        = require("core.logger.engine.shim")
-local Paths         = require("infra.paths")
+local Paths         = require("core.fs.engine.paths")
 local ConfigPaths   = require("infra.config_paths")
 local I18n          = require("infra.i18n")
-local FileSystem    = require("adapters.file_system")
+local FileSystem    = require("core.fs.adapters.file_system")
 local HttpClient    = require("adapters.http_client")
-local FileDigest    = require("adapters.file_digest")
+local FileDigest    = require("core.fs.adapters.file_digest")
 local ShellRunner   = require("adapters.shell_runner")
 local ProcessRunner = require("adapters.process_runner")
 local Json          = require("core.text.engine.json")
@@ -421,7 +421,7 @@ local function managed_python(confirm)
 				function(result) callback(result.exit_code == 0 and result.error == nil) end)
 		end,
 		delete = FileSystem.delete,
-		rename = require("infra.no_replace_move").move,
+		rename = require("core.fs.engine.no_replace_move").move,
 	}
 	return function(callback) require("modules.keymap.managed_python").ensure(deps, callback) end
 end

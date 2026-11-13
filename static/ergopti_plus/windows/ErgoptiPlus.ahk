@@ -402,7 +402,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/crypto/crypto.ahk
 #Include adapters/clipboard.ahk
 #Include core/events/timer_scheduler.ahk
-#Include adapters/file_system.ahk
+#Include core/fs/adapters/file_system.ahk
 ; Crash-safe multi-file config transitions bind strict Windows-only filesystem
 ; operations at this integration boundary; the portable core remains OS-free.
 #Include infra/config_transition.ahk
@@ -418,7 +418,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include ../_shared/core/network/data/failure.ahk
 #Include adapters/http_client.ahk
 #Include adapters/secure_field_detector.ahk
-#Include adapters/storage.ahk
+#Include core/fs/adapters/storage.ahk
 #Include adapters/process_lifecycle.ahk
 #Include adapters/key_state.ahk
 #Include adapters/keyboard_layout_switch.ahk
@@ -590,7 +590,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include infra/metrics/metrics_shortcuts.ahk
 #Include infra/metrics/metrics_filters.ahk
 #Include ui/wpm/init.ahk
-#Include infra/sqlite3.ahk
+#Include core/fs/engine/sqlite3.ahk
 #Include vendor/ComVar.ahk
 #Include vendor/Promise.ahk
 #Include vendor/WebView2.ahk

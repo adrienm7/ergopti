@@ -17,7 +17,7 @@ function M.new(logger, log)
 	assert(type(logger) == "table" and type(logger.error) == "function"
 		and type(logger.debug) == "function", "payload cleanup needs the canonical logger")
 	assert(type(log) == "string" and log ~= "", "payload cleanup needs a backend log identity")
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	assert(type(files) == "table" and type(files.remove_if_unchanged) == "function"
 		and type(files.classify_no_follow) == "function", "payload cleanup needs exact file cleanup ports")
 	local pending, settling = {}, false

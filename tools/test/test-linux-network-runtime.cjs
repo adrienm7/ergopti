@@ -788,7 +788,7 @@ function native() {
 		fs.mkdirSync(path.join(driver, 'platform/network'), { recursive: true });
 		fs.mkdirSync(path.join(driver, 'infra'), { recursive: true });
 		fs.copyFileSync(
-			path.join(ROOT, DRIVER, 'infra/regular_file_reader.lua'),
+			path.join(ROOT, DRIVER, 'core/fs/engine/regular_file_reader.lua'),
 			path.join(driver, 'infra/regular_file_reader.lua')
 		);
 		fs.mkdirSync(path.join(driver, '_generated'), { recursive: true });

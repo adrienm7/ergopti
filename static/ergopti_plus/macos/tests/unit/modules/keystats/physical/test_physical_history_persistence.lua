@@ -99,8 +99,8 @@ local function ports()
 		host = { localizedName = function() return "Fixture" end } }
 	package.loaded["hs.fs"], package.loaded["hs.timer"] = fs, timer
 	package.loaded["hs.json"], package.loaded["hs.sqlite3"] = json, sqlite
-	package.loaded["infra.logger"], package.loaded["adapters.file_system"] = logger, file_system
-	package.loaded["infra.paths"] = { shared = function(path) return shared .. "/" .. path end }
+	package.loaded["infra.logger"], package.loaded["core.fs.adapters.file_system"] = logger, file_system
+	package.loaded["core.fs.engine.paths"] = { shared = function(path) return shared .. "/" .. path end }
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.text_utils"] = { shell_quote = function(value)
 		return "'" .. value:gsub("'", "'\\''") .. "'"
@@ -164,7 +164,7 @@ shell.run(function(capture, observed, native)
 	log.error=function(_,msg,...) logs[#logs+1]=string.format(msg,...) end
 	package.loaded["infra.logger"]=log
 	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,metrics_cache_dir=function() return temporary.."/ergopti_metrics" end,get_config_dir=function() return temporary end}
-	package.loaded["adapters.file_system"]=file_system
+	package.loaded["core.fs.adapters.file_system"]=file_system
 	package.loaded["modules.keystats.text_cipher"]={is_enabled=function() return false end}
 	package.loaded["modules.keystats.export"]=nil
 	complete_batch_offset=require("modules.keystats.export")._last_complete_batch_offset
@@ -327,7 +327,7 @@ shell.run(function(capture, observed, native)
 		return result
 	end
 	-- Stop completed before the persistence-only reload; old Session/capabilities never reopen.
-	for _,name in ipairs({"adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
+	for _,name in ipairs({"core.fs.adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
 	ports();manager=require("modules.keystats.log_manager");assert(manager.init(state))
 	receipt.live=snapshot()
 	for _,phase in ipairs({"rebuild_one","rebuild_two"}) do
@@ -336,7 +336,7 @@ shell.run(function(capture, observed, native)
 		assert(database:exec("UPDATE ngram_keycodes SET c=999;")==sqlite.OK)
 		assert(database:exec("UPDATE meta SET value='0' WHERE key='aggregate_cache_revision';")==sqlite.OK)
 		assert(manager.stop({process_exit=true}))
-		for _,name in ipairs({"adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
+		for _,name in ipairs({"core.fs.adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
 		ports();manager=require("modules.keystats.log_manager");assert(manager.init(state))
 		receipt[phase]=snapshot()
 		helpers.assert_eq(receipt[phase],receipt.live,"Real raw rebuild must recover independent totals")
@@ -446,8 +446,8 @@ local function ports()
 		host = { localizedName = function() return "Fixture" end } }
 	package.loaded["hs.fs"], package.loaded["hs.timer"] = fs, timer
 	package.loaded["hs.json"], package.loaded["hs.sqlite3"] = json, sqlite
-	package.loaded["infra.logger"], package.loaded["adapters.file_system"] = logger, file_system
-	package.loaded["infra.paths"] = { shared = function(path) return shared .. "/" .. path end }
+	package.loaded["infra.logger"], package.loaded["core.fs.adapters.file_system"] = logger, file_system
+	package.loaded["core.fs.engine.paths"] = { shared = function(path) return shared .. "/" .. path end }
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.text_utils"] = { shell_quote = function(value)
 		return "'" .. value:gsub("'", "'\\''") .. "'"
@@ -511,7 +511,7 @@ shell.run(function(capture, observed, native)
 	log.error=function(_,msg,...) logs[#logs+1]=string.format(msg,...) end
 	package.loaded["infra.logger"]=log
 	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,metrics_cache_dir=function() return temporary.."/ergopti_metrics" end,get_config_dir=function() return temporary end}
-	package.loaded["adapters.file_system"]=file_system
+	package.loaded["core.fs.adapters.file_system"]=file_system
 	package.loaded["modules.keystats.text_cipher"]={is_enabled=function() return false end}
 	package.loaded["modules.keystats.export"]=nil
 	complete_batch_offset=require("modules.keystats.export")._last_complete_batch_offset
@@ -634,7 +634,7 @@ shell.run(function(capture, observed, native)
 	-- Two cancelled intervals still credit their original presses, no held duration.
 	assert(manager.stop({process_exit=true}))
 	local function reopen()
-		for _,name in ipairs({"adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
+		for _,name in ipairs({"core.fs.adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
 		ports();manager=require("modules.keystats.log_manager");assert(manager.init(state))
 	end
 	reopen();receipt.reopened=snapshot()

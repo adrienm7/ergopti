@@ -275,7 +275,7 @@ function M.cancel_path(pid, start_tick, boot_id)
 	start_tick = start_tick or M.process_start_time(pid)
 	boot_id = M.boot_id(boot_id)
 	if type(start_tick) ~= "string" or not start_tick:match("^%d+$") or not boot_id then return nil end
-	return require("adapters.storage").path() .. ".relay-cancel-" .. string.format("%.0f", pid)
+	return require("core.fs.adapters.storage").path() .. ".relay-cancel-" .. string.format("%.0f", pid)
 		.. "-" .. start_tick .. "-" .. boot_id
 end
 
@@ -353,7 +353,7 @@ function M.restart(opts)
 		local token = M.allocate_token(opts.mkdtemp)
 		if token then
 			successor = { root = opts.successor.root, token = token,
-				log = opts.successor.log or (require("adapters.storage").path() .. ".update-watch.log") }
+				log = opts.successor.log or (require("core.fs.adapters.storage").path() .. ".update-watch.log") }
 		else
 			Logger.warn(LOG, "No boot-ready token could be allocated; the updated daemon starts unwatched.")
 		end

@@ -146,7 +146,7 @@ helpers.describe("healthcheck (linux): the daemon's own load", function()
 	-- The resident memory of the daemon, which a report of a slow or leaking
 	-- driver is read for (system-load)
 	helpers.it("reports the daemon's resident memory from /proc/self/status (system-load)", function()
-		local reader = require("infra.regular_file_reader")
+		local reader = require("core.fs.engine.regular_file_reader")
 		local real_read = reader.read_source
 		reader.read_source = function(path)
 			if path ~= "/proc/self/status" then return real_read(path) end

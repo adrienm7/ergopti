@@ -18,7 +18,7 @@
 
 local M = {}
 
-local JsonCodec   = require("adapters.json_codec")
+local JsonCodec   = require("core.fs.adapters.json_codec")
 local text_utils  = require("infra.text_utils")
 -- The collision cascade is shared with the Linux driver rather than defined here:
 -- it existed in two Lua copies and one AutoHotkey copy, and the Linux driver had
@@ -26,7 +26,7 @@ local text_utils  = require("infra.text_utils")
 local HotstringPriority = require("hotstrings.engine.priority")
 local km_utils    = require("modules.keymap.utils")
 local Logger      = require("infra.logger")
-local Paths       = require("infra.paths")
+local Paths       = require("core.fs.engine.paths")
 local Terminators = require("modules.keymap.terminators")
 local Groups      = require("modules.keymap.registry_groups")
 local RI          = require("modules.keymap.registry_index")

@@ -126,7 +126,7 @@ _LRPS_ChildSource(BodyName := "layout_row_passthrough_body.ahk", ExtraSource := 
 	; never calls. Runtime unset reads still throw; only load-time warnings stop.
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
 	Code .= "#Include " . _DriverDir . "\infra\json.ahk`n"
-	Code .= "#Include " . _DriverDir . "\adapters\file_system.ahk`n"
+	Code .= "#Include " . _DriverDir . "\core\fs\adapters\file_system.ahk`n"
 	Code .= "#Include " . _SharedDir . "\settings\data\features\layout_rows_policy.ahk`n"
 	Owner := _DriverProductionFileForSymbol("_LayoutRowPassthrough")
 	AssertTrue(Owner != "", "the genuine row sender must have one production owner")

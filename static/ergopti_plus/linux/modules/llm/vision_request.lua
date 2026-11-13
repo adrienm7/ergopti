@@ -84,7 +84,7 @@ end
 --- @return table|nil config
 function M.config()
 	if _config then return _config end
-	local path = require("infra.paths").shared("ai/data/vision.json")
+	local path = require("core.fs.engine.paths").shared("ai/data/vision.json")
 	local text, status
 	if path then text, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then text = nil end

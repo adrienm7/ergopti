@@ -3,10 +3,10 @@
 local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 local Manifest = require("infra.manifest_reader")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 
 local function fixture(source)
-	package.loaded["adapters.file_system"] = FileSystem
+	package.loaded["core.fs.adapters.file_system"] = FileSystem
 	package.loaded["modules.gestures.engine"] = nil
 	package.loaded["modules.gestures.conflicts"] = nil
 	helpers.load_with_stubs("modules.gestures.actions")
@@ -45,7 +45,7 @@ local function fixture(source)
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = files_port
+	package.loaded["core.fs.adapters.file_system"] = files_port
 	local prefs = helpers.load_with_stubs("infra.preferences")
 	prefs.load("config")
 	local PT = require("ui.menu.preferences_transaction")
@@ -258,7 +258,7 @@ helpers.describe("macOS complete gesture scope", function()
 	end)
 end)
 
-package.loaded["adapters.file_system"] = FileSystem
+package.loaded["core.fs.adapters.file_system"] = FileSystem
 package.loaded["infra.preferences"] = nil
 
 
@@ -272,7 +272,7 @@ package.loaded["infra.preferences"] = nil
 -- ========================================================
 
 local function actual_frame_fixture(source)
-	package.loaded["adapters.file_system"] = FileSystem
+	package.loaded["core.fs.adapters.file_system"] = FileSystem
 	package.loaded["modules.gestures.engine"] = nil
 	package.loaded["modules.gestures.conflicts"] = nil
 	local recording = require("tests.support.synthetic_action_fixture").load("modules.gestures.actions")
@@ -314,7 +314,7 @@ local function actual_frame_fixture(source)
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = files_port
+	package.loaded["core.fs.adapters.file_system"] = files_port
 	local prefs = helpers.load_with_stubs("infra.preferences")
 	prefs.load("config")
 	local PT = require("ui.menu.preferences_transaction")
@@ -374,12 +374,12 @@ helpers.describe("macOS two-finger neutral recommendations", function()
 		local title = restore and "clear then recommended leaves every two-contact gesture to the OS"
 			or "an explicit custom two-contact binding remains unchanged and emits its tagged key"
 		helpers.it(title, function()
-			local previous_files = package.loaded["adapters.file_system"]
+			local previous_files = package.loaded["core.fs.adapters.file_system"]
 			helpers.with_stub_scope({
 				"modules.gestures", "modules.gestures.init", "modules.gestures.engine",
 				"modules.gestures.actions", "modules.gestures.conflicts", "modules.gestures.actions_click",
 				"modules.gestures.actions_aux_owner", "modules.gestures.sticky_modifiers",
-				"adapters.file_system",
+				"core.fs.adapters.file_system",
 				"adapters.synthetic_input", "adapters.event_provenance", "core.events.timer_scheduler",
 				"infra.preferences", "ui.menu.gesture_scope", "ui.menu.scoped_preferences",
 				"ui.menu.preferences_transaction", "ui.menu.menu_gestures", "infra.manifest_menu",
@@ -464,7 +464,7 @@ helpers.describe("macOS two-finger neutral recommendations", function()
 				assert(engine.stop() == true, "the exact inert engine tap must retire")
 				if not ok then error(detail, 0) end
 			end)
-			helpers.assert_true(rawequal(package.loaded["adapters.file_system"], previous_files),
+			helpers.assert_true(rawequal(package.loaded["core.fs.adapters.file_system"], previous_files),
 				"the complete actual-owner case must restore the exact filesystem adapter")
 		end)
 	end

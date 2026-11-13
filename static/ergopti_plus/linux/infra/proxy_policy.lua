@@ -11,8 +11,8 @@
 --- ==============================================================================
 
 local M = {}
-local Paths = require("infra.paths")
-local Reader = require("infra.regular_file_reader")
+local Paths = require("core.fs.engine.paths")
+local Reader = require("core.fs.engine.regular_file_reader")
 local Json = require("core.text.engine.json")
 local SharedPolicy = require("core.network.engine.proxy_policy_core")
 local Override = require("core.network.engine.proxy_override")
@@ -54,7 +54,7 @@ end
 function M.override_choice()
 	local setting, reason = M.override_setting()
 	if not setting then return nil, reason end
-	return setting.parse(require("adapters.storage").get(setting.storage_key, nil))
+	return setting.parse(require("core.fs.adapters.storage").get(setting.storage_key, nil))
 end
 
 --- Loads the shared canonical routing inventory exactly once.

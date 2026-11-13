@@ -21,7 +21,7 @@ local modules = nil
 --- @return string published Bytes the save published.
 local function save_once(source, mutate)
 	local published
-	helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system", "modules.keystats.kc_bridge" }, function()
+	helpers.with_fresh_modules({ "infra.preferences", "core.fs.adapters.file_system", "modules.keystats.kc_bridge" }, function()
 		package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
 		-- One load per process: the keymap refuses a second LLM-bridge init.
 		if not modules then
@@ -31,7 +31,7 @@ local function save_once(source, mutate)
 				modules[key] = helpers.load_with_stubs("modules." .. name)
 			end
 		end
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function() return source, "ok" end,
 			write = function() error("publication must retain its source precondition") end,
 			write_if_unchanged = function(_, content) source = content; return true end,
@@ -63,8 +63,8 @@ helpers.describe("dynamic date family row (dynamic-date-row-2026-10-27)", functi
 	end)
 
 	helpers.it("reads the switch from the row's enabled leaf", function()
-		helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system" }, function()
-			package.loaded["adapters.file_system"] = {
+		helpers.with_fresh_modules({ "infra.preferences", "core.fs.adapters.file_system" }, function()
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return "[hotstrings.dynamic]\ndate = { enabled = true }\n", "ok" end,
 			}
 			local state, status = helpers.load_with_stubs("infra.preferences").load("/dynamic/config.toml")

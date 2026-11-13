@@ -171,7 +171,7 @@ end
 M._now_ms = function() return Monotonic.now_ms() end
 M._defer = function(fn) return TimerScheduler.after(0, fn).fired ~= true end
 M._read_file = function(path)
-	local file = require("infra.regular_file_reader").open_source(path)
+	local file = require("core.fs.engine.regular_file_reader").open_source(path)
 	return read_bounded(file, MAX_SETTINGS_BYTES, true)
 end
 -- The account home only: a server's settings file is never looked for in the

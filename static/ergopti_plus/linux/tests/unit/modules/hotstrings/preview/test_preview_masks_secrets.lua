@@ -228,7 +228,7 @@ end)
 --- a reveal on one platform and a blank on another are not the same check.
 helpers.describe("preview masking: the shared cross-driver vectors", function()
 
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local Reader = require("core.text.engine.toml_codec")
 	local Fields = helpers.load_module("infra.personal_info_fields")
 

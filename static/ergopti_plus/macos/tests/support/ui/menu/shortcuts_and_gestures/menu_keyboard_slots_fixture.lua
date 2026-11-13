@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local MODULES = {
-	"adapters.file_system", "adapters.hotkey_registrar", "infra.config_paths",
+	"core.fs.adapters.file_system", "adapters.hotkey_registrar", "infra.config_paths",
 	"infra.preferences", "infra.deferred_work", "infra.dialog_util", "infra.logger",
 	"modules.shortcuts", "modules.shortcuts.bindings", "modules.shortcuts.keyboard_shortcuts",
 	"modules.shortcuts.tap_keys", "modules.shortcuts.script_control", "modules.gestures.actions",
@@ -82,7 +82,7 @@ end
 --- whether a webview opens.
 --- @return table ui, table shortcuts, table picker
 local function fresh()
-	local files = helpers.load_with_stubs("adapters.file_system")
+	local files = helpers.load_with_stubs("core.fs.adapters.file_system")
 	local read_resource = files.read_with_status
 	local persisted = {}
 	require("tests.support.keyboard_config_fixture").install(persisted)

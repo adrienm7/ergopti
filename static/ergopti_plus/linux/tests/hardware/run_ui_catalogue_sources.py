@@ -10,7 +10,7 @@ import tempfile
 
 WORKER = r"""
 require("core.lifecycle.engine.compat.utf8").install()
-local paths = require("infra.paths")
+local paths = require("core.fs.engine.paths")
 local original = paths.shared
 local kind, endpoint = os.getenv("UI_SOURCE_KIND"), os.getenv("UI_SOURCE_PATH")
 local target = kind == "catalogue" and require("onboarding.engine.answers").CATALOGUE_PATH

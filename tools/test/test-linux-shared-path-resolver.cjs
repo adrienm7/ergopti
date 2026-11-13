@@ -36,7 +36,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
-const RESOLVER = path.join(DRIVER, 'infra', 'paths.lua');
+const RESOLVER = path.join(DRIVER, 'core', 'fs', 'engine', 'paths.lua');
 
 /** Every production Lua file in the Linux driver. */
 function walk(dir, acc = []) {
@@ -56,7 +56,7 @@ const errors = [];
 
 if (!fs.existsSync(RESOLVER)) {
 	errors.push(
-		'linux/infra/paths.lua is missing — every module would go back to counting ".." itself'
+		'linux/core/fs/engine/paths.lua is missing — every module would go back to counting ".." itself'
 	);
 }
 
@@ -112,7 +112,7 @@ for (const abs of files) {
 		const hit = HARDCODED.find((h) => h.re.test(line));
 		if (!hit) return;
 		errors.push(
-			`${rel}:${i + 1}: derives the shared tree by ${hit.why} — require("infra.paths") and ` +
+			`${rel}:${i + 1}: derives the shared tree by ${hit.why} — require("core.fs.engine.paths") and ` +
 				'call Paths.shared(…). A per-file depth cannot be verified, and a wrong one degrades ' +
 				'silently: this is how the language menu came to offer 2 locales of 21, and how every ' +
 				'installed package came to read its timings from /usr/_shared.'

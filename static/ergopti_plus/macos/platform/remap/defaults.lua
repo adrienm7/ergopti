@@ -59,7 +59,7 @@ local READER_ARTIFACT_KEYS = { description = true, entries = true }
 --- module on the same un-pcall'd load path this comment is about.
 --- @return string Absolute path to the shared tap-hold defaults TOML.
 local function shared_defaults_path()
-	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	if ok_paths and type(Paths) == "table" and type(Paths.shared) == "function" then
 		local resolved = Paths.shared("tap_hold/data/defaults.toml")
 		if type(resolved) == "string" and resolved ~= "" then return resolved end

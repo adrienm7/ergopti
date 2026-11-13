@@ -19,7 +19,7 @@ FOLDER = tomllib.loads(APP_DIRS.read_text(encoding="utf-8"))["app"]["linux_folde
 
 
 WORKER = r"""
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 assert(Storage.get("value", "default") == "default")
 local recovery = assert(Storage.recovery_status())
 if os.getenv("ERGOPTI_NATIVE_BACKUP_REFUSE") == "true" then

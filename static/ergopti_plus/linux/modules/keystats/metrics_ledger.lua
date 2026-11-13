@@ -504,8 +504,8 @@ end
 --- The file ports the daemon gives the exporter and the identity resolver.
 --- @return table ports { read_with_status, write, write_new, append, mkdir, size, rename, list, read }
 function M.native_ports()
-	local FileSystem = require("adapters.file_system")
-	local NativeDirectory = require("infra.native_directory")
+	local FileSystem = require("core.fs.adapters.file_system")
+	local NativeDirectory = require("core.fs.engine.native_directory")
 	local uv = require("luv")
 	local shell_quote = require("core.text.engine.utils_core").shell_quote
 	local ports = { write = FileSystem.write, write_new = FileSystem.write_new, append = FileSystem.append }

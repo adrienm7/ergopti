@@ -39,7 +39,7 @@ local TAP_HOLD_PLATFORM = { macos = "hs", linux = "linux" }
 --- The generated catalogue text, read through the driver's own path owner.
 --- @return string
 local function catalogue_text()
-	local path = require("infra.paths").shared(Answers.CATALOGUE_PATH)
+	local path = require("core.fs.engine.paths").shared(Answers.CATALOGUE_PATH)
 	local fh = assert(io.open(path, "r"), "the onboarding catalogue is missing: " .. tostring(path))
 	local text = fh:read("*a")
 	fh:close()
@@ -142,7 +142,7 @@ function M.register(helpers, opts)
 
 		helpers.it("names this engine's tap-hold keys, never as configuration paths", function()
 			local catalogue = require("tap_hold.engine.key_catalog").load(
-				require("infra.paths").shared("tap_hold/data/defaults.toml"), TAP_HOLD_PLATFORM[driver])
+				require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), TAP_HOLD_PLATFORM[driver])
 			local engine_keys = {}
 			for _, key in ipairs(catalogue) do engine_keys[key.id] = true end
 			local count = 0

@@ -148,7 +148,7 @@ helpers.describe("meta: hs.fs.dir is always consumed by a generic-for (init-fsdi
 	-- extensions folder did not exist. infra/fs_dir.entries() is the only form that
 	-- is both state-correct AND throw-safe, and it is now the only form in the
 	-- tree — so the guard can demand it rather than merely tolerate the weaker one.
-	helpers.it("no driver file outside infra/fs_dir.lua references hs.fs.dir directly", function()
+	helpers.it("no driver file outside core/fs/engine/dir.lua references hs.fs.dir directly", function()
 		local direct = {}
 		for _, path in ipairs(files) do
 			if not path:find("fs_dir", 1, true) then
@@ -188,11 +188,11 @@ helpers.describe("infra/fs_dir: hs.fs.dir iteration is pcall-protected (init-fsd
 	helpers.it("fs_dir.entries wraps an hs.fs.dir loop in pcall so a bad directory cannot abort boot", function()
 		-- The blessed wrapper (formerly the inline safe_dir_entries in init.lua) now
 		-- lives in infra/fs_dir; init.lua and the hotstrings config window both alias it
-		-- (`local safe_dir_entries = require("infra.fs_dir").entries`), so the protection
+		-- (`local safe_dir_entries = require("core.fs.engine.dir").entries`), so the protection
 		-- is enforced in exactly one place. A pcall'd closure that contains the
 		-- hs.fs.dir loop is the shape that both catches the throw AND preserves the
 		-- state object. `.` spans newlines in Lua patterns, so this matches across lines.
-		local code = strip_comments(assert(helpers.read_module_source("infra.fs_dir")))
+		local code = strip_comments(assert(helpers.read_module_source("core.fs.engine.dir")))
 		helpers.assert_true(
 			code:match("pcall%s*%(%s*function.-hs%.fs%.dir") ~= nil,
 			"infra/fs_dir.entries must iterate hs.fs.dir inside a pcall'd closure so an "

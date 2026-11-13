@@ -13,7 +13,7 @@ helpers.describe("hotstring priority overrides", function()
 		local previous_config = package.loaded["modules.hotstrings.hotstrings_config"]
 		local previous_paths = package.loaded["infra.config_paths"]
 		local previous_shell = package.loaded["adapters.shell_runner"]
-		local previous_storage = package.loaded["adapters.storage"]
+		local previous_storage = package.loaded["core.fs.adapters.storage"]
 		local previous_load_catalogue = Loader.load_catalogue
 		local previous_open = io.open
 		local previous_rename = os.rename
@@ -96,7 +96,7 @@ helpers.describe("hotstring priority overrides", function()
 
 		local release_source = helpers.route_source_through_stdio(override_path, true)
 		local ok, failure = xpcall(function()
-			package.loaded["adapters.storage"] = require("tests.fakes").storage()
+			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage()
 			package.loaded["infra.config_paths"] = {
 				config = function() return "/virtual-home/.config/ergopti" end,
 			}
@@ -282,7 +282,7 @@ helpers.describe("hotstring priority overrides", function()
 		os.remove(choice_path)
 		os.remove(choice_path .. ".tmp"); os.remove(helpers.stage_path(choice_path))
 		Loader.load_catalogue = previous_load_catalogue
-		package.loaded["adapters.storage"] = previous_storage
+		package.loaded["core.fs.adapters.storage"] = previous_storage
 		package.loaded["adapters.shell_runner"] = previous_shell
 		package.loaded["infra.config_paths"] = previous_paths
 		package.loaded["modules.hotstrings.hotstrings_config"] = previous_config
@@ -314,7 +314,7 @@ helpers.describe("hotstring override leaf ownership", function()
 		assert(assert(io.open(choices, "w")):close())
 		local old_config = package.loaded["modules.hotstrings.hotstrings_config"]
 		local old_open, old_rename, old_remove = io.open, os.rename, os.remove
-		local NativeWriter = require("infra.regular_file_writer")
+		local NativeWriter = require("core.fs.engine.regular_file_writer")
 		local old_stage = NativeWriter.open
 		local old_shell = package.loaded["adapters.shell_runner"]
 		local ok, failure = xpcall(function()
@@ -393,7 +393,7 @@ helpers.describe("hotstring override leaf ownership", function()
 	helpers.it("rechecks source after staging before acknowledging a public change", function()
 		with_owner(source, function(config, path, read, write, changes)
 			local cached = config.resolve("ext:future:pack", "literal.section")
-			local NativeWriter = require("infra.regular_file_writer")
+			local NativeWriter = require("core.fs.engine.regular_file_writer")
 			local old_stage, staged = NativeWriter.open, 0
 			local foreign = source .. "# Edit after staging.\n"
 			NativeWriter.open = function(name, mode)
@@ -494,7 +494,7 @@ helpers.describe("hotstring override leaf ownership", function()
 		for _, fault in ipairs({ "open", "write_nil", "write_false", "write_throw", "close", "rename" }) do
 			with_owner(source, function(config, path, read, _, changes)
 				local cached = config.resolve("ext:future:pack", "literal.section")
-				local NativeWriter = require("infra.regular_file_writer")
+				local NativeWriter = require("core.fs.engine.regular_file_writer")
 				local old_stage, old_rename, faults = NativeWriter.open, os.rename, 0
 				NativeWriter.open = function(name, mode)
 					if name ~= helpers.stage_path(path) or mode ~= "wx" then return old_stage(name, mode) end

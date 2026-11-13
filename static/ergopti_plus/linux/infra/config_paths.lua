@@ -4,7 +4,7 @@
 --- MODULE: Linux User-Directory Resolver
 --- DESCRIPTION:
 --- Single source of truth for the user's home, config and data directories,
---- mirroring the macOS infra/paths.lua config helpers.
+--- mirroring the macOS core/fs/engine/paths.lua config helpers.
 ---
 --- WHY THIS EXISTS:
 --- Fifteen files derived `$HOME` themselves, across nineteen call sites, with
@@ -129,7 +129,7 @@ end
 --- points at changes and cannot recurse through M.config().
 --- @return string Absolute path, no trailing slash.
 function M.get_config_dir()
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "core.fs.adapters.storage")
 	if not ok or type(Storage) ~= "table" or type(Storage.get) ~= "function" then
 		return M.default_config_dir()
 	end
@@ -180,7 +180,7 @@ function M.set_config_dir(path)
 	local normalized = normalize_config_override(path)
 	if normalized == nil then return false end
 
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "core.fs.adapters.storage")
 	if not ok or type(Storage) ~= "table" then return false end
 	if not prepare_config_directory(normalized) then return false end
 	local committed
@@ -298,7 +298,7 @@ end
 --- reload after the path editor saved a new folder needs no other hand-off.
 --- @return string Absolute path, no trailing slash.
 function M.get_logs_dir()
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "core.fs.adapters.storage")
 	if not ok or type(Storage) ~= "table" or type(Storage.get) ~= "function" then
 		return M.default_logs_dir()
 	end
@@ -315,7 +315,7 @@ end
 function M.set_logs_dir(path)
 	local normalized, err = M.normalize_logs_dir(path)
 	if normalized == nil then return false, err end
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "core.fs.adapters.storage")
 	if not ok or type(Storage) ~= "table" then return false, "bootstrap storage is unavailable" end
 	if normalized == "" or normalized == M.default_logs_dir() then
 		return type(Storage.delete) == "function"
@@ -342,7 +342,7 @@ function M.set_paths(config_dir, logs_dir)
 	end
 	append(CONFIG_DIR_STORAGE_KEY, config, M.default_config_dir())
 	if logs_dir ~= nil then append(LOGS_DIR_STORAGE_KEY, logs, M.default_logs_dir()) end
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "core.fs.adapters.storage")
 	if not ok or type(Storage) ~= "table" or type(Storage.set_many) ~= "function" then return false end
 	if not prepare_config_directory(config) then return false end
 	local called, saved = pcall(Storage.set_many, values, deletions)

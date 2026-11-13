@@ -18,8 +18,8 @@ local MODULES = {
 	"modules.llm.prompt_builder", "modules.llm.app_filter", "modules.llm.api_common",
 	"modules.llm.api_remote", "modules.llm.api_mlx", "modules.llm.api_ollama",
 	"modules.llm.profiles", "modules.keystats", "modules.shortcuts.script_control",
-	"modules.shortcuts.actions.screenshot_save", "adapters.file_system",
-	"adapters.json_codec", "adapters.storage", "core.events.timer_scheduler",
+	"modules.shortcuts.actions.screenshot_save", "core.fs.adapters.file_system",
+	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.events.timer_scheduler",
 	"adapters.mouse_control", "infra.logger", "infra.timings", "infra.keycodes",
 	"ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
 	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
@@ -29,7 +29,7 @@ local function with_capture(callback)
 	helpers.with_stub_scope(MODULES, function()
 		local f = { captures = {}, posts = {}, loading = 0, hidden = 0, notices = {}, ready = true, paused = false }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function(path)
 				local file = assert(io.open(path, "rb"))
 				local bytes = assert(file:read("*a"))
@@ -37,8 +37,8 @@ local function with_capture(callback)
 				return bytes
 			end,
 		}
-		package.loaded["adapters.json_codec"] = { decode = Json.decode }
-		package.loaded["adapters.storage"] = {
+		package.loaded["core.fs.adapters.json_codec"] = { decode = Json.decode }
+		package.loaded["core.fs.adapters.storage"] = {
 			-- The real adapter's read and write pair (api_remote's refused thinking fields)
 			get = function() return nil end,
 			read_exact = function() return true, nil end,

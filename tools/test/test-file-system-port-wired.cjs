@@ -61,6 +61,8 @@ const WINDOWS_OWNER = path.join(
 	'static',
 	'ergopti_plus',
 	'windows',
+	'core',
+	'fs',
 	'adapters',
 	'file_system.ahk'
 );

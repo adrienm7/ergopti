@@ -51,7 +51,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 	helpers.it("(ergopti-extension-selection) persists the actual replacement gate, reloads it and rolls back refusals", function()
 		helpers.with_stub_scope({ "modules.keymap", "modules.keymap.init", "modules.keymap.state",
 			"modules.keymap.utils", "modules.keymap.expander", "modules.keymap.llm_bridge",
-			"infra.extension_packs", "infra.preferences", "infra.i18n", "adapters.storage", "adapters.file_system" }, function()
+			"infra.extension_packs", "infra.preferences", "infra.i18n", "core.fs.adapters.storage", "core.fs.adapters.file_system" }, function()
 			package.loaded["modules.keymap.utils"] = setmetatable({
 				is_ignored_window = function() return false, 0 end,
 				is_secure_field = function() return false end,
@@ -72,7 +72,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 			package.loaded["infra.i18n"] = setmetatable({ build_language_menu_items = function() return {} end },
 				{ __index = require("infra.i18n") })
 			local FixtureFiles = require("tests.support.file_system_write_stub")
-			package.loaded["adapters.file_system"] = setmetatable({
+			package.loaded["core.fs.adapters.file_system"] = setmetatable({
 				read = function(path) return FixtureFiles.read_with_status(path) end,
 			}, { __index = FixtureFiles })
 			package.loaded["modules.hotstrings.hotstrings_config"] = {

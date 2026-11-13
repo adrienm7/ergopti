@@ -8,7 +8,7 @@ helpers.describe("section capture receipt admission", function()
 		helpers.it("refuses a " .. kind .. " capture before publishing an unchanged cohort", function()
 			local _, registry = Fixture.fresh_registry()
 			registry.register_lua_group("owned", "Owned", { { name = "section" } })
-			local storage = require("adapters.storage")
+			local storage = require("core.fs.adapters.storage")
 			local key = registry.section_setting_key("owned", "section")
 			helpers.assert_true(storage.set(key, true))
 			local original = storage.capture_owned

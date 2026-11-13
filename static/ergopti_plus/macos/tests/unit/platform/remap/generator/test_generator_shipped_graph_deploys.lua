@@ -51,8 +51,8 @@ local EXISTING_WITH_TWIN_PROFILES = [[{
 --- @param layout_id string|nil Explicit registered input source; fixtures normally select Ergopti.
 local function with_generator(existing, json_codec, run, locale_code, layout_id)
 	helpers.with_fresh_modules({
-		"adapters.file_system",
-		"adapters.json_codec",
+		"core.fs.adapters.file_system",
+		"core.fs.adapters.json_codec",
 		"infra.config_paths",
 		"infra.keycodes",
 		"infra.logger",
@@ -81,7 +81,7 @@ local function with_generator(existing, json_codec, run, locale_code, layout_id)
 		package.loaded["core.text.engine.toml_codec"] = toml_stub
 		package.loaded["infra.toml.codec"] = toml_stub
 		local file_state = { content = existing, writes = 0 }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = SourceFile.read,
 			read_with_status = function(path)
 				if path == KARABINER_OUT then
@@ -101,7 +101,7 @@ local function with_generator(existing, json_codec, run, locale_code, layout_id)
 				return true
 			end,
 		}
-		if json_codec then package.loaded["adapters.json_codec"] = json_codec end
+		if json_codec then package.loaded["core.fs.adapters.json_codec"] = json_codec end
 
 		package.loaded["modules.keymap.layout_registry"] = require("tests.support.active_layout_registry_fixture").new(
 			layout_id or "ergopti", layout_id == "ergol" and "ansi" or "iso")
@@ -166,7 +166,7 @@ helpers.describe("the shipped rule graph deploys (json-shared-tables)", function
 						helpers.assert_eq(by_id.alt_tab_apps.karabiner_to[1].key_code, "f17")
 						local generated, detail, legacy, context = build(env, preset, tap_holds, combinations)
 						helpers.assert_not_nil(generated, detail)
-						local source = require("adapters.json_codec").decode(EXISTING_WITH_TWIN_PROFILES)
+						local source = require("core.fs.adapters.json_codec").decode(EXISTING_WITH_TWIN_PROFILES)
 						local merged, merge_error, snapshot = env.Generator.merge_into_existing_config(
 							generated, KARABINER_OUT, legacy, context)
 						helpers.assert_not_nil(merged, merge_error)

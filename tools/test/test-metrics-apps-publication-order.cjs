@@ -262,8 +262,8 @@ require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,
  package.loaded['infra.dialog_util'].text_prompt=function() return 'button.ok','1' end
  local saved='{}'
  package.loaded['hs.json'].decode=json.decode
- package.loaded['adapters.file_system'].read_with_status=function() return saved,'ok' end
- package.loaded['adapters.file_system'].write_if_unchanged=function(_,content)
+ package.loaded['core.fs.adapters.file_system'].read_with_status=function() return saved,'ok' end
+ package.loaded['core.fs.adapters.file_system'].write_if_unchanged=function(_,content)
   saved=content
   return true
  end
@@ -309,7 +309,7 @@ require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,
   dashboard._app_icon_cache[name]='data:image/png;base64,'..name
  end
  local saved=json.encode(categories)
- local files=package.loaded['adapters.file_system']
+ local files=package.loaded['core.fs.adapters.file_system']
  files.read_with_status=function() return saved,'ok' end
  files.write_if_unchanged=function(_,content) saved=content; return true end
  package.loaded['modules.keystats.sqlite_reader'].read_manifest=function()

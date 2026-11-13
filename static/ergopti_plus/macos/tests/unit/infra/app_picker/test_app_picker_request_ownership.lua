@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"infra.app_picker",
 	"adapters.shell_runner",
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"infra.i18n",
 	"infra.logger",
 	"infra.text_utils",
@@ -38,7 +38,7 @@ local function with_picker(run, options)
 				return { start = function() return true end }
 			end,
 		}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			directory_status = function(path)
 				if path == "/Applications" or path == "/System/Applications" then
 					return "present", { mode = "directory" }

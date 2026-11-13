@@ -303,11 +303,11 @@ end
 --- @param virtual boolean|nil True when no file exists on disk at that path.
 --- @return function restore Reinstates the native admission.
 function M.route_source_through_stdio(path, virtual)
-	local Reader = require("infra.regular_file_reader")
+	local Reader = require("core.fs.engine.regular_file_reader")
 	local native = Reader.open
 	local Writer, native_write
 	if virtual then
-		Writer = require("infra.regular_file_writer"); native_write = Writer.open
+		Writer = require("core.fs.engine.regular_file_writer"); native_write = Writer.open
 		Writer.open = function(candidate, mode)
 			if candidate ~= M.stage_path(path) or mode ~= "wx" then return native_write(candidate, mode) end
 			local stream, detail, errno = io.open(candidate, "w")

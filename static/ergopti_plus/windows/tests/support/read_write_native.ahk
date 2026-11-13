@@ -5,7 +5,7 @@
 #Warn All, StdOut
 #Warn VarUnset, Off
 #Include infra/file_read_activity.ahk
-#Include adapters/file_system.ahk
+#Include core/fs/adapters/file_system.ahk
 #Include infra/config_write_lease.ahk
 
 global _RW_State := 0

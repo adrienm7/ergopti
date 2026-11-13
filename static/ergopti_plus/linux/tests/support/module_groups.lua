@@ -50,8 +50,8 @@ M.GROUPS = {
 		"tests/unit/platform/remap/tap_hold/test_tap_hold_integration.lua",
 	} },
 	{ name = "meta", prefixes = { "tests/meta/" } },
-	{ name = "core", prefixes = { "tests/unit/adapters/", "tests/unit/platform/" } },
-	{ name = "infra", prefixes = { "tests/unit/infra/" } },
+	{ name = "core", prefixes = { "tests/unit/", "tests/unit/platform/" } },
+	{ name = "infra", prefixes = { "tests/unit/" } },
 	{ name = "input", prefixes = {
 		"tests/unit/modules/hotstrings/",
 		"tests/unit/modules/dynamic_hotstrings/",

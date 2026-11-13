@@ -142,4 +142,4 @@ for _, adapter_name in ipairs(ADAPTERS_UNDER_TEST) do
 end
 
 require("tests.lua.core_fs.file_system_ports_contract").register(helpers, "macos", 8,
-	function() return helpers.load_with_stubs("adapters.file_system") end)
+	function() return helpers.load_with_stubs("core.fs.adapters.file_system") end)

@@ -24,9 +24,9 @@ ORIGINAL = '{"preserve":"original"}'
 WORKER = r"""
 local baseline = os.getenv("ERGOPTI_STORAGE_BASELINE")
 if baseline then
-	package.preload["adapters.storage"] = function() return assert(loadfile(baseline))() end
+	package.preload["core.fs.adapters.storage"] = function() return assert(loadfile(baseline))() end
 end
-local S = require("adapters.storage")
+local S = require("core.fs.adapters.storage")
 local regular = os.getenv("ERGOPTI_STORAGE_REGULAR") == "yes"
 assert(S.get("preserve", "default") == (regular and "original" or "default"))
 local operation = os.getenv("ERGOPTI_STORAGE_OPERATION")

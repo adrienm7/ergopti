@@ -65,7 +65,7 @@ local function managed_service(executable, port, log_dir)
 	local candidate, budgets = Binary.native_candidate()
 	if executable ~= candidate then return nil, "managed runtime selection is unavailable" end
 	local Python = require("modules.llm.managed_native_python")
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local python = Python.resolve()
 	local source = debug.getinfo(1, "S").source:sub(2)
 	local driver = source:match("^(.*)/modules/llm/ollama_server_command%.lua$")

@@ -18,7 +18,7 @@ local function fixture(body)
 		package.loaded["ui.webview_controller_pool"] = nil
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.paths"] = { shared = function() return "/controlled/shared" end }
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "/controlled/shared" end }
 		package.loaded["infra.timings"] = Timings
 		package.loaded["adapters.program_providers"] = { create = function()
 			local owner = { resolutions = 0, invalidations = 0, retired = false }

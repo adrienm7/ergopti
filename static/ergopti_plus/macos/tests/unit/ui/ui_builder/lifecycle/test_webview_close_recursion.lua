@@ -12,7 +12,7 @@ require("core.logger.engine")
 
 local function with_windows(scenario)
 	helpers.with_stub_scope({ "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "infra.logger",
-		"adapters.json_codec", "core.events.timer_scheduler", "infra.locale", "core.text.engine.json", "core.i18n.engine.core",
+		"core.fs.adapters.json_codec", "core.events.timer_scheduler", "infra.locale", "core.text.engine.json", "core.i18n.engine.core",
 		"core.ui.engine.webview.i18n_seed", "core.ui.engine.webview.presentation", "core.ui.engine.window_titles",
 		"tests.support.webview_recursive_close_fixture" }, function()
 		local h = { windows = {}, retained = {}, deferred = {}, errors = {}, notification_depth = 0, closed = 0 }

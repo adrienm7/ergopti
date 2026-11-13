@@ -12,10 +12,10 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"modules.llm.api_mlx_inference", "modules.llm.api_ollama", "modules.llm.api_common",
 	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
-	"adapters.shell_runner", "core.events.timer_scheduler", "adapters.http_client", "adapters.file_system",
+	"adapters.shell_runner", "core.events.timer_scheduler", "adapters.http_client", "core.fs.adapters.file_system",
 	"infra.logger", "infra.notifications", "infra.timings", "infra.text_utils",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
-	"adapters.json_codec", "adapters.storage", "core.lifecycle.engine.compat.utf8", "infra.toml.reader", "core.text.engine.json",
+	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.lifecycle.engine.compat.utf8", "infra.toml.reader", "core.text.engine.json",
 	"ai.engine.api.parser_core", "core.logger.engine", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
 	"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 	"adapters.managed_ollama_daemon", "adapters.owned_program_runner", "core.fs.engine.app_dirs", "settings.engine.publication.defaults",
@@ -39,7 +39,7 @@ local function with_stream(backend, callback)
 		-- Transport, scheduling, metrics and diagnostic boundaries are irrelevant
 		-- until the real request path admits its payload. Keep those ports local.
 		package.loaded["modules.keystats"] = {}
-		package.loaded["adapters.file_system"] = { exists = function(path)
+		package.loaded["core.fs.adapters.file_system"] = { exists = function(path)
 			local file = io.open(path, "rb"); if not file then return false end
 			assert(file:close()); return true
 		end, read = function(path)
@@ -80,7 +80,7 @@ local function with_stream(backend, callback)
 			h.removed[path] = true
 			return remove(path)
 		end
-		local filesystem = package.loaded["adapters.file_system"]
+		local filesystem = package.loaded["core.fs.adapters.file_system"]
 		filesystem.remove_exact = function(path)
 			local removed, detail = os.remove(path)
 			return removed == true, detail

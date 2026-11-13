@@ -292,7 +292,7 @@ end
 --- @param label string Diagnostic label.
 --- @return any value
 local function decode_or_fail(text, label)
-	local value, decode_err = require("adapters.json_codec").decode(text)
+	local value, decode_err = require("core.fs.adapters.json_codec").decode(text)
 	if decode_err ~= nil then
 		error({ scan_error = label .. " does not decode: " .. tostring(decode_err) }, 0)
 	end
@@ -427,7 +427,7 @@ function M.remove_managed_rules(karabiner_out)
 		Logger.error(LOG, "Managed-rule removal refused: the karabiner.json path is not resolved.")
 		return false, "karabiner.json path is not resolved", 0
 	end
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local raw, status, read_detail = FileSystem.read_with_status(karabiner_out)
 	if status == "absent" then
 		Logger.success(LOG, "No karabiner.json at '%s' — no ErgoptiPlus rule to remove.", karabiner_out)
@@ -518,7 +518,7 @@ function M.remove_legacy_rules(karabiner_out, legacy_context)
 	if type(legacy_context) ~= "table" then
 		return refuse("the legacy migration context is missing")
 	end
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local raw, status, read_detail = FileSystem.read_with_status(karabiner_out)
 	if status == "absent" then
 		Logger.success(LOG, "No karabiner.json at '%s' — no legacy ErgoptiPlus rule to remove.", karabiner_out)
@@ -529,7 +529,7 @@ function M.remove_legacy_rules(karabiner_out, legacy_context)
 	end
 
 	-- A tree, like the merge's: classification must see the file the merge sees.
-	local tree, decode_err = require("adapters.json_codec").decode(raw)
+	local tree, decode_err = require("core.fs.adapters.json_codec").decode(raw)
 	if decode_err ~= nil or type(tree) ~= "table" then
 		return refuse("karabiner.json is not valid JSON: " .. tostring(decode_err or "not an object"))
 	end

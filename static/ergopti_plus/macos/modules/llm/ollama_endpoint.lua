@@ -15,7 +15,7 @@
 local M = {}
 
 local Logger  = require("infra.logger")
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 
 local LOG = "llm.ollama_endpoint"
 local HOST = "127.0.0.1"

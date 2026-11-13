@@ -406,7 +406,7 @@ function receivingNetworkSource(fixturePolicy) {
 		// The shared origin inventory is read by its suffix: the copied driver root has no _shared sibling.
 		// This exact existence port also keeps Git Bash paths independent of
 		// the host Lua file-name convention. No NetworkEnv method is replaced.
-		`package.loaded["adapters.file_system"] = { exists = function(p) return p == ${luaString(shellPath(managedReceiver))} end,
+		`package.loaded["core.fs.adapters.file_system"] = { exists = function(p) return p == ${luaString(shellPath(managedReceiver))} end,
 			read_with_status = function(p) if p:match("/core/network/data/route_origins%.json$") then return ${luaString(fs.readFileSync(path.join(root, 'static/ergopti_plus/_shared/core/network/data/route_origins.json'), 'utf8'))}, "ok" end return nil, "missing" end }`,
 		`local Network = assert(load(${luaString(networkSource)}, ${luaString('@' + shellPath(managedRoot) + '/modules/llm/network_env.lua')}))()`,
 		`Network.policy_path = function() return ${luaString(shellPath(fixturePolicy))} end`,
@@ -418,7 +418,7 @@ function emittedOwners(fixturePolicy, python, binary) {
 	const shared = path.join(root, 'static/ergopti_plus/_shared').replace(/\\/g, '/');
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
-		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
+		'package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		...receivingNetworkSource(fixturePolicy),
 		`local packet = require("tests.support.opaque_network_owner_fixture").capture(Network, ${luaString(shellPath(python))}, ${luaString(shellPath(binary))}, receiver)`,
 		'io.write(require("core.text.engine.json").encode(packet))'
@@ -438,7 +438,7 @@ function receiveOwners(fixturePolicy, bytes, code, mode, owner) {
 	const shared = path.join(root, 'static/ergopti_plus/_shared').replace(/\\/g, '/');
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
-		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
+		'package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		...receivingNetworkSource(fixturePolicy),
 		`local bytes = require("core.text.engine.json").decode(${luaString(JSON.stringify(bytes))})`,
 		`local result = require("tests.support.opaque_network_owner_fixture").receive(Network, bytes, ${code}, ${mode ? luaString(mode) : 'nil'}, receiver, ${owner ? luaString(owner) : 'nil'})`,
@@ -459,7 +459,7 @@ function receivePhase(chunks, code) {
 	const shared = path.join(root, 'static/ergopti_plus/_shared').replace(/\\/g, '/');
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
-		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
+		'package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		'local Json = require("core.text.engine.json")',
 		`local chunks = Json.decode(${luaString(JSON.stringify(chunks))})`,
 		'local phase = require("modules.llm.opaque_network_admission").new()',
@@ -511,9 +511,9 @@ function emittedBootstrapPrelude(fixturePolicy, ownerRoot, interpreter) {
 	const admitted = fs.existsSync(receiver) ? [owner + '/platform/network/native_http.py'] : [];
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
-		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
+		'package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		`local admitted = ${luaStringArray(admitted)}`,
-		'package.loaded["adapters.file_system"] = { exists = function(p) for _, v in ipairs(admitted) do if p == v then return true end end return false end }',
+		'package.loaded["core.fs.adapters.file_system"] = { exists = function(p) for _, v in ipairs(admitted) do if p == v then return true end end return false end }',
 		`local Network = assert(load(${luaString(networkSource)}, ${luaString('@' + owner + '/modules/llm/network_env.lua')}))()`,
 		`Network.policy_path = function() return ${luaString(shellPath(fixturePolicy))} end`,
 		`local prelude, detail = Network.bootstrap_prelude("BOOTSTRAP", ${luaString(shellPath(interpreter))})`,
@@ -534,7 +534,7 @@ function emittedPrelude(fixturePolicy) {
 	const shared = path.join(root, 'static/ergopti_plus/_shared').replace(/\\/g, '/');
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
-		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
+		'package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		`local Network = assert(loadfile(${luaString(`${macos}/modules/llm/network_env.lua`)}))()`,
 		`Network.policy_path = function() return ${luaString(shellPath(fixturePolicy))} end`,
 		'local prelude, detail = Network.opaque_prelude("TEST")',
@@ -555,7 +555,7 @@ function emittedManagedPrelude(fixturePolicy) {
 	const shared = path.join(root, 'static/ergopti_plus/_shared').replace(/\\/g, '/');
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
-		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
+		'package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		...receivingNetworkSource(fixturePolicy),
 		'local prelude, detail = Network.managed_http_prelude("MLX")',
 		'assert(prelude, detail); io.write(prelude)'

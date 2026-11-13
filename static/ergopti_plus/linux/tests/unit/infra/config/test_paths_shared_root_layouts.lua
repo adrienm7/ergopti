@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: The Resolver Finds The Shared Tree In Both Shipped Layouts
 --- DESCRIPTION:
---- infra/paths.lua answers exactly one question — where is `_shared`? — and
+--- core/fs/engine/paths.lua answers exactly one question — where is `_shared`? — and
 --- every locale, keycode table, hotstring pack, tooltip config and defaults file
 --- the driver reads is built on that answer. This pins it against BOTH layouts
 --- that actually ship.
@@ -32,7 +32,7 @@
 --- The resolver locates itself with debug.getinfo on its own file and then opens
 --- a real file to decide. Stubbing io.open would test the stub's idea of the
 --- layout — which is precisely the assumption that was wrong. So each case
---- copies the real infra/paths.lua into a throwaway root, exactly as an
+--- copies the real core/fs/engine/paths.lua into a throwaway root, exactly as an
 --- installed package relocates it, writes the file the probe looks for, and
 --- loads that copy. The copy is also the seam: a freshly loaded chunk carries
 --- its own memo cell, so the module needs no production reset hook.
@@ -43,7 +43,7 @@ local helpers = require("tests.helpers")
 local ok_lfs, lfs = pcall(require, "lfs")
 
 -- The one file a candidate directory must carry to BE the shared tree. It
--- mirrors SHARED_PROBE_FILE in infra/paths.lua; a fixture carrying anything else
+-- mirrors SHARED_PROBE_FILE in core/fs/engine/paths.lua; a fixture carrying anything else
 -- would prove nothing about what the resolver actually looks for.
 local PROBE_REL = "core/i18n/data/locales/en.json"
 -- The folders of the probe path, outermost first: the fixture follows the
@@ -132,12 +132,12 @@ local function write_probe(shared_dir)
 	return true
 end
 
---- Absolute path of the real infra/paths.lua, asked of Lua rather than written
+--- Absolute path of the real core/fs/engine/paths.lua, asked of Lua rather than written
 --- down: deriving it from the loaded function keeps this test attached to the
 --- resolver across a `git mv` instead of breaking on a stale string.
 --- @return string Absolute path with forward slashes.
 local function resolver_source()
-	local Paths = helpers.load_module("infra.paths")
+	local Paths = helpers.load_module("core.fs.engine.paths")
 	local src = debug.getinfo(Paths.shared_root, "S").source
 	if src:sub(1, 1) == "@" then src = src:sub(2) end
 	return (src:gsub("\\", "/"))
@@ -153,7 +153,7 @@ helpers.describe("native current-directory receipts", function()
 	}
 	for number, case in ipairs(cases) do
 		helpers.it("linux-native-cwd: ignores stale PWD and checks cwd receipt " .. number, function()
-			local Paths = helpers.load_module("infra.paths")
+			local Paths = helpers.load_module("core.fs.engine.paths")
 			local real_ffi, real_uv = package.loaded.ffi, package.loaded.luv
 			local real_getenv, real_popen = os.getenv, io.popen
 			package.loaded.ffi = { os = "Windows" }
@@ -209,8 +209,8 @@ local function stage(case, layout)
 	local root = base .. "/ergopti"
 	mkdir_chain(FIXTURE_BASE, case, "ergopti", "infra")
 
-	if not copy_file(resolver_source(), root .. "/infra/paths.lua") then
-		error("could not stage a copy of infra/paths.lua under " .. root, 0)
+	if not copy_file(resolver_source(), root .. "/core/fs/engine/paths.lua") then
+		error("could not stage a copy of core/fs/engine/paths.lua under " .. root, 0)
 	end
 
 	local staged = {}
@@ -222,7 +222,7 @@ local function stage(case, layout)
 		end
 	end
 
-	local chunk, err = loadfile(root .. "/infra/paths.lua")
+	local chunk, err = loadfile(root .. "/core/fs/engine/paths.lua")
 	if not chunk then error("could not load the staged resolver — " .. tostring(err), 0) end
 	return chunk(), root, staged
 end
@@ -255,7 +255,7 @@ local function unstage(root, staged)
 		end
 		rmdir_one(dir)
 	end
-	os.remove(root .. "/infra/paths.lua")
+	os.remove(root .. "/core/fs/engine/paths.lua")
 	rmdir_one(root .. "/infra")
 	rmdir_one(root)
 	rmdir_one(root:match("^(.*)/[^/]+$") or root)
@@ -271,7 +271,7 @@ end
 -- ===============================================
 -- ===============================================
 
-helpers.describe("infra.paths: shared_root resolves both shipped layouts", function()
+helpers.describe("core.fs.engine.paths: shared_root resolves both shipped layouts", function()
 
 	helpers.it("finds the tree beside the driver — the checkout and the tarball", function()
 		local Paths, root, staged = stage("checkout", "sibling")
@@ -343,7 +343,7 @@ end)
 -- ==========================================
 -- ==========================================
 
-helpers.describe("infra.paths: an unresolvable tree is named, not guessed", function()
+helpers.describe("core.fs.engine.paths: an unresolvable tree is named, not guessed", function()
 
 	helpers.it("returns nil and reports both candidates when neither carries the tree", function()
 		local logger = require("core.logger.engine.shim")
@@ -384,7 +384,7 @@ end)
 -- ============================================
 -- ============================================
 
-helpers.describe("infra.paths: the resolved root is memoised", function()
+helpers.describe("core.fs.engine.paths: the resolved root is memoised", function()
 
 	helpers.it("resolves once and keeps the answer", function()
 		local Paths, root, staged = stage("memoised", "sibling")
@@ -412,7 +412,7 @@ rmdir_one(FIXTURE_BASE)
 helpers.describe("paths: the driver root is absolute", function()
 	helpers.it("linux-path-root-cwd: anchors the current directory at filesystem root", function()
 		if package.config:sub(1, 1) == "\\" then return end
-		local Paths, uv = helpers.load_module("infra.paths"), require("luv")
+		local Paths, uv = helpers.load_module("core.fs.engine.paths"), require("luv")
 		local previous = assert(uv.cwd())
 		assert(uv.chdir("/"))
 		local ok, root, child = pcall(function() return Paths._absolute_for_test("."), Paths._absolute_for_test("./child") end)
@@ -424,11 +424,11 @@ helpers.describe("paths: the driver root is absolute", function()
 
 	helpers.it("even when the modules load through a relative package.path", function()
 		-- The test runner and a checkout launch (`luajit ergopti_hotstrings.lua`)
-		-- both load infra/paths.lua as "./infra/paths.lua". The root it derived
+		-- both load core/fs/engine/paths.lua as "./infra/paths.lua". The root it derived
 		-- was then "." and every path built on it — the tray icon handed to the
 		-- panel, pages handed to WebKit — resolved in the OTHER process's
 		-- working directory, i.e. nowhere.
-		local Paths = helpers.load_module("infra.paths")
+		local Paths = helpers.load_module("core.fs.engine.paths")
 		for _, relative in ipairs({ ".", "./linux", "linux/sub" }) do
 			local anchored = Paths._absolute_for_test(relative)
 			helpers.assert_true(anchored:sub(1, 1) == "/" or anchored:match("^%a:/") ~= nil,
@@ -451,7 +451,7 @@ helpers.describe("paths: the driver root is absolute", function()
 		-- is opened from. On Windows the working directory came back from the
 		-- Git userland's pwd as "/d/...", which this process resolves as
 		-- "D:\d\...", so the daemon started from a checkout found no shared tree.
-		local Paths = helpers.load_module("infra.paths")
+		local Paths = helpers.load_module("core.fs.engine.paths")
 		local name = string.format("ergopti-cwd-probe-%d-%d.tmp", os.time(), math.random(1, 1000000))
 		local probe = assert(io.open(name, "w"))
 		probe:close()

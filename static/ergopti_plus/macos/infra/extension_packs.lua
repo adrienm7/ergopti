@@ -61,8 +61,8 @@ local _routes = nil
 --- @param kind string Expected attribute mode, "directory" or "file".
 --- @return table Sorted absolute paths.
 local function children(path, kind)
-	local FsDir = require("infra.fs_dir")
-	local FileSystem = require("adapters.file_system")
+	local FsDir = require("core.fs.engine.dir")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local ok_root, root_attributes = pcall(hs.fs.attributes, path)
 	if not ok_root then error("Extension directory inspection did not commit", 0) end
 	if root_attributes == nil then
@@ -103,7 +103,7 @@ end
 --- @param path string Manifest path.
 --- @return string|nil Contents, or nil when the pack ships no manifest.
 local function read_manifest(path)
-	local content, status = require("adapters.file_system").read_with_status(path)
+	local content, status = require("core.fs.adapters.file_system").read_with_status(path)
 	if status == "absent" then return nil end
 	if status ~= "ok" or type(content) ~= "string" then
 		error("Extension manifest read did not commit", 0)
@@ -126,7 +126,7 @@ end
 --- installed by shipping (layouts/extension.shipped_root).
 --- @return table Absolute extension roots, and the shipped { pack = dir } root.
 function M.roots()
-	local shared = require("infra.paths").shared_root()
+	local shared = require("core.fs.engine.paths").shared_root()
 	if not shared then error("The shared extension directory cannot be resolved", 0) end
 	local LayoutRegistry = require("modules.keymap.layout_registry")
 	local roots = { shared .. "/../extensions" }
