@@ -24,6 +24,17 @@ return function(helpers, json, shared_root)
 			helpers.assert_eq(names, VECTORS.fields)
 		end)
 
+		helpers.it("redacts values before encoding, so no JSON escape is cut", function()
+			-- A path-segment redactor of the drivers' shape: it replaced the
+			-- `n2026-…` after an encoded `\n` and left an invalid `\<name>`.
+			local function redact(text) return (text:gsub("/[^/%s]+", "/<name>")) end
+			local record = CrashReport.build({ log_tail = "ready: /tmp/a/b\n2026-11-13 next line" })
+			local document = CrashReport.encode(assert(CrashReport.redact(record, redact)))
+			local decoded = assert(json.decode(document), document)
+			helpers.assert_eq(decoded.log_tail, "ready: /<name>/<name>/<name>\n2026-11-13 next line")
+			helpers.assert_nil(CrashReport.redact(record, function() return nil end))
+		end)
+
 		helpers.it("derives the file stem from the UTC timestamp", function()
 			for _, vector in ipairs(VECTORS.stems) do
 				helpers.assert_eq(CrashReport.stem(vector.timestamp), vector.stem)

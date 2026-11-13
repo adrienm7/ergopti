@@ -97,6 +97,27 @@ function M.build(fields)
 	return record
 end
 
+--- Redacts every value of a built record before it is encoded.
+---
+--- The redactor works on plain text. Run over the encoded document it read
+--- the JSON escape of a log tail's newline as the start of a path segment and
+--- replaced `\n2026-11-13` with `\<name>`, leaving an invalid escape that
+--- made the whole report unreadable; on the values, there is no escape to cut.
+--- @param record table From M.build.
+--- @param redact function Text → redacted text, or nil when it cannot answer.
+--- @return table|nil redacted A fresh record, or nil when any value was refused.
+function M.redact(record, redact)
+	assert(type(record) == "table", "a crash report needs its record")
+	assert(type(redact) == "function", "a crash report needs its redactor")
+	local redacted = {}
+	for _, field in ipairs(M.FIELDS) do
+		local value = redact(record[field[1]])
+		if type(value) ~= "string" then return nil end
+		redacted[field[1]] = value
+	end
+	return redacted
+end
+
 --- Serialises a built record as the report document.
 --- @param record table From M.build.
 --- @return string json Pretty JSON object, no trailing newline.
