@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 17:15)
+## Where things stand (2026-11-13, 22:40)
 
 - Branch: `claude/ergopti-todo-structure-phase2-night`, fast-forward only,
   rebased on dev `42f8c1327`. Never merge dev into a branch: rebase it, so
@@ -14,6 +14,34 @@ same commit as each step or checkpoint. Times are Paris time.
 - Steps landed on dev: S01+S02 (dev `520bb24c8..42f8c1327`, landed by the
   coordinator, its two flaky reds accepted). Next block: S03–S05, built on
   the night branch.
+- S03–S05, proof 16 (run 43481259457): reds beyond the baseline in 7 Common
+  JS jobs, Windows unit core and meta, Linux E2E network-ai. Local triage
+  (full JS suite and both Lua suites against the night tip, which matches the
+  baseline exactly) found these causes, all fixed on the night branch:
+  - tools that name their driver as `path.join(root, 'macos')`, a variable
+    driver piece, a single driver, a regex-escaped module or a
+    `rawget(<alias>, "a.b")` key (`f0501dbc`, `325e8497`, `5a2605ef`,
+    `20195e69`, `5f420497`); Lua tools proved by their requires
+    (`1b5bfed2`); module prefixes completed by test helpers refused
+    (`902adaa3`);
+  - folder-gain lists written one element per line or as `(?:a|b)`
+    (`abd4e8c4`, `5d9ce9e2`); fixture mkdir ladders (`e269c4a3`);
+  - an included AutoHotkey test's `A_ScriptDir . "\..\x"` climbs from
+    windows/tests (`8ac047d6`);
+  - listed edits for synthetic or piece-wise paths: config migration vectors,
+    path resolver source and folder chain, hs.fs.dir wrapper, port wiring join,
+    locale layouts, input probe includes, i18n boot folder, network runtime
+    tree, OS-purity exemption (`82519f95`, `0d741678`, `4ca11e1d`, `13f0012f`,
+    `ef39e799`, `bcc05405`, `eadf5853`, `968a7315`, `00fb8335`, `c6901bc1`);
+  - small test-source changes in the same spirit as the predicate: adapter
+    compliance names modules and ports (`b84c04d6`), the compile guard's
+    roots are counted from its table (`4006af3b`), the read interlock child
+    mirrors its include layout at any depth (`cc1bae45`);
+  - the shared literal baseline moves with a step, named in its commit
+    (`84cebf24`).
+- Open: a Linux logger corpus order leak in a single-process full run only
+  (passes alone and in its CI shard). Windows AHK changes are unverified
+  locally (no AutoHotkey here); CI is their proof.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
   Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
   input-display, platform-metrics; Windows Integration Driver startup (and
@@ -146,6 +174,15 @@ A red outside this list is the step's (the coordinator, 2026-11-12 22:00).
   both run ids; the coordinator judges flake or real.
 
 ### Decisions to review by the maintainer
+
+- The OS-purity ratchets exempt adapters/ by folder; S02 and S03 put three
+  former adapters in core/ without one (core/crypto/crypto.ahk,
+  core/events/boot_clock.ahk, core/events/timer_scheduler.ahk) while S03 adds
+  core/ to the scan. A listed edit keeps their exemption by name (`c6901bc1`)
+  instead of raising the baselines.
+- The shared literal inventory (Rule A) baseline moves with a step under the
+  runner, named in the commit like the folder bounds (`84cebf24`): S05 brought
+  both drivers' i18n `scope_ready` to one spelling, an existing duplicate.
 
 - C1, the Windows cohort requalification (decided by the coordinator on
   2026-11-12).
