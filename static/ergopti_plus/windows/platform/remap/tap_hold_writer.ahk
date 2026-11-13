@@ -30,6 +30,7 @@
 
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\infra\value_check.ahk
 #Include %A_LineFile%\..\..\..\infra\key_names.ahk
 #Include ../../adapters/native_number.ahk
 
@@ -589,18 +590,8 @@ _TH_RebindEnables(Entry) {
 }
 
 _TH_DurationValueValid(Seconds) {
-	global TAPHOLD_MAX_ACTIVATION_SECONDS
-	if !((Seconds is Integer) || (Seconds is Float))
-		return false
-	if Seconds is Float {
-		try {
-			if !NativeNumberIsFinite(Seconds)
-				return false
-		} catch {
-			return false
-		}
-	}
-	return Seconds > 0 && Seconds <= TAPHOLD_MAX_ACTIVATION_SECONDS
+	; One rule with the loader and the prompts: the shared value schema's.
+	return ValueCheckValue(ValueCheckEntryFor("tap_hold.time_activation_seconds"), Seconds)["ok"]
 }
 
 _TH_DurationKeyKnown(KeyId) {

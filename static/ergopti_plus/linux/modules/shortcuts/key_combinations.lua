@@ -114,6 +114,18 @@ function M.new(options)
 			local defaults=declared_settings()
 			if defaults then combos=namespace(combos) else assert(type(combos)=="table") end
 			local delay,symmetric=combos.simultaneous_threshold_ms,combos.symmetric
+			-- A stored delay the shared value schema refuses is reported once, never
+			-- dropped silently; the chords stay off (fail closed, as before), since a
+			-- malformed setting must not become a delay on the original holds.
+			if delay~=nil then
+				local ValueCheck=require("settings.engine.value_check")
+				local checked=ValueCheck.check_value(ValueCheck.declaration(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS),delay)
+				if not checked.ok then
+					require("settings.engine.migration.outdated").report(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS,
+						string.format("%s is refused (%s, %s..%s ms); the key chords stay off until it is fixed", tostring(delay),
+							checked.reason, tostring(checked.min), tostring(checked.max)))
+				end
+			end
 			if delay==nil and defaults then delay=defaults.simultaneous_threshold_ms end
 			if symmetric==nil and defaults then symmetric=defaults.combo_symmetric end
 			local settings = Shared.chord_settings({ simultaneous_threshold_ms=delay,combo_symmetric=symmetric })

@@ -4943,10 +4943,18 @@ end
 --- @param ms number|nil Per-key override in milliseconds, or nil to clear.
 function M.set_tap_timeout(key_id, ms)
 	if not require_state("set_tap_timeout") then return false end
-	local value = ms == nil and nil or tonumber(ms)
-	if ms ~= nil and (not require("core.text.engine.number_policy").within_timer_ceiling(value)
-		or (value > 0 and value % 1 ~= 0)) then
-		Logger.error(LOG, "set_tap_timeout: invalid value '%s' — ignoring.", tostring(ms))
+	local value = ms
+	-- nil or a value at or under 0 inherits the global delay; any other value
+	-- passes the per-key declaration of the shared value schema.
+	local inherits = ms == nil
+		or (require("core.text.engine.number_policy").is_finite(ms) and ms <= 0)
+	local admitted, reason = true, nil
+	if not inherits then
+		admitted, reason = require("settings.engine.value_check").check_whole_scaled(
+			require("settings.engine.value_check").KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS, ms, 0.001)
+	end
+	if not admitted then
+		Logger.error(LOG, "set_tap_timeout: value '%s' refused (%s) — ignoring.", tostring(ms), tostring(reason))
 		return false
 	end
 	if value ~= nil and value <= 0 then value = nil end -- inherit the global timeout
@@ -5072,9 +5080,11 @@ end
 --- @param ms number Timeout in milliseconds (must be a positive integer).
 function M.set_tap_hold_timeout(ms)
 	if not require_state("set_tap_hold_timeout") then return false end
-	local value = tonumber(ms)
-	if not require("core.text.engine.number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
-		Logger.error(LOG, "set_tap_hold_timeout: invalid value '%s' — ignoring.", tostring(ms))
+	local value = ms
+	local admitted, reason = require("settings.engine.value_check").check_whole_scaled(
+		require("settings.engine.value_check").KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS, ms, 0.001)
+	if not admitted then
+		Logger.error(LOG, "set_tap_hold_timeout: value '%s' refused (%s) — ignoring.", tostring(ms), tostring(reason))
 		return false
 	end
 	local committed = commit_state_mutation(function(candidate)
@@ -5145,9 +5155,11 @@ end
 --- @param ms number Threshold in milliseconds (must be a positive integer).
 function M.set_simultaneous_threshold(ms)
 	if not require_state("set_simultaneous_threshold") then return false end
-	local value = tonumber(ms)
-	if not require("core.text.engine.number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
-		Logger.error(LOG, "set_simultaneous_threshold: invalid value '%s' — ignoring.", tostring(ms))
+	local value = ms
+	local admitted, reason = require("settings.engine.value_check").check_whole_scaled(
+		require("settings.engine.keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, ms, 1)
+	if not admitted then
+		Logger.error(LOG, "set_simultaneous_threshold: value '%s' refused (%s) — ignoring.", tostring(ms), tostring(reason))
 		return false
 	end
 	local committed = commit_state_mutation(function(candidate)

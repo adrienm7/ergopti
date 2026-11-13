@@ -22,18 +22,24 @@
 ---    generator gates each tap on a delayed action (platform/remap/generator.lua
 ---    apply_tap_minimum).
 --- 4. One rule for the Lua drivers; the Windows driver ports it in AHK
----    (platform/remap/constants.ahk TapHoldTapWindowSec).
+---    (platform/remap/constants.ahk TapHoldTapWindowSec). The bounds are the
+---    shared value schema's (_shared/settings/data/value_schema).
 --- ==============================================================================
+
+local ValueCheck = require("settings.engine.value_check")
 
 local M = {}
 
---- Validates the configured window.
+-- The setting's declaration in the shared value schema owns its bounds.
+local KEY = require("settings.engine.keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS
+
+--- Validates the configured window against its shared declaration (0 or a
+--- whole number of milliseconds up to the declared maximum), raising a
+--- message that names the setting and the reason otherwise.
 --- @param value any The configured milliseconds.
 --- @return number window_ms 0 (strict) or a positive whole number of milliseconds.
 function M.validate(value)
-	assert(type(value) == "number" and value >= 0 and value < math.huge and value % 1 == 0,
-		"tap_holds.lone_modifier_tap_max_ms must be 0 or a positive whole number of milliseconds")
-	return value
+	return ValueCheck.require_value(nil, KEY, value)
 end
 
 --- The longest press that still types the tap.

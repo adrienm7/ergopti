@@ -19,8 +19,27 @@ if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 local prompt_text = require("ui.menu.menu_dialogs").prompt_text
 local show_error = require("ui.menu.menu_dialogs").show_error
 local plain_markup = require("ui.menu.menu_dialogs").plain_markup
+local ValueCheck = require("settings.engine.value_check")
 
 local LOG = "ui.menu.menu_tap_holds"
+
+-- The shared value schema declarations of the two delays this menu asks for.
+local GLOBAL_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS
+local KEY_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS
+
+--- Reads typed text through the shared value check. A refusal is logged and
+--- shown with the localized text naming the accepted range, and nothing is
+--- written.
+--- @param key string Declaration of the shared value schema.
+--- @param text string What the person typed.
+--- @return any|nil value The value in the stored unit, nil when refused.
+local function read_typed(key, text)
+	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text)
+	if result.ok then return result.value end
+	Logger.warn(LOG, "Typed value '%s' for %s refused (%s).", tostring(text), key, result.reason)
+	show_error(plain_markup(ValueCheck.refusal_text(key, result, i18n_safe)), i18n_safe("dialog.value_check.title"))
+	return nil
+end
 
 --- Display name of a tap-hold key: its name in the shared key name table, the
 --- one the Windows and macOS menus show. A key the table does not name raises
@@ -198,14 +217,10 @@ local function _build_tap_holds(ctx)
 			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt_current"), current_ms),
 			tostring(current_ms))
 		if value == nil then return false end
-		local ms = tonumber(value)
-		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
-			Logger.warn(LOG, "Invalid tap-hold delay '%s' — ignored.", tostring(value))
-			show_error(plain_markup(tostring(value)), i18n_safe("dialog.gestures.param_error_title"))
-			return false
-		end
+		local seconds = read_typed(KEY_DELAY_KEY, value)
+		if seconds == nil then return false end
 		if guard() ~= true then changed(false); return false end
-		local call_ok, persisted = pcall(setter, key_id, math.floor(ms + 0.5) / 1000, guard)
+		local call_ok, persisted = pcall(setter, key_id, seconds, guard)
 		if not call_ok or persisted ~= true then
 			changed(false)
 			return false
@@ -224,14 +239,10 @@ local function _build_tap_holds(ctx)
 			string.format(i18n_safe("menu.tapholds.tap_hold_dialog_prompt"), default_ms),
 			tostring(current_ms))
 		if value == nil then return false end
-		local ms = tonumber(value)
-		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
-			Logger.warn(LOG, "Invalid global tap-hold delay '%s' — ignored.", tostring(value))
-			show_error(plain_markup(tostring(value)), i18n_safe("dialog.gestures.param_error_title"))
-			return false
-		end
+		local seconds = read_typed(GLOBAL_DELAY_KEY, value)
+		if seconds == nil then return false end
 		if guard() ~= true then changed(false); return false end
-		local call_ok, persisted = pcall(setter, math.floor(ms + 0.5) / 1000, guard)
+		local call_ok, persisted = pcall(setter, seconds, guard)
 		if not call_ok or persisted ~= true then
 			changed(false)
 			return false

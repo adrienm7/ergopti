@@ -204,7 +204,10 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-value-schema.cjs',
-		outputs: ['static/ergopti_plus/windows/_generated/value_schema.ahk']
+		outputs: [
+			'static/ergopti_plus/windows/_generated/value_schema.ahk',
+			'static/ergopti_plus/_shared/settings/engine/value_schema_data.lua'
+		]
 	},
 	{
 		script: 'codegen/codegen-touchpad-registry.cjs',

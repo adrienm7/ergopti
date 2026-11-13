@@ -85,8 +85,10 @@ _A0720B4_TapHoldDurationIsValidated() {
 	Assert(ValidationBody != "", "the shared tap-hold duration validator must exist")
 	ValidationCode := _DriverMaskNonCode(&ValidationBody)
 	Assert(RegExMatch(ValidationCode,
-		"m)^\s*return\s+IsNumber\(Seconds\)\s*&&\s*Seconds\s*>\s*0\s*&&\s*Seconds\s*<=\s*TAPHOLD_MAX_ACTIVATION_SECONDS\s*$") > 0,
-		"the shared duration validator must require a number above zero within the named runtime upper bound")
+		"m)^\s*return\s+ValueCheckValue\(ValueCheckEntryFor\(\s+\),\s*Seconds\)\[\s+\]\s*$") > 0,
+		"the shared duration validator must check the declaration of the shared value schema (a number within its declared bounds)")
+	Assert(InStr(ValidationBody, 'ValueCheckEntryFor("tap_hold.time_activation_seconds")'),
+		"the duration validator reads the tap-hold delay declaration, not another setting's")
 	Assert(RegExMatch(Code, "\bLoggerWarn\s*\(") > 0,
 		"an invalid tap-hold duration must be logged, not silently coerced — the failure was invisible precisely because the throw was absorbed by the global error net")
 }

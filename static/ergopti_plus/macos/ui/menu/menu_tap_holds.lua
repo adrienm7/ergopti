@@ -38,10 +38,38 @@ local CombinationLabels = require("tap_hold.engine.combination_labels")
 local LoneTap     = require("tap_hold.engine.lone_tap")
 local Manifest    = require("infra.manifest_reader")
 local LOG         = "menu.tap_holds"
+
 local i18n        = require("infra.i18n")
 local text_utils  = require("infra.text_utils")
 local WindowTitles = require("core.ui.engine.window_titles")
 local ConfigKeys = require("settings.engine.keys")
+
+local ValueCheck = require("settings.engine.value_check")
+
+-- The shared value schema declarations of the delays this menu asks for.
+local GLOBAL_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS
+local KEY_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS
+
+--- Reads typed text through the shared value check. A refusal is logged and
+--- shown with the localized text naming the accepted range; nothing is written.
+--- @param key string Declaration of the shared value schema.
+--- @param text any What the person typed.
+--- @return any|nil value The value in the stored unit, nil when refused.
+local function read_typed(key, text)
+	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text)
+	if result.ok then return result.value end
+	Logger.warn(LOG, "Typed value '%s' for %s refused (%s).", tostring(text), key, result.reason)
+	require("infra.dialog_util").block_alert(i18n.get("dialog.value_check.title"),
+		ValueCheck.refusal_text(key, result, i18n.get), i18n.get("button.ok"))
+	return nil
+end
+
+--- Milliseconds of a delay the schema stores in seconds, typed in whole ms.
+--- @param seconds number
+--- @return integer
+local function whole_ms(seconds)
+	return math.floor(seconds * 1000 + 0.5)
+end
 
 
 
@@ -504,13 +532,10 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 			local call_ok, ok, result = pcall(hs.osascript.applescript, script)
 			if not call_ok or ok ~= true or type(result) ~= "table"
 				or type(result["text returned"]) ~= "string" then return false end
-			local ms = tonumber(result["text returned"])
-			if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms) <= 0 then
-				Logger.warn(LOG, "Invalid per-key delay '%s' — ignored.", tostring(result["text returned"]))
-				return false
-			end
+			local seconds = read_typed(KEY_DELAY_KEY, result["text returned"])
+			if seconds == nil then return false end
 			return commit_menu_setting(karabiner, "Per-key tap/hold timeout", function()
-				return karabiner.set_tap_timeout(kid, math.floor(ms))
+				return karabiner.set_tap_timeout(kid, whole_ms(seconds))
 			end, update_menu)
 		end,
 		[ConfigKeys.COMMAND.TAP_HOLD_KEY_DELAY_USE_GLOBAL] = function()
@@ -773,13 +798,10 @@ local function build_delay_item(karabiner, update_menu)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Delay input dialog: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
-			local ms = tonumber(result["text returned"])
-			if not ms or ms <= 0 then
-				Logger.warn(LOG, "Invalid delay input '%s' — ignored.", tostring(result["text returned"]))
-				return
-			end
+			local seconds = read_typed(GLOBAL_DELAY_KEY, result["text returned"])
+			if seconds == nil then return end
 			commit_menu_setting(karabiner, "Tap/hold timeout", function()
-				return karabiner.set_tap_hold_timeout(math.floor(ms))
+				return karabiner.set_tap_hold_timeout(whole_ms(seconds))
 			end, update_menu)
 		end,
 	}
@@ -877,13 +899,10 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Simultaneous threshold input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
-			local ms = tonumber(result["text returned"])
-			if not ms or ms <= 0 then
-				Logger.warn(LOG, "Invalid threshold '%s' — ignored.", tostring(result["text returned"]))
-				return
-			end
+			local ms = read_typed(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, result["text returned"])
+			if ms == nil then return end
 			commit_menu_setting(karabiner, "Simultaneous threshold", function()
-				return karabiner.set_simultaneous_threshold(math.floor(ms))
+				return karabiner.set_simultaneous_threshold(ms)
 			end, update_menu)
 		end,
 	}

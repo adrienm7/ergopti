@@ -283,14 +283,65 @@ function M.render_message(parts, translate)
 	return table.concat(sentences, " ")
 end
 
+--- The declared keys by constant name (TAP_HOLD_TIME_ACTIVATION_SECONDS, a `*`
+--- segment spelled ANY), generated from the schema; an unknown name raises,
+--- since a misspelt key would read as nil.
+M.KEY = setmetatable({}, {
+	__index = function(_, name)
+		local key = require("settings.engine.value_schema_data").keys[name]
+		if key == nil then error("value_check: no declared key named " .. tostring(name), 2) end
+		return key
+	end,
+	__newindex = function() error("value_check: the key table is read-only", 2) end,
+})
+
+--- The generated declarations (value_schema_data.lua), required on first use.
+--- @return table schema
+function M.schema()
+	return require("settings.engine.value_schema_data")
+end
+
+--- The declaration of a setting of the shared schema.
+--- @param key string Dotted setting path.
+--- @return table entry
+function M.declaration(key)
+	return M.entry_for(M.schema(), key)
+end
+
+--- The localized refusal text of a setting of the shared schema.
+--- @param key string Dotted setting path.
+--- @param result table A refusal from parse_entry() or check_value().
+--- @param translate function i18n accessor returning a template.
+--- @return string message
+function M.refusal_text(key, result, translate)
+	return M.render_message(M.message_parts(M.declaration(key), result), translate)
+end
+
+--- Checks a value a driver holds in another unit than its declaration (the
+--- macOS remap model holds whole milliseconds for a delay the files store in
+--- seconds): it must be a finite whole number and pass the declaration once
+--- multiplied by `scale`. A string or a fraction never reaches the engine.
+--- @param key string Dotted setting path of the shared schema.
+--- @param value any Candidate in the driver's unit.
+--- @param scale number Declared units per driver unit.
+--- @return boolean admitted
+--- @return string|nil reason One of M.REASONS when refused.
+function M.check_whole_scaled(key, value, scale)
+	if type(value) ~= "number" then return false, "wrong_type" end
+	if not NumberPolicy.is_finite(value) then return false, "not_finite" end
+	if value % 1 ~= 0 then return false, "not_integer" end
+	local checked = M.check_value(M.declaration(key), value * scale)
+	return checked.ok, checked.reason
+end
+
 --- Guards a consuming boundary: returns the value, or raises an error naming
 --- the setting, the reason and the value for the caller to log.
---- @param schema table Decoded value_schema.json.
+--- @param schema table|nil Decoded value_schema.json; the generated one when nil.
 --- @param key string Dotted setting path.
 --- @param value any Value about to reach the engine.
 --- @return any value
 function M.require_value(schema, key, value)
-	local result = M.check_value(M.entry_for(schema, key), value)
+	local result = M.check_value(M.entry_for(schema or M.schema(), key), value)
 	if not result.ok then
 		error(string.format("value_check: %s refused (%s): %s", key, result.reason, tostring(value)), 2)
 	end

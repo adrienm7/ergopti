@@ -54,13 +54,18 @@ local Shapes = require("platform.remap.tap_hold_shapes")
 local Migration = require("platform.remap.tap_hold_migration")
 local ConfigKeys = require("settings.engine.keys")
 local LoneTap = require("tap_hold.engine.lone_tap")
+local ValueCheck = require("settings.engine.value_check")
+
+-- The shared value schema declarations of the global and per-key delays.
+local GLOBAL_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS
+local KEY_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS
 
 local LOG = "platform.remap.tap_hold_loader"
 local TIME_FIELD = require("settings.engine.keys").LEAF.TIME_ACTIVATION_SECONDS
 
--- The bound of time_activation_seconds and the global default: the timing
--- registry's, the one declaration every driver reads or is pinned to.
-local MAX_THRESHOLD_SECONDS = require("infra.timings").ms("tap_hold", "max_activation_ms") / 1000
+-- The global default: the timing registry's. The bounds of
+-- time_activation_seconds are the shared value schema's, pinned to the
+-- registry's max_activation_ms by tools/test/test-value-schema.cjs.
 M.GLOBAL_DEFAULT_SECONDS = require("infra.timings").ms("tap_hold", "default_activation_ms") / 1000
 
 -- How long a modifier key pressed alone still taps (config.toml [tap_holds]
@@ -199,10 +204,11 @@ local function validated(key_id, fields, hold_picker, origin, global_seconds)
 	end
 	-- The key's own delay when it has a usable one, else the global delay.
 	local seconds = key.time_activation_seconds
-	if type(seconds) ~= "number" or seconds ~= seconds or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS then
-		if key.time_activation_seconds ~= nil then
-			outdated(TIME_FIELD, string.format("%s is outside 0..%d s; the global delay %.3f s is used",
-				tostring(key.time_activation_seconds), MAX_THRESHOLD_SECONDS, global_seconds))
+	local checked = seconds ~= nil and ValueCheck.check_value(ValueCheck.declaration(KEY_DELAY_KEY), seconds)
+	if not (checked and checked.ok) then
+		if seconds ~= nil then
+			outdated(TIME_FIELD, string.format("%s is refused (%s, %s..%s s); the global delay %.3f s is used",
+				tostring(seconds), checked.reason, tostring(checked.min), tostring(checked.max), global_seconds))
 		end
 		key.time_activation_seconds = global_seconds
 	end
@@ -360,12 +366,14 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes, confi
 	local global_user_set = false
 	if section.time_activation_seconds ~= nil then
 		local seconds = section.time_activation_seconds
-		if type(seconds) == "number" and seconds > 0 and seconds <= MAX_THRESHOLD_SECONDS then
+		local checked = ValueCheck.check_value(ValueCheck.declaration(GLOBAL_DELAY_KEY), seconds)
+		if checked.ok then
 			global_seconds, global_user_set = seconds, true
 		else
 			Outdated.report_in_file(user_file, { "tap_hold", TIME_FIELD },
-				string.format("%s is not a number of seconds in 0..%d; the global delay stays %.3f s",
-					tostring(seconds), MAX_THRESHOLD_SECONDS, M.GLOBAL_DEFAULT_SECONDS))
+				string.format("%s is refused (%s, %s..%s s); the global delay stays %.3f s",
+					tostring(seconds), checked.reason, tostring(checked.min), tostring(checked.max),
+					M.GLOBAL_DEFAULT_SECONDS))
 		end
 	end
 	-- How long a modifier key pressed alone still taps: the user's when the file
@@ -377,7 +385,7 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes, confi
 			lone_tap_max_ms = stored_lone_tap
 		else
 			Outdated.report_in_file(config_file, { ConfigKeys.KEY.TAP_HOLDS, LONE_TAP_FIELD },
-				string.format("%s is not 0 or a whole number of milliseconds; the window stays %d ms",
+				string.format("%s is not 0 or a whole number of milliseconds up to the declared maximum; the window stays %d ms",
 					tostring(stored_lone_tap), M.LONE_TAP_DEFAULT_MS))
 		end
 	end

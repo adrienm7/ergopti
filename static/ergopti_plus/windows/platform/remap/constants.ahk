@@ -9,6 +9,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\infra\value_check.ahk
 
 
 
@@ -82,13 +83,12 @@ global STUCK_MODIFIER_RELEASE_TIMEOUT_SEC := 5
 ; still absorbing a transient injection failure before lifecycle cleanup runs.
 global TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS := 3
 
-; Refuses a lone tap window that is neither 0 nor a positive whole number.
+; Refuses a lone tap window its shared value schema declaration refuses: 0 or
+; a whole number of milliseconds up to the declared maximum.
 ; @param Ms {Number} Milliseconds.
 ; @returns {Integer}
 TapHoldValidLoneTapMaxMs(Ms) {
-	if !(Ms is Integer) || Ms < 0
-		throw ValueError("tap_holds.lone_modifier_tap_max_ms must be 0 or a positive whole number of milliseconds.", -1, String(Ms))
-	return Ms
+	return Integer(ValueCheckRequire(ConfigKey.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS, Ms))
 }
 
 ; Sets the lone tap window from the configuration.

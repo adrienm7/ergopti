@@ -29,7 +29,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 			local calls, notices = {}, 0
 			local current = receipt
 			local ok, err = pcall(function()
-				TextPrompt.ask = function() return "375.5" end
+				TextPrompt.ask = function() return "376" end
 				os.execute = function(command)
 					if command:find("dialog_host.lua' --error", 1, true) then notices = notices + 1; return 1 end
 					return original_execute(command)
@@ -54,7 +54,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 			if not ok then error(err, 0) end
 		end)
 	end
-	helpers.it("(tap-hold-invalid-markup) escapes invalid text before showing the error", function()
+	helpers.it("(tap-hold-invalid-markup) refuses invalid text with the accepted range, never its markup", function()
 		local calls = {}
 		local section, Manager = build(calls, {})
 		local TextPrompt = require("ui.text_prompt")
@@ -65,7 +65,10 @@ helpers.describe("native per-key delay acknowledgement", function()
 			os.execute = function(value) command = value; return 0 end
 			local key = assert(find(key_rows(section), require("infra.i18n").get("key_name.left_shift")))
 			helpers.assert_eq(key.menu[6].fn(), false)
-			helpers.assert_contains(command, "&lt;invalid &amp; value&gt;")
+			-- The refusal names the accepted range (1 to 10000 ms) and never echoes
+			-- the typed markup into the dialog.
+			helpers.assert_contains(command, "10000")
+			helpers.assert_true(not command:find("<invalid", 1, true), "typed markup never reaches the dialog")
 			helpers.assert_eq(#calls, 0)
 		end)
 		TextPrompt.ask, os.execute = original_ask, original_execute
@@ -73,7 +76,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 		if not ok then error(err, 0) end
 	end)
 
-	for _, value in ipairs({ "0.49", "0", "-1", "1e309", "nan" }) do
+	for _, value in ipairs({ "0.49", "0", "-1", "1e309", "nan", "375.5", "10001", "0x10" }) do
 		helpers.it("refuses invalid " .. value .. " before the native threshold writer (tap-hold-key-delay)", function()
 			local calls = {}
 			local section, Manager = build(calls, {})
