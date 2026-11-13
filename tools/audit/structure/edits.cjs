@@ -210,6 +210,15 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: 'Wanted := "\\hotstrings\\data\\catalogue\\" . (Vector'
 	},
 	{
+		// The source contract test pins the clock evidence's expression as text;
+		// S38 moves the fixture into tests/support/core, and the expression
+		// follows it there (MAC + '...' is rewritten in the evidence itself).
+		file: 'tools/test/test-native-pac-source-contract.cjs',
+		moves: 'macos/tests/support/native_http_fixture_main.swift',
+		from: "(MAC + 'tests/support/native_http_fixture_main.swift',)",
+		to: "(MAC + 'tests/support/core/native_http_fixture_main.swift',)"
+	},
+	{
 		// The ledger's family contracts leave one folder for two, and lose the
 		// name prefixes that told them from their neighbours there.
 		file: 'tools/test/test-contract-vector-ledger.cjs',
