@@ -251,6 +251,30 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '\tif NativePath.basename(src) ~= "ui" then return "." end\n\tlocal feature = NativePath.dirname(src) or ""\n\tif NativePath.basename(feature) ~= "ui" then return "." end\n\tlocal core = NativePath.dirname(feature) or ""\n\tif NativePath.basename(core) ~= "core" then return "." end\n\treturn NativePath.dirname(core) or "."'
 	},
 	{
+		// The remap core reads the keyboard data beside it; S28 moves the core
+		// into keyboard/engine and the data into keyboard/data.
+		file: 'static/ergopti_plus/macos/platform/remap/init.lua',
+		moves: 'macos/platform/remap/data/tap_hold_keys.json',
+		from: 'or "./") .. "data/"',
+		to: 'or "./") .. "../data/"'
+	},
+	{
+		// The tap-hold file reads the same data from platform/remap until S34
+		// moves it to tap_hold/engine, as deep: both reach keyboard/data alike.
+		file: 'static/ergopti_plus/macos/platform/remap/tap_hold_file.lua',
+		moves: 'macos/platform/remap/data/tap_hold_keys.json',
+		from: 'or "./") .. "data/"',
+		to: 'or "./") .. "../../keyboard/data/"'
+	},
+	{
+		// The tray source reader read every section from ui/menu/; the sections
+		// leave it for their features from S18 on, so it finds each by name.
+		file: 'static/ergopti_plus/linux/tests/helpers.lua',
+		moves: 'linux/ui/menu/menu_configuration.lua',
+		from: '\tlocal directory = M.driver_root() .. "/ui/menu/"\n\tlocal function read(name)\n\t\tlocal handle = assert(io.open(directory .. name .. ".lua", "rb"))\n\t\tlocal text = assert(handle:read("*a"))\n\t\tassert(handle:close())\n\t\treturn text\n\tend\n\t-- A part may bind another part (the dialogs), which the root no longer names.\n\tlocal texts, seen, index = { read("builder") }, {}, 1\n\twhile texts[index] do\n\t\tfor name in texts[index]:gmatch(\'require%("ui%.menu%.(menu_[a-z_]+)"%)\') do\n\t\t\tif not seen[name] then\n\t\t\t\tseen[name] = true\n\t\t\t\ttexts[#texts + 1] = read(name)\n\t\t\tend\n\t\tend',
+		to: '\tlocal root = M.driver_root()\n\tlocal search = root .. "/?.lua;" .. root .. "/?/init.lua"\n\tlocal function read(path)\n\t\tlocal handle = assert(io.open(path, "rb"))\n\t\tlocal text = assert(handle:read("*a"))\n\t\tassert(handle:close())\n\t\treturn text\n\tend\n\t-- A part may bind another part (the dialogs), which the root no longer names.\n\t-- The sections live in their features\' folders: each is found by its module\n\t-- name; a menu module outside the driver (a shared one) is not a section.\n\tlocal texts, seen, index = { read(assert(package.searchpath("ui.menu.builder", search))) }, {}, 1\n\twhile texts[index] do\n\t\tfor name in texts[index]:gmatch(\'require%("([%w_%.]*menu[%w_%.]*)"%)\') do\n\t\t\tlocal path = not seen[name] and package.searchpath(name, search)\n\t\t\tseen[name] = true\n\t\t\tif path then texts[#texts + 1] = read(path) end\n\t\tend'
+	},
+	{
 		// The XI2 receiver derives the shared Lua root from the logger shim's
 		// path; S01 moves the shim to core/logger/engine under _shared itself.
 		file: 'static/ergopti_plus/linux/tests/hardware/xi2_luajit_receiver.lua',
