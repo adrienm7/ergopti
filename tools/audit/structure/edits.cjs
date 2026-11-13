@@ -88,6 +88,13 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '\t\t\tlocal source = "@" .. case.prefix .. separator .. "linux" .. separator .. "core" .. separator .. "fs"\n\t\t\t\t.. separator .. "engine" .. separator .. "paths.lua"'
 	},
 	{
+		// The same relative launch, named in the file's header.
+		file: 'static/ergopti_plus/linux/tests/unit/infra/i18n/test_locale_path_layouts.lua',
+		moves: 'linux/infra/locale.lua',
+		from: '---   - a checkout launch ("./infra/locale.lua") read nothing at all.',
+		to: '---   - a checkout launch ("./core/i18n/engine/locale.lua") read nothing at all.'
+	},
+	{
 		// The locale resolver loaded as if installed (a package root, a relative
 		// checkout): S05 moves it to core/i18n/engine, and so do its layouts.
 		file: 'static/ergopti_plus/linux/tests/unit/infra/i18n/test_locale_path_layouts.lua',
@@ -156,7 +163,7 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		file: 'static/ergopti_plus/macos/tests/meta/lua_safety/test_fs_dir_iterator_contract.lua',
 		moves: 'macos/infra/fs_dir.lua',
 		from: '\t\t\tif not path:find("fs_dir", 1, true) then',
-		to: '\t\t\tif not path:find("/core/fs/engine/dir.lua", 1, true) then'
+		to: '\t\t\tif not path:find("/fs/engine/dir.lua", 1, true) then'
 	},
 	{
 		// The staged driver root's folders, one argument per folder, for the
