@@ -5,9 +5,9 @@
 --- DESCRIPTION:
 --- Verifies three structural invariants of the hexagonal architecture:
 ---
---- 1. ADAPTER PRESENCE — Every port spec in _shared/core/ports/*.spec.js has a
----    matching adapter file in static/ergopti_plus/windows/adapters/ and in
----    static/ergopti_plus/macos/adapters/. A missing adapter means a port
+--- 1. ADAPTER PRESENCE — Every port spec in _shared/core/ports/*.spec.js has an
+---    adapter listed in _shared/core/ports/adapters.json, on Windows and on macOS,
+---    and that file exists. A missing adapter means a port
 ---    contract exists on paper but is not honoured by a driver.
 ---
 --- 2. DOMAIN TEST COVERAGE — Every domain spec in _shared/core/domain/*.spec.js
@@ -84,13 +84,6 @@ local function base_name(path)
 	return name:gsub("%.[^.]+$", ""):gsub("%.spec$", "")
 end
 
---- Converts a PascalCase identifier to snake_case.
---- @param s string PascalCase string (e.g. "KeyboardHook").
---- @return string snake_case string (e.g. "keyboard_hook").
-local function to_snake_case(s)
-	return s:gsub("(%u)", function(c) return "_" .. c:lower() end):gsub("^_", "")
-end
-
 
 
 
@@ -103,9 +96,17 @@ end
 
 helpers.describe("meta: port-adapter coverage", function()
 	local shared_ports  = SHARED_DIR .. "/core/ports"
-	local ahk_adapters  = REPO_ROOT .. "/static/ergopti_plus/windows/adapters"
-	local hs_adapters   = REPO_ROOT .. "/static/ergopti_plus/macos/adapters"
-	local linux_adapters = REPO_ROOT .. "/static/ergopti_plus/linux/adapters"
+	-- Where each adapter lives, by repository path: the structure plan moves
+	-- adapters into the features they serve, often renamed, so the table
+	-- (shared with tools/test/test-port-adapter-matrix.cjs) follows each move.
+	local table_fh = assert(io.open(shared_ports .. "/adapters.json", "r"), "adapters.json is unreadable")
+	local adapters = require("json").decode(table_fh:read("a")).adapters
+	table_fh:close()
+	local function adapter_path(port, driver)
+		local homes = adapters[port]
+		local rel = homes and homes[driver]
+		return rel and (REPO_ROOT .. "/" .. rel) or ("(no " .. driver .. " entry in adapters.json)")
+	end
 
 	local spec_files   = list_files(shared_ports, "js")
 	local missing_ahk  = 0
@@ -118,10 +119,9 @@ helpers.describe("meta: port-adapter coverage", function()
 		spec_count = spec_count + 1
 
 		local raw_name    = base_name(spec_path)
-		local snake_name  = to_snake_case(raw_name)
-		local ahk_file    = ahk_adapters   .. "/" .. snake_name .. ".ahk"
-		local hs_file     = hs_adapters    .. "/" .. snake_name .. ".lua"
-		local linux_file  = linux_adapters .. "/" .. snake_name .. ".lua"
+		local ahk_file    = adapter_path(raw_name, "windows")
+		local hs_file     = adapter_path(raw_name, "macos")
+		local linux_file  = adapter_path(raw_name, "linux")
 
 		local ahk_fh = io.open(ahk_file, "r")
 		if ahk_fh then
