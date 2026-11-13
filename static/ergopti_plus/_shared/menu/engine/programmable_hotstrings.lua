@@ -50,6 +50,12 @@ local PROBLEMS = { missing = true, failed = true }
 --- missing »), opening a missing source is greyed, and creating the example
 --- loads it at once when the option is on. A refused action redraws the menu
 --- so the row shows the state the owner now reports.
+---
+--- A pause stops typing, not configuration (EDD-1): every control runs while
+--- paused. Enabling loads the source at once; its hotstrings stay inert until
+--- resume because the paused driver types nothing (decided by the agent on
+--- 2026-11-13, to review by the maintainer).
+---
 --- A typed activation delay its value schema declaration refuses is passed
 --- to `ports.refusal` with the localized text naming the range (decided by the
 --- agent on 2026-11-14, to review by the maintainer: the 2026-11-13 validation
@@ -66,7 +72,7 @@ function M.build(ports)
 	local problem = ports.problem()
 	assert(problem == nil or PROBLEMS[problem], "unknown programmable source problem: " .. tostring(problem))
 	local function mutation(enabled, seconds)
-		if ports.paused() or ports.master() ~= true or type(enabled) ~= "boolean"
+		if ports.master() ~= true or type(enabled) ~= "boolean"
 			or not ValueCheck.check_value(ValueCheck.declaration(DELAY_KEY), seconds).ok then return refused() end
 		if ports.set(enabled, seconds) ~= true then return refused() end
 		ports.changed()
@@ -86,13 +92,13 @@ function M.build(ports)
 	local function repair_with_example()
 		if ports.create() ~= true then return false end
 		local enabled, seconds = ports.get()
-		if enabled ~= true or ports.paused() or ports.master() ~= true then return true end
+		if enabled ~= true or ports.master() ~= true then return true end
 		return ports.set(true, seconds) == true
 	end
 	local feature_rows = {}
 	feature_rows[FEATURE] = function()
 		local enabled, seconds = ports.get()
-		local blocked = ports.paused() or ports.master() ~= true
+		local blocked = ports.master() ~= true
 		local label = ports.i18n("menu.hotstrings.user_code.title")
 		if problem then label = label .. " — " .. ports.i18n("menu.hotstrings.user_code.problem_" .. problem) end
 		return { label = label, checked = enabled,
