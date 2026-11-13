@@ -207,6 +207,11 @@ function rewriteText(text, rows, movedRepo, file) {
 			text = text.replace(new RegExp(`(?<![\\w\\\\])${esc}(?![\\w])`, 'g'), () => hold(row.new));
 			continue;
 		}
+		// A module-prefix sweep literal moves whole, or is held whole (Plan).
+		if (row.kind === 'lua-prefix-pattern') {
+			swap(row.old, row.new);
+			continue;
+		}
 		if (row.kind === 'join' || row.kind === 'join-successor') {
 			swap(row.old, row.new);
 			continue;

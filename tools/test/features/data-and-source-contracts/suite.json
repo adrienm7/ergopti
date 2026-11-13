@@ -754,6 +754,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-linux-layout-python-floor.cjs"],
 			"repro": "npm run test:linux-layout-python-floor"
+		},
+		{
+			"id": "js-0520",
+			"ordinal": 643,
+			"name": "structure plan follows a Lua module-prefix sweep only when its modules move together, and refuses a scattering step",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-lua-prefix-sweeps.cjs"],
+			"repro": "npm run test:structure-lua-prefix-sweeps"
 		}
 	]
 }
