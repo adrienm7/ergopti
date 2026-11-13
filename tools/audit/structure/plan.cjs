@@ -2099,6 +2099,28 @@ function scanFile(file, text, ctx) {
 			if (respelled !== m[0])
 				add('lua-module-quoted', m[0], respelled, { oldRepo: oldTarget, newRepo: newTarget });
 		}
+	// DRIVER = Path(__file__).absolute().parents[2]: a bare anchor on a folder
+	// above the file. When the file moves deeper or shallower under that
+	// folder, the climb is recounted so it still names the same folder (S08:
+	// native_http.py went from platform/network to core/network/adapters and
+	// its parents[2] named core, so the receiver found no driver root).
+	if (file.endsWith('.py') || /^#![^\n]*\bpython/.test(text)) {
+		const newFile = byRepoPath.get(file);
+		if (newFile && newFile !== SPLIT && newFile !== file)
+			for (const m of text.matchAll(
+				/Path\(__file__\)((?:\.resolve\(\)|\.absolute\(\))*)(?:((?:\.parent(?!s))+)|\.parents\[(\d+)\])(?!\s*\/\s*["'])/g
+			)) {
+				const climbs = m[2] ? m[2].split('.parent').length - 2 : Number(m[3]);
+				const oldDir = path.posix.dirname(file).split('/');
+				const base = oldDir.slice(0, Math.max(0, oldDir.length - climbs)).join('/');
+				if (!base || !newFile.startsWith(`${base}/`)) continue;
+				const k = path.posix.dirname(newFile).split('/').length - base.split('/').length;
+				const climb = m[2] ? '.parent'.repeat(k + 1) : `.parents[${k}]`;
+				const respelled = `Path(__file__)${m[1]}${climb}`;
+				if (respelled !== m[0])
+					add('lua-module-quoted', m[0], respelled, { oldRepo: file, newRepo: newFile });
+			}
+	}
 	// ROOT / "static" / "ergopti_plus" / "_shared" / "data" / "x.sql": a Python
 	// path joined with the / operator, read from the tree it passes through;
 	// os.path.join(root, "_shared", "data", "locales") the same with commas.
