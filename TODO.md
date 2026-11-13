@@ -192,8 +192,14 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 [Focused audit](docs/audits/platform-parity/2026-11-05-dead-keys/report.md), pinned source `f2c3ea43542c985fb20e5f0887976f1c02525341`: five new roots, [generated comparison](docs/audits/platform-parity/2026-11-05-dead-keys/capabilities.md). Evidence boundaries remain explicit; these are follow-ups, not implemented fixes.
 
-- [ ] **Pause and a pending dead key (macOS, Linux).** A pending composition is native state there and Ergopti's pause
+- [x] **Pause and a pending dead key (macOS, Linux).** A pending composition is native state there and Ergopti's pause
       does not cancel it (both Windows engines do); decide whether the pause must clear it, and how.
+      Done 2026-11-13 (worker F): the layout emulation, which owns its pending dead key in Lua on both drivers, drops
+      it when the script pauses (`layout_emulation.drop_pending_dead_key`, called by macOS `pause_processing` and the
+      Linux pause listener), so it never composes with the first key after the resume; held custom modifiers keep
+      their own release path. Tests `(pause-drops-dead-key)` on both drivers. A dead key pending in the system's own
+      layout (no emulation) stays the OS's state, as with Ergopti not running: decided by the agent on 2026-11-13,
+      to review by the maintainer.
 
 ## Cross-platform feature inventory
 
@@ -524,8 +530,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       helper role and the helper's one-hash report rule (`OwnedVirtualHIDDaemonReportStageOwner.admitImage`); rebuild it
       and update its manifest pin.
 
-- [ ] **`events_typing.rich_text` in clear (AHK-005 / WM-002 left).** With metrics encryption on, Windows and Linux
-      store it empty; macOS still writes the typed text to SQLite.
+- [x] **`events_typing.rich_text` in clear (AHK-005 / WM-002 left).** With metrics encryption on, Windows and Linux
+      store it empty; macOS still writes the typed text to SQLite. Done 2026-11-13 (worker F): the macOS writer stores
+      nothing there while encryption is on, and the shared encrypt pass first empties the local device's stored copies
+      (`text_migration_core.clear_rich_text_sql`, macOS and Linux backends; the Windows AHK pass needs none, its
+      writer never fills the column). Tests: `test_rich_text_not_stored_encrypted.lua`, runner contract.
 
 ### All drivers
 
@@ -553,8 +562,12 @@ between workers) green alone. All live checks pass, typed by the harness.
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).
 
-- [ ] **Modifier-chord action labels from the key name table.** The action pickers still show raw or French chords
+- [x] **Modifier-chord action labels from the key name table.** The action pickers still show raw or French chords
       (« Cmd + Option + Shift + Enter ») on every driver; the tests that pin this label family change with it.
+      Checked 2026-11-13 (worker F): already done on the three drivers, every picker row goes through the shared
+      `key_names.chord_label` (macOS `gestures/actions.lua` and `remap/config.lua`, Linux `gestures/manager.lua`,
+      Windows `KeyNameChordLabel` in `gestures/actions.ahk`), pinned per locale by `test_action_catalogue_parity.lua`
+      and Linux `test_key_names.lua`. No code step left.
 
 ### Linux (container proofs of 2026-11-10)
 
