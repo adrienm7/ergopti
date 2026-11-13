@@ -4376,7 +4376,6 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Non su Linux: il numero di desktop dipende dalle impostazioni di ogni desktop (GNOME li aggiunge e li toglie da sé, KDE e Xfce ne tengono un numero fisso), e Wayland non dà a nessuna app una richiesta per cambiarlo.",
 	"platform_reason.action_key_is_its_own_binding_here": "Non è una riga a sé su questo sistema: l'azione equivalente invia lo stesso tasto.",
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Nessun interruttore su Linux: GNOME e KDE scelgono Duplica nel proprio selettore degli schermi Super+P; assegna quel tasto come combinazione di tasti.",
-	"platform_reason.action_sticky_keys_are_the_systems": "Questo sistema ha i Tasti permanenti nelle impostazioni di accessibilità, che rendono ogni modificatore valido per un solo tasto; attivali lì.",
 	"platform_reason.action_take_note_uses_notepad": "macOS offre Nota rapida (Fn+Q) invece di aprire un file di note in testo semplice.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "Su macOS, Testo attivo legge il testo di qualsiasi istantanea o immagine: fanne una con l'azione equivalente, poi seleziona il suo testo.",
 	"inventory.behavior.backspace_restore": "Ripristinare un’espansione con Backspace",

@@ -4376,7 +4376,6 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "ليس في Linux: عدد سطوح المكتب جزء من إعدادات كل بيئة سطح مكتب (يضيفها GNOME ويزيلها بنفسه، ويحتفظ KDE وXfce بعدد ثابت)، ولا يمنح Wayland أي تطبيق طلباً لتغييره.",
 	"platform_reason.action_key_is_its_own_binding_here": "ليس صفاً مستقلاً في هذا النظام: يرسل الإجراء المكافئ المفتاح نفسه.",
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "لا يوجد مفتاح تبديل في Linux: يختار GNOME وKDE «تكرار» من مبدّل الشاشات الخاص بهما Super+P؛ عيّن ذلك المفتاح كتركيبة مفاتيح.",
-	"platform_reason.action_sticky_keys_are_the_systems": "لهذا النظام «المفاتيح الثابتة» في إعدادات إمكانية الوصول، فتجعل كل مفتاح تعديل يعمل لمفتاح واحد؛ فعّلها هناك.",
 	"platform_reason.action_take_note_uses_notepad": "يوفّر macOS «ملاحظة سريعة» (Fn+Q) بدلًا من فتح ملف ملاحظات بنص عادي.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "في macOS يقرأ «النص المباشر» نص أي لقطة أو صورة: التقط واحدة بالإجراء المكافئ ثم حدّد نصها.",
 	"inventory.behavior.backspace_restore": "استعادة النص قبل التوسيع بمفتاح Backspace",

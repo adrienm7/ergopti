@@ -752,6 +752,41 @@ function M.arm_one_shot_shift()
 	return armed == true
 end
 
+-- The modifier names each token of a sticky_* action id holds, as the
+-- catalogue spells them on every driver: cmd is Super, option is Alt.
+local STICKY_TOKENS = { cmd = { "super" }, option = { "alt" }, ctrl = { "ctrl" }, shift = { "shift" },
+	altgr = { "altgr" }, hyper = { "ctrl", "alt", "shift", "super" } }
+
+--- The engine's modifier codes for a sticky_* action id; fails fast on an
+--- unknown token rather than arming a partial set.
+--- @param action_id string A sticky_* action id.
+--- @return table codes
+function M.sticky_codes(action_id)
+	local rest = type(action_id) == "string" and action_id:match("^sticky_(.+)$")
+	if not rest then error("not a sticky action: " .. tostring(action_id), 2) end
+	local Codes = require("platform.remap.tap_hold_engine").STICKY_MODIFIER_CODES
+	local codes = {}
+	for token in rest:gmatch("[^_]+") do
+		local names = STICKY_TOKENS[token]
+		if not names then error("unknown sticky modifier " .. token .. " in " .. action_id, 2) end
+		for _, name in ipairs(names) do codes[#codes + 1] = assert(Codes[name], name) end
+	end
+	return codes
+end
+
+--- Arms a sticky_* action's modifiers for the next key, through the hook's
+--- installed tap-hold engine (maintainer decision of 2026-11-13: every
+--- one-shot on every OS), as Windows' StickyModifier and macOS' sticky
+--- modifiers do.
+--- @param action_id string A sticky_* action id.
+--- @return boolean armed
+function M.arm_sticky(action_id)
+	record(action_id)
+	local armed, refusal = require("adapters.keyboard_hook").arm_action_sticky(M.sticky_codes(action_id))
+	if not armed then Logger.warn(LOG, "Sticky modifiers %s not armed: %s.", action_id, tostring(refusal)) end
+	return armed == true
+end
+
 --- The catalogue actions this module performs, by action id, for the gesture
 --- executor. The daemon injects them through modules/shortcuts/action_handlers,
 --- so a gesture or a keyboard slot runs the same code as the tray row instead
@@ -766,6 +801,20 @@ function M.action_handlers()
 		-- toggles the session the tray row shows, as Windows' ToggleCapsWord.
 		["caps_word"] = function() return M.toggle_caps_word() end,
 		["one_shot_shift"] = function() return M.arm_one_shot_shift() end,
+		["sticky_ctrl"] = function() return M.arm_sticky("sticky_ctrl") end,
+		["sticky_cmd"] = function() return M.arm_sticky("sticky_cmd") end,
+		["sticky_option"] = function() return M.arm_sticky("sticky_option") end,
+		["sticky_cmd_shift"] = function() return M.arm_sticky("sticky_cmd_shift") end,
+		["sticky_cmd_option"] = function() return M.arm_sticky("sticky_cmd_option") end,
+		["sticky_cmd_ctrl"] = function() return M.arm_sticky("sticky_cmd_ctrl") end,
+		["sticky_option_shift"] = function() return M.arm_sticky("sticky_option_shift") end,
+		["sticky_option_ctrl"] = function() return M.arm_sticky("sticky_option_ctrl") end,
+		["sticky_ctrl_shift"] = function() return M.arm_sticky("sticky_ctrl_shift") end,
+		["sticky_cmd_option_shift"] = function() return M.arm_sticky("sticky_cmd_option_shift") end,
+		["sticky_cmd_option_ctrl"] = function() return M.arm_sticky("sticky_cmd_option_ctrl") end,
+		["sticky_cmd_shift_ctrl"] = function() return M.arm_sticky("sticky_cmd_shift_ctrl") end,
+		["sticky_option_shift_ctrl"] = function() return M.arm_sticky("sticky_option_shift_ctrl") end,
+		["sticky_hyper"] = function() return M.arm_sticky("sticky_hyper") end,
 		["select_line"] = function() return M.select_line() end,
 		["select_word"] = function() return M.select_word() end,
 		["paste_plain"] = function() return M.paste_plain() end,

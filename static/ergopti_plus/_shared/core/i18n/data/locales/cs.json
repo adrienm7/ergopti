@@ -4376,7 +4376,6 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Ne v Linuxu: počet ploch patří k nastavení každého prostředí (GNOME je sám přidává a odebírá, KDE a Xfce drží pevný počet) a Wayland žádné aplikaci nedává požadavek, jak ho změnit.",
 	"platform_reason.action_key_is_its_own_binding_here": "Na tomto systému to není samostatný řádek: odpovídající akce posílá stejnou klávesu.",
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "V Linuxu není přepínač: GNOME a KDE volí Duplikovat ve vlastním přepínači obrazovek Super+P; přiřaďte tuto klávesu jako kombinaci kláves.",
-	"platform_reason.action_sticky_keys_are_the_systems": "Tento systém má v nastavení usnadnění Jedním prstem (lepivé klávesy), díky nimž každý modifikátor platí pro jednu klávesu; zapněte je tam.",
 	"platform_reason.action_take_note_uses_notepad": "macOS nabízí Rychlou poznámku (Fn+Q) místo otevření prostého textového souboru.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "V macOS čte Živý text text každého snímku nebo obrázku: pořiďte snímek odpovídající akcí a pak označte jeho text.",
 	"inventory.behavior.backspace_restore": "Obnovit rozvinutí klávesou Backspace",

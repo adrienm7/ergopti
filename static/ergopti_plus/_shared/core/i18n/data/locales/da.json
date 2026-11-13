@@ -4376,7 +4376,6 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Ikke på Linux: antallet af skriveborde hører til hvert skrivebordsmiljøs egne indstillinger (GNOME tilføjer og fjerner dem selv, KDE og Xfce har et fast antal), og Wayland giver ingen app en anmodning om at ændre det.",
 	"platform_reason.action_key_is_its_own_binding_here": "Ikke en særskilt række på dette system: den tilsvarende handling sender den samme tast.",
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Ingen kontakt på Linux: GNOME og KDE vælger Dupliker i deres egen skærmvælger Super+P; tildel den tast som tastekombination.",
-	"platform_reason.action_sticky_keys_are_the_systems": "Dette system har Træg tast i sine hjælpemiddelindstillinger, som får hver modifikator til at gælde én tast; slå den til dér.",
 	"platform_reason.action_take_note_uses_notepad": "macOS tilbyder Hurtig note (Fn+Q) i stedet for at åbne en almindelig tekstfil.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "På macOS læser Livetekst teksten i ethvert skærmbillede eller billede: tag et med den tilsvarende handling, og markér derefter teksten.",
 	"inventory.behavior.backspace_restore": "Gendan en udvidelse med Backspace",

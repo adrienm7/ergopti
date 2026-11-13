@@ -4376,7 +4376,6 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Pas sous Linux : le nombre de bureaux relève des réglages de chaque bureau (GNOME les ajoute et les retire lui-même, KDE et Xfce en gardent un nombre fixe), et Wayland ne donne à aucune application de requête pour le changer.",
 	"platform_reason.action_key_is_its_own_binding_here": "Pas une ligne à part sur ce système : l’action équivalente envoie la même touche.",
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Pas de bascule sous Linux : GNOME et KDE choisissent Dupliquer dans leur propre sélecteur d’affichage Super+P ; associez cette touche comme combinaison de touches.",
-	"platform_reason.action_sticky_keys_are_the_systems": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
 	"platform_reason.action_take_note_uses_notepad": "macOS propose Note rapide (Fn+Q) au lieu d’ouvrir un fichier de notes en texte brut.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "Sous macOS, Texte en direct lit le texte de toute capture ou image : prenez-en une avec l’action équivalente, puis sélectionnez son texte.",
 	"inventory.behavior.backspace_restore": "Restaurer une expansion avec Retour arrière",

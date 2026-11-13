@@ -4376,7 +4376,6 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Не в Linux: число рабочих столов относится к настройкам каждой среды (GNOME сам добавляет и убирает их, KDE и Xfce держат постоянное число), а Wayland не даёт ни одному приложению запроса, чтобы его изменить.",
 	"platform_reason.action_key_is_its_own_binding_here": "В этой системе это не отдельная строка: равноценное действие посылает ту же клавишу.",
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "В Linux переключателя нет: GNOME и KDE выбирают «Повторяющийся» в своём переключателе экранов Super+P; назначьте эту клавишу как сочетание клавиш.",
-	"platform_reason.action_sticky_keys_are_the_systems": "В этой системе есть залипание клавиш в настройках специальных возможностей: каждый модификатор действует на одну клавишу; включите его там.",
 	"platform_reason.action_take_note_uses_notepad": "В macOS есть «Быстрая заметка» (Fn+Q) вместо открытия обычного текстового файла заметок.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "В macOS функция «Живой текст» читает текст любого снимка или изображения: сделайте снимок равноценным действием, затем выделите его текст.",
 	"inventory.behavior.backspace_restore": "Восстановить развёртывание клавишей Backspace",

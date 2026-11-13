@@ -4376,7 +4376,6 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Inte i Linux: antalet skrivbord hör till varje skrivbordsmiljös egna inställningar (GNOME lägger till och tar bort dem själv, KDE och Xfce har ett fast antal), och Wayland ger ingen app en begäran om att ändra det.",
 	"platform_reason.action_key_is_its_own_binding_here": "Ingen egen rad i det här systemet: motsvarande åtgärd skickar samma tangent.",
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Ingen växlare på Linux: GNOME och KDE väljer Duplicera i sin egen skärmväxlare Super+P; tilldela den tangenten som tangentkombination.",
-	"platform_reason.action_sticky_keys_are_the_systems": "Det här systemet har Tröga tangenter i sina hjälpmedelsinställningar, som får varje modifierare att gälla en tangent; slå på dem där.",
 	"platform_reason.action_take_note_uses_notepad": "macOS erbjuder Snabbanteckning (Fn+Q) i stället för att öppna en ren textfil med anteckningar.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "I macOS läser Live Text texten i varje skärmdump eller bild: ta en med motsvarande åtgärd och markera sedan dess text.",
 	"inventory.behavior.backspace_restore": "Återställ en expansion med Backsteg",

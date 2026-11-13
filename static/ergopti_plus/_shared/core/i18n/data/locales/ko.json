@@ -4376,7 +4376,6 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Linux에는 없음: 데스크톱 수는 각 데스크톱 환경의 설정에 속하며(GNOME은 스스로 늘리고 줄이고, KDE와 Xfce는 고정된 수를 유지), Wayland는 어떤 앱에도 이를 바꾸는 요청을 주지 않습니다.",
 	"platform_reason.action_key_is_its_own_binding_here": "이 시스템에서는 별도 행이 아닙니다: 대응하는 동작이 같은 키를 보냅니다.",
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Linux에는 전환이 없습니다: GNOME과 KDE는 자체 Super+P 디스플레이 전환기에서 복제를 고릅니다. 그 키를 키 조합으로 지정하세요.",
-	"platform_reason.action_sticky_keys_are_the_systems": "이 시스템의 손쉬운 사용 설정에는 각 수정 키를 한 번만 적용하는 고정 키가 있습니다. 거기서 켜세요.",
 	"platform_reason.action_take_note_uses_notepad": "macOS에서는 일반 텍스트 메모 파일을 여는 대신 빠른 메모(Fn+Q)를 사용할 수 있습니다.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "macOS에서는 라이브 텍스트가 모든 스크린샷이나 이미지의 텍스트를 읽습니다: 대응하는 동작으로 찍은 뒤 그 텍스트를 선택하세요.",
 	"inventory.behavior.backspace_restore": "Backspace로 확장 전 입력 복원",

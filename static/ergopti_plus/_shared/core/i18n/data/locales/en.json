@@ -4376,7 +4376,6 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Not on Linux: the number of desktops belongs to each desktop's own settings (GNOME adds and removes them by itself, KDE and Xfce keep a set count), and Wayland gives no application a request to change it.",
 	"platform_reason.action_key_is_its_own_binding_here": "Not a separate row on this system: the equivalent action sends the same key.",
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke.",
-	"platform_reason.action_sticky_keys_are_the_systems": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
 	"platform_reason.action_take_note_uses_notepad": "macOS provides Quick Note (Fn+Q) instead of opening a plain-text notes file.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "On macOS, Live Text reads the text of any capture or image: take one with the equivalent action, then select its text.",
 	"inventory.behavior.backspace_restore": "Restore an expansion with Backspace",

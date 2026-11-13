@@ -4376,7 +4376,6 @@
 	"platform_reason.action_desktop_count_belongs_to_the_desktop": "Niet op Linux: het aantal bureaubladen hoort bij de instellingen van elk bureaublad (GNOME voegt ze zelf toe en verwijdert ze, KDE en Xfce houden een vast aantal), en Wayland geeft geen enkele app een verzoek om het te wijzigen.",
 	"platform_reason.action_key_is_its_own_binding_here": "Geen aparte regel op dit systeem: de gelijkwaardige actie stuurt dezelfde toets.",
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Geen schakelaar op Linux: GNOME en KDE kiezen Dupliceren in hun eigen schermkiezer Super+P; koppel die toets als toetscombinatie.",
-	"platform_reason.action_sticky_keys_are_the_systems": "Dit systeem heeft Plaktoetsen in zijn toegankelijkheidsinstellingen, waardoor elke modificatietoets voor één toets geldt; zet ze daar aan.",
 	"platform_reason.action_take_note_uses_notepad": "macOS biedt Snelle notitie (Fn+Q) in plaats van een tekstbestand met notities te openen.",
 	"platform_reason.action_text_recognition_is_live_text_on_macos": "Op macOS leest Live Text de tekst van elke schermafbeelding of afbeelding: maak er een met de gelijkwaardige actie en selecteer dan de tekst.",
 	"inventory.behavior.backspace_restore": "Een uitbreiding herstellen met Backspace",

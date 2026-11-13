@@ -1730,60 +1730,46 @@ reason_linux = "platform_reason.action_same_action_under_another_name"
 equivalent_linux = ["one_shot_shift"]
 
 [sg_actions.sticky_ctrl]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_cmd]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_option]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_cmd_shift]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_cmd_option]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_cmd_ctrl]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_option_shift]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_option_ctrl]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_ctrl_shift]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_cmd_option_shift]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_cmd_option_ctrl]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_cmd_shift_ctrl]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_option_shift_ctrl]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 [sg_actions.sticky_hyper]
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+platform = "ahk,hs,linux"
 
 # --- Debug ---
 

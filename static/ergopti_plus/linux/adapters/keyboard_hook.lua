@@ -76,7 +76,7 @@ local hook_directory = HookModuleDirectory.capture()
 local hook_source_label = debug.getinfo(1, "S").source
 local original_input_hook_ports = {}
 local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "set_remapper", "stop", "emergency_stop", "key_text", "capture_buffered_input", "buffered_input_current", "buffered_input_view", "retire_buffered_input", "refresh_capture" }
-local INPUT_PORT_NAMES = { "capture_input_owner", "input_owner_current", "capture_input_guard", "arm_one_shot", "input_owner_state", "clear_input_arm", "buffered_request_current" }
+local INPUT_PORT_NAMES = { "capture_input_owner", "input_owner_current", "capture_input_guard", "arm_one_shot", "arm_sticky", "input_owner_state", "clear_input_arm", "buffered_request_current" }
 local _input_ports = {}
 for _, name in ipairs(INPUT_PORT_NAMES) do _input_ports[name] = rawget(InputIssuer, name) end
 
@@ -1280,6 +1280,34 @@ function M.arm_action_one_shot()
 		called, published = pcall(_input_ports.arm_one_shot, issuer, at_ms, current)
 	elseif not engine.has_combinations and type(engine.arm_one_shot) == "function" then
 		called, published = pcall(engine.arm_one_shot, engine, at_ms, current)
+	else
+		return false, "the installed engine has no input owner"
+	end
+	if not called or published ~= true then return false, "the engine refused the arm" end
+	return true
+end
+
+--- Arms sticky (one-shot) modifiers from an action (a gesture, a key, a
+--- tap-hold tap) through the installed tap-hold engine, as arm_action_one_shot
+--- arms the one-shot Shift: the next key that is not a modifier goes down with
+--- them, once.
+--- @param codes table Modifier key codes (tap_hold_engine STICKY_MODIFIER_CODES).
+--- @return boolean armed
+--- @return string|nil refusal
+function M.arm_action_sticky(codes)
+	local engine, generation, issuer = _remapper, _remapper_generation, _remapper_input_owner
+	if not _running or not _intercept or not engine then return false, "no tap-hold engine is installed" end
+	local at_ms = _event_clock_now_ms()
+	if not at_ms then return false, "no keyboard event has set the engine clock yet" end
+	local function current()
+		return package.loaded["adapters.keyboard_hook"] == M and _running and _intercept
+			and _remapper == engine and _remapper_generation == generation and _remapper_input_owner == issuer
+	end
+	local called, published
+	if issuer then
+		called, published = pcall(_input_ports.arm_sticky, issuer, at_ms, codes, current)
+	elseif not engine.has_combinations and type(engine.arm_sticky) == "function" then
+		called, published = pcall(engine.arm_sticky, engine, at_ms, codes, current)
 	else
 		return false, "the installed engine has no input owner"
 	end
