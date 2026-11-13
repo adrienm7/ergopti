@@ -124,7 +124,10 @@ helpers.describe("ui.bridge_handlers", function()
 					return true
 				end,
 				notify_restart_required = function() captured.notices = captured.notices + 1 end,
-				notify_error = function(key) captured.errors[#captured.errors + 1] = key end,
+				notify_error = function(key, translate)
+					captured.errors[#captured.errors + 1] = key
+					captured.translated = translate and translate(key) or nil
+				end,
 			}
 			return state, values, captured
 		end
@@ -316,6 +319,30 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(handler.on_message({
 				action = "localeSelected", locale = "xx",
 			}, state).accepted, false)
+		end)
+
+		-- The host's dialogs speak the language chosen on the first step, as on
+		-- Windows and macOS (OBM-001), not the running one.
+		helpers.it("(onboarding-host-dialog-locale) host dialogs follow the chosen locale", function()
+			local state, _, captured = onboarding_state()
+			handler.on_message({ action = "ready" }, state)
+			helpers.assert_true(handler.on_message({ action = "localeSelected", locale = "fr" }, state).accepted)
+			local command
+			state.shell = {
+				has_command = function(binary) return binary == "zenity" end,
+				quote = function(value) return "'" .. value .. "'" end,
+				exec_checked = function(line) command = line; return false end,
+			}
+			handler.on_message({ action = "pickConfigDir", current = "" }, state)
+			helpers.assert_contains(command, "Sélectionner le dossier de configuration")
+			handler.on_message({ action = "finish", answers = {} }, state)
+			helpers.assert_eq(captured.errors[1], "onboarding.error.invalid_answers")
+			helpers.assert_contains(captured.translated, "Les réponses de l’assistant")
+			handler.on_message({ action = "ready" }, state)
+			command = nil
+			handler.on_message({ action = "pickConfigDir", current = "" }, state)
+			helpers.assert_true(command ~= nil and not command:find("Sélectionner", 1, true),
+				"a fresh page starts in the running language")
 		end)
 
 		helpers.it("(onboarding-window-title) retitles the window in the previewed locale", function()

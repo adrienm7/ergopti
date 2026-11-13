@@ -3250,13 +3250,14 @@ local function main()
 				end
 			end,
 			-- A refusal may carry its own localized text (a value check naming the
-			-- range); the key alone names the message otherwise.
-			notify_error = function(key, text)
+			-- range), and a host may pass its own translator instead: the onboarding
+			-- wizard speaks the language chosen on its first step.
+			notify_error = function(key, detail)
 				if notifier and ok_i18n and i18n_mod then
-					local message = i18n_mod.get(key)
-					if type(text) == "string" then message = text end
+					local get = type(detail) == "function" and detail or i18n_mod.get
+					local message = type(detail) == "string" and detail or get(key)
 					notifier.send(message, {
-						title = i18n_mod.get("common.error_title"), level = "error",
+						title = get("common.error_title"), level = "error",
 					})
 				end
 			end,
