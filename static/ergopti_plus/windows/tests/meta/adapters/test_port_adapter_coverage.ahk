@@ -6,8 +6,8 @@
 ; Verifies three structural invariants of the hexagonal architecture:
 ;
 ; 1. ADAPTER PRESENCE  --  Every port spec in _shared/core/ports/*.spec.js has a
-;    matching adapter file in static/ergopti_plus/windows/adapters/ and in
-;    static/ergopti_plus/macos/adapters/. A missing adapter means a port
+;    adapter listed in _shared/core/ports/adapters.json, on Windows and on
+;    macOS, and that file exists. A missing adapter means a port
 ;    contract exists on paper but is not honoured by a driver.
 ;
 ; 2. DOMAIN TEST COVERAGE  --  Every domain spec in _shared/core/domain/*.spec.js
@@ -51,12 +51,6 @@ _MetaPACBaseName(Path) {
 	return RegExReplace(Name, "\.[^.]+$", "")
 }
 
-; Converts PascalCase to snake_case (e.g. "KeyboardHook" -> "keyboard_hook").
-_MetaPACToSnake(S) {
-	S := RegExReplace(S, "([A-Z])", "_$L1")
-	return LTrim(StrLower(S), "_")
-}
-
 
 
 
@@ -74,9 +68,15 @@ _MetaRunAdapterPresenceTests() {
 	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
 	SharedPorts := RepoRoot . "/static/ergopti_plus/_shared/core/ports"
-	AhkAdapters   := RepoRoot . "/static/ergopti_plus/windows/adapters"
-	HsAdapters    := RepoRoot . "/static/ergopti_plus/macos/adapters"
-	LinuxAdapters := RepoRoot . "/static/ergopti_plus/linux/adapters"
+	; Where each adapter lives, by repository path: the structure plan moves
+	; adapters into the features they serve, often renamed, so one table
+	; (shared with the JS matrix and the macOS coverage test) follows each move.
+	Adapters := JsonParse(FileRead(StrReplace(SharedPorts . "/adapters.json", "/", "\"), "UTF-8"))["adapters"]
+	AdapterPath(Port, Driver) {
+		if Adapters.Has(Port) && Adapters[Port].Has(Driver)
+			return RepoRoot . "/" . Adapters[Port][Driver]
+		return "(no " . Driver . " entry in adapters.json)"
+	}
 
 	SpecFiles    := _MetaPACListFiles(SharedPorts, "js")
 	MissingAhk   := 0
@@ -90,10 +90,9 @@ _MetaRunAdapterPresenceTests() {
 		}
 		SpecCount++
 		RawName   := _MetaPACBaseName(SpecPath)
-		SnakeName := _MetaPACToSnake(RawName)
-		AhkFile   := AhkAdapters   . "/" . SnakeName . ".ahk"
-		HsFile    := HsAdapters    . "/" . SnakeName . ".lua"
-		LinuxFile := LinuxAdapters . "/" . SnakeName . ".lua"
+		AhkFile   := AdapterPath(RawName, "windows")
+		HsFile    := AdapterPath(RawName, "macos")
+		LinuxFile := AdapterPath(RawName, "linux")
 		if not FileExist(StrReplace(AhkFile, "/", "\")) {
 			MissingAhk++
 			OutputDebug("WARN: AHK adapter missing for port '" . RawName . "': " . AhkFile)
