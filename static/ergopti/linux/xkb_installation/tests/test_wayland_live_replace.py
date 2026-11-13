@@ -5,9 +5,11 @@ use, moves the desktop setting to it and succeeds only once XWayland, which
 receives the compositor's keymap, holds that slot with the installed cells.
 
 No GNOME or KDE runs here. The desktop setting is a fake ``gsettings`` (or
-``kreadconfig6``/``kwriteconfig6``) backed by files, and the compositor is a
-stand-in that, like mutter and KWin, compiles the first listed layout when the
-setting's value changes and hands it to an Xvfb server playing XWayland. What
+``kreadconfig6``/``kwriteconfig6``) backed by files, the Ergopti GNOME Shell
+extension a fake ``gdbus`` that activates a listed source, and the compositor
+a stand-in that, like mutter and KWin, compiles the active layout (GNOME: the
+one the extension activated; KDE: the first listed) when it changes and hands
+it to an Xvfb server playing XWayland. What
 this proves: the slot alternation, the setting writes and read-backs, the
 restoration on every refusal and the read-back of the loaded cells. What it
 cannot prove: that mutter and KWin read the user tree and recompile on that
@@ -59,6 +61,26 @@ else:
     sys.exit(1)
 """
 
+# gdbus call ... --method org.ergopti.InputSource1.Activate 'xkb:<id>': the
+# extension activates a source the Shell lists (store/gnome-sources), or the
+# Shell has no such object when store/no-extension exists.
+FAKE_GDBUS = """#!/usr/bin/env python3
+import ast, os, pathlib, sys
+store = pathlib.Path(os.environ["FAKE_DESKTOP_STORE"])
+if (store / "no-extension").exists():
+    sys.stderr.write("Error: GDBus.Error:org.freedesktop.DBus.Error.UnknownMethod: "
+                     "Object does not exist at path '/org/ergopti/InputSource'\\n")
+    sys.exit(1)
+source = ast.literal_eval(sys.argv[-1])
+listed = (store / "gnome-sources").read_text() if (store / "gnome-sources").exists() else ""
+kind, _, ident = source.partition(":")
+if "('%s', '%s')" % (kind, ident) in listed:
+    (store / "gnome-active").write_text(ident)
+    print("(true,)")
+else:
+    print("(false,)")
+"""
+
 # kreadconfig6/kwriteconfig6 --file kxkbrc --group Layout --key KEY [VALUE]
 FAKE_KCONFIG = """#!/usr/bin/env python3
 import os, pathlib, sys
@@ -88,14 +110,13 @@ class FakeCompositor:
         self._thread = threading.Thread(target=self._run, daemon=True)
 
     def _value(self) -> str | None:
-        name = "gnome-sources" if self.desktop == "gnome" else "kde-LayoutList"
+        name = "gnome-active" if self.desktop == "gnome" else "kde-LayoutList"
         path = self.store / name
         return path.read_text() if path.exists() else None
 
     def _first(self, value: str) -> str | None:
         if self.desktop == "gnome":
-            sources = parse_gsettings_sources(value) or []
-            return next((ident for kind, ident in sources if kind == "xkb"), None)
+            return value.strip() or None
         layouts = parse_kde_layouts(value, "")
         return layouts[0].layout if layouts else None
 
@@ -134,6 +155,7 @@ class WaylandLiveReplaceTests(unittest.TestCase):
         self.bin.mkdir()
         for name, text in (
             ("gsettings", FAKE_GSETTINGS),
+            ("gdbus", FAKE_GDBUS),
             ("kreadconfig6", FAKE_KCONFIG),
             ("kwriteconfig6", FAKE_KCONFIG),
         ):
@@ -202,7 +224,7 @@ class WaylandLiveReplaceTests(unittest.TestCase):
     def apply(self, environ: dict) -> dict:
         with mock.patch.dict(os.environ, environ):
             return installer.apply_wayland(
-                "ergol", "ergol", self.source, ["fr"], self.root, self.home, 1, environ
+                "ergol", "ergol", self.source, ["fr"], self.root, self.home, environ
             )
 
     def test_each_build_moves_gnome_to_the_other_slot_and_is_read_back(self) -> None:
@@ -224,14 +246,8 @@ class WaylandLiveReplaceTests(unittest.TestCase):
                 )
                 self.assertEqual(self.gnome("sources"), [("xkb", slot), ("xkb", "us")])
                 self.assertEqual(self.gnome("mru-sources")[0], ("xkb", slot))
-            # GNOME gets the slot alone, then the merged list: the same first source
-        # twice, which this polling compositor may see as one load or two.
-        distinct = [
-            slot
-            for index, slot in enumerate(compositor.loads)
-            if index == 0 or compositor.loads[index - 1] != slot
-        ]
-        self.assertEqual(distinct, list(expected_slots))
+        # The Shell switches only through the extension: one load per build.
+        self.assertEqual(compositor.loads, list(expected_slots))
         manifest = installer.read_manifest(self.root)
         self.assertEqual(sorted(manifest), ["ergol", "ergol_live"], "two copies at most")
         for slot in ("ergol", "ergol_live"):
@@ -265,6 +281,24 @@ class WaylandLiveReplaceTests(unittest.TestCase):
                 report = self.apply(self.environ(server, "GNOME"))
         self.assertEqual(report["code"], desktop_activation.WAYLAND_SELECT_REFUSED)
         self.assertEqual(self.gnome("sources"), [("xkb", "us")])
+
+    def test_gnome_without_the_extension_is_refused_and_restored(self) -> None:
+        """gnome-runtime-switch: a running Shell switches only through the Ergopti
+        extension; without it the setting is put back and the code names it."""
+        self.login()
+        before = "[('xkb', 'ergol'), ('xkb', 'us')]"
+        (self.store / "gnome-sources").write_text(before)
+        (self.store / "gnome-mru-sources").write_text(before)
+        (self.store / "no-extension").write_text("")
+        with XvfbServer() as server, FakeCompositor(
+            self.store, "gnome", self.root, server.display
+        ) as compositor:
+            report = self.apply(self.environ(server, "GNOME"))
+            self.assertFalse(report["ok"], report)
+            self.assertEqual(report["code"], desktop_activation.WAYLAND_GNOME_EXTENSION_MISSING)
+            self.assertEqual(compositor.loads, [])
+        self.assertEqual(self.gnome("sources"), parse_gsettings_sources(before))
+        self.assertEqual(self.gnome("mru-sources"), parse_gsettings_sources(before))
 
     def test_kde_moves_the_layout_list_and_is_read_back(self) -> None:
         (self.store / "kde-LayoutList").write_text("us,ergol")

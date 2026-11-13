@@ -1103,7 +1103,7 @@ end
 --- on_done(true, { id, rows, slot }) or on_done(false, failure_code, detail,
 --- user_message, live_code) runs once unless terminal shutdown cancels its delivery.
 --- live_code is the installer's closed code (not_loaded, stale_keymap, select_refused,
---- ...) when the load failed.
+--- gnome_extension_missing, ...) when the load failed.
 --- @param id string|nil Installed layout id; nil takes the active or the only one.
 --- @param rows table { order = "native"|"digits"|"symbols", edges = boolean }
 --- @param on_done function
@@ -1160,8 +1160,7 @@ function M.apply_rows(id, rows, on_done, deps)
 		end
 		if path == "wayland" then
 			local args = { "apply-wayland", "--layout-id", base, "--display-name", entry.name,
-				"--source-dir", deps.local_dir .. base, "--gnome-settle-ms",
-				tostring(require("infra.timings").ms("ui", "gnome_input_source_settle_ms")) }
+				"--source-dir", deps.local_dir .. base }
 			for _, language in ipairs(type(entry.languages) == "table" and entry.languages or {}) do
 				args[#args + 1] = "--language"
 				args[#args + 1] = language

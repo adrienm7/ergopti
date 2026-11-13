@@ -720,7 +720,36 @@ def apply_gnome(specs: list[LayoutSpec], tokens: set[str]) -> bool:
     else:
         print("   ✅ GNOME : la disposition est déjà en première position.")
     _gnome_make_most_recent(wanted, changed)
+    if is_gnome_session(tokens):
+        # Only a GNOME session runs the Shell the extension lives in.
+        _gnome_switch_running_shell("xkb:" + wanted[0][1])
     return True
+
+
+def _gnome_switch_running_shell(source_id: str) -> None:
+    """Switches the running Shell, which ignores the lists until the next login.
+
+    Only the Ergopti GNOME Shell extension can; a Shell that does not list the
+    layout yet (registered after it started) keeps its own, never the "us"
+    fallback, since the extension activates listed sources only."""
+    state = gnome_activate_when_listed(source_id)
+    if state == GNOME_SWITCH_SWITCHED:
+        print("   ✅ GNOME : disposition activée dans la session en cours.")
+    elif state == GNOME_SWITCH_MISSING:
+        print(
+            "   ℹ️  GNOME : l'extension Ergopti n'est pas active ; la disposition "
+            "sera active à la prochaine connexion."
+        )
+    elif state == GNOME_SWITCH_UNLISTED:
+        print(
+            "   ℹ️  GNOME Shell ne connaît pas encore cette disposition : elle sera "
+            "active à la prochaine connexion."
+        )
+    else:
+        print(
+            "   ⚠️  GNOME : la session en cours n'a pas changé de disposition ; elle "
+            "sera active à la prochaine connexion."
+        )
 
 
 def _gnome_make_most_recent(wanted: list[tuple[str, str]], sources_changed: bool) -> None:
@@ -1080,6 +1109,7 @@ WAYLAND_SELECT_REFUSED = "select_refused"
 WAYLAND_NOT_LOADED = "not_loaded"
 WAYLAND_STALE_KEYMAP = "stale_keymap"
 WAYLAND_NEEDS_RELOGIN = "needs_relogin"
+WAYLAND_GNOME_EXTENSION_MISSING = "gnome_extension_missing"
 
 # The compositor compiles the new keymap in its own time after the setting
 # changes; XWayland then receives it. A bounded poll, never a fixed sleep.
@@ -1206,33 +1236,95 @@ def read_desktop_selection(desktop: str, slots: tuple[str, str]) -> DesktopSelec
     return _read_kde_selection(slots)
 
 
-def _gnome_select(
-    slot: str, slots: tuple[str, str], selection: DesktopSelection, settle_s: float
-) -> bool:
-    """Writes the slot as the only source, waits, then the merged lists.
+# The Ergopti GNOME Shell extension's layout switch
+# (static/ergopti_plus/linux/desktop_focus/gnome/extension.js, which
+# tests/test_desktop_activation.py pins against these).
+GNOME_SWITCH_PATH = "/org/ergopti/InputSource"
+GNOME_SWITCH_INTERFACE = "org.ergopti.InputSource1"
+GNOME_SWITCH_SWITCHED = "switched"
+GNOME_SWITCH_UNLISTED = "unlisted"
+GNOME_SWITCH_MISSING = "extension_missing"
+GNOME_SWITCH_FAILED = "failed"
+# What GDBus answers for a path or method nobody exports on the Shell.
+_GNOME_SWITCH_MISSING_ERRORS = (
+    "org.freedesktop.DBus.Error.UnknownMethod",
+    "org.freedesktop.DBus.Error.UnknownObject",
+    "org.freedesktop.DBus.Error.UnknownInterface",
+)
 
-    A running GNOME Shell (checked on 46) reads mru-sources only when it
-    starts and keeps its in-memory recent list on a sources change, so a list
-    with the slot first leaves the old layout active. The slot alone is a list
-    the shell must activate; ``settle_s`` gives it the time to read that write
-    before the merged list follows (the daemon passes the shared
-    gnome_input_source_settle_ms)."""
-    if not _gnome_set(GNOME_KEY, [("xkb", slot)], "GNOME : disposition " + slot + " seule"):
-        return False
-    time.sleep(settle_s)
+
+def gnome_extension_activate(source_id: str) -> str:
+    """Asks the Ergopti GNOME Shell extension to activate ``source_id`` ("xkb:<id>").
+
+    A running GNOME Shell keeps its input sources in memory and ignores
+    runtime writes of ``current`` and ``mru-sources``: only code inside the
+    Shell switches it reliably. Returns one of the GNOME_SWITCH_* states."""
+    try:
+        result = subprocess.run(
+            [
+                "gdbus",
+                "call",
+                "--session",
+                "--dest",
+                "org.gnome.Shell",
+                "--object-path",
+                GNOME_SWITCH_PATH,
+                "--method",
+                GNOME_SWITCH_INTERFACE + ".Activate",
+                "'" + source_id + "'",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=15,
+            check=False,
+            env={**os.environ, "LC_ALL": "C"},
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return GNOME_SWITCH_FAILED
+    if result.returncode == 0:
+        answer = result.stdout.strip()
+        if answer == "(true,)":
+            return GNOME_SWITCH_SWITCHED
+        return GNOME_SWITCH_UNLISTED if answer == "(false,)" else GNOME_SWITCH_FAILED
+    if any(marker in result.stderr for marker in _GNOME_SWITCH_MISSING_ERRORS):
+        return GNOME_SWITCH_MISSING
+    return GNOME_SWITCH_FAILED
+
+
+def gnome_activate_when_listed(source_id: str) -> str:
+    """Activates ``source_id`` once the Shell lists it.
+
+    The Shell reads a `sources` write in its own time: until then the
+    extension answers that it does not list the source. A bounded poll,
+    never a fixed sleep."""
+    deadline = time.monotonic() + WAYLAND_READBACK_SECONDS
+    while True:
+        state = gnome_extension_activate(source_id)
+        if state != GNOME_SWITCH_UNLISTED or time.monotonic() >= deadline:
+            return state
+        time.sleep(WAYLAND_READBACK_INTERVAL_SECONDS)
+
+
+def _gnome_select(slot: str, slots: tuple[str, str], selection: DesktopSelection) -> str:
+    """Writes the merged lists with the slot first, then activates it through
+    the Ergopti GNOME Shell extension; returns a GNOME_SWITCH_* state.
+
+    The lists keep the slot first for the next login; the running Shell
+    switches only through the extension."""
     for key in (GNOME_KEY, GNOME_MRU_KEY):
         current = parse_gsettings_sources(selection.values[key]) or []
         wanted = [("xkb", slot)] + [
             pair for pair in current if not (pair[0] == "xkb" and pair[1] in slots)
         ]
         if not _gnome_set(key, wanted, "GNOME : disposition " + slot):
-            return False
+            return GNOME_SWITCH_FAILED
         readback = parse_gsettings_sources(
             run_capture(["gsettings", "get", GNOME_SCHEMA, key]) or ""
         )
         if readback != wanted:
-            return False
-    return True
+            return GNOME_SWITCH_FAILED
+    return gnome_activate_when_listed("xkb:" + slot)
 
 
 def _kde_select(slot: str, slots: tuple[str, str], selection: DesktopSelection) -> bool:
@@ -1320,7 +1412,6 @@ def select_live_slot(
     slots: tuple[str, str],
     selection: DesktopSelection,
     tree_root: Path,
-    gnome_settle_s: float,
     environ: dict[str, str] | None = None,
 ) -> tuple[bool, str]:
     """Selects ``slot`` through the desktop setting and proves it through XWayland.
@@ -1332,7 +1423,11 @@ def select_live_slot(
         return False, refusal
     display = (os.environ if environ is None else environ)["DISPLAY"]
     if selection.desktop == "gnome":
-        selected = _gnome_select(slot, slots, selection, gnome_settle_s)
+        state = _gnome_select(slot, slots, selection)
+        if state == GNOME_SWITCH_MISSING:
+            restore_desktop_selection(selection)
+            return False, WAYLAND_GNOME_EXTENSION_MISSING
+        selected = state == GNOME_SWITCH_SWITCHED
     else:
         selected = _kde_select(slot, slots, selection)
     if not selected:
