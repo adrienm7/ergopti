@@ -2090,6 +2090,24 @@ function scanFile(file, text, ctx) {
 			// name expression) are left alone.
 			add(hit.kind, j.prefix + j.text, j.prefix + hit.rendered, hit);
 		}
+	// filepath.Join("..", "..", "modules", "x.json") in Go: pieces relative to
+	// the package folder, which moves with the step as its target may.
+	if (file.endsWith('.go'))
+		for (const j of joinedPaths(text)) {
+			if (j.callee !== 'filepath.Join' || j.parts[0] !== '..') continue;
+			const oldRepo = path.posix.normalize(`${path.posix.dirname(file)}/${j.parts.join('/')}`);
+			const target = byRepoPath.get(oldRepo) || byRepoDir.get(oldRepo);
+			if (!target && !selfTarget) continue;
+			if (target === SPLIT || target === PREFIX) {
+				add('join-split', j.prefix + j.text, '(split)', { oldRepo });
+				continue;
+			}
+			const newRepo = target || oldRepo;
+			const home = path.posix.dirname(selfTarget ? PREFIX + selfTarget : file);
+			const rendered = renderJoin(j, path.posix.relative(home, newRepo));
+			if (rendered === j.text) continue;
+			add('join', j.prefix + j.text, j.prefix + rendered, { oldRepo, newRepo });
+		}
 	// "ergopti_plus/_shared/modules/llm/validate_*.py": a glob whose last segment
 	// holds the wildcard; its folder follows a folder that moves whole.
 	for (const m of text.matchAll(/(["'])([\w.%\/-]+\/[\w.%-]+)\/([^\/"'\s*]*[*?][^\/"'\s]*)\1/g)) {
