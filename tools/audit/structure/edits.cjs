@@ -111,6 +111,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "\t\tfs.mkdirSync(path.join(driver, 'core/fs/engine'), { recursive: true });"
 	},
 	{
+		// The read interlock child copies the reader adapter's ports sibling by
+		// its bare name beside the copied adapter; S04 renames it ports.ahk.
+		file: 'static/ergopti_plus/windows/tests/unit/adapters/test_file_read_activity.ahk',
+		moves: 'windows/adapters/file_system_ports.ahk',
+		from: '\tFileCopy(AdapterDir . "\\file_system_ports.ahk", PublishedDir . "\\file_system_ports.ahk")',
+		to: '\tFileCopy(AdapterDir . "\\ports.ahk", PublishedDir . "\\ports.ahk")'
+	},
+	{
 		// The opaque admission fixture stages the macOS receiver in a bootstrap
 		// tree and names it by a concatenated owner path; S08 moves it to
 		// core/network/adapters, emptying platform/network.
