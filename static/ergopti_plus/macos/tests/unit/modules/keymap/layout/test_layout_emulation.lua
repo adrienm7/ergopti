@@ -115,6 +115,19 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		helpers.assert_eq(after.unicode, "e", "Delete dropped the dead key")
 	end)
 
+	helpers.it("drops a pending dead key at a pause so it never composes after the resume (pause-drops-dead-key)", function()
+		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
+		M.reload()
+		helpers.assert_eq(M.drop_pending_dead_key(), false, "nothing pending, nothing dropped")
+		helpers.assert_true(M.key_down(event(), KC_BACKSLASH), "the dead key is deleted")
+		record.paused = true
+		helpers.assert_eq(M.drop_pending_dead_key(), true, "the pause drops the pending dead key")
+		record.paused = false
+		local after = event({}, "d")
+		M.key_down(after, KC_D)
+		helpers.assert_eq(after.unicode, "e", "the resumed key types alone, no stale circumflex")
+	end)
+
 	helpers.it("moves a Cmd chord to the system layout's key of the Command-level character", function()
 		local M = fixture({ emulated_layout = "ergopti", ergopti_base = true })
 		M.reload()
