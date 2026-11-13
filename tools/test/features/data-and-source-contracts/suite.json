@@ -809,6 +809,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-regex-tail-paths.cjs"],
 			"repro": "npm run test:structure-regex-tail-paths"
+		},
+		{
+			"id": "js-0528",
+			"ordinal": 647,
+			"name": "structure plan adds each new scope home once, never under another",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-scope-overlap.cjs"],
+			"repro": "npm run test:structure-scope-overlap"
 		}
 	]
 }
