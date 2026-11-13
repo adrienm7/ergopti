@@ -1,0 +1,59 @@
+# Direct XKB and KLC compiler fixture (tools/test/test-layout-source-compiler.cjs,
+# test-layout-editor-target-exports.cjs): layers held by modifiers no .keylayout has,
+# Right Ctrl (sided), a held and a locked custom modifier and Kana on a plain key.
+format = "ergopti-layout"
+version = 1
+[layout]
+id = "sided"
+name = "Sided"
+[physical]
+base = "iso"
+[[modifiers]]
+id = "nav"
+mode = "held"
+keys = ["CapsLock"]
+[[modifiers]]
+id = "sym"
+mode = "locked"
+keys = ["ContextMenu"]
+[[layers]]
+id = "base"
+required = []
+optional = ["caps_lock"]
+keys = { KeyA = { text = "a" }, KeyB = { text = "b" } }
+[[layers]]
+id = "shift"
+required = ["shift"]
+optional = ["caps_lock"]
+keys = { KeyA = { text = "A" }, KeyB = { text = "B" } }
+[[layers]]
+id = "altgr"
+required = ["alt_right"]
+optional = ["caps_lock"]
+keys = { KeyA = { text = "æ" } }
+[[layers]]
+id = "rctrl"
+required = ["control_right"]
+optional = ["caps_lock"]
+keys = { KeyA = { text = "α" }, KeyB = { text = "β" } }
+[[layers]]
+id = "nav"
+required = ["nav"]
+optional = ["caps_lock"]
+keys = { KeyA = { text = "←" } }
+[[layers]]
+id = "sym"
+required = ["sym"]
+optional = ["caps_lock"]
+keys = { KeyB = { text = "→" } }
+[[layers]]
+id = "kana"
+required = ["kana"]
+optional = ["caps_lock"]
+keys = { KeyB = { text = "ka" } }
+[windows]
+kana_key = "F12"
+[exports.windows]
+locale = "fr-FR"
+layout_id = "0000040c"
+dll_name = "kbdsided"

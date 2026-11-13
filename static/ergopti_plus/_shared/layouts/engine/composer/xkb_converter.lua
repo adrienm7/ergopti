@@ -48,6 +48,22 @@ local XKB_LEVELS = {
 	{ "shift", "option" },
 }
 
+-- A source compiled straight to XKB (layout_composer/target_compiler.js) may
+-- hold one more modifier on XKB's fifth level: its canonical selectors name it
+-- "level5", and its keys type ISO_Level5_Shift or ISO_Level5_Lock. The type
+-- then grows these four levels after the seven (Caps Lock leaves them as they
+-- are, as it leaves AltGr's); it is written from the shipped seven-level type,
+-- so the two stay one definition.
+local LEVEL5_TOKEN = "level5"
+local LEVEL5_TYPE_NAME = "ERGOPTI_ELEVEN_LEVEL"
+local LEVEL5_LEVELS = {
+	{ { LEVEL5_TOKEN }, "LevelFive", "Level5" },
+	{ { "shift", LEVEL5_TOKEN }, "Shift + LevelFive", "Shift + Level5" },
+	{ { "option", LEVEL5_TOKEN }, "LevelThree + LevelFive", "AltGr + Level5" },
+	{ { "shift", "option", LEVEL5_TOKEN }, "Shift + LevelThree + LevelFive", "Shift + AltGr + Level5" },
+}
+local LEVEL5_KEYSYMS = { ISO_Level5_Shift = true, ISO_Level5_Lock = true }
+
 -- The number-row options (layout.direct_access_digits, layout.number_row_reorder_edges):
 -- the XKB names of the ten digit keys (1 to 0) and of the three edge keys, and which
 -- level takes which when a key trades its unshifted and Shift cells (levels 1 to 4 of
@@ -302,16 +318,71 @@ end
 local Converter = {}
 Converter.__index = Converter
 
-local function new_converter(layout, keycodes, hints, keysyms, private_states)
+--- The levels and key type a conversion writes: the seven-level type, or the
+--- eleven-level one when the source holds a modifier on XKB's fifth level.
+--- @param level5 table|nil { keys = { { xkb = "RCTL", keysym = "ISO_Level5_Shift" }... } }
+--- @return table { name, levels }
+function M.level_plan(level5)
+	if level5 == nil then return { name = TYPE_NAME, levels = XKB_LEVELS } end
+	if type(level5.keys) ~= "table" or #level5.keys == 0 then fail("the fifth level has no key") end
+	for _, key in ipairs(level5.keys) do
+		if type(key.xkb) ~= "string" or not key.xkb:match("^%u[%u%d]*$") then fail("a fifth-level key needs an XKB key name") end
+		if not LEVEL5_KEYSYMS[key.keysym] then fail("a fifth-level key types ISO_Level5_Shift or ISO_Level5_Lock") end
+	end
+	local levels = {}
+	for index, tokens in ipairs(XKB_LEVELS) do levels[index] = tokens end
+	for _, level in ipairs(LEVEL5_LEVELS) do levels[#levels + 1] = level[1] end
+	return { name = LEVEL5_TYPE_NAME, levels = levels }
+end
+
+--- The types file a conversion ships: the shipped one, with the eleven-level
+--- type written from its seven-level type when the fifth level is used.
+--- @param types string Shipped xkb_types.txt.
+--- @param level5 table|nil As M.level_plan.
+--- @return string types
+function M.types_text(types, level5)
+	if level5 == nil then return types end
+	local start = types:find('type%s+"' .. TYPE_NAME .. '"%s*{')
+	if not start then fail("the types file has no " .. TYPE_NAME .. " type") end
+	local stop = select(2, types:find("\n%s*};", start))
+	if not stop then fail("the " .. TYPE_NAME .. " type is not closed") end
+	local block = types:sub(start, stop)
+	block = block:gsub('"' .. TYPE_NAME .. '"', '"' .. LEVEL5_TYPE_NAME .. '"', 1)
+	local modifiers_found
+	block, modifiers_found = block:gsub("(modifiers%s*=%s*[^;]-LevelThree)", "%1 + LevelFive", 1)
+	if modifiers_found ~= 1 then fail("the " .. TYPE_NAME .. " type has no LevelThree modifiers line") end
+	-- Integer levels: xkbcomp names only Level1 to Level8.
+	local maps, names = {}, {}
+	for offset, level in ipairs(LEVEL5_LEVELS) do
+		local number = #XKB_LEVELS + offset
+		maps[#maps + 1] = string.format("        map[%s] = %d;", level[2], number)
+		maps[#maps + 1] = string.format("        map[Lock + %s] = %d;", level[2], number)
+		names[#names + 1] = string.format('        level_name[%d] = "%s";', number, level[3])
+	end
+	local last_map = 0
+	for position in block:gmatch("()map%[[^\n]*\n") do last_map = position end
+	local map_end = block:find("\n", last_map, true)
+	block = block:sub(1, map_end) .. table.concat(maps, "\n") .. "\n" .. block:sub(map_end + 1)
+	local last_name = 0
+	for position in block:gmatch("()level_name%[[^\n]*\n") do last_name = position end
+	if last_name == 0 then fail("the " .. TYPE_NAME .. " type has no level names") end
+	local name_end = block:find("\n", last_name, true)
+	block = block:sub(1, name_end) .. table.concat(names, "\n") .. "\n" .. block:sub(name_end + 1)
+	return types:sub(1, stop) .. "\n\n    " .. block .. types:sub(stop + 1)
+end
+
+local function new_converter(layout, keycodes, hints, keysyms, private_states, plan)
 	local self = setmetatable({}, Converter)
 	self.layout = layout
+	self.type_name = plan.name
+	self.levels = plan.levels
 	-- Dead states whose trigger is borrowed instead of standard, see M.convert.
 	self.private_states = private_states
 	self.keycodes = keycodes
 	self.keysyms = keysyms
 	self.base_level_only = set_of(hints.base_level_only or {})
 	self.level_indices = {}
-	for level, modifiers in ipairs(XKB_LEVELS) do
+	for level, modifiers in ipairs(plan.levels) do
 		self.level_indices[level] = key_map_index(layout, set_of(modifiers))
 	end
 	-- Insertion order matters: XCompose lists these in this order.
@@ -536,7 +607,8 @@ function Converter:dead_sequences()
 end
 
 --- The XKB symbols file.
-function Converter:symbols(template, layout_id, display_name)
+--- @param level5_keys table|nil { { xkb, keysym }... }: the keys holding the fifth level.
+function Converter:symbols(template, layout_id, display_name, level5_keys)
 	local text = template:gsub('xkb_symbols%s+"[^"]+"', function() return 'xkb_symbols "' .. layout_id .. '"' end)
 	text = text:gsub('name%[Group1%]%s*=%s*"[^"]+";', function() return 'name[Group1] = "' .. display_name .. '";' end)
 	for _, key in ipairs(self.keycodes) do
@@ -548,7 +620,7 @@ function Converter:symbols(template, layout_id, display_name)
 			comments[#comments + 1] = ulen(shown) >= 2 and ('"' .. shown .. '"') or shown
 		end
 		local line = string.format('key <%s> { type[group1] = "%s", [%s] }; // %s',
-			xkb, TYPE_NAME, table.concat(names, ", "), table.concat(comments, " "))
+			xkb, self.type_name, table.concat(names, ", "), table.concat(comments, " "))
 		-- Exactly one `key <XXXX>[^\n]*;` match: from the key to the last ";" of its line.
 		local needle = "key <" .. xkb .. ">"
 		local matches, from = {}, 1
@@ -569,6 +641,20 @@ function Converter:symbols(template, layout_id, display_name)
 		end
 		if #matches ~= 1 then fail("the symbols template has no single line for <" .. xkb .. ">") end
 		text = text:sub(1, matches[1][1] - 1) .. line .. text:sub(matches[1][2] + 1)
+	end
+	if level5_keys ~= nil then
+		-- After the template's level3 include, so a later include cannot take them back.
+		local close = nil
+		for position in text:gmatch("()\n};") do close = position end
+		if close == nil then fail("the symbols template has no closing };") end
+		local lines = {}
+		for _, key in ipairs(level5_keys) do
+			if self.grid[key.xkb] ~= nil then fail("<" .. key.xkb .. "> types characters and cannot hold the fifth level") end
+			-- No explicit type: XKB gives a one-keysym key ONE_LEVEL, and the installer
+			-- checks every type the symbols name against the shipped types file.
+			lines[#lines + 1] = string.format("\n\tkey <%s> { [ %s ] };", key.xkb, key.keysym)
+		end
+		text = text:sub(1, close - 1) .. "\n" .. table.concat(lines) .. text:sub(close)
 	end
 	return text
 end
@@ -789,7 +875,8 @@ local function convert_once(canonical, options, private_states)
 	local converter
 	local ok, result = pcall(function()
 		local layout = index_layout(canonical)
-		converter = new_converter(layout, options.keycodes, options.hints or {}, options.keysyms, private_states)
+		local plan = M.level_plan(options.level5)
+		converter = new_converter(layout, options.keycodes, options.hints or {}, options.keysyms, private_states, plan)
 		local rows_report = options.rows ~= nil and converter:apply_rows(options.rows) or nil
 		-- Dead triggers first, in state order, so borrowed keysyms do not depend on the
 		-- order keys happen to be listed in.
@@ -804,7 +891,8 @@ local function convert_once(canonical, options, private_states)
 		end
 		table.sort(states)
 		for _, state in ipairs(states) do converter:dead_trigger(state) end
-		local symbols_text = converter:symbols(options.template, options.layout_id, options.display_name)
+		local symbols_text = converter:symbols(options.template, options.layout_id, options.display_name,
+			options.level5 and options.level5.keys)
 		local compose_text = converter:compose()
 		return {
 			symbols_text = symbols_text,
@@ -828,7 +916,8 @@ end
 ---   layout_id = string (letters, digits, "_"), display_name = string,
 ---   locale_extended_prefixes = array of space-joined keysym sequences the locale
 ---     Compose table extends (key_sym.json "locale_extended_prefixes"),
----   hints = { keysym_overrides = { {text, keysym}... }, base_level_only = { text... } } | nil }
+---   hints = { keysym_overrides = { {text, keysym}... }, base_level_only = { text... } } | nil,
+---   level5 = { keys = { { xkb, keysym }... } } | nil: the fifth level, see M.level_plan }
 --- @return table|nil result { symbols_text, compose_text, conflicts, unplaced }
 --- @return string|nil err
 function M.convert(canonical, options)
@@ -860,25 +949,32 @@ end
 --- differences are reported even when the neutral text happens to be equal.
 --- @param canonical table Schema-1 layout.
 --- @param keycodes table Array of { xkb_name, mac_code }.
---- @param types string Shipped xkb_types.txt, the owner of native level selection.
+--- @param types string The types file the conversion ships (M.types_text), the owner of native level selection.
+--- @param level5 table|nil As M.level_plan: the fifth level joins the compared modifiers.
 --- @return table report { source_levels, modifier_differences }
-function M.projection_report(canonical, keycodes, types)
+function M.projection_report(canonical, keycodes, types, level5)
 	local layout, native = index_layout(canonical), {}
+	local plan = M.level_plan(level5)
 	local function signature(tokens)
 		table.sort(tokens)
 		return table.concat(tokens, "+")
 	end
-	for keys, level in types:gmatch("map%[([^%]]+)%]%s*=%s*Level(%d+)") do
+	local start = types:find('type%s+"' .. plan.name .. '"%s*{')
+	assert(start, "the types file has no " .. plan.name .. " type")
+	local block = types:sub(start, (select(2, types:find("\n%s*};", start))))
+	for keys, spelled in block:gmatch("map%[([^%]]+)%]%s*=%s*(%w+)") do
 		local tokens = {}
 		for token in keys:gmatch("%a[%w_]*") do if token ~= "None" then tokens[#tokens + 1] = token end end
-		level = tonumber(level)
-		assert(XKB_LEVELS[level], "unknown XKB projection level")
+		-- A level is LevelN (xkbcomp names one to eight) or its number.
+		local level = tonumber(spelled:match("^Level(%d+)$") or spelled:match("^(%d+)$"))
+		assert(plan.levels[level], "unknown XKB projection level")
 		native[signature(tokens)] = level
 	end
 	assert(native[""] == 1, "XKB type has no base mapping")
 	local modifiers = { { "shift", "Shift" }, { "caps", "Lock" }, { "option", "LevelThree" }, { "control", "Control" }, { "command", "Mod4" } }
+	if level5 ~= nil then modifiers[#modifiers + 1] = { LEVEL5_TOKEN, "LevelFive" } end
 	local differences = {}
-	for mask = 0, 31 do
+	for mask = 0, 2 ^ #modifiers - 1 do
 		local source, target = {}, {}
 		for bit, pair in ipairs(modifiers) do
 			if math.floor(mask / 2 ^ (bit - 1)) % 2 == 1 then source[#source + 1] = pair[1]; target[#target + 1] = pair[2] end
@@ -886,7 +982,7 @@ function M.projection_report(canonical, keycodes, types)
 		-- XKB's default level is one for combinations absent from the type map.
 		local level = native[signature(target)] or 1
 		local original = key_map_index(layout, set_of(source))
-		local projected = key_map_index(layout, set_of(XKB_LEVELS[level]))
+		local projected = key_map_index(layout, set_of(plan.levels[level]))
 		local changed = {}
 		for _, key in ipairs(keycodes) do
 			local before = key_entry(layout, canonical.map_set, original, key[2], 0)
@@ -896,7 +992,7 @@ function M.projection_report(canonical, keycodes, types)
 		if #changed > 0 then differences[#differences + 1] = { modifiers = source, level = level, key_codes = changed } end
 	end
 	local empty, bound = {}, {}
-	for level, modifiers_at_level in ipairs(XKB_LEVELS) do
+	for level, modifiers_at_level in ipairs(plan.levels) do
 		local index = key_map_index(layout, set_of(modifiers_at_level))
 		local codes = {}
 		for _, key in ipairs(keycodes) do
@@ -912,7 +1008,7 @@ function M.projection_report(canonical, keycodes, types)
 			if when.state ~= "none" and not bound[action.id] then unbound[#unbound + 1] = action.id; break end
 		end
 	end
-	return { source_levels = TableUtil.deep_copy(XKB_LEVELS), modifier_differences = differences, empty_cells = empty, unbound_actions = unbound }
+	return { source_levels = TableUtil.deep_copy(plan.levels), modifier_differences = differences, empty_cells = empty, unbound_actions = unbound }
 end
 
 return M

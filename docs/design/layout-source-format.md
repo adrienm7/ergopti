@@ -15,8 +15,9 @@ byte for byte). The one generator,
 `static/ergopti_plus/_shared/ui/layout_composer/source_compiler.js`, compiles a
 structured source into a `.keylayout` per physical variant, lays out the macOS
 bundle, and reports per record what each target leaves out. The Linux XKB and
-Windows KLC exports read that same compiled `.keylayout` through their existing
-converters, so every target consumes one compilation. It is a pure classic
+Windows KLC exports compile the same records straight to their writers' canonical
+form (`layout_composer/target_compiler.js`, see [Direct XKB and KLC
+compilation](#direct-xkb-and-klc-compilation)), with no `.keylayout` in between. It is a pure classic
 script: pages, the app webviews and the Node tools load it after
 `composer_model.js` and `source_model.js` and pass it the key tables. The [unified
 layout editor](layout-editor.md) consumes this model through
@@ -65,7 +66,9 @@ filesystem write failure is reported and may leave an incomplete directory.
 
 The Linux result is explicitly **partial**, never a claim of native behavior
 parity. Seven character levels are generated: base, Caps, Shift, Shift+Caps,
-Command shortcuts, Option and Shift+Option. The report compares the actual
+Command shortcuts, Option and Shift+Option, and four more when the source holds
+a modifier on XKB's fifth level (see [Direct XKB and KLC
+compilation](#direct-xkb-and-klc-compilation)). The report compares the actual
 source entries (including action identities) against native selection for all
 32 combinations of Shift, Caps, Option, Control and Command, listing changed
 physical keycodes for each combination. Option becomes AltGr; Linux Alt,
@@ -85,7 +88,7 @@ states and outputs,
 Compose conflicts and unplaced non-keypad typing keys. It reuses the canonical
 reader's tag scanner; it is not an additional XML parser or a DTD validator.
 An edited preserved import is refused; a structured source reaches the
-converter as its compiled `.keylayout` (see [The generator](#the-generator)). Linux name/description
+converter as its canonical form, compiled straight from the source. Linux name/description
 metadata are compiled, while other target preferences do not affect this
 export. Description characters unsafe in the existing converter's XKB quoted
 string are refused. Registry-specific driver hints are not inferred from a name.
@@ -235,7 +238,7 @@ base = "iso"
 ansi_extra_key = "Backquote"
 
 [[modifiers]]
-id = "kana"
+id = "navlock"
 mode = "locked"
 keys = ["ScrollLock"]
 
@@ -247,7 +250,7 @@ keys = { KeyA = { text = "a" }, KeyB = { text = "ffi🦆" } }
 
 [[layers]]
 id = "nav"
-required = ["kana"]
+required = ["navlock"]
 optional = []
 keys = { KeyJ = { action = "arrow_left" } }
 
@@ -316,12 +319,51 @@ Lock there), `action`/`key` mappings, and keys with no macOS code. Two keys
 sharing a compose identity with different texts are refused
 (`source_compose_conflict`).
 
-For Linux and Windows the compilation is the input of their converters, which
-read Option as AltGr: `alt_right` folds onto it (AltGr is the right Alt key),
-other sided modifiers drop their layer with `sided_modifier_not_in_<platform>`,
-and a disabled character key becomes an empty cell
-(`disabled_key_is_empty_cell`). Each converter's own report (projection levels,
-KLC column limits) follows.
+The ErgoptiPlus composer host still receives this `.keylayout` for Linux (the
+driver installs it through the converter) and the emulation table lists what it
+leaves out; the Linux XKB and Windows KLC exports compile the source directly
+(next section).
+
+### Direct XKB and KLC compilation
+
+`LayoutTargetCompiler.target(source, tables, platform)` compiles a structured
+source to the canonical form both writers read (schema 1 of
+`_shared/layouts/engine/composer/keylayout.lua`), through the same keyMaps,
+actions and transitions as the `.keylayout` (`compileModel`), and a preserved
+import stays its own XML. Each target chooses which source modifier reaches
+which of its levels:
+
+| Source modifier                                                            | Linux XKB                                                                                   | Windows KLC                                                                                                                           |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `shift`, `caps_lock`, `meta`, `control`                                    | Shift, Lock, the Command shortcut level                                                     | Shift column, Caps Lock attribute; Ctrl/Command are not compiled                                                                      |
+| `alt`, `alt_right`                                                         | AltGr (level 3, `ISO_Level3_Shift` on Right Alt)                                            | AltGr columns (Ctrl+Alt)                                                                                                              |
+| `kana`                                                                     | AltGr, unless Alt selects a layer: then the fifth level when its key can hold it            | The Kana bit (shift state 8) when `windows.kana_key` has a plain scan code, else AltGr                                                |
+| A custom modifier, a sided one (Right Ctrl, Left Alt, either Shift or Win) | The fifth level (`ISO_Level5_Shift`, or `ISO_Level5_Lock` when locked) on its modifier keys | The Roya, then Loya, then a free Kana bit (16, 32, 8) on its key's plain scan code; a custom `roya` or `loya` takes its own bit first |
+
+XKB has one fifth level: the first such modifier in layer order whose keys
+can hold it (Caps Lock, either Shift, Control, Win, Left Alt or Menu: a
+character key keeps its row, Right Alt stays AltGr) takes it; the type grows to
+eleven levels (`ERGOPTI_ELEVEN_LEVEL`, written from the shipped seven-level type
+into the exported `xkb_types.txt`) and its keys get a one-keysym row (XKB gives it `ONE_LEVEL`) after the
+template's level-three include. A KLC row puts the bit's virtual key on its key
+(`VK_KANA`, `VK_OEM_FJ_ROYA`, `VK_OEM_FJ_LOYA`); an E0 key (Right Ctrl, Right
+Alt, the Win keys) cannot move there, and Roya and Loya cannot lock. The key
+holding a level no longer acts as its own modifier, which the reports say.
+Decided by the agent on 2026-11-13, to review by the maintainer.
+
+The rest is left out with a stable reason (`xkb_level5_taken`,
+`modifier_key_cannot_hold_xkb_level5`, `modifier_key_not_in_klc`,
+`locked_modifier_not_in_klc`, `klc_modifier_bits_taken`, `kana_level_taken_by_alt`,
+and the `.keylayout`'s own reasons spelled for the format, such as
+`shortcut_output_not_in_xkb`), and the driver's emulation table performs it. A
+disabled character key becomes an empty cell (`disabled_key_is_empty_cell`).
+With none of these extra levels the canonical form is exactly the reading of the
+compiled `.keylayout`, so the shipped layouts keep their bytes
+(`tools/test/test-layout-source-compiler.cjs`, which also pins
+`_shared/tests/corpus/layouts/source/direct_levels.toml`; the page writes the
+same files, `tools/test/test-layout-editor-target-exports.cjs`). Each writer's
+own report (projection levels, KLC column limits, `level5`, `modifier_bits`)
+follows.
 
 ### The Kana level
 
@@ -329,12 +371,12 @@ KLC column limits) follows.
 AltGr. Each target maps it to its closest native level; decided by the coordinator on 2026-11-11, to review by the
 maintainer:
 
-| Target                | Kana becomes                                                                                                           | Cannot                                                                                                   |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| macOS `.keylayout`    | The Option level (`anyOption`), where Ergopti's macOS layout puts it; KbdEdit's own export uses Command.               | Keep Option shortcuts free: both Option keys select the level, as for any macOS layout with Option text. |
-| Linux XKB             | The AltGr level (Option through the converter: `ISO_Level3_Shift`).                                                    | Have a separate Kana level: XKB's fifth level is not generated.                                          |
-| Windows KLC           | The AltGr columns, the only extra level MSKLC writes.                                                                  | Carry `KBDKANA`: the keyboard DLL generator (`docs/design/layout-windows-dll.md`) writes the real level. |
-| Emulation and preview | A native layer: no driver reports Kana, so the engines know the id and never select it; the preview types it with Alt. | Emulate a Kana level the target left out.                                                                |
+| Target                | Kana becomes                                                                                                           | Cannot                                                                                                     |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| macOS `.keylayout`    | The Option level (`anyOption`), where Ergopti's macOS layout puts it; KbdEdit's own export uses Command.               | Keep Option shortcuts free: both Option keys select the level, as for any macOS layout with Option text.   |
+| Linux XKB             | The AltGr level (`ISO_Level3_Shift`); the fifth level when Alt takes AltGr and Kana's key can hold it.                 | Have a separate Kana level beside AltGr on Right Alt.                                                      |
+| Windows KLC           | The Kana bit (shift states 8 and 9) when `windows.kana_key` has a plain scan code, else the AltGr columns.             | Move Kana to Right Alt (an E0 key): the keyboard DLL generator (`docs/design/layout-windows-dll.md`) does. |
+| Emulation and preview | A native layer: no driver reports Kana, so the engines know the id and never select it; the preview types it with Alt. | Emulate a Kana level the target left out.                                                                  |
 
 No collision with Ergopti's own Option on macOS: Ergopti's macOS layout (`static/layouts/registry/ergopti/ergopti.keylayout`)
 already types this level with Option (keyMaps `anyOption caps?` and `anyOption anyShift caps?`), and ErgoptiPlus's

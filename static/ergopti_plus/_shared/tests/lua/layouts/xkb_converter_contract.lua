@@ -110,6 +110,47 @@ function M.register(helpers, paths)
 			helpers.assert_true(result == nil and tostring(err):find("locale-extended", 1, true) ~= nil, "refused: " .. tostring(err))
 		end)
 
+		-- A source compiled straight to XKB (layout_composer/target_compiler.js) keeps
+		-- a layer held by a modifier no .keylayout has on XKB's fifth level.
+		helpers.it("writes the fifth level a direct compilation holds on a modifier key", function()
+			local vector = assert(Json.decode(read_all(paths.vectors))).vectors[1]
+			local canonical = assert(Keylayout.parse(vector.keylayout))
+			table.insert(canonical.selects, 1, { index = 99, modifiers = { { required = { "level5" }, optional = {} } } })
+			for _, set in ipairs(canonical.key_map_sets) do
+				if set.id == canonical.map_set then
+					set.key_maps[#set.key_maps + 1] = { index = 99, keys = { { code = 0, output = "\206\177" } } }
+				end
+			end
+			local options = options_of(vector)
+			options.level5 = { keys = { { xkb = "RCTL", keysym = "ISO_Level5_Shift" } } }
+			local result = assert(Converter.convert(canonical, options))
+			local line = result.symbols_text:match("key <AC01> {[^\n]*")
+			helpers.assert_true(line:find('"ERGOPTI_ELEVEN_LEVEL"', 1, true) ~= nil, "the eleven-level type: " .. line)
+			local _, commas = line:match(", %[([^%]]*)%]"):gsub(",", "")
+			helpers.assert_eq(commas, 10, "eleven levels")
+			helpers.assert_true(line:find(", U03B1, ", 1, true) ~= nil, "the fifth level types alpha: " .. line)
+			helpers.assert_true(result.symbols_text:find('\tkey <RCTL> { [ ISO_Level5_Shift ] };\n};', 1, true) ~= nil,
+				"Right Ctrl holds the fifth level, after the level3 include")
+			local types = Converter.types_text(read_all(paths.data_dir .. "/xkb_types.txt"), options.level5)
+			helpers.assert_true(types:find('type "ERGOPTI_SEVEN_LEVEL"', 1, true) ~= nil, "the shipped type stays")
+			helpers.assert_true(types:find("LevelThree + LevelFive + Control", 1, true) ~= nil, "the fifth level joins the modifiers")
+			helpers.assert_true(types:find("map[Shift + LevelThree + LevelFive] = 11;", 1, true) ~= nil, "the eleventh level")
+			local report = Converter.projection_report(canonical, options.keycodes, types, options.level5)
+			helpers.assert_eq(#report.source_levels, 11, "eleven projected levels")
+		end)
+
+		helpers.it("refuses a fifth level on a character key or with another keysym", function()
+			local vector = assert(Json.decode(read_all(paths.vectors))).vectors[1]
+			local canonical = assert(Keylayout.parse(vector.keylayout))
+			local options = options_of(vector)
+			options.level5 = { keys = { { xkb = "AC01", keysym = "ISO_Level5_Shift" } } }
+			local result, err = Converter.convert(canonical, options)
+			helpers.assert_true(result == nil and tostring(err):find("cannot hold the fifth level", 1, true) ~= nil, "refused: " .. tostring(err))
+			options.level5 = { keys = { { xkb = "RCTL", keysym = "Control_R" } } }
+			result, err = Converter.convert(canonical, options)
+			helpers.assert_true(result == nil and tostring(err):find("ISO_Level5_Shift", 1, true) ~= nil, "refused: " .. tostring(err))
+		end)
+
 		helpers.it("refuses an unknown keycode convention", function()
 			local keycodes, err = Converter.keycodes(assert(Json.decode(read_all(paths.keycodes))), "dvorak")
 			helpers.assert_true(keycodes == nil and type(err) == "string", "refused")

@@ -36,13 +36,25 @@ function M.read(input)
 	return { ok = true, canonical = canonical }
 end
 
---- Converts a .keylayout into XKB symbols and XCompose text with its projection report.
---- @param input table { xml, convention, layout_id, display_name, keycodes, keysyms,
----   locale_extended_prefixes, template, types }
---- @return table { ok = true, symbols, compose, projection, system_key_codes } or { ok = false, reason, ... }
+--- Converts a .keylayout, or the canonical form a structured source compiles
+--- to (layout_composer/source_compiler.js compileCanonical), into XKB symbols
+--- and XCompose text with its projection report.
+--- @param input table { xml | canonical, convention, layout_id, display_name, keycodes, keysyms,
+---   locale_extended_prefixes, template, types, level5? } (level5: see xkb_converter.level_plan)
+--- @return table { ok = true, symbols, compose, types, projection, system_key_codes } or { ok = false, reason, ... }
 function M.xkb(input)
-	local canonical, reason = Keylayout.parse_conversion(input.xml)
+	local canonical, reason
+	if input.canonical ~= nil then
+		canonical, reason = Keylayout.admit_canonical(input.canonical)
+	else
+		canonical, reason = Keylayout.parse_conversion(input.xml)
+	end
 	if not canonical then return { ok = false, reason = reason } end
+	local level5 = input.level5
+	local planned, plan_error = pcall(Converter.level_plan, level5)
+	if not planned then return { ok = false, reason = "xkb_level5_plan", detail = tostring(type(plan_error) == "table" and plan_error.keylayout_error or plan_error) } end
+	local types_ok, types = pcall(Converter.types_text, input.types, level5)
+	if not types_ok then return { ok = false, reason = "xkb_types", detail = tostring(type(types) == "table" and types.keylayout_error or types) } end
 	local codes, code_error = Converter.keycodes(input.keycodes, input.convention)
 	if not codes then return { ok = false, reason = code_error } end
 	local placed, untouched = {}, {}
@@ -72,7 +84,7 @@ function M.xkb(input)
 		if control(terminator.state) then return { ok = false, reason = "control_state_identifier" } end
 		if control(terminator.output) then return { ok = false, reason = "control_terminator", state = terminator.state } end
 	end
-	local projection = Converter.projection_report(canonical, codes, input.types)
+	local projection = Converter.projection_report(canonical, codes, types, level5)
 	for _, action in ipairs(projection.unbound_actions) do
 		-- A one-scalar action ID has a defined Unicode keysym fallback. Arbitrary
 		-- identifiers would be emitted as raw, possibly nonexistent keysyms.
@@ -81,6 +93,7 @@ function M.xkb(input)
 	local result, conversion_error = Converter.convert(canonical, {
 		keycodes = codes, keysyms = input.keysyms, locale_extended_prefixes = input.locale_extended_prefixes,
 		template = input.template, layout_id = input.layout_id, display_name = input.display_name,
+		level5 = level5,
 	})
 	if not result then return { ok = false, reason = "xkb_conversion_failed", detail = tostring(conversion_error) } end
 	if #result.conflicts > 0 then return { ok = false, reason = "compose_conflicts", conflicts = result.conflicts } end
@@ -96,7 +109,7 @@ function M.xkb(input)
 	projection.modifier_differences = Json.array(projection.modifier_differences)
 	projection.empty_cells = Json.array(projection.empty_cells)
 	projection.unbound_actions = Json.array(projection.unbound_actions)
-	return { ok = true, symbols = result.symbols_text, compose = result.compose_text,
+	return { ok = true, symbols = result.symbols_text, compose = result.compose_text, types = types,
 		projection = projection, system_key_codes = Json.array(passthrough) }
 end
 
