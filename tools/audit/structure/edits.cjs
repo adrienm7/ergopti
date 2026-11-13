@@ -80,6 +80,43 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: 'assert(json_path == shared_lua .. "/core/text/engine/json.lua"'
 	},
 	{
+		// The config migration's adapter identity vectors: synthetic sources
+		// (a cwd of /r/linux, package roots under /usr/lib/ergopti) whose driver
+		// adapter S04 moves to core/fs/adapters, inputs and answers alike.
+		file: 'static/ergopti_plus/linux/tests/unit/infra/config/test_config_migrate.lua',
+		moves: 'linux/adapters/file_system.lua',
+		from: '\t\t\t{ "@./adapters/file_system.lua", "/r/linux", "@/r/linux/adapters/file_system.lua" },',
+		to: '\t\t\t{ "@./core/fs/adapters/file_system.lua", "/r/linux", "@/r/linux/core/fs/adapters/file_system.lua" },'
+	},
+	{
+		// The same vectors, continued.
+		file: 'static/ergopti_plus/linux/tests/unit/infra/config/test_config_migrate.lua',
+		moves: 'linux/adapters/file_system.lua',
+		from: '\t\tlocal before = sibling("@./adapters/file_system.lua", "linux/adapters/file_system.lua",',
+		to: '\t\tlocal before = sibling("@./core/fs/adapters/file_system.lua", "linux/core/fs/adapters/file_system.lua",'
+	},
+	{
+		// The same vectors, continued.
+		file: 'static/ergopti_plus/linux/tests/unit/infra/config/test_config_migrate.lua',
+		moves: 'linux/adapters/file_system.lua',
+		from: '\t\t\thelpers.assert_eq(sibling("@./adapters/file_system.lua", "macos/adapters/file_system.lua",',
+		to: '\t\t\thelpers.assert_eq(sibling("@./core/fs/adapters/file_system.lua", "macos/core/fs/adapters/file_system.lua",'
+	},
+	{
+		// The same vectors, continued.
+		file: 'static/ergopti_plus/linux/tests/unit/infra/config/test_config_migrate.lua',
+		moves: 'linux/adapters/file_system.lua',
+		from: '\t\thelpers.assert_eq(inside("@/repo/static/ergopti_plus/linux/adapters/file_system.lua", own_checkout, "linux"), true)\n\t\thelpers.assert_eq(inside("@/usr/lib/ergopti/adapters/file_system.lua", own_package, "linux"), true)\n\t\thelpers.assert_eq(inside("@/tmp/.mount_Ergo12/usr/lib/ergopti/adapters/file_system.lua", own_appimage, "linux"), true)\n\t\thelpers.assert_eq(inside("@/tmp/elsewhere/adapters/file_system.lua", own_package, "linux"), false,',
+		to: '\t\thelpers.assert_eq(inside("@/repo/static/ergopti_plus/linux/core/fs/adapters/file_system.lua", own_checkout, "linux"), true)\n\t\thelpers.assert_eq(inside("@/usr/lib/ergopti/core/fs/adapters/file_system.lua", own_package, "linux"), true)\n\t\thelpers.assert_eq(inside("@/tmp/.mount_Ergo12/usr/lib/ergopti/core/fs/adapters/file_system.lua", own_appimage, "linux"), true)\n\t\thelpers.assert_eq(inside("@/tmp/elsewhere/core/fs/adapters/file_system.lua", own_package, "linux"), false,'
+	},
+	{
+		// The same vectors, continued.
+		file: 'static/ergopti_plus/linux/tests/unit/infra/config/test_config_migrate.lua',
+		moves: 'linux/adapters/file_system.lua',
+		from: '\t\thelpers.assert_eq(inside("@/repo/static/ergopti_plus/macos/adapters/file_system.lua", own_checkout, "linux"), false)',
+		to: '\t\thelpers.assert_eq(inside("@/repo/static/ergopti_plus/macos/core/fs/adapters/file_system.lua", own_checkout, "linux"), false)'
+	},
+	{
 		// The serve-command receiving test copies the shared Python the emitted
 		// command loads; S01 splits _shared/python into the ai and network
 		// features, so the one source folder becomes the two it lands in.
