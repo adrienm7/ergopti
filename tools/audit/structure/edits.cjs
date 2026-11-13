@@ -88,6 +88,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '\t\t\tlocal source = "@" .. case.prefix .. separator .. "linux" .. separator .. "core" .. separator .. "fs"\n\t\t\t\t.. separator .. "engine" .. separator .. "paths.lua"'
 	},
 	{
+		// The staged driver root's folders, one argument per folder, for the
+		// resolver copy S04 moves to core/fs/engine.
+		file: 'static/ergopti_plus/linux/tests/unit/infra/config/test_paths_shared_root_layouts.lua',
+		moves: 'linux/infra/paths.lua',
+		from: '\tmkdir_chain(FIXTURE_BASE, case, "ergopti", "infra")',
+		to: '\tmkdir_chain(FIXTURE_BASE, case, "ergopti", "core", "fs", "engine")'
+	},
+	{
 		// The comment naming the resolver's relative load path.
 		file: 'static/ergopti_plus/linux/tests/unit/infra/config/test_paths_shared_root_layouts.lua',
 		moves: 'linux/infra/paths.lua',
