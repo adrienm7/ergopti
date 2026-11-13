@@ -290,8 +290,13 @@ function stepOrder(a, b) {
 	return rank(a) - rank(b) || a.localeCompare(b);
 }
 
-/** Moves grouped by step, in order. */
-function steps(map) {
+/**
+ * Moves grouped by step, in order.
+ * @param {Map<string, string|null>} map Tree-relative old path to target.
+ * @param {{byOld: Map<string, string>, stepped: boolean}} [done] The committed
+ *   numbering (committedSteps).
+ */
+function steps(map, done = committedSteps()) {
 	const groups = new Map();
 	for (const [old, target] of map) {
 		if (old === target) continue;
@@ -299,11 +304,38 @@ function steps(map) {
 		if (!groups.has(key)) groups.set(key, []);
 		groups.get(key).push([old, target]);
 	}
-	return [...groups.keys()].sort(stepOrder).map((key, i) => ({
-		id: `S${String(i + 1).padStart(2, '0')}`,
-		key,
-		moves: groups.get(key).sort((x, y) => x[0].localeCompare(y[0]))
-	}));
+	return [...groups.keys()].sort(stepOrder).map((key, i) => {
+		const moves = groups.get(key).sort((x, y) => x[0].localeCompare(y[0]));
+		// On a tree earlier steps already rearranged, the remaining steps keep
+		// the numbers the committed plan gave them, not their rank among the rest.
+		let id = `S${String(i + 1).padStart(2, '0')}`;
+		if (done.stepped) {
+			const ids = new Set(moves.map(([old]) => done.byOld.get(PREFIX + old)));
+			if (ids.size !== 1 || ids.has(undefined))
+				throw new Error(`step ${key}: the committed move map does not number it`);
+			[id] = ids;
+		}
+		return { id, key, moves };
+	});
+}
+
+/**
+ * The committed move map's step of each old path, and whether the tree is
+ * stepped: one of its moves is already made (the old path gone, the new there).
+ */
+function committedSteps(
+	tsv = fs.readFileSync(path.join(ROOT, 'docs/design/structure-plan/move-map.tsv'), 'utf8'),
+	has = (f) => EXISTING.has(f)
+) {
+	const byOld = new Map();
+	let stepped = false;
+	for (const line of tsv.split('\n').slice(1)) {
+		if (!line) continue;
+		const [old, target, step] = line.split('\t');
+		byOld.set(old, step);
+		if (!stepped && target && !has(old) && has(target)) stepped = true;
+	}
+	return { byOld, stepped };
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -2960,6 +2992,7 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
+	committedSteps,
 	SPLIT,
 	neverRewritten,
 	foreignBaseBefore,
