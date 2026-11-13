@@ -15,6 +15,7 @@ local TITLE_KEYS = {
 	["hotstring_editor"] = "editor.hotstrings.window_title",
 	["hotstrings_config_window"] = "hs_config.window_title",
 	["layer_editor"] = "layer_editor.window_title",
+	["layout_editor_window"] = "layout_editor.title",
 	["layout_manager"] = "layout_manager.window_title",
 	["metrics_apps"] = "metrics_apps.window_title",
 	["metrics_typing"] = "metrics_apps.title",
