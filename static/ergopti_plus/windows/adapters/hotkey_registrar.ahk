@@ -1276,6 +1276,27 @@ HotkeyRegistrarPhysicalIdentityOf(handle) {
 }
 
 /**
+ * Lists the live bindings' native specs and owners, for a collision owner that
+ * must see every chord this process registered.
+ * @returns {Array} Map("spec", s, "owner", o) per binding that is not retired.
+ */
+HotkeyRegistrarLiveSpecs() {
+	global HOTKEY_REGISTRAR_SPECS
+
+	Specs := []
+	if !IsSet(HOTKEY_REGISTRAR_SPECS)
+		return Specs
+	PreviousCritical := Critical("On")
+	try {
+		for Spec, Entry in HOTKEY_REGISTRAR_SPECS {
+			if Entry["state"]["phase"] != "retired"
+				Specs.Push(Map("spec", Spec, "owner", String(Entry["owner"])))
+		}
+	} finally Critical(PreviousCritical)
+	return Specs
+}
+
+/**
  * Reports how many bindings this adapter currently holds.
  * A leak here is invisible in the UI — the hotkeys keep firing — so the count is
  * exposed for the suite to assert against after a stop/start cycle.

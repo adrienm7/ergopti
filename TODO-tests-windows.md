@@ -136,3 +136,10 @@ Account and tester actions (maintainer, from the PC):
 
 - [ ] Navigation-owner DLL after the folder migration (2026-11-13): its manifest fingerprint was derived by the
       migration without a rebuild; run `-UpdateTracked` with the pinned MSVC and check the DLL is byte-identical.
+
+- [ ] Physical shortcut collision and delivery owners (2026-11-13, worker F, `ui/physical_shortcuts/delivery.ahk`):
+      in an isolated driver only, make `PhysicalShortcutDeliveryAvailable` answer true, then run steps (3) to (7) of
+      the « qualify physical shortcut delivery » item in TODO.md: a bound key runs its action once and types nothing;
+      nothing runs while paused, after quit, with AltGr held or for the key sent by another program (SendInput);
+      binding a position a tap-hold, a tap key, a key combination, a script shortcut or the layout emulation already
+      holds is refused with `collision`. Only then may the production getter turn true.
