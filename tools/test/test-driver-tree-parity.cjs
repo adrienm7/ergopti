@@ -424,6 +424,41 @@ if (union.size > BASELINE_UNION) {
 	);
 }
 
+// A structure step moves directories on the way to the target tree: the union
+// grows while old and new folders coexist, and the shared counts fall while a
+// feature has moved on one driver's tests only. Under the structure phase 2
+// runner only, --update-baseline --allow-rise moves each recorded value to
+// the measured one, one `[RISE]` line per change for the step's commit.
+if (process.argv.includes('--update-baseline')) {
+	if (!process.argv.includes('--allow-rise') || process.env.ERGOPTI_STRUCTURE_PHASE !== '2') {
+		console.error(
+			'[ERROR] --update-baseline --allow-rise is for the structure phase 2 runner only.'
+		);
+		process.exit(1);
+	}
+	const measured = {
+		BASELINE_UNION: union.size,
+		BASELINE_TESTS_UNION: testsUnion.size,
+		BASELINE_SHARED: shared.length,
+		BASELINE_TESTS_SHARED: testsShared.length,
+		BASELINE_CANONICAL_ON_ALL: canonicalOnAll.length
+	};
+	let source = fs.readFileSync(__filename, 'utf8');
+	for (const [name, value] of Object.entries(measured)) {
+		const literal = new RegExp(`^const ${name} = (\\d+);$`, 'm');
+		const recorded = source.match(literal);
+		if (!recorded) {
+			console.error(`[ERROR] ${name} is not a literal of this file.`);
+			process.exit(1);
+		}
+		if (Number(recorded[1]) === value) continue;
+		source = source.replace(literal, `const ${name} = ${value};`);
+		console.log(`[RISE] I1 ${name} moved to ${value} (recorded ${recorded[1]})`);
+	}
+	fs.writeFileSync(__filename, source);
+	process.exit(0);
+}
+
 if (process.argv.includes('--measure')) {
 	console.log(
 		`canonical features (_shared/core/features.json): ${canonicalOnAll.length} on all three, ` +

@@ -248,7 +248,16 @@ function runStep(key, opts) {
 		['tools/test/test-structure-folder-bounds.cjs', '--update-baseline', '--allow-rise'],
 		{ env: { ERGOPTI_STRUCTURE_PHASE: '2' } }
 	);
-	receipt.boundsRaised = bounds.tail
+	// The driver tree parity ratchet (I1) counts directories old and new trees
+	// share; its recorded values move with the step the same way.
+	const parity = action(
+		'tree parity',
+		process.execPath,
+		['tools/test/test-driver-tree-parity.cjs', '--update-baseline', '--allow-rise'],
+		{ env: { ERGOPTI_STRUCTURE_PHASE: '2' } }
+	);
+	receipt.boundsRaised = [bounds.tail, parity.tail]
+		.join('\n')
 		.split('\n')
 		.filter((l) => l.startsWith('[RISE] '))
 		.map((l) => l.slice('[RISE] '.length));
