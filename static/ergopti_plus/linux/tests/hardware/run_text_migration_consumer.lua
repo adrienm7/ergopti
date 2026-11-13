@@ -49,7 +49,7 @@ local ok, failure = xpcall(function()
 			k.init({ sqlite_path = path })
 			require("tests.support.metrics_consent_fixture").enable(k)
 			local writer = require("modules.keystats.sqlite_writer")
-			assert(require("infra.openssl_cipher").available, "This public-consumer proof requires native AES")
+			assert(require("core.network.engine.openssl_cipher").available, "This public-consumer proof requires native AES")
 			assert(cipher.is_available(), "The owned machine identity must derive a real encryption key")
 			local device = assert(writer.query_rows("SELECT device_id FROM devices LIMIT 1;"))[1]
 			assert(writer.insert_typing_events(device, { { app = "owned-app", text = "historical-original" } }))

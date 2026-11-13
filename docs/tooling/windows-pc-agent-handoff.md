@@ -144,7 +144,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
 
 - Run 41261068581 on dev a149b129 (1 November, 01:40 UTC), new since the
   entries below: `tools/test/test-no-hardcoded-ui-strings.cjs` refuses the
-  literal "curl" passed to `Ui_MsgBox` in `windows/adapters/http_client.ahk`
+  literal "curl" passed to `Ui_MsgBox` in `windows/core/network/adapters/http_client.ahk`
   (route it through the i18n catalogue); the Windows core lane fails
   `test_network_dispatch_nonblocking.ahk:498` ("LLM_RemoteIsReady_Async must
   construct the tree-owned curl transport"); the AHK pinned-read ratchet is

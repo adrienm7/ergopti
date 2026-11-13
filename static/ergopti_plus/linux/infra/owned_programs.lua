@@ -53,7 +53,7 @@ end
 
 --- The program to run for one owned program, without logging.
 --- For a helper process that has only the driver tree on package.path
---- (adapters/sqlite_process_worker.lua, platform/network/system_proxy_probe.lua):
+--- (adapters/sqlite_process_worker.lua, core/network/adapters/system_proxy_probe.lua):
 --- the daemon already logged the mode, and a helper's stdout may be its protocol.
 --- @param name string One of M.PROGRAMS.
 --- @param getenv function|nil os.getenv by default; a test seam.

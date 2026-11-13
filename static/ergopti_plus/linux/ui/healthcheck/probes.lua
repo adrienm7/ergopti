@@ -137,7 +137,7 @@ end
 --- @return function
 local function github_api(config, run)
 	return function(done)
-		local HttpClient = require("adapters.http_client")
+		local HttpClient = require("core.network.adapters.http_client")
 		if not HttpClient.HAS_ASYNC then
 			done({ state = "unsupported" })
 			return
@@ -169,7 +169,7 @@ end
 local function proxy_pac(config, run)
 	return function(done)
 		local Shell = require("adapters.shell_runner")
-		local HttpClient = require("adapters.http_client")
+		local HttpClient = require("core.network.adapters.http_client")
 		if not Shell.HAS_ASYNC or not HttpClient.HAS_ASYNC then
 			done({ state = "unsupported" })
 			return
@@ -225,7 +225,7 @@ local function ai_health(config, state, run)
 		end
 		local read, backend = pcall(function() return type(llm.get_backend) == "function" and llm.get_backend() end)
 		local path = read and type(backend) == "string" and config.paths[backend] or nil
-		local HttpClient = require("adapters.http_client")
+		local HttpClient = require("core.network.adapters.http_client")
 		if not path or backend ~= AI_LOCAL_BACKEND or not HttpClient.HAS_ASYNC or type(llm.get_base_url) ~= "function" then
 			done({ state = "unsupported" })
 			return

@@ -27,7 +27,7 @@ local OWNERS = {
 	-- The renderer asks it which applications answer Accessibility; it
 	-- captures hs at require time, so each scenario loads it afresh.
 	"adapters.accessibility_permission",
-	"infra.vscode_bridge", "core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.llm_line", "core.ui.engine.tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
+	"core.network.engine.vscode_bridge", "core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.llm_line", "core.ui.engine.tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
 	-- The configuration names the shortcut column's modifiers through the key
 	-- name table, which it loads with its data and sorting helper.
 	"platform.input.keycodes.key_names", "platform.input.keycodes.key_names_data", "core.text.engine.table_util",

@@ -552,7 +552,7 @@ local function native_ports()
 	ffi.cdef([[int open(const char *path, int flags, ...); int close(int fd);
 		int ftruncate(int fd, long length);]])
 	local Clock = require("core.logger.engine.monotonic")
-	local Deadline = require("infra.managed_http_deadline")
+	local Deadline = require("core.network.engine.managed_http_deadline")
 	local function errno()
 		local code = ffi.errno()
 		-- Canonical names from actual POSIX syscall errno; other errors stay
@@ -586,7 +586,7 @@ local function native_ports()
 			end)
 		end,
 		hash = function(fd, length, current, hash_deadline, callback)
-			return require("infra.fd_sha256").native().start(fd, length, current, hash_deadline, callback)
+			return require("core.network.engine.fd_sha256").native().start(fd, length, current, hash_deadline, callback)
 		end,
 		close = function(fd)
 			if ffi.C.close(fd) ~= 0 then return false, errno() end
@@ -675,7 +675,7 @@ local function native_artifact(basename, pinned)
  local backend = native_artifact_backend()
  if not backend then return unavailable("native_archive_component_unavailable") end
  local ffi, native, now_ms = backend.ffi, backend.symbols, backend.now_ms
- local Target = require("infra.http_output_target")
+ local Target = require("core.network.engine.http_output_target")
  local create_target, seal_owned = rawget(Target, "create"), rawget(Target, "seal_owned")
  if type(create_target) ~= "function" or type(seal_owned) ~= "function" then return unavailable("owned_archive_sealing_unavailable") end
  local factory, records = {}, {}

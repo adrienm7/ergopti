@@ -94,7 +94,7 @@ end
 --- The OpenSSL binding, or nil with a reason.
 --- @return table|nil binding
 local function native()
-	local Native = require("infra.openssl_library")
+	local Native = require("core.network.engine.openssl_library")
 	local ffi, library = Native.ffi, Native.library
 	if not ffi then return nil end
 	-- Through the library owner: the digest module declares the same EVP

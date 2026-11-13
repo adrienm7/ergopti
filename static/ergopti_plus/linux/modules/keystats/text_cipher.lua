@@ -29,8 +29,8 @@ local M = {}
 
 local Logger  = require("core.logger.engine.shim")
 local Crypto  = require("core.crypto.crypto")
-local OpenSSL = require("infra.openssl_command")
-local NativeCipher = require("infra.openssl_cipher")
+local OpenSSL = require("core.network.engine.openssl_command")
+local NativeCipher = require("core.network.engine.openssl_cipher")
 local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
 local LOG = "modules.keystats.text_cipher"

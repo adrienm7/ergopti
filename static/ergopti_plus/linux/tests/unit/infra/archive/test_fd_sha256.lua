@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 --- Independent parent read/context/phase-deadline ownership controls.
-local Digest = require("infra.fd_sha256")
+local Digest = require("core.network.engine.fd_sha256")
 local tests = {}
 local ABC = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 local function test(name, body) tests[#tests + 1] = { name, body } end

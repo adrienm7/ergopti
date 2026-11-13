@@ -63,7 +63,7 @@ _RSH_GroupRules() {
 	AssertEqual("keystats", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\keystats\test_keystats_event_id.ahk"))
 	AssertEqual("ui", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\ui\menu\test_script_control_submenu.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\adapters\shell_runner\test_shell_runner_tree_owned.ahk"))
-	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\platform\network\test_managed_remote_transport.ahk"))
+	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\core\network\adapters\test_managed_remote_transport.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\test_text_utils.ahk"))
 	; No catch-all: a file no category declares is refused, never filed under core.
 	AssertThrows(() => _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\run_all.ahk"))

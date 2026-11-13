@@ -263,7 +263,7 @@ helpers.describe("changelog_bridge: native fetch push", function()
 
 	helpers.it("(changelog-http-refusal) reports failed HTTP admission", function()
 		local _, pushed = install()
-		local client = require("adapters.http_client")
+		local client = require("core.network.adapters.http_client")
 		local previous, count = client.get, 0
 		client.get = function() count = count + 1; return false end
 		raw_bridge._http_get = native_get
@@ -277,7 +277,7 @@ helpers.describe("changelog_bridge: native fetch push", function()
 
 	helpers.it("(changelog-http-refusal) keeps an inline HTTP result despite refusal receipt", function()
 		local _, pushed = install()
-		local client = require("adapters.http_client")
+		local client = require("core.network.adapters.http_client")
 		local previous, count = client.get, 0
 		client.get = function(_, _, _, callback)
 			count = count + 1

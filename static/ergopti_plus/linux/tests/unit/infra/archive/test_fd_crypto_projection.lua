@@ -24,7 +24,7 @@ Helpers.describe("infra/fd_sha256 generated native descriptor", function()
 			package.loaded["ffi"] = { os = "Linux", cdef = function() end,
 				load = function() loads = loads + 1; error("Unexpected native load") end }
 			local ok, err = xpcall(function()
-				local called = pcall(require("infra.fd_sha256").native)
+				local called = pcall(require("core.network.engine.fd_sha256").native)
 				Helpers.assert_eq(called, false, "Malformed projection cannot construct native digest")
 				Helpers.assert_eq(loads, 0, "No native library acquisition")
 			end, debug.traceback)
@@ -39,7 +39,7 @@ Helpers.describe("infra/fd_sha256 generated native descriptor", function()
 			__index = function(_, key) reads = reads + 1; return key == "schema_version" and 1 or "libcrypto.so.3" end,
 		}) }
 		local ok, err = xpcall(function()
-			local called, refusal = pcall(require("infra.fd_sha256").native)
+			local called, refusal = pcall(require("core.network.engine.fd_sha256").native)
 			Helpers.assert_eq(called, false, "No metadata getter authority")
 			Helpers.assert_eq(type(refusal), "string", "Descriptor refusal has a concrete reason")
 			Helpers.assert_true(refusal:find("Generated FD digest runtime descriptor unavailable", 1, true) ~= nil,
@@ -74,7 +74,7 @@ Helpers.describe("platform/network/digest_probe exact raw descriptor", function(
 			package.loaded["ffi"] = { cdef = function() end,
 				load = function() loads = loads + 1; return {} end }
 			local ok, err = xpcall(function()
-				local chunk = assert(loadfile(root .. "/platform/network/digest_probe.lua"))
+				local chunk = assert(loadfile(root .. "/core/network/adapters/digest_probe.lua"))
 				local called, refusal = pcall(chunk)
 				Helpers.assert_eq(called, false, "Invalid probe descriptor cannot admit crypto")
 				Helpers.assert_eq(type(refusal), "string", "Native probe refusal has a concrete reason")

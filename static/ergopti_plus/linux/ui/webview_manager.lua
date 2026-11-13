@@ -1151,7 +1151,7 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 			_document_windows[app_name] = document_entry
 			local loaded, err = pcall(function()
 				local Lease = require("core.ui.engine.webview.document_lease")
-				local Deadline = require("infra.managed_http_deadline")
+				local Deadline = require("core.network.engine.managed_http_deadline")
 				local Timings = require("infra.timings")
 				assert(Monotonic.has_hires(), "document admission requires an actual monotonic clock")
 				local function native_current()

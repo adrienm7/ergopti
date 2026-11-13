@@ -47,7 +47,7 @@ const inputs = [
 	'static/ergopti_plus/linux/modules/updater/archive_transfer.lua',
 	'static/ergopti_plus/linux/infra/archive_output.lua',
 	'static/ergopti_plus/linux/infra/archive_tar_feeder.lua',
-	'static/ergopti_plus/linux/infra/fd_sha256.lua',
+	'static/ergopti_plus/linux/core/network/engine/fd_sha256.lua',
 	'static/ergopti_plus/linux/modules/shortcuts/script_actions.lua',
 	'static/ergopti_plus/linux/native/archive_output/archive_publication.c',
 	'static/ergopti_plus/linux/native/archive_output/archive_publication.h',
@@ -430,7 +430,7 @@ console.log(
 
 // Required native writer/hash closure and component lookup ports retain their gate.
 const closureInputs = [
-	'static/ergopti_plus/linux/infra/managed_http_deadline.lua',
+	'static/ergopti_plus/linux/core/network/engine/managed_http_deadline.lua',
 	'static/ergopti_plus/linux/infra/native_timer.lua',
 	'static/ergopti_plus/linux/core/logger/engine/monotonic.lua',
 	'static/ergopti_plus/linux/core/fs/engine/paths.lua'
@@ -939,7 +939,7 @@ cryptoControl('native digest skip or diagnostic refused', () => {
 });
 const cryptoInputs = [
 	'static/ergopti_plus/linux/tests/hardware/run_openssl_byte_input_native.lua',
-	'static/ergopti_plus/linux/infra/openssl_digest.lua'
+	'static/ergopti_plus/linux/core/network/engine/openssl_digest.lua'
 ];
 function cryptoRegistration(producer, planner) {
 	for (const input of cryptoInputs)

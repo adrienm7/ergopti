@@ -44,7 +44,7 @@ local Output = require("infra.archive_output")
 local prepared_artifact = assert(Output.native_artifact("ergopti-plus-linux.tar.gz"),
  "Actual native archive runtime preparation unavailable")
 local prepared_output = Output.native()
-local prepared_digest = require("infra.fd_sha256").native()
+local prepared_digest = require("core.network.engine.fd_sha256").native()
 print("ready"); io.stdout:flush(); assert(io.read("*l") == "go")
 local origin = assert(os.getenv("ERGOPTI_NATIVE_UPDATER_ORIGIN"))
 local mode = assert(os.getenv("ERGOPTI_NATIVE_UPDATER_MODE"))

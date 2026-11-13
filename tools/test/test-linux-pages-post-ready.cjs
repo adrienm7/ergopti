@@ -21,7 +21,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const plus = path.resolve(__dirname, '../../static/ergopti_plus');
-const linuxUi = path.join(plus, 'linux/ui');
+const linuxUi = path.join(plus, 'linux');
 const sharedUi = path.join(plus, '_shared/ui');
 
 // A page no Linux caller opens: its bridge is registered, nothing shows it.

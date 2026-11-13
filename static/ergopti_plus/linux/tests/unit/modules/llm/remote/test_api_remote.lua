@@ -16,7 +16,7 @@ local Json = require("core.text.engine.json")
 --- @return table remote, table calls
 local function load_remote()
 	local calls = {}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		get = function(url, headers, options, callback)
 			calls.probes = calls.probes or {}
 			calls.probes[#calls.probes + 1] = { url = url, headers = headers, callback = callback, options = options }
@@ -34,7 +34,7 @@ local function load_remote()
 end
 
 local function unload()
-	package.loaded["adapters.http_client"] = nil
+	package.loaded["core.network.adapters.http_client"] = nil
 	package.loaded["modules.llm.api_remote"] = nil
 end
 

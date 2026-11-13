@@ -24,7 +24,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const RECEIVER = 'static/ergopti_plus/macos/platform/network/native_http.py';
+const RECEIVER = 'static/ergopti_plus/macos/core/network/adapters/native_http.py';
 const IDENTIFIERS = 'static/ergopti_plus/_shared/core/text/data/identifiers.py';
 const DEV = JSON.parse(
 	fs.readFileSync(
@@ -139,7 +139,7 @@ try {
 		const bundled = place(
 			packaged.app,
 			RECEIVER,
-			'Contents/Resources/static/ergopti_plus/macos/platform/network/native_http.py'
+			'Contents/Resources/static/ergopti_plus/macos/core/network/adapters/native_http.py'
 		);
 		assert.equal(resolve(bundled, packaged.launcher), packaged.launcher);
 		assert.equal(resolve(bundled, packaged.launcher, dev), packaged.launcher);

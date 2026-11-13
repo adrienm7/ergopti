@@ -737,17 +737,20 @@ console.log('lint-conventions: scanning…');
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/core/network/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/lifecycle'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/fs/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/core/network/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/logger/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/lifecycle/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/core/network'),
 	// Portable AHK policy is audited with its native consumers.
 	join(REPO_ROOT, 'static/ergopti_plus/_shared')
 ];
@@ -772,34 +775,41 @@ const ahkAll = [
 // file count and passes.
 const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/core/network/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/logger/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/fs/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/core/network/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/logger/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/lifecycle/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/core/network'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tests'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/core/network/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/fs/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/core/network/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/logger/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/lifecycle/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/core/network'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/tests'),
 	// platform/ is where the OS seams live — the remap generator and the tray
 	// binding — and it held Lua that no convention check had ever read.
 	join(REPO_ROOT, 'static/ergopti_plus/linux/platform'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/platform'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/core/network/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/_shared')
 ];
 const luaAll = luaDirs.flatMap((d) => walkFiles(d, ['.lua']));

@@ -169,7 +169,7 @@ end
 local function fresh_client(config)
  config = config or {}
  local fake, state = fake_luv(config)
- local names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "core.logger.engine.monotonic", "infra.managed_http_deadline", "core.fs.engine.paths" }
+ local names = { "luv", "core.network.adapters.http_client", "core.network.adapters.curl_http_client", "core.network.adapters.system_proxy", "core.network.engine.proxy_policy", "core.network.engine.managed_http", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.fs.engine.paths" }
  local saved = {}
  for _, name in ipairs(names) do saved[name] = package.loaded[name] end
  local ok, client = pcall(function()
@@ -180,13 +180,13 @@ local function fresh_client(config)
  local file = assert(io.open(assert(Paths.shared("core/network/data/proxy_policy.json")), "rb"))
  local data = Json.decode(file:read("*a")); file:close()
  local policy = assert(policy_module.new(data))
- package.loaded["infra.proxy_policy"] = { load = function() return policy end, environment = function() return {} end }
+ package.loaded["core.network.engine.proxy_policy"] = { load = function() return policy end, environment = function() return {} end }
  package.loaded["core.fs.engine.paths"] = { driver_root = function() return driver_root end,
   shared_root = function() return assert(Paths.shared_root()) end,
   shared = function(path) return assert(Paths.shared(path)) end }
- package.loaded["infra.managed_http_deadline"] = { start = deadline_port(state, config) }
- if config.native_curl then package.loaded["adapters.curl_http_client"] = config.native_curl end
- return helpers.fresh_module("adapters.http_client")
+ package.loaded["core.network.engine.managed_http_deadline"] = { start = deadline_port(state, config) }
+ if config.native_curl then package.loaded["core.network.adapters.curl_http_client"] = config.native_curl end
+ return helpers.fresh_module("core.network.adapters.http_client")
  end)
  for _, name in ipairs(names) do package.loaded[name] = saved[name] end
  if not ok then error(client, 0) end

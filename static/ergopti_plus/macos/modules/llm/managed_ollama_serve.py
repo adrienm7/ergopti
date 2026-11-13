@@ -38,8 +38,8 @@ AUTHORITY = load("ergopti_serve_daemon_authority", DRIVER / "platform/ollama_dae
 PROXY = load(
     "ergopti_serve_proxy_policy", SHARED / "core/network/adapters/python_network_proxy_policy.py"
 )
-NATIVE = load("ergopti_serve_native_helper", DRIVER / "platform/network/native_http.py")
-API = load("ergopti_serve_native_api", DRIVER / "platform/network/native_ollama_api.py")
+NATIVE = load("ergopti_serve_native_helper", DRIVER / "core/network/adapters/native_http.py")
+API = load("ergopti_serve_native_api", DRIVER / "core/network/adapters/native_ollama_api.py")
 PULL = load("ergopti_serve_admission_owner", SHARED / "ai/adapters/python/managed_ollama_pull.py")
 
 

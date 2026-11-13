@@ -18,7 +18,7 @@ local AppDirs = require("core.fs.engine.app_dirs")
 
 -- The modules each case replaces, restored after it
 local FIXTURE_MODULES = {
-	"core.logger.engine.logger", "ui.healthcheck.probes", "core.events.timer_scheduler", "adapters.http_client",
+	"core.logger.engine.logger", "ui.healthcheck.probes", "core.events.timer_scheduler", "core.network.adapters.http_client",
 	"adapters.shell_runner", "core.fs.adapters.json_codec", "modules.llm", "ui.healthcheck.appleevents",
 }
 
@@ -90,7 +90,7 @@ local function with_probes(body)
 				end
 			end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function(options)
 				local client = {}
 				function client.get(url, headers, callback)

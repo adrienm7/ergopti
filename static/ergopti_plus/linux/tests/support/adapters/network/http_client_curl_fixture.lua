@@ -184,12 +184,12 @@ end
 local function fresh_client(config)
 	local fake, state = fake_luv(config)
 	local previous_luv = package.loaded["luv"]
-	local previous_client = package.loaded["adapters.curl_http_client"]
+	local previous_client = package.loaded["core.network.adapters.curl_http_client"]
 	package.loaded["luv"] = fake
-	package.loaded["adapters.curl_http_client"] = nil
-	local client = require("adapters.curl_http_client")
+	package.loaded["core.network.adapters.curl_http_client"] = nil
+	local client = require("core.network.adapters.curl_http_client")
 	package.loaded["luv"] = previous_luv
-	package.loaded["adapters.curl_http_client"] = previous_client
+	package.loaded["core.network.adapters.curl_http_client"] = previous_client
 	return client, state
 end
 
@@ -230,10 +230,10 @@ local function private_client(config)
 		if options.stat_case == "status-ack" then return stat, nil, "EINVAL" end
 		return stat
 	end
-	local previous_luv, previous_client = package.loaded["luv"], package.loaded["adapters.curl_http_client"]
-	package.loaded["luv"], package.loaded["adapters.curl_http_client"] = fake, nil
-	local client = require("adapters.curl_http_client")
-	package.loaded["luv"], package.loaded["adapters.curl_http_client"] = previous_luv, previous_client
+	local previous_luv, previous_client = package.loaded["luv"], package.loaded["core.network.adapters.curl_http_client"]
+	package.loaded["luv"], package.loaded["core.network.adapters.curl_http_client"] = fake, nil
+	local client = require("core.network.adapters.curl_http_client")
+	package.loaded["luv"], package.loaded["core.network.adapters.curl_http_client"] = previous_luv, previous_client
 	return client, state
 end
 
@@ -258,17 +258,17 @@ local function exact_core_client(config)
 	if options.identity and options.identity.missing_constants then fake.constants = nil end
 	if options.identity and options.identity.missing_port then fake[options.identity.missing_port] = nil end
 	state.fd_state = fd_state
-	local exact_module = require("infra.curl_identity")
-	local previous_identity = package.loaded["infra.curl_identity"]
+	local exact_module = require("core.network.engine.curl_identity")
+	local previous_identity = package.loaded["core.network.engine.curl_identity"]
 	if options.constructor_throw then
-		package.loaded["infra.curl_identity"] = { copy = exact_module.copy, equal = exact_module.equal,
+		package.loaded["core.network.engine.curl_identity"] = { copy = exact_module.copy, equal = exact_module.equal,
 			new = function() error("independent constructor refusal") end }
 	end
-	local previous_luv, previous_client = package.loaded.luv, package.loaded["adapters.curl_http_client"]
-	package.loaded.luv, package.loaded["adapters.curl_http_client"] = fake, nil
-	local loaded, client = pcall(require, "adapters.curl_http_client")
-	package.loaded.luv, package.loaded["adapters.curl_http_client"] = previous_luv, previous_client
-	package.loaded["infra.curl_identity"] = previous_identity
+	local previous_luv, previous_client = package.loaded.luv, package.loaded["core.network.adapters.curl_http_client"]
+	package.loaded.luv, package.loaded["core.network.adapters.curl_http_client"] = fake, nil
+	local loaded, client = pcall(require, "core.network.adapters.curl_http_client")
+	package.loaded.luv, package.loaded["core.network.adapters.curl_http_client"] = previous_luv, previous_client
+	package.loaded["core.network.engine.curl_identity"] = previous_identity
 	if not loaded then error(client) end
 	return client, state
 end
@@ -332,10 +332,10 @@ end
 local function authorizer_client(config, hook)
 	local fake, state = fake_luv(config)
 	if hook then hook(fake, state) end
-	local previous_luv, previous_client = package.loaded["luv"], package.loaded["adapters.curl_http_client"]
-	package.loaded["luv"], package.loaded["adapters.curl_http_client"] = fake, nil
-	local client = require("adapters.curl_http_client")
-	package.loaded["luv"], package.loaded["adapters.curl_http_client"] = previous_luv, previous_client
+	local previous_luv, previous_client = package.loaded["luv"], package.loaded["core.network.adapters.curl_http_client"]
+	package.loaded["luv"], package.loaded["core.network.adapters.curl_http_client"] = fake, nil
+	local client = require("core.network.adapters.curl_http_client")
+	package.loaded["luv"], package.loaded["core.network.adapters.curl_http_client"] = previous_luv, previous_client
 	return client, state
 end
 
@@ -343,10 +343,10 @@ end
 -- Independent literal native stdout/stderr inputs; original assertions unchanged.
 local function redirect_engine_client(config)
 	local fake, state = fake_luv(config or {})
-	local saved_luv, saved_core = package.loaded.luv, package.loaded["adapters.curl_http_client"]
-	package.loaded.luv, package.loaded["adapters.curl_http_client"] = fake, nil
-	local loaded, client = pcall(require, "adapters.curl_http_client")
-	package.loaded.luv, package.loaded["adapters.curl_http_client"] = saved_luv, saved_core
+	local saved_luv, saved_core = package.loaded.luv, package.loaded["core.network.adapters.curl_http_client"]
+	package.loaded.luv, package.loaded["core.network.adapters.curl_http_client"] = fake, nil
+	local loaded, client = pcall(require, "core.network.adapters.curl_http_client")
+	package.loaded.luv, package.loaded["core.network.adapters.curl_http_client"] = saved_luv, saved_core
 	if not loaded then error(client) end
 	return client, state
 end

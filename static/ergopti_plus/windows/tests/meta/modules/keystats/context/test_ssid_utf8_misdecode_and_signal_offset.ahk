@@ -13,7 +13,7 @@
 ; encoding. The fix also bounds-checks cbData against the minimum size that can
 ; hold the signal-quality field at +576 before reading it.
 ;
-; This is a meta-static test (scans source text) because adapters/network_info.ahk
+; This is a meta-static test (scans source text) because core/network/adapters/info.ahk
 ; is NOT part of the headless runner include graph (run_all.ahk does not include
 ; it - its DllCall paths target live wlanapi/iphlpapi hardware). Calling its
 ; functions from a test would be a load-time error that hangs the suite, so the

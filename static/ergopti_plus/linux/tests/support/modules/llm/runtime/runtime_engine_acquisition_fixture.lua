@@ -16,7 +16,7 @@ local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 local function with_owner(body, options)
 	options = options or {}
-	local names = { "adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
+	local names = { "core.network.adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
 		"modules.llm.prediction_engine", "modules.llm.profiles", "modules.llm.model_inventory", "infra.llm_preferences",
 		"modules.llm.local_servers", "modules.llm.api_entries", "adapters.keyboard_hook",
 		"adapters.shell_runner", "core.i18n.engine.i18n", "core.ui.engine.window_titles", "modules.llm.runtime_factory" }
@@ -37,7 +37,7 @@ local function with_owner(body, options)
 		end,
 	}
 	world.owned_http = {}
-	package.loaded["adapters.http_client"] = require("tests.support.owned_http_fixture").attach(Http, world.owned_http)
+	package.loaded["core.network.adapters.http_client"] = require("tests.support.owned_http_fixture").attach(Http, world.owned_http)
 	package.loaded["modules.llm.enable_admission"] = nil
 	world.owner = require("modules.llm.enable_admission").new({
 		snapshot = function()
@@ -165,7 +165,7 @@ end
 --- @param body function Receives actual producers and the retained service capability.
 local function with_managed_responses(body)
 	local names = { "modules.llm.api_ollama", "modules.llm.local_model_probe", "ai.engine.local_servers.runtime_repair",
-		"modules.llm.model_inventory", "infra.managed_http_deadline" }
+		"modules.llm.model_inventory", "core.network.engine.managed_http_deadline" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local popen = io.popen
 	local ok, failure = xpcall(function()
@@ -241,7 +241,7 @@ local function with_managed_responses(body)
 			assert(world.ready, "the actual explicit repair acquired its version probe")
 			world.ready:answer({ ok = true, status = 200, body = '{"version":"0.24.0"}' })
 			helpers.assert_true(engine.is_enabled()); helpers.assert_eq(world.controller:app_status(), "running")
-			local Http = package.loaded["adapters.http_client"]
+			local Http = package.loaded["core.network.adapters.http_client"]
 			Http.postStream = function(url, _, _, _, chunk, done)
 				world.posts[#world.posts + 1] = { url = url, chunk = chunk, done = done }; return true
 			end

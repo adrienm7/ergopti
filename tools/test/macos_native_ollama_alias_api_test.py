@@ -32,8 +32,8 @@ class AliasWireReceiving(unittest.TestCase):
         self.addCleanup(self.owner.cleanup)
         self.directory = Path(self.owner.name)
         for relative in (
-            "static/ergopti_plus/macos/platform/network/native_http.py",
-            "static/ergopti_plus/macos/platform/network/native_ollama_api.py",
+            "static/ergopti_plus/macos/core/network/adapters/native_http.py",
+            "static/ergopti_plus/macos/core/network/adapters/native_ollama_api.py",
             "static/ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py",
         ):
             target = self.directory / relative
@@ -41,7 +41,7 @@ class AliasWireReceiving(unittest.TestCase):
             shutil.copyfile(ROOT / relative, target)
         self.api = load(
             "actual_alias_wire_port",
-            self.directory / "static/ergopti_plus/macos/platform/network/native_ollama_api.py",
+            self.directory / "static/ergopti_plus/macos/core/network/adapters/native_ollama_api.py",
         )
         self.peer = self.directory / "peer"
         self.peer.write_text("#!" + sys.executable + "\n" + ORIGINAL.PEER, encoding="utf-8")

@@ -69,7 +69,7 @@ local MODULES = {
 	"adapters.task_lifecycle",
 	"adapters.shell_runner",
 	"core.events.timer_scheduler",
-	"adapters.http_client",
+	"core.network.adapters.http_client",
 	"ui.download_window",
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_ollama",
@@ -309,7 +309,7 @@ local function with_fixture(spec, body)
 			end,
 		}
 
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function()
 				local client = { settled = false, observers = {} }
 				function client.post(url, headers, body, callback)

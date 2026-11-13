@@ -21,7 +21,7 @@
 local M = {}
 
 local HttpBridge = require("infra.llm_bridge")
-local HttpClient = require("adapters.http_client")
+local HttpClient = require("core.network.adapters.http_client")
 local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.shim")
 local Timings = require("infra.timings")

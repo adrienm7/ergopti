@@ -117,7 +117,7 @@ for (const file of [
 
 assert.equal(GATE_COMMANDS['linux-http-stream'].npm, 'test:linux:http-stream');
 for (const file of [
-	'static/ergopti_plus/linux/adapters/http_client.lua',
+	'static/ergopti_plus/linux/core/network/adapters/http_client.lua',
 	'static/ergopti_plus/linux/modules/llm/api_ollama.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_http_stream_receipts.lua',
 	'static/ergopti_plus/_shared/ai/engine/ollama/local_model_policy.lua'

@@ -150,7 +150,7 @@ local function load_api(state, daemon)
 	}
 	package.loaded["modules.llm.ollama_binary"] = nil
 	helpers.load_with_stubs("modules.llm.ollama_binary", { fs = fake_fs(state) })
-	package.loaded["adapters.http_client"] = { new = function()
+	package.loaded["core.network.adapters.http_client"] = { new = function()
 		local client = { settled = true, cancel_calls = 0 }
 		function client.isSettled() return client.settled end
 		function client.isActive() return false end
@@ -287,7 +287,7 @@ local STUBBED_MODULES = {
 	"ui.menu.menu_llm.runtime_install_offer",
 	"modules.llm.network_env", "core.fs.adapters.file_system",
 	"adapters.managed_ollama_hint", "adapters.managed_ollama_daemon",
-	"adapters.http_client", "adapters.shell_runner", "core.fs.adapters.json_codec",
+	"core.network.adapters.http_client", "adapters.shell_runner", "core.fs.adapters.json_codec",
 	"modules.llm.ollama_server_command", "modules.llm.parser", "modules.llm.profiles",
 	"modules.llm.progressive_reveal", "modules.llm.prediction_engine",
 	"ui.menu.menu_llm.models_manager_ollama", "modules.llm.api_common",

@@ -33,7 +33,7 @@ local function with_changelog(callback)
 			"ui.ui_builder",
 			"core.fs.adapters.file_system",
 			"core.fs.adapters.json_codec",
-			"adapters.http_client",
+			"core.network.adapters.http_client",
 			"core.events.timer_scheduler",
 			"infra.deferred_work",
 			"core.i18n.engine.i18n",
@@ -81,7 +81,7 @@ local function with_changelog(callback)
 			-- The real HttpClient owns redirects, so the window never reaches the
 			-- opaque auto-follow entry: asyncGet fails the case that uses it.
 			hs_stub.http.asyncGet = function()
-				error("the changelog must request through adapters.http_client, not hs.http.asyncGet")
+				error("the changelog must request through core.network.adapters.http_client, not hs.http.asyncGet")
 			end
 			hs_stub.http.doAsyncRequest = function(url, method, _, headers, on_response, _, explicit_redirect)
 				state.callbacks[#state.callbacks + 1] = on_response

@@ -255,7 +255,7 @@ function admittedRemapSwitchRetirement(manifest) {
 	const retired = 'macos/ui/menu/remap_switch.lua';
 	const ids = new Set(['karabiner_integration', 'remove_from_karabiner']);
 	const { scriptTokens } = require('../lib/script-source.cjs');
-	for (const file of sourceFiles(path.join(SP, 'macos/ui'), '.lua'))
+	for (const file of sourceFiles(path.join(SP, 'macos'), '.lua'))
 		for (const token of scriptTokens(fs.readFileSync(file, 'utf8'), '.lua'))
 			assert.ok(
 				!(token.kind === 'string' && /(?:^|[./])remap_switch$/.test(token.value)),
@@ -294,7 +294,7 @@ function admittedWindowsRetirements() {
 function admittedSelectorRetirement() {
 	const retired = 'macos/ui/menu/menu_llm/models_selector.lua';
 	const { scriptTokens } = require('../lib/script-source.cjs');
-	for (const file of sourceFiles(path.join(SP, 'macos/ui'), '.lua'))
+	for (const file of sourceFiles(path.join(SP, 'macos'), '.lua'))
 		for (const token of scriptTokens(fs.readFileSync(file, 'utf8'), '.lua'))
 			assert.ok(
 				token.value !== 'ModelsSelector' &&
@@ -413,7 +413,7 @@ const DRIVERS = ['windows', 'macos', 'linux'];
 // minimum against the immutable pre-migration oracle, not the migration debt.
 const FLOORS = { windows: 20, macos: 20, linux: 20 };
 const LEGACY_PATH = path.join(__dirname, 'fixtures', 'native-menu-census-legacy.json');
-const LEGACY_SHA256 = '4908b966bcc0177f3483a5f9fcabea697cf4b5439af7b32a7f8d4e205167d2fc';
+const LEGACY_SHA256 = 'c1ce558b1b9e4c3396de3ffa92d5219b52cae35bc41c26bea0d81e98860019c9';
 const legacyBytes = fs.readFileSync(LEGACY_PATH);
 assert.equal(
 	crypto.createHash('sha256').update(legacyBytes).digest('hex'),

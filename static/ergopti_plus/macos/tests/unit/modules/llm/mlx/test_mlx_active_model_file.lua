@@ -14,7 +14,7 @@ local AppDirs = require("core.fs.engine.app_dirs")
 
 local MODULES = {
 	"core.fs.adapters.file_system",
-	"adapters.http_client",
+	"core.network.adapters.http_client",
 	"core.fs.adapters.json_codec",
 	"adapters.shell_runner",
 	"core.events.timer_scheduler",
@@ -67,7 +67,7 @@ local function with_fixture(run)
 			return content, "ok"
 		end,
 	}
-	package.loaded["adapters.http_client"] = { new = function() return {} end }
+	package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }
 	package.loaded["core.fs.adapters.json_codec"] = {
 		encode = function() return "{}" end,
 		decode = function() return {} end,

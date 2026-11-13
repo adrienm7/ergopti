@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
-local REFUSED_STORAGE_MODULES = { "adapters.http_client", "modules.llm.enable_admission",
+local REFUSED_STORAGE_MODULES = { "core.network.adapters.http_client", "modules.llm.enable_admission",
   "infra.llm_preferences", "modules.llm.profiles", "modules.llm.prediction_engine" }
 
 --- Isolates the actual admission and publication owners, including failed assertions.
@@ -23,7 +23,7 @@ local function with_refused_storage(body)
       writes_fail = true,
     })
     package.loaded["infra.llm_preferences"] = storage
-    package.loaded["adapters.http_client"] = {
+    package.loaded["core.network.adapters.http_client"] = {
       get = function(url, _, _, callback)
         helpers.assert_eq(url, "http://127.0.0.1:11435/api/version")
         pending = callback
@@ -31,7 +31,7 @@ local function with_refused_storage(body)
       end,
       cancel = function() pending = nil; return true end,
     }
-    require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"])
+    require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"])
     package.loaded["modules.llm.enable_admission"] = nil
     package.loaded["modules.llm.profiles"] = nil
     package.loaded["modules.llm.prediction_engine"] = nil
@@ -98,15 +98,15 @@ helpers.describe("prediction_engine integration", function()
     end)
 
     local function with_enable_receipt(body)
-      local names = { "adapters.http_client", "modules.llm.enable_admission",
+      local names = { "core.network.adapters.http_client", "modules.llm.enable_admission",
         "modules.llm.profiles", "modules.llm.prediction_engine" }
       local previous, pending = {}, nil
       for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-      package.loaded["adapters.http_client"] = {
+      package.loaded["core.network.adapters.http_client"] = {
         get = function(_, _, _, callback) pending = callback; return true end,
         cancel = function() pending = nil; return true end,
       }
-      require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"])
+      require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"])
     package.loaded["modules.llm.enable_admission"] = nil
       package.loaded["modules.llm.profiles"] = nil
       package.loaded["modules.llm.prediction_engine"] = nil

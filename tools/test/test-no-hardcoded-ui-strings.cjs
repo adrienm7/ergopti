@@ -673,7 +673,7 @@ function collectFindings(driversRoot = DRIVERS) {
 			add(file, scanLua(fs.readFileSync(file, 'utf8')));
 	const scripts = [
 		...walk(path.join(driversRoot, '_shared', 'ui'), ['.js']),
-		...walk(path.join(driversRoot, 'macos', 'ui'), ['.js'])
+		...walk(path.join(driversRoot, 'macos'), ['.js'])
 	];
 	for (const file of scripts) add(file, scanJs(fs.readFileSync(file, 'utf8')));
 	const shell = [

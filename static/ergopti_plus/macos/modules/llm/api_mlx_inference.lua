@@ -44,7 +44,7 @@ if not ok_kl then keystats = nil end
 
 -- Dedicated client for non-streaming inference POSTs; isolated so it never shares
 -- state with the warmup/probe/check clients that live in api_mlx.lua.
-local _infer_client  = require("adapters.http_client").new()
+local _infer_client  = require("core.network.adapters.http_client").new()
 
 local _req_counter = 0
 -- Read from the shared inference.json through ApiCommon, exactly as api_ollama and

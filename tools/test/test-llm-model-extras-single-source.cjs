@@ -249,8 +249,10 @@ for (const [index, family] of families.entries()) {
 const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/modules',
 	'static/ergopti_plus/macos/ui',
+	'static/ergopti_plus/macos/core/network',
 	'static/ergopti_plus/linux/modules',
 	'static/ergopti_plus/linux/infra',
+	'static/ergopti_plus/linux/core/network/engine',
 	'static/ergopti_plus/linux/core/logger/engine',
 	'static/ergopti_plus/linux/core/lifecycle/engine',
 	'static/ergopti_plus/linux/core/i18n/engine',

@@ -15,7 +15,7 @@ local function with_scope(body)
 		local loaded_before = {}
 		for name, value in pairs(package.loaded) do loaded_before[name] = value end
 		local names = { "infra.config_paths", "infra.llm_preferences", "infra.llm_scope",
-			"adapters.http_client", "adapters.secure_field_detector", "ui.tooltip.llm",
+			"core.network.adapters.http_client", "adapters.secure_field_detector", "ui.tooltip.llm",
 			"core.fs.adapters.storage", "modules.hotstrings.magic_key" }
 		for _, name in ipairs({ "settings", "trigger_settings", "display_settings", "navigation_settings",
 			"profile_settings", "profiles", "prediction_engine", "api_ollama", "api_remote" }) do
@@ -31,7 +31,7 @@ local function with_scope(body)
 				default_config_dir = function() return path .. ".home/" .. require("core.fs.engine.app_dirs").linux.folder_name end }
 			package.loaded["adapters.secure_field_detector"] = { isSecureField = function() return false end,
 				isUrlBar = function() return false end }
-			package.loaded["adapters.http_client"] = {
+			package.loaded["core.network.adapters.http_client"] = {
 				postStream = function(_, _, _, _, chunk, done)
 					controls.requests = controls.requests + 1
 					controls.chunk, controls.done, controls.active = chunk, done, true
@@ -44,7 +44,7 @@ local function with_scope(body)
 					return true
 				end,
 			}
-			require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"])
+			require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"])
 			local overlay = require("ui.tooltip.llm")
 			overlay.init({ style = {}, renderer = {
 				show = function() controls.visible = true; return true end,

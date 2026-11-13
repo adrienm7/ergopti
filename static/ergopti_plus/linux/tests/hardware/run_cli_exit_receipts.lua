@@ -13,7 +13,7 @@ ffi.cdef[[
 -- leaving zombies to the container's init. This changes only this process.
 assert(ffi.C.prctl(36, 1, 0, 0, 0) == 0, "native fixture requires Linux child-subreaper support")
 local Shell = require("adapters.shell_runner")
-local Http = require("adapters.http_client")
+local Http = require("core.network.adapters.http_client")
 local Digest = require("core.fs.adapters.file_digest")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-cli-exits-XXXXXX"))
 local previous_path = assert(uv.os_getenv("PATH"))

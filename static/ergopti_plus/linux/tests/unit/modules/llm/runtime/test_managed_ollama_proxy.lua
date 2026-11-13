@@ -33,7 +33,7 @@ local function relay_policy()
 	return assert(require("core.network.engine.proxy_auth_relay_core").new(require("core.text.engine.json").decode(bytes)))
 end
 
-local ORIGINS = assert(require("infra.route_origins").client("ollama"))
+local ORIGINS = assert(require("core.network.engine.route_origins").client("ollama"))
 local BLOB = ORIGINS[2]
 
 --- One port over a scripted lookup. `world.receipt` is what the desktop answers
@@ -49,7 +49,7 @@ local function world(options)
 	w.port = Proxy.new({
 		policy = w.policy or policy(), environment = function() return w.rows end, timeout_ms = 3000, owner = "test-owner",
 		origins = w.origins or ORIGINS,
-		probe_timeout_ms = 1000, relay_address = require("adapters.tcp_probe").relay_address,
+		probe_timeout_ms = 1000, relay_address = require("core.network.adapters.tcp_probe").relay_address,
 		probe = function(host, port, timeout_ms, callback)
 			w.tcp_probes = w.tcp_probes or {}
 			w.tcp_probes[#w.tcp_probes + 1] = { host = host, port = port, timeout_ms = timeout_ms }
@@ -533,15 +533,15 @@ end)
 
 --- The real Linux policy binding over a stubbed storage holding `stored`.
 local function bound_policy(stored)
-	local saved = { storage = package.loaded["core.fs.adapters.storage"], binding = package.loaded["infra.proxy_policy"] }
+	local saved = { storage = package.loaded["core.fs.adapters.storage"], binding = package.loaded["core.network.engine.proxy_policy"] }
 	package.loaded["core.fs.adapters.storage"] = { get = function(key, default)
 		if key == "network.proxy_override" then return stored end
 		return default
 	end }
-	package.loaded["infra.proxy_policy"] = nil
-	local active = assert(require("infra.proxy_policy").load())
+	package.loaded["core.network.engine.proxy_policy"] = nil
+	local active = assert(require("core.network.engine.proxy_policy").load())
 	return active, function()
-		package.loaded["core.fs.adapters.storage"], package.loaded["infra.proxy_policy"] = saved.storage, saved.binding
+		package.loaded["core.fs.adapters.storage"], package.loaded["core.network.engine.proxy_policy"] = saved.storage, saved.binding
 	end
 end
 

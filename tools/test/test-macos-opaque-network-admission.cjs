@@ -582,7 +582,7 @@ const managedRoot = path.join(
 const managedReceiver = path.join(managedRoot, 'platform/network/native_http.py');
 fs.mkdirSync(path.dirname(managedReceiver), { recursive: true });
 fs.copyFileSync(
-	path.join(root, 'static/ergopti_plus/macos/platform/network/native_http.py'),
+	path.join(root, 'static/ergopti_plus/macos/core/network/adapters/native_http.py'),
 	managedReceiver
 );
 // A shipped bundle carries the proxy override declaration every prelude reads.
@@ -1202,7 +1202,7 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		path.join(bundledPolicy, 'proxy_override.json')
 	);
 	fs.copyFileSync(
-		path.join(root, 'static/ergopti_plus/macos/platform/network/native_http.py'),
+		path.join(root, 'static/ergopti_plus/macos/core/network/adapters/native_http.py'),
 		path.join(bootstrapRoot, 'platform/network/native_http.py')
 	);
 	fs.writeFileSync(

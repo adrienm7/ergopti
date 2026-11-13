@@ -12,7 +12,7 @@ package.path = root .. "/?.lua;" .. package.path
 package.loaded["_generated.native_runtime"] = {
 	network_runtime = { proxy_schema = "org.gnome.system.proxy" },
 }
-local Runtime = require("platform.network.native_proxy_runtime")
+local Runtime = require("core.network.adapters.native_proxy_runtime")
 local passed = 0
 
 --- Creates independent owned-schema/factory witnesses with forbidden early construction.

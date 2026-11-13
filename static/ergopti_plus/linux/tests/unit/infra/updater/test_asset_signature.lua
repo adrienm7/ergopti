@@ -77,7 +77,7 @@ helpers.describe("update asset signature (Linux)", function()
 		helpers.assert_eq(reason, "bad_key")
 	end)
 
-	-- The archive digest (infra/fd_sha256.lua) declares EVP_MD_CTX_new too. When
+	-- The archive digest (core/network/engine/fd_sha256.lua) declares EVP_MD_CTX_new too. When
 	-- it loaded first, LuaJIT refused the signature check's whole declaration
 	-- block, which then reported OpenSSL as missing on the distros where the
 	-- shard ran the digest tests earlier.
@@ -104,10 +104,10 @@ helpers.describe("update asset signature (Linux)", function()
 				return { fake = true }
 			end,
 		}
-		package.loaded["infra.openssl_library"] = nil
-		local ok, Library = pcall(require, "infra.openssl_library")
+		package.loaded["core.network.engine.openssl_library"] = nil
+		local ok, Library = pcall(require, "core.network.engine.openssl_library")
 		package.loaded["ffi"] = real_ffi
-		package.loaded["infra.openssl_library"] = nil
+		package.loaded["core.network.engine.openssl_library"] = nil
 		helpers.assert_true(ok, tostring(Library))
 		helpers.assert_eq(Library.soname, "libcrypto.so.4")
 		helpers.assert_eq(table.concat(tried, ","), "libcrypto.so.3,libcrypto.so.4")

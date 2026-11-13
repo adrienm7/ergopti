@@ -39,6 +39,7 @@ const ROOT = path.join(__dirname, '../..');
 const CONTRACTS_PATH = shared('core/ports/contracts.json');
 const AHK_ADAPTERS_DIRS = [
 	path.join(ROOT, 'static/ergopti_plus/windows/adapters'),
+	path.join(ROOT, 'static/ergopti_plus/windows/core/network/adapters'),
 	path.join(ROOT, 'static/ergopti_plus/windows/core/lifecycle'),
 	path.join(ROOT, 'static/ergopti_plus/windows/core/fs/adapters'),
 	path.join(ROOT, 'static/ergopti_plus/windows/core/events'),
@@ -255,7 +256,7 @@ if (validHeaderInventory) pass('HTTP redirect sensitive-header inventory is vali
 else fail('HTTP redirect sensitive-header inventory is valid and unique');
 
 const macHttpSource = fs.readFileSync(
-	path.join(ROOT, 'static/ergopti_plus/macos/adapters/http_client.lua'),
+	path.join(ROOT, 'static/ergopti_plus/macos/core/network/adapters/http_client.lua'),
 	'utf8'
 );
 const macHeaderBlock = macHttpSource.match(/local SENSITIVE_HEADERS = \{([\s\S]*?)\n\}/);

@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local M = {}
-local Http = require("adapters.http_client")
-local Deferred = require("infra.managed_http_deadline")
+local Http = require("core.network.adapters.http_client")
+local Deferred = require("core.network.engine.managed_http_deadline")
 local Monotonic = require("core.logger.engine.monotonic")
 local Bridge = require("infra.llm_bridge")
 local Policy = require("ai.engine.ollama.local_model_policy")
@@ -51,8 +51,8 @@ function M.new(context)
 
 	local function authorized(frame)
 		if active ~= frame or frame.revoked or not source_current(frame) then return false end
-		return active == frame and not frame.revoked and package.loaded["adapters.http_client"] == Http
-			and Http.get_owned == get and package.loaded["infra.managed_http_deadline"] == Deferred
+		return active == frame and not frame.revoked and package.loaded["core.network.adapters.http_client"] == Http
+			and Http.get_owned == get and package.loaded["core.network.engine.managed_http_deadline"] == Deferred
 			and Deferred.start == defer and Monotonic.now_ms == clock
 	end
 

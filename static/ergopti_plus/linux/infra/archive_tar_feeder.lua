@@ -20,7 +20,7 @@ function M.new(backend, listing_max_output_bytes, ollama_zstd)
 	elseif type(listing_max_output_bytes) ~= "number" or listing_max_output_bytes <= 0
 		or listing_max_output_bytes % 1 ~= 0 then return nil end
 	local uv = require("luv")
-	local Deadline = require("infra.managed_http_deadline")
+	local Deadline = require("core.network.engine.managed_http_deadline")
 	local Process = require("adapters.owned_process")
 	local native = {}
 	for _, name in ipairs({ "new_pipe", "fs_read", "fs_close", "write", "shutdown", "hrtime" }) do

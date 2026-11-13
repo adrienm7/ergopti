@@ -572,7 +572,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.http_client",
+		id       = "core.network.adapters.http_client",
 		contract = { "get", "post" },
 		wired    = true,
 	},
@@ -607,7 +607,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.network_info",
+		id       = "core.network.adapters.info",
 		contract = { "getSsidHash", "getSignalStrength", "isInternetReachable", "isVpnActive" },
 		wired    = true,
 	},
@@ -674,7 +674,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.system_curl",
+		id       = "core.network.adapters.system_curl",
 		contract = { "check", "message_for", "parse_version", "verdict_for" },
 		-- Every curl start goes through ShellRunner.spawn or TaskLifecycle.native.
 		wired    = true,
