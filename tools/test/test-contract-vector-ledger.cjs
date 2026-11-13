@@ -36,7 +36,9 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const CORPUS = path.join(SHARED, 'tests', 'corpus');
-const CONTRACTS = path.join(SHARED, 'lua', 'test');
+// The family contracts: in each folder, the Lua files whose names match. The
+// ledger names each contract by its repository path.
+const FAMILY = [[['lua', 'test'], /^(config_scope|toml_|menu_)/]];
 const EXPECT_KEYS = new Set([
 	'ok',
 	'content',
@@ -170,6 +172,7 @@ const SCHEMAS = {
 
 /** Counts passed to one replayer by both drivers' TOML suites. */
 function replayerCounts(contract, held, label) {
+	const name = path.basename(contract, '.lua');
 	const found = [];
 	for (const relative of [
 		'static/ergopti_plus/linux/tests/unit/infra/config/test_toml_codec_shared_decode.lua',
@@ -177,7 +180,7 @@ function replayerCounts(contract, held, label) {
 	]) {
 		const match = fs
 			.readFileSync(path.join(ROOT, relative), 'utf8')
-			.match(new RegExp(`require\\("test\\.${contract}"\\)\\(helpers, corpus, (\\d+)\\)`));
+			.match(new RegExp(`require\\("(?:[\\w.]+\\.)?${name}"\\)\\(helpers, corpus, (\\d+)\\)`));
 		assert(match, `${relative} does not replay the ${label} vectors`);
 		found.push([relative, Number(match[1]), held]);
 	}
@@ -202,14 +205,14 @@ const LUA_COUNTS = {
 	},
 	toml_inline_scalar(corpus) {
 		return replayerCounts(
-			'toml_inline_scalar_vectors_contract',
+			'static/ergopti_plus/_shared/lua/test/toml_inline_scalar_vectors_contract.lua',
 			corpus.vectors.length,
 			'inline scalar'
 		);
 	},
 	toml_hotstring_reader(corpus) {
 		return replayerCounts(
-			'toml_hotstring_reader_vectors_contract',
+			'static/ergopti_plus/_shared/lua/test/toml_hotstring_reader_vectors_contract.lua',
 			corpus.vectors.length,
 			'hotstring reader'
 		);
@@ -230,7 +233,10 @@ const LUA_COUNTS = {
 	},
 	menu_numbered_caption(corpus) {
 		const match = fs
-			.readFileSync(path.join(CONTRACTS, 'menu_numbered_caption_contract.lua'), 'utf8')
+			.readFileSync(
+				path.join(ROOT, 'static/ergopti_plus/_shared/lua/test/menu_numbered_caption_contract.lua'),
+				'utf8'
+			)
 			.match(
 				/#corpus\.positive == (\d+) and #corpus\.grammar_refusals == (\d+) and #corpus\.ownership_refusals == (\d+)/
 			);
@@ -243,7 +249,10 @@ const LUA_COUNTS = {
 	},
 	config_scope_plan(corpus) {
 		const match = fs
-			.readFileSync(path.join(CONTRACTS, 'config_scope_plan_contract.lua'), 'utf8')
+			.readFileSync(
+				path.join(ROOT, 'static/ergopti_plus/_shared/lua/test/config_scope_plan_contract.lua'),
+				'utf8'
+			)
 			.match(
 				/#corpus\.stored_paths == (\d+) and #corpus\.inventories == (\d+) and #corpus\.refusals == (\d+)\s+and #corpus\.declaration_plans == (\d+) and #corpus\.declaration_refusals == (\d+) and #corpus\.declaration_cycles == (\d+)\s+and #corpus\.inventory_collections == (\d+) and #corpus\.inventory_refusals == (\d+)/
 			);
@@ -269,7 +278,7 @@ for (const family of ledger.families) {
 
 	const listed = [];
 	for (const source of family.sources) {
-		const text = fs.readFileSync(path.join(CONTRACTS, source.contract), 'utf8');
+		const text = fs.readFileSync(path.join(ROOT, source.contract), 'utf8');
 		for (const moved of source.moved) {
 			assert(moved.vectors.length > 0, `${source.contract}: a moved entry maps to no vector`);
 			if (moved.case !== undefined) {
@@ -323,7 +332,7 @@ const seenContracts = new Set();
 for (const entry of ledger.contracts) {
 	assert(!seenContracts.has(entry.contract), `${entry.contract}: listed twice`);
 	seenContracts.add(entry.contract);
-	const text = fs.readFileSync(path.join(CONTRACTS, entry.contract), 'utf8');
+	const text = fs.readFileSync(path.join(ROOT, entry.contract), 'utf8');
 	assert.equal(
 		entry.lua_sites,
 		luaSites(text),
@@ -349,9 +358,17 @@ for (const entry of ledger.contracts) {
 	}
 	sites += entry.lua_sites;
 }
-const onDisk = fs
-	.readdirSync(CONTRACTS)
-	.filter((name) => /^(config_scope|toml_|menu_)/.test(name) && !name.includes('vectors_contract'));
+const onDisk = FAMILY.flatMap(([dir, names]) =>
+	fs
+		.readdirSync(path.join(SHARED, ...dir))
+		.filter((name) => names.test(name) && !name.includes('vectors_contract'))
+		.map((name) =>
+			path
+				.relative(ROOT, path.join(SHARED, ...dir, name))
+				.split(path.sep)
+				.join('/')
+		)
+);
 for (const name of onDisk)
 	assert(seenContracts.has(name), `${name}: a family contract missing from the ledger contracts`);
 
