@@ -10,7 +10,7 @@ This file lists features and fixes. The checks only real hardware can answer are
 [TODO-tests-macos.md](TODO-tests-macos.md), [TODO-tests-windows.md](TODO-tests-windows.md) and
 [TODO-tests-linux.md](TODO-tests-linux.md).
 
-## Resume here (2026-11-12 evening, read first)
+## Resume here (2026-11-13, read first)
 
 If the coordinating session stopped (weekly quota), any agent can continue from this section alone. Follow
 [AGENTS.md](AGENTS.md); never push `dev` or `main` without the maintainer's go in the current conversation.
@@ -22,10 +22,11 @@ If the coordinating session stopped (weekly quota), any agent can continue from 
   `docs/plans/structure-migration-resume.md` first: base `dev` commit, steps done with their proof, the step in
   progress, the next command, known traps, how to regenerate `move-map.tsv`. One step per commit with
   `tools/audit/structure/apply-step.cjs` (`--check-all` clean first); a step is done when local gates and CI on the
-  three OS show only the reds `dev` already has. Land on `dev` only with the maintainer's go. State at 00:35
-  Paris (2026-11-13): S01 is not green on CI. Its proof `claude/ergopti-todo-structure-phase2-proof-2` on dev
-  520bb24c (CI run 43311674550) has 28 failing jobs that local gates masked. The causes found so far and the
-  next actions, in order, are in the branch's resume file; S02 applies locally but waits for S01.
+  three OS show only the reds `dev` already has. Land on `dev` only with the maintainer's go, in small linear
+  blocks (decision of 2026-11-13: no merge commits, rebase the branch on `dev`). State at 17:05 Paris
+  (2026-11-13): S01 and S02 are on `dev` (42f8c1327, proof-10 CI run 43430776650). Next block S03-S05 is built on
+  top of it; the full chain still has about 2,000 Lua test failures, handled by the approved shared module
+  predicate (see the resume file's decisions).
 - **Reds `dev` already has (2026-11-12 evening), the baseline a step is compared with.** Windows Unit tests
   (meta, `desktop-ci-evidence`); Windows Build (AV-surface ceilings, item below); Linux E2E desktop-webview,
   updater, platform-metrics, input-display; Common Shared ui (App Cloner generated literals); Common Packaging and
