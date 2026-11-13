@@ -86,3 +86,51 @@ helpers.describe("tap-hold engine: sticky modifiers (sticky-linux)", function()
 	end)
 
 end)
+
+helpers.describe("tap-hold: a one-shot tap with its modifier on hold (sticky-tap-hold-pair)", function()
+	local ALTGR = 100
+	local function pair_engine()
+		return Engine.new({ keys = { alt_gr = { tap_action = "sticky_altgr", hold_modifier = "alt_gr",
+			time_activation_seconds = 0.2 } }, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
+			key_text = Fixture.us_text, plan_text = Fixture.us_plan, one_shot_result = Fixture.one_shot_result })
+	end
+
+	helpers.it("taps the one-shot AltGr action (sticky-tap-hold-pair)", function()
+		local e = pair_engine()
+		e:process(ALTGR, DOWN, 0)
+		local _, tap = e:process(ALTGR, UP, 100)
+		helpers.assert_eq(tap, "sticky_altgr", "the tap runs the catalogue's one-shot AltGr")
+		helpers.assert_true(e:arm_sticky(100, { CODES.altgr }), "which arms the engine's AltGr")
+		helpers.assert_eq(trail((e:process(KEY_J, DOWN, 200))), "100↓ 36↓", "the next key gets AltGr")
+	end)
+
+	helpers.it("holds AltGr under a key struck while it is down (sticky-tap-hold-pair)", function()
+		local e = pair_engine()
+		local down = e:process(ALTGR, DOWN, 0)
+		helpers.assert_eq(trail(down), "100↓", "AltGr goes down with the key, its own hold")
+		local out = e:process(KEY_J, DOWN, 300)
+		helpers.assert_true(trail(out):find("100↑", 1, true) == nil, "the key struck under it keeps AltGr")
+		local _, tap = e:process(ALTGR, UP, 400)
+		helpers.assert_nil(tap, "a hold that made a chord runs no one-shot")
+		helpers.assert_nil(e:sticky_armed())
+	end)
+end)
+
+helpers.describe("shortcuts manager: sticky action ids (sticky-linux)", function()
+	helpers.it("maps every catalogue sticky id to the engine's modifier codes (sticky-linux)", function()
+		local Manager = require("modules.shortcuts.manager")
+		helpers.assert_eq(Manager.sticky_codes("sticky_cmd_ctrl"), { CODES.super, CODES.ctrl }, "cmd is Super")
+		helpers.assert_eq(Manager.sticky_codes("sticky_option_shift"), { CODES.alt, CODES.shift }, "option is Alt")
+		helpers.assert_eq(Manager.sticky_codes("sticky_altgr"), { CODES.altgr }, "AltGr is Right Alt")
+		helpers.assert_eq(Manager.sticky_codes("sticky_altgr_shift"), { CODES.altgr, CODES.shift })
+		helpers.assert_eq(#Manager.sticky_codes("sticky_hyper"), 4, "Hyper holds four")
+		helpers.assert_true(not pcall(Manager.sticky_codes, "sticky_fn"), "an unknown modifier is refused")
+		local handlers = Manager.action_handlers()
+		for _, id in ipairs({ "sticky_ctrl", "sticky_cmd", "sticky_option", "sticky_cmd_shift", "sticky_cmd_option",
+			"sticky_cmd_ctrl", "sticky_option_shift", "sticky_option_ctrl", "sticky_ctrl_shift", "sticky_cmd_option_shift",
+			"sticky_cmd_option_ctrl", "sticky_cmd_shift_ctrl", "sticky_option_shift_ctrl", "sticky_hyper", "sticky_altgr",
+			"sticky_altgr_shift" }) do
+			helpers.assert_eq(type(handlers[id]), "function", id .. " has a handler")
+		end
+	end)
+end)

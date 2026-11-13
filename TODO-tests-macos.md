@@ -135,3 +135,6 @@ Hands needed:
       the cleanup).
 - [ ] <!-- field-point: input_policies --> Branch `wave3/input-policies` (2026-11-06): CapsWord closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778) (`test_watchers_capsword_auto_off` « a second CapsWord action ends it at once and unlocks CapsLock », `test_karabiner_actions_reachable`, `test_menu_caps_word` « ★ » after the rename). Native one-shot Shift (modifier-map, dead-key and IME handling of the captured key) and CapsWord key/control payload receiving stay hands (moved from the one-shot and CapsWord parity follow-ups).
 - [ ] <!-- field-point: layout_editor_window --> Layout editor window (2026-11-13): « Create or edit a layout… » and the layout manager's « Layout editor » open the editor in its own window; a second request brings it to the front with its unsaved work; « Close » closes it.
+- [ ] One-shot modifiers (worker A, 2026-11-13): the sticky delay row accepts 0 and shows « no time limit », the
+      one-shot Shift and a gesture-armed `sticky_*` then never auto-cancel; a Karabiner tap-hold key set to tap
+      `sticky_altgr` and hold Option types one Option-level character after a tap.

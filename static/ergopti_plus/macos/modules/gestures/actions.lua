@@ -1075,6 +1075,9 @@ sg("sticky_cmd_option_ctrl",   function() arm_sticky({ "cmd", "alt", "ctrl" }) e
 sg("sticky_cmd_shift_ctrl",    function() arm_sticky({ "cmd", "shift", "ctrl" }) end)
 sg("sticky_option_shift_ctrl", function() arm_sticky({ "alt", "shift", "ctrl" }) end)
 sg("sticky_hyper",             function() arm_sticky({ "cmd", "alt", "shift", "ctrl" }) end)
+-- Ergopti's AltGr level is Option on macOS (the Kana layers compile to it too).
+sg("sticky_altgr",             function() arm_sticky({ "alt" }) end)
+sg("sticky_altgr_shift",       function() arm_sticky({ "alt", "shift" }) end)
 
 
 -- Tabs

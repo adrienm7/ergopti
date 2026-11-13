@@ -1992,6 +1992,18 @@
 		"reasons": {}
 	},
 	{
+		"path": "sg_actions.sticky_altgr",
+		"labels": { "fr": "📌 {1} rémanente", "en": "📌 Sticky {1}" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "sg_actions.sticky_altgr_shift",
+		"labels": { "fr": "📌 {1} rémanents", "en": "📌 Sticky {1}" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
 		"path": "sg_actions.open_console",
 		"labels": { "fr": "▤ Console", "en": "▤ Console" },
 		"platforms": { "windows": false, "macos": true, "linux": false },

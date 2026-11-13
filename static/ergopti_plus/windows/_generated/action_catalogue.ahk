@@ -218,6 +218,8 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "sticky_cmd_option_ctrl" })
 	Items.Push({ Kind: "action", Id: "sticky_cmd_shift_ctrl" })
 	Items.Push({ Kind: "action", Id: "sticky_option_shift_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_altgr" })
+	Items.Push({ Kind: "action", Id: "sticky_altgr_shift" })
 	Items.Push({ Kind: "action", Id: "sticky_hyper" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.grp_app" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.ui" })
@@ -412,6 +414,8 @@ GestureActionCatalogueData() {
 	Actions["snap_right"] := { Family: "sg", LabelKey: "sg_actions.snap_right", Parameter: "", Confirm: false }
 	Actions["space"] := { Family: "sg", LabelKey: "sg_actions.space", Parameter: "", Confirm: false }
 	Actions["spotlight_mouse"] := { Family: "sg", LabelKey: "sg_actions.spotlight_mouse", Parameter: "", Confirm: false }
+	Actions["sticky_altgr"] := { Family: "sg", LabelKey: "sg_actions.sticky_altgr", Parameter: "", Confirm: false }
+	Actions["sticky_altgr_shift"] := { Family: "sg", LabelKey: "sg_actions.sticky_altgr_shift", Parameter: "", Confirm: false }
 	Actions["sticky_cmd"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd", Parameter: "", Confirm: false }
 	Actions["sticky_cmd_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_ctrl", Parameter: "", Confirm: false }
 	Actions["sticky_cmd_option"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_option", Parameter: "", Confirm: false }

@@ -12,7 +12,8 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. The id spells the modifiers, as the catalogue does on every driver:
----    cmd, ctrl, option and shift, Option being the Alt key.
+---    cmd, ctrl, option, shift and altgr, Option being the Alt key and altgr
+---    the layout's AltGr level.
 --- 2. sticky_hyper is named by its own word and holds no {1}.
 --- 3. Fail fast: an unknown modifier token raises rather than dropping it.
 --- ==============================================================================
@@ -22,7 +23,7 @@ local KeyNames = require("platform.input.keycodes.key_names")
 local M = {}
 
 -- The key name id of each token a sticky id spells.
-local MODIFIER_IDS = { cmd = "cmd", ctrl = "ctrl", option = "alt", shift = "shift" }
+local MODIFIER_IDS = { cmd = "cmd", ctrl = "ctrl", option = "alt", shift = "shift", altgr = "alt_gr" }
 
 --- The key name ids a sticky action holds, in the order its id spells them.
 --- @param id string A sticky_* action id.

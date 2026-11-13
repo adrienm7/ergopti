@@ -2205,6 +2205,14 @@
 			"reason": "brand-or-feature-name",
 			"locales": "*"
 		},
+		"sg_actions.sticky_altgr": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_altgr_shift": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
 		"sg_actions.sticky_cmd": {
 			"reason": "brand-or-feature-name",
 			"locales": ["da", "de", "es", "it", "nl", "no", "pl", "pt", "sv", "zh"]

@@ -345,6 +345,8 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `sticky_cmd_option_ctrl` | 📌 Sticky Cmd + Option + Ctrl | yes | yes | yes |
 | `sticky_cmd_shift_ctrl` | 📌 Sticky Cmd + Shift + Ctrl | yes | yes | yes |
 | `sticky_option_shift_ctrl` | 📌 Sticky Option + Shift + Ctrl | yes | yes | yes |
+| `sticky_altgr` | 📌 Sticky AltGr | yes | yes | yes |
+| `sticky_altgr_shift` | 📌 Sticky AltGr + Shift | yes | yes | yes |
 | `sticky_hyper` | 📌 Sticky Hyper | yes | yes | yes |
 | `open_metrics_typing` | 📊 Typing stats | yes | yes | yes |
 | `open_metrics_apps` | 📊 App stats | yes | yes | yes |
