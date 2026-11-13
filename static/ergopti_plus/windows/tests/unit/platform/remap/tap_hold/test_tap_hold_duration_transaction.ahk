@@ -15,7 +15,7 @@
 
 global _THD_Phase := ""
 global _THD_Result := 0
-global _THD_Answer := { Result: "OK", Value: "375.4" }
+global _THD_Answer := { Result: "OK", Value: "375" }
 global _THD_Prompts := []
 global _THD_Setters := []
 global _THD_Reloads := []
@@ -25,7 +25,7 @@ _THD_Reset() {
 	global _THD_Phase, _THD_Result, _THD_Answer, _THD_Prompts, _THD_Setters, _THD_Reloads, _THD_Mode
 	_THD_Phase := ""
 	_THD_Result := 0
-	_THD_Answer := { Result: "OK", Value: "375.4" }
+	_THD_Answer := { Result: "OK", Value: "375" }
 	_THD_Prompts := []
 	_THD_Setters := []
 	_THD_Reloads := []
@@ -287,9 +287,16 @@ _THD_PromptRefusesMalformed(TargetPath) {
 		{ Result: "OK", Value: "nan" }, { Result: "OK", Value: "1e309" }, { Result: "OK", Value: "invalid" }] {
 		_THD_Reset()
 		_THD_Answer := Answer
+		Shown := _ValueCheckTest_Refusals.Length
 		AssertEqual(false, _THD_Ask())
 		AssertEqual(0, _THD_Setters.Length, "invalid/cancelled answers invoke no owner")
 		AssertEqual(0, _THD_Reloads.Length)
+		; Typed text that is refused is shown with the accepted range, never dropped silently.
+		Typed := (Answer is Object) && !(Answer is Map) && Answer.HasOwnProp("Value") && (Answer.Value is String)
+			&& Answer.Result == "OK"
+		AssertEqual(Shown + (Typed ? 1 : 0), _ValueCheckTest_Refusals.Length, "refusal shown for a typed answer")
+		if Typed
+			AssertEqual("tap_hold.keys.*.time_activation_seconds", _ValueCheckTest_Refusals[-1]["key"])
 	}
 	_THD_Reset()
 	_THD_Mode := "prompt_throw"
@@ -782,9 +789,12 @@ _THD_NumericPromptBody(GlobalDelay, Raw, ExpectedMs, TargetPath) {
  }
 }
 _THD_NumericPromptDomain(GlobalDelay) {
- for Raw in ["18446744073709551619", "00018446744073709551619", "0x10000000000000003", "-18446744073709551613", "", "0"]
+ ; Whole milliseconds only (the shared value schema): a hexadecimal, fractional or
+ ; exponent spelling is refused with the accepted range, never reinterpreted.
+ for Raw in ["18446744073709551619", "00018446744073709551619", "0x10000000000000003", "-18446744073709551613", "", "0",
+   "0x3", "3.4", "3e0", "10001"]
   _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, Raw, 0))
- for Raw in ["3", "0003", "+3", "0x3", "3.4", "3e0"]
+ for Raw in ["3", "0003", "+3", " 3 ", "10000"]
   _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, Raw, 3))
 }
 Test("Tap-hold global delay refuses overflowing prompt aliases (tap-hold-prompt-numeric-domain)", _THD_NumericPromptDomain.Bind(true))

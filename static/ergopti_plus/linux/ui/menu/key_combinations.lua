@@ -184,9 +184,16 @@ function M.build(ctx,ui)
 				local source=snapshot();if not source or type(ui.prompt_delay)~="function" then return feedback(false) end
 				local selected=ui.prompt_delay(settings.simultaneous_threshold_ms,delay_entry.default)
 				if selected==nil then return false end
-				if type(selected)~="string" or not selected:match("^%s*%d+%.?%d*%s*$") then return feedback(false) end
-				local delay=tonumber(selected)
-				if not delay or delay<=0 or delay>=math.huge or source.guard()~=true then return feedback(false) end
+				-- The shared value check names the accepted range; a refusal writes nothing.
+				local ValueCheck=require("settings.engine.value_check")
+				local key=require("settings.engine.keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS
+				local typed=ValueCheck.parse_entry(ValueCheck.declaration(key),selected)
+				if not typed.ok then
+					ui.error(ValueCheck.refusal_text(key,typed,t),t("dialog.value_check.title"))
+					return false
+				end
+				local delay=typed.value
+				if source.guard()~=true then return feedback(false) end
 				return feedback(Scope.set_chord_settings({simultaneous_threshold_ms=delay,combo_symmetric=settings.combo_symmetric},source))
 			end}}
 	end

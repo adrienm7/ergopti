@@ -13,6 +13,7 @@
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\..\..\infra\number.ahk
+#Include %A_LineFile%\..\..\..\infra\value_check.ahk
 
 
 
@@ -623,20 +624,19 @@ _TH_PromptGlobalDelay(PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 			: Ui_InputBox(Prompt, Title, "w340 h160", CurrentMs)
 		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
 			return false
-		Raw := Trim(Answer.Value, " `t")
-		if !IsNumber(Raw)
+		; The shared value schema owns the accepted range and its refusal text.
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor("tap_hold.time_activation_seconds"), Answer.Value)
+		if !Typed["ok"] {
+			ValueCheckShowRefusal("tap_hold.time_activation_seconds", Typed, Answer.Value)
 			return false
-		if !(IsInteger(Raw) ? NumberTryParseInputInteger(Raw, &Ms) : NumberTryParseFiniteFloat(Raw, &Ms))
-			return false
-		Ms := Round(Ms)
-		if Ms <= 0 || !_TH_DurationValueValid(Ms / 1000)
-			return false
+		}
+		Seconds := Typed["value"]
 	} catch as Err {
 		try LoggerError("TapHoldMenu", "The global delay prompt was refused: {1}.", Err.Message)
 		return false
 	}
-	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(Ms / 1000)
-		: WriteTapHoldGlobalDuration(Ms / 1000)
+	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(Seconds)
+		: WriteTapHoldGlobalDuration(Seconds)
 	catch as Err {
 		try LoggerError("TapHoldMenu", "The global delay could not be saved: {1}.", Err.Message)
 		return false
@@ -728,16 +728,13 @@ _TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 			: Ui_InputBox(Prompt, Title, "w340 h160", CurrentMs)
 		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
 			return false
-		Raw := Trim(Answer.Value, " `t")
-		if !IsNumber(Raw)
+		; The shared value schema owns the accepted range and its refusal text.
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor("tap_hold.keys.*.time_activation_seconds"), Answer.Value)
+		if !Typed["ok"] {
+			ValueCheckShowRefusal("tap_hold.keys.*.time_activation_seconds", Typed, Answer.Value)
 			return false
-		if !(IsInteger(Raw) ? NumberTryParseInputInteger(Raw, &Ms) : NumberTryParseFiniteFloat(Raw, &Ms))
-			return false
-		if !_TH_DurationValueValid(Ms / 1000)
-			return false
-		Ms := Round(Ms)
-		if Ms <= 0
-			return false
+		}
+		Seconds := Typed["value"]
 	} catch as Err {
 		try LoggerError("TapHoldMenu", "The per-key delay prompt was refused: {1}.", Err.Message)
 		return false
@@ -746,8 +743,8 @@ _TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 		try LoggerWarn("TapHoldMenu", "The per-key delay source changed while its prompt was open.")
 		return false
 	}
-	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(KeyId, Ms / 1000, SourceWitness)
-		: WriteTapHoldDuration(KeyId, Ms / 1000, 0, 0, 0, 0, SourceWitness)
+	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(KeyId, Seconds, SourceWitness)
+		: WriteTapHoldDuration(KeyId, Seconds, 0, 0, 0, 0, SourceWitness)
 	catch as Err {
 		try LoggerError("TapHoldMenu", "The per-key delay could not be saved: {1}.", Err.Message)
 		return false
@@ -756,7 +753,7 @@ _TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 		return false
 	; A persistence callback cannot acknowledge a different key or parent and
 	; then send Reload to that successor configuration.
-	if !_TH_DurationReceiptMatches(SourceWitness, _TH_TapHoldConfigPath(), KeyId, Ms / 1000)
+	if !_TH_DurationReceiptMatches(SourceWitness, _TH_TapHoldConfigPath(), KeyId, Seconds)
 		return false
 	try Reloaded := HasMethod(ReloadFn, "Call") ? ReloadFn.Call("delay_set", KeyId)
 		: _TH_ReloadTapHoldMenu("delay_set", KeyId)

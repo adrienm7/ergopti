@@ -171,7 +171,6 @@ end
 
 
 local TAP_HOLD_TIMEOUT_MS_DEFAULT       = Defaults.tap_hold_timeout_ms
-local TAP_HOLD_MAX_TIMEOUT_MS           = Defaults.tap_hold_max_timeout_ms
 local LoneTap = require("tap_hold.engine.lone_tap")
 -- How long a modifier key pressed alone still taps: the manifest's
 -- tap_holds.lone_modifier_tap_max_ms (0 = the strict tap-hold).
@@ -180,23 +179,37 @@ M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT = LoneTap.validate(
 local STICKY_TIMEOUT_MS_DEFAULT         = Defaults.sticky_timeout_ms
 local SIMULTANEOUS_THRESHOLD_MS_DEFAULT = Defaults.simultaneous_threshold_ms
 local COMBO_SYMMETRIC_DEFAULT           = Defaults.combo_symmetric
+-- The shared value schema declarations of the global and per-key delays.
+local ValueCheck = require("settings.engine.value_check")
+local GLOBAL_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS
+local KEY_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS
 local OUTDATED_BINDING_REASON = "a binding is a table of actions; the neutral one is used"
 local OUTDATED_ARRAY_REASON = "a remap dictionary is not an array; the neutral state is used"
 
 --- Reads one timing leaf without treating obsolete data as a file failure.
+--- A leaf the shared value schema declares (`declaration`) is checked against
+--- it; the model holds milliseconds, so `scale` converts to the declared unit
+--- (0.001 for a delay the files store in seconds).
 --- @return number value The existing numeric policy or the canonical default.
 --- @return boolean outdated True when the raw leaf must survive ordinary saves.
-local function timing_leaf(section, key, default, path, section_name)
+local function timing_leaf(section, key, default, path, section_name, declaration, scale)
 	if section[key] == nil then return default, false end
-	-- The global delay has SCHEMA.md's bound, read wherever this leaf is.
-	local maximum = section_name == ConfigKeys.KEY.TAP_HOLDS and key == "timeout_ms" and TAP_HOLD_MAX_TIMEOUT_MS or nil
-	local called, value = pcall(tonumber, section[key])
+	local raw = section[key]
+	if declaration ~= nil then
+		local checked = ValueCheck.check_value(ValueCheck.declaration(declaration),
+			type(raw) == "number" and raw * (scale or 1) or raw)
+		-- The model is whole milliseconds: the generator writes integers.
+		if checked.ok and raw % 1 == 0 then return raw, false end
+		Outdated.report_in_file(path, { section_name, key }, string.format(
+			"%s is refused (%s, %s..%s); the canonical default is used", tostring(raw),
+			checked.ok and "not_integer" or checked.reason, tostring(checked.min), tostring(checked.max)), Logger)
+		return default, true
+	end
+	local called, value = pcall(tonumber, raw)
 	if called and require("core.text.engine.number_policy").within_timer_ceiling(value)
-		and value > 0 and value % 1 == 0 and (maximum == nil or value <= maximum) then return value, false end
-	Outdated.report_in_file(path, { section_name, key }, maximum == nil
-		and "a timing is a finite positive whole number of milliseconds; the canonical default is used"
-		or string.format("a delay is a positive whole number of milliseconds up to %d; the canonical default is used",
-			maximum), Logger)
+		and value > 0 and value % 1 == 0 then return value, false end
+	Outdated.report_in_file(path, { section_name, key },
+		"a timing is a finite positive whole number of milliseconds; the canonical default is used", Logger)
 	return default, true
 end
 
@@ -947,25 +960,28 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	-- follows the global delay, and the file keeps the value for the user.
 	for id, entry in pairs(tap_hold_config) do
 		local own = type(entry) == "table" and entry.timeout_ms or nil
-		if own ~= nil and not (type(own) == "number" and own > 0 and own <= TAP_HOLD_MAX_TIMEOUT_MS) then
+		local checked = own ~= nil and ValueCheck.check_value(ValueCheck.declaration(KEY_DELAY_KEY),
+			type(own) == "number" and own / 1000 or own)
+		if checked and not checked.ok then
 			Outdated.report_in_file(user_config_path, { ConfigKeys.KEY.TAP_HOLDS, "config", tostring(id), "timeout_ms" },
-				string.format("a key's delay is more than 0 and at most %d ms; the key follows the global delay",
-					TAP_HOLD_MAX_TIMEOUT_MS), Logger)
+				string.format("a key's delay is refused (%s, %s..%s s); the key follows the global delay",
+					checked.reason, tostring(checked.min), tostring(checked.max)), Logger)
 		end
 	end
 
 	-- Reads one optional number; absence is the canonical default.
-	local function timing(section, key, default, label)
+	local function timing(section, key, default, label, declaration, scale)
 		local section_name = assert(label:match("^([^.]+)%."), "a timing needs its owning section")
-		return timing_leaf(section, key, default, user_config_path, section_name)
+		return timing_leaf(section, key, default, user_config_path, section_name, declaration, scale)
 	end
-	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS)
+	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS,
+		GLOBAL_DELAY_KEY, 0.001)
 	local sticky_ms = timing(tap_holds, ConfigKeys.LEAF.STICKY_TIMEOUT_MS, STICKY_TIMEOUT_MS_DEFAULT,
 		ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
 	local lone_tap_ms = lone_tap_leaf(tap_holds, ConfigKeys.LEAF.LONE_MODIFIER_TAP_MAX_MS,
 		M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT, user_config_path, ConfigKeys.KEY.TAP_HOLDS)
 	local simultaneous_ms = timing(combos, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS, SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
-		ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
+		ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 
 	local combo_symmetric = combinations_symmetric(combos, user_config_path)
 

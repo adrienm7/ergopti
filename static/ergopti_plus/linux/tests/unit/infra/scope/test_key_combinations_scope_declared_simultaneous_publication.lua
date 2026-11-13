@@ -270,6 +270,16 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
    end,true)
   end)
  end
+ for _,typed in ipairs({'3.5','1001','0x10',' '}) do
+  helpers.it("refuses typed delay '"..typed.."' with the accepted range and no publication (value-validation)",function()
+   with_menu(function(s)
+    s.delay_selection=typed
+    local row=find_menu(s.build(),s.translate('menu.tapholds.simultaneous_title'):gsub('%%s',''))
+    helpers.assert_eq(row.fn(),false);helpers.assert_eq(s.publications,0)
+    helpers.assert_eq(s.errors,1,"the refusal is shown once, never dropped silently")
+   end,true)
+  end)
+ end
  helpers.it("copy command and clear command publish through actual guarded scope",function()
   with_menu(function(s)
    local rows=s.build();helpers.assert_true(find_menu(rows,s.translate('menu.tapholds.copy_tap_to_combo'),true).fn())

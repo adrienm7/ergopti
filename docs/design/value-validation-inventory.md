@@ -42,6 +42,20 @@ It is applied at three places:
 Refusal reasons are a closed list: `empty`, `wrong_type`, `not_finite`, `not_integer`,
 `below_minimum`, `above_maximum`, `not_allowed`, `too_long`.
 
+## Migration status
+
+| Family           | Settings                                                                                                                                   | State                                                                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tap-hold timings | `tap_hold.time_activation_seconds` (global and per key), `tap_holds.lone_modifier_tap_max_ms`, `mod_combos.simultaneous_threshold_ms`      | Wired on the three OS: entry (localized refusal naming the range), load (report, default or fail-closed chords on Linux), boundary (setters, shared `lone_tap` and chord policy) |
+| One-shot timeout | `tap_holds.sticky_timeout_ms`                                                                                                              | After worker A lands « 0 = no time limit »                                                                                                                                       |
+| Hotstring delays | `hotstrings.expansion_delay`, `idle_reset_seconds`, `cascade_max_arrows`, user-code delay, `hotstrings_config.toml` `delay` and `priority` | Next                                                                                                                                                                             |
+| LLM settings     | `llm.generation.*`, `llm.trigger.*`, `llm.profiles.num_predictions`, ports                                                                 | Planned                                                                                                                                                                          |
+| Others           | caps-word idle timeout, gesture sensitivity, updater interval, URLs, personal info                                                         | Planned                                                                                                                                                                          |
+
+A Lua driver reads a declared key through `ValueCheck.KEY.<NAME>` (generated from the schema), never as a typed
+string. A Linux chord delay the schema refuses keeps the chords off, as before, so a malformed setting never adds a
+delay to the original holds; macOS keeps its default delay, as before. Both now report it.
+
 ## Windows (AutoHotkey)
 
 | Setting / prompt                                                                                 | Entry                                                         | Type, enforced range, default                                | Entry check                                                                                           | Load check                                                                               | Boundary check                                                                       |

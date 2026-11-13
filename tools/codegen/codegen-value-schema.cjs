@@ -5,12 +5,15 @@
  * MODULE: User Value Schema Codegen
  * DESCRIPTION:
  * Emits the declarations of _shared/settings/data/value_schema/value_schema.json
- * as the data the Windows value check (windows/infra/value_check.ahk) reads.
+ * as the data the Windows value check (windows/infra/value_check.ahk) reads and
+ * as the Lua table both Lua drivers require (_shared/settings/engine/
+ * value_schema_data.lua), so no driver resolves a path to read the schema.
  *
  * WHY THIS EXISTS:
  * A compiled AHK build has no JSON reader at include time, so it gets a
- * generated copy instead of a hand-maintained one; macOS and Linux decode the
- * JSON at runtime and the web pages import it. The declarations are checked by
+ * generated copy instead of a hand-maintained one. The Lua drivers resolve the
+ * shared folder differently (and a packaged build has no source tree), so a
+ * required module serves them; the web pages import the JSON. The declarations are checked by
  * tools/test/test-value-schema.cjs, which also compares this output with a
  * fresh render.
  *
@@ -27,6 +30,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const SOURCE = path.join(SP, '_shared', 'settings', 'data', 'value_schema', 'value_schema.json');
 const OUTPUT = path.join(SP, 'windows', '_generated', 'value_schema.ahk');
+const LUA_OUTPUT = path.join(SP, '_shared', 'settings', 'engine', 'value_schema_data.lua');
 const RUN_HINT = 'npm run codegen:value-schema';
 
 // ==========================================
@@ -73,6 +77,81 @@ function ahkValue(value, where, depth) {
 	throw new Error(`${where} has no AHK spelling`);
 }
 
+/** A Lua string literal. */
+function luaStr(value) {
+	return JSON.stringify(String(value));
+}
+
+/**
+ * One JSON value as a Lua expression, keys sorted so the output is stable.
+ * @param {*} value - JSON value.
+ * @param {string} where - Path for the error message.
+ * @param {number} depth - Indentation depth.
+ * @return {string}
+ */
+function luaValue(value, where, depth) {
+	if (typeof value === 'string') return luaStr(value);
+	if (typeof value === 'boolean') return String(value);
+	if (typeof value === 'number') {
+		if (!Number.isFinite(value)) throw new Error(`${where} is not a finite number`);
+		return String(value);
+	}
+	const pad = '\t'.repeat(depth + 1);
+	const close = '\t'.repeat(depth);
+	if (Array.isArray(value)) {
+		return (
+			'{ ' +
+			value.map((item, index) => luaValue(item, `${where}[${index}]`, depth)).join(', ') +
+			' }'
+		);
+	}
+	if (value && typeof value === 'object') {
+		const pairs = Object.keys(value)
+			.sort()
+			.map(
+				(key) => `${pad}[${luaStr(key)}] = ${luaValue(value[key], `${where}.${key}`, depth + 1)},`
+			);
+		return '{\n' + pairs.join('\n') + '\n' + close + '}';
+	}
+	throw new Error(`${where} has no Lua spelling`);
+}
+
+/**
+ * A constant name for every declared key, so a driver reads the key from the
+ * schema instead of typing it: dots become underscores and a `*` segment ANY
+ * (tap_hold.keys.*.time_activation_seconds is TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS).
+ * @param {Object} schema - Decoded value_schema.json.
+ * @return {Object} Constant name to key.
+ */
+function keyConstants(schema) {
+	const constants = {};
+	for (const key of Object.keys(schema.settings)) {
+		const name = key.replace(/\*/g, 'any').replace(/\./g, '_').toUpperCase();
+		if (constants[name])
+			throw new Error(`${key} and ${constants[name]} share the constant ${name}`);
+		constants[name] = key;
+	}
+	return constants;
+}
+
+/**
+ * Renders the generated Lua module from the schema on disk.
+ * @return {string}
+ */
+function renderLua() {
+	const schema = JSON.parse(fs.readFileSync(SOURCE, 'utf8'));
+	return (
+		'--- _shared/settings/engine/value_schema_data.lua\n' +
+		'--- AUTO-GENERATED from _shared/settings/data/value_schema/value_schema.json.\n' +
+		`--- DO NOT EDIT BY HAND — run \`${RUN_HINT}\` to refresh.\n` +
+		'---\n' +
+		'--- The declaration of every user-entered setting value, as the table\n' +
+		'--- settings.engine.value_check reads on macOS and Linux.\n' +
+		'\n' +
+		`return {\n\t["version"] = ${luaValue(schema.version, 'version', 1)},\n\t["keys"] = ${luaValue(keyConstants(schema), 'keys', 1)},\n\t["settings"] = ${luaValue(schema.settings, 'settings', 1)},\n}\n`
+	);
+}
+
 /**
  * Renders the generated AHK file from the schema on disk.
  * @return {string}
@@ -115,10 +194,15 @@ function render() {
 
 function main() {
 	fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
-	fs.writeFileSync(OUTPUT, render(), 'utf8');
-	console.log(`  wrote ${path.relative(ROOT, OUTPUT).split(path.sep).join('/')}`);
+	for (const [file, content] of [
+		[OUTPUT, render()],
+		[LUA_OUTPUT, renderLua()]
+	]) {
+		fs.writeFileSync(file, content, 'utf8');
+		console.log(`  wrote ${path.relative(ROOT, file).split(path.sep).join('/')}`);
+	}
 }
 
 if (require.main === module) main();
 
-module.exports = { render, OUTPUT };
+module.exports = { render, renderLua, OUTPUT, LUA_OUTPUT };

@@ -10,6 +10,15 @@
 ; marked ahk_skip needs a boolean type AutoHotkey does not have.
 ; ==============================================================================
 
+; The headless suite records refusals instead of opening a native message box,
+; which would block the run; a test reads the record to prove a refusal was shown.
+global _ValueCheckTest_Refusals := []
+_ValueCheckTest_RecordRefusal(Key, Result) {
+	global _ValueCheckTest_Refusals
+	_ValueCheckTest_Refusals.Push(Map("key", Key, "reason", Result["reason"]))
+}
+ValueCheckSetRefusalPresenter(_ValueCheckTest_RecordRefusal)
+
 _ValueCheckTest_Corpus() {
 	Path := A_ScriptDir . "\..\..\_shared\settings\data\value_schema\value_check_vectors.json"
 	AssertTrue(FileExist(Path) != "", "value check vectors must exist at: " . Path)

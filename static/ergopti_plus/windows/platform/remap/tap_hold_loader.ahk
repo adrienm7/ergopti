@@ -35,6 +35,7 @@
 ; The loader reads the generated config leaf names (ConfigLeaf); include their
 ; owner here so a runner that loads this file alone still resolves them.
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\infra\value_check.ahk
 ; The loader reads a file the boot has not migrated as the migration leaves it.
 #Include %A_LineFile%\..\tap_hold_migration.ahk
 
@@ -504,7 +505,9 @@ TapHoldConfiguredTapAction(TapHold, KeyId) {
 ; Whether a delay is a usable threshold: a number above 0 and within the runtime
 ; limit. The one rule for a key's own delay and for the global one.
 _TapHoldDurationValid(Seconds) {
-	return IsNumber(Seconds) && Seconds > 0 && Seconds <= TAPHOLD_MAX_ACTIVATION_SECONDS
+	; The shared value schema owns the bounds (pinned to max_activation_ms); a
+	; key's own delay has the same declaration as the global one.
+	return ValueCheckValue(ValueCheckEntryFor("tap_hold.time_activation_seconds"), Seconds)["ok"]
 }
 
 ; Return the GLOBAL delay in seconds: the user's ``[tap_hold]

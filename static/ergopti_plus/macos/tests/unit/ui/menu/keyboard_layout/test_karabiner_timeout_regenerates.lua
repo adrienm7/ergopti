@@ -212,6 +212,35 @@ helpers.describe("karabiner delay pickers push the new value to the keyboard", f
 			"a cancelled prompt writes nothing, so it must not regenerate either")
 	end)
 
+	-- A typed value outside the shared value schema is refused with the accepted
+	-- range, never dropped silently and never written.
+	for _, typed in ipairs({ "10001", "0", "350.5", "abc" }) do
+		helpers.it("refuses a typed tap/hold delay '" .. typed .. "' with the range (value-validation)", function()
+			local karabiner = make_karabiner()
+			local alerts = {}
+			local DialogUtil = require("infra.dialog_util")
+			local original = DialogUtil.block_alert
+			DialogUtil.block_alert = function(title, message) alerts[#alerts + 1] = { title, message } end
+			local ok, err = pcall(function()
+				local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_tap_holds", {
+					osascript = { applescript = function() return true, { ["text returned"] = typed } end },
+				})
+				local item = menu_karabiner.build({ karabiner = karabiner, updateMenu = function() end })
+				row_action(find_item(item, TAP_HOLD_ITEM_TITLE))()
+			end)
+			DialogUtil.block_alert = original
+			if not ok then error(err, 0) end
+			helpers.assert_eq(karabiner._calls.set_tap_hold, 0, "a refused value reaches no setter")
+			helpers.assert_eq(karabiner._calls.regenerate, 0)
+			helpers.assert_eq(#alerts, 1, "the refusal is shown once")
+			-- The suite's i18n answers keys: the range sentence is the one shown.
+			local message = tostring(alerts[1][2])
+			helpers.assert_true(message:find("10000", 1, true) ~= nil
+				or message:find("dialog.value_check.range_integer_unit", 1, true) ~= nil,
+				"the refusal names the accepted range: " .. message)
+		end)
+	end
+
 	helpers.it("renders a fractional persisted timeout as an integral dialog default", function()
 		local karabiner = make_karabiner()
 		karabiner.get_tap_hold_timeout = function() return 250.5 end

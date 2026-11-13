@@ -33,6 +33,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\value_check.ahk
 #Include %A_LineFile%\..\ai_action_gate.ahk
 #Include %A_LineFile%\..\number.ahk
 
@@ -966,8 +967,8 @@ KeyCombinationFireAltGrSuffix(Passthrough, Ports := 0) {
 ; @param Symmetric {Integer} Whether both orders of a pair select one owner.
 ; @returns {Map} Map("simultaneous_threshold_ms", ..., "combo_symmetric", ...).
 KeyCombinationChordSettings(DelayMs, Symmetric) {
-	if !(DelayMs is Number) || !(DelayMs - DelayMs == 0) || DelayMs <= 0
-		throw ValueError("The chord delay must be a positive finite number.", -1, String(DelayMs))
+	; The shared value schema owns the bounds: a whole number of milliseconds.
+	DelayMs := ValueCheckRequire(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, DelayMs)
 	if !(Symmetric is Integer) || (Symmetric != 0 && Symmetric != 1)
 		throw ValueError("The chord symmetry must be an exact boolean.", -1, IsObject(Symmetric) ? Type(Symmetric) : Symmetric)
 	return Map(ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS, DelayMs, MenuCommand.COMBO_SYMMETRIC, Symmetric)
@@ -1800,13 +1801,13 @@ KeyCombinationChordPromptDelay() {
 ; @returns {Boolean} False when nothing was committed.
 KeyCombinationChordCommitDelay(Text, Path := "", ReloadFn := 0) {
 	global ConfigurationFile
-	Parsed := ""
-	Valid := RegExMatch(Text, "^\d+(\.\d+)?$")
-		&& (InStr(Text, ".") ? NumberTryParseFiniteFloat(Text, &Parsed) : NumberTryParseInputInteger(Text, &Parsed))
-	if !Valid || Parsed <= 0 {
-		LoggerWarn("KeyCombinations", "The chord delay '{1}' is no positive number: nothing changes.", Text)
+	; The shared value schema owns the accepted range and its localized refusal.
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS), Text)
+	if !Typed["ok"] {
+		ValueCheckShowRefusal(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, Typed, Text)
 		return false
 	}
+	Parsed := Typed["value"]
 	Rows := [ManifestSparseOperation(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, Parsed)]
 	if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, Rows, "the delay of the key chords")
 		return false

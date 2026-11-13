@@ -147,8 +147,9 @@ end
 
 function M.chord_settings(values)
 	assert(type(values) == "table", "declared chord settings required")
-	local delay = values.simultaneous_threshold_ms
-	assert(finite(delay) and delay > 0, "chord delay must be a positive finite number")
+	-- The shared value schema owns the bounds: a whole number of milliseconds.
+	local delay = require("settings.engine.value_check").require_value(nil,
+		require("settings.engine.keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, values.simultaneous_threshold_ms)
 	assert(type(values.combo_symmetric) == "boolean", "chord symmetry must be an exact boolean")
 	return { simultaneous_threshold_ms = delay, combo_symmetric = values.combo_symmetric }
 end

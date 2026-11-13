@@ -322,6 +322,38 @@ ValueCheckRenderMessage(Parts, Translate) {
 }
 
 /**
+ * Replaces how a refusal is shown, for the headless test suite, where a native
+ * message box would block the run. A function static, so include order cannot
+ * reset it.
+ * @param {Func} Presenter - Presenter(Key, Result), or 0 for the native box.
+ * @returns {Func|Integer} The presenter in force after the call.
+ */
+ValueCheckSetRefusalPresenter(Presenter := "") {
+	static Current := 0
+	if !(Presenter is String)
+		Current := Presenter
+	return Current
+}
+
+/**
+ * Shows the localized refusal of typed text: the accepted range and the special
+ * values, under the shared « Invalid value » title, and logs it. Nothing is
+ * written by the caller after a refusal.
+ * @param {String} Key - Declaration of the shared value schema.
+ * @param {Map} Result - The refusal from ValueCheckParseEntry().
+ * @param {Any} Typed - What the person typed, for the log.
+ */
+ValueCheckShowRefusal(Key, Result, Typed := "") {
+	LoggerWarn("ValueCheck", "Typed value '{1}' for {2} refused ({3}).",
+		IsObject(Typed) ? Type(Typed) : Typed, Key, Result["reason"])
+	Presenter := ValueCheckSetRefusalPresenter()
+	if HasMethod(Presenter, "Call")
+		return Presenter.Call(Key, Result)
+	Text := ValueCheckRenderMessage(ValueCheckMessageParts(ValueCheckEntryFor(Key), Result), (K) => t(K))
+	Ui_MsgBox(Text, t("dialog.value_check.title"), "Iconx")
+}
+
+/**
  * Guards a consuming boundary: returns the value, or throws a ValueError naming
  * the setting, the reason and the value for the caller to log.
  * @param {String} Key - Dotted setting path.

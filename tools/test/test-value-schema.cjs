@@ -345,11 +345,16 @@ function checkPorts() {
 			check(text.includes(item.wiring.needle), `${item.wiring.file} runs ${item.test}`);
 		}
 	}
-	const { render, OUTPUT } = require(GENERATOR);
-	check(
-		fs.readFileSync(OUTPUT, 'utf8') === render(),
-		`${path.relative(ROOT, OUTPUT)} is stale: run npm run codegen:value-schema`
-	);
+	const { render, renderLua, OUTPUT, LUA_OUTPUT } = require(GENERATOR);
+	for (const [file, content] of [
+		[OUTPUT, render()],
+		[LUA_OUTPUT, renderLua()]
+	]) {
+		check(
+			fs.readFileSync(file, 'utf8') === content,
+			`${path.relative(ROOT, file)} is stale: run npm run codegen:value-schema`
+		);
+	}
 }
 
 async function main() {

@@ -90,13 +90,30 @@ helpers.describe("karabiner synchronous setters commit disk before live state", 
 			local remap, calls = fixture.load_enabled_remap()
 			helpers.assert_true(remap.set_tap_timeout("left_shift", 321))
 			local before = calls.save
-			for _, value in ipairs({ "invalid", 0.5, 1.5, math.huge, -math.huge, 0/0, 2^54 }) do
+			for _, value in ipairs({ "invalid", "321", 0.5, 1.5, 10001, math.huge, -math.huge, 0/0, 2^54 }) do
 				helpers.assert_eq(remap.set_tap_timeout("left_shift", value), false)
 				helpers.assert_eq(remap.get_tap_timeout("left_shift"), 321)
 				helpers.assert_eq(calls.save, before)
 			end
 			helpers.assert_true(remap.set_tap_timeout("left_shift", 0), "zero intentionally clears the override")
 			helpers.assert_nil(remap.get_tap_timeout("left_shift"))
+		end)
+	end)
+
+	helpers.it("refuses a global delay or chord threshold outside the shared schema (value-validation)", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap()
+			helpers.assert_true(remap.set_tap_hold_timeout(10000), "the declared maximum is accepted")
+			helpers.assert_true(remap.set_simultaneous_threshold(1000), "the declared maximum is accepted")
+			local before = calls.save
+			for _, value in ipairs({ "300", 0, 10001, 2.5, 0/0, math.huge }) do
+				helpers.assert_eq(remap.set_tap_hold_timeout(value), false)
+				helpers.assert_eq(remap.get_tap_hold_timeout(), 10000)
+			end
+			for _, value in ipairs({ "80", 0, 1001, 2.5, 0/0 }) do
+				helpers.assert_eq(remap.set_simultaneous_threshold(value), false)
+			end
+			helpers.assert_eq(calls.save, before, "a refused value is never saved")
 		end)
 	end)
 

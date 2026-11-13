@@ -1714,6 +1714,26 @@ helpers.describe("generated Linux defaults received by original native combinati
    if not called then error(detail,0) end
   end)
  end)
+ for _,stored in ipairs({'0','3.5','1001','"100"'}) do
+  helpers.it("reports a refused stored chord delay "..stored.." and keeps the chords off (value-validation)",function()
+   local Outdated=require("settings.engine.migration.outdated")
+   local original,reported=Outdated.report,{}
+   Outdated.report=function(path,detail,...) reported[#reported+1]={path,detail};return original(path,detail,...) end
+   local ok,err=pcall(with_public,{before_manager=function(s)
+     s.bytes='[mod_combos]\nsimultaneous_threshold_ms='..stored..'\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
+    end},function(s)
+    s.edge("a",58,1,1000);helpers.assert_eq(s.rows[1],{29,1},"a refused delay never delays the original hold")
+    s.edge("a",58,0,1100)
+   end)
+   Outdated.report=original
+   if not ok then error(err,0) end
+   local found=false
+   for _,row in ipairs(reported) do
+    if row[1]=="mod_combos.simultaneous_threshold_ms" and tostring(row[2]):find("refused",1,true) then found=true end
+   end
+   helpers.assert_true(found,"the refused delay is reported, never dropped silently")
+  end)
+ end
  for _,text in ipairs({'[mod_combos]\nsymmetric="false"\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n',
   '[mod_combos]\nconfig=[]\n','mod_combos="occupied"\n','[mod_combos]\nsimultaneous_threshold_ms=0\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'}) do
   helpers.it("never normalizes a malformed namespace or setting into delayed authority",function()
