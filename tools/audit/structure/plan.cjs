@@ -1761,6 +1761,29 @@ function scanFile(file, text, ctx) {
 		else add(prose ? 'dir-split-prose' : 'dir-split', raw, '(split)', hit);
 	}
 	const jsEnv = /\.(c?js|mjs)$/.test(file) ? jsConstants(text, file) : new Map();
+	// MAC + 'tests/support/x.swift', with const MAC = 'static/ergopti_plus/macos/':
+	// a path concatenated onto a constant the file defines follows its file,
+	// spelled from the same base.
+	for (const m of text.matchAll(/\b([A-Za-z_$][\w$]*)\s*\+\s*(['"])([\w.-]+(?:\/[\w.-]+)+)\2/g)) {
+		const base = jsEnv.get(m[1]);
+		if (!base || !base.startsWith(PREFIX)) continue;
+		const old = path.posix.normalize(`${base}/${m[3]}`);
+		const moved = byRepoPath.get(old) || byRepoDir.get(old);
+		if (!moved || moved === SPLIT || moved === old) continue;
+		if (!moved.startsWith(`${base}/`)) {
+			add('dir-split', m[0], '(split)', { oldRepo: old });
+			continue;
+		}
+		add(
+			'lua-module-quoted',
+			m[0],
+			m[0].replace(`${m[2]}${m[3]}${m[2]}`, `${m[2]}${moved.slice(base.length + 1)}${m[2]}`),
+			{
+				oldRepo: old,
+				newRepo: moved
+			}
+		);
+	}
 	// path.join(root, `../data/locales/${code}.json`): the template's leading
 	// folder joined onto a known base follows that folder.
 	for (const m of text.matchAll(

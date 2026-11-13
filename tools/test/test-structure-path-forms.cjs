@@ -974,6 +974,20 @@ function run() {
 			'a PowerShell Combine path follows its file'
 		);
 	}
+	// MAC + 'tests/support/x.swift' with const MAC = 'static/ergopti_plus/macos/':
+	// a path concatenated onto a constant the file defines follows its file.
+	// Left as it was, the native HTTP clock evidence listed a moved fixture.
+	const concat = 'macos/tests/support/native_http_fixture_main.swift';
+	if (fs.existsSync(path.join(repo, P, concat)) && full.get(concat) !== concat) {
+		const js = 'tools/ci/z.cjs';
+		const src =
+			"const MAC = 'static/ergopti_plus/macos/';\nconst F = MAC + 'tests/support/native_http_fixture_main.swift';\n";
+		const out = Apply.rewriteText(src, Plan.scanFile(js, src, fullCtx), moved, js);
+		assert.ok(
+			out.includes(`MAC + '${full.get(concat).slice('macos/'.length)}'`),
+			`a path concatenated onto a known constant follows its file: ${out}`
+		);
+	}
 	// Third-party code keeps its own paths; our scripts in a vendor folder move.
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/_shared/ui/vendor/fengari-web.js'));
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/windows/vendor/WebView2.ahk'));
