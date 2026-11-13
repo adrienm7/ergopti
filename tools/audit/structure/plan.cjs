@@ -1705,11 +1705,12 @@ function scanFile(file, text, ctx) {
 			i = j;
 		}
 		// \.(ahk|lua) is a list of extensions, whatever folders share the names.
-		for (const m of text.matchAll(/(?<!\\\.)\(((?:[a-z_]+\|)+[a-z_]+)\)/g)) {
-			const names = m[1].split('|');
+		// (?:modules|infra|ui) too: a non-capturing group is the same list.
+		for (const m of text.matchAll(/(?<!\\\.)\((\?:)?((?:[a-z_]+\|)+[a-z_]+)\)/g)) {
+			const names = m[2].split('|');
 			const to = [...new Set(gainsFor(names).map((g) => g.to))];
 			if (to.length === 0) continue;
-			add('tree-list', m[0], `(${[...names, ...to].join('|')})`, {
+			add('tree-list', m[0], `(${m[1] || ''}${[...names, ...to].join('|')})`, {
 				oldRepo: `${PREFIX}${treeGains[0].parent}`
 			});
 		}
