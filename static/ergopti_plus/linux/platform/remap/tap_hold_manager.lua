@@ -262,7 +262,7 @@ local function build_tap_copy(execute, capture_destination)
 		log = function(level, fmt, ...) Logger[level](LOG, fmt, ...) end,
 		warn_user = function()
 			local sent_ok, sent = pcall(require("adapters.notifier").send,
-				require("infra.i18n").get("notify.tap_hold.copy_failed"), { level = "warning" })
+				require("core.i18n.engine.i18n").get("notify.tap_hold.copy_failed"), { level = "warning" })
 			if not sent_ok or sent == false then
 				Logger.error(LOG, "Copy failure notice was not delivered: %s.", tostring(sent))
 			end

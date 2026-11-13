@@ -30,7 +30,7 @@ local M = {}
 local WebviewResult = require("adapters.webview_result")
 local NativePath = require("core.fs.engine.native_path")
 
-local i18n         = require("infra.i18n")
+local i18n         = require("core.i18n.engine.i18n")
 local toml_writer  = require("infra.toml.writer")
 local toml_codec   = require("infra.toml.codec")
 local notifications = require("infra.notifications")

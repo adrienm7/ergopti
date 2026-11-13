@@ -27,7 +27,7 @@ end
 --- @param items table Top-level tray rows.
 --- @return table rows
 local function ai_rows(items)
-	local label = require("infra.i18n").get("menu.llm.title")
+	local label = require("core.i18n.engine.i18n").get("menu.llm.title")
 	for _, item in ipairs(items) do
 		if item.title == label then return item.menu end
 	end
@@ -39,7 +39,7 @@ end
 --- @return table row, number index
 local function count_row(rows)
 	local current = require("modules.llm.profile_settings").get("num_predictions")
-	local label = string.format(require("infra.i18n").get("menu.llm.num_predictions_label"), current)
+	local label = string.format(require("core.i18n.engine.i18n").get("menu.llm.num_predictions_label"), current)
 	for index, row in ipairs(rows) do
 		if row.title == label then return row, index end
 	end
@@ -49,7 +49,7 @@ end
 helpers.describe("tray (linux): the AI suggestion count", function()
 
 	helpers.it("labels each count with the one/other plural keys (llm-count-plural)", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local one = i18n.get("menu.llm.prediction_count_label_one")
 		local other = i18n.get("menu.llm.prediction_count_label_other")
 		helpers.assert_true(one:find("%d", 1, true) ~= nil, "the singular key must resolve, got: " .. one)
@@ -68,7 +68,7 @@ helpers.describe("tray (linux): the AI suggestion count", function()
 	-- rows are inline, so it heads them, right above the minimum words
 	-- (ai-generation-groups).
 	helpers.it("heads the generation parameters, not the profile block (llm-count-row)", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local rows = ai_rows(build())
 		local _, index = count_row(rows)
 		local next_row = rows[index + 1]
@@ -127,8 +127,8 @@ local function with_numeric_menu(options, exercise)
 		local strings = NumericJson.decode(numeric_read(NumericRoot .. "core/i18n/data/locales/" .. locale .. ".json"))
 		local translate = { get = function(key) return strings[key] or key end,
 			section = function(key) return strings[key] or key end, get_locale = function() return locale end }
-		setmetatable(translate, { __index = loaded["infra.i18n"] })
-		package.loaded["infra.i18n"] = translate
+		setmetatable(translate, { __index = loaded["core.i18n.engine.i18n"] })
+		package.loaded["core.i18n.engine.i18n"] = translate
 		local renderer = assert(NumericRenderer.new({ platform = options.platform or "linux",
 			manifest_path = function() return NumericRoot .. "menu/data/menu_manifest.json" end, json_decode = NumericJson.decode,
 			i18n = translate, logger = require("core.logger.engine.shim") }))

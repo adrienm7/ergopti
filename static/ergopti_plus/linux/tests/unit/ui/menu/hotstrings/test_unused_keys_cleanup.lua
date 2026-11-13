@@ -410,7 +410,7 @@ helpers.describe("unused keys (linux): tray wiring", function()
 		}
 		local ok, detail = pcall(function()
 			local mb = helpers.load_module("ui.menu.builder")
-			local label = require("infra.i18n").get("menu.global.clean_unused_keys")
+			local label = require("core.i18n.engine.i18n").get("menu.global.clean_unused_keys")
 			local row = find_row(mb.build({ _version = "test", on_quit = function() end }), label)
 			helpers.assert_true(row ~= nil, "the Configuration menu must expose cleanup")
 			local callback = row.fn or row.action

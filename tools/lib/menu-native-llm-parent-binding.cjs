@@ -609,12 +609,12 @@ end`;
 const LINUX_UNINSTALL_CAPTION_LOCALS = {
 	uninstall_caption_factory:
 		'type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")',
-	uninstall_caption_i18n: 'rawget(separator_modules, "infra.i18n")',
+	uninstall_caption_i18n: 'rawget(separator_modules, "core.i18n.engine.i18n")',
 	uninstall_caption_get:
 		'type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")'
 };
 const LINUX_UNINSTALL_CAPTION_FACADE_SOURCE =
-	'local function uninstall_caption_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand rawget(separator_modules, "infra.manifest_menu") == ManifestMenu\n\t\tand type(uninstall_caption_factory) == "function" and rawget(ManifestMenu, "command_caption_receiver") == uninstall_caption_factory\n\t\tand type(uninstall_caption_i18n) == "table" and getmetatable(uninstall_caption_i18n) == nil\n\t\tand rawget(separator_modules, "infra.i18n") == uninstall_caption_i18n\n\t\tand type(uninstall_caption_get) == "function" and rawget(uninstall_caption_i18n, "get") == uninstall_caption_get\nend';
+	'local function uninstall_caption_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand rawget(separator_modules, "infra.manifest_menu") == ManifestMenu\n\t\tand type(uninstall_caption_factory) == "function" and rawget(ManifestMenu, "command_caption_receiver") == uninstall_caption_factory\n\t\tand type(uninstall_caption_i18n) == "table" and getmetatable(uninstall_caption_i18n) == nil\n\t\tand rawget(separator_modules, "core.i18n.engine.i18n") == uninstall_caption_i18n\n\t\tand type(uninstall_caption_get) == "function" and rawget(uninstall_caption_i18n, "get") == uninstall_caption_get\nend';
 const LINUX_UNINSTALL_CAPTION_COMMAND_SOURCE =
 	'local function _uninstall_command(ctx)\n\tlocal receive, current\n\tif uninstall_caption_facade_current() then receive, current = uninstall_caption_factory("about_menu", "uninstall") end\n\treturn function()\n\t\tif not uninstall_caption_facade_current() or type(receive) ~= "function" or type(current) ~= "function" or not current() then return false end\n\t\tlocal run = require("ui.menu.uninstall").run\n\t\tlocal title = receive()\n\t\tif title == nil or not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal confirmation = i18n_safe("dialog.uninstall.confirm")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal failure = i18n_safe("dialog.uninstall.failed")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal missing_program = i18n_safe("dialog.uninstall.missing_program")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal options = {\n\t\t\ttitle = title,\n\t\t\tconfirmation = confirmation,\n\t\t\tfailure = failure,\n\t\t\tmissing_program = missing_program,\n\t\t\tconfirm = function(title, text)\n\t\t\t\treturn ask_yes_no(title, plain_markup(text),\n\t\t\t\t\ti18n_safe("button.remove"), i18n_safe("button.cancel"))\n\t\t\tend,\n\t\t\tfail = function(text) show_error(plain_markup(text), i18n_safe("menu.global.uninstall")) end,\n\t\t\tquit = function()\n\t\t\t\tif type(ctx.on_quit) ~= "function" then\n\t\t\t\t\tLogger.error(LOG, "Uninstall: ctx.on_quit is absent — the daemon cannot quit.")\n\t\t\t\t\treturn\n\t\t\t\tend\n\t\t\t\tctx.on_quit()\n\t\t\tend,\n\t\t}\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\trun(options)\n\tend\nend';
 
@@ -1963,7 +1963,7 @@ function nativeLinuxDisabledTopLevelBranch(unit, builder) {
 	if (historical) return 0;
 	const caption = body(builder, 'function i18n_safe(key)');
 	const expected = lex(
-		'local ok, i18n = pcall(require, "infra.i18n") if ok and i18n and type(i18n.get) == "function" then local val = i18n.get(key) if val and val ~= key then return val end end return key'
+		'local ok, i18n = pcall(require, "core.i18n.engine.i18n") if ok and i18n and type(i18n.get) == "function" then local val = i18n.get(key) if val and val ~= key then return val end end return key'
 	);
 	const shape = (value) => value?.tokens.map((token) => [token.kind, token.value]);
 	if (
@@ -2154,7 +2154,7 @@ function declaredLinuxNativeTray(unit, builder) {
 			shape(caption),
 			shape(
 				lex(
-					'local ok, i18n = pcall(require, "infra.i18n") if ok and i18n and type(i18n.get) == "function" then local val = i18n.get(key) if val and val ~= key then return val end end return key'
+					'local ok, i18n = pcall(require, "core.i18n.engine.i18n") if ok and i18n and type(i18n.get) == "function" then local val = i18n.get(key) if val and val ~= key then return val end end return key'
 				)
 			)
 		)

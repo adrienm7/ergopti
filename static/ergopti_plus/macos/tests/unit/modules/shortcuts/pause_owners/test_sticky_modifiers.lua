@@ -84,7 +84,7 @@ local function load_real_sticky_pause_owner()
 	package.loaded["infra.notifications"] = { notify = function() end }
 	package.loaded["core.fs.engine.paths"] = { shared = function(path) return "missing/" .. path end }
 	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.text_utils"] = permissive({
 		escape_gsub_replacement = function(value) return value end,
 	})

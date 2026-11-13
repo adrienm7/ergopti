@@ -72,7 +72,7 @@ local function scenario(opts, body)
 		local previous = {}
 		for _, name in ipairs(RELOADED) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		for _, name in ipairs(FAKED) do previous[name] = package.loaded[name] end
-		local I18n = require("infra.i18n")
+		local I18n = require("core.i18n.engine.i18n")
 		local previous_locale = I18n.get_locale
 		local locale = opts.locale or "fr"
 		I18n.get_locale = function() return locale end
@@ -184,7 +184,7 @@ end
 --- @param key string
 --- @return string
 local function notice(key)
-	return require("infra.i18n").get(key)
+	return require("core.i18n.engine.i18n").get(key)
 end
 
 --- The candidate texts on offer.
@@ -421,7 +421,7 @@ helpers.describe("selected translations require a known stable native focus", fu
 			helpers.assert_eq(world.handlers.llm_translate_selection("tap_3", "en"), false)
 			helpers.assert_eq(world.reads, 0)
 			helpers.assert_eq(#world.posts, 0)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.text_target_unavailable"))
 		end)
 	end)
 	helpers.it("a mashed translation shortcut cancels its request in flight before the next one leaves (mashed-shortcut)", function()
@@ -478,7 +478,7 @@ helpers.describe("selected translations require a known stable native focus", fu
 				helpers.assert_eq(world.engine.translate_selection("en"), false)
 				helpers.assert_eq(world.reads, 0)
 				helpers.assert_eq(#world.posts, 0)
-				helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"),
+				helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.text_target_unavailable"),
 					"a deliberate action must explain that the active text field is unavailable")
 			end)
 		end)

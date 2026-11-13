@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 helpers.describe("API panel durable persistence gate", function()
 	helpers.it("rolls back a validated Add when Keychain persistence fails", function()
 		local module_names = {
-			"modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
+			"modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
 			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
 		}
 		local saved = {}
@@ -59,7 +59,7 @@ helpers.describe("API panel durable persistence gate", function()
 				persist_callback = callback
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.logger"] = {
 			debug = function() end, info = function() end, warn = function() end, error = function() end,
 		}
@@ -80,7 +80,7 @@ helpers.describe("API panel durable persistence gate", function()
 			manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 			json_decode = require("core.fs.adapters.json_codec").decode,
 			i18n = {
-			get = package.loaded["infra.i18n"].get,
+			get = package.loaded["core.i18n.engine.i18n"].get,
 			-- These command rows never request a translated section.
 			section = function() return {} end,
 		},

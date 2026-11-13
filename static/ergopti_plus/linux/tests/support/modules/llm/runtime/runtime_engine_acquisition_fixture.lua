@@ -19,7 +19,7 @@ local function with_owner(body, options)
 	local names = { "adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
 		"modules.llm.prediction_engine", "modules.llm.profiles", "modules.llm.model_inventory", "infra.llm_preferences",
 		"modules.llm.local_servers", "modules.llm.api_entries", "adapters.keyboard_hook",
-		"adapters.shell_runner", "infra.i18n", "core.ui.engine.window_titles", "modules.llm.runtime_factory" }
+		"adapters.shell_runner", "core.i18n.engine.i18n", "core.ui.engine.window_titles", "modules.llm.runtime_factory" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { calls = {}, commits = {}, rejects = {}, changes = 0, cancels = {}, cancel_ok = true }
@@ -113,7 +113,7 @@ local function with_owner(body, options)
 				return true, world.native_answer or "replacement_1\n"
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.ui.engine.window_titles"] = { compose = function(value) return value end }
 		local Hook = helpers.load_module("adapters.keyboard_hook")
 		package.loaded["ui.llm_enable_refusal"] = nil

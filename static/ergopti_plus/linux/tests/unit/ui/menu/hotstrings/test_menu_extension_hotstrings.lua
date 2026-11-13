@@ -82,7 +82,7 @@ end
 helpers.describe("Hotstrings menu (linux): extension submenus", function()
 	helpers.it("(ergopti-hotstrings-ext) lists SFB reduction and rolls in a Hotstrings Ergopti submenu", function()
 		local mb = helpers.load_module("ui.menu.builder")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local label = string.format(i18n.get("menu.extensions.hotstrings_of"), "Ergopti+")
 		local row = row_starting(mb.build({ config = fake_config(true), _version = "9.9.9" }), label)
 		helpers.assert_true(row ~= nil, "the « " .. label .. " » submenu must be drawn")
@@ -102,7 +102,7 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 	helpers.it("(ergopti-hotstrings-ext) takes the repeat corrections out of the magic key submenu", function()
 		local mb = helpers.load_module("ui.menu.builder")
 		local built = mb.build({ config = fake_config(true), _version = "9.9.9" })
-		local label = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
+		local label = string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
 		local seen = 0
 		for _, row in ipairs(titles(built)) do
 			if row.title:find("repeat_corrections", 1, true) then seen = seen + 1 end
@@ -115,7 +115,7 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 
 	helpers.it("(ergopti-hotstrings-ext) draws no Ergopti submenu when the extension is not installed", function()
 		local mb = helpers.load_module("ui.menu.builder")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local label = string.format(i18n.get("menu.extensions.hotstrings_of"), "Ergopti+")
 		helpers.assert_nil(row_starting(mb.build({ config = fake_config(false), _version = "9.9.9" }), label))
 	end)
@@ -127,7 +127,7 @@ local function with_extension_frame(body, paused)
 	local names = { "infra.manifest_menu", "ui.menu.builder" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local ok, err = pcall(function()
-		local translator = require("infra.i18n")
+		local translator = require("core.i18n.engine.i18n")
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "linux",
 			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.text.engine.json").decode, i18n = translator, logger = require("core.logger.engine.shim"),
@@ -226,7 +226,7 @@ local StandardEmptyCorpus = read_standard_empty_json(require("core.fs.engine.pat
 local function with_standard_empty(callback, locale)
 	local old_builder = package.loaded["ui.menu.builder"]
 	local binding = require("infra.manifest_menu")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local old_build, old_status, old_get, old_locale = binding.build, binding.status_rows, i18n.get, i18n.get_locale
 	local owner
 	for _, row in ipairs(binding.get_array(StandardEmptyCorpus.section)) do
@@ -416,7 +416,7 @@ local ExtensionEmptyCorpus = read_standard_empty_json(require("core.fs.engine.pa
 
 local function with_extension_empty(callback, locale)
 	local old_builder = package.loaded["ui.menu.builder"]
-	local binding, i18n = require("infra.manifest_menu"), require("infra.i18n")
+	local binding, i18n = require("infra.manifest_menu"), require("core.i18n.engine.i18n")
 	local old_build, old_status, old_get, old_locale = binding.build, binding.status_rows, i18n.get, i18n.get_locale
 	local owner
 	for _, row in ipairs(binding.get_array(ExtensionEmptyCorpus.section)) do
@@ -496,7 +496,7 @@ helpers.describe("shared Linux empty extension status", function()
 				helpers.assert_eq(count_extension_empty(rows, expected), 1)
 				local header
 				for index, row in ipairs(rows) do
-					if row.title == require("infra.i18n").section("menu.extensions.header") then header = index end
+					if row.title == require("core.i18n.engine.i18n").section("menu.extensions.header") then header = index end
 				end
 				helpers.assert_not_nil(header)
 				helpers.assert_eq(rows[header + 1].title, expected)
@@ -545,10 +545,10 @@ helpers.describe("shared Linux empty extension status", function()
 			local rows = build()
 			helpers.assert_eq(#state.data, 1)
 			helpers.assert_eq(count_extension_empty(rows, ExtensionEmptyCorpus.captions.en), 0)
-			local extension = assert(row_starting(rows, string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")))
+			local extension = assert(row_starting(rows, string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")))
 			helpers.assert_eq(#extension.menu, 7)
 			helpers.assert_eq(extension.menu[4].title, "sfbsreduction (5)")
-			helpers.assert_eq(extension.menu[5].title, require("infra.i18n").get("category.rolls") .. " (7)")
+			helpers.assert_eq(extension.menu[5].title, require("core.i18n.engine.i18n").get("category.rolls") .. " (7)")
 			helpers.assert_eq(extension.menu[7].title, "repeat_corrections (14)")
 			helpers.assert_eq(extension.menu[1].fn(), true)
 			helpers.assert_eq(extension.menu[2].fn(), true)
@@ -559,7 +559,7 @@ helpers.describe("shared Linux empty extension status", function()
 		end)
 	end)
 	helpers.it("(extension-empty-status) restores exact native owners after a failed scenario", function()
-		local binding, translator = require("infra.manifest_menu"), require("infra.i18n")
+		local binding, translator = require("infra.manifest_menu"), require("core.i18n.engine.i18n")
 		local before = { binding.build, binding.status_rows, translator.get, translator.get_locale, package.loaded["ui.menu.builder"] }
 		local ok, detail = pcall(function() with_extension_empty(function(build) build(); error("extension empty sentinel", 0) end) end)
 			helpers.assert_eq(ok, false)

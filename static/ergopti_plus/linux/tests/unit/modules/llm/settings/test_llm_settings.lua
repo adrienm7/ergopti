@@ -280,7 +280,7 @@ local function with_auto_menu(options, callback)
 			end
 			return root
 		end,
-		i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
+		i18n = require("core.i18n.engine.i18n"), logger = require("core.logger.engine.shim"),
 	}))
 	package.loaded["infra.manifest_menu"] = renderer
 	local observed = { writes = 0, redraws = 0 }
@@ -310,7 +310,7 @@ local function with_auto_menu(options, callback)
 				if child then return child, siblings, position end
 			end
 		end
-		local title = require("infra.i18n").get(options.find or options.label or "menu.llm.auto_raise_temp")
+		local title = require("core.i18n.engine.i18n").get(options.find or options.label or "menu.llm.auto_raise_temp")
 		local row, siblings, position = find(items, title)
 		callback(assert(row, "the actual automatic temperature control must exist"), settings, profiles, storage, observed, context, admission, siblings, position)
 	end, debug.traceback)
@@ -388,12 +388,12 @@ helpers.describe("LLM shared automatic temperature control", function()
 
 	helpers.it("uses the changed shared label and order before numeric providers (shared-auto-raise)", function()
 		with_auto_menu({selected = true, label = auto_raise_corpus().alternate_i18n, auto_first = true}, function(row, _, _, _, observed, _, _, siblings, position)
-			local count_label = string.format(require("infra.i18n").get("menu.llm.num_predictions_label"), "2")
+			local count_label = string.format(require("core.i18n.engine.i18n").get("menu.llm.num_predictions_label"), "2")
 			local count_position
 			for index, sibling in ipairs(siblings) do if sibling.title == count_label then count_position = index end end
 			helpers.assert_true(count_position ~= nil, "the actual numeric provider remains present")
 			helpers.assert_true(position < count_position, "the declaration moves the check before numeric values")
-			helpers.assert_eq(row.title, require("infra.i18n").get(auto_raise_corpus().alternate_i18n))
+			helpers.assert_eq(row.title, require("core.i18n.engine.i18n").get(auto_raise_corpus().alternate_i18n))
 			helpers.assert_eq(observed.writes, 0)
 			helpers.assert_eq(observed.redraws, 0)
 		end)

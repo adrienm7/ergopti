@@ -28,7 +28,7 @@ local MODULE_NAMES = {
 	"core.fs.adapters.json_codec",
 	"infra.notifications",
 	"infra.logger",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.config_paths",
 	"modules.llm.api_common",
 	"adapters.task_lifecycle",
@@ -152,7 +152,7 @@ local function with_server_fixture(options, assertions)
 			warn = noop,
 			error = function(...) server_tasks.logged_error = { ... }; logged_errors[#logged_errors + 1] = { ... } end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.config_paths"] = {
 			get = function(key)
 				helpers.assert_eq(key, "MlxActiveModelPath")

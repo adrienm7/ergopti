@@ -36,7 +36,7 @@ local saved_file_system = package.loaded["core.fs.adapters.file_system"]
 package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
 
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	t = function(key) return key end,
 }
 

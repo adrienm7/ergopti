@@ -54,7 +54,7 @@ helpers.describe("app_picker — a '%' in the frontmost app name", function()
 
 		-- load_with_stubs installs an identity i18n stub; override it so the
 		-- exclude entry actually exercises the "{app}" interpolation.
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key)
 				if key == "app_picker.exclude_current" then return "Exclude {app}" end
 				return key

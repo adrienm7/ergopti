@@ -12,7 +12,7 @@
 return require("menu.engine.native_presentation_core").receiver({
 	platform = "hs",
 	name = "infra.native_presentation",
-	i18n = { name = "infra.i18n", module = require("infra.i18n") },
-	locale = { name = "infra.locale", module = require("infra.locale") },
+	i18n = { name = "core.i18n.engine.i18n", module = require("core.i18n.engine.i18n") },
+	locale = { name = "core.i18n.engine.locale", module = require("core.i18n.engine.locale") },
 	core = { name = "core.i18n.engine.core", module = require("core.i18n.engine.core") },
 })

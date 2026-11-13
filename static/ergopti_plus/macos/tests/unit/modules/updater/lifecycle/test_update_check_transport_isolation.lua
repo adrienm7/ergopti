@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"modules.updater.auto_check", "modules.updater", "core.fs.engine.paths", "infra.logger", "infra.timings",
 	"adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.file_system",
-	"core.fs.adapters.json_codec", "adapters.update_launcher", "infra.notifications", "infra.i18n",
+	"core.fs.adapters.json_codec", "adapters.update_launcher", "infra.notifications", "core.i18n.engine.i18n",
 	"infra.http_header_policy",
 }
 local FEED = '<feed xmlns="http://www.w3.org/2005/Atom"><entry>'
@@ -60,7 +60,7 @@ local function with_owner(run)
 		package.loaded["modules.updater"] = { channels = function() return registry end, GH_OWNER = "adrienm7", GH_REPO = "ergopti" }
 		package.loaded["adapters.update_launcher"] = {}
 		package.loaded["infra.notifications"] = {}
-		package.loaded["infra.i18n"] = {}
+		package.loaded["core.i18n.engine.i18n"] = {}
 		local AutoCheck = require("modules.updater.auto_check")
 		ctx.timing = defaults.timing
 		ctx.state_key = defaults.check_state.storage_key

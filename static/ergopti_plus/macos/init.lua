@@ -157,8 +157,8 @@ do
 			.. "it keeps running without the driver.", identity, tostring(admission_mode))
 		if InstanceAdmission.shows_dialog(decision) then
 			local shown_ok, shown_err = pcall(function()
-				local i18n_boot = require("infra.i18n")
-				i18n_boot.set_locale_injector(function(code) require("infra.locale").set_locale(code) end)
+				local i18n_boot = require("core.i18n.engine.i18n")
+				i18n_boot.set_locale_injector(function(code) require("core.i18n.engine.locale").set_locale(code) end)
 				i18n_boot.init()
 				hs.dialog.blockAlert(i18n_boot.get("launcher.fatal.title"),
 					i18n_boot.get("startup.native_logger_unavailable"), i18n_boot.get("common.ok"))
@@ -273,8 +273,8 @@ do
 end
 Boot.stage("Core module requires")
 
-local i18n               = require("infra.i18n")
-local locale_mod         = require("infra.locale")
+local i18n               = require("core.i18n.engine.i18n")
+local locale_mod         = require("core.i18n.engine.locale")
 local crash_reporter     = require("modules.diagnostics.crash_reporter")
 local reload_guard       = require("infra.reload_guard")
 local EmergencyExit      = require("infra.emergency_exit")

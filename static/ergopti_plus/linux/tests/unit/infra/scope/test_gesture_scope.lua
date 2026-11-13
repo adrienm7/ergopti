@@ -162,7 +162,7 @@ helpers.describe("Linux gesture scope transaction", function()
 					_version = "scope-test", gestures = gestures,
 					on_menu_changed = function() refreshes = refreshes + 1 end,
 				})
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local submenu
 				for _, parent in ipairs(rows) do
 					if parent.title == i18n.get("menu.gestures.title") then submenu = parent.menu end

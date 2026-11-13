@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNED = {
-	"infra.logger", "infra.notifications", "infra.i18n", "infra.config_paths",
+	"infra.logger", "infra.notifications", "core.i18n.engine.i18n", "infra.config_paths",
 	"infra.text_utils", "infra.timings", "core.fs.engine.paths", "core.fs.adapters.storage",
 	"adapters.http_client", "core.fs.adapters.json_codec", "adapters.shell_runner",
 	"core.events.timer_scheduler", "adapters.task_lifecycle", "modules.llm.profiles",
@@ -49,7 +49,7 @@ function M.with_commands(callback)
 				today_log_path = function() return "/fixture/log.txt" end,
 			}
 			package.loaded["infra.notifications"] = { notify = noop }
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.config_paths"] = { get = function() return "/fixture/model.txt" end }
 			package.loaded["infra.text_utils"] = { shell_quote = M.quote }
 			package.loaded["infra.timings"] = { sec = function() return 1 end }

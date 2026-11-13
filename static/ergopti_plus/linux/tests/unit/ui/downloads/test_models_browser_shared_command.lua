@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- Exercises the browser provider with its unrelated tray surfaces isolated.
 --- @param callback function Receives native rows and observable browser ports.
 local function with_browser(callback)
-	local names = { "ui.menu.builder", "ui.menu.llm_backend_rows", "infra.manifest_menu", "core.fs.engine.paths", "infra.i18n",
+	local names = { "ui.menu.builder", "ui.menu.llm_backend_rows", "infra.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
 		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal",
@@ -44,7 +44,7 @@ local function with_browser(callback)
 		local header_labels = assert(require("core.text.engine.json").decode(assert(header_raw)))
 		local header_brand = assert(header_labels["menu.builder.active_brand"])
 		assert(type(header_brand) == "string" and header_brand ~= "" and header_brand ~= "menu.builder.active_brand")
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key)
 				if key == "menu.builder.active_brand" then return header_brand end
 				-- The button's caption is its getter alone ("%s" in every locale).

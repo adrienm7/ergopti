@@ -2926,7 +2926,7 @@ local function build_tap_copy()
 	local function log(level, fmt, ...) Logger[level](log_name, fmt, ...) end
 	local function warn_user()
 		local ok, sent_or_err = pcall(require("infra.notifications").notify,
-			require("infra.i18n").get("notify.tap_hold.copy_failed"), nil, "warning")
+			require("core.i18n.engine.i18n").get("notify.tap_hold.copy_failed"), nil, "warning")
 		if not ok or sent_or_err ~= true then
 			Logger.error(log_name, "Copy failure notice was not delivered: %s.", tostring(sent_or_err))
 		end

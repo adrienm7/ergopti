@@ -18,7 +18,7 @@ local function upvalue(callback, wanted)
 end
 
 local function native_fixture(body)
-	local native = require("infra.i18n")
+	local native = require("core.i18n.engine.i18n")
 	native.init()
 	local renderer = require("infra.manifest_menu")
 	local builder = require("ui.menu.builder")

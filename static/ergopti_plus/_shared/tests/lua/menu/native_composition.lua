@@ -18,7 +18,7 @@ function M.register(helpers, platform)
 			assert(handle:close()); handle = nil
 			local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
 				manifest_path = function() return path end, json_decode = require("core.text.engine.json").decode,
-				i18n = require("infra.i18n"), logger = helpers.make_logger_stub() }))
+				i18n = require("core.i18n.engine.i18n"), logger = helpers.make_logger_stub() }))
 			local effects = 0
 			local callback = function(...) effects = effects + 1; return ... end
 			local resource = {}

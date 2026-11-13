@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local names = {"ai.engine.bootstrap.budget", "ai.engine.local_servers.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "core.logger.engine.shim", "infra.i18n", "ai.engine.settings.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "settings.engine.migration.outdated", "core.text.engine.toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
+local names = {"ai.engine.bootstrap.budget", "ai.engine.local_servers.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "core.logger.engine.shim", "core.i18n.engine.i18n", "ai.engine.settings.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "settings.engine.migration.outdated", "core.text.engine.toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
 local previous = {}
 for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 local function run_registered()
@@ -35,7 +35,7 @@ for _,name in ipairs({'info','warn','debug','error'})do
 	logger[name]=function(_,message)if w and w.on_log then w.on_log(message)end end
 end
 fixture_ports={['core.logger.engine.shim']=logger,['infra.logger']=logger,
-	['infra.i18n']={get=function(k)return k end},['ai.engine.settings.profile_selector']={},['infra.llm_bridge']={}}
+	['core.i18n.engine.i18n']={get=function(k)return k end},['ai.engine.settings.profile_selector']={},['infra.llm_bridge']={}}
 for name,value in pairs(fixture_ports)do package.loaded[name]=value end
 Writer = helpers.load_module("core.text.engine.toml_codec.writer")
 local function world()
@@ -398,7 +398,7 @@ for _, stale in ipairs({ false, true }) do
 		local text=assert(helpers.read_driver_unit('local function SYSTEM_CLOCK('))
 		local callback=assert(text:match('request:on_result%((function%(result%).-\n\t\t\t\tend)%)'), 'actual production runtime failure observer')
 		local env={type=type,tostring=tostring,require=require,Logger=logger,LOG='runtime-notice-test',
-			owner={source=v.source},handle=v.handle,I18n=require('infra.i18n')}
+			owner={source=v.source},handle=v.handle,I18n=require('core.i18n.engine.i18n')}
 		local chunk
 		if setfenv then chunk=assert(loadstring('return '..callback));setfenv(chunk,env)
 		else chunk=assert(load('return '..callback,'actual-runtime-error-observer','t',env))end

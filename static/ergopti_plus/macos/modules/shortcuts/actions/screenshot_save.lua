@@ -20,7 +20,7 @@ local ShellRunner   = require("adapters.shell_runner")
 local FileSystem    = require("core.fs.adapters.file_system")
 local Logger        = require("infra.logger")
 local notifications = require("infra.notifications")
-local i18n          = require("infra.i18n")
+local i18n          = require("core.i18n.engine.i18n")
 local CaptureFlow   = require("modules.shortcuts.actions.screen_capture_flow")
 local NativePath = require("core.fs.engine.native_path")
 

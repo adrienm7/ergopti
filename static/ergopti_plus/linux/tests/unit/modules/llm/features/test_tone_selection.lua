@@ -363,7 +363,7 @@ helpers.describe("tone actions: the selection moves along the ladder", function(
 			helpers.assert_eq(world.handlers.llm_tone_more_formal("gesture_swipe_right", nil), false)
 			world.wait_for(3)
 			helpers.assert_eq(#world.posts, 2, "no request past the most formal register")
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.tone.most_formal"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.tone.most_formal"))
 			helpers.assert_eq(#world.emitted, 0)
 
 			-- With cycling: wraps around to the most familiar register
@@ -384,7 +384,7 @@ helpers.describe("tone actions: the selection moves along the ladder", function(
 			helpers.assert_eq(system_turn(world.posts[1]):sub(1, 120), prompt_head("tone_familiar"))
 			world.respond(1, "REWRITE: Bonjour")
 			helpers.assert_eq(world.handlers.llm_tone_more_familiar("tap_3", nil), false)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.tone.most_familiar"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.tone.most_familiar"))
 			helpers.assert_eq(world.handlers.llm_tone_more_familiar_cycle("tap_3", nil), true)
 			world.wait_for(2)
 			helpers.assert_eq(system_turn(world.posts[2]):sub(1, 120), prompt_head("tone_very_formal"),
@@ -452,7 +452,7 @@ helpers.describe("tone actions: refusals and dropped answers", function()
 	helpers.it("refuses like the manual prediction while the AI is off, without probing", function()
 		scenario({ selection = "merci", disabled = true }, function(world)
 			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.disabled"))
 			helpers.assert_eq(world.reads, 0, "no copy chord is sent")
 			helpers.assert_eq(#world.posts, 0)
 		end)
@@ -461,7 +461,7 @@ helpers.describe("tone actions: refusals and dropped answers", function()
 	helpers.it("refuses while paused", function()
 		scenario({ selection = "merci", paused = true }, function(world)
 			helpers.assert_eq(world.handlers.llm_tone_more_formal_cycle("tap_3", nil), false)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.paused"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.paused"))
 			helpers.assert_eq(#world.posts, 0)
 		end)
 	end)
@@ -610,7 +610,7 @@ helpers.describe("selection rewrites require a known stable native focus", funct
 			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
 			helpers.assert_eq(world.reads, 0)
 			helpers.assert_eq(#world.posts, 0)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.text_target_unavailable"))
 		end)
 	end)
 	for _, missing in ipairs({"empty", "unavailable"}) do
@@ -620,7 +620,7 @@ helpers.describe("selection rewrites require a known stable native focus", funct
 				helpers.assert_eq(world.engine.shift_tone(require("ai.engine.prediction.tone").MORE_FORMAL, false), false)
 				helpers.assert_eq(world.reads, 0, "an unknown target cannot authorize a copy probe")
 				helpers.assert_eq(#world.posts, 0)
-				helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"),
+				helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.text_target_unavailable"),
 					"a deliberate action must explain that the active text field is unavailable")
 			end)
 		end)

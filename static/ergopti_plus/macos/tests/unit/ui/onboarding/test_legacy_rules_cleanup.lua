@@ -13,7 +13,7 @@
 local helpers    = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
 
-local MODULES = { "ui.legacy_rules_cleanup", "infra.logger", "infra.i18n", "infra.dialog_util",
+local MODULES = { "ui.legacy_rules_cleanup", "infra.logger", "core.i18n.engine.i18n", "infra.dialog_util",
 	"infra.deferred_work" }
 
 --- Installs recording doubles and loads the dialog module.
@@ -44,7 +44,7 @@ local function load_cleanup(h)
 	local cleanup = helpers.load_with_stubs("ui.legacy_rules_cleanup")
 	-- The loader installs its echoing i18n stub, which the module captured:
 	-- give that same table a format that shows its arguments.
-	package.loaded["infra.i18n"].format = function(key, ...)
+	package.loaded["core.i18n.engine.i18n"].format = function(key, ...)
 		local parts = { key }
 		for index = 1, select("#", ...) do parts[#parts + 1] = tostring(select(index, ...)) end
 		return table.concat(parts, "|")

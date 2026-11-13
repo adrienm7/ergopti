@@ -35,7 +35,7 @@ end
 
 local function menu_controls(paused, relabel, magic_relabel, presence_options)
 	local paths = require("core.fs.engine.paths")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local original = package.loaded["infra.manifest_menu"]
 	local observations = { writes = 0, redraws = 0 }
 	local renderer = assert(require("menu.engine.renderer").new({
@@ -100,7 +100,7 @@ helpers.describe("declared coloured preview native row", function()
 	helpers.it("uses the shared label and keeps the three presence rows plus separator", function()
 		with_preferences(function(_, _, _, _)
 			local rows = menu_controls(false, true)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			helpers.assert_eq(#rows, 5)
 			for index, label in ipairs({ "tooltip_magic", "tooltip_autocorrect", "tooltip_ai" }) do
 				helpers.assert_eq(rows[index].title, i18n.get("menu.hotstrings." .. label))
@@ -227,7 +227,7 @@ helpers.describe("preview bubble toggles notify like the macOS menu", function()
 	helpers.it("announces the new state of the coloured bubble and nothing when the write is refused", function()
 		with_preferences(function(Preferences, _, _, _)
 			with_recording_notifier(function(sent)
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local lease = {}; assert(Preferences.acquire(lease))
 				local refused_rows = menu_controls(false)
 				helpers.assert_eq(refused_rows[5].fn(), false)
@@ -245,7 +245,7 @@ end)
 helpers.describe("coloured provider locale contract", function()
 	helpers.it("uses all twenty-one actual catalogues without disturbing provider order", function()
 		with_preferences(function(_, _, _, _)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local observed = {}
 			local ok, err = pcall(function()
 				for _, code in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
@@ -254,14 +254,14 @@ helpers.describe("coloured provider locale contract", function()
 					local catalog = assert(require("core.text.engine.json").decode(raw))
 					local translated = {}; for key, value in pairs(i18n) do translated[key] = value end
 					translated.get = function(key) return catalog[key] or key end
-					package.loaded["infra.i18n"] = translated
+					package.loaded["core.i18n.engine.i18n"] = translated
 					local rows = menu_controls(false)
 					observed[#observed + 1] = { rows = rows, expected = catalog["menu.hotstrings.tooltip_colored"] }
 				end
 			end)
-			package.loaded["infra.i18n"] = i18n
+			package.loaded["core.i18n.engine.i18n"] = i18n
 			if not ok then error(err, 0) end
-			helpers.assert_eq(package.loaded["infra.i18n"], i18n)
+			helpers.assert_eq(package.loaded["core.i18n.engine.i18n"], i18n)
 			helpers.assert_eq(#observed, 21)
 			for _, item in ipairs(observed) do
 				helpers.assert_eq(#item.rows, 5)
@@ -326,7 +326,7 @@ helpers.describe("magic provider locale contract", function()
 	helpers.it("consumes the declaration label while keeping separator and colored siblings", function()
 		with_preferences(function()
 			local rows = menu_controls(false, false, true)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			helpers.assert_eq(#rows, 5)
 			helpers.assert_eq(rows[1].title, i18n.get("button.ok"))
 			helpers.assert_eq(rows[2].title, i18n.get("menu.hotstrings.tooltip_autocorrect"))
@@ -337,7 +337,7 @@ helpers.describe("magic provider locale contract", function()
 	end)
 	helpers.it("uses all twenty-one real catalogues for the magic checkbox", function()
 		with_preferences(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/preview_magic_control.json"), "rb"))
 			local raw = file:read("*a"); file:close()
 			local corpus = assert(require("core.text.engine.json").decode(raw))
@@ -349,13 +349,13 @@ helpers.describe("magic provider locale contract", function()
 					local catalog = assert(require("core.text.engine.json").decode(text))
 					local translated = {}; for key, value in pairs(i18n) do translated[key] = value end
 					translated.get = function(key) return catalog[key] or key end
-					package.loaded["infra.i18n"] = translated
+					package.loaded["core.i18n.engine.i18n"] = translated
 					observations[#observations + 1] = { rows = menu_controls(false), label = catalog[corpus.row.i18n] }
 				end
 			end)
-			package.loaded["infra.i18n"] = i18n
+			package.loaded["core.i18n.engine.i18n"] = i18n
 			if not passed then error(err, 0) end
-			helpers.assert_eq(package.loaded["infra.i18n"], i18n)
+			helpers.assert_eq(package.loaded["core.i18n.engine.i18n"], i18n)
 			helpers.assert_eq(#observations, 21)
 			for _, observation in ipairs(observations) do
 				helpers.assert_eq(observation.rows[1].title, observation.label)
@@ -481,7 +481,7 @@ end)
 helpers.describe("ordered presence provider locale contract", function()
 	helpers.it("uses all twenty-one actual catalogues in canonical and reversed declaration order", function()
 		with_preferences(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local function read_json(path)
 				local file = assert(io.open(path, "rb")); local text = file:read("*a"); file:close()
 				return assert(require("core.text.engine.json").decode(text))
@@ -494,15 +494,15 @@ helpers.describe("ordered presence provider locale contract", function()
 					local catalog = read_json(Paths.shared("core/i18n/data/locales/" .. code .. ".json"))
 					local translated = {}; for key, value in pairs(i18n) do translated[key] = value end
 					translated.get = function(key) return catalog[key] or key end
-					package.loaded["infra.i18n"] = translated
+					package.loaded["core.i18n.engine.i18n"] = translated
 					for _, reverse in ipairs({ false, true }) do
 						observations[#observations + 1] = { rows = menu_controls(false, false, false, { reverse = reverse }), catalog = catalog, reverse = reverse }
 					end
 				end
 			end)
-			package.loaded["infra.i18n"] = i18n
+			package.loaded["core.i18n.engine.i18n"] = i18n
 			if not passed then error(err, 0) end
-			helpers.assert_eq(package.loaded["infra.i18n"], i18n)
+			helpers.assert_eq(package.loaded["core.i18n.engine.i18n"], i18n)
 			helpers.assert_eq(#observations, 42)
 			for _, observation in ipairs(observations) do
 				helpers.assert_eq(#observation.rows, 5)
@@ -520,8 +520,8 @@ helpers.describe("ordered presence provider locale contract", function()
 	helpers.it("consumes the current declaration label rather than a cached native caption", function()
 		with_preferences(function()
 			local rows = menu_controls(false, false, false, { relabel = true })
-			helpers.assert_eq(rows[2].title, require("infra.i18n").get("button.ok"))
-			helpers.assert_eq(rows[3].title, require("infra.i18n").get("menu.hotstrings.tooltip_ai"))
+			helpers.assert_eq(rows[2].title, require("core.i18n.engine.i18n").get("button.ok"))
+			helpers.assert_eq(rows[3].title, require("core.i18n.engine.i18n").get("menu.hotstrings.tooltip_ai"))
 		end)
 	end)
 end)

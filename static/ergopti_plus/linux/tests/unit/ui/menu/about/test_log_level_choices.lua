@@ -37,7 +37,7 @@ local function build(selected, setter)
 		config = config, log_level = selected, on_set_log_level = setter,
 		on_toggle_pause = function() end, on_quit = function() end,
 	})
-	local label = require("infra.i18n").get("menu.debug.log_level")
+	local label = require("core.i18n.engine.i18n").get("menu.debug.log_level")
 	for _, top in ipairs(rows) do
 		for _, row in ipairs(top.menu or {}) do
 			if row.title and row.title:find(label, 1, true) == 1 then return row end
@@ -119,7 +119,7 @@ helpers.describe("Linux shared Debug log choices", function()
 				helpers.assert_eq(row.menu[index].title, level.label)
 				helpers.assert_eq(row.menu[index].checked == true, state.checked[index])
 				if level.value == state.selected then
-					helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(require("infra.i18n").get, require("infra.i18n").get("menu.debug.log_level"), level.label))
+					helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(require("core.i18n.engine.i18n").get, require("core.i18n.engine.i18n").get("menu.debug.log_level"), level.label))
 				end
 				helpers.assert_eq(row.menu[index].fn(), true)
 			end
@@ -180,16 +180,16 @@ end)
 local function debug_parent_fixture(body)
 	-- These real modules capture one another. A preceding registered fixture may
 	-- reload locale alone; retain a fresh coherent native chain for this case.
-	local names = { "core.i18n.engine.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
+	local names = { "core.i18n.engine.core", "core.i18n.engine.locale", "core.i18n.engine.i18n", "infra.manifest_menu", "ui.menu.builder" }
 	local previous, original_i18n_safe = {}, rawget(_G, "i18n_safe")
 	for module, value in pairs(package.loaded) do previous[module] = value end
 	for _, module in ipairs(names) do rawset(package.loaded, module, nil) end
 	local completed, failure = xpcall(function()
 	-- Complete the genuine discovery/read phase before a requested test locale;
 	-- the Language child must not lazily initialize it back to the saved locale.
-	require("infra.i18n").init()
+	require("core.i18n.engine.i18n").init()
 	local native = helpers.load_module("ui.menu.builder")
-	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
+	local renderer, locale = require("infra.manifest_menu"), require("core.i18n.engine.locale")
 	local language = locale.current_locale()
 	local callbacks = {}
 	local function setter(value) callbacks[#callbacks + 1] = value; return false end

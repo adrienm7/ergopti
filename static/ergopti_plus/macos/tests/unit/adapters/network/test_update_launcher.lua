@@ -176,8 +176,8 @@ local CHECK_FAILED_KEY = "updater.check_request_failed"
 --- @param alert function|nil Modal alert double.
 --- @return table dialogs, table notifications
 local function refuse_with_echoed_keys(open_url, alert)
-	return helpers.with_fresh_modules({ "infra.i18n", "adapters.update_launcher" }, function()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+	return helpers.with_fresh_modules({ "core.i18n.engine.i18n", "adapters.update_launcher" }, function()
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		local subject, _, dialogs, notifications = load_subject(open_url, alert)
 		helpers.assert_eq(subject.request_check(), false)
 		return dialogs, notifications

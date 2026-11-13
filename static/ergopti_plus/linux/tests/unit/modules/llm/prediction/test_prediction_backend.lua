@@ -159,7 +159,7 @@ helpers.describe("prediction backend: the selected backend answers", function()
 			scheduler.settle()
 			helpers.assert_eq(#calls.remote + #calls.ollama, 0)
 			helpers.assert_eq(#calls.notices, 1, "the refusal must reach the visible notice surface")
-			helpers.assert_eq(calls.notices[1], require("infra.i18n").get("llm.manual_prediction.backend_not_ready"))
+			helpers.assert_eq(calls.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.backend_not_ready"))
 		end)
 		restore()
 		if not ok then error(err, 0) end

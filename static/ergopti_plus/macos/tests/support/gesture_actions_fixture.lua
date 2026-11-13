@@ -57,7 +57,7 @@ local OWNERS = {
 	"core.events.timer_scheduler",
 	"keyboard.engine.desktop_navigation",
 	"infra.config_paths",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.manifest_reader",
 	"infra.notifications",
@@ -150,7 +150,7 @@ local function fresh_actions(options)
 		"core.fs.engine.paths",
 		"infra.config_paths",
 		"infra.timings",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 	}) do package.loaded[name] = nil end
 
 	local calls = {
@@ -741,7 +741,7 @@ local function fresh_actions(options)
 		}
 	end
 	package.loaded["infra.logger"] = logger
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 
 	local event_types = { rightMouseDown = 1, rightMouseUp = 2 }
 	local focused_window = {

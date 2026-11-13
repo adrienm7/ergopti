@@ -17,7 +17,7 @@ local function with_fixture(callback)
 	local previous_base = rawget(_G, "_base_dir")
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
-			"ui.ui_builder", "ui.webview_close_owner", "ui.menu.menu_paths", "infra.i18n", "infra.locale", "core.i18n.engine.core",
+			"ui.ui_builder", "ui.webview_close_owner", "ui.menu.menu_paths", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
 			"infra.logger", "core.fs.engine.paths", "infra.config_paths", "infra.deferred_work",
 			"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.fs.adapters.storage", "core.ui.engine.webview.i18n_seed",
 			"core.ui.engine.window_titles", "hs", "tests.stubs.hs",
@@ -56,9 +56,9 @@ local function with_fixture(callback)
 				},
 			})
 			-- The loader injects passthrough i18n; require the actual producer after it.
-			package.loaded["infra.i18n"] = nil
-			local i18n = require("infra.i18n")
-			local locale = require("infra.locale")
+			package.loaded["core.i18n.engine.i18n"] = nil
+			local i18n = require("core.i18n.engine.i18n")
+			local locale = require("core.i18n.engine.locale")
 			local titles = require("core.ui.engine.window_titles")
 			local function request(app_id)
 				return {

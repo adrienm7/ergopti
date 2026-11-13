@@ -65,7 +65,7 @@ local function shortcuts_menu(ctx_extra)
 	local ctx = { _version = "9.9.9", shortcuts = fake_shortcuts() }
 	for k, v in pairs(ctx_extra or {}) do ctx[k] = v end
 
-	local wanted = require("infra.i18n").get("menu.shortcuts.select_word")
+	local wanted = require("core.i18n.engine.i18n").get("menu.shortcuts.select_word")
 	for _, item in ipairs(mb.build(ctx)) do
 		if type(item.menu) == "table" then
 			for _, row in ipairs(item.menu) do
@@ -196,7 +196,7 @@ local function with_keyboard_slot_picker(prompt, body)
 					return prompt(binding, action, spec, prior)
 				end end
 				local built = shortcuts_menu(ctx)
-				local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+				local picker_label = require("core.i18n.engine.i18n").get("dialog.action_picker.label") .. "…"
 				local slot_row = find_row_prefix(built, "Ctrl+K")
 				helpers.assert_not_nil(slot_row, "the keyboard slot must be drawn")
 				local picker_choice = find_row(slot_row.menu, picker_label)
@@ -226,12 +226,12 @@ end
 
 -- Own the genuine native translation cohort while exercising cold and warm trays.
 local function with_shortcut_locale(code, scenario)
-	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.menu.builder" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.menu.builder" }
 	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
 	local native, owner, receipt, acquired
 	local ok, detail = xpcall(function()
 		for _, name in ipairs(names) do rawset(package.loaded, name, nil) end
-		native = require("infra.i18n")
+		native = require("core.i18n.engine.i18n")
 		native.init()
 		owner = { pending = function() return false end }
 		assert(native.scope_acquire(owner))
