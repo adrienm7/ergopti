@@ -218,7 +218,7 @@ content = ['["\x27]xdotool[ "\x27]']
 "adapters/window_switch.lua" = ["gestures.*"]
 # The active file manager window behind the open_terminal_here and
 # new_text_file_here gesture actions (modules/gestures/system_actions.lua).
-"adapters/file_manager_folder.lua" = ["gestures.*"]
+"core/fs/adapters/file_manager_folder.lua" = ["gestures.*"]
 "ui/tooltip/preview.lua" = [
 	"hotstrings.preview_ai_enabled",
 	"hotstrings.preview_autocorrect_enabled",

@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local planner = helpers.load_module("hotstrings.engine.bulk_scope")
-local Paths = helpers.load_module("infra.paths")
+local Paths = helpers.load_module("core.fs.engine.paths")
 local Json = require("core.text.engine.json")
 local path = Paths.shared("tests/corpus/hotstrings/bulk_scope_vectors.json")
 local file = assert(io.open(path, "r"))

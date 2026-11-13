@@ -11,7 +11,7 @@ local MODULES = {
 	"infra.dialog_util",
 	"infra.i18n",
 	"infra.logger",
-	"infra.paths", "infra.timings",
+	"core.fs.engine.paths", "infra.timings",
 	"modules.llm",
 	"ui.menu.menu_llm.models_manager",
 	"ui.menu.menu_llm.models_manager_mlx",
@@ -135,7 +135,7 @@ local function with_fixture(callback)
 			return key
 		end }
 		helpers.provide_timings()
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared_llm_path = function(name)
 				return helpers.shared("ai/data/" .. tostring(name))
 			end,

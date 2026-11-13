@@ -11,7 +11,7 @@
 --- WRITE PERMISSIONS:
 --- An ancestor writable by others is always refused. One writable by its group
 --- is admitted only when that group is the user's own private group (same name
---- and primary gid as the user, no other member: infra/user_private_group.lua):
+--- and primary gid as the user, no other member: core/fs/engine/user_private_group.lua):
 --- under the Debian/Ubuntu/Fedora umask 0002 an application creates
 --- ~/.local/share that way, and only the user can write it. Any other shared
 --- group is refused. The folders this resolver creates stay owner-only.
@@ -69,7 +69,7 @@ local copy = TableUtil.shallow_copy
 --- @return table|nil catalogue
 --- @return string|nil reason
 local function catalogue()
-	local path = require("infra.paths").shared("ai/data/ollama_release.json")
+	local path = require("core.fs.engine.paths").shared("ai/data/ollama_release.json")
 	if not path then return nil, "ollama_release_unreadable" end
 	local data, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 	if status ~= "ok" or type(data) ~= "string" then return nil, "ollama_release_unreadable" end
@@ -82,7 +82,7 @@ end
 --- Captures a read-only per-user plan and its actual native identity receipts.
 --- @param options table|nil { native, catalogue, app_dirs, environment, private_group }:
 ---   private_group(gid) -> boolean tells the user's private group (default
----   infra/user_private_group.lua, from the system account databases).
+---   core/fs/engine/user_private_group.lua, from the system account databases).
 --- @return table|nil resolver
 --- @return string|nil reason
 function M.new(options)
@@ -125,7 +125,7 @@ function M.new(options)
 	local plan, plan_reason = Policy.posix_plan(environment, app_dirs, asset)
 	if not plan then return nil, plan_reason end
 	local private_group = options.private_group
-	if private_group == nil then private_group = require("infra.user_private_group").is_current_user_private end
+	if private_group == nil then private_group = require("core.fs.engine.user_private_group").is_current_user_private end
 	if type(private_group) ~= "function" then return nil, "native_install_resolver_unavailable" end
 	local private_answers = {}
 

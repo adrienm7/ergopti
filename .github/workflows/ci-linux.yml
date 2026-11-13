@@ -5375,7 +5375,7 @@ jobs:
             echo "::error::no executable at ~/.local/bin/ergopti-hotstrings"
             FAIL=1
           fi
-          # The driver root and the shared tree must be SIBLINGS: infra/paths.lua
+          # The driver root and the shared tree must be SIBLINGS: core/fs/engine/paths.lua
           # resolves _shared as ../_shared from the driver root and probes it, so a
           # layout that nests them differently boots to "shared tree not found".
           for path in "$HOME/.local/lib/ergopti/linux/ergopti_hotstrings.lua" \

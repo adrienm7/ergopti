@@ -51,7 +51,7 @@ local function with_action(session, action, change, body)
 	local ok, detail = pcall(function()
 		fixture.with(function(guard, state, _, _, watch)
 			local world = { clipboard = "saved clipboard", writes = {}, pasted = {}, events = {}, held = {}, reads = 0, logs = {} }
-			local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 			logger.set_level("trace"); logger.set_sink(function(line) world.logs[#world.logs + 1] = line end)
 			package.loaded["core.logger.engine.shim"] = logger
 			local pending, changed = nil, false

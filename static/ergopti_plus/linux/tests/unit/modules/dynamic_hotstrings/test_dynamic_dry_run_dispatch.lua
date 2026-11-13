@@ -185,7 +185,7 @@ local function exercise(kind, dry_run, options)
 				if loadstring then compiled = assert(loadstring(body)); setfenv(compiled, environment)
 				else compiled = assert(load(body, "original Main handle_char", "t", environment)) end
 				handler = gate.guard(compiled())
-				local read = require("adapters.file_system").read_with_status
+				local read = require("core.fs.adapters.file_system").read_with_status
 				-- LuaJIT calls no hook from a compiled trace, so a hot read or request
 				-- loop went uncounted on one Arch run (dyn-dry-run-hook-jit). The
 				-- interpreter alone runs while the calls are counted.

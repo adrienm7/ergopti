@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local Paths      = require("infra.paths")
+local Paths      = require("core.fs.engine.paths")
 
 local Json       = require("core.text.engine.json")
 
@@ -141,7 +141,7 @@ local function with_offline_shipped_probe(body)
 	local updater_name, registry_name = "modules.updater.manager", "modules.keymap.layout_registry"
 	local previous_updater, previous_preload = package.loaded[updater_name], package.preload[updater_name]
 	local previous_registry = package.loaded[registry_name]
-	local Http, FileSystem = require("adapters.http_client"), require("adapters.file_system")
+	local Http, FileSystem = require("adapters.http_client"), require("core.fs.adapters.file_system")
 	local previous_get, previous_read = Http.get, FileSystem.read
 	local observed = { updater = 0, network = 0, reads = {} }
 	package.loaded[updater_name] = nil

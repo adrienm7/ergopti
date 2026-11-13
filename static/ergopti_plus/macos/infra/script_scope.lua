@@ -50,8 +50,8 @@ function M.adopt_configured()
 	adopted[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = nil
 	return require("settings.engine.scope.script_config_authority").adopt({
 		path = require("infra.config_paths").get("ConfigTomlPath"),
-		file_adapter = require("adapters.file_system"), manifest = Manifest, platform = "hs",
-		aliases = adopted, storage = require("adapters.storage"),
+		file_adapter = require("core.fs.adapters.file_system"), manifest = Manifest, platform = "hs",
+		aliases = adopted, storage = require("core.fs.adapters.storage"),
 		logger = require("infra.logger"), log = "script_scope" })
 end
 
@@ -64,7 +64,7 @@ function M.rewrite_configured(path, value)
 	assert(ALIAS_NAMES[path] ~= nil, "not a native script row: " .. tostring(path))
 	local committed, detail = require("settings.engine.scope.script_config_authority").rewrite({
 		path = require("infra.config_paths").get("ConfigTomlPath"),
-		file_adapter = require("adapters.file_system"), manifest = Manifest, key = path, value = value })
+		file_adapter = require("core.fs.adapters.file_system"), manifest = Manifest, key = path, value = value })
 	if committed ~= true then
 		require("infra.logger").error("script_scope", "%s was not changed: %s.", path, tostring(detail))
 	end
@@ -76,7 +76,7 @@ function M.rewrite_configured_owned(path, value)
 	assert(ALIAS_NAMES[path] ~= nil, "not a native script row: " .. tostring(path))
 	return require("settings.engine.scope.script_config_authority").rewrite_owned({
 		path = require("infra.config_paths").get("ConfigTomlPath"),
-		file_adapter = require("adapters.file_system"), manifest = Manifest, key = path, value = value })
+		file_adapter = require("core.fs.adapters.file_system"), manifest = Manifest, key = path, value = value })
 end
 
 function M.restore_configured_rewrite(receipt)
@@ -106,7 +106,7 @@ function M.new(options)
 	local transaction
 	local token = { pending = function() return transaction ~= nil and transaction.pending() end }
 	local runtime = Runtime.new({ manifest = Manifest, platform = "hs", aliases = options.aliases or aliases(),
-		storage = options.storage or require("adapters.storage"), token = token, files = options.files,
+		storage = options.storage or require("core.fs.adapters.storage"), token = token, files = options.files,
 		storage_backup_path = options.storage_backup_path })
 	local ports = {}
 	for key, value in pairs(options) do ports[key] = value end

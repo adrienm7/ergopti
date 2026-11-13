@@ -5,10 +5,10 @@ return function(helpers, driver)
 	local name = driver == "linux" and "infra.script_settings" or "infra.logger"
 	local function with_native(callback)
 		local previous = package.loaded[name]
-		local storage = package.loaded["adapters.storage"]
+		local storage = package.loaded["core.fs.adapters.storage"]
 		local writes = 0
 		if driver == "linux" then
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return default end,
 				set = function() writes = writes + 1; return true end,
 			}
@@ -22,7 +22,7 @@ return function(helpers, driver)
 			else logger.set_level("INFO") end
 			callback(native, logger, level, function() return writes end)
 		end)
-		package.loaded[name], package.loaded["adapters.storage"] = previous, storage
+		package.loaded[name], package.loaded["core.fs.adapters.storage"] = previous, storage
 		if not ok then error(err) end
 	end
 	helpers.describe("script log runtime owned scalar", function()

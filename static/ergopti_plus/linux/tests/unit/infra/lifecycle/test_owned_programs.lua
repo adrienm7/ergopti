@@ -72,7 +72,7 @@ helpers.describe("owned_programs: the private runtime's programs only", function
 					execvp = function(file) execed = file return -1 end,
 				},
 			},
-			["infra.private_sqlite_file"] = { admit = function() return true end, creation_mask = 63 },
+			["core.fs.engine.private_sqlite_file"] = { admit = function() return true end, creation_mask = 63 },
 			["infra.owned_programs"] = {
 				resolve = function(...)
 					resolved[#resolved + 1] = { ... }

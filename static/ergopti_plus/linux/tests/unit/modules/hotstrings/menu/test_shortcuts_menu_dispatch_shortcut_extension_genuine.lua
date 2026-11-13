@@ -41,7 +41,7 @@ helpers.describe("Shortcut extension genuine physical failure marker", function(
 		local language = code
 		helpers.it("uses and withdraws the whole declared " .. language .. " marker after the real extension chunk fails", function()
 			with_shortcut_locale(language, function()
-				local lfs, Paths = require("lfs"), require("infra.paths")
+				local lfs, Paths = require("lfs"), require("core.fs.engine.paths")
 				local directory = os.tmpname(); assert(os.remove(directory)); assert(lfs.mkdir(directory))
 				local pack = directory .. "/g1-marker"
 				assert(lfs.mkdir(pack)); assert(lfs.mkdir(pack .. "/shortcuts")); assert(lfs.mkdir(pack .. "/hotstrings"))

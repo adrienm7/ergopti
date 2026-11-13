@@ -22,7 +22,7 @@ local M = {}
 
 local Migrate = require("tap_hold.engine.migrate")
 local Shapes = require("platform.remap.tap_hold_shapes")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 M.META_SECTION = Migrate.META_SECTION
 M.VERSION_KEY = Migrate.VERSION_KEY

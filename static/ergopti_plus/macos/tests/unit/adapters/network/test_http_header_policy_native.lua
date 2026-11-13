@@ -10,11 +10,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("macOS native HTTP header policy", function()
 	local function with_policy(source, scenario)
-		helpers.with_stub_scope({ "infra.http_header_policy", "infra.paths", "adapters.file_system" }, function()
-			package.loaded["infra.paths"] = { shared = function(path)
+		helpers.with_stub_scope({ "infra.http_header_policy", "core.fs.engine.paths", "core.fs.adapters.file_system" }, function()
+			package.loaded["core.fs.engine.paths"] = { shared = function(path)
 				helpers.assert_eq(path, "core/network/data/http/header_policy.json"); return "fixture-policy"
 			end }
-			package.loaded["adapters.file_system"] = { read_bounded = function(path, limit)
+			package.loaded["core.fs.adapters.file_system"] = { read_bounded = function(path, limit)
 				helpers.assert_eq(path, "fixture-policy"); helpers.assert_eq(limit, 4096)
 				return source, source and "ok" or "error"
 			end }

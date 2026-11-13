@@ -294,7 +294,7 @@ helpers.describe("changelog_bridge: native fetch push", function()
 	end)
 
 	helpers.it("changelog refuses a FIFO release configuration without blocking", function()
-		local uv, Paths = require("luv"), require("infra.paths")
+		local uv, Paths = require("luv"), require("core.fs.engine.paths")
 		local original = Paths.shared
 		local source = assert(original("updater/data/defaults.json"))
 		local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-changelog-fifo-XXXXXX"))

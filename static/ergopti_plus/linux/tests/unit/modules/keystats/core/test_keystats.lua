@@ -654,7 +654,7 @@ helpers.describe("keystats events_json controls are escaped (json-controls)", fu
     }, { __index = function() return function() return true end end })
     require("tests.support.sqlite_flush_fake").attach(package.loaded["modules.keystats.sqlite_writer"])
     local ok, err = pcall(function()
-      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["core.fs.adapters.storage"] = Fakes.storage()
       package.loaded["modules.keystats.keystats"] = nil
       local kl = require("modules.keystats.keystats")
       kl.init({})
@@ -750,7 +750,7 @@ helpers.describe("physical-backspace-corrections", function()
     }, { __index = function() return function() return true end end })
     require("tests.support.sqlite_flush_fake").attach(package.loaded["modules.keystats.sqlite_writer"])
     local ok, err = pcall(function()
-      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["core.fs.adapters.storage"] = Fakes.storage()
       package.loaded["modules.keystats.keystats"] = nil
       local kl = require("modules.keystats.keystats")
       kl.init({})
@@ -851,7 +851,7 @@ helpers.describe("linux-cross-flush-walk", function()
     package.loaded["modules.keystats.sqlite_writer"] = writer
     local ok, err = pcall(function()
       Monotonic.now_ms = function() return now end
-      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["core.fs.adapters.storage"] = Fakes.storage()
       package.loaded["modules.keystats.keystats"] = nil
       local kl = require("modules.keystats.keystats")
       kl.init({})
@@ -898,7 +898,7 @@ helpers.describe("linux-cross-flush-walk", function()
     require("tests.support.sqlite_flush_fake").attach(writer)
     package.loaded["modules.keystats.sqlite_writer"] = writer
     local ok, err = pcall(function()
-      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["core.fs.adapters.storage"] = Fakes.storage()
       package.loaded["modules.keystats.keystats"] = nil
       local kl = require("modules.keystats.keystats")
       kl.init({})
@@ -1029,7 +1029,7 @@ end)
 -- Replayed terminators belong to the physical output journal, independently of
 -- the logical replacement used for hotstring counters and its event row.
 local function with_replayed_hotstring(options, callback)
-  local names = { "modules.keystats.keystats", "modules.keystats.sqlite_writer", "adapters.storage",
+  local names = { "modules.keystats.keystats", "modules.keystats.sqlite_writer", "core.fs.adapters.storage",
     "modules.hotstrings.injector", "adapters.keyboard_hook", "adapters.keyboard_layout", "adapters.xkb_capture" }
   local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
   local Monotonic = require("infra.monotonic")
@@ -1053,7 +1053,7 @@ local function with_replayed_hotstring(options, callback)
     writer.upsert_app_day = function(_, _, _, fields) world.app_days[#world.app_days + 1] = fields; return true end
     require("tests.support.sqlite_flush_fake").attach(writer)
     package.loaded["modules.keystats.sqlite_writer"] = writer
-    package.loaded["adapters.storage"] = Fakes.storage()
+    package.loaded["core.fs.adapters.storage"] = Fakes.storage()
     package.loaded["modules.keystats.keystats"] = nil
     Monotonic.now_ms = function() return now end
     local collector = require("modules.keystats.keystats")

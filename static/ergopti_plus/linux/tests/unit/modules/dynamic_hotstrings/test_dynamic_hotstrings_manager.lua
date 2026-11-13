@@ -174,8 +174,8 @@ assert(next(manager.get_info()) == nil)
       local fh = assert(io.open(path, "w"))
       fh:write('[info]\nfirst_name = "Effective"\n\n[letters]\np = "first_name"\n')
       fh:close()
-      local previous = package.loaded["adapters.storage"]
-      package.loaded["adapters.storage"] = { get = function() return directory end }
+      local previous = package.loaded["core.fs.adapters.storage"]
+      package.loaded["core.fs.adapters.storage"] = { get = function() return directory end }
       local ok, err = pcall(function()
         helpers.assert_true(dh.init({ trigger_char = "★" }))
         helpers.assert_eq(dh.get_info().first_name, "Effective",
@@ -186,7 +186,7 @@ assert(next(manager.get_info()) == nil)
         saved:close()
         helpers.assert_eq(decoded.info.first_name, "Saved")
       end)
-      package.loaded["adapters.storage"] = previous
+      package.loaded["core.fs.adapters.storage"] = previous
       os.remove(path)
       os.remove(path .. ".tmp")
       os.execute("rmdir '" .. directory .. "'")

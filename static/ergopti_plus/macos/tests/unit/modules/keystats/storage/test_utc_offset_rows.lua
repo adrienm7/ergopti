@@ -46,9 +46,9 @@ helpers.describe("keystats: rows in UTC with their recorded offset (utc-offset-r
 		helpers.it("the rebuild reads a " .. case.os .. " row " .. (case.offset and "with" or "without")
 			.. " an offset in its lived time (utc-offset-rows)", function()
 			helpers.with_stub_scope({
-				"infra.logger", "adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
+				"infra.logger", "core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
 				"modules.keystats.aggregator", "modules.keystats.rotation", "modules.keystats.export",
-				"metrics.engine.metrics", "adapters.file_system", "core.events.timer_scheduler",
+				"metrics.engine.metrics", "core.fs.adapters.file_system", "core.events.timer_scheduler",
 			}, function()
 				package.loaded["infra.logger"] = helpers.make_logger_stub()
 				local seen = {}

@@ -14,14 +14,14 @@ local lfs = require("lfs")
 --- Owns physical files and the source-classification adapter for one observation.
 --- @param body function
 local function fixture(body)
-	return helpers.with_stub_scope({ "adapters.file_system", "infra.personal_file_adoption" }, function()
+	return helpers.with_stub_scope({ "core.fs.adapters.file_system", "infra.personal_file_adoption" }, function()
 		local root = os.tmpname(); os.remove(root)
 		assert(lfs.mkdir(root)); assert(lfs.mkdir(root .. "/a"))
 		local paths = { root .. "/a__b.toml", root .. "/a/b.toml", root .. "/personal_hotstrings.toml" }
 		for index, path in ipairs(paths) do
 			local file = assert(io.open(path, "w")); assert(file:write("[probe]\nentry = \"source" .. index .. "\"\n")); assert(file:close())
 		end
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			path_status = function(path)
 				local attributes = lfs.symlinkattributes(path)
 				return attributes and "present" or "absent", attributes

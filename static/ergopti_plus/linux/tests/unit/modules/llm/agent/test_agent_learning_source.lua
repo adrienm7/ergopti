@@ -128,7 +128,7 @@ helpers.describe("agent learning source admission", function()
 	helpers.it("preserves a newer learning file published during staging", function()
 		with_source(PREFIX .. "7" .. SUFFIX, function(Learning, path, config)
 			Learning.record(config, "Mine", "calendar", true)
-			local writer, original = require("infra.regular_file_writer"), nil
+			local writer, original = require("core.fs.engine.regular_file_writer"), nil
 			original = writer.open
 			local successor = '{"version":1,"apps":{"Other":{"used":8,"thresholds":{"calendar":0.4}}}}'
 			writer.open = function(...)
@@ -210,7 +210,7 @@ helpers.describe("agent learning quarantine ownership", function()
 				local source = PREFIX .. "7" .. SUFFIX
 				with_source(source, function(Learning, path, config)
 					local open, fault, handles, opened, closed = io.open, true, {}, 0, 0
-					local Reader = require("infra.regular_file_reader")
+					local Reader = require("core.fs.engine.regular_file_reader")
 					local open_source, wrapped = Reader.open_source, {}
 					local function refused()
 						if refusal == "throw" then error("controlled stream refusal", 0) end
@@ -274,7 +274,7 @@ helpers.describe("agent learning quarantine ownership", function()
 		local source = PREFIX .. "7" .. SUFFIX
 		with_source(source, function(Learning, path, config)
 			local open, fault = io.open, true
-			local Reader = require("infra.regular_file_reader")
+			local Reader = require("core.fs.engine.regular_file_reader")
 			local open_source = Reader.open_source
 			io.open = function(candidate, mode)
 				if fault and candidate == path and mode == "r" then return nil, "controlled read refusal", 13 end
@@ -330,7 +330,7 @@ helpers.describe("agent learning quarantine ownership", function()
 		helpers.it("(agent-learning-quarantine) blocks publication after a " .. refusal .. " preservation receipt", function()
 			local source = "invalid source retained during recovery refusal"
 			with_source(source, function(Learning, path, config)
-				local Move = require("infra.no_replace_move")
+				local Move = require("core.fs.engine.no_replace_move")
 				local rename, move, fault = os.rename, Move.move, true
 				local function refused()
 					if refusal == "throw" then error("controlled preservation refusal", 0) end

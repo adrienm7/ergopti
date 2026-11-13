@@ -22,13 +22,13 @@ end
 local function with_download_window(controls, callback)
 	helpers.with_fresh_modules({
 		"ui.download_window", "ui.ui_builder", "infra.logger", "infra.deferred_work",
-		"infra.paths", "infra.i18n", "infra.text_utils", "hs", "tests.stubs.hs",
+		"core.fs.engine.paths", "infra.i18n", "infra.text_utils", "hs", "tests.stubs.hs",
 	}, function()
 		local hs_stub = fresh_hs()
 		local state = { errors = 0, successes = 0, show_calls = 0 }
 		package.loaded["infra.logger"] = logger_spy(state)
 		package.loaded["infra.deferred_work"] = { after = function() return true end }
-		package.loaded["infra.paths"] = { shared = function() return "/controlled/assets" end }
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "/controlled/assets" end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.text_utils"] = {
 			applescript_format = function(value) return value end,
@@ -52,10 +52,10 @@ end
 local function with_onboarding(controls, callback)
 	helpers.with_fresh_modules({
 		"ui.onboarding", "ui.ui_builder", "infra.logger", "infra.i18n",
-		"infra.toml.writer", "infra.toml.codec", "infra.notifications", "infra.paths",
+		"infra.toml.writer", "infra.toml.codec", "infra.notifications", "core.fs.engine.paths",
 		"infra.deferred_work", "infra.text_utils", "infra.manifest_reader",
-		"infra.dialog_util", "ui.menu.menu_paths", "adapters.file_system",
-		"adapters.storage", "hs", "tests.stubs.hs",
+		"infra.dialog_util", "ui.menu.menu_paths", "core.fs.adapters.file_system",
+		"core.fs.adapters.storage", "hs", "tests.stubs.hs",
 	}, function()
 		local hs_stub = fresh_hs()
 		local state = {
@@ -75,12 +75,12 @@ local function with_onboarding(controls, callback)
 		}
 		package.loaded["infra.toml.codec"] = {}
 		package.loaded["infra.notifications"] = {}
-		package.loaded["infra.paths"] = { shared = function() return "/controlled/assets" end }
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "/controlled/assets" end }
 		package.loaded["infra.deferred_work"] = { after = function() return true end }
 		package.loaded["infra.text_utils"] = {}
 		package.loaded["infra.manifest_reader"] = {}
-		package.loaded["adapters.file_system"] = {}
-		package.loaded["adapters.storage"] = {}
+		package.loaded["core.fs.adapters.file_system"] = {}
+		package.loaded["core.fs.adapters.storage"] = {}
 		package.loaded["infra.dialog_util"] = {block_alert = function() return true end}
 		package.loaded["ui.menu.menu_paths"] = {
 			persist_config_dir_for_wizard = function() return false, "synthetic persistence refusal" end,
@@ -132,7 +132,7 @@ local function with_healthcheck(controls, callback)
 	controls = controls or {}
 	helpers.with_fresh_modules({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
-		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
+		"infra.logger", "core.fs.engine.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
 		"infra.dialog_util", "core.events.timer_scheduler", "hs", "tests.stubs.hs",
 	}, function()
 		local hs_stub = fresh_hs()
@@ -147,7 +147,7 @@ local function with_healthcheck(controls, callback)
 		package.loaded["infra.logger"] = logger_spy(state)
 		package.loaded["ui.healthcheck.helpers"] = {}
 		package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
-		package.loaded["infra.paths"] = { shared = function() return "/shared" end }
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared" end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return true end }
 		package.loaded["core.events.timer_scheduler"] = {

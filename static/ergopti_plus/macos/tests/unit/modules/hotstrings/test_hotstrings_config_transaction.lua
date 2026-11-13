@@ -39,7 +39,7 @@ end
 --- @return table module
 local function fresh_module(path, write_result)
 	local fixture_io = require("tests.support.file_system_write_stub")
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = fixture_io.read_with_status,
 		write_if_unchanged = function() return write_result end,
 	}
@@ -58,7 +58,7 @@ end
 --- @return table calls
 local function init_with_read_status(path, status, detail)
 	local calls = { reads = 0, writes = 0 }
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function(candidate)
 			helpers.assert_eq(candidate, path)
 			calls.reads = calls.reads + 1
@@ -147,7 +147,7 @@ helpers.describe("hotstrings config: failed source reads stay fail-closed", func
 		local path = fixture_path("reload_dangling")
 		local phase = "ok"
 		local calls = { writes = 0 }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function()
 				if phase == "ok" then return SENTINEL, "ok" end
 				return nil, "error", "dangling symlink target"
@@ -173,7 +173,7 @@ helpers.describe("hotstrings config: failed source reads stay fail-closed", func
 		local path = os.tmpname() .. "_absent.toml"
 		os.remove(path)
 		local writes = 0
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(candidate)
 				helpers.assert_eq(candidate, path)
 				return nil, "absent", "not found"
@@ -228,7 +228,7 @@ helpers.describe("hotstrings config: setters publish only after atomic commit", 
 	helpers.it("a symlink retarget between committed read and write publishes no candidate", function()
 		local path = fixture_path("retarget")
 		local events = {}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(candidate)
 				helpers.assert_eq(candidate, path)
 				events[#events + 1] = "read"
@@ -266,7 +266,7 @@ helpers.describe("hotstrings config: setters publish only after atomic commit", 
 		local external = "[rolls]\ndelay = 0.91\n\n[abbrevs]\ncolor = \"#123456\"\n"
 		local snapshots = {}
 		local fixture_io = require("tests.support.file_system_write_stub")
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = fixture_io.read_with_status,
 			write_if_unchanged = function(candidate, content, expected_source)
 				helpers.assert_eq(candidate, path)
@@ -314,7 +314,7 @@ helpers.describe("hotstrings config: setters publish only after atomic commit", 
 		local fh = assert(io.open(path, "w"))
 		assert(fh:write(record .. "\n[rolls]\ndelay = 0.5\n"))
 		assert(fh:close())
-		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+		package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 		package.loaded["modules.hotstrings.hotstrings_config"] = nil
 		local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 		helpers.assert_eq(mod.init({ override_path = path, toml_resolver = function() return nil end }), true)
@@ -343,7 +343,7 @@ helpers.describe("hotstrings config: override inputs stay data", function()
 		local path = fixture_path("hostile_inputs")
 		local writes = 0
 		local fixture_io = require("tests.support.file_system_write_stub")
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = fixture_io.read_with_status,
 			write_if_unchanged = function()
 				writes = writes + 1

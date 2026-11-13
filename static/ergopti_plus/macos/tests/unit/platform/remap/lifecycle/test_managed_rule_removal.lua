@@ -12,8 +12,8 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"adapters.file_system",
-	"adapters.json_codec",
+	"core.fs.adapters.file_system",
+	"core.fs.adapters.json_codec",
 	"platform.remap.lease_contract",
 	"platform.remap.managed_rule_removal",
 }
@@ -78,7 +78,7 @@ end
 --- @return table calls
 local function load_remover(content, write_result)
 	local calls = { writes = {}, reads = 0 }
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function()
 			calls.reads = calls.reads + 1
 			if content == nil then return nil, "absent" end
@@ -90,7 +90,7 @@ local function load_remover(content, write_result)
 			return true
 		end,
 	}
-	package.loaded["adapters.json_codec"] = nil
+	package.loaded["core.fs.adapters.json_codec"] = nil
 	package.loaded["platform.remap.lease_contract"] = nil
 	local remover = helpers.load_with_stubs("platform.remap.managed_rule_removal")
 	return remover, calls

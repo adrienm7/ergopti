@@ -21,7 +21,7 @@
 local M = {}
 
 -- The one module name a driver publishes to own descriptor admission.
-local NATIVE_READER = "infra.regular_file_reader"
+local NATIVE_READER = "core.fs.engine.regular_file_reader"
 
 -- Resolved once: package.path is fixed before the codec loads.
 local has_native_reader = (package.loaded["infra.literal_module_loader"] or package).searchpath(NATIVE_READER, package.path) ~= nil

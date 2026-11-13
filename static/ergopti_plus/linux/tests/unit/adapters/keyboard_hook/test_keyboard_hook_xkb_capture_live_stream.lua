@@ -811,7 +811,7 @@ helpers.describe("Original Hook physical editor position observation", function(
 	helpers.it("joins the original Reader occurrence to the actual host and shared editor without writes", function()
 		with_position_capture(nil, function(s)
 			local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "modules.gestures.manager",
-				"infra.paths", "infra.i18n", "core.logger.engine.shim" }
+				"core.fs.engine.paths", "infra.i18n", "core.logger.engine.shim" }
 			local previous = {}; for _, name in ipairs(names) do previous[name] = { package.loaded[name] } end
 			local host, receipt, epoch, sends, writes, paused = nil, {}, 0, {}, 0, false
 			local called, detail = pcall(function()
@@ -824,7 +824,7 @@ helpers.describe("Original Hook physical editor position observation", function(
 				package.loaded["modules.gestures.manager"] = { is_assignable = function(action) return action == "none" end,
 					get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
 					split_action_parameter_key = function() end, get_action_label = function(action) return action end }
-				package.loaded["infra.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
+				package.loaded["core.fs.engine.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
 				package.loaded["infra.i18n"] = { get = function(key) return key end }
 				package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 				host = helpers.load_module("ui.physical_shortcuts.bridge")

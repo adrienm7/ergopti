@@ -18,7 +18,7 @@ end
 
 helpers.describe("FileSystem publication stays in-process and nonblocking", function()
 	helpers.it("contains no synchronous task/helper publication path", function()
-		-- This declaration is unique to adapters/file_system.lua. Reading by symbol
+		-- This declaration is unique to core/fs/adapters/file_system.lua. Reading by symbol
 		-- keeps the invariant valid if the adapter is moved or renamed.
 		local source, detail = helpers.read_driver_unit("local function write_atomic(")
 		helpers.assert_type(source, "string", "the FileSystem implementation must be uniquely locatable: " .. tostring(detail))

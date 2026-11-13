@@ -46,7 +46,7 @@ local function with_personal_frame(body, options)
 		assert(native.scope_apply(owner, receipt, options.locale or PersonalTranslator.get_locale()) == true)
 		local renderer = require("infra.manifest_menu")
 
-		local corpus_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/hotstring_personal_frames.json"), "rb"))
+		local corpus_file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/hotstring_personal_frames.json"), "rb"))
 		local corpus = assert(require("core.text.engine.json").decode(assert(corpus_file:read("*a")))); assert(corpus_file:close())
 		local calls = { saves = 0, updates = 0, defaults = 0, closes = 0 }
 		local sections = options.empty and {} or {

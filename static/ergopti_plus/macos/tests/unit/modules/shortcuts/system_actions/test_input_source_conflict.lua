@@ -25,7 +25,7 @@ local SUBJECT = "modules.shortcuts.input_source_conflict"
 local function fresh(reply, path_status)
 	local spawned = {}
 	local saved = package.loaded["adapters.shell_runner"]
-	local saved_fs = package.loaded["adapters.file_system"]
+	local saved_fs = package.loaded["core.fs.adapters.file_system"]
 	local saved_logger = package.loaded["infra.logger"]
 	local logger = helpers.make_logger_stub()
 	local errors = {}
@@ -33,7 +33,7 @@ local function fresh(reply, path_status)
 		errors[#errors + 1] = string.format(template, ...)
 	end
 	package.loaded["infra.logger"] = logger
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		path_status = function() return path_status or "present", "injected inspection failure" end,
 	}
 	package.loaded["adapters.shell_runner"] = {
@@ -50,7 +50,7 @@ local function fresh(reply, path_status)
 	package.loaded[SUBJECT] = nil
 	local ok, conflict = pcall(helpers.load_with_stubs, SUBJECT)
 	package.loaded["adapters.shell_runner"] = saved
-	package.loaded["adapters.file_system"] = saved_fs
+	package.loaded["core.fs.adapters.file_system"] = saved_fs
 	package.loaded["infra.logger"] = saved_logger
 	if not ok then error(conflict, 0) end
 	-- This is a macOS account even when the Lua harness runs on Windows.

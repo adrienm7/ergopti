@@ -71,7 +71,7 @@ local DEFAULT_EFFECTS = {
 		if not Shell.run("mkdir -p " .. Shell.quote(dir)) then return nil, "cannot create " .. dir end
 		local stem, extension = name:match("^(.*)(%.[^.]+)$")
 		stem, extension = stem or name, extension or ""
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		for index = 0, 999 do
 			local path = dir .. "/" .. stem .. (index == 0 and "" or "-" .. index) .. extension
 			local written, errno = files.write_new(path, text)
@@ -81,7 +81,7 @@ local DEFAULT_EFFECTS = {
 		return nil, "no unused diagnostic report name"
 	end,
 	exists = function(path)
-		local called, kind = pcall(require("infra.native_directory").target_kind, path)
+		local called, kind = pcall(require("core.fs.engine.native_directory").target_kind, path)
 		return called and kind ~= nil
 	end,
 	-- No portable "select this file" exists across file managers; the folder

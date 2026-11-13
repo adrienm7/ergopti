@@ -395,7 +395,7 @@ test("default process limit still refuses the measured archive names output", fu
 end)
 
 test("captured updater limit admits both measured listing outputs", function(owner, _, state)
- local path = assert(require("infra.paths").shared("updater/data/defaults.json"))
+ local path = assert(require("core.fs.engine.paths").shared("updater/data/defaults.json"))
  local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
  local defaults = assert(require("core.text.engine.json").decode(raw))
  local cap = assert(require("updater.engine.install_budget").capture_listing(defaults))
@@ -410,7 +410,7 @@ test("captured updater limit admits both measured listing outputs", function(own
 end)
 
 test("explicit updater listing ceiling still rejects one byte beyond its cap", function(owner, _, state)
- local path = assert(require("infra.paths").shared("updater/data/defaults.json"))
+ local path = assert(require("core.fs.engine.paths").shared("updater/data/defaults.json"))
  local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
  local defaults = assert(require("core.text.engine.json").decode(raw))
  local cap = assert(require("updater.engine.install_budget").capture_listing(defaults))

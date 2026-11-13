@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local M = {}
-local Files = require("adapters.file_system")
-local Storage = require("adapters.storage")
+local Files = require("core.fs.adapters.file_system")
+local Storage = require("core.fs.adapters.storage")
 local Shell = require("adapters.shell_runner")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Native = require("luv")

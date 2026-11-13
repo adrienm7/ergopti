@@ -90,8 +90,8 @@ constructs from `tests/helpers`.
 | Directory        | Purpose                                                                                                                            |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `meta/`          | Invariants no runtime call can check: boot order, teardown paths, ports, Lua and Hammerspoon foot-guns, the test harness itself.   |
-| `unit/adapters/` | The OS-isolation layer, one folder per port family, plus the cross-driver contract vectors.                                        |
-| `unit/infra/`    | Infrastructure: configuration, preferences, logger, TOML, file watchers, i18n, lifecycle.                                          |
+| `unit/`          | The OS-isolation layer, one folder per port family, plus the cross-driver contract vectors.                                        |
+| `unit/`          | Infrastructure: configuration, preferences, logger, TOML, file watchers, i18n, lifecycle.                                          |
 | `unit/modules/`  | Domain modules: keymap, keystats, llm, gestures, shortcuts, dynamic_hotstrings, hotstrings, updater, diagnostics.                  |
 | `unit/platform/` | The Karabiner remap bridge.                                                                                                        |
 | `unit/ui/`       | Windows, dialogs, tooltips and the tray menu.                                                                                      |

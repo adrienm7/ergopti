@@ -403,7 +403,7 @@ helpers.describe("Adapter contract vectors: Storage", function()
 	-- Back the adapter with an isolated in-memory hs.settings so the round-trip
 	-- touches no real persisted settings and keys()/getKeys is fully supported.
 	local store = {}
-	local adapter = helpers.load_with_stubs("adapters.storage", {
+	local adapter = helpers.load_with_stubs("core.fs.adapters.storage", {
 		settings = {
 			set = function(k, v) store[k] = v end,
 			get = function(k) return store[k] end,

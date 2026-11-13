@@ -16,7 +16,7 @@ local function with_scope(body)
 		for name, value in pairs(package.loaded) do loaded_before[name] = value end
 		local names = { "infra.config_paths", "infra.llm_preferences", "infra.llm_scope",
 			"adapters.http_client", "adapters.secure_field_detector", "ui.tooltip.llm",
-			"adapters.storage", "modules.hotstrings.magic_key" }
+			"core.fs.adapters.storage", "modules.hotstrings.magic_key" }
 		for _, name in ipairs({ "settings", "trigger_settings", "display_settings", "navigation_settings",
 			"profile_settings", "profiles", "prediction_engine", "api_ollama", "api_remote" }) do
 			names[#names + 1] = "modules.llm." .. name

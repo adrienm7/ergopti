@@ -20,10 +20,10 @@ local RuntimeChoice = require("core.lifecycle.engine.core.ollama_runtime_choice"
 local EnableAdmission = require("ai.engine.settings.enable_admission_core")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local Logger    = require("infra.logger")
-local Paths     = require("infra.paths")
+local Paths     = require("core.fs.engine.paths")
 local TimerScheduler = require("core.events.timer_scheduler")
-local Storage = require("adapters.storage")
-local JsonCodec = require("adapters.json_codec")
+local Storage = require("core.fs.adapters.storage")
+local JsonCodec = require("core.fs.adapters.json_codec")
 local TableUtil = require("core.text.engine.table_util")
 local ConfigKeys = require("settings.engine.keys")
 
@@ -2029,7 +2029,7 @@ local _model_index = nil
 --- @return table The index keyed by model label.
 local function get_model_index()
 	if _model_index then return _model_index end
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local path = Paths.shared_llm_path("models.json")
 	local presets = {}
 	if path then

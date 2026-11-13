@@ -57,7 +57,7 @@ hs = { processInfo = { arch = "arm64" }, fs = { attributes = function(path)
 		return { mode = "file", permissions = "rwxr-xr-x" }
 	end
 end } }
-package.loaded["adapters.file_system"] = {
+package.loaded["core.fs.adapters.file_system"] = {
 	exists = function(path) return files[path] ~= nil end,
 	classify_no_follow = function(path)
 		local raw = files[path]; return raw and { mode = "file", size = #raw } or nil, raw and "ok" or "absent"
@@ -73,7 +73,7 @@ package.loaded["adapters.python_interpreter"] = { resolve = function() return py
 -- The real app_dirs names the daily log. The real timing registry reads the
 -- production _shared/ tree, which the hs.fs double cannot walk to, and logs its
 -- own load: bind it under a silent logger before the command module needs it.
-package.loaded["infra.paths"] = { shared = function(relative)
+package.loaded["core.fs.engine.paths"] = { shared = function(relative)
 	return production .. "/static/ergopti_plus/_shared/" .. relative
 end }
 package.loaded["infra.logger"] = setmetatable({}, { __index = function() return function() end end })

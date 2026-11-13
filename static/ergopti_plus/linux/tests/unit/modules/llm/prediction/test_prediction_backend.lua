@@ -22,7 +22,7 @@ local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", to
 local function load(backend, entry, stored_settings, without_local_model, asynchronous, privacy)
 	local names = {
 		"adapters.secure_field_detector", "modules.llm.api_ollama", "modules.llm.api_remote",
-		"modules.llm.api_entries", "modules.llm.profiles", "modules.llm.profile_settings", "adapters.storage",
+		"modules.llm.api_entries", "modules.llm.profiles", "modules.llm.profile_settings", "core.fs.adapters.storage",
 		"infra.llm_preferences", "modules.llm.trigger_settings", "modules.llm.display_settings",
 	}
 	local previous = {}
@@ -82,7 +82,7 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	package.loaded["modules.llm.settings"] = nil
 	package.loaded["modules.llm.trigger_settings"] = nil
 	package.loaded["modules.llm.display_settings"] = nil
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key, default) if stored[key] ~= nil then return stored[key] end return default end,
 		set = function(key, value) stored[key] = value; return true end,
 	}

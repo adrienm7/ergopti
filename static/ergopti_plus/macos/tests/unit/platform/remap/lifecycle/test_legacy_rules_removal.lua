@@ -107,8 +107,8 @@ end
 --- @param run function Receives { Generator, Removal, fs, build }.
 local function with_remap(files, run)
 	helpers.with_fresh_modules({
-		"adapters.file_system",
-		"adapters.json_codec",
+		"core.fs.adapters.file_system",
+		"core.fs.adapters.json_codec",
 		"infra.config_paths",
 		"infra.keycodes",
 		"infra.logger",
@@ -135,7 +135,7 @@ local function with_remap(files, run)
 		package.loaded["core.text.engine.toml_codec"] = toml_stub
 		package.loaded["infra.toml.codec"] = toml_stub
 		local fs = memory_file_system(files)
-		package.loaded["adapters.file_system"] = fs
+		package.loaded["core.fs.adapters.file_system"] = fs
 
 		package.loaded["modules.keymap.layout_registry"] = require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
 

@@ -41,7 +41,7 @@ helpers.describe("updater restart: starting the installed version", function()
 		local ran = {}
 		local run = function(cmd) ran[#ran + 1] = cmd; return true end
 		local path = Restarter.cancel_path(4242, "1337", BOOT_ID)
-		helpers.assert_eq(path, require("adapters.storage").path() .. ".relay-cancel-4242-1337-" .. BOOT_ID)
+		helpers.assert_eq(path, require("core.fs.adapters.storage").path() .. ".relay-cancel-4242-1337-" .. BOOT_ID)
 		helpers.assert_eq(Restarter.cancel("relay", { run = run, pid = 4242, start_tick = "1337", boot_id = BOOT_ID }), true)
 		helpers.assert_eq(ran, { "touch '" .. path .. "'" })
 		local refused, detail = Restarter.cancel("relay", { run = function() return false end, pid = 4242, start_tick = "1337", boot_id = BOOT_ID })
@@ -63,7 +63,7 @@ helpers.describe("updater restart: starting the installed version", function()
 
 	helpers.it("(relay-cancel-identity) a stale cancellation does not suppress the new launcher", function()
 		if ON_WINDOWS then return end
-		local Shell, Storage = require("adapters.shell_runner"), require("adapters.storage")
+		local Shell, Storage = require("adapters.shell_runner"), require("core.fs.adapters.storage")
 		local directory = os.tmpname(); os.remove(directory); assert(Shell.run("mkdir " .. Shell.quote(directory)))
 		local original = Storage.path
 		local ok, detail = xpcall(function()
@@ -126,7 +126,7 @@ helpers.describe("updater restart: starting the installed version", function()
 
 	helpers.it("(relay-cancel-identity) quits the actual relay without rereading unavailable proc identity", function()
 		if ON_WINDOWS then return end
-		local Shell, Storage = require("adapters.shell_runner"), require("adapters.storage")
+		local Shell, Storage = require("adapters.shell_runner"), require("core.fs.adapters.storage")
 		local directory = os.tmpname(); os.remove(directory); assert(Shell.run("mkdir " .. Shell.quote(directory)))
 		local old_path, old_open = Storage.path, io.open
 		local child

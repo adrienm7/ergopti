@@ -492,8 +492,8 @@ helpers.describe("Adapter contract vectors: FileSystem", function()
 	local host_fs = hs.fs
 	-- Reuse the faithful host-stub primitives so the private staging directory
 	-- exists on disk and cleanup exercises the same return contracts as production
-	package.loaded["infra.fs_dir"] = nil
-	local adapter = helpers.load_with_stubs("adapters.file_system", {
+	package.loaded["core.fs.engine.dir"] = nil
+	local adapter = helpers.load_with_stubs("core.fs.adapters.file_system", {
 		fs = {
 			dir = host_fs.dir,
 			attributes = host_fs.attributes,

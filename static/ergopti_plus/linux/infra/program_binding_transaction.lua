@@ -60,7 +60,7 @@ function M.new(options)
 		"parameterized binding update is invalid")
 	parameter = { section = parameter.section, key = parameter.key, value = parameter.value }
 	local owner, held, retiring, busy = {}, {}, false, false
-	local files = options.files or require("adapters.file_system")
+	local files = options.files or require("core.fs.adapters.file_system")
 	local checkpoint, reconcile_pending, inverse_source = nil, false, nil
 	local ports = { { acquire = parameters.acquire_parameter_configuration, release = parameters.release_parameter_configuration,
 		snapshot = function()

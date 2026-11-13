@@ -360,7 +360,7 @@ helpers.describe("linux actions: modifier chords", function()
 	--- Every chord the shared catalogue declares for Linux, read from the
 	--- catalogue itself: { id, mods = {combo names}, key = key id }.
 	local function declared_chords()
-		local path = require("infra.paths").shared("shortcuts/data/actions/modifier_chords.json")
+		local path = require("core.fs.engine.paths").shared("shortcuts/data/actions/modifier_chords.json")
 		local fh = assert(io.open(path, "r"), "the shared modifier chords must be readable")
 		local catalogue = require("core.text.engine.json").decode(fh:read("*a"))
 		fh:close()

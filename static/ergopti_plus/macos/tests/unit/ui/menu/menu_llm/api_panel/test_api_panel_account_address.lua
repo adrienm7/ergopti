@@ -102,7 +102,7 @@ local function run_add_fixture(provider, prompt_result)
 		local command_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
 			manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
-			json_decode = require("adapters.json_codec").decode,
+			json_decode = require("core.fs.adapters.json_codec").decode,
 			i18n = {
 			get = package.loaded["infra.i18n"].get,
 			-- These command rows never request a translated section.

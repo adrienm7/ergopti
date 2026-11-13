@@ -133,8 +133,8 @@ function M.new(options)
 	end
 	local function context_matches()
 		if not rawequal(package.loaded["infra.manifest_reader"], manifest) then return false end
-		if not rawequal(package.loaded["adapters.storage"], Storage)
-			or not rawequal(package.loaded["adapters.file_system"], options.files) then return false end
+		if not rawequal(package.loaded["core.fs.adapters.storage"], Storage)
+			or not rawequal(package.loaded["core.fs.adapters.file_system"], options.files) then return false end
 		for _, method in ipairs(file_names) do if options.files[method] ~= file_methods[method] then return false end end
 		for method, callback in pairs(manifest_methods) do if manifest[method] ~= callback then return false end end
 		for method, callback in pairs(storage_methods) do if Storage[method] ~= callback then return false end end

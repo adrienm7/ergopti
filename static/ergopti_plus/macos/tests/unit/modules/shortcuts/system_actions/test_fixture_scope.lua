@@ -12,10 +12,10 @@ local OWNERS = {
 	"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
 	"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
 	"modules.gestures", "infra.keycodes", "infra.logger", "infra.notifications",
-	"adapters.event_provenance", "adapters.file_system", "adapters.key_state",
+	"adapters.event_provenance", "core.fs.adapters.file_system", "adapters.key_state",
 	"adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
-	"adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
-	"infra.deferred_work", "infra.fs_dir", "modules.keymap.utils",
+	"core.fs.adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
+	"infra.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
 	"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",
 }
 
@@ -101,11 +101,11 @@ helpers.describe("System action fixture isolation", function()
 					configure(second.hs, 22)
 					calls[11], calls[22] = 0, 0
 					if consumer == "storage" then
-						helpers.assert_eq(require("adapters.storage").get("fixture_probe"), 22)
+						helpers.assert_eq(require("core.fs.adapters.storage").get("fixture_probe"), 22)
 					elseif consumer == "mouse" then
 						helpers.assert_eq(require("adapters.mouse_control").getPos().x, 22)
 					elseif consumer == "directory" then
-						local entries, listed = require("infra.fs_dir").try_entries("system-fixture-directory")
+						local entries, listed = require("core.fs.engine.dir").try_entries("system-fixture-directory")
 						helpers.assert_eq(listed, true)
 						helpers.assert_eq(#entries, 1)
 						helpers.assert_eq(entries[1], "22")

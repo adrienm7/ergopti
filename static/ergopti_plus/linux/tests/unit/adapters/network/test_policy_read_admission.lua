@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local native = require("luv")
 local Shell = require("adapters.shell_runner")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 local policies = {
 	{ module = "infra.proxy_policy", path = "core/network/data/proxy_policy.json", call = ".load()" },
@@ -36,7 +36,7 @@ helpers.describe("network-policy-source", function()
 			helpers.it("(network-policy-source) " .. policy.module .. " admits " .. kind .. " explicitly", function()
 				local base = os.tmpname(); os.remove(base)
 				local driver = base .. "/driver"
-				copy(assert(package.searchpath("infra.paths", package.path)), driver .. "/infra/paths.lua")
+				copy(assert(package.searchpath("core.fs.engine.paths", package.path)), driver .. "/core/fs/engine/paths.lua")
 				copy(Paths.shared("core/i18n/data/locales/en.json"), driver .. "/_shared/core/i18n/data/locales/en.json")
 				for _, declaration in ipairs(policies) do
 					copy(Paths.shared(declaration.path), driver .. "/_shared/" .. declaration.path)
@@ -48,8 +48,8 @@ helpers.describe("network-policy-source", function()
 					assert(os.rename(target, target .. ".regular")); assert(native.fs_symlink(target .. ".regular", target))
 				elseif kind == "unreadable" then assert(native.fs_chmod(target, 0)) end
 				local code = string.format([[package.path = %q
-package.loaded["infra.paths"] = dofile(%q)
-assert(require("infra.paths").shared_root(), "the installed locale sentinel must be admitted")
+package.loaded["core.fs.engine.paths"] = dofile(%q)
+assert(require("core.fs.engine.paths").shared_root(), "the installed locale sentinel must be admitted")
 if %q == "close-failure" then
     local original = io.open
     io.open = function(path, ...)
@@ -65,7 +65,7 @@ if %q == "symlink" then
 else
     assert(value == nil and type(refusal) == "string", "unadmitted policy must refuse explicitly")
 end
-]], package.path, driver .. "/infra/paths.lua", kind, policy.module, policy.call, kind)
+]], package.path, driver .. "/core/fs/engine/paths.lua", kind, policy.module, policy.call, kind)
 				local expired, exited, exit_code, exit_signal = false, false, nil, nil
 				local timer_closed, child_closed = false, false
 				local timer = assert(native.new_timer())

@@ -131,7 +131,7 @@ end
 
 local function non_negative(value) return value >= 0 end
 
-require("tests.lua.timer_delay_ceiling_contract").register(helpers, require("infra.paths").shared, {
+require("tests.lua.timer_delay_ceiling_contract").register(helpers, require("core.fs.engine.paths").shared, {
 	{ name = "linux scheduler after", unit = "seconds", replay = scheduler_replay("after") },
 	{ name = "linux scheduler every", unit = "seconds", replay = scheduler_replay("every") },
 	{ name = "linux native timer start", unit = "milliseconds", replay = native_timer_replay },

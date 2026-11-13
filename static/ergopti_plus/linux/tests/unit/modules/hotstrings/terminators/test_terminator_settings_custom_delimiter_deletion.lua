@@ -101,7 +101,7 @@ helpers.describe("custom delimiter Delete translations use the shared declaratio
 		local observed = {}
 		local passed, failure = pcall(function()
 			for _, locale in ipairs(locales) do
-				local path = require("infra.paths").shared("core/i18n/data/locales/" .. locale .. ".json")
+				local path = require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. locale .. ".json")
 				local file = assert(io.open(path, "rb"))
 				local raw = file:read("*a")
 				file:close()

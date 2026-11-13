@@ -20,7 +20,7 @@
 
 local helpers = require("tests.helpers")
 
-local SCHEMA = require("diagnostics.engine.healthcheck.snapshot").load_config(require("infra.paths").shared).schema
+local SCHEMA = require("diagnostics.engine.healthcheck.snapshot").load_config(require("core.fs.engine.paths").shared).schema
 
 --- The real core over a counted network adapter.
 --- @param body function(Core, world)

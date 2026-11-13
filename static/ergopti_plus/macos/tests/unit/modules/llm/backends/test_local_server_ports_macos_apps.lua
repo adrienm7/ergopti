@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Ports = require("ai.engine.local_servers.ports_core")
 
 --- Reads the shipped local server catalogue.

@@ -6,7 +6,7 @@ local helpers = require("tests.helpers")
 local Native = require("luv")
 
 local function run_fixture(fixture, expected)
-	local path = require("infra.paths").driver_root() .. "/tests/hardware/" .. fixture
+	local path = require("core.fs.engine.paths").driver_root() .. "/tests/hardware/" .. fixture
 	local code = "package.path = " .. string.format("%q", package.path)
 		.. "; require('core.lifecycle.engine.compat.utf8').install(); dofile(" .. string.format("%q", path) .. ")"
 	local stdout, stderr = assert(Native.new_pipe(false)), assert(Native.new_pipe(false))

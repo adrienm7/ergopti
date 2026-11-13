@@ -402,7 +402,7 @@ helpers.describe("diagnostics bridge stable-metadata report", function()
 		with_bridge({ logs_dir = HOME .. "/.local/state/" .. FOLDER }, function(bridge, context)
 			local ready = bridge.on_message("ready", {}, page(context))
 			local exported = bridge.on_message({ action = "export_snapshot", export_sequence = 77 }, {}, page(context))
-			local fs = require("adapters.file_system")
+			local fs = require("core.fs.adapters.file_system")
 			local old_write, old_shell = fs.write_new, package.loaded["adapters.shell_runner"]
 			local old_desktop = package.loaded["adapters.desktop_opener"]
 			local calls, written = {}, {}
@@ -446,7 +446,7 @@ end)
 --- delivered explicitly by the subject, outside the producer's protected call.
 local function with_deferred_opener(body)
 	with_bridge({ logs_dir = HOME .. "/.local/state/" .. FOLDER }, function(bridge, context)
-		local shell, fs = package.loaded["adapters.shell_runner"], require("adapters.file_system")
+		local shell, fs = package.loaded["adapters.shell_runner"], require("core.fs.adapters.file_system")
 		local held_write, desktop = fs.write_new, package.loaded["adapters.desktop_opener"]
 		context.openers, context.writes = {}, 0
 		fs.write_new = function()

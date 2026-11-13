@@ -12,7 +12,7 @@ local ENOENT, EACCES = 2, 13 -- Canonical Linux missing-source and permission re
 -- Real file output is independently exercised by the native causal receipt.
 local function with_fixture(body, cold)
 	local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim", "infra.diagnostic_snapshot",
-		"infra.version", "infra.paths", "adapters.file_system", "infra.regular_file_reader", "infra.regular_file_writer" }
+		"infra.version", "core.fs.engine.paths", "core.fs.adapters.file_system", "core.fs.engine.regular_file_reader", "core.fs.engine.regular_file_writer" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local open, popen, execute, remove, stderr = io.open, io.popen, os.execute, os.remove, io.stderr
 	local state = { files = {}, notices = {}, stderr = {}, opened = 0, closed = 0, logger_opened = 0 }
@@ -58,7 +58,7 @@ local function with_fixture(body, cold)
 		end
 		-- Model the canonical logger acquisitions at their actual public ports.
 		-- Policy and other sources outside this owned root keep native read admission.
-		local Reader, Writer = require("infra.regular_file_reader"), require("infra.regular_file_writer")
+		local Reader, Writer = require("core.fs.engine.regular_file_reader"), require("core.fs.engine.regular_file_writer")
 		local reader_ports, writer_ports = {}, {}
 		for name, value in pairs(Reader) do reader_ports[name] = value end
 		for name, value in pairs(Writer) do writer_ports[name] = value end
@@ -90,7 +90,7 @@ local function with_fixture(body, cold)
 				return state.files[path] == expected
 			end
 		end
-		package.loaded["infra.regular_file_reader"], package.loaded["infra.regular_file_writer"] = reader_ports, writer_ports
+		package.loaded["core.fs.engine.regular_file_reader"], package.loaded["core.fs.engine.regular_file_writer"] = reader_ports, writer_ports
 		Sink = require("infra.logger_sink")
 		state.try_install = function(context)
 			return Sink.install(Logger, { log_dir = DIRECTORY, redaction_context = context or { home = HOME, user = USER } })
@@ -282,7 +282,7 @@ if package.config:sub(1, 1) == "/" then
 			local directory = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-crash-image-XXXXXX"))
 			local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-			local Writer = require("infra.regular_file_writer")
+			local Writer = require("core.fs.engine.regular_file_writer")
 			local native_write, Sink, Logger = Writer.open
 			local ok, err = xpcall(function()
 				Logger, Sink = require("core.logger.engine.shim"), require("infra.logger_sink")
@@ -392,7 +392,7 @@ if package.config:sub(1, 1) == "/" then
 			local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local date, Sink, Logger = os.date
-			local Writer = require("infra.regular_file_writer")
+			local Writer = require("core.fs.engine.regular_file_writer")
 			local native_write = Writer.open
 			local timestamp = "2026-10-25T12:00:00Z"
 			local ok, err = xpcall(function()

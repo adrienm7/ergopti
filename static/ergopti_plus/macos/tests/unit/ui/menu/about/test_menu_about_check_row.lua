@@ -162,8 +162,8 @@ end)
 --- Exercises the actual source-only provider through its native-bound renderer.
 --- @param alternative boolean True to independently replace the declared label and reason.
 local function with_source_row(alternative, callback)
-	helpers.with_stub_scope({ "ui.menu.menu_about", "infra.manifest_menu", "infra.paths", "infra.i18n",
-		"infra.logger", "adapters.json_codec", "modules.updater", "modules.updater.auto_check",
+	helpers.with_stub_scope({ "ui.menu.menu_about", "infra.manifest_menu", "core.fs.engine.paths", "infra.i18n",
+		"infra.logger", "core.fs.adapters.json_codec", "modules.updater", "modules.updater.auto_check",
 		"ui.changelog", "adapters.update_launcher", "ui.menu.start_at_login", "hs", "tests.stubs.hs" }, function()
 		local native = require("tests.stubs.hs")
 		native.__reset()
@@ -177,7 +177,7 @@ local function with_source_row(alternative, callback)
 		package.loaded["infra.i18n"] = { get = function(key) return labels[key] or key end,
 			section = function(key) return labels[key] or key end }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.paths"] = { shared = helpers.shared }
+		package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 		package.loaded["modules.updater"] = {
 			is_local_source = function() return true end,
 			installed_channel = function() return "dev" end,
@@ -185,7 +185,7 @@ local function with_source_row(alternative, callback)
 			releases_page_url = function() return "https://example.invalid/releases" end,
 		}
 		local defaults_file = assert(io.open(helpers.shared("updater/data/defaults.json"), "rb"))
-		local defaults = assert(require("adapters.json_codec").decode(assert(defaults_file:read("*a"))))
+		local defaults = assert(require("core.fs.adapters.json_codec").decode(assert(defaults_file:read("*a"))))
 		assert(defaults_file:close())
 		package.loaded["modules.updater.auto_check"] = { stored_interval = function()
 			return defaults.timing.default_check_interval_sec
@@ -436,11 +436,11 @@ helpers.describe("Packaged About check consumes the existing shared command", fu
 	end)
 	helpers.it("consumes the existing shared label through the actual renderer in all21 locales", function()
 		local handle = assert(io.open(helpers.shared("core/i18n/data/locale_order.json"), "rb"))
-		local locales = assert(require("adapters.json_codec").decode(handle:read("*a"))).order; assert(handle:close())
+		local locales = assert(require("core.fs.adapters.json_codec").decode(handle:read("*a"))).order; assert(handle:close())
 		helpers.assert_eq(#locales, 21)
 		for _, locale in ipairs(locales) do
 			local file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
-			local labels = assert(require("adapters.json_codec").decode(file:read("*a"))); assert(file:close())
+			local labels = assert(require("core.fs.adapters.json_codec").decode(file:read("*a"))); assert(file:close())
 			-- The native binding captures its catalogue object at construction.
 			-- Bind each real catalogue before the existing build helper resets stubs.
 			helpers.with_stub_scope({"infra.manifest_menu", "infra.i18n", "ui.menu.menu_about"}, function()
