@@ -111,6 +111,21 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "\t\tfs.mkdirSync(path.join(driver, 'core/fs/engine'), { recursive: true });"
 	},
 	{
+		// The opaque admission fixture stages the macOS receiver in a bootstrap
+		// tree and names it by a concatenated owner path; S08 moves it to
+		// core/network/adapters, emptying platform/network.
+		file: 'tools/test/test-macos-opaque-network-admission.cjs',
+		moves: 'macos/platform/network/native_http.py',
+		from: "\tfs.mkdirSync(path.join(bootstrapRoot, 'platform/network'), { recursive: true });",
+		to: "\tfs.mkdirSync(path.join(bootstrapRoot, 'core/network/adapters'), { recursive: true });"
+	},
+	{
+		file: 'tools/test/test-macos-opaque-network-admission.cjs',
+		moves: 'macos/platform/network/native_http.py',
+		from: "[owner + '/platform/network/native_http.py']",
+		to: "[owner + '/core/network/adapters/native_http.py']"
+	},
+	{
 		// The i18n boot check reads the folder that holds i18n.ahk; S05 moves it
 		// out of infra/ into core/i18n/engine, while infra/ keeps other files.
 		file: 'static/ergopti_plus/windows/tests/meta/infra/i18n/test_i18n_fallback_deferred.ahk',
