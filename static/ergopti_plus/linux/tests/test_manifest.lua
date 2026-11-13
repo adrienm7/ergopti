@@ -941,6 +941,7 @@ return {
 	"tests.meta.harness.test_logger_fixture_identity",
 	"tests.meta.harness.test_notify_send_guard",
 	"tests.meta.harness.test_module_groups",
+	"tests.meta.harness.test_driver_module_predicate",
 	"tests.meta.harness.test_native_child_cpath",
 	"tests.meta.harness.test_os_execute_status",
 	"tests.unit.infra.control.test_field_todo_coverage",
