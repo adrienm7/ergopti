@@ -1414,6 +1414,7 @@ function referenceContext(map) {
 	const byRepoDir = directoryMap(map);
 	const successors = splitSuccessors(map, byRepoDir);
 	const rootSwitch = switchesSharedRoot(map);
+	const treeGains = folderGains(map);
 	// Each token starts where its run of path characters starts: a match from
 	// a later position of the same run is the same match, and trying them all
 	// is quadratic on a long run (a generated 400 KB table took minutes).
@@ -1434,10 +1435,44 @@ function referenceContext(map) {
 		byRepoDir,
 		successors,
 		rootSwitch,
+		treeGains,
 		pathToken,
 		dirToken,
 		luaToken
 	};
+}
+
+/**
+ * The folders a step creates beside the ones its files leave: core beside
+ * adapters when windows/adapters/crypto.ahk moves to windows/core/crypto/.
+ * A list of sibling folders that names the one left (a scanner's trees, a test
+ * group's alternation) must name the new one too, or it stops covering the
+ * files it covered.
+ * @param {Map<string, string|null>} map Tree-relative old path to target.
+ * @returns {{parent: string, from: string, to: string, siblings: Set<string>}[]}
+ */
+function folderGains(map) {
+	const gains = new Map();
+	for (const [old, target] of map) {
+		if (!target || old === target) continue;
+		const a = old.split('/');
+		const b = target.split('/');
+		let i = 0;
+		while (i < a.length - 1 && i < b.length - 1 && a[i] === b[i]) i++;
+		if (i === 0 || i >= a.length - 1 || i >= b.length - 1 || a[i] === b[i]) continue;
+		const parent = a.slice(0, i).join('/');
+		const key = `${parent}|${a[i]}|${b[i]}`;
+		if (!gains.has(key)) gains.set(key, { parent, from: a[i], to: b[i], siblings: new Set() });
+	}
+	for (const gain of gains.values()) {
+		const depth = gain.parent.split('/').length;
+		for (const old of map.keys()) {
+			const parts = old.split('/');
+			if (parts.length > depth + 1 && parts.slice(0, depth).join('/') === gain.parent)
+				gain.siblings.add(parts[depth]);
+		}
+	}
+	return [...gains.values()];
 }
 
 /**
@@ -1458,6 +1493,7 @@ function scanFile(file, text, ctx) {
 		byRepoDir,
 		successors,
 		rootSwitch,
+		treeGains,
 		pathToken,
 		dirToken,
 		luaToken
@@ -1486,6 +1522,46 @@ function scanFile(file, text, ctx) {
 	};
 	if (rootSwitch && hasSharedRoot(text))
 		add('shared-root', '_shared/lua', '_shared', { oldRepo: `${PREFIX}_shared/lua` });
+	// { "adapters", "infra", "modules" } or (adapters|platform|infra): a list of
+	// sibling folders naming one a file of the step leaves names the folder
+	// it moves into too (folderGains).
+	// The plan's own vocabularies (a feature's roles, these patterns) are
+	// not scans of a driver.
+	if (
+		/\.(ahk|lua|c?js|mjs)$/.test(file) &&
+		!file.startsWith('tools/audit/structure/') &&
+		treeGains.length > 0
+	) {
+		const gainsFor = (names) =>
+			treeGains.filter(
+				(g) =>
+					names.includes(g.from) &&
+					!names.includes(g.to) &&
+					names.filter((n) => g.siblings.has(n)).length >= 2
+			);
+		for (const m of text.matchAll(
+			/[[{]\s*(?:(["'])[a-z_]+\/?\1\s*,\s*)+(["'])[a-z_]+\/?\2\s*[\]}]/g
+		)) {
+			const items = [...m[0].matchAll(/(["'])([a-z_]+)(\/?)\1/g)];
+			const names = items.map((x) => x[2]);
+			const to = [...new Set(gainsFor(names).map((g) => g.to))];
+			if (to.length === 0) continue;
+			const [, quote, , slash] = items[items.length - 1];
+			const close = m[0].match(/\s*[\]}]$/)[0];
+			const added = to.map((t) => `, ${quote}${t}${slash}${quote}`).join('');
+			add('tree-list', m[0], `${m[0].slice(0, -close.length)}${added}${close}`, {
+				oldRepo: `${PREFIX}${treeGains[0].parent}`
+			});
+		}
+		for (const m of text.matchAll(/\(((?:[a-z_]+\|)+[a-z_]+)\)/g)) {
+			const names = m[1].split('|');
+			const to = [...new Set(gainsFor(names).map((g) => g.to))];
+			if (to.length === 0) continue;
+			add('tree-list', m[0], `(${[...names, ...to].join('|')})`, {
+				oldRepo: `${PREFIX}${treeGains[0].parent}`
+			});
+		}
+	}
 	// The file itself moves: what it spells relative to its own place must
 	// follow it even when the target stays.
 	const selfOld = inTree ? file.slice(PREFIX.length) : null;
