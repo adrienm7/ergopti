@@ -24,7 +24,7 @@ local text_utils = require("core.text.engine.utils")
 local AppDirs    = require("core.fs.engine.app_dirs")
 local NetworkEnv = require("modules.llm.network_env")
 local NativePath = require("core.fs.engine.native_path")
-local Timings    = require("infra.timings")
+local Timings    = require("core.timing.engine.timings")
 
 -- The daemon appends to the same dated file the logger names, so the prefix
 -- and extension come from the one registry that names it.

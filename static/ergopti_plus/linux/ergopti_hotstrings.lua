@@ -278,7 +278,7 @@ local InputEvent        = require("infra.input_event")
 local Monotonic         = require("core.logger.engine.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
 local ScriptSettings    = require("infra.script_settings")
-local Timings           = require("infra.timings")
+local Timings           = require("core.timing.engine.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keystats.focus_guard")
@@ -3673,7 +3673,7 @@ local function main()
 	-- An update watcher that started this daemon keeps it only once it reports ready.
 	require("infra.updater_boot_ready").report("daemon ready")
 	-- The Reload this boot completes, if any, from its request in the previous daemon.
-	local reload_ms = require("infra.reload_timing").complete()
+	local reload_ms = require("core.timing.engine.reload_timing").complete()
 	if not privacy_owners.startup_checkpoint() then return end
 	emit_diagnostic_snapshot(boot_ms, opts, ok_i18n and i18n_mod or nil, privacy_owners.startup.snapshot)
 	privacy_owners.startup.snapshot = nil

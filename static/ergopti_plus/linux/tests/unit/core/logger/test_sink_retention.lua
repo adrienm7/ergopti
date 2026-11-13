@@ -144,7 +144,7 @@ helpers.describe("log retention purge deletes aged generated files", function()
 	end)
 	helpers.it("keeps the cutoff calendar day and rejects invalid dated names", function()
 		if ON_WINDOWS then return end
-		local days = require("infra.timings").count("logger", "retention_days")
+		local days = require("core.timing.engine.timings").count("logger", "retention_days")
 		local calendar = os.date("*t"); calendar.day = calendar.day - days
 		calendar.hour, calendar.min, calendar.sec, calendar.isdst = 12, 0, 0, nil
 		local cutoff = os.time(calendar)
@@ -185,7 +185,7 @@ helpers.describe("log retention purge deletes aged generated files", function()
 	end)
 	helpers.it("keeps foreign prefix-matching files during real installation", function()
 		if ON_WINDOWS then return end
-		local days = require("infra.timings").count("logger", "retention_days")
+		local days = require("core.timing.engine.timings").count("logger", "retention_days")
 		local dir = fixture(days)
 		local foreign = dir .. "/ErgoptiPlus_notes.log"
 		local file = assert(io.open(foreign, "wb")); assert(file:write("user notes")); assert(file:close())
@@ -204,7 +204,7 @@ helpers.describe("log retention purge deletes aged generated files", function()
 
 	helpers.it("removes only aged regular generated files at install without find", function()
 		if ON_WINDOWS then print("  SKIP native POSIX purge: Windows has no GNU find or symbolic links here"); return end
-		local days = require("infra.timings").count("logger", "retention_days")
+		local days = require("core.timing.engine.timings").count("logger", "retention_days")
 		local dir = fixture(days)
 		local Sink = helpers.load_module("core.logger.engine.sink")
 		local logger = fake_logger()
@@ -239,7 +239,7 @@ helpers.describe("log retention purge deletes aged generated files", function()
 
 	helpers.it("purges at a date rollover with zero io.popen or os.execute", function()
 		if ON_WINDOWS then print("  SKIP native POSIX purge: Windows has no GNU find or symbolic links here"); return end
-		local days = require("infra.timings").count("logger", "retention_days")
+		local days = require("core.timing.engine.timings").count("logger", "retention_days")
 		local dir = os.tmpname()
 		os.remove(dir)
 		assert(Shell.run("mkdir -p " .. Shell.quote(dir)))

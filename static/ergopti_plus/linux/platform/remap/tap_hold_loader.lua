@@ -60,8 +60,8 @@ local TIME_FIELD = require("settings.engine.keys").LEAF.TIME_ACTIVATION_SECONDS
 
 -- The bound of time_activation_seconds and the global default: the timing
 -- registry's, the one declaration every driver reads or is pinned to.
-local MAX_THRESHOLD_SECONDS = require("infra.timings").ms("tap_hold", "max_activation_ms") / 1000
-M.GLOBAL_DEFAULT_SECONDS = require("infra.timings").ms("tap_hold", "default_activation_ms") / 1000
+local MAX_THRESHOLD_SECONDS = require("core.timing.engine.timings").ms("tap_hold", "max_activation_ms") / 1000
+M.GLOBAL_DEFAULT_SECONDS = require("core.timing.engine.timings").ms("tap_hold", "default_activation_ms") / 1000
 
 -- How long a modifier key pressed alone still taps (config.toml [tap_holds]
 -- lone_modifier_tap_max_ms, the manifest's tap_holds.lone_modifier_tap_max_ms).
@@ -75,7 +75,7 @@ M.LONE_TAP_DEFAULT_MS = LoneTap.validate(Manifest.default_for(ConfigKeys.KEY.TAP
 -- value: macOS refuses them too.
 M.ONE_SHOT_TIMEOUT_FIELD = ConfigKeys.LEAF.STICKY_TIMEOUT_MS
 local ONE_SHOT_TIMEOUT_FIELD = M.ONE_SHOT_TIMEOUT_FIELD
-M.ONE_SHOT_TIMEOUT_DEFAULT_MS = require("infra.timings").ms("tap_hold", "one_shot_shift_timeout_ms")
+M.ONE_SHOT_TIMEOUT_DEFAULT_MS = require("core.timing.engine.timings").ms("tap_hold", "one_shot_shift_timeout_ms")
 
 --- Whether a value is an admitted one-shot timeout.
 --- @param ms any

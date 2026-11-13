@@ -26,7 +26,7 @@ local MODULES = {
 	"ui.download_window.javascript",
 	"ui.ui_builder",
 	"core.fs.engine.paths",
-	"infra.deferred_work",
+	"core.timing.engine.deferred_work",
 	"ui.menu.menu_llm.model_switcher",
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"ui.menu.menu_llm.models_manager_mlx_download",
@@ -518,7 +518,7 @@ local function with_fixture(plan, callback)
 				package.loaded["core.fs.engine.paths"] = { shared = function()
 					return helpers.driver_root() .. "../_shared"
 				end }
-				package.loaded["infra.deferred_work"] = { after = function() return true end }
+				package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 				package.loaded["ui.ui_builder"] = {
 					get_app_geometry = function() return { width = 460, height = 380 } end,
 					show_webview = function(options)

@@ -24,7 +24,7 @@ local function load_fixture()
 	for _, name in ipairs({
 		"modules.keymap.utils", "adapters.clipboard", "adapters.synthetic_input",
 		"adapters.event_provenance", "core.events.timer_scheduler",
-		"core.logger.engine.logger", "infra.timings",
+		"core.logger.engine.logger", "core.timing.engine.timings",
 	}) do
 		package.loaded[name] = nil
 	end
@@ -37,7 +37,7 @@ local function load_fixture()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_, key)
 			return key == "clipboard_restore_ms" and 0.15 or 0.08
 		end,
@@ -358,7 +358,7 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 			payload_before_host_grace = current
 			-- Exercise the independent fallback after the host has actually settled.
 			fixture.hs.timer.__elapsed = fixture.hs.timer.__elapsed
-				+ require("infra.timings").sec("debounce", "clipboard_restore_ms")
+				+ require("core.timing.engine.timings").sec("debounce", "clipboard_restore_ms")
 		end)
 		local ok = pcall(function()
 			fixture.synthetic.with_transaction(transaction, function()
@@ -427,7 +427,7 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		fixture.synthetic.on_complete(transaction, function()
 			payload_before_host_grace = current
 			fixture.hs.timer.__elapsed = fixture.hs.timer.__elapsed
-				+ require("infra.timings").sec("debounce", "clipboard_restore_ms")
+				+ require("core.timing.engine.timings").sec("debounce", "clipboard_restore_ms")
 		end)
 		local ok = pcall(function()
 			fixture.synthetic.with_transaction(transaction, function()

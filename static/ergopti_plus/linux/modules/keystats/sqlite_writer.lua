@@ -1992,7 +1992,7 @@ function M.start_flush(device_id, payload)
 	assert(type(payload) == "table" and type(payload.raw) == "table" and type(payload.upserts) == "table")
 	local Process = require("core.fs.engine.sqlite_batch_process")
 	if not Process.is_available() then return nil end
-	local timeout_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+	local timeout_ms = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 	local function array(values)
 		assert(type(values) == "table", "Invalid SQLite flush array")
 		local length, entries = #values, 0

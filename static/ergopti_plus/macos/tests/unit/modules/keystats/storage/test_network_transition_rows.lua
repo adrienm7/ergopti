@@ -18,7 +18,7 @@ require("tests.lua.core.network_transitions_contract").register(helpers)
 --- @return table watcher, table entries, table control
 local function scripted()
 	local Watcher = helpers.load_with_stubs("modules.keystats.network_watcher")
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	local entries, now, vpn_answers, control = {}, 0, {}, { watched = nil, stopped = false, private = false }
 	helpers.assert_true(Watcher.start({
 		append = function(entry) entries[#entries + 1] = entry end,

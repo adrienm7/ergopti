@@ -65,7 +65,7 @@ local OWNERS = {
 	"core.lifecycle.engine.startup_transaction",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"core.text.engine.utils",
-	"infra.timings",
+	"core.timing.engine.timings",
 	-- The driver bindings of the manifest reader and the timings registry build on these.
 	"menu.engine.manifest_reader_core",
 	"core.timing.engine.timings_core",
@@ -149,7 +149,7 @@ local function fresh_actions(options)
 		"core.logger.engine.logger",
 		"core.fs.engine.paths",
 		"infra.config_paths",
-		"infra.timings",
+		"core.timing.engine.timings",
 		"core.i18n.engine.i18n",
 	}) do package.loaded[name] = nil end
 
@@ -731,7 +731,7 @@ local function fresh_actions(options)
 	package.loaded["infra.config_paths"] = {
 		get = function(key) return config_files[key] and ("/fixture/config/" .. config_files[key]) or nil end,
 	}
-	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.2 end }
 	local logger = helpers.make_logger_stub()
 	logger.error = function(module_name, message, ...)
 		local ok, rendered = pcall(string.format, message, ...)

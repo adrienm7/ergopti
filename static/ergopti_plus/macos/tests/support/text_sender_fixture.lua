@@ -14,7 +14,7 @@ local function with_sender(callback)
 	helpers.with_stub_scope({
 		"adapters.text_sender", "adapters.clipboard", "adapters.synthetic_input",
 		"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
-		"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "infra.timings",
+		"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 		"core.text.engine.toml.reader", "core.text.engine.json", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom",
 		"core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 	}, function()
@@ -72,7 +72,7 @@ local function with_sender(callback)
 		f.sender = require("adapters.text_sender")
 		f.clipboard = function() return clipboard end
 		f.initial = initial
-		f.restore_delay = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+		f.restore_delay = require("core.timing.engine.timings").sec("debounce", "clipboard_restore_ms")
 		f.expire_restore = function()
 			local snapshot = {}
 			for _, timer in ipairs(f.timers) do snapshot[#snapshot + 1] = timer end

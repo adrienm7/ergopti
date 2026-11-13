@@ -1282,8 +1282,8 @@ do
 			schedule = function(delay, callback)
 				return hs.timer.doAfter(delay, callback)
 			end,
-			user_exit_deadline_seconds = require("infra.timings").sec("ui", "user_quit_deadline_ms"),
-			reload_deadline_seconds = require("infra.timings").sec("ui", "reload_deadline_ms"),
+			user_exit_deadline_seconds = require("core.timing.engine.timings").sec("ui", "user_quit_deadline_ms"),
+			reload_deadline_seconds = require("core.timing.engine.timings").sec("ui", "reload_deadline_ms"),
 			record_stage = ReloadBreadcrumb.record,
 			report_update_quit = function(reason)
 				return require("infra.updater_boot_ready").report_quit(reason)
@@ -2455,7 +2455,7 @@ Boot.stage("Boot complete (post-init deferrals scheduled)")
 -- Warm up macOS WebKit in the background so the first dashboard open is
 -- not penalised by the framework load (~1-2 s).  Deferred so it never
 -- blocks the boot critical path.
-hs.timer.doAfter(require("infra.timings").sec("ui", "webkit_warmup_delay_ms"), function()
+hs.timer.doAfter(require("core.timing.engine.timings").sec("ui", "webkit_warmup_delay_ms"), function()
 	pcall(function() require("ui.ui_builder").warmup_webkit() end)
 end)
 
@@ -2463,7 +2463,7 @@ end)
 -- Windows loader does at startup: the warning behind what « Nettoyer
 -- config.toml » offers. Off the boot critical path; a failure is logged with
 -- its traceback, never lost in the timer's dispatch.
-hs.timer.doAfter(require("infra.timings").sec("ui", "unused_keys_warning_delay_ms"), function()
+hs.timer.doAfter(require("core.timing.engine.timings").sec("ui", "unused_keys_warning_delay_ms"), function()
 	local listed, list_err = xpcall(function()
 		require("ui.menu.unused_keys_cleanup").warn_unused(config_paths.get("ConfigTomlPath"))
 	end, debug.traceback)
@@ -2478,7 +2478,7 @@ end)
 -- asked to use it) or logged as still off.
 local PendingLayoutActivation = require("modules.keymap.pending_layout_activation")
 PendingLayoutActivation.init(PendingLayoutActivation.production_deps())
-hs.timer.doAfter(require("infra.timings").sec("ui", "pending_layout_activation_delay_ms"), function()
+hs.timer.doAfter(require("core.timing.engine.timings").sec("ui", "pending_layout_activation_delay_ms"), function()
 	local reported, report_err = xpcall(require("modules.keymap.layout_install").report_duplicate_bundles, debug.traceback)
 	if not reported then
 		Logger.error(LOG, "The duplicate keyboard-layout bundles could not be listed: %s", tostring(report_err))
@@ -2498,7 +2498,7 @@ if _reload_started_epoch_ms then
 	local reload_ms = TimerScheduler.now() * 1000 - _reload_started_epoch_ms
 	Logger.info(LOG, "Reload completed in %.0f ms (reload call to boot complete).", reload_ms)
 	require("core.logger.engine.perf_budget").judge(Logger, LOG, "reload", math.max(0, reload_ms),
-		function() return require("infra.timings").ms("budgets", "driver_reload_ms") end)
+		function() return require("core.timing.engine.timings").ms("budgets", "driver_reload_ms") end)
 end
 -- Permanent phase counters (hot path, menu, boot sub-stages, config parses,
 -- child processes): one summary line per family every interval, never at boot.

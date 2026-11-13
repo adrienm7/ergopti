@@ -40,7 +40,7 @@ M.I18N_PLACEHOLDER_FORMATS = {
 
 --- The shared timing registry, built from the real file on first use. A fixture that virtualises
 --- the file system or the shared paths calls M.provide_timings() before it does, so a call-time
---- read of the registry (`require("infra.timings").sec(...)`) answers with the real values
+--- read of the registry (`require("core.timing.engine.timings").sec(...)`) answers with the real values
 --- instead of failing on a missing virtual constants.toml.
 local REAL_TIMINGS = nil
 
@@ -65,7 +65,7 @@ end
 
 --- Installs the real timing registry reader as the module the code under test requires.
 function M.provide_timings()
-	package.loaded["infra.timings"] = real_timings()
+	package.loaded["core.timing.engine.timings"] = real_timings()
 end
 local SourceFile = require("tests.support.source_file")
 local NativePath = require("core.fs.engine.native_path")
@@ -342,7 +342,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- Foreign ledger readers retain the native hash API across ingest turns.
 	loaded["adapters.foreign_ledger_snapshot"] = nil
 	if module_name == "modules.keystats.export" or module_name == "adapters.foreign_ledger_snapshot" then
-		loaded["infra.paced_job"] = nil
+		loaded["core.timing.engine.paced_job"] = nil
 		loaded["core.events.timer_scheduler"] = nil
 	end
 	-- The keystats and its process-lifetime physical-source settlement port
@@ -453,7 +453,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- The real registry itself is immutable and survives: a fixture that
 	-- virtualised the file system installed it through M.provide_timings(), and
 	-- re-parsing constants.toml here would fail under that virtual file system.
-	if loaded["infra.timings"] ~= REAL_TIMINGS then loaded["infra.timings"] = nil end
+	if loaded["core.timing.engine.timings"] ~= REAL_TIMINGS then loaded["core.timing.engine.timings"] = nil end
 
 	-- Clipboard borrowing admission is process-global: each test starts with no
 	-- borrower registered by a previous test's module instances.

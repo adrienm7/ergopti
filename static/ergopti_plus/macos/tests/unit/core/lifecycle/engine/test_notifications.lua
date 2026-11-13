@@ -99,7 +99,7 @@ helpers.describe("notifications.notify", function()
 			return native
 		end
 		helpers.assert_true(notifications.notify("hello"))
-		helpers.assert_eq(captured.withdrawAfter, require("infra.timings").sec("ui", "notification_ttl_ms"),
+		helpers.assert_eq(captured.withdrawAfter, require("core.timing.engine.timings").sec("ui", "notification_ttl_ms"),
 			"one declaration in _shared/core/timing/data/constants.toml, shared with Linux")
 		local source = assert(helpers.read_module_source("infra.notifications"))
 		helpers.assert_true(source:find("RETENTION_SEC = 5", 1, true) == nil and source:find("withdrawAfter   = 5", 1, true) == nil, "no typed copy of the duration")

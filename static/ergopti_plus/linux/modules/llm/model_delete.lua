@@ -24,7 +24,7 @@ local HttpBridge = require("infra.llm_bridge")
 local HttpClient = require("core.network.adapters.http_client")
 local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.shim")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 local LOG = "modules.llm.model_delete"
 local OWNER = "ollama_model_delete"

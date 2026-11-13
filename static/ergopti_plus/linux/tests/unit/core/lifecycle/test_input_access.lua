@@ -347,7 +347,7 @@ helpers.describe("input-access-fifo-probe", function()
 				native.close(timer)
 				native.close(child)
 			end))
-			assert(require("infra.native_timer").start(native, timer, 2000, 0, function()
+			assert(require("core.timing.engine.native_timer").start(native, timer, 2000, 0, function()
 				expired = true
 				child:kill("sigkill")
 			end))

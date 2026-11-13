@@ -12,7 +12,7 @@ local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 
 local MODULE_KEYS = {
 	"core.fs.adapters.file_system",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"metrics.engine.metrics",
 	"modules.keystats.aggregator",
 	"modules.keystats.export",
@@ -69,7 +69,7 @@ local function run_refused_transaction(failure)
 			read = function() return nil end,
 			write = function() return true end,
 		}
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			ms = function() return 5000 end,
 			sec = function() return 1 end,
 		}

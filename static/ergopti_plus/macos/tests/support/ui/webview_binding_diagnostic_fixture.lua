@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 
-local OWNED = { "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.logger.engine.logger",
+local OWNED = { "ui.ui_builder", "ui.webview_close_owner", "core.timing.engine.deferred_work", "core.logger.engine.logger",
 	"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.i18n.engine.locale", "core.text.engine.json", "core.i18n.engine.core",
 	"core.ui.engine.webview.i18n_seed", "core.ui.engine.webview.presentation", "core.ui.engine.window_titles", "adapters.webview_result", "hs.json", "lfs" }
 

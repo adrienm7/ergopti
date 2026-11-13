@@ -15,7 +15,7 @@ package.loaded["tests.support.platform.remap.tap_hold.tap_hold_engine_fixture"] 
 local Fixture = require("tests.support.platform.remap.tap_hold.tap_hold_engine_fixture")
 local helpers, Engine = Fixture.helpers, Fixture.Engine
 local Loader = require("platform.remap.tap_hold_loader")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 local DEFAULTS_PATH = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 

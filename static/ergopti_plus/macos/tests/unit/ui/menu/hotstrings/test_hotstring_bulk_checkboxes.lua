@@ -269,7 +269,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 			helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
 			helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
 			helpers.assert_eq(file.menu[3].title, "menu.hotstrings.open_file")
-			local deferred = require("infra.deferred_work")
+			local deferred = require("core.timing.engine.deferred_work")
 			local shell = require("core.process.adapters.shell_runner")
 			local original = deferred.after
 			local original_open = shell.open
@@ -303,7 +303,7 @@ end)
 --- @param committed boolean Native scheduling acknowledgement.
 --- @param body function Real category callback observations.
 local function with_category_file(committed, body, change_label)
-	helpers.with_stub_scope({ "infra.manifest_menu", "infra.deferred_work",
+	helpers.with_stub_scope({ "infra.manifest_menu", "core.timing.engine.deferred_work",
 		"core.events.timer_scheduler", "core.process.adapters.shell_runner", "modules.keymap", "modules.dynamic_hotstrings",
 		"ui.menu.menu_hotstrings", "ui.menu.menu_hotstrings_custom" }, function()
 		-- Category file opening neither starts nor inspects these unrelated engines.
@@ -457,7 +457,7 @@ local function with_personal_info_leaf(body)
 			return native
 		end
 		package.loaded["core.events.timer_scheduler"] = nil
-		package.loaded["infra.deferred_work"] = nil
+		package.loaded["core.timing.engine.deferred_work"] = nil
 		package.loaded["infra.manifest_menu"] = nil
 		package.loaded["ui.menu.menu_hotstrings"] = nil
 		local timer

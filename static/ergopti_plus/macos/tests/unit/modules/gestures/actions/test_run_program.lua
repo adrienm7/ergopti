@@ -16,7 +16,7 @@ local function with_program(callback, program_admission)
 	local owned = { "modules.gestures.actions", "modules.gestures.actions_aux_owner", "core.process.adapters.shell_runner",
 		"core.process.adapters.owned_program_runner", "platform.remap.lease_helper", "core.crypto.crypto",
 		"core.process.adapters.task_environment", "core.fs.adapters.file_system", "core.events.timer_scheduler", "infra.preferences",
-		"infra.config_paths", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.timings",
+		"infra.config_paths", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.timing.engine.timings",
 		"modules.shortcuts.keyboard_shortcuts", "tests.stubs.hs", "hs" }
 	for _, name in ipairs(owned) do package.loaded[name] = nil end
 	local ok, failure = xpcall(function()

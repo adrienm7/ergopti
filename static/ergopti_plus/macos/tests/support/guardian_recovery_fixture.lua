@@ -25,7 +25,7 @@ local STUB_MODULES = {
 	"core.fs.engine.dir",
 	"core.logger.engine.logger",
 	"infra.config_paths",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"platform.remap.defaults",
 	"platform.remap.config",
 	"platform.remap.generator",
@@ -205,13 +205,13 @@ local function with_remap(options, body)
 		["debounce.layout_tis_settle_ms"] = 0.5,
 		["ui.onboarding_startup_delay_ms"] = 2,
 	}
-	package.loaded["infra.timings"] = nil
-	local RegistryTimings = require("infra.timings")
+	package.loaded["core.timing.engine.timings"] = nil
+	local RegistryTimings = require("core.timing.engine.timings")
 	timings_sec["ui.input_source_operation_timeout_ms"] = RegistryTimings.sec("ui", "input_source_operation_timeout_ms")
 	local timings_count = {
 		["limits.input_source_id_bytes"] = RegistryTimings.count("limits", "input_source_id_bytes"),
 	}
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(category, key)
 			local value = timings_sec[category .. "." .. key]
 			helpers.assert_true(value ~= nil, "unexpected timing read: " .. category .. "." .. key)

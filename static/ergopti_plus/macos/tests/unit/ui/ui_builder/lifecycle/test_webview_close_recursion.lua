@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 require("core.logger.engine")
 
 local function with_windows(scenario)
-	helpers.with_stub_scope({ "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.logger.engine.logger",
+	helpers.with_stub_scope({ "ui.ui_builder", "ui.webview_close_owner", "core.timing.engine.deferred_work", "core.logger.engine.logger",
 		"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.i18n.engine.locale", "core.text.engine.json", "core.i18n.engine.core",
 		"core.ui.engine.webview.i18n_seed", "core.ui.engine.webview.presentation", "core.ui.engine.window_titles",
 		"tests.support.webview_recursive_close_fixture" }, function()
@@ -20,7 +20,7 @@ local function with_windows(scenario)
 		local logger = helpers.make_logger_stub()
 		logger.error = function(...) if h.on_error then h.on_error(...) end end
 		package.loaded["core.logger.engine.logger"] = logger
-		package.loaded["infra.deferred_work"] = { after = function(_, callback)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 			if h.schedule_refuses == "throw" then error("deferred owner allocation raised") end
 			if h.schedule_refuses then return false end
 			if h.schedule_inline then callback(); return true end

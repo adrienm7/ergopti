@@ -24,7 +24,7 @@ local TableUtil = require("core.text.engine.table_util")
 
 local Logger    = require("core.logger.engine.shim")
 local Constants = require("infra.wpm_constants")
-local Timings   = require("infra.timings")
+local Timings   = require("core.timing.engine.timings")
 local Manifest  = require("infra.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
 local ConfigPaths = require("infra.config_paths")

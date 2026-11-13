@@ -41,7 +41,7 @@ helpers.describe("gestures: the HID kickstart is silent while paused", function(
 			"modules.gestures.init", "modules.gestures.engine",
 			"modules.gestures.actions", "modules.gestures.conflicts",
 			"infra.notifications", "core.logger.engine.logger", "infra.manifest_reader",
-			"infra.timings", "hs._asm.undocumented.touchdevice",
+			"core.timing.engine.timings", "hs._asm.undocumented.touchdevice",
 			"hs.caffeinate.watcher",
 		}
 		for _, name in ipairs(reset_modules) do
@@ -79,7 +79,7 @@ helpers.describe("gestures: the HID kickstart is silent while paused", function(
 			default_for = function() return false end,
 			recommended_for = function() return "none" end,
 		}
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			sec = function() return 1 end,
 		}
 		package.loaded["modules.gestures.engine"] = setmetatable({

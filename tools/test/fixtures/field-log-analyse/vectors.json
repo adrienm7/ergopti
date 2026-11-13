@@ -989,7 +989,7 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/linux/infra/reload_timing.lua",
+			"source": "static/ergopti_plus/linux/core/timing/engine/reload_timing.lua",
 			"template": "Reload completed in %.0f ms (reload request to boot complete).",
 			"line": "2026-10-30 10:00:00:123 [INFO] [infra.reload_timing] Reload completed in 2650 ms (reload request to boot complete).",
 			"expect": {

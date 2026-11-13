@@ -101,7 +101,7 @@ helpers.describe("warmup_controller — retry loop terminates after mark_load_fa
 	--- @return table The loaded warmup_controller module.
 	local function load_controller(timer_stub)
 		-- Stub lib.timings before requiring the module so the TOML is never read
-		package.loaded["infra.timings"] = TIMINGS_STUB
+		package.loaded["core.timing.engine.timings"] = TIMINGS_STUB
 		package.loaded["core.events.timer_scheduler"] = timer_stub
 		package.loaded["modules.llm.warmup_controller"] = nil
 		return require("modules.llm.warmup_controller")

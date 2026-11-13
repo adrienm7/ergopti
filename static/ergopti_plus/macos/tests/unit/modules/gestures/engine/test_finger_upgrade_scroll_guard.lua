@@ -110,12 +110,12 @@ helpers.describe("gestures.engine — 3-finger upgrade blocked on vertical scrol
 		-- We call M.process_frame() directly so no OS interaction is needed.
 		package.loaded["modules.gestures.engine"] = nil
 		package.loaded["core.logger.engine.logger"]  = nil
-		package.loaded["infra.timings"] = nil
+		package.loaded["core.timing.engine.timings"] = nil
 
 		local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 		-- Stub timings to return fixed values
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			count = require("tests.support.registry_count"),
 			sec = function(_, key)
 				if key == "tap_max_ms"              then return 0.5

@@ -649,7 +649,7 @@ it("an unreachable relay moves to the next relay, not straight to DIRECT", funct
 end)
 
 it("the shared probe deadline is the timings registry's one second", function()
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	eq(Timings.ms("llm", "managed_proxy_probe_timeout_ms"), 1000)
 end)
 

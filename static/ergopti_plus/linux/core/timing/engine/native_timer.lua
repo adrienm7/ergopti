@@ -1,4 +1,4 @@
---- infra/native_timer.lua
+--- core/timing/engine/native_timer.lua
 
 --- ==============================================================================
 --- MODULE: Native Relative Timer Arming

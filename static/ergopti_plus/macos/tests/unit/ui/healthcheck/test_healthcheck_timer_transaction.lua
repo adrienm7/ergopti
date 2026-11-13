@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local function load_healthcheck(scheduler, title_label)
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
-		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder", "ui.webview_close_owner", "core.timing.engine.deferred_work",
 	}) do package.loaded[name] = nil end
 
 	package.loaded["tests.stubs.hs"] = nil
@@ -64,7 +64,7 @@ local function load_healthcheck(scheduler, title_label)
 
 	-- Focus tests control only their presentation schedule; retain close cleanup
 	-- separately, without synchronously invoking a native close continuation.
-	package.loaded["infra.deferred_work"] = { after = function(_, receive)
+	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, receive)
 		context.close_cleanup = context.close_cleanup or {}
 		context.close_cleanup[#context.close_cleanup + 1] = receive
 		return true

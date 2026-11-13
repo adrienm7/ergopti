@@ -21,7 +21,7 @@ local Paths = require("core.fs.engine.paths")
 local NativePath = require("core.fs.engine.native_path")
 local TextUtils = require("core.text.engine.utils_core")
 local I18nSeed = require("core.ui.engine.webview.i18n_seed")
-local DeferredWork = require("infra.deferred_work")
+local DeferredWork = require("core.timing.engine.deferred_work")
 local TimerScheduler = require("core.events.timer_scheduler")
 local JsonCodec = require("core.fs.adapters.json_codec")
 local OwnWindow = require("adapters.own_window")
@@ -326,7 +326,7 @@ function M.warmup_webkit()
 		pcall(function() wv:html("<html><body></body></html>") end)
 		pcall(function() wv:hide() end)
 		-- Hold the warmup webview for 5 s so WebKit fully initialises, then release.
-		if DeferredWork.after(require("infra.timings").sec("ui", "webkit_warmup_hold_ms"),
+		if DeferredWork.after(require("core.timing.engine.timings").sec("ui", "webkit_warmup_hold_ms"),
 			function()
 				if _webkit_warmup_session ~= session then return false end
 				session.pending = false

@@ -37,7 +37,7 @@ local MODULE_NAMES = {
 	"core.logger.engine.logger",
 	"infra.manifest_reader",
 	"infra.notifications",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"modules.gestures",
 	"modules.gestures.actions",
 	"modules.gestures.conflicts",
@@ -134,7 +134,7 @@ local function with_fixture(options, scenario)
 		recommended_for = function() return "none" end,
 	}
 	package.loaded["infra.notifications"] = { notify = noop }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_, key)
 			if key == "health_check_interval_ms" then return 30 end
 			if key == "startup_phase_timeout_ms" then return 10 end

@@ -102,7 +102,7 @@ local PROC_STAT_PATH, MEMINFO_PATH = "/proc/stat", "/proc/meminfo"
 local _proc = { stat = PROC_STAT_PATH, meminfo = MEMINFO_PATH }
 
 -- How often CPU and memory are sampled, the interval macOS and Windows use.
-local SYSTEM_LOAD_POLL_MS = require("infra.timings").ms("keystats", "system_load_poll_ms")
+local SYSTEM_LOAD_POLL_MS = require("core.timing.engine.timings").ms("keystats", "system_load_poll_ms")
 
 -- The current-desktop source (read() -> number|string|nil), or nil with the i18n
 -- key of why virtual-desktop changes are not measured.
@@ -483,7 +483,7 @@ function M.sample()
 		transition("wake", { asleep_ms = sleep_total })
 		local local_ts = os.date("%Y-%m-%d %H:%M:%S", math.floor(clock.wall_ms / 1000))
 		-- A wake earlier than [keystats] night_wake_end_ms after local midnight is a night wake.
-		if require("metrics.engine.aggregator.helpers").is_night_wake(local_ts, require("infra.timings").ms("keystats", "night_wake_end_ms")) then
+		if require("metrics.engine.aggregator.helpers").is_night_wake(local_ts, require("core.timing.engine.timings").ms("keystats", "night_wake_end_ms")) then
 			_day.night_wake_count = _day.night_wake_count + 1
 		end
 	end

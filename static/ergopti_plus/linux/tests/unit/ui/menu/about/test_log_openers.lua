@@ -150,7 +150,7 @@ helpers.describe("log-openers-native-refusal", function()
 			native.close(timer)
 			native.close(child)
 		end))
-		assert(require("infra.native_timer").start(native, timer, 2000, 0, function() expired = true; child:kill("sigkill") end))
+		assert(require("core.timing.engine.native_timer").start(native, timer, 2000, 0, function() expired = true; child:kill("sigkill") end))
 		while not exited do native.run("once") end
 		native.run("nowait")
 		os.remove(path)

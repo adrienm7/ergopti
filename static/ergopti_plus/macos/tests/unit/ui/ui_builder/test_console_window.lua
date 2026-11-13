@@ -12,13 +12,13 @@ local helpers = require("tests.helpers")
 --- Runs the console owner against a stateful native window and deferred queue.
 --- @param run function Receives the owner and observable native state.
 local function with_console(run)
-	helpers.with_fresh_modules({ "ui.console_window", "infra.deferred_work", "core.logger.engine.logger", "core.fs.engine.paths" }, function()
+	helpers.with_fresh_modules({ "ui.console_window", "core.timing.engine.deferred_work", "core.logger.engine.logger", "core.fs.engine.paths" }, function()
 		local state = {
 			frame = { x = 10, y = 20, w = 300, h = 200 },
 			screen = { x = 100, y = 50, w = 1000, h = 800 },
 			moves = 0, opens = 0, errors = 0, reads = 0, queue = {},
 		}
-		package.loaded["infra.deferred_work"] = { after = function(delay, callback)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(delay, callback)
 			helpers.assert_eq(delay, 0)
 			if state.refuse_timer then return false end
 			state.queue[#state.queue + 1] = callback

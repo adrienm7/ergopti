@@ -44,7 +44,7 @@ const SOURCES = [
 	'static/ergopti_plus/linux/core/network/engine/http_body_pipe.lua',
 	'static/ergopti_plus/linux/core/network/engine/managed_http.lua',
 	'static/ergopti_plus/linux/core/network/engine/managed_http_deadline.lua',
-	'static/ergopti_plus/linux/infra/native_timer.lua',
+	'static/ergopti_plus/linux/core/timing/engine/native_timer.lua',
 	'static/ergopti_plus/linux/core/network/engine/proxy_policy.lua',
 	'static/ergopti_plus/linux/core/network/adapters/system_proxy_probe.lua',
 	'static/ergopti_plus/linux/core/network/adapters/native_proxy_runtime.lua',

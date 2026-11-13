@@ -39,7 +39,7 @@ local _logo_image = nil
 -- callback ran.
 --- @return number seconds Read when a notice is sent, so loading this module
 ---   reads no timing.
-local function retention_sec() return require("infra.timings").sec("ui", "notification_ttl_ms") end
+local function retention_sec() return require("core.timing.engine.timings").sec("ui", "notification_ttl_ms") end
 local _notification_owners = {}
 local _next_notification_id = 0
 

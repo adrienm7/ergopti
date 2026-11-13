@@ -24,7 +24,7 @@ local ManifestMenu  = require("infra.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
 local Logger         = require("core.logger.engine.logger")
-local DeferredWork   = require("infra.deferred_work")
+local DeferredWork   = require("core.timing.engine.deferred_work")
 local ParameterLabel = require("shortcuts.engine.action_parameter_label")
 
 local LOG = "menu.gestures"
@@ -286,7 +286,7 @@ function M.build(ctx)
 			end
 			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
 			if spec then
-				return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+				return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), function()
 					local click_change
 					local called, committed = xpcall(shortcut_utils.prompt_action_parameter, debug.traceback,
 						gestures, slot, a, spec, picked, {
@@ -411,7 +411,7 @@ function M.build(ctx)
 			[require("settings.engine.keys").COMMAND.GESTURE_SLOT_CHANGE_ACTION] = function()
 				-- A refused schedule is reported; an accepted one only opens the
 				-- picker later, so it is not a publication receipt.
-				if DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
+				if DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"),
 					function() open_action_chooser(slot, names(), current) end,
 					"menu_gestures.action_chooser") ~= true then return false end
 			end,
@@ -484,7 +484,7 @@ function M.build(ctx)
 	local function cmd_scope_restore()
 		if apply_scope("recommended") ~= true then return false end
 		if not recommended_slot_claimed() then return true end
-		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), function()
 			local settings = i18n.get("menu.gestures.open_settings")
 			local clicked = dialog.block_alert(i18n.get("menu.gestures.notify_title"),
 				i18n.get("menu.gestures.recommended_reason_macos"), settings, i18n.get("button.ok"), "informational")

@@ -1,4 +1,4 @@
---- infra/paced_job.lua
+--- core/timing/engine/paced_job.lua
 
 --- ==============================================================================
 --- MODULE: Paced Job
@@ -26,7 +26,7 @@ local hs             = hs
 local Logger         = require("core.logger.engine.logger")
 local TimerScheduler = require("core.events.timer_scheduler")
 
-local LOG = "infra.paced_job"
+local LOG = "core.timing.engine.paced_job"
 
 
 

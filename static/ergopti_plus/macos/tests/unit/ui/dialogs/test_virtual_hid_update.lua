@@ -16,7 +16,7 @@
 local helpers = require("tests.helpers")
 
 -- The modules this file stubs, restored after each case so later files see the real ones.
-local STUBBED = { "core.i18n.engine.i18n", "infra.dialog_util", "infra.deferred_work", "ui.virtual_hid_update" }
+local STUBBED = { "core.i18n.engine.i18n", "infra.dialog_util", "core.timing.engine.deferred_work", "ui.virtual_hid_update" }
 local ORIGINALS = {}
 for _, name in ipairs(STUBBED) do ORIGINALS[name] = package.loaded[name] end
 
@@ -42,7 +42,7 @@ local function load(answer)
 			return first
 		end,
 	}
-	package.loaded["infra.deferred_work"] = { after = function(_, fn) fn(); return true end }
+	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) fn(); return true end }
 	package.loaded["ui.virtual_hid_update"] = nil
 	local Offer = require("ui.virtual_hid_update")
 	return Offer, world

@@ -80,7 +80,7 @@ helpers.describe("dialog_util: the focus nudge is asynchronous", function()
 		-- fires the nudge inline. The delay ([ui] dialog_focus_delay_ms, 100 ms) is load-bearing: hs.dialog.* blocks
 		-- the main runloop, so anything scheduled AFTER the dialog opens will not run
 		-- until it is dismissed — the nudge has to be armed before that.
-		helpers.assert_true(code:find('TimerScheduler.after(require("infra.timings").sec("ui", "dialog_focus_delay_ms")', 1, true) ~= nil,
+		helpers.assert_true(code:find('TimerScheduler.after(require("core.timing.engine.timings").sec("ui", "dialog_focus_delay_ms")', 1, true) ~= nil,
 			"the nudge must still be armed on a short delay before the dialog blocks the "
 			.. "runloop, or it can never reach the dialog it exists to focus")
 	end)

@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 
 local OWNED = {
 	"ui.menu.menu_llm.model_selector_page", "ui.menu.menu_llm.custom_models",
-	"ui.menu.menu_llm.backend_labels", "infra.dialog_util", "infra.deferred_work",
+	"ui.menu.menu_llm.backend_labels", "infra.dialog_util", "core.timing.engine.deferred_work",
 	"modules.llm", "modules.llm.api_mlx",
 	"ui.menu.menu_llm.mlx_repair_offer", "ui.menu.menu_llm.api_panel", "ui.download_window", "ui.model_browser",
 }
@@ -68,7 +68,7 @@ local function with_page(opts, body)
 			return opts.confirm_remove and require("core.i18n.engine.i18n").get("button.remove") or "OK"
 		end,
 			text_prompt = function() return "OK", opts.typed_model or "" end }
-		package.loaded["infra.deferred_work"] = { after = function(_, fn) fn(); return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) fn(); return true end }
 		package.loaded["ui.menu.menu_llm.mlx_repair_offer"] = { set_alternative = function() end }
 		package.loaded["ui.download_window"] = { set_percent_listener = function(fn) calls.percent_listener = fn end }
 		package.loaded["ui.model_browser"] = { inject_progress = function(update)
@@ -268,7 +268,7 @@ helpers.describe("model selector page owner", function()
 		local opts = { ollama = { installed = false, pending = true } }
 		with_page(opts, function(Page, ctx, _, collected, p)
 			local attempts, pending = 0, nil
-			package.loaded["infra.deferred_work"].after = function(_, callback)
+			package.loaded["core.timing.engine.deferred_work"].after = function(_, callback)
 				attempts = attempts + 1
 				if attempts == 1 then
 					if mode == "throws" then error("timer unavailable") end

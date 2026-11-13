@@ -159,7 +159,7 @@ local function load_fixture()
 	package.loaded["modules.llm.app_filter"] = {
 		is_blocked = function() return false end,
 	}
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function() return 0.1 end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = {

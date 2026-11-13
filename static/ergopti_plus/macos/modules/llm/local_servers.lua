@@ -208,7 +208,7 @@ local controller = Discovery.new({
 	order = M.ORDER,
 	identities = M.IDENTITIES,
 	clock = function() return TimerScheduler.now() end,
-	max_age = function() return require("infra.timings").sec("llm", "local_server_detection_max_age_ms") end,
+	max_age = function() return require("core.timing.engine.timings").sec("llm", "local_server_detection_max_age_ms") end,
 	on_publish = function(results)
 		local found = {}
 		for _, id in ipairs(M.ORDER) do

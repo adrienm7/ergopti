@@ -16,7 +16,7 @@ local function load_fixture()
 	for _, name in ipairs({
 		"modules.keymap.utils", "adapters.clipboard", "adapters.synthetic_input",
 		"adapters.event_provenance", "core.events.timer_scheduler",
-		"core.logger.engine.logger", "infra.timings",
+		"core.logger.engine.logger", "core.timing.engine.timings",
 	}) do
 		package.loaded[name] = nil
 	end
@@ -26,7 +26,7 @@ local function load_fixture()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_, key)
 			return key == "clipboard_restore_ms" and 0.15 or 0.08
 		end,

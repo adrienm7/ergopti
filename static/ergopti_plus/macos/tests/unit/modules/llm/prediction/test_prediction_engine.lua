@@ -1175,7 +1175,7 @@ local function with_backend_label_composition(target, refuse_menu, body)
 		"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
 		"ui.menu.menu_llm.mlx_repair_offer", "modules.llm.mlx_bootstrap_diagnosis",
 		"infra.dialog_util", "infra.notifications", "modules.llm.ollama_binary",
-		"infra.deferred_work", "modules.llm.backend_detector",
+		"core.timing.engine.deferred_work", "modules.llm.backend_detector",
 	}
 	helpers.with_fresh_modules(names, function()
 		local previous_label = read_upvalue(PE.set_llm_backend_name, "llm_backend_label")

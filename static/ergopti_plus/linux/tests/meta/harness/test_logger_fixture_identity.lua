@@ -38,7 +38,7 @@ helpers.describe("instrumentation fixture logger ownership", function()
 package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 require("tests.lua.core.runner_home").isolate()
 require("core.lifecycle.engine.compat.utf8").install()
-if ]] .. string.format("%q", mode) .. [[ == "warm" then require("infra.timings") end
+if ]] .. string.format("%q", mode) .. [[ == "warm" then require("core.timing.engine.timings") end
 local helpers = require("tests.helpers")
 helpers.reset_results()
 local logger = require("core.logger.engine.shim")

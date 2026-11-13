@@ -116,7 +116,7 @@ M.FINGER_COUNT_CODES = FINGER_COUNT_CODES
 -- indistinguishable from tapping: both travel no distance. The old engine had
 -- this and a test pinned it — a two-second near-stationary hold must NOT fire a
 -- tap — so it is carried here rather than lost with that engine.
-local ok_timings, Timings = pcall(require, "infra.timings")
+local ok_timings, Timings = pcall(require, "core.timing.engine.timings")
 M.TAP_MAX_SEC = ok_timings and Timings.sec("gestures", "tap_max_ms") or nil
 if not M.TAP_MAX_SEC then
 	-- Loud, not defaulted. A missing key is a broken install, and inventing a

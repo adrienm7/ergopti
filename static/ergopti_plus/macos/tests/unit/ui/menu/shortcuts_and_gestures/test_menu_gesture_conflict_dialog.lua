@@ -27,7 +27,7 @@ local function choose(parameter, clicked, refusal, picked)
 	local names = {
 		"ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils", "infra.dialog_util",
 		"core.i18n.engine.i18n", "infra.manifest_menu", "ui.action_picker", "ui.menu.shortcut_utils",
-		"core.logger.engine.logger", "infra.deferred_work", "core.fs.adapters.storage", "ui.gesture_conflict_notice",
+		"core.logger.engine.logger", "core.timing.engine.deferred_work", "core.fs.adapters.storage", "ui.gesture_conflict_notice",
 		"menu.engine.renderer", "core.text.engine.json",
 	}
 	local saved, observed = {}, { queue = {}, opened = {}, dialogs = 0, refreshed = 0, settings = 0, prompts = 0 }
@@ -102,7 +102,7 @@ local function choose(parameter, clicked, refusal, picked)
 	package.loaded["ui.action_picker"] = { open = function(_, callback) callback(action_id, picked) end }
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.adapters.storage"] = { get = function() return false end }
-	package.loaded["infra.deferred_work"] = { after = function(_, callback) observed.queue[#observed.queue + 1] = callback; return true end }
+	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback) observed.queue[#observed.queue + 1] = callback; return true end }
 	package.loaded["core.process.adapters.shell_runner"] = { open = function(url) observed.opened[#observed.opened + 1] = url; return true end }
 	local ok, err = xpcall(function()
 		-- Keep the prompt and retained writer owner genuine; dialog/native ports
@@ -176,7 +176,7 @@ end)
 local refresh_modules = {
 	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger",
 	"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
-	"ui.menu.shortcut_utils", "infra.deferred_work", "ui.menu.menu_gestures",
+	"ui.menu.shortcut_utils", "core.timing.engine.deferred_work", "ui.menu.menu_gestures",
 }
 local function refresh_json(path)
 	local file = assert(io.open(path, "rb"))
@@ -218,7 +218,7 @@ local function with_status_refresh(options, callback)
 		package.loaded["infra.dialog_util"] = {}
 		package.loaded["ui.action_picker"] = {}
 		package.loaded["ui.menu.shortcut_utils"] = {}
-		package.loaded["infra.deferred_work"] = {}
+		package.loaded["core.timing.engine.deferred_work"] = {}
 		package.loaded["infra.manifest_menu"] = {
 			group_receiver = renderer.group_receiver,
 			template_rows = renderer.template_rows,

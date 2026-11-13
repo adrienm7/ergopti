@@ -66,7 +66,7 @@ local function with_picker(options, callback)
 				return confirm, scalar
 			end,
 		}
-		package.loaded["infra.deferred_work"] = { after = function(_, work)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, work)
 			if options.reject_chooser then return false end
 			work(); return true
 		end }
@@ -125,7 +125,7 @@ helpers.describe("gesture picker acknowledged parameter transaction", function()
 	end)
 	helpers.it("keeps the picker open when its parameter handoff is refused", function()
 		with_picker({}, function(fixture, pick)
-			local deferred = require("infra.deferred_work")
+			local deferred = require("core.timing.engine.deferred_work")
 			local previous = deferred.after
 			deferred.after = function() return false end
 			local ok, result = pcall(pick)

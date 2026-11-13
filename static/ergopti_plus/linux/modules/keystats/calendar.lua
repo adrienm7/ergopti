@@ -34,7 +34,7 @@ local function wall_ms()
 end
 
 --- Epoch milliseconds, the daemon's one wall-clock reader (the reload duration
---- across a restart reads it too, infra/reload_timing.lua).
+--- across a restart reads it too, core/timing/engine/reload_timing.lua).
 M.wall_ms = wall_ms
 
 -- CLOCK_BOOTTIME includes suspended time; Linux CLOCK_MONOTONIC (luv.hrtime)

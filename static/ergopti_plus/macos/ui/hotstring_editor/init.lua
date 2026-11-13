@@ -27,7 +27,7 @@ local Paths         = require("core.fs.engine.paths")
 local Chord         = require("keyboard.engine.chord")
 local Hotkeys       = require("adapters.hotkey_registrar")
 local FileSystem    = require("core.fs.adapters.file_system")
-local DeferredWork  = require("infra.deferred_work")
+local DeferredWork  = require("core.timing.engine.deferred_work")
 local SaveValidation = require("ui.hotstring_editor.save_validation")
 local LOG           = "hotstring_editor"
 

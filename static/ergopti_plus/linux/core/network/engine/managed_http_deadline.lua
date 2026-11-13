@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local NativeTimer = require("infra.native_timer")
+local NativeTimer = require("core.timing.engine.native_timer")
 local Monotonic = require("core.logger.engine.monotonic")
 local Logger = require("core.logger.engine.shim")
 local LOG = "core.network.engine.managed_http_deadline"

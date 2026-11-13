@@ -10,7 +10,7 @@ local MODULES = {
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"infra.notifications",
-	"core.fs.engine.paths", "infra.timings",
+	"core.fs.engine.paths", "core.timing.engine.timings",
 	"ui.ui_builder",
 	"ui.menu.menu_llm.models_manager_mlx_hf",
 }

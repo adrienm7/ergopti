@@ -2,7 +2,7 @@
 -- Native level selection never turns an action or a dead state into text.
 
 local Policy = require("layouts.engine.layout.number_row_policy")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local utf8_lib = (type(utf8) == "table" and type(utf8.len) == "function") and utf8 or require("core.lifecycle.engine.compat.utf8")
 local M = {}
 M.POSITIONS = 10

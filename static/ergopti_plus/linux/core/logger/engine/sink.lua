@@ -98,7 +98,7 @@ local _retention_days = nil
 --- @return number|nil Days to keep, or nil when the registry is unreadable.
 local function retention_days()
 	if _retention_days ~= nil then return _retention_days end
-	local ok, Timings = pcall(require, "infra.timings")
+	local ok, Timings = pcall(require, "core.timing.engine.timings")
 	if not ok or not Timings then return nil end
 	local ok_value, value = pcall(Timings.count, "logger", "retention_days")
 	if not ok_value or type(value) ~= "number" or value <= 0 then return nil end

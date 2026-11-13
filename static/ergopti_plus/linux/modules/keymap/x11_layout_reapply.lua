@@ -55,7 +55,7 @@ end
 --- The production collaborators.
 --- @return table
 local function production()
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	local OwnedProcess = require("core.process.adapters.owned_process")
 	return {
 		settle_ms = Timings.ms("ui", "x11_layout_reapply_settle_ms"),

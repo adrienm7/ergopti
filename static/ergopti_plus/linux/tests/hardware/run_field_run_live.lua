@@ -10,7 +10,7 @@
 --- tools/dev/linux-field-run.sh writes the request, waits for the done marker,
 --- copies the results and prints the marks. No window opens and nobody clicks.
 --- The timed reload step restarts the host as the daemon restarts: its reload
---- owner stamps the request (infra/reload_timing.lua), stops the session, starts
+--- owner stamps the request (core/timing/engine/reload_timing.lua), stops the session, starts
 --- a successor host and exits; the successor reports the reload at its start and
 --- its field run resumes the run, so the collector reads one run across two
 --- processes.
@@ -43,12 +43,12 @@ end
 
 if arg[1] == "daemon" then
 	-- As the daemon's boot completion does: the reload this start follows, if any.
-	local reload_ms = require("infra.reload_timing").complete()
+	local reload_ms = require("core.timing.engine.reload_timing").complete()
 	local session
 	local log = os.getenv("XDG_RUNTIME_DIR") .. "/../daemon.log"
 	--- The daemon's reload owner, for this host: a restart into a successor host.
 	local function reload()
-		if not require("infra.reload_timing").mark() then return false, "failed" end
+		if not require("core.timing.engine.reload_timing").mark() then return false, "failed" end
 		local timer = uv.new_timer()
 		timer:start(0, 0, function()
 			timer:close()

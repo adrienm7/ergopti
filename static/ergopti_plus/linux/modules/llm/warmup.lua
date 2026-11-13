@@ -27,7 +27,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
 
 local LOG = "modules.llm.warmup"

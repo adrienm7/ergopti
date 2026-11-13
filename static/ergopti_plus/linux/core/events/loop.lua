@@ -26,7 +26,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local NativeTimer = require("infra.native_timer")
+local NativeTimer = require("core.timing.engine.native_timer")
 local NumberPolicy = require("core.text.engine.number_policy")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local LOG = "core.events.loop"
@@ -58,7 +58,7 @@ end
 local native_nap = (function()
 	local ok_ffi, ffi = pcall(require, "ffi")
 	-- The shared binding resumes the remainder after a libuv child's SIGCHLD.
-	return require("infra.native_sleep").bind(ok_ffi and ffi or nil)
+	return require("core.timing.engine.native_sleep").bind(ok_ffi and ffi or nil)
 end)()
 local nap = native_nap or command_nap
 

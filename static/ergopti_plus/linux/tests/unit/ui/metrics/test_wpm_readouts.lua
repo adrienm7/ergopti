@@ -347,7 +347,7 @@ helpers.describe("wpm readouts: the live speed", function()
 	helpers.it("(wpm-source-parity) real keystats preserves independent holds and the physical clock", function()
 		require("tests.support.keystats_native_fixture").with(function(keystats)
 			require("tests.support.metrics_consent_fixture").enable(keystats)
-			local hold = require("infra.timings").ms("ui", "wpm_color_hold_ms")
+			local hold = require("core.timing.engine.timings").ms("ui", "wpm_color_hold_ms")
 			local start = 10000
 			keystats.on_keydown("a", start, "app", 30)
 			keystats.record_synthetic_output("app", "AI", "llm", start, 0, 0)

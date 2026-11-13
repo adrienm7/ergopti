@@ -15,7 +15,7 @@ local REGISTRY_KEYS = { "log_prepare_tick_bytes", "shell_captured_output_bytes",
 helpers.describe("Generated registry limits", function()
 	helpers.it("answers the registry value of every key the early modules read", function()
 		local Generated = require("_generated.registry_limits")
-		local Timings = require("infra.timings")
+		local Timings = require("core.timing.engine.timings")
 		for _, key in ipairs(REGISTRY_KEYS) do
 			helpers.assert_eq(Generated.count("limits", key), Timings.count("limits", key), key)
 		end

@@ -41,7 +41,7 @@ return function()
 		local errors, logger = {}, helpers.make_logger_stub()
 		logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 		package.loaded["core.logger.engine.logger"] = logger
-		package.loaded["infra.timings"] = { sec = function() return 5 end, ms = function() return 5000 end }
+		package.loaded["core.timing.engine.timings"] = { sec = function() return 5 end, ms = function() return 5000 end }
 		package.loaded["metrics.engine.metrics"] = {}
 		local aggregator = { get_ngram_ctx = function() return {} end }
 		for _, key in ipairs({ "init", "flush", "reset_batch", "reset_ngram_ctx", "set_device_id", "set_ngram_ctx",

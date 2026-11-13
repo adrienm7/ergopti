@@ -24,7 +24,7 @@ local Paths      = require("core.fs.engine.paths")
 local GraphicsRenderer = require("adapters.graphics_renderer")
 local Storage = require("core.fs.adapters.storage")
 local TimerScheduler = require("core.events.timer_scheduler")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local TomlCodec = require("core.text.engine.toml_codec")
 -- What the readouts decide — colours, frames, the graph, the default place —
 -- shared with the Linux driver.

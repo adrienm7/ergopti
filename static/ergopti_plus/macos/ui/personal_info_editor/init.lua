@@ -23,7 +23,7 @@ local WebviewResult = require("adapters.webview_result")
 
 local hs     = hs
 local Logger = require("core.logger.engine.logger")
-local DeferredWork = require("infra.deferred_work")
+local DeferredWork = require("core.timing.engine.deferred_work")
 local i18n   = require("core.i18n.engine.i18n")
 local Paths  = require("core.fs.engine.paths")
 
@@ -308,7 +308,7 @@ function M.open(current_info, save_callback)
 			end,
 			on_navigation = function(action)
 				if action == "didFinishNavigation" and owner_is_current(owner) then
-					DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function() inject_init_data(owner) end, "personal_info_editor.navigation")
+					DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), function() inject_init_data(owner) end, "personal_info_editor.navigation")
 				end
 				return true
 			end,

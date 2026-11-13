@@ -21,7 +21,7 @@ local OWNED_MODULES = {
 	"platform.remap.ke_lifecycle",
 	"platform.remap.watchers",
 	"adapters.hotkey_registrar",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"infra.config_paths",
 	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
@@ -131,7 +131,7 @@ local function run_disabled_init(removal_succeeds)
 			stop_alt_tab_apps_tracker = function() return true end,
 		}
 		package.loaded["adapters.hotkey_registrar"] = { unbind = function() end }
-		package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 		package.loaded["infra.config_paths"] = { get = function() return "existing-config.toml" end }
 		package.loaded["modules.keystats.kc_bridge"] = {
 			refresh_managed_set = function() return true end,

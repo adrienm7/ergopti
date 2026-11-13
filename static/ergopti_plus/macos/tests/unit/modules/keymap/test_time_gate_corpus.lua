@@ -41,7 +41,7 @@ helpers.describe("expansion delay: the shared time-gate corpus", function()
 			end
 			-- The keyDown tap's join: the shared rule with the registry's factor and
 			-- carry, then the delay policy with the resulting multiplier.
-			local Timings = require("infra.timings")
+			local Timings = require("core.timing.engine.timings")
 			local Core = require("infra.hotstring_engine")
 			local mult = Core.complex_delay_multiplier(vector.expander.complex == true,
 				before_expander.complex == true, elapsed_s and elapsed_s * 1000 or nil,

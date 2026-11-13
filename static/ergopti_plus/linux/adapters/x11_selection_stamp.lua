@@ -73,7 +73,7 @@ local function bind()
 	end
 	local loaded, x11 = pcall(ffi.load, Runtime.x11)
 	if not loaded then return nil, "unsupported" end
-	local sleep = require("infra.native_sleep").bind(ffi)
+	local sleep = require("core.timing.engine.native_sleep").bind(ffi)
 	if not sleep then return nil, "unsupported" end
 	_bound = { ffi = ffi, x11 = x11, sleep = sleep }
 	return _bound

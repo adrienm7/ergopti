@@ -86,7 +86,7 @@ local function load_expander(buffer)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
 			name:match("^modules%.keymap") or name == "modules.keystats"
-			or name:match("^adapters%.") or name == "core.logger.engine.logger" or name == "infra.timings"
+			or name:match("^adapters%.") or name == "core.logger.engine.logger" or name == "core.timing.engine.timings"
 		) then
 			package.loaded[name] = nil
 		end
@@ -97,7 +97,7 @@ local function load_expander(buffer)
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function() return 5 end,
 		sec = function(_, key) return key == "clipboard_restore_ms" and 0.15 or 0.08 end,
 	}

@@ -548,7 +548,7 @@ helpers.describe("model manager generation fences", function()
 	helpers.it("(HS-007-delayed-prompt-yield) drops a hardware prompt after its generation expires", function()
 		local modules = {
 			"hs", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.logger.engine.logger", "core.i18n.engine.i18n",
-			"infra.dialog_util", "core.fs.engine.paths", "infra.timings",
+			"infra.dialog_util", "core.fs.engine.paths", "core.timing.engine.timings",
 			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
 		}

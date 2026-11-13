@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
 
 local INITIAL_SEC = Timings.ms("llm", "warmup_initial_delay_ms") / 1000

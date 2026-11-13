@@ -38,7 +38,7 @@ local Rewrite          = require("ai.engine.prediction.rewrite")
 local RequestSettings  = require("ai.engine.settings.request_settings")
 local PromptAction     = require("ai.engine.prediction.prompt_action")
 local Logger           = require("core.logger.engine.logger")
-local Timings          = require("infra.timings")
+local Timings          = require("core.timing.engine.timings")
 local TimerScheduler   = require("core.events.timer_scheduler")
 local Storage          = require("core.fs.adapters.storage")
 local FileSystem       = require("core.fs.adapters.file_system")
@@ -2944,7 +2944,7 @@ function M._inline_accept(preds, fetch_id, deps)
 		return runtime_available() and fetch_request_counter == fetch_id and predictions_visible
 			and pending_predictions[1] == first
 	end
-	local after = deps.after or require("infra.deferred_work").after
+	local after = deps.after or require("core.timing.engine.deferred_work").after
 	local scheduled = after(0, function()
 		if not is_current() then
 			Logger.debug(LOG, "Inline prediction #%s superseded before typing.", tostring(fetch_id))

@@ -30,7 +30,7 @@ helpers.describe("perf counters: closed names and aggregation", function()
 		-- Child workers load shell_runner with a minimal logger shim: a registry
 		-- parse at require time made every one of them exit on the missing logger level.
 		-- A refused infra.timings raises here, failing the case, if require reads it.
-		local perf = helpers.load_module_with_dependency("core.logger.engine.perf_counters", "infra.timings", false)
+		local perf = helpers.load_module_with_dependency("core.logger.engine.perf_counters", "core.timing.engine.timings", false)
 		package.loaded["core.logger.engine.perf_counters"] = nil
 		helpers.assert_eq(type(perf.span), "function")
 	end)
@@ -160,7 +160,7 @@ end)
 
 helpers.describe("perf counters: slow segments", function()
 	local Segments = require("metrics.engine.perf.hotpath_segments")
-	local SLOW_MS = require("infra.timings").ms("logger", "hotpath_slow_ms")
+	local SLOW_MS = require("core.timing.engine.timings").ms("logger", "hotpath_slow_ms")
 
 	helpers.it("warns once with the name and duration when a segment exceeds its threshold", function()
 		local perf, lines = fixture(30)

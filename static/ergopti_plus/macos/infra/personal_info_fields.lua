@@ -14,7 +14,7 @@
 ---    list disagreed with the declaration. Linux carries the same module for the
 ---    same reason; the two must not diverge, and the corpus at
 ---    _shared/hotstrings/data/personal_info/preview_vectors.toml is what measures that.
---- 2. Fail-CLOSED, unlike its timings sibling. infra/timings.lua raises when the
+--- 2. Fail-CLOSED, unlike its timings sibling. core/timing/engine/timings.lua raises when the
 ---    registry is unreadable, which is right for a boot-time constant table.
 ---    Here a raise would take down the preview bubble on the keystroke path, and
 ---    worse, a driver that cannot read the classification must not conclude that

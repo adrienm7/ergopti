@@ -1331,7 +1331,7 @@ helpers.describe("prediction engine: model warmup lifecycle", function()
 			package.loaded["modules.llm.warmup"] = nil
 		end
 	end
-	local INITIAL_SEC = require("infra.timings").ms("llm", "warmup_initial_delay_ms") / 1000
+	local INITIAL_SEC = require("core.timing.engine.timings").ms("llm", "warmup_initial_delay_ms") / 1000
 
 	helpers.it("linux-model-warmup: the engine loads its Ollama model, and a pause stops the chain until resume", function()
 		local engine, _, _, restore = load("ollama", ENTRY, nil, false, true)

@@ -23,7 +23,7 @@ local OWNED_MODULES = {
 	"core.logger.engine.key_event_health",
 	"core.logger.engine.logger",
 	"core.text.engine.utils",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"core.i18n.engine.i18n",
 	"infra.keycodes",
 	"modules.keymap.control_sentinels",
@@ -108,7 +108,7 @@ local function with_awake(callback)
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, format, ...) world.errors[#world.errors + 1] = string.format(format, ...) end
 			package.loaded["core.logger.engine.logger"] = logger
-			package.loaded["infra.timings"] = {
+			package.loaded["core.timing.engine.timings"] = {
 				sec = function(group, key)
 					local seconds = { tick_min_ms = 1, tick_max_ms = 5, return_delay_ms = 0.2 }
 					assert(group == "keep_awake" and seconds[key] ~= nil, "unexpected keep-awake timing")

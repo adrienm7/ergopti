@@ -63,7 +63,7 @@ local function load_fixture(buffer)
 			or name == "modules.keystats"
 			or name:match("^adapters%.")
 			or name == "core.logger.engine.logger"
-			or name == "infra.timings"
+			or name == "core.timing.engine.timings"
 		) then
 			package.loaded[name] = nil
 		end
@@ -74,7 +74,7 @@ local function load_fixture(buffer)
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		-- The hot-path profiler, loaded through the expander, reads its slow threshold.
 		ms = function(_, key)
 			assert(key == "hotpath_slow_ms", "unexpected millisecond timing " .. tostring(key))

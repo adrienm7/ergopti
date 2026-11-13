@@ -240,7 +240,7 @@ function M.send(target, body, on_done)
 		on_done(text, err)
 	end
 	local HttpClient = require("core.network.adapters.http_client")
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	-- Image and transcription never enter the logs; only the encoded size does.
 	Logger.info(LOG, "Vision request → %s (format=%s, %d byte(s)).",
 		require("modules.llm.api_remote").redact_url(target.url), target.format, #encoded)

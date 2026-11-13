@@ -1606,7 +1606,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 			"modules.hotstrings.injector", "adapters.keyboard_layout", "modules.hotstrings.magic_key",
 			"modules.hotstrings.magic_key_source", "modules.hotstrings.repeat_key", "modules.shortcuts.keyboard_shortcuts",
 			"modules.hotstrings.device_finder", "infra.input_event", "core.logger.engine.monotonic", "infra.manifest_reader",
-			"infra.script_settings", "infra.timings", "modules.shortcuts.script_actions", "modules.diagnostics.crash_reporter",
+			"infra.script_settings", "core.timing.engine.timings", "modules.shortcuts.script_actions", "modules.diagnostics.crash_reporter",
 			"modules.keystats.focus_guard", "infra.input_capture_gate", "core.logger.engine.boot_profiler", "infra.diagnostic_snapshot" }) do
 			modules[name] = {}
 		end

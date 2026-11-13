@@ -15,7 +15,7 @@ local OWNERS = {
 	"adapters.event_provenance", "core.fs.adapters.file_system", "adapters.key_state",
 	"core.process.adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
 	"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
-	"infra.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
+	"core.timing.engine.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
 	"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",
 }
 
@@ -117,7 +117,7 @@ helpers.describe("System action fixture isolation", function()
 						helpers.assert_eq(calls[22], 1)
 					else
 						local delivered = 0
-						helpers.assert_eq(require("infra.deferred_work").after(0, function()
+						helpers.assert_eq(require("core.timing.engine.deferred_work").after(0, function()
 							delivered = delivered + 1
 						end, "fixture_probe"), true)
 						helpers.assert_eq(calls[11], 0, "retired native timer must not run")

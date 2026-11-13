@@ -15,7 +15,7 @@ local BATCH = "BEGIN TRANSACTION;\nINSERT INTO events VALUES (1);\nCOMMIT;\n"
 --- @param check function Receives the exporter, scheduler and native observations.
 local function observe(check)
 	helpers.with_stub_scope({ "core.logger.engine.logger", "core.fs.engine.dir", "modules.keystats.export",
-		"adapters.foreign_ledger_snapshot", "core.events.timer_scheduler", "infra.paced_job" }, function()
+		"adapters.foreign_ledger_snapshot", "core.events.timer_scheduler", "core.timing.engine.paced_job" }, function()
 		local source = BATCH:rep(8000)
 		local h = { now = 0, timers = {}, read_bytes = 0, foreground = 0, watermark = 0, applied = {}, closes = 0 }
 		local timer = { absoluteTime = function() return h.now * 1e9 end }
@@ -102,7 +102,7 @@ end
 helpers.describe("foreign ledger foreground pump", function()
 	helpers.it("(foreign-ledger-real-cadence) verifies between ingests while foreground timers run", function()
 		observe(function(export, scheduler, h, source, oracle)
-			local ingest_interval = require("infra.timings").sec("keystats", "ingest_tick_ms")
+			local ingest_interval = require("core.timing.engine.timings").sec("keystats", "ingest_tick_ms")
 			local observer, committed = scheduler.every(0.005, function() h.foreground = h.foreground + 1 end)
 			helpers.assert_true(committed)
 			helpers.assert_type(observer, "table")

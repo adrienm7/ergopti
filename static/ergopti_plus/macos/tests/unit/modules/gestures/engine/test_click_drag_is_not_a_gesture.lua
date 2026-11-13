@@ -18,7 +18,7 @@
 
 local helpers = require("tests.helpers")
 
-local INJECTED = { "modules.gestures.engine", "adapters.mouse_control", "infra.timings", "core.logger.engine.logger", "core.events.timer_scheduler" }
+local INJECTED = { "modules.gestures.engine", "adapters.mouse_control", "core.timing.engine.timings", "core.logger.engine.logger", "core.events.timer_scheduler" }
 
 local current_time = 0
 
@@ -43,7 +43,7 @@ local function with_engine(body)
 	package.loaded["modules.gestures.engine"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["core.logger.engine.logger"] = nil
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_, key)
 			if key == "tap_max_ms" then return 0.5 end
 			if key == "finger_confirm_ms" then return 0.05 end

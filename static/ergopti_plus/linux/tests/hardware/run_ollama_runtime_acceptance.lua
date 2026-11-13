@@ -32,7 +32,7 @@ for _, level in ipairs({ "error", "warn", "info" }) do
 end
 local Http = require("core.network.adapters.http_client")
 local Native = require("core.process.adapters.owned_process")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local Engine, Profiles
 local chronological, native_services = {}, {}
 -- Timestamped step lines name the step a stalled run is waiting on. They carry

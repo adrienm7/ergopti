@@ -8,7 +8,7 @@
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.log_transport_fixture")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local new_context, configure = Fixture.new_context, Fixture.configure
 local TOKEN, SESSION, LOOPBACK = Fixture.TOKEN, Fixture.SESSION, Fixture.LOOPBACK
 

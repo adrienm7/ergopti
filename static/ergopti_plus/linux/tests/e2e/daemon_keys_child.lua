@@ -452,7 +452,7 @@ if TAP_WRAP ~= "none" then
 	local original, elapsed_ms = Clock.now_ms, 0
 	Clock.now_ms = function() return original() + elapsed_ms end
 	settle_selection = function()
-		elapsed_ms = elapsed_ms + require("infra.timings").ms("privacy", "focus_settle_ms")
+		elapsed_ms = elapsed_ms + require("core.timing.engine.timings").ms("privacy", "focus_settle_ms")
 	end
 end
 

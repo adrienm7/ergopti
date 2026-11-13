@@ -117,7 +117,7 @@ function M.run(callback)
 				local reader = require("modules.keystats.sqlite_reader")
 				reader.history_fingerprint_exact = true -- The fixture owns every row and mutation, so its fingerprint is exact.
 				local projection = require("ui.metrics_typing.projection")
-				local encoder = require("infra.paced_json").encode
+				local encoder = require("core.timing.engine.paced_json").encode
 				state.reader, state.projection = reader, projection
 				dashboard._app_icon_cache.Editor = false
 				local original_read, original_merge = reader.read_ngrams, reader.merge_ngrams

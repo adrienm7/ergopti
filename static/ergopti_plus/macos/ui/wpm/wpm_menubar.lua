@@ -52,7 +52,7 @@ end
 -- The colour hold and the refresh, from the shared timings registry — the
 -- same hold the floating widget reads, so the two agree on how long a source
 -- colour lingers. The registry fails fast on a missing key: no literal copy.
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local COLOR_HOLD_S = Timings.sec("ui", "wpm_color_hold_ms")
 local UPDATE_S = Timings.sec("ui", "wpm_menubar_update_ms")
 

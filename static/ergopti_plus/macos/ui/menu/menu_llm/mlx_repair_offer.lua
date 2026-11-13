@@ -51,7 +51,7 @@ local function router() return require("ui.menu.menu_llm.runtime_install_offer")
 local function menu_llm() return require("ui.menu.menu_llm") end
 local function dialogs() return require("infra.dialog_util") end
 local function notifications() return require("infra.notifications") end
-local function deferred() return require("infra.deferred_work") end
+local function deferred() return require("core.timing.engine.deferred_work") end
 
 -- fn() -> boolean: selects the Ollama backend, as its menu row does
 local _alternative = nil

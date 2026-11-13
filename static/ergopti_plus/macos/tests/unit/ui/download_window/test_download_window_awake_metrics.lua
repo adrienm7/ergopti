@@ -7,8 +7,8 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"ui.download_window", "ui.download_window.javascript",
 	"ui.download_window.pending_queue", "adapters.webview_result",
-	"infra.deferred_work", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
-	"core.logger.engine.logger", "core.fs.engine.paths", "infra.timings", "core.i18n.engine.i18n", "core.text.engine.utils",
+	"core.timing.engine.deferred_work", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
+	"core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings", "core.i18n.engine.i18n", "core.text.engine.utils",
 	"core.process.adapters.shell_runner", "adapters.own_window", "ui.ui_builder",
 }
 

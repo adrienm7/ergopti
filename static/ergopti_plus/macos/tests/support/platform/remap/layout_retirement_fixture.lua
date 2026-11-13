@@ -5,7 +5,7 @@ local M = {}
 local OWNED = {
 	"platform.remap.watchers", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
 	"adapters.input_source_broker", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
-	"infra.deferred_work", "diagnostics.engine.runtime_log", "core.logger.engine.logger", "infra.timings", "infra.keycodes",
+	"core.timing.engine.deferred_work", "diagnostics.engine.runtime_log", "core.logger.engine.logger", "core.timing.engine.timings", "infra.keycodes",
 	"adapters.key_state", "adapters.mouse_control", "adapters.hotkey_registrar",
 	"platform.remap.lease_contract", "platform.remap.ke_variables", "infra.capsword_auto_off",
 	"infra.capsword_output", "keyboard.engine.caps_word_auto_off",
@@ -18,7 +18,7 @@ local OWNED = {
 function M.with_world(options, callback)
 	return helpers.with_stub_scope(OWNED, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.timings"] = { sec = function(_, key) return key == "layout_poll_ms" and 1 or 0.1 end }
+		package.loaded["core.timing.engine.timings"] = { sec = function(_, key) return key == "layout_poll_ms" and 1 or 0.1 end }
 		package.loaded["infra.keycodes"] = { F17_CYCLE_WINDOWS = 64, to_name = function() return "f17" end }
 		for _, name in ipairs({ "adapters.key_state", "adapters.mouse_control", "adapters.hotkey_registrar",
 			"platform.remap.lease_contract", "platform.remap.ke_variables", "infra.capsword_auto_off",

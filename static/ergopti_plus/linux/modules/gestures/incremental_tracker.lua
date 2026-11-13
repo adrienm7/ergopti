@@ -49,7 +49,7 @@ function M.new(opts)
 	-- Travel, in millimetres, before a moving swipe has a direction: the shared
 	-- timings registry's [gestures] *_minimum_mm, which macOS reads too, a
 	-- pair's larger (maintainer decision GSD-3). Read once per touchpad.
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	local minimums = {
 		swipe_minimum_mm = Timings.count("gestures", "swipe_minimum_mm"),
 		pair_swipe_minimum_mm = Timings.count("gestures", "pair_swipe_minimum_mm"),

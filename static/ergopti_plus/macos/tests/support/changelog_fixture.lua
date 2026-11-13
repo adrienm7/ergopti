@@ -35,7 +35,7 @@ local function with_changelog(callback)
 			"core.fs.adapters.json_codec",
 			"core.network.adapters.http_client",
 			"core.events.timer_scheduler",
-			"infra.deferred_work",
+			"core.timing.engine.deferred_work",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
 			"core.fs.engine.paths",
@@ -117,7 +117,7 @@ local function with_changelog(callback)
 				end
 				return bridge
 			end
-			package.loaded["infra.deferred_work"] = {
+			package.loaded["core.timing.engine.deferred_work"] = {
 				after = function(seconds, callback, label)
 					-- Request deadlines are observed separately so lifecycle timers
 					-- keep their historical indexes.

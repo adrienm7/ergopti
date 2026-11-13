@@ -271,7 +271,7 @@ local _clock_ms = Monotonic.now_ms
 -- (one table, not locals: this chunk is at Lua's limit of 200 local variables).
 local _debounce = {
 	-- How long an automatic request that found its backend busy waits to ask again.
-	busy_recheck_ms = require("infra.timings").ms("llm", "backend_busy_recheck_ms"),
+	busy_recheck_ms = require("core.timing.engine.timings").ms("llm", "backend_busy_recheck_ms"),
 	plan = require("ai.engine.request_plan.debounce").new(function() return TriggerSettings.get(require("settings.engine.keys").LEAF.MIN_REQUEST_INTERVAL_MS) end),
 	retired = {}, timer_cancel = {}, retiring = {},
 }

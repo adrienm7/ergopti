@@ -202,13 +202,13 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 			if contract then
 				helpers.assert_eq(count, contract.count,
 					relative .. " raw timer inventory changed; migrate fire-and-forget sites "
-						.. "through infra.deferred_work")
+						.. "through core.timing.engine.deferred_work")
 				for _, pattern in ipairs(contract.patterns) do
 					helpers.assert_true(code:find(pattern) ~= nil,
 						relative .. " lost an exact strong owner for an allowed raw timer")
 				end
 			elseif count > 0 then
-				error(relative .. " contains an unowned raw UI timer; use infra.deferred_work", 0)
+				error(relative .. " contains an unowned raw UI timer; use core.timing.engine.deferred_work", 0)
 			end
 			raw_sites = raw_sites + count
 		end
@@ -253,7 +253,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 	helpers.it("retains a deferred personal-shortcuts launch until delivery", function()
 		helpers.with_fresh_modules({
 			"core.events.timer_scheduler",
-			"infra.deferred_work",
+			"core.timing.engine.deferred_work",
 			"infra.personal_shortcuts",
 		}, function()
 			local weak_timers, restore_timers = install_weak_timers()

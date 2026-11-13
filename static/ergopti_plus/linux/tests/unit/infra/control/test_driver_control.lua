@@ -454,7 +454,7 @@ if session then assert(session:stop()) end
 						status, signal, exited = result, killed, true
 						uv.timer_stop(timer); uv.close(timer); uv.close(child)
 					end))
-					assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+					assert(require("core.timing.engine.native_timer").start(uv, timer, 2000, 0, function()
 						expired = true; child:kill("sigkill")
 					end))
 					while not exited do uv.run("once") end

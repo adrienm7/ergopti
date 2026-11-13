@@ -18,7 +18,7 @@
 local helpers = require("tests.helpers")
 local MetricsState = require("infra.metrics_state_keys")
 
-local original_deferred_work = package.loaded["infra.deferred_work"]
+local original_deferred_work = package.loaded["core.timing.engine.deferred_work"]
 local original_subject = package.loaded["ui.menu.menu_state"]
 local DeferredWork = {
 	after = function(_, callback)
@@ -26,7 +26,7 @@ local DeferredWork = {
 		return true
 	end,
 }
-package.loaded["infra.deferred_work"] = DeferredWork
+package.loaded["core.timing.engine.deferred_work"] = DeferredWork
 local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
 
 --- True when `list` contains the string `needle`.
@@ -442,5 +442,5 @@ helpers.describe("menu_state: saved delimiter states replay without ERROR (confi
 	end)
 end)
 
-package.loaded["infra.deferred_work"] = original_deferred_work
+package.loaded["core.timing.engine.deferred_work"] = original_deferred_work
 package.loaded["ui.menu.menu_state"] = original_subject

@@ -1,7 +1,7 @@
 --- tests/unit/core/lifecycle/test_native_timer.lua
 --- Native relative clock integration and explicitly simulated receipt controls.
 local helpers = require("tests.helpers")
-local Timer = require("infra.native_timer")
+local Timer = require("core.timing.engine.native_timer")
 
 helpers.describe("linux-relative-clock", function()
 	helpers.it("linux-relative-clock: refreshes before arming and preserves native start receipts", function()
@@ -73,7 +73,7 @@ local uv = {
 	end,
 }
 local native = { start = function() return 0 end }
-local require = function(name) assert(name == "infra.native_timer"); return native end
+local require = function(name) assert(name == "core.timing.engine.native_timer"); return native end
 ]]
 		local compile = loadstring or load
 		assert(compile(prefix .. chunk, "@passive-http-diagnostic-control"))()

@@ -14,7 +14,7 @@ local function with_crypto_fixture(options, body)
 	options = options or {}
 	local names = {
 		"modules.llm.api_token_crypto", "core.process.adapters.shell_runner",
-		"core.events.timer_scheduler", "infra.timings", "core.logger.engine.logger",
+		"core.events.timer_scheduler", "core.timing.engine.timings", "core.logger.engine.logger",
 		"platform.remap.lease_helper",
 	}
 	local saved = {}
@@ -44,7 +44,7 @@ local function with_crypto_fixture(options, body)
 			fixture.errors[#fixture.errors + 1] = string.format(tostring(fmt), ...)
 		end,
 	}
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(section, key)
 			helpers.assert_eq(section, "llm")
 			helpers.assert_eq(key, "keychain_operation_timeout_ms")

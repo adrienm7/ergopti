@@ -57,7 +57,7 @@ local function load_prefetch()
 			return true, {}
 		end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(delay, callback, label)
 			env.timers[#env.timers + 1] = { delay = delay, callback = callback, label = label }
 			return true
@@ -69,7 +69,7 @@ end
 
 local PREFETCH_MODULES = {
 	"modules.keystats.host_signature", "core.logger.engine.logger",
-	"core.process.adapters.shell_runner", "infra.deferred_work",
+	"core.process.adapters.shell_runner", "core.timing.engine.deferred_work",
 }
 
 local function with_prefetch(run)

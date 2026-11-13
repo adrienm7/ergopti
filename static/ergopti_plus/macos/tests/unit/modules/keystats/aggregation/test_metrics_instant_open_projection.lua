@@ -115,12 +115,12 @@ end)
 
 helpers.describe("metrics-instant-open: incremental projection", function()
 	local owners = { "modules.keystats.sqlite_reader", "core.logger.engine.logger", "hs.sqlite3", "hs.json",
-		"ui.metrics_typing.projection", "infra.paced_json", "core.text.engine.json" }
+		"ui.metrics_typing.projection", "core.timing.engine.paced_json", "core.text.engine.json" }
 
 	local function load(tables)
 		local sqlite = FakeSqlite.new(tables)
 		local reader = load_reader(sqlite)
-		package.loaded["infra.paced_json"] = nil
+		package.loaded["core.timing.engine.paced_json"] = nil
 		package.loaded["ui.metrics_typing.projection"] = nil
 		local projection = require("ui.metrics_typing.projection")
 		return reader, projection, sqlite

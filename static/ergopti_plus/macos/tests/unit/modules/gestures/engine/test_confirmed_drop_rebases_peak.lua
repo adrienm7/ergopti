@@ -53,7 +53,7 @@ local AFTER_FRAMES = 10
 --- @return table Array of action names, in fire order.
 local function gesture_with_confirmed_drop()
 	package.loaded["modules.gestures.engine"] = nil
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		count = require("tests.support.registry_count"),
 		sec = function(_, key)
 			-- tap_max_ms is generous on purpose: confirming the drop legitimately

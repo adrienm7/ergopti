@@ -73,7 +73,7 @@ local function native_timer_replay(milliseconds)
 		update_time = function() end,
 		timer_start = function() arms = arms + 1; return 0 end,
 	}
-	local result, message = require("infra.native_timer").start(backend, {}, milliseconds, 0, function() end)
+	local result, message = require("core.timing.engine.native_timer").start(backend, {}, milliseconds, 0, function() end)
 	helpers.assert_eq(result == 0, arms == 1, "the start receipt is the backend's own")
 	return arms == 1, result == nil and type(message) == "string" and message ~= ""
 end
@@ -84,7 +84,7 @@ end
 local function event_loop_fixture()
 	local naps = {}
 	local fake_sleep = { bind = function() return function(seconds) naps[#naps + 1] = seconds end end }
-	local loop = helpers.load_module_with_dependency("core.events.loop", "infra.native_sleep", fake_sleep)
+	local loop = helpers.load_module_with_dependency("core.events.loop", "core.timing.engine.native_sleep", fake_sleep)
 	return loop, naps
 end
 
@@ -122,7 +122,7 @@ local function native_sleep_replay(seconds)
 		errno = function() return 0 end,
 		C = { nanosleep = function() calls = calls + 1; return 0 end },
 	}
-	local sleep = assert(helpers.load_module("infra.native_sleep").bind(ffi))
+	local sleep = assert(helpers.load_module("core.timing.engine.native_sleep").bind(ffi))
 	local completed, detail = pcall(sleep, seconds)
 	local refusal = not completed and tostring(detail) or nil
 	helpers.assert_eq(refusal == nil, calls == 1, "nanosleep raises exactly when it refuses")

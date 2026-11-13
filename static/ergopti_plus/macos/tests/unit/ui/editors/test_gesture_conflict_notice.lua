@@ -13,7 +13,7 @@ helpers.describe("gesture warning consent (gesture-conflicts)", function()
 	for _, choice in ipairs({ "menu.gestures.open_settings", "gestures.system.dismiss", "close", "refused" }) do
 		helpers.it("honours the " .. choice .. " button", function()
 			local names = { "ui.gesture_conflict_notice", "infra.dialog_util", "core.i18n.engine.i18n", "core.fs.adapters.storage",
-				"infra.deferred_work", "core.logger.engine.logger" }
+				"core.timing.engine.deferred_work", "core.logger.engine.logger" }
 			local saved, store, timers = {}, {}, {}
 			local saved_shell = package.loaded["core.process.adapters.shell_runner"]
 			local opened, dialogs, errors, reject_schedule = 0, 0, 0, true
@@ -32,7 +32,7 @@ helpers.describe("gesture warning consent (gesture-conflicts)", function()
 					store[key] = value; return true
 				end,
 			}
-			package.loaded["infra.deferred_work"] = { after = function(_, fn)
+			package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn)
 				if reject_schedule then return false end
 				timers[#timers + 1] = fn; return true
 			end }

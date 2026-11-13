@@ -45,7 +45,7 @@ end
 --- @param reason string Stable refusal reason.
 --- @param next_step function Continuation.
 local function report_failure(reason, next_step)
-	local committed = require("infra.deferred_work").after(0, function()
+	local committed = require("core.timing.engine.deferred_work").after(0, function()
 		local shown, err = pcall(function()
 			require("infra.dialog_util").block_alert(i18n.get("apps.cloner.python_offer.title"),
 				i18n.format("apps.cloner.python_offer.failed", tostring(reason)), i18n.get("common.ok"))

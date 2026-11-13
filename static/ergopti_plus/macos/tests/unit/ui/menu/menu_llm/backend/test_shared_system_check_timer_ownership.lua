@@ -11,7 +11,7 @@ local MODULES = {
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"core.fs.engine.paths", "infra.timings",
+	"core.fs.engine.paths", "core.timing.engine.timings",
 	"modules.llm",
 	"ui.menu.menu_llm.models_manager",
 	"ui.menu.menu_llm.models_manager_mlx",

@@ -250,7 +250,7 @@ helpers.describe("The AI menu builds no model list (model-selector-page)", funct
 		with_count_menu(function(menu)
 			menu.build_item()
 			local page = require("ui.menu.menu_llm.model_selector_page")
-			local deferred = require("infra.deferred_work")
+			local deferred = require("core.timing.engine.deferred_work")
 			local previous = deferred.after
 			deferred.after = function() return false end
 			local ok, result = pcall(page.open)

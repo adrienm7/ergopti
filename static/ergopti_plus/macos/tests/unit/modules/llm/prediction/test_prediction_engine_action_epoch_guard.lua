@@ -56,7 +56,7 @@ local function load_fixture(streaming)
 		Logger[level] = function() effects.logs = effects.logs + 1 end
 	end
 	package.loaded["core.logger.engine.logger"] = Logger
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_section, key)
 			if key == "chain_fallback_ms" then return 1 end
 			return 0.1

@@ -431,7 +431,7 @@ console.log(
 // Required native writer/hash closure and component lookup ports retain their gate.
 const closureInputs = [
 	'static/ergopti_plus/linux/core/network/engine/managed_http_deadline.lua',
-	'static/ergopti_plus/linux/infra/native_timer.lua',
+	'static/ergopti_plus/linux/core/timing/engine/native_timer.lua',
 	'static/ergopti_plus/linux/core/logger/engine/monotonic.lua',
 	'static/ergopti_plus/linux/core/fs/engine/paths.lua'
 ];

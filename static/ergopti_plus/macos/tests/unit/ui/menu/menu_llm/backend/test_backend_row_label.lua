@@ -20,7 +20,7 @@ local OWNED_MODULES = {
 	"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
 	"ui.menu.menu_llm.backend_labels", "ui.menu.menu_llm.mlx_repair_offer",
-	"modules.llm.mlx_bootstrap_diagnosis", "infra.deferred_work",
+	"modules.llm.mlx_bootstrap_diagnosis", "core.timing.engine.deferred_work",
 	"modules.llm.backend_detector",
 }
 

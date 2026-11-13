@@ -45,7 +45,7 @@ local i18n = require("core.i18n.engine.i18n")
 local ShellRunner = require("core.process.adapters.shell_runner")
 local NativeDialog = require("ui.native_dialog")
 local FileSelection = require("core.fs.engine.file_selection")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 local LOG = "modules.gestures.system_actions"
 local EEXIST = 17 -- Linux exclusive-create collision receipt.

@@ -36,7 +36,7 @@ local function load_module(file_system, observations)
 		end,
 	}
 	package.loaded["core.logger.engine.logger"] = logger_stub()
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_, callback)
 			observations.timers = observations.timers + 1
 			callback()
@@ -56,7 +56,7 @@ local function with_runtime(file_system, body)
 	local original_hs = _G.hs
 	local original_file_system = package.loaded["core.fs.adapters.file_system"]
 	local original_config_paths = package.loaded["infra.config_paths"]
-	local original_deferred_work = package.loaded["infra.deferred_work"]
+	local original_deferred_work = package.loaded["core.timing.engine.deferred_work"]
 	local original_logger = package.loaded["core.logger.engine.logger"]
 	local original_text_utils = package.loaded["core.text.engine.utils"]
 	local original_subject = package.loaded["infra.personal_shortcuts"]
@@ -84,7 +84,7 @@ local function with_runtime(file_system, body)
 	_G.hs = original_hs
 	package.loaded["core.fs.adapters.file_system"] = original_file_system
 	package.loaded["infra.config_paths"] = original_config_paths
-	package.loaded["infra.deferred_work"] = original_deferred_work
+	package.loaded["core.timing.engine.deferred_work"] = original_deferred_work
 	package.loaded["core.logger.engine.logger"] = original_logger
 	package.loaded["core.text.engine.utils"] = original_text_utils
 	package.loaded["infra.personal_shortcuts"] = original_subject

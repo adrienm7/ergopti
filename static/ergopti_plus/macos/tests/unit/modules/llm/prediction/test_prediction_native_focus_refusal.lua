@@ -29,7 +29,7 @@ local OWNED = {
 	"core.logger.engine.logger",
 	"core.fs.engine.paths",
 	"core.text.engine.utils",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"core.text.engine.toml.reader",
 	"core.text.engine.json",
 	"platform.input.keycodes.core",

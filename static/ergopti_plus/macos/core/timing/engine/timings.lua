@@ -1,4 +1,4 @@
---- infra/timings.lua
+--- core/timing/engine/timings.lua
 
 --- ==============================================================================
 --- MODULE: Shared Timings Reader (Hammerspoon)
@@ -18,7 +18,7 @@
 ---    directory.
 ---
 --- USAGE:
----   local Timings = require("infra.timings")
+---   local Timings = require("core.timing.engine.timings")
 ---   local CHAIN_FALLBACK_SEC = Timings.sec("llm", "chain_fallback_ms")
 ---   local IDLE_CHECK_SEC = Timings.sec("keystats", "idle_check_interval_ms")
 --- ==============================================================================

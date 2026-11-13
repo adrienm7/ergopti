@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 
 local DEPENDENCIES = {
 	"core.logger.engine.logger",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
 	"core.events.timer_scheduler",
@@ -112,7 +112,7 @@ local function with_fixture(failure_mode, body)
 			fixture.errors[#fixture.errors + 1] = string.format(format_string, ...)
 		end,
 	}
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function() return 0.25 end,
 	}
 	package.loaded["adapters.event_provenance"] = {

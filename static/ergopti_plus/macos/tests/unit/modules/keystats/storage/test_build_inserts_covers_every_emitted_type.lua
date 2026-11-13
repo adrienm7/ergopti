@@ -100,7 +100,7 @@ local function load_real_keystats()
 		get_db_rev = function() return 0 end, sync_foreign_data_sql = function() end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { t = function(k) return k end, get = function(k) return k end }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		ms  = function(section, key) return (_TIMINGS_MS[section] or {})[key] or 1000 end,
 		sec = function() return 1.0 end,
 	}

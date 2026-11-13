@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 --- @return table watcher, table entries, table control
 local function scripted()
 	local Watcher = helpers.load_with_stubs("modules.keystats.topology_watcher")
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	local entries, now, observation, ids, private = {}, 0, nil, {}, false
 	helpers.assert_true(Watcher.start({
 		append = function(entry) entries[#entries + 1] = entry end,

@@ -16,7 +16,7 @@ local OWNED = {
 	"infra.dialog_util", "adapters.mouse_control", "adapters.window_info",
 	"adapters.window_manager", "adapters.running_application", "adapters.tcc_grant",
 	"core.process.adapters.shell_runner", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
-	"infra.deferred_work", "diagnostics.engine.runtime_log", "core.fs.engine.file_selection", "core.ui.engine.window_titles",
+	"core.timing.engine.deferred_work", "diagnostics.engine.runtime_log", "core.fs.engine.file_selection", "core.ui.engine.window_titles",
 }
 
 --- Runs real business owners with only their native calls recorded.

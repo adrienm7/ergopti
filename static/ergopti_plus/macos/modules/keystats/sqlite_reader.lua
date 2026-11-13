@@ -42,7 +42,7 @@ local Literal = require("core.fs.engine.sqlite.literal")
 local Queries = require("metrics.engine.queries")
 local KUtils = require("metrics.engine.utils")
 local LOG    = "keystats.sqlite_reader"
-local BUSY_TIMEOUT_MS = require("infra.timings").ms("keystats", "sqlite_read_busy_timeout_ms")
+local BUSY_TIMEOUT_MS = require("core.timing.engine.timings").ms("keystats", "sqlite_read_busy_timeout_ms")
 
 
 
@@ -810,7 +810,7 @@ end
 --- @return table into
 function M.merge_ngrams(into, from, pacer)
 	if pacer ~= nil and (type(pacer) ~= "table" or type(pacer.pause) ~= "function") then
-		error("sqlite_reader.merge_ngrams: the pacer must come from infra.paced_job", 2)
+		error("sqlite_reader.merge_ngrams: the pacer must come from core.timing.engine.paced_job", 2)
 	end
 	for code, tokens in pairs(from) do
 		local bucket = into[code]

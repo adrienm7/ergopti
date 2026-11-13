@@ -151,7 +151,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 	for _, refused in ipairs({ false, true }) do
 		helpers.it("(webview-focus-owner) model browser retirement revokes focus, delete refused=" .. tostring(refused), function()
 			local _, state = install_hs_stubs()
-			package.loaded["infra.deferred_work"] = { after = function() return true end }
+			package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 			package.loaded["ui.model_browser"] = nil
 			package.loaded["ui.ui_builder"] = nil
 			local browser = require("ui.model_browser")
@@ -174,7 +174,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 	-- refused one repaints the page, which already drew it as running.
 	helpers.it("(model-selector-install-button) an install click reaches the owner; a refusal sends a new payload", function()
 		local bridge, state = install_hs_stubs()
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["ui.model_browser"] = nil
 		package.loaded["ui.ui_builder"] = nil
 		local browser = require("ui.model_browser")
@@ -200,7 +200,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 
 	helpers.it("(model-browser-operation-session) does not transfer selection authority through logger reentry", function()
 		local bridge, state = install_hs_stubs()
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["ui.model_browser"] = nil
 		package.loaded["ui.ui_builder"] = nil
 		local browser = require("ui.model_browser")
@@ -229,7 +229,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 
 	helpers.it("(model-browser-operation-session) rejects old and untagged actions on native reuse", function()
 		local bridge, state = install_hs_stubs()
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["ui.model_browser"] = nil
 		package.loaded["ui.ui_builder"] = nil
 		local browser = require("ui.model_browser")
@@ -282,7 +282,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 
 	helpers.it("(model-browser-queue-owner) stops flushing after synchronous native replacement", function()
 		local bridge, state = install_hs_stubs()
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["ui.model_browser"] = nil
 		package.loaded["ui.ui_builder"] = nil
 		local browser = require("ui.model_browser")
@@ -305,7 +305,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 	for _, mode in ipairs({ "raise", "nil", "false", "async", "success" }) do
 		helpers.it("(model-browser-javascript-boundary) observes " .. mode .. " without logging catalogue data", function()
 			local bridge, state = install_hs_stubs()
-			package.loaded["infra.deferred_work"] = { after = function() return true end }
+			package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 			local errors = {}
 			package.loaded["core.logger.engine.logger"].error = function(_, fmt, ...)
 				errors[#errors + 1] = string.format(fmt, ...)
@@ -334,7 +334,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 	helpers.it("(model-browser-ready-fallback) injects the catalogue without either readiness notification", function()
 		local _, state = install_hs_stubs()
 		local fallback
-		package.loaded["infra.deferred_work"] = {
+		package.loaded["core.timing.engine.deferred_work"] = {
 			after = function(_, callback, label)
 				if label == "model_browser.ready_fallback" then fallback = callback end
 				return true
@@ -526,7 +526,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 	helpers.it("ignores a deferred navigation callback from a replaced browser", function()
 		local _, state = install_hs_stubs()
 		local timers = {}
-		package.loaded["infra.deferred_work"] = {
+		package.loaded["core.timing.engine.deferred_work"] = {
 			after = function(delay, callback, label)
 				timers[#timers + 1] = { delay = delay, callback = callback, label = label }
 				return true
@@ -558,7 +558,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 
 	helpers.it("ignores bridge messages from a replaced browser controller", function()
 		local _, state = install_hs_stubs()
-		package.loaded["infra.deferred_work"] = {
+		package.loaded["core.timing.engine.deferred_work"] = {
 			after = function() return true end,
 		}
 		package.loaded["ui.model_browser"] = nil

@@ -249,7 +249,7 @@ function M.complete()
 		M.cpu_ms(), total)
 	-- Read here, not at load: the profiler starts before the timings registry.
 	PerfBudget.judge(Logger, LOG, "boot", total,
-		function() return require("infra.timings").ms("budgets", "boot_total_ms") end)
+		function() return require("core.timing.engine.timings").ms("budgets", "boot_total_ms") end)
 end
 
 --- Logs the time since the previous mark and since M.begin().

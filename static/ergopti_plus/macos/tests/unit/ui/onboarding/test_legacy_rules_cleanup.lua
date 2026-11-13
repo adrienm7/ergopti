@@ -14,7 +14,7 @@ local helpers    = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
 
 local MODULES = { "ui.legacy_rules_cleanup", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.dialog_util",
-	"infra.deferred_work" }
+	"core.timing.engine.deferred_work" }
 
 --- Installs recording doubles and loads the dialog module.
 --- @param h table Harness receiving the recordings.
@@ -35,7 +35,7 @@ local function load_cleanup(h)
 			return h.answer
 		end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(delay, callback, label)
 			h.deferred[#h.deferred + 1] = { delay = delay, callback = callback, label = label }
 			return true

@@ -18,7 +18,7 @@ local function with_window(domain, scenario)
 	return helpers.with_stub_scope({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot", "diagnostics.engine.healthcheck.cleanup", "diagnostics.engine.healthcheck.actions",
 		"ui.error_dialog", "diagnostics.engine.reports.error_policy", "diagnostics.engine.reports.error_report", "diagnostics.engine.reports.issue_report", "diagnostics.engine.reports.redact",
-		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder", "ui.webview_close_owner", "core.timing.engine.deferred_work",
 		"core.events.timer_scheduler", "core.fs.adapters.storage", "ui.healthcheck.report", "hs", "tests.stubs.hs",
 		"tests.support.webview_recursive_close_fixture", "core.text.engine.json", "core.fs.adapters.json_codec",
 	}, function()

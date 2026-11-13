@@ -22,7 +22,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("core.logger.engine.logger")
-local DeferredWork  = require("infra.deferred_work")
+local DeferredWork  = require("core.timing.engine.deferred_work")
 local i18n          = require("core.i18n.engine.i18n")
 local Paths         = require("core.fs.engine.paths")
 local FileSystem    = require("core.fs.adapters.file_system")
@@ -302,7 +302,7 @@ function M.open()
 		end,
 		on_navigation = function(action)
 			if action == "didFinishNavigation" and candidate ~= nil and candidate == _webview and _controller then
-				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+				DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), function()
 					if candidate == _webview and _controller then _controller.on_message({ action = "ready" }) end
 				end, "layout_manager.navigation")
 			end
@@ -408,7 +408,7 @@ function M.close() return close_window() end
 --- @return function
 function M.menu_command()
 	return function()
-		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), M.open, "layout_manager.open")
+		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), M.open, "layout_manager.open")
 	end
 end
 
@@ -416,7 +416,7 @@ end
 --- @return function
 function M.editor_menu_command()
 	return function()
-		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), M.open_editor,
+		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), M.open_editor,
 			"layout_manager.open_editor")
 	end
 end

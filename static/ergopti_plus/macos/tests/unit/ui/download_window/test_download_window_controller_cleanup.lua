@@ -16,14 +16,14 @@ local function with_window(scenario)
 	local records = { bridges = {}, views = {}, deletes = 0, releases = 0 }
 	local ok, err = xpcall(function()
 		helpers.with_stub_scope({ "ui.download_window", "ui.download_window.javascript",
-			"ui.download_window.pending_queue", "ui.ui_builder", "core.logger.engine.logger", "core.fs.engine.paths", "infra.timings",
-			"core.i18n.engine.i18n", "infra.deferred_work", "core.process.adapters.shell_runner",
+			"ui.download_window.pending_queue", "ui.ui_builder", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
+			"core.i18n.engine.i18n", "core.timing.engine.deferred_work", "core.process.adapters.shell_runner",
 			"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy" }, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/assets" end }
 			helpers.provide_timings()
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.deferred_work"] = { after = function() return true end }
+			package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 			package.loaded["core.process.adapters.shell_runner"] = {}
 			_G.hs = {
 				timer = { secondsSinceEpoch = function() return 1 end,

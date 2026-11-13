@@ -66,7 +66,7 @@ helpers.describe("injector: the erase pause follows the pacing port", function()
 		local injector, pauses = load()
 		injector.set_erase_pacing(function() return true end)
 		helpers.assert_true(injector.inject(2, "Bo").ok)
-		local delay = require("infra.timings").ms("debounce", "terminal_hotstring_key_delay_ms") / 1000
+		local delay = require("core.timing.engine.timings").ms("debounce", "terminal_hotstring_key_delay_ms") / 1000
 		helpers.assert_eq(pauses, { delay, delay },
 			"a terminal reads each deletion against its own render, as Windows and macOS pace it")
 		done()

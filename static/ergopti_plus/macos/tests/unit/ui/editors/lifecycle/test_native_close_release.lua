@@ -19,7 +19,7 @@ local function with_native_editor(name, scenario)
 	return helpers.with_stub_scope({
 		"ui.hotstring_editor", "ui.hotstring_editor.save_validation", "ui.hotstrings_config_window",
 		"ui.personal_info_editor", "ui.prompt_editor", "ui.ui_builder", "ui.webview_close_owner", "core.events.timer_scheduler",
-		"adapters.webview_result", "infra.deferred_work", "core.fs.engine.paths", "core.fs.engine.dir", "infra.notifications",
+		"adapters.webview_result", "core.timing.engine.deferred_work", "core.fs.engine.paths", "core.fs.engine.dir", "infra.notifications",
 		"core.text.engine.toml.reader", "core.text.engine.toml.writer", "modules.hotstrings.hotstrings_config",
 		"modules.hotstrings.hotstrings_config_schema", "adapters.hotkey_registrar", "keyboard.engine.chord",
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",

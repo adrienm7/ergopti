@@ -24,7 +24,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local NativeTimer = require("infra.native_timer")
+local NativeTimer = require("core.timing.engine.native_timer")
 local NumberPolicy = require("core.text.engine.number_policy")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 

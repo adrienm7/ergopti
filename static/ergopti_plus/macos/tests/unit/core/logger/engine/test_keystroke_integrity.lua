@@ -17,7 +17,7 @@ local function noop() end
 helpers.describe("core.logger.engine.keystroke_integrity", function()
 	local saved = {
 		logger = package.loaded["core.logger.engine.logger"],
-		deferred = package.loaded["infra.deferred_work"],
+		deferred = package.loaded["core.timing.engine.deferred_work"],
 		timer = package.loaded["core.events.timer_scheduler"],
 		subject = package.loaded["core.logger.engine.keystroke_integrity"],
 	}
@@ -28,7 +28,7 @@ helpers.describe("core.logger.engine.keystroke_integrity", function()
 		end,
 		info = noop, debug = noop, error = noop,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(delay, callback, label)
 			deferred[#deferred + 1] = { delay = delay, callback = callback, label = label }
 			return true
@@ -103,7 +103,7 @@ helpers.describe("core.logger.engine.keystroke_integrity", function()
 	end)
 
 	package.loaded["core.logger.engine.logger"] = saved.logger
-	package.loaded["infra.deferred_work"] = saved.deferred
+	package.loaded["core.timing.engine.deferred_work"] = saved.deferred
 	package.loaded["core.events.timer_scheduler"] = saved.timer
 	package.loaded["core.logger.engine.keystroke_integrity"] = saved.subject
 end)

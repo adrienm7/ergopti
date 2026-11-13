@@ -213,7 +213,7 @@ function M.run(options)
 		elseif name == "infra.typed_input_withheld" then
 			-- The session's withheld-input summary is logged as the daemon exits.
 			return { summary = function() record("withheld.summary"); return "controlled withheld summary" end }
-		elseif name == "infra.reload_timing" then
+		elseif name == "core.timing.engine.reload_timing" then
 			-- The Reload this boot completes is reported once the boot is complete.
 			return { complete = function() record("reload.complete"); return nil end }
 		elseif name == "infra.field_run" then

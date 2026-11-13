@@ -31,7 +31,7 @@ local M = {}
 
 local Layers = require("layouts.engine.layers.layers")
 local TomlWriter = require("core.text.engine.toml_codec.writer")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 
 

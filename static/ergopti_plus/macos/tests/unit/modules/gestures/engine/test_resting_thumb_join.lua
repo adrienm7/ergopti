@@ -58,7 +58,7 @@ local function new_harness()
 	local saved_clock = hs.timer.secondsSinceEpoch
 	local saved_absolute = hs.timer.absoluteTime
 	local saved_scheduler = package.loaded["core.events.timer_scheduler"]
-	local saved_timings = package.loaded["infra.timings"]
+	local saved_timings = package.loaded["core.timing.engine.timings"]
 	local saved_logger = package.loaded["core.logger.engine.logger"]
 	local debug_lines = {}
 	local real_logger = require("core.logger.engine.logger")
@@ -73,7 +73,7 @@ local function new_harness()
 	hs.timer.secondsSinceEpoch = function() return clock end
 	hs.timer.absoluteTime = function() return clock * 1e9 end
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["infra.timings"] = nil
+	package.loaded["core.timing.engine.timings"] = nil
 	package.loaded["modules.gestures.engine"] = nil
 	hs.eventtap.__reset()
 
@@ -130,7 +130,7 @@ local function new_harness()
 		hs.timer.secondsSinceEpoch = saved_clock
 		hs.timer.absoluteTime = saved_absolute
 		package.loaded["core.events.timer_scheduler"] = saved_scheduler
-		package.loaded["infra.timings"] = saved_timings
+		package.loaded["core.timing.engine.timings"] = saved_timings
 		package.loaded["core.logger.engine.logger"] = saved_logger
 		package.loaded["modules.gestures.engine"] = nil
 	end

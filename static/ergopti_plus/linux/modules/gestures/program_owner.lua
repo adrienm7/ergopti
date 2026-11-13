@@ -4,7 +4,7 @@
 local Runner = require("core.process.adapters.program_runner")
 local Worker = require("core.lifecycle.engine.native_worker_owner")
 local Parameter = require("settings.engine.program_parameter")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local Logger = require("core.logger.engine.shim")
 local loaded, Native = pcall(require, "luv")
 if not loaded then Native = nil end

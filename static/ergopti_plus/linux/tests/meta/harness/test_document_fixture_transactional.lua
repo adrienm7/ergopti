@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 local DocumentFixture = require("tests.support.document_fixture")
 
 local SWAPPED = {
-	"lgi", "core.logger.engine.monotonic", "infra.timings", "core.network.engine.managed_http_deadline",
+	"lgi", "core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline",
 	"core.events.loop", "adapters.notifier", "adapters.application_notifier",
 	"ui.webkit_host", "ui.webview_manager",
 }
@@ -59,7 +59,7 @@ helpers.describe("document fixture: transactional construction", function()
 
 	helpers.it("leaves the real timings registry usable after a failure", function()
 		pcall(DocumentFixture.new, "", { bridge_name = "fixture" }, nil)
-		local Timings = require("infra.timings")
+		local Timings = require("core.timing.engine.timings")
 		local read_ok, timeout_ms = pcall(Timings.ms, "ui", "document_initialization_ack_timeout_ms")
 		helpers.assert_true(read_ok and type(timeout_ms) == "number" and timeout_ms > 0,
 			"the real registry still answers: " .. tostring(timeout_ms))

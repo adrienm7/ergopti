@@ -11,7 +11,7 @@ local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local SectionOrder = require("hotstrings.engine.section_order")
 local TableUtil = require("core.text.engine.table_util")
 local Logger        = require("core.logger.engine.logger")
-local DeferredWork  = require("infra.deferred_work")
+local DeferredWork  = require("core.timing.engine.deferred_work")
 local ShellRunner   = require("core.process.adapters.shell_runner")
 local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
@@ -286,7 +286,7 @@ local function buildPersonalInfoItems(ctx, description)
 	local editor = template("personal_info_editor_frame", {
 		personal_info_editor_open = function()
 			if not current() then return false end
-			return DeferredWork.after(require("infra.timings").sec("ui", "editor_open_after_click_ms"),
+			return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "editor_open_after_click_ms"),
 				function()
 					if not current() then return false end
 					pcall(ctx.personal_info.open_editor)

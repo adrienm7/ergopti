@@ -123,7 +123,7 @@ helpers.describe("input source switch: plans", function()
 			for index, step in ipairs(steps) do out[index] = step.program .. " " .. table.concat(step.args, " ") end
 			return out
 		end
-		local settle = string.format("%.3f", require("infra.timings").ms("ui", "gnome_input_source_settle_ms") / 1000)
+		local settle = string.format("%.3f", require("core.timing.engine.timings").ms("ui", "gnome_input_source_settle_ms") / 1000)
 		helpers.assert_eq(lines(Switch.plan(listing, "xkb:fr+ergopti")), {
 			"gsettings set org.gnome.desktop.input-sources sources [('xkb', 'fr+ergopti')]",
 			"sleep " .. settle,

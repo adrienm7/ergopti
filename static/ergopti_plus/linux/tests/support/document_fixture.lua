@@ -9,7 +9,7 @@ local Json = require("core.text.engine.json")
 function M.new(app_name, handler, state)
 	local c = { views = {}, windows = {}, timers = {}, now = 100, scripts = {}, effects = {}, notices = {}, idles = {}, signal_serial = 0 }
 	local saved = {}
-	local names = {"lgi","core.logger.engine.monotonic","infra.timings","core.network.engine.managed_http_deadline",
+	local names = {"lgi","core.logger.engine.monotonic","core.timing.engine.timings","core.network.engine.managed_http_deadline",
 		"core.events.loop","adapters.notifier","adapters.application_notifier","ui.webkit_host","ui.webview_manager"}
 	for _,name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 	local real_host = require("ui.webkit_host")
@@ -106,7 +106,7 @@ function M.new(app_name, handler, state)
 				ucm.on_script_message_received[ucm.signal_details[id]]=nil
 			end,signal_handler_is_connected=function(ucm,id)return ucm.connected[id]==true end}}
 		package.loaded["core.logger.engine.monotonic"]={now_ms=function()return c.now end,has_hires=function()return true end}
-		package.loaded["infra.timings"]={ms=function(section,key)
+		package.loaded["core.timing.engine.timings"]={ms=function(section,key)
 			assert(section=="ui" and key=="document_initialization_ack_timeout_ms");return 5000 end}
 		package.loaded["core.network.engine.managed_http_deadline"]={start=function(deadline,expired)
 			local t={started=true,settled=false,listeners={},deadline=deadline,expired=expired}
