@@ -166,11 +166,13 @@ helpers.describe("developer source mode: the launcher helper is found from the r
 			helpers.assert_eq(resolved, helper_path, tostring(reason))
 			os.getenv = function(name)
 				if name == "ERGOPTI_LAUNCHER_EXECUTABLE" then return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus" end
+				if name == "ERGOPTI_LAUNCHER_DEVICE" then return "7" end
+				if name == "ERGOPTI_LAUNCHER_INODE" then return "9" end
 				return original_getenv(name)
 			end
 			local foreign, foreign_reason = helper.resolve()
 			helpers.assert_eq(foreign, nil, "another app's launcher must not cross the spawn boundary")
-			helpers.assert_contains(foreign_reason, "differs from the bundle-owned helper")
+			helpers.assert_contains(foreign_reason, "is not the bundle-owned helper")
 		end, debug.traceback)
 		os.getenv = original_getenv
 		package.loaded["infra.dev_source"] = saved

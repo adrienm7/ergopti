@@ -8,8 +8,9 @@
 --- application bundle containing this driver may cross the spawn boundary.
 ---
 --- FEATURES & RATIONALE:
---- 1. Bundle-Bound Override: the launcher export is accepted only when it equals
----    the exact helper path derived independently from this bundled Lua tree.
+--- 1. Bundle-Bound Override: the launcher export is accepted only when it is the
+---    same regular file as the helper derived independently from this bundled
+---    Lua tree, proved by file identity rather than by spelling (MLC-005).
 --- 2. Bundle Derivation: direct launches of the embedded Hammerspoon still find
 ---    Contents/MacOS/ErgoptiPlus from the bundled Lua source path. A developer
 ---    app runs a clone, so its helper is derived from the runtime's own bundle.
@@ -66,33 +67,44 @@ local function is_canonical_identity_text(value)
 		and (value == "0" or value:match("^[1-9]%d*$") ~= nil)
 end
 
---- Proves that a candidate is the exact regular executable derived from the
---- containing application bundle, not a same-named alias or wrapper. Basename is
---- only a shape check; equality with the independently derived bundle path is the
---- authority that prevents a renamed stock Karabiner process from being spawned.
---- @param path string Candidate helper path.
---- @param expected_path string Exact bundle-derived helper path.
+--- Reads one path's own file identity without following a final symlink.
+--- @param path string
+--- @return string|nil device, string|nil inode Nil unless a regular file.
+local function regular_file_identity(path)
+	local ok, attributes = pcall(hs.fs.symlinkAttributes, path)
+	if not ok or type(attributes) ~= "table" or attributes.mode ~= "file" then return nil end
+	return identity_component(attributes.dev), identity_component(attributes.ino)
+end
+
+--- Proves that the launcher's exported path and the bundle-derived path name
+--- the same regular executable, the one the running launcher exported the file
+--- identity of. The proof is the file identity, not the spelling: Hammerspoon
+--- loads init.lua under a resolved path (/private/var for a translocated app, the
+--- target of a symlinked Applications folder) and an accented folder may reach
+--- each side in another Unicode form, while Foundation exports the launcher's
+--- own spelling (MLC-005). A symlink at the helper itself, a renamed wrapper, a
+--- replaced file and a path resolving to another program are still refused.
+--- @param override string Path the running launcher exported.
+--- @param bundled string Helper path derived from this driver's bundle.
 --- @param expected_device string Device exported by the running launcher.
 --- @param expected_inode string Inode exported by the running launcher.
 --- @return boolean valid
-local function is_helper_executable(path, expected_path, expected_device, expected_inode)
-	if type(path) ~= "string" or path == "" then return false end
-	if type(expected_path) ~= "string" or path ~= expected_path then return false end
-	if basename(path) ~= HELPER_BASENAME then return false end
+local function is_helper_executable(override, bundled, expected_device, expected_inode)
+	if type(override) ~= "string" or override == "" or type(bundled) ~= "string" or bundled == "" then
+		return false
+	end
+	if basename(override) ~= HELPER_BASENAME or basename(bundled) ~= HELPER_BASENAME then return false end
 	if not hs or type(hs.fs) ~= "table"
 		or type(hs.fs.attributes) ~= "function"
 		or type(hs.fs.symlinkAttributes) ~= "function"
 		or type(hs.fs.pathToAbsolute) ~= "function" then
 		return false
 	end
-	local lstat_ok, link_attributes = pcall(hs.fs.symlinkAttributes, path)
-	if not lstat_ok or type(link_attributes) ~= "table"
-		or link_attributes.mode ~= "file"
-		or identity_component(link_attributes.dev) ~= expected_device
-		or identity_component(link_attributes.ino) ~= expected_inode then
-		return false
+	for _, path in ipairs({ override, bundled }) do
+		local device, inode = regular_file_identity(path)
+		if device ~= expected_device or inode ~= expected_inode then return false end
 	end
-	local ok, attributes = pcall(hs.fs.attributes, path)
+	local ok, attributes = pcall(hs.fs.attributes, bundled)
 	if not ok or type(attributes) ~= "table" or attributes.mode ~= "file"
 		or type(attributes.permissions) ~= "string"
 		or attributes.permissions:find("x", 1, true) == nil
@@ -100,8 +112,11 @@ local function is_helper_executable(path, expected_path, expected_device, expect
 		or identity_component(attributes.ino) ~= expected_inode then
 		return false
 	end
-	local resolved_ok, resolved = pcall(hs.fs.pathToAbsolute, path)
-	return resolved_ok and resolved == expected_path
+	-- Whatever folders lead to it, the file must sit in an application bundle's
+	-- executable folder under the helper's name.
+	local resolved_ok, resolved = pcall(hs.fs.pathToAbsolute, bundled)
+	return resolved_ok and type(resolved) == "string"
+		and resolved:match("%.app/Contents/MacOS/" .. HELPER_BASENAME .. "$") ~= nil
 end
 
 local function bundle_candidate(driver_root)
@@ -142,22 +157,20 @@ function M.resolve(driver_root_override)
 	if type(override) ~= "string" or override == "" then
 		return nil, "running launcher did not export its exact helper path"
 	end
-	if override ~= bundled then
-		return nil, "ERGOPTI_LAUNCHER_EXECUTABLE differs from the bundle-owned helper"
-	end
 	if not is_canonical_identity_text(expected_device)
 		or not is_canonical_identity_text(expected_inode) then
 		return nil, "running launcher did not export a canonical helper file identity"
 	end
-	if is_helper_executable(bundled, bundled, expected_device, expected_inode) then
-		return bundled, nil, {
-			[HELPER_ENV] = bundled,
+	if is_helper_executable(override, bundled, expected_device, expected_inode) then
+		-- The launcher's own spelling: it is the path it exported to this child.
+		return override, nil, {
+			[HELPER_ENV] = override,
 			[HELPER_DEVICE_ENV] = expected_device,
 			[HELPER_INODE_ENV] = expected_inode,
 		}
 	end
 
-	return nil, "bundle-owned ErgoptiPlus helper no longer matches the running launcher"
+	return nil, "ERGOPTI_LAUNCHER_EXECUTABLE is not the bundle-owned helper the running launcher identified"
 end
 
 return M
