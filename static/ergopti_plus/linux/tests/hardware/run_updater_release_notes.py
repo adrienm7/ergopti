@@ -74,14 +74,17 @@ def main():
             "Actual release notes",
         ]
         for index, note in enumerate(notes, 1):
+            # The updater admits an asset only under the release page's own /download/<tag>/ path (UPX-002).
             assets = [
                 {
                     "name": "ergopti-plus-linux.tar.gz",
-                    "browser_download_url": origin + "/never-requested-bundle",
+                    "browser_download_url": origin
+                    + "/releases/download/v1.2.0/ergopti-plus-linux.tar.gz",
                 },
                 {
                     "name": "ergopti-plus-linux.tar.gz.sha256",
-                    "browser_download_url": origin + "/never-requested-checksum",
+                    "browser_download_url": origin
+                    + "/releases/download/v1.2.0/ergopti-plus-linux.tar.gz.sha256",
                 },
             ]
             release = {
