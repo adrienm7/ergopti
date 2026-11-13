@@ -57,10 +57,13 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
 
 ### Maintainer decisions of 2026-11-13, to implement
 
-- [ ] **One-shot modifiers (OSM-002 and beyond).** A one-shot timeout of 0 is refused at entry on every OS (it
-      would never work); an unlimited timeout stays allowed. Generalize one-shot to every modifier (Shift, Ctrl,
-      Alt, AltGr, Kana, Cmd/Win) on Windows, macOS and Linux, so one key can hold AltGr and tap a one-shot AltGr.
-      Shared defaults, menu entries in every locale, tests per OS.
+- [ ] **One-shot modifiers (OSM-002 and beyond).** Timeout: an unlimited one-shot timeout is allowed on every OS;
+      exactly 0 is refused (it would never apply), at entry in the menu and the configuration file, and a stored 0
+      is reported at load and replaced by the default with a log line. No other minimum: a fast typist presses the
+      next key almost at once, so any positive value stays valid. Features: make sure every one-shot exists on
+      Windows, macOS and Linux, single and combined: Shift, Ctrl, Alt, AltGr, Kana, Win/Cmd, and chords such as
+      Ctrl+Shift or Win+Ctrl; a key can tap one modifier's one-shot and hold that modifier (AltGr key: one-shot
+      AltGr on tap, AltGr on hold). Shared defaults, menu entries in every locale, tests per OS.
 - [ ] **Direct XKB and KLC compilers.** Replace the compiled `.keylayout` as the intermediate form for Linux and
       Windows: compile the Ergopti TOML source straight to XKB and to KLC, using each format's full capability
       (XKB levels 3 and 5 on any key and sided modifiers; KLC Kana/Roya/Loya bits), so sided-modifier layers are
