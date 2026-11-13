@@ -184,12 +184,24 @@ function M.status()
 	return { active = _status.active, id = _status.id, error = _status.error }
 end
 
---- Drops a pending dead key (pause, focus change), and a held or locked custom
---- modifier or a tap-hold's held modifier.
+--- Drops a pending dead key, and a held or locked custom modifier or a
+--- tap-hold's held modifier (a failed key release). A pause drops only the
+--- dead key (drop_pending_dead_key).
 function M.reset()
 	if _session ~= nil then Emulation.reset(_session) end
 	if _extras ~= nil then SourceEmulation.reset(_extras) end
 	_virtual = {}
+end
+
+--- Drops a pending dead key when the script pauses, as both Windows engines
+--- do: the paused tap types nothing through the emulation, so a dead key left
+--- pending would compose with the first key typed after the resume. Held or
+--- locked custom modifiers are left to their own release path.
+--- @return boolean dropped True when a dead key was pending.
+function M.drop_pending_dead_key()
+	if _session == nil or not Emulation.pending(_session) then return false end
+	Emulation.reset(_session)
+	return true
 end
 
 --- Forgets the collaborators and the session (test seam).

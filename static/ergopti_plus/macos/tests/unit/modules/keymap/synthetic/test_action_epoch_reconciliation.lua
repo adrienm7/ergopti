@@ -447,6 +447,22 @@ helpers.describe("keymap action epochs", function()
 		fixture.keymap.stop()
 	end)
 
+	helpers.it("drops the emulation's pending dead key when processing pauses (pause-drops-dead-key)", function()
+		local fixture = load_fixture()
+		local emulation = package.loaded["modules.keymap.layout_emulation"]
+		local original, drops = emulation.drop_pending_dead_key, 0
+		emulation.drop_pending_dead_key = function() drops = drops + 1; return true end
+		local ok, err = pcall(function()
+			helpers.assert_eq(fixture.keymap.pause_processing(), true)
+			helpers.assert_eq(drops, 1, "the pause reaches the emulation's dead key")
+			helpers.assert_eq(fixture.keymap.resume_processing(), true)
+			helpers.assert_eq(drops, 1, "a resume drops nothing")
+		end)
+		emulation.drop_pending_dead_key = original
+		fixture.keymap.stop()
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("an action with no following key clears the buffer and hides predictions", function()
 		local fixture = load_fixture()
 		fixture.advance()
