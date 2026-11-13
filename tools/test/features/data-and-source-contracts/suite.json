@@ -745,6 +745,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-lua-prefix-sweeps.cjs"],
 			"repro": "npm run test:structure-lua-prefix-sweeps"
+		},
+		{
+			"id": "js-0520",
+			"ordinal": 639,
+			"name": "structure plan never widens a live scope to the folder above a scattered one",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-scope-ancestor.cjs"],
+			"repro": "npm run test:structure-scope-ancestor"
 		}
 	]
 }

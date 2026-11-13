@@ -1755,10 +1755,18 @@ function scanFile(file, text, ctx) {
 				.replace(/\\/g, '/')
 				.replace(/^\/+|\/+$/g, '')
 				.split('/').length === 1;
-		// A scattered folder whose nearest new home is a driver root: in live
-		// code, the root would widen a scan to the whole driver. An element of a
-		// list on its own line becomes one element per real new home.
-		if (!prose && successor && Census.DRIVERS.some((d) => successor === `${PREFIX}${d}`)) {
+		// A scattered folder whose nearest new home is a driver root, or a
+		// folder above it inside a tree (tests/unit for tests/unit/infra): in live
+		// code that folder would widen a scan or a test shard to all its
+		// siblings. An element of a list on its own line becomes one element per
+		// real new home. A tree root itself keeps the rules below: a local
+		// holding it is joined to pieces that are respelled from it.
+		const widens =
+			successor &&
+			(Census.DRIVERS.some((d) => successor === `${PREFIX}${d}`) ||
+				(hit.oldRepo.startsWith(`${successor}/`) &&
+					!Census.TREES.some((t) => successor === `${PREFIX}${t}`)));
+		if (!prose && widens) {
 			const expanded = splitScopeLine(text, m.index, raw, hit.oldRepo, map);
 			if (expanded) add('scope-split', expanded.old, expanded.new, hit);
 			// A folder that keeps files keeps its name, for the reviewer and the
