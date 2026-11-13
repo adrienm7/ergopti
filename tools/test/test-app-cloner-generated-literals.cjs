@@ -234,6 +234,20 @@ try {
 				`Physical CLI ownership is unknown; retain ${fixtureRoot}: ${physicalRun.stdout}`
 			);
 		const signalExit = 128 + os.constants.signals.SIGXFSZ;
+		// How /bin/cat reports a closed reading end, observed outside the CLI:
+		// BSD and GNU cat die of SIGPIPE (141); uutils cat (Ubuntu 26.04)
+		// ignores it and exits 1 on EPIPE. Either is a reported failure.
+		const pipeProbe = spawnSync(
+			'python3',
+			[
+				'-c',
+				'import os,subprocess\nr,w=os.pipe()\nos.close(r)\n' +
+					'print(subprocess.run(["/bin/cat"],input=b"x",stdout=w,stderr=subprocess.DEVNULL).returncode)'
+			],
+			{ encoding: 'utf8', timeout: 10000 }
+		);
+		const pipeStatus = Number(pipeProbe.stdout.trim());
+		const closedPipeExit = pipeStatus === 1 ? 1 : 128 + os.constants.signals.SIGPIPE;
 		const expectedPhysical = {
 			'clone:healthy': 0,
 			'clone:finite': signalExit,
@@ -252,9 +266,9 @@ try {
 			'shortcut:result-backslash-c': 0,
 			'shortcut:result-backslash-t': 0,
 			'clone:result-closed-fd': 1,
-			'clone:result-closed-pipe': 128 + os.constants.signals.SIGPIPE,
+			'clone:result-closed-pipe': closedPipeExit,
 			'shortcut:result-closed-fd': 1,
-			'shortcut:result-closed-pipe': 128 + os.constants.signals.SIGPIPE,
+			'shortcut:result-closed-pipe': closedPipeExit,
 			'owner:refusal-zero': 1,
 			'owner:refusal-primary': 74
 		};
