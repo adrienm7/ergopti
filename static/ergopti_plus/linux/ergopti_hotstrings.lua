@@ -3127,6 +3127,10 @@ local function main()
 					covered = tooltip_preview.note_covered,
 					redraw = tooltip_preview.redraw,
 				},
+				-- An offer left alone runs out, as on Windows and macOS.
+				on_expire = function()
+					if prediction_engine then prediction_engine.dismiss() end
+				end,
 			}) then llm_overlay = nil end
 			Logger.info(LOG, "Preview tooltip initialised (renderer available: %s).",
 				tostring(require("adapters.graphics_renderer").is_available()))

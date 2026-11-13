@@ -36,6 +36,10 @@ local settle_cleanup
 -- covered = fn }. rows() answers the preview rows to draw above the
 -- suggestions (llm.trigger.while_hotstring_tooltip = "both"), nil otherwise.
 local _companion = nil
+-- An offer's lifetime, armed at its first shown answer and cancelled by hide():
+-- { handle, token }, and the owner told when it runs out (the engine's dismiss).
+local _expiry = nil
+local _on_expire = nil
 
 --- The pieces a candidate's line reads, each with its role.
 ---
@@ -138,6 +142,7 @@ function M.init(opts)
 	_anchor_provider = opts.anchor_provider
 	_screen_provider = opts.screen_provider
 	_companion = type(opts.companion) == "table" and opts.companion or nil
+	_on_expire = type(opts.on_expire) == "function" and opts.on_expire or nil
 	if type(_style) ~= "table" or type(_renderer) ~= "table" then
 		Logger.error(LOG, "Suggestion overlay initialisation failed: style or renderer unavailable.")
 		return false
@@ -305,6 +310,31 @@ local function attempt_draw(generation)
 	return called and result == true
 end
 
+local function cancel_expiry()
+	local old = _expiry
+	_expiry = nil
+	if old then pcall(require("adapters.timer_scheduler").cancel, old.handle) end
+end
+
+--- Arms the offer's lifetime once, at its first shown answer (a loading
+--- placeholder starts nothing), as Windows and macOS do.
+local function arm_expiry()
+	if _expiry or not _on_expire or _meta.loading == true then return end
+	local token = {}
+	local Scheduler = require("adapters.timer_scheduler")
+	local called, handle = pcall(Scheduler.after, Config.llm_timeout_seconds(), function()
+		if not _expiry or _expiry.token ~= token then return end
+		_expiry = nil
+		local ok, err = pcall(_on_expire)
+		if not ok then Logger.warn(LOG, "AI suggestion expiry observer failed: %s", tostring(err)) end
+	end)
+	if not called or type(handle) ~= "table" or handle.armed ~= true then
+		Logger.warn(LOG, "AI suggestion lifetime could not be armed; it stays until the next activity.")
+		return
+	end
+	_expiry = { handle = handle, token = token }
+end
+
 --- Replaces the displayed candidates atomically.
 --- @param candidates table
 --- @param meta table|nil
@@ -321,6 +351,7 @@ function M.show(candidates, meta)
 	_candidates = candidates
 	_meta = type(meta) == "table" and meta or {}
 	_active_index = math.min(math.max(1, tonumber(_meta.active_index) or 1), math.max(1, #candidates))
+	if #candidates > 0 then arm_expiry() end
 	return attempt_draw(_generation)
 end
 
@@ -381,6 +412,7 @@ end
 
 --- Revokes an offer covered by a failed companion draw, without touching its surface.
 function M.revoke_presentation()
+	cancel_expiry()
 	_generation = _generation + 1
 	_candidates, _active_index, _meta = {}, 1, {}
 end
@@ -401,6 +433,7 @@ function M.hide()
 		if not called or hidden ~= true then return false end
 	end
 	local shared = #_candidates > 0 and companion_rows() ~= nil
+	cancel_expiry()
 	_candidates = {}
 	_active_index = 1
 	_meta = {}
