@@ -2591,13 +2591,18 @@ function scanFile(file, text, ctx) {
 			// The log tag of an embedded Lua chunk (Logger.error("x.y", …)) is
 			// the module's name, as in the Lua it mirrors, where it follows.
 			const tag = m[1].includes('.') && isLuaLogTagSite(text, m.index);
+			// rawget(separator_modules, "infra.i18n") in a quoted Lua line: a dotted
+			// key read from a table that aliases package.loaded where the line runs.
+			const rawKey =
+				m[1].includes('.') &&
+				/\brawget\s*\(\s*[A-Za-z_]\w*\s*,\s*$/.test(text.slice(Math.max(0, m.index - 60), m.index));
 			if (
-				(!dotted && !listed && !tag && !isModuleLoadSite(text, m.index)) ||
+				(!dotted && !listed && !tag && !rawKey && !isModuleLoadSite(text, m.index)) ||
 				NODE_MODULES.has(m[1])
 			)
 				continue;
 			// The same Ruby load in a tool.
-			if (!dotted && !listed && !tag && rubyNotLua(text)) continue;
+			if (!dotted && !listed && !tag && !rawKey && rubyNotLua(text)) continue;
 			const shared = byLuaName.get(`_shared|${m[1]}`);
 			const own = drivers.map((d) => byLuaName.get(`${d}|${m[1]}`)).filter(Boolean);
 			const targets = new Set(own.map((h) => h[2]));
@@ -2605,7 +2610,7 @@ function scanFile(file, text, ctx) {
 			if (hit && hit[2])
 				add('lua-module', m[1], hit[2], {
 					oldRepo: PREFIX + hit[0],
-					loadOnly: !dotted && !listed && !tag,
+					loadOnly: !dotted && !listed && !tag && !rawKey,
 					listed: listed && !dotted
 				});
 		}
