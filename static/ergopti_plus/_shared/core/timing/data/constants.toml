@@ -1255,6 +1255,11 @@ updater_callback_defer_ms = 50
 # within this delay rather than at the next one-second layout poll.
 # AHK: modules/keymap/layout_registry_watch.ahk.
 layout_registry_watch_poll_ms = 100
+# Linux: the longest `xkbcli dump-keymap-wayland` may wait for the
+# compositor's keymap. libxkbcommon 1.8+ waits for a wl_keyboard keymap event,
+# which a seat without a keyboard never sends: unbounded, the start-up hung.
+# LX: adapters/keyboard_layout.lua.
+wayland_keymap_dump_timeout_ms = 3000
 
 # Windows: minimum age of an abandoned atomic-write stage before it is reaped.
 # AHK: infra/toml/toml_helpers.ahk StaleTempAgeMs (pinned copy).
