@@ -222,6 +222,12 @@ function run() {
 			rewrite('tools/x.cjs', "const L = path.join(SP, '_shared', 'zz_probe_data', 'locales');"),
 			"const L = path.join(SP, '_shared', 'core', 'zz_probe_i18n', 'data', 'locales');"
 		);
+		// A shared argument that climbs into a driver keeps its climb (S35 cut
+		// "../macos/updater/…" to "dater/…" by slicing the _shared prefix).
+		assert.equal(
+			rewrite(`${P}macos/y.lua`, 'local s = Paths.shared("../macos/zz_probe_llm/binary.lua")'),
+			'local s = Paths.shared("../macos/zz_ai/adapters/binary.lua")'
+		);
 		assert.equal(
 			rewrite(`${P}linux/y.lua`, 'local d = Paths.shared("zz_probe_mod/hotstrings")'),
 			'local d = Paths.shared("zz_probe_hs/data")',
