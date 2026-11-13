@@ -1,6 +1,6 @@
 // src/lib/js/hotstringDataUrls.js
 
-const hotstringsRoot = 'ergopti_plus/_shared/modules/hotstrings';
+const hotstringsRoot = 'ergopti_plus/_shared/hotstrings/data/catalogue';
 
 /**
  * Return the shared symbols and French demo catalogues in their source order.

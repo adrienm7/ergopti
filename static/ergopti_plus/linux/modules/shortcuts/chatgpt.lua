@@ -21,14 +21,14 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Manifest = require("infra.manifest_reader")
 local Shell = require("adapters.shell_runner")
 local Paths = require("infra.config_paths")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local ConfigKeys = require("config_keys")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.shortcuts.chatgpt"
 local FEATURE_PATH = ConfigKeys.KEY.SHORTCUTS_CHATGPT_URL

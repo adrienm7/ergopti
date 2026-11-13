@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 local function scan(source)
 	return helpers.with_stub_scope({ "adapters.storage", "adapters.file_system", "infra.config_overrides",
 		"infra.preferences", "ui.onboarding", "ui.menu.unused_keys_cleanup", "ui.menu.builder",
-		"menu.wrap_preferences", "compat.utf8" }, function()
+		"menu.engine.wrap_preferences", "core.lifecycle.engine.compat.utf8" }, function()
 		local stored = {}
 		package.loaded["adapters.storage"] = { set = function(key, value) stored[key] = value; return true end,
 			get = function(key) return stored[key] end, delete = function(key) stored[key] = nil; return true end,
@@ -14,7 +14,7 @@ local function scan(source)
 		helpers.load_with_stubs("infra.config_overrides")
 		helpers.load_with_stubs("ui.onboarding")
 		local cleanup = helpers.load_with_stubs("ui.menu.unused_keys_cleanup")
-		local result = require("config_unused_keys").find_in_source(source, cleanup.collect)
+		local result = require("settings.engine.migration.unused_keys").find_in_source(source, cleanup.collect)
 		helpers.assert_eq(result.status, "ok")
 		local offered = {}
 		for _, key in ipairs(result.keys) do offered[table.concat(key.path, ".")] = true end

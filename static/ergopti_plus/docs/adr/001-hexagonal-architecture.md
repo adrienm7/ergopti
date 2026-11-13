@@ -39,7 +39,7 @@ Adopt a **hexagonal (ports-and-adapters) architecture** across all drivers.
 - **Adapters** are driver-specific implementations of those contracts. The
   macOS driver provides Hammerspoon adapters; the Linux driver provides
   LuaJIT/POSIX adapters; the Windows driver provides AHK COM adapters.
-- **Domain modules** in `static/ergopti_plus/_shared/core/domain/` depend only on
+- **Domain modules** in `static/ergopti_plus/_shared/core/text/data/domain/` depend only on
   port interfaces, never on concrete OS APIs.
 
 The twenty port contracts are: `FileSystem`, `HttpClient`, `KeyboardHook`,
@@ -87,4 +87,4 @@ The twenty port contracts are: `FileSystem`, `HttpClient`, `KeyboardHook`,
 - Port spec documentation: `static/ergopti_plus/_shared/core/ports/SPEC.md`
 - Linux adapter implementations: `static/ergopti_plus/linux/adapters/`
 - Compliance enforcement script: `tools/test/test-port-compliance.cjs` (`npm run test:port-compliance`)
-- Domain module specs: `static/ergopti_plus/_shared/core/domain/SPEC.md`
+- Domain module specs: `static/ergopti_plus/_shared/core/text/data/domain/SPEC.md`

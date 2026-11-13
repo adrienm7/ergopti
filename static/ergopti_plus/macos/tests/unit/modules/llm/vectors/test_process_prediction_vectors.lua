@@ -11,7 +11,7 @@
 --- to_type / nw / has_corrections / disable_bold).
 ---
 --- This side passes by construction; its purpose is to make the corpus a tripwire:
---- any change to _shared/lua/llm/parser.lua that shifts the output fails here until
+--- any change to _shared/ai/engine/api/parser_core.lua that shifts the output fails here until
 --- the corpus is regenerated (lua tools/build/gen-process-prediction-corpus.lua),
 --- forcing the AHK port to be re-verified against the new truth.
 --- ==============================================================================
@@ -22,11 +22,11 @@ local helpers = require("tests.helpers")
 package.loaded["infra.logger"] = nil
 helpers.load_with_stubs("infra.logger")
 
--- Put _shared/lua on the path so require("llm.parser") resolves to the oracle.
-local shared_lua  = helpers.shared("lua/")
+-- Put _shared on the path so require("ai.engine.api.parser_core") resolves to the oracle.
+local shared_lua  = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local parser = require("llm.parser")
+local parser = require("ai.engine.api.parser_core")
 
 local corpus_path = helpers.shared("tests/corpus/llm/process_prediction_vectors.json")
 

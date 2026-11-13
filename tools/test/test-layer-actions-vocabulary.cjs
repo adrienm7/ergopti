@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Layer-Action Vocabulary Gate
  * DESCRIPTION:
- * `_shared/keymap/layer_actions.toml` is the grammar every layer file is written
+ * `_shared/layouts/data/layer_actions.toml` is the grammar every layer file is written
  * in and the table every driver resolves a binding through. This gate checks
  * that the vocabulary is complete and honest before any layer is read with it.
  *
@@ -14,7 +14,7 @@
  * 2. Resolution: every action resolves on every OS, or names the reason it does
  *    not; each resolution parses, uses only modifiers that exist on that OS and
  *    only call handlers that OS declares. No handler is declared for nothing.
- * 3. Catalogue: an id that also exists in _shared/modules/actions/actions.toml
+ * 3. Catalogue: an id that also exists in _shared/shortcuts/data/actions/actions.toml
  *    ([sg_actions]) must say so, and must send exactly the keystroke the
  *    catalogue emits on each OS where the catalogue emits one. A deliberate
  *    difference is declared per OS in `catalogue_divergence`, and a declared
@@ -46,8 +46,8 @@ const {
 } = require('../lib/keymap-layers.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CATALOGUE_PATH = shared('modules', 'actions', 'actions.toml');
-const LOCALES_DIR = shared('data', 'locales');
+const CATALOGUE_PATH = shared('shortcuts', 'data', 'actions', 'actions.toml');
+const LOCALES_DIR = shared('core', 'i18n', 'data', 'locales');
 const COMBO_EMITTER = path.join(
 	ROOT,
 	'static',
@@ -405,7 +405,7 @@ for (const [id, action] of Object.entries(actions)) {
 	}
 }
 const brightness = JSON.parse(
-	fs.readFileSync(shared('modules', 'actions', 'brightness.json'), 'utf8')
+	fs.readFileSync(shared('shortcuts', 'data', 'actions', 'brightness.json'), 'utf8')
 );
 for (const id of ['brightness_up', 'brightness_down']) {
 	if (catalogue[id].emit_ahk_key !== undefined)

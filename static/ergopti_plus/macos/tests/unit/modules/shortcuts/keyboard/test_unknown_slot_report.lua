@@ -75,7 +75,7 @@ local function with_subject(store, scenario)
 	return observed
 end
 
-local ConfigOutdated = require("config_outdated")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 
 helpers.describe("keyboard shortcuts: unknown slot ids (unknown-slot-report)", function()
 	helpers.it("(unknown-slot-report) names an unowned id and keeps an owned id quiet", function()

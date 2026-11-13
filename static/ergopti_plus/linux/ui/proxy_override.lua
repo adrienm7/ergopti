@@ -4,7 +4,7 @@
 --- MODULE: Proxy Override Row (Linux)
 --- DESCRIPTION:
 --- Debug > proxy for downloads: runs the shared edit flow
---- (network/proxy_override.lua) over this driver's dialogs and settings store.
+--- (core/network/engine/proxy_override.lua) over this driver's dialogs and settings store.
 --- The proxy policy binding (infra/proxy_policy.lua) reads the stored value at
 --- every route decision, so a change applies to the next download.
 --- ==============================================================================
@@ -13,10 +13,10 @@ local M = {}
 
 local Dialogs = require("ui.menu.menu_dialogs")
 local I18n = require("infra.i18n")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Storage = require("adapters.storage")
 local Binding = require("infra.proxy_policy")
-local Override = require("network.proxy_override")
+local Override = require("core.network.engine.proxy_override")
 
 local LOG = "ui.proxy_override"
 

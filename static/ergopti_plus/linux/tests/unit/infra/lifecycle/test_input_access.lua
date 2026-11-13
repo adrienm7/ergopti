@@ -73,7 +73,7 @@ helpers.describe("input_access: telling the user", function()
 		helpers.assert_true(src:find("body_key = InputAccess.NO_DEVICE_BODY_KEY", 1, true) ~= nil,
 			"the absent-keyboard report must use the no-device body")
 		local Paths = helpers.load_module("infra.paths")
-		local fh = assert(io.open(Paths.shared("data/locales/en.json"), "r"))
+		local fh = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "r"))
 		local text = fh:read("*a")
 		fh:close()
 		local body = text:match("\"startup.linux_input_access_no_device_body\": \"([^\"]*)\"")
@@ -88,7 +88,7 @@ helpers.describe("input_access: telling the user", function()
 			"ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }
 		local Paths = helpers.load_module("infra.paths")
 		for _, code in ipairs(locales) do
-			local fh = assert(io.open(Paths.shared("data/locales/" .. code .. ".json"), "r"))
+			local fh = assert(io.open(Paths.shared("core/i18n/data/locales/" .. code .. ".json"), "r"))
 			local text = fh:read("*a")
 			fh:close()
 			for _, key in ipairs({ "startup.linux_input_access_title", "startup.linux_input_access_body", "startup.linux_input_access_label", "startup.linux_input_access_no_device_body" }) do
@@ -303,7 +303,7 @@ helpers.describe("input_access: a program the permission setup needs is missing"
 	helpers.it("has a message naming the program in every locale (missing-program-locales)", function()
 		for _, locale in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl",
 			"no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
-			local json = read("../_shared/data/locales/" .. locale .. ".json")
+			local json = read("../_shared/core/i18n/data/locales/" .. locale .. ".json")
 			for _, key in ipairs({ "startup.linux_input_access_missing_program_body", "dialog.uninstall.missing_program" }) do
 				local text = json:match('"' .. key:gsub("%.", "%%.") .. '": "([^\n]-)",?\n')
 				helpers.assert_true(text ~= nil and text:find("{1}", 1, true) ~= nil, locale .. " " .. key .. " names {1}")

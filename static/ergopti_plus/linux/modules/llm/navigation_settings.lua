@@ -10,10 +10,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Manifest = require("infra.manifest_reader")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.llm.navigation_settings"
 local KEY = ConfigKeys.KEY.LLM_NAVIGATION_VAL_MODIFIERS
@@ -31,13 +31,13 @@ local function collision_dependency(name)
 end
 local CollisionPreferences = collision_dependency("infra.llm_preferences")
 local CollisionRoutes = collision_dependency("infra.config_paths")
-local CollisionWriter = collision_dependency("toml_codec.writer")
+local CollisionWriter = collision_dependency("core.text.engine.toml_codec.writer")
 local collision_many = CollisionPreferences and CollisionPreferences.get_many
 local collision_revision = CollisionPreferences and CollisionPreferences.is_current_revision
 local collision_generation = CollisionPreferences and CollisionPreferences.generation
 local collision_route = CollisionRoutes and CollisionRoutes.config
 local collision_read = CollisionWriter and CollisionWriter.read_classified
-local CollisionCodec = collision_dependency("toml_codec")
+local CollisionCodec = collision_dependency("core.text.engine.toml_codec")
 local collision_decode = CollisionCodec and CollisionCodec.decode
 local collision_default = Manifest.default_for
 local collision_factory
@@ -240,9 +240,9 @@ function M.capture_collision_configuration()
 			and CollisionPreferences.get_many == collision_many and CollisionPreferences.is_current_revision == collision_revision
 			and CollisionPreferences.generation == collision_generation
 			and rawequal(package.loaded["infra.config_paths"], CollisionRoutes) and CollisionRoutes.config == collision_route
-			and rawequal(package.loaded["toml_codec.writer"], CollisionWriter) and CollisionWriter.read_classified == collision_read
+			and rawequal(package.loaded["core.text.engine.toml_codec.writer"], CollisionWriter) and CollisionWriter.read_classified == collision_read
 			and rawequal(package.loaded["infra.manifest_reader"], Manifest) and Manifest.default_for == collision_default
-			and rawequal(package.loaded["toml_codec"], CollisionCodec) and CollisionCodec.decode == collision_decode
+			and rawequal(package.loaded["core.text.engine.toml_codec"], CollisionCodec) and CollisionCodec.decode == collision_decode
 	end
 	if not ports_current() then return nil end
 	local path = collision_route("config.toml")

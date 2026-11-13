@@ -760,7 +760,7 @@ _Updater_NavigateReleaseNotes(WVC, Release) {
 ; as an HTML-safe JSON string literal, so release text is only ever data.
 _Updater_ReleaseNotesSeed(Body, Session) {
 	global _I18nLocale, UPDATER_GH_OWNER, UPDATER_GH_REPO, RELEASE_NOTES_VHOST
-	return "window.__i18n_base=" . JsonStringLiteral("https://" . RELEASE_NOTES_VHOST . "/data/locales/", true) . ";"
+	return "window.__i18n_base=" . JsonStringLiteral("https://" . RELEASE_NOTES_VHOST . "/core/i18n/data/locales/", true) . ";"
 		. "window._i18n_locale=" . JsonStringLiteral(_I18nLocale, true) . ";"
 		. "window.__release_notes={body:" . JsonStringLiteral(Body, true)
 		. ",owner:" . JsonStringLiteral(UPDATER_GH_OWNER, true)

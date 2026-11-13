@@ -24,9 +24,9 @@ local TomlWriter = Fixture.TomlWriter
 
 helpers.describe("Mac actual file exact integer scalar publication", function()
 	helpers.it("writes exact requested integer through root inline with native file and fresh reader", function()
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
 			local logger=helpers.make_logger_stub()
-			package.loaded["infra.logger"],package.loaded["logger.shim"]=logger,logger
+			package.loaded["infra.logger"],package.loaded["core.logger.engine.shim"]=logger,logger
 			package.loaded["adapters.file_system"]=nil
 			local preferences=helpers.load_with_stubs("infra.preferences")
 			local path=os.tmpname()
@@ -45,9 +45,9 @@ helpers.describe("Mac actual file exact integer scalar publication", function()
 		end)
 	end)
 	helpers.it("writes exact requested integer through root dotted with native file and fresh reader", function()
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
 			local logger=helpers.make_logger_stub()
-			package.loaded["infra.logger"],package.loaded["logger.shim"]=logger,logger
+			package.loaded["infra.logger"],package.loaded["core.logger.engine.shim"]=logger,logger
 			package.loaded["adapters.file_system"]=nil
 			local preferences=helpers.load_with_stubs("infra.preferences")
 			local path=os.tmpname()
@@ -66,9 +66,9 @@ helpers.describe("Mac actual file exact integer scalar publication", function()
 		end)
 	end)
 	helpers.it("writes exact requested integer through section dotted with native file and fresh reader", function()
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
 			local logger=helpers.make_logger_stub()
-			package.loaded["infra.logger"],package.loaded["logger.shim"]=logger,logger
+			package.loaded["infra.logger"],package.loaded["core.logger.engine.shim"]=logger,logger
 			package.loaded["adapters.file_system"]=nil
 			local preferences=helpers.load_with_stubs("infra.preferences")
 			local path=os.tmpname()
@@ -87,9 +87,9 @@ helpers.describe("Mac actual file exact integer scalar publication", function()
 		end)
 	end)
 	helpers.it("writes exact requested integer through header leaf with native file and fresh reader", function()
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
 			local logger=helpers.make_logger_stub()
-			package.loaded["infra.logger"],package.loaded["logger.shim"]=logger,logger
+			package.loaded["infra.logger"],package.loaded["core.logger.engine.shim"]=logger,logger
 			package.loaded["adapters.file_system"]=nil
 			local preferences=helpers.load_with_stubs("infra.preferences")
 			local path=os.tmpname()
@@ -108,9 +108,9 @@ helpers.describe("Mac actual file exact integer scalar publication", function()
 		end)
 	end)
 	helpers.it("writes exact requested integer through section inline with native file and fresh reader", function()
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
 			local logger=helpers.make_logger_stub()
-			package.loaded["infra.logger"],package.loaded["logger.shim"]=logger,logger
+			package.loaded["infra.logger"],package.loaded["core.logger.engine.shim"]=logger,logger
 			package.loaded["adapters.file_system"]=nil
 			local preferences=helpers.load_with_stubs("infra.preferences")
 			local path=os.tmpname()
@@ -132,12 +132,12 @@ end)
 
 helpers.describe("Mac actual file authenticated integer candidate proof", function()
 	helpers.it("refuses a wrong genuine prepared scalar then reloads repaired bytes through native Preferences", function()
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim" },function()
+		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim" },function()
 			local logger=helpers.make_logger_stub()
-			package.loaded["infra.logger"],package.loaded["logger.shim"]=logger,logger
+			package.loaded["infra.logger"],package.loaded["core.logger.engine.shim"]=logger,logger
 			package.loaded["adapters.file_system"]=nil
 			local file_owner=require("adapters.file_system")
-			local LeafRows=require("toml_codec.leaf_rows")
+			local LeafRows=require("core.text.engine.toml_codec.leaf_rows")
 			local source='[llm.generation]\ntemperature=0\nfuture=9223372036854775807 # exact\n'
 			local path=os.tmpname()
 			local file=assert(io.open(path,"wb")); assert(file:write(source)); assert(file:close())
@@ -178,9 +178,9 @@ helpers.describe("Mac native absent inline scalar preference",function()
 	}
 	for index,vector in ipairs(vectors) do
 		helpers.it("inserts absent known scalar with native file and fresh Preferences reader "..index,function()
-			helpers.with_stub_scope({"infra.preferences","adapters.file_system","infra.logger","logger.shim"},function()
+			helpers.with_stub_scope({"infra.preferences","adapters.file_system","infra.logger","core.logger.engine.shim"},function()
 				local logger=helpers.make_logger_stub()
-				package.loaded["infra.logger"],package.loaded["logger.shim"]=logger,logger
+				package.loaded["infra.logger"],package.loaded["core.logger.engine.shim"]=logger,logger
 				package.loaded["adapters.file_system"]=nil
 				local preferences=helpers.load_with_stubs("infra.preferences")
 				local path=os.tmpname();local file=assert(io.open(path,"wb"));assert(file:write(vector.source));assert(file:close())

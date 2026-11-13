@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
-local Json = require("json")
+local AppDirs = require("core.fs.engine.app_dirs")
+local Json = require("core.text.engine.json")
 local raw = assert(helpers.read_fixture("paths_editor_original_native_captions.json"))
 local original = assert(Json.decode(raw))
 
@@ -17,10 +17,10 @@ local function with_fixture(callback)
 	local previous_base = rawget(_G, "_base_dir")
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
-			"ui.ui_builder", "ui.webview_close_owner", "ui.menu.menu_paths", "infra.i18n", "infra.locale", "locale.core",
+			"ui.ui_builder", "ui.webview_close_owner", "ui.menu.menu_paths", "infra.i18n", "infra.locale", "core.i18n.engine.core",
 			"infra.logger", "infra.paths", "infra.config_paths", "infra.deferred_work",
-			"adapters.json_codec", "adapters.timer_scheduler", "adapters.storage", "webview.i18n_seed",
-			"window_titles", "hs", "tests.stubs.hs",
+			"adapters.json_codec", "adapters.timer_scheduler", "adapters.storage", "core.ui.engine.webview.i18n_seed",
+			"core.ui.engine.window_titles", "hs", "tests.stubs.hs",
 		}, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.paths"] = { shared = helpers.shared }
@@ -59,7 +59,7 @@ local function with_fixture(callback)
 			package.loaded["infra.i18n"] = nil
 			local i18n = require("infra.i18n")
 			local locale = require("infra.locale")
-			local titles = require("window_titles")
+			local titles = require("core.ui.engine.window_titles")
 			local function request(app_id)
 				return {
 					app_id = app_id,

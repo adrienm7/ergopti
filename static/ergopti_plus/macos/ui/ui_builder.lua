@@ -18,9 +18,9 @@ local M = {}
 local hs = hs
 local Logger = require("infra.logger")
 local Paths = require("infra.paths")
-local NativePath = require("native_path")
-local TextUtils = require("text_utils")
-local I18nSeed = require("webview.i18n_seed")
+local NativePath = require("core.fs.engine.native_path")
+local TextUtils = require("core.text.engine.utils_core")
+local I18nSeed = require("core.ui.engine.webview.i18n_seed")
 local DeferredWork = require("infra.deferred_work")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
@@ -35,11 +35,11 @@ end
 local LOG = "ui_builder"
 
 -- The generated shared policy owns branding for every native host.
-local WindowTitles = require("window_titles")
+local WindowTitles = require("core.ui.engine.window_titles")
 local WindowTitleKeyOwner = rawget(WindowTitles, "key_for_app")
 local WindowTitleComposeOwner = rawget(WindowTitles, "compose")
 local WindowPresentationOwner = rawget(WindowTitles, "presentation_for_app")
-local Presentation = require("webview.presentation")
+local Presentation = require("core.ui.engine.webview.presentation")
 local PresentationPrepareOwner = rawget(Presentation, "prepare")
 local PresentationTitlePrepareOwner = rawget(Presentation, "prepare_window_title")
 local PresentationContextPrepareOwner = rawget(Presentation, "prepare_contextual_title")
@@ -48,7 +48,7 @@ local PresentationLocale = require("infra.locale")
 local PresentationTranslateOwner = rawget(PresentationI18n, "get")
 local PresentationLocaleGetOwner = rawget(PresentationLocale, "get")
 local PresentationLocaleCurrentOwner = rawget(PresentationLocale, "current_locale")
-local PresentationLocaleCore = require("locale.core")
+local PresentationLocaleCore = require("core.i18n.engine.core")
 local PresentationCoreGetOwner = rawget(PresentationLocaleCore, "get")
 local PresentationCoreCurrentOwner = rawget(PresentationLocaleCore, "current_locale")
 local _presentation_receipts = setmetatable({}, { __mode = "k" })
@@ -140,7 +140,7 @@ local function close_webkit_warmup(session)
 	return true
 end
 
--- Absolute file:// URL to the shared static/ergopti_plus/_shared/data/locales/ directory.
+-- Absolute file:// URL to the shared static/ergopti_plus/_shared/core/i18n/data/locales/ directory.
 -- Computed once at module-load time from this file's own path.
 -- Injected into every webview as window.__i18n_base so that the browser-side
 -- i18n.js fetch() resolves locale JSON files correctly even when the HTML is
@@ -149,7 +149,7 @@ local _locales_base_url = (function()
 	-- Resolved through the single shared-tree resolver (Paths.shared); the
 	-- trailing slash is preserved because the browser-side fetch() concatenates
 	-- the locale filename directly onto this base.
-	local locales = (Paths.shared("data/locales") or "") .. "/"
+	local locales = (Paths.shared("core/i18n/data/locales") or "") .. "/"
 	-- A backslash separates components only on a Windows host (the headless
 	-- suite); on macOS it is a filename byte, so it and every other byte a URL
 	-- path cannot carry verbatim (a quote would also end the injected string)
@@ -669,11 +669,11 @@ local function presentation_owners_current()
 		and getmetatable(PresentationI18n) == nil and getmetatable(PresentationLocale) == nil
 		and getmetatable(PresentationLocaleCore) == nil
 		and rawget(package.loaded, "ui.ui_builder") == M
-		and rawget(package.loaded, "window_titles") == WindowTitles
-		and rawget(package.loaded, "webview.presentation") == Presentation
+		and rawget(package.loaded, "core.ui.engine.window_titles") == WindowTitles
+		and rawget(package.loaded, "core.ui.engine.webview.presentation") == Presentation
 		and rawget(package.loaded, "infra.i18n") == PresentationI18n
 		and rawget(package.loaded, "infra.locale") == PresentationLocale
-		and rawget(package.loaded, "locale.core") == PresentationLocaleCore
+		and rawget(package.loaded, "core.i18n.engine.core") == PresentationLocaleCore
 		and rawget(PresentationLocaleCore, "get") == PresentationCoreGetOwner
 		and rawget(PresentationLocaleCore, "current_locale") == PresentationCoreCurrentOwner
 		and rawget(WindowTitles, "presentation_for_app") == WindowPresentationOwner
@@ -816,7 +816,7 @@ local function declared_window_title(opts)
 		return getmetatable(opts) == nil and rawget(opts, "app_id") == app_id
 			and rawget(opts, "title") == nil
 			and getmetatable(WindowTitles) == nil and getmetatable(i18n) == nil
-			and rawget(package.loaded, "window_titles") == WindowTitles
+			and rawget(package.loaded, "core.ui.engine.window_titles") == WindowTitles
 			and rawget(package.loaded, "infra.i18n") == i18n
 			and rawget(WindowTitles, "key_for_app") == WindowTitleKeyOwner
 			and rawget(WindowTitles, "compose") == WindowTitleComposeOwner

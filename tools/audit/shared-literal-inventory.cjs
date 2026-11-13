@@ -58,27 +58,27 @@ const NAME_KINDS = [
 
 const HOMES = {
 	duration: {
-		home: '_shared/modules/timings/constants.toml',
+		home: '_shared/core/timing/data/constants.toml',
 		mechanism: 'shared data file every driver reads at boot (Timings.ms/sec, TimingsGet)'
 	},
 	limit: {
-		home: '_shared/modules/timings/constants.toml [limits] or _shared/modules/<domain>/constants.toml',
+		home: '_shared/core/timing/data/constants.toml [limits] or _shared/<domain>/constants.toml',
 		mechanism: 'shared data file every driver reads at boot'
 	},
 	color: {
-		home: '_shared/data/native_theme.toml (native) or _shared/ui/theme_tokens.js (web)',
+		home: '_shared/core/ui/data/native_theme.toml (native) or _shared/ui/theme_tokens.js (web)',
 		mechanism: 'shared data file; AHK and Lua read native_theme.toml'
 	},
 	path_name: {
-		home: '_shared/data/identifiers.json',
+		home: '_shared/core/text/data/identifiers.json',
 		mechanism: 'generated constant (tools/codegen/codegen-identifiers.cjs)'
 	},
 	enum_name: {
-		home: '_shared/modules/<domain>/*.json, projected by a generator',
+		home: '_shared/<domain>/*.json, projected by a generator',
 		mechanism: 'generated constant table that raises on an unknown name (config_keys pattern)'
 	},
 	timer_literal: {
-		home: '_shared/modules/timings/constants.toml',
+		home: '_shared/core/timing/data/constants.toml',
 		mechanism: 'shared data file; the call reads a named registry key'
 	},
 	lua_function: {

@@ -50,6 +50,7 @@ const RECIPIENT_LIBRARIES = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
+	'updater',
 	'data',
 	'linux_appimage_recipient_libraries.json'
 );

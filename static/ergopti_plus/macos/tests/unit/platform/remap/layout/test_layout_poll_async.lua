@@ -107,7 +107,7 @@ helpers.describe("karabiner.watchers: layout refresh is async (HS-197)", functio
 			-- (top-level KEYCODE_F17_NAME assignment), which does
 			-- `for _, code in pairs(hs.keycodes.map)` — without .map here that
 			-- pairs() crashes on nil before this test's own assertions run.
-			-- F17_CYCLE_WINDOWS = 64 in _shared/lua/keycodes/init.lua.
+			-- F17_CYCLE_WINDOWS = 64 in _shared/platform/input/keycodes/core.lua.
 			keycodes = { inputSourceChanged = function() end, currentLayout = function() return "ABC" end,
 			          map = { f17 = 64 } },
 			execute  = function() return "", true end,

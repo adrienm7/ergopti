@@ -17,7 +17,7 @@
 ---    so the JS never touches the network directly.
 --- 1b. Bounded sources: every request carries a deadline, and a failed GitHub
 ---    API request falls back to the public releases Atom feed through the
----    shared order in _shared/lua/updater/release_sources.lua. The outcome, or
+---    shared order in _shared/updater/engine/release_sources.lua. The outcome, or
 ---    a translated error, always reaches the page.
 --- 2. Singleton window: a second call to M.open() while the window is already
 ---    visible brings it to the front instead of opening a duplicate.
@@ -29,10 +29,10 @@
 --- 4. One document policy: the page's browser-host CSP only allows external
 ---    same-origin scripts, which blocks every script once inlined, so the page
 ---    never left its loading state. The generated document instead carries the
----    shared driver policy (_shared/lua/webview/document_csp.lua) with a
+---    shared driver policy (_shared/core/ui/engine/webview/document_csp.lua) with a
 ---    per-document nonce on every script.
 --- 5. One-click release install: « Install this version » posts install_release.
----    The shared sequence (_shared/lua/updater/release_install.lua) backs the
+---    The shared sequence (_shared/updater/engine/release_install.lua) backs the
 ---    configuration up (modules/updater/config_backup.lua), finds the release
 ---    in the list this window last fetched from the GitHub API, then downloads
 ---    and verifies it and arms the app replacement
@@ -62,15 +62,15 @@ local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
 local HttpClient = require("adapters.http_client")
-local Json       = require("json")
+local Json       = require("core.text.engine.json")
 local JsonCodec  = require("adapters.json_codec")
-local ReleaseSources = require("updater.release_sources")
-local RepositoryUrl = require("updater.repository_url")
-local UpdateChannels = require("updater.channels")
-local DocumentCsp = require("webview.document_csp")
-local ReleaseInstall = require("updater.release_install")
-local VersionOrder = require("updater.version")
-local NetworkFailure = require("network.failure")
+local ReleaseSources = require("updater.engine.release_sources")
+local RepositoryUrl = require("updater.engine.repository_url")
+local UpdateChannels = require("updater.engine.channels")
+local DocumentCsp = require("core.ui.engine.webview.document_csp")
+local ReleaseInstall = require("updater.engine.release_install")
+local VersionOrder = require("updater.engine.version_core")
+local NetworkFailure = require("core.network.engine.failure")
 
 local LOG = "changelog_window"
 
@@ -82,7 +82,7 @@ local _channels = nil
 --- @return string|nil error
 local function load_sources()
 	if _sources then return _sources, nil end
-	local path = Paths.shared("modules/updater/defaults.json")
+	local path = Paths.shared("updater/data/defaults.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then return nil, "shared updater defaults are unreadable" end
 	local ok, decoded = pcall(Json.decode, raw)
@@ -99,7 +99,7 @@ end
 --- @return string|nil error
 local function load_channels()
 	if _channels then return _channels, nil end
-	local path = Paths.shared("modules/updater/channels.json")
+	local path = Paths.shared("updater/data/channels.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then return nil, "the shared update channel registry is unreadable" end
 	local ok, decoded = pcall(Json.decode, raw)
@@ -536,7 +536,7 @@ end
 --- @return table session
 local function failure_contract()
 	if _failure_contract then return _failure_contract end
-	local path = Paths.shared("modules/network/managed_network.json")
+	local path = Paths.shared("core/network/data/managed_network.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	assert(type(raw) == "string", "the canonical managed network policy is unreadable")
 	_failure_contract = NetworkFailure.new(Json.decode(raw))

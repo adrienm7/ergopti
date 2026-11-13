@@ -4,17 +4,17 @@
 --- MODULE: Remote Usage and Cost Corpus (shared Lua oracle)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/remote_usage_vectors.json through the
---- shared remote response classifier (_shared/lua/llm/remote_response_classifier.lua)
+--- shared remote response classifier (_shared/ai/engine/policy/remote_response_classifier.lua)
 --- that macOS and Linux both use for the events_llm token and cost columns.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.path
+package.path = SHARED .. "?.lua;" .. SHARED .. "?/init.lua;" .. package.path
 
-local Classifier = require("llm.remote_response_classifier")
+local Classifier = require("ai.engine.policy.remote_response_classifier")
 
 -- Tolerance for comparing a computed dollar cost with its vector
 local COST_TOLERANCE = 1e-12

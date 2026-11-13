@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local Policy = require("menu.programmable_hotstrings")
+local Policy = require("menu.engine.programmable_hotstrings")
 local Manifest = require("infra.manifest_menu")
 local Dialog = require("infra.dialog_util")
 local Shell = require("adapters.shell_runner")
@@ -17,7 +17,7 @@ local I18n = require("infra.i18n")
 local User = require("modules.dynamic_hotstrings")
 local Logger = require("infra.logger")
 local Features = require("infra.manifest_reader")
-local Publication = require("dynamic_hotstrings.menu_publication").new()
+local Publication = require("hotstrings.engine.dynamic.menu_publication").new()
 
 --- Builds declared rows around the currently owned menu state.
 --- @param ctx table Menu state, exact preference save and refresh ports.
@@ -29,8 +29,8 @@ function M.build(ctx)
 	local function get()
 		local enabled, seconds = ctx.state.dynamichotstrings_user_code_enabled,
 			ctx.state.dynamichotstrings_user_code_time_activation_seconds
-		if enabled == nil then enabled = Features.default_for(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED) end
-		if seconds == nil then seconds = Features.default_for(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS) end
+		if enabled == nil then enabled = Features.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED) end
+		if seconds == nil then seconds = Features.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS) end
 		return enabled, seconds
 	end
 	return Policy.build({ manifest = Manifest, i18n = I18n.get, get = get,

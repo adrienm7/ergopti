@@ -1,10 +1,10 @@
 {
-	"description": "Cross-driver corpus for layer files (_shared/keymap/layers.recommended.toml and the user's layers.toml). Every vector is replayed by the JS reference loader (tools/lib/keymap-layers.cjs), the shared Lua loader (_shared/lua/keymap/layers.lua) under both the macOS and the Linux suite, and the AutoHotkey loader (windows/platform/remap/layers_loader.ahk). The expected answers are written by hand from the vocabulary (_shared/keymap/layer_actions.toml), not computed by any of the loaders. Files outside the layer-file format described there (valid TOML the AutoHotkey reader cannot read) are toml_invalid on every OS.",
+	"description": "Cross-driver corpus for layer files (_shared/layouts/data/layers.recommended.toml and the user's layers.toml). Every vector is replayed by the JS reference loader (tools/lib/keymap-layers.cjs), the shared Lua loader (_shared/layouts/engine/layers/layers.lua) under both the macOS and the Linux suite, and the AutoHotkey loader (windows/platform/remap/layers_loader.ahk). The expected answers are written by hand from the vocabulary (_shared/layouts/data/layer_actions.toml), not computed by any of the loaders. Files outside the layer-file format described there (valid TOML the AutoHotkey reader cannot read) are toml_invalid on every OS.",
 	"version": 1,
 	"field_semantics": {
 		"os": "The OS the file is resolved for: windows, macos or linux. Sections for the other OSes are still validated.",
 		"toml": "The layer file's text, or null for an absent file (which is no layer at all, not an error).",
-		"file": "Instead of toml: a file under _shared/keymap/ read as the layer file.",
+		"file": "Instead of toml: a file under _shared/layouts/data/ read as the layer file.",
 		"expected.errors": "Error signatures code|layer|section|key|reason_key, absent parts empty, compared as a sorted list. The human-readable detail is not compared.",
 		"expected.layers": "Layer id -> physical-key code -> canonical resolution: keystroke:<mods+Key>[,<chord>…] with modifiers in [_meta].modifier_order, call:<handler>, repeat_count:<N> or none, suffixed @repeat when the repeat count applies to the action. A file-level error (toml_invalid, schema_version_*, a non-table layers) leaves no layer at all."
 	},

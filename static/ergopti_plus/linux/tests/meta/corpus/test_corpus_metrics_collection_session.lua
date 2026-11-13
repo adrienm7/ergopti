@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local it = require("tests.support.metrics_preferences_fixture").it
 local NativeFixture = require("tests.support.keystats_native_fixture")
 local keystats

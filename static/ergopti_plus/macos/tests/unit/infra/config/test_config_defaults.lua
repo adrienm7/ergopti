@@ -31,7 +31,7 @@ helpers.describe("neutral configuration contract", function()
 		helpers.assert_eq(changed["hotstrings.modules.future.unknown"], nil)
 	end)
 	helpers.it("keeps structured assignments whose neutral sentinel is false", function()
-		local defaults = require("config_defaults").new(require("_generated.features_manifest"))
+		local defaults = require("settings.engine.publication.defaults").new(require("_generated.features_manifest"))
 		local binding = { mods = { "ctrl" }, key = "space" }
 		local operation = defaults.operation("shortcuts.keys.cmd_star", binding)
 		helpers.assert_eq(operation.value, binding)
@@ -58,7 +58,7 @@ helpers.describe("neutral configuration contract", function()
 	end)
 
 	helpers.it("projects real neutral values while retaining the explicit recommended preset", function()
-		local defaults = require("config_defaults").new(require("_generated.features_manifest"))
+		local defaults = require("settings.engine.publication.defaults").new(require("_generated.features_manifest"))
 		helpers.assert_eq(defaults.default_for("shortcuts.enabled"), false)
 		helpers.assert_eq(defaults.recommended_for("shortcuts.enabled"), true)
 		helpers.assert_eq(defaults.default_for("gestures.swipe_3_down"), "none")
@@ -67,7 +67,7 @@ helpers.describe("neutral configuration contract", function()
 	end)
 
 	helpers.it("returns detached values and produces explicit sparse deletion intent", function()
-		local defaults = require("config_defaults").new(require("_generated.features_manifest"))
+		local defaults = require("settings.engine.publication.defaults").new(require("_generated.features_manifest"))
 		local original = defaults.default_for("hotstrings.magic_key.replace")
 		original.enabled = true
 		helpers.assert_eq(defaults.default_for("hotstrings.magic_key.replace.enabled"), false)
@@ -82,7 +82,7 @@ helpers.describe("neutral configuration contract", function()
 	end)
 
 	helpers.it("restores only selected recommendations and never imports metrics or AI consent", function()
-		local defaults = require("config_defaults").new(require("_generated.features_manifest"))
+		local defaults = require("settings.engine.publication.defaults").new(require("_generated.features_manifest"))
 		local all = defaults.scope_operations("global", "recommended")
 		local found, count = {}, 0
 		for _, row in ipairs(all) do
@@ -103,4 +103,4 @@ helpers.describe("neutral configuration contract", function()
 	end)
 end)
 
-require("test.scope_sparse_contract")(helpers)
+require("tests.lua.settings.scope_sparse_contract")(helpers)

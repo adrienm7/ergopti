@@ -28,7 +28,7 @@ class TooltipLlmStaleRenderError extends Error {
 ; ============================================================
 ; ============================================================
 
-; Surface lifecycle — canonical phases in _shared/modules/tooltip/lifecycle.js.
+; Surface lifecycle — canonical phases in _shared/core/ui/data/tooltip/lifecycle.js.
 ; AHK uses two HWNDs (content + border); PREPARE keeps both hidden until the
 ; border DIB and content controls are ready, then REVEAL shows them together.
 
@@ -180,7 +180,7 @@ _TooltipClampToScreen(X, Y, W, H) {
 }
 
 ; Where the tooltip goes, given an anchor and the frame it must stay inside —
-; the Windows port of _shared/lua/tooltip/layout.lua compute_position (macOS),
+; the Windows port of _shared/core/ui/engine/tooltip/layout.lua compute_position (macOS),
 ; replayed against _shared/tests/corpus/tooltip/layout_vectors.json. Pure: all
 ; values share one unit system (the caller converts).
 ;   caret     — below-right of the insertion point: x + CaretOffsetX,

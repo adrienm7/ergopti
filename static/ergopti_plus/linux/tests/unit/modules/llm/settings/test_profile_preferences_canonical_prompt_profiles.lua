@@ -18,7 +18,7 @@ helpers.describe("canonical Linux prompt profiles", function()
 			helpers.assert_true(Json.is_array(settings.list_user()[1].stop_sequences))
 			local added = profile(); added.id = "user_second"
 			helpers.assert_true(settings.save_user_profile(added, false, false))
-			local stored = require("llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
+			local stored = require("ai.engine.settings.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
 			helpers.assert_true(Json.is_array(stored[1].stop_sequences))
 			helpers.assert_eq(Json.is_array(stored[3].stop_sequences), false)
 			helpers.assert_eq(Json.is_null(stored[3].stop_sequences), false)
@@ -70,14 +70,14 @@ helpers.describe("canonical Linux prompt profiles", function()
 			helpers.assert_eq(#settings.list_user(), 0)
 			local added = profile(); added.id = "user_valid"
 			helpers.assert_true(settings.save_user_profile(added, false, false))
-			local stored = require("llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
+			local stored = require("ai.engine.settings.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
 			helpers.assert_eq(stored[2].system_multi, false)
 			helpers.assert_eq(stored[3].system_multi_template, { future = 1 })
 		end)
 	end)
 
 	helpers.it("refuses sparse registries and sparse profile stop sequences", function()
-		local codec = require("llm.profile_registry_codec")
+		local codec = require("ai.engine.settings.profile_registry_codec")
 		local sparse = { profile(), profile(), profile() }
 		sparse[2] = nil
 		local failure = helpers.assert_throws(function() codec.encode(sparse) end)
@@ -101,7 +101,7 @@ helpers.describe("canonical Linux prompt profiles", function()
 		for _, invalid in ipairs({ "Zg", "Zg=", "Zg===", "Zg==AAAA", "Zg=Z", "Zh==", "Zm9=", " Zg==", "!!!!", "====" }) do
 			helpers.assert_nil(Base64.decode(invalid), invalid)
 		end
-		local codec = require("llm.profile_registry_codec")
+		local codec = require("ai.engine.settings.profile_registry_codec")
 		for _, row in ipairs({
 			{ "v2:W10=", "unknown user profile registry version" },
 			{ "v1:e30=", "user profile JSON must be an array" },
@@ -116,14 +116,14 @@ helpers.describe("canonical Linux prompt profiles", function()
 	helpers.it("reads an older build's registry as no user profile, warns and offers it (config-outdated-llm-profiles)", function()
 		local source = "[llm]\nuser_profiles = '[{\"id\":\"user_old\"}]'\n[llm.profiles]\nactive = \"basic\"\n"
 		with_config(source, function(settings)
-			require("config_outdated").reset_for_tests()
-			local reported = require("config_outdated").collect_reports(function()
+			require("settings.engine.migration.outdated").reset_for_tests()
+			local reported = require("settings.engine.migration.outdated").collect_reports(function()
 				helpers.assert_eq(settings.get("active"), "basic", "the menu and typing paths never raise")
 				helpers.assert_eq(settings.list_user(), {})
 			end)
 			helpers.assert_eq(reported, { ["llm.user_profiles"] = true })
 		end)
-		local scan = require("config_unused_keys").find_in_source(source, require("ui.menu.unused_keys_cleanup").collect)
+		local scan = require("settings.engine.migration.unused_keys").find_in_source(source, require("ui.menu.unused_keys_cleanup").collect)
 		helpers.assert_eq(#scan.keys, 1, "the cleanup offers the registry the reader ignores")
 		helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm", "user_profiles" })
 	end)
@@ -135,7 +135,7 @@ helpers.describe("canonical Linux prompt profiles", function()
 				-- erasing every prompt the user had written.
 				local source = "[llm]\n" .. stored .. "\n"
 				with_config(source, function(settings, path)
-					local Logger = require("logger.shim")
+					local Logger = require("core.logger.engine.shim")
 					local real_error, errors = Logger.error, {}
 					Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 					local ok, err = pcall(function()
@@ -156,7 +156,7 @@ helpers.describe("canonical Linux prompt profiles", function()
 		local stale = profile(); stale.id = "user_stale"; stale.retired_field = 1
 		local registry = "v1:" .. Base64.encode(Json.encode({ profile(), stale }))
 		with_config('[llm]\nuser_profiles = "' .. registry .. '"\n', function(settings, path)
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local real_error, real_warn, errors, warnings = Logger.error, Logger.warn, {}, {}
 			Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 			Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -169,7 +169,7 @@ helpers.describe("canonical Linux prompt profiles", function()
 				helpers.assert_contains(warnings[1], "index 2")
 				local added = profile(); added.id = "user_added"
 				helpers.assert_true(settings.save_user_profile(added, false, false))
-				local stored = require("llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
+				local stored = require("ai.engine.settings.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
 				helpers.assert_eq(stored[#stored].retired_field, 1, "the outdated profile is kept on write")
 			end)
 			Logger.error, Logger.warn = real_error, real_warn
@@ -221,7 +221,7 @@ helpers.describe("canonical Linux prompt profiles", function()
 			helpers.assert_eq(#settings.list_user(), 1)
 			local another = profile(); another.id = "user_second"
 			helpers.assert_true(settings.save_user_profile(another, false, false))
-			local stored = require("llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
+			local stored = require("ai.engine.settings.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
 			helpers.assert_eq(#stored, 3)
 			helpers.assert_eq(stored[3], broken)
 		end)
@@ -252,7 +252,7 @@ helpers.describe("canonical Linux prompt profiles", function()
 
 	helpers.it("publishes no registry or active identity when exact-source publication refuses", function()
 		with_config('[llm.profiles]\nactive = "raw"\n', function(settings, path)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local original = writer.batch_write
 			local before, called = Sandbox.read_bytes(path), false
 			writer.batch_write = function() called = true; return false, "fixture refusal" end
@@ -270,7 +270,7 @@ helpers.describe("canonical Linux prompt profiles", function()
 
 	helpers.it("preserves an external edit arriving after its registry candidate was read", function()
 		with_config('[llm.profiles]\nactive = "raw"\n', function(settings, path)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local original = writer.batch_write
 			local changed = Sandbox.read_bytes(path) .. '# external owner\n'
 			writer.batch_write = function(...)
@@ -310,8 +310,8 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 				local names = { "infra.manifest_menu", "ui.menu.builder", "ui.prompt_editor.bridge" }
 				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 				local ok, err = pcall(function()
-					local document = read_json("modules/menu/menu_manifest.json")
-					local header_captions = read_json("data/locales/en.json")
+					local document = read_json("menu/data/menu_manifest.json")
+					local header_captions = read_json("core/i18n/data/locales/en.json")
 					local translator = { get = function(key)
 						if key == "menu.builder.active_brand" or key == "menu.builder.title_paused" then
 							return header_captions[key]
@@ -321,9 +321,9 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 					local native_translator = require("infra.i18n")
 					translator.locale = native_translator.locale
 					translator.section = native_translator.section
-					local renderer = assert(require("menu.renderer").new({ platform = "linux",
-						manifest_path = function() return shared("modules/menu/menu_manifest.json") end,
-						json_decode = function() return document end, i18n = translator, logger = require("logger.shim"),
+					local renderer = assert(require("menu.engine.renderer").new({ platform = "linux",
+						manifest_path = function() return shared("menu/data/menu_manifest.json") end,
+						json_decode = function() return document end, i18n = translator, logger = require("core.logger.engine.shim"),
 					}))
 					package.loaded["infra.manifest_menu"] = renderer
 					local opened, editor_calls, rebuilds, confirmations = nil, 0, 0, 0
@@ -512,10 +512,10 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 	end)
 	helpers.it("custom-profile-child: all 21 existing Linux captions are consumed without Mac shortcut", function()
 		with_child(function(f)
-			local languages=read_json("data/locale_order.json").order
+			local languages=read_json("core/i18n/data/locale_order.json").order
 			helpers.assert_eq(#languages,21)
 			for _,language in ipairs(languages) do
-				local values=read_json("data/locales/"..language..".json")
+				local values=read_json("core/i18n/data/locales/"..language..".json")
 				f.i18n.get=function(key) return values[key] or key end
 				helpers.assert_eq(captions(f.child()), {values["menu.profiles.use_profile"],values["menu.profiles.edit_profile"],values["menu.profiles.delete_profile"]},language)
 			end
@@ -540,9 +540,9 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 			local names={"infra.manifest_menu","infra.i18n","ui.menu.builder"}
 			local saved={};for _,name in ipairs(names) do saved[name]=package.loaded[name] end
 			local ok,err=xpcall(function()
-				local document=read_json("modules/menu/menu_manifest.json")
+				local document=read_json("menu/data/menu_manifest.json")
 				local native_i18n=require("infra.i18n")
-				local header_captions=read_json("data/locales/en.json")
+				local header_captions=read_json("core/i18n/data/locales/en.json")
 				local i18n=setmetatable({get=function(key)
 					if key == "menu.builder.active_brand" or key == "menu.builder.title_paused" then
 						return header_captions[key]
@@ -554,9 +554,9 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 				-- native i18n.section does.
 				i18n.section=function(key) return native_i18n.decorate_section(i18n.get(key)) end
 				package.loaded["infra.i18n"]=i18n
-				local renderer=assert(require("menu.renderer").new({platform="linux",
-					manifest_path=function() return shared("modules/menu/menu_manifest.json") end,
-					json_decode=function() return document end,i18n=i18n,logger=require("logger.shim")}))
+				local renderer=assert(require("menu.engine.renderer").new({platform="linux",
+					manifest_path=function() return shared("menu/data/menu_manifest.json") end,
+					json_decode=function() return document end,i18n=i18n,logger=require("core.logger.engine.shim")}))
 				package.loaded["infra.manifest_menu"]=renderer
 				local redraws=0
 				local ctx={is_paused=function() return false end,llm={is_enabled=function() return true end,
@@ -572,7 +572,7 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 					end
 				end
 				body({document=document,i18n=i18n,heading_index=2,other_platform="hs",
-					caption=function(key) return require("menu.labels").decorate_section(i18n.get(key)) end,decorate=function(value) return require("menu.labels").decorate_section(value) end,
+					caption=function(key) return require("menu.engine.labels").decorate_section(i18n.get(key)) end,decorate=function(value) return require("menu.engine.labels").decorate_section(value) end,
 					rows=function() return assert(find(builder.build(ctx)),"actual profile parent missing") end,
 					untouched=function() helpers.assert_eq(Sandbox.read_bytes(path),initial);helpers.assert_eq(redraws,0) end,
 					settings=settings,path=path,ctx=ctx,redraws=function() return redraws end})
@@ -655,7 +655,7 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 			local count = 0
 			for language, pair in pairs(expected.captions) do
 				count = count + 1
-				local values = read_json("data/locales/" .. language .. ".json")
+				local values = read_json("core/i18n/data/locales/" .. language .. ".json")
 				helpers.assert_eq({values[expected.keys[1]], values[expected.keys[2]]}, pair, language)
 				f.i18n.get = function(key) return values[key] or key end
 				local rows = f.rows()

@@ -11,8 +11,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Report = require("field_check_report")
+local Json = require("core.text.engine.json")
+local Report = require("diagnostics.engine.field_check.report")
 local Check = require("infra.field_check_layout_rows")
 local Build = require("modules.keymap.layout_rows_build")
 local FakeMac = require("tests.support.layout_rows_fake_mac")

@@ -337,7 +337,7 @@ _WS_BuildSymbolRows() {
 		return []
 
 	; ── Built-in symbols, one named nested group per family ──────────────────
-	; Order and grouping come from _shared/modules/wrap_symbols/wrap_symbols.json.
+	; Order and grouping come from _shared/keyboard/data/wrap_symbols/wrap_symbols.json.
 	; Each group carries its own « check all / uncheck all » so a whole family can
 	; be flipped at once, and the parent row ticks when every symbol in it is on.
 	for _, Group in _WS_BUILTIN_GROUPS {

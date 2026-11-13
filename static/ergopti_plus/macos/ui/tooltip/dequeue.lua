@@ -1,6 +1,6 @@
 --- ui/tooltip/dequeue.lua
 ---
---- Lua port of _shared/modules/tooltip/dequeue.js — stacked hotstring row expiry logic.
+--- Lua port of _shared/core/ui/data/tooltip/dequeue.js — stacked hotstring row expiry logic.
 --- Keep in sync with the JS reference; contract tests live in
 --- tests/unit/ui/tooltip/test_tooltip_dequeue_contract.lua.
 
@@ -8,7 +8,7 @@ local M = {}
 
 -- MIN_TIMER_SEC is a genuine local floor for the dequeue timer, not a shared
 -- value. The decrement and the floor of a row's duration are declared once, in
--- _shared/modules/tooltip/constants.toml [timing]; every caller passes them from
+-- _shared/core/ui/data/tooltip/constants.toml [timing]; every caller passes them from
 -- the loaded tooltip config (ui/tooltip/config.lua M.timing), so this module
 -- keeps no copy and raises when a caller forgets them.
 local MIN_TIMER_SEC = 0.05

@@ -26,7 +26,7 @@ const path = require('node:path');
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER_ROOT = path.join(REPO_ROOT, 'static', 'ergopti_plus');
 const WORKER = path.join(DRIVER_ROOT, 'windows', 'vendor', 'ergopti_diagnostics.ps1');
-const CONTRACT = path.join(DRIVER_ROOT, '_shared', 'modules', 'diagnostics', 'collection.json');
+const CONTRACT = path.join(DRIVER_ROOT, '_shared', 'diagnostics', 'data', 'collection.json');
 const WORKER_EXIT_BOUND_MS = 60000;
 const BRIEF_HOLD_MS = 300;
 

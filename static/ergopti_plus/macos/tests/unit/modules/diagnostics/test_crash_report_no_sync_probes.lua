@@ -21,7 +21,7 @@
 --- The test drives the real M.report with a healthcheck double that records
 --- whether it was invoked, which is the observable that matters: whether a report
 --- forks subprocesses on the run loop. When it is asked for, the report reads the
---- version 2 snapshot's sections (_shared/modules/diagnostics/schema.json).
+--- version 2 snapshot's sections (_shared/diagnostics/data/schema.json).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

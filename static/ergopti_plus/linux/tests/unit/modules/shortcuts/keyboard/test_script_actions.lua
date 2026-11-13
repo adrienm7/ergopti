@@ -101,7 +101,7 @@ helpers.describe("script lifecycle actions", function()
 		local gestures_before = package.loaded["modules.gestures.manager"]
 		local paths_before = package.loaded["infra.config_paths"]
 		local path = os.tmpname()
-		require("test.config_unused_keys_contract").sandbox.write_bytes(path,
+		require("tests.lua.settings.unused_keys_contract").sandbox.write_bytes(path,
 			'[shortcuts.keyboard]\nprimary_j = "select_line"\nprimary_k = "script_pause_toggle"\n')
 		package.loaded["infra.config_paths"] = { config = function() return path end }
 		local executed = {}
@@ -235,7 +235,7 @@ helpers.describe("pause and resume notices", function()
 		handle:close()
 		local publish = assert(mac:match("local function publish_pause_state%(target_paused%)(.-)\nend\n"),
 			"macOS publish_pause_state moved: re-pin the cross-driver notice contract")
-		local catalogue_handle = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/en.json", "rb"))
+		local catalogue_handle = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/en.json", "rb"))
 		local catalogue = assert(catalogue_handle:read("*a"))
 		catalogue_handle:close()
 		for _, paused in ipairs({ true, false }) do

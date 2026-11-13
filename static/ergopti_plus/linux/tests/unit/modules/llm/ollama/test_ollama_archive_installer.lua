@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local function expect(value, message) assert(value, message) end
 local function test(name, body) helpers.it(name .. " (ollama-install)", body) end
-local Installer = helpers.load_module("llm.ollama_archive_installer")
+local Installer = helpers.load_module("ai.engine.ollama.archive_installer")
 local sequence = {
 	{ program = "sha256sum", stdout = "GNU coreutils --zero" },
 	{ program = "tar", stdout = "tar (GNU tar) 1.35" },

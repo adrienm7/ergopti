@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Drift gate: verifies that the owner/repo/timing literals in
  * windows/modules/updater/core.ahk and macos/modules/updater/init.lua agree with the
- * canonical values in _shared/modules/updater/defaults.json. A mismatch here
+ * canonical values in _shared/updater/data/defaults.json. A mismatch here
  * means someone edited a per-driver literal without updating the shared JSON
  * (or vice versa).
  *
@@ -33,7 +33,7 @@ const { expandIdentifiers } = require('../lib/shell-identifiers.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED_ROOT = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
-const DEFAULTS = path.join(SHARED_ROOT, 'modules', 'updater', 'defaults.json');
+const DEFAULTS = path.join(SHARED_ROOT, 'updater', 'data', 'defaults.json');
 const AHK_CORE = path.join(
 	ROOT,
 	'static',
@@ -76,7 +76,7 @@ function pass(msg) {
 // ─── Load defaults.json ───────────────────────────────────────────────────────
 
 if (!fs.existsSync(DEFAULTS)) {
-	fail('_shared/modules/updater/defaults.json not found — file was deleted or moved');
+	fail('_shared/updater/data/defaults.json not found — file was deleted or moved');
 	process.exit(1);
 }
 
@@ -84,7 +84,7 @@ let defaults;
 try {
 	defaults = JSON.parse(fs.readFileSync(DEFAULTS, 'utf8'));
 } catch (e) {
-	fail('_shared/modules/updater/defaults.json is not valid JSON: ' + e.message);
+	fail('_shared/updater/data/defaults.json is not valid JSON: ' + e.message);
 	process.exit(1);
 }
 
@@ -365,7 +365,7 @@ if (/start_background_checks|default_check_interval_sec|boot_check_delay_sec/.te
 	const autoSrc = fs.readFileSync(MAC_AUTO_CHECK, 'utf8');
 	if (
 		!/defaults\.json/.test(autoSrc) ||
-		!autoSrc.includes('require("updater.schedule")') ||
+		!autoSrc.includes('require("updater.engine.schedule")') ||
 		/\b86400\b/.test(autoSrc)
 	) {
 		fail(
@@ -425,10 +425,10 @@ for (const drv of LUA_DRIVERS) {
 	// The live values must come from the JSON, not from the fallback directly.
 	if (!/defaults\.json/.test(src)) {
 		fail(
-			`${drv.label}: does not reference _shared/modules/updater/defaults.json — it must read the canonical source`
+			`${drv.label}: does not reference _shared/updater/data/defaults.json — it must read the canonical source`
 		);
 	} else {
-		pass(`${drv.label}: reads _shared/modules/updater/defaults.json`);
+		pass(`${drv.label}: reads _shared/updater/data/defaults.json`);
 	}
 }
 
@@ -521,16 +521,16 @@ if (packagingFilesScanned === 0) {
 
 // ─── Verify dead constants.toml is gone ──────────────────────────────────────
 
-const deadToml = path.join(SHARED_ROOT, 'modules', 'updater', 'constants.toml');
+const deadToml = path.join(SHARED_ROOT, 'updater', 'data', 'constants.toml');
 if (fs.existsSync(deadToml)) {
 	fail(
-		'_shared/modules/updater/constants.toml still exists — should have been deleted (dead code, §5.6)'
+		'_shared/updater/data/constants.toml still exists — should have been deleted (dead code, §5.6)'
 	);
 } else {
 	pass('dead constants.toml is absent');
 }
 
-// The archive transfer budget is _shared/modules/updater/defaults.json
+// The archive transfer budget is _shared/updater/data/defaults.json
 // archive_transfer, read through transfer_budget.lua; a typed copy in the Linux
 // manager was never read (NET-004).
 if (/\bDOWNLOAD_TIMEOUT_MS\b/.test(fs.readFileSync(LINUX_UPDATER, 'utf8'))) {
@@ -542,7 +542,7 @@ if (/\bDOWNLOAD_TIMEOUT_MS\b/.test(fs.readFileSync(LINUX_UPDATER, 'utf8'))) {
 }
 
 // The release archive's absolute and idle bounds are declared once in
-// _shared/modules/updater/defaults.json archive_transfer (decided by the
+// _shared/updater/data/defaults.json archive_transfer (decided by the
 // maintainer on 2026-11-12: 1,200 s absolute, 600 s without data, aligned on
 // Windows). Linux reads them through transfer_budget.lua; macOS passes them to
 // the staging script and the launcher; neither keeps a typed copy.
@@ -563,7 +563,7 @@ if (/\bDOWNLOAD_TIMEOUT_MS\b/.test(fs.readFileSync(LINUX_UPDATER, 'utf8'))) {
 	);
 	if (
 		/\b900000\b|--max-time 900\b/.test(macInstaller + macStage) ||
-		!macInstaller.includes('require("updater.transfer_budget").archive_limits(')
+		!macInstaller.includes('require("updater.engine.transfer_budget").archive_limits(')
 	) {
 		fail('the macOS release download keeps a typed budget instead of the shared archive limits');
 	} else {

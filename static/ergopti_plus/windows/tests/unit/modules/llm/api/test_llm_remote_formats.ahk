@@ -48,7 +48,7 @@ _LRF_Corpus() {
 
 _LRF_Providers() {
 	global _SharedDir
-	return JsonParse(FileRead(_SharedDir . "\modules\llm\api_providers.json", "UTF-8"))
+	return JsonParse(FileRead(_SharedDir . "\ai\data\api_providers.json", "UTF-8"))
 }
 
 ; Asserts a built value against its vector, compared as the JSON it is sent

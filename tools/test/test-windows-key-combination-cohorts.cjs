@@ -438,12 +438,12 @@ const pacFixture = (callback) => {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'windows91-pac-receiving-'));
 	try {
 		const sourceNames = [
-			'static/ergopti_plus/_shared/data/linux_native_runtime.json',
-			'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
-			'static/ergopti_plus/_shared/modules/updater/defaults.json',
-			'static/ergopti_plus/_shared/modules/network/pac_helpers.js',
-			'static/ergopti_plus/_shared/native/network/pac_runtime.c',
-			'static/ergopti_plus/_shared/native/network/pac_runtime.h',
+			'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
+			'static/ergopti_plus/_shared/core/network/data/proxy_policy.json',
+			'static/ergopti_plus/_shared/updater/data/defaults.json',
+			'static/ergopti_plus/_shared/core/network/data/pac_helpers.js',
+			'static/ergopti_plus/_shared/core/network/native/pac_runtime.c',
+			'static/ergopti_plus/_shared/core/network/native/pac_runtime.h',
 			'static/ergopti_plus/windows/native/ergopti_network_pac_platform.c',
 			'static/ergopti_plus/windows/native/ergopti_network_pac_platform.h',
 			'static/ergopti_plus/windows/native/ergopti_network_pac.c',

@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Incremental Swipe Steps (AutoHotkey port)
 ; DESCRIPTION:
-; Port of _shared/lua/gestures/incremental.lua, the step rule the macOS engine
+; Port of _shared/gestures/engine/incremental.lua, the step rule the macOS engine
 ; and the Linux tracker count with: how many actions an incremental swipe has
 ; earned over the distance it travelled, and how far it must come back before
 ; it counts as a reversal. Distances are millimetres of travel on the pad.

@@ -78,16 +78,16 @@ helpers.describe("hotstrings_config: common section migration ownership", functi
 		local path = temp_path("common_refused")
 		local input = '[autocorrection.caps]\ndelay = 0.3\n# independent original notes\n'
 		write_fixture(path, input)
-		local original = require("toml_codec.writer").publish_if_unchanged
+		local original = require("core.text.engine.toml_codec.writer").publish_if_unchanged
 		local ok, detail = pcall(function()
-			require("toml_codec.writer").publish_if_unchanged = function() return false, "independent refusal" end
+			require("core.text.engine.toml_codec.writer").publish_if_unchanged = function() return false, "independent refusal" end
 			local mod = fresh_module(path)
 			helpers.assert_eq(mod.set_override("autocorrection", "names", "delay", 0.4), false)
 			local handle = assert(io.open(path, "rb")); local bytes = handle:read("*a"); assert(handle:close())
 			helpers.assert_eq(bytes, input)
 			helpers.assert_nil(mod.get_user_override("autocorrection", "names"), "unacknowledged candidates never become live")
 		end)
-		require("toml_codec.writer").publish_if_unchanged = original; os.remove(path)
+		require("core.text.engine.toml_codec.writer").publish_if_unchanged = original; os.remove(path)
 		if not ok then error(detail) end
 	end)
 		helpers.it("(common-autocorrection-split) unverified foreign bytes retain their native owner while requested common registration refuses", function()
@@ -110,19 +110,19 @@ helpers.describe("hotstrings_config: common section migration ownership", functi
 				Registry.set_group_context(nil)
 				local before, sequence = { state.mappings[1] }, state.seq_counter
 				helpers.assert_true(require("adapters.storage").set("hotstrings_section_autocorrection_names", true))
-				helpers.assert_eq(Registry.load_toml("autocorrection", helpers.shared("modules/hotstrings/autocorrection.toml")), false)
+				helpers.assert_eq(Registry.load_toml("autocorrection", helpers.shared("hotstrings/data/catalogue/autocorrection.toml")), false)
 				helpers.assert_eq(state.mappings, before, "the actual native transaction keeps every previous mapping")
 				helpers.assert_eq(state.seq_counter, sequence)
 				local Boot = require("infra.common_hotstrings_boot")
 				local hotfiles, hotfile_paths = {}, {}
 				local refused = Boot.load(Registry, "autocorrection",
-					helpers.shared("modules/hotstrings/autocorrection.toml"), nil, hotfiles, hotfile_paths)
+					helpers.shared("hotstrings/data/catalogue/autocorrection.toml"), nil, hotfiles, hotfile_paths)
 				helpers.assert_eq(refused, { committed = false, complete = false, unavailable = { "autocorrection" } })
 				helpers.assert_eq(hotfiles, {}, "cold startup never advertises a refused common group")
 				helpers.assert_nil(hotfile_paths.autocorrection)
 				helpers.assert_eq(state.mappings, before, "cold refusal also leaves prior unrelated native rows intact")
 				helpers.assert_true(require("adapters.storage").set(require("modules.keymap.section_keys").current("french_autocorrection", "names"), true))
-				local french_path = helpers.shared("modules/hotstrings/french/autocorrection.toml")
+				local french_path = helpers.shared("hotstrings/data/catalogue/french/autocorrection.toml")
 				local admitted = Boot.load(Registry, "french_autocorrection", french_path, nil, hotfiles, hotfile_paths)
 				helpers.assert_eq(admitted, { committed = true, complete = true, unavailable = {} })
 				helpers.assert_eq(hotfiles, { "french_autocorrection" }, "unrelated cold groups still load through the actual registry")

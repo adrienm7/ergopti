@@ -29,7 +29,7 @@ local Parser  = require("modules.llm.parser")
 local Logger  = require("infra.logger")
 local i18n    = require("infra.i18n")
 local PredictionTooltipPort = require("adapters.prediction_tooltip_port")
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "llm.streaming_handler"
 

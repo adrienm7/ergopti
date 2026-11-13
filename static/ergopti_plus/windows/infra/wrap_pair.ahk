@@ -5,10 +5,10 @@
 ; DESCRIPTION:
 ; Resolves the wrap_pair parameter of the wrap_selection action to the left and
 ; right symbols it names: a symbol of the built-in catalogue
-; (_shared/modules/wrap_symbols/wrap_symbols.json, opening or closing) or a
+; (_shared/keyboard/data/wrap_symbols/wrap_symbols.json, opening or closing) or a
 ; custom pair written left|right. Pure, so the unit suite replays the shared
 ; corpus _shared/tests/corpus/action_parameters/wrap_pair_vectors.json, which the
-; macOS and Linux suites replay against _shared/lua/wrap_pair too.
+; macOS and Linux suites replay against _shared/keyboard/engine too.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

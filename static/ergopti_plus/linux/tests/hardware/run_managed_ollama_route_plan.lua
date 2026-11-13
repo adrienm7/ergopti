@@ -11,12 +11,12 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 -- The parent passes the launcher's LUA_PATH; a module resolved elsewhere would
 -- prove another tree than the installed one.
 local installed = assert(os.getenv("ERGOPTI_INSTALLED_ROOT"), "installed root required")
-for _, name in ipairs({ "network.route_plan", "infra.route_origins", "modules.llm.managed_ollama_proxy" }) do
+for _, name in ipairs({ "core.network.engine.route_plan", "infra.route_origins", "modules.llm.managed_ollama_proxy" }) do
 	local found = package.searchpath(name, package.path)
 	assert(found and found:sub(1, #installed + 1) == installed .. "/", "module outside the installed root: " .. name)
 end

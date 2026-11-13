@@ -1,5 +1,5 @@
 {
-	"_comment": "The official Go archives the macOS developer app installs when no go is on PATH (tools/dev/macos_dev_go.py). version must equal go_version in _shared/modules/llm/managed_ollama_runtime.json; bumping it means copying the two darwin archive digests and sizes from https://go.dev/dl/?mode=json&include=all.",
+	"_comment": "The official Go archives the macOS developer app installs when no go is on PATH (tools/dev/macos_dev_go.py). version must equal go_version in _shared/ai/data/managed_ollama_runtime.json; bumping it means copying the two darwin archive digests and sizes from https://go.dev/dl/?mode=json&include=all.",
 	"version": "go1.26.8",
 	"url": "https://dl.google.com/go/{filename}",
 	"archives": {

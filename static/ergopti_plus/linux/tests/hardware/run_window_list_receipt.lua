@@ -10,7 +10,7 @@
 --- `wmctrl -lp` answers and that `/proc/<pid>/comm` names the owner.
 --- ==============================================================================
 
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local DisplayServer = require("infra.display_server")
 assert(DisplayServer.is_x11(), "the window list receipt needs an X11 display")
 local WindowInfo = require("adapters.window_info")

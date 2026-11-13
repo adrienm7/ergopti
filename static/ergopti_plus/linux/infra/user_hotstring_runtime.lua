@@ -9,7 +9,7 @@
 local M = {}
 local Destination = require("adapters.user_hotstring_destination")
 local Engine = require("modules.hotstrings.engine")
-local Utf8 = require("compat.utf8")
+local Utf8 = require("core.lifecycle.engine.compat.utf8")
 local Monotonic = require("infra.monotonic")
 
 --- Creates native ports around the daemon's existing matcher and privacy owners.

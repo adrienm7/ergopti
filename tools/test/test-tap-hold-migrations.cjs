@@ -5,7 +5,7 @@
  * MODULE: Tap-Hold Migration Registry Gate
  * DESCRIPTION:
  * Pins the versioned tap_hold.toml contract: the shipped registry
- * (_shared/tap_hold/migrations.toml) is a gap-free chain over a closed op set,
+ * (_shared/tap_hold/data/migrations.toml) is a gap-free chain over a closed op set,
  * its corpus (_shared/tests/corpus/tap_hold_migrations) is listed and well
  * formed, and an independent reference interpreter replays every case so an
  * expected.toml cannot describe behaviour no driver has. It also keeps this
@@ -20,7 +20,7 @@
  *    this one adds: windows/infra/config_migrate.ahk refuses an op it does not
  *    know, so sharing the registry would break every Windows boot.
  * 3. Replay. The reference interpreter below is a second implementation of the
- *    op semantics (after _shared/lua/tap_hold/migrate.lua). It decides each
+ *    op semantics (after _shared/tap_hold/engine/migrate.lua). It decides each
  *    case's outcome, compares the migrated document with expected.toml and
  *    replays the steps on their own output, which must change nothing.
  * 4. Marker retired. No Linux or Windows driver file writes or reads the
@@ -36,9 +36,9 @@ const path = require('path');
 const TOML = require('smol-toml');
 const { shared } = require('../lib/paths.cjs');
 
-const REGISTRY_PATH = shared('tap_hold/migrations.toml');
-const DEFAULTS_PATH = shared('tap_hold/defaults.toml');
-const CONFIG_REGISTRY_PATH = shared('core/config_schema/migrations.toml');
+const REGISTRY_PATH = shared('tap_hold/data/migrations.toml');
+const DEFAULTS_PATH = shared('tap_hold/data/defaults.toml');
+const CONFIG_REGISTRY_PATH = shared('settings/data/config_schema/migrations.toml');
 const CORPUS_DIR = shared('tests/corpus/tap_hold_migrations');
 const BARE_PATH = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/;
 const OUTCOMES = ['migrated', 'current', 'newer', 'invalid'];

@@ -1,7 +1,7 @@
 --- tests/unit/ui/menu/menu_llm/mlx/test_mlx_requirement_server_descendant_pause_join.lua
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local MODULES = {
 	"infra.logger",

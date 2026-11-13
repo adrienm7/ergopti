@@ -792,24 +792,23 @@ function native() {
 			path.join(driver, 'infra/regular_file_reader.lua')
 		);
 		fs.mkdirSync(path.join(driver, '_generated'), { recursive: true });
-		fs.mkdirSync(path.join(shared, 'lua'), { recursive: true });
+		fs.mkdirSync(shared, { recursive: true });
 		fs.mkdirSync(cwd);
 		for (const name of ['runtime_probe.lua', 'native_proxy_runtime.lua'])
 			fs.copyFileSync(
 				path.join(ROOT, DRIVER, 'platform/network', name),
 				path.join(driver, 'platform/network', name)
 			);
-		fs.copyFileSync(path.join(ROOT, SHARED, 'lua/json.lua'), path.join(shared, 'lua/json.lua'));
-		fs.mkdirSync(path.join(shared, 'lua/compat'));
-		fs.copyFileSync(
-			path.join(ROOT, SHARED, 'lua/compat/utf8.lua'),
-			path.join(shared, 'lua/compat/utf8.lua')
-		);
+		// Each shared module is staged under its own folder, whatever its depth.
+		for (const name of ['core/text/engine/json.lua', 'core/lifecycle/engine/compat/utf8.lua']) {
+			fs.mkdirSync(path.dirname(path.join(shared, name)), { recursive: true });
+			fs.copyFileSync(path.join(ROOT, SHARED, name), path.join(shared, name));
+		}
 		// The installed lookup helper bounds its receipt by the shared policy's limits.
-		fs.mkdirSync(path.join(shared, 'modules/network'), { recursive: true });
+		fs.mkdirSync(path.join(shared, 'core/network/data'), { recursive: true });
 		fs.copyFileSync(
-			path.join(ROOT, SHARED, 'modules/network/proxy_policy.json'),
-			path.join(shared, 'modules/network/proxy_policy.json')
+			path.join(ROOT, SHARED, 'core/network/data/proxy_policy.json'),
+			path.join(shared, 'core/network/data/proxy_policy.json')
 		);
 		fs.writeFileSync(
 			path.join(driver, '_generated/native_runtime.lua'),
@@ -895,7 +894,7 @@ function native() {
 				};
 				// Withhold only the staged canonical policy, then restore the same file:
 				// a missing policy and missing schema must remain independent refusals.
-				const policy = path.join(shared, 'modules/network/proxy_policy.json');
+				const policy = path.join(shared, 'core/network/data/proxy_policy.json');
 				const withheldPolicy = path.join(root, 'withheld-proxy-policy.json');
 				fs.renameSync(policy, withheldPolicy);
 				assert.deepEqual(runHelper(), { ok: false, error: 'proxy-policy-unavailable' });

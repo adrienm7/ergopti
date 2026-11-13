@@ -18,7 +18,7 @@ local function run_guard(failure)
 	local facts = { closes = 0, commands = 0, parsed = 0 }
 	local stub_helpers = {
 		driver_root = function() return "/owned/driver/" end,
-		shared = function() return "/owned/shared/lua" end,
+		shared = function() return "/owned/shared/" end,
 		describe = function(_, callback) callback() end,
 		it = function(_, callback) callback() end,
 		assert_true = helpers.assert_true,

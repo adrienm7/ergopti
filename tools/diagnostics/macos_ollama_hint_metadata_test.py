@@ -161,9 +161,9 @@ class HintSelection(unittest.TestCase):
         self.addCleanup(self.owned.cleanup)
         self.home = Path(self.owned.name) / "home"
         self.driver = Path(self.owned.name) / "macos"
-        self.shared = self.driver.parent / "_shared/modules/llm"
+        self.shared = self.driver.parent / "_shared/ai/data"
         self.shared.mkdir(parents=True)
-        retry_data = self.driver.parent / "_shared/modules/network/bootstrap_retry.json"
+        retry_data = self.driver.parent / "_shared/core/network/data/bootstrap_retry.json"
         retry_data.parent.mkdir(parents=True)
         retry_data.write_bytes(
             b'{"schema_version":1,"admission_seconds":30,"idle_seconds":60,"retirement_seconds":600}'
@@ -285,8 +285,8 @@ class IsolatedBytecodeControls(unittest.TestCase):
             paths = (
                 "static/ergopti_plus/macos/modules/llm/managed_ollama_hint.py",
                 "static/ergopti_plus/macos/platform/ollama_hint_metadata.py",
-                "static/ergopti_plus/_shared/python/managed_ollama_runtime.py",
-                "static/ergopti_plus/_shared/python/managed_ollama_hint.py",
+                "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py",
+                "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_hint.py",
             )
             for relative in paths:
                 destination = copied / relative

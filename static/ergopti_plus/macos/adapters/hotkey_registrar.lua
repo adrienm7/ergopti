@@ -29,9 +29,9 @@
 local M = {}
 
 local hs     = hs
-local Chord  = require("chord")
+local Chord  = require("keyboard.engine.chord")
 local Logger = require("infra.logger")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "adapters.hotkey_registrar"
 

@@ -39,7 +39,7 @@ local _active_tasks = {}
 
 
 -- Timing thresholds come from the shared cross-driver registry
--- (_shared/modules/timings/constants.toml [keystats]) so the AHK and macOS
+-- (_shared/core/timing/data/constants.toml [keystats]) so the AHK and macOS
 -- keystatss stay in sync; mirrored from keystats/init.lua.
 -- Typing session idle threshold before a "micro-idle" event is logged (30 s)
 local MICRO_IDLE_TIMEOUT_MS      = Timings.ms("keystats", "micro_idle_timeout_ms")
@@ -911,7 +911,7 @@ function M.stop_hardware_watchers()
 end
 
 --- A bound actor observes existing writers; binding does not activate sensors.
-local PhysicalLifecycle = require("keystats.physical_lifecycle_observation")
+local PhysicalLifecycle = require("metrics.engine.capture.physical_lifecycle_observation")
 local _physical_lifecycle = PhysicalLifecycle.new("system", function()
 	return require("adapters.physical_observation_clock").now()
 end, function(reason) Logger.error(LOG, "Physical lifecycle observer retired: %s.", tostring(reason)) end)

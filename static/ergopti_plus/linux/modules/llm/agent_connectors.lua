@@ -6,7 +6,7 @@
 --- Carries out one action of the AI agent once the user accepted it: a
 --- calendar event or a reminder, a mail draft, or one of the user's own tools.
 --- One function per action type; the payloads (the iCalendar file, the mailto:
---- link) come from the shared _shared/lua/llm/agent.lua, so the three drivers
+--- link) come from the shared _shared/ai/engine/agent/agent.lua, so the three drivers
 --- hand the system the same bytes.
 ---
 --- FEATURES & RATIONALE:
@@ -27,9 +27,9 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Agent = require("llm.agent")
-local Utf8 = require("compat.utf8")
+local Logger = require("core.logger.engine.shim")
+local Agent = require("ai.engine.agent.agent")
+local Utf8 = require("core.lifecycle.engine.compat.utf8")
 local ShellRunner = require("adapters.shell_runner")
 
 local LOG = "modules.llm.agent_connectors"

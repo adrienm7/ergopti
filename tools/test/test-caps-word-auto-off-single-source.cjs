@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * What ends CapsWord on its own is declared once. The delay presets are the
  * shortcuts.caps_word.idle_timeout_seconds preset_values; the delimiters are
- * the hotstring delimiter catalogue (_shared/core/domain/Terminators.spec.js),
+ * the hotstring delimiter catalogue (_shared/core/text/data/domain/Terminators.spec.js),
  * whose built-in keys are the only valid shortcuts.caps_word.terminators
  * values; the pointer kinds are the [shortcuts.caps_word.pointer] features.
  * This gate pins the defaults, the shared corpus and the menu rows to those
@@ -28,10 +28,10 @@ const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(SP, '_shared', 'modules', 'features', 'manifest.toml');
-const SPEC = path.join(SP, '_shared', 'core', 'domain', 'Terminators.spec.js');
+const MANIFEST = path.join(SP, '_shared', 'settings', 'data', 'features', 'manifest.toml');
+const SPEC = path.join(SP, '_shared', 'core', 'text', 'data', 'domain', 'Terminators.spec.js');
 const CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'caps_word', 'auto_off_vectors.json');
-const EN = path.join(SP, '_shared', 'data', 'locales', 'en.json');
+const EN = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales', 'en.json');
 const PLATFORMS = ['ahk', 'hs', 'linux'];
 // Physical keys a driver may bind natively and name by their delimiter key;
 // the magic key is spelled "star" by unrelated hotstring code.
@@ -67,7 +67,7 @@ const flattened = toml.parse(
 const feature = (prefix, id) =>
 	(flattened.entries || []).find((entry) => entry.path_prefix === prefix && entry.id === id);
 const menu = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json'), 'utf8')
 );
 const corpus = JSON.parse(fs.readFileSync(CORPUS, 'utf8'));
 const en = JSON.parse(fs.readFileSync(EN, 'utf8'));

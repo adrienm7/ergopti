@@ -57,7 +57,7 @@ _MM1D_EnclosingFunction(Src, Offset) {
 _MM1D_OnlyOneMenuLayerDecoder() {
 	global _MM1D_ALLOWED_OWNERS
 	Src    := _DriverSourceNoComments()
-	Needle := "\modules\menu\menu_manifest.json"
+	Needle := "\menu\data\menu_manifest.json"
 
 	Owners := Map()
 	Pos := 1

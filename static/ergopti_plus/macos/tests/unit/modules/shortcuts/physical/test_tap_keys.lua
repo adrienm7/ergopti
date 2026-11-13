@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 --- @param characters table Keycode -> the character the input source puts there.
 --- @return table TapKeys, function restore
 local function fresh(stored, characters)
-	local content = stored and require("toml_codec").encode({ shortcuts = { tap_keys = stored } }) or nil
+	local content = stored and require("core.text.engine.toml_codec").encode({ shortcuts = { tap_keys = stored } }) or nil
 	local owned = { "adapters.storage", "infra.keycodes", "adapters.file_system",
 		"infra.paths", "infra.preferences", "infra.config_paths", "modules.shortcuts.tap_keys" }
 	local saved = {}

@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 helpers.describe("layout manager window (macOS)", function()
 	helpers.it("sends every string the page declares, translated (layout-manager-bridge)", function()

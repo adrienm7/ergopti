@@ -13,7 +13,7 @@
  * Ctrl+Arrow and hid a "circular" checkbox that never wrapped; Windows left it
  * to Ctrl+Win+Arrow, which stops at the edge; Linux computed a modulo in shell,
  * so its "previous desktop" wrapped while the other two stopped. The plain and
- * wrapping actions now share one rule (_shared/lua/desktop_navigation, ported
+ * wrapping actions now share one rule (_shared/keyboard/engine, ported
  * to windows/modules/gestures/virtual_desktops.ahk), and this corpus pins it.
  * A corpus nobody replays pins nothing, so this gate also fails when a suite
  * stops reading it or stops being run.
@@ -116,7 +116,14 @@ check(
 // ==================================================
 // ==================================================
 
-const CONTRACT = path.join(SP, '_shared', 'lua', 'test', 'desktop_navigation_contract.lua');
+const CONTRACT = path.join(
+	SP,
+	'_shared',
+	'tests',
+	'lua',
+	'core',
+	'desktop_navigation_contract.lua'
+);
 const contract = fs.existsSync(CONTRACT) ? fs.readFileSync(CONTRACT, 'utf8') : '';
 check(
 	contract.includes('tests/corpus/desktop_navigation/vectors.json'),
@@ -125,11 +132,11 @@ check(
 const CONSUMERS = [
 	{
 		file: 'macos/tests/unit/modules/gestures/parameters/test_desktop_navigation_vectors.lua',
-		needle: 'require("test.desktop_navigation_contract")'
+		needle: 'require("tests.lua.core.desktop_navigation_contract")'
 	},
 	{
 		file: 'linux/tests/unit/modules/gestures/actions/test_desktop_navigation_vectors.lua',
-		needle: 'require("test.desktop_navigation_contract")'
+		needle: 'require("tests.lua.core.desktop_navigation_contract")'
 	},
 	{
 		file: 'windows/tests/unit/modules/gestures/test_virtual_desktops.ahk',

@@ -8,7 +8,7 @@
 --- and vpn_connected / vpn_disconnected with the same `adapter` sentinel.
 ---
 --- FEATURES & RATIONALE:
---- 1. Same kinds, reducer and sampler as macOS: _shared/lua/keystats/
+--- 1. Same kinds, reducer and sampler as macOS: _shared/metrics/engine/
 ---    network_transitions.lua ports the Windows KL_Net_ReduceBinarySample; this
 ---    module only supplies the Linux probes.
 --- 2. Reachability resolves the Windows NCSI host asynchronously through libuv:
@@ -23,9 +23,9 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Timings = require("infra.timings")
-local Transitions = require("keystats.network_transitions")
+local Transitions = require("metrics.engine.system.network_transitions")
 
 local LOG = "modules.keystats.network_metrics"
 

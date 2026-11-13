@@ -82,11 +82,11 @@ local function start_with(max_fingers, bindings)
 		logger[level] = function(_, fmt, ...) lines[#lines + 1] = { level = level, text = string.format(fmt, ...) } end
 	end
 	local saved = {
-		logger = package.loaded["logger.shim"],
+		logger = package.loaded["core.logger.engine.shim"],
 		reader = package.loaded["adapters.evdev_reader"],
 		finder = package.loaded["modules.gestures.touchpad_finder"],
 	}
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["adapters.evdev_reader"] = Fakes.evdev_reader({ events = {} })
 	-- Only find() and a pad with no resolution, as the other gesture tests fake
 	-- it: the report must not need the finder.
@@ -103,7 +103,7 @@ local function start_with(max_fingers, bindings)
 		helpers.assert_true(M.start_reading(), "the faked touchpad opens")
 		M.stop_reading()
 	end)
-	package.loaded["logger.shim"] = saved.logger
+	package.loaded["core.logger.engine.shim"] = saved.logger
 	package.loaded["adapters.evdev_reader"] = saved.reader
 	package.loaded["modules.gestures.touchpad_finder"] = saved.finder
 	package.loaded["modules.gestures.manager"] = nil

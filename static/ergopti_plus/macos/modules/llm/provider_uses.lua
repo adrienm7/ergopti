@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Remote Provider Uses
 --- DESCRIPTION:
---- Tells which uses each request format of _shared/modules/llm/api_providers.json
+--- Tells which uses each request format of _shared/ai/data/api_providers.json
 --- can serve, and lists the providers of the catalogue that serve one use, in the
 --- catalogue's order.
 ---

@@ -8,11 +8,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
 local MODULES = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_loader",
-	"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "config_scope_transaction" }
+	"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "settings.engine.scope.transaction" }
 
 local function read(path)
 	local fh = io.open(path, "r")

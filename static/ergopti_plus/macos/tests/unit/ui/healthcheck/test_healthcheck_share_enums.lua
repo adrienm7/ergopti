@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Reads one file whole.
 --- @param path string
@@ -69,7 +69,7 @@ local function lease_phases(source)
 end
 
 helpers.describe("healthcheck: shared report enums", function()
-	local schema = Json.decode(read_file(helpers.shared("modules/diagnostics/schema.json")))
+	local schema = Json.decode(read_file(helpers.shared("diagnostics/data/schema.json")))
 
 	helpers.it("accepts every lease phase the controller publishes", function()
 		local descriptor = find_enum(schema, "remap_phase")

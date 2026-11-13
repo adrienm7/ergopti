@@ -10,7 +10,7 @@
 --- fixed; this test locks in the delegation so the fork cannot silently return.
 ---
 --- WHAT WE CHECK:
---- 1. loader.lua contains `require("toml_codec.reader")` (delegates to codec).
+--- 1. loader.lua contains `require("core.text.engine.toml_codec.reader")` (delegates to codec).
 --- 2. loader.lua does NOT define its own parse_toml_file (no parallel parser).
 --- 3. toml_codec.reader soft-resolves Logger so it loads on the Linux runtime.
 --- 4. Every per-entry flag in the shared schema survives the whole TOML → reader
@@ -43,10 +43,10 @@ local assert_true = helpers.assert_true
 -- modules/hotstrings/loader, selected by a declaration unique to it.
 local loader_src = assert(helpers.read_driver_unit("local function tiers("))
 
-describe("Linux TOML loader delegation to toml_codec.reader", function()
+describe("Linux TOML loader delegation to core.text.engine.toml_codec.reader", function()
 
 	it("(reader-string-failure) rejects malformed strings without publishing partial sections", function()
-		local reader = require("toml_codec.reader")
+		local reader = require("core.text.engine.toml_codec.reader")
 		for _, content in ipairs({
 			'[[s]]\n"bad\\q" = { output = "A" }',
 			'[_meta]\nsections_order = ["s", "bad\\q"]',
@@ -63,23 +63,23 @@ describe("Linux TOML loader delegation to toml_codec.reader", function()
 
 	it("loader.lua parses through the shared codec (directly, or through the timed wrapper that delegates to it)", function()
 		assert_true(
-			loader_src:find('require%("toml_codec%.reader"%)', 1, false) ~= nil
+			loader_src:find('require%("core%.text%.engine%.toml_codec%.reader"%)', 1, false) ~= nil
 				or loader_src:find('require%("infra%.toml%.reader"%)', 1, false) ~= nil,
-			"loader.lua must delegate to toml_codec.reader — no local parser fork allowed."
+			"loader.lua must delegate to core.text.engine.toml_codec.reader — no local parser fork allowed."
 		)
 		-- The timed wrapper hands every parse to the shared reader: a recording
 		-- shared reader receives the call and its answer comes back unchanged.
-		local saved_shared, saved_wrapper = package.loaded["toml_codec.reader"], package.loaded["infra.toml.reader"]
+		local saved_shared, saved_wrapper = package.loaded["core.text.engine.toml_codec.reader"], package.loaded["infra.toml.reader"]
 		local seen = {}
-		package.loaded["toml_codec.reader"] = { parse = function(path)
+		package.loaded["core.text.engine.toml_codec.reader"] = { parse = function(path)
 			seen[#seen + 1] = path
 			return { from_shared = true }, true
 		end }
 		package.loaded["infra.toml.reader"] = nil
 		local ok, document, committed = pcall(function() return require("infra.toml.reader").parse("/fixture.toml") end)
-		package.loaded["toml_codec.reader"], package.loaded["infra.toml.reader"] = saved_shared, saved_wrapper
+		package.loaded["core.text.engine.toml_codec.reader"], package.loaded["infra.toml.reader"] = saved_shared, saved_wrapper
 		assert_true(ok, tostring(document))
-		helpers.assert_eq(seen, { "/fixture.toml" }, "the timed wrapper must delegate to toml_codec.reader")
+		helpers.assert_eq(seen, { "/fixture.toml" }, "the timed wrapper must delegate to core.text.engine.toml_codec.reader")
 		helpers.assert_eq(document, { from_shared = true })
 		helpers.assert_eq(committed, true)
 	end)
@@ -108,9 +108,9 @@ describe("Linux TOML loader delegation to toml_codec.reader", function()
 -- =====================================
 -- =====================================
 
-	it("toml_codec.reader loads without error on Linux runtime", function()
-		local ok, result = pcall(require, "toml_codec.reader")
-		assert_true(ok, "toml_codec.reader failed to load: " .. tostring(result))
+	it("core.text.engine.toml_codec.reader loads without error on Linux runtime", function()
+		local ok, result = pcall(require, "core.text.engine.toml_codec.reader")
+		assert_true(ok, "core.text.engine.toml_codec.reader failed to load: " .. tostring(result))
 	end)
 
 	it("modules.hotstrings.loader loads without error on Linux runtime", function()
@@ -217,7 +217,7 @@ describe("Linux loader: every schema flag survives TOML → mapping", function()
 			for _, flag in ipairs(SCHEMA_FLAGS) do
 				assert_true(m[flag] == flag_value, string.format(
 					"'%s' arrived as %s but the TOML says %s. Some link in TOML → " ..
-					"toml_codec.reader → loader → mapping drops it, and a dropped flag " ..
+					"core.text.engine.toml_codec.reader → loader → mapping drops it, and a dropped flag " ..
 					"reads as its default rather than as an error.",
 					flag, tostring(m[flag]), tostring(flag_value)))
 			end

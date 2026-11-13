@@ -3,14 +3,14 @@
 local root, mode = assert(arg[1]), assert(arg[2])
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver = assert(source:match("^(.*)/tests/fixtures/native_hotstring_path_admission%.lua$"))
-package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. driver .. "/../_shared/lua/?.lua;"
-	.. driver .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. driver .. "/../_shared/?.lua;"
+	.. driver .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local Paths = require("infra.paths")
 if mode == "index" then
 	local shared = Paths.shared
 	Paths.shared = function(path)
-		if path == "modules/hotstrings/_index.toml" then return root .. "/index.toml" end
+		if path == "hotstrings/data/catalogue/_index.toml" then return root .. "/index.toml" end
 		return shared(path)
 	end
 end

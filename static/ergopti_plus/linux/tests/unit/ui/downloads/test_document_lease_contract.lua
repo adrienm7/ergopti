@@ -3,5 +3,5 @@
 --- Shared document ledger and actual Linux network-progress caller controls.
 --- Controlled ports do not prove GTK/WebKit or physical native cleanup.
 local helpers = require("tests.helpers")
-require("test.document_lease_contract").register(helpers)
-require("test.download_document_contract").register(helpers)
+require("tests.lua.document_lease_contract").register(helpers)
+require("tests.lua.updater.download_document_contract").register(helpers)

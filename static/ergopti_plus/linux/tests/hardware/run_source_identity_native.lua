@@ -7,9 +7,9 @@
 --- ==============================================================================
 
 local driver = assert(arg[1])
-local shared = driver .. "/../_shared/lua"
+local shared = driver .. "/../_shared"
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
 local root = assert(uv.fs_mkdtemp(assert(uv.os_tmpdir()) .. "/source-id-XXXXXX"))
 local literal = root .. "/native\\\nname"
@@ -20,8 +20,8 @@ assert(uv.fs_mkdir(root .. "/native", 448)); assert(uv.fs_mkdir(separated, 448))
 -- finds them, so the copied tree follows wherever the layout puts them.
 local search = shared .. "/?.lua;" .. shared .. "/?/init.lua"
 local function shared_relative(found) return found:sub(#shared + 2) end
-local MIGRATION_FILE = shared_relative(assert(package.searchpath("config_migrate", search)))
-local WRITER_FILE = shared_relative(assert(package.searchpath("toml_codec.writer", search)))
+local MIGRATION_FILE = shared_relative(assert(package.searchpath("settings.engine.migration.migrate", search)))
+local WRITER_FILE = shared_relative(assert(package.searchpath("core.text.engine.toml_codec.writer", search)))
 local made = {}
 for _, relative in ipairs({ MIGRATION_FILE, WRITER_FILE }) do
 	local folder, parent = literal, relative:match("^(.*)/[^/]+$") or ""
@@ -40,9 +40,9 @@ copy(MIGRATION_FILE); copy(WRITER_FILE)
 local original = assert(uv.cwd())
 local ok, failure = xpcall(function()
 	assert(uv.chdir(literal))
-	local directory = assert(require("module_source_directory").capture())
+	local directory = assert(require("core.fs.engine.module_source_directory").capture())
 	assert(directory == literal and directory == require("lfs").currentdir())
-	local Source = require("module_source_identity")
+	local Source = require("core.fs.engine.module_source_identity")
 	local chunk = assert(loadfile("./" .. MIGRATION_FILE))
 	local actual = debug.getinfo(chunk, "S").source
 	local normalized = assert(Source.normalize(actual, directory))
@@ -50,10 +50,10 @@ local ok, failure = xpcall(function()
 	assert(not Source.same("@" .. literal .. "/" .. MIGRATION_FILE, "@" .. separated .. "/" .. MIGRATION_FILE),
 		"different native component names must not become one loader source")
 	package.path = "./?.lua;./?/init.lua;" .. package.path
-	local writer = require("toml_codec.writer")
+	local writer = require("core.text.engine.toml_codec.writer")
 	assert(type(writer.batch_write) == "function", "the real canonical writer constructor must initialize")
-	local Migration = require("config_migrate")
-	local Codec = require("toml_codec.codec")
+	local Migration = require("settings.engine.migration.migrate")
+	local Codec = require("core.text.engine.toml_codec.codec")
 	local source = '[owned]\ntext = "literal"\n'
 	assert(Codec.decode(source).owned.text == "literal")
 	local model = assert(Migration.model_from_source(source))

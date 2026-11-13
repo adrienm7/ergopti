@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Locale JSON Validity Test
 ; DESCRIPTION:
-; Ensures every .json file under _shared/data/locales/ is structurally valid:
+; Ensures every .json file under _shared/core/i18n/data/locales/ is structurally valid:
 ; parseable by JsonParse, starts with '{', ends with '}', and contains the
 ; minimum required keys (e.g. _meta.locale, _meta.flag).
 ;
@@ -90,10 +90,10 @@ _MetaLocaleScanFresh() {
 	; A_ScriptDir = tests/ (set by run_all.ahk, which #Include-s this file)
 	; SplitPath(tests/) → windows/
 	; SplitPath(windows/) → ergopti_plus/
-	; _shared/data/locales lives at ergopti_plus/_shared/data/locales
+	; _shared/core/i18n/data/locales lives at ergopti_plus/_shared/core/i18n/data/locales
 	SplitPath(A_ScriptDir, , &_LocaleTestDriverDir)
 	SplitPath(_LocaleTestDriverDir, , &_LocaleTestEpDir)
-	LocaleDir := _LocaleTestEpDir . "\_shared\data\locales"
+	LocaleDir := _LocaleTestEpDir . "\_shared\core\i18n\data\locales"
 
 	Files := _LocaleListJsonFiles(LocaleDir)
 	TotalFiles := Files.Length

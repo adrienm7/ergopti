@@ -1,5 +1,5 @@
 {
-	"_comment": "The agent's admission decisions replayed through _shared/lua/llm/request_plan/agent.lua by the macOS and Linux runners (_shared/lua/test/llm_request_plan_contract.lua). admit: the refusal a manual action meets first (paused, AI off, agent mode off, System 2 unusable, focus refused); auto_blocker: what stops the automatic mode's triage, in order; triage_skip: whether a sentence is worth triaging. An absent blocker or skip means the plan answers nil: nothing blocks and nothing is skipped.",
+	"_comment": "The agent's admission decisions replayed through _shared/ai/engine/request_plan/agent.lua by the macOS and Linux runners (_shared/tests/lua/ai/request_plan_contract.lua). admit: the refusal a manual action meets first (paused, AI off, agent mode off, System 2 unusable, focus refused); auto_blocker: what stops the automatic mode's triage, in order; triage_skip: whether a sentence is worth triaging. An absent blocker or skip means the plan answers nil: nothing blocks and nothing is skipped.",
 	"drivers": {
 		"macos": "Replays every vector.",
 		"linux": "Replays every vector.",

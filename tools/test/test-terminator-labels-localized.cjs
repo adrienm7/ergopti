@@ -33,11 +33,11 @@ const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SPEC = path.join(SP, '_shared', 'core', 'domain', 'Terminators.spec.js');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const SPEC = path.join(SP, '_shared', 'core', 'text', 'data', 'domain', 'Terminators.spec.js');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 const GENERATED = {
 	ahk: path.join(SP, 'windows', '_generated', 'terminators.ahk'),
-	lua: path.join(SP, '_shared', 'lua', 'keymap', 'terminators_catalogue.lua')
+	lua: path.join(SP, '_shared', 'layouts', 'engine', 'layers', 'terminators_catalogue.lua')
 };
 const RENDERERS = [
 	{

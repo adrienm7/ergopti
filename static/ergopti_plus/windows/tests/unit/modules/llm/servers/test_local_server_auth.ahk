@@ -21,7 +21,7 @@
 
 _LSA_SharedCorpus() {
 	global _SharedDir
-	Root := JsonParse(FileRead(_SharedDir . "\modules\llm\local_servers.json", "UTF-8"))
+	Root := JsonParse(FileRead(_SharedDir . "\ai\data\local_servers.json", "UTF-8"))
 	Catalogue := LocalServerAuthCatalogue(Root, Map("openai", true, "openai_compat", true))
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\llm\local_server_auth.json", "UTF-8"))
 	AssertEqual(Root["server_order"].Length, Catalogue["order"].Length, "every catalogue descriptor owns optional authentication")
@@ -58,7 +58,7 @@ Test("local API authentication: independent cross-driver credential and models c
 
 _LSA_ResolverAndPrivateRestart() {
 	global LLM_LOCAL_API_SERVERS, _SharedDir
-	for Id in JsonParse(FileRead(_SharedDir . "\modules\llm\local_servers.json", "UTF-8"))["server_order"] {
+	for Id in JsonParse(FileRead(_SharedDir . "\ai\data\local_servers.json", "UTF-8"))["server_order"] {
 		AssertTrue(LLM_LOCAL_API_SERVERS.Has(Id), "actual provider boot publishes the shared local capability")
 		Entry := Map("Id", "local_" . Id, "Name", Id, "Provider", Id, "BaseUrl", "http://127.0.0.1:19273/v1", "Token", "", "Model", "fixture-model")
 		Resolved := _LLMRemoteResolveEntry(Entry)

@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/action_parameters/user_action_vectors.json"
 local ACTION_OF_KIND = { command = "run_command", path = "open_path" }
@@ -52,7 +52,7 @@ end)
 
 -- The modules each fixture loads fresh, and the owners it replaces.
 local OWNED = {
-	"modules.gestures.user_actions", "logger.shim", "infra.i18n", "adapters.shell_runner",
+	"modules.gestures.user_actions", "core.logger.engine.shim", "infra.i18n", "adapters.shell_runner",
 	"adapters.application_notifier", "adapters.clipboard", "adapters.file_system", "modules.shortcuts.manager",
 }
 
@@ -68,7 +68,7 @@ local function with_world(body)
 		for _, level in ipairs({ "debug", "trace", "done", "info", "start", "success", "warn", "error" }) do
 			logger[level] = function(_, fmt, ...) world.logs[#world.logs + 1] = string.format(tostring(fmt), ...) end
 		end
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		package.loaded["infra.i18n"] = { get = function(key) return key .. "|{1}|{2}" end }
 		package.loaded["adapters.application_notifier"] = { send = function(text)
 			world.notices[#world.notices + 1] = (text:gsub("|{%d}", ""))
@@ -81,7 +81,7 @@ local function with_world(body)
 		}
 		package.loaded["adapters.file_system"] = { exists = function(path) return world.present[path] == true end }
 		package.loaded["adapters.shell_runner"] = {
-			quote = require("text_utils").shell_quote,
+			quote = require("core.text.engine.utils_core").shell_quote,
 			has_command = function(binary) return world.installed[binary] == true end,
 			run = function(command) world.shell[#world.shell + 1] = command; return true end,
 			run_async = function(executable, args, options, callback)
@@ -236,7 +236,7 @@ helpers.describe("run_command runs the user's line hidden or in a terminal (Linu
 				"gnome-terminal", "--", "/bin/sh", "-l", "-c", User.TERMINAL_SCRIPT, "ergopti", SECRET })
 			helpers.assert_true(not User.TERMINAL_SCRIPT:find("s3cr3t", 1, true))
 			helpers.assert_eq(User.run_command({ command = SECRET, mode = "terminal", output = "none" }, 500), true)
-			local quote = require("text_utils").shell_quote
+			local quote = require("core.text.engine.utils_core").shell_quote
 			helpers.assert_eq(world.shell[1], "setsid " .. quote("x-terminal-emulator") .. " " .. quote("-e") .. " "
 				.. quote("/bin/sh") .. " " .. quote("-l") .. " " .. quote("-c") .. " " .. quote(User.TERMINAL_SCRIPT)
 				.. " " .. quote("ergopti") .. " " .. quote(SECRET) .. " </dev/null >/dev/null 2>&1 &")
@@ -254,7 +254,7 @@ helpers.describe("run_command runs the user's line hidden or in a terminal (Linu
 
 	helpers.it("the terminal program runs the command then keeps the user's shell (user-actions)", function()
 		with_world(function(User)
-			local handle = io.popen("/bin/sh -c " .. require("text_utils").shell_quote(User.TERMINAL_SCRIPT)
+			local handle = io.popen("/bin/sh -c " .. require("core.text.engine.utils_core").shell_quote(User.TERMINAL_SCRIPT)
 				.. " ergopti 'printf done' </dev/null 2>/dev/null; true", "r")
 			local output = handle:read("*a")
 			handle:close()
@@ -282,7 +282,7 @@ helpers.describe("open_path opens an existing file or folder (Linux)", function(
 			helpers.assert_eq(User.open_path({ path = "/home/me/It's $HOME" }), true)
 			world.installed = {}
 			helpers.assert_eq(User.open_path({ path = "/home/me/It's $HOME" }), false)
-			local quote = require("text_utils").shell_quote
+			local quote = require("core.text.engine.utils_core").shell_quote
 			helpers.assert_eq(world.shell, {
 				"setsid " .. quote("xdg-open") .. " " .. quote("/home/me/It's $HOME") .. " </dev/null >/dev/null 2>&1 &",
 				"setsid " .. quote("gio") .. " " .. quote("open") .. " " .. quote("/home/me/It's $HOME")
@@ -312,11 +312,11 @@ helpers.describe("the user action editors store one canonical value (Linux)", fu
 			pick = function() asked = asked + 1; return "terminal" end,
 		})
 		helpers.assert_eq(asked, 1)
-		helpers.assert_eq(require("user_action_parameter").parse("command", value), nil)
+		helpers.assert_eq(require("shortcuts.engine.user_action_parameter").parse("command", value), nil)
 	end)
 
 	helpers.it("a file or folder is picked with the owned dialog (user-actions)", function()
-		local shell = { quote = require("text_utils").shell_quote }
+		local shell = { quote = require("core.text.engine.utils_core").shell_quote }
 		local Chooser = helpers.load_module("ui.app_chooser")
 		local dialog = require("ui.native_dialog").command()
 		helpers.assert_eq(Chooser.path_picker_command(shell, "T", true, "/home/me/"),
@@ -331,7 +331,7 @@ helpers.describe("the user action editors store one canonical value (Linux)", fu
 		})
 		helpers.assert_eq(value, "/home/me/Docs")
 		-- The caption is the composed window title, like every tray dialog's
-		helpers.assert_true(ran:find(" --title=" .. shell.quote(require("window_titles").compose("Title")), 1, true) ~= nil,
+		helpers.assert_true(ran:find(" --title=" .. shell.quote(require("core.ui.engine.window_titles").compose("Title")), 1, true) ~= nil,
 			"the picker's caption is composed through window_titles: " .. tostring(ran))
 		helpers.assert_true(ran:find(" --directory", 1, true) ~= nil, "a folder is picked as a folder")
 	end)
@@ -350,13 +350,13 @@ end)
 helpers.describe("private user-action notification fallback", function()
 	for _, mode in ipairs({ "unavailable", "refused" }) do
 		helpers.it("does not log command stderr when notifier is " .. mode, function()
-			local names = { "logger.shim", "infra.i18n", "adapters.shell_runner", "adapters.notifier",
+			local names = { "core.logger.engine.shim", "infra.i18n", "adapters.shell_runner", "adapters.notifier",
 				"adapters.application_notifier", "modules.gestures.user_actions" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local logs = {}
-			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
-			package.loaded["logger.shim"] = logger
+			package.loaded["core.logger.engine.shim"] = logger
 			package.loaded["infra.i18n"] = { get = function() return "Command failed: {1}: {2}" end }
 			package.loaded["adapters.shell_runner"] = {
 				has_command = function() return mode ~= "unavailable" end,

@@ -236,7 +236,7 @@ helpers.describe("private program group retirement (program106-group)", function
 	end)
 
 	helpers.it("reports only the closed numeric execution failure (program106-group)", function()
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local previous, messages = Logger.error, {}
 		Logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
 		local ok, failure = xpcall(function()
@@ -417,7 +417,7 @@ end)
 
 local function with_bindings(callback)
 	local modules = { "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts",
-		"infra.config_paths", "infra.i18n", "logger.shim", "ui.gesture_conflicts" }
+		"infra.config_paths", "infra.i18n", "core.logger.engine.shim", "ui.gesture_conflicts" }
 	local saved = {}
 	for _, name in ipairs(modules) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local path = os.tmpname()
@@ -426,7 +426,7 @@ local function with_bindings(callback)
 	local ok, failure = xpcall(function()
 		package.loaded["infra.config_paths"] = { config = function() return path end, get_config_dir = function() return "/tmp" end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["logger.shim"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 		package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
 		manager = require("modules.gestures.manager")
 		manager.init({ persist = true, config_path = path, enabled = false, is_paused = function() return false end })
@@ -465,7 +465,7 @@ helpers.describe("private user program real gesture and keyboard bindings", func
 
 	helpers.it("persists and dispatches the same typed program through gesture and keyboard owners", function()
 		with_bindings(function(manager, keyboard, path)
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local output = path .. ".out"
 			local parameter = Json.encode({ version = 1, executable = "/bin/sh",
 				arguments = { "-c", 'printf "%s" "$2" > "$1"', "fixture", output, "été 日本 literal" } })
@@ -498,7 +498,7 @@ helpers.describe("private user program real gesture and keyboard bindings", func
 			helpers.assert_eq(bytes, "été 日本 literal")
 			local canonical = assert(io.open(path, "rb")); local source = canonical:read("*a"); canonical:close()
 			helpers.assert_contains(source, "# retained foreign note")
-			local document = require("toml_codec").decode(source)
+			local document = require("core.text.engine.toml_codec").decode(source)
 			helpers.assert_eq(document.gesture_parameters["keyboard__primary_p__run_program"], parameter)
 			os.remove(output)
 		end)
@@ -572,8 +572,8 @@ helpers.describe("private user program durable parameter receipts", function()
 	for _, mode in ipairs({ "false", "nil", "truthy", "throw" }) do
 		helpers.it("retains RAM and exact source after writer " .. mode, function()
 			with_bindings(function(manager, _, path)
-				local Writer = require("toml_codec.writer")
-				local Logger = require("logger.shim")
+				local Writer = require("core.text.engine.toml_codec.writer")
+				local Logger = require("core.logger.engine.shim")
 				local write, log = Writer.batch_write, Logger.error
 				local messages, calls = {}, 0
 				local f = assert(io.open(path, "rb")); local before = f:read("*a"); f:close()
@@ -605,7 +605,7 @@ end)
 
 helpers.describe("private program lossless shared parameter corpus", function()
 	helpers.it("checks every executable syntax against independently declared literal vectors", function()
-		local Json, Program = require("json"), require("program_parameter")
+		local Json, Program = require("core.text.engine.json"), require("settings.engine.program_parameter")
 		local file = assert(io.open(require("infra.paths").shared("tests/corpus/action_parameters/program_vectors.json"), "rb"))
 		local corpus = assert(Json.decode_lossless(file:read("*a"))); file:close()
 		local count = 0

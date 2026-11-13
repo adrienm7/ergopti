@@ -8,7 +8,7 @@
 ; mappings, shortcuts sending another key, tap-holds and remaps of system keys.
 ; It reads the emulation table the one source compiler writes
 ; (_shared/ui/layout_composer/source_compiler.js, compileEmulation) and is the
-; AutoHotkey port of _shared/lua/layouts/source_emulation.lua: every driver and
+; AutoHotkey port of _shared/layouts/engine/composer/source_emulation.lua: every driver and
 ; the web emulation replay the same vectors
 ; (_shared/tests/corpus/layouts/source/emulation_vectors.json).
 ;

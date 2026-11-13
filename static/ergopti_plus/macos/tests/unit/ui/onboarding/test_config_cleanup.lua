@@ -1,12 +1,12 @@
 --- tests/unit/ui/onboarding/test_config_cleanup.lua
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function with_host(controls, run)
 	local context = { sessions = {}, views = {}, callbacks = {}, scripts = {}, evaluations = {}, errors = {} }
 	local current_hs = _G.hs
-	local real_session = controls.real_session and require("config_cleanup_session") or nil
+	local real_session = controls.real_session and require("settings.engine.migration.cleanup_session") or nil
 	local logger = {}
 	for _, name in ipairs({ "start", "success", "info", "warn" }) do logger[name] = function() end end
 	logger.error = function(_, message, ...) context.errors[#context.errors + 1] = string.format(message, ...) end
@@ -14,7 +14,7 @@ local function with_host(controls, run)
 		["infra.logger"] = logger,
 		["infra.i18n"] = { get = function(key) return key end },
 		["infra.paths"] = { shared = function(path) return "/shared/" .. path end },
-		["config_cleanup_session"] = { new = function(options)
+		["settings.engine.migration.cleanup_session"] = { new = function(options)
 			if real_session then
 				local session = real_session.new(options)
 				context.sessions[#context.sessions + 1] = session
@@ -236,7 +236,7 @@ helpers.describe("configuration cleanup JavaScript receipts", function()
 end)
 
 helpers.it("(cleanup-js-receipts) the real cleanup preview observes the native delivery refusal", function()
-	helpers.with_fresh_modules({ "config_cleanup_session", "config_unused_keys" }, function()
+	helpers.with_fresh_modules({ "settings.engine.migration.cleanup_session", "settings.engine.migration.unused_keys" }, function()
 		with_host({ real_session = true, submit = function() return nil end }, function(host, context)
 			local reads = 0
 			helpers.assert_eq(host.open({

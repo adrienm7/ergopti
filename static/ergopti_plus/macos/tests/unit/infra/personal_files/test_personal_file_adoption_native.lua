@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Files = require("hotstrings.personal_files")
+local Files = require("hotstrings.engine.catalogue.personal_files")
 local lfs = require("lfs")
 
 --- Owns physical files and the source-classification adapter for one observation.
@@ -45,7 +45,7 @@ end
 
 helpers.describe("native personal file adoption", function()
 	helpers.it("projects only the ambiguous metadata field as unavailable without changing gate admission", function()
-		local Metadata = require("hotstrings.personal_metadata")
+		local Metadata = require("hotstrings.engine.catalogue.personal_metadata")
 		local source = '[_meta]\nDelay = 0.4 # case-distinct field\ncolor = "#aabbcc"\n[probe]\n"entry" = "Source"\n'
 		local fields = Metadata.readonly_fields(source)
 		helpers.assert_eq(fields, { delay = true, color = false, show_tooltip = false, priority = false })
@@ -79,7 +79,7 @@ helpers.describe("native personal file adoption", function()
 		end)
 	end
 	helpers.it("refuses exact requested metadata header and field case aliases while retaining distinct literal sections", function()
-		local Metadata = require("hotstrings.personal_metadata")
+		local Metadata = require("hotstrings.engine.catalogue.personal_metadata")
 		for _, sample in ipairs({
 			{ source = '[_META]\ncolor = "aabbcc"\n[probe]\n"entry" = "Source"\n', field = "color", value = "112233" },
 			{ source = '[_meta.sections.team]\ndelay = 0.4\n[[Team]]\n"entry" = "Source"\n', section = "Team", field = "delay", value = 0.2 },
@@ -92,7 +92,7 @@ helpers.describe("native personal file adoption", function()
 		end
 		local source = '[[Team]]\n"one" = "One"\n[[team]]\n"two" = "Two"\n'
 		local plan = assert(Metadata.prepare(source, "Team", "delay", 0.2))
-		local decoded = require("toml_codec").decode(plan.content)
+		local decoded = require("core.text.engine.toml_codec").decode(plan.content)
 		helpers.assert_eq(decoded._meta.sections.Team.delay, 0.2)
 		helpers.assert_nil(decoded._meta.sections.team)
 		helpers.assert_true(plan.content:find(source, 1, true) ~= nil)
@@ -117,7 +117,7 @@ helpers.describe("native personal file adoption", function()
 		end)
 	end)
 	helpers.it("keeps explicit canonical true intent bounded to its admitted legacy scalar owner", function()
-		local Plan, Writer = require("hotstrings.personal_adoption"), require("toml_codec.writer")
+		local Plan, Writer = require("hotstrings.engine.catalogue.personal_adoption"), require("core.text.engine.toml_codec.writer")
 		local id = "personal-file:615f5f622e746f6d6c"
 		local record = { owner = id, source = Files.describe({ "a__b.toml" }), admitted = true, legacy_name = "old" }
 		local row = Plan.preference_row(record, "dotted.team", true)
@@ -154,7 +154,7 @@ helpers.describe("native personal file adoption", function()
 		end)
 	end)
 	helpers.it("plans canonical literal section gates while preserving generic dotted refusals", function()
-		local Plan = require("hotstrings.personal_adoption")
+		local Plan = require("hotstrings.engine.catalogue.personal_adoption")
 		local id = "personal-file:615f5f622e746f6d6c"
 		local inventory = { [id] = { "dotted.team", "Équipe", 'quote"section' }, personal = { "probe" } }
 		local changes = assert(Plan.plan_gates(inventory, { id }, false))
@@ -163,11 +163,11 @@ helpers.describe("native personal file adoption", function()
 		helpers.assert_nil(Plan.plan_gates(inventory, { "personal" }, true))
 		helpers.assert_nil(Plan.plan_gates(inventory, { id, id }, true))
 		helpers.assert_nil(Plan.plan_gates({ [id] = { "probe", "probe" } }, { id }, true))
-		helpers.assert_nil(require("hotstrings.bulk_scope").plan(inventory, { id }, true))
+		helpers.assert_nil(require("hotstrings.engine.bulk_scope").plan(inventory, { id }, true))
 		helpers.assert_eq(#assert(Plan.plan_selection(inventory, { "personal", id }, true)), 6)
 	end)
 	helpers.it("parses quoted literal metadata identities without changing rule header semantics", function()
-		local parsed, committed = require("toml_codec.reader").parse_text([=[
+		local parsed, committed = require("core.text.engine.toml_codec.reader").parse_text([=[
 [_meta.sections."dotted.Équipe"]
 delay = 0.2
 color = "#aabbcc"
@@ -185,11 +185,11 @@ priority = 41
 	end)
 	helpers.it("prepares exact literal metadata and retains inherited legacy settings for siblings", function()
 		local source = '# owned neighbor\n[_meta]\nfuture = "retained"\n[_meta.section_delays]\n"dotted.team" = 0.4\nother = 0.8\n[[dotted.team]]\ntrigger = "literal"\nreplacement = "output"\n[other]\n"sibling" = "Sibling"\n'
-		local Metadata = require("hotstrings.personal_metadata")
+		local Metadata = require("hotstrings.engine.catalogue.personal_metadata")
 		local plan = assert(Metadata.prepare(source, "dotted.team", "delay", 0.2,
 			{ delay = 0.9, sections = { ["dotted.team"] = { delay = 0.7 } } }))
 		helpers.assert_eq(plan.remove_file, true); helpers.assert_eq(plan.remove_section, true)
-		local parsed, committed = require("toml_codec.reader").parse_text(plan.content)
+		local parsed, committed = require("core.text.engine.toml_codec.reader").parse_text(plan.content)
 		helpers.assert_eq(committed, true); helpers.assert_eq(parsed.meta.delay, 0.9)
 		helpers.assert_eq(parsed.meta.sections["dotted.team"].delay, 0.2)
 		helpers.assert_nil(parsed.meta.section_delays["dotted.team"])
@@ -210,7 +210,7 @@ priority = 41
 		for _, bad in ipairs({ -1, 101, 1.5 }) do helpers.assert_eq(Metadata.valid("priority", bad), false) end
 	end)
 	helpers.it("shares exact descriptor neutral defaults without granting forged identities", function()
-		local defaults = require("config_defaults").new({ features = {}, scopes = { hotstrings = { dynamic_defaults = {
+		local defaults = require("settings.engine.publication.defaults").new({ features = {}, scopes = { hotstrings = { dynamic_defaults = {
 			{ prefix = "hotstrings.groups", depth = 1, default = false, recommended = true },
 			{ prefix = "hotstrings.modules", depth = 2, default = false, recommended = true },
 		} } } })

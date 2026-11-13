@@ -25,7 +25,10 @@ const { spawnSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = path.join(ROOT, 'tools/dev/run-windows-dev.ps1');
 const IDENTIFIERS = JSON.parse(
-	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.json'), 'utf8')
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/core/text/data/identifiers.json'),
+		'utf8'
+	)
 );
 const source = fs.readFileSync(SCRIPT, 'utf8');
 let checks = 0;
@@ -37,7 +40,7 @@ function check(name, body) {
 }
 
 check('reads the developer variable from the shared identifiers', () => {
-	assert.match(source, /_shared\\data\\identifiers\.json/);
+	assert.match(source, /_shared\\core\\text\\data\\identifiers\.json/);
 	assert.match(source, /\$Identifiers\.dev_source\.environment/);
 	assert.ok(
 		!source.includes(IDENTIFIERS.dev_source.environment),

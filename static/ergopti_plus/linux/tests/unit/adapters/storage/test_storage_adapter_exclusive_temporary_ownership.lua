@@ -15,15 +15,15 @@
 --- nested value was dropped and its inner keys leaked to the top level. The
 --- encoder also serialised Lua arrays as string-keyed objects. Any non-flat
 --- stored value was therefore corrupted on reload. The fix routes encode/decode
---- through the shared _shared/lua/json.lua codec; this test fails (nested/array
---- fields come back nil) against the bespoke codec and passes against json.lua.
+--- through the shared _shared/core/text/engine/json.lua codec; this test fails (nested/array
+--- fields come back nil) against the bespoke codec and passes against core/text/engine/json.lua.
 --- ==============================================================================
 
 package.loaded["tests.support.adapters.storage.storage_adapter_fixture"] = nil
 local Fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local helpers, make_temp_config_root =
 	Fixture.helpers, Fixture.make_temp_config_root
 

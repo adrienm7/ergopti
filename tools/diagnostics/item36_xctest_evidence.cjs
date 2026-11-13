@@ -51,7 +51,7 @@ const METHODS = Object.freeze({
 const SOURCE_ROOTS = Object.freeze([
 	'static/ergopti_plus/macos/launcher',
 	'static/ergopti_plus/macos/adapters/release_stage.sh',
-	'static/ergopti_plus/_shared/modules/updater/defaults.json',
+	'static/ergopti_plus/_shared/updater/data/defaults.json',
 	'tools/build',
 	'tools/diagnostics'
 ]);

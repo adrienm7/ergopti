@@ -58,8 +58,8 @@ local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 local PythonInterpreter = require("adapters.python_interpreter")
 local NetworkEnv = require("modules.llm.network_env")
 local NetworkAdmission = require("modules.llm.opaque_network_admission")
-local TextUtils = require("text_utils")
-local NativePath = require("native_path")
+local TextUtils = require("core.text.engine.utils_core")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "mlx_deps"
 
@@ -156,8 +156,8 @@ local _active_tasks = {}
 -- when activation or cancellation refuses, and the task descriptor survives
 -- until its one native terminal callback proves process settlement.
 -- The bootstrap's named timers (initial, hide, deadline), owned from request
--- to native settlement by the shared slots (_shared/lua/owned_timer_slots.lua).
-local _timers = require("owned_timer_slots").new({ scheduler = TimerScheduler, logger = Logger, log = LOG })
+-- to native settlement by the shared slots (_shared/core/timing/engine/owned_timer_slots.lua).
+local _timers = require("core.timing.engine.owned_timer_slots").new({ scheduler = TimerScheduler, logger = Logger, log = LOG })
 local _owned_timers = _timers.slots
 local _task_owner = nil
 -- A failed receipt rollback remains owned even before a native task exists.
@@ -252,7 +252,7 @@ function M.venv_dir()
 	if config_ok and type(config_dir) == "string" and config_dir ~= "" then
 		local home_ok, home = pcall(os.getenv, "HOME")
 		if not home_ok or type(home) ~= "string" or home:sub(1, 1) ~= "/" then return nil end
-		return home .. "/" .. require("app_dirs").macos.support_relative .. "/mlx-venv"
+		return home .. "/" .. require("core.fs.engine.app_dirs").macos.support_relative .. "/mlx-venv"
 	end
 	local hs_root = resolve_hs_root()
 	return hs_root and (hs_root .. "/.venv") or nil

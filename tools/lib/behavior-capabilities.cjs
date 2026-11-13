@@ -16,7 +16,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const SYSTEMS = ['windows', 'macos', 'linux'];
-const CATALOGUE = 'static/ergopti_plus/_shared/modules/features/behaviors.json';
+const CATALOGUE = 'static/ergopti_plus/_shared/settings/data/features/behaviors.json';
 
 /** Reject unrecognized fields instead of silently dropping declaration mistakes. */
 function keys(value, expected, label) {

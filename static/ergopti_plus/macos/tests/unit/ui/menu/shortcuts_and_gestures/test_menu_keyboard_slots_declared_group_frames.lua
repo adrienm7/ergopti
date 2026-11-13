@@ -105,7 +105,7 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 		local ui, shortcuts = fresh()
 		local ctx = make_ctx()
 		local i18n = require("infra.i18n")
-		local locales = keyboard_frame_json("data/locale_order.json").order
+		local locales = keyboard_frame_json("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21, "this assertion covers every actual supported catalogue")
 		-- Spelled here, not read from the driver: the groups are Option, Ctrl,
 		-- Ctrl + Shift, Cmd and Cmd + Shift, each modifier under the shared key
@@ -121,7 +121,7 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 		local previous_get = i18n.get
 		local ok, detail = xpcall(function()
 			for _, locale in ipairs(locales) do
-				local catalogue = keyboard_frame_json("data/locales/" .. locale .. ".json")
+				local catalogue = keyboard_frame_json("core/i18n/data/locales/" .. locale .. ".json")
 				i18n.get = function(key) return catalogue[key] or key end
 				local rows = physical_rows(ui.provide_rows(ctx, nil), shortcuts)
 				helpers.assert_eq(#rows, 5)

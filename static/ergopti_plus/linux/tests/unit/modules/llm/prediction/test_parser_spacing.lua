@@ -11,8 +11,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Parser = require("llm.parser")
-local PromptBuilder = require("llm.prompt_builder")
+local Parser = require("ai.engine.api.parser_core")
+local PromptBuilder = require("ai.engine.prediction.prompt_builder_core")
 
 --- The text a completion adds after a context, as the engine computes it.
 --- @param context string

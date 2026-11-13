@@ -31,16 +31,16 @@
 --- ==============================================================================
 
 local M = {}
-local ManifestKeys = require("keystats.manifest_keys")
+local ManifestKeys = require("metrics.engine.view.manifest_keys")
 
 local hs      = hs
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("infra.logger")
-local Literal = require("sqlite.literal")
-local Queries = require("keystats.queries")
-local KUtils = require("keystats.utils")
+local Literal = require("core.fs.engine.sqlite.literal")
+local Queries = require("metrics.engine.queries")
+local KUtils = require("metrics.engine.utils")
 local LOG    = "keystats.sqlite_reader"
 local BUSY_TIMEOUT_MS = require("infra.timings").ms("keystats", "sqlite_read_busy_timeout_ms")
 
@@ -249,7 +249,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 		end
 		return (#clauses > 0) and (" WHERE " .. table.concat(clauses, " AND ")) or ""
 	end
-	-- The SQL is the shared catalogue's (_shared/data/db/queries.sql) in the
+	-- The SQL is the shared catalogue's (_shared/metrics/data/db/queries.sql) in the
 	-- in-process dialect, the same statements the Windows and Linux readers run.
 	local function manifest_sql(name)
 		return Queries.render(name, "native", { where = date_filter() })
@@ -392,12 +392,12 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	-- Semantic keys have labelled rows, never fabricated numeric positions.
 	query("ngram_media_keys", function()
 		for r in _rows(db, manifest_sql("manifest.media_keys"), pacer) do
-			_get(manifest, r.date, r.app).media_keys[r.media_id] = require("keystats.media_store").project_press(r)
+			_get(manifest, r.date, r.app).media_keys[r.media_id] = require("metrics.engine.media.store").project_press(r)
 		end
 	end, pacer)
 	query("agg_app_day_media_hold", function()
 		for r in _rows(db, manifest_sql("manifest.media_hold"), pacer) do
-			_get(manifest, r.date, r.app).media_hold[r.media_id] = require("keystats.media_store").project_hold(r)
+			_get(manifest, r.date, r.app).media_hold[r.media_id] = require("metrics.engine.media.store").project_hold(r)
 		end
 	end, pacer)
 
@@ -677,7 +677,7 @@ local function _ngram_days(db, start_date, end_date)
 		end)
 		if accepted ~= true then complete = false end
 	end
-	return require("table_util").sorted_keys(found), complete
+	return require("core.text.engine.table_util").sorted_keys(found), complete
 end
 
 --- Adds one date window of every n-gram table into `out`. The row handlers are

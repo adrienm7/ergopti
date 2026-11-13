@@ -35,7 +35,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
 local Timings        = require("infra.timings")
 local ApiCommon = require("modules.llm.api_common")
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 local _probe_client  = require("adapters.http_client").new()  -- Dedicated client for discover() POST probes; never shares state with warmup
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
@@ -60,7 +60,7 @@ local LOG            = "llm.api_mlx"
 -- mlx-lm 0.18→0.21 series; discover() overrides them at runtime
 -- whenever a probe finds a different working route.
 -- The base URL is injected by api_mlx via M.init() (derived from MLX_HOST/MLX_PORT,
--- loaded from _shared/modules/llm/mlx_server.json) and refreshed via M.set_base_url()
+-- loaded from _shared/ai/data/mlx_server.json) and refreshed via M.set_base_url()
 -- when the user changes the port. discover() overrides the routes at runtime.
 local _base_url             = nil
 local _completions_endpoint = nil

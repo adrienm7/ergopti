@@ -3,11 +3,11 @@
 --- Registers the global declaration's own script rows through native owners.
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Runtime = require("script_scope_runtime")
-local Transaction = require("config_scope_transaction")
-local Fenced = require("config_scope_fenced_transaction")
-local Logger = require("logger.shim")
-local ConfigKeys = require("config_keys")
+local Runtime = require("settings.engine.scope.script_scope_runtime")
+local Transaction = require("settings.engine.scope.transaction")
+local Fenced = require("settings.engine.scope.fenced_transaction")
+local Logger = require("core.logger.engine.shim")
+local ConfigKeys = require("settings.engine.keys")
 local _owner, _edit_owners, _sequence = nil, {}, 0
 require("infra.scope_registry").register("script_scope", function()
 	if _owner ~= nil and _owner.pending() == true then return true end
@@ -50,7 +50,7 @@ end
 --- Runs before the error window, the log level and i18n read their alias.
 --- @return table|nil adopted Canonical path -> adopted value.
 function M.adopt_configured()
-	return require("script_config_authority").adopt({
+	return require("settings.engine.scope.script_config_authority").adopt({
 		path = require("infra.config_paths").config("config.toml"), manifest = Manifest, platform = "linux",
 		aliases = M.alias_names(), storage = require("adapters.storage"), logger = Logger, log = "infra.script_scope" })
 end
@@ -62,7 +62,7 @@ end
 --- @return boolean committed
 function M.rewrite_configured(path, value)
 	assert(ALIAS_NAMES[path] ~= nil, "not a native script row: " .. tostring(path))
-	local committed, detail = require("script_config_authority").rewrite({
+	local committed, detail = require("settings.engine.scope.script_config_authority").rewrite({
 		path = require("infra.config_paths").config("config.toml"), manifest = Manifest, key = path, value = value })
 	if committed ~= true then Logger.error("infra.script_scope", "%s was not changed: %s.", path, tostring(detail)) end
 	return committed == true
@@ -70,16 +70,16 @@ end
 
 function M.rewrite_configured_owned(path, value)
 	assert(ALIAS_NAMES[path] ~= nil, "not a native script row: " .. tostring(path))
-	return require("script_config_authority").rewrite_owned({
+	return require("settings.engine.scope.script_config_authority").rewrite_owned({
 		path = require("infra.config_paths").config("config.toml"), manifest = Manifest, key = path, value = value })
 end
 
 function M.restore_configured_rewrite(receipt)
-	return require("script_config_authority").restore_rewrite(receipt)
+	return require("settings.engine.scope.script_config_authority").restore_rewrite(receipt)
 end
 
 function M.verify_configured_rewrite(receipt)
-	return require("script_config_authority").verify_rewrite(receipt)
+	return require("settings.engine.scope.script_config_authority").verify_rewrite(receipt)
 end
 
 --- Creates the direct participant's existing file transaction and native fences.
@@ -103,7 +103,7 @@ function M.new(options)
 	local owner
 	owner = Fenced.new({ owner = {}, native_token = token, transaction = transaction, scope = "global",
 		fences = runtime.fences, available = function()
-			return require("config_migrate").read_only_reason(options.path) == nil
+			return require("settings.engine.migration.migrate").read_only_reason(options.path) == nil
 		end })
 	local release = owner.release
 	function owner.release()
@@ -139,7 +139,7 @@ function M.edit_setting(key, value)
 	local storage_backup = require("infra.config_paths").default_config_dir() .. "/storage.edit-" .. timestamp .. ".bak"
 	local field = assert(key:match("^script%.([%w_]+)$"))
 	local function prepare(target, updates, files)
-		local Writer, Codec = require("toml_codec.writer"), require("toml_codec")
+		local Writer, Codec = require("core.text.engine.toml_codec.writer"), require("core.text.engine.toml_codec")
 		local content, status, detail = Writer.read_classified(target, files)
 		if status ~= "ok" and status ~= "absent" then return false, detail end
 		local source = { status = status, content = status == "ok" and content or nil }
@@ -195,7 +195,7 @@ end
 --- Retains the exact participant cohort through the shared composition.
 --- @return table participant Shared synchronous participant.
 function M.participant()
-	return require("config_scope_participant").synchronous({
+	return require("settings.engine.scope.participant").synchronous({
 		apply = function(mode) return M.apply(mode) end,
 		owner = function() return _owner end,
 	})

@@ -4,7 +4,7 @@
 --- MODULE: API Model Listing Corpus Consumer (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/api_model_listing_vectors.json through the
---- shared listing plan (_shared/lua/llm/api_model_listing.lua) the Linux model
+--- shared listing plan (_shared/ai/engine/api/model_listing.lua) the Linux model
 --- selector page draws its API rows with.
 ---
 --- ROOT CAUSE ENCODED:
@@ -14,10 +14,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/llm/api_model_listing_vectors.json"
-local Listing = helpers.load_module("llm.api_model_listing")
+local Listing = helpers.load_module("ai.engine.api.model_listing")
 
 --- Reads and decodes the shared corpus.
 --- @return table corpus

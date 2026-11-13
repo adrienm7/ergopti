@@ -6,12 +6,12 @@
  * DESCRIPTION:
  * Checks the corpus of the wrap_selection parameter,
  * _shared/tests/corpus/action_parameters/wrap_pair_vectors.json, against the
- * built-in catalogue _shared/modules/wrap_symbols/wrap_symbols.json with a
+ * built-in catalogue _shared/keyboard/data/wrap_symbols/wrap_symbols.json with a
  * reference implementation of its documented rule, and checks that each driver
  * suite replays it.
  *
  * WHY:
- * The wrap_pair rule is implemented three times (_shared/lua/wrap_pair for
+ * The wrap_pair rule is implemented three times (_shared/keyboard/engine for
  * macOS and Linux, windows/infra/wrap_pair.ahk). The corpus is what keeps them
  * equal; a corpus whose expectations disagree with the catalogue, or that no
  * suite replays, pins nothing.
@@ -33,7 +33,7 @@ const CORPUS = path.join(
 	'action_parameters',
 	'wrap_pair_vectors.json'
 );
-const CATALOGUE = path.join(SP, '_shared', 'modules', 'wrap_symbols', 'wrap_symbols.json');
+const CATALOGUE = path.join(SP, '_shared', 'keyboard', 'data', 'wrap_symbols', 'wrap_symbols.json');
 
 const errors = [];
 let checks = 0;

@@ -1,5 +1,5 @@
 {
-	"_comment": "Where the shortcut column of the AI tooltip goes: shortcut_column and column_placement in _shared/lua/tooltip/llm_line.lua, ported in windows/ui/tooltip/llm.ahk. Replayed by the three drivers.",
+	"_comment": "Where the shortcut column of the AI tooltip goes: shortcut_column and column_placement in _shared/core/ui/engine/tooltip/llm_line.lua, ported in windows/ui/tooltip/llm.ahk. Replayed by the three drivers.",
 	"vectors": [
 		{
 			"id": "the panel fits the block: the widest label touches the widest line's gap",

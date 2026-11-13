@@ -9,14 +9,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("logger")
+require("core.logger.engine")
 
 local function with_host(scenario)
-	helpers.with_stub_scope({ "ui.physical_shortcuts", "shortcuts.physical_editor_window",
-		"shortcuts.physical_slots", "shortcuts.physical_availability", "ui.ui_builder", "ui.webview_close_owner",
-		"infra.logger", "infra.paths", "infra.i18n", "webview.i18n_seed", "adapters.file_system",
-		"window_titles", "json", "adapters.json_codec", "infra.deferred_work", "adapters.timer_scheduler",
-		"infra.locale", "locale.core", "webview.presentation", "tests.support.webview_recursive_close_fixture",
+	helpers.with_stub_scope({ "ui.physical_shortcuts", "shortcuts.engine.physical_editor_window",
+		"shortcuts.engine.physical_slots", "shortcuts.engine.physical_availability", "ui.ui_builder", "ui.webview_close_owner",
+		"infra.logger", "infra.paths", "infra.i18n", "core.ui.engine.webview.i18n_seed", "adapters.file_system",
+		"core.ui.engine.window_titles", "core.text.engine.json", "adapters.json_codec", "infra.deferred_work", "adapters.timer_scheduler",
+		"infra.locale", "core.i18n.engine.core", "core.ui.engine.webview.presentation", "tests.support.webview_recursive_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, errors = {}, notification_depth = 0,
 			bridges = {}, script_refs = {}, retired = 0, received = 0, logs = {}, timers = {}, timer_attempts = 0, retirement_callbacks = {} }
@@ -29,12 +29,12 @@ local function with_host(scenario)
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.paths"] = { shared = function(path) return path end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["webview.i18n_seed"] = {}
+		package.loaded["core.ui.engine.webview.i18n_seed"] = {}
 		package.loaded["adapters.file_system"] = { read = function() return "{}" end }
-		package.loaded["window_titles"] = { compose = function(key) return key end }
-		package.loaded["json"] = { encode = function() return "{}" end }
-		package.loaded["shortcuts.physical_slots"] = { new = function() return { candidates = function() return {} end } end }
-		package.loaded["shortcuts.physical_editor_window"] = { new = function(options)
+		package.loaded["core.ui.engine.window_titles"] = { compose = function(key) return key end }
+		package.loaded["core.text.engine.json"] = { encode = function() return "{}" end }
+		package.loaded["shortcuts.engine.physical_slots"] = { new = function() return { candidates = function() return {} end } end }
+		package.loaded["shortcuts.engine.physical_editor_window"] = { new = function(options)
 			return { retire = function()
 				h.retired = h.retired + 1
 				if h.on_retire then h.on_retire() end

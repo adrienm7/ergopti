@@ -720,7 +720,7 @@ _ActPickWeb_JsStr(s) {
 _ActPickWeb_I18nSeed() {
 	global ACTPICK_VHOST, _I18nLocale
 	loc := IsSet(_I18nLocale) ? _I18nLocale : "en"
-	return "window.__i18n_base='https://" . ACTPICK_VHOST . "/data/locales/';"
+	return "window.__i18n_base='https://" . ACTPICK_VHOST . "/core/i18n/data/locales/';"
 		. "window._i18n_locale='" . loc . "';"
 }
 

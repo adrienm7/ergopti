@@ -23,8 +23,8 @@
 
 local helpers = require("tests.helpers")
 local Scenario = require("tests.support.agent_scenario")
-local Agent = require("llm.agent")
-local Json = require("json")
+local Agent = require("ai.engine.agent.agent")
+local Json = require("core.text.engine.json")
 
 local SENTENCE = "On se voit jeudi 14h avec Paul"
 local ANSWER = 'ACTIONS: [{"type":"calendar","title":"Paul","start":"2026-10-01T14:00"}]'
@@ -560,7 +560,7 @@ local JEV_ANSWERS = { intent = { choice = "calendar", probabilities = { none = 0
 --- The providers' base URLs.
 --- @return table
 local function base_urls()
-	local fh = assert(io.open(require("tests.helpers").driver_root() .. "/../_shared/modules/llm/api_providers.json"))
+	local fh = assert(io.open(require("tests.helpers").driver_root() .. "/../_shared/ai/data/api_providers.json"))
 	local root = Json.decode(fh:read("*a"))
 	fh:close()
 	return { typesafe = root.providers.typesafe.base_url, backboard = root.providers.backboard.base_url }
@@ -568,7 +568,7 @@ end
 
 helpers.describe("AI agent automatic mode: Jev as System 1", function()
 	local urls = base_urls()
-	local Formats = require("llm.remote_formats")
+	local Formats = require("ai.engine.api.remote_formats")
 
 	helpers.it("through TypeSafe: the jev question to the full endpoint, then System 2", function()
 		Scenario.run({ stored = auto({ ["llm.agent_system1"] = "typesafe" }),

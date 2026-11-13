@@ -102,7 +102,7 @@ helpers.describe("Generator.build_karabiner_json: navigation-layer sentinel", fu
 	end
 
 	-- Mirrors the reported configuration: left Command taps Backspace and holds
-	-- the navigation layer (_shared/tap_hold/defaults.toml).
+	-- the navigation layer (_shared/tap_hold/data/defaults.toml).
 	local function build()
 		local state = make_state({
 			tap_hold_config = { left_command = { tap = "backspace", hold = "layer" } },

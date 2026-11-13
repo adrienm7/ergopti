@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 local script = helpers.driver_root() .. "../../../tools/diagnostics/keystats_startup_replay_test.py"
 
 local scenarios = {

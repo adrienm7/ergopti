@@ -79,8 +79,8 @@ local PERSONAL_SOURCE = '[meta]\nname = "WebKit fixture"\n[General]\n"probe" = {
 --- @return string directory An exclusively created temporary directory.
 local function prepare_personal_source()
 	local Shell = require("adapters.shell_runner")
-	local Writer = require("toml_codec.writer")
-	local Reader = require("toml_codec.reader")
+	local Writer = require("core.text.engine.toml_codec.writer")
+	local Reader = require("core.text.engine.toml_codec.reader")
 	local directory = os.tmpname()
 	assert(os.remove(directory), "the owned temporary placeholder must retire")
 	assert(Shell.run("mkdir " .. Shell.quote(directory)) == true,

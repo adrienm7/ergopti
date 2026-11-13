@@ -18,7 +18,7 @@
 local M = {}
 
 local FileSystem = require("adapters.file_system")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 -- Under the user's own caches, not the temporary folder of one login shell.
 local RELATIVE = "/" .. AppDirs.macos.cache_relative .. "/proxy_relay_refusal"
@@ -39,7 +39,7 @@ function M.reason()
 	local path = M.path()
 	if not path or not FileSystem.exists(path) then return nil end
 	local relay = require("modules.llm.network_env").proxy_auth_relay()
-	local Contract = require("network.proxy_auth_relay")
+	local Contract = require("core.network.engine.proxy_auth_relay_core")
 	local ok, bytes, status = pcall(FileSystem.read_with_status, path, function() end)
 	local reason = ok and status == "ok" and type(bytes) == "string" and bytes:match("^([a-z_]+)\n?$") or nil
 	if relay and reason and relay.is_refusal(reason) then return reason end

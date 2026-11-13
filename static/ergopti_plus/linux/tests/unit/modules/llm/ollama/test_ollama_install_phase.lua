@@ -10,8 +10,8 @@
 local helpers = require("tests.helpers")
 local function expect(value, message) assert(value, message) end
 local function test(name, body) helpers.it(name .. " (ollama-install)", body) end
-helpers.load_module("llm.ollama_archive_installer")
-local Phase = helpers.load_module("llm.ollama_install_phase")
+helpers.load_module("ai.engine.ollama.archive_installer")
+local Phase = helpers.load_module("ai.engine.ollama.install_phase")
 local fixture = helpers.load_module("tests.support.ollama_archive_fixture")
 local function phase()
 	local f = fixture(); f.remaining, f.budget_current, f.cancel_listeners = 1000, true, {}

@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Tone Ladder (AHK)
 ; DESCRIPTION:
-; AutoHotkey port of _shared/lua/llm/tone.lua: the pure logic behind the
+; AutoHotkey port of _shared/ai/engine/prediction/tone.lua: the pure logic behind the
 ; "more formal" / "more familiar" actions, which register a selection moves
 ; to, and which text is rewritten into it.
 ;

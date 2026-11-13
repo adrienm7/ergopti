@@ -70,7 +70,7 @@ for (const name of fs.readdirSync(CORPUS).sort()) {
 // 1.0.9 would: a file with no stamp would skip the steps these boots exercise.
 const OLDEST_SCHEMA_VERSION = parseToml(
 	fs.readFileSync(
-		path.join(WINDOWS, '..', '_shared', 'core', 'config_schema', 'migrations.toml'),
+		path.join(WINDOWS, '..', '_shared', 'settings', 'data', 'config_schema', 'migrations.toml'),
 		'utf8'
 	)
 ).registry.oldest_version;

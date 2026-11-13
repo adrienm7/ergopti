@@ -100,7 +100,7 @@ local host = io.popen("luajit " .. quote(SCRIPT) .. " daemon >" .. quote(scratch
 	.. " 2>&1 & echo $!", "r")
 local host_pid = tonumber(host:read("*l"))
 host:close()
-local ready = scratch .. "/run/" .. require("app_dirs").linux.folder_name .. "/field-run/ready.json"
+local ready = scratch .. "/run/" .. require("core.fs.engine.app_dirs").linux.folder_name .. "/field-run/ready.json"
 for _ = 1, 200 do
 	if read(ready) then break end
 	uv.sleep(50)

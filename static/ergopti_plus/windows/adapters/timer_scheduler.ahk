@@ -37,7 +37,7 @@
 global _TIMER_ADAPTER_REGISTRY := Map()
 global _TIMER_ADAPTER_NEXT_ID  := 0
 global TIMER_ADAPTER_MAX_INTERVAL_MS := 0xFFFFFFFF
-; Longest relative delay any driver arms, as _shared/lua/number_policy.lua
+; Longest relative delay any driver arms, as _shared/core/text/engine/number_policy.lua
 ; MAX_TIMER_DELAY_MS; _shared/tests/corpus/timer/delay_ceiling_vectors.json pins it.
 global TIMER_MAX_DELAY_MS := 2 ** 53
 

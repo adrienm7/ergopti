@@ -84,7 +84,7 @@ _MNW_Scope(Body) {
 	ManagedDownloadFailureSession.Counter := 0
 	ManagedDownloadFailureWindow.Current := 0
 	try {
-		Policy := JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))
+		Policy := JsonParse(FileRead(_SharedDir . "\core\network\data\managed_network.json", "UTF-8"))
 		ManagedNetworkFailureWindows_Init(Policy, _MNW_Ports(State))
 		Body.Call(State)
 	} finally {

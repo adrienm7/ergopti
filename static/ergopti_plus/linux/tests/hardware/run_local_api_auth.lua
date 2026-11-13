@@ -7,19 +7,19 @@
 --- Credentials, HTTP refusal and cancelled or changed sources retain their owners.
 --- ==============================================================================
 
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 local native_cpath = os.getenv("ERGOPTI_NATIVE_LUA_CPATH")
 if native_cpath and native_cpath ~= "" then package.cpath = native_cpath end
 local available, uv = pcall(require, "luv")
 if not available then io.stderr:write("ENVIRONMENT: native lua-luv is required\n"); os.exit(2) end
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 -- API keys live in the desktop secret service: give this process the in-memory
 -- one the unit runner uses, never the developer's keyring or a missing tool.
 require("tests.support.secret_service_fake").isolate()
 local Http = require("adapters.http_client")
 local EventLoop = require("adapters.event_loop")
 local Remote = require("modules.llm.api_remote")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local failures, checks, sockets, requests = {}, 0, {}, {}
 local response = { status = 200, body = '{"data":[{"id":"fixture-model"}]}' }
 

@@ -220,8 +220,8 @@ class PhysicalReleasePersistenceTests(unittest.TestCase):
             )
             fixture = root / "confinement.lua"
             source = [
-                'package.path = arg[1] .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path',
-                'local json, refusals = require("json"), {}',
+                'package.path = arg[1] .. "/static/ergopti_plus/_shared/?.lua;" .. package.path',
+                'local json, refusals = require("core.text.engine.json"), {}',
             ]
             for message in requests:
                 request = json.dumps({"kind": "request", **message})
@@ -300,7 +300,7 @@ class ForeignLedgerGenerationTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.ledger = folder / "data.sql"
-        self.schema = ROOT / "static/ergopti_plus/_shared/data/db/schema.sql"
+        self.schema = ROOT / "static/ergopti_plus/_shared/metrics/data/db/schema.sql"
         with sqlite3.connect(self.root / "cache.sqlite") as connection:
             connection.executescript(self.schema.read_text(encoding="utf-8"))
 

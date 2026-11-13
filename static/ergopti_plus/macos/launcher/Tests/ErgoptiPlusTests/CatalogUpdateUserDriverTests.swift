@@ -39,13 +39,13 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		}
 	}
 
-	/// static/ergopti_plus/_shared/data/locales, found from this file.
+	/// static/ergopti_plus/_shared/core/i18n/data/locales, found from this file.
 	private static let localesDirectory: String = {
 		var url = URL(fileURLWithPath: #filePath)
 		for _ in 0..<5 {
 			url.deleteLastPathComponent()
 		}
-		return url.appendingPathComponent("_shared/data/locales").path
+		return url.appendingPathComponent("_shared/core/i18n/data/locales").path
 	}()
 
 	private static func localization(_ code: String) throws -> LauncherLocalization {
@@ -249,6 +249,7 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 	/// Reads the source policy independently of the generated Swift composer.
 	private static func nativeCaption(_ label: String) throws -> String {
 		let manifestURL = URL(fileURLWithPath: localesDirectory)
+			.deletingLastPathComponent().deletingLastPathComponent()
 			.deletingLastPathComponent().deletingLastPathComponent()
 			.appendingPathComponent("ui/apps.manifest.json")
 		let data = try Data(contentsOf: manifestURL)

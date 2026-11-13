@@ -10,7 +10,7 @@
 ; FEATURES & RATIONALE:
 ; 1. Calendar events and tasks go to Outlook through COM when it answers
 ;    (saved, like an entry the user typed), otherwise to an iCalendar file
-;    (_shared/lua/llm/agent.lua's bytes) opened with the default handler, which
+;    (_shared/ai/engine/agent/agent.lua's bytes) opened with the default handler, which
 ;    imports it into the calendar the user uses. The path taken is logged.
 ; 2. A mail is only ever a draft: an Outlook message displayed for review, or
 ;    a mailto: link opened with the default mail client. Nothing is sent.

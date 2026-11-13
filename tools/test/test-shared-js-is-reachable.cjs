@@ -45,9 +45,9 @@ const SHARED_ROOT = path.join(ROOT, 'static/ergopti_plus/_shared');
 // The folders of the canonical shared JS algorithms, each named on its own so
 // the list follows them wherever the layout puts them.
 const MODULE_DIRS = [
-	path.join(ROOT, 'static/ergopti_plus/_shared/modules/network'),
-	path.join(ROOT, 'static/ergopti_plus/_shared/modules/tooltip'),
-	path.join(ROOT, 'static/ergopti_plus/_shared/modules/updater')
+	path.join(ROOT, 'static/ergopti_plus/_shared/core/network/data'),
+	path.join(ROOT, 'static/ergopti_plus/_shared/core/ui/data/tooltip'),
+	path.join(ROOT, 'static/ergopti_plus/_shared/updater/data')
 ];
 const DRIVERS = ['windows', 'macos', 'linux'];
 
@@ -72,7 +72,7 @@ function corpusFiles() {
 	const out = [];
 	for (const d of DRIVERS) out.push(...walk(path.join(ROOT, 'static/ergopti_plus', d)));
 	out.push(...walk(path.join(ROOT, 'tools')));
-	out.push(...walk(path.join(ROOT, 'static/ergopti_plus/_shared/core')));
+	out.push(...walk(path.join(ROOT, 'static/ergopti_plus/_shared')));
 	return out.filter((f) => /\.(js|cjs|mjs|lua|ahk|c|h)$/.test(f));
 }
 

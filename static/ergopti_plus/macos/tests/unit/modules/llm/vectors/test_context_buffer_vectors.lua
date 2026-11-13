@@ -4,17 +4,17 @@
 --- MODULE: AI Context Buffer Corpus (shared Lua oracle)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/context_buffer_vectors.json through the
---- shared context buffer (_shared/lua/llm/context_buffer.lua) that macOS and
+--- shared context buffer (_shared/ai/engine/policy/context_buffer.lua) that macOS and
 --- Linux both feed with typed text, and pins the strict-input contract.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.path
+package.path = SHARED .. "?.lua;" .. SHARED .. "?/init.lua;" .. package.path
 
-local ContextBuffer = require("llm.context_buffer")
+local ContextBuffer = require("ai.engine.policy.context_buffer")
 
 local function read_vectors()
 	local path = SHARED .. "tests/corpus/llm/context_buffer_vectors.json"

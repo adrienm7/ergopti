@@ -19,8 +19,8 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local ErrorDescription = require("error_description")
-local NumberPolicy = require("number_policy")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
+local NumberPolicy = require("core.text.engine.number_policy")
 
 local LOG = "infra.emergency_exit"
 

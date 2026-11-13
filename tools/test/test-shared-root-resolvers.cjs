@@ -11,7 +11,7 @@
  * WHY EXECUTION AND NOT INSPECTION:
  * test-linux-shared-path-resolver.cjs already enforces *routing* — no module may
  * reach the tree by counting `..` itself. Routing is not reachability. Once every
- * call goes through `Paths.shared("data/locales")`, the resolver is a single
+ * call goes through `Paths.shared("core/i18n/data/locales")`, the resolver is a single
  * point of failure that no static check can evaluate: the argument is a string,
  * the root is computed at runtime from `debug.getinfo` (Linux) or by walking up
  * from `hs.configdir` (macOS), and neither is visible to a reader.
@@ -119,7 +119,7 @@ function collectTargets(luaFiles, driversRoot) {
 			for (const m of line.matchAll(LITERAL_CALL)) {
 				const arg = m[2];
 				if (arg === '') continue; // Documented "nil/empty → the root itself"
-				const target = m[1] === 'shared_llm_path' ? `modules/llm/${arg}` : arg;
+				const target = m[1] === 'shared_llm_path' ? `ai/data/${arg}` : arg;
 				if (!targets.has(target)) targets.set(target, []);
 				targets.get(target).push(`${rel}:${i + 1}`);
 			}
@@ -172,8 +172,8 @@ try {
 	);
 	const requested = collectTargets(walked, collectionFixture);
 	assert.deepEqual([...requested.keys()].sort(), [
+		'ai/data/fixture.json',
 		'missing-runtime.txt',
-		'modules/llm/fixture.json',
 		'nested-runtime.txt',
 		'runtime.txt'
 	]);
@@ -224,8 +224,8 @@ local driver_root, targets_file, use_hs_stub = ...
 package.path = driver_root .. "/?.lua;"
 	.. driver_root .. "/?/init.lua;"
 	.. driver_root .. "/tests/stubs/?.lua;"
-	.. driver_root .. "/../_shared/lua/?.lua;"
-	.. driver_root .. "/../_shared/lua/?/init.lua;"
+	.. driver_root .. "/../_shared/?.lua;"
+	.. driver_root .. "/../_shared/?/init.lua;"
 	.. package.path
 
 -- The macOS resolver walks up from hs.configdir and probes the real filesystem
@@ -391,8 +391,8 @@ if (!LUA) {
 const HOME_PROBE_LUA = `
 local driver_root = ...
 package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;"
-	.. driver_root .. "/../_shared/lua/?.lua;"
-	.. driver_root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. driver_root .. "/../_shared/?.lua;"
+	.. driver_root .. "/../_shared/?/init.lua;" .. package.path
 
 local ok, CP = pcall(require, "infra.config_paths")
 if not ok then

@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function read_corpus()
 	local path = assert(helpers.shared("tests/corpus/http/get_redirect_vectors.json"))

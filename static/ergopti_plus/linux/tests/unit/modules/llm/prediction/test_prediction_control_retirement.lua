@@ -63,8 +63,8 @@ local function scenario(options, body)
 			"modules.hotstrings.injector", "adapters.clipboard" }) do package.loaded[name] = nil end
 		local state = { text = "", caret = 0, wire = {}, held = {}, requests = {}, submissions = {},
 			cancelled = 0, offers = {}, overlay_showing = false, controls = 0, moves = 0, outputs = 0 }
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
-		logger.set_sink(function() end); package.loaded["logger.shim"] = logger
+		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		logger.set_sink(function() end); package.loaded["core.logger.engine.shim"] = logger
 		local preferences = require("tests.support.llm_preferences_fixture").new({ initial = {
 			["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
 			["llm.profiles.active"] = "basic", ["llm.profiles.num_predictions"] = options.count or 1,
@@ -639,7 +639,7 @@ end)
 -- Whole-Main regression fixture: configuration/desktop/input/transport ports are
 -- controlled. Main is loaded intact and initializes the actual AI/focus owners.
 do
-	local shared_engine = require("hotstring_engine")
+	local shared_engine = require("hotstrings.engine.matcher")
 	local shared_new = shared_engine.new
 
 	local function whole_main(options, body)
@@ -656,7 +656,7 @@ do
 			for _, name in ipairs({ "adapters.keyboard_hook", "adapters.evdev_reader", "adapters.modifier_broker",
 				"adapters.keyboard_layout", "adapters.secure_field_detector", "adapters.clipboard", "adapters.timer_scheduler",
 				"infra.hotstring_preferences", "infra.llm_preferences", "infra.metrics_preferences", "infra.monotonic",
-				"infra.config_paths", "config_migrate", "toml_codec.writer",
+				"infra.config_paths", "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer",
 				-- Main initialises these owners once; an earlier suite may have loaded them.
 				"modules.keymap.pause_layout_switch", "modules.keymap.layout_emulation" }) do package.loaded[name] = nil end
 			local root, key, phase, modifier = helpers.driver_root(), options.key or "u", options.phase or "late", options.modifier or "ctrl"
@@ -664,9 +664,9 @@ do
 			local action_mode = options.mode or "none"
 			local terminal = app == "gnome-terminal"
 			local role = terminal and 60 or 61
-			package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-			require("compat.utf8").install()
-			local Json = require("json")
+			package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+			require("core.lifecycle.engine.compat.utf8").install()
+			local Json = require("core.text.engine.json")
 			local state = { requests = {}, cancellations = 0, text = "", caret = 0, output = 0, overlays = {}, chars = 0, controls = 0, forwarded = 0, read_frame = 1 }
 			fixture_state = state
 			local function noop() end
@@ -680,8 +680,8 @@ do
 			local scheduler = require("tests.fakes").timer_scheduler()
 			put("adapters.timer_scheduler", scheduler)
 			put("infra.monotonic", { now_ms = function() return 1000 + scheduler.now * 1000 end, resolution_ms = function() return .001 end })
-			local logger = assert(dofile(root .. "/../_shared/lua/logger/init.lua")); logger.set_sink(function(line) state.last_log = tostring(line) end)
-			put("logger.shim", logger)
+			local logger = assert(dofile(root .. "/../_shared/core/logger/engine/init.lua")); logger.set_sink(function(line) state.last_log = tostring(line) end)
+			put("core.logger.engine.shim", logger)
 			put("infra.logger_sink", { install = yes })
 			put("infra.session_lock", { protect = yes, acquire = yes })
 			put("infra.script_settings", { apply = yes, current = function() return "ERROR" end })
@@ -805,11 +805,11 @@ do
 			local launch_args = { "--device", marker .. ".event-placeholder", "--config", marker .. ".config.toml" }
 			local main = assert(loadfile(root .. "/ergopti_hotstrings.lua"))
 			-- Migration/persistence is an explicit inert Main boundary; canonical writer imports stay real.
-			local migration = require("config_migrate")
+			local migration = require("settings.engine.migration.migrate")
 			local startup_migration = { REGISTRY_PATH = migration.REGISTRY_PATH, boot = function() return {} end,
 			  read_only_notice_key = function() return nil end }
 			local environment = setmetatable({ arg = launch_args, require = function(name)
-			  if name == "config_migrate" then return startup_migration end
+			  if name == "settings.engine.migration.migrate" then return startup_migration end
 			  -- The legacy folder move is an inert boundary too: no account folder moves.
 			  if name == "infra.legacy_folder_migration" then return require("tests.support.legacy_folder_migration_stub") end
 			  return require(name)

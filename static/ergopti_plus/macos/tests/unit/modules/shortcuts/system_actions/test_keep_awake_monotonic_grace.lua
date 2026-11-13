@@ -34,8 +34,8 @@ local OWNED_MODULES = {
 	"adapters.event_clock",
 	"adapters.timer_scheduler",
 	"adapters.storage",
-	"error_description",
-	"number_policy",
+	"diagnostics.engine.reports.error_description",
+	"core.text.engine.number_policy",
 }
 
 

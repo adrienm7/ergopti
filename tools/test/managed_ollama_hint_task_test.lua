@@ -1,8 +1,8 @@
 --- tools/test/managed_ollama_hint_task_test.lua
 --- Exact asynchronous owner over explicit native lifecycle and filesystem ports.
 local root, production = assert(arg[1]), assert(arg[2])
-package.path = production .. "/static/ergopti_plus/_shared/lua/?.lua;" .. production .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
-local Json = require("json")
+package.path = production .. "/static/ergopti_plus/_shared/?.lua;" .. production .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
+local Json = require("core.text.engine.json")
 local directory, driver = "/private/home/Library/Application Support/Ergopti/ollama-native-http", "/private/source/macos"
 local checks, cases = 0, 0
 local function check(a, b) assert(a == b, "asynchronous metadata owner assertion failed"); checks = checks + 1 end

@@ -22,7 +22,7 @@ local Logger        = require("infra.logger")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local CaptureFlow   = require("modules.shortcuts.actions.screen_capture_flow")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "shortcuts.actions.screenshot_save"
 

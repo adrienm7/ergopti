@@ -61,7 +61,7 @@ class ColdReceiptTests(unittest.TestCase):
         }
 
     def test_real_source_inventory_contains_the_loadable_shared_receipt(self):
-        self.assertIn("_shared/lua/core/llm/native_pty_receipt.lua", SOURCE_PATHS)
+        self.assertIn("_shared/core/lifecycle/engine/core/native_pty_receipt.lua", SOURCE_PATHS)
         self.assertNotIn("_shared/core/llm/native_pty_receipt.lua", SOURCE_PATHS)
         for relative in SOURCE_PATHS:
             with self.subTest(source=relative):

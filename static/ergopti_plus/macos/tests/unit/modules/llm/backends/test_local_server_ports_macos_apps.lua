@@ -12,14 +12,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
-local Ports = require("llm.local_server_ports")
+local Ports = require("ai.engine.local_servers.ports_core")
 
 --- Reads the shipped local server catalogue.
 --- @return table
 local function catalogue()
-	local file = assert(io.open(Paths.shared("modules/llm/local_servers.json"), "rb"))
+	local file = assert(io.open(Paths.shared("ai/data/local_servers.json"), "rb"))
 	local root = assert(Json.decode(file:read("*a")))
 	file:close()
 	return root

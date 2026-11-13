@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Loads the candidate with independent controllable native acknowledgements.
 --- @param config table|nil
@@ -90,14 +90,14 @@ local function fresh(config)
 	end
 	local saved = package.loaded.luv
 	local saved_paths = package.loaded["infra.paths"]
-	local saved_logger = package.loaded["logger.shim"]
+	local saved_logger = package.loaded["core.logger.engine.shim"]
 	local ok, adapter = pcall(function()
 	if config.throw_logger then
-		package.loaded["logger.shim"] = { error = function() error("controlled diagnostic failure") end }
+		package.loaded["core.logger.engine.shim"] = { error = function() error("controlled diagnostic failure") end }
 	end
 	if config.capture_logger then
 		state.logs = {}
-		package.loaded["logger.shim"] = { error = function(_, message) state.logs[#state.logs + 1] = message end }
+		package.loaded["core.logger.engine.shim"] = { error = function(_, message) state.logs[#state.logs + 1] = message end }
 	end
 	if config.nil_driver_root then
 		package.loaded["infra.paths"] = {
@@ -110,7 +110,7 @@ local function fresh(config)
 	end)
 	package.loaded.luv = saved
 	package.loaded["infra.paths"] = saved_paths
-	package.loaded["logger.shim"] = saved_logger
+	package.loaded["core.logger.engine.shim"] = saved_logger
 	if not ok then error(adapter, 0) end
 	return adapter, state, config
 end

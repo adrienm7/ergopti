@@ -55,9 +55,9 @@ function M.create(installer)
 	local root = M.scratch()
 	local prefix, payload = root .. "/prefix", root .. "/payload"
 	local installed = prefix .. "/lib/ergopti"
-	for _, path in ipairs({ installed .. "/linux/install", installed .. "/_shared/lua",
-		installed .. "/_shared/data/locales", installed .. "/bin", prefix .. "/bin",
-		payload .. "/linux/infra", payload .. "/linux/install", payload .. "/_shared/data/locales", payload .. "/_shared/lua", payload .. "/bin" }) do
+	for _, path in ipairs({ installed .. "/linux/install", installed .. "/_shared",
+		installed .. "/_shared/core/i18n/data/locales", installed .. "/bin", prefix .. "/bin",
+		payload .. "/linux/infra", payload .. "/linux/install", payload .. "/_shared/core/i18n/data/locales", payload .. "/_shared", payload .. "/bin" }) do
 		assert(Shell.run("mkdir -p -- " .. Shell.quote(path)))
 	end
 	for _, name in ipairs({ "ownership.sh", "ownership_schema.sh" }) do
@@ -66,8 +66,8 @@ function M.create(installer)
 	end
 	M.write(installed .. "/old.marker", "original installation\n")
 	M.write(installed .. "/linux/ergopti_hotstrings.lua", "-- Previous driver fixture.\n")
-	M.write(installed .. "/_shared/data/locales/en.json", "{}\n")
-	M.write(installed .. "/_shared/lua/init.lua", "-- Previous shared fixture.\n")
+	M.write(installed .. "/_shared/core/i18n/data/locales/en.json", "{}\n")
+	M.write(installed .. "/_shared/init.lua", "-- Previous shared fixture.\n")
 	M.write(installed .. "/bin/ergopti-hotstrings", "#!/bin/sh\nexit 0\n")
 	assert(Native.fs_chmod(installed .. "/bin/ergopti-hotstrings", 493))
 	local wrapper = prefix .. "/bin/ergopti-hotstrings"
@@ -76,8 +76,8 @@ function M.create(installer)
 	M.write(payload .. "/linux/ergopti_hotstrings.lua", "-- Selected driver fixture.\n")
 	M.write(payload .. "/linux/infra/version.lua", "return {}\n")
 	M.write(payload .. "/linux/new.marker", "selected installation\n")
-	M.write(payload .. "/_shared/data/locales/en.json", "{}\n")
-	M.write(payload .. "/_shared/lua/init.lua", "-- Selected shared fixture.\n")
+	M.write(payload .. "/_shared/core/i18n/data/locales/en.json", "{}\n")
+	M.write(payload .. "/_shared/init.lua", "-- Selected shared fixture.\n")
 	M.write(payload .. "/_shared/build_stamp.txt", "commit=" .. string.rep("a", 40) .. "\nversion=1.2.3\n")
 	M.write(payload .. "/bin/ergopti-hotstrings", "#!/bin/sh\nexit 0\n")
 	assert(Native.fs_chmod(payload .. "/bin/ergopti-hotstrings", 493))
@@ -93,11 +93,11 @@ function M.create(installer)
 	end
 	ops.extract = function(path, work_dir)
 		if path ~= archive or M.read(path) ~= archive_receipt then return false end
-		for _, relative in ipairs({ "linux", "linux/infra", "linux/install", "_shared", "_shared/data", "_shared/data/locales", "_shared/lua", "bin" }) do
+		for _, relative in ipairs({ "linux", "linux/infra", "linux/install", "_shared", "_shared/core", "_shared/core/i18n", "_shared/core/i18n/data", "_shared/core/i18n/data/locales", "bin" }) do
 			if Native.fs_mkdir(work_dir .. "/" .. relative, 448) ~= true then return false end
 		end
 		for _, relative in ipairs({ "linux/ergopti_hotstrings.lua", "linux/infra/version.lua", "linux/new.marker", "linux/install/ownership.sh", "linux/install/ownership_schema.sh",
-			"_shared/data/locales/en.json", "_shared/lua/init.lua", "_shared/build_stamp.txt", "bin/ergopti-hotstrings", "install.sh" }) do
+			"_shared/core/i18n/data/locales/en.json", "_shared/init.lua", "_shared/build_stamp.txt", "bin/ergopti-hotstrings", "install.sh" }) do
 			if Native.fs_copyfile(payload .. "/" .. relative, work_dir .. "/" .. relative) ~= true then return false end
 		end
 		return true

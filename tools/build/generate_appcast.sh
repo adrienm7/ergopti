@@ -14,7 +14,7 @@
 # REQUIRED ENV VARS:
 #   ERGOPTI_VERSION  — semver string, e.g. "1.2.3"
 #   ERGOPTI_BUILD    — integer build number (CFBundleVersion in Info.plist)
-#   ERGOPTI_CHANNEL  — update channel id (_shared/modules/updater/channels.json)
+#   ERGOPTI_CHANNEL  — update channel id (_shared/updater/data/channels.json)
 #   SPARKLE_SIG_FILE — path to the .sig file written by sign_update
 #   ARCHIVE_DIR      — fresh signed archives and their publication receipt
 #   ZIP_PATH         — explicit historical ZIP input (without ARCHIVE_DIR)

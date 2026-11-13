@@ -30,7 +30,7 @@
 --- and accessibility buses and the window manager. Exit 0 = every check held.
 --- ==============================================================================
 
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 
 local ffi = require("ffi")
 local uv = require("luv")
@@ -41,7 +41,7 @@ ffi.cdef([[
 
 local SCRATCH = assert(os.getenv("ERGOPTI_LIVE_SCRATCH"), "run through run_layout_typing_live.sh")
 if os.getenv("ERGOPTI_LIVE_DEBUG") then
-	require("logger").set_sink(function(line) io.stderr:write(line, "\n") end)
+	require("core.logger.engine").set_sink(function(line) io.stderr:write(line, "\n") end)
 end
 local PYTHON_ATSPI = assert(os.getenv("ERGOPTI_LIVE_ATSPI_PYTHON"), "run through run_layout_typing_live.sh")
 local SETTLE_MS = 250
@@ -404,7 +404,7 @@ end
 -- =======================================
 -- =======================================
 
-local VECTORS = require("json").decode(read("../_shared/tests/corpus/layouts/keylayout_vectors.json")).vectors
+local VECTORS = require("core.text.engine.json").decode(read("../_shared/tests/corpus/layouts/keylayout_vectors.json")).vectors
 local EMULATED = { ergopti = "ergopti", ergopti_plus = "ergopti_plus", ergol = "ergol" }
 
 local function layout_config(id)
@@ -485,15 +485,15 @@ end
 --- A key AZERTY makes dead (SC01A, dead_circumflex) types the emulated character.
 local function french_dead_key(editor)
 	emulate(layout_config("ergopti_plus"))
-	local Shared = require("layouts.keylayout_emulation")
+	local Shared = require("layouts.engine.composer.keylayout_emulation")
 	local registry = require("modules.keymap.layout_registry")
 	local shipped = registry.shipped_layout("ergopti_plus")
-	local keycodes = require("json").decode(read("../_shared/modules/layouts/mac_keycodes.json"))
-	local physical = require("json").decode_lossless(read("../_shared/data/keycodes/physical_keys.json"))
+	local keycodes = require("core.text.engine.json").decode(read("../_shared/layouts/data/mac_keycodes.json"))
+	local physical = require("core.text.engine.json").decode_lossless(read("../_shared/layouts/data/keycodes/physical_keys.json"))
 	local model = Shared.load(shipped.text, keycodes, shipped.entry.keycode_convention, {})
-	local session = Shared.new_session(model, Shared.row_map(physical, require("json").is_null))
+	local session = Shared.new_session(model, Shared.row_map(physical, require("core.text.engine.json").is_null))
 	local all_rows = {}
-	for _, row in ipairs(require("layout.layout_rows_policy").IDS) do all_rows["emulate_" .. row] = true end
+	for _, row in ipairs(require("layouts.engine.layout.rows_policy").IDS) do all_rows["emulate_" .. row] = true end
 	Shared.configure(session, { base = true, alt_gr = true, layout = all_rows, number_row = "native", edges = false })
 	local code_of = {}
 	for code, key in pairs(physical.keys) do if key.evdev then code_of[key.evdev] = code end end
@@ -560,7 +560,7 @@ end
 local function bepo_compose()
 	local Registry = require("modules.keymap.layout_registry")
 	local registry_dir = "../../layouts/registry/"
-	local index = require("json").decode(read(registry_dir .. "index.json"))
+	local index = require("core.text.engine.json").decode(read(registry_dir .. "index.json"))
 	local bepo
 	for _, entry in ipairs(index.layouts) do if entry.id == "bepo" then bepo = entry end end
 	local text = read(registry_dir .. bepo.file)

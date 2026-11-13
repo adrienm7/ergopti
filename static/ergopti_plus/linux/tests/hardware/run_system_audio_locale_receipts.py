@@ -98,7 +98,7 @@ def main():
                                 "LANGUAGE": locale.split("_")[0],
                                 "XDG_CONFIG_HOME": str(root / (locale + str(muted)) / "config"),
                                 "ERGOPTI_NATIVE_AUDIO_MUTED": "true" if muted else "false",
-                                "LUA_PATH": "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                                "LUA_PATH": "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                             }
                         )
                         try:

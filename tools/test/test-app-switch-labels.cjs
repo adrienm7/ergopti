@@ -88,7 +88,7 @@ function validate(input) {
 				let label = strings[`sg_actions.${id}`];
 				if (label === undefined) continue;
 				// A sticky label is a template its modifiers fill on the driver
-				// (_shared/lua/actions/sticky_label.lua): compare what it shows.
+				// (_shared/shortcuts/engine/actions/sticky_label.lua): compare what it shows.
 				const sticky = KeyNames.stickyModifiers(id);
 				if (sticky !== null)
 					label = label.replace(
@@ -129,11 +129,11 @@ function validate(input) {
 	return { errors, checks };
 }
 
-const catalogue = toml.parse(read('_shared/modules/actions/actions.toml'));
+const catalogue = toml.parse(read('_shared/shortcuts/data/actions/actions.toml'));
 const locales = {};
-for (const file of fs.readdirSync(path.join(SP, '_shared/data/locales'))) {
+for (const file of fs.readdirSync(path.join(SP, '_shared/core/i18n/data/locales'))) {
 	if (file.endsWith('.json')) {
-		locales[file.slice(0, -5)] = JSON.parse(read(`_shared/data/locales/${file}`));
+		locales[file.slice(0, -5)] = JSON.parse(read(`_shared/core/i18n/data/locales/${file}`));
 	}
 }
 const input = {

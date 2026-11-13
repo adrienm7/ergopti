@@ -9,7 +9,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
-#Include ../../../_shared/modules/hotstrings/user_code.ahk
+#Include ../../../_shared/hotstrings/data/catalogue/user_code.ahk
 #Include ../../adapters/user_hotstrings_native.ahk
 
 ; Native programmable hotstrings run outside the keyboard hook, in an owned Job.
@@ -536,7 +536,7 @@ class UserHotstringWorker {
 			if !FSWriteCreateDurable(SourcePath, this.source["content"])
 				throw Error("The source stage could not be published.")
 			this.paths.Push(SourcePath)
-			Body := "#Include " . _SharedDir . "\modules\hotstrings\user_code.ahk`n"
+			Body := "#Include " . _SharedDir . "\hotstrings\data\catalogue\user_code.ahk`n"
 				. "#Include " . _VendorDir . "\ergopti_user_hotstrings.ahk`n#Include " . SourcePath . "`n"
 			if !FSWriteCreateDurable(Wrapper, Body)
 				throw Error("The worker stage could not be published.")

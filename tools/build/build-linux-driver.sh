@@ -168,7 +168,7 @@ echo "--- Copying _shared tree ---"
 # openers rendered an app-not-found page. Keep the complete offline UI tree;
 # Corpus fixtures and website-only source-review declarations are development data.
 copy_tree "${SHARED_SRC}/" "${BUILD_DIR}/_shared/" --exclude corpus \
-	--exclude modules/features/behaviors.json
+	--exclude settings/data/features/behaviors.json
 
 # Every Linux package (.deb, .rpm, AppImage, Flatpak, tarball) is made from this
 # shared tree, and none of them carries a .git: without the stamp the daemon's
@@ -179,7 +179,7 @@ echo "--- Copying the .keylayout converter ---"
 
 # Registry layouts reach Linux as their macOS .keylayout only: the package
 # carries no XKB file of any layout, and modules/keymap/layout_registry.lua converts
-# the downloaded file on the user's machine in Lua (_shared/lua/layouts/
+# the downloaded file on the user's machine in Lua (_shared/layouts/engine/
 # xkb_converter.lua), from the keysym table, symbols template and key types that
 # ship in data/. The Python converter, the repository-only regeneration script and
 # the tests stay behind: the package does not run them.
@@ -226,8 +226,8 @@ REQUIRED_FILES=(
 	"linux/ergopti_hotstrings.lua"
 	"linux/apps/encryptor.lua"
 	"linux/apps/app_cloner.lua"
-	"_shared/data/encryptor/format.json"
-	"_shared/data/app_cloner/families.json"
+	"_shared/apps/data/encryptor/format.json"
+	"_shared/apps/data/app_cloner/families.json"
 	"linux/modules/hotstrings/engine.lua"
 	"linux/modules/hotstrings/loader.lua"
 	"linux/modules/hotstrings/injector.lua"
@@ -252,48 +252,48 @@ REQUIRED_FILES=(
 	# the manifest, and degrades without the other three, so their absence must
 	# fail the build rather than the user's first launch.
 	"linux/_generated/features_manifest.lua"
-	"_shared/lua/features/manifest.lua"
-	"_shared/lua/features/manifest_data.lua"
+	"_shared/settings/engine/features/manifest.lua"
+	"_shared/settings/engine/features/manifest_data.lua"
 	"linux/_generated/gesture_emit_actions.lua"
 	"linux/_generated/locale_table.lua"
 	"linux/_generated/config_template.toml"
-	"_shared/lua/hotstring_engine/init.lua"
-	"_shared/lua/hotstring_engine/cascade.lua"
-	"_shared/lua/keystats/utils.lua"
-	"_shared/lua/keystats/metrics.lua"
-	"_shared/lua/keystats/aggregator_helpers.lua"
-	"_shared/lua/llm/prompt_builder.lua"
+	"_shared/hotstrings/engine/matcher/init.lua"
+	"_shared/hotstrings/engine/matcher/cascade.lua"
+	"_shared/metrics/engine/utils.lua"
+	"_shared/metrics/engine/metrics.lua"
+	"_shared/metrics/engine/aggregator/helpers.lua"
+	"_shared/ai/engine/prediction/prompt_builder_core.lua"
 	"linux/infra/llm_bridge.lua"
-	"_shared/lua/tray/protocol.lua"
+	"_shared/tray/protocol.lua"
 	# The tray logo. Without it the icon silently falls back to a generic glyph.
-	"_shared/assets/ergopti_tray.png"
-	"_shared/assets/ergopti_tray_paused.png"
-	"_shared/lua/compat/base64.lua"
-	"_shared/lua/compat/utf8.lua"
-	"_shared/lua/keymap/terminators.lua"
-	"_shared/lua/keymap/terminators_catalogue.lua"
+	"_shared/tray/data/ergopti_tray.png"
+	"_shared/tray/data/ergopti_tray_paused.png"
+	"_shared/core/lifecycle/engine/compat/base64.lua"
+	"_shared/core/lifecycle/engine/compat/utf8.lua"
+	"_shared/layouts/engine/layers/terminators.lua"
+	"_shared/layouts/engine/layers/terminators_catalogue.lua"
 	# The logs folder and log names: the logger sink cannot start without it.
-	"_shared/lua/app_dirs.lua"
+	"_shared/core/fs/engine/app_dirs.lua"
 	# Application and bundle names, service labels and external hosts.
-	"_shared/lua/identifiers.lua"
+	"_shared/core/text/engine/identifiers.lua"
 	# Their shell copy: install.sh and the Ollama installer source it.
-	"_shared/data/identifiers.sh"
-	"_shared/lua/keycodes/evdev.lua"
-	"_shared/lua/updater/version.lua"
-	"_shared/lua/updater/release_sources.lua"
-	"_shared/lua/updater/channels.lua"
-	"_shared/lua/updater/schedule.lua"
+	"_shared/core/text/data/identifiers.sh"
+	"_shared/platform/input/keycodes/evdev.lua"
+	"_shared/updater/engine/version_core.lua"
+	"_shared/updater/engine/release_sources.lua"
+	"_shared/updater/engine/channels.lua"
+	"_shared/updater/engine/schedule.lua"
 	# The About submenu's version row: the tray cannot build without it.
-	"_shared/lua/updater/version_label.lua"
+	"_shared/updater/engine/version_label.lua"
 	# Registry layouts: the client, its settings and keycode table, and the
 	# conversion data it reads (tools/test/
 	# test-linux-ships-keylayout-converter.cjs keeps this list complete).
-	"_shared/lua/layouts/registry.lua"
-	"_shared/lua/layouts/catalogue.lua"
-	"_shared/lua/layouts/keylayout.lua"
-	"_shared/lua/layouts/xkb_converter.lua"
-	"_shared/modules/layouts/defaults.json"
-	"_shared/modules/layouts/mac_keycodes.json"
+	"_shared/layouts/engine/registry/registry_core.lua"
+	"_shared/layouts/engine/composer/catalogue.lua"
+	"_shared/layouts/engine/composer/keylayout.lua"
+	"_shared/layouts/engine/composer/xkb_converter.lua"
+	"_shared/layouts/data/defaults.json"
+	"_shared/layouts/data/mac_keycodes.json"
 	"linux/modules/keymap/layout_registry.lua"
 	"linux/adapters/process_runner.lua"
 	"linux/xkb_generation/data/key_sym.json"
@@ -315,40 +315,40 @@ REQUIRED_FILES=(
 	"linux/install/native_source_build.sh"
 	# The .rpm wrapper and the standalone launcher admit native_modules/ here.
 	"linux/install/native_modules_env.sh"
-	"_shared/modules/updater/defaults.json"
+	"_shared/updater/data/defaults.json"
 	# The daemon migrates config.toml at start; without the registry or the
 	# engine every session would refuse to write it.
-	"_shared/core/config_schema/migrations.toml"
-	"_shared/lua/config_migrate.lua"
-	"_shared/modules/updater/channels.json"
-	"_shared/lua/json.lua"
-	"_shared/lua/unicode_case/init.lua"
-	"_shared/lua/unicode_case/data.lua"
-	"_shared/lua/wrap_pair/init.lua"
+	"_shared/settings/data/config_schema/migrations.toml"
+	"_shared/settings/engine/migration/migrate.lua"
+	"_shared/updater/data/channels.json"
+	"_shared/core/text/engine/json.lua"
+	"_shared/core/text/engine/unicode_case/init.lua"
+	"_shared/core/text/engine/unicode_case/data.lua"
+	"_shared/keyboard/engine/wrap_pair.lua"
 	# What ends CapsWord on its own; the shortcuts manager loads it.
-	"_shared/lua/caps_word/auto_off.lua"
+	"_shared/keyboard/engine/caps_word_auto_off.lua"
 	# Where a previous/next desktop step lands; the gesture manager loads it.
-	"_shared/lua/desktop_navigation/init.lua"
-	"_shared/lua/send_input/init.lua"
-	"_shared/lua/brightness_actions.lua"
-	"_shared/lua/brightness_actions_data.lua"
-	"_shared/lua/native_theme_data.lua"
-	"_shared/modules/actions/brightness.json"
-	"_shared/modules/actions/send_keys.json"
-	"_shared/modules/actions/tap_keys.json"
-	"_shared/data/keycodes/evdev.json"
+	"_shared/keyboard/engine/desktop_navigation.lua"
+	"_shared/platform/input/send_input.lua"
+	"_shared/shortcuts/engine/brightness_actions.lua"
+	"_shared/shortcuts/engine/brightness_actions_data.lua"
+	"_shared/core/ui/engine/native_theme_data.lua"
+	"_shared/shortcuts/data/actions/brightness.json"
+	"_shared/shortcuts/data/actions/send_keys.json"
+	"_shared/shortcuts/data/actions/tap_keys.json"
+	"_shared/layouts/data/keycodes/evdev.json"
 	# Shared layer data used by the configuration editor.
-	"_shared/lua/keymap/layers.lua"
-	"_shared/keymap/layer_actions.toml"
-	"_shared/data/keycodes/physical_keys.json"
-	"_shared/data/locales/fr.json"
-	"_shared/data/locales/en.json"
-	"_shared/modules/timings/constants.toml"
-	"_shared/modules/llm/defaults.json"
-	"_shared/modules/llm/profiles.json"
-	"_shared/modules/features/manifest.schema.json"
-	"_shared/modules/menu/menu_manifest.json"
-	"_shared/modules/hotstrings/defaults.toml"
+	"_shared/layouts/engine/layers/layers.lua"
+	"_shared/layouts/data/layer_actions.toml"
+	"_shared/layouts/data/keycodes/physical_keys.json"
+	"_shared/core/i18n/data/locales/fr.json"
+	"_shared/core/i18n/data/locales/en.json"
+	"_shared/core/timing/data/constants.toml"
+	"_shared/ai/data/defaults.json"
+	"_shared/ai/data/profiles.json"
+	"_shared/settings/data/features/manifest.schema.json"
+	"_shared/menu/data/menu_manifest.json"
+	"_shared/hotstrings/data/catalogue/defaults.toml"
 	"_shared/ui/host_bridge.js"
 	"_shared/ui/i18n.js"
 	"install.sh"
@@ -457,7 +457,7 @@ else
 			"$lua_command" -e "
 				local sep = package.config:sub(1,1)
 				local driver_root = 'linux'
-				local shared_lua = '_shared' .. sep .. 'lua'
+				local shared_lua = '_shared'
 				package.path = driver_root .. sep .. '?.lua;' ..
 				               driver_root .. sep .. '?' .. sep .. 'init.lua;' ..
 				               shared_lua .. sep .. '?.lua;' ..
@@ -502,17 +502,17 @@ else
 		# Test 3: verify all shared modules can be required (non-blocking)
 		echo "  Test: require all shared modules..."
 		SHARED_MODS=(
-			"keystats.utils"
-			"keystats.metrics"
-			"keystats.aggregator_helpers"
-			"llm.prompt_builder"
+			"metrics.engine.utils"
+			"metrics.engine.metrics"
+			"metrics.engine.aggregator.helpers"
+			"ai.engine.prediction.prompt_builder_core"
 			"infra.llm_bridge"
 			"tray.protocol"
-			"compat.utf8"
-			"keymap.terminators"
-			"keycodes.evdev"
-			"updater.version"
-			"updater.release_sources"
+			"core.lifecycle.engine.compat.utf8"
+			"layouts.engine.layers.terminators"
+			"platform.input.keycodes.evdev"
+			"updater.engine.version_core"
+			"updater.engine.release_sources"
 		)
 		SHARED_OK=true
 		for mod in "${SHARED_MODS[@]}"; do

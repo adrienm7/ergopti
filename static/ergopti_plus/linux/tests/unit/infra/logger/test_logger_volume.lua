@@ -8,4 +8,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.logger_volume_contract")(helpers, helpers.driver_root() .. "/../_shared")
+require("tests.lua.core.logger_volume_contract")(helpers, helpers.driver_root() .. "/../_shared")

@@ -4,8 +4,8 @@
 --- MODULE: Typed-Text Cipher (Hammerspoon)
 --- DESCRIPTION:
 --- macOS counterpart of linux/modules/keystats/text_cipher.lua. Supplies the
---- ports of the shared cipher policy (_shared/lua/keystats/text_cipher.lua),
---- which runs the shared at-rest codec (_shared/lua/keystats/text_crypto.lua)
+--- ports of the shared cipher policy (_shared/metrics/engine/privacy/text_cipher_core.lua),
+--- which runs the shared at-rest codec (_shared/metrics/engine/privacy/text_crypto.lua)
 --- against the columns that hold literal typed text, with a key derived once
 --- from this Mac's hardware UUID.
 ---
@@ -39,9 +39,9 @@ local M = {}
 local Logger     = require("infra.logger")
 local Shell      = require("adapters.shell_runner")
 local Crypto     = require("adapters.crypto")
-local TextCrypto = require("keystats.text_crypto")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
-local LOG = "keystats.text_cipher"
+local LOG = "metrics.engine.privacy.text_cipher_core"
 
 
 
@@ -152,7 +152,7 @@ local function decrypt_value(key, iv, ciphertext)
 	return plaintext
 end
 
-local Cipher = require("keystats.text_cipher").new({
+local Cipher = require("metrics.engine.privacy.text_cipher_core").new({
 	logger = Logger,
 	log = LOG,
 	sha256 = Crypto.sha256,

@@ -20,7 +20,7 @@
 ;    removed and the migration has nothing to do at the next boot. paths.toml
 ;    is backed up before its text changes. The shared vectors
 ;    (_shared/tests/corpus/paths/legacy_folder_migration_vectors.json) pin both;
-;    _shared/lua/legacy_folder_migration.lua is the Lua twin.
+;    _shared/settings/engine/migration/legacy_folder_migration_core.lua is the Lua twin.
 ; 2. Before paths.toml: infra/boot.ahk runs it before the configuration
 ;    transition recovery reads paths.toml, and before the logger opens its
 ;    folder; its lines are queued until LoggerInit. A transition journal the
@@ -36,7 +36,7 @@
 ; The suffix of the private stage files the paths.toml publication renames.
 global LEGACY_FOLDER_STAGE_SUFFIX := ".migration-stage"
 ; Why paths.toml still names an old folder, for its warning (PATHS_FILE_REFUSALS
-; of _shared/lua/legacy_folder_migration.lua).
+; of _shared/settings/engine/migration/legacy_folder_migration_core.lua).
 global LEGACY_FOLDER_PATHS_REFUSALS := Map(
 		"read_failed", "it could not be read",
 		"backup_taken", "its backup name already holds other text",
@@ -84,7 +84,7 @@ LegacyFolderIsEmptyDir(Dir) {
 }
 
 ; Moves one old entry into its backup slot, its destination being taken.
-; Mirrors back_up_entry of _shared/lua/legacy_folder_migration.lua.
+; Mirrors back_up_entry of _shared/settings/engine/migration/legacy_folder_migration_core.lua.
 ; @param From {String} Old path.
 ; @param To {String} The taken destination.
 ; @param Backup {String} Path the old entry takes.
@@ -107,7 +107,7 @@ LegacyFolderBackUpEntry(From, To, Backup, Report) {
 
 ; Moves one file or folder to its destination; when the destination holds
 ; something, moves it into the backup slot instead. Mirrors move_entry of
-; _shared/lua/legacy_folder_migration.lua. DirMove and FSMove never replace an
+; _shared/settings/engine/migration/legacy_folder_migration_core.lua. DirMove and FSMove never replace an
 ; existing destination, so one that appears after the check fails the move and
 ; the old entry goes to its backup like any taken name.
 ; @param From {String} Old path.
@@ -204,7 +204,7 @@ LegacyFolderNormalize(Value) {
 
 ; Reads one single-line TOML string at Pos of Line, as the boot TOML reader
 ; does: a literal string as written, a basic string with its escapes decoded.
-; Mirrors read_string of _shared/lua/legacy_folder_migration.lua.
+; Mirrors read_string of _shared/settings/engine/migration/legacy_folder_migration_core.lua.
 ; @param Line {String}
 ; @param Pos {Integer} Position of the opening quote.
 ; @param Value {VarRef} Receives the decoded value.
@@ -255,7 +255,7 @@ LegacyFolderReadTomlString(Line, Pos, &Value, &After, &Kind) {
 
 ; Spells a value as a TOML string of the kind it replaces; a literal string
 ; cannot hold a quote or a control character, so such a value becomes basic.
-; Mirrors spell_string of _shared/lua/legacy_folder_migration.lua.
+; Mirrors spell_string of _shared/settings/engine/migration/legacy_folder_migration_core.lua.
 ; @param Value {String}
 ; @param Kind {String} "basic" or "literal".
 ; @returns {String}
@@ -287,7 +287,7 @@ LegacyFolderSpellTomlString(Value, Kind) {
 
 ; Splits one `key = "value"` line of paths.toml as the boot TOML reader reads
 ; it: a bare or quoted key, and a basic or literal single-line string.
-; Mirrors parse_assignment of _shared/lua/legacy_folder_migration.lua.
+; Mirrors parse_assignment of _shared/settings/engine/migration/legacy_folder_migration_core.lua.
 ; @param Line {String}
 ; @returns {Map|String} "indent", "key", "key_text", "spacing", "value", "kind"
 ;   and "rest", or "" when the line is not such an assignment.
@@ -310,7 +310,7 @@ LegacyFolderParseAssignment(Line) {
 }
 
 ; The new value of one locator, or "" when the rule does not name it. Mirrors
-; rebased of _shared/lua/legacy_folder_migration.lua: the old folder itself
+; rebased of _shared/settings/engine/migration/legacy_folder_migration_core.lua: the old folder itself
 ; becomes "new", a folder below it the same folder below "under" (where the old
 ; folder went; "new" by default). The comparison ignores case, as Windows paths
 ; do, and the result keeps the separator style of the value.
@@ -350,7 +350,7 @@ LegacyFolderRebased(Value, Rule) {
 ; Rewrites the paths.toml lines whose value is an old default folder or a
 ; folder below one, reading quoted keys, literal strings and escapes as the
 ; boot TOML reader does. Mirrors rewrite_paths_text of
-; _shared/lua/legacy_folder_migration.lua.
+; _shared/settings/engine/migration/legacy_folder_migration_core.lua.
 ; @param Text {String} paths.toml content.
 ; @param Rewrites {Array} Maps with "key", "old" (Array), "new" and an optional "under".
 ; @returns {String} The new text, or "" when nothing changed.
@@ -386,7 +386,7 @@ LegacyFolderRewritePathsText(Text, Rewrites) {
 }
 
 ; Rewrites one paths.toml after keeping its previous text beside it. Mirrors
-; rewrite_paths_file of _shared/lua/legacy_folder_migration.lua: both files are
+; rewrite_paths_file of _shared/settings/engine/migration/legacy_folder_migration_core.lua: both files are
 ; written to a private stage and renamed into place (the backup with a
 ; no-replace move, paths.toml with an atomic replace), so a refused or partial
 ; write leaves paths.toml exactly as it was. A backup holding the current text,
@@ -563,7 +563,7 @@ LegacyFolderLogReport(Report) {
 		for Row in Report["backed_up"]
 				LoggerWarn("Boot", "Moved legacy folder entry '{1}' to the backup '{2}': '{3}' is already taken.",
 						Row["from"], Row["to"], Row["taken"])
-		; The reason phrases of KEPT_REASONS in _shared/lua/legacy_folder_migration.lua.
+		; The reason phrases of KEPT_REASONS in _shared/settings/engine/migration/legacy_folder_migration_core.lua.
 		Reasons := Map("backup_exists", "a backup already exists", "list_failed", "its folder could not be listed",
 				"remove_failed", "its emptied folder could not be removed",
 				"restore_failed", "it could not be moved back to the folder paths.toml names")

@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
-local data = assert(require("json").decode(SourceFile.read(helpers.shared("tap_hold/one_shot_shift.json"))))
+local data = assert(require("core.text.engine.json").decode(SourceFile.read(helpers.shared("tap_hold/data/one_shot_shift.json"))))
 
 local function fixture()
 	local text_by_key = { [0] = { "a", "A" }, [1] = { "é", "2" }, [2] = { " ", " " }, [3] = { "b", "B" } }
@@ -52,7 +52,7 @@ helpers.describe("one-shot native boundary", function()
 	-- ends on " :" though the physical "." keeps it (one-shot-capsword-relay).
 	helpers.it("relays the serialized result to the CapsWord observer on handoff (one-shot-capsword-relay)", function()
 		local CapsWordOutput = require("infra.capsword_output")
-		local Policy = require("caps_word.auto_off")
+		local Policy = require("keyboard.engine.caps_word_auto_off")
 		local reported = {}
 		helpers.assert_true(CapsWordOutput.set_observer(function(text) reported[#reported + 1] = text end))
 		local ok, err = pcall(function()

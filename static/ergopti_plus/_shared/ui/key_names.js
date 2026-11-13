@@ -5,7 +5,7 @@
  * MODULE: Web Page Key Names
  * DESCRIPTION:
  * Names a key in the user's language from the shared key name table
- * (_shared/data/keycodes/key_names.json, projected to
+ * (_shared/layouts/data/keycodes/key_names.json, projected to
  * _generated/key_names.js), as the native menus do. A page must load the
  * generated table, then this file, and receive the locale catalogue in
  * window._i18n_strings (i18n.js).

@@ -88,7 +88,7 @@ assert.ok(
 );
 for (const statement of [
 	'local TextPrompt = require("ui.text_prompt")',
-	'local WindowTitles = require("window_titles")',
+	'local WindowTitles = require("core.ui.engine.window_titles")',
 	'local uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")'
 ])
 	assert.equal(
@@ -97,7 +97,7 @@ for (const statement of [
 		'the composed root declares a part-only import once: ' + statement
 	);
 assert.ok(
-	whole.indexOf('local WindowTitles = require("window_titles")') <
+	whole.indexOf('local WindowTitles = require("core.ui.engine.window_titles")') <
 		whole.indexOf('local function plain_markup('),
 	'a part-only import precedes the definitions that read it'
 );

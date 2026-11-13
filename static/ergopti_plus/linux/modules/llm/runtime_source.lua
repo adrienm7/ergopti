@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local M={}
-local KEY=require("config_keys").KEY
-local TableUtil=require("table_util")
+local KEY=require("settings.engine.keys").KEY
+local TableUtil=require("core.text.engine.table_util")
 -- Two reads of one source, compared as the writer compares them: an absent
 -- file has no bytes (the writer's preimage carries "", a preference read nil).
 local function same_source(a,b)

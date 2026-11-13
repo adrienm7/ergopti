@@ -8,15 +8,15 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 helpers.describe("configured gesture menu label", function()
 	helpers.it("replaces the marker on the four-finger menu row", function()
 		helpers.with_fresh_modules({ "ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils",
 			"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "ui.action_picker",
-			"menu.renderer",
+			"menu.engine.renderer",
 			"ui.menu.shortcut_utils", "infra.logger", "infra.deferred_work" }, function()
-			local file = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
+			local file = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
 			local strings = json.decode(file:read("*a"))
 			file:close()
 			local url = "https://apple.com/?q=[x]&part=50%"
@@ -34,9 +34,9 @@ helpers.describe("configured gesture menu label", function()
 			package.loaded["ui.menu.menu_utils"] = {}
 			package.loaded["infra.dialog_util"] = {}
 			package.loaded["infra.i18n"] = { get = function(key) return strings[key] or key end, section = function(key) return key end }
-			local renderer = assert(require("menu.renderer").new({
+			local renderer = assert(require("menu.engine.renderer").new({
 				platform = "hs",
-				manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+				manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 				json_decode = json.decode,
 				i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub(),
 			}))

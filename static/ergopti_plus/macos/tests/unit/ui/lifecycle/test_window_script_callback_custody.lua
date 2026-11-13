@@ -15,7 +15,7 @@ local with_window = require("tests.support.ui.owned_window_close_fixture")
 --- @param module_name string Real window host.
 --- @param scenario function Complete callback and window lifetime scenario.
 local function with_bridge(module_name, scenario)
-	return helpers.with_fresh_modules({ "updater.release_parser", "updater.check_result" }, function()
+	return helpers.with_fresh_modules({ "updater.engine.release_parser", "updater.engine.check_result" }, function()
 		return with_window(module_name, function(host, h)
 			h.releases = 0
 			local construct_view, construct_controller = hs.webview.new, hs.webview.usercontent.new

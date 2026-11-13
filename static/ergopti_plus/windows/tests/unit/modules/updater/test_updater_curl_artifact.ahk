@@ -167,8 +167,8 @@ class _ArtifactCurlDownloadRun extends _UpdaterNativeDownloadRun {
 			_UpdaterNativeStagingWorkerPath(this), _Updater_SwapWorkerPath(),
 			Url, this.Digest, this.NewExe, this.SwapPath, this.CurrentExe,
 			UPDATER_MIN_EXE_SIZE_BYTES, 5000, _VendorDir . "\ergopti_updater_download.ps1",
-			this.DeadlineMs, this.StartedTick, _SharedDir . "\modules\network\proxy_policy.json",
-			_SharedDir . "\modules\updater\defaults.json", this.Size)
+			this.DeadlineMs, this.StartedTick, _SharedDir . "\core\network\data\proxy_policy.json",
+			_SharedDir . "\updater\data\defaults.json", this.Size)
 		try {
 			_Updater_BindStagedArtifactTransport(this.Transport, this.StagingOwner)
 			if this.WrongExecutableIdentity {
@@ -288,7 +288,7 @@ _ArtifactCurlProductionDispatchJoin() {
 		"CurrentExe, Release.Tag, StagingEpoch, Release, Request, InstallObserver, Asset.Size)",
 		"the compiled install path passes its parsed authenticated size into staging")
 	AssertContains(Start,
-		'_SharedDir . "\modules\updater\defaults.json", AuthenticatedSize)',
+		'_SharedDir . "\updater\data\defaults.json", AuthenticatedSize)',
 		"the staging owner passes the same size into the real transport builder")
 	Tag := "v9.8.7"
 	Url := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
@@ -315,8 +315,8 @@ _ArtifactCurlProductionDispatchJoin() {
 	Transport := _Updater_BuildStagingTransport(_Updater_StagingWorkerPath(), _Updater_SwapWorkerPath(), Asset.Url, Asset.Digest,
 		"C:\Temp\review-staged.exe", "C:\Temp\review-swap.ps1", "C:\Temp\review-current.exe",
 		1024, 5000, _VendorDir . "\ergopti_updater_download.ps1", 30000, 123456,
-		_SharedDir . "\modules\network\proxy_policy.json",
-		_SharedDir . "\modules\updater\defaults.json", Asset.Size)
+		_SharedDir . "\core\network\data\proxy_policy.json",
+		_SharedDir . "\updater\data\defaults.json", Asset.Size)
 	SizeName := ""
 	try {
 		for Pair in Transport.Environment {

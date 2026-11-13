@@ -5,7 +5,7 @@
  * MODULE: Hotstring Language Packs Are Complete Data
  * DESCRIPTION:
  * Hotstrings written for one natural language live in
- * _shared/modules/hotstrings/<language>/<stem>.toml and are declared in
+ * _shared/hotstrings/data/catalogue/<language>/<stem>.toml and are declared in
  * _index.toml [languages]. Each one loads as the group "<language>_<stem>",
  * which config.toml, the feature manifest and the three tray menus key on.
  *
@@ -36,9 +36,9 @@ const { parse } = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
-const HS = path.join(SHARED, 'modules', 'hotstrings');
-const MANIFEST = path.join(SHARED, 'modules', 'features', 'manifest.toml');
-const LOCALE_NAMES = path.join(SHARED, 'data', 'locale_names.json');
+const HS = path.join(SHARED, 'hotstrings', 'data', 'catalogue');
+const MANIFEST = path.join(SHARED, 'settings', 'data', 'features', 'manifest.toml');
+const LOCALE_NAMES = path.join(SHARED, 'core', 'i18n', 'data', 'locale_names.json');
 
 // Rows under hotstrings.* that are not hotstring sections: the J→★ key remap.
 const NOT_A_HOTSTRING = new Set(['hotstrings.magic_key.replace']);
@@ -133,7 +133,7 @@ try {
 	);
 	const classification = JSON.parse(
 		fs.readFileSync(
-			path.join(SHARED, 'data/hotstrings/common_autocorrection_sections.json'),
+			path.join(SHARED, 'hotstrings/data/autocorrection/common_autocorrection_sections.json'),
 			'utf8'
 		)
 	);

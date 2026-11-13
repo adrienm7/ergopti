@@ -101,7 +101,7 @@ const { namesCommandConstant } = require('../lib/menu-command-constant.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const manifest = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json'), 'utf8')
 );
 
 const EXT = { ahk: '.ahk', hs: '.lua', linux: '.lua' };
@@ -127,9 +127,7 @@ function driverSource(driver) {
 		nativeSources,
 		text: out
 			.concat(
-				delegatedMenuSources(nativeSources, path.join(SP, '_shared', 'lua')).map(
-					(source) => source.src
-				)
+				delegatedMenuSources(nativeSources, path.join(SP, '_shared')).map((source) => source.src)
 			)
 			.join('\n')
 	};
@@ -836,7 +834,9 @@ function reachedInertTemplateRows(nativeSources, extension, definitions, platfor
 	}
 }
 
-const english = JSON.parse(fs.readFileSync(path.join(SP, '_shared/data/locales/en.json'), 'utf8'));
+const english = JSON.parse(
+	fs.readFileSync(path.join(SP, '_shared/core/i18n/data/locales/en.json'), 'utf8')
+);
 const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : undefined);
 {
 	const caption = {
@@ -1072,7 +1072,7 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 	const { nativeLayoutRowOwnership } = require('../lib/menu-native-layout-binding.cjs');
 	const source = fs.readFileSync(path.join(SP, 'macos/ui/menu/menu_keyboard_layout.lua'), 'utf8');
 	const english = JSON.parse(
-		fs.readFileSync(path.join(SP, '_shared/data/locales/en.json'), 'utf8')
+		fs.readFileSync(path.join(SP, '_shared/core/i18n/data/locales/en.json'), 'utf8')
 	);
 	const caption = (key) => (Object.hasOwn(english, key) ? english[key] : undefined);
 	const behavior = [
@@ -1531,16 +1531,16 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 			'withdraw native include',
 			mutateSource(
 				helper,
-				'#Include ../../_shared/modules/menu/startup_tray_projection.ahk',
-				'; #Include ../../_shared/modules/menu/startup_tray_projection.ahk'
+				'#Include ../../_shared/menu/data/startup_tray_projection.ahk',
+				'; #Include ../../_shared/menu/data/startup_tray_projection.ahk'
 			)
 		],
 		[
 			'quoted include decoy',
 			mutateSource(
 				helper,
-				'#Include ../../_shared/modules/menu/startup_tray_projection.ahk',
-				'QuotedInclude := "#Include ../../_shared/modules/menu/startup_tray_projection.ahk"'
+				'#Include ../../_shared/menu/data/startup_tray_projection.ahk',
+				'QuotedInclude := "#Include ../../_shared/menu/data/startup_tray_projection.ahk"'
 			)
 		],
 		[
@@ -1626,13 +1626,13 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 		],
 		[
 			'foreign source policy',
-			"shared('modules/menu/startup_tray.toml')",
-			"shared('modules/menu/foreign.toml')"
+			"shared('menu/data/startup_tray.toml')",
+			"shared('menu/data/foreign.toml')"
 		],
 		[
 			'foreign output owner',
-			"shared('modules/menu/startup_tray_projection.ahk')",
-			"shared('modules/menu/foreign.ahk')"
+			"shared('menu/data/startup_tray_projection.ahk')",
+			"shared('menu/data/foreign.ahk')"
 		],
 		[
 			'fake produced result',

@@ -2,7 +2,7 @@
 
 --- Controlled asynchronous native ports; no Hammerspoon/ScriptingBridge qualification.
 local H = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Adapter = require("adapters.apple_shortcuts")
 local function assert_false(value) H.assert_eq(value, false) end
 local ID1 = "11111111-1111-1111-1111-111111111111"
@@ -78,7 +78,7 @@ H.describe("chosen Apple Shortcut ownership", function()
 		H.assert_true(f.owner.resolve(initial.choices[2].key, {}, function(value) scalar = value end))
 		local task = f.tasks[2]; H.assert_eq(task.request.id, ID2)
 		f.reply(task, { f.rows[2] }); task.retire()
-		H.assert_eq(require("program_parameter").parse(scalar, "posix"), {
+		H.assert_eq(require("settings.engine.program_parameter").parse(scalar, "posix"), {
 			executable = "/usr/bin/shortcuts", arguments = { "run", ID2 } })
 	end)
 	for _, changed in ipairs({ "id", "name", "accepts_input" }) do
@@ -689,7 +689,7 @@ H.describe("Apple Shortcut query start acknowledgement", function()
 					H.assert_nil(result.start_reason); H.assert_nil(result.terminal_reason)
 					if operation == "discover" then H.assert_eq(#result.value.choices, 1)
 					else
-						H.assert_eq(require("program_parameter").parse(result.value, "posix"), {
+						H.assert_eq(require("settings.engine.program_parameter").parse(result.value, "posix"), {
 							executable = "/usr/bin/shortcuts", arguments = { "run", ID1 } })
 					end
 				else
@@ -747,7 +747,7 @@ H.describe("Apple Shortcut query start acknowledgement", function()
 			task.retire(); H.assert_eq(result.calls, 1); H.assert_nil(result.terminal_reason)
 			assert_false(f.owner.pending()); H.assert_eq(task.cancels, 0)
 			if operation == "discover" then H.assert_eq(#result.value.choices, 1)
-			else H.assert_eq(require("program_parameter").parse(result.value, "posix").arguments, { "run", ID1 }) end
+			else H.assert_eq(require("settings.engine.program_parameter").parse(result.value, "posix").arguments, { "run", ID1 }) end
 		end)
 	end
 end)

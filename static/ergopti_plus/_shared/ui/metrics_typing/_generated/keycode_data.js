@@ -2,7 +2,7 @@
 
 // ==========================================
 // AUTO-GENERATED — do not edit manually
-// Source: static/ergopti_plus/_shared/data/keycodes/azerty.json
+// Source: static/ergopti_plus/_shared/layouts/data/keycodes/azerty.json
 // Run: npm run codegen:keycode-data:js
 // ==========================================
 
@@ -88,7 +88,7 @@ const KEYCODE_DATA = [
 	{ kc: 126, finger: 'l_ring' },
 ];
 
-// Semantic media labels from static/ergopti_plus/_shared/data/keycodes/metrics_media_keys.json; no keyboard positions.
+// Semantic media labels from static/ergopti_plus/_shared/layouts/data/keycodes/metrics_media_keys.json; no keyboard positions.
 const METRICS_MEDIA_KEYS = Object.freeze([
 	Object.freeze({"id":"media.play_pause","label_key":"sg_actions.track_play"}),
 	Object.freeze({"id":"media.next_track","label_key":"sg_actions.track_next"}),

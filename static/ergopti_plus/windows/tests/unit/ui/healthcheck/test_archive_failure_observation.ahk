@@ -17,7 +17,7 @@ _HC_TestArchiveObservationCase(Mode) {
 	FSCreateDirectoryExclusiveStrict(Directory)
 	Owner := {Id: "private-archive-observation", Directory: Directory, Archive: Directory . "\report.zip",
 		Result: Map("phase", "failed", "archive_created", false),
-		Contract: JsonParse(FSReadStrict(_SharedDir . "\modules\diagnostics\collection.json"))}
+		Contract: JsonParse(FSReadStrict(_SharedDir . "\diagnostics\data\collection.json"))}
 	try {
 		if Mode != "absent" {
 			Text := Mode == "malformed" ? "{" : _HC_ValueToJson(Map("schema_version", 1,

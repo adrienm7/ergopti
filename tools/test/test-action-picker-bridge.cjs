@@ -44,8 +44,8 @@ const MAC_MENU = 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua';
 const MAC_UTILS = 'static/ergopti_plus/macos/ui/menu/shortcut_utils.lua';
 const LINUX_HOST = 'static/ergopti_plus/linux/ui/action_picker/bridge.lua';
 const LINUX_ACTIONS = 'static/ergopti_plus/linux/modules/gestures/manager.lua';
-const EN_LOCALE = 'static/ergopti_plus/_shared/data/locales/en.json';
-const PROVIDER_PICKER = 'static/ergopti_plus/_shared/lua/program_provider_picker.lua';
+const EN_LOCALE = 'static/ergopti_plus/_shared/core/i18n/data/locales/en.json';
+const PROVIDER_PICKER = 'static/ergopti_plus/_shared/apps/engine/program_provider_picker.lua';
 
 let total_pass = 0;
 let total_fail = 0;
@@ -273,7 +273,7 @@ check(
 );
 
 // 4d. Catalogue is now multi-level (at least one "##" sub-header in sg_order).
-const catalogue = read('static/ergopti_plus/_shared/modules/actions/actions.toml');
+const catalogue = read('static/ergopti_plus/_shared/shortcuts/data/actions/actions.toml');
 check(
 	'actions.toml sg_order has h1 group parents (grp_*) + h2 sub-headers (##)',
 	/"#grp_/.test(catalogue) && /"##/.test(catalogue)

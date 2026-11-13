@@ -14,7 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ResetFailure = require("config_reset_failure")
+local ResetFailure = require("settings.engine.publication.reset_failure")
 
 --- Runs `body` with zenity recorded, answering every dialog.
 --- @param body function Clicks the rows under test.

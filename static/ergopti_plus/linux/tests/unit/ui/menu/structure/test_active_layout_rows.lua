@@ -98,8 +98,8 @@ helpers.describe("active layout rows", function()
 	end)
 
 	helpers.it("is declared for every driver and provided by the layout menu owner", function()
-		local Json = require("json")
-		local manifest = Json.decode(read(helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json"))
+		local Json = require("core.text.engine.json")
+		local manifest = Json.decode(read(helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json"))
 		local found
 		for _, row in ipairs(manifest.layout_menu) do
 			if row.id == "active_layouts" then found = row end
@@ -117,7 +117,7 @@ helpers.describe("active layout rows", function()
 		helpers.assert_eq(type(system), "table", "Windows declares its install row")
 		helpers.assert_eq(system.platforms[1], "ahk")
 		helpers.assert_eq(#system.platforms, 1, "the Windows install row is Windows-only")
-		local english = Json.decode(read(helpers.driver_root() .. "/../_shared/data/locales/en.json"))
+		local english = Json.decode(read(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/en.json"))
 		local reason = english[bundle.reason_key]
 		-- The Windows row's label without its parenthetical and ellipsis.
 		local windows_row = english["menu.layout.system_layout_install"]:match("^(.-) %(")

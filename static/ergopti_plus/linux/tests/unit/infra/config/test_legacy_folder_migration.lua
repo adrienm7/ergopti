@@ -12,9 +12,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Contract = require("test.legacy_folder_migration_contract")
+local Contract = require("tests.lua.settings.legacy_folder_migration_contract")
 local Migration = require("infra.legacy_folder_migration")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 Contract.run(helpers, helpers.driver_root() .. "/../_shared")
 
@@ -100,7 +100,7 @@ helpers.describe("Linux legacy folder migration", function()
 				if to == dir .. "/new/storage.json" then write(to, "CONCURRENT-NEW") end
 				return rename(from, to)
 			end
-			local report = require("legacy_folder_migration").apply({
+			local report = require("settings.engine.migration.legacy_folder_migration_core").apply({
 				{ from_dir = dir .. "/old", to_dir = dir .. "/new", backup_dir = dir .. "/new/bak/old" } }, ports)
 			helpers.assert_eq(read(dir .. "/new/storage.json"), "CONCURRENT-NEW", "the newer file survives")
 			helpers.assert_eq(read(dir .. "/new/bak/old/storage.json"), "LEGACY", "the old file went to the backup")
@@ -119,7 +119,7 @@ helpers.describe("Linux legacy folder migration", function()
 			-- A newline is a legal filename byte: line-split listing invented two names.
 			write(dir .. "/old/line\nbreak", "NL")
 			write(dir .. "/notdir", "FILE")
-			local Core = require("legacy_folder_migration")
+			local Core = require("settings.engine.migration.legacy_folder_migration_core")
 			local ports = Migration.native_ports()
 			local report = Core.apply({
 				{ from_dir = dir .. "/old", to_dir = dir .. "/new", backup_dir = dir .. "/new/bak/old" },
@@ -147,7 +147,7 @@ helpers.describe("Linux legacy folder migration", function()
 			assert(os.execute("mkdir -p -- '" .. dir .. "/old' '" .. dir .. "/new'"))
 			write(dir .. "/old/storage.json", "LEGACY")
 			assert(os.execute("chmod 000 -- '" .. dir .. "/old'"))
-			local report = require("legacy_folder_migration").apply({
+			local report = require("settings.engine.migration.legacy_folder_migration_core").apply({
 				{ from_dir = dir .. "/old", to_dir = dir .. "/new", backup_dir = dir .. "/new/bak/old" } },
 				Migration.native_ports())
 			assert(os.execute("chmod 700 -- '" .. dir .. "/old'"))

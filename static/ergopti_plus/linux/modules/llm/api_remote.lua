@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Sends predictions to a hosted API (Cerebras, OpenAI, Anthropic, Gemini,
 --- Mistral, OpenRouter, Groq, Backboard, any OpenAI-compatible server)
---- described by the shared catalogue _shared/modules/llm/api_providers.json,
+--- described by the shared catalogue _shared/ai/data/api_providers.json,
 --- the same file macOS and Windows read, and asks the agent's System 1 question
 --- to Jev (TypeSafe's decisions protocol, directly or through Backboard).
 ---
@@ -23,7 +23,7 @@
 ---    an image, or only the agent's System 1. Backboard chats through an
 ---    assistant created once per key and remembered for the session; a
 ---    decisions provider (Jev) is not a chat model and only answers decide().
----    Their request shapes are the shared _shared/lua/llm/remote_formats.lua.
+---    Their request shapes are the shared _shared/ai/engine/api/remote_formats.lua.
 --- ==============================================================================
 
 local M = {}
@@ -32,28 +32,28 @@ local M = {}
 -- requests. The engine hands it in at init; every other request keeps the adapter.
 local InferenceClient = nil
 
-local Logger = require("logger.shim")
-local ErrorDescription = require("error_description")
-local Json = require("json")
+local Logger = require("core.logger.engine.shim")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local HttpClient = require("adapters.http_client")
-local Ports = require("llm.request_plan.ports")
-local PromptBuilder = require("llm.prompt_builder")
-local TextUtils = require("text_utils")
+local Ports = require("ai.engine.request_plan.ports")
+local PromptBuilder = require("ai.engine.prediction.prompt_builder_core")
+local TextUtils = require("core.text.engine.utils_core")
 local LlmBridge = require("infra.llm_bridge")
 local Monotonic = require("infra.monotonic")
-local Formats = require("llm.remote_formats")
-local Classifier = require("llm.remote_response_classifier")
-local AuthPolicy = require("llm.local_server_auth")
-local ThinkingOff = require("llm.thinking_off")
-local ModelCapabilities = require("llm.model_capabilities")
-local TableUtil = require("table_util")
-local ApiModelListing = require("llm.api_model_listing")
+local Formats = require("ai.engine.api.remote_formats")
+local Classifier = require("ai.engine.policy.remote_response_classifier")
+local AuthPolicy = require("ai.engine.local_servers.auth")
+local ThinkingOff = require("ai.engine.policy.thinking_off")
+local ModelCapabilities = require("ai.engine.local_servers.model_capabilities")
+local TableUtil = require("core.text.engine.table_util")
+local ApiModelListing = require("ai.engine.api.model_listing")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
-local ProviderConfig = require("llm.provider_config_policy")
-local UrlTemplate = require("llm.api_url_template")
-local TokenExchange = require("llm.api_token_exchange")
+local ProviderConfig = require("ai.engine.policy.provider_config_policy")
+local UrlTemplate = require("ai.engine.api.url_template")
+local TokenExchange = require("ai.engine.api.token_exchange")
 
 local LOG = "modules.llm.api_remote"
 
@@ -228,9 +228,9 @@ end
 --- @return table
 local function catalogue()
 	if _catalogue then return _catalogue end
-	local path = Paths.shared("modules/llm/api_providers.json")
+	local path = Paths.shared("ai/data/api_providers.json")
 	local text, status
-	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if path then text, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then text = nil end
 	local closed = status == "ok"
 	local cloud_published
@@ -715,7 +715,7 @@ end
 --- @return boolean saved
 local function save_thinking_refused()
 	local path = thinking_refused_path()
-	local dir = require("native_path").dirname(path)
+	local dir = require("core.fs.engine.native_path").dirname(path)
 	local Shell = require("adapters.shell_runner")
 	if dir and not Shell.run("mkdir -p " .. Shell.quote(dir) .. " 2>/dev/null") then return false end
 	local text = Json.encode(_thinking_refused)
@@ -751,9 +751,9 @@ end
 --- @return table families
 function thinking_families()
 	if _thinking_families then return _thinking_families end
-	local path = Paths.shared("modules/llm/thinking_off.json")
+	local path = Paths.shared("ai/data/thinking_off.json")
 	local text, status
-	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if path then text, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then text = nil end
 	local families, reason = ThinkingOff.parse_families(type(text) == "string" and Json.decode(text) or nil)
 	if not families then
@@ -1250,7 +1250,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		end
 		local elapsed_ms = Monotonic.now_ms() - started
 		Logger.debug(LOG, "Remote completion received (%d chars in %d ms).", #text, elapsed_ms)
-		require("perf_budget").judge(Logger, LOG, "llm.remote", elapsed_ms,
+		require("core.logger.engine.perf_budget").judge(Logger, LOG, "llm.remote", elapsed_ms,
 			function() return Timings.ms("budgets", "llm_remote_request_ms") end)
 		if authorized and not authorized() then return end
 		if type(on_chunk) == "function" then pcall(on_chunk, text) end

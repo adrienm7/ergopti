@@ -70,7 +70,7 @@ end
 --- The decoded file.
 --- @return table
 local function stored()
-	return require("json").decode(assert(file_text(), "the file exists"))
+	return require("core.text.engine.json").decode(assert(file_text(), "the file exists"))
 end
 
 local LEGACY = '{"version":1,"active_id":"cerebras-1","entries":[{"id":"cerebras-1","provider":"cerebras",'
@@ -370,7 +370,7 @@ assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics 
 		local info = fifo and uv.fs_lstat(fifo)
 		if fifo then
 			os.remove(fifo)
-			uv.fs_rmdir(require("native_path").dirname(fifo))
+			uv.fs_rmdir(require("core.fs.engine.native_path").dirname(fifo))
 		end
 		os.execute("rm -rf '" .. dir .. "'")
 		helpers.assert_eq(expired, false, "secret-tool diagnostics must not block on a FIFO")
@@ -399,7 +399,7 @@ assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics 
 		Store._set_tool_for_test(nil)
 		Fake.uninstall()
 		local uv = require("luv")
-		local result_dir = result_path and require("native_path").dirname(result_path)
+		local result_dir = result_path and require("core.fs.engine.native_path").dirname(result_path)
 		local file_left = result_path and uv.fs_lstat(result_path)
 		local dir_left = result_dir and uv.fs_lstat(result_dir)
 		os.execute("rm -rf '" .. dir .. "'")

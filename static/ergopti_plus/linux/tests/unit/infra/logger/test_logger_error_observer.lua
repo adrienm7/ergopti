@@ -14,7 +14,7 @@
 
 local helpers = require("tests.helpers")
 
-local Core = require("logger")
+local Core = require("core.logger.engine")
 
 --- Runs a body with an observer installed, the core at its lowest level and a
 --- fresh dedup streak, restoring all three afterwards.

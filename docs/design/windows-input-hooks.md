@@ -12,7 +12,7 @@ reassertion" below.
 ## The two checks
 
 Both rows are in the shared Debug menu (`menu.debug_menu` in
-`_shared/modules/features/manifest.toml`), declared for `ahk` only with the
+`_shared/settings/data/features/manifest.toml`), declared for `ahk` only with the
 reason `platform_reason.input_probe_is_autohotkey_specific` (no other driver has
 SendInput or an AutoHotkey hook). Code: `windows/infra/input_probe.ahk`; pure
 cores and menu declaration are pinned by

@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local codec = require("toml_codec.codec")
+local codec = require("core.text.engine.toml_codec.codec")
 
 helpers.describe("toml_codec: multiline continuation escape ownership", function()
 	for count = 1, 4 do

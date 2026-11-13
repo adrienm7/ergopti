@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local CORPUS = helpers.shared("tests/corpus/action_parameters/user_action_vectors.json")
 local ACTION_OF_KIND = { command = "run_command", path = "open_path", apple_shortcut = "run_apple_shortcut" }

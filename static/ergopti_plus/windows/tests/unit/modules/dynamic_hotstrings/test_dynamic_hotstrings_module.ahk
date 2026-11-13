@@ -556,7 +556,7 @@ Test("dynamic hotstrings: the long French date names every month and weekday (PA
 ; backs it, so only the user's tray override can replace the shared default.
 _DynHSTest_DelayDefault() {
 	global _SharedDir, _HotstringsOverrides
-	Shared := ParseTomlFile(_SharedDir . "\modules\hotstrings\defaults.toml")["delays"]["dynamichotstrings_sec"]
+	Shared := ParseTomlFile(_SharedDir . "\hotstrings\data\catalogue\defaults.toml")["delays"]["dynamichotstrings_sec"]
 	Saved := _HotstringsOverrides.Has("dynamichotstrings") ? _HotstringsOverrides["dynamichotstrings"] : ""
 	try {
 		if (Saved != "")

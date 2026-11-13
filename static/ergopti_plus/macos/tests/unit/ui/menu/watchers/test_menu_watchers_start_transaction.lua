@@ -15,7 +15,7 @@
 
 local helpers = require("tests.helpers")
 
-local SCHEDULER_OWNERS = { "adapters.timer_scheduler", "error_description", "number_policy" }
+local SCHEDULER_OWNERS = { "adapters.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy" }
 
 
 

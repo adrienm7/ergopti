@@ -4,7 +4,7 @@
 --- MODULE: Tray Quit Request (Linux)
 --- DESCRIPTION:
 --- The daemon's answer to the tray's Quit. It follows the shared quit admission
---- (`_shared/lua/quit_admission.lua`, also read by the macOS menu): Quit wins over
+--- (`_shared/core/lifecycle/engine/shutdown/quit_admission.lua`, also read by the macOS menu): Quit wins over
 --- a reload in flight, waits for a running configuration write or hotstring
 --- publication, and is refused only when an exit already owns the process. The
 --- tray row tells the user of a refusal with the one `notify.quit_refused` notice.
@@ -27,8 +27,8 @@
 ---    the previous daemon (infra/updater_boot_ready.lua).
 --- ==============================================================================
 
-local QuitAdmission = require("quit_admission")
-local Logger = require("logger.shim")
+local QuitAdmission = require("core.lifecycle.engine.shutdown.quit_admission")
+local Logger = require("core.logger.engine.shim")
 
 local M = {}
 
@@ -82,7 +82,7 @@ function M.new(ports)
 	end
 
 	return function(reason)
-		-- The tray row's closed reason (_shared/modules/logger/vocabulary.json);
+		-- The tray row's closed reason (_shared/core/logger/data/vocabulary.json);
 		-- a shortcut or gesture names its own source.
 		if reason == nil then reason = "tray_quit" end
 		assert(type(reason) == "string" and reason ~= "", "a user Quit names its source")
