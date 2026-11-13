@@ -905,6 +905,7 @@ return {
 	"tests.unit.ui.menu.llm.test_llm_menu_prediction_count",
 	"tests.unit.ui.downloads.test_models_browser_shared_command",
 	"tests.unit.ui.tooltip.test_llm_overlay_anchor",
+	"tests.unit.ui.tooltip.test_llm_overlay_expiry",
 	"tests.unit.ui.tooltip.test_llm_overlay_lines",
 	"tests.unit.ui.tooltip.test_llm_overlay_shared_stack",
 	"tests.unit.ui.webview.test_webview_page_messages",

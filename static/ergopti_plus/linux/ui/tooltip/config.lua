@@ -186,6 +186,15 @@ function M.effective_delay(delay)
 	return math.max(floor, delay - decrement)
 end
 
+--- An AI suggestion's lifetime: the shared [timing] llm_timeout_sec less the
+--- shared decrement, never below the floor, as on Windows and macOS.
+--- @return number seconds
+function M.llm_timeout_seconds()
+	local timeout = require_key("timing", "llm_timeout_sec")
+	return math.max(require_key("timing", "timeout_floor_sec"),
+		timeout - require_key("timing", "timeout_decrement_sec"))
+end
+
 --- The chrome of an AI prediction line, read once.
 local _llm_line = nil
 
