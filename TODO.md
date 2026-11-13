@@ -666,6 +666,12 @@ Each closes on a named green hosted or native run, recorded here.
       4 other failures). A new intermittent, `NativeAppClonerBundleOwnershipTests.testActualNativeCliLogLimits...`
       (runs 42438031643, 42480689370, `[Errno 1] Operation not permitted`), is fixed at its cause in bce01f27: XNU
       answers `killpg(group, 0)` with EPERM while the last members are unreaped zombies.
+      Worker G, 2026-11-13 (Paris): the baseline flake `TestCancellationAndConcurrentClosePhysicallyRetirePeer` (macOS
+      Intel Managed Ollama) is fixed at its cause in 927912e33b: a 120 ms deadline and a 200 ms idle clock could end
+      the request before a slow runner had started the peer, so the retirement check found no receipt. Each case now
+      cancels once the peer has recorded itself; a slow-start case (peer delayed 300 ms) fails with the old timing and
+      passes now. `TestClientErrorPrivacyRetainsContextCause` had the same 100 ms race (999d111fb2). Keep it listed until
+      the Intel cell stays green.
       New 2026-11-11: Install-and-launch `symlink_logs_dir` failed once in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (job 130257482167) with "Quit did
       not end both processes within 10 s (the Quit AppleEvent was never answered)" while the same build quit in
       0.3–0.4 s in every other row. Its re-run (attempt 2, job 130295289361) passed and the macOS Verdict of
