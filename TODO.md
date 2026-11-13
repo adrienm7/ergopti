@@ -372,10 +372,13 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       so the pause function lands in `expected_source` and Linux E2E
       desktop-webview fails (« original publisher clears only the known third slot », line 252). Drop the argument,
       then confirm with that E2E job.
-- [ ] **Windows global restore and the preferences source (found 2026-11-12).** On macOS the remap save wrote
+- [x] **Windows global restore and the preferences source (found 2026-11-12).** On macOS the remap save wrote
       `config.toml` without handing the bytes to the preferences, so « Restore recommended values » refused at the
       shortcuts participant (fixed in 3e209162 by `Preferences.replace_source`). Check whether the AHK global restore
       cohort has the same handoff gap now that `[tap_holds]` and `[mod_combos]` live in `config.toml`.
+      Checked 2026-11-13 by worker E: no gap on Windows. `ConfigScopeCommitOperations` admits a fresh source
+      generation of `config.toml` at each commit (`TOML_BuildConfigUpdatedContent`) and checks the bytes it read,
+      so no acknowledged source outlives a remap save the way macOS's preferences snapshot did.
 - [ ] **ci-acceptance-3 commits not yet on `dev` (2026-11-12).** On `claude/ergopti-todo-ci-acceptance-3`: the
       keyboard-source evidence (cf44fb4e, aef8ae05, da7cf001, 84e97e47: conflicts in `ci-macos.yml` and
       `test-macos-tsm-refusal.cjs` against the tap-hold series, rebase them), the TODO receipts 8886f2ba and
@@ -482,8 +485,11 @@ between workers) green alone. All live checks pass, typed by the harness.
 - [ ] **Immediate-Backspace restoration after Notepad-paste and terminal expansions.** Those owners emit after the
       keystroke and keep no undo record, so a Backspace right after their expansion does not type the trigger back.
 
-- [ ] **LogsDirPath under the old folder name.** `infra/legacy_folder_migration.ahk` renames a custom logs folder named
+- [x] **LogsDirPath under the old folder name.** `infra/legacy_folder_migration.ahk` renames a custom logs folder named
       like the old app folder to `Ergopti`, as macOS and Linux do since 2026-11-11 (shared `renamed` rule).
+      Done 2026-11-13 by worker E: `LegacyFolderCustomLegacyLogs`, `LegacyFolderCustomLogsStep` and the `renamed`
+      rule of `LegacyFolderRebased`; the logger's entries move, the user's own files stay (tests
+      `legacy-folder-custom-logs`).
 
 - [ ] **Hotstring header rows outlive their expiry** in the « both » stack of `llm.trigger.while_hotstring_tooltip`
       until the next render.

@@ -365,3 +365,59 @@ _LFM_OldTransitionJournalIsRecoveredFirst() {
 }
 Test("legacy folder migration: an old transition journal is recovered before paths.toml moves (legacy-folder-migration-journal)",
 	_LFM_OldTransitionJournalIsRecoveredFirst)
+
+; The shared « renamed » rule (macOS and Linux since 2026-11-11): a custom logs
+; folder named like the old application folder, or its application-named
+; subfolder, is the one rule names; any other folder is kept.
+_LFM_CustomLegacyLogsIsRecognized() {
+	Old := AppDirsMigrationWindowsLegacyLocalFolder(), App := AppDirsFolderName()
+	Local_ := "C:\Users\u\AppData\Local\" . Old
+	AssertEqual("D:\Logs\" . Old, LegacyFolderCustomLegacyLogs("D:\Logs\" . Old, Local_))
+	AssertEqual("D:\Logs\" . Old, LegacyFolderCustomLegacyLogs("D:/Logs/" . Old . "/" . App . "/", Local_),
+		"the logger's application subfolder names the same custom folder")
+	AssertEqual("", LegacyFolderCustomLegacyLogs("D:\Logs\mine", Local_), "another custom folder is kept")
+	AssertEqual("", LegacyFolderCustomLegacyLogs(Local_, Local_), "the old default folder merges into the root instead")
+	AssertEqual("", LegacyFolderCustomLegacyLogs("relative\" . Old, Local_), "a relative folder is not a logs folder")
+	AssertEqual("D:\Logs\" . App, LegacyFolderRenamedFolder("D:\Logs\" . Old, Map("from", Old, "to", App)))
+	AssertEqual("", LegacyFolderRenamedFolder("D:\Logs\other", Map("from", Old, "to", App)))
+}
+Test("legacy folder migration: a custom logs folder named like the old folder is recognized (legacy-folder-custom-logs)",
+	_LFM_CustomLegacyLogsIsRecognized)
+
+; End to end on a private profile: the logger's entries move to the renamed
+; folder, the user's own files stay, and LogsDirPath follows in its spelling.
+_LFM_CustomLegacyLogsMoves() {
+	Profile := A_Temp . "\ergopti_test_legacy_custom_logs_" . A_TickCount
+	Saved := Map()
+	for Name in ["LOCALAPPDATA", "APPDATA", "USERPROFILE"]
+		Saved[Name] := EnvGet(Name)
+	try {
+		Old := AppDirsMigrationWindowsLegacyLocalFolder(), App := AppDirsFolderName()
+		Local_ := Profile . "\Local", Custom := Profile . "\Logs\" . Old
+		for Path in [Local_, Profile . "\Roaming", Profile . "\Home", Custom . "\" . App]
+			DirCreate(Path)
+		FileAppend("log", Custom . "\" . App . "\today.log")
+		FileAppend("mine", Custom . "\mine.txt")
+		EnvSet("LOCALAPPDATA", Local_), EnvSet("APPDATA", Profile . "\Roaming"), EnvSet("USERPROFILE", Profile . "\Home")
+		PathsFile := AppFoldersPathsFile()
+		SplitPath(PathsFile, , &PathsDir)
+		DirCreate(PathsDir)
+		FileAppend(AppDirsLogsOverrideKey() . ' = "' . StrReplace(Custom, "\", "/") . '"`n', PathsFile, "UTF-8-RAW")
+		Report := LegacyFolderMigrationRun(PathsFile)
+		Assert(FileExist(Profile . "\Logs\" . App . "\today.log"), "the logger's entries moved to the renamed folder")
+		Assert(FileExist(Custom . "\mine.txt"), "the user's own file stays in the custom folder")
+		AssertEqual(AppDirsLogsOverrideKey() . ' = "' . StrReplace(Profile . "\Logs\" . App, "\", "/") . '"`n',
+			FileRead(PathsFile, "UTF-8"), "LogsDirPath names the renamed folder, in its own separator style")
+		AssertEqual("rewritten", Report["paths_file"])
+		Again := LegacyFolderMigrationRun(PathsFile)
+		AssertEqual("unchanged", Again["paths_file"], "a second boot has nothing to rename")
+	} finally {
+		for Name, Value in Saved
+			EnvSet(Name, Value)
+		if DirExist(Profile)
+			DirDelete(Profile, true)
+	}
+}
+Test("legacy folder migration: a custom old-named logs folder is renamed after the application (legacy-folder-custom-logs)",
+	_LFM_CustomLegacyLogsMoves)
+
