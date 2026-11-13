@@ -17,7 +17,7 @@ h.describe("original retirement inside acknowledged synthetic output", function(
 			end
 		end }, function(s)
 			s.queue("a", 42, 1, 1); s.pump()
-			local C = h.load_module("modules.gestures.combo_emitter")
+			local C = h.load_module("gestures.engine.combo_emitter")
 			h.assert_true(C.press_codes({ 42 }, { 30 }, "queued original UP"))
 			h.assert_true(fired)
 			h.assert_eq(s.rows, { { 42, 1 }, { 30, 1 }, { 30, 0 }, { 42, 0 } })
@@ -70,7 +70,7 @@ h.describe("original retirement inside acknowledged synthetic output", function(
 			end
 		end, fail_sync = function(code, value) return code == 42 and value == 0 end }, function(s)
 			s.queue("a", 42, 1, 1); s.pump()
-			local C = h.load_module("modules.gestures.combo_emitter")
+			local C = h.load_module("gestures.engine.combo_emitter")
 			h.assert_eq(C.press_codes({ 42 }, { 30 }, "inverse ACK refused"), false)
 			h.assert_true(fired); h.assert_true(broker(s).has_debt())
 			h.assert_eq(s.hook.isRunning(), false); h.assert_eq(s.writer.is_open(), false)

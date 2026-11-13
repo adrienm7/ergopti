@@ -23,7 +23,7 @@ local function binding_source_fixture(source, test)
 		local file = assert(io.open(path, "rb")); local content = file:read("*a"); assert(file:close()); return content
 	end
 	write(source)
-	local manager = helpers.load_module("modules.gestures.manager")
+	local manager = helpers.load_module("gestures.engine.manager")
 	local okay, detail = xpcall(function() test(manager, path, read, write) end, debug.traceback)
 	pcall(os.remove, path)
 	if not okay then error(detail, 0) end

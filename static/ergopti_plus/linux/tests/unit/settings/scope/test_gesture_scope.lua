@@ -9,7 +9,7 @@ local SOURCE = '[gestures]\nenabled = true\ntap_3 = "enter"\n[gesture_parameters
 
 local function with_scope(body)
 	Sandbox.with_config(SOURCE, function(path)
-		local manager_name = "modules.gestures.manager"
+		local manager_name = "gestures.engine.manager"
 		local original_manager = package.loaded[manager_name]
 		local original_reader = package.loaded["platform.input.evdev_reader"]
 		package.loaded[manager_name] = nil
@@ -40,7 +40,7 @@ local function with_scope(body)
 					return Writer.publish_if_unchanged(target, content, nil, expected)
 				end,
 			}
-			local owner = require("infra.gesture_scope").new({
+			local owner = require("gestures.engine.scope").new({
 				path = path, backup_path = backup, gestures = gestures, files = files,
 			})
 			body(owner, gestures, controls, path, backup)
@@ -233,8 +233,8 @@ helpers.describe("Linux gesture scope transaction", function()
 			end
 			helpers.assert_eq(gestures.get_all_action_parameters().tap_3__open_url, nil)
 			helpers.assert_eq(gestures.get_all_action_parameters().tap_4__open_url, nil)
-			package.loaded["modules.gestures.manager"] = nil
-			local restarted = require("modules.gestures.manager")
+			package.loaded["gestures.engine.manager"] = nil
+			local restarted = require("gestures.engine.manager")
 			restarted.init({ persist = true, config_path = path })
 			helpers.assert_eq(restarted.get_action("tap_4"), "none", "legacy configuration cannot resurrect the assignment")
 			helpers.assert_eq(restarted.is_enabled(), false)

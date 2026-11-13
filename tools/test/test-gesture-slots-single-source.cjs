@@ -106,7 +106,7 @@ try {
 	// macOS still hardcodes the slot arrays (deriving them would need an
 	// unverifiable Hammerspoon reload), so its literals are pinned to the TOML.
 	{
-		const file = 'macos/modules/gestures/init.lua';
+		const file = 'macos/gestures/engine/init.lua';
 		const src = read(file);
 		if (!eqOrdered(luaSlotArray(src, 'SINGLE_SLOTS', file), single)) {
 			errors.push('macos SINGLE_SLOTS != actions.toml [slots].single');
@@ -148,7 +148,7 @@ try {
 			if (!eqOrdered(names(slots[2]), axis))
 				errors.push('generated Linux slots.axis != actions.toml [slots].axis');
 		}
-		const file = 'linux/modules/gestures/manager.lua';
+		const file = 'linux/gestures/engine/manager.lua';
 		const src = read(file);
 		if (
 			!src.includes('M.SINGLE_SLOTS = copy_list(Catalogue.slots.single)') ||

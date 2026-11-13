@@ -2756,7 +2756,7 @@ i18n = "common.restore_recommended"
 # On Windows the clear also puts the Precision Touchpad registry back to its
 # system state: the values backed up before Ergopti's first gesture
 # configuration, or the Windows factory defaults without a backup
-# (windows/modules/gestures/touchpad_registry.ahk). It replaced the
+# (windows/gestures/adapters/touchpad_registry.ahk). It replaced the
 # Configuration menu's « Restaurer les gestes du pavé tactile Windows » row
 # (maintainer, 2026-11-03), and the global clear composes it too. macOS and
 # Linux read the touchpad themselves and change no system setting, so their

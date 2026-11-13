@@ -39,7 +39,7 @@ end
 
 helpers.describe("meta: nominal startup diagnostics stay warning-free", function()
 	helpers.it("unavailable optional primer event names are debug-only", function()
-		local source = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
+		local source = read_source("local function schedule_emergency_recycle") -- gestures/engine/init.lua
 		helpers.assert_true(source:find("primer event type '%%s' is unavailable", 1, false) ~= nil)
 		helpers.assert_true(source:find("Logger.debug(LOG, \"  primer event type", 1, true) ~= nil)
 	end)
@@ -68,13 +68,13 @@ helpers.describe("meta: nominal startup diagnostics stay warning-free", function
 	end)
 
 	helpers.it("automatic gesture recovery stays debug-only", function()
-		local source = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
+		local source = read_source("local function schedule_emergency_recycle") -- gestures/engine/init.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"schedule_emergency_recycle: SCHEDULED", 1, true) ~= nil)
 		helpers.assert_true(source:find("Logger.debug(LOG, \"EMERGENCY RECYCLE executing now", 1, true) ~= nil)
 	end)
 
 	helpers.it("gesture lift-off drift rejection stays debug-only", function()
-		local source = read_source("local function triggerLiveAxisIfNeeded") -- modules/gestures/engine.lua
+		local source = read_source("local function triggerLiveAxisIfNeeded") -- gestures/engine/engine.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"commitGesture: dir=%s does not match gesture lockedDir", 1, true) ~= nil)
 	end)
 

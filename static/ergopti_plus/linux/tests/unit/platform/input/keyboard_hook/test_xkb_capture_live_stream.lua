@@ -810,7 +810,7 @@ helpers.describe("Original Hook physical editor position observation", function(
 	end)
 	helpers.it("joins the original Reader occurrence to the actual host and shared editor without writes", function()
 		with_position_capture(nil, function(s)
-			local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "modules.gestures.manager",
+			local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "gestures.engine.manager",
 				"core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 			local previous = {}; for _, name in ipairs(names) do previous[name] = { package.loaded[name] } end
 			local host, receipt, epoch, sends, writes, paused = nil, {}, 0, {}, 0, false
@@ -821,7 +821,7 @@ helpers.describe("Original Hook physical editor position observation", function(
 					show = function() epoch = 53; return host.on_window_acquiring(epoch) end,
 					hide = function(_, exact) if exact ~= epoch then return false end; local old = epoch; epoch = 0; host.on_window_closed(old); return true end,
 					eval_js = function(_, script) sends[#sends + 1] = script; return true end }
-				package.loaded["modules.gestures.manager"] = { is_assignable = function(action) return action == "none" end,
+				package.loaded["gestures.engine.manager"] = { is_assignable = function(action) return action == "none" end,
 					get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
 					split_action_parameter_key = function() end, get_action_label = function(action) return action end }
 				package.loaded["core.fs.engine.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }

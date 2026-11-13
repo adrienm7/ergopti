@@ -10,7 +10,7 @@ local Json = require("core.text.engine.json")
 local PRIOR = Json.encode({ version = 1, executable = "/private/prior-program", arguments = { "private-prior" } })
 local NEXT = Json.encode({ version = 1, executable = "/private/next-program", arguments = { "private-next" } })
 local CASES = {
-	{ binding = "tap_3", section = "gestures", slot = "tap_3", module = "modules.gestures.manager" },
+	{ binding = "tap_3", section = "gestures", slot = "tap_3", module = "gestures.engine.manager" },
 	{ binding = "keyboard__primary_j", section = "shortcuts.keyboard", slot = "primary_j", module = "modules.shortcuts.keyboard_shortcuts" },
 	{ binding = "tap_key__number_row_left", section = "shortcuts.tap_keys", slot = "number_row_left", module = "modules.shortcuts.tap_keys" },
 	{ binding = "script__script_altgr_enter", section = "shortcuts.script_control", slot = "script_altgr_enter", module = "modules.shortcuts.script_chords" },
@@ -75,7 +75,7 @@ local function with_case(spec, body)
 			-- The actual contextual keyboard row reads the trigger owner too. A
 			-- previous missing-default fixture may have cached it against a stubbed
 			-- manifest; load this dependency against the restored production owner.
-			for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
+			for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
 				"modules.shortcuts.script_chords", "modules.hotstrings.magic_key", "settings.engine.preferences.program_binding_transaction" }) do package.loaded[name] = nil end
 			local controls = { changed = 0, backups = {}, logs = {}, publications = 0 }
 			local logger = {}
@@ -87,11 +87,11 @@ local function with_case(spec, body)
 			package.loaded["core.logger.engine.shim"] = logger
 			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
-			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
+			package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end, rows = function() return {} end }
 			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() error("picker must not close input") end }
 			package.loaded["core.process.adapters.shell_runner"] = { has_command = function() return true end,
 				quote = function(value) return "'" .. value .. "'" end }
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			gestures.init({ persist = true, config_path = path, enabled = false })
 			local acquire_parameters = gestures.acquire_parameter_configuration
 			gestures.acquire_parameter_configuration = function(token)
@@ -169,7 +169,7 @@ local function with_configuration_picker(body)
 		for _, id in ipairs({ "a", "b" }) do
 			Sandbox.write_bytes(f.dirs[id] .. "/config.toml", f.bytes(id) .. suffix)
 		end
-		for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
+		for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
 			"modules.shortcuts.script_chords", "modules.hotstrings.magic_key", "settings.engine.preferences.program_binding_transaction",
 			"ui.action_picker.bridge" }) do package.loaded[name] = nil end
 		local seen = { logs = {}, changed = 0 }
@@ -178,10 +178,10 @@ local function with_configuration_picker(body)
 			logger[level] = function(_, message, ...) seen.logs[#seen.logs + 1] = string.format(message, ...) end
 		end
 		package.loaded["core.logger.engine.shim"] = logger
-		package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
+		package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end, rows = function() return {} end }
 		package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad" }
 		package.loaded["core.process.adapters.program_providers"] = {}
-		local gestures = require("modules.gestures.manager")
+		local gestures = require("gestures.engine.manager")
 		gestures.init({ persist = true, config_path = f.paths.config("config.toml"), enabled = false })
 		local keyboard = require("modules.shortcuts.keyboard_shortcuts")
 		local bridge = require("ui.action_picker.bridge")
@@ -637,7 +637,7 @@ local function parameterized_confirmation(gestures, path)
 	-- The existing reduced fixture omits the post-commit desktop notice port.
 	-- Its genuine signature is show({ key, slot }) -> queued; never open a UI here.
 	local notices = {}
-	package.loaded["ui.gesture_conflicts"].show = function(group)
+	package.loaded["gestures.ui.conflicts"].show = function(group)
 		notices[#notices + 1] = { key = group.key, slot = group.slot }
 		return true
 	end

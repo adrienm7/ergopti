@@ -381,8 +381,8 @@ helpers.with_stub_scope(MODULES, function()
 			}, "\n")
 			-- The catalogue itself has its own parity test; here it only has to
 			-- refuse the retired id.
-			local saved = package.loaded["modules.gestures.actions"]
-			package.loaded["modules.gestures.actions"] = {
+			local saved = package.loaded["gestures.engine.actions"]
+			package.loaded["gestures.engine.actions"] = {
 				is_assignable = function(action) return action ~= "retired_action_xyz" end,
 			}
 			local ok, err = pcall(function()
@@ -397,7 +397,7 @@ helpers.with_stub_scope(MODULES, function()
 				helpers.assert_eq(offered, { "gestures.tap_3", "shortcuts.keyboard.primary_k",
 					"shortcuts.script_control.script_altgr_backspace", "shortcuts.tap_keys.number_row_left" })
 			end)
-			package.loaded["modules.gestures.actions"] = saved
+			package.loaded["gestures.engine.actions"] = saved
 			if not ok then error(err, 0) end
 		end)
 
@@ -412,8 +412,8 @@ helpers.with_stub_scope(MODULES, function()
 					"tap_5__open_url = \"https://example.com\"",
 					"",
 				}, "\n")
-				local saved = package.loaded["modules.gestures.actions"]
-				package.loaded["modules.gestures.actions"] = {
+				local saved = package.loaded["gestures.engine.actions"]
+				package.loaded["gestures.engine.actions"] = {
 					is_assignable = function() return true end,
 					split_action_parameter_key = function(key)
 						for _, action in ipairs({ "wrap_selection", "open_url" }) do
@@ -438,7 +438,7 @@ helpers.with_stub_scope(MODULES, function()
 					helpers.assert_eq(offered, { "gestures.action_parameters.tap_3__retired_action",
 						"gestures.action_parameters.tap_4__wrap_selection" })
 				end)
-				package.loaded["modules.gestures.actions"] = saved
+				package.loaded["gestures.engine.actions"] = saved
 				if not ok then error(err, 0) end
 			end)
 

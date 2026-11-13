@@ -13,13 +13,13 @@ local json = require("core.text.engine.json")
 helpers.describe("configured gesture menu label", function()
 	helpers.it("replaces the marker on the four-finger label", function()
 		local original = package.loaded["core.i18n.engine.i18n"]
-		local manager_before = package.loaded["modules.gestures.manager"]
+		local manager_before = package.loaded["gestures.engine.manager"]
 		local ok, failure = xpcall(function()
 			local file = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/fr.json", "rb"))
 			local strings = json.decode(file:read("*a"))
 			file:close()
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return strings[key] or key end }
-			local manager = helpers.load_module("modules.gestures.manager")
+			local manager = helpers.load_module("gestures.engine.manager")
 			manager.init({ persist = false })
 			local url = "https://apple.com/?q=[x]&part=50%"
 			helpers.assert_true(manager.set_action("tap_4", "open_url"))
@@ -28,7 +28,7 @@ helpers.describe("configured gesture menu label", function()
 			helpers.assert_eq(manager.get_action_display_label("tap_4"), prefix .. "[" .. url .. "]")
 		end, debug.traceback)
 		package.loaded["core.i18n.engine.i18n"] = original
-		package.loaded["modules.gestures.manager"] = manager_before
+		package.loaded["gestures.engine.manager"] = manager_before
 		assert(ok, failure)
 	end)
 end)

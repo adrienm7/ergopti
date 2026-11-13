@@ -45,8 +45,8 @@ function M.with_world(options, callback)
 				return native
 			end
 			package.loaded["clipboard.adapters.clipboard"] = nil
-			package.loaded["modules.gestures.actions"] = nil
-			local actions = require("modules.gestures.actions")
+			package.loaded["gestures.engine.actions"] = nil
+			local actions = require("gestures.engine.actions")
 			actions.init({ action_params = {} })
 			assert(actions.set_action_parameter("keyboard__primary_1", "search_web", "https://example.test/?q=%s"))
 			if options.backlog then

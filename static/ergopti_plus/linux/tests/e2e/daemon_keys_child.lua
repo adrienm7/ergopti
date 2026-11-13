@@ -284,7 +284,7 @@ end
 local WITH_LLM = os.getenv("ERGOPTI_E2E_LLM") == "1"
 for _, name in ipairs(MENU_ROWS_FILE and {} or { "core.ui.ui.tooltip.preview", "core.ui.ui.tooltip.llm", "tray.adapters.menu",
 	"menu.ui.builder.builder", "modules.updater.manager",
-	"modules.gestures.manager", "platform.focus.window_info", "core.process.adapters.lifecycle",
+	"gestures.engine.manager", "platform.focus.window_info", "core.process.adapters.lifecycle",
 	"core.ui.ui.webview_manager",
 	"core.fs.engine.file_watchers", "ui.wpm.widget", "modules.keystats.system_metrics", "platform.system.notifier" }) do
 	package.preload[name] = function() error("disabled for the daemon key scenarios") end
@@ -321,7 +321,7 @@ end
 -- Keep the actual empty helper owners: scripted action effects cannot claim
 -- native cleanup by omitting the manager's stop and settled protocols.
 local function scripted_gestures(ports)
-	local owner = dofile("modules/gestures/manager.lua")
+	local owner = dofile("gestures/engine/manager.lua")
 	for name, value in pairs(ports) do owner[name] = value end
 	return owner
 end
@@ -332,7 +332,7 @@ end
 -- daemon's loop guard once dropped the whole module when the pump failed, and
 -- every tap action died with the reader (gesture-pump-keeps-actions).
 if os.getenv("ERGOPTI_E2E_GESTURE_PUMP") == "fails" then
-	package.preload["modules.gestures.manager"] = function()
+	package.preload["gestures.engine.manager"] = function()
 		return scripted_gestures({
 			init = function() return true end,
 			is_enabled = function() return true end,
@@ -352,7 +352,7 @@ if TAP_WRAP ~= "none" or TAP_COLLISION then
 		selection.reads = selection.reads + 1
 		return true, selection.primary
 	end
-	package.preload["modules.gestures.manager"] = function()
+	package.preload["gestures.engine.manager"] = function()
 		return scripted_gestures({
 			init = function() return true end,
 			is_assignable = function(id) return id == "send_text" end,

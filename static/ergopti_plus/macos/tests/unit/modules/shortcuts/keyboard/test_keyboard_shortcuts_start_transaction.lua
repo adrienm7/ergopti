@@ -72,7 +72,7 @@ local function load_subject()
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	-- The start transaction is independent of which ids exist; the load-time
 	-- catalogue check has its own test (test_keyboard_shortcuts_unknown_action.lua).
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.actions"] = {
 		is_assignable = function(action_id) return type(action_id) == "string" end,
 		execute_single = function() end,
 	}

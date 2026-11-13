@@ -5,9 +5,9 @@ local helpers = require("tests.helpers")
 local eq = helpers.assert_eq
 local function with_input(body, setup)
 	local names = { "adapters.system_switcher_input", "adapters.system_switcher_sampler",
-		"core.events.timer_scheduler", "modules.gestures.native_app_switcher", "platform.input.synthetic_input",
+		"core.events.timer_scheduler", "gestures.adapters.native_app_switcher", "platform.input.synthetic_input",
 		"platform.focus.window_manager", "core.fs.adapters.storage", "core.logger.engine.logger", "core.timing.engine.timings",
-		"modules.gestures.native_app_switcher_action", "adapters.system_switcher_runtime" }
+		"gestures.adapters.native_app_switcher_action", "adapters.system_switcher_runtime" }
 	local saved, old_hs = {}, hs
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local path = os.tmpname()
@@ -150,7 +150,7 @@ local function with_input(body, setup)
 			return key == "native_switcher_deadline_ms" and 8 or 0.02
 		end }
 		package.loaded["platform.focus.window_manager"] = { frontmost_pid = function() return f.front end }
-		return require("modules.gestures.native_app_switcher_action")
+		return require("gestures.adapters.native_app_switcher_action")
 	end
 	if setup then setup(f) end
 	package.loaded["core.events.timer_scheduler"] = scheduler
@@ -400,7 +400,7 @@ helpers.describe("native switcher exact input and sample owner", function()
 				retire_system_switcher = f.owner.retire,
 			}
 			package.loaded["platform.focus.window_manager"] = { frontmost_pid = function() return f.front end }
-			local facade = require("modules.gestures.native_app_switcher")
+			local facade = require("gestures.adapters.native_app_switcher")
 			eq(facade.init({ deadline_sec = 4, poll_sec = 0.02 }), true)
 			local source = { current = function() return f.source end, cached = function() return f.source end }
 			local cap, admitted = facade.request(source); eq(admitted, true)

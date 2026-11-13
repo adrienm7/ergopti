@@ -146,7 +146,7 @@ for (const file of localeFiles) {
 // "remove it first" note is not shown there.
 const DIALOG_OWNERS = [
 	{
-		file: 'windows/ui/menu/menu_gestures.ahk',
+		file: 'windows/gestures/ui/menu/gestures.ahk',
 		// A startup UI command: the dialog opens at once, even before input
 		// initialization completes after a reload.
 		register:
@@ -157,7 +157,7 @@ const DIALOG_OWNERS = [
 		absent: ['menu.gestures.recommended_note']
 	},
 	{
-		file: 'macos/ui/menu/menu_gestures.lua',
+		file: 'macos/gestures/ui/menu/gestures.lua',
 		register: /COMMAND\.GESTURE_RECOMMENDED_INFO\] = cmd_recommended_info\n/,
 		body: /local function cmd_recommended_info\(\)\n([\s\S]*?)\n\tend\n/,
 		helper: 'dialog.block_alert(',

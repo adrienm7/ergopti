@@ -366,7 +366,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/modules/gestures/init.lua",
+			"source": "static/ergopti_plus/macos/gestures/engine/init.lua",
 			"template": "Wake-from-sleep detected (event=%d) — recycling watchers",
 			"line": "2026-10-30 10:00:00:123 [INFO] [gestures] Wake-from-sleep detected (event=0) — recycling watchers",
 			"expect": {
@@ -375,7 +375,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/modules/gestures/init.lua",
+			"source": "static/ergopti_plus/macos/gestures/engine/init.lua",
 			"template": "Wake-from-sleep detected",
 			"line": "2026-10-30 10:00:00:123 [INFO] [gestures] Startup phase timeout (30.5s) — switching to slow health-check (subsystem will wake on first physical touch).",
 			"expect": {

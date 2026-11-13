@@ -179,7 +179,7 @@ end
 --- @return boolean opened
 local function open_action_picker(title, current, binding, on_confirm, selected_items)
 	local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
-	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+	local ok_gestures, Gestures = pcall(require, "gestures.engine.manager")
 	if not ok_picker or type(Picker.open) ~= "function" or not ok_gestures then
 		Logger.error(LOG, "Action picker is unavailable for '%s'.", tostring(title))
 		return false

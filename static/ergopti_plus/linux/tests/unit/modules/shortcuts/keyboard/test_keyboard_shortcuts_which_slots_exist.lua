@@ -478,7 +478,7 @@ helpers.describe("Keyboard configuration admission", function()
 	for _, scenario in ipairs({ "ordinary rebind", "owned dispatch", "released generation", "new generation" }) do
 		helpers.it("keeps " .. scenario .. " bounded by the actual dispatcher", function()
 			local shortcuts, config = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			local execute = gestures.execute_action
 			local queue, fired = {}, {}
 			gestures.execute_action = function(action) fired[#fired + 1] = action end
@@ -538,7 +538,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 		local saved_source = package.loaded["modules.hotstrings.magic_key_source"]
 		local saved_magic = package.loaded["modules.hotstrings.magic_key"]
 		local saved_builder = package.loaded["menu.ui.builder.builder"]
-		local gestures = require("modules.gestures.manager")
+		local gestures = require("gestures.engine.manager")
 		local saved_execute = gestures.execute_action
 		local state = { trigger = "★", generation = 1, master = true, paused = false, inhibited = false,
 			rows = { { code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false } },
@@ -613,7 +613,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 			local group = contextual(build())
 			helpers.assert_type(group, "table", "the stable logical slot must be visible through the ordinary menu provider")
 			helpers.assert_eq(#group.menu, 1)
-			helpers.assert_eq(group.menu[1].title, "Super + ★ → " .. require("modules.gestures.manager").get_action_label("open_hotstrings_editor"))
+			helpers.assert_eq(group.menu[1].title, "Super + ★ → " .. require("gestures.engine.manager").get_action_label("open_hotstrings_editor"))
 			helpers.assert_type(group.menu[1].menu[1].fn, "function", "the ordinary action picker offers reassignment")
 			helpers.assert_eq(group.menu[1].menu[2].title, i18n.get("dialog.action_picker.disabled"))
 			group.menu[1].menu[2].fn()
@@ -792,7 +792,7 @@ helpers.describe('keyboard shortcut after a pause cycle', function()
   for _, action in ipairs({'select_line', 'script_reload'}) do
     helpers.it('respects pause generation for '..action, function()
       local shortcuts = load_over_config({['shortcuts.keyboard.primary_j']=action})
-      local gestures = require('modules.gestures.manager')
+      local gestures = require('gestures.engine.manager')
       local original = gestures.execute_action
       local queue, fired = {}, {}
       gestures.execute_action = function(value) fired[#fired+1]=value end

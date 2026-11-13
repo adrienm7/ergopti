@@ -16,8 +16,8 @@ local DIALOG = require("core.ui.ui.native_dialog").command()
 --- Owns module replacements and pipe restoration for one completed scenario.
 --- @param body function Receives effect observations and a shell authority.
 local function scenario(body)
-	local names = { "core.ui.ui.text_prompt", "apps.ui.chooser", "settings.ui.dir_picker", "ui.gesture_conflicts",
-		"modules.gestures.system_actions", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "core.ui.ui.modal",
+	local names = { "core.ui.ui.text_prompt", "apps.ui.chooser", "settings.ui.dir_picker", "gestures.ui.conflicts",
+		"gestures.engine.system_actions", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "core.ui.ui.modal",
 		"core.fs.adapters.storage", "core.events.loop", "platform.input.keyboard_hook",
 		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "menu.engine.manifest_menu" }
 	local saved, observed = {}, { commands = {}, modals = 0, queued = {}, writes = {} }
@@ -120,7 +120,7 @@ h.describe("native dialog captions (linux-native-titles)", function()
 	end)
 	h.it("(linux-native-titles) system confirmation preserves safe cancellation and command chaining", function()
 		scenario(function()
-			local command = require("modules.gestures.system_actions").confirmed_command("Owned action", "printf owned")
+			local command = require("gestures.engine.system_actions").confirmed_command("Owned action", "printf owned")
 			h.assert_eq(command:sub(1, #DIALOG + 1), DIALOG .. " ", "the owned dialog asks, never a host tool")
 			h.assert_true(command:find("ErgoptiPlus — Confirm action", 1, true) ~= nil)
 			h.assert_true(command:find("dialog.confirm_action.message", 1, true) ~= nil)
@@ -130,7 +130,7 @@ h.describe("native dialog captions (linux-native-titles)", function()
 	end)
 	h.it("(linux-native-titles) gesture conflict chrome is branded without changing cancellation persistence", function()
 		scenario(function(observed)
-			local admitted = require("ui.gesture_conflicts").show({ key = "swipe_3", slot = "swipe_3_left" })
+			local admitted = require("gestures.ui.conflicts").show({ key = "swipe_3", slot = "swipe_3_left" })
 			h.assert_eq(admitted, true)
 			h.assert_eq(#observed.commands, 0)
 			observed.queued[1]()
@@ -336,8 +336,8 @@ h.describe("native caption consumer inventory", function()
 			-- their composed caption; test_app_chooser proves the error dialog.
 			["apps.ui.chooser"] = 3,
 			["settings.ui.dir_picker"] = 1,
-			["ui.gesture_conflicts"] = 1,
-			["modules.gestures.system_actions"] = 1,
+			["gestures.ui.conflicts"] = 1,
+			["gestures.engine.system_actions"] = 1,
 			["menu.ui.builder.dialogs"] = 3,
 			["ai.engine.ollama.local_model_offer"] = 1,
 			-- The enable refusal tests prove the policy-owned native caption and modal receipts.

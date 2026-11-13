@@ -181,9 +181,9 @@ local function with_paths_restart(mode, body)
         .. tostring(id == "a") .. "\n[shortcuts.keyboard]\nprimary_j = \""
         .. (id == "a" and "copy" or "none") .. "\"\n[hotstrings]\ngroups = { autocorrection = false }\n")
     end
-    for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.manager",
+    for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.manager",
       "modules.shortcuts.keyboard_shortcuts", "modules.hotstrings.hotstrings_config", "core.lifecycle.engine.reload.restart_pause" }) do package.loaded[name] = nil end
-    local gestures = require("modules.gestures.manager")
+    local gestures = require("gestures.engine.manager")
     gestures.init({ persist = true, enabled = false })
     local shortcuts = require("modules.shortcuts.manager"); shortcuts.init({ persist = true })
     local keyboard = require("modules.shortcuts.keyboard_shortcuts")

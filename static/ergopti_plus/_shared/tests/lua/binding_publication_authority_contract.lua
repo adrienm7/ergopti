@@ -116,7 +116,7 @@ function M.register(helpers, driver)
 			local name = family == "tap" and "modules.shortcuts.tap_keys"
 				or driver == "macos" and "infra.script_chord_catalogue" or "modules.shortcuts.script_chords"
 			local target = family == "tap" and "number_row_left" or "script_altgr_enter"
-			local consumer_name = driver == "macos" and "modules.gestures.actions" or "modules.gestures.manager"
+			local consumer_name = driver == "macos" and "gestures.engine.actions" or "gestures.engine.manager"
 			local function fresh()
 				package.loaded[name], package.loaded[consumer_name] = nil, nil
 				local owner = require(name)

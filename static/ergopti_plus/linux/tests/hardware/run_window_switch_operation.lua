@@ -78,8 +78,8 @@ if mode == "binding" or mode == "canonical" or mode == "physical" or mode == "di
 		return { generation = physical_generation, ready = true }
 	end }
 	local global_combos = 0
-	package.loaded["modules.gestures.combo_emitter"] = { press = function() global_combos = global_combos + 1; return true end }
-	Gestures = require("modules.gestures.manager")
+	package.loaded["gestures.engine.combo_emitter"] = { press = function() global_combos = global_combos + 1; return true end }
+	Gestures = require("gestures.engine.manager")
 	assert(Gestures.init({ persist = true, config_path = arg[4], is_paused = function() return paused end }) ~= false)
 	owner = {
 		run = function(_, done)

@@ -7,10 +7,10 @@ local FileSystem = require("core.fs.adapters.file_system")
 
 local function fixture(source)
 	package.loaded["core.fs.adapters.file_system"] = FileSystem
-	package.loaded["modules.gestures.engine"] = nil
-	package.loaded["modules.gestures.conflicts"] = nil
-	helpers.load_with_stubs("modules.gestures.actions")
-	local gestures = helpers.load_with_stubs("modules.gestures")
+	package.loaded["gestures.engine.engine"] = nil
+	package.loaded["gestures.engine.conflicts"] = nil
+	helpers.load_with_stubs("gestures.engine.actions")
+	local gestures = helpers.load_with_stubs("gestures.engine")
 	local controls, state, files = {}, { gestures = true }, {}
 	local original = source or '[gestures]\nenabled = true\ntap_4 = "open_url"\nmodes = { swipe_3_horiz = "incremental", future = "keep" }\nsensitivities = { swipe_3_horiz = 9, future = 17 }\naction_parameters = { tap_4__open_url = "https://apple.com", keyboard__primary_k__open_url = "https://example.com", future = { preserve = 7 } }\n[future]\nkeep = 42\n'
 	files.config = original
@@ -61,7 +61,7 @@ local function fixture(source)
 			return true
 		end,
 	})
-	local owner = require("ui.menu.gesture_scope").new({
+	local owner = require("gestures.ui.menu.scope").new({
 		path = "config", files = files_port, state = state, gestures = gestures,
 		preferences = prefs, checkpoint = checkpoint,
 		demotions = demotions,
@@ -75,20 +75,20 @@ end
 
 local function menu_commands(owner, gestures, state)
 	local original_renderer = package.loaded["menu.engine.manifest_menu"]
-	local original_menu = package.loaded["ui.menu.menu_gestures"]
+	local original_menu = package.loaded["gestures.ui.menu.gestures"]
 	local commands
 	package.loaded["menu.engine.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(_, _, _, _, context)
 		commands = context.commands
 		return {}
 	end }
-	package.loaded["ui.menu.menu_gestures"] = nil
+	package.loaded["gestures.ui.menu.gestures"] = nil
 	local ok, detail = pcall(function()
-		require("ui.menu.menu_gestures").build({ gestures = gestures, state = state, paused = false,
+		require("gestures.ui.menu.gestures").build({ gestures = gestures, state = state, paused = false,
 			apply_gesture_scope = owner.apply, save_prefs = function() error("scope must not use ordinary save") end,
 			updateMenu = function() end })
 	end)
 	package.loaded["menu.engine.manifest_menu"] = original_renderer
-	package.loaded["ui.menu.menu_gestures"] = original_menu
+	package.loaded["gestures.ui.menu.gestures"] = original_menu
 	if not ok then error(detail) end
 	return commands
 end
@@ -273,22 +273,22 @@ package.loaded["settings.engine.preferences.preferences"] = nil
 
 local function actual_frame_fixture(source)
 	package.loaded["core.fs.adapters.file_system"] = FileSystem
-	package.loaded["modules.gestures.engine"] = nil
-	package.loaded["modules.gestures.conflicts"] = nil
-	local recording = require("tests.support.synthetic_action_fixture").load("modules.gestures.actions")
+	package.loaded["gestures.engine.engine"] = nil
+	package.loaded["gestures.engine.conflicts"] = nil
+	local recording = require("tests.support.synthetic_action_fixture").load("gestures.engine.actions")
 	local actions = recording.subject
 	local core, initialize = nil, actions.init
 	actions.init = function(candidate)
 		core = candidate
 		return initialize(candidate)
 	end
-	package.loaded["modules.gestures"] = nil
+	package.loaded["gestures.engine"] = nil
 	package.loaded["modules.gestures.init"] = nil
-	local loaded, gestures = xpcall(function() return require("modules.gestures") end, debug.traceback)
+	local loaded, gestures = xpcall(function() return require("gestures.engine") end, debug.traceback)
 	actions.init = initialize
 	if not loaded then error(gestures, 0) end
 	assert(type(core) == "table", "the actual gesture constructor did not publish its CoreState")
-	local engine = require("modules.gestures.engine")
+	local engine = require("gestures.engine.engine")
 	assert(engine.init(core, actions) == true, "the actual engine refused the constructor's exact dependencies")
 	assert(gestures.enable_all() == true, "the actual gesture master did not enable")
 	local controls, state, files = {}, { gestures = true }, {}
@@ -330,7 +330,7 @@ local function actual_frame_fixture(source)
 			return true
 		end,
 	})
-	local owner = require("ui.menu.gesture_scope").new({
+	local owner = require("gestures.ui.menu.scope").new({
 		path = "config", files = files_port, state = state, gestures = gestures,
 		preferences = prefs, checkpoint = checkpoint,
 		demotions = demotions,
@@ -359,7 +359,7 @@ local function actual_menu_frame(owner, gestures, state)
 		return {}
 	end
 	local ok, detail = xpcall(function()
-		require("ui.menu.menu_gestures").build({ gestures = gestures, state = state, paused = false,
+		require("gestures.ui.menu.gestures").build({ gestures = gestures, state = state, paused = false,
 			apply_gesture_scope = owner.apply,
 			save_prefs = function() error("the scope must not use an ordinary save") end,
 			updateMenu = function() end })
@@ -376,13 +376,13 @@ helpers.describe("macOS two-finger neutral recommendations", function()
 		helpers.it(title, function()
 			local previous_files = package.loaded["core.fs.adapters.file_system"]
 			helpers.with_stub_scope({
-				"modules.gestures", "modules.gestures.init", "modules.gestures.engine",
-				"modules.gestures.actions", "modules.gestures.conflicts", "modules.gestures.actions_click",
-				"modules.gestures.actions_aux_owner", "modules.gestures.sticky_modifiers",
+				"gestures.engine", "modules.gestures.init", "gestures.engine.engine",
+				"gestures.engine.actions", "gestures.engine.conflicts", "gestures.engine.actions_click",
+				"gestures.engine.actions_aux_owner", "gestures.engine.sticky_modifiers",
 				"core.fs.adapters.file_system",
 				"platform.input.synthetic_input", "diagnostics.adapters.event_provenance", "core.events.timer_scheduler",
-				"settings.engine.preferences.preferences", "ui.menu.gesture_scope", "settings.ui.menu.scoped_preferences",
-				"settings.ui.menu.preferences_transaction", "ui.menu.menu_gestures", "menu.engine.manifest_menu",
+				"settings.engine.preferences.preferences", "gestures.ui.menu.scope", "settings.ui.menu.scoped_preferences",
+				"settings.ui.menu.preferences_transaction", "gestures.ui.menu.gestures", "menu.engine.manifest_menu",
 			}, function()
 				local original = '[gestures]\nenabled = true\nswipe_2_left = "arrow_up"\n'
 				local owner, gestures, files, state, recording, core, engine = actual_frame_fixture(original)

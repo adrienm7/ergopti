@@ -36,7 +36,7 @@ local PRESETS = {
 --- @return table chords, table log
 local function fresh(source)
 	local log = { deferred = {}, executed = {}, paused = false }
-	local names = { "settings.engine.paths", "modules.gestures.manager", "modules.shortcuts.script_chords" }
+	local names = { "settings.engine.paths", "gestures.engine.manager", "modules.shortcuts.script_chords" }
 	local previous = {}
 	for _, name in ipairs(names) do
 		previous[name] = package.loaded[name]
@@ -46,7 +46,7 @@ local function fresh(source)
 	if source then Sandbox.write_bytes(path, source) end
 	log.path = path
 	package.loaded["settings.engine.paths"] = { config = function() return path end }
-	package.loaded["modules.gestures.manager"] = {
+	package.loaded["gestures.engine.manager"] = {
 		is_assignable = function(id)
 			return PRESETS.script_altgr_enter == id or id == "script_reload" or id == "open_personal_shortcuts"
 				or id == "script_quit" or id == "screen_capture"
@@ -82,7 +82,7 @@ end
 
 for _, initial in ipairs({ "absent", "false" }) do
 	helpers.it("script-chord fixture restores " .. initial .. " cached dependencies", function()
-		local names = { "settings.engine.paths", "modules.gestures.manager", "modules.shortcuts.script_chords" }
+		local names = { "settings.engine.paths", "gestures.engine.manager", "modules.shortcuts.script_chords" }
 		local previous = {}
 		for _, name in ipairs(names) do
 			previous[name] = package.loaded[name]

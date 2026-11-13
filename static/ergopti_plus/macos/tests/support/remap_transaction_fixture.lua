@@ -21,7 +21,7 @@ local OWNED_MODULES = {
 	"core.events.timer_scheduler",
 	"settings.engine.paths",
 	"modules.keystats.kc_bridge",
-	"modules.gestures.engine",
+	"gestures.engine.engine",
 	"modules.shortcuts",
 	"platform.remap.onboarding",
 	"platform.remap",
@@ -32,7 +32,7 @@ local OWNED_MODULES = {
 	"platform.remap.ke_paths",
 	"core.process.adapters.task_lifecycle",
 	"platform.input.keycodes",
-	"modules.gestures.actions",
+	"gestures.engine.actions",
 	"platform.input.key_state",
 	"ai.engine.local_servers.warmup_controller",
 	"ai.engine.api.mlx",
@@ -507,7 +507,7 @@ return function(run, dependencies)
 					return true
 				end,
 			}
-			package.loaded["modules.gestures.engine"] = {}
+			package.loaded["gestures.engine.engine"] = {}
 			package.loaded["modules.shortcuts"] = {
 				is_paused = function() return paused_now end,
 			}
@@ -789,8 +789,8 @@ return function(run, dependencies)
 				RETURN = 0x24,
 				ESCAPE = 0x35,
 			}
-			package.loaded["modules.gestures.engine"] = {}
-			package.loaded["modules.gestures.actions"] = {
+			package.loaded["gestures.engine.engine"] = {}
+			package.loaded["gestures.engine.actions"] = {
 				get_label = function(name) return name end,
 				execute_single = function() return true end,
 				SG_NAMES = { "none", "script_pause_toggle" },

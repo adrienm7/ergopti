@@ -15,7 +15,7 @@ local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 --- @param body function body(context)
 local function with_owner(domain, body)
 	local module_name = domain == "tap" and "modules.shortcuts.tap_keys" or "modules.shortcuts.script_chords"
-	local names = { "settings.engine.paths", "modules.gestures.manager", "core.logger.engine.shim", "modules.shortcuts.script_chords", module_name }
+	local names = { "settings.engine.paths", "gestures.engine.manager", "core.logger.engine.shim", "modules.shortcuts.script_chords", module_name }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local source = '[shortcuts.tap_keys]\nnumber_row_left = "screen_capture"\n'
 		.. '[shortcuts.script_control]\nchords_enabled = true\nscript_altgr_enter = "screen_capture"\n'
@@ -36,7 +36,7 @@ local function with_owner(domain, body)
 			for _, slot in ipairs(require("modules.shortcuts.script_chords").slots()) do
 				assignable[Manifest.default_for(section .. "." .. slot.id)] = true
 			end
-			package.loaded["modules.gestures.manager"] = {
+			package.loaded["gestures.engine.manager"] = {
 				is_assignable = function(id) return assignable[id] == true end,
 				execute_action = function(action, binding) ctx.executed[#ctx.executed + 1] = { action, binding } end,
 			}

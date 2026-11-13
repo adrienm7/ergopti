@@ -58,7 +58,7 @@ class _PidRegistrationPort {
 
 SystemControl() => _PidRegistrationPort()
 
-#Include %A_LineFile%\..\..\unit\modules\gestures\test_system_actions_process_lease.ahk
+#Include %A_LineFile%\..\..\unit\gestures\engine\test_system_actions_process_lease.ahk
 
 if A_Args.Length != 2
 	throw Error("The owned registration observer requires a report and completion event.")

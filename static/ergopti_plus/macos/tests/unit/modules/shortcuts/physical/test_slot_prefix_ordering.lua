@@ -45,7 +45,7 @@ helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 	helpers.it("binds and labels shifted slots through the real declared prefix consumer", function()
 		return helpers.with_stub_scope({
 			"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "core.fs.engine.paths", "settings.engine.paths",
-			"settings.engine.preferences.preferences", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts",
+			"settings.engine.preferences.preferences", "gestures.engine.actions", "modules.shortcuts.keyboard_shortcuts",
 		}, function()
 			helpers.load_with_stubs("settings.engine.preferences.preferences")
 			local observed = {}
@@ -57,7 +57,7 @@ helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 				bind = function(chord) observed[chord] = (observed[chord] or 0) + 1; return chord end,
 				unbind = function() return true end,
 			}
-			package.loaded["modules.gestures.actions"] = {
+			package.loaded["gestures.engine.actions"] = {
 				is_assignable = function(action) return action == "send_text" or action == "none" end,
 			}
 			require("tests.support.keyboard_config_fixture").install({

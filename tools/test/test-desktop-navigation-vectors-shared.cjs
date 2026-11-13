@@ -14,7 +14,7 @@
  * to Ctrl+Win+Arrow, which stops at the edge; Linux computed a modulo in shell,
  * so its "previous desktop" wrapped while the other two stopped. The plain and
  * wrapping actions now share one rule (_shared/keyboard/engine, ported
- * to windows/modules/gestures/virtual_desktops.ahk), and this corpus pins it.
+ * to windows/gestures/adapters/virtual_desktops.ahk), and this corpus pins it.
  * A corpus nobody replays pins nothing, so this gate also fails when a suite
  * stops reading it or stops being run.
  * ==============================================================================
@@ -131,15 +131,15 @@ check(
 );
 const CONSUMERS = [
 	{
-		file: 'macos/tests/unit/modules/gestures/parameters/test_desktop_navigation_vectors.lua',
+		file: 'macos/tests/unit/gestures/engine/parameters/test_desktop_navigation_vectors.lua',
 		needle: 'require("tests.lua.core.desktop_navigation_contract")'
 	},
 	{
-		file: 'linux/tests/unit/modules/gestures/actions/test_desktop_navigation_vectors.lua',
+		file: 'linux/tests/unit/gestures/engine/actions/test_desktop_navigation_vectors.lua',
 		needle: 'require("tests.lua.core.desktop_navigation_contract")'
 	},
 	{
-		file: 'windows/tests/unit/modules/gestures/test_virtual_desktops.ahk',
+		file: 'windows/tests/unit/gestures/adapters/test_virtual_desktops.ahk',
 		needle: '\\tests\\corpus\\desktop_navigation\\vectors.json'
 	}
 ];

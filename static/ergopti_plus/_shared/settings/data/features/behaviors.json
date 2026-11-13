@@ -57,7 +57,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "238674173118eba5dcd1c409f911f1e7ce65a18cb370c41352be11dbf6190475"
+			"sha256": "5bb24f1db566aee4c3bba3f8566d810d5f3004228f84b2a1484ed441aeaee916"
 		},
 		{
 			"id": "windows-dead-legacy",
@@ -92,7 +92,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/platform/input/keyboard_hook.lua",
 			"symbol": "local function _dispatch_post_remap(ev, source)",
-			"sha256": "02e60251abc920f0b2fd80d24ff9f32b7530cf7d3246ae4facce3aa809176bfd"
+			"sha256": "453f3a8706d60240f5f2f9194f79a5cc8b1d3254e59322c076b5c62da108641c"
 		},
 		{
 			"id": "windows-layout-emulation",
@@ -113,7 +113,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
 			"symbol": "function M.on_key(detail)",
-			"sha256": "ab5e6a9cc2f19d4f1876d90aa894aaafa36c9ff1ff5a57917b4667d5e871c0fd"
+			"sha256": "62532df1021b4c3fe5226fb37d3cc0225d0bb1f8ed6667f818cef1ee0fec74fc"
 		}
 	],
 	"behaviors": [

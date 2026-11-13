@@ -27,12 +27,12 @@ local MODULES = {
 	"core.fs.adapters.file_system",
 	"core.fs.engine.paths",
 	"core.logger.engine.logger",
-	"modules.gestures.actions",
+	"gestures.engine.actions",
 	"modules.shortcuts.keyboard_shortcuts",
 }
 
 -- The only ids the stubbed catalogue offers. The real catalogue's contents have
--- their own test (tests/unit/modules/gestures/actions/test_action_catalogue_parity.lua).
+-- their own test (tests/unit/gestures/engine/actions/test_catalogue_parity.lua).
 local OFFERED = { lookup = true, none = true }
 
 --- Runs `scenario` against the real keyboard-shortcut owner over stubbed
@@ -60,7 +60,7 @@ local function with_subject(store, scenario)
 	}
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "catalogue.json" end }
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.actions"] = {
 		is_assignable = function(action_id) return OFFERED[action_id] == true end,
 		execute_single = function() return true end,
 	}

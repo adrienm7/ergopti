@@ -13,7 +13,7 @@ local MODULES = {
 	"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "settings.engine.paths",
 	"settings.engine.preferences.preferences", "core.timing.engine.deferred_work", "core.ui.engine.dialog_util", "core.logger.engine.logger",
 	"modules.shortcuts", "modules.shortcuts.bindings", "modules.shortcuts.keyboard_shortcuts",
-	"modules.shortcuts.tap_keys", "modules.shortcuts.script_control", "modules.gestures.actions",
+	"modules.shortcuts.tap_keys", "modules.shortcuts.script_control", "gestures.engine.actions",
 	"ui.action_picker", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
 	"tests.support.keyboard_config_fixture", "menu.engine.manifest_menu", "menu.engine.renderer", "core.i18n.engine.i18n",
 	"settings.ui.menu.preferences_transaction", "menu.ui.transactions.program_parameter_transaction", "menu.ui.transactions.global_actions_transaction",

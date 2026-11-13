@@ -107,7 +107,7 @@ helpers.describe("shortcuts feature toggle keeps the script-control tap alive", 
 				return true
 			end,
 		}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.actions"] = {
 			force_cleanup = function(parent)
 				calls.actions_pause = calls.actions_pause + 1
 				calls.action_parents[#calls.action_parents + 1] = parent
@@ -129,7 +129,7 @@ helpers.describe("shortcuts feature toggle keeps the script-control tap alive", 
 		package.loaded["modules.shortcuts.bindings"]           = nil
 		package.loaded["modules.shortcuts.script_control"]     = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
-		package.loaded["modules.gestures.actions"]             = nil
+		package.loaded["gestures.engine.actions"]             = nil
 		package.loaded["modules.shortcuts"]                    = nil
 	end
 

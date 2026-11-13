@@ -12,9 +12,9 @@ local helpers = require("tests.helpers")
 local NativeFixture = require("tests.support.ui.usercontent_reference_fixture")
 
 local OWNED_MODULES = {
-	"ui.menu.menu_gestures", "modules.gestures", "menu.ui.builder.utils",
+	"gestures.ui.menu.gestures", "gestures.engine", "menu.ui.builder.utils",
 	"core.ui.engine.dialog_util", "menu.engine.manifest_menu", "ui.menu.shortcut_utils",
-	"core.timing.engine.deferred_work", "shortcuts.engine.action_parameter_label", "ui.gesture_conflict_notice",
+	"core.timing.engine.deferred_work", "shortcuts.engine.action_parameter_label", "gestures.ui.conflict_notice",
 	"settings.ui.menu.preferences_transaction", "diagnostics.engine.operation_reporter",
 	"menu.engine.renderer", "core.logger.engine.shim", "core.lifecycle.engine.compat.utf8", "core.text.engine.number_policy", "core.text.engine.toml_codec.leaf_rows",
 }
@@ -41,7 +41,7 @@ local function with_gesture(mode, conflict, scenario)
 					controls.queue[#controls.queue + 1] = work
 					return true
 				end }
-				package.loaded["ui.gesture_conflict_notice"] = { show = function(value)
+				package.loaded["gestures.ui.conflict_notice"] = { show = function(value)
 					controls.notices[#controls.notices + 1] = value
 					return true
 				end }
@@ -60,7 +60,7 @@ local function with_gesture(mode, conflict, scenario)
 						return conflict
 					end,
 				}
-				package.loaded["modules.gestures"] = runtime
+				package.loaded["gestures.engine"] = runtime
 				local Transaction = require("settings.ui.menu.preferences_transaction")
 				local save = Transaction.bind({ save = function(_, candidate)
 					controls.saves = controls.saves + 1
@@ -91,7 +91,7 @@ local function with_gesture(mode, conflict, scenario)
 					get_root = function() return { gesture_slots = { ["3"] = { "tap_3" } } } end,
 					build = function(_, _, _, _, _, providers) provider = providers.gesture_slots_3; return {} end,
 				}
-				require("ui.menu.menu_gestures").build({ state = state, gestures = runtime, paused = false,
+				require("gestures.ui.menu.gestures").build({ state = state, gestures = runtime, paused = false,
 					save_prefs = save, updateMenu = function() controls.updates = controls.updates + 1 end })
 				helpers.assert_type(provider, "function")
 				local rows = provider()

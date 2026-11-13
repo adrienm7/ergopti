@@ -119,13 +119,13 @@ local function with_keyboard_slot_picker(prompt, body)
 	local source = '[shortcuts.keyboard]\nprimary_k = "none"\n[gesture_parameters]\nkeyboard__primary_k__open_url = "https://old.example"\n[unrelated]\nkeep = 42\n'
 	local ok, failure = pcall(function()
 		Sandbox.with_config(source, function(path)
-			for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts",
+			for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.keyboard_shortcuts",
 				"modules.shortcuts.manager", "modules.hotstrings.magic_key", "settings.engine.preferences.program_binding_transaction",
 				"menu.engine.manifest_menu" }) do package.loaded[name] = nil end
 			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
-			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
+			package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end, rows = function() return {} end }
 			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() error("menu fixture must not close input") end }
 			local scene = { events = {} }
 			local events, backups, publications = scene.events, {}, 0
@@ -141,7 +141,7 @@ local function with_keyboard_slot_picker(prompt, body)
 				end,
 			}
 			local called, result = pcall(function()
-				local gestures = require("modules.gestures.manager")
+				local gestures = require("gestures.engine.manager")
 				gestures.init({ persist = true, config_path = path, enabled = false })
 				local keyboard = require("modules.shortcuts.keyboard_shortcuts")
 				-- A one-row presentation still delegates all ownership/domain policy.

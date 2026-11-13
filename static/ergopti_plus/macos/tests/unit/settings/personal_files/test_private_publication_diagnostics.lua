@@ -116,7 +116,7 @@ helpers.describe("private publication diagnostic ownership", function()
 	end)
 	for _, private in ipairs({ true, false }) do
 		helpers.it("private-publication actual keyboard setter exception " .. (private and "is redacted" or "keeps ordinary details"), function()
-			helpers.with_fresh_modules({ "modules.shortcuts.keyboard_shortcuts", "modules.gestures.actions", "settings.engine.paths",
+			helpers.with_fresh_modules({ "modules.shortcuts.keyboard_shortcuts", "gestures.engine.actions", "settings.engine.paths",
 				"core.fs.engine.paths", "settings.engine.preferences.preferences", "core.logger.engine.logger", "core.text.engine.toml_codec.writer", "core.fs.adapters.file_system" }, function()
 				local logs, categories, unavailable = {}, {}, false
 				local logger = helpers.make_logger_stub()
@@ -126,7 +126,7 @@ helpers.describe("private publication diagnostic ownership", function()
 				package.loaded["core.logger.engine.logger"] = logger
 				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 				package.loaded["settings.engine.paths"] = { get = function() return "config" end }
-				package.loaded["modules.gestures.actions"] = { is_assignable = function() return true end }
+				package.loaded["gestures.engine.actions"] = { is_assignable = function() return true end }
 				package.loaded["core.fs.adapters.file_system"] = {
 					read = function(path) local file = assert(io.open(path, "rb")); local body = file:read("*a"); file:close(); return body end,
 					read_with_status = function()

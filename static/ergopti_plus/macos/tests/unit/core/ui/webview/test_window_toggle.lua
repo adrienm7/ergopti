@@ -168,8 +168,8 @@ end)
 
 helpers.describe("window actions reach the toggle (macOS)", function()
 	helpers.it("each catalogue window action toggles its own page", function()
-		package.loaded["modules.gestures.actions"] = nil
-		local Actions = helpers.load_with_stubs("modules.gestures.actions")
+		package.loaded["gestures.engine.actions"] = nil
+		local Actions = helpers.load_with_stubs("gestures.engine.actions")
 		local Catalogue = require("_generated.action_catalogue")
 		helpers.assert_eq(type(Actions.WINDOW_ACTIONS), "table")
 		local count = 0

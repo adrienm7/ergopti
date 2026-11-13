@@ -46,8 +46,8 @@ local OWNED_MODULES = {
 	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"platform.input.keycodes",
-	"modules.gestures.engine",
-	"modules.gestures.actions",
+	"gestures.engine.engine",
+	"gestures.engine.actions",
 	"platform.input.key_state",
 	"ai.engine.local_servers.warmup_controller",
 	"ai.engine.api.ollama",
@@ -602,8 +602,8 @@ local function build_fixture(backend, save_results, options)
 			RETURN = 36,
 			ESCAPE = 53,
 		}
-		package.loaded["modules.gestures.engine"] = {}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.engine"] = {}
+		package.loaded["gestures.engine.actions"] = {
 			get_label = function(name) return name end,
 			execute_single = function() return true end,
 			SG_NAMES = {},

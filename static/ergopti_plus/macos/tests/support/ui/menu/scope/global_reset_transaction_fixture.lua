@@ -16,7 +16,7 @@ local MODULE_KEYS = {
 	"modules.hotstrings.hotstrings_config",
 	"menu.ui.transactions.global_scope",
 	"settings.ui.menu.scoped_preferences",
-	"ui.menu.gesture_scope",
+	"gestures.ui.menu.scope",
 	"core.ui.engine.dialog_util",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
@@ -41,7 +41,7 @@ local MODULE_KEYS = {
 	"settings.engine.factory_reset_journal",
 	"menu.ui.transactions.recoverable_file_moves",
 	"menu.ui.transactions.global_actions_transaction",
-	"ui.menu.menu_gestures",
+	"gestures.ui.menu.gestures",
 	"ui.menu.menu_shortcuts",
 	"ui.menu.menu_keyboard_layout",
 	"ui.menu.menu_hotstrings",
@@ -54,7 +54,7 @@ local MODULE_KEYS = {
 	"modules.keystats",
 	"modules.shortcuts",
 	"modules.dynamic_hotstrings",
-	"modules.gestures",
+	"gestures.engine",
 	"infra.personal_shortcuts",
 	"settings.ui.menu.preferences_transaction",
 	"menu.ui.transactions.program_parameter_transaction",
@@ -524,7 +524,7 @@ local function with_menu_fixture(options, callback)
 	}
 
 	for _, module_name in ipairs({
-		"ui.menu.menu_gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
+		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
 		"ui.menu.menu_hotstrings", "ui.menu.menu_metrics", "ui.menu.menu_tap_holds",
 		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
@@ -535,7 +535,7 @@ local function with_menu_fixture(options, callback)
 	package.loaded["modules.keystats"] = {}
 	package.loaded["modules.dynamic_hotstrings"] = {}
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
-	package.loaded["modules.gestures"] = {
+	package.loaded["gestures.engine"] = {
 		SINGLE_SLOTS = { "swipe_left", "swipe_right" },
 		DEFAULT_GESTURES = { swipe_left = "desktop_left", swipe_right = "desktop_right" },
 	}

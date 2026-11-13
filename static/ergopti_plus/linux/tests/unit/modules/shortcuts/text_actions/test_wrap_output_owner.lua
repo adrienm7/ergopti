@@ -39,7 +39,7 @@ local function with_wrap(options, body)
 	Fixture.with(function(guard, focus, _, _, watch)
 		local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
 			"modules.hotstrings.injector", "platform.input.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type",
-			"modules.gestures.user_actions", "core.logger.engine.shim" }
+			"gestures.engine.user_actions", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { primary = "baseline", clipboard = "SAVED", wire = {}, writes = {}, stops = 0, resets = 0,
@@ -163,8 +163,8 @@ end
 helpers.describe("wrap output publication ownership", function()
 	helpers.it("does not log text inserted from a command result (wrap-output-owner)", function()
 		with_wrap({}, function(state)
-			package.loaded["modules.gestures.user_actions"] = nil
-			require("modules.gestures.user_actions").deliver_output("privatecommandoutput", "type", 100,
+			package.loaded["gestures.engine.user_actions"] = nil
+			require("gestures.engine.user_actions").deliver_output("privatecommandoutput", "type", 100,
 				assert(state.guard.capture_text_owner()))
 			helpers.assert_true(not table.concat(state.logs, "\n"):find("privatecommandoutput", 1, true),
 				"command output must not enter trace logs")

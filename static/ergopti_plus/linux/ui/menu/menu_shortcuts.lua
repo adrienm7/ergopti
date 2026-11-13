@@ -397,7 +397,7 @@ local function _build_shortcuts(ctx)
 	local providers = {}
 	providers["keyboard_slots"] = function()
 		local ok_kbd, Keyboard = pcall(require, "modules.shortcuts.keyboard_shortcuts")
-		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		local ok_gestures, Gestures = pcall(require, "gestures.engine.manager")
 		if not ok_kbd or not ok_gestures then
 			Logger.error(LOG, "Keyboard slots unavailable — the shortcuts submenu loses its bindings.")
 			return {}
@@ -489,7 +489,7 @@ local function _build_shortcuts(ctx)
 	-- under the loaded XKB keymap, then its action; the submenu opens the picker.
 	providers["tap_keys"] = function()
 		local ok_tap, TapKeys = pcall(require, "modules.shortcuts.tap_keys")
-		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		local ok_gestures, Gestures = pcall(require, "gestures.engine.manager")
 		if not ok_tap or not ok_gestures then
 			Logger.error(LOG, "Tap keys unavailable — the shortcuts submenu loses them.")
 			return {}
@@ -579,7 +579,7 @@ local function _build_shortcuts(ctx)
 	end
 	group_builders[require("settings.engine.keys").LEAF.SCRIPT_CONTROL] = function()
 		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")
-		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		local ok_gestures, Gestures = pcall(require, "gestures.engine.manager")
 		if not ok_chords or not ok_gestures then
 			Logger.error(LOG, "Script chords unavailable — the shortcuts submenu loses them.")
 			return nil

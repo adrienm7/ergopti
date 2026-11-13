@@ -13,7 +13,7 @@
 ; 1. The refusals of the manual prediction trigger (paused, AI off, backend not
 ;    ready) come first, then the binding and its model: nothing is captured
 ;    for a request that cannot run.
-; 2. The capture is the screenshot actions' own (modules/gestures/screenshots.ahk):
+; 2. The capture is the screenshot actions' own (gestures/adapters/screenshots.ahk):
 ;    Snip & Sketch for a region, a GDI+ copy of the pointer's monitor for the
 ;    full screen. It is saved to a private temp PNG, shrunk to vision.json's
 ;    max_image_edge, read once and deleted whatever happens next.

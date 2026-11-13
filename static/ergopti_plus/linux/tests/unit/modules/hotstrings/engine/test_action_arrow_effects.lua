@@ -94,13 +94,13 @@ helpers.describe("gesture manager: acknowledged emissions reach one observer (WR
 	--- @param acknowledges boolean What the emitter answers.
 	--- @return table manager, table seen
 	local function manager_over_emitter(acknowledges)
-		local saved = package.loaded["modules.gestures.combo_emitter"]
-		package.loaded["modules.gestures.combo_emitter"] = {
+		local saved = package.loaded["gestures.engine.combo_emitter"]
+		package.loaded["gestures.engine.combo_emitter"] = {
 			press = function() return acknowledges end,
 			can_fallback = function() return false end,
 		}
-		local ok, manager = pcall(helpers.load_module, "modules.gestures.manager")
-		if not ok then package.loaded["modules.gestures.combo_emitter"] = saved; error(manager, 0) end
+		local ok, manager = pcall(helpers.load_module, "gestures.engine.manager")
+		if not ok then package.loaded["gestures.engine.combo_emitter"] = saved; error(manager, 0) end
 		-- The manager keeps its admitted emitter only while that owner stays loaded.
 		local seen = {}
 		manager.set_effect_observer(function(action, combo, binding)
@@ -108,7 +108,7 @@ helpers.describe("gesture manager: acknowledged emissions reach one observer (WR
 		end)
 		return manager, seen, function()
 			manager.set_effect_observer(nil)
-			package.loaded["modules.gestures.combo_emitter"] = saved
+			package.loaded["gestures.engine.combo_emitter"] = saved
 		end
 	end
 

@@ -314,7 +314,7 @@ local function genuine_gesture_providers(damage)
 	local original_i18n_safe = rawget(_G, "i18n_safe")
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu",
-		"menu.ui.builder.builder", "ui.gesture_conflicts", "modules.gestures.manager",
+		"menu.ui.builder.builder", "gestures.ui.conflicts", "gestures.engine.manager",
 		"core.fs.adapters.storage", "core.fs.engine.paths", "core.text.engine.json", "menu.engine.renderer" }
 	local directory, filesystem, created
 	local restore = function() end
@@ -330,8 +330,8 @@ local function genuine_gesture_providers(damage)
 		for _, name in ipairs(names) do package.loaded[name] = nil end
 		require("core.i18n.engine.i18n").init()
 		local manifest = require("menu.engine.manifest_menu")
-		local native = require("modules.gestures.manager")
-		local producer = require("ui.gesture_conflicts")
+		local native = require("gestures.engine.manager")
+		local producer = require("gestures.ui.conflicts")
 		local builder = require("menu.ui.builder.builder")
 		local closure, slot
 		for index = 1, 100 do
@@ -418,7 +418,7 @@ local function genuine_gesture_providers(damage)
 		local result_rows = active({ gestures = gestures, paused = false,
 			on_menu_changed = function() observed.effects = observed.effects + 1 end })
 		local current = rawequal(active, closure) and rawequal(producer.rows, witnessed_rows)
-			and rawequal(package.loaded["ui.gesture_conflicts"], producer)
+			and rawequal(package.loaded["gestures.ui.conflicts"], producer)
 		for _, key in ipairs(frames) do current = current and rawequal(root[key], saved[key]) end
 		assert(observed.effects == 0, "coverage evidence cannot open settings or publish")
 		if current and consumed and successful_status and reached and type(result_rows) == "table"
@@ -826,7 +826,7 @@ local function registered_providers(omitted_delegate)
 			found[entry.id] = language[entry.id] == true or nil
 		end
 	end
-	if omitted_delegate ~= "ui.gesture_conflicts" then
+	if omitted_delegate ~= "gestures.ui.conflicts" then
 		for id in pairs(genuine_gesture_providers()) do found[id] = true end
 	end
 	return found
@@ -1019,7 +1019,7 @@ helpers.describe("Gesture status list evidence follows genuine native publicatio
 		helpers.assert_eq(observed.calls, 1)
 		helpers.assert_eq(observed.status_calls, 1)
 		helpers.assert_eq(observed.effects, 0)
-		local omitted = registered_providers("ui.gesture_conflicts")
+		local omitted = registered_providers("gestures.ui.conflicts")
 		helpers.assert_nil(omitted.gesture_system_cached_overlap)
 	end)
 	local mutations = {

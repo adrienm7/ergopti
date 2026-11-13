@@ -10,12 +10,12 @@ local OWNED = {
 	"core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n", "menu.engine.ui_restore", "core.text.engine.utils",
 	"core.timing.engine.deferred_work", "settings.engine.preferences.preferences", "ui.hotstring_editor", "menu.ui.builder.builder", "ui.menu.hotstring_counter",
 	"settings.ui.menu.paths", "settings.engine.factory_reset_journal", "menu.ui.builder.watchers", "modules.updater",
-	"tray.adapters.menu", "platform.input.hotkey_registrar", "core.lifecycle.engine.shutdown.termination_coordinator", "ui.menu.menu_gestures",
+	"tray.adapters.menu", "platform.input.hotkey_registrar", "core.lifecycle.engine.shutdown.termination_coordinator", "gestures.ui.menu.gestures",
 	"ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout", "ui.menu.menu_hotstrings", "ui.menu.menu_metrics",
 	"ui.menu.menu_tap_holds", "apps.ui.menu.apps", "ui.menu.menu_about", "ai.ui.menu", "infra.personal_shortcuts",
-	"modules.dynamic_hotstrings", "modules.gestures", "modules.keystats.text_cipher", "ai.engine",
+	"modules.dynamic_hotstrings", "gestures.engine", "modules.keystats.text_cipher", "ai.engine",
 	"modules.keystats", "modules.shortcuts", "modules.shortcuts.actions.text", "menu.engine.wrap_mutation",
-	"menu.ui.transactions.global_scope", "ui.menu.metrics_scope", "ui.menu.gesture_scope", "ui.menu.hotstrings_scope",
+	"menu.ui.transactions.global_scope", "ui.menu.metrics_scope", "gestures.ui.menu.scope", "ui.menu.hotstrings_scope",
 	"settings.ui.menu.scoped_preferences", "modules.hotstrings.hotstrings_config",
 }
 local function with_boot(saved, callback)

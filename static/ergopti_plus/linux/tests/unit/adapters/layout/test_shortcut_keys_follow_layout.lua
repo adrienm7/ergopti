@@ -27,7 +27,7 @@ helpers.describe("shortcut keys: the live layout decides the key", function()
 
 	helpers.it("resolves ctrl+w to AZERTY's w key, not KEY_W (which is z there)", function()
 		with_layout(AZERTY)
-		local Emitter = helpers.load_module("modules.gestures.combo_emitter")
+		local Emitter = helpers.load_module("gestures.engine.combo_emitter")
 		local parsed = Emitter.parse("ctrl+w")
 		helpers.assert_eq(parsed.keys, { 44 }, "Ctrl+KEY_W is Ctrl+Z (undo) on AZERTY")
 		helpers.assert_eq(parsed.mods, { 29 })
@@ -90,7 +90,7 @@ helpers.describe("shortcut keys: the live layout decides the key", function()
 		code, level_mods = Layout.shortcut_keycode("1", 2)
 		helpers.assert_eq({ code, level_mods }, { 2, {} },
 			"a digit on its own US key stays that key: toolkits read Ctrl+KEY_1 as Ctrl+1")
-		local Emitter = helpers.load_module("modules.gestures.combo_emitter")
+		local Emitter = helpers.load_module("gestures.engine.combo_emitter")
 		helpers.assert_eq(Emitter.parse("ctrl+period"), { mods = { 29, 42 }, keys = { 51 } })
 		helpers.assert_eq(Emitter.parse("ctrl+shift+period"), { mods = { 29, 42 }, keys = { 51 } },
 			"a Shift the chord already holds is not pressed twice")

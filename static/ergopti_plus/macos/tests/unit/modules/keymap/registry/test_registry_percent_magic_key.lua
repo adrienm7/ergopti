@@ -83,7 +83,7 @@ helpers.describe("registry survives a regex-metacharacter magic key", function()
 	end)
 
 	helpers.it("escape_gsub_replacement survives percent-encoded text (the search_web case)", function()
-		-- The same class, found in modules/gestures/actions.lua: a web-search
+		-- The same class, found in gestures/engine/actions.lua: a web-search
 		-- template is filled via template:gsub("%%s", url_encode_query(selection)),
 		-- and url_encode_query emits percent-escapes — a selection containing a
 		-- space becomes "%20", whose "%2" reads as capture reference #2. That raised

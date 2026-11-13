@@ -1240,13 +1240,13 @@ BootProfile_StageEnd("feature gates", Format("{1}/{2} feature switch(es) enabled
 ; The touchpad registry table and its one owner (backup, write, restore).
 ; Functions only: the first-run wizard above already calls them.
 #Include _generated/touchpad_registry.ahk
-#Include modules/gestures/touchpad_registry.ahk
-#Include modules/gestures/init.ahk
-#Include modules/gestures/click.ahk
-#Include modules/gestures/screenshots.ahk
-#Include modules/gestures/window_cycle.ahk
-#Include modules/gestures/virtual_desktops.ahk
-#Include modules/gestures/config.ahk
+#Include gestures/adapters/touchpad_registry.ahk
+#Include gestures/engine/init.ahk
+#Include gestures/engine/click.ahk
+#Include gestures/adapters/screenshots.ahk
+#Include gestures/adapters/window_cycle.ahk
+#Include gestures/adapters/virtual_desktops.ahk
+#Include gestures/engine/config.ahk
 BootProfile_StageBegin("shortcuts")
 ReadScriptShortcutsConfig()
 ReadKeyboardShortcutsConfig()

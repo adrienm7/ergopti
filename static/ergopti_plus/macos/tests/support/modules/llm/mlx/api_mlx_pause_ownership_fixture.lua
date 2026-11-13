@@ -266,8 +266,8 @@ local function install_script_control_dependencies(options)
 		RETURN = 36,
 		ESCAPE = 53,
 	}
-	package.loaded["modules.gestures.engine"] = {}
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.engine"] = {}
+	package.loaded["gestures.engine.actions"] = {
 		get_label = function(name) return name end,
 		execute_single = settled,
 		SG_NAMES = { "none", "script_pause_toggle" },

@@ -326,7 +326,7 @@ equivalent_linux = ["app_switcher"]
 
 # The two previous-application scopes: every screen, and only the screen under
 # the cursor. macOS activates the application directly
-# (macos/modules/gestures/app_switch.lua): a posted Cmd+Tab never switched.
+# (macos/gestures/engine/app_switch.lua): a posted Cmd+Tab never switched.
 [sg_actions.app_previous]
 platform = "hs"
 reason_ahk = "platform_reason.action_application_switching_is_macos"
@@ -528,7 +528,7 @@ equivalent_hs = ["win_app_next"]
 emit_linux = "alt+Tab"
 
 # The windows of the active application, in turn. macOS focuses them directly
-# (macos/modules/gestures/app_switch.lua), since a posted Cmd+` depends on a
+# (macos/gestures/engine/app_switch.lua), since a posted Cmd+` depends on a
 # layout carrying a backquote.
 [sg_actions.win_app_prev]
 platform = "ahk,hs"
@@ -1648,7 +1648,7 @@ emit_hs_mods = ["cmd"]
 
 # What a Cmd+Shift+Tab tap selects: the least recently used application. A
 # posted Cmd+Shift+Tab switched nothing, like a posted Cmd+Tab, so macOS
-# activates it from Lua (macos/modules/gestures/app_switch.lua).
+# activates it from Lua (macos/gestures/engine/app_switch.lua).
 [sg_actions.cmd_shift_tab]
 platform = "hs"
 reason_ahk = "platform_reason.action_application_switching_is_macos"

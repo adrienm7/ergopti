@@ -88,7 +88,7 @@ helpers.describe("Ctrl+Caps Lock evidence sources (capslock-chord-field)", funct
 		}
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "catalogue.json" end }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.actions"] = {
 			is_assignable = function(action_id) return type(action_id) == "string" end,
 			execute_single = function() executed = executed + 1; return true end,
 		}
@@ -117,7 +117,7 @@ helpers.describe("Ctrl+Caps Lock evidence sources (capslock-chord-field)", funct
 		package.loaded["platform.input.hotkey_registrar"] = nil
 		package.loaded["core.fs.adapters.file_system"] = nil
 		package.loaded["core.fs.engine.paths"] = nil
-		package.loaded["modules.gestures.actions"] = nil
+		package.loaded["gestures.engine.actions"] = nil
 	end)
 
 	helpers.it("counts presses and deliveries for the session", function()

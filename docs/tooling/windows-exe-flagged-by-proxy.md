@@ -48,7 +48,7 @@ PE comparison of v1.0.0, v1.0.3 and v1.0.4 (7-Zip PE resource listing):
 ## Ranked candidate triggers
 
 1. **High: inline PowerShell clipboard grabber pattern, new in v1.0.4.** This is
-   `_GestureScreenshotRegionSaveScript` in `static/ergopti_plus/windows/modules/gestures/screenshots.ahk`
+   `_GestureScreenshotRegionSaveScript` in `static/ergopti_plus/windows/gestures/adapters/screenshots.ahk`
    (commits `defb01f5c0`, `c7d6d1959d`, `f1de20560f`, `bd0f94b1a4`). It launches
    `powershell.exe -NoProfile -NonInteractive -Sta -WindowStyle Hidden -Command "..."` with
    `Add-Type -TypeDefinition` C# `[DllImport("user32.dll")] OpenClipboard/GetClipboardData/CopyImage`,

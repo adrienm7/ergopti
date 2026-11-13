@@ -19,8 +19,8 @@ local function with_menu(body)
 		local function t(key) return locale[key] or key end
 		local state={source="",paused=false,edits={},prompts=0,pickers=0,errors=0}
 		local keys,holds=KeyCatalog.for_platform(defaults,"linux"),HoldOptions.build(defaults.tap_hold.hold_picker)
-		package.loaded["modules.gestures.manager"]=nil
-		local gestures=require("modules.gestures.manager")
+		package.loaded["gestures.engine.manager"]=nil
+		local gestures=require("gestures.engine.manager")
 		package.loaded["modules.shortcuts.key_combinations"]=nil
 		local Pair=require("modules.shortcuts.key_combinations")
 		local owner=Pair.new({keys=keys,hold_picker=defaults.tap_hold.hold_picker,route=function() return "/controlled/config.toml" end,
@@ -157,8 +157,8 @@ local function with_controlled_probes(callback)
 	local targets = {
 		{ require("core.process.adapters.shell_runner"), "has_command", function() return true end },
 		{ require("adapters.window_switch"), "available", function() return true, nil, nil end },
-		{ require("modules.gestures.program_owner"), "available", function() return true end },
-		{ require("modules.gestures.workspace_switcher"), "detect", function() return {}, nil end },
+		{ require("gestures.engine.program_owner"), "available", function() return true end },
+		{ require("gestures.adapters.workspace_switcher"), "detect", function() return {}, nil end },
 	}
 	local originals = {}
 	for index, target in ipairs(targets) do
@@ -207,7 +207,7 @@ local function with_canonical_locale_menu(callback)
 		i18n.init()
 		local renderer = require("menu.engine.manifest_menu")
 		local provider = require("ui.menu.key_combinations")
-		local actions = require("modules.gestures.manager")
+		local actions = require("gestures.engine.manager")
 		local last_pick
 		local context = {
 			tap_holds = { key_catalog = function() return state.keys end, hold_options = function() return state.holds end },

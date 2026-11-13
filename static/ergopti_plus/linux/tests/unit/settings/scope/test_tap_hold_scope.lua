@@ -553,7 +553,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 	end
 	helpers.it("keeps the public scope owner until its refused layer cleanup settles", function()
 		with_scope(nil, '[gesture_parameters]\ntap_hold__open_url = "https://tap.example"\n', function(s)
-			local names = { "settings.engine.paths", "modules.gestures.manager", "core.fs.adapters.file_system" }
+			local names = { "settings.engine.paths", "gestures.engine.manager", "core.fs.adapters.file_system" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local owned_backups = {}
@@ -578,7 +578,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 				helpers.assert_eq(name, "config.toml")
 				return s.config_path
 			end }
-			package.loaded["modules.gestures.manager"] = s.parameters
+			package.loaded["gestures.engine.manager"] = s.parameters
 			package.loaded["core.fs.adapters.file_system"] = s.files
 			local ok, err = pcall(function()
 				s.controls.refuse = s.config_path

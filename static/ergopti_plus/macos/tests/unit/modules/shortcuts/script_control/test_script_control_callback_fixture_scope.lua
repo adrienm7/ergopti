@@ -12,7 +12,7 @@ local Fixture = require("tests.support.script_control_callback_fixture")
 
 local OWNERS = {
 	"core.logger.engine.logger", "core.ui.engine.notifications", "platform.input.keycodes", "core.i18n.engine.i18n", "core.fs.engine.paths",
-	"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
+	"gestures.engine.engine", "gestures.engine.actions", "modules.keystats",
 	"diagnostics.adapters.event_provenance", "platform.input.synthetic_input", "core.events.timer_scheduler",
 	"platform.input.key_state", "modules.shortcuts.script_control", "core.fs.adapters.file_system",
 	"platform.input.hotkey_registrar", "core.fs.adapters.storage", "modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord",
@@ -30,7 +30,7 @@ helpers.describe("Script control callback fixture isolation", function()
 					local prior_identity = {}
 					package.loaded[identity_name] = prior_identity
 					package.loaded["core.logger.engine.logger"] = false
-					package.loaded["modules.gestures.actions"] = nil
+					package.loaded["gestures.engine.actions"] = nil
 					local subject_name = kind == "sentinel"
 						and "modules.shortcuts.script_control" or "modules.shortcuts.keyboard_shortcuts"
 					local original_loader = helpers.load_with_stubs
@@ -57,7 +57,7 @@ helpers.describe("Script control callback fixture isolation", function()
 						helpers.assert_contains(tostring(result), "shortcut " .. failure .. " marker")
 					end
 					helpers.assert_eq(reached, failure == "construction" and 0 or 1)
-					helpers.assert_nil(package.loaded["modules.gestures.actions"])
+					helpers.assert_nil(package.loaded["gestures.engine.actions"])
 					helpers.assert_eq(package.loaded["core.logger.engine.logger"], false)
 					helpers.assert_true(package.loaded[identity_name] == prior_identity)
 					helpers.assert_true(_G.hs == prior_hs)

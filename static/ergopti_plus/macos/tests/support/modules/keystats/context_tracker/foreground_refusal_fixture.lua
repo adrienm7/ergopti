@@ -48,8 +48,8 @@ local OWNERS = {
 	"metrics.engine.capture.physical_subscription_lifetime",
 	"modules.shortcuts.script_control",
 	"core.ui.engine.notifications",
-	"modules.gestures.engine",
-	"modules.gestures.actions",
+	"gestures.engine.engine",
+	"gestures.engine.actions",
 	"platform.input.key_state",
 	"infra.script_chord_catalogue",
 	"keyboard.engine.layers.script_chords",
@@ -240,8 +240,8 @@ function M.with_runtime(callback)
 			end
 			local notices = {}
 			package.loaded["core.ui.engine.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
-			package.loaded["modules.gestures.engine"] = {}
-			package.loaded["modules.gestures.actions"] = { SG_NAMES = {}, get_label = function(value) return value end }
+			package.loaded["gestures.engine.engine"] = {}
+			package.loaded["gestures.engine.actions"] = { SG_NAMES = {}, get_label = function(value) return value end }
 			package.loaded["platform.input.key_state"] = {}
 			package.loaded["infra.script_chord_catalogue"] = {}
 			local function yes() return true end

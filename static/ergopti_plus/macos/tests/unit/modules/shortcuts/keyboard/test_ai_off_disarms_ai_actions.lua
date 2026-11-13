@@ -100,7 +100,7 @@ local function load_keyboard()
 	}
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "catalogue.json" end }
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.actions"] = {
 		is_assignable = function(action_id) return type(action_id) == "string" end,
 		execute_single = function() end,
 	}

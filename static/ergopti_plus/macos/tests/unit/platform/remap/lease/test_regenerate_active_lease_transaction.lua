@@ -212,7 +212,7 @@ local function load_active_remap(options)
 			return true
 		end,
 	}
-	package.loaded["modules.gestures.engine"] = {}
+	package.loaded["gestures.engine.engine"] = {}
 	package.loaded["modules.shortcuts"] = { is_paused = function() return false end }
 	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none

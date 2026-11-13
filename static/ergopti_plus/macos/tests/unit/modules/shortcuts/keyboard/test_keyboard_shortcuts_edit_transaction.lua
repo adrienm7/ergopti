@@ -20,7 +20,7 @@ local MODULES = {
 	"core.fs.engine.paths",
 	"core.logger.engine.logger",
 	"menu.engine.manifest_reader",
-	"modules.gestures.actions",
+	"gestures.engine.actions",
 	"modules.shortcuts.keyboard_shortcuts",
 }
 
@@ -96,7 +96,7 @@ local function with_subject(initial_action, scenario)
 		return ok, result
 	end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.actions"] = {
 		-- The transaction under test is independent of which ids exist; the
 		-- catalogue refusal has its own test (test_action_catalogue_parity.lua).
 		is_assignable = function(action_id) return type(action_id) == "string" end,

@@ -82,8 +82,8 @@ function M.build_world(options)
 			package.loaded[name] = nil
 		end
 	end
-	local _gestures = helpers.load_with_stubs("modules.gestures")
-	world.actions = require("modules.gestures.actions")
+	local _gestures = helpers.load_with_stubs("gestures.engine")
+	world.actions = require("gestures.engine.actions")
 	world.actions.init({ action_params = {} })
 	local logger = helpers.make_logger_stub()
 	for _, level in ipairs({ "debug", "info", "start", "success", "warn", "error" }) do

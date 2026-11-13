@@ -229,7 +229,7 @@ helpers.describe("copy_selected_path replays the shared open-target corpus", fun
 end)
 
 helpers.describe("copy_selected_path opens the primary selection (open-target-ip-address)", function()
-	local G = helpers.load_module("modules.gestures.manager")
+	local G = helpers.load_module("gestures.engine.manager")
 	G.init({ enabled = false })
 
 	helpers.it("open-target: copy_selected_path is a Linux action now", function()
@@ -443,7 +443,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 
 	helpers.it("the real URI adapter guards the actual Ctrl+C emitter", function()
 		local Subject = require("modules.shortcuts.open_selection")
-		local names = { "clipboard.adapters.clipboard", "modules.gestures.combo_emitter", "core.events.loop" }
+		local names = { "clipboard.adapters.clipboard", "gestures.engine.combo_emitter", "core.events.loop" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local app, emitted = "nautilus", 0
@@ -540,7 +540,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 	end)
 
 	helpers.it("(linux-copy-path-file-manager) the gesture dispatcher runs the file-manager branch", function()
-		local G = helpers.load_module("modules.gestures.manager")
+		local G = helpers.load_module("gestures.engine.manager")
 		G.init({ enabled = false })
 		local world, Subject = record_in("nautilus", { ok = true, uri_list = "file:///home/ada/notes.txt\n" })
 		with_selection("ignored", function() G.execute_action("copy_selected_path", "tap_3") end)

@@ -93,7 +93,7 @@ helpers.describe("window actions reach the toggle (Linux)", function()
 
 	helpers.it("each catalogue window action toggles its own page", function()
 		local Catalogue = require("_generated.action_catalogue")
-		local Gestures = require("modules.gestures.manager")
+		local Gestures = require("gestures.engine.manager")
 		local previous = package.loaded["core.ui.ui.webview_manager"]
 		local toggled = {}
 		package.loaded["core.ui.ui.webview_manager"] = {

@@ -80,7 +80,7 @@ end)
 -- ======================================================
 
 helpers.describe("startup: gestures pre-warm does not re-initialise its sub-modules (gestures-prewarm-no-reinit)", function()
-	local src = read_code("local function schedule_emergency_recycle") -- modules/gestures/init.lua
+	local src = read_code("local function schedule_emergency_recycle") -- gestures/engine/init.lua
 
 	helpers.it("Actions.init is called exactly once (at module load, not in pre-warm)", function()
 		local count = select(2, src:gsub("Actions%.init%(", ""))

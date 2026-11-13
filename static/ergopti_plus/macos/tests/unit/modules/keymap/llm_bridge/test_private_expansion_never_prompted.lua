@@ -75,7 +75,7 @@ local function build_world()
 			package.loaded[name] = nil
 		end
 	end
-	local _gestures = helpers.load_with_stubs("modules.gestures")
+	local _gestures = helpers.load_with_stubs("gestures.engine")
 	local front_app = {
 		title = function() return "E2EApp" end,
 		name = function() return "E2EApp" end,

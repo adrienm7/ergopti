@@ -171,10 +171,10 @@ helpers.describe("layout emulation (Linux consumption)", function()
 	-- the rule macOS now follows too (ILD-2, decided by the maintainer on
 	-- 2026-11-11; ctrl-altgr-logical): the production chord carries no AltGr.
 	helpers.it("presses Ctrl and the logical key for Ctrl+AltGr, AltGr suspended (ctrl-altgr-logical)", function()
-		local saved = { combo = package.loaded["modules.gestures.combo_emitter"],
+		local saved = { combo = package.loaded["gestures.engine.combo_emitter"],
 			layout = package.loaded["adapters.keyboard_layout"] }
 		local chords = {}
-		package.loaded["modules.gestures.combo_emitter"] = {
+		package.loaded["gestures.engine.combo_emitter"] = {
 			KEYSYM_TO_CODE = { z = 44 },
 			press_codes = function(modifiers, keys)
 				chords[#chords + 1] = { modifiers = modifiers, keys = keys }
@@ -190,7 +190,7 @@ helpers.describe("layout emulation (Linux consumption)", function()
 			helpers.assert_true(deps.emit_shortcut("z", KEY_Q, { ctrl = true, altgr = true }))
 			helpers.assert_true(deps.emit_shortcut("z", KEY_Q, { ctrl = true, shift = true, altgr = true }))
 		end)
-		package.loaded["modules.gestures.combo_emitter"] = saved.combo
+		package.loaded["gestures.engine.combo_emitter"] = saved.combo
 		package.loaded["adapters.keyboard_layout"] = saved.layout
 		package.loaded["modules.keymap.layout_emulation"] = nil
 		if not ok then error(problem, 0) end

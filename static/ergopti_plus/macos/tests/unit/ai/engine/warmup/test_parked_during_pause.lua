@@ -44,8 +44,8 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"platform.input.key_state",
-	"modules.gestures.engine",
-	"modules.gestures.actions",
+	"gestures.engine.engine",
+	"gestures.engine.actions",
 	"ai.engine.api.mlx",
 	"ai.engine.local_servers.warmup_controller",
 	"ai.engine.api.ollama",
@@ -110,8 +110,8 @@ local function exercise_committed_backend_pause()
 			every = function() return { timer = nil }, true end,
 			cancel = function() return true end,
 		}
-		package.loaded["modules.gestures.engine"] = {}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.engine"] = {}
+		package.loaded["gestures.engine.actions"] = {
 			get_label = function(name) return name end,
 			execute_single = function() return true end,
 			SG_NAMES = { "none", "script_pause_toggle" },

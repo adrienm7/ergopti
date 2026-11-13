@@ -231,7 +231,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			request_reload = function() return true end,
 		}
 		for _, module_name in ipairs({
-			"ui.menu.menu_gestures",
+			"gestures.ui.menu.gestures",
 			"ui.menu.menu_shortcuts",
 			"ui.menu.menu_keyboard_layout",
 			"ui.menu.menu_hotstrings",
@@ -253,7 +253,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		package.loaded["modules.keystats"] = {}
 		package.loaded["modules.shortcuts"] = shortcuts
 		package.loaded["modules.dynamic_hotstrings"] = {}
-		package.loaded["modules.gestures"] = { SINGLE_SLOTS = {}, DEFAULT_GESTURES = {} }
+		package.loaded["gestures.engine"] = { SINGLE_SLOTS = {}, DEFAULT_GESTURES = {} }
 		package.loaded["infra.personal_shortcuts"] = { load = noop }
 		package.loaded["ui.menu.init"] = nil
 		local Menu = require("ui.menu.init")

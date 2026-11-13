@@ -2851,7 +2851,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		{ mode: 'incremental', checked: [false, true] },
 		{ mode: 'future_mode', checked: [false, false] }
 	]);
-	const sourcePath = resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua');
+	const sourcePath = resolve(REPO_ROOT, 'static/ergopti_plus/macos/gestures/ui/menu/gestures.lua');
 	const source = readSourceFile(sourcePath);
 	const graph = readSourceFile(resolve(__dirname, 'test-menu-parity.cjs'));
 	function modeGraph(source) {
@@ -3416,7 +3416,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			assert.equal(actual[key], expected, code + ': unchanged existing caption ' + key);
 	}
 	const owner = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/gestures/ui/menu/gestures.lua')
 	);
 	function hasTemplate(tokens, section) {
 		return tokens.some(
@@ -3765,7 +3765,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	{
 		const extension = '.lua';
 		const owner = readSourceFile(
-			resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua')
+			resolve(REPO_ROOT, 'static/ergopti_plus/macos/gestures/ui/menu/gestures.lua')
 		);
 		assertRefreshWiring(owner, extension);
 		const child = 'gesture_system_macos_children';
@@ -3826,7 +3826,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'the status submenu is not declared for the Windows driver'
 		);
 		const windowsSource = readSourceFile(
-			resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_gestures.ahk')
+			resolve(REPO_ROOT, 'static/ergopti_plus/windows/gestures/ui/menu/gestures.ahk')
 		);
 		assert.ok(
 			!windowsSource.includes('system_gesture_status'),
@@ -3906,7 +3906,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		);
 	}
 	const owner = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/gestures/ui/menu/gestures.lua')
 	);
 	function hasSequence(tokens, sequence) {
 		return tokens.some((_, index) =>
@@ -4060,7 +4060,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			assert.equal(edge.kind, 'compose');
 			assert.equal(edge.platforms.length, 1);
 			assert.equal(edge.platforms[0], 'hs');
-			assert.equal(edge.native_sources?.hs, 'macos/ui/menu/menu_gestures.lua');
+			assert.equal(edge.native_sources?.hs, 'macos/gestures/ui/menu/gestures.lua');
 		}
 		const mode = actual.gesture_mode_options;
 		assert.equal(mode.menu, 'gesture_slot_mode_commands');
@@ -4072,7 +4072,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		assert.equal(sens.kind, 'compose');
 		assert.equal(sens.platforms.length, 1);
 		assert.equal(sens.platforms[0], 'hs');
-		assert.equal(sens.native_sources?.hs, 'macos/ui/menu/menu_gestures.lua');
+		assert.equal(sens.native_sources?.hs, 'macos/gestures/ui/menu/gestures.lua');
 	}
 	assertSwipeGraph(graph);
 	for (const changed of [
@@ -10029,35 +10029,35 @@ console.log(
 	}
 	for (const [file, extension, section, key, port] of [
 		[
-			'macos/ui/menu/menu_gestures.lua',
+			'macos/gestures/ui/menu/gestures.lua',
 			'.lua',
 			'gesture_system_macos_children',
 			'gesture_system_open_enabled_pinch',
 			1
 		],
 		[
-			'macos/ui/menu/menu_gestures.lua',
+			'macos/gestures/ui/menu/gestures.lua',
 			'.lua',
 			'gesture_system_macos_children',
 			'gesture_system_cached_conflicts',
 			3
 		],
 		[
-			'linux/ui/gesture_conflicts.lua',
+			'linux/gestures/ui/conflicts.lua',
 			'.lua',
 			'gesture_system_slot_linux_frame',
 			'gesture_system_open_unknown_slot',
 			1
 		],
 		[
-			'linux/ui/gesture_conflicts.lua',
+			'linux/gestures/ui/conflicts.lua',
 			'.lua',
 			'gesture_system_linux_children',
 			'gesture_system_cached_overlap',
 			3
 		],
 		[
-			'linux/ui/gesture_conflicts.lua',
+			'linux/gestures/ui/conflicts.lua',
 			'.lua',
 			'gesture_system_status_linux_frame',
 			'gesture_system_unknown_children',

@@ -447,7 +447,7 @@ helpers.describe("caps word auto-off: the manager session", function()
 
 	helpers.it("caps word auto-off, the session presses the CapsLock key on the daemon's device", function()
 		with_caps_word(nil, function(c)
-			local Emitter = require("modules.gestures.combo_emitter")
+			local Emitter = require("gestures.engine.combo_emitter")
 			local original, pressed = Emitter.press_codes, nil
 			Emitter.press_codes = function(mods, keys) pressed = { mods = mods, keys = keys }; return true end
 			local called, result = pcall(function()
@@ -463,7 +463,7 @@ helpers.describe("caps word auto-off: the manager session", function()
 
 	helpers.it("(linux-caps-word-unlock-debt) retains the native output outcome through the manager emitter", function()
 		with_caps_word(nil, function(c)
-			local Emitter = require("modules.gestures.combo_emitter")
+			local Emitter = require("gestures.engine.combo_emitter")
 			local original = Emitter.press_codes
 			local called, failure = pcall(function()
 				helpers.assert_true(c.manager.toggle_caps_word())

@@ -217,7 +217,7 @@ local _build_shortcuts = require("ui.menu.menu_shortcuts").build
 
 local _build_tap_holds = require("ui.menu.menu_tap_holds").build
 
-local _build_gestures = require("ui.menu.menu_gestures").build
+local _build_gestures = require("gestures.ui.menu.gestures").build
 
 local _build_configuration = require("settings.ui.menu.configuration").build
 

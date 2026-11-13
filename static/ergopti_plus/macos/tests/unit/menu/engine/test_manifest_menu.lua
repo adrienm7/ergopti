@@ -635,7 +635,7 @@ require("tests.lua.menu.fixed_feature_parent_contract").register(helpers, "macos
 -- Actual component factories consume genuine existing fixture-owned data modules.
 local function fixed_parent_native_cohort(body)
 	local names = {"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "core.logger.engine.logger",
-		"ui.menu.menu_shortcuts", "ui.menu.menu_gestures", "ui.menu.menu_tap_holds",
+		"ui.menu.menu_shortcuts", "gestures.ui.menu.gestures", "ui.menu.menu_tap_holds",
 		"menu.ui.builder.utils", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys"}
 	local previous = {}; for name, value in pairs(package.loaded) do previous[name] = value end
 	local ok, detail = xpcall(function()
@@ -732,7 +732,7 @@ helpers.describe("fixed feature parents: actual Mac component owners (fixed-feat
 		helpers.it("retains actual Gestures child order, callbacks, check " .. tostring(preference) .. " and pause " .. tostring(posture) .. " (fixed-feature-parent-native)", function()
 			require("tests.support.gesture_runtime_fixture").with_fixture({}, function(gestures)
 				fixed_parent_native_cohort(function(renderer, translator)
-					local module = require("ui.menu.menu_gestures")
+					local module = require("gestures.ui.menu.gestures")
 					local context = {gestures = gestures, state = {gestures = preference}, paused = posture,
 						save_prefs = function() error("construction must not publish") end,
 						updateMenu = function() error("construction must not redraw") end,

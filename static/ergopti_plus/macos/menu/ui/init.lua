@@ -104,7 +104,7 @@ local _branch_rows = BranchRows.new()
 
 -- Load isolated sub-menu builders safely
 local menu_mods = _branch_rows.wrap({
-	gestures        = safe_require("ui.menu.menu_gestures",        "gestures menu"),
+	gestures        = safe_require("gestures.ui.menu.gestures",        "gestures menu"),
 	shortcuts       = safe_require("ui.menu.menu_shortcuts",       "shortcuts menu"),
 	keyboard_layout = safe_require("ui.menu.menu_keyboard_layout", "keyboard layout menu"),
 	hotstrings      = safe_require("ui.menu.menu_hotstrings",      "hotstrings menu"),
@@ -531,7 +531,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return committed, report
 	end
 
-	local gestures_core_mod = safe_require("modules.gestures", "gestures core")
+	local gestures_core_mod = safe_require("gestures.engine", "gestures core")
 	local file_mover = RecoverableFileMoves.create()
 	local reset_journal_path = FactoryResetJournal.path_for(MenuPaths.get("ConfigTomlPath"))
 	local reset_journal, reset_journal_detail = FactoryResetJournal.create(reset_journal_path)
@@ -1248,7 +1248,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local function gesture_scope_owner()
 		if read_only_reason ~= nil or type(gestures) ~= "table" then return nil end
 		if not gesture_scope then
-			gesture_scope = require("ui.menu.gesture_scope").new({
+			gesture_scope = require("gestures.ui.menu.scope").new({
 				path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 				state = state, gestures = gestures, preferences = Preferences, checkpoint = preference_checkpoint,
 				demotions = session_demotions,

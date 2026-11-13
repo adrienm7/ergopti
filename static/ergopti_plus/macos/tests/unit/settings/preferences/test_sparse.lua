@@ -41,7 +41,7 @@ helpers.describe("sparse preference transactions", function()
 
 	helpers.it("does not reinterpret unknown gesture fields as live action assignments", function()
 		-- No action catalogue: this case is about field shape, not retirement.
-		helpers.with_fresh_modules({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "modules.gestures.actions" }, function()
+		helpers.with_fresh_modules({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "gestures.engine.actions" }, function()
 			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function()
 					return '[gestures]\ntap_2 = "copy"\nfuture = 17\n[gestures.expert]\nvalue = "keep"\n', "ok"

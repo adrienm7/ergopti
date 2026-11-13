@@ -277,7 +277,7 @@ end)
 helpers.describe("shortcuts menu: configured binding labels", function()
 	for _, surface in ipairs({ "keyboard", "tap" }) do
 		helpers.it("shows the saved value in the real " .. surface .. " provider", function()
-			local owned = { "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys", "modules.gestures.manager" }
+			local owned = { "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys", "gestures.engine.manager" }
 			local saved = {}
 			for _, name in ipairs(owned) do saved[name] = package.loaded[name] end
 			local ok, failure = xpcall(function()

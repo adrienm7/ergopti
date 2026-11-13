@@ -72,7 +72,8 @@ const DRIVER_SUBDIRS = [
 	'ai',
 	'apps',
 	'clipboard',
-	'diagnostics'
+	'diagnostics',
+	'gestures'
 ];
 
 /** Supported target languages. */

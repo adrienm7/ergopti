@@ -261,7 +261,7 @@ helpers.describe("actual shared-output handoff dependencies: green controls", fu
 	helpers.it("records legitimate ComboEmitter writes on the same exact output capability", function()
 		local session = aggregate_consumer_session({ a = { { 42, 1, 1 } } })
 		session.pump(); local before, capability = session.view(), session.cap
-		local combo = helpers.load_module("modules.gestures.combo_emitter")
+		local combo = helpers.load_module("gestures.engine.combo_emitter")
 		local accepted = combo.press_codes({ 56 }, { 30 }, "controlled shared writer")
 		local after = session.view()
 		local same_capability = rawequal(session.writer.capture_output(), capability)

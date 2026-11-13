@@ -134,8 +134,8 @@ helpers.describe("real script-action catalogue projection", function()
 				return result
 			end
 			translator.section = function(key) return translator.decorate_section(translator.get(key)) end
-			package.loaded["modules.gestures.actions"], package.loaded["modules.shortcuts.script_control"] = nil, nil
-			local actions = require("modules.gestures.actions")
+			package.loaded["gestures.engine.actions"], package.loaded["modules.shortcuts.script_control"] = nil, nil
+			local actions = require("gestures.engine.actions")
 			local script = require("modules.shortcuts.script_control")
 			helpers.assert_eq(script.ACTIONS, actions.SG_NAMES)
 			helpers.assert_eq(#script.ACTIONS, 840)

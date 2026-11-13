@@ -19,8 +19,8 @@ Logger.set_sink(function(line) io.stdout:write(line, "\n"); io.stdout:flush() en
 local i18n = require("core.i18n.engine.i18n")
 i18n.init()
 
-local Manager = require("modules.gestures.manager")
-local Background = require("modules.gestures.background_commands")
+local Manager = require("gestures.engine.manager")
+local Background = require("gestures.engine.background_commands")
 local ran = Manager.execute_action("take_note", "desktop_proof")
 local deadline = uv.hrtime() + 10e9
 while Background.pending_count() > 0 and uv.hrtime() < deadline do

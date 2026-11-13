@@ -411,7 +411,7 @@ end)
 
 helpers.describe("gesture clipboard screenshots use the verified owner", function()
 	helpers.it("no gesture clipboard action passes -c", function()
-		local saved_actions = package.loaded["modules.gestures.actions"]
+		local saved_actions = package.loaded["gestures.engine.actions"]
 		local saved_screenshot = package.loaded["modules.shortcuts.actions.screenshot_save"]
 		local saved_hs = _G.hs
 		local captures = {}
@@ -422,16 +422,16 @@ helpers.describe("gesture clipboard screenshots use the verified owner", functio
 			end,
 			save = function() return true end,
 		}
-		package.loaded["modules.gestures.actions"] = nil
+		package.loaded["gestures.engine.actions"] = nil
 		local ok, err = xpcall(function()
-			local actions = helpers.load_with_stubs("modules.gestures.actions")
+			local actions = helpers.load_with_stubs("gestures.engine.actions")
 			for _, name in ipairs({ "screenshot_window_clipboard",
 				"screenshot_region_clipboard", "screenshot_fullscreen_clipboard" }) do
 				helpers.assert_eq(actions.execute_single(name), true)
 			end
 			helpers.assert_eq(captures, { { "-w" }, { "-i" }, {} })
 		end, debug.traceback)
-		package.loaded["modules.gestures.actions"] = saved_actions
+		package.loaded["gestures.engine.actions"] = saved_actions
 		package.loaded["modules.shortcuts.actions.screenshot_save"] = saved_screenshot
 		_G.hs = saved_hs
 		if not ok then error(err, 0) end

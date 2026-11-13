@@ -260,14 +260,14 @@ local function run_fixture(body, source)
 		end
 		return event
 	end
-	local actions = require("modules.gestures.actions")
+	local actions = require("gestures.engine.actions")
 	controls.executions = {}
 	local execute_single = actions.execute_single
 	actions.execute_single = function(action, binding)
 		controls.executions[#controls.executions + 1] = {action=action,binding=binding}
 		return execute_single(action,binding)
 	end
-	local gestures = require("modules.gestures")
+	local gestures = require("gestures.engine")
 	local bindings = require("modules.shortcuts.bindings")
 	local keyboard = require("modules.shortcuts.keyboard_shortcuts")
 	-- Explicit controlled-native premise; this fixture does not qualify host input.

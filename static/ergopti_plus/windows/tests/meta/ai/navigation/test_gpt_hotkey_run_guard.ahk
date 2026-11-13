@@ -17,7 +17,7 @@ _GHG_ReadSource(RelPath) {
 
 _GHG_ConfiguredUrlLaunchIsGuarded() {
     Body := _DriverFuncBody("GestureOpenChatGpt")
-    Source := _DriverDirConcat("modules/gestures")
+    Source := _DriverDirConcat("gestures")
     Assert(Body != "", "GestureOpenChatGpt must own the Win+G callback")
     Assert(InStr(Source, '"open_chatgpt", {') > 0,
         "open_chatgpt must dispatch through the guarded GestureOpenChatGpt callback")

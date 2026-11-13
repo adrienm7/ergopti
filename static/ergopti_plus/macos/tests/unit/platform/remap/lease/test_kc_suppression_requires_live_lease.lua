@@ -178,7 +178,7 @@ local function load_remap(initially_enabled, options)
 			return true
 		end,
 	}
-	package.loaded["modules.gestures.engine"] = {}
+	package.loaded["gestures.engine.engine"] = {}
 	package.loaded["modules.shortcuts"] = { is_paused = function() return false end }
 	package.loaded["platform.remap"] = nil
 

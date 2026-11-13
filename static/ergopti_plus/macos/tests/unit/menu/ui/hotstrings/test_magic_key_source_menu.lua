@@ -242,7 +242,7 @@ helpers.describe("magic key source menu: configured tap ownership", function()
 	helpers.it("(magic-key-source) selection and capture refuse an assigned source before any save", function()
 		with_menu(function(Menu, world)
 			local Tap = require("modules.shortcuts.tap_keys")
-			local actions = require("modules.gestures.actions")
+			local actions = require("gestures.engine.actions")
 			helpers.assert_true(Tap.apply_configuration({ shortcuts = { tap_keys = { number_row_left = "send_text" } } }, actions.is_assignable))
 			local ctx = context(true)
 			for _, code in ipairs({ "Backquote" }) do

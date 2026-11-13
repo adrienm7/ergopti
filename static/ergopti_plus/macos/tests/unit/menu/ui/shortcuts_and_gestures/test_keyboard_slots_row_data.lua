@@ -372,7 +372,7 @@ local function parameter_ctx()
 	end
 	ctx.gestures.get_all_action_parameters = function() return copy(parameters) end
 	ctx.gestures.replace_action_parameters = function(snapshot) parameters = copy(snapshot); return true end
-	ctx.gestures.is_assignable = require("modules.gestures.actions").is_assignable
+	ctx.gestures.is_assignable = require("gestures.engine.actions").is_assignable
 
 	-- Keep the retained transaction on the same real keyboard publisher and
 	-- canonical conditional file port installed by fresh().

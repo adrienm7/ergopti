@@ -380,7 +380,7 @@ local _chord_catalogue = nil
 --- @param actions table The decoded action list, mutated in place.
 --- @return number localised How many labels came from the registry.
 local function localise_action_labels(actions)
-	local ok_reg, Registry = pcall(require, "modules.gestures.actions")
+	local ok_reg, Registry = pcall(require, "gestures.engine.actions")
 	local aliases = {}
 	if ok_reg and type(Registry) == "table" and type(Registry.karabiner_aliases) == "function" then
 		aliases = Registry.karabiner_aliases() or {}

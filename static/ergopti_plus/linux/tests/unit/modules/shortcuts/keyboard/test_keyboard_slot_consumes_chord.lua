@@ -53,7 +53,7 @@ local function fixture(stored)
 	Sandbox.write_bytes(config_path, table.concat(lines, "\n") .. "\n")
 	replace("settings.engine.paths", { config = function() return config_path end })
 	replace("modules.shortcuts.chatgpt", { open = function() seen.chatgpt = seen.chatgpt + 1 return true end })
-	replace("modules.gestures.manager", {
+	replace("gestures.engine.manager", {
 		is_assignable = function(id) return id == "select_line" or id == "script_reload" or id == "open_chatgpt" end,
 		execute_action = function(action, binding)
 			seen.executed[#seen.executed + 1] = action .. "@" .. binding

@@ -26,8 +26,8 @@ package.loaded["platform.input.keycodes"] = {
 	ESCAPE = 0x35,
 	FORWARD_DELETE = 0x75,
 }
-package.loaded["modules.gestures.engine"] = { init = function() end }
-package.loaded["modules.gestures.actions"] = {
+package.loaded["gestures.engine.engine"] = { init = function() end }
+package.loaded["gestures.engine.actions"] = {
 	SG_NAMES = {
 		"none", "script_pause_toggle", "script_reload", "script_quit",
 		"open_metrics_typing",

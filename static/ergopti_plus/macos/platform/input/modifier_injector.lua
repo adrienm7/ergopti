@@ -6,7 +6,7 @@
 --- Adds a set of modifier flags to the NEXT key event the user produces, then
 --- removes itself. This is the OS half of a one-shot ("sticky") modifier; the
 --- policy half — which modifiers, for how long, and what toggling one twice
---- means — lives in modules/gestures/sticky_modifiers.lua and never touches
+--- means — lives in gestures/engine/sticky_modifiers.lua and never touches
 --- Hammerspoon.
 ---
 --- FEATURES & RATIONALE:

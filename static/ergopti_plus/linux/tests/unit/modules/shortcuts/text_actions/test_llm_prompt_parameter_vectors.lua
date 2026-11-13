@@ -31,7 +31,7 @@ local function read_corpus()
 	return assert(json.decode(raw), "the llm_prompt corpus is not valid JSON")
 end
 
-local Gestures = helpers.load_module("modules.gestures.manager")
+local Gestures = helpers.load_module("gestures.engine.manager")
 local PromptAction = require("ai.engine.prediction.prompt_action")
 
 --- Runs body over a fresh profile registry on isolated AI preferences.
@@ -161,7 +161,7 @@ helpers.describe("llm_prompt_prediction parameter: the dispatcher hands the stor
 		local file = assert(io.open(path, "wb"))
 		assert(file:write("[shortcuts.keyboard]\nprimary_p = \"llm_prompt_prediction\"\n"))
 		assert(file:close())
-		local G = helpers.load_module("modules.gestures.manager")
+		local G = helpers.load_module("gestures.engine.manager")
 		local seen = {}
 		local function initialize()
 			G.init({ enabled = false, persist = true, config_path = path, action_handlers = {
@@ -179,7 +179,7 @@ helpers.describe("llm_prompt_prediction parameter: the dispatcher hands the stor
 			assert(saved:close())
 			helpers.assert_eq(document.gesture_parameters.keyboard__primary_p__llm_prompt_prediction,
 				"user_private_notes|2", "the keyboard binding owns its custom profile parameter")
-			G = helpers.load_module("modules.gestures.manager")
+			G = helpers.load_module("gestures.engine.manager")
 			initialize()
 			helpers.assert_eq(G.get_action_parameter("keyboard__primary_p", ACTION), "user_private_notes|2")
 			G.execute_action(ACTION, "keyboard__primary_p")
@@ -192,7 +192,7 @@ helpers.describe("llm_prompt_prediction parameter: the dispatcher hands the stor
 	end)
 
 	helpers.it("runs the handler with the binding's own value", function()
-		local G = helpers.load_module("modules.gestures.manager")
+		local G = helpers.load_module("gestures.engine.manager")
 		local seen = {}
 		G.init({ enabled = false, action_handlers = {
 			[ACTION] = function(binding, parameter) seen[#seen + 1] = { binding, parameter } end,

@@ -81,7 +81,7 @@ local function with_action(route, mode, action, body)
 			package.loaded["core.ui.engine.display_server"] = { UNKNOWN = "unknown", kind = function() return "x11" end,
 				is_x11 = function() return true end, is_wayland = function() return false end }
 			package.loaded["platform.focus.window_info"] = { focused_app_id = function() return "owned-editor" end }
-			package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function()
+			package.loaded["gestures.adapters.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function()
 				return { path = "controlled-touchpad", name = "controlled", max_fingers = 3 }
 			end }
 			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad",
@@ -97,7 +97,7 @@ local function with_action(route, mode, action, body)
 			local function lifecycle() world.lifecycle = world.lifecycle + 1 end
 			environment.script_actions = require("modules.shortcuts.script_actions").new({ reset = lifecycle, reload = lifecycle, quit = lifecycle })
 			for field, name in pairs({ shortcuts = "modules.shortcuts.manager", event_loop = "core.events.loop",
-				gestures = "modules.gestures.manager", ActionHandlers = "modules.shortcuts.action_handlers",
+				gestures = "gestures.engine.manager", ActionHandlers = "modules.shortcuts.action_handlers",
 				prediction_engine = "ai.engine.prediction.engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
 				keyboard_hook = "platform.input.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "core.logger.engine.monotonic",
 				MagicKeySource = "modules.hotstrings.magic_key_source", script_chords = "modules.shortcuts.script_chords",

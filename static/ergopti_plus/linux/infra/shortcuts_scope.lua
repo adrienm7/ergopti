@@ -83,7 +83,7 @@ function M.new(options)
 		"unknown shortcut scope narrowing")
 	local taps = options.taps or require("modules.shortcuts.tap_keys")
 	local chords = options.chords or require("modules.shortcuts.script_chords")
-	local parameters = options.parameters or require("modules.gestures.manager")
+	local parameters = options.parameters or require("gestures.engine.manager")
 	local url = options.url or require("modules.shortcuts.chatgpt")
 	local files = options.files or require("core.fs.adapters.file_system")
 	local manifest = options.manifest or Manifest

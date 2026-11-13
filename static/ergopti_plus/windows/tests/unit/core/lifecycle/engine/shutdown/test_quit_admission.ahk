@@ -193,7 +193,7 @@ _TQA_DriverWiring() {
 		"a vetoed superseding retry answers the owed Quit")
 	Assert(InStr(_DriverFuncBody("_LifecycleAbandonExitRetry"), "QuitRequest_RetryAbandoned(") > 0,
 		"a retry that gave up answers the owed Quit")
-	Assert(InStr(FileRead(_DriverDir . "\modules\gestures\actions.ahk", "UTF-8"), "Fn: (*) => ExitApp()") == 0,
+	Assert(InStr(FileRead(_DriverDir . "\gestures\engine\actions.ahk", "UTF-8"), "Fn: (*) => ExitApp()") == 0,
 		"the script_quit action is a Quit like the tray's row")
 }
 Test("quit admission: the tray and script_quit reach it, and retries answer it (PAR-45)", _TQA_DriverWiring)

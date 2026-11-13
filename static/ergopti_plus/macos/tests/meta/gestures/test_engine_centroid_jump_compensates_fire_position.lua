@@ -24,8 +24,8 @@ helpers.describe("gesture engine compensates a centroid jump", function()
 	-- =========================================================
 
 	helpers.it("engine.lua must compensate lastFirePos on finger-count centroid jump", function()
-		local src = read_src("local function triggerLiveAxisIfNeeded") -- modules/gestures/engine.lua
-		assert(src, "modules/gestures/engine.lua must be readable")
+		local src = read_src("local function triggerLiveAxisIfNeeded") -- gestures/engine/engine.lua
+		assert(src, "gestures/engine/engine.lua must be readable")
 		-- The bug: startPos was adjusted by jumpX/jumpY but lastFirePos was not.
 		-- The reversal detector uses (pos - lastFirePos), so the jump appeared as
 		-- movement in the wrong direction, firing a spurious reversal.

@@ -380,7 +380,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	if module_name == "modules.shortcuts.actions.system"
 		or module_name == "modules.shortcuts.actions.system_pixel"
 		or module_name == "modules.shortcuts.actions.screenshot_save"
-		or module_name == "modules.gestures.actions" then
+		or module_name == "gestures.engine.actions" then
 		loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
 	end
 	-- Dependency checkers and their backend-local pause controller form one

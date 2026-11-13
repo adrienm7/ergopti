@@ -48,7 +48,7 @@ local function load_subject(controls)
 		start = start_child("keyboard"),
 		stop = stop_child("keyboard"),
 	}
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.actions"] = {
 		resume_after_cleanup = start_child("actions"),
 		force_cleanup = stop_child("actions"),
 	}

@@ -146,7 +146,7 @@ local function load_shortcuts_with_spies(started, options)
 		set_shortcut_action = function() end, set_on_pause_change = function() end,
 		set_extras = function() end, toggle = function() end,
 	}
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.actions"] = {
 		force_cleanup = function() spy.action_pause = spy.action_pause + 1; return true end,
 		resume_after_cleanup = function()
 			spy.action_resume = spy.action_resume + 1

@@ -773,7 +773,7 @@ const actions = parseToml(
 	fs.readFileSync(path.join(DRIVERS_DIR, '_shared/shortcuts/data/actions/actions.toml'), 'utf8')
 ).sg_actions;
 const parameterStorageOwner = fs.readFileSync(
-	path.join(DRIVERS_DIR, 'linux/modules/gestures/manager.lua'),
+	path.join(DRIVERS_DIR, 'linux/gestures/engine/manager.lua'),
 	'utf8'
 );
 const parameterWriterPath = 'infra/program_binding_transaction.lua';

@@ -19,7 +19,7 @@ local DisplayServer = require("core.ui.engine.display_server")
 assert(DisplayServer.is_x11(), "the file manager folder receipt needs an X11 display")
 
 local Folder = require("core.fs.adapters.file_manager_folder")
-local SystemActions = require("modules.gestures.system_actions")
+local SystemActions = require("gestures.engine.system_actions")
 
 local mode = arg[1]
 

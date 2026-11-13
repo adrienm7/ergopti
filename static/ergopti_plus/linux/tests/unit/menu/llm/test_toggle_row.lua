@@ -299,7 +299,7 @@ local function with_slot_frame(locale, mutation, body)
 		local declarations = renderer.get_root()
 		if mutation then mutation(declarations) end
 		state.items = { { id = "open_url", label = "Controlled native picker choice" } }
-		package.loaded["modules.gestures.manager"] = {
+		package.loaded["gestures.engine.manager"] = {
 			get_picker_items = function() return state.items end,
 			get_picker_parameter_fields = function(items, binding)
 				state.editor_items, state.editor_binding = items, binding

@@ -14,7 +14,7 @@ local Json = require("core.text.engine.json")
 local MODULES = {
 	"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "core.fs.engine.paths", "core.logger.engine.logger",
 	"settings.engine.preferences.preferences", "settings.engine.paths", "menu.engine.manifest_reader", "core.text.engine.toml_codec.writer",
-	"modules.gestures.actions", "modules.shortcuts.magic_editor",
+	"gestures.engine.actions", "modules.shortcuts.magic_editor",
 	"modules.shortcuts.keyboard_shortcuts",
 }
 
@@ -32,7 +32,7 @@ local function with_subject(assignments, scenario)
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "modifier-chords.json" end }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["menu.engine.manifest_reader"] = nil
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.actions"] = {
 			is_assignable = function(action) return type(action) == "string" end,
 			execute_single = function(action) observed.actions[#observed.actions + 1] = action; return true end,
 		}

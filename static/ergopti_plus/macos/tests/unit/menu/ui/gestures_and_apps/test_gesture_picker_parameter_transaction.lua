@@ -54,7 +54,7 @@ local function with_picker(options, callback)
 	}
 	local picker_callback, provider
 	local ok, failure = xpcall(function()
-		package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true } }
+		package.loaded["gestures.engine"] = { DEFAULT_STATE = { gestures = true } }
 		package.loaded["menu.ui.builder.utils"] = {}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end }
 		local logger = helpers.make_logger_stub()
@@ -85,14 +85,14 @@ local function with_picker(options, callback)
 			build = function(_, _, _, _, _, providers) provider = providers.gesture_slots_3; return {} end,
 		}
 		package.loaded["ui.action_picker"] = { open = function(_, picked) picker_callback = picked end }
-		package.loaded["ui.menu.menu_gestures"] = nil
+		package.loaded["gestures.ui.menu.gestures"] = nil
 		package.loaded["ui.menu.shortcut_utils"] = nil
 		runtime.is_assignable = function() return true end
 		local owner = require("tests.support.program_parameter_fixture")(runtime, { gestures = true }, "gesture",
 			function() return fixture.assigned end,
 			function() fixture.saves = fixture.saves + 1; return result(options.save) end)
 		fixture.owner = owner
-		local menu = require("ui.menu.menu_gestures")
+		local menu = require("gestures.ui.menu.gestures")
 		menu.build({ gestures = runtime, state = { gestures = true },
 			commit_program_parameter = owner.apply,
 			save_prefs = function() error("program must use its fenced owner") end,

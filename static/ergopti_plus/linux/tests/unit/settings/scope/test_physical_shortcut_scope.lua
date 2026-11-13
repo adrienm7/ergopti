@@ -31,7 +31,7 @@ local function with_scope(body, source, chord_j_identity)
 	local ok, err = pcall(function()
 		Sandbox.with_config(source or SOURCE, function(path)
 			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.gestures.manager",
+				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "gestures.engine.manager",
 				"infra.shortcuts_scope", "menu.ui.builder.builder", "modules.shortcuts.key_combinations",
 				"platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
 				"modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }) do
@@ -55,15 +55,15 @@ local function with_scope(body, source, chord_j_identity)
 				TOUCHPAD = "touchpad", close = function() controls.device_calls = controls.device_calls + 1; return false end,
 				open = function() controls.device_calls = controls.device_calls + 1; return false end,
 			}
-			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
+			package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end }
 			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return true end,
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function(command) controls.executed[#controls.executed + 1] = command; return true end,
 			}
-			local ActualProgramOwner = require("modules.gestures.program_owner")
+			local ActualProgramOwner = require("gestures.engine.program_owner")
 			controls.worker_observers, controls.worker_timers = {}, {}
-			package.loaded["modules.gestures.program_owner"] = { new = function(capture)
+			package.loaded["gestures.engine.program_owner"] = { new = function(capture)
 				return ActualProgramOwner.new(capture, { runner = { spawn = function(_,_,_,admission)
 					return {
 						start = function() controls.worker_starts = (controls.worker_starts or 0) + 1; return admission() end,
@@ -82,7 +82,7 @@ local function with_scope(body, source, chord_j_identity)
 				controls.worker_settled = true
 				for _, callback in ipairs(controls.worker_observers) do callback() end
 			end
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			gestures.init({ persist = true, config_path = path, enabled = false })
 			gestures.execute_action = function(action, binding)
 				controls.executed[#controls.executed + 1] = action .. "@" .. binding

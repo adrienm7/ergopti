@@ -210,7 +210,7 @@ function M.boot(opts)
 		is_pending = function() return fixture.terminal_pending == true end,
 	}
 	for _, module_name in ipairs({
-		"ui.menu.menu_gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
+		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
 		"ui.menu.menu_hotstrings", "ui.menu.menu_metrics", "ui.menu.menu_tap_holds",
 		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
@@ -219,7 +219,7 @@ function M.boot(opts)
 	package.loaded["ai.ui.menu"] = { create = function() return {} end }
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
 	package.loaded["modules.dynamic_hotstrings"] = {}
-	package.loaded["modules.gestures"] = {
+	package.loaded["gestures.engine"] = {
 		SINGLE_SLOTS = { "swipe_left" }, DEFAULT_GESTURES = { swipe_left = "none" },
 	}
 	package.loaded["modules.keystats.text_cipher"] = { set_enabled = function() return true end }

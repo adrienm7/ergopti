@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"modules.gestures.sticky_modifiers",
+	"gestures.engine.sticky_modifiers",
 	"platform.input.modifier_injector",
 	"modules.keymap.control_sentinels",
 	"layouts.engine.layers.control_signals",
@@ -92,7 +92,7 @@ local function with_fixture(callback)
 		local Keycodes = require("platform.input.keycodes.core")
 		local Timer = require("core.events.timer_scheduler")
 		local Injector = require("platform.input.modifier_injector")
-		local Sticky = require("modules.gestures.sticky_modifiers")
+		local Sticky = require("gestures.engine.sticky_modifiers")
 		Sentinels.set_listener("test.sticky_control", function(signal)
 			world.signals[#world.signals + 1] = signal
 		end)

@@ -227,7 +227,7 @@ local function decide_tap_key(keycode, keyboard_type)
 	local action, binding = TapKeys.decide(keycode, keyboard_type)
 	if not action then return nil end
 	return function()
-		local GestActions = require("modules.gestures.actions")
+		local GestActions = require("gestures.engine.actions")
 		return GestActions.execute_single(action, binding)
 	end
 end
@@ -237,12 +237,12 @@ end
 hotkey_labels.tap_keys = i18n.get("menu.shortcuts.header_tap_keys")
 hotkey_defs.tap_keys   = function()
 	-- Read before the tap starts: its callback may only consult memory.
-	TapKeys.ensure_loaded(require("modules.gestures.actions").is_assignable)
+	TapKeys.ensure_loaded(require("gestures.engine.actions").is_assignable)
 	return sys_acts.bind_tap_keys(delivery_admitted, decide_tap_key)
 end
 
 local function has_tap_key_assignments()
-	TapKeys.ensure_loaded(require("modules.gestures.actions").is_assignable)
+	TapKeys.ensure_loaded(require("gestures.engine.actions").is_assignable)
 	return TapKeys.has_assignments()
 end
 

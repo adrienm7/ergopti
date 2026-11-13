@@ -144,8 +144,8 @@ local function build_world(selection, ui_locale, options)
 			package.loaded[name] = nil
 		end
 	end
-	local _gestures = helpers.load_with_stubs("modules.gestures")
-	world.actions = require("modules.gestures.actions")
+	local _gestures = helpers.load_with_stubs("gestures.engine")
+	world.actions = require("gestures.engine.actions")
 	world.actions.init({ action_params = {} })
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 

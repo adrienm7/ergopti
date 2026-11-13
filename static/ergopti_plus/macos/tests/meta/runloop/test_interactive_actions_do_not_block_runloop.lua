@@ -33,7 +33,7 @@ local CommandLines = require("tests.support.command_lines")
 -- Directories whose code runs in direct response to a live user input event.
 local INTERACTIVE_DIRS = {
 	"modules/shortcuts/actions",
-	"modules/gestures",
+	"gestures",
 }
 
 -- The synchronous APIs. Both block the runloop until the child process exits.

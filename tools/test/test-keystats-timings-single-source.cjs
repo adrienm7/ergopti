@@ -152,7 +152,7 @@ const PINS = [
 	pin(
 		'gestures',
 		'gesture_auto_configure_delay_ms',
-		'windows/modules/gestures/init.ahk',
+		'windows/gestures/engine/init.ahk',
 		'GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS'
 	),
 	pin(

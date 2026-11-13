@@ -228,7 +228,7 @@ function M.run(options)
 		elseif name == "infra.personal_shortcuts" then
 			-- The user's personal source runs once, at the end of the services.
 			return { load = function() record("personal_shortcuts"); return true end }
-		elseif name == "modules.gestures.workspace_switcher" then
+		elseif name == "gestures.adapters.workspace_switcher" then
 			-- No X11 desktop in the fixture: the Wayland workspace reader is asked,
 			-- and this session has none (its own cases: test_workspace_switcher).
 			return { current_workspace_source = function() record("workspace.source"); return nil, "unsupported" end }

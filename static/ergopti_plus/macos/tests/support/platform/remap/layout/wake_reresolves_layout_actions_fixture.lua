@@ -295,7 +295,7 @@ local function load_remap(options)
 			return true
 		end,
 	}
-	package.loaded["modules.gestures.engine"] = {}
+	package.loaded["gestures.engine.engine"] = {}
 	package.loaded["modules.shortcuts"] = {
 		is_paused = function()
 			append("pause-query")

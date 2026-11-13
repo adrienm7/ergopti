@@ -41,8 +41,8 @@
 			"sites": [
 				"macos/menu/ui/builder/builder.lua:452 separator",
 				"macos/menu/ui/builder/builder.lua:876 separator",
-				"macos/ui/menu/menu_gestures.lua:205 static",
-				"macos/ui/menu/menu_gestures.lua:257 static",
+				"macos/gestures/ui/menu/gestures.lua:205 static",
+				"macos/gestures/ui/menu/gestures.lua:257 static",
 				"macos/ui/menu/menu_hotstrings.lua:297 static",
 				"macos/ui/menu/menu_hotstrings.lua:518 separator",
 				"macos/ui/menu/menu_hotstrings_custom.lua:259 static",
@@ -257,16 +257,16 @@
 				"windows/diagnostics/engine/reports/crash_reporter.ahk",
 				"windows/modules/dynamic_hotstrings/dynamic_hotstrings.ahk",
 				"windows/modules/dynamic_hotstrings/user_code.ahk",
-				"windows/modules/gestures/actions.ahk",
-				"windows/modules/gestures/click.ahk",
-				"windows/modules/gestures/config.ahk",
-				"windows/modules/gestures/constants.ahk",
-				"windows/modules/gestures/init.ahk",
-				"windows/modules/gestures/screenshots.ahk",
-				"windows/modules/gestures/system_actions.ahk",
-				"windows/modules/gestures/touchpad_registry.ahk",
-				"windows/modules/gestures/virtual_desktops.ahk",
-				"windows/modules/gestures/window_cycle.ahk",
+				"windows/gestures/engine/actions.ahk",
+				"windows/gestures/engine/click.ahk",
+				"windows/gestures/engine/config.ahk",
+				"windows/gestures/engine/constants.ahk",
+				"windows/gestures/engine/init.ahk",
+				"windows/gestures/adapters/screenshots.ahk",
+				"windows/gestures/engine/system_actions.ahk",
+				"windows/gestures/adapters/touchpad_registry.ahk",
+				"windows/gestures/adapters/virtual_desktops.ahk",
+				"windows/gestures/adapters/window_cycle.ahk",
 				"windows/modules/hotstrings.ahk",
 				"windows/modules/hotstrings/hotstrings_autocorrection.ahk",
 				"windows/modules/hotstrings/hotstrings_distances.ahk",
@@ -426,7 +426,7 @@
 				"windows/ui/download_window/session.ahk",
 				"windows/core/ui/ui/editors.ahk",
 				"windows/diagnostics/ui/error_dialog.ahk",
-				"windows/ui/gesture_conflicts.ahk",
+				"windows/gestures/ui/conflicts.ahk",
 				"windows/diagnostics/ui/healthcheck/actions.ahk",
 				"windows/diagnostics/ui/healthcheck/core.ahk",
 				"windows/diagnostics/ui/healthcheck/helpers.ahk",
@@ -441,7 +441,7 @@
 				"windows/ui/layout_manager/init.ahk",
 				"windows/diagnostics/ui/log_openers.ahk",
 				"windows/menu/ui/builder/actions.ahk",
-				"windows/ui/menu/menu_gestures.ahk",
+				"windows/gestures/ui/menu/gestures.ahk",
 				"windows/ui/menu/menu_hotstring_switches.ahk",
 				"windows/ui/menu/menu_hotstrings.ahk",
 				"windows/menu/ui/builder/menu_init.ahk",
@@ -691,7 +691,7 @@
 				"macos/menu/ui/keyboard/base_delay_transaction.lua",
 				"macos/menu/ui/builder/builder.lua",
 				"macos/menu/ui/builder/canvas_badge.lua",
-				"macos/ui/menu/gesture_scope.lua",
+				"macos/gestures/ui/menu/scope.lua",
 				"macos/menu/ui/transactions/global_actions_transaction.lua",
 				"macos/menu/ui/transactions/global_scope.lua",
 				"macos/ui/menu/hotstring_counter.lua",
@@ -702,7 +702,7 @@
 				"macos/ui/menu/magic_key_source_menu.lua",
 				"macos/ui/menu/menu_about.lua",
 				"macos/apps/ui/menu/apps.lua",
-				"macos/ui/menu/menu_gestures.lua",
+				"macos/gestures/ui/menu/gestures.lua",
 				"macos/ui/menu/menu_hotstrings.lua",
 				"macos/ui/menu/menu_hotstrings_custom.lua",
 				"macos/ui/menu/menu_hotstrings_management.lua",
@@ -785,18 +785,18 @@
 					]
 				},
 				{
-					"path": "macos/ui/menu/menu_gestures.lua",
+					"path": "macos/gestures/ui/menu/gestures.lua",
 					"sourceSha256": "658889a17c3a0cc720868d48e37f1f33097fa0681427399496d2b9cac5639e15",
 					"lines": [
 						{
 							"line": 205,
 							"source": "\t\tlabel    = i18n.get(\"menu.gestures.title\"),",
-							"expectedSite": "macos/ui/menu/menu_gestures.lua:205 static"
+							"expectedSite": "macos/gestures/ui/menu/gestures.lua:205 static"
 						},
 						{
 							"line": 257,
 							"source": "\t\t\tlabel   = i18n.get(\"dialog.action_picker.label\"),",
-							"expectedSite": "macos/ui/menu/menu_gestures.lua:257 static"
+							"expectedSite": "macos/gestures/ui/menu/gestures.lua:257 static"
 						}
 					]
 				},

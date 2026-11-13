@@ -306,7 +306,7 @@ local dyn_hotstrings = RuntimeGuard.optional_require("modules.dynamic_hotstrings
 local updater = RuntimeGuard.optional_require("modules.updater.manager")
 
 -- Gestures manager (optional — trackpad/mouse gesture recognition via libinput).
-local gestures = RuntimeGuard.optional_require("modules.gestures.manager")
+local gestures = RuntimeGuard.optional_require("gestures.engine.manager")
 
 -- Shortcuts manager (optional — wrap symbols, CapsWord, text manipulation).
 local shortcuts = RuntimeGuard.optional_require("modules.shortcuts.manager")
@@ -2704,7 +2704,7 @@ local function main()
 			end,
 			emulating = function() return require("modules.keymap.layout_emulation").status().active == true end,
 			defer = function(fn) return event_loop.defer(fn) end,
-			press = function(combo) return (require("modules.gestures.combo_emitter").press(combo)) end,
+			press = function(combo) return (require("gestures.engine.combo_emitter").press(combo)) end,
 		})
 		if accented then
 			return { consume = true, repeat_callback = input_capture_gate.guard(accented_repeat) }
@@ -3368,7 +3368,7 @@ local function main()
 			not sources.pointer and "platform_reason.pointer_distance_needs_cursor_position" or nil)
 		local desktop, desktop_reason = sources.desktop, nil
 		if not desktop then
-			desktop, desktop_reason = require("modules.gestures.workspace_switcher")
+			desktop, desktop_reason = require("gestures.adapters.workspace_switcher")
 				.current_workspace_source(Monotonic.now_ms)
 		end
 		if system_metrics then

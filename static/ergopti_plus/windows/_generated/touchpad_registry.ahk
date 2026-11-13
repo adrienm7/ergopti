@@ -1,5 +1,5 @@
 ﻿; _generated/touchpad_registry.ahk
-; AUTO-GENERATED from windows/modules/gestures/precision_touchpad_registry.toml.
+; AUTO-GENERATED from windows/gestures/adapters/precision_touchpad_registry.toml.
 ; DO NOT EDIT BY HAND — run `npm run codegen:touchpad-registry` to refresh.
 #Requires AutoHotkey v2.0
 

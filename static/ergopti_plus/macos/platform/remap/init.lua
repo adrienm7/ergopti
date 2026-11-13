@@ -798,7 +798,7 @@ local function start_lease_bound_inputs(required_phase, retain_if_paused, recove
 	end
 	local uncommitted_watcher = nil
 	if not _state.watcher then
-		local ok_ge, gestures_engine = pcall(require, "modules.gestures.engine")
+		local ok_ge, gestures_engine = pcall(require, "gestures.engine.engine")
 		if not ok_ge then gestures_engine = nil end
 		local watcher_ok, watcher_or_err = xpcall(function()
 			return Watchers.start_gesture_watcher(gestures_engine, expected_token)

@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Precision Touchpad Registry Codegen
  * DESCRIPTION:
- * Emits windows/modules/gestures/precision_touchpad_registry.toml as the data
+ * Emits windows/gestures/adapters/precision_touchpad_registry.toml as the data
  * the one Windows touchpad writer reads (modules/gestures/touchpad_registry.ahk),
  * for the tray action and the first-run wizard alike.
  *
@@ -28,7 +28,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SOURCE = path.join(SP, 'windows', 'modules', 'gestures', 'precision_touchpad_registry.toml');
+const SOURCE = path.join(SP, 'windows', 'gestures', 'adapters', 'precision_touchpad_registry.toml');
 const AHK_OUTPUT = path.join(SP, 'windows', '_generated', 'touchpad_registry.ahk');
 const RUN_HINT = 'npm run codegen:touchpad-registry';
 
@@ -191,7 +191,7 @@ function emitAhk(contract) {
 	);
 	return (
 		'﻿; _generated/touchpad_registry.ahk\n' +
-		'; AUTO-GENERATED from windows/modules/gestures/precision_touchpad_registry.toml.\n' +
+		'; AUTO-GENERATED from windows/gestures/adapters/precision_touchpad_registry.toml.\n' +
 		`; DO NOT EDIT BY HAND — run \`${RUN_HINT}\` to refresh.\n` +
 		'#Requires AutoHotkey v2.0\n' +
 		'\n' +

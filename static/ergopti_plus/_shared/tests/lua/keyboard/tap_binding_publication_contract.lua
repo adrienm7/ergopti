@@ -277,14 +277,14 @@ function M.register(helpers, driver)
 		scope(function()
 			local parameters, preferences, logger
 			if driver == "macos" then
-				package.loaded["modules.gestures"], package.loaded["modules.gestures.actions"] = nil, nil
-				helpers.load_with_stubs("modules.gestures")
-				parameters = require("modules.gestures.actions")
+				package.loaded["gestures.engine"], package.loaded["gestures.engine.actions"] = nil, nil
+				helpers.load_with_stubs("gestures.engine")
+				parameters = require("gestures.engine.actions")
 				logger = assert(package.loaded["core.logger.engine.logger"], "the actual Actions logger must be available")
 				package.loaded["core.logger.engine.shim"] = logger
 				preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 			else
-				parameters = helpers.load_module("modules.gestures.manager")
+				parameters = helpers.load_module("gestures.engine.manager")
 				logger = require("core.logger.engine.shim")
 			end
 			local warn, error_log = logger.warn, logger.error

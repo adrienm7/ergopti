@@ -176,7 +176,7 @@ helpers.describe("shortcut retained native release debt", function()
 		with_scope(function(_, _, controls, path)
 			local owners = { manager = require("modules.shortcuts.manager"), keyboard = require("modules.shortcuts.keyboard_shortcuts"),
 				taps = require("modules.shortcuts.tap_keys"), chords = require("modules.shortcuts.script_chords"),
-				url = require("modules.shortcuts.chatgpt"), gestures = require("modules.gestures.manager") }
+				url = require("modules.shortcuts.chatgpt"), gestures = require("gestures.engine.manager") }
 			local scope, block, live = controlled_scope(owners, controls, path, "keyboard", function() return false end)
 			block(false)
 			helpers.assert_eq(scope.apply("recommended"), true)

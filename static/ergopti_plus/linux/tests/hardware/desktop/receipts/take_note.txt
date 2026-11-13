@@ -10,7 +10,7 @@
 # empty) never reached the editor. xdg-open typed the empty file
 # inode/x-empty (gio: application/x-zerosize) and opened it in the container's
 # web browser; the driver now launches the registered text/plain handler by its
-# desktop-file id with gtk-launch (regression: tests/unit/modules/gestures/
+# desktop-file id with gtk-launch (regression: tests/unit/gestures/
 # actions/test_take_note.lua, "an empty note opens in the registered editor").
 
 === daily notes through the registered text editor (display :72) ===

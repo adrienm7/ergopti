@@ -17,7 +17,7 @@ local OWNED_MODULES = {
 	"modules.shortcuts.actions.system_mouse",
 	"modules.shortcuts.actions.screenshot_save",
 	"modules.shortcuts.actions.text",
-	"modules.gestures",
+	"gestures.engine",
 	"modules.keystats.log_manager",
 	"core.ui.engine.notifications",
 	"core.logger.engine.key_event_health",
@@ -127,7 +127,7 @@ local function with_awake(callback)
 			for _, name in ipairs({
 				"modules.shortcuts.actions.system_pixel", "modules.shortcuts.actions.system_mouse",
 				"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-				"modules.gestures", "core.ui.engine.notifications", "core.logger.engine.key_event_health",
+				"gestures.engine", "core.ui.engine.notifications", "core.logger.engine.key_event_health",
 				"core.text.engine.utils", "modules.keymap.control_sentinels", "platform.input.key_state",
 				"platform.input.keyboard_geometry", "modules.keystats.log_manager",
 			}) do package.loaded[name] = {} end

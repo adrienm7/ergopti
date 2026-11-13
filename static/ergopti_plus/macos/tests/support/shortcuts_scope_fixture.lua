@@ -144,7 +144,7 @@ local function run_fixture(body, source)
 		end
 		return tap
 	end
-	local gestures = require("modules.gestures")
+	local gestures = require("gestures.engine")
 	local bindings = require("modules.shortcuts.bindings")
 	local keyboard = require("modules.shortcuts.keyboard_shortcuts")
 	local taps = require("modules.shortcuts.tap_keys")

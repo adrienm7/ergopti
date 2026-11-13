@@ -24,9 +24,9 @@ local helpers = require("tests.helpers")
 local function with_toggle_fixture(previous, options, body)
 	options = options or {}
 	local names = {
-		"modules.gestures", "menu.ui.builder.utils", "core.ui.engine.dialog_util",
+		"gestures.engine", "menu.ui.builder.utils", "core.ui.engine.dialog_util",
 		"core.i18n.engine.i18n", "menu.engine.manifest_menu", "ui.action_picker",
-		"ui.menu.shortcut_utils", "core.logger.engine.logger", "ui.menu.menu_gestures",
+		"ui.menu.shortcut_utils", "core.logger.engine.logger", "gestures.ui.menu.gestures",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do
@@ -54,7 +54,7 @@ local function with_toggle_fixture(previous, options, body)
 		if mode == "throw" then error("synthetic gesture lifecycle refusal") end
 		return true
 	end
-	package.loaded["modules.gestures"] = {
+	package.loaded["gestures.engine"] = {
 		DEFAULT_STATE = { gestures = false },
 		enable_all = function() return lifecycle("enable", true) end,
 		disable_all = function() return lifecycle("disable", false) end,
@@ -76,9 +76,9 @@ local function with_toggle_fixture(previous, options, body)
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local state = { gestures = previous }
-	local MenuGestures = require("ui.menu.menu_gestures")
+	local MenuGestures = require("gestures.ui.menu.gestures")
 	local item = MenuGestures.build({
-		gestures = package.loaded["modules.gestures"],
+		gestures = package.loaded["gestures.engine"],
 		state = state,
 		paused = options.paused == true,
 		save_prefs = function()

@@ -338,7 +338,7 @@ Test("LLM accept meta: every direct injection/accept call site is enumerated (AH
 
 _TLTSH_EveryTabProducerUsesTheGuardedWrapper() {
 	DriverSrc := _DriverSourceNoComments()
-	GestureSrc := _DriverDirConcat("modules/gestures")
+	GestureSrc := _DriverDirConcat("gestures")
 	RemapSrc := _DriverDirConcat("platform/remap")
 
 	; The physical Tab accepts only through the SC00F handlers, which declare

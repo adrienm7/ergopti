@@ -30,8 +30,8 @@
 --- the test.
 --- ==============================================================================
 
-local Decoder = require("modules.gestures.mt_decoder")
-local Finder = require("modules.gestures.touchpad_finder")
+local Decoder = require("gestures.engine.mt_decoder")
+local Finder = require("gestures.adapters.touchpad_finder")
 local Reader = require("platform.input.evdev_reader")
 local Record = require("tests.support.touchpad_record")
 

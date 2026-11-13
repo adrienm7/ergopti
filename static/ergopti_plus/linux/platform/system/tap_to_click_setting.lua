@@ -36,7 +36,7 @@ local M = {}
 
 local Shell = require("core.process.adapters.shell_runner")
 local DisplayServer = require("core.ui.engine.display_server")
-local TapDetector = require("modules.gestures.tap_detector")
+local TapDetector = require("gestures.engine.tap_detector")
 local json = require("core.text.engine.json")
 
 -- Seconds each tool call may take (see FEATURES 1).
@@ -243,7 +243,7 @@ function M.read(device)
 	if DisplayServer.desktop_is("kde") then
 		local node = device.path:match("/(event%d+)$")
 		if not node then return unknown("not an event node: " .. device.path) end
-		for _, binary in ipairs(require("modules.gestures.workspace_switcher").QDBUS_BINARIES) do
+		for _, binary in ipairs(require("gestures.adapters.workspace_switcher").QDBUS_BINARIES) do
 			if Shell.has_command(binary, true) then
 				local base = binary .. " org.kde.KWin /org/kde/KWin/InputDevice/" .. node .. " org.kde.KWin.InputDevice."
 				return M.parse_kwin(query(base .. "tapToClick"), query(base .. "lmrTapButtonMap"), query(base .. "enabled"))

@@ -72,7 +72,7 @@ local function with_subject(stage, body, options)
 				package.loaded["core.logger.engine.logger"] = logger
 				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
 				package.loaded["settings.engine.paths"] = { get = function() return path end }
-				package.loaded["modules.gestures.actions"] = { is_assignable = function() return true end }
+				package.loaded["gestures.engine.actions"] = { is_assignable = function() return true end }
 				local preferences = require("settings.engine.preferences.preferences"); preferences.load(path)
 				local keyboard = require("modules.shortcuts.keyboard_shortcuts")
 				helpers.assert_eq(keyboard.get_action("primary_1"), "none")

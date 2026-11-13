@@ -85,7 +85,7 @@ local function keyboard_fixture()
 	Sandbox.write_bytes(config_path,
 		"[shortcuts.keyboard]\nprimary_j = \"llm_generate_prediction\"\nprimary_k = \"select_line\"\n")
 	replace("settings.engine.paths", { config = function() return config_path end })
-	replace("modules.gestures.manager", {
+	replace("gestures.engine.manager", {
 		is_assignable = function(id) return id == "select_line" or id == "llm_generate_prediction" end,
 		execute_action = function(action, binding) seen.executed[#seen.executed + 1] = action .. "@" .. binding end,
 	})
@@ -148,7 +148,7 @@ end)
 helpers.describe("AI tap keys (ai-off-inert-linux)", function()
 	helpers.it("types the key while the AI is off and claims it once the AI is on", function()
 		with_ai(function(state)
-			local names = { "core.fs.adapters.storage", "settings.engine.paths", "modules.gestures.manager",
+			local names = { "core.fs.adapters.storage", "settings.engine.paths", "gestures.engine.manager",
 				"modules.shortcuts.tap_keys" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -157,7 +157,7 @@ helpers.describe("AI tap keys (ai-off-inert-linux)", function()
 			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = Fakes.storage({ initial = {} })
 			local executed, deferred = {}, {}
-			package.loaded["modules.gestures.manager"] = {
+			package.loaded["gestures.engine.manager"] = {
 				is_assignable = function(id) return id == "llm_generate_prediction" end,
 				execute_action = function(action, binding) executed[#executed + 1] = action .. "@" .. binding end,
 			}
@@ -191,7 +191,7 @@ end)
 helpers.describe("AI gestures (ai-off-inert-linux)", function()
 	helpers.it("runs no AI action from a gesture while the AI is off", function()
 		with_ai(function(state)
-			local M = helpers.load_module("modules.gestures.manager")
+			local M = helpers.load_module("gestures.engine.manager")
 			local fired = {}
 			M.init({ enabled = false, persist = false, action_handlers = {
 				llm_generate_prediction = function() fired[#fired + 1] = "llm_generate_prediction" end,

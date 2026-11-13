@@ -60,7 +60,7 @@ local _full_rebind_retry_index = nil
 -- Ownership inspection needs only key identities; action initialization belongs
 -- to assignment validation and delivery, not the cleanup reader.
 local function action_catalogue()
-	if GestActions == nil then GestActions = require("modules.gestures.actions") end
+	if GestActions == nil then GestActions = require("gestures.engine.actions") end
 	return GestActions
 end
 

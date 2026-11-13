@@ -1129,7 +1129,7 @@ swipe whose own direction slot is unbound runs the axis slot's action; a bound
 actions. Diagonals, vertical swipes, taps and two fingers have no axis slot.
 The decoder's shared direction thresholds apply unchanged, and Linux fires once
 per completed gesture (no incremental repeat: modes and sensitivities stay
-macOS only). `linux/modules/gestures/manager.lua` (`dispatch_gesture`) owns the
+macOS only). `linux/gestures/engine/manager.lua` (`dispatch_gesture`) owns the
 rule and `test_gesture_axis_slots.lua` pins it from evdev frames. The macOS
 engine does not read the axis slots yet (it resolves only direction slots);
 bringing it onto the same rule is a separate TODO item, not a reason to change
@@ -1181,7 +1181,7 @@ for macOS and Linux, `LLM_ApiCommon_IsAuthenticationFailure` for Windows, both
 replaying `_shared/tests/corpus/llm/auth_failure_vectors.json`.
 
 rule and `test_gesture_axis_slots.lua` pins it from evdev frames. macOS applies the same rule
-(`resolveSwipeSlot` in `macos/modules/gestures/engine.lua`, on the commit and
+(`resolveSwipeSlot` in `macos/gestures/engine/engine.lua`, on the commit and
 live paths; `test_gesture_axis_slots.lua`). Windows has no axis slots: the OS
 recognises its gestures. No `swipe_N_vert` slot exists on any OS.
 

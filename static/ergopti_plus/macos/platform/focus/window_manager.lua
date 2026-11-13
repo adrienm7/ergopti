@@ -218,7 +218,7 @@ end
 -- ============================================
 
 -- Not part of the WindowManager port: the reads and the focus call that
--- modules/gestures/app_switch.lua needs to switch applications and windows
+-- gestures/engine/app_switch.lua needs to switch applications and windows
 -- directly. A synthetic Cmd+Tab never did that: the Dock only commits its
 -- switcher when Command itself is released, which a posted Tab keystroke
 -- carrying the Command flag does not do.

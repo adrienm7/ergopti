@@ -68,8 +68,8 @@ function M.with_world(config, body)
 			package.loaded[name] = nil
 		end
 	end
-	helpers.load_with_stubs("modules.gestures")
-	local actions = require("modules.gestures.actions")
+	helpers.load_with_stubs("gestures.engine")
+	local actions = require("gestures.engine.actions")
 	actions.init({ action_params = {} })
 	local front_app = {
 		title = function() return "E2EApp" end, name = function() return "E2EApp" end,

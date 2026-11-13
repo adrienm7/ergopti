@@ -55,7 +55,7 @@ end)
 
 helpers.describe("touch frame evidence (gesture-frames-field)", function()
 	helpers.it("the touch watcher counts each frame, stamped or not", function()
-		local Evidence = require("infra.gesture_frame_evidence")
+		local Evidence = require("gestures.engine.frame_evidence")
 		Evidence.reset()
 		local with_fixture = require("tests.support.gesture_runtime_fixture").with_fixture
 		with_fixture({}, function(gestures, runtime, watcher)
@@ -73,7 +73,7 @@ helpers.describe("touch frame evidence (gesture-frames-field)", function()
 	end)
 
 	helpers.it("leaves the pause between two touches out of the mean", function()
-		local Evidence = require("infra.gesture_frame_evidence")
+		local Evidence = require("gestures.engine.frame_evidence")
 		Evidence.reset()
 		Evidence.note(10.0)
 		Evidence.note(10.01)

@@ -84,7 +84,7 @@ helpers.describe("linux personal shortcuts source (linux-open-personal-shortcuts
 			local commands, real = {}, os.execute
 			os.execute = function(cmd) commands[#commands + 1] = tostring(cmd) return true end
 			local ok, err = pcall(function()
-				local Gestures = helpers.load_module("modules.gestures.manager")
+				local Gestures = helpers.load_module("gestures.engine.manager")
 				Gestures.execute_action("open_personal_shortcuts", "test__slot")
 			end)
 			os.execute = real

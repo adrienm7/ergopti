@@ -737,7 +737,7 @@ every row that misses an OS a localized `reason_<os>` (table in
 `_shared/shortcuts/data/actions/README.md`). These Windows rows point at an equivalent
 today, but Windows could run them itself; each one is a row of `actions.toml`
 (add `ahk` to `platform`, drop its `reason_ahk`/`equivalent_ahk`) plus a handler
-in `windows/modules/gestures/actions.ahk`:
+in `windows/gestures/engine/actions.ahk`:
 
 - `home`, `end`, `page_up`, `page_down`: plain keystrokes (`emit_ahk_key`
   `Home`, `End`, `PgUp`, `PgDn`).

@@ -56,7 +56,7 @@ helpers.describe("loader currency after the last construction callback",function
   Manager._reset_for_test()
   local Loader=require("platform.remap.tap_hold_loader")
   local original=Loader.load_document
-  local original_names=require("modules.gestures.manager").get_executable_action_names
+  local original_names=require("gestures.engine.manager").get_executable_action_names
   local change=false
   Manager.init({keyboard_hook=hook,execute_action=function()end,on_text_injected=function()end,
    action_names=function()
@@ -134,7 +134,7 @@ keep = true
 			package.loaded[combination_name], package.loaded[owner_name] = nil, nil
 			local Combinations = require(combination_name)
 			Manager = require(owner_name)
-			local Gestures = helpers.load_module("modules.gestures.manager")
+			local Gestures = helpers.load_module("gestures.engine.manager")
 			local hook = fake_hook()
 			local function start()
 				return Manager.init({ keyboard_hook = hook, execute_action = Gestures.execute_action,

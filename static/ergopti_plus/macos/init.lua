@@ -395,7 +395,7 @@ end
 require("settings.engine.scope.script_scope").adopt_configured()
 i18n.adopt_saved_locale()
 -- Configuration consumers may perform reads during require; path ownership comes first.
-local gestures           = require("modules.gestures")
+local gestures           = require("gestures.engine")
 local keymap             = require("modules.keymap")
 local ManifestReader     = require("menu.engine.manifest_reader")
 -- Wire keymap → locale so trigger-character substitutions (★) use the live char.

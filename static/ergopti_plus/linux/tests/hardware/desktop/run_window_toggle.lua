@@ -4,7 +4,7 @@
 --- MODULE: The Ten Window-Toggle Actions On A Real Desktop
 --- DESCRIPTION:
 --- Runs each of the ten `open_*` page actions of the shared catalogue through
---- the real gestures manager (modules/gestures/manager.lua execute_action) and
+--- the real gestures manager (gestures/engine/manager.lua execute_action) and
 --- the real webview manager, with real WebKit2GTK windows on the session the
 --- launcher started (run_window_toggle.sh: X11 under openbox, or GNOME Shell on
 --- Wayland). For every action, three presses:
@@ -101,7 +101,7 @@ local function open_cover()
 end
 
 local Manager = require("core.ui.ui.webview_manager")
-local Gestures = require("modules.gestures.manager")
+local Gestures = require("gestures.engine.manager")
 
 local function run()
 	Manager.init()

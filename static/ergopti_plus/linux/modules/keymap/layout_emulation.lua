@@ -428,7 +428,7 @@ function M.production_deps(ports)
 			-- character's US key, as GTK and Qt resolve a shortcut there; the
 			-- physical key would be another shortcut (Ctrl+X for Ergopti's c).
 			-- A character with no US key keeps the physical one.
-			local Combo = require("modules.gestures.combo_emitter")
+			local Combo = require("gestures.engine.combo_emitter")
 			local us_name = char:match("^%w$") and char:lower() or ({ ["."] = "period", [","] = "comma" })[char]
 			local us_code = us_name and Combo.KEYSYM_TO_CODE[us_name] or code
 			local keycode, level_mods = require("adapters.keyboard_layout").shortcut_keycode(char, us_code)
@@ -442,7 +442,7 @@ function M.production_deps(ports)
 				if type(mods) == "table" and mods[held.name] == true then chord[#chord + 1] = held.code end
 			end
 			for _, mod in ipairs(level_mods) do chord[#chord + 1] = mod end
-			local pressed = require("modules.gestures.combo_emitter").press_codes(chord, { keycode }, "emulated shortcut")
+			local pressed = require("gestures.engine.combo_emitter").press_codes(chord, { keycode }, "emulated shortcut")
 			return pressed == true
 		end,
 		emit_key = function(code, modifiers)
@@ -457,7 +457,7 @@ function M.production_deps(ports)
 				if evdev == nil then return false end
 				chord[#chord + 1] = evdev
 			end
-			return require("modules.gestures.combo_emitter").press_codes(chord, { key.evdev },
+			return require("gestures.engine.combo_emitter").press_codes(chord, { key.evdev },
 				"emulated layout source key") == true
 		end,
 		now_ms = function() return require("core.logger.engine.monotonic").now_ms() end,

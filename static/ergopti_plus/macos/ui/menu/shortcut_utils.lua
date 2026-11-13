@@ -600,7 +600,7 @@ function M.picker_parameter_fields(gestures, items, binding)
 		if kind then
 			if kind == "program" then
 				local ready_ok, ready = pcall(function()
-					return require("modules.gestures.actions_aux_owner").program_available() == true
+					return require("gestures.engine.actions_aux_owner").program_available() == true
 						and type(gestures.program_admission_available) == "function"
 						and gestures.program_admission_available() == true
 						and type(gestures.program_binding_supported) == "function"

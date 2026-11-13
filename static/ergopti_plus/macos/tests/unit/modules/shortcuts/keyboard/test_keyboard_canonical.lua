@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 local function with_subject(source, body)
 	local names = { "core.fs.adapters.storage", "core.fs.adapters.file_system", "platform.input.hotkey_registrar", "settings.engine.preferences.preferences",
-		"core.fs.engine.paths", "settings.engine.paths", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts" }
+		"core.fs.engine.paths", "settings.engine.paths", "gestures.engine.actions", "modules.shortcuts.keyboard_shortcuts" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local control = { content = source, writes = 0, handles = {}, fired = {} }
@@ -40,7 +40,7 @@ local function with_subject(source, body)
 			setEnabled = function(handle, enabled) handle.enabled = enabled; return true end,
 			unbind = function(handle) handle.enabled = false; return true end,
 		}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.actions"] = {
 			is_assignable = function(id) return id == "none" or id == "send_text" or id == "screen_capture" end,
 			execute_single = function(action) control.fired[#control.fired + 1] = action; return true end,
 		}

@@ -7,7 +7,7 @@
 ; boundary: a screen rectangle copied into a private DIB section, the admitted
 ; clipboard bitmap copied under its own lock, and the shrink-and-encode step
 ; that writes a private stage file. The gesture screenshot owner
-; (modules/gestures/screenshots.ahk) keeps the workers, epochs, publication and
+; (gestures/adapters/screenshots.ahk) keeps the workers, epochs, publication and
 ; cleanup; these functions only turn pixels into a stage file, or throw.
 ;
 ; FEATURES & RATIONALE:

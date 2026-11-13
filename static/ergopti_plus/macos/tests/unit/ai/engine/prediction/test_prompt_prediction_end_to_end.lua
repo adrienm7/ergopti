@@ -70,8 +70,8 @@ local function build_world(buffer)
 	end
 	-- The gesture registry first: loading it installs a fresh hs stub, which the
 	-- engine and the core capture when they load next
-	local _gestures = helpers.load_with_stubs("modules.gestures")
-	world.actions = require("modules.gestures.actions")
+	local _gestures = helpers.load_with_stubs("gestures.engine")
+	world.actions = require("gestures.engine.actions")
 	world.actions.init({ action_params = {} })
 
 	local front_app = {

@@ -16,7 +16,7 @@ _OTO_Read(RelPath) {
 }
 
 _OTO_RefusalKeepsGestureHookLive() {
-	GestureInit := _OTO_Read("modules/gestures/init.ahk")
+	GestureInit := _OTO_Read("gestures/engine/init.ahk")
 	ShutdownBody := _DriverFuncBody("Ergopti_OnShutdown")
 	Assert(ShutdownBody != "", "Ergopti_OnShutdown must remain source-visible")
 	Assert(InStr(GestureInit, "OnExit(_GestureUnhook") == 0,

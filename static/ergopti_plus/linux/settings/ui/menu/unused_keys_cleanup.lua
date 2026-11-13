@@ -37,7 +37,7 @@ local Engine = require("settings.engine.migration.unused_keys")
 --- @param decoded table Decoded config.toml.
 --- @param mark function mark(...segments).
 function M.collect(decoded, mark)
-	require("modules.gestures.manager").mark_config_reads(decoded, mark)
+	require("gestures.engine.manager").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.manager").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.chatgpt").mark_config_reads(decoded, mark)
 	require("modules.hotstrings.repeat_key").mark_config_reads(decoded, mark)

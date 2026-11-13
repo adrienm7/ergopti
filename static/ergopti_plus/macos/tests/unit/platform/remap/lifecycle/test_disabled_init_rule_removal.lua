@@ -24,7 +24,7 @@ local OWNED_MODULES = {
 	"core.timing.engine.timings",
 	"settings.engine.paths",
 	"modules.keystats.kc_bridge",
-	"modules.gestures.engine",
+	"gestures.engine.engine",
 	"platform.remap",
 }
 
@@ -136,7 +136,7 @@ local function run_disabled_init(removal_succeeds)
 		package.loaded["modules.keystats.kc_bridge"] = {
 			refresh_managed_set = function() return true end,
 		}
-		package.loaded["modules.gestures.engine"] = {}
+		package.loaded["gestures.engine.engine"] = {}
 		package.loaded["platform.remap"] = nil
 
 		local remap = helpers.load_with_stubs("platform.remap", {

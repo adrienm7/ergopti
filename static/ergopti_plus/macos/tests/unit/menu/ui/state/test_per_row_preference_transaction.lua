@@ -173,8 +173,8 @@ end)
 
 local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 	helpers.with_fresh_modules({
-		"ui.menu.menu_gestures",
-		"modules.gestures",
+		"gestures.ui.menu.gestures",
+		"gestures.engine",
 		"menu.ui.builder.utils",
 		"core.ui.engine.dialog_util",
 		"core.i18n.engine.i18n",
@@ -213,7 +213,7 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 			enable_all = function() return true end,
 			disable_all = function() return true end,
 		}
-		package.loaded["modules.gestures"] = {
+		package.loaded["gestures.engine"] = {
 			DEFAULT_STATE = { gestures = true },
 			DEFAULT_GESTURES = {},
 			SINGLE_SLOTS = { "swipe_2_left" },
@@ -247,7 +247,7 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 
-		local Menu = require("ui.menu.menu_gestures")
+		local Menu = require("gestures.ui.menu.gestures")
 		local item = Menu.build({
 			gestures = gestures,
 			state = { gestures = true },

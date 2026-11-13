@@ -37,7 +37,7 @@ end
 --- @return table gestures, table log
 local function routed_gestures()
 	local names = {
-		combo = "modules.gestures.combo_emitter",
+		combo = "gestures.engine.combo_emitter",
 		injector = "modules.hotstrings.injector",
 		layout = "adapters.keyboard_layout",
 		keystats = "modules.keystats.keystats",
@@ -82,7 +82,7 @@ local function routed_gestures()
 	local ScriptActions = helpers.load_module("modules.shortcuts.script_actions")
 	local ActionHandlers = helpers.load_module("modules.shortcuts.action_handlers")
 	local noop = function() end
-	local Gestures = helpers.load_module("modules.gestures.manager")
+	local Gestures = helpers.load_module("gestures.engine.manager")
 	Gestures.init({
 		enabled = false,
 		persist = false,
@@ -99,7 +99,7 @@ end
 helpers.describe("send input parameters replay the shared send-input corpus (send-input-actions)", function()
 	local corpus = read_corpus()
 	local Shortcuts = helpers.load_module("modules.shortcuts.manager")
-	local Gestures = helpers.load_module("modules.gestures.manager")
+	local Gestures = helpers.load_module("gestures.engine.manager")
 
 	helpers.it("the parameters are declared and the corpus is loaded", function()
 		for kind, action in pairs(ACTIONS) do

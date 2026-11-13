@@ -738,7 +738,7 @@ _GSWO_AllEntryPointsShareOwnership() {
 	; makes a newly added sibling fail until it is explicitly routed through one
 	; of the lifecycle-owned entry points below.
 	global _DriverDirConcatFn
-	GestureSource := _StripFullLineComments(_DriverDirConcatFn.Call("modules/gestures"))
+	GestureSource := _StripFullLineComments(_DriverDirConcatFn.Call("gestures"))
 	ExpectedRoutes := Map(
 		"screenshot_window_clipboard", 'GestureScreenshotWindow("clipboard")',
 		"screenshot_window_save", 'GestureScreenshotWindow("save")',

@@ -156,19 +156,19 @@ const OPENS_SUBMENU = {
 			menu: 'gesture_system_status_controls',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		},
 		{
 			menu: 'gesture_system_status_macos_frame',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		},
 		{
 			menu: 'gesture_system_status_linux_frame',
 			platforms: ['linux'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/gesture_conflicts.lua' }
+			native_sources: { linux: 'linux/gestures/ui/conflicts.lua' }
 		}
 	],
 	gesture_system_unknown_children: [
@@ -176,7 +176,7 @@ const OPENS_SUBMENU = {
 			menu: 'gesture_system_linux_children',
 			platforms: ['linux'],
 			kind: 'submenu',
-			native_sources: { linux: 'linux/ui/gesture_conflicts.lua' }
+			native_sources: { linux: 'linux/gestures/ui/conflicts.lua' }
 		}
 	],
 	gesture_system_clear_children: [
@@ -184,7 +184,7 @@ const OPENS_SUBMENU = {
 			menu: 'gesture_system_macos_children',
 			platforms: ['hs'],
 			kind: 'submenu',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		}
 	],
 	gesture_system_conflict_children: [
@@ -192,14 +192,14 @@ const OPENS_SUBMENU = {
 			menu: 'gesture_system_macos_children',
 			platforms: ['hs'],
 			kind: 'submenu',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		}
 	],
 	gesture_system_cached_overlap: {
 		menu: 'gesture_system_slot_linux_frame',
 		platforms: ['linux'],
 		kind: 'compose',
-		native_sources: { linux: 'linux/ui/gesture_conflicts.lua' }
+		native_sources: { linux: 'linux/gestures/ui/conflicts.lua' }
 	},
 	selection_operations: [
 		'selection_caps_word_control',
@@ -562,20 +562,20 @@ const OPENS_SUBMENU = {
 			menu: 'gesture_swipe_slot_menu',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		},
 		{ menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
 		{
 			menu: 'gesture_sensitivity_head',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		},
 		{
 			menu: 'gesture_change_action',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		}
 	],
 	gesture_slots_3: [
@@ -583,20 +583,20 @@ const OPENS_SUBMENU = {
 			menu: 'gesture_swipe_slot_menu',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		},
 		{ menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
 		{
 			menu: 'gesture_sensitivity_head',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		},
 		{
 			menu: 'gesture_change_action',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		}
 	],
 	gesture_slots_4: [
@@ -604,20 +604,20 @@ const OPENS_SUBMENU = {
 			menu: 'gesture_swipe_slot_menu',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		},
 		{ menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
 		{
 			menu: 'gesture_sensitivity_head',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		},
 		{
 			menu: 'gesture_change_action',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		}
 	],
 	gesture_slots_5: [
@@ -625,20 +625,20 @@ const OPENS_SUBMENU = {
 			menu: 'gesture_swipe_slot_menu',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		},
 		{ menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
 		{
 			menu: 'gesture_sensitivity_head',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		},
 		{
 			menu: 'gesture_change_action',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		}
 	],
 	gesture_mode_options: {
@@ -649,7 +649,7 @@ const OPENS_SUBMENU = {
 		menu: 'gesture_sensitivity_head',
 		platforms: ['hs'],
 		kind: 'compose',
-		native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 	},
 	tap_holds: [
 		'tap_holds_menu',
@@ -2880,76 +2880,76 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 			menu: 'gesture_system_status_controls',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+			native_sources: { hs: 'macos/gestures/ui/menu/gestures.lua' }
 		},
 		'the controls edge is macOS only: the Windows driver has no status submenu'
 	);
 	const owners = [
 		{
-			file: 'macos/ui/menu/menu_gestures.lua',
+			file: 'macos/gestures/ui/menu/gestures.lua',
 			platform: 'hs',
 			section: 'gesture_system_status_clear',
 			key: 'gesture_system_clear_children',
 			port: 3
 		},
 		{
-			file: 'macos/ui/menu/menu_gestures.lua',
+			file: 'macos/gestures/ui/menu/gestures.lua',
 			platform: 'hs',
 			section: 'gesture_system_status_conflicts',
 			key: 'gesture_system_conflict_children',
 			port: 3
 		},
 		{
-			file: 'macos/ui/menu/menu_gestures.lua',
+			file: 'macos/gestures/ui/menu/gestures.lua',
 			platform: 'hs',
 			section: 'gesture_system_macos_children',
 			key: 'gesture_system_cached_conflicts',
 			port: 3
 		},
 		{
-			file: 'macos/ui/menu/menu_gestures.lua',
+			file: 'macos/gestures/ui/menu/gestures.lua',
 			platform: 'hs',
 			section: 'gesture_system_status_controls',
 			key: 'gesture_system_refresh',
 			port: 1
 		},
 		{
-			file: 'macos/ui/menu/menu_gestures.lua',
+			file: 'macos/gestures/ui/menu/gestures.lua',
 			platform: 'hs',
 			section: 'gesture_system_pinch_enabled',
 			key: 'gesture_system_open_enabled_pinch',
 			port: 1
 		},
 		{
-			file: 'macos/ui/menu/menu_gestures.lua',
+			file: 'macos/gestures/ui/menu/gestures.lua',
 			platform: 'hs',
 			section: 'gesture_system_pinch_disabled',
 			key: 'gesture_system_open_disabled_pinch',
 			port: 1
 		},
 		{
-			file: 'macos/ui/menu/menu_gestures.lua',
+			file: 'macos/gestures/ui/menu/gestures.lua',
 			platform: 'hs',
 			section: 'gesture_system_pinch_unknown',
 			key: 'gesture_system_open_unknown_pinch',
 			port: 1
 		},
 		{
-			file: 'linux/ui/gesture_conflicts.lua',
+			file: 'linux/gestures/ui/conflicts.lua',
 			platform: 'linux',
 			section: 'gesture_system_status_unknown',
 			key: 'gesture_system_unknown_children',
 			port: 3
 		},
 		{
-			file: 'linux/ui/gesture_conflicts.lua',
+			file: 'linux/gestures/ui/conflicts.lua',
 			platform: 'linux',
 			section: 'gesture_system_linux_children',
 			key: 'gesture_system_cached_overlap',
 			port: 3
 		},
 		{
-			file: 'linux/ui/gesture_conflicts.lua',
+			file: 'linux/gestures/ui/conflicts.lua',
 			platform: 'linux',
 			section: 'gesture_system_slot_unknown',
 			key: 'gesture_system_open_unknown_slot',
@@ -3021,7 +3021,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 {
 	const assert = require('node:assert/strict');
 	for (const [platform, file, child] of [
-		['hs', 'macos/ui/menu/menu_gestures.lua', 'gesture_system_macos_children']
+		['hs', 'macos/gestures/ui/menu/gestures.lua', 'gesture_system_macos_children']
 	]) {
 		const native = readSourceFile(path.join(SP, file));
 		const extension = path.extname(file);

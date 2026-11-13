@@ -39,8 +39,8 @@ local function with_owner(body, managed, public_chords)
 		if public_chords~=true then require("tests.support.key_combination_declaration_fixture").install_unavailable() end
 		package.loaded["modules.shortcuts.key_combinations"] = nil
 		local PairOwner = require("modules.shortcuts.key_combinations")
-		package.loaded["modules.gestures.manager"] = nil
-		local gestures = require("modules.gestures.manager")
+		package.loaded["gestures.engine.manager"] = nil
+		local gestures = require("gestures.engine.manager")
 		local state = { bytes = { [path] = source }, paused = false, publications = 0, changes = 0 }
 		local files = {
 			read_with_status = function(target)

@@ -99,7 +99,7 @@ local function with_provider(kind, options, body)
 			if options.unavailable then helpers.assert_eq(settings.items[1].hint, "platform_reason.program_runner_unavailable") end
 			picker_callback = callback
 		end }
-		package.loaded["modules.gestures.actions_aux_owner"] = { program_available = function() return true end }
+		package.loaded["gestures.engine.actions_aux_owner"] = { program_available = function() return true end }
 		package.loaded["modules.shortcuts.input_source_conflict"] = { check = function(_, _, callback) callback({}); return true end }
 		package.loaded["core.process.adapters.shell_runner"] = {}
 		package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }

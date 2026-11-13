@@ -16,7 +16,7 @@ local Input = require("platform.input.event")
 --- @return table session
 function M.new(options)
 	options = options or {}
-	local doubled = { "platform.input.evdev_reader", "platform.input.uinput_writer", "platform.input.keyboard_hook", "adapters.keyboard_layout", "modules.hotstrings.injector", "modules.gestures.combo_emitter" }
+	local doubled = { "platform.input.evdev_reader", "platform.input.uinput_writer", "platform.input.keyboard_hook", "adapters.keyboard_layout", "modules.hotstrings.injector", "gestures.engine.combo_emitter" }
 	local saved_modules = {}
 	for _, name in ipairs(doubled) do saved_modules[name] = package.loaded[name] end
 	local queues, sources, handles, paths, next_fd = {}, {}, {}, {}, 10

@@ -13,7 +13,7 @@
 --- adapters/xkb_capture.lua on the server's own keymap (libxkbcommon),
 --- modules/hotstrings/injector.lua, platform/input/modifier_broker.lua,
 --- platform/input/uinput_writer.lua, modules/shortcuts/accented_shortcuts.lua,
---- modules/gestures/combo_emitter.lua, and modules/keymap/layout_registry.lua
+--- gestures/engine/combo_emitter.lua, and modules/keymap/layout_registry.lua
 --- with the real Python installer for the Bépo user-tree install.
 ---
 --- Replaced edges: the last uinput hop is XTest (tests/hardware/lib/
@@ -268,7 +268,7 @@ local KeyboardLayout = require("adapters.keyboard_layout")
 local XkbCapture = require("adapters.xkb_capture")
 local Emulation = require("modules.keymap.layout_emulation")
 local Accented = require("modules.shortcuts.accented_shortcuts")
-local ComboEmitter = require("modules.gestures.combo_emitter")
+local ComboEmitter = require("gestures.engine.combo_emitter")
 local NumberRow = require("infra.number_row_preferences")
 local EvdevCodes = require("platform.input.evdev_codes")
 

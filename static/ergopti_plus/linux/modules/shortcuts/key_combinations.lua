@@ -76,7 +76,7 @@ function M.new(options)
 	for _, hold in ipairs(HoldOptions.build(options.hold_picker)) do
 		if hold.kind ~= "none" then holds[hold.id] = true end
 	end
-	local catalogue = options.actions or require("modules.gestures.manager")
+	local catalogue = options.actions or require("gestures.engine.manager")
 	local owner, state, lease, generation, busy = {}, nil, nil, 0, false
 	local delivery_fence
 	local function candidate(document, strict, shapes)
