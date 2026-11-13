@@ -6,12 +6,12 @@ local Codec = require("core.text.engine.toml_codec")
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
-		local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profiles",
+		local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.profiles",
 			"modules.llm.prediction_engine", "core.fs.adapters.storage" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, err = pcall(function()
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {
 				["llm.model"] = "legacy-model", ["llm.enabled"] = true, ["llm.models.selected"] = "ollama",
 			} })
@@ -82,7 +82,7 @@ helpers.describe("canonical Linux model preferences", function()
 			end)
 			helpers.assert_eq(reported, { ["llm.models.selected"] = true })
 			local scan = require("settings.engine.migration.unused_keys").find_in_source(source,
-				require("ui.menu.unused_keys_cleanup").collect)
+				require("settings.ui.menu.unused_keys_cleanup").collect)
 			helpers.assert_eq(#scan.keys, 1, "the cleanup offers what the reader ignores")
 			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm.models", "selected" })
 		end)

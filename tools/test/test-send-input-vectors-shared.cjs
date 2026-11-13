@@ -13,7 +13,7 @@
  *
  * WHY:
  * The grammar is implemented twice (_shared/platform/input for macOS and Linux,
- * windows/infra/send_input_parameter.ahk) and read a third time by the shared
+ * windows/settings/engine/send_input_parameter.ahk) and read a third time by the shared
  * action picker. The corpus is what keeps them equal; a corpus whose
  * expectations disagree with its own rule, or that no suite replays, pins
  * nothing.

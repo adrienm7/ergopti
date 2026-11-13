@@ -22,7 +22,7 @@ local MODULES = {
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.profiles_manager",
 	"ui.menu.shortcut_utils",
-	"ui.menu.preferences_transaction",
+	"settings.ui.menu.preferences_transaction",
 	"ui.prompt_editor",
 }
 
@@ -311,8 +311,8 @@ local function with_fixture(options, body)
 			get_model_info = function() return {params = 1} end,
 			get_presets = function() return {} end,
 		}
-		package.loaded["ui.menu.preferences_transaction"] = nil
-		local PreferencesTransaction = require("ui.menu.preferences_transaction")
+		package.loaded["settings.ui.menu.preferences_transaction"] = nil
+		local PreferencesTransaction = require("settings.ui.menu.preferences_transaction")
 		local preferences = {
 			save = function()
 				save_count = save_count + 1

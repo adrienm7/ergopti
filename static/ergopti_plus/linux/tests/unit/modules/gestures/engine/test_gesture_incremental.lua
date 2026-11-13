@@ -283,7 +283,7 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 	helpers.it("incremental: the cleanup keeps the saved modes and steps (gesture-slot-settings-cleanup)", function()
 		local source = "[gestures.modes]\nswipe_3_left = \"x1\"\nswipe_3_up = \"fast\"\n\n"
 			.. "[gestures.sensitivities]\nswipe_3_up = 12.0\n"
-		local scan = require("settings.engine.migration.unused_keys").find_in_source(source, require("ui.menu.unused_keys_cleanup").collect)
+		local scan = require("settings.engine.migration.unused_keys").find_in_source(source, require("settings.ui.menu.unused_keys_cleanup").collect)
 		local offered = {}
 		for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
 		table.sort(offered)

@@ -173,7 +173,7 @@ end
 --- @return number removed
 function M.reap_settings()
 	local folders, seen, removed = {}, {}, 0
-	for _, file in ipairs({ require("infra.config_paths").config("config.toml"), require("core.fs.adapters.storage").path() }) do
+	for _, file in ipairs({ require("settings.engine.paths").config("config.toml"), require("core.fs.adapters.storage").path() }) do
 		local folder = type(file) == "string" and require("core.fs.engine.native_path").dirname(file) or nil
 		if folder and folder ~= "" and not seen[folder] then
 			seen[folder] = true

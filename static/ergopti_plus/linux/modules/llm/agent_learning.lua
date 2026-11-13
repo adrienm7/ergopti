@@ -67,7 +67,7 @@ local _source = nil
 --- @return string
 local function state_path()
 	if _path then return _path end
-	return require("infra.config_paths").state(STATE_FILE)
+	return require("settings.engine.paths").state(STATE_FILE)
 end
 
 --- Preserves the rejected source without replacing an older recovery file.

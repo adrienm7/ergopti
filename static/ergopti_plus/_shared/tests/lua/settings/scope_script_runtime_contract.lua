@@ -2,7 +2,7 @@
 
 --- Actual native scalar ownership retains exact inverses across compositions.
 return function(helpers, driver)
-	local name = driver == "linux" and "infra.script_settings" or "core.logger.engine.logger"
+	local name = driver == "linux" and "settings.engine.scope.script_settings" or "core.logger.engine.logger"
 	local function with_native(callback)
 		local previous = package.loaded[name]
 		local storage = package.loaded["core.fs.adapters.storage"]

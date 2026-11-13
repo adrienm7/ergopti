@@ -144,7 +144,7 @@ local function with_repeat(source, body)
 	local ok, err = pcall(function()
 		Sandbox.with_config(source, function(path)
 			local controls = { legacy_writes = 0 }
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = {
 				get = function() return true end,
 				set = function() controls.legacy_writes = controls.legacy_writes + 1; return true end,
@@ -474,8 +474,8 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 					helpers.assert_eq(subject.is_enabled(), false)
 				end)
 				helpers.assert_eq(reported, { ["hotstrings.repeat_key_enabled"] = true })
-				package.loaded["ui.menu.unused_keys_cleanup"] = nil
-				local scan = require("ui.menu.unused_keys_cleanup").find(path)
+				package.loaded["settings.ui.menu.unused_keys_cleanup"] = nil
+				local scan = require("settings.ui.menu.unused_keys_cleanup").find(path)
 				helpers.assert_eq(scan.status, "ok", "the cleanup scan never fails on it")
 				local offered = {}
 				for _, key in ipairs(scan.keys) do offered[table.concat(key.path, ".")] = true end
@@ -486,8 +486,8 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 			end)
 			with_repeat("hotstrings = true\n", function(subject, _, path)
 				helpers.assert_eq(subject.is_enabled(), false)
-				package.loaded["ui.menu.unused_keys_cleanup"] = nil
-				helpers.assert_eq(require("ui.menu.unused_keys_cleanup").find(path).status, "ok",
+				package.loaded["settings.ui.menu.unused_keys_cleanup"] = nil
+				helpers.assert_eq(require("settings.ui.menu.unused_keys_cleanup").find(path).status, "ok",
 					"an old scalar [hotstrings] never makes the cleanup scan unreadable")
 			end)
 		end)
@@ -554,8 +554,8 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 
 	helpers.it("keeps the consumed setting during actual unused-key cleanup", function()
 		with_repeat(SOURCE, function(_, _, path)
-			package.loaded["ui.menu.unused_keys_cleanup"] = nil
-			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			package.loaded["settings.ui.menu.unused_keys_cleanup"] = nil
+			local scan = require("settings.ui.menu.unused_keys_cleanup").find(path)
 			helpers.assert_eq(scan.status, "ok")
 			local found_unknown = false
 			for _, key in ipairs(scan.keys) do

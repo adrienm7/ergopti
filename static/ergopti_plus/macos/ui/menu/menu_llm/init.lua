@@ -1106,7 +1106,7 @@ local function create_menu(deps)
 				-- The AI submenus that write config.toml name the same cause as the
 				-- manifest rows when the file refuses writes, and recheck it on a click.
 				local function config_reason()
-						return ConfigGuard.reason_key(require("ui.menu.menu_paths").get("ConfigTomlPath"),
+						return ConfigGuard.reason_key(require("settings.ui.menu.paths").get("ConfigTomlPath"),
 								require("settings.engine.migration.migrate"))
 				end
 				local blocked_reason = config_reason()
@@ -1444,7 +1444,7 @@ local function create_menu(deps)
 				-- through the declared `llm_toggle_ready` key and a click is refused
 				-- with a log line, rather than the row vanishing from the submenu.
 				local function configuration_writable()
-					local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
+					local path = require("settings.ui.menu.paths").get("ConfigTomlPath")
 					return type(path) == "string" and path ~= ""
 						and require("settings.engine.migration.migrate").read_only_reason(path) == nil
 				end
@@ -1989,11 +1989,11 @@ local function create_menu(deps)
 												llm_toggle_ready = function() return toggle_ready == true and configuration_writable() end,
 												llm_scope_ready  = function() return configuration_writable() end,
 												config_newer_schema = function()
-													local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
+													local path = require("settings.ui.menu.paths").get("ConfigTomlPath")
 													return require("settings.engine.migration.migrate").read_only_status(path) == "newer"
 												end,
 												config_older_schema = function()
-													local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
+													local path = require("settings.ui.menu.paths").get("ConfigTomlPath")
 													return require("settings.engine.migration.migrate").read_only_status(path) == "unsupported"
 												end,
 										},

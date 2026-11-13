@@ -6,7 +6,7 @@
 ; The four switches of the hotstring preview bubble (hotstrings.preview_star_enabled,
 ; preview_autocorrect_enabled, preview_ai_enabled, preview_colored_tooltips), as
 ; macOS and Linux have them. One home for the key list, the published values and
-; the family classification, included by the config loader (infra/feature_state.ahk)
+; the family classification, included by the config loader (settings/engine/preferences/feature_state.ahk)
 ; and by the hotstring engine, so the headless harnesses that load only one of them
 ; still see the same definitions.
 ; ==============================================================================

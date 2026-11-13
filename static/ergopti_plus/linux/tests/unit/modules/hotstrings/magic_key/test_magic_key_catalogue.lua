@@ -69,7 +69,7 @@ helpers.describe("magic key: static catalogue ownership", function()
 		-- Category and section switches go through the configuration owner's own
 		-- choices file: without this route they landed in the real config.toml.
 		local choices_path = temporary .. "_choices.toml"
-		local user_config = require("infra.config_paths").config("config.toml")
+		local user_config = require("settings.engine.paths").config("config.toml")
 		local before = io.open(user_config, "rb")
 		local before_bytes = before and before:read("*a")
 		if before then before:close() end

@@ -134,7 +134,7 @@ local function load_fixture(render_result, previews_enabled, options)
 		section = "fixture",
 		is_private = false,
 	}
-	package.loaded["modules.keymap.registry"] = {
+	package.loaded["settings.engine.registry"] = {
 		mappings_for_star_tail = function() return nil end,
 		mappings_for_tail = function()
 			-- Do not use `condition and nil or fallback` here: nil deliberately
@@ -623,7 +623,7 @@ end)
 
 helpers.describe("personal-file identity reaches the deferred native preview owner", function()
 	helpers.it("publishes the actual registered source id without changing the promised expansion", function()
-		local Registry = helpers.load_with_stubs("modules.keymap.registry")
+		local Registry = helpers.load_with_stubs("settings.engine.registry")
 		local State = helpers.load_with_stubs("modules.keymap.state")
 		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 		helpers.assert_true(Registry.init(state))

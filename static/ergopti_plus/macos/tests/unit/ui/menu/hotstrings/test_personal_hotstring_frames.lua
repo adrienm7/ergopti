@@ -34,7 +34,7 @@ local function with_personal_frame(body, options)
 			if name == "ERGOPTI_PATHS_FILE" then return scratch .. "/paths.toml" end
 			return previous_getenv(name)
 		end
-		local paths = require("infra.config_paths"); assert(paths.init(scratch .. "/") == true)
+		local paths = require("settings.engine.paths"); assert(paths.init(scratch .. "/") == true)
 		package.loaded["core.i18n.engine.i18n"] = nil
 		native = require("core.i18n.engine.i18n")
 		local backend = require("core.i18n.engine.locale")
@@ -307,12 +307,12 @@ local function with_registered_personal_sections(frame, scenario, posture)
 	local cleanup = {}; frame.section_fixture_cleanup = cleanup
 	local scoped, scope_error = pcall(helpers.with_stub_scope, {
 		"modules.keymap", "modules.keymap.init", "modules.keymap.state",
-		"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
+		"settings.engine.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 		"modules.keymap.utils", "modules.keymap.expander", "modules.keymap.llm_bridge",
-		"modules.keymap.terminator_replay", "infra.personal_hotstrings", "infra.personal_file_controls",
+		"modules.keymap.terminator_replay", "infra.personal_hotstrings", "settings.engine.preferences.personal_file_controls",
 	}, function()
 		local lfs = require("lfs")
-		local paths = require("infra.config_paths")
+		local paths = require("settings.engine.paths")
 		local original_get = paths.get
 		local original_attributes, original_symlink_attributes = hs.fs.attributes, hs.fs.symlinkAttributes
 		local root, path, state_module, original_new, native_keymap
@@ -342,7 +342,7 @@ local function with_registered_personal_sections(frame, scenario, posture)
 				if key == "PersonalHotstringsDir" then return root end
 				return original_get(key)
 			end
-			local registry = require("modules.keymap.registry")
+			local registry = require("settings.engine.registry")
 			state_module = require("modules.keymap.state")
 			original_new = state_module.new
 			local state, received_defaults, received_delays
@@ -359,7 +359,7 @@ local function with_registered_personal_sections(frame, scenario, posture)
 			native_keymap = value
 			assert(type(state) == "table" and rawequal(received_defaults, native_keymap.DEFAULT_STATE)
 				and rawequal(received_delays, native_keymap.DELAYS_DEFAULT), "actual boot state and canonical defaults")
-			assert(rawequal(rawget(package.loaded, "modules.keymap.registry"), registry), "actual retained registry cohort")
+			assert(rawequal(rawget(package.loaded, "settings.engine.registry"), registry), "actual retained registry cohort")
 			local name = "personal_ext_section"
 			local descriptor = require("hotstrings.engine.catalogue.personal_files").describe({ "section.toml" })
 			assert(registry.load_toml(name, path, nil, descriptor) == true)
@@ -373,7 +373,7 @@ local function with_registered_personal_sections(frame, scenario, posture)
 			frame.context.paused = posture == "paused"
 			local notices = 0
 			frame.context.notify_feature = function() notices = notices + 1 end
-			local current = require("infra.personal_file_scope").bind(frame.context, record)
+			local current = require("settings.engine.scope.personal_file_scope").bind(frame.context, record)
 			assert(current() == true, "the genuine registered descriptor and actual physical source admit this section owner")
 			scenario({ frame = frame, registry = registry, state = state, name = name, path = path,
 				current = current, read = read_source, repair = write_source, source = source,
@@ -533,9 +533,9 @@ helpers.describe("shared personal section leaf policy", function()
 	end)
 		helpers.it("restores actual section fixture paths stat ports and module owners after a scenario raises", function()
 		with_personal_frame(function(frame)
-			local paths = require("infra.config_paths")
+			local paths = require("settings.engine.paths")
 			local before_get, before_attributes, before_links = paths.get, hs.fs.attributes, hs.fs.symlinkAttributes
-			local before_registry = rawget(package.loaded, "modules.keymap.registry")
+			local before_registry = rawget(package.loaded, "settings.engine.registry")
 			local path, primary = nil, { message = "personal section scenario sentinel" }
 			local ok, detail = pcall(with_registered_personal_sections, frame, function(f)
 				path = f.path; registered_section_rows(frame); error(primary, 0)
@@ -547,7 +547,7 @@ helpers.describe("shared personal section leaf policy", function()
 			helpers.assert_true(rawequal(paths.get, before_get))
 			helpers.assert_true(rawequal(hs.fs.attributes, before_attributes))
 			helpers.assert_true(rawequal(hs.fs.symlinkAttributes, before_links))
-			helpers.assert_true(rawequal(rawget(package.loaded, "modules.keymap.registry"), before_registry))
+			helpers.assert_true(rawequal(rawget(package.loaded, "settings.engine.registry"), before_registry))
 			helpers.assert_nil(require("lfs").symlinkattributes(path))
 		end)
 	end)

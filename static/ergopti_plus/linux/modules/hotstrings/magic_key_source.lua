@@ -566,7 +566,7 @@ end
 
 
 -- These source observers are captured by the same original replacement owner.
-local CollisionRoutes = require("infra.config_paths")
+local CollisionRoutes = require("settings.engine.paths")
 local CollisionCodec = require("core.text.engine.toml_codec")
 local collision_route, collision_read, collision_decode = CollisionRoutes.config, FileSystem.read_with_status, CollisionCodec.decode
 local preference_ports = { get = Preferences.get, generation = Preferences.generation,
@@ -637,7 +637,7 @@ collision_factory = function()
 			if rawget(deps, name) ~= callbacks[name] then return false end
 		end end
 		return rawequal(package.loaded["infra.hotstring_preferences"], Preferences)
-			and rawequal(package.loaded["infra.config_paths"], CollisionRoutes) and CollisionRoutes.config == collision_route
+			and rawequal(package.loaded["settings.engine.paths"], CollisionRoutes) and CollisionRoutes.config == collision_route
 			and rawequal(package.loaded["core.fs.adapters.file_system"], FileSystem) and FileSystem.read_with_status == collision_read
 			and rawequal(package.loaded["core.text.engine.toml_codec"], CollisionCodec) and CollisionCodec.decode == collision_decode
 	end

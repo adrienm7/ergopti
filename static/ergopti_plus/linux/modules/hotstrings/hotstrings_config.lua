@@ -35,7 +35,7 @@ local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 local DelayResolver = require("hotstrings.engine.delay_resolver")
 local Priority = require("hotstrings.engine.priority")
 local Extensions = require("hotstrings.engine.extensions")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local Paths = require("core.fs.engine.paths")
 local RegularFile = require("core.fs.engine.regular_file_reader")
 local TomlReader = require("core.text.engine.toml.reader")
@@ -46,7 +46,7 @@ local Languages = require("hotstrings.engine.languages")
 local BulkScope = require("hotstrings.engine.bulk_scope")
 local ChoiceCatalogue = require("hotstrings.engine.choice_catalogue")
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
-local PersonalAdoption = require("infra.personal_file_adoption")
+local PersonalAdoption = require("settings.engine.preferences.personal_file_adoption")
 local ManifestReader = require("infra.manifest_reader")
 local Preferences = require("infra.hotstring_preferences")
 local KEY = require("settings.engine.keys").KEY
@@ -1064,7 +1064,7 @@ function M.init(engine, config_dir, on_change)
 	if type(config_dir) == "string" and config_dir ~= "" then
 		_config_dir = config_dir
 	else
-		local xdg = require("infra.config_paths").default_config_dir() .. "/hotstrings"
+		local xdg = require("settings.engine.paths").default_config_dir() .. "/hotstrings"
 		local kind, detail, code = require("core.fs.engine.native_directory").target_kind(xdg)
 		if kind == "directory" then _config_dir = xdg
 		elseif kind ~= nil or code ~= "ENOENT" then

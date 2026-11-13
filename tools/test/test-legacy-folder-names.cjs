@@ -54,10 +54,10 @@ const OWNERS = new Set([
 	'static/ergopti_plus/_shared/tests/corpus/paths/legacy_folder_migration_vectors.json',
 	'static/ergopti_plus/macos/core/fs/adapters/legacy_folder_migration.lua',
 	'static/ergopti_plus/macos/tests/unit/core/fs/adapters/test_legacy_folder_migration.lua',
-	'static/ergopti_plus/linux/infra/legacy_folder_migration.lua',
-	'static/ergopti_plus/linux/tests/unit/infra/config/test_legacy_folder_migration.lua',
-	'static/ergopti_plus/windows/infra/legacy_folder_migration.ahk',
-	'static/ergopti_plus/windows/tests/unit/infra/config/migration/test_legacy_folder_migration.ahk',
+	'static/ergopti_plus/linux/settings/engine/migration/legacy_folder_migration.lua',
+	'static/ergopti_plus/linux/tests/unit/settings/migration/test_legacy_folder_migration.lua',
+	'static/ergopti_plus/windows/settings/engine/migration/legacy_folder_migration.ahk',
+	'static/ergopti_plus/windows/tests/unit/settings/engine/migration/test_legacy_folder_migration.ahk',
 	'docs/tooling/one-folder-name-handoff.md',
 	'tools/test/test-legacy-folder-names.cjs'
 ]);

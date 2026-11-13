@@ -58,7 +58,7 @@ local NativePath = require("core.fs.engine.native_path")
 --- Absolute path of the pre-configuration log.
 --- @return string
 function M.path()
-	return require("infra.config_paths").default_logs_dir() .. "/" .. AppDirs.files.bootstrap_log
+	return require("settings.engine.paths").default_logs_dir() .. "/" .. AppDirs.files.bootstrap_log
 end
 
 --- Appends one record, creating the default logs folder if needed.

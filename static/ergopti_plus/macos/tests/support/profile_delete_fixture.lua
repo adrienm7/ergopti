@@ -52,7 +52,7 @@ local MODULES = {
 	"ui.menu.menu_llm.trigger_orchestrator",
 	"ui.menu.menu_llm.trigger_panel",
 	"ui.menu.shortcut_utils",
-	"ui.menu.preferences_transaction",
+	"settings.ui.menu.preferences_transaction",
 	"ui.prompt_editor",
 }
 

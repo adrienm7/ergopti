@@ -27,16 +27,16 @@ local function fixture(number_row_source, complete_source)
 		end,
 	}
 	package.loaded["core.fs.adapters.file_system"] = adapter
-	local prefs = helpers.load_with_stubs("infra.preferences")
+	local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 	prefs.load("config")
-	local PT = require("ui.menu.preferences_transaction")
+	local PT = require("settings.ui.menu.preferences_transaction")
 	local save, checkpoint = PT.bind(prefs, { path = "config", state = state, hotfiles = {}, core_modules = {},
 		initial_state = state, initial_preferences = prefs.snapshot(state, {}, {}), restore_runtime = function() return true end })
 	--- A layout owner over this fixture's file, preferences and checkpoint.
 	--- @param backup string|nil Its backup path; the first owner uses "backup".
 	--- @return table owner
 	local function new_owner(backup)
-		return require("ui.menu.scoped_preferences").new({
+		return require("settings.ui.menu.scoped_preferences").new({
 			scope = "keyboard_layout", path = "config", state = state, files = adapter, preferences = prefs,
 			checkpoint = checkpoint, demotions = require("ui.menu.session_demotions").new(),
 			capture_preferences = function() return prefs.snapshot(state, {}, {}) end,
@@ -159,7 +159,7 @@ helpers.describe("macOS keyboard-layout scope", function()
 end)
 
 package.loaded["core.fs.adapters.file_system"] = FileSystem
-package.loaded["infra.preferences"] = nil
+package.loaded["settings.engine.preferences.preferences"] = nil
 
 helpers.describe("layout scope provider", LayoutFixture.scoped(function()
 	helpers.it("dispatches the common commands through the exact scope owner", function()
@@ -252,7 +252,7 @@ helpers.describe("macOS scoped preferences under a composition", function()
 		helpers.assert_eq(owner.apply("clear"), true)
 		helpers.assert_true(writes() > 0)
 		local ok, err = pcall(function()
-			return require("ui.menu.scoped_preferences").new({ scope = "keyboard_layout",
+			return require("settings.ui.menu.scoped_preferences").new({ scope = "keyboard_layout",
 				confirm = function() return true end, admission = function() end, paused = function() end,
 				backup_path = function() end, capture_preferences = function() end,
 				checkpoint = { capture = function() end, replace = function() end, restore = function() end },

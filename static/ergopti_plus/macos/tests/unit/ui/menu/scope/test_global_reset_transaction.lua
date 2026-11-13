@@ -436,7 +436,7 @@ helpers.describe("layout scope menu composition", function()
 				dialog_args = { ... }
 				return selected
 			end }
-			package.loaded["ui.menu.scoped_preferences"] = { new = function(options)
+			package.loaded["settings.ui.menu.scoped_preferences"] = { new = function(options)
 				received = options
 				return { apply = function(mode)
 					return options.admission("layout scope fixture", function()

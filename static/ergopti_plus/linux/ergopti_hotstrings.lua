@@ -192,7 +192,7 @@ end
 -- The builds before the single folder name kept the configuration, the state
 -- and the logs in a second folder of each XDG base. They move once, here: before
 -- the logger sink opens its folder and before the bootstrap storage is read.
-local LegacyFolderMigration = require("infra.legacy_folder_migration")
+local LegacyFolderMigration = require("settings.engine.migration.legacy_folder_migration")
 local legacy_folder_report = LegacyFolderMigration.run()
 
 
@@ -277,7 +277,7 @@ local keyboard_hook     = require("platform.input.keyboard_hook")
 local InputEvent        = require("platform.input.event")
 local Monotonic         = require("core.logger.engine.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
-local ScriptSettings    = require("infra.script_settings")
+local ScriptSettings    = require("settings.engine.scope.script_settings")
 local Timings           = require("core.timing.engine.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
@@ -331,7 +331,7 @@ local input_capture_gate = nil
 -- Installed before main() so the boot's own errors count; it opens nothing before the event loop runs.
 -- config.toml's [script] rows (locale, log level, error window) win over the
 -- saved values at start, as on Windows: adopted before any of them is read.
-require("infra.script_scope").adopt_configured()
+require("settings.engine.scope.script_scope").adopt_configured()
 local ErrorDialog = RuntimeGuard.optional_require("ui.error_dialog.bridge")
 if ErrorDialog and ErrorDialog.init() then Logger.set_error_observer(ErrorDialog.on_error) end
 
@@ -681,7 +681,7 @@ local PERIODIC_TICK_MS   = 250
 local FLUSH_EVERY_TICKS  = math.max(1,
 	math.floor(Timings.ms("keystats", "ingest_tick_ms") / PERIODIC_TICK_MS))
 
-local DEFAULT_CONFIG_DIR = require("infra.config_paths").config("hotstrings")
+local DEFAULT_CONFIG_DIR = require("settings.engine.paths").config("hotstrings")
 
 -- Terminator catalogue: shared between Linux and macOS.
 local terminators_mod = (function()
@@ -875,7 +875,7 @@ privacy_owners.tray_quit = require("core.lifecycle.engine.shutdown.quit_request"
 	shutdown = shutdown,
 	reload_in_flight = reload_in_flight,
 	abandon_reload = abandon_reload,
-	writer_active = function() return require("infra.scope_registry").pending() end,
+	writer_active = function() return require("settings.engine.scope.registry").pending() end,
 	publication_pending = function() return hotstrings_config.publication_pending() end,
 	apply_pause_layout = function() require("modules.keymap.pause_layout_switch").quit_safely() end,
 	report_update_quit = function(reason) require("infra.updater_boot_ready").report_quit(reason) end,
@@ -997,7 +997,7 @@ local function main()
 
 	BootProfiler.stage("config")
 	require("core.text.engine.toml_codec.writer").set_sparse_defaults(
-		require("infra.config_paths").config("config.toml"), require("infra.manifest_reader"))
+		require("settings.engine.paths").config("config.toml"), require("infra.manifest_reader"))
 	require("core.text.engine.toml_codec.writer").set_case_twin_reporter(function(message, admission)
 		local notifier = require("platform.system.notifier")
 		if admission ~= nil then
@@ -1019,13 +1019,13 @@ local function main()
 	-- sits near LuaJIT's upvalue limit.
 	do
 		local migration = require("settings.engine.migration.migrate").boot({
-			path          = require("infra.config_paths").config("config.toml"),
+			path          = require("settings.engine.paths").config("config.toml"),
 			driver        = "linux",
 			registry_path = require("core.fs.engine.paths").shared(require("settings.engine.migration.migrate").REGISTRY_PATH),
 			-- The v22 step moves the switch, the timings and [mod_combos] out of the
 			-- tap_hold.toml beside config.toml, once (maintainer decision 2026-11-11).
 			companions    = { [require("tap_hold.engine.shared_file").FILE_NAME] =
-				require("infra.config_paths").config(require("tap_hold.engine.shared_file").FILE_NAME) },
+				require("settings.engine.paths").config(require("tap_hold.engine.shared_file").FILE_NAME) },
 		})
 		-- A newer file stays read-only for the session: tell the user why their
 		-- changes do not stick. Block-local, as main() is near the upvalue limit.
@@ -1041,7 +1041,7 @@ local function main()
 	-- leaves once, before any hotstring owner reads them: the canonical readers
 	-- resolve absence to off, which would silence an updated install.
 	require("infra.legacy_hotstring_storage").import({
-		path     = require("infra.config_paths").config("config.toml"),
+		path     = require("settings.engine.paths").config("config.toml"),
 		storage  = require("core.fs.adapters.storage"),
 		families = dyn_hotstrings and dyn_hotstrings.RULE_FAMILIES or {},
 	})
@@ -1210,7 +1210,7 @@ local function main()
 	-- whose closure reads it.
 	-- tap_hold.toml is versioned like config.toml: migrated before the engine reads it.
 	require("platform.remap.tap_hold_writer").migrate_file(
-		require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME))
+		require("settings.engine.paths").config(require("platform.remap.tap_hold_writer").FILE_NAME))
 	local TapHold = require("platform.remap.tap_hold_manager")
 	-- When the buffer forgets the current word: after a pause and on a click.
 	-- Required here for the same upvalue budget as TapHold.
@@ -1259,9 +1259,9 @@ local function main()
 			engine:reset(false)
 		end,
 		defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"),
-		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
+		user_path = require("settings.engine.paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
 		-- The switch and the timings are config.toml rows on every OS.
-		config_path = require("infra.config_paths").config("config.toml"),
+		config_path = require("settings.engine.paths").config("config.toml"),
 	})
 	end)
 	if not privacy_owners.tap_hold_called or privacy_owners.tap_hold_initialized ~= true then
@@ -1300,7 +1300,7 @@ local function main()
 		canonical_hold = TapHold.canonical_hold,
 		layers = {
 			shared_root = require("core.fs.engine.paths").shared_root(),
-			config_dir = require("infra.config_paths").get_config_dir(),
+			config_dir = require("settings.engine.paths").get_config_dir(),
 		},
 	})
 
@@ -3259,7 +3259,7 @@ local function main()
 	-- Run only after every bridge dependency is ready and never in hardware probes.
 	require("ui.onboarding.startup").run({
 		graphical = opts.tray == true and not opts.dry_run,
-		path = require("infra.config_paths").config("config.toml"),
+		path = require("settings.engine.paths").config("config.toml"),
 		show = function(app) return webview_manager and webview_manager.show(app) == true end,
 		fail = function(reason)
 			Logger.error(LOG, "%s.", reason)

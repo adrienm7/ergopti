@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("trigger ROI admitted registry", function()
 	helpers.it("tracks strict triggers and retires the index while a deferred mutation is pending", function()
-		local registry = helpers.load_with_stubs("modules.keymap.registry")
+		local registry = helpers.load_with_stubs("settings.engine.registry")
 		helpers.assert_nil(registry.is_known_trigger("other"))
 		registry.init({ magic_key = "★", mappings = {}, mappings_lookup = {},
 			mappings_by_tail_char = {}, mappings_by_star_tail_char = {}, groups = {},

@@ -5,17 +5,17 @@
 --- DESCRIPTION:
 --- Handles group registration, file loading (Lua and TOML), group enable/disable,
 --- and group-context management for the keymap registry.
---- Initialized by registry.lua via Groups.init(state, callbacks) so that all
+--- Initialized by ../../settings/engine/registry.lua via Groups.init(state, callbacks) so that all
 --- group-level operations share the same CoreState and rebuild helpers without
 --- circular dependencies.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Extraction: Keeps the heavy group-loading logic (TOML parser, section
----    enable/disable, priority cascade) out of the monolithic registry.lua so
+---    enable/disable, priority cascade) out of the monolithic ../../settings/engine/registry.lua so
 ---    each concern lives in a focused module.
 --- 2. Callback Bridge: Receives sort_mappings, add, is_section_enabled,
 ---    resolve_priority, rebuild_lookup, and rebuild_tail_indexes as callbacks
----    from registry.lua so the extracted functions keep identical behaviour
+---    from ../../settings/engine/registry.lua so the extracted functions keep identical behaviour
 ---    without introducing a reverse dependency.
 --- ==============================================================================
 
@@ -54,8 +54,8 @@ local function require_state(func_name)
 	return true
 end
 
---- Receives the shared state and rebuild callbacks from registry.lua.
---- Must be called exactly once, from within registry.lua'·s M.init().
+--- Receives the shared state and rebuild callbacks from ../../settings/engine/registry.lua.
+--- Must be called exactly once, from within ../../settings/engine/registry.lua'·s M.init().
 --- @param state table The shared CoreState.
 --- @param callbacks table {add, sort_mappings, is_section_enabled, resolve_priority, rebuild_lookup, rebuild_tail_indexes}.
 --- Required callback names. Validated once at init rather than checked at each
@@ -500,7 +500,7 @@ end
 --- @param path string Absolute file path.
 --- @return string origin "user", "bundled" or "origin unknown".
 function M.file_origin(path)
-	local loaded, ConfigPaths = pcall(require, "infra.config_paths")
+	local loaded, ConfigPaths = pcall(require, "settings.engine.paths")
 	if not loaded or type(ConfigPaths) ~= "table" or type(ConfigPaths.get_config_dir) ~= "function" then
 		return "origin unknown"
 	end

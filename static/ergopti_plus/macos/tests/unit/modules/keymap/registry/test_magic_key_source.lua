@@ -25,7 +25,7 @@ local RESET_MODULES = {
 	"core.logger.engine.logger", "core.text.engine.utils",
 	"modules.hotstrings.hotstrings_config", "modules.keystats",
 	"modules.keymap", "modules.keymap.init", "modules.keymap.expander",
-	"modules.keymap.llm_bridge", "modules.keymap.registry",
+	"modules.keymap.llm_bridge", "settings.engine.registry",
 	"modules.keymap.state", "modules.keymap.terminator_replay",
 	"modules.keymap.utils", "modules.keymap.magic_key_source",
 	"modules.llm", "modules.llm.prediction_engine", "core.ui.ui.tooltip",
@@ -178,7 +178,7 @@ helpers.describe("magic key source: the keymap keyDown tap", function()
 	helpers.it("(magic-key-source) a plain press of the chosen key carries the magic key", function()
 		local keymap, tap = load_keymap()
 		helpers.assert_type(tap and tap.callback, "function", "the keyDown tap must be captured")
-		local Registry = require("modules.keymap.registry")
+		local Registry = require("settings.engine.registry")
 		local replace = true
 		Registry.is_group_enabled = function(name) return name == "magickey" end
 		Registry.is_section_enabled = function(group, section)
@@ -220,13 +220,13 @@ end)
 
 helpers.describe("magic key source: config.toml", function()
 	helpers.it("(magic-key-source) a stored key reaches the menu state, an outdated one is offered", function()
-		helpers.with_fresh_modules({ "core.logger.engine.shim", "settings.engine.migration.outdated", "infra.preferences" }, function()
+		helpers.with_fresh_modules({ "core.logger.engine.shim", "settings.engine.migration.outdated", "settings.engine.preferences.preferences" }, function()
 			local warnings = {}
 			local shim = helpers.make_logger_stub()
 			shim.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
 			package.loaded["core.logger.engine.shim"] = shim
 			helpers.load_with_stubs("settings.engine.migration.outdated")
-			local Preferences = helpers.load_with_stubs("infra.preferences")
+			local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 			local TomlCodec = require("core.text.engine.toml_codec")
 
 			local chosen = "[hotstrings]\nmagic_key_source = \"Semicolon\"\n"
@@ -252,7 +252,7 @@ helpers.describe("magic key source: acknowledged tap dispatcher", function()
   if prior_bridge then helpers.assert_true(prior_bridge.stop()) end
   package.loaded["modules.keystats.kc_bridge"] = nil
   local keymap, keymap_tap = load_keymap()
-  local Registry = require("modules.keymap.registry")
+  local Registry = require("settings.engine.registry")
   Registry.is_group_enabled = function(name) return name == "magickey" end
   Registry.is_section_enabled = function(group, section) return group == "magickey" and section == "replace" end
   assert(keymap.set_magic_key_source("Backquote"))

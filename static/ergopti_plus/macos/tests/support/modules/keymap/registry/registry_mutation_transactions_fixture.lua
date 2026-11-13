@@ -31,7 +31,7 @@ end
 --- @return table registry
 local function fresh_registry()
 	package.loaded["core.fs.adapters.storage"] = nil
-	local registry = helpers.load_with_stubs("modules.keymap.registry")
+	local registry = helpers.load_with_stubs("settings.engine.registry")
 	package.loaded["modules.keymap.state"] = nil
 	local State = require("modules.keymap.state")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
@@ -104,8 +104,8 @@ local function dynamic_personal_scope_fixture(enabled, outcome, absent)
 			files[path] = content; return true
 		end,
 	}
-	package.loaded["infra.preferences"] = nil
-	local preferences = require("infra.preferences")
+	package.loaded["settings.engine.preferences.preferences"] = nil
+	local preferences = require("settings.engine.preferences.preferences")
 	preferences.load("config")
 	local shared = assert(require("core.text.engine.toml_codec").decode(require("tests.support.source_file").read(
 		helpers.driver_root() .. "../_shared/hotstrings/data/catalogue/_index.toml")))

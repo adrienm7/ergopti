@@ -776,11 +776,11 @@ global TEST_MODULE_GROUPS := [
 	; The rest of the LLM module: prediction, menus, API clients.
 	["llm", "^unit/modules/llm/"],
 	; Configuration version transitions.
-	["config-transition", "^unit/infra/config/transition/"],
+	["config-transition", "^unit/settings/engine/transition/"],
 	; Whole-configuration scope: global scope, recommended restore, scope manifest, menus.
 	["config-scope-global", "^unit/infra/config/scope/test_(global_config_scope|restore_recommended_no_confirm|config_scope_menus|config_scope_shortcuts)\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
 	; Per-feature configuration scope: hotstrings, tap-hold, personal files.
-	["config-scope-features", "^unit/infra/config/scope/"],
+	["config-scope-features", "^unit/settings/engine/scope/"],
 	; Configuration storage, TOML and the updater.
 	["config-updater", "^unit/(config|toml)/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
 	; Hotstrings, dynamic hotstrings and shortcuts.
@@ -792,7 +792,7 @@ global TEST_MODULE_GROUPS := [
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
 	["ui", "^unit/"],
 	; Adapters, platform services, shared infrastructure and the test runner.
-	["core", "^unit/(adapters|platform|infra|suite|core)/"]
+	["core", "^unit/(adapters|platform|infra|suite|core|settings)/"]
 ]
 
 ; The test category of a registering test file; a file no category declares is refused.

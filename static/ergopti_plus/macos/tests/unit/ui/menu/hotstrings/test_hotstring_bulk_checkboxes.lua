@@ -249,11 +249,11 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 		end
 	end
 	helpers.it("a personal file submenu owns only its group and keeps shared command order", function()
-		helpers.with_stub_scope({ "infra.personal_file_scope", "ui.menu.menu_hotstrings_custom" }, function()
+		helpers.with_stub_scope({ "settings.engine.scope.personal_file_scope", "ui.menu.menu_hotstrings_custom" }, function()
 			-- This projection fixture owns a synthetic acknowledged group. Actual
 			-- provenance, native route and refusal behavior have their own owner test.
 			local bindings = 0
-			package.loaded["infra.personal_file_scope"] = { bind = function()
+			package.loaded["settings.engine.scope.personal_file_scope"] = { bind = function()
 				bindings = bindings + 1
 				return function() return true end
 			end }

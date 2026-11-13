@@ -16,9 +16,9 @@ local TextUtils = require("core.text.engine.utils")
 --- @param body function Receives the actual native-owner fixture.
 local function with_fixture(collision, body)
 	return helpers.with_stub_scope({
-		"infra.preferences", "core.fs.adapters.file_system", "core.fs.adapters.storage", "infra.config_paths",
-		"core.ui.engine.notifications", "ui.menu.keymap_lifecycle", "modules.keymap.registry", "modules.keymap.registry_index",
-		"modules.keymap.registry_groups", "ui.menu.menu_hotstrings_custom", "infra.personal_file_scope",
+		"settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.fs.adapters.storage", "settings.engine.paths",
+		"core.ui.engine.notifications", "ui.menu.keymap_lifecycle", "settings.engine.registry", "modules.keymap.registry_index",
+		"modules.keymap.registry_groups", "ui.menu.menu_hotstrings_custom", "settings.engine.scope.personal_file_scope",
 		"infra.personal_hotstrings",
 		"core.i18n.engine.i18n", "infra.manifest_menu", "core.i18n.engine.locale", "core.i18n.engine.core",
 	}, function()
@@ -84,19 +84,19 @@ local function with_fixture(collision, body)
 			end,
 		}
 		package.loaded["core.fs.adapters.file_system"] = native_files
-		package.loaded["infra.config_paths"] = { get = function(key)
+		package.loaded["settings.engine.paths"] = { get = function(key)
 			if key == "PersonalHotstringsDir" then return controls.root or root end
 			if key == "ConfigTomlPath" then return config end
 		end }
 		package.loaded["core.ui.engine.notifications"] = { notify = function(...)
 			observations.notices[#observations.notices + 1] = { ... }
 		end }
-		local R = helpers.load_with_stubs("modules.keymap.registry")
+		local R = helpers.load_with_stubs("settings.engine.registry")
 		local state = require("modules.keymap.state").new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 		assert(R.init(state))
 		for _, entry in ipairs(definitions) do assert(R.load_toml(entry.name, entry.path, nil, entry.personal_source)) end
 		R.start = function() observations.starts = observations.starts + 1; return true end
-		local Preferences = require("infra.preferences")
+		local Preferences = require("settings.engine.preferences.preferences")
 		local saved, loaded = Preferences.load(config); assert(loaded == "ok")
 		local menu_state = Preferences.build_initial_state(names, {}, {})
 		Preferences.merge_saved_data(menu_state, saved)

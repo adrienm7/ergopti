@@ -235,7 +235,7 @@ end
 --- Reads every slot and the switch from config.toml, or the manifest defaults.
 local function load_assignments()
 	if _assignments then return end
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	local content, status, detail = TomlWriter.read_classified(path)
 	if status ~= "ok" and status ~= "absent" then
 		error("script_chords: cannot read configuration: " .. tostring(detail))
@@ -272,7 +272,7 @@ end
 --- @param value any
 --- @return boolean committed
 local function persist(key, value)
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	local assignments, enabled, generation = _assignments, _chords_on, _dispatch_generation
 	local bytes, status = TomlWriter.read_classified(path)
 	if status ~= "ok" and status ~= "absent" then return false end

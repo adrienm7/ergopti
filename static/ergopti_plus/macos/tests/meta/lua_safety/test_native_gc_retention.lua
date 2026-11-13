@@ -269,7 +269,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 				["core.fs.adapters.file_system"] = {
 					read_with_status = function() return "source", "ok" end,
 				},
-				["infra.config_paths"] = {
+				["settings.engine.paths"] = {
 					get = function() return "/tmp/personal_shortcuts.lua" end,
 				},
 				["core.logger.engine.logger"] = helpers.make_logger_stub(),

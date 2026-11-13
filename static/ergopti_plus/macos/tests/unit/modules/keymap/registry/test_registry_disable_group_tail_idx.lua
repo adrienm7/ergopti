@@ -4,7 +4,7 @@
 --- MODULE: Registry disable_group Tail-Index Consistency Test
 --- DESCRIPTION:
 --- Regression test for the "registry-disable-group-stale-tail-index" audit
---- finding in modules/keymap/registry.lua.
+--- finding in settings/engine/registry.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- disable_group() purged entries from _state.mappings and rebuilt the lookup
@@ -26,10 +26,10 @@ package.loaded["core.logger.engine.logger"] = nil
 local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local State    = helpers.load_with_stubs("modules.keymap.state")
-local Registry = helpers.load_with_stubs("modules.keymap.registry")
+local Registry = helpers.load_with_stubs("settings.engine.registry")
 
 local REGISTRY_OWNERSHIP = {
-	"modules.keymap.registry",
+	"settings.engine.registry",
 	"modules.keymap.registry_groups",
 	"modules.keymap.registry_index",
 	"modules.keymap.terminators",
@@ -39,7 +39,7 @@ local REGISTRY_OWNERSHIP = {
 --- @return table state, table R
 local function fresh_registry()
 	return helpers.with_fresh_modules(REGISTRY_OWNERSHIP, function()
-		local R = require("modules.keymap.registry")
+		local R = require("settings.engine.registry")
 		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })
 		helpers.assert_eq(R.init(state), true)
 		Registry = R

@@ -342,8 +342,8 @@ helpers.describe("profile initialization recovery", function()
 		with_initialization(function(_, engine, profiles)
 			local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 			Sandbox.with_config("[llm\n", function(path)
-				local previous_paths, previous_preferences = package.loaded["infra.config_paths"], package.loaded["infra.llm_preferences"]
-				package.loaded["infra.config_paths"] = { config = function() return path end }
+				local previous_paths, previous_preferences = package.loaded["settings.engine.paths"], package.loaded["infra.llm_preferences"]
+				package.loaded["settings.engine.paths"] = { config = function() return path end }
 				package.loaded["infra.llm_preferences"] = nil
 				local ok, failure = pcall(function()
 					local preferences = require("infra.llm_preferences")
@@ -355,7 +355,7 @@ helpers.describe("profile initialization recovery", function()
 					helpers.assert_true(engine.init({}) ~= false)
 					helpers.assert_eq(profiles.get_current_model(), "repaired:2b")
 				end)
-				package.loaded["infra.config_paths"], package.loaded["infra.llm_preferences"] = previous_paths, previous_preferences
+				package.loaded["settings.engine.paths"], package.loaded["infra.llm_preferences"] = previous_paths, previous_preferences
 				if not ok then error(failure, 0) end
 			end)
 		end)

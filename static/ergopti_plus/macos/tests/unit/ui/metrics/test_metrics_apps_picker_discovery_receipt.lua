@@ -19,7 +19,7 @@ local PICKER_OWNERS = {
 	"core.logger.engine.logger",
 	"core.ui.engine.dialog_util",
 	"core.fs.adapters.file_system",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
 	"core.ui.adapters.webview_result",

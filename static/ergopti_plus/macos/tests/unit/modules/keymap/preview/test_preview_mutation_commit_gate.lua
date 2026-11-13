@@ -108,7 +108,7 @@ helpers.describe("keymap semantic mutations wait for native preview revocation",
 	helpers.it("rejects malformed magic keys and custom collisions before preview revocation", function()
 		local effects = { allow_hide = true, hide_calls = 0, reset_calls = 0, visible = false }
 		local Keymap = fresh_runtime(effects)
-		local Registry = assert(package.loaded["modules.keymap.registry"])
+		local Registry = assert(package.loaded["settings.engine.registry"])
 		local Bridge = assert(package.loaded["modules.keymap.llm_bridge"])
 
 		helpers.assert_true(Keymap.set_trigger_char("a"))
@@ -157,7 +157,7 @@ helpers.describe("keymap semantic mutations wait for native preview revocation",
 	helpers.it("keeps the old engine state and lease when canvas hide fails", function()
 		local effects = { allow_hide = true, hide_calls = 0, reset_calls = 0, visible = false }
 		local Keymap = fresh_runtime(effects)
-		local Registry = assert(package.loaded["modules.keymap.registry"])
+		local Registry = assert(package.loaded["settings.engine.registry"])
 		local Bridge = assert(package.loaded["modules.keymap.llm_bridge"])
 
 		helpers.assert_eq(type(Keymap.invalidate_hotstring_preview), "function")

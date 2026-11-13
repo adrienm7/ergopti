@@ -422,9 +422,9 @@ helpers.describe("backend publication rechecks actual admission after dismissal"
 			local initial = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n[future]\nvalue = 42 # independently owned\n'
 			Sandbox.with_config(initial, function(path)
 				local engine, _, scheduler, restore = load("ollama", nil)
-				local previous_paths = package.loaded["infra.config_paths"]
+				local previous_paths = package.loaded["settings.engine.paths"]
 				local ok, err = xpcall(function()
-					package.loaded["infra.config_paths"] = {config = function() return path end}
+					package.loaded["settings.engine.paths"] = {config = function() return path end}
 					package.loaded["infra.llm_preferences"] = nil
 					local preferences = require("infra.llm_preferences")
 					local _, captured = preferences.get_many({"llm.models.selected"})
@@ -469,7 +469,7 @@ helpers.describe("backend publication rechecks actual admission after dismissal"
 					end
 					helpers.assert_eq(observations.admissions, 2, "the existing admission owner is rechecked after real dismissal")
 				end, debug.traceback)
-				package.loaded["infra.config_paths"] = previous_paths
+				package.loaded["settings.engine.paths"] = previous_paths
 				restore()
 				if not ok then error(err, 0) end
 			end)

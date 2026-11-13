@@ -212,7 +212,7 @@ end
 --- @param code string Locale about to be saved.
 --- @return boolean committed
 local function rewrite_configured(code)
-	local committed, detail, receipt = require("infra.script_scope").rewrite_configured_owned(
+	local committed, detail, receipt = require("settings.engine.scope.script_scope").rewrite_configured_owned(
 		require("settings.engine.keys").KEY.SCRIPT_LOCALE, code)
 	_locale_rewrite_debt = receipt
 	if committed ~= true then
@@ -225,7 +225,7 @@ end
 --- Keeps the exact config inverse until restoration is confirmed by readback.
 local function settle_locale_rewrite()
 	if _locale_rewrite_debt == nil then return true end
-	local ok, restored = pcall(require("infra.script_scope").restore_configured_rewrite, _locale_rewrite_debt)
+	local ok, restored = pcall(require("settings.engine.scope.script_scope").restore_configured_rewrite, _locale_rewrite_debt)
 	if not ok or restored ~= true then
 		Logger.error(LOG, "Locale config rollback remains pending; another locale change is blocked.")
 		return false
@@ -280,7 +280,7 @@ end
 local function persist_selected_locale(code)
 	local debt = _locale_storage_debt
 	if not debt or debt.backup_path then return false end
-	local path = require("infra.config_paths").get("ConfigTomlPath")
+	local path = require("settings.engine.paths").get("ConfigTomlPath")
 	if type(path) ~= "string" or path == "" then return false end
 	_locale_storage_serial = _locale_storage_serial + 1
 	debt.backup_path = path .. ".locale-" .. tostring(hs.timer.absoluteTime()) .. "-"
@@ -293,7 +293,7 @@ local function persist_selected_locale(code)
 end
 
 local function verify_configured_locale()
-	local ok, verified = pcall(require("infra.script_scope").verify_configured_rewrite, _locale_rewrite_debt)
+	local ok, verified = pcall(require("settings.engine.scope.script_scope").verify_configured_rewrite, _locale_rewrite_debt)
 	return ok and verified == true
 end
 

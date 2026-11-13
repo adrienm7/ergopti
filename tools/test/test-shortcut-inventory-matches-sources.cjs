@@ -191,7 +191,7 @@ const roleFamilies = JSON.parse(
 ).families;
 const prefixesOf = (driver) => roleFamilies[driver].map((roles) => roles.join('_') + '_').sort();
 const windowsGroups = [
-	...read(DRIVERS, 'windows', 'infra', 'config_io.ahk')
+	...read(DRIVERS, 'windows', 'settings', 'engine', 'io.ahk')
 		.match(/global KEYBOARD_SLOT_GROUPS := \[([\s\S]*?)\n\]/)[1]
 		.matchAll(/Map\("prefix", "([a-z_]+_)"/g)
 ]

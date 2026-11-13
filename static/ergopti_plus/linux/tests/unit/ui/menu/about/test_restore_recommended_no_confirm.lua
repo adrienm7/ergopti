@@ -183,12 +183,12 @@ helpers.describe("restore-recommended-no-confirm: Configuration (Linux)", functi
 	for _, case in ipairs({ { key = "common.restore_recommended", mode = "recommended" },
 		{ key = "common.clear_to_system", mode = "clear" } }) do
 		helpers.it("the global " .. case.mode .. " composes every category without a question", function()
-			local names = { "infra.global_scope", "ui.menu.builder" }
+			local names = { "settings.engine.scope.global_scope", "ui.menu.builder" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local calls = {}
 			local ok, err = pcall(function()
-				package.loaded["infra.global_scope"] = {
+				package.loaded["settings.engine.scope.global_scope"] = {
 					participants = function() calls[#calls + 1] = "participants"; return {} end,
 					apply = function(mode, _, done) calls[#calls + 1] = mode; done(true, { reverted = nil }); return true end,
 				}

@@ -455,7 +455,7 @@ function M.start(ports)
 	M.init({
 		read_config = function()
 			local content, status, detail = require("core.text.engine.toml_codec.writer").read_classified(
-				require("infra.config_paths").get("ConfigTomlPath"), require("core.fs.adapters.file_system"))
+				require("settings.engine.paths").get("ConfigTomlPath"), require("core.fs.adapters.file_system"))
 			if status ~= "ok" and status ~= "absent" then error("config.toml is unreadable: " .. tostring(detail)) end
 			return require("core.text.engine.toml_codec").decode(content or "")
 		end,

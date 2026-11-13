@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Binds the shared configuration backup owner (_shared/updater/engine/
 --- config_backup.lua, assembled by config_backup_binding.lua) to this driver: the configuration folder of
---- infra/config_paths.lua and file ports over the FileSystem adapter's
+--- settings/engine/paths.lua and file ports over the FileSystem adapter's
 --- classified reads, create-only writes and compare-and-publish. The Versions
 --- window backs the configuration up through it before installing a release,
 --- and restores a backup through it.
@@ -29,7 +29,7 @@ local M = {}
 
 local Logger      = require("core.logger.engine.logger")
 local Paths       = require("core.fs.engine.paths")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local FsDir       = require("core.fs.engine.dir")
 local FileSystem  = require("core.fs.adapters.file_system")
 local JsonCodec   = require("core.fs.adapters.json_codec")

@@ -158,7 +158,7 @@ local CONFIG_FILES = {
 --- The configuration files, with whether each one exists.
 --- @return table files { { name, path, present } }
 local function config_files()
-	local ConfigPaths = require("infra.config_paths")
+	local ConfigPaths = require("settings.engine.paths")
 	local FileSystem = require("core.fs.adapters.file_system")
 	local files = {}
 	for _, entry in ipairs(CONFIG_FILES) do
@@ -232,7 +232,7 @@ local function keystats_database()
 	local legacy = device and type(tmp) == "string" and tmp:sub(1, 1) == "/"
 		and (tmp:gsub("/+$", "") .. "/ergopti_metrics/" .. device .. "/db.sqlite") or nil
 	return { path = path, present = FileSystem.exists(path) == true,
-		expected_root = require("infra.config_paths").metrics_cache_dir(),
+		expected_root = require("settings.engine.paths").metrics_cache_dir(),
 		legacy_present = legacy ~= nil and FileSystem.exists(legacy) == true }
 end
 
@@ -598,7 +598,7 @@ end
 --- ends one, or nil before the keymap registry is loaded.
 --- @return table|nil facts { candidates = { { trigger, expansion } }, space_terminates, space_consumed }
 local function hotstring_candidates()
-	local registry = package.loaded["modules.keymap.registry"]
+	local registry = package.loaded["settings.engine.registry"]
 	if type(registry) ~= "table" or type(registry.field_run_candidates) ~= "function" then return nil end
 	return {
 		candidates = registry.field_run_candidates(),
@@ -921,7 +921,7 @@ local function layout_rows_env()
 	if not shipped then return nil, shipped_err end
 	local deps = Build.default_deps({
 		file_prefix = ROWS_FILE_PREFIX,
-		record_path = require("infra.config_paths").get_config_dir() .. "layouts/field_rows_builds.json",
+		record_path = require("settings.engine.paths").get_config_dir() .. "layouts/field_rows_builds.json",
 	})
 	if type(deps.keycodes_table) ~= "table" then return nil, "the keycode table is unreadable" end
 	return {

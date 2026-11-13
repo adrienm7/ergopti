@@ -162,7 +162,7 @@ local DEFAULT_DEPS = {
 	remove = function(path) return os.remove(path) end,
 	utc_stamp = function() return os.date("!%Y%m%dT%H%M%SZ") end,
 	random_hex = random_hex,
-	tools_dir = function() return require("infra.config_paths").config(M.TOOLS_DIR) end,
+	tools_dir = function() return require("settings.engine.paths").config(M.TOOLS_DIR) end,
 	list_executables = list_executables,
 	clock = os.time,
 }

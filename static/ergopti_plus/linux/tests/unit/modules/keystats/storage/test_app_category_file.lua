@@ -21,7 +21,7 @@ local function with_config_dir(body)
 	local dir = os.tmpname()
 	os.remove(dir)
 	assert(os.execute("mkdir -p '" .. dir .. "'"))
-	local name = "infra.config_paths"
+	local name = "settings.engine.paths"
 	local previous = package.loaded[name]
 	package.loaded[name] = { config = function(rel) return dir .. "/" .. rel end }
 	local file_name = "modules.keystats.app_category_file"

@@ -28,7 +28,7 @@ local function fixture(demoted)
 		end,
 	}
 	package.loaded["core.fs.adapters.file_system"] = adapter
-	local Preferences = helpers.load_with_stubs("infra.preferences")
+	local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 	package.loaded["ui.menu.metrics_scope"] = nil
 	Preferences.load("config")
 	local state = {}
@@ -66,7 +66,7 @@ local function fixture(demoted)
 			end,
 		}
 	end
-	local save, checkpoint = require("ui.menu.preferences_transaction").bind(Preferences, {
+	local save, checkpoint = require("settings.ui.menu.preferences_transaction").bind(Preferences, {
 		path = "config", state = state, hotfiles = {}, core_modules = {}, initial_state = state,
 		initial_preferences = Preferences.snapshot(state, {}, {}), restore_runtime = function() return true end,
 		snapshot_view = demotions.persisted_view,
@@ -168,7 +168,7 @@ helpers.describe("macOS complete Metrics scope", function()
 end)
 
 package.loaded["core.fs.adapters.file_system"] = FS
-package.loaded["infra.preferences"] = nil
+package.loaded["settings.engine.preferences.preferences"] = nil
 
 helpers.describe("Metrics scope provider", function()
 	-- The restore alone since the maintainer retired the Metrics clear on

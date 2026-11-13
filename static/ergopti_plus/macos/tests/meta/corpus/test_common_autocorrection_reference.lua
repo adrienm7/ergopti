@@ -54,7 +54,7 @@ helpers.describe("common autocorrection historical reference", function()
 
 	helpers.it("(common-autocorrection-reference) registers every historical mapping once with its native priority and insertion order", function()
 		helpers.with_stub_scope({
-			"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
+			"settings.engine.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 			"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage",
 			"modules.hotstrings.hotstrings_config", "core.text.engine.toml.reader",
 		}, function()
@@ -63,7 +63,7 @@ helpers.describe("common autocorrection historical reference", function()
 				get_user_override = function() return nil end,
 			}
 			local State = helpers.load_with_stubs("modules.keymap.state")
-			local Registry = helpers.load_with_stubs("modules.keymap.registry")
+			local Registry = helpers.load_with_stubs("settings.engine.registry")
 			local Storage = require("core.fs.adapters.storage")
 			local expected = reference()
 			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
@@ -170,13 +170,13 @@ helpers.describe("common autocorrection interleaved source order", function()
 		end
 		local ok, failure = pcall(function()
 			helpers.with_stub_scope({
-				"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
+				"settings.engine.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 				"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage",
 				"modules.hotstrings.hotstrings_config", "core.text.engine.toml.reader",
 			}, function()
 				package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = function() return nil end }
 				local State = helpers.load_with_stubs("modules.keymap.state")
-				local Registry = helpers.load_with_stubs("modules.keymap.registry")
+				local Registry = helpers.load_with_stubs("settings.engine.registry")
 				local Storage = require("core.fs.adapters.storage")
 				local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 				helpers.assert_true(Registry.init(state))
@@ -255,7 +255,7 @@ require("tests.lua.common_autocorrection_split_contract").register(helpers, help
 --- Qualifies each selectable family and their original composed registration order.
 local function shipped_split_registry(only)
 		helpers.with_stub_scope({
-			"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
+			"settings.engine.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 			"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage",
 			"modules.keymap.expander", "modules.keymap.terminator_replay",
 			"modules.hotstrings.hotstrings_config", "core.text.engine.toml.reader",
@@ -265,7 +265,7 @@ local function shipped_split_registry(only)
 				get_user_override = function() return nil end,
 			}
 			local State = helpers.load_with_stubs("modules.keymap.state")
-			local Registry = helpers.load_with_stubs("modules.keymap.registry")
+			local Registry = helpers.load_with_stubs("settings.engine.registry")
 			local Storage = require("core.fs.adapters.storage")
 			local expected, assignment = require("tests.lua.common_autocorrection_split_contract").reference(helpers.shared)
 			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})

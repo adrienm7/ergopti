@@ -12,7 +12,7 @@
  * WHY:
  * The editor promised {Left} and the shipped magic-key pack holds {U+XXXX}, while
  * Windows and Linux typed both as text and macOS typed the second. The grammar is
- * implemented twice (_shared/platform/input, windows/infra/send_input_parameter.ahk);
+ * implemented twice (_shared/platform/input, windows/settings/engine/send_input_parameter.ahk);
  * the corpus is what keeps them equal, and it pins nothing if no suite replays it.
  * ==============================================================================
  */

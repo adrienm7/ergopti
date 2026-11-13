@@ -81,7 +81,7 @@ if (fs.existsSync(ahkTestPath)) {
 // ─── 4. All 4 coercion sites still exist ─────────────────────────────
 
 // macOS: infra/config_overrides.lua exports M.coerce
-const macosOverridePath = path.join(MACOS, 'infra', 'config_overrides.lua');
+const macosOverridePath = path.join(MACOS, 'settings', 'engine', 'overrides.lua');
 assert(fs.existsSync(macosOverridePath), 'macOS config_overrides.lua exists');
 if (fs.existsSync(macosOverridePath)) {
 	const src = fs.readFileSync(macosOverridePath, 'utf8');
@@ -93,7 +93,7 @@ if (fs.existsSync(macosOverridePath)) {
 }
 
 // AHK: config_shortcuts.ahk defines CS_CoerceValue
-const csPath = path.join(WINDOWS, 'infra', 'config_shortcuts.ahk');
+const csPath = path.join(WINDOWS, 'settings', 'engine', 'shortcuts.ahk');
 assert(fs.existsSync(csPath), 'AHK config_shortcuts.ahk exists');
 if (fs.existsSync(csPath)) {
 	const src = fs.readFileSync(csPath, 'utf8');

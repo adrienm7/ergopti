@@ -1057,7 +1057,7 @@ function M.capture_scope(state, source)
 		end
 	end
 	local result = {}
-	local Preferences = require("infra.preferences")
+	local Preferences = require("settings.engine.preferences.preferences")
 	for _, row in ipairs(Manifest.scope_operations("keyboard_layout", "clear")) do
 		local key = assert(Preferences.flat_key_for(row.section .. "." .. row.key), "layout preference owner missing")
 		result[#result + 1] = { key = key, value = state[key] }
@@ -1071,7 +1071,7 @@ end
 --- @return boolean applied Terminal policy acknowledgement.
 function M.apply_scope(state, rows)
 	if M.scope_pending() then return false end
-	local Preferences, values = require("infra.preferences"), {}
+	local Preferences, values = require("settings.engine.preferences.preferences"), {}
 	local allowed = {}
 	for _, row in ipairs(Manifest.scope_operations("keyboard_layout", "clear")) do
 		allowed[row.section .. "." .. row.key] = true

@@ -264,7 +264,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 			helpers.assert_true(declared[name] == true,
 				name .. " is read by the manifest but not declared in infra/metrics_state_keys.lua")
 		end
-		local Preferences = require("infra.preferences")
+		local Preferences = require("settings.engine.preferences.preferences")
 		local owned = {}
 		for _, path in pairs(require("settings.engine.keys").KEY) do
 			if path:sub(1, 8) == "metrics." then

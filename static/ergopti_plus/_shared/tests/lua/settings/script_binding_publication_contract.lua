@@ -160,7 +160,7 @@ function M.register(helpers, driver)
 				parameters = require("modules.gestures.actions")
 				logger = helpers.make_logger_stub()
 				package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
-				preferences = helpers.load_with_stubs("infra.preferences")
+				preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 			else
 				parameters = helpers.load_module("modules.gestures.manager")
 				logger = require("core.logger.engine.shim")
@@ -346,7 +346,7 @@ function M.register_late(helpers, driver)
 				parameters = require("modules.gestures.actions")
 				logger = require("core.logger.engine.logger")
 				package.loaded["core.logger.engine.shim"] = logger
-				preferences = helpers.load_with_stubs("infra.preferences")
+				preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 			else
 				parameters = helpers.load_module("modules.gestures.manager")
 				logger = require("core.logger.engine.shim")

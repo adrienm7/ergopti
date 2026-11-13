@@ -20,7 +20,7 @@ local STUBBED_MODULES = {
 	"modules.keystats",
 	"core.ui.ui.tooltip",
 	"modules.llm.prediction_engine",
-	"modules.keymap.registry",
+	"settings.engine.registry",
 	"modules.hotstrings.hotstrings_config",
 	"modules.keymap.expander",
 	"infra.manifest_reader",
@@ -106,7 +106,7 @@ local function load_fixture(options, lifetime)
 	}, {
 		__index = function() return function() end end,
 	})
-	package.loaded["modules.keymap.registry"] = {
+	package.loaded["settings.engine.registry"] = {
 		mappings_for_tail = function() return nil end,
 		mappings_for_star_tail = function() return nil end,
 	}

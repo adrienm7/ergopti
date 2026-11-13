@@ -98,11 +98,11 @@ helpers.describe("hotstrings_config: common section migration ownership", functi
 			local mod = fresh_module(path)
 			helpers.assert_eq(mod.common_autocorrection_admitted(), false)
 			helpers.with_stub_scope({
-				"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
+				"settings.engine.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 				"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage", "core.text.engine.toml.reader",
 			}, function()
 				local State = helpers.load_with_stubs("modules.keymap.state")
-				local Registry = helpers.load_with_stubs("modules.keymap.registry")
+				local Registry = helpers.load_with_stubs("settings.engine.registry")
 				local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 				helpers.assert_true(Registry.init(state))
 				Registry.set_group_context("foreign_guard")

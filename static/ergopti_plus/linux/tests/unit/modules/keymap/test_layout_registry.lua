@@ -171,18 +171,18 @@ helpers.describe("layout manager (Linux): installing", function()
 	helpers.it("makes committed layout packs visible before user overrides", function()
 		local Paths = require("core.fs.engine.paths")
 		local saved_registry = package.loaded["modules.keymap.layout_registry"]
-		local saved_config = package.loaded["infra.config_paths"]
+		local saved_config = package.loaded["settings.engine.paths"]
 		package.loaded["modules.keymap.layout_registry"] = {
 			extension_roots = function() return { "/committed/layout/generation" } end,
 			shipped_extension_root = function() return { pack = "/driver/layouts/registry/ergopti" } end,
 		}
-		package.loaded["infra.config_paths"] = {
+		package.loaded["settings.engine.paths"] = {
 			home = function() return "/private/user" end,
 			get_config_dir = function() return "/private/xdg/ergopti" end,
 		}
 		local ok, roots = pcall(Paths.extension_roots)
 		package.loaded["modules.keymap.layout_registry"] = saved_registry
-		package.loaded["infra.config_paths"] = saved_config
+		package.loaded["settings.engine.paths"] = saved_config
 		helpers.assert_true(ok, tostring(roots))
 		helpers.assert_eq(roots[#roots - 2], "/committed/layout/generation")
 		helpers.assert_eq(roots[#roots - 1], { pack = "/driver/layouts/registry/ergopti" },
@@ -194,7 +194,7 @@ helpers.describe("layout manager (Linux): installing", function()
 	helpers.it("still starts with the other packs when the installed record is damaged (config-outdated-installed)", function()
 		local Paths = require("core.fs.engine.paths")
 		local saved_registry = package.loaded["modules.keymap.layout_registry"]
-		local saved_config = package.loaded["infra.config_paths"]
+		local saved_config = package.loaded["settings.engine.paths"]
 		local saved_logger = package.loaded["core.logger.engine.shim"]
 		local errors = {}
 		local recorder = helpers.make_logger_stub()
@@ -203,7 +203,7 @@ helpers.describe("layout manager (Linux): installing", function()
 			extension_roots = function() error("the installed-layouts record is not valid JSON", 0) end,
 			shipped_extension_root = function() return { pack = "/driver/layouts/registry/ergopti" } end,
 		}
-		package.loaded["infra.config_paths"] = {
+		package.loaded["settings.engine.paths"] = {
 			home = function() return "/private/user" end,
 			get_config_dir = function() return "/private/xdg/ergopti" end,
 		}
@@ -214,7 +214,7 @@ helpers.describe("layout manager (Linux): installing", function()
 			return Fresh.extension_roots()
 		end)
 		package.loaded["modules.keymap.layout_registry"] = saved_registry
-		package.loaded["infra.config_paths"] = saved_config
+		package.loaded["settings.engine.paths"] = saved_config
 		package.loaded["core.logger.engine.shim"] = saved_logger
 		package.loaded["core.fs.engine.paths"] = Paths
 		helpers.assert_true(ok, "a damaged record never stops the daemon: " .. tostring(roots))
@@ -441,7 +441,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		local Managed = require("modules.keymap.managed_python")
 		local Http, Process = require("core.network.adapters.http_client"), require("core.process.adapters.runner")
 		local Shell, Files = require("core.process.adapters.shell_runner"), require("core.fs.adapters.file_system")
-		local Paths = require("infra.config_paths")
+		local Paths = require("settings.engine.paths")
 		local saved = { download = Http.download, run = Process.run, settled = Process.is_settled,
 			shell = Shell.run, exists = Files.exists, data = Paths.data }
 		local root = assert(require("luv").fs_mkdtemp("/tmp/ergopti-python-registry-XXXXXX"))

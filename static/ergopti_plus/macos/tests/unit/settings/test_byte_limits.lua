@@ -1,0 +1,12 @@
+--- tests/unit/settings/test_byte_limits.lua
+
+--- ==============================================================================
+--- MODULE: Byte Limits Tests (macOS)
+--- DESCRIPTION:
+--- Registers the shared [limits] contract: the byte caps shared Lua modules
+--- publish are the registry values, as on Linux.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+require("tests.lua.byte_limits_contract").register(helpers, { driver = "macos", timings = require("core.timing.engine.timings") })

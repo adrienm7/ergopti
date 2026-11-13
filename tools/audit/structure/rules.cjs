@@ -974,7 +974,7 @@ const RUNTIME_PREFIXES = [
 		]
 	},
 	{
-		file: 'linux/ui/menu/unused_keys_cleanup.lua',
+		file: 'linux/settings/ui/menu/unused_keys_cleanup.lua',
 		old: 'modules.llm.',
 		names: [
 			'settings',

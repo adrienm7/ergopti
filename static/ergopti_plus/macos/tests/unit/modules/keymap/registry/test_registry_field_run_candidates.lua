@@ -12,16 +12,16 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.config_paths", "modules.keymap.registry" }
+local MODULES = { "settings.engine.paths", "settings.engine.registry" }
 
 --- Runs body over a registry holding a shipped group, a user group and a
 --- disabled shipped group.
 --- @param body function fn(Registry, state).
 local function with_registry(body)
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.config_paths"] = { get_config_dir = function() return "/cfg" end }
-		package.loaded["modules.keymap.registry"] = nil
-		local Registry = helpers.load_with_stubs("modules.keymap.registry")
+		package.loaded["settings.engine.paths"] = { get_config_dir = function() return "/cfg" end }
+		package.loaded["settings.engine.registry"] = nil
+		local Registry = helpers.load_with_stubs("settings.engine.registry")
 		local state = {
 			magic_key = "\u{2605}", mappings = {}, mappings_lookup = {},
 			mappings_by_tail_char = {}, mappings_by_star_tail_char = {},

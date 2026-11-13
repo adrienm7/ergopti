@@ -145,8 +145,8 @@ pour naviguer aujourd'hui :
    physique (couches base/Shift/CapsLock/AltGr, touches mortes) ; sur macOS c'est le moteur
    d'expansion (boucle eventtap, registre, expander). Les deux README sont corrects
    séparément — c'est le _nom_ qui est le bug.
-2. **`registry` désigne deux choses.** `windows/infra/registry.ahk` est un wrapper du registre
-   Windows ; `macos/modules/keymap/registry.lua` est le registre de hotstrings.
+2. **`registry` désigne deux choses.** `windows/settings/engine/registry.ahk` est un wrapper du registre
+   Windows ; `macos/settings/engine/registry.lua` est le registre de hotstrings.
 
 ---
 
@@ -721,7 +721,7 @@ correspondant du plan. Si l'écart vous choque, c'est l'intérêt du plan.
 4. `macos/modules/gestures/actions.lua` : ajouter l'entrée `sg(...)`.
 5. `linux/modules/gestures/manager.lua` : ajouter une branche `elseif` dans
    `_execute_action` **et** une entrée dans la table `ACTION_LABELS` (français en dur).
-6. Pour la lier à un accord clavier : `windows/infra/feature_state.ahk`
+6. Pour la lier à un accord clavier : `windows/settings/engine/preferences/feature_state.ahk`
    `KEYBOARD_SHORTCUT_DEFAULTS`, **plus** un support de préfixe dans
    `_KeyboardSlotSendCode` (qui ne comprend que 4 préfixes — `win_alt_` n'existe pas).
 7. macOS : rien à faire, parce qu'**il n'y a aucun sélecteur** capable d'assigner un slot.

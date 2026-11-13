@@ -87,7 +87,7 @@ end
 if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" or CASCADE ~= "none" then
 	local modes = { accepted = true, unassigned = true, modified = true, refused = true, reopened = true }
 	assert(TAP_WRAP == "none" or modes[TAP_WRAP], "unknown tap/wrap scenario")
-	local Paths = require("infra.config_paths")
+	local Paths = require("settings.engine.paths")
 	local original = Paths.config
 	-- Named config.toml in a folder of its own: the tap-hold import checks the
 	-- file it reads [mod_combos] from is the driver's config.toml by name.

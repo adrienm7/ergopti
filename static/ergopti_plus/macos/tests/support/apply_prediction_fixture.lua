@@ -195,7 +195,7 @@ function M.run(options)
 		set_runtime_guard = noop,
 	}
 	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = noop }
-	package.loaded["modules.keymap.registry"] = {
+	package.loaded["settings.engine.registry"] = {
 		init = function() return true end,
 		mappings_for_tail = function() return nil end,
 		mappings_for_star_tail = function() return nil end,
@@ -274,7 +274,7 @@ function M.run(options)
 		preview_autocorrect_enabled = true,
 	})
 	if not options.expander_failure and not options.expander then
-		expander.init(state, package.loaded["modules.keymap.registry"], bridge)
+		expander.init(state, package.loaded["settings.engine.registry"], bridge)
 	end
 
 	local buffer_before = state.buffer

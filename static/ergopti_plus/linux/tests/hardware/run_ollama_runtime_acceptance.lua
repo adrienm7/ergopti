@@ -173,7 +173,7 @@ Engine.init({ is_paused = function() return false end })
 -- Public profile initialization configures this fixture's isolated listener;
 -- source provenance and subsequent publication remain the actual owners.
 Profiles.init({ port = port })
-local Config = require("infra.config_paths").config("config.toml")
+local Config = require("settings.engine.paths").config("config.toml")
 local Writer = require("core.text.engine.toml_codec.writer")
 -- Control only WebKit presentation: actual bridge retains session ownership.
 local window_calls = { show = 0, hide = 0, evaluate = 0 }

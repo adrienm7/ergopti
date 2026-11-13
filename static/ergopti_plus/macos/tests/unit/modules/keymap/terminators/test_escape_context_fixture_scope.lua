@@ -14,7 +14,7 @@ local OWNERS = {
 	"core.logger.engine.logger", "adapters.event_provenance", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "modules.keymap.utils", "core.text.engine.utils",
 	"modules.llm", "platform.input.keycodes", "modules.keystats", "core.ui.ui.tooltip",
-	"modules.llm.prediction_engine", "modules.keymap.registry",
+	"modules.llm.prediction_engine", "settings.engine.registry",
 	"modules.hotstrings.hotstrings_config", "modules.keymap.expander",
 	"infra.manifest_reader", "modules.keymap.llm_bridge",
 	"modules.diagnostics.hid_diagnostic_mailbox",
@@ -29,7 +29,7 @@ helpers.describe("Escape context fixture isolation", function()
 				local prior_utils = {}
 				package.loaded["modules.keymap.utils"] = prior_utils
 				package.loaded["core.logger.engine.logger"] = false
-				package.loaded["modules.keymap.registry"] = nil
+				package.loaded["settings.engine.registry"] = nil
 				local native_eventtap, original_new
 				local foreign_new = function() end
 				local foreign_hs = { eventtap = { new = foreign_new } }
@@ -68,7 +68,7 @@ helpers.describe("Escape context fixture isolation", function()
 				helpers.assert_not_nil(native_eventtap, "the test must reach the native replacement boundary")
 				helpers.assert_true(native_eventtap.new == original_new, "restore the captured native eventtap field")
 				helpers.assert_true(foreign_hs.eventtap.new == foreign_new, "never mutate a successor native host")
-				helpers.assert_nil(package.loaded["modules.keymap.registry"])
+				helpers.assert_nil(package.loaded["settings.engine.registry"])
 				helpers.assert_eq(package.loaded["core.logger.engine.logger"], false)
 				helpers.assert_true(package.loaded["modules.keymap.utils"] == prior_utils)
 				helpers.assert_true(_G.hs == prior_hs)

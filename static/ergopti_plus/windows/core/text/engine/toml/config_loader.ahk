@@ -57,7 +57,7 @@
 ; never be enumerated in the static, compile-time manifest:
 ;   - ``hotstrings.personal.<name>`` — <name> is a user-chosen personal
 ;     hotstring category created at runtime via the personal TOML editor
-;     (see EnsurePersonalHotstringFeature in infra/personal_features.ahk).
+;     (see EnsurePersonalHotstringFeature in settings/engine/preferences/personal_features.ahk).
 ; Editor UI preferences are separately enumerated in the foreign ownership
 ; registry. Their keys never become dynamic feature paths during this walk.
 /**

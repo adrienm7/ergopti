@@ -186,7 +186,7 @@ local function run()
 	eval_sync(webview, "document.getElementById('le-confirm-yes').click(); 'yes'")
 	check(settled_after(before_emulate), "the host emulates it and the page says so: " .. tostring(message_text()))
 	local composer = assert(Registry.composer_settings())
-	local composer_folder = require("infra.config_paths").get_config_dir() .. "/" .. composer.folder .. "/"
+	local composer_folder = require("settings.engine.paths").get_config_dir() .. "/" .. composer.folder .. "/"
 	check(read(composer_folder .. composer.keylayout_file) ~= nil, "the compiled layout is kept in the composer folder")
 	check((Registry.snapshot().installed or {})[composer.id] == nil, "nothing is installed in the system")
 	local emulated = require("infra.layout_emulation_preferences").settings()
@@ -244,7 +244,7 @@ local function run()
 
 	-- What the daemon stored from the page's own message.
 	local settings = assert(Registry.composer_settings())
-	local folder = require("infra.config_paths").get_config_dir() .. "/" .. settings.folder .. "/"
+	local folder = require("settings.engine.paths").get_config_dir() .. "/" .. settings.folder .. "/"
 	local stored = read(folder .. settings.source_file)
 	check(stored ~= nil and stored:find('id = "ergopti"', 1, true) ~= nil, "the source is stored by the host")
 	local table_ = Registry.composer_emulation()

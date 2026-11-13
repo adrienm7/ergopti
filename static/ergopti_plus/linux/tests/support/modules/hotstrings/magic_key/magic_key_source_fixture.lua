@@ -306,16 +306,16 @@ end
 
 --- Keeps the real cached preference owner and exact source route in one fixture.
 local function with_collision_source(content, body)
-	local saved = package.loaded["infra.config_paths"]
+	local saved = package.loaded["settings.engine.paths"]
 	local routed
-	package.loaded["infra.config_paths"] = { config = function() return routed end }
+	package.loaded["settings.engine.paths"] = { config = function() return routed end }
 	local ok, why = pcall(function()
 		with_source(content, function(Source, Preferences, path)
 			routed = path
 			body(Source, Preferences, path)
 		end)
 	end)
-	package.loaded["infra.config_paths"] = saved
+	package.loaded["settings.engine.paths"] = saved
 	if not ok then error(why, 0) end
 end
 

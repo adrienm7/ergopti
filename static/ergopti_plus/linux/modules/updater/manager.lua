@@ -272,7 +272,7 @@ M.LINUX_CHECKSUM_ASSET_NAME = LINUX_CHECKSUM_ASSET_NAME
 -- Path for the ETag cache (one per channel), in the driver's cache folder
 -- that the legacy folder migration creates at boot.
 local function etag_cache_path(channel)
-	return require("infra.config_paths").cache("updater_etag_" .. channel .. ".txt")
+	return require("settings.engine.paths").cache("updater_etag_" .. channel .. ".txt")
 end
 
 -- =========================================
@@ -2155,7 +2155,7 @@ function M.init(opts)
 	_is_paused = opts.is_paused
 	_on_available = opts.on_available
 
-	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
+	_config_path = opts.config_path or require("settings.engine.paths").config("config.toml")
 	_load_persisted()
 
 	if opts.channel then

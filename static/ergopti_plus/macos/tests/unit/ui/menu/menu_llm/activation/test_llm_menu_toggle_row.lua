@@ -625,8 +625,8 @@ helpers.describe("IA protected configuration admission", function()
 				helpers.assert_eq(outcome.read_only, true)
 				return Migrate.read_only_reason(path)
 			end
-			local prior = package.loaded["ui.menu.menu_paths"]
-			package.loaded["ui.menu.menu_paths"] = { get = function(key)
+			local prior = package.loaded["settings.ui.menu.paths"]
+			package.loaded["settings.ui.menu.paths"] = { get = function(key)
 				helpers.assert_eq(key, "ConfigTomlPath")
 				return path
 			end }
@@ -651,7 +651,7 @@ helpers.describe("IA protected configuration admission", function()
 					helpers.assert_eq(Migrate.read_only_reason(path), reason, "refusal retains exact migration custody")
 				end)
 			end, debug.traceback)
-			package.loaded["ui.menu.menu_paths"] = prior
+			package.loaded["settings.ui.menu.paths"] = prior
 			if not ok then error(failure, 0) end
 		end)
 	end

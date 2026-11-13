@@ -35,7 +35,7 @@ local PAGES = {
 	metrics_typing           = { module = "ui.metrics_typing", open = "show" },
 	metrics_apps             = { module = "ui.metrics_apps", open = "show" },
 	hotstring_editor         = { module = "ui.hotstring_editor", open = "open" },
-	paths_editor             = { module = "ui.menu.menu_paths", open = "open_editor",
+	paths_editor             = { module = "settings.ui.menu.paths", open = "open_editor",
 		window = "editor_window", close = "close_editor" },
 	hotstrings_config_window = { module = "ui.hotstrings_config_window", open = "open" },
 	layout_manager           = { module = "ui.layout_manager", open = "open" },

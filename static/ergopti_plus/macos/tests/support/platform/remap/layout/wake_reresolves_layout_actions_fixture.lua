@@ -279,7 +279,7 @@ local function load_remap(options)
 	}
 	package.loaded["platform.input.hotkey_registrar"] = { unbind = function() return true end }
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function() return "missing-config.toml" end,
 		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}

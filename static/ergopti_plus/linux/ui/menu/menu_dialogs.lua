@@ -117,7 +117,7 @@ end
 local function assign_parameterized_action(ctx, gestures, binding, action, assign, picked)
 	local spec = type(gestures.get_action_parameter_spec) == "function"
 		and gestures.get_action_parameter_spec(action) or nil
-	local bindings = package.loaded["infra.program_binding_transaction"]
+	local bindings = package.loaded["settings.engine.preferences.program_binding_transaction"]
 	if spec ~= "program" and type(bindings) == "table" and bindings.pending() then
 		Logger.error(LOG, "Binding edit refused while private user program compensation remains pending.")
 		return false
@@ -166,7 +166,7 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		return false
 	end
 	-- A rejected assignment cannot leave its parameter durably changed.
-	return require("infra.program_binding_transaction").apply(binding, value, ctx.is_paused, action)
+	return require("settings.engine.preferences.program_binding_transaction").apply(binding, value, ctx.is_paused, action)
 end
 
 --- Opens the shared searchable action catalogue for one current assignment.
@@ -184,7 +184,7 @@ local function open_action_picker(title, current, binding, on_confirm, selected_
 		Logger.error(LOG, "Action picker is unavailable for '%s'.", tostring(title))
 		return false
 	end
-	local Paths = require("infra.config_paths")
+	local Paths = require("settings.engine.paths")
 	local path = Paths.config("config.toml")
 	local items = type(selected_items) == "table" and selected_items or Gestures.get_picker_items()
 	local editor = Gestures.get_picker_parameter_fields(items, binding)

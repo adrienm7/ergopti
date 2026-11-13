@@ -30,10 +30,10 @@ local function with_bridge(controls, run)
 			return session
 		end },
 	}
-	local saved, names = {}, { "ui.config_cleanup.bridge" }
+	local saved, names = {}, { "settings.ui.cleanup" }
 	for name in pairs(stubs) do names[#names + 1] = name end
 	for _, name in ipairs(names) do saved[name] = { package.loaded[name] }; package.loaded[name] = stubs[name] end
-	local ok, detail = xpcall(function() run(require("ui.config_cleanup.bridge"), context) end, debug.traceback)
+	local ok, detail = xpcall(function() run(require("settings.ui.cleanup"), context) end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name][1] end
 	if not ok then error(detail, 0) end
 end

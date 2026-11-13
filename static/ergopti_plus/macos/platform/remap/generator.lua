@@ -221,7 +221,7 @@ local SWALLOWED_ON_LAYER = { left_command = { tap = "backspace" } }
 -- pointing ConfigDirPath elsewhere; bridge reader resolves the same path.
 local KE_PHYSICAL_KC_LOG
 do
-	local mp = require("infra.config_paths")
+	local mp = require("settings.engine.paths")
 	KE_PHYSICAL_KC_LOG = NativePath.with_trailing_separator(mp.get_config_dir()) .. "metrics/karabiner_kc.log"
 	-- Parent dir created lazily by deploy_json_file() or when keystats starts;
 	-- no mkdir here to avoid creating metrics/ when the feature is off

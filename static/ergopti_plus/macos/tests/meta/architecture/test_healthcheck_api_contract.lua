@@ -30,7 +30,7 @@ local helpers = require("tests.helpers")
 local CONTRACT = {
 	{ mod = "core.logger.engine.logger",                       fns = { "ring_buffer_snapshot", "session_issues",
 		"logs_dir", "today_log_path", "today_errors_path", "crash_reports_dir" } },
-	{ mod = "infra.config_paths",               fns = { "is_initialized", "get_config_dir" } },
+	{ mod = "settings.engine.paths",               fns = { "is_initialized", "get_config_dir" } },
 	{ mod = "infra.diagnostic_snapshot",        fns = { "resolve_commit" } },
 	{ mod = "modules.diagnostics.crash_reporter", fns = { "reports_dir" } },
 	{ mod = "adapters.boot_fatal",              constants = { "LAUNCHER_LOG_ENV" } },

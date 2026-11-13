@@ -458,7 +458,7 @@ local function build_state()
 				local file_meta = read_file_meta(parsed)
 				local file_secs = read_file_sections(parsed)
 				local effective = hotstrings_config.resolve(source.owner, nil)
-				local binding = require("infra.personal_file_controls").capture(source.owner)
+				local binding = require("settings.engine.preferences.personal_file_controls").capture(source.owner)
 				_personal_bindings[source.owner] = binding
 
 				local entry = build_cat_entry(
@@ -753,7 +753,7 @@ local function on_message(msg, owner)
 			return false
 		end
 		local function patch(_, requested_section, field, value)
-			return require("infra.personal_file_controls").apply(binding, requested_section, field, value)
+			return require("settings.engine.preferences.personal_file_controls").apply(binding, requested_section, field, value)
 		end
 		local toml_path = binding.record.path
 		if action == "set_delay" and type(body.ms) == "number" then

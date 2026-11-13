@@ -7,7 +7,7 @@
 --- contract vectors defined in _shared/core/text/data/domain/HotstringMatcher.spec.js.
 ---
 --- The canonical matching algorithm is specified in HotstringMatcher.spec.js.
---- The HS implementation is split between modules/keymap/registry.lua
+--- The HS implementation is split between settings/engine/registry.lua
 --- (tail-char bucketing, longest-first sort) and modules/keymap/expander.lua
 --- (word-boundary check, backspace count, consume_terminator flag).
 ---
@@ -37,7 +37,7 @@ local helpers = require("tests.helpers")
 local function make_registry(specs)
 	package.loaded["core.logger.engine.logger"] = nil
 	helpers.load_with_stubs("core.logger.engine.logger")
-	local R = helpers.load_with_stubs("modules.keymap.registry")
+	local R = helpers.load_with_stubs("settings.engine.registry")
 	R.init({
 		magic_key               = "\xe2\x98\x85",  -- UTF-8 for ★
 		mappings                = {},

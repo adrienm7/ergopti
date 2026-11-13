@@ -1606,20 +1606,20 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 			"modules.hotstrings.injector", "adapters.keyboard_layout", "modules.hotstrings.magic_key",
 			"modules.hotstrings.magic_key_source", "modules.hotstrings.repeat_key", "modules.shortcuts.keyboard_shortcuts",
 			"modules.hotstrings.device_finder", "platform.input.event", "core.logger.engine.monotonic", "infra.manifest_reader",
-			"infra.script_settings", "core.timing.engine.timings", "modules.shortcuts.script_actions", "modules.diagnostics.crash_reporter",
+			"settings.engine.scope.script_settings", "core.timing.engine.timings", "modules.shortcuts.script_actions", "modules.diagnostics.crash_reporter",
 			"modules.keystats.focus_guard", "platform.input.capture_gate", "core.logger.engine.boot_profiler", "infra.diagnostic_snapshot" }) do
 			modules[name] = {}
 		end
 		modules["core.lifecycle.engine.shutdown.session_lock"] = { protect = function() return true end }
 		-- Main lets config.toml's [script] rows win before the error window starts.
-		modules["infra.script_scope"] = { adopt_configured = function() return {} end }
+		modules["settings.engine.scope.script_scope"] = { adopt_configured = function() return {} end }
 		-- Main writes a pre-sink fatal record only when startup is refused.
 		modules["core.logger.engine.bootstrap_log"] = { append = function(reason) error("isolated Main must not refuse startup: " .. tostring(reason)) end }
 		modules["core.lifecycle.engine.compat.utf8"] = { install = function() return false end }
 		-- Main reserves WebKit's collector signal before anything else it loads.
 		modules["core.lifecycle.engine.shutdown.signal_handlers"] = { reserve_webkit_gc_signal = function() return true end }
 		-- Main moves the legacy folders first; the isolated Main moves none.
-		modules["infra.legacy_folder_migration"] = require("tests.support.legacy_folder_migration_stub")
+		modules["settings.engine.migration.legacy_folder_migration"] = require("tests.support.legacy_folder_migration_stub")
 		modules["core.logger.engine.shim"] = { info = noop, error = noop, warn = noop, debug = noop, success = noop }
 		modules["core.logger.engine.sink"] = { install = function() return true end }
 		modules["modules.keystats.keystats"] = { stop = function() return true end }

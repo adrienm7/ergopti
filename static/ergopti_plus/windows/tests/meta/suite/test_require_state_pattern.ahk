@@ -143,7 +143,7 @@ _MetaGuardRatchet() {
 
 	; All four trees that hold production code. modules/ alone was the original
 	; blind spot: the stateful code largely lives elsewhere now.
-	for SubDir in ["modules", "infra", "platform", "adapters", "ui", "core"] {
+	for SubDir in ["modules", "infra", "platform", "adapters", "ui", "core", "settings"] {
 		for AbsPath in _MetaListAhkFilesGuardV2(StrReplace(DriverRoot . SubDir, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))

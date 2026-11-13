@@ -25,8 +25,8 @@ local function fixture(demoted)
 		end,
 	}
 	package.loaded["core.fs.adapters.file_system"] = adapter
-	local Preferences = helpers.load_with_stubs("infra.preferences")
-	for _, name in ipairs({ "ui.menu.llm_scope", "ui.menu.menu_llm.scope_runtime", "ui.menu.scoped_preferences" }) do package.loaded[name] = nil end
+	local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
+	for _, name in ipairs({ "ui.menu.llm_scope", "ui.menu.menu_llm.scope_runtime", "settings.ui.menu.scoped_preferences" }) do package.loaded[name] = nil end
 	Preferences.load("config")
 	local state, values = {}, {}
 	for _, row in ipairs(Manifest.scope_operations("llm", "clear")) do
@@ -74,7 +74,7 @@ local function fixture(demoted)
 	})
 	local demotions = require("ui.menu.session_demotions").new()
 	if demoted then demotions.record({ feature = "ai", key = "llm_enabled", persisted = true, demoted = false }) end
-	local save, checkpoint = require("ui.menu.preferences_transaction").bind(Preferences, {
+	local save, checkpoint = require("settings.ui.menu.preferences_transaction").bind(Preferences, {
 		path = "config", state = state, hotfiles = {}, core_modules = {}, initial_state = state,
 		initial_preferences = Preferences.snapshot(state, {}, {}), restore_runtime = function() return true end,
 		snapshot_view = demotions.persisted_view,
@@ -194,4 +194,4 @@ helpers.describe("macOS complete LLM scope", function()
 end)
 
 package.loaded["core.fs.adapters.file_system"] = FS
-package.loaded["infra.preferences"] = nil
+package.loaded["settings.engine.preferences.preferences"] = nil

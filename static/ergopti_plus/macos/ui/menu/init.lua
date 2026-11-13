@@ -24,14 +24,14 @@ local i18n             = require("core.i18n.engine.i18n")
 local ui_restore       = require("infra.ui_restore")
 local Manifest         = require("infra.manifest_reader")
 
-local Preferences   = require("infra.preferences")
+local Preferences   = require("settings.engine.preferences.preferences")
 local Builder       = require("ui.menu.builder")
 local ClickGate     = require("ui.menu.click_gate")
 local RefreshScope  = require("ui.menu.refresh_scope")
 local BranchRows    = require("ui.menu.branch_rows")
 local QuitAdmission = require("core.lifecycle.engine.shutdown.quit_admission")
 local HotCounter    = require("ui.menu.hotstring_counter")
-local MenuPaths     = require("ui.menu.menu_paths")
+local MenuPaths     = require("settings.ui.menu.paths")
 local MenuState     = require("ui.menu.menu_state")
 local WrapMutation  = require("menu.engine.wrap_mutation")
 local MenuWatchers  = require("ui.menu.menu_watchers")
@@ -40,15 +40,15 @@ local Storage       = require("core.fs.adapters.storage")
 local TimerScheduler = require("core.events.timer_scheduler")
 local DeferredWork = require("core.timing.engine.deferred_work")
 local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
-local PreferencesTransaction = require("ui.menu.preferences_transaction")
+local PreferencesTransaction = require("settings.ui.menu.preferences_transaction")
 local SessionDemotions = require("ui.menu.session_demotions")
 local ProgramParameterTransaction = require("ui.menu.program_parameter_transaction")
 local GlobalActionsTransaction = require("ui.menu.global_actions_transaction")
 local RecoverableFileMoves = require("ui.menu.recoverable_file_moves")
-local FactoryResetJournal = require("infra.factory_reset_journal")
+local FactoryResetJournal = require("settings.engine.factory_reset_journal")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
 local BootProfiler = require("core.logger.engine.boot_profiler")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local LogOpeners = require("ui.log_openers")
 local ShellRunner = require("core.process.adapters.shell_runner")
 
@@ -1092,7 +1092,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		factory_reset             = function() return reset_all_defaults() end,
 		clean_unused_keys         = function()
-			return require("ui.menu.unused_keys_cleanup").run_from_menu()
+			return require("settings.ui.menu.unused_keys_cleanup").run_from_menu()
 		end,
 		open_paths                = function()
 			return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths")
@@ -1208,7 +1208,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		set_log_level             = function(level)
 			local L = require("core.logger.engine.logger")
 			-- config.toml's [script] log_level wins at start: rewrite it first.
-			if not require("infra.script_scope").rewrite_configured(require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL, level) then
+			if not require("settings.engine.scope.script_scope").rewrite_configured(require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL, level) then
 				return false
 			end
 			local ok, committed = pcall(Storage.set, require("settings.engine.keys").LEAF.LOG_LEVEL, level)
@@ -1292,7 +1292,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if read_only_reason ~= nil then return nil end
 			if not script_scope then
 				local script_backup
-				script_scope = require("infra.script_scope").new({
+				script_scope = require("settings.engine.scope.script_scope").new({
 					path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
@@ -1419,7 +1419,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if scope ~= "keyboard_layout" then return nil end
 		if read_only_reason ~= nil then return nil end
 		if not layout_scope then
-			layout_scope = require("ui.menu.scoped_preferences").new({
+			layout_scope = require("settings.ui.menu.scoped_preferences").new({
 				path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 				scope = scope, state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 				runtime = {

@@ -5,11 +5,11 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcut_bindings_fixture")
 
 local function scenario(body)
-	return helpers.with_stub_scope({ "modules.shortcuts.tap_keys", "infra.preferences",
-		"infra.config_paths", "core.fs.adapters.file_system" }, function()
-		helpers.load_with_stubs("infra.preferences")
+	return helpers.with_stub_scope({ "modules.shortcuts.tap_keys", "settings.engine.preferences.preferences",
+		"settings.engine.paths", "core.fs.adapters.file_system" }, function()
+		helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local files = require("core.fs.adapters.file_system")
-		local paths = require("infra.config_paths")
+		local paths = require("settings.engine.paths")
 		local escaped = 0
 		local native_read = files.read_with_status
 		local function forbidden()

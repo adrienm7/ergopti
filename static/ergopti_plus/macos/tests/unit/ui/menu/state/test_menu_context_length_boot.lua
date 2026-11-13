@@ -8,13 +8,13 @@ helpers.describe("boot projection of persisted AI context length", function()
 	for _, case in ipairs({ { value = "5000", refused = true }, { value = '"5000"', refused = false, ignored = true },
 		{ value = "4000", refused = false }, { value = '"4000"', refused = false, ignored = true } }) do
 		helpers.it("loads " .. case.value .. " without misreporting the live value", function()
-			helpers.with_stub_scope({ "infra.preferences", "ui.menu.menu_state", "core.fs.adapters.storage" }, function()
+			helpers.with_stub_scope({ "settings.engine.preferences.preferences", "ui.menu.menu_state", "core.fs.adapters.storage" }, function()
 				local pipeline = Pipeline.load()
 				local engine = pipeline.engine
 				helpers.assert_eq(engine.set_llm_context_length(1500), true)
 				local stored = {}
 				package.loaded["core.fs.adapters.storage"] = { set = function(key, value) stored[key] = value; return true end }
-				local Preferences = helpers.load_with_stubs("infra.preferences")
+				local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 				local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
 				local Session = require("ui.menu.session_demotions")
 				OutputFixture.with_output(function(path)

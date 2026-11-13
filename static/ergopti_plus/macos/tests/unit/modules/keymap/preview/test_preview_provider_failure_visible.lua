@@ -20,7 +20,7 @@ local function run_scenario()
 		"infra.manifest_reader",
 		"modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander",
-		"modules.keymap.registry",
+		"settings.engine.registry",
 		"modules.keymap.registry_groups",
 		"modules.keymap.registry_index",
 		"modules.keymap.utils",

@@ -16,7 +16,7 @@ local MODULES = {
 	"hotstrings.engine.dynamic.core",
 	"modules.dynamic_hotstrings.personal_info",
 	"modules.dynamic_hotstrings.rules_engine",
-	"modules.keymap.registry",
+	"settings.engine.registry",
 	"modules.keymap.registry_groups",
 	"modules.keymap.registry_index",
 	"modules.keymap.state",
@@ -79,7 +79,7 @@ local function with_fixture(scenario, source)
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules(MODULES, function()
 			local State = require("modules.keymap.state")
-			local Registry = require("modules.keymap.registry")
+			local Registry = require("settings.engine.registry")
 			local RulesEngine = require("modules.dynamic_hotstrings.rules_engine")
 			local PersonalInfo = require("modules.dynamic_hotstrings.personal_info")
 			local FileSystem = require("core.fs.adapters.file_system")

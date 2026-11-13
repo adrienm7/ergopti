@@ -195,7 +195,7 @@ end
 --- @param config_dir string|nil Folder from the wizard field.
 --- @return string Absolute metrics directory.
 function M._metrics_path_for(config_dir)
-	local ConfigPaths = require("infra.config_paths")
+	local ConfigPaths = require("settings.engine.paths")
 	local dir = (type(config_dir) == "string" and config_dir ~= "") and config_dir
 		or ConfigPaths.get_config_dir()
 	return ConfigPaths.metrics_dir(dir)
@@ -288,7 +288,7 @@ end
 --- @param config_path string Absolute config.toml path.
 --- @return string
 local function remap_settings_beside(config_path)
-	local name = NativePath.basename(require("infra.config_paths").get("TapHoldConfigPath"))
+	local name = NativePath.basename(require("settings.engine.paths").get("TapHoldConfigPath"))
 	local folder = type(config_path) == "string" and NativePath.dirname(config_path) or nil
 	assert(name and folder, "no remap settings file beside " .. tostring(config_path))
 	return folder .. "/" .. name
@@ -457,7 +457,7 @@ local function inject_init_data(owner, view, config_path)
 	-- Resolve the current + default config directories so the wizard can
 	-- pre-fill the input when the driver uses a custom folder.
 	local cur_config_dir, default_config_dir = "", ""
-	local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
+	local ok_mp, menu_paths = pcall(require, "settings.ui.menu.paths")
 	if ok_mp and menu_paths then
 		local ok1, v1 = pcall(menu_paths.get_config_dir)
 		if ok1 and type(v1) == "string" then cur_config_dir = v1 end
@@ -714,7 +714,7 @@ local function import_tap_holds(keys, moved, on_done)
 		on_done(false, "the remap owner is unavailable: " .. tostring(Remap))
 		return
 	end
-	local ok_path, path = pcall(require("infra.config_paths").get, "TapHoldConfigPath")
+	local ok_path, path = pcall(require("settings.engine.paths").get, "TapHoldConfigPath")
 	if not ok_path then
 		on_done(false, "the remap settings file cannot be resolved: " .. tostring(path))
 		return
@@ -744,7 +744,7 @@ local function import_nav_layer(keys)
 		if not NavLayer.recommendation_enters_layer(keys, require("platform.remap.defaults").tap_hold) then
 			return nil, false
 		end
-		local imported = NavLayer.import_owned({ config_dir = require("infra.config_paths").get_config_dir() })
+		local imported = NavLayer.import_owned({ config_dir = require("settings.engine.paths").get_config_dir() })
 		return imported, imported == nil
 	end)
 	if not ok then
@@ -847,7 +847,7 @@ local function commit_owned(answers, publication)
 			i18n.set_locale_no_reload(previous_locale)
 		end
 		if published_dir ~= nil then
-			local ConfigPaths = require("infra.config_paths")
+			local ConfigPaths = require("settings.engine.paths")
 			if ConfigPaths.get_config_dir() ~= published_dir then
 				-- Something else chose a folder since: that newer choice stands.
 				Logger.warn(LOG, "The configuration folder changed during Finish; it is kept.")
@@ -872,16 +872,16 @@ local function commit_owned(answers, publication)
 	end
 	if answers.config_dir ~= "" then
 		_config_path_unresolved = true
-		local ok_mp, loaded_menu_paths = pcall(require, "ui.menu.menu_paths")
+		local ok_mp, loaded_menu_paths = pcall(require, "settings.ui.menu.paths")
 		menu_paths = ok_mp and loaded_menu_paths or nil
-		previous_dir = require("infra.config_paths").get_config_dir()
+		previous_dir = require("settings.engine.paths").get_config_dir()
 		local persisted, persist_err = M._persist_config_dir(menu_paths, answers.config_dir)
 		if not persisted then
 			Logger.error(LOG, "Failed to persist config dir override: %s.", tostring(persist_err))
 			fail_commit("paths_editor.save_failed_title", wizard_text("paths_editor.save_failed"))
 			return
 		end
-		published_dir = require("infra.config_paths").get_config_dir()
+		published_dir = require("settings.engine.paths").get_config_dir()
 		-- _config_path was captured in M.run() from the config dir as it stood
 		-- BEFORE the wizard ran; persistence above moved the resolver. Writing
 		-- through the stale path would leave the NEW directory without config.toml,
@@ -1058,7 +1058,7 @@ local function handle_message(body)
 		-- The path editor's picker is the single native folder dialog: the
 		-- wizard's former copy read the raw AppleEvent descriptor instead of the
 		-- parsed result, so the two could disagree on the very same answer.
-		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
+		local ok_mp, menu_paths = pcall(require, "settings.ui.menu.paths")
 		if not ok_mp or type(menu_paths) ~= "table" or type(menu_paths.pick_config_dir) ~= "function" then
 			Logger.error(LOG, "pickConfigDir: the native folder picker is unavailable.")
 			return

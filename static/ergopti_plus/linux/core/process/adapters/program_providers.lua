@@ -4,7 +4,7 @@
 local Shared = require("apps.engine.program_providers")
 local Json = require("core.text.engine.json")
 local Paths = require("core.fs.engine.paths")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local loaded, Native = pcall(require, "luv")
 if not loaded then Native = nil end
 local M = {}

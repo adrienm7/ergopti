@@ -67,7 +67,7 @@ local function genuine_shared_providers(damage)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key_source",
-		"infra.hotstring_preferences", "modules.shortcuts.tap_keys", "infra.config_paths",
+		"infra.hotstring_preferences", "modules.shortcuts.tap_keys", "settings.engine.paths",
 		"core.fs.adapters.storage", "modules.keymap.layout_registry", "modules.hotstrings.input_reader",
 		"menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local directory, path, filesystem, directory_created
@@ -173,7 +173,7 @@ local function genuine_trigger_providers(damage, default_source)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "modules.hotstrings.magic_key", "infra.manifest_reader",
-		"infra.hotstring_preferences", "infra.config_paths", "core.fs.adapters.storage",
+		"infra.hotstring_preferences", "settings.engine.paths", "core.fs.adapters.storage",
 		"menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local directory, path, filesystem, directory_created
 	local restore, found = function() end, {}
@@ -447,7 +447,7 @@ local function genuine_language_providers(damage, exercise)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "core.fs.engine.paths", "core.text.engine.json", "menu.engine.renderer",
-		"infra.hotstring_preferences", "infra.config_paths", "core.fs.adapters.storage",
+		"infra.hotstring_preferences", "settings.engine.paths", "core.fs.adapters.storage",
 		"modules.hotstrings.magic_key", "modules.hotstrings.magic_key_source" }
 	local directory, path, filesystem, created
 	local restore = function() end

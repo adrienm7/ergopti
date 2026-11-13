@@ -105,7 +105,7 @@ end
 --- Captures the guarded files and preferences.
 --- @return table snapshot
 local function config_snapshot()
-	local ConfigPaths = require("infra.config_paths")
+	local ConfigPaths = require("settings.engine.paths")
 	local Storage = require("core.fs.adapters.storage")
 	local snapshot = { files = {}, settings = {}, runtime_keys = runtime_setting_keys() }
 	for _, key in ipairs(GUARDED_FILES) do
@@ -382,7 +382,7 @@ end
 --- @return function restore fn() -> code: "active_model_kept",
 ---   "active_model_restored" or "active_model_restore_failed".
 local function keep_mlx_active_model()
-	local path = require("infra.config_paths").get("MlxActiveModelPath")
+	local path = require("settings.engine.paths").get("MlxActiveModelPath")
 	if type(path) ~= "string" or path == "" then error("config path MlxActiveModelPath is unresolved", 0) end
 	local content, status = FileSystem.read_with_status(path)
 	if status ~= "ok" and status ~= "absent" then error("the MLX active-model file is unreadable", 0) end

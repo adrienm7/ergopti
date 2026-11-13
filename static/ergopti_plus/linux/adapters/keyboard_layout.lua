@@ -50,7 +50,7 @@ local inverse_republish = XkbCapture.inverse_republish
 local inverse_retarget = XkbCapture.inverse_retarget
 local retarget_is_x11 = DisplayServer.is_x11
 local XkbRmlvo = require("infra.xkb_rmlvo")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local EvdevCodes = require("platform.input.evdev_codes")
 local Utf8 = require("core.lifecycle.engine.compat.utf8")
 

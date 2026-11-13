@@ -96,7 +96,7 @@ local function load_fixture(opts)
 		update_channel = "dev",
 		update_check_interval_seconds = 3600,
 	}
-	package.loaded["infra.preferences"] = {
+	package.loaded["settings.engine.preferences.preferences"] = {
 		build_initial_state = function() return state end,
 		load = function() return {}, "present" end,
 		merge_saved_data = noop,
@@ -112,13 +112,13 @@ local function load_fixture(opts)
 		invalidate_cache = noop,
 	}
 	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = noop }
-	package.loaded["ui.menu.menu_paths"] = {
+	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
 		get = function() return "/virtual/config.toml" end,
 		get_config_dir = function() return "/virtual" end,
 		open_editor = noop,
 	}
-	package.loaded["infra.factory_reset_journal"] = {
+	package.loaded["settings.engine.factory_reset_journal"] = {
 		path_for = function(path) return path .. ".journal" end,
 		create = function()
 			return {

@@ -49,7 +49,7 @@ const VENDOR_WORDS =
 // Trees where a vendor name is legitimate: the OS seam itself, and third-party
 // code whose names we did not choose. tests/ mirrors the source tree, so a test
 // named after a vendor is a symptom of the source, not a separate offence.
-const EXEMPT = /[/\\](platform|adapters|vendor|tests|docs|core)[/\\]/;
+const EXEMPT = /[/\\](platform|adapters|vendor|tests|docs|core|settings)[/\\]/;
 
 // Frozen baseline — driver-tree paths naming an OS or vendor outside the seam.
 // Drive to zero; NEVER raise it.

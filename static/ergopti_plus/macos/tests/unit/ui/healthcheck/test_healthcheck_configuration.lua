@@ -366,9 +366,9 @@ helpers.describe("diagnostics configuration is collected by a probe, not by phas
 	-- it called config_paths.config(), which only Linux has, and the probe
 	-- answered "error" on every Mac (#99).
 	helpers.it("the default context finds the files where macOS keeps them (healthcheck-config-paths-99)", function()
-		local previous = package.loaded["infra.config_paths"]
+		local previous = package.loaded["settings.engine.paths"]
 		local ran, err = pcall(under_stub, function()
-			local real = require("infra.config_paths")
+			local real = require("settings.engine.paths")
 			-- The real module's surface, with only its two folder readers pinned
 			local surface = {}
 			for name, value in pairs(real) do surface[name] = value end
@@ -376,7 +376,7 @@ helpers.describe("diagnostics configuration is collected by a probe, not by phas
 				return key == "ConfigTomlPath" and "/cfg/hammerspoon/config.toml" or ""
 			end
 			surface.get_config_dir = function() return "/cfg/" end
-			package.loaded["infra.config_paths"] = surface
+			package.loaded["settings.engine.paths"] = surface
 			local schema = require("ui.healthcheck.core").config().schema
 			local context = require("ui.healthcheck.helpers").configuration_context(schema, {})
 			local ok, config_path = pcall(context.path_of, "config")
@@ -384,7 +384,7 @@ helpers.describe("diagnostics configuration is collected by a probe, not by phas
 			helpers.assert_eq(config_path, "/cfg/hammerspoon/config.toml")
 			helpers.assert_eq(context.path_of("layers"), "/cfg/layers.toml")
 		end)
-		package.loaded["infra.config_paths"] = previous
+		package.loaded["settings.engine.paths"] = previous
 		if not ran then error(err, 0) end
 	end)
 end)

@@ -4,7 +4,7 @@
 ; MODULE: Registry OSError.Number (not .Extra) Meta Test
 ; DESCRIPTION:
 ; Regression guard for a systemic bug found across five sites in
-; infra/registry.ahk: each checked `e.Extra = 2` (or `!= 2 and != 3`) to
+; settings/engine/registry.ahk: each checked `e.Extra = 2` (or `!= 2 and != 3`) to
 ; recognise ERROR_FILE_NOT_FOUND/ERROR_PATH_NOT_FOUND from RegDelete/RegRead/
 ; the Reg loop directive, but the Win32 error code for these OSErrors lands
 ; in the `Number` property, not `Extra` -- confirmed empirically with a
@@ -21,7 +21,7 @@
 ;     case of checking whether a key exists yet) logged a spurious
 ;     LoggerWarn "unexpected error" for what is normal, expected behavior.
 ;
-; SCOPE: source introspection of infra/registry.ahk.
+; SCOPE: source introspection of settings/engine/registry.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -41,7 +41,7 @@ _RONE_NoRemainingExtraChecks() {
 
 	for _, FuncName in ["Reg_DeleteValue", "Reg_DeleteKey", "Reg_KeyExists"] {
 		Body := _DriverFuncBody(FuncName)
-		Assert(Body != "", FuncName . " must exist in infra/registry.ahk")
+		Assert(Body != "", FuncName . " must exist in settings/engine/registry.ahk")
 		Assert(InStr(Body, "e.Extra") = 0,
 			FuncName . " must not check e.Extra for the Win32 error code -- OSError's Extra property is empty for RegDelete/RegRead/Reg-loop errors; the real code is in e.Number")
 		if (FuncName == "Reg_KeyExists")

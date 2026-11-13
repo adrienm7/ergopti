@@ -40,7 +40,7 @@ helpers.describe("Profile deletion fixture ownership (profile-delete-fixture-sco
 					local sentinel
 					if initial == "false" then sentinel = false end
 					if initial == "existing" then sentinel = {} end
-					for _, name in ipairs({ "core.events.timer_scheduler", "ui.menu.preferences_transaction",
+					for _, name in ipairs({ "core.events.timer_scheduler", "settings.ui.menu.preferences_transaction",
 						"ui.menu.menu_llm.prediction_lock_registry", "ui.menu.menu_llm.profiles_manager",
 						"ui.menu.menu_llm.trigger_orchestrator", "core.logger.engine.logger" }) do
 						package.loaded[name] = sentinel

@@ -35,7 +35,7 @@ M.GROUPS = {
 	{ name = "integration", prefixes = {
 		"tests/meta/harness/test_e2e_corpus_integration.lua",
 		"tests/meta/harness/test_property_runner_integration.lua",
-		"tests/unit/infra/config/paths/test_bootstrap_toml.lua",
+		"tests/unit/settings/test_bootstrap_toml.lua",
 		"tests/unit/modules/llm/agent/test_agent_end_to_end.lua",
 		"tests/unit/modules/llm/features/test_live_mode_end_to_end.lua",
 		"tests/unit/modules/llm/features/test_screen_answer_end_to_end.lua",

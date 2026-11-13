@@ -42,7 +42,7 @@ local LOG = "ui.menu.menu_llm"
 local function numeric_setting_request(refresh, owner, module_name, name, path)
 	-- Not named Preferences: that local belongs to _build_llm's toggle admission.
 	local Prefs = require("infra.llm_preferences")
-	local Paths = require("infra.config_paths")
+	local Paths = require("settings.engine.paths")
 	local set, get_many, generation = owner.set, Prefs.get_many, Prefs.generation
 	local classified, retained = owner.set_with_reason, owner.set_with_source_notice
 	local revision_current, publish, config = Prefs.is_current_revision, Prefs.set_many, Paths.config
@@ -53,7 +53,7 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 			and owner.set_with_source_notice == retained
 			and package.loaded["infra.llm_preferences"] == Prefs and Prefs.get_many == get_many
 			and Prefs.generation == generation and Prefs.is_current_revision == revision_current
-			and Prefs.set_many == publish and package.loaded["infra.config_paths"] == Paths and Paths.config == config
+			and Prefs.set_many == publish and package.loaded["settings.engine.paths"] == Paths and Paths.config == config
 	end
 	local root_ok, root = pcall(config, "config.toml")
 	if not root_ok or type(root) ~= "string" or not ports_current() then return nil end
@@ -113,7 +113,7 @@ end
 --- @return boolean committed
 --- Captures the configuration owner at menu projection time.
 local function choice_origin()
-	local Paths = require("infra.config_paths")
+	local Paths = require("settings.engine.paths")
 	local config = Paths.config
 	if type(config) ~= "function" then return nil end
 	local okay, path = pcall(config, "config.toml")
@@ -126,7 +126,7 @@ end
 local function commit_choice(owner, name, value, source, prefix, expected, origin, classified)
 	local setter = classified and owner.set_with_reason or owner.set_with_reason_notice
 	if type(setter) ~= "function" then return false end
-	local Prefs, Paths = require("infra.llm_preferences"), require("infra.config_paths")
+	local Prefs, Paths = require("infra.llm_preferences"), require("settings.engine.paths")
 	local read, config, current_revision = Prefs.get_many, Paths.config, Prefs.is_current_revision
 	local publish = Prefs.set_many_with_notice
 	local module_names = { ["llm.trigger."] = "modules.llm.trigger_settings", ["llm.display."] = "modules.llm.display_settings", ["llm.generation."] = "modules.llm.settings", ["llm.profiles."] = "modules.llm.profile_settings" }
@@ -141,7 +141,7 @@ local function commit_choice(owner, name, value, source, prefix, expected, origi
 		or (expected ~= nil and values[prefix .. name] ~= expected)
 		or type(revision) ~= "number" or (source and (source.status ~= observed.status or source.content ~= observed.content)) then return false end
 	local function owner_current()
-		if package.loaded["infra.llm_preferences"] ~= Prefs or package.loaded["infra.config_paths"] ~= Paths
+		if package.loaded["infra.llm_preferences"] ~= Prefs or package.loaded["settings.engine.paths"] ~= Paths
 			or package.loaded[module_name] ~= owner or Prefs.set_many_with_notice ~= publish
 			or Prefs.get_many ~= read or Prefs.is_current_revision ~= current_revision or Paths.config ~= config
 			or (classified and owner.set_with_reason or owner.set_with_reason_notice) ~= setter then return false end
@@ -154,7 +154,7 @@ local function commit_choice(owner, name, value, source, prefix, expected, origi
 		local checked, unchanged = pcall(current_revision, revision)
 		return checked and unchanged == true and package.loaded["infra.llm_preferences"] == Prefs
 			and package.loaded[module_name] == owner and Prefs.set_many_with_notice == publish
-			and package.loaded["infra.config_paths"] == Paths and Prefs.get_many == read
+			and package.loaded["settings.engine.paths"] == Paths and Prefs.get_many == read
 			and Prefs.is_current_revision == current_revision and Paths.config == config
 			and (classified and owner.set_with_reason or owner.set_with_reason_notice) == setter
 	end
@@ -1117,11 +1117,11 @@ local function _build_llm(ctx)
 	end
 	-- A configuration saved by a newer version names its own cause on those rows.
 	local function newer_schema()
-		return require("settings.engine.migration.migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "newer"
+		return require("settings.engine.migration.migrate").read_only_status(require("settings.engine.paths").config("config.toml")) == "newer"
 	end
 	-- So does one too old for this build to migrate.
 	local function older_schema()
-		return require("settings.engine.migration.migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "unsupported"
+		return require("settings.engine.migration.migrate").read_only_status(require("settings.engine.paths").config("config.toml")) == "unsupported"
 	end
 	-- The restore alone: the AI menu's clear row was retired.
 	llm_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function()

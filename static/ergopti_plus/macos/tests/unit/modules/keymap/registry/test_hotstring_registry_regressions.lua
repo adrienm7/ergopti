@@ -6,14 +6,14 @@
 local helpers = require("tests.helpers")
 
 local REGISTRY_OWNERSHIP = {
-	"modules.keymap.registry",
+	"settings.engine.registry",
 	"modules.keymap.registry_groups",
 	"modules.keymap.registry_index",
 	"modules.keymap.terminators",
 }
 
 local PRIORITY_OWNERSHIP = {
-	"modules.keymap.registry",
+	"settings.engine.registry",
 	"modules.keymap.registry_groups",
 	"modules.keymap.registry_index",
 	"modules.keymap.terminators",
@@ -22,7 +22,7 @@ local PRIORITY_OWNERSHIP = {
 }
 
 helpers.describe("Registry — hotstring counting regressions", function()
-	local Registry = helpers.load_with_stubs("modules.keymap.registry")
+	local Registry = helpers.load_with_stubs("settings.engine.registry")
 	
 	helpers.it("correctly counts and loads hotstrings from standard TOML table sections", function()
 		-- Mock data with mixed formats: one array-of-tables (legacy) and one direct-table (modern)
@@ -121,7 +121,7 @@ helpers.describe("HS-150 modern-section registration order", function()
 			package.loaded["modules.hotstrings.hotstrings_config"] = {
 				get_user_override = function() return nil end,
 			}
-			local Registry = require("modules.keymap.registry")
+			local Registry = require("settings.engine.registry")
 			local state = {
 				groups = {}, mappings = {}, mappings_lookup = {},
 				mappings_by_tail_char = {}, mappings_by_star_tail_char = {},
@@ -150,7 +150,7 @@ end)
 helpers.describe("Registry — TOML read commitment", function()
 	helpers.it("registers nothing when the reader returns a table without exact commitment", function()
 		for key in pairs(package.loaded) do
-			if type(key) == "string" and key:match("^modules%.keymap%.registry") then
+			if type(key) == "string" and key:match("^settings%.engine%.registry") then
 				package.loaded[key] = nil
 			end
 		end
@@ -164,7 +164,7 @@ helpers.describe("Registry — TOML read commitment", function()
 			end,
 		}
 
-		local Registry = require("modules.keymap.registry")
+		local Registry = require("settings.engine.registry")
 		local state = {
 			groups = { existing = { enabled = true } },
 			mappings = {}, mappings_lookup = {}, mappings_by_tail_char = {},
@@ -211,7 +211,7 @@ helpers.describe("Registry — same-group re-registration metadata", function()
 			package.loaded["modules.hotstrings.hotstrings_config"] = {
 				get_user_override = function() return nil end,
 			}
-			local Registry = require("modules.keymap.registry")
+			local Registry = require("settings.engine.registry")
 			local state = {
 				groups = {
 					rolls = {
@@ -279,7 +279,7 @@ helpers.describe("Registry -- shifted-comma case variants (':D' emoji safety)", 
 	--- @return table state The shared state populated with the comma mappings.
 	local function registry_with_comma_ds()
 		return helpers.with_fresh_modules(REGISTRY_OWNERSHIP, function()
-			local R = require("modules.keymap.registry")
+			local R = require("settings.engine.registry")
 			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { sfbsreduction = 0.3 })
 			helpers.assert_eq(R.init(state), true)
 			-- Same flags as static/ergopti_plus/_shared/hotstrings/data/catalogue/sfbsreduction.toml:
@@ -357,7 +357,7 @@ helpers.describe("Registry — section priority from the shared override file", 
 		return helpers.with_fresh_modules(PRIORITY_OWNERSHIP, function()
 			package.loaded["core.text.engine.toml.reader"] = { parse = function() return toml_data, true end }
 			package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = override_fn }
-			local Registry = require("modules.keymap.registry")
+			local Registry = require("settings.engine.registry")
 
 			local state = {
 				groups = { rolls = { enabled = true, sections = { sec1 = { enabled = true } } } },

@@ -35,7 +35,7 @@ KEY_LEFTCTRL, KEY_LEFT = 29, 105
 SELECT_ALL = ["K 29 1", "K 30 1", "K 30 0", "K 29 0"]
 
 PREPARE = r"""
-local Paths = require("infra.config_paths")
+local Paths = require("settings.engine.paths")
 local fh = assert(io.open(Paths.config("config.toml"), "ab"))
 fh:write('\n[hotstrings]\nmagic_key_source = "KeyQ"\n\n[shortcuts]\nenabled = true\n\n[shortcuts.keyboard]\n'
 	.. 'physical_none_KeyJ = "select_all"\nphysical_none_KeyZ = "select_all"\nphysical_none_Tab = "select_all"\n'

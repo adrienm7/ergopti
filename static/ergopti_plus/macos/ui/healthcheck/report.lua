@@ -206,7 +206,7 @@ local DEFAULT_EFFECTS = {
 		return require("platform.focus.application_notifier").send(title, { body = body, kind = kind })
 	end,
 	identity = function()
-		local ConfigPaths = require("infra.config_paths")
+		local ConfigPaths = require("settings.engine.paths")
 		return {
 			home = os.getenv("HOME"), user = os.getenv("USER"),
 			config_dir = ConfigPaths.is_initialized() and ConfigPaths.get_config_dir() or nil,

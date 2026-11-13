@@ -124,7 +124,7 @@ function M.with_configurable(callback)
 	local names = {
 		"core.logger.engine.logger", "core.fs.engine.paths", "core.fs.adapters.file_system",
 		"platform.input.hotkey_registrar", "core.fs.adapters.storage", "modules.gestures.actions",
-		"modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord", "infra.config_paths", "infra.preferences",
+		"modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord", "settings.engine.paths", "settings.engine.preferences.preferences",
 	}
 	return helpers.with_stub_scope(names, function()
 		local logger, failures = callback_logger()
@@ -155,8 +155,8 @@ function M.with_configurable(callback)
 			execute_single = function() error("gesture exploded") end,
 		}
 		package.loaded["core.fs.adapters.storage"] = nil
-		package.loaded["infra.config_paths"] = { get = function() return "callback-fixture-config" end }
-		package.loaded["infra.preferences"] = nil
+		package.loaded["settings.engine.paths"] = { get = function() return "callback-fixture-config" end }
+		package.loaded["settings.engine.preferences.preferences"] = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
 		local subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts")

@@ -2,7 +2,7 @@
 # Versioned config.toml: the ordered, data-only migration registry.
 #
 # READ AT RUNTIME, ON EVERY BOOT, BY ALL THREE DRIVERS, before anything applies
-# or saves config.toml: Windows through windows/infra/config_migrate.ahk, macOS
+# or saves config.toml: Windows through windows/settings/engine/migration/migrate.ahk, macOS
 # and Linux through _shared/settings/engine/migration/migrate.lua. The decision record is
 # docs/adr/009-config-versioning.md.
 #

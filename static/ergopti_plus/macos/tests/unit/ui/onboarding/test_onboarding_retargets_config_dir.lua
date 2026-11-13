@@ -139,11 +139,11 @@ end)
 
 helpers.describe("onboarding commit() honours the retarget", function()
 	helpers.it("(onboarding-retarget-behavior) finish writes to the newly persisted resolver destination", function()
-		helpers.with_fresh_modules({ "core.text.engine.toml.writer", "core.fs.adapters.file_system", "ui.menu.menu_paths",
+		helpers.with_fresh_modules({ "core.text.engine.toml.writer", "core.fs.adapters.file_system", "settings.ui.menu.paths",
 			"core.ui.engine.notifications" }, function()
 			return require("tests.support.onboarding_finish_fixture").with_migration_reader(function()
 			local destination, persisted, writes, notified = OLD_CONFIG_PATH, 0, {}, 0
-			package.loaded["ui.menu.menu_paths"] = {
+			package.loaded["settings.ui.menu.paths"] = {
 				persist_config_dir_for_wizard = function(directory)
 					helpers.assert_eq(directory, NEW_DIR)
 					persisted = persisted + 1
@@ -214,8 +214,8 @@ helpers.describe("menu_paths really retargets after persist_config_dir_for_wizar
 	--- Loads the real menu_paths with the filesystem side effects neutralised.
 	--- @return table
 	local function fresh_menu_paths()
-		package.loaded["ui.menu.menu_paths"] = nil
-		package.loaded["infra.config_paths"] = nil
+		package.loaded["settings.ui.menu.paths"] = nil
+		package.loaded["settings.engine.paths"] = nil
 		local saved_file_system = package.loaded["core.fs.adapters.file_system"]
 		local bootstrap_content = nil
 		package.loaded["core.fs.adapters.file_system"] = {
@@ -233,7 +233,7 @@ helpers.describe("menu_paths really retargets after persist_config_dir_for_wizar
 				return true
 			end,
 		}
-		local MP = helpers.load_with_stubs("ui.menu.menu_paths", {
+		local MP = helpers.load_with_stubs("settings.ui.menu.paths", {
 			fs = {
 				-- Report every directory as already present so ensure_dir does no
 				-- work; the assertion is about the resolved path, not about mkdir.

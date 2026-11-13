@@ -111,7 +111,7 @@ local function load_fixture(reset_result)
 		end,
 	})
 	package.loaded["modules.llm.prediction_engine"] = engine
-	package.loaded["modules.keymap.registry"] = {
+	package.loaded["settings.engine.registry"] = {
 		mappings_for_tail = function() return nil end,
 		mappings_for_star_tail = function() return nil end,
 	}

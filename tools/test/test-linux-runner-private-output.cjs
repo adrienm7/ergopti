@@ -120,7 +120,7 @@ fs.writeFileSync(
 	[
 		'local native_require, canonical_helpers = require, nil',
 		'require = function(name)',
-		'  if name == "tests.unit.infra.scope.test_global_shortcuts_pair_scope"',
+		'  if name == "tests.unit.settings.scope.test_global_shortcuts_pair_scope"',
 		'    and canonical_helpers and package.loaded["tests.helpers"] ~= canonical_helpers then',
 		'    error("controlled pair module load refusal", 0)',
 		'  end',

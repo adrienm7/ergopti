@@ -147,7 +147,7 @@ end
 
 --- Builds a synthetic registry with FIXTURE_TRIGGER_COUNT entries bucketed by
 --- tail codepoint, mirroring the data structures built by add_raw() /
---- rebuild_tail_indexes() in modules/keymap/registry.lua.
+--- rebuild_tail_indexes() in settings/engine/registry.lua.
 --- @return table Registry with a mappings array and a mappings_by_tail_char table.
 local function build_fixture_registry()
 	-- Representative short triggers from the real TOML corpus

@@ -109,7 +109,7 @@ local function with_remap(files, run)
 	helpers.with_fresh_modules({
 		"core.fs.adapters.file_system",
 		"core.fs.adapters.json_codec",
-		"infra.config_paths",
+		"settings.engine.paths",
 		"platform.input.keycodes",
 		"core.logger.engine.logger",
 		"core.text.engine.toml.codec",
@@ -120,7 +120,7 @@ local function with_remap(files, run)
 		"core.text.engine.toml_codec",
 	}, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.config_paths"] = {
+		package.loaded["settings.engine.paths"] = {
 			get_config_dir = function() return "/tmp/ergopti_test" end,
 		}
 		package.loaded["platform.input.keycodes"] = {

@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Contract = require("tests.runner_contract")
-local CONTINUATION_MODULE = "tests.unit.infra.scope.test_global_shortcuts_pair_scope"
+local CONTINUATION_MODULE = "tests.unit.settings.scope.test_global_shortcuts_pair_scope"
 
 --- Keeps the continuation actor's deliberate failure and headers out of the real tally.
 --- @param body function Owned private actor, given its retained transcript.

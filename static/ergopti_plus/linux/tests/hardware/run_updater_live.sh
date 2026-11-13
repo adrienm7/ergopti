@@ -104,7 +104,7 @@ wait "${STDERR_PID}" || echo "Updater stderr evidence could not be copied." >&2
 # from the installed launcher, it must report the version just installed.
 PHASE=restart
 NEW="$(sed -n 's/^version=//p' "${LIB}/_shared/build_stamp.txt")"
-# Where that daemon writes its logs: state, not data (infra/config_paths.lua),
+# Where that daemon writes its logs: state, not data (settings/engine/paths.lua),
 # in the folder its own installed registry names. It is the newest published
 # release, which may predate this checkout's folder name, so the name is read
 # from the installed _shared/core/fs/engine/app_dirs.lua (LUA_PATH above), not spelled.

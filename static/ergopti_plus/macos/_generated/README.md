@@ -51,7 +51,7 @@ cannot fail teaches nobody anything, so the explanation lives here instead.
 
 They used to be generated here as a planned "hexagonal migration" (consume the
 shared `Registry.spec.js` / `Expander.spec.js` adapters from both drivers), but
-the migration never happened: the hand-written `modules/keymap/registry.lua`
+the migration never happened: the hand-written `settings/engine/registry.lua`
 (~1126 lines) and `expander.lua` diverged far past the generated pure-logic
 contract — TOML loading, `hs.settings`, the priority cascade, case-variant
 generation and i18n live only in the hand-written modules. The generated

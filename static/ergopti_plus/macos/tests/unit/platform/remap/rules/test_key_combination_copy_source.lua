@@ -136,7 +136,7 @@ h.describe("chord copy actual fresh source producer", function()
      return Config.prepare_copy_taps_to_chords(actual_entries, actions, actual_path)
     end
     port.publish_copy_taps_to_chords = Config.publish_copy_taps_to_chords
-    package.loaded["infra.config_paths"].get = function() return path end
+    package.loaded["settings.engine.paths"].get = function() return path end
     local completed, result, changed, pending = 0, nil, nil, nil
     remap.regenerate = function(done) pending = done; return true end
     h.assert_eq(remap.get_combo_tap_action(entries[1].id), "none")
@@ -254,7 +254,7 @@ h.describe("chord copy final logical admission", function()
     end
     port.publish_copy_taps_to_chords = Config.publish_copy_taps_to_chords
     local route = path
-    package.loaded["infra.config_paths"].get = function() return route end
+    package.loaded["settings.engine.paths"].get = function() return route end
     local prepared_reads, read_native = 0, adapter.read_with_status
     local final_phase = false
     adapter.read_with_status = function(...)

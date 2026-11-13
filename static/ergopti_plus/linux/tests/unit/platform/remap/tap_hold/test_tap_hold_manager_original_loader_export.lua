@@ -90,7 +90,7 @@ helpers.describe("complete original-issuer combination binding publication", fun
 		local saved, undo = {}, {}
 		for name, value in pairs(package.loaded) do saved[name] = value end
 		local previous_open = io.open
-		local paths = require("infra.config_paths")
+		local paths = require("settings.engine.paths")
 		local previous_route = paths.config
 		local user_path, config_path, Manager
 		local owned_paths, cleanup = {}, {}

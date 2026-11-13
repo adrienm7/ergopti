@@ -21,7 +21,7 @@ local function isolated(body)
 		assert(uv.os_setenv(name, scratch .. "/" .. name))
 	end
 	for _, name in ipairs({ "ui.menu.llm_backend_rows", "modules.llm.prediction_engine", "modules.llm.api_entries",
-		"modules.llm.api_remote", "infra.llm_preferences", "infra.config_paths", "core.fs.adapters.storage" }) do
+		"modules.llm.api_remote", "infra.llm_preferences", "settings.engine.paths", "core.fs.adapters.storage" }) do
 		package.loaded[name] = nil
 	end
 	local function write(path, content)
@@ -42,7 +42,7 @@ local function isolated(body)
 	end
 	local ok, why = xpcall(function()
 		local Json = require("core.text.engine.json")
-		local Paths = require("infra.config_paths")
+		local Paths = require("settings.engine.paths")
 		assert(uv.fs_mkdir(Paths.config_home(), 448))
 		assert(uv.fs_mkdir(Paths.get_config_dir(), 448))
 		local config_path, api_path = Paths.config("config.toml"), scratch .. "/api.json"

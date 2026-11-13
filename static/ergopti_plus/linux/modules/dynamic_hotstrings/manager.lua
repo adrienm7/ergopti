@@ -235,7 +235,7 @@ function M.init(opts)
 	-- Resolve personal_info.toml path.
 	-- The EFFECTIVE configuration directory (the user's override included), the
 	-- same file the open-personal-information action and the editor point at.
-	local info_path = options.personal_info_path or require("infra.config_paths").config("personal_info.toml")
+	local info_path = options.personal_info_path or require("settings.engine.paths").config("personal_info.toml")
 
 	-- Load shared engine.
 	local ok_eng, Engine = pcall(require, "hotstrings.engine.dynamic.core")

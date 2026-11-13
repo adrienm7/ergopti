@@ -205,7 +205,7 @@ end)
 
 describe("Build commit: the healthcheck reports the commit and the real config dir", function()
 	it("sends the resolved commit, its source, the config dir and the script dir", function()
-		local ConfigPaths = require("infra.config_paths")
+		local ConfigPaths = require("settings.engine.paths")
 		local Paths = require("core.fs.engine.paths")
 		local handler = helpers.load_module("ui.healthcheck.bridge")
 		local result
@@ -229,7 +229,7 @@ end)
 describe("Build commit: the crash dump names the build and the config dir", function()
 	it("writes the resolved commit and the configuration directory", function()
 		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
-			local ConfigPaths = require("infra.config_paths")
+			local ConfigPaths = require("settings.engine.paths")
 			local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
 			with_module("infra.diagnostic_snapshot", {
 				resolve_commit = function() return SHORT, Snapshot.COMMIT_SOURCE_BUILD end,

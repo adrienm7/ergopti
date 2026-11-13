@@ -1052,7 +1052,7 @@ local function with_control_trigger_source(scenario, source)
 		.. '[llm.trigger]\ndebounce_ms = 500\nfuture = "keep exact" # retained\n'), function(path)
 		local names = { "infra.llm_preferences", "modules.llm.trigger_settings" }
 		local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name); rawset(package.loaded, name, nil) end
-		local Paths = require("infra.config_paths")
+		local Paths = require("settings.engine.paths")
 		local original = Paths.config
 		Paths.config = function(relative) helpers.assert_eq(relative, "config.toml"); return path end
 		local ok, detail = xpcall(function()
@@ -1167,7 +1167,7 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 	helpers.it("restores original source-routing and module identities after raised native construction (llm-control-boundaries)", function()
 		local names = { "infra.llm_preferences", "modules.llm.trigger_settings" }
 		local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
-		local Paths = require("infra.config_paths"); local original = Paths.config
+		local Paths = require("settings.engine.paths"); local original = Paths.config
 		local path
 		local ok, detail = pcall(function()
 			with_control_trigger_source(function(_, owned) path = owned; error("trigger boundary inverse sentinel") end)

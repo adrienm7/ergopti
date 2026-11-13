@@ -558,7 +558,7 @@ end)
 
 helpers.it("Linux trigger ROI: real canonical file transitions reject malformed encryption without input reparsing", function()
 	Home.run(function()
-		local path = require("infra.config_paths").config("config.toml")
+		local path = require("settings.engine.paths").config("config.toml")
 		local shell = require("core.process.adapters.shell_runner")
 		assert(shell.run("mkdir -p " .. shell.quote(path:match("^(.*)/[^/]+$"))))
 		local function write(source)

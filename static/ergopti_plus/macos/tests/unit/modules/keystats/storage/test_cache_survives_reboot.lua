@@ -213,14 +213,14 @@ helpers.describe("keystats cache location: a reboot keeps the cache (L64)", func
 	end)
 
 	helpers.it("the production cache root is the user's Caches folder, from config_paths alone", function()
-		package.loaded["infra.config_paths"] = nil
-		local ConfigPaths = helpers.load_with_stubs("infra.config_paths")
+		package.loaded["settings.engine.paths"] = nil
+		local ConfigPaths = helpers.load_with_stubs("settings.engine.paths")
 		local home = os.getenv("HOME")
 		helpers.assert_eq(ConfigPaths.metrics_cache_dir(),
 			home:gsub("/$", "") .. "/" .. AppDirs.macos.cache_relative .. "/metrics")
-		package.loaded["infra.config_paths"] = nil
+		package.loaded["settings.engine.paths"] = nil
 		local src = helpers.read_driver_source("Central shared-state table passed by reference to all sub-modules")
-		helpers.assert_true(src:find('CACHE_DIR = require("infra.config_paths").metrics_cache_dir()', 1, true) ~= nil,
+		helpers.assert_true(src:find('CACHE_DIR = require("settings.engine.paths").metrics_cache_dir()', 1, true) ~= nil,
 			"the keystats core state must take its cache root from config_paths")
 	end)
 

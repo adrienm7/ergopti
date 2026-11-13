@@ -100,7 +100,7 @@ local active = Sink.install(logger, { log_dir = root .. "/logs", redaction_conte
 assert(active == (endpoint ~= "main" and endpoint ~= "close"), "main refusal must degrade without blocking other channels")
 if endpoint == "close" then assert(close_refusals == 1, "the actual admission descriptor close must be observed") end
 if endpoint == "repoint" then
- require("infra.config_paths").get_logs_dir = function() return root .. "/candidate" end
+ require("settings.engine.paths").get_logs_dir = function() return root .. "/candidate" end
  assert(Sink.repoint() == false, "refused candidate must retain the original sink")
 end
 assert(type(emit) == "function")

@@ -36,7 +36,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const HOT_PATH = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'modules', 'keymap');
+const HOT_PATH = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
 const DEFER_HELPER = 'schedule_prediction_deferred';
 
 const CENTRAL_DEFERRAL = new RegExp(

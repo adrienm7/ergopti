@@ -58,7 +58,7 @@ local function with_action(route, mode, action, body)
 			.. 'tap_key__number_row_left__send_text = "ok"\nscript__script_altgr_enter__send_text = "ok"\n'
 			.. 'tap_3__send_text = "ok"\n')
 		assert(configuration:close())
-		local routes = require("infra.config_paths")
+		local routes = require("settings.engine.paths")
 		local config_route = routes.config
 		routes.config = function(name) return name == "config.toml" and path or config_route(name) end
 		require("tests.support.text_owner_fixture").with(function(guard)

@@ -237,7 +237,7 @@ end)
 --- @return table rows, table state
 local PREVIEW_OWNERSHIP = {
 	"modules.keymap.state",
-	"modules.keymap.registry",
+	"settings.engine.registry",
 	"modules.keymap.registry_groups",
 	"modules.keymap.registry_index",
 	"modules.keymap.terminators",
@@ -265,7 +265,7 @@ local function capture_rows(register, buf)
 		-- The registry instance the BRIDGE resolved, not a separately loaded one: the
 		-- bridge captured its Registry upvalue at require time, and a second instance
 		-- would be initialised over a state the bridge never reads.
-		local Registry = package.loaded["modules.keymap.registry"]
+		local Registry = package.loaded["settings.engine.registry"]
 		helpers.assert_not_nil(Registry, "the bridge must have loaded the registry")
 		local Expander = package.loaded["modules.keymap.expander"]
 		helpers.assert_not_nil(Expander, "the bridge must have loaded the expander")

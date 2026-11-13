@@ -99,11 +99,11 @@ helpers.describe("script lifecycle actions", function()
 		local storage_before = package.loaded["core.fs.adapters.storage"]
 		local module_before = package.loaded["modules.shortcuts.keyboard_shortcuts"]
 		local gestures_before = package.loaded["modules.gestures.manager"]
-		local paths_before = package.loaded["infra.config_paths"]
+		local paths_before = package.loaded["settings.engine.paths"]
 		local path = os.tmpname()
 		require("tests.lua.settings.unused_keys_contract").sandbox.write_bytes(path,
 			'[shortcuts.keyboard]\nprimary_j = "select_line"\nprimary_k = "script_pause_toggle"\n')
-		package.loaded["infra.config_paths"] = { config = function() return path end }
+		package.loaded["settings.engine.paths"] = { config = function() return path end }
 		local executed = {}
 		package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {
 			["shortcuts.keyboard.primary_j"] = "select_line",
@@ -126,7 +126,7 @@ helpers.describe("script lifecycle actions", function()
 		package.loaded["core.fs.adapters.storage"] = storage_before
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = module_before
 		package.loaded["modules.gestures.manager"] = gestures_before
-		package.loaded["infra.config_paths"] = paths_before
+		package.loaded["settings.engine.paths"] = paths_before
 		os.remove(path)
 		helpers.assert_true(not held_back, "Ctrl+J fired select_line while the script was paused")
 		helpers.assert_true(not resumed,

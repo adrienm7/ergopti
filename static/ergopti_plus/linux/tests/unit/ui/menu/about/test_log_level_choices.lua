@@ -53,7 +53,7 @@ end
 --- @return function setter, table observations
 local function native_owner(receipt)
 	local previous = { storage = package.loaded["core.fs.adapters.storage"], logger = package.loaded["core.logger.engine.shim"],
-		settings = package.loaded["infra.script_settings"] }
+		settings = package.loaded["settings.engine.scope.script_settings"] }
 	local observed = { selected = "INFO", durable = { ["script.log_level"] = "INFO", future = 42 }, rebuilds = 0 }
 	local source = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
 	local raw = source:read("*a")
@@ -76,21 +76,21 @@ local function native_owner(receipt)
 		end,
 	}
 	package.loaded["core.fs.adapters.storage"] = storage
-	package.loaded["infra.script_settings"] = nil
-	local settings = require("infra.script_settings")
+	package.loaded["settings.engine.scope.script_settings"] = nil
+	local settings = require("settings.engine.scope.script_settings")
 	settings.apply("INFO")
 	local factory = assert(load("return function(ScriptSettings, Logger, rebuild_tray_menu) local LOG = 'menu'; return function(lvl)"
 		.. body .. "\nend end", "actual-daemon-log-level"))()
 	local callback = factory(settings, logger, function() observed.rebuilds = observed.rebuilds + 1 end)
-	for key, name in pairs({ storage = "core.fs.adapters.storage", logger = "core.logger.engine.shim", settings = "infra.script_settings" }) do
+	for key, name in pairs({ storage = "core.fs.adapters.storage", logger = "core.logger.engine.shim", settings = "settings.engine.scope.script_settings" }) do
 		package.loaded[name] = previous[key]
 	end
 	return function(value)
-		local saved_scope, saved_settings = package.loaded["infra.script_scope"], package.loaded["infra.script_settings"]
+		local saved_scope, saved_settings = package.loaded["settings.engine.scope.script_scope"], package.loaded["settings.engine.scope.script_settings"]
 		local saved_shim, saved_logger = package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"]
-		package.loaded["infra.script_settings"], package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"] = settings, logger, logger
+		package.loaded["settings.engine.scope.script_settings"], package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"] = settings, logger, logger
 		-- The transaction owns persistence followed by publication to the real settings owner.
-		package.loaded["infra.script_scope"] = { retry_edit = function() return true end, edit_setting = function(key, level)
+		package.loaded["settings.engine.scope.script_scope"] = { retry_edit = function() return true end, edit_setting = function(key, level)
 			if storage.set(key, level) ~= true then return false end
 			local token = { pending = function() return false end }
 			assert(settings.scope_acquire(token))
@@ -100,7 +100,7 @@ local function native_owner(receipt)
 			return applied
 		end }
 		local ok, result = pcall(callback, value)
-		package.loaded["infra.script_scope"], package.loaded["infra.script_settings"] = saved_scope, saved_settings
+		package.loaded["settings.engine.scope.script_scope"], package.loaded["settings.engine.scope.script_settings"] = saved_scope, saved_settings
 		package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"] = saved_shim, saved_logger
 		if not ok then error(result, 0) end
 		observed.selected = settings.current()

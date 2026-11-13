@@ -61,8 +61,8 @@ const AHK_FILTERS = P(
 	'metrics',
 	'metrics_filters.ahk'
 );
-const AHK_LOADER = P('static', 'ergopti_plus', 'windows', 'infra', 'config_shortcuts.ahk');
-const AHK_WRITER = P('static', 'ergopti_plus', 'windows', 'infra', 'config_io.ahk');
+const AHK_LOADER = P('static', 'ergopti_plus', 'windows', 'settings', 'engine', 'shortcuts.ahk');
+const AHK_WRITER = P('static', 'ergopti_plus', 'windows', 'settings', 'engine', 'io.ahk');
 const HS_KEYSTATS = P('static', 'ergopti_plus', 'macos', 'modules', 'keystats', 'init.lua');
 
 // The canonical id of each setting, and the default it must resolve to.

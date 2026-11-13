@@ -21,7 +21,7 @@ local RESET_MODULES = {
 	"core.logger.engine.logger", "core.text.engine.utils",
 	"modules.hotstrings.hotstrings_config", "modules.keystats",
 	"modules.keymap", "modules.keymap.init", "modules.keymap.expander",
-	"modules.keymap.llm_bridge", "modules.keymap.registry",
+	"modules.keymap.llm_bridge", "settings.engine.registry",
 	"modules.keymap.state", "modules.keymap.terminator_replay",
 	"modules.keymap.utils", "modules.llm", "modules.llm.prediction_engine",
 	"core.ui.ui.tooltip",

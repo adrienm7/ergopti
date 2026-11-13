@@ -34,7 +34,7 @@ local function run_case(family, change, route)
 			local fixture = require("tests.support.dynamic_hotstrings_fixture")
 			local preference_path
 			restore_preferences, preference_path = fixture.route()
-			local paths = require("infra.config_paths")
+			local paths = require("settings.engine.paths")
 			local original_config = paths.config
 			paths.config = function(name)
 				if name == "config.toml" then return preference_path end

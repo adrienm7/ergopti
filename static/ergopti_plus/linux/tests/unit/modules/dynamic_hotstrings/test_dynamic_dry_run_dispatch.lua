@@ -76,7 +76,7 @@ local function exercise(kind, dry_run, options)
 		require("tests.support.text_owner_fixture").with(function(guard, state, detector, policy)
 			local preference_path
 			restore_preferences, preference_path = require("tests.support.dynamic_hotstrings_fixture").route()
-			local paths = require("infra.config_paths")
+			local paths = require("settings.engine.paths")
 			local original_config = paths.config
 			paths.config = function(name)
 				if name == "config.toml" then return preference_path end

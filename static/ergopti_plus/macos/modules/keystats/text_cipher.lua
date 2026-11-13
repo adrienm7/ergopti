@@ -187,7 +187,7 @@ local _requested_enabled = nil
 --- @return boolean
 function M.roi_text_enabled()
 	if _requested_enabled ~= false or Cipher.is_enabled() ~= false then return false end
-	local preferences = package.loaded["infra.preferences"]
+	local preferences = package.loaded["settings.engine.preferences.preferences"]
 	if type(preferences) ~= "table" or type(preferences.roi_encryption_requested) ~= "function" then return false end
 	local called, requested = pcall(preferences.roi_encryption_requested)
 	return called and requested == false

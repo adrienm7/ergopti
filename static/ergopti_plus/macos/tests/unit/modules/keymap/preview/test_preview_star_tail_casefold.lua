@@ -79,7 +79,7 @@ local function fresh_runtime(effects, magic_key)
 	install_collaborators(effects)
 	local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
 	local State = require("modules.keymap.state")
-	local Registry = assert(package.loaded["modules.keymap.registry"])
+	local Registry = assert(package.loaded["settings.engine.registry"])
 	local Expander = assert(package.loaded["modules.keymap.expander"])
 	local state = State.new({ trigger_char = magic_key or STAR, expansion_delay = 0.4 }, {})
 	state.preview_providers = {}

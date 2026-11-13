@@ -17,7 +17,7 @@
 ---    codes denotes the chosen physical key. The other key stays untouched.
 --- 3. Nothing on the typing path. The keycodes are resolved when the value is
 ---    set; the tap looks one integer up and asks nothing more of any other key.
---- 4. An outdated stored value is automatic here; infra/preferences.lua reports
+--- 4. An outdated stored value is automatic here; settings/engine/preferences/preferences.lua reports
 ---    it once and leaves it to the config cleanup.
 --- ==============================================================================
 

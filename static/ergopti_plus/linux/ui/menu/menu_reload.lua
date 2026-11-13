@@ -44,7 +44,7 @@ local function _build_reload(ctx)
 			end
 			if not ok or (result == false and not pending) then
 				Logger.error(LOG, "Reload request was refused: %s.", tostring(result))
-				local notified, err = pcall(function() return require("ui.reload_refusal").notify() end)
+				local notified, err = pcall(function() return require("settings.ui.reload_refusal").notify() end)
 				if not notified or err == false then Logger.warn(LOG, "Reload refusal notification could not be shown.") end
 			end
 		end,

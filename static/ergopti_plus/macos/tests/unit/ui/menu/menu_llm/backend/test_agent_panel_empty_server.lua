@@ -62,7 +62,7 @@ local function with_empty_server_owner(scenario)
 			if name == "ERGOPTI_PATHS_FILE" then return scratch .. "/paths.toml" end
 			return previous_getenv(name)
 		end
-		local paths = require("infra.config_paths")
+		local paths = require("settings.engine.paths")
 		helpers.assert_eq(paths.init(scratch .. "/"), true)
 		helpers.assert_eq(paths.get_config_dir(), scratch .. "/")
 		package.loaded["core.i18n.engine.i18n"] = nil

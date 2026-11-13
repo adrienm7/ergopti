@@ -127,7 +127,7 @@ local KARABINER_OUT = nil
 --     <config_dir>/hammerspoon/tap_hold.toml
 -- Resolution is deferred to MenuPaths so a relocated config follows.
 local function resolve_user_config()
-	local MenuPaths = require("infra.config_paths")
+	local MenuPaths = require("settings.engine.paths")
 	return MenuPaths.get("TapHoldConfigPath")
 end
 local ACTIONS_FILE    = _DATA_DIR .. "actions.json"

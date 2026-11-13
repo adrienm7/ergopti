@@ -47,7 +47,7 @@ local TextUtils = require("core.text.engine.utils_core")
 
 local Logger = require("core.logger.engine.shim")
 local Manifest = require("infra.manifest_reader")
-local Paths = require("infra.config_paths")
+local Paths = require("settings.engine.paths")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")
 local Preferences = require("infra.hotstring_preferences")

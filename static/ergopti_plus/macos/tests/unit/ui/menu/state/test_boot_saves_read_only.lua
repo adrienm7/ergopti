@@ -81,8 +81,8 @@ helpers.describe("preferences transaction read-only contract", function()
 	--- @return table calls
 	local function bind(reason)
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["ui.menu.preferences_transaction"] = nil
-		local Transaction = require("ui.menu.preferences_transaction")
+		package.loaded["settings.ui.menu.preferences_transaction"] = nil
+		local Transaction = require("settings.ui.menu.preferences_transaction")
 		local calls = { save = 0, restore = 0 }
 		local state = { gestures = false }
 		local save = Transaction.bind({

@@ -668,7 +668,7 @@ end)
 helpers.describe("magic key source: tap assignment admission", function()
 	helpers.it("(magic-key-source) configured claims refuse choice and capture without changing any bytes", function()
 		with_source('[hotstrings]\nmagic_key_source = "KeyJ"\n[shortcuts.tap_keys]\nnumber_row_left = "send_text" # owned choice\n[action_parameters]\nfuture = "preserved"\n', function(Source, Preferences, path)
-			local Paths = require("infra.config_paths")
+			local Paths = require("settings.engine.paths")
 			local get_path, saved = Paths.config, package.loaded["modules.shortcuts.tap_keys"]
 			local called, detail = pcall(function()
 				Paths.config = function(name) if name == "config.toml" then return path end return get_path(name) end

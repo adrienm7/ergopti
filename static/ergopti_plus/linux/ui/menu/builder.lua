@@ -219,9 +219,9 @@ local _build_tap_holds = require("ui.menu.menu_tap_holds").build
 
 local _build_gestures = require("ui.menu.menu_gestures").build
 
-local _build_configuration = require("ui.menu.menu_configuration").build
+local _build_configuration = require("settings.ui.menu.configuration").build
 
-local _build_language = require("ui.menu.menu_language").build
+local _build_language = require("settings.ui.menu.language").build
 local _build_apps = require("ui.menu.menu_apps").build
 
 local _about_update_rows = require("ui.menu.menu_about")._about_update_rows

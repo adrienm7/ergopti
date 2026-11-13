@@ -16,7 +16,7 @@ local uv = require("luv")
 local function with_editor(body)
 	require("infra.llm_preferences")
 	require("modules.llm.profile_settings")
-	local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings",
+	local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.profile_settings",
 		"core.ui.ui.webview_manager", "ui.prompt_editor.bridge" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -29,9 +29,9 @@ local function with_editor(body)
 	local file = assert(io.open(path, "wb"))
 	assert(file:write("# unrelated source stays intact\n[independent]\nkeep = 'sentinel'\n")); assert(file:close())
 	local paths = {}
-	for key, value in pairs(previous["infra.config_paths"]) do paths[key] = value end
+	for key, value in pairs(previous["settings.engine.paths"]) do paths[key] = value end
 	paths.config = function() return path end
-	package.loaded["infra.config_paths"] = paths
+	package.loaded["settings.engine.paths"] = paths
 	package.loaded["infra.llm_preferences"] = nil
 	local profiles = helpers.load_module("modules.llm.profile_settings")
 	local seen = { epoch = 0, visible = false, closes = 0 }

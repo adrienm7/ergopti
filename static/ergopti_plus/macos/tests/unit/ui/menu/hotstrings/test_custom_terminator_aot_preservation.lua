@@ -47,14 +47,14 @@ end
 --- @param callback function Observations asserted outside production catches.
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger", "infra.preferences",
+		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger", "settings.engine.preferences.preferences",
 		"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "infra.manifest_reader",
 		"core.ui.engine.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_state", "ui.menu.menu_hotstrings_management",
-		"ui.menu.preferences_transaction",
+		"settings.ui.menu.preferences_transaction",
 	}, function()
-		local Preferences = helpers.load_with_stubs("infra.preferences")
-		local Transaction = require("ui.menu.preferences_transaction")
+		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
+		local Transaction = require("settings.ui.menu.preferences_transaction")
 		local Terminators = require("layouts.engine.layers.terminators")
 		local calls = { writes = 0, updates = 0 }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end }
@@ -200,7 +200,7 @@ helpers.describe("hand-written delimiter records through the management owner", 
 			with_fixture(function(fixture)
 				local row = find_row(fixture.rows, label)
 				helpers.assert_type(row, "table")
-				local before = require("ui.menu.preferences_transaction").clone(fixture.state)
+				local before = require("settings.ui.menu.preferences_transaction").clone(fixture.state)
 				fixture.calls.refuse_write = true
 				helpers.assert_eq(row.action(), false)
 				helpers.assert_eq(fixture.state, before, "the existing transaction restores complete records")

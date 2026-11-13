@@ -18,7 +18,7 @@
 
 local M = {}
 local WindowTitles = require("core.ui.engine.window_titles")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local AppParameter = require("apps.engine.parameter")
 local NativePath = require("core.fs.engine.native_path")
 

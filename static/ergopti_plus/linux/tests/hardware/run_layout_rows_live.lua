@@ -324,7 +324,7 @@ local stored = await("the menu stores « digits »", function(done) Live.set("or
 check(stored[1] == true, "the menu's choice is stored and loaded: " .. tostring(stored[2]))
 check(levels(server_keymap(), "AE01")[BASE] == "1", "the server types 1 on the bare 1 key")
 
-local GlobalScope = require("infra.global_scope")
+local GlobalScope = require("settings.engine.scope.global_scope")
 local LayoutScope = require("infra.keyboard_layout_scope")
 local settled_at_once = nil
 local cleared = await("the global clear", function(done)

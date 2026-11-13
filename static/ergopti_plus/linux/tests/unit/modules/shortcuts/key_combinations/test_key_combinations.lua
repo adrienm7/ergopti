@@ -229,7 +229,7 @@ helpers.describe("ordered pairs through actual native consumers", function()
 		protected_modules({ ["modules.shortcuts.key_combinations"] = false, ["platform.remap.tap_hold_manager"] = false, ["platform.remap.tap_hold_loader"]={ GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS, load=function() return loaded end },
 			["platform.remap.nav_layer"]={load=function() return {} end},
 			["core.fs.adapters.file_system"]={read_with_status=function() return base_text,"ok" end},
-			["infra.config_paths"]={config=function() return path end} },function()
+			["settings.engine.paths"]={config=function() return path end} },function()
 			-- The owner must capture these actual declared ports before the manager
 			-- requires it; previous cache identity is restored by the outer guard.
 			local manager = require("platform.remap.tap_hold_manager")
@@ -325,7 +325,7 @@ helpers.describe("configured pair publication lifecycle",function()
 		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
 			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
 			["platform.remap.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
-			["infra.config_paths"]={config=function() return path end}},function()
+			["settings.engine.paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program","copy"} end,
 				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
@@ -406,7 +406,7 @@ helpers.describe("independent pair enablement across empty configuration",functi
 		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
 			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
 			["platform.remap.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
-			["infra.config_paths"]={config=function() return path end}},function()
+			["settings.engine.paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
 				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))

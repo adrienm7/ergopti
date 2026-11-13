@@ -35,7 +35,7 @@ end
 --- @return table ports
 function M.native_ports()
 	local quote = require("core.text.engine.utils_core").shell_quote
-	local ConfigPaths = require("infra.config_paths")
+	local ConfigPaths = require("settings.engine.paths")
 	-- The real account home: a clone's profile and the shared VS Code settings
 	-- live there, never in the temporary folder home() falls back to.
 	local home = assert(ConfigPaths.account_home(), "the account has no home folder")

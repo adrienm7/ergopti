@@ -30,7 +30,7 @@ local DISABLED_ID = "cmd_star"
 --- @return ... Callback results.
 local function with_preferences(callback)
 	return helpers.with_stub_scope({
-		"infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger",
+		"settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger",
 	}, function()
 		local disk = {}
 		local control = { refuse_write = false }
@@ -46,7 +46,7 @@ local function with_preferences(callback)
 				return true
 			end,
 		}
-		local preferences = helpers.load_with_stubs("infra.preferences")
+		local preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		return callback(preferences, disk, control)
 	end)
 end
@@ -156,7 +156,7 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 		helpers.with_fresh_modules({
 			"ui.menu.menu_state", "ui.menu.keymap_lifecycle", "core.fs.adapters.storage",
 			"core.timing.engine.deferred_work", "modules.keystats.text_cipher",
-			"ui.menu.session_demotions", "ui.menu.preferences_transaction",
+			"ui.menu.session_demotions", "settings.ui.menu.preferences_transaction",
 		}, function()
 			with_preferences(function(preferences, disk, control)
 				disk[CONFIG_PATH] = "[shortcuts]\nenabled = true\n[shortcuts.keys]\ncmd_star = false\n"
@@ -186,7 +186,7 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 					helpers.assert_eq(#report.unsettled, 0, "the actual preference is observable")
 					local registry = require("ui.menu.session_demotions").new()
 					registry.record(report.demotions[1])
-					local save = require("ui.menu.preferences_transaction").bind(preferences, {
+					local save = require("settings.ui.menu.preferences_transaction").bind(preferences, {
 						path = CONFIG_PATH, state = state, hotfiles = {}, core_modules = core,
 						initial_state = state,
 						initial_preferences = preferences.snapshot(state, {}, core),

@@ -322,7 +322,7 @@ try:
                             if mode == "prompt"
                             else "local value=require('ui.app_chooser').pick(shell,'Native application')\n"
                             if mode == "application"
-                            else "local value=require('ui.config_dir_picker').pick(shell,{default_config_dir=function() return '/tmp' end},{get=function() return 'Select configuration folder' end},'/tmp')\n"
+                            else "local value=require('settings.ui.dir_picker').pick(shell,{default_config_dir=function() return '/tmp' end},{get=function() return 'Select configuration folder' end},'/tmp')\n"
                             if mode == "directory"
                             else "local dialogs\n"
                             "package.loaded['ui.menu.llm_backend_rows']={bind_page=function(_,options) dialogs=options.dialogs end,caption=function() return 'model button' end}\n"

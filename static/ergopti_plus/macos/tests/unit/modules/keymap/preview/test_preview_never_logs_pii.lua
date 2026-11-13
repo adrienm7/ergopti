@@ -63,7 +63,7 @@ local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 --- @return table bridge, table state
 local PREVIEW_OWNERSHIP = {
 	"modules.keymap.state",
-	"modules.keymap.registry",
+	"settings.engine.registry",
 	"modules.keymap.registry_groups",
 	"modules.keymap.registry_index",
 	"modules.keymap.terminators",
@@ -185,7 +185,7 @@ helpers.describe("hotstring preview never logs personal-info content", function(
 			-- Take the registry instance the BRIDGE resolved, not a separately loaded
 			-- one: the bridge captured its Registry upvalue at require time, and a
 			-- second instance would be initialised over a state the bridge never reads.
-			local Registry = package.loaded["modules.keymap.registry"]
+			local Registry = package.loaded["settings.engine.registry"]
 			helpers.assert_true(Registry ~= nil, "the bridge must have loaded the registry")
 			local Expander = package.loaded["modules.keymap.expander"]
 			helpers.assert_true(Expander ~= nil, "the bridge must have loaded the expander")

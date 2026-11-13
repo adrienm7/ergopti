@@ -249,7 +249,7 @@ function M.run(options)
 			-- An installed daemon: no developer root, no source watchers.
 			return { root = function() return nil end, is_active = function() return false end,
 				source_dirs = function() return nil end, DRIVER_SUBPATH = "/static/ergopti_plus/linux" }
-		elseif name == "infra.config_paths" then
+		elseif name == "settings.engine.paths" then
 			return { config = function() return "/controlled/config.toml" end }
 		elseif name == "ui.onboarding.startup" then
 			return { run = function(opts)

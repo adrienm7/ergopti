@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"modules.keymap.registry",
+	"settings.engine.registry",
 	"modules.keymap.registry_groups",
 	"modules.keymap.registry_index",
 	"modules.keymap.terminators",
@@ -20,7 +20,7 @@ local OWNED_MODULES = {
 	"core.text.engine.toml.reader",
 	"core.timing.engine.timings",
 	"modules.hotstrings.hotstrings_config",
-	"infra.config_paths",
+	"settings.engine.paths",
 }
 
 local CONFIG_DIR = "/virtual/config/"
@@ -41,10 +41,10 @@ local function with_registry(data_by_path, callback)
 		package.loaded["modules.hotstrings.hotstrings_config"] = {
 			get_user_override = function() return nil end,
 		}
-		package.loaded["infra.config_paths"] = { get_config_dir = function() return CONFIG_DIR end }
+		package.loaded["settings.engine.paths"] = { get_config_dir = function() return CONFIG_DIR end }
 		local State = helpers.load_with_stubs("modules.keymap.state")
 		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
-		local Registry = require("modules.keymap.registry")
+		local Registry = require("settings.engine.registry")
 		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 		helpers.assert_eq(Registry.init(state), true)
 

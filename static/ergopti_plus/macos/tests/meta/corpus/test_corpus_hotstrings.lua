@@ -120,7 +120,7 @@ end)
 -- Load the registry with a clean stub environment
 package.loaded["core.logger.engine.logger"] = nil
 helpers.load_with_stubs("core.logger.engine.logger")
-local Registry = helpers.load_with_stubs("modules.keymap.registry")
+local Registry = helpers.load_with_stubs("settings.engine.registry")
 
 -- Registry requires a core_state; provide a minimal one.
 Registry.init({
@@ -141,7 +141,7 @@ helpers.describe("hotstring corpus — registry matching", function()
 		for _, v in ipairs(corpus.vectors) do
 			if v.expected and v.expected.matched == true then
 				-- Fresh registry per vector to avoid cross-vector interference
-				local R = helpers.load_with_stubs("modules.keymap.registry")
+				local R = helpers.load_with_stubs("settings.engine.registry")
 				R.init({
 					magic_key               = "★",
 					mappings                = {},
@@ -167,7 +167,7 @@ seq_counter             = 0,
 		if not corpus then return end
 		for _, v in ipairs(corpus.vectors) do
 			if v.expected and v.expected.matched == true then
-				local R = helpers.load_with_stubs("modules.keymap.registry")
+				local R = helpers.load_with_stubs("settings.engine.registry")
 				R.init({
 					magic_key               = "★",
 					mappings                = {},
@@ -222,7 +222,7 @@ seq_counter             = 0,
 	--- @param v table The corpus vector.
 	--- @return table The core_state, whose .mappings holds every registered entry.
 	local function register_vector(v)
-		local R     = helpers.load_with_stubs("modules.keymap.registry")
+		local R     = helpers.load_with_stubs("settings.engine.registry")
 		local state = {
 			magic_key               = "★",
 			mappings                = {},
@@ -268,7 +268,7 @@ seq_counter             = 0,
 					-- user's word as they typed it.
 					local state = register_vector(v)
 					local Expander = helpers.load_with_stubs("modules.keymap.expander")
-					local Registry = helpers.load_with_stubs("modules.keymap.registry")
+					local Registry = helpers.load_with_stubs("settings.engine.registry")
 					Expander.init(state, Registry, {})
 					state.buffer = v.buffer or v.trigger
 					state.start_is_word_boundary = true
@@ -288,7 +288,7 @@ seq_counter             = 0,
 					-- the buffer — one vector's worth of false red, and it would have been
 					-- false GREEN for a vector expecting no match.
 					local Expander = helpers.load_with_stubs("modules.keymap.expander")
-					local Registry = helpers.load_with_stubs("modules.keymap.registry")
+					local Registry = helpers.load_with_stubs("settings.engine.registry")
 					-- The LLM bridge is a hard requirement of init(), and would_fire never
 					-- touches it; an empty table satisfies the guard without stubbing a
 					-- module this replay has no opinion about.
@@ -323,7 +323,7 @@ seq_counter             = 0,
 		if not corpus then return end
 		for _, v in ipairs(corpus.vectors) do
 			if v.expected and v.expected.matched == false then
-				local R = helpers.load_with_stubs("modules.keymap.registry")
+				local R = helpers.load_with_stubs("settings.engine.registry")
 				R.init({
 					magic_key               = "★",
 					mappings                = {},
@@ -375,11 +375,11 @@ end)
 --- never bleed across vectors.
 --- @return table The registry module reference.
 local function fresh_collision_registry()
-	package.loaded["modules.keymap.registry"] = nil
+	package.loaded["settings.engine.registry"] = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	package.loaded["core.logger.engine.logger"] = nil
 	helpers.load_with_stubs("core.logger.engine.logger")
-	local R = helpers.load_with_stubs("modules.keymap.registry")
+	local R = helpers.load_with_stubs("settings.engine.registry")
 	R.init({
 		magic_key                  = "★",
 		mappings                   = {},

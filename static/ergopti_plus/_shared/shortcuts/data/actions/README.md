@@ -60,7 +60,7 @@ is added to all three and to `PARAMETER_KINDS` in the generator in one change;
 the `wrap_pair` rule is pinned by
 `_shared/tests/corpus/action_parameters/wrap_pair_vectors.json`, and the
 `text`, `key` and `shortcut` rules (over `send_keys.json`, parsed by
-`_shared/platform/input` and `windows/infra/send_input_parameter.ahk`) by
+`_shared/platform/input` and `windows/settings/engine/send_input_parameter.ahk`) by
 `_shared/tests/corpus/action_parameters/send_input_vectors.json`.
 
 The shared action picker (`_shared/ui/action_picker/`) edits the `text`, `key`

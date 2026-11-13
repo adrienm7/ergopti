@@ -14,7 +14,7 @@ local SourceFile = require("tests.support.source_file")
 local ONE_SHOT_DATA = assert(require("core.text.engine.json").decode(SourceFile.read(helpers.shared("tap_hold/data/one_shot_shift.json"))))
 
 local RESET_MODULES = {
-	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
+	"modules.keymap", "modules.keymap.init", "settings.engine.registry",
 	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
 	"modules.diagnostics.hid_diagnostic_mailbox",
@@ -169,7 +169,7 @@ local function load_fixture(prepare_input)
 		shift_side = nil,
 	}
 	package.loaded["modules.keymap.state"] = { new = function() return state end }
-	package.loaded["modules.keymap.registry"] = api({
+	package.loaded["settings.engine.registry"] = api({
 		init = function() return true end,
 		is_repeat_feature_enabled = function() return false end,
 		set_repeat_feature_enabled = noop,
@@ -361,8 +361,8 @@ helpers.describe("keymap start: exact native commitment", function()
 				end,
 			}
 			fixture = load_fixture()
-			package.loaded["modules.keymap.registry"].is_group_enabled = function() return true end
-			package.loaded["modules.keymap.registry"].is_section_enabled = function() return true end
+			package.loaded["settings.engine.registry"].is_group_enabled = function() return true end
+			package.loaded["settings.engine.registry"].is_section_enabled = function() return true end
 			package.loaded["platform.input.synthetic_input"].admission_open = function() return true end
 			helpers.assert_eq(fixture.keymap.start(), true)
 			helpers.assert_eq(fixture.keymap.set_magic_key_source("KeyJ"), true)

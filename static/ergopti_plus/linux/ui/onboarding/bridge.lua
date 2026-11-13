@@ -33,7 +33,7 @@ local Logger = require("core.logger.engine.shim")
 local Paths = require("core.fs.engine.paths")
 local TomlCodec = require("core.text.engine.toml_codec")
 local Answers = require("onboarding.engine.answers")
-local ConfigDirPicker = require("ui.config_dir_picker")
+local ConfigDirPicker = require("settings.ui.dir_picker")
 local LOG = "bridge.onboarding"
 local APP_NAME = "onboarding"
 -- The catalogue platform this host reads and the id the config migration
@@ -216,7 +216,7 @@ end
 
 local function build_init_data(state)
 	local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
-	local config_paths = dependency(state, "config_paths", "infra.config_paths")
+	local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 	if not i18n or not config_paths then return nil end
 	local ok_catalogue, catalogue_error = pcall(catalogue)
 	if not ok_catalogue then
@@ -413,7 +413,7 @@ local function finish_owned(state, answers)
 	end
 	local authorities = {
 		i18n = dependency(state, "i18n", "core.i18n.engine.i18n"),
-		config_paths = dependency(state, "config_paths", "infra.config_paths"),
+		config_paths = dependency(state, "config_paths", "settings.engine.paths"),
 		manifest = dependency(state, "manifest", "infra.manifest_reader"),
 		writer = dependency(state, "writer", "core.text.engine.toml_codec.writer"),
 		prepare = type(state.prepare_destination) == "function" and state.prepare_destination
@@ -464,7 +464,7 @@ local function finish_owned(state, answers)
 		current = function()
 			return dependency(state, "writer", "core.text.engine.toml_codec.writer") == authorities.writer
 				and dependency(state, "file_system", "core.fs.adapters.file_system") == files
-				and dependency(state, "config_paths", "infra.config_paths") == authorities.config_paths
+				and dependency(state, "config_paths", "settings.engine.paths") == authorities.config_paths
 				and dependency(state, "i18n", "core.i18n.engine.i18n") == authorities.i18n
 				and authorities.config_paths.set_config_dir == path_set and authorities.config_paths.get_config_dir == path_get
 				and authorities.i18n.set_locale == locale_set and authorities.i18n.get_locale == locale_get
@@ -556,7 +556,7 @@ end
 
 local function pick_config_dir(state, current, page_current)
 	local shell = dependency(state, "shell", "core.process.adapters.shell_runner")
-	local config_paths = dependency(state, "config_paths", "infra.config_paths")
+	local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 	local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 	if not shell or not config_paths then return { picked = false } end
 	local normalized = ConfigDirPicker.pick(shell, config_paths, i18n, current)
@@ -625,7 +625,7 @@ function M.on_message(payload, state, context)
 	elseif action == "resolveMetricsPath" then
 		-- The store lives in the data directory and does not follow the chosen
 		-- configuration folder; answering keeps the page on the keystats's path.
-		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 		if type(payload.request) ~= "number" or not config_paths then
 			Logger.error(LOG, "resolveMetricsPath refused — request number or path authority missing.")
 			return { pushed = false }
@@ -636,7 +636,7 @@ function M.on_message(payload, state, context)
 	elseif action == "loadExistingConfig" then
 		-- The pages restart from the chosen folder's config.toml: its values when
 		-- it exists, the neutral ones when it does not.
-		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 		local chosen = config_paths and normalize_config_dir(config_paths, payload.config_dir) or nil
 		if not chosen or type(payload.request) ~= "number" then
 			Logger.error(LOG, "loadExistingConfig refused — folder or request number invalid.")

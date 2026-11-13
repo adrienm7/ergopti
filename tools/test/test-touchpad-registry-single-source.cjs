@@ -209,7 +209,7 @@ function functionBody(source, name) {
 		'TouchpadRegistryClearFromScope('
 	);
 	check(clearAt > 0, 'the Gestures clear must restore the touchpad through the owner');
-	const globalScope = read(path.join(WIN, 'infra', 'config_global_scope.ahk'));
+	const globalScope = read(path.join(WIN, 'settings', 'engine', 'scope', 'global_scope.ahk'));
 	check(
 		functionBody(globalScope, 'ConfigGlobalScopeApply').includes('TouchpadRegistryClearFromScope('),
 		'the global clear must restore the touchpad through the owner too'

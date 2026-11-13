@@ -406,7 +406,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 		local to_clear = {
 			"modules.keymap.llm_bridge",
 			"modules.keymap.utils",
-			"modules.keymap.registry",
+			"settings.engine.registry",
 			"modules.keymap.terminators",
 			"modules.llm",
 			"modules.llm.prediction_engine",
@@ -530,7 +530,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 		package.loaded["modules.llm.prediction_engine"] = engine_stub
 
 		-- Stub Registry: no mappings, all lookups return nil.
-		package.loaded["modules.keymap.registry"] = {
+		package.loaded["settings.engine.registry"] = {
 			mappings_for_tail      = function(_) return nil end,
 			mappings_for_star_tail = function(_) return nil end,
 		}

@@ -12,7 +12,7 @@ local Logger = require("core.logger.engine.shim")
 local KEY = require("settings.engine.keys").KEY
 local LOG = "infra.metrics_scope"
 local _owner, _sequence = nil, 0
-require("infra.scope_registry").register("metrics_scope", function() return _owner ~= nil and _owner.pending() == true end)
+require("settings.engine.scope.registry").register("metrics_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Builds one recoverable transaction with acknowledged native compensation.
 --- @param options table Configuration path, backup path and runtime owners.
@@ -88,7 +88,7 @@ function M.apply(mode)
 	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid metrics scope mode" end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false, "metrics rollback is pending" end
 	_sequence = _sequence + 1
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	_owner = M.new({ path = path, backup_path = path .. ".metrics-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
 		collector = require("modules.keystats.keystats"), widget = require("ui.wpm.widget"),
 		readout = require("ui.wpm.tray_readout") })

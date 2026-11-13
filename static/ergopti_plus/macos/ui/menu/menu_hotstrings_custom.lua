@@ -10,7 +10,7 @@
 --- `for k, v in pairs(sub) do M[k] = v end`.
 --- ==============================================================================
 
-local PersonalFileScope = require("infra.personal_file_scope")
+local PersonalFileScope = require("settings.engine.scope.personal_file_scope")
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local PersonalFileMenu = require("menu.engine.personal_files")
 local M = {}
@@ -97,7 +97,7 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label, admission)
 			end
 		end
 		local will_enable = not (ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(group_name, sec_name) or false)
-		if PersonalFiles.components(group_name) and require("infra.preferences").personal_choices_available({
+		if PersonalFiles.components(group_name) and require("settings.engine.preferences.preferences").personal_choices_available({
 			{ group = group_name, section = sec_name, enabled = will_enable },
 		}) ~= true then
 			return KeymapLifecycle.commit_mutation(ctx, "admit canonical personal section choice", function() return false end)
@@ -674,7 +674,7 @@ function M.build_custom(ctx, counts)
 			})
 		local personal_current
 		if PersonalFiles.components(gname) then
-			local Controller = require("infra.personal_file_controls")
+			local Controller = require("settings.engine.preferences.personal_file_controls")
 			local Config = require("modules.hotstrings.hotstrings_config")
 			local binding = Controller.capture(gname)
 			local unavailable = binding and require("hotstrings.engine.catalogue.personal_metadata").readonly_fields(binding.record.content,
@@ -687,14 +687,14 @@ function M.build_custom(ctx, counts)
 				available = function(field) return unavailable[field] ~= true end,
 				enable = function(enabled)
 					local choices = { { group = gname, enabled = enabled } }
-					if require("infra.preferences").personal_choices_available(choices) ~= true then return false end
+					if require("settings.engine.preferences.preferences").personal_choices_available(choices) ~= true then return false end
 					local previous = ctx.state.hotstrings[gname]
 					return KeymapLifecycle.commit_mutation(ctx, "set personal file gate", function()
 						if check() ~= true then return false end
 						local committed = ctx.keymap.set_groups_sections_enabled({
 							{ name = gname, sections = {}, group_enabled = enabled } }, false, function()
 							if require("infra.personal_hotstrings").adoption_current(binding.record) ~= true
-								or require("infra.preferences").personal_choices_available(choices) ~= true then return false end
+								or require("settings.engine.preferences.preferences").personal_choices_available(choices) ~= true then return false end
 							ctx.state.hotstrings[gname] = enabled
 							if ctx.save_prefs() == true then return true end
 							ctx.state.hotstrings[gname] = previous; return false

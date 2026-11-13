@@ -635,8 +635,8 @@ helpers.describe("word-delimiter settings: scope adoption and outdated entries",
 	helpers.it("keeps its leaves through the actual unused-key cleanup", function()
 		local stored = SOURCE .. '\n[hotstrings.terminator_states]\nslash = true\nretired = true\n'
 		with_settings(stored, function(_, path)
-			package.loaded["ui.menu.unused_keys_cleanup"] = nil
-			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			package.loaded["settings.ui.menu.unused_keys_cleanup"] = nil
+			local scan = require("settings.ui.menu.unused_keys_cleanup").find(path)
 			helpers.assert_eq(scan.status, "ok")
 			local offered = {}
 			for _, key in ipairs(scan.keys) do offered[table.concat(key.path, ".")] = true end
@@ -649,8 +649,8 @@ helpers.describe("word-delimiter settings: scope adoption and outdated entries",
 		local stored = '[hotstrings]\nterminators = [{ key = "custom_¤", char = "¤", label = "¤", consume = true }, '
 			.. '{ key = "custom_comma", char = ",", label = ",", consume = false }]\n'
 		with_settings(stored, function(_, path)
-			package.loaded["ui.menu.unused_keys_cleanup"] = nil
-			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			package.loaded["settings.ui.menu.unused_keys_cleanup"] = nil
+			local scan = require("settings.ui.menu.unused_keys_cleanup").find(path)
 			helpers.assert_eq(scan.status, "ok")
 			for _, key in ipairs(scan.keys) do
 				helpers.assert_true(table.concat(key.path, ".") ~= "hotstrings.terminators",

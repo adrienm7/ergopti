@@ -27,7 +27,7 @@ local function with_editor(module_name, callback)
 			"program_providers", "core.process.adapters.task_environment", "core.lifecycle.engine.compat.utf8", "diagnostics.engine.runtime_log",
 			"adapters.apple_shortcuts", "core.process.adapters.shell_runner", "adapters.apple_shortcuts_native",
 			"core.timing.engine.deferred_work", "core.lifecycle.engine.launcher_environment", "core.events.timer_scheduler", "app_dirs",
-			"lfs", "program_provider_picker", "diagnostics.engine.operation_reporter", "infra.config_paths",
+			"lfs", "program_provider_picker", "diagnostics.engine.operation_reporter", "settings.engine.paths",
 			"core.logger.engine.log_folders", "program_parameter", "user_action_parameter", "text_utils", "core.process.adapters.program_providers",
 			"core.fs.adapters.file_system", "json",
 			"core.text.engine.toml.codec", "toml_codec", "core.text.engine.toml_codec.codec", "core.text.engine.toml_codec.basic_string",

@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local RESET_MODULES = {
-	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
+	"modules.keymap", "modules.keymap.init", "settings.engine.registry",
 	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
 	"platform.input.synthetic_input", "adapters.event_provenance",
@@ -123,7 +123,7 @@ local function load_fixture()
 	package.loaded["modules.keymap.state"] = {
 		new = function() return state end,
 	}
-	package.loaded["modules.keymap.registry"] = api({
+	package.loaded["settings.engine.registry"] = api({
 		init = function() return true end,
 		is_terminator = function()
 			if raw_failure then error("forced post-commit callback failure") end

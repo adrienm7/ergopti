@@ -49,7 +49,7 @@ helpers.describe("registry init: nested commitments and ownership", function()
 	helpers.it("refuses to publish Registry state when registry_index.setup refuses", function()
 		local group_calls = 0
 		local index_calls = 0
-		with_stubbed_module("modules.keymap.registry", {
+		with_stubbed_module("settings.engine.registry", {
 			["modules.keymap.registry_groups"] = {
 				init = function()
 					group_calls = group_calls + 1
@@ -78,7 +78,7 @@ helpers.describe("registry init: nested commitments and ownership", function()
 		local group_calls = 0
 		local index_calls = 0
 		local mutation_calls = 0
-		with_stubbed_module("modules.keymap.registry", {
+		with_stubbed_module("settings.engine.registry", {
 			["modules.keymap.registry_groups"] = {
 				note_registry_mutation = function() mutation_calls = mutation_calls + 1 end,
 				init = function()
@@ -222,7 +222,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 				end,
 				set_runtime_guard = function() engine_guard_calls = engine_guard_calls + 1 end,
 			},
-			["modules.keymap.registry"] = {},
+			["settings.engine.registry"] = {},
 			["modules.hotstrings.hotstrings_config"] = {},
 			["modules.keymap.expander"] = {},
 			["core.events.timer_scheduler"] = {},

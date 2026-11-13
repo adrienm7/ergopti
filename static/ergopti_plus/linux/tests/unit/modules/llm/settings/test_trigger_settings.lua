@@ -211,8 +211,8 @@ helpers.describe("prediction engine: invalid exclusions retain privacy", functio
 			local file = assert(io.open(path, "wb"))
 			assert(file:write(vector.config))
 			assert(file:close())
-			local original_paths = require("infra.config_paths")
-			replace("infra.config_paths", setmetatable({ config = function(name)
+			local original_paths = require("settings.engine.paths")
+			replace("settings.engine.paths", setmetatable({ config = function(name)
 				if name == "config.toml" then return path end
 				return original_paths.config(name)
 			end }, { __index = original_paths }))

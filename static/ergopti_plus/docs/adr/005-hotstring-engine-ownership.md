@@ -14,7 +14,7 @@ The hotstring expansion pipeline has two concrete implementations:
 
 - **AHK driver**: `static/ergopti_plus/windows/lib/hotstrings/hotstring_engine.ahk`
   — handles trigger detection, expansion dispatch, and caret positioning.
-- **Hammerspoon driver**: `static/ergopti_plus/macos/modules/keymap/registry.lua`
+- **Hammerspoon driver**: `static/ergopti_plus/macos/settings/engine/registry.lua`
   - `expander.lua` — implements the same pipeline in Lua.
 
 Both implementations evolved independently and diverged in edge-case handling:

@@ -282,7 +282,7 @@ function M.register(helpers, driver)
 				parameters = require("modules.gestures.actions")
 				logger = assert(package.loaded["core.logger.engine.logger"], "the actual Actions logger must be available")
 				package.loaded["core.logger.engine.shim"] = logger
-				preferences = helpers.load_with_stubs("infra.preferences")
+				preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 			else
 				parameters = helpers.load_module("modules.gestures.manager")
 				logger = require("core.logger.engine.shim")

@@ -647,7 +647,7 @@ function M.native_port()
 	local sequence = 0
 	return {
 		kde_config = function()
-			local handle = io.open(require("infra.config_paths").config_home() .. "/kxkbrc", "rb")
+			local handle = io.open(require("settings.engine.paths").config_home() .. "/kxkbrc", "rb")
 			if handle == nil then return nil end
 			local text = handle:read("*a")
 			handle:close()

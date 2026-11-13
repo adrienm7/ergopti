@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: LLM Menu Persistence Tests (Hammerspoon)
 --- DESCRIPTION:
---- Ensures every LLM menu setting mapped in infra/preferences.lua is written
+--- Ensures every LLM menu setting mapped in settings/engine/preferences/preferences.lua is written
 --- to config.toml and read back. Contract: _shared/ai/data/menu_persistence_contract.json
 --- ==============================================================================
 
@@ -113,7 +113,7 @@ helpers.describe("LLM menu persistence — preferences ownership", function()
 	helpers.it("resolves every HS contract path to its flat_key through the preference owner", function()
 		-- Asks the owner, not its text: a flat key named in a comment or a dead
 		-- table entry would satisfy a source search and still load nothing.
-		local prefs = helpers.load_with_stubs("infra.preferences")
+		local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local checked = 0
 		for _, entry in ipairs(load_contract()) do
 			local hs = entry.hs

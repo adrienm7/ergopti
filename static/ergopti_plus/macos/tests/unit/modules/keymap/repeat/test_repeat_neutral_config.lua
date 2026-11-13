@@ -5,7 +5,7 @@ local codec = require("core.text.engine.toml_codec")
 
 helpers.describe("neutral repeat configuration", function()
 	helpers.it("requires explicit repeat intent and saves it through the canonical sparse preferences", function()
-		helpers.with_fresh_modules({ "modules.keymap.registry_index", "infra.preferences", "core.fs.adapters.file_system" }, function()
+		helpers.with_fresh_modules({ "modules.keymap.registry_index", "settings.engine.preferences.preferences", "core.fs.adapters.file_system" }, function()
 			local source, writes = "", 0
 			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return source, "ok" end,
@@ -17,7 +17,7 @@ helpers.describe("neutral repeat configuration", function()
 				end,
 			}
 			local registry = helpers.load_with_stubs("modules.keymap.registry_index")
-			local prefs = helpers.load_with_stubs("infra.preferences")
+			local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 			helpers.assert_eq(registry.is_repeat_feature_enabled(), false)
 			helpers.assert_eq(registry.set_repeat_feature_enabled(true), true)
 			helpers.assert_eq(prefs.save("/repeat/config.toml", {}, {}, { keymap = registry }), true)

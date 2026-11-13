@@ -91,7 +91,7 @@ local function with_settings(source, body)
 	local ok, err = pcall(function()
 		Sandbox.with_config(source, function(path)
 			local controls = {}
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			Writer.batch_write = function(target, operations, files, expected)
 				if controls.refuse then return false, "injected publication refusal" end
 				return original(target, operations, files, expected)
@@ -267,8 +267,8 @@ helpers.describe("word reset: the settings", function()
 			.. "shortcut_resets_word = false\ntap_hold_resets_word = false\n", function(_, _, path)
 			local consumed = { ["hotstrings.idle_reset_seconds"] = true }
 			for _, key in ipairs(SWITCHES) do consumed["hotstrings." .. key] = true end
-			package.loaded["ui.menu.unused_keys_cleanup"] = nil
-			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			package.loaded["settings.ui.menu.unused_keys_cleanup"] = nil
+			local scan = require("settings.ui.menu.unused_keys_cleanup").find(path)
 			helpers.assert_eq(scan.status, "ok")
 			for _, key in ipairs(scan.keys) do
 				local dotted = table.concat(key.path, ".")
@@ -563,8 +563,8 @@ helpers.describe("word reset: the cascade arrow count", function()
 
 	helpers.it("cascade arrows, is marked as read for the cleanup and adopted with the scope", function()
 		with_settings("[hotstrings]\ncascade_max_arrows = 2\n", function(subject, _, path)
-			package.loaded["ui.menu.unused_keys_cleanup"] = nil
-			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			package.loaded["settings.ui.menu.unused_keys_cleanup"] = nil
+			local scan = require("settings.ui.menu.unused_keys_cleanup").find(path)
 			helpers.assert_eq(scan.status, "ok")
 			for _, key in ipairs(scan.keys) do
 				helpers.assert_true(table.concat(key.path, ".") ~= "hotstrings.cascade_max_arrows",

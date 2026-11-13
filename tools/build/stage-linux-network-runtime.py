@@ -858,7 +858,7 @@ def explicit_digest_sources(catalogue):
 
 
 # The programs the private prefix carries, run by the driver from there only
-# (linux/infra/owned_programs.lua). luajit runs the daemon, curl every HTTP
+# (linux/settings/engine/preferences/owned_programs.lua). luajit runs the daemon, curl every HTTP
 # request, sqlite3 the keystats writer, openssl the keystats key derivation and
 # zstd unpacks the Ollama archive. The owned-runtimes registry decides each PIN.
 OWNED_PROGRAMS = ("luajit", "curl", "sqlite3", "openssl", "zstd")

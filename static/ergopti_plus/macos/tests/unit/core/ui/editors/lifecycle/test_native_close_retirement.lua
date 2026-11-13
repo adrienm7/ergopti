@@ -19,8 +19,8 @@ local function with_window(module_name, scenario)
 	rawset(_G, "lfs", nil)
 	local outcome = table.pack(xpcall(function()
 		return helpers.with_stub_scope({
-			"ui.layer_editor", "ui.action_picker", "core.ui.ui.webview_controller_pool", "ui.layout_manager", "ui.menu.menu_paths",
-			"infra.config_paths", "core.process.adapters.program_providers", "apps.engine.program_provider_picker", "modules.keymap.layout_registry",
+			"ui.layer_editor", "ui.action_picker", "core.ui.ui.webview_controller_pool", "ui.layout_manager", "settings.ui.menu.paths",
+			"settings.engine.paths", "core.process.adapters.program_providers", "apps.engine.program_provider_picker", "modules.keymap.layout_registry",
 			"layouts.engine.layers.editor", "layouts.engine.layers.layers", "platform.remap.nav_layer", "platform.input.keycodes", "core.fs.adapters.file_system",
 			"core.text.engine.utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "layouts.engine.manager_bridge",
 
@@ -52,7 +52,7 @@ local function with_window(module_name, scenario)
 			end
 			package.loaded["core.process.adapters.program_providers"] = {}
 			package.loaded["modules.keymap.layout_registry"] = { snapshot = function() return { platform = "macos", installed = {} } end }
-			package.loaded["infra.config_paths"] = {
+			package.loaded["settings.engine.paths"] = {
 				is_initialized = function() return true end,
 				get_config_dir = function() return "/virtual/config/" end,
 				get_logs_dir = function() return "/virtual/logs/" end,
@@ -100,13 +100,13 @@ local function with_window(module_name, scenario)
 				if key == "menu.paths.window_title" then return "Folders" end
 				return translated(key, ...)
 			end
-			if module_name == "ui.menu.menu_paths" then assert(window.init("/virtual/app/", function() end)) end
+			if module_name == "settings.ui.menu.paths" then assert(window.init("/virtual/app/", function() end)) end
 			function h.show()
 				if module_name == "ui.layer_editor" then
 					return window.open({ karabiner = { regenerate = function() return true end } })
 				elseif module_name == "ui.action_picker" then
 					return window.open({ title = "Native close fixture", items = {} }, function() return true end)
-				elseif module_name == "ui.menu.menu_paths" then return window.open_editor()
+				elseif module_name == "settings.ui.menu.paths" then return window.open_editor()
 				else return window.open() end
 			end
 			function h.close()
@@ -127,7 +127,7 @@ local function with_window(module_name, scenario)
 end
 
 helpers.describe("editor close retires native references", function()
-	for _, module_name in ipairs({ "ui.layer_editor", "ui.action_picker", "ui.layout_manager", "ui.menu.menu_paths" }) do
+	for _, module_name in ipairs({ "ui.layer_editor", "ui.action_picker", "ui.layout_manager", "settings.ui.menu.paths" }) do
 		helpers.it("retires native user close and reopens " .. module_name, function()
 			with_window(module_name, function(_, h)
 				helpers.assert_true(h.show(), table.concat(h.errors, "\n"))
@@ -279,7 +279,7 @@ local function assert_prior_callback_retired(module_name, h, controller, before)
 end
 
 helpers.describe("editor native message callbacks retire independently of windows", function()
-	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "ui.menu.menu_paths" }) do
+	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "settings.ui.menu.paths" }) do
 		for _, mode in ipairs({ "native", "explicit" }) do
 			helpers.it(module_name .. " unrefs its script callback after " .. mode .. " close", function()
 				with_window(module_name, function(_, h)
@@ -341,7 +341,7 @@ helpers.describe("editor native message callbacks retire independently of window
 end)
 
 helpers.describe("editor bridge retirement without a native candidate", function()
-	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "ui.menu.menu_paths" }) do
+	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "settings.ui.menu.paths" }) do
 		for _, refusal in ipairs({ "nil", "false" }) do
 			helpers.it(module_name .. " retires a bound bridge when native creation returns " .. refusal, function()
 				with_window(module_name, function(_, h)

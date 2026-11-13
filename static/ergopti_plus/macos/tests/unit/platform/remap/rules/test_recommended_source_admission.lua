@@ -70,7 +70,7 @@ helpers.describe("detached recommendation source admission", function()
 				calls.lease_phase = "uninitialized"
 				local configured = package.loaded["platform.remap.config"]
 				configured.load_tap_hold_keys = function() return { { id = "left_shift" }, { id = "tab" } } end
-				package.loaded["infra.config_paths"].get = function() return path end
+				package.loaded["settings.engine.paths"].get = function() return path end
 				local captured = require("core.fs.adapters.file_system")
 				for _, method in ipairs({ "read_with_status", "write_if_unchanged", "write", "remove_if_unchanged", "remove_exact" }) do
 					captured[method] = fs[method]

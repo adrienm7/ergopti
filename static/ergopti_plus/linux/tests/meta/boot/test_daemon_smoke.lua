@@ -235,7 +235,7 @@ local function with_paths_restart(mode, body)
     local callback = daemon_paths_callback(environment)
     local function save()
       assert(f.host.show("paths_editor"))
-      return require("ui.paths_editor.bridge").on_message({ action = "save", configDir = f.dirs.b },
+      return require("settings.ui.paths_editor.bridge").on_message({ action = "save", configDir = f.dirs.b },
         { config_paths = f.paths, webview_manager = f.host, on_reload = callback })
     end
     body(f, state, save, keyboard, shortcuts)

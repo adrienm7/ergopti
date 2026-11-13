@@ -364,7 +364,7 @@ helpers.describe("personal-file discovery: exact owners preserve source and choi
 					helpers.assert_eq(preview.fires, true)
 				end
 				local Codec = require("core.text.engine.toml_codec")
-				local inventory = assert(require("infra.personal_file_adoption").stage(records,
+				local inventory = assert(require("settings.engine.preferences.personal_file_adoption").stage(records,
 					Codec.decode(before).hotstrings, root .. "/personal_hotstrings.toml"))
 				local evidence = {}
 				for _, item in ipairs(inventory) do evidence[item.source.id] = item end

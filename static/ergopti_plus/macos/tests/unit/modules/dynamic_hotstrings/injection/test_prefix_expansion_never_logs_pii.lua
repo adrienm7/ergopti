@@ -79,7 +79,7 @@ local function build_engine(personal_data)
 	local rec = install_keystats_recorder()
 
 	local State    = helpers.load_with_stubs("modules.keymap.state")
-	local Registry = helpers.load_with_stubs("modules.keymap.registry")
+	local Registry = helpers.load_with_stubs("settings.engine.registry")
 	local Expander = helpers.load_with_stubs("modules.keymap.expander")
 	local RE       = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
 

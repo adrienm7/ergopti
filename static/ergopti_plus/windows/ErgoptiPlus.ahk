@@ -266,7 +266,7 @@ global _PersonalShortcutsRegistry := Map("__Order", [])
 ; LoggerStart and before any parse-time-armed callback or deferred worker reads it.
 global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 #Include infra/manifest_reader.ahk
-#Include infra/feature_io.ahk
+#Include settings/engine/preferences/feature_io.ahk
 
 ; ===== Global error net — armed BEFORE the first message pump =====
 ; Without this, any uncaught error pops an AHK dialog mid-keystroke and can leave
@@ -340,7 +340,7 @@ BootProfile_Stamp("UIA include initialised")
 
 ; The global error net itself is armed far above, before Bundle_Init()'s
 ; message-pumping RunWait — see the "Global error net" block there.
-#Include infra/personal_features.ahk
+#Include settings/engine/preferences/personal_features.ahk
 #Include infra/menu_helpers.ahk
 
 ; #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t   ; Adds the no breaking spaces as hotstrings triggers
@@ -374,7 +374,7 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 ; The Ergopti root and its purpose folders, and the one-time move of the folders
 ; of the builds before the single folder name (run by core/lifecycle/engine/boot.ahk).
 #Include infra/app_folders.ahk
-#Include infra/legacy_folder_migration.ahk
+#Include settings/engine/migration/legacy_folder_migration.ahk
 #Include core/logger/engine/tick_count.ahk
 #Include core/logger/engine/wall_clock.ahk
 #Include core/logger/engine/logger.ahk
@@ -388,7 +388,7 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 #Include infra/error_report.ahk
 #Include infra/hotpath_profiler.ahk
 #Include core/logger/engine/perf_budget.ahk
-#Include infra/registry.ahk
+#Include settings/engine/registry.ahk
 #Include core/lifecycle/engine/app_state.ahk
 BootProfile_Stamp("Diagnostics and core state initialised")
 
@@ -405,8 +405,8 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/fs/adapters/file_system.ahk
 ; Crash-safe multi-file config transitions bind strict Windows-only filesystem
 ; operations at this integration boundary; the portable core remains OS-free.
-#Include infra/config_transition.ahk
-#Include infra/config_transition_runtime.ahk
+#Include settings/engine/migration/transition.ahk
+#Include settings/engine/migration/transition_runtime.ahk
 #Include platform/focus/window_info.ahk
 #Include core/process/adapters/uia_worker.ahk
 #Include platform/input/hotkey_registrar.ahk
@@ -468,7 +468,7 @@ if UIASW_IsWorkerInvocation()
 #Include infra/text_case.ahk
 #Include infra/wrap_pair.ahk
 #Include infra/open_target.ahk
-#Include infra/send_input_parameter.ahk
+#Include settings/engine/send_input_parameter.ahk
 #Include core/ui/ui/spotlight/init.ahk
 #Include infra/nav_layer_helpers.ahk
 #Include infra/capsword_state.ahk
@@ -500,7 +500,7 @@ if UIASW_IsWorkerInvocation()
 #Include core/text/engine/toml/config_loader.ahk
 BootProfile_Stamp("Hotstring and TOML state initialised")
 ; The config.toml schema migration the boot runs before any reader or writer.
-#Include infra/config_migrate.ahk
+#Include settings/engine/migration/migrate.ahk
 ; manifest_reader.ahk + feature_io.ahk are loaded at the top of the file so
 ; Features / feature-IO functions are available before any #HotIf expression is
 ; evaluated. Re-listing them here would cause AHK to complain about the same
@@ -535,7 +535,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include ui/update_check/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk
 #Include core/text/engine/json.ahk
-#Include infra/program_parameter.ahk
+#Include settings/engine/program_parameter.ahk
 #Include core/process/adapters/program_providers.ahk
 #Include infra/program_actions.ahk
 #Include infra/user_actions.ahk
@@ -586,7 +586,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include modules/keymap/keylayout/layout_catalogue.ahk
 #Include modules/keymap/keylayout/layout_extension.ahk
 #Include infra/app_picker.ahk
-#Include infra/config_shortcuts.ahk
+#Include settings/engine/shortcuts.ahk
 #Include infra/metrics/metrics_shortcuts.ahk
 #Include infra/metrics/metrics_filters.ahk
 #Include ui/wpm/init.ahk
@@ -724,7 +724,7 @@ BootProfile_Stamp("Module includes initialised")
 #Include infra/field_run.ahk
 #Include core/lifecycle/engine/boot.ahk
 BootProfile_Stamp("Paths and shared configuration loaded")
-#Include infra/feature_state.ahk
+#Include settings/engine/preferences/feature_state.ahk
 ; Settle parse-time personal includes before any process reveals the tray icon.
 try {
 		if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"],
@@ -787,7 +787,7 @@ BootProfile_Stamp("Tray reset + onboarding")
 ; ApplyBootConfigToml and the boot full save all see the migrated file. A file
 ; this build cannot version (a newer schema, a failed migration) stays
 ; untouched and every write to it is refused for the session
-; (infra/config_migrate.ahk, docs/adr/009-config-versioning.md).
+; (settings/engine/migration/migrate.ahk, docs/adr/009-config-versioning.md).
 ConfigMigrateBoot(ConfigurationFile)
 ; From here to readiness the boot only reads config.toml: one registry comparison
 ; serves those reads, and the close below compares again.
@@ -1251,11 +1251,11 @@ BootProfile_StageBegin("shortcuts")
 ReadScriptShortcutsConfig()
 ReadKeyboardShortcutsConfig()
 
-#Include infra/config_io.ahk
-#Include infra/config_scope.ahk
+#Include settings/engine/io.ahk
+#Include settings/engine/scope/scope.ahk
 #Include ../_shared/hotstrings/data/catalogue/scope_overrides.ahk
 #Include infra/hotstrings/hotstrings_scope.ahk
-#Include infra/config_global_scope.ahk
+#Include settings/engine/scope/global_scope.ahk
 _BootMetricsCache := CS_Load()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()
@@ -1418,7 +1418,7 @@ BootProfile_Mark("Metrics/keystats started")
 
 #Include ui/action_picker/init.ahk
 #Include ui/action_picker_webview.ahk
-#Include ui/paths_editor/init.ahk
+#Include settings/ui/paths_editor/init.ahk
 #Include ui/layout_manager/init.ahk
 #Include ui/layout_manager/composer.ahk
 #Include ui/layout_manager/composer_check.ahk

@@ -51,7 +51,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 	helpers.it("(ergopti-extension-selection) persists the actual replacement gate, reloads it and rolls back refusals", function()
 		helpers.with_stub_scope({ "modules.keymap", "modules.keymap.init", "modules.keymap.state",
 			"modules.keymap.utils", "modules.keymap.expander", "modules.keymap.llm_bridge",
-			"infra.extension_packs", "infra.preferences", "core.i18n.engine.i18n", "core.fs.adapters.storage", "core.fs.adapters.file_system" }, function()
+			"infra.extension_packs", "settings.engine.preferences.preferences", "core.i18n.engine.i18n", "core.fs.adapters.storage", "core.fs.adapters.file_system" }, function()
 			package.loaded["modules.keymap.utils"] = setmetatable({
 				is_ignored_window = function() return false, 0 end,
 				is_secure_field = function() return false end,
@@ -91,9 +91,9 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 			helpers.assert_true(Keymap.set_magic_key_source("KeyJ"))
 			CaptionFixture.install(require("core.i18n.engine.i18n"))
 			package.loaded["ui.menu.builder"] = nil
-			local Registry = require("modules.keymap.registry")
+			local Registry = require("settings.engine.registry")
 			local Hotstrings = require("ui.menu.menu_hotstrings")
-			local Preferences = require("infra.preferences")
+			local Preferences = require("settings.engine.preferences.preferences")
 			local neutral = Preferences.project_hotstring_preferences({}, Registry.list_groups(), Keymap.get_sections)
 			helpers.assert_eq(neutral.section_states.magickey.replace, false, "fresh canonical absence keeps native replacement opt-in")
 			local prefs_file = os.tmpname()

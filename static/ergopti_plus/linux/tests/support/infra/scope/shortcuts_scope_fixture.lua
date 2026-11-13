@@ -56,7 +56,7 @@ local function with_scope(body, source, options)
 				package.loaded[name] = nil
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0, pair_changes = 0 }
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return default end,
 				set = function() error("shortcut scope must not write legacy storage") end,

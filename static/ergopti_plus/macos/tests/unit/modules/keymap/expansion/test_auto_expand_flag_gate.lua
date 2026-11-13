@@ -64,14 +64,14 @@ local function fresh_engine()
 		set_buffer       = function() end,
 		log_hotstring    = function() end,
 	}
-	package.loaded["modules.keymap.registry"]    = nil
+	package.loaded["settings.engine.registry"]    = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	package.loaded["modules.keymap.expander"]    = nil
 	package.loaded["modules.keymap.utils"]       = nil
 	package.loaded["core.text.engine.utils"]           = nil
 	package.loaded["core.text.engine.utils_core"]                 = nil
 
-	local R = require("modules.keymap.registry")
+	local R = require("settings.engine.registry")
 	local E = require("modules.keymap.expander")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 	R.init(state)

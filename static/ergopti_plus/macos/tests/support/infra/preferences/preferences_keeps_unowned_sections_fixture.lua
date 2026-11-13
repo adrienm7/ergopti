@@ -39,8 +39,8 @@ local function load_preferences(disk)
 			return true
 		end,
 	}
-	package.loaded["infra.preferences"] = nil
-	return require("infra.preferences"), writes
+	package.loaded["settings.engine.preferences.preferences"] = nil
+	return require("settings.engine.preferences.preferences"), writes
 end
 
 local SOURCE = table.concat({

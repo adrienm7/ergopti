@@ -10,9 +10,9 @@
 local helpers = require("tests.helpers")
 
 local function fixture(body)
-	return helpers.with_stub_scope({ "core.fs.adapters.storage", "modules.keymap.state", "modules.keymap.registry",
+	return helpers.with_stub_scope({ "core.fs.adapters.storage", "modules.keymap.state", "settings.engine.registry",
 		"modules.keymap.registry_groups", "modules.keymap.registry_index" }, function()
-		local registry = helpers.load_with_stubs("modules.keymap.registry")
+		local registry = helpers.load_with_stubs("settings.engine.registry")
 		local state = require("modules.keymap.state").new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 		assert(registry.init(state))
 		registry.register_lua_group("owner", "Owner", {})

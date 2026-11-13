@@ -689,11 +689,11 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 		local sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 		-- The agent reads on: an off category greys every row of its submenu.
 		sandbox.with_config('[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras"\n[future]\nkeep = "initial"\n', function(path)
-			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.agent_settings", "ui.menu.agent_rows" }
+			local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.agent_settings", "ui.menu.agent_rows" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 			local ok, err = pcall(function()
-				package.loaded["infra.config_paths"] = { config = function() return path end }
+				package.loaded["settings.engine.paths"] = { config = function() return path end }
 				local preferences = require("infra.llm_preferences")
 				local changes = 0
 				local menu = require("ui.menu.agent_rows").build({ on_menu_changed = function() changes = changes + 1 end }, {})
@@ -871,13 +871,13 @@ helpers.describe("Agent model physical-source ownership (agent-system-model)", f
 		local foreign = '[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras|hand/50%"\n[future]\nkeep = "external"\n'
 		local expected = '[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras|changed-model"\n[future]\nkeep = "external"\n'
 		sandbox.with_config(initial, function(path)
-			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.agent_settings", "ui.menu.agent_rows" }
+			local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.agent_settings", "ui.menu.agent_rows" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 			local writer = require("core.text.engine.toml_codec.writer")
 			local original_batch = writer.batch_write
 			local ok, err = pcall(function()
-				package.loaded["infra.config_paths"] = { config = function() return path end }
+				package.loaded["settings.engine.paths"] = { config = function() return path end }
 				local preferences = require("infra.llm_preferences")
 				local changes = 0
 				local menu = require("ui.menu.agent_rows").build({

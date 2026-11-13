@@ -108,8 +108,8 @@ local IoAdapter = {
 }
 
 local MODULES = {
-	"core.fs.adapters.storage", "core.fs.adapters.file_system", "infra.config_overrides",
-	"infra.preferences", "ui.onboarding", "ui.menu.unused_keys_cleanup", "ui.menu.builder",
+	"core.fs.adapters.storage", "core.fs.adapters.file_system", "settings.engine.overrides",
+	"settings.engine.preferences.preferences", "ui.onboarding", "settings.ui.menu.unused_keys_cleanup", "ui.menu.builder",
 }
 
 helpers.with_stub_scope(MODULES, function()
@@ -121,10 +121,10 @@ helpers.with_stub_scope(MODULES, function()
 		keys = function() return {} end,
 	}
 	package.loaded["core.fs.adapters.file_system"] = IoAdapter
-	local Overrides   = helpers.load_with_stubs("infra.config_overrides")
-	local Preferences = helpers.load_with_stubs("infra.preferences")
+	local Overrides   = helpers.load_with_stubs("settings.engine.overrides")
+	local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 	local Onboarding  = helpers.load_with_stubs("ui.onboarding")
-	local Cleanup     = helpers.load_with_stubs("ui.menu.unused_keys_cleanup")
+	local Cleanup     = helpers.load_with_stubs("settings.ui.menu.unused_keys_cleanup")
 
 	Contract.register(helpers, {
 		driver = "macos",
@@ -615,7 +615,7 @@ helpers.with_stub_scope(MODULES, function()
 			helpers.assert_true(source ~= nil, tostring(err))
 			local at = source:find("clean_unused_keys%s*=%s*function%(%)")
 			helpers.assert_true(at ~= nil, "the actions table must define clean_unused_keys")
-			helpers.assert_true(source:find("require(\"ui.menu.unused_keys_cleanup\").run_from_menu()",
+			helpers.assert_true(source:find("require(\"settings.ui.menu.unused_keys_cleanup\").run_from_menu()",
 				at, true) ~= nil, "clean_unused_keys must run the macOS cleanup")
 		end)
 
@@ -753,7 +753,7 @@ helpers.with_stub_scope(MODULES, function()
 		end)
 
 		helpers.it("unused keys: the list cap matches the Windows driver", function()
-			local fh = assert(io.open(helpers.driver_root() .. "../windows/infra/config_unused_keys.ahk", "rb"))
+			local fh = assert(io.open(helpers.driver_root() .. "../windows/settings/engine/migration/unused_keys.ahk", "rb"))
 			local ahk = fh:read("*a")
 			fh:close()
 			helpers.assert_eq(tonumber(ahk:match("CONFIG_UNUSED_KEYS_DISPLAY_LIMIT := (%d+)")),
@@ -768,7 +768,7 @@ helpers.with_stub_scope(MODULES, function()
 		delete = function() return true end, keys = function() return {} end,
 	}
 	package.loaded["core.fs.adapters.file_system"] = IoAdapter
-	local cleanup = helpers.load_with_stubs("ui.menu.unused_keys_cleanup")
+	local cleanup = helpers.load_with_stubs("settings.ui.menu.unused_keys_cleanup")
 	require("tests.lua.settings.cleanup_roots_contract").register(helpers, {
 		driver = "macos", collect = cleanup.collect, file_adapter = IoAdapter,
 		find = function(path) return cleanup.find(path, IoAdapter) end,

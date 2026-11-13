@@ -12,7 +12,7 @@
 ; FEATURES & RATIONALE:
 ; 1. In-place include: AHK runs top-level statements in #Include order, so
 ;    relocating this block to its own file and #Include-ing it at the original
-;    line preserves boot order exactly (same technique as infra/feature_state.ahk).
+;    line preserves boot order exactly (same technique as settings/engine/preferences/feature_state.ahk).
 ; 2. Thin entry: keeps ErgoptiPlus.ahk focused on the #Include manifest and the
 ;    high-level boot orchestration rather than the line-by-line init detail.
 ; 3. No directives/hotkeys: this block is pure top-level initialisation, so it

@@ -140,7 +140,7 @@ helpers.describe("crash_reporter — the outcome is announced without a blocking
 		helpers.assert_true(names_path,
 			"the notification must name the saved report path — it is the only actionable detail")
 
-		package.loaded["infra.config_paths"] = nil
+		package.loaded["settings.engine.paths"] = nil
 		package.loaded["core.fs.adapters.file_system"] = nil
 	end)
 
@@ -159,7 +159,7 @@ helpers.describe("crash_reporter — the outcome is announced without a blocking
 		helpers.assert_true(#notifications >= 1,
 			"a failed save must still be surfaced to the user")
 
-		package.loaded["infra.config_paths"] = nil
+		package.loaded["settings.engine.paths"] = nil
 		package.loaded["core.fs.adapters.file_system"] = nil
 	end)
 end)

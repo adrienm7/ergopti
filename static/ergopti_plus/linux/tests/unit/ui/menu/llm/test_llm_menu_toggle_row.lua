@@ -430,7 +430,7 @@ helpers.describe("Linux rendered AI source refusal", function()
 			local saved = {}
 			for name, value in pairs(package.loaded) do saved[name] = value end
 			local ok, raised = pcall(function()
-				package.loaded["infra.config_paths"] = {
+				package.loaded["settings.engine.paths"] = {
 					config = function() return path end,
 					config_home = function() return assert(path:match("^(.*)/[^/]+$")) end,
 					-- The storage adapter keeps storage.json in the default configuration folder.

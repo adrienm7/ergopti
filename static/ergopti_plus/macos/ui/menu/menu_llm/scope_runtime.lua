@@ -3,7 +3,7 @@
 --- Reconciles scoped preferences through the existing native LLM owners.
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Preferences = require("infra.preferences")
+local Preferences = require("settings.engine.preferences.preferences")
 local Logger = require("core.logger.engine.logger")
 local TableUtil = require("core.text.engine.table_util")
 local ConfigKeys = require("settings.engine.keys")

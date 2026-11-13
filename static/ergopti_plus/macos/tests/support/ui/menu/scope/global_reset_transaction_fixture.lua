@@ -15,7 +15,7 @@ local MODULE_KEYS = {
 	"ui.menu.hotstrings_scope",
 	"modules.hotstrings.hotstrings_config",
 	"ui.menu.global_scope",
-	"ui.menu.scoped_preferences",
+	"settings.ui.menu.scoped_preferences",
 	"ui.menu.gesture_scope",
 	"core.ui.engine.dialog_util",
 	"core.logger.engine.logger",
@@ -24,10 +24,10 @@ local MODULE_KEYS = {
 	"core.text.engine.utils",
 	"core.i18n.engine.i18n",
 	"infra.ui_restore",
-	"infra.preferences",
+	"settings.engine.preferences.preferences",
 	"ui.menu.builder",
 	"ui.menu.hotstring_counter",
-	"ui.menu.menu_paths",
+	"settings.ui.menu.paths",
 	"ui.menu.menu_state",
 	"ui.menu.keymap_lifecycle",
 	"ui.menu.menu_watchers",
@@ -38,7 +38,7 @@ local MODULE_KEYS = {
 	"keyboard.engine.chord",
 	"platform.input.hotkey_registrar",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
-	"infra.factory_reset_journal",
+	"settings.engine.factory_reset_journal",
 	"ui.menu.recoverable_file_moves",
 	"ui.menu.global_actions_transaction",
 	"ui.menu.menu_gestures",
@@ -56,7 +56,7 @@ local MODULE_KEYS = {
 	"modules.dynamic_hotstrings",
 	"modules.gestures",
 	"infra.personal_shortcuts",
-	"ui.menu.preferences_transaction",
+	"settings.ui.menu.preferences_transaction",
 	"ui.menu.program_parameter_transaction",
 	"ui.menu.init",
 }
@@ -314,7 +314,7 @@ local function with_menu_fixture(options, callback)
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
-	package.loaded["infra.preferences"] = {
+	package.loaded["settings.engine.preferences.preferences"] = {
 		build_initial_state = function() return state end,
 		load = function() return {}, "ok" end,
 		merge_saved_data = noop,
@@ -350,7 +350,7 @@ local function with_menu_fixture(options, callback)
 		invalidate_cache = noop,
 	}
 	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = noop }
-	package.loaded["ui.menu.menu_paths"] = {
+	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
 		get = function(key)
 			if key == "ConfigTomlPath" then return "/virtual/config.toml" end
@@ -518,7 +518,7 @@ local function with_menu_fixture(options, callback)
 			end)
 		end,
 	}
-	package.loaded["infra.factory_reset_journal"] = {
+	package.loaded["settings.engine.factory_reset_journal"] = {
 		path_for = function(path) return path .. ".ergopti-reset-journal-v1.json" end,
 		create = function() return reset_journal end,
 	}

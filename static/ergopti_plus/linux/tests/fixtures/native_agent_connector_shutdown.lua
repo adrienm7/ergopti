@@ -78,7 +78,7 @@ local ok, why = xpcall(function()
 		print("PASS native cold agent shutdown: no process backend acquisition")
 		return
 	end
-	local tools = require("infra.config_paths").config(Connectors.TOOLS_DIR)
+	local tools = require("settings.engine.paths").config(Connectors.TOOLS_DIR)
 	assert(tools:sub(1, #scratch) == scratch, "tools escaped owned XDG configuration")
 	assert(Shell.run("mkdir -p " .. Shell.quote(tools)))
 	if arg[1] == "spawn-refused" then

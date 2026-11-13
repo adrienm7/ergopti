@@ -403,7 +403,7 @@ helpers.describe("original configured Navigation source reservations", function(
 			made_directory = true
 			-- The switch is a config.toml row: every scenario runs with it on.
 			write_source(dir .. "/config.toml", "[tap_holds]\nenabled = true\n" .. (config_text or ""))
-			package.loaded["infra.config_paths"] = { config = function(name) return dir .. "/" .. name end }
+			package.loaded["settings.engine.paths"] = { config = function(name) return dir .. "/" .. name end }
 			package.loaded["platform.remap.nav_layer"] = nil
 			package.loaded["platform.remap.tap_hold_manager"] = nil
 			package.loaded["modules.shortcuts.key_combinations"] = nil

@@ -29,7 +29,7 @@ local SOURCE = table.concat({
 
 helpers.describe("AI agent settings (macOS)", function()
 	helpers.it("loads each setting at its owner and saves it back unchanged", function()
-		helpers.with_fresh_modules({ "infra.preferences", "core.fs.adapters.file_system" }, function()
+		helpers.with_fresh_modules({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system" }, function()
 			local source = SOURCE
 			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return source, "ok" end,
@@ -39,7 +39,7 @@ helpers.describe("AI agent settings (macOS)", function()
 					return true
 				end,
 			}
-			local prefs = helpers.load_with_stubs("infra.preferences")
+			local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 			for path, key in pairs({
 				["llm.agent_system1"] = "llm_agent_system1", ["llm.agent_system2"] = "llm_agent_system2",
 				["llm.agent_mode"] = "llm_agent_mode", ["llm.agent_disabled_apps"] = "llm_agent_disabled_apps",

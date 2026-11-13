@@ -394,7 +394,7 @@ function M.production_deps(ports)
 	return {
 		read_config = function()
 			local bytes, status, detail = require("core.text.engine.toml_codec.writer").read_classified(
-				require("infra.config_paths").config("config.toml"))
+				require("settings.engine.paths").config("config.toml"))
 			if status ~= "ok" and status ~= "absent" then error("config.toml is unreadable: " .. tostring(detail)) end
 			return require("core.text.engine.toml_codec").decode(bytes or "")
 		end,

@@ -54,7 +54,7 @@ local function load_fixture(opts)
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
-	package.loaded["infra.preferences"] = {
+	package.loaded["settings.engine.preferences.preferences"] = {
 		build_initial_state = function() return state end,
 		load = function() return { shortcuts = opts.script_rollback == true }, "present" end,
 		merge_saved_data = function(live, saved)
@@ -76,13 +76,13 @@ local function load_fixture(opts)
 		invalidate_cache = noop,
 	}
 	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = noop }
-	package.loaded["ui.menu.menu_paths"] = {
+	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
 		get = function() return "/virtual/config.toml" end,
 		get_config_dir = function() return "/virtual" end,
 		open_editor = noop,
 	}
-	package.loaded["infra.factory_reset_journal"] = {
+	package.loaded["settings.engine.factory_reset_journal"] = {
 		path_for = function(config_path)
 			if type(config_path) ~= "string" or config_path == "" then return nil end
 			return config_path .. ".ergopti-reset-journal-v1.json"

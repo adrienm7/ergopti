@@ -31,7 +31,7 @@
 
 local Logger        = require("core.logger.engine.shim")
 local Paths         = require("core.fs.engine.paths")
-local ConfigPaths   = require("infra.config_paths")
+local ConfigPaths   = require("settings.engine.paths")
 local I18n          = require("core.i18n.engine.i18n")
 local FileSystem    = require("core.fs.adapters.file_system")
 local HttpClient    = require("core.network.adapters.http_client")

@@ -1,5 +1,5 @@
 {
-	"description": "The grammar of a hotstring output, read the same way by the three drivers: _shared/platform/input (parse_output) on macOS and Linux, windows/infra/send_input_parameter.ahk (SendInputParseOutput) on Windows.",
+	"description": "The grammar of a hotstring output, read the same way by the three drivers: _shared/platform/input (parse_output) on macOS and Linux, windows/settings/engine/send_input_parameter.ahk (SendInputParseOutput) on Windows.",
 	"rule": "{name} presses a key of _shared/shortcuts/data/actions/send_keys.json, by id or alias, in any case. {name N} presses it N times, N from 1 to output_key_max_repeat with no leading zero. {U+XXXX} types that code point, from 1 to 6 hex digits; a surrogate, a value above 10FFFF or a control character is not a code point here. {{} types a left brace and {}} a right brace, which is how a literal {Left} is written: {{}Left}. A line break (CRLF, CR or LF) is the enter key and a tab is the tab key. Everything else is literal text: an unknown {group}, an unmatched brace, and + ^ ! # ~ which have no meaning here. An output with a key token leaves the caret somewhere the engine cannot read, so each driver forgets its typing buffer and the AI context after it, and such an output takes no part in a cascade.",
 	"vectors": [
 		{

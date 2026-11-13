@@ -377,12 +377,12 @@ end)
 helpers.describe("macOS acknowledged token streaming checkbox", function()
 	for _, race in ipairs({"before menu construction", "before forward acknowledgement", "after forward acknowledgement", "between own acknowledgement and receipt admission"}) do
 	helpers.it("preserves a real foreign master winner " .. race .. " through compensation and a fresh second click (shared-token-streaming)", function()
-		local path = require("infra.config_paths").get("ConfigTomlPath")
+		local path = require("settings.engine.paths").get("ConfigTomlPath")
 		local initial = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n[llm.display]\nstreaming = false\nstreaming_multi = true\n[private]\nfuture = 42\n'
 		local external = race == "before menu construction" and (initial .. '[llm.generation]\ntemperature = 0.9\n')
 			or initial:gsub('enabled = true', 'enabled = false')
 		local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
-		local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+		local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["settings.engine.preferences.preferences"]
 		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(read_path)
 				if read_path ~= path then wrong_path = true end
@@ -398,8 +398,8 @@ helpers.describe("macOS acknowledged token streaming checkbox", function()
 				return true
 			end,
 		}
-		package.loaded["infra.preferences"] = nil
-		local preferences = require("infra.preferences")
+		package.loaded["settings.engine.preferences.preferences"] = nil
+		local preferences = require("settings.engine.preferences.preferences")
 		local ok, err = xpcall(function()
 			local _, status = preferences.load(path)
 			helpers.assert_eq(status, "ok")
@@ -465,7 +465,7 @@ helpers.describe("macOS acknowledged token streaming checkbox", function()
 				helpers.assert_eq(wrong_path, false)
 			end)
 		end, debug.traceback)
-		package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+		package.loaded["core.fs.adapters.file_system"], package.loaded["settings.engine.preferences.preferences"] = previous_fs, previous_preferences
 		if not ok then error(err, 0) end
 	end)
 

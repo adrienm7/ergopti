@@ -56,7 +56,7 @@ local OWNERS = {
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"keyboard.engine.desktop_navigation",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"infra.manifest_reader",
@@ -148,7 +148,7 @@ local function fresh_actions(options)
 		"core.lifecycle.engine.shutdown.termination_coordinator",
 		"core.logger.engine.logger",
 		"core.fs.engine.paths",
-		"infra.config_paths",
+		"settings.engine.paths",
 		"core.timing.engine.timings",
 		"core.i18n.engine.i18n",
 	}) do package.loaded[name] = nil end
@@ -728,7 +728,7 @@ local function fresh_actions(options)
 		PersonalShortcutsLuaPath = "personal_shortcuts.lua",
 		PersonalTomlPath = "hotstrings/personal_hotstrings.toml",
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function(key) return config_files[key] and ("/fixture/config/" .. config_files[key]) or nil end,
 	}
 	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.2 end }

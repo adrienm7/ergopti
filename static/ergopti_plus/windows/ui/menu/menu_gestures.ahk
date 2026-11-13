@@ -234,7 +234,7 @@ ToggleGesturesEnabled() {
 	NewVal := !_GES_IsEnabled()
 	; v2-native write via the canonical manifest path — no v1->v2 translation.
 	; WriteFeatureV2 derives the [gestures] section + the Features node from
-	; the path and persists in lock-step (see infra/feature_io.ahk).
+	; the path and persists in lock-step (see settings/engine/preferences/feature_io.ahk).
 	if !WriteFeatureV2(Features, ConfigKey.GESTURES_ENABLED, NewVal)
 		return ConfigReportPersistenceFailure("the gestures enable toggle")
 	NotifyFeature(t("menu.gestures.notify_title"), NewVal)

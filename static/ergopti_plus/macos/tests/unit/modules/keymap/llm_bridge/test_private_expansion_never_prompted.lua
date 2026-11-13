@@ -117,7 +117,7 @@ local function build_world()
 	package.loaded["core.ui.adapters.tooltip_renderer"] = setmetatable({}, { __index = function() return noop end })
 
 	local State = helpers.load_with_stubs("modules.keymap.state")
-	local Registry = require("modules.keymap.registry")
+	local Registry = require("settings.engine.registry")
 	local Expander = require("modules.keymap.expander")
 	local RulesEngine = require("modules.dynamic_hotstrings.rules_engine")
 	local core = require("modules.llm")

@@ -16,7 +16,7 @@ local DIALOG = require("core.ui.ui.native_dialog").command()
 --- Owns module replacements and pipe restoration for one completed scenario.
 --- @param body function Receives effect observations and a shell authority.
 local function scenario(body)
-	local names = { "core.ui.ui.text_prompt", "ui.app_chooser", "ui.config_dir_picker", "ui.gesture_conflicts",
+	local names = { "core.ui.ui.text_prompt", "ui.app_chooser", "settings.ui.dir_picker", "ui.gesture_conflicts",
 		"modules.gestures.system_actions", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "core.ui.ui.modal",
 		"core.fs.adapters.storage", "core.events.loop", "platform.input.keyboard_hook",
 		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "infra.manifest_menu" }
@@ -111,7 +111,7 @@ h.describe("native dialog captions (linux-native-titles)", function()
 		scenario(function(observed, shell)
 			observed.answer, observed.status = "/owned/chosen/", 0
 			local paths = { default_config_dir = function() return "/owned/default" end }
-			local value = require("ui.config_dir_picker").pick(shell, paths, require("core.i18n.engine.i18n"), "/owned/current")
+			local value = require("settings.ui.dir_picker").pick(shell, paths, require("core.i18n.engine.i18n"), "/owned/current")
 			h.assert_eq(value, "/owned/chosen")
 			h.assert_eq(observed.commands[1], DIALOG .. " --file-selection --directory"
 				.. " --title='ErgoptiPlus — Select configuration folder' --filename='/owned/current/' 2>/dev/null")
@@ -335,7 +335,7 @@ h.describe("native caption consumer inventory", function()
 			-- The picker, its verification error and the open_path picker retain
 			-- their composed caption; test_app_chooser proves the error dialog.
 			["ui.app_chooser"] = 3,
-			["ui.config_dir_picker"] = 1,
+			["settings.ui.dir_picker"] = 1,
 			["ui.gesture_conflicts"] = 1,
 			["modules.gestures.system_actions"] = 1,
 			["ui.menu.menu_dialogs"] = 3,
@@ -405,7 +405,7 @@ local function picker_exit_receipt(status, output, application_root)
 			.. "local paths = { default_config_dir = function() return '/owned/default' end }\n"
 			.. (application_root and "local value = require('ui.app_chooser').pick(shell, 'Choose application', {resolve=function() return "
 				.. string.format("%q", output:gsub("\n$", "")) .. ", 'found' end})\n"
-				or "local value = require('ui.config_dir_picker').pick(shell, paths, nil, '/owned/current')\n")
+				or "local value = require('settings.ui.dir_picker').pick(shell, paths, nil, '/owned/current')\n")
 			.. "io.write(value == nil and 'refused' or 'accepted|' .. value)\n"
 			.. "io.write('|modal:' .. modals)\n")
 		local command = "env PATH=" .. Shell.quote(directory .. ":" .. (os.getenv("PATH") or ""))
@@ -493,7 +493,7 @@ h.describe("configuration filesystem root", function()
 			scenario(function(observed, shell)
 				observed.answer, observed.status = "/\n", 0
 				local paths = { default_config_dir = function() return "/owned/default" end }
-				local picker = require("ui.config_dir_picker")
+				local picker = require("settings.ui.dir_picker")
 				h.assert_eq(picker.pick(shell, paths, require("core.i18n.engine.i18n"), "/"), "/")
 				h.assert_eq(picker.normalize(paths, "///"), "/")
 				h.assert_eq(picker.normalize(paths, ""), "/owned/default")

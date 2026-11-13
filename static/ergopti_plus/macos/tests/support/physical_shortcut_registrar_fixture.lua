@@ -23,7 +23,7 @@ local function with_compiled_navigation(body, controls, files)
 			package.loaded["platform.remap.nav_layer"] = nil
 			return require("tests.support.remap_transaction_fixture")(function(fixture)
 				local remap, observations = fixture.load_enabled_remap({ real_user_config_path = path, initially_enabled = false })
-				local paths = package.loaded["infra.config_paths"]
+				local paths = package.loaded["settings.engine.paths"]
 				paths.get = function(key) if key == "TapHoldConfigPath" then return path end; return "config" end
 				paths.get_config_dir = function() return directory end
 				local terminal, reason
@@ -34,7 +34,7 @@ local function with_compiled_navigation(body, controls, files)
 				local inventory = assert(remap.capture_configured_navigation_inventory(), "original compiled Navigation receipt is required")
 				assert(#inventory.codes == 0 and inventory.current() == true, "only a genuine empty compiled layer admits this fixture")
 				local retained = { ["platform.remap"] = true, ["platform.remap.config"] = true,
-					["platform.remap.nav_layer"] = true, ["infra.config_paths"] = true,
+					["platform.remap.nav_layer"] = true, ["settings.engine.paths"] = true,
 					["core.fs.adapters.file_system"] = true, ["core.text.engine.json"] = true, ["core.text.engine.toml_codec"] = true,
 					["core.text.engine.toml_codec.writer"] = true, ["layouts.engine.layers.layers"] = true }
 				-- The scope's own recorded native/port identities stay unchanged.
@@ -112,7 +112,7 @@ local function run_fixture(body, source)
 		end,
 	}
 	package.loaded["core.fs.adapters.file_system"] = file_port
-	package.loaded["infra.config_paths"] = { get = function() return "config" end }
+	package.loaded["settings.engine.paths"] = { get = function() return "config" end }
 	package.loaded["core.fs.engine.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
 	local logger = helpers.make_logger_stub()
 	controls.errors = {}
@@ -253,7 +253,7 @@ local function run_fixture(body, source)
 	local taps = require("modules.shortcuts.tap_keys")
 	local script = require("modules.shortcuts.script_control")
 	local shortcuts = require("modules.shortcuts")
-	local prefs = require("infra.preferences")
+	local prefs = require("settings.engine.preferences.preferences")
 	local saved = prefs.load("config")
 	local state = { shortcuts = true, script_control_enabled = true,
 		script_control_shortcuts = { script_altgr_enter = "open_url", script_altgr_backspace = "none",
@@ -276,7 +276,7 @@ local function run_fixture(body, source)
 	helpers.assert_eq(start_script(), true)
 	local modules = { gestures = gestures, shortcuts_mod = shortcuts }
 	local demotions = require("ui.menu.session_demotions").new()
-	local save, checkpoint = require("ui.menu.preferences_transaction").bind(prefs, {
+	local save, checkpoint = require("settings.ui.menu.preferences_transaction").bind(prefs, {
 		path = "config", state = state, hotfiles = {}, core_modules = modules,
 		initial_state = state, initial_preferences = prefs.snapshot(state, {}, modules),
 		snapshot_view = demotions.persisted_view,

@@ -867,7 +867,7 @@ local function native_ports()
 		cancel = function(handle) if not handle:is_closing() then handle:stop(); handle:close() end end,
 		now_ms = function() uv.update_time(); return uv.now() end,
 		iso_now = function() return os.date("!%Y-%m-%dT%H:%M:%SZ") end,
-		config_bytes = function() return FileSystem.read(require("infra.config_paths").config("config.toml")) end,
+		config_bytes = function() return FileSystem.read(require("settings.engine.paths").config("config.toml")) end,
 		run_check = function(check, on_result)
 			return require(M.CHECK_RUNNERS[check]).run_headless(on_result)
 		end,

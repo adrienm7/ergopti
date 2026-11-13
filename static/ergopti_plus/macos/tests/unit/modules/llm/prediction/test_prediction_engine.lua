@@ -226,7 +226,7 @@ local function load_real_setting_bridge()
 		},
 		["modules.keystats"] = {},
 		["core.ui.ui.tooltip"] = {},
-		["modules.keymap.registry"] = {},
+		["settings.engine.registry"] = {},
 		["modules.hotstrings.hotstrings_config"] = {},
 		["modules.keymap.expander"] = {},
 		["core.events.timer_scheduler"] = {after = noop},

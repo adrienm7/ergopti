@@ -15,11 +15,11 @@
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to modules/keymap/registry.lua rather than by
+-- Selected by a declaration unique to settings/engine/registry.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
 local src = helpers.read_driver_source("local function trigger_has_shift_symbol")
-helpers.assert_true(src ~= nil, "modules/keymap/registry.lua source must be locatable")
+helpers.assert_true(src ~= nil, "settings/engine/registry.lua source must be locatable")
 
 -- Find the update_trigger_char function body.
 local fn_start = src:find("function update_trigger_char", 1, true)

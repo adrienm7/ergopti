@@ -15,8 +15,8 @@ local function with_program(callback, program_admission)
 	local tasks, actions, auxiliary = {}, nil, nil
 	local owned = { "modules.gestures.actions", "modules.gestures.actions_aux_owner", "core.process.adapters.shell_runner",
 		"core.process.adapters.owned_program_runner", "platform.remap.lease_helper", "core.crypto.crypto",
-		"core.process.adapters.task_environment", "core.fs.adapters.file_system", "core.events.timer_scheduler", "infra.preferences",
-		"infra.config_paths", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.timing.engine.timings",
+		"core.process.adapters.task_environment", "core.fs.adapters.file_system", "core.events.timer_scheduler", "settings.engine.preferences.preferences",
+		"settings.engine.paths", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.timing.engine.timings",
 		"modules.shortcuts.keyboard_shortcuts", "tests.stubs.hs", "hs" }
 	for _, name in ipairs(owned) do package.loaded[name] = nil end
 	local ok, failure = xpcall(function()
@@ -26,7 +26,7 @@ local function with_program(callback, program_admission)
 		package.loaded["hs"] = native
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, format = function(key) return key end }
-		package.loaded["infra.config_paths"] = { get = function() return path end }
+		package.loaded["settings.engine.paths"] = { get = function() return path end }
 		package.loaded["platform.remap.lease_helper"] = { resolve = function()
 			return HELPER, nil, { ERGOPTI_LAUNCHER_EXECUTABLE = HELPER,
 				ERGOPTI_LAUNCHER_DEVICE = "42", ERGOPTI_LAUNCHER_INODE = "73" }
@@ -72,7 +72,7 @@ local function with_program(callback, program_admission)
 		end
 		actions = require("modules.gestures.actions")
 		auxiliary = require("modules.gestures.actions_aux_owner")
-		local preferences = require("infra.preferences")
+		local preferences = require("settings.engine.preferences.preferences")
 		local state = { ga = { tap_3 = "run_program" }, action_params = {} }
 		actions.init(state)
 		if program_admission ~= false and type(actions.configure_program_admission) == "function" then
@@ -484,7 +484,7 @@ helpers.describe("private run_program owned source admission", function()
 			local create = native.task.new
 			native.task.new = function(...)
 				local task = create(...)
-				package.loaded["infra.config_paths"].get = function() return path .. ".foreign" end
+				package.loaded["settings.engine.paths"].get = function() return path .. ".foreign" end
 				return task
 			end
 			helpers.assert_eq(actions.run_program("tap_3"), false)

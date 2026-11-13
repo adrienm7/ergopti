@@ -248,11 +248,14 @@ for (const [index, family] of families.entries()) {
 // be an expression, never a literal, and its file must reach the resolver.
 const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/modules',
+	'static/ergopti_plus/macos/settings/engine',
 	'static/ergopti_plus/macos/ui',
+	'static/ergopti_plus/macos/settings/ui',
 	'static/ergopti_plus/macos/core/ui/ui',
 	'static/ergopti_plus/macos/core/network',
 	'static/ergopti_plus/linux/modules',
 	'static/ergopti_plus/linux/infra',
+	'static/ergopti_plus/linux/settings/engine',
 	'static/ergopti_plus/linux/platform/input',
 	'static/ergopti_plus/linux/core/ui/engine',
 	'static/ergopti_plus/linux/core/timing/engine',

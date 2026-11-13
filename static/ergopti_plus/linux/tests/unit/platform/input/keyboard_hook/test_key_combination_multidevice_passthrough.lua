@@ -42,7 +42,7 @@ local function with_manager(route, body)
 		end
 		write(config_path, text)
 		write(tap_path, '[tap_hold]\nenabled = true\ninherit_defaults = false\n')
-		local paths = require("infra.config_paths")
+		local paths = require("settings.engine.paths")
 		local original = paths.config
 		paths.config = function(name)
 			if name == "config.toml" then return config_path end

@@ -17,11 +17,11 @@ local helpers =
 --- Runs the real resolver with one fresh owner, restoring the caller's exact cache.
 --- @param body function Receives the freshly reloaded configuration paths module.
 local function with_real_config_paths(body)
-	local previous = package.loaded["infra.config_paths"]
+	local previous = package.loaded["settings.engine.paths"]
 	local ok, detail = pcall(function()
-		body(helpers.load_module("infra.config_paths"))
+		body(helpers.load_module("settings.engine.paths"))
 	end)
-	package.loaded["infra.config_paths"] = previous
+	package.loaded["settings.engine.paths"] = previous
 	if not ok then error(detail, 0) end
 end
 
@@ -139,7 +139,7 @@ helpers.describe("ui.bridge_handlers", function()
 			state.webview_manager.current_epoch = function() return epoch end
 			state.webview_manager.page_current = function(_, value) return value == epoch end
 			state.shell = { quote = function(value) return value end, exec_checked = function() return true, "/tmp/ignored" end }
-			local picker, original = require("ui.config_dir_picker"), require("ui.config_dir_picker").pick
+			local picker, original = require("settings.ui.dir_picker"), require("settings.ui.dir_picker").pick
 			picker.pick = function() epoch = 2; return "/tmp/selected" end
 			local ok, result = pcall(handler.on_message, { action = "pickConfigDir" }, state,
 				{ app_name = "onboarding", epoch = 1 })
@@ -367,15 +367,15 @@ helpers.describe("ui.bridge_handlers", function()
 		end)
 
 		helpers.it("(onboarding-metrics-path) the real resolver names the keystats store", function()
-			local previous = package.loaded["infra.config_paths"]
+			local previous = package.loaded["settings.engine.paths"]
 			with_real_config_paths(function(ConfigPaths)
 				helpers.assert_eq(ConfigPaths.metrics_path(), ConfigPaths.data("metrics.sqlite"))
 			end)
-			helpers.assert_true(rawequal(package.loaded["infra.config_paths"], previous), "the real resolver retains the original path owner")
+			helpers.assert_true(rawequal(package.loaded["settings.engine.paths"], previous), "the real resolver retains the original path owner")
 		end)
 
 		helpers.it("(onboarding-metrics-path) restores a warm preference path owner after a resolver failure", function()
-			local paths = require("infra.config_paths")
+			local paths = require("settings.engine.paths")
 			local preferences = require("infra.metrics_preferences")
 			local failure, visited = {}, 0
 			local ok, detail = pcall(with_real_config_paths, function(fresh)
@@ -387,7 +387,7 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(ok, false)
 			helpers.assert_true(rawequal(detail, failure), "preserve the resolver's original failure")
 			helpers.assert_eq(visited, 1)
-			helpers.assert_true(rawequal(require("infra.config_paths"), paths), "a failed resolver cannot replace the warm preference path owner")
+			helpers.assert_true(rawequal(require("settings.engine.paths"), paths), "a failed resolver cannot replace the warm preference path owner")
 			helpers.assert_true(rawequal(require("infra.metrics_preferences"), preferences))
 		end)
 

@@ -368,8 +368,8 @@ helpers.describe("canonical hotstring cache projection", function()
 				files[path] = content; return true
 			end,
 		}
-		package.loaded["infra.preferences"] = nil
-		local preferences = require("infra.preferences")
+		package.loaded["settings.engine.preferences.preferences"] = nil
+		local preferences = require("settings.engine.preferences.preferences")
 		registry.register_lua_group("rolls", "Rolls", { { name = "hc" }, { name = "sx" }, { name = "-" } })
 		registry.register_lua_group("ext:demo:test", "Extension", { { name = "fast" }, { name = "info", is_module_placeholder = true } })
 		return state, registry, preferences, files
@@ -548,7 +548,7 @@ helpers.describe("canonical hotstring cache projection", function()
 		helpers.assert_type(body, "string", "the owned boot boundary must exist")
 		local starts = 0
 		local run = assert(load(body, "hotstring boot boundary", "t", setmetatable({
-			boot_saved_prefs = require("infra.preferences").load("config"),
+			boot_saved_prefs = require("settings.engine.preferences.preferences").load("config"),
 			keymap = {
 				apply_hotstring_preferences = registry.apply_hotstring_preferences,
 				start_layout_emulation = function() end,

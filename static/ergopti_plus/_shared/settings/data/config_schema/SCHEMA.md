@@ -19,7 +19,7 @@ This folder describes the target user-configuration schema after the Scope C ref
 ```
 
 Linux keeps `config.toml` and `tap_hold.toml` directly in its configuration
-folder (`linux/infra/config_paths.lua` owns the location).
+folder (`linux/settings/engine/paths.lua` owns the location).
 
 And on the repo's shared-resources side:
 

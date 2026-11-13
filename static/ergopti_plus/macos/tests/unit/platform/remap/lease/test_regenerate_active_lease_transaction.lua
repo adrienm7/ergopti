@@ -217,7 +217,7 @@ local function load_active_remap(options)
 	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none
 	-- unless the test hands a folder of its own.
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function() return "tests/unit/platform/remap/active-regeneration.toml" end,
 		get_config_dir = function() return options.config_dir or "tests/unit/platform/remap/no-layers-toml" end,
 	}

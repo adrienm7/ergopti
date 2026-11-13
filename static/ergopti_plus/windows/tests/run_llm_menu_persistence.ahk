@@ -17,7 +17,7 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../_generated/config_keys.ahk
 #Include ../_generated/app_dirs.ahk
 #Include ../infra/app_folders.ahk
-#Include ../infra/legacy_folder_migration.ahk
+#Include ../settings/engine/migration/legacy_folder_migration.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../core/logger/engine/logger.ahk
 #Include ../core/crypto/crypto.ahk
@@ -36,12 +36,12 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../infra/manifest_reader.ahk
 #Include ../core/lifecycle/engine/master_gates.ahk
 #Include ../infra/hotstrings/hotstrings_cache.ahk
-#Include ../infra/config_transition.ahk
-#Include ../infra/config_transition_runtime.ahk
-#Include ../infra/config_migrate.ahk
+#Include ../settings/engine/migration/transition.ahk
+#Include ../settings/engine/migration/transition_runtime.ahk
+#Include ../settings/engine/migration/migrate.ahk
 #Include ../infra/magic_editor.ahk
-#Include ../infra/config_io.ahk
-#Include ../infra/config_scope.ahk
+#Include ../settings/engine/io.ahk
+#Include ../settings/engine/scope/scope.ahk
 #Include ../infra/metrics/metrics_filters.ahk
 #Include ../infra/metrics/metrics_shortcuts.ahk
 #Include support/wpm_widget_state_contract.ahk

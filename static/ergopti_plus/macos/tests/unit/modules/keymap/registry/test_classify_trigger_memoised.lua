@@ -17,8 +17,8 @@
 local helpers = require("tests.helpers")
 
 local function fresh_registry()
-	package.loaded["modules.keymap.registry"] = nil
-	local Registry = helpers.load_with_stubs("modules.keymap.registry")
+	package.loaded["settings.engine.registry"] = nil
+	local Registry = helpers.load_with_stubs("settings.engine.registry")
 	Registry.init({
 		magic_key = "\u{2605}", mappings = {}, mappings_lookup = {},
 		mappings_by_tail_char = {}, mappings_by_star_tail_char = {},

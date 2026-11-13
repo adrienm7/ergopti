@@ -46,9 +46,9 @@ local function fixture(source)
 		end,
 	}
 	package.loaded["core.fs.adapters.file_system"] = files_port
-	local prefs = helpers.load_with_stubs("infra.preferences")
+	local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 	prefs.load("config")
-	local PT = require("ui.menu.preferences_transaction")
+	local PT = require("settings.ui.menu.preferences_transaction")
 	local modules = { gestures = gestures }
 	local demotions = require("ui.menu.session_demotions").new()
 	controls.demotions = demotions
@@ -259,7 +259,7 @@ helpers.describe("macOS complete gesture scope", function()
 end)
 
 package.loaded["core.fs.adapters.file_system"] = FileSystem
-package.loaded["infra.preferences"] = nil
+package.loaded["settings.engine.preferences.preferences"] = nil
 
 
 
@@ -315,9 +315,9 @@ local function actual_frame_fixture(source)
 		end,
 	}
 	package.loaded["core.fs.adapters.file_system"] = files_port
-	local prefs = helpers.load_with_stubs("infra.preferences")
+	local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 	prefs.load("config")
-	local PT = require("ui.menu.preferences_transaction")
+	local PT = require("settings.ui.menu.preferences_transaction")
 	local modules = { gestures = gestures }
 	local demotions = require("ui.menu.session_demotions").new()
 	controls.demotions = demotions
@@ -381,8 +381,8 @@ helpers.describe("macOS two-finger neutral recommendations", function()
 				"modules.gestures.actions_aux_owner", "modules.gestures.sticky_modifiers",
 				"core.fs.adapters.file_system",
 				"platform.input.synthetic_input", "adapters.event_provenance", "core.events.timer_scheduler",
-				"infra.preferences", "ui.menu.gesture_scope", "ui.menu.scoped_preferences",
-				"ui.menu.preferences_transaction", "ui.menu.menu_gestures", "infra.manifest_menu",
+				"settings.engine.preferences.preferences", "ui.menu.gesture_scope", "settings.ui.menu.scoped_preferences",
+				"settings.ui.menu.preferences_transaction", "ui.menu.menu_gestures", "infra.manifest_menu",
 			}, function()
 				local original = '[gestures]\nenabled = true\nswipe_2_left = "arrow_up"\n'
 				local owner, gestures, files, state, recording, core, engine = actual_frame_fixture(original)

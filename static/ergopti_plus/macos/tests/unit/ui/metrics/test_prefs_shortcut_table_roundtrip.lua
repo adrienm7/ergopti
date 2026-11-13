@@ -35,7 +35,7 @@ helpers.describe("preferences flatten_from_disk: table-valued scalar keys", func
 		-- owner. Without the early scalar lookup it falls into the sub-path walk,
 		-- which finds no inner owner and drops it with no outdated report, so the
 		-- setting silently reverts to its default at every boot.
-		local prefs = helpers.load_with_stubs("infra.preferences")
+		local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local flat
 		local reports = require("settings.engine.migration.outdated").collect_reports(function()
 			flat = prefs.flatten_document({ hotstrings = { trigger_char = { mods = { "cmd" }, key = "x" } } })
@@ -46,7 +46,7 @@ helpers.describe("preferences flatten_from_disk: table-valued scalar keys", func
 	end)
 
 	helpers.it("keeps retired dashboard paths out of the preference owner", function()
-		local prefs = helpers.load_with_stubs("infra.preferences")
+		local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		helpers.assert_nil(prefs.flat_key_for("metrics.shortcut"))
 		helpers.assert_nil(prefs.flat_key_for("metrics.apps_shortcut"))
 		helpers.assert_eq(prefs.flat_key_for("metrics.enabled"), MetricsState.ENABLED)

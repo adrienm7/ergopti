@@ -24,7 +24,7 @@ local State  = helpers.load_with_stubs("modules.keymap.state")
 local txt    = helpers.load_with_stubs("core.text.engine.utils")
 
 local REGISTRY_OWNERSHIP = {
-	"modules.keymap.registry",
+	"settings.engine.registry",
 	"modules.keymap.registry_groups",
 	"modules.keymap.registry_index",
 	"modules.keymap.terminators",
@@ -34,7 +34,7 @@ local REGISTRY_OWNERSHIP = {
 }
 
 local ENGINE_OWNERSHIP = {
-	"modules.keymap.registry",
+	"settings.engine.registry",
 	"modules.keymap.registry_groups",
 	"modules.keymap.registry_index",
 	"modules.keymap.terminators",
@@ -98,7 +98,7 @@ end)
 
 local function fresh_registry()
 	return helpers.with_fresh_modules(REGISTRY_OWNERSHIP, function()
-		local R = require("modules.keymap.registry")
+		local R = require("settings.engine.registry")
 		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 		helpers.assert_eq(R.init(state), true)
 		return state, R
@@ -194,7 +194,7 @@ local function fresh_engine()
 			set_buffer       = function() end,
 			log_hotstring    = function() end,
 		}
-		local R = require("modules.keymap.registry")
+		local R = require("settings.engine.registry")
 		local E = require("modules.keymap.expander")
 		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 		helpers.assert_eq(R.init(state), true)

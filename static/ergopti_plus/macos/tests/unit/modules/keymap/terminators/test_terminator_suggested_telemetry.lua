@@ -57,7 +57,7 @@ helpers.describe("terminator expansion records no zero-argument suggestion event
 		local rec = install_keystats_recorder()
 
 		local State    = helpers.load_with_stubs("modules.keymap.state")
-		local Registry = helpers.load_with_stubs("modules.keymap.registry")
+		local Registry = helpers.load_with_stubs("settings.engine.registry")
 		local Expander = helpers.load_with_stubs("modules.keymap.expander")
 
 		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })

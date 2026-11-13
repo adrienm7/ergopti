@@ -188,9 +188,9 @@ M.DEFAULT_STATE = {
 local CoreState = {
 	-- Paths — keystroke / metrics data goes under <config_dir>/metrics/.
 	-- Resolved at module-load time via the central menu_paths module
-	LOG_DIR = require("infra.config_paths").metrics_dir(),
+	LOG_DIR = require("settings.engine.paths").metrics_dir(),
 	-- The SQLite mirror's persistent cache root (survives a reboot, L64).
-	CACHE_DIR = require("infra.config_paths").metrics_cache_dir(),
+	CACHE_DIR = require("settings.engine.paths").metrics_cache_dir(),
 
 	-- Enablement
 	options    = { encrypt = false },

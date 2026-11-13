@@ -14,7 +14,7 @@ package.loaded["core.logger.engine.logger"] = nil
 local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local State = helpers.load_with_stubs("modules.keymap.state")
-local Registry = helpers.load_with_stubs("modules.keymap.registry")
+local Registry = helpers.load_with_stubs("settings.engine.registry")
 
 
 --- Builds an initialized registry with a fresh shared state. Reloads the
@@ -22,11 +22,11 @@ local Registry = helpers.load_with_stubs("modules.keymap.registry")
 --- @return table state, table Registry The fresh state and module reference.
 local function fresh_registry()
 	package.loaded["core.fs.adapters.storage"] = nil
-	package.loaded["modules.keymap.registry"] = nil
+	package.loaded["settings.engine.registry"] = nil
 	package.loaded["modules.keymap.registry_groups"] = nil
 	package.loaded["modules.keymap.registry_index"] = nil
 	package.loaded["modules.keymap.terminators"] = nil
-	local R = require("modules.keymap.registry")
+	local R = require("settings.engine.registry")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })
 	R.init(state)
 	Registry = R
@@ -44,7 +44,7 @@ end
 
 helpers.describe("Registry.init / guard", function()
 	helpers.it("init silently rejects non-table arg", function()
-		local fresh = helpers.load_with_stubs("modules.keymap.registry")
+		local fresh = helpers.load_with_stubs("settings.engine.registry")
 		fresh.init("oops")
 		-- add() must short-circuit because state is still nil
 		fresh.add("a", "A")  -- Should log an error, not crash
@@ -52,7 +52,7 @@ helpers.describe("Registry.init / guard", function()
 
 	helpers.it("warns on duplicate init", function()
 		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { a = 0.3 })
-		local fresh = helpers.load_with_stubs("modules.keymap.registry")
+		local fresh = helpers.load_with_stubs("settings.engine.registry")
 		fresh.init(state)
 		fresh.init(state)  -- Second call must not crash
 	end)

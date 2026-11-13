@@ -186,11 +186,11 @@ driver_log_layout() {
 	LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;" \
 		luajit -e '
 			local dirs, files = require("core.fs.engine.app_dirs"), require("core.fs.engine.app_dirs").files
-			print(require("infra.config_paths").get_logs_dir())
+			print(require("settings.engine.paths").get_logs_dir())
 			print(files.unified_prefix); print(files.errors_prefix); print(files.extension)
 			print(files.bootstrap_log); print(dirs.crash_reports_dir)
-			print(require("infra.config_paths").config("personal_hotstrings.toml"))
-			print(require("infra.config_paths").metrics_path())'
+			print(require("settings.engine.paths").config("personal_hotstrings.toml"))
+			print(require("settings.engine.paths").metrics_path())'
 }
 
 # Copies one log into the report without the user's typed text.

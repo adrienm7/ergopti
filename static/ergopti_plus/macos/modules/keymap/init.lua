@@ -35,7 +35,7 @@ local HotstringCore = require("infra.hotstring_engine")
 local TextSender = require("platform.input.text_sender")
 local AppFilter  = require("modules.llm.app_filter")
 
-local Registry   = require("modules.keymap.registry")
+local Registry   = require("settings.engine.registry")
 local Expander   = require("modules.keymap.expander")
 local LLMBridge  = require("modules.keymap.llm_bridge")
 local CoreStateM = require("modules.keymap.state")

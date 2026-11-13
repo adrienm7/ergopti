@@ -4080,7 +4080,7 @@ function M.api_selection_is_current(receipt, source_current)
 	if _runtime_closed or _scope_owner ~= expected_owner or held.revision ~= _enable_generation
 		or held.epoch ~= _runtime_app_epoch then return false end
 	local paused_ok, paused = pcall(_is_paused)
-	local paths = require("infra.config_paths")
+	local paths = require("settings.engine.paths")
 	local path_ok, path = pcall(paths.config, "config.toml")
 	local loaded, values, source = pcall(require("infra.llm_preferences").get_many, { BACKEND_KEY })
 	local final_path_ok, final_path = pcall(paths.config, "config.toml")
@@ -4103,7 +4103,7 @@ function M.begin_api_selection()
 	local revision, epoch = _enable_generation, _runtime_app_epoch
 	if _runtime_closed or _scope_owner then return nil end
 	local paused_ok, paused = pcall(_is_paused)
-	local paths = require("infra.config_paths")
+	local paths = require("settings.engine.paths")
 	local path_ok, path = pcall(paths.config, "config.toml")
 	local loaded, values, source = pcall(require("infra.llm_preferences").get_many, { BACKEND_KEY })
 	local function initial()

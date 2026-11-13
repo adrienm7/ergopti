@@ -683,7 +683,7 @@ end
 --- @param metrics_dir string|nil Override of <config>/metrics (tests).
 --- @return table|string identity, or the refusal.
 LedgerSetup.resolve = function(hostname, metrics_dir)
-	local ConfigPaths = require("infra.config_paths")
+	local ConfigPaths = require("settings.engine.paths")
 	local ports = MetricsLedger.native_ports()
 	local identity, reason = MetricsLedger.resolve_identity({
 		metrics_dir = metrics_dir or ConfigPaths.config("metrics"),
@@ -715,7 +715,7 @@ end
 --- @param metrics_dir string|nil Override of <config>/metrics (tests).
 LedgerSetup.start = function(identity, metrics_dir)
 	local ledger = MetricsLedger.new({
-		metrics_dir = metrics_dir or require("infra.config_paths").config("metrics"),
+		metrics_dir = metrics_dir or require("settings.engine.paths").config("metrics"),
 		identity = identity,
 		store = { query_rows = SqliteWriter.query_rows, get_meta = SqliteWriter.get_meta, exec_sql = SqliteWriter.exec_sql },
 		fs = MetricsLedger.native_ports(),
@@ -750,7 +750,7 @@ LedgerSetup.start_import = function(identity, metrics_dir)
 	end
 	local store = { query_rows = SqliteWriter.query_rows, exec_sql = SqliteWriter.exec_sql }
 	_ledger.importer = LedgerImport.new({
-		metrics_dir = metrics_dir or require("infra.config_paths").config("metrics"),
+		metrics_dir = metrics_dir or require("settings.engine.paths").config("metrics"),
 		local_device_id = identity.device_id, schema = schema, store = store,
 		fs = LedgerImport.native_ports(), digest_stream = Digest.stream,
 		rebuild = function(device_id)
@@ -784,7 +784,7 @@ function M.init(opts)
 	-- Through the resolver. The old "~" fallback was not expanded by io.open —
 	-- Lua does no tilde expansion — so with HOME unset the keystats wrote its
 	-- database into a literal directory named "~" beside the process.
-	local ConfigPaths = require("infra.config_paths")
+	local ConfigPaths = require("settings.engine.paths")
 	_log_dir = options.log_dir or ConfigPaths.config("logs")
 	_sqlite_path = options.sqlite_path or ConfigPaths.metrics_path()
 

@@ -27,7 +27,7 @@ local function with_window(test)
 		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 		package.loaded["modules.keymap"] = {}
 		package.loaded["infra.personal_hotstrings"] = { adoptions = function() return {} end }
-		package.loaded["infra.personal_file_controls"] = {
+		package.loaded["settings.engine.preferences.personal_file_controls"] = {
 			capture = function() return nil end, apply = function() return false end,
 		}
 		package.loaded["modules.hotstrings.hotstrings_config"] = {
@@ -116,7 +116,7 @@ local function install_personal_binding(path, content)
 	package.loaded["infra.personal_hotstrings"] = {
 		adoptions = function() return { record } end,
 	}
-	package.loaded["infra.personal_file_controls"] = {
+	package.loaded["settings.engine.preferences.personal_file_controls"] = {
 		capture = function(id)
 			context.captures = context.captures + 1
 			if id == record.owner and record.admitted == true and context.current == true then return binding end

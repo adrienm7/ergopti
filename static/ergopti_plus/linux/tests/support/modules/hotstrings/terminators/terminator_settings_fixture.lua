@@ -39,9 +39,9 @@ local function with_settings(source, body)
 	local ok, err = pcall(function()
 		Sandbox.with_config(source, function(path)
 			local paths = {}
-			for key, value in pairs(require("infra.config_paths")) do paths[key] = value end
+			for key, value in pairs(require("settings.engine.paths")) do paths[key] = value end
 			paths.config = function() return path end
-			package.loaded["infra.config_paths"] = paths
+			package.loaded["settings.engine.paths"] = paths
 			for _, name in ipairs({ "infra.hotstring_preferences", "modules.hotstrings.terminator_settings" }) do
 				package.loaded[name] = nil
 			end

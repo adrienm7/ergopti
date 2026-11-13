@@ -16,7 +16,7 @@ local MODULE_NAMES = {
 	"core.ui.engine.notifications",
 	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"modules.llm.api_common",
 	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
@@ -60,7 +60,7 @@ helpers.describe("HS-025: MLX readiness timeout retirement", function()
 				end,
 			}
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.config_paths"] = {
+			package.loaded["settings.engine.paths"] = {
 				get = function(key)
 					helpers.assert_eq(key, "MlxActiveModelPath")
 					return "/Users/fixture/" .. AppDirs.config.macos_relative .. "/hammerspoon/mlx_active_model.txt"

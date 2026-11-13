@@ -33,7 +33,7 @@ local SECTION_COUNT = 24
 --- @return table RI, table counts
 local function load_with_counters()
 	package.loaded["core.fs.adapters.storage"] = nil
-	local Registry = helpers.load_with_stubs("modules.keymap.registry")
+	local Registry = helpers.load_with_stubs("settings.engine.registry")
 	package.loaded["modules.keymap.state"] = nil
 	local State = require("modules.keymap.state")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})

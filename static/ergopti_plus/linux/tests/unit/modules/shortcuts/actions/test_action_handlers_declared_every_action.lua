@@ -145,7 +145,7 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 	helpers.it("the three personal files each resolve to their own path", function()
 		-- The recorded shell fakes mkdir, and the Lua source is created before
 		-- it opens: the scratch configuration folder must really exist.
-		local made = os.execute("mkdir -p '" .. require("infra.config_paths").config() .. "'")
+		local made = os.execute("mkdir -p '" .. require("settings.engine.paths").config() .. "'")
 		helpers.assert_true(made == true or made == 0, "scratch configuration folder")
 		with_recorded_shell(function(commands)
 			for _, id in ipairs({ "open_personal_info", "open_personal_hotstrings", "open_personal_shortcuts" }) do

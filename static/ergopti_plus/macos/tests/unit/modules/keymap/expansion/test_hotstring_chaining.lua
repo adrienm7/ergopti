@@ -51,7 +51,7 @@ local function fresh_engine(entries)
 	package.loaded["core.text.engine.utils"]           = nil
 	package.loaded["core.text.engine.utils_core"]                 = nil
 
-	local R = require("modules.keymap.registry")
+	local R = require("settings.engine.registry")
 	local E = require("modules.keymap.expander")
 	local state = State.new({ trigger_char = STAR, expansion_delay = 0.4 }, {})
 	R.init(state)

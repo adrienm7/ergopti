@@ -125,8 +125,8 @@ local run_contract = function(helpers,load_manager,load_host)
   end
   helpers.it('(native-refocus-owner) configuration cleanup reopen refuses a synchronously closed page',function()
    fixture(function(m,c)
-    package.loaded['ui.config_cleanup.bridge']=nil
-    local cleanup=require('ui.config_cleanup.bridge')
+    package.loaded['settings.ui.cleanup']=nil
+    local cleanup=require('settings.ui.cleanup')
     helpers.assert_eq(cleanup.open({path='/owned/config.toml'}),true)
     local old=m.current_epoch('config_cleanup')
     c.present=function(owner)helpers.assert_eq(owner.hide('config_cleanup',old),true)end

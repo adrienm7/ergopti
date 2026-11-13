@@ -62,7 +62,7 @@ end
 --- @param sorted boolean Whether to sort (and so build the indexes) after adding.
 --- @return table The registry module.
 local function registry_with(triggers, sorted)
-	local R = helpers.load_with_stubs("modules.keymap.registry")
+	local R = helpers.load_with_stubs("settings.engine.registry")
 	R.init({
 		magic_key                  = "★",
 		mappings                   = {},

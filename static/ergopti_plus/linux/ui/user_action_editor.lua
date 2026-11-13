@@ -93,7 +93,7 @@ function M.ask_path(title, prompt, prior, deps)
 		{ value = "folder", key = "dialog.gestures.param_path_kind_folder" },
 	}), nil)
 	if kind == nil then return nil end
-	local start = stored and stored.path or (require("infra.config_paths").home() .. "/")
+	local start = stored and stored.path or (require("settings.engine.paths").home() .. "/")
 	local chosen, why = require("ui.app_chooser").pick_path(shell, title, kind == "folder", start, deps.modal)
 	if not chosen then Logger.info(LOG, "No path chosen: %s.", tostring(why)) end
 	return chosen

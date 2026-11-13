@@ -100,9 +100,9 @@ local unpack_values = table.unpack or unpack
 --- @return boolean
 local function _check_sqlite3()
 	if _available ~= nil then return _available end
-	-- The private runtime's sqlite3 (infra/owned_programs.lua): every package
+	-- The private runtime's sqlite3 (settings/engine/preferences/owned_programs.lua): every package
 	-- carries it, so its absence is a broken install, not a missing host package.
-	local Owned = require("infra.owned_programs")
+	local Owned = require("settings.engine.preferences.owned_programs")
 	_available = Owned.available("sqlite3")
 	if not _available then
 		Logger.error(LOG, "sqlite3 (%s) is not available — SQLite persistence disabled.", Owned.path("sqlite3"))

@@ -41,7 +41,7 @@ local LOG     = "keystats.kc_bridge"
 -- Resolved via the central menu_paths module — no local fallback.
 local KC_LOG_PATH
 do
-	local mp = require("infra.config_paths")
+	local mp = require("settings.engine.paths")
 	KC_LOG_PATH = NativePath.with_trailing_separator(mp.get_config_dir()) .. "metrics/karabiner_kc.log"
 end
 

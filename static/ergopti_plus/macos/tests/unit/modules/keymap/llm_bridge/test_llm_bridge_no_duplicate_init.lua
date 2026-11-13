@@ -37,7 +37,7 @@ local STUB_MODULES = {
 	"modules.keystats",
 	"core.ui.ui.tooltip",
 	"modules.llm.prediction_engine",
-	"modules.keymap.registry",
+	"settings.engine.registry",
 	"modules.hotstrings.hotstrings_config",
 	"modules.keymap.llm_bridge",
 	"core.logger.engine.logger",
@@ -167,7 +167,7 @@ local engine_stub = {
 package.loaded["modules.llm.prediction_engine"] = engine_stub
 
 -- modules.keymap.registry: no-op stub.
-package.loaded["modules.keymap.registry"] = {
+package.loaded["settings.engine.registry"] = {
 	init                   = function() end,
 	mappings_for_tail      = function() return nil end,
 	mappings_for_star_tail = function() return nil end,

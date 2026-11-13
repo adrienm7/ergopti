@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 require("core.logger.engine")
 
 local OWNED = {
-	"core.fs.engine.app_dirs", "infra.config_paths", "core.lifecycle.engine.launcher_environment", "core.logger.engine.log_folders",
+	"core.fs.engine.app_dirs", "settings.engine.paths", "core.lifecycle.engine.launcher_environment", "core.logger.engine.log_folders",
 	"core.ui.engine.notifications", "core.text.engine.json", "modules.llm.progressive_reveal",
 	"modules.llm.api_mlx", "modules.llm.api_mlx_fetch", "modules.llm.api_mlx_discovery",
 	"modules.llm.mlx_stream_retirement",

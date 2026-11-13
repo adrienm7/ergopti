@@ -11,7 +11,7 @@ local Updates = require("shortcuts.engine.physical_availability")
 local ConfigKeys = require("settings.engine.keys")
 local M = {}
 local retained, sequence, session_busy = nil, 0, false
-require("infra.scope_registry").register("key_combinations_scope", function() return session_busy or (retained ~= nil and retained.pending() == true) end)
+require("settings.engine.scope.registry").register("key_combinations_scope", function() return session_busy or (retained ~= nil and retained.pending() == true) end)
 --- Creates one exact ordered-pair publication owner. Native and source
 --- inverses retain their lease until literal acknowledgement.
 --- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
@@ -359,7 +359,7 @@ local function session(expected_source)
 	if retained and retained.pending() and retained.retry_restore() ~= true then return nil end
 	if retained and retained.release() ~= true then return nil end
 	sequence = sequence + 1
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	retained = M.new({path=path,backup_path=path..".combinations-"..os.date("%Y%m%d-%H%M%S").."-"..sequence..".bak",expected_source=expected_source})
 	return retained
 end

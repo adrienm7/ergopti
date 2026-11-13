@@ -43,7 +43,7 @@ local OWNED_MODULES = {
 	"diagnostics.engine.runtime_log",
 	"error_description",
 	"hotstrings.engine.catalogue.personal_files",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.timing.engine.deferred_work",
 	"core.ui.engine.dialog_util",
 	"core.fs.engine.dir",

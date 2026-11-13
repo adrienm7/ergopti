@@ -410,7 +410,7 @@ _HCA_SetterPersistsAndPublishes() {
 	}
 }
 
-; The loader (infra/feature_state.ahk) is not part of the headless suite, so its
+; The loader (settings/engine/preferences/feature_state.ahk) is not part of the headless suite, so its
 ; reader _FeatureStateCascadeMaxArrows cannot be called here. Its rule is the
 ; engine's HSE_ValidCascadeMaxArrows, checked on the cases the reader must accept
 ; or fall back from, while the source pins that the loader restates the same rule

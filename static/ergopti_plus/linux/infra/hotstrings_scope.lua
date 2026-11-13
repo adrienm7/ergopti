@@ -52,7 +52,7 @@ local BASE_DELAY_PATH = require("settings.engine.keys").KEY.HOTSTRINGS_EXPANSION
 local NativePath = require("core.fs.engine.native_path")
 local TableUtil = require("core.text.engine.table_util")
 local _owner, _sequence = nil, 0
-require("infra.scope_registry").register("hotstrings_scope", function() return _owner ~= nil and _owner.pending() == true end)
+require("settings.engine.scope.registry").register("hotstrings_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Whether a category or section identity can be named by a canonical path.
 --- @param id string
@@ -308,7 +308,7 @@ function M.apply_magic(value, options)
 	if type(options) ~= "table" or options.magic_key.validate(value) ~= true then return false end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false end
 	_sequence = _sequence + 1
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	_owner = M.new_magic({ path = path, backup_path = path .. ".magic-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
 		config = options.config, preferences = options.preferences, dynamic = options.dynamic,
 		magic_key = options.magic_key, reload = options.reload, after_restore = options.after_restore })
@@ -328,7 +328,7 @@ function M.apply(mode, ports)
 	ports = type(ports) == "table" and ports or {}
 	_sequence = _sequence + 1
 	_owner = M.new({
-		path = require("infra.config_paths").config("config.toml"),
+		path = require("settings.engine.paths").config("config.toml"),
 		backup_suffix = ".hotstrings-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
 		config = require("modules.hotstrings.hotstrings_config"),
 		preferences = require("infra.hotstring_preferences"),

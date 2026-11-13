@@ -16,7 +16,7 @@ local OWNERS = {
 	"adapters.event_provenance", "platform.input.synthetic_input", "core.events.timer_scheduler",
 	"platform.input.key_state", "modules.shortcuts.script_control", "core.fs.adapters.file_system",
 	"platform.input.hotkey_registrar", "core.fs.adapters.storage", "modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord",
-	"infra.config_paths", "infra.preferences",
+	"settings.engine.paths", "settings.engine.preferences.preferences",
 }
 
 helpers.describe("Script control callback fixture isolation", function()

@@ -127,7 +127,7 @@ end
 --- @return boolean saved
 function M.set_enabled(enabled)
 	if type(enabled) ~= "boolean" then return false end
-	local script_scope = require("infra.script_scope")
+	local script_scope = require("settings.engine.scope.script_scope")
 	if not script_scope.retry_edit(SETTING) or not _scope.admit_change() then return false end
 	if not script_scope.edit_setting(SETTING, enabled) then return false end
 	if not enabled and _scheduled ~= nil then

@@ -10,11 +10,11 @@ local function write(path, bytes)
 	local file = assert(io.open(path, "wb")); assert(file:write(bytes)); assert(file:close())
 end
 local function with_source(source, callback)
-	return helpers.with_stub_scope({ "infra.preferences", "ui.menu.unused_keys_cleanup", "menu.engine.wrap_preferences",
+	return helpers.with_stub_scope({ "settings.engine.preferences.preferences", "settings.ui.menu.unused_keys_cleanup", "menu.engine.wrap_preferences",
 		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger" }, function()
 		helpers.load_with_stubs("core.logger.engine.logger")
-		local preferences = helpers.load_with_stubs("infra.preferences")
-		local cleanup = helpers.load_with_stubs("ui.menu.unused_keys_cleanup")
+		local preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
+		local cleanup = helpers.load_with_stubs("settings.ui.menu.unused_keys_cleanup")
 		local engine = require("settings.engine.migration.unused_keys")
 		return output.with_output(function(path)
 			write(path, source)

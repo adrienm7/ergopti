@@ -97,7 +97,7 @@ local function config_path_failure_is_terminal(source)
 	source = strip_lua_comments(source)
 	local i18n_at = source:find("i18n.init()", 1, true)
 	local abort_at = source:find(PRE_RUNTIME_ABORT, 1, true)
-	local config_require_at = source:find('local config_paths       = require("infra.config_paths")', 1, true)
+	local config_require_at = source:find('local config_paths       = require("settings.engine.paths")', 1, true)
 	local init_at = source:find(CONFIG_INIT, 1, true)
 	local consumer_at = source:find("config_paths.get_logs_dir()", 1, true)
 	if not i18n_at or not abort_at or not config_require_at or not init_at or not consumer_at then
@@ -154,7 +154,7 @@ helpers.describe("root boot: config-path initialization is fail-fast", function(
 		local invisible = replace_plain(source,
 			"BootFatal.report(stage, detail, message)", "false")
 		local abort_at = assert(source:find(PRE_RUNTIME_ABORT, 1, true))
-		local config_at = assert(source:find('local config_paths       = require("infra.config_paths")', abort_at, true))
+		local config_at = assert(source:find('local config_paths       = require("settings.engine.paths")', abort_at, true))
 		local abort_body = source:sub(abort_at, config_at - 1)
 		local _, exits = abort_body:gsub("os%.exit%(1%)", "")
 		helpers.assert_eq(exits, 1, "The exact pre-runtime abort owns one terminal exit")

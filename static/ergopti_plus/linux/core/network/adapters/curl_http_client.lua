@@ -1020,8 +1020,8 @@ local function admit_metadata(url, headers, body, options)
 		max_download_bytes = options.max_download_bytes,
 		receive_idle_timeout_ms = options.receive_idle_timeout_ms,
 		proxy_selection = options.proxy_selection,
-		-- The private runtime's curl unless the caller pinned one (infra/owned_programs.lua).
-		curl_executable = options.curl_executable or require("infra.owned_programs").path("curl"),
+		-- The private runtime's curl unless the caller pinned one (settings/engine/preferences/owned_programs.lua).
+		curl_executable = options.curl_executable or require("settings.engine.preferences.owned_programs").path("curl"),
 		curl_executable_identity = copy_executable_identity(options.curl_executable_identity),
 		curl_executable_identity_exact = ExactIdentity.copy(options.curl_executable_identity_exact),
 		proxy_metrics_available = options.proxy_metrics_available == true and type(options.curl_executable) == "string",

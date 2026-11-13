@@ -6,12 +6,12 @@ local OutputFixture = require("tests.support.toml_output_fixture")
 helpers.describe("explicit confirmation of a demoted context length", function()
 	for _, outcome in ipairs({ "success", "save_refused", "menu_refused" }) do
 		helpers.it("preserves the original setting until the transaction commits: " .. outcome, function()
-			helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.fs.adapters.storage",
+			helpers.with_stub_scope({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.fs.adapters.storage",
 				"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "modules.llm", "ui.menu.menu_llm.settings_manager" }, function()
-				local Preferences = helpers.load_with_stubs("infra.preferences")
+				local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 				local FileSystem = require("core.fs.adapters.file_system")
 				local Session = require("ui.menu.session_demotions")
-				local Transaction = require("ui.menu.preferences_transaction")
+				local Transaction = require("settings.ui.menu.preferences_transaction")
 				local session = Session.new()
 				session.record({ feature = "ai", key = "llm_context_length", persisted = 5000, demoted = 1500 })
 				session.record({ feature = "ai", key = "llm_max_words", persisted = 20, demoted = 10 })

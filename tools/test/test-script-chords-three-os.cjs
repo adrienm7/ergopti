@@ -202,8 +202,8 @@ for (const [id, , keyName] of PRESETS) {
 }
 
 // Windows declares the same slots, scan codes and paused actions.
-const featureState = read('windows', 'infra', 'feature_state.ahk');
-const configIo = read('windows', 'infra', 'config_io.ahk');
+const featureState = read('windows', 'settings', 'engine', 'preferences', 'feature_state.ahk');
+const configIo = read('windows', 'settings', 'engine', 'io.ahk');
 const ahkBlock = (source, name) => {
 	const match = source.match(new RegExp(`global ${name} := (?:Map|\\[)\\(?([\\s\\S]*?)\\n\\)`));
 	const brackets = source.match(new RegExp(`global ${name} := \\[([\\s\\S]*?)\\]`));

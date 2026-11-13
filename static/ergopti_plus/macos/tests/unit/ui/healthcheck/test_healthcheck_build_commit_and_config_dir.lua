@@ -28,7 +28,7 @@ local CHOSEN_DIR = "/Users/alice/Documents/ErgoptiConfig/"
 -- The modules these fixtures replace or reload; restored after each case.
 local FIXTURE_MODULES = {
 	"ui.healthcheck.helpers",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"infra.diagnostic_snapshot",
 	"modules.diagnostics.crash_reporter",
 	"core.logger.engine.logger",
@@ -80,7 +80,7 @@ local function packaged_helpers()
 		configdir = APP_SCRIPTS,
 		execute = function() return "" end,
 	})
-	package.loaded["infra.config_paths"] = chosen_config_paths()
+	package.loaded["settings.engine.paths"] = chosen_config_paths()
 	package.loaded["infra.diagnostic_snapshot"] = stamped_snapshot()
 	package.loaded["ui.healthcheck.helpers"] = nil
 	return require("ui.healthcheck.helpers")
@@ -193,7 +193,7 @@ helpers.describe("build-commit: the healthcheck of a packaged app", function()
 	helpers.it("build-commit: an uninitialised config_paths is left unknown, not replaced by the bundle", function()
 		helpers.with_stub_scope(FIXTURE_MODULES, function()
 			local H = packaged_helpers()
-			package.loaded["infra.config_paths"] = { is_initialized = function() return false end }
+			package.loaded["settings.engine.paths"] = { is_initialized = function() return false end }
 			helpers.assert_nil(H.collect_paths("diagnostics").config_dir)
 		end)
 	end)
@@ -212,7 +212,7 @@ helpers.describe("build-commit: the crash report of a packaged app", function()
 	helpers.it("build-commit: carries the commit and both directories without system probes", function()
 		helpers.with_stub_scope(FIXTURE_MODULES, function()
 			helpers.load_with_stubs("core.logger.engine.logger", { configdir = APP_SCRIPTS })
-			package.loaded["infra.config_paths"] = chosen_config_paths()
+			package.loaded["settings.engine.paths"] = chosen_config_paths()
 			package.loaded["infra.diagnostic_snapshot"] = stamped_snapshot()
 			package.loaded["modules.diagnostics.crash_reporter"] = nil
 			local report = require("modules.diagnostics.crash_reporter").report("boom")
@@ -226,7 +226,7 @@ helpers.describe("build-commit: the crash report of a packaged app", function()
 	helpers.it("build-commit: the version is the launcher's, not Hammerspoon's", function()
 		helpers.with_stub_scope(FIXTURE_MODULES, function()
 			helpers.load_with_stubs("core.logger.engine.logger", { configdir = APP_SCRIPTS })
-			package.loaded["infra.config_paths"] = chosen_config_paths()
+			package.loaded["settings.engine.paths"] = chosen_config_paths()
 			package.loaded["infra.diagnostic_snapshot"] = stamped_snapshot()
 			package.loaded["modules.updater"] = { current_version = function() return "2.4.0" end }
 			local saved_info = hs.processInfo
@@ -244,7 +244,7 @@ helpers.describe("build-commit: the crash report of a packaged app", function()
 	helpers.it("build-commit: a resolver failure is reported as unknown, not raised", function()
 		helpers.with_stub_scope(FIXTURE_MODULES, function()
 			helpers.load_with_stubs("core.logger.engine.logger", { configdir = APP_SCRIPTS })
-			package.loaded["infra.config_paths"] = chosen_config_paths()
+			package.loaded["settings.engine.paths"] = chosen_config_paths()
 			package.loaded["infra.diagnostic_snapshot"] = {
 				resolve_commit = function() error("stamp read exploded") end,
 			}

@@ -49,11 +49,11 @@ local function gesture_fixture()
 		end,
 	}
 	package.loaded["core.fs.adapters.file_system"] = files_port
-	local prefs = helpers.load_with_stubs("infra.preferences")
+	local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 	prefs.load("config")
 	local modules = { gestures = gestures }
 	local demotions = require("ui.menu.session_demotions").new()
-	local _, checkpoint = require("ui.menu.preferences_transaction").bind(prefs, {
+	local _, checkpoint = require("settings.ui.menu.preferences_transaction").bind(prefs, {
 		path = "config", state = state, hotfiles = {}, core_modules = modules,
 		initial_state = state, initial_preferences = prefs.snapshot(state, {}, modules),
 		snapshot_view = demotions.persisted_view,
@@ -138,7 +138,7 @@ helpers.describe("restore-recommended-no-confirm: Gestures (macOS)", function()
 end)
 
 package.loaded["core.fs.adapters.file_system"] = FileSystem
-package.loaded["infra.preferences"] = nil
+package.loaded["settings.engine.preferences.preferences"] = nil
 
 --- A remap facade double recording each scope request; its terminal is true.
 --- @param requests table Receives every apply_scope request.
@@ -162,14 +162,14 @@ end
 --- @return table asked Dialog messages shown.
 --- @return number refreshes Menu refreshes.
 local function run_tap_hold_row(id)
-	local names = { "core.ui.engine.dialog_util", "infra.config_paths", "infra.manifest_menu", "ui.menu.menu_tap_holds" }
+	local names = { "core.ui.engine.dialog_util", "settings.engine.paths", "infra.manifest_menu", "ui.menu.menu_tap_holds" }
 	return helpers.with_fresh_modules(names, function()
 		local asked, requests, refreshes, commands = {}, {}, 0, nil
 		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, message, no)
 			asked[#asked + 1] = message
 			return no
 		end }
-		package.loaded["infra.config_paths"] = { get = function() return "/remap/tap_hold.toml" end }
+		package.loaded["settings.engine.paths"] = { get = function() return "/remap/tap_hold.toml" end }
 		package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(menu_key, _, _, _, context)
 			if menu_key == "tap_holds_menu" then commands = context.commands end
 			return {}
@@ -260,7 +260,7 @@ end
 helpers.describe("restore-recommended-no-confirm: the menu's scope wiring (macOS)", function()
 	helpers.it("no restore or clear row asks, and no owner is handed a question port", function()
 		local owners = { "ui.menu.gesture_scope", "ui.menu.shortcuts_scope", "ui.menu.llm_scope",
-			"ui.menu.metrics_scope", "ui.menu.hotstrings_scope", "ui.menu.scoped_preferences",
+			"ui.menu.metrics_scope", "ui.menu.hotstrings_scope", "settings.ui.menu.scoped_preferences",
 			"ui.menu.global_scope" }
 		local names = { "core.ui.engine.dialog_util", "modules.hotstrings.hotstrings_config" }
 		for _, name in ipairs(owners) do names[#names + 1] = name end

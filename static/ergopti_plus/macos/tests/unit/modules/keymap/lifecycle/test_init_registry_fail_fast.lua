@@ -37,7 +37,7 @@ local function load_keymap_with_results(results)
 		["infra.manifest_reader"] = {
 			default_for = function() return true end,
 		},
-		["modules.keymap.registry"] = {
+		["settings.engine.registry"] = {
 			is_repeat_feature_enabled = function() return false end,
 			set_repeat_feature_enabled = function() end,
 			init = function()

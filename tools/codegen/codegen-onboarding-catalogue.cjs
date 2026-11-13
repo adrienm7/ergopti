@@ -453,7 +453,7 @@ function createLabels(locales) {
 
 // Keyboard-slot and built-in shortcut ids spell their chord: a modifier prefix,
 // then the key, formatted as each tray prints them: the Windows slots
-// (windows/infra/config_io.ahk _FormatSlotLabel), the macOS Shortcuts menu
+// (windows/settings/engine/io.ahk _FormatSlotLabel), the macOS Shortcuts menu
 // (macos/ui/menu/menu_shortcuts.lua pretty_key) and the Linux slot prefixes
 // (linux/modules/shortcuts/keyboard_shortcuts.lua SLOT_MODS). Longest prefix
 // first; only named keys translate.

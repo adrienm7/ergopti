@@ -820,8 +820,8 @@ local function native_switcher_publication(binding)
 	if type(binding) ~= "string" or binding == "" then return nil end
 	local parent, lifecycle = current_action_parent(), action_scope_lifecycle(current_action_parent())
 	local epoch, state = lifecycle.epoch, _state
-	local Preferences = require("infra.preferences")
-	local path = require("infra.config_paths").get("ConfigTomlPath")
+	local Preferences = require("settings.engine.preferences.preferences")
+	local path = require("settings.engine.paths").get("ConfigTomlPath")
 	local source = Preferences.source_snapshot(path)
 	if type(source) ~= "table" or source.status ~= "ok" or type(source.content) ~= "string" then return nil end
 	local source_guard = Preferences.capture_source_delivery_guard(path)
@@ -1590,7 +1590,7 @@ end)
 --- @param label string Opener label.
 --- @return boolean started
 local function open_user_file(key, label)
-	local path = require("infra.config_paths").get(key)
+	local path = require("settings.engine.paths").get(key)
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "%s: the configuration path %s is not resolvable.", label, key)
 		return false
@@ -2763,8 +2763,8 @@ function M.run_program(binding)
 		if not program_admission_open() or not M.program_binding_supported(binding)
 			or not _state or not AuxOwner.program_available()
 			or not aux_admission_open(parent) then return false end
-		local Preferences = require("infra.preferences")
-		local ConfigPaths = require("infra.config_paths")
+		local Preferences = require("settings.engine.preferences.preferences")
+		local ConfigPaths = require("settings.engine.paths")
 		local Toml = require("core.text.engine.toml.codec")
 		local path = ConfigPaths.get("ConfigTomlPath")
 		local scalar = M.get_action_parameter(binding, "run_program")

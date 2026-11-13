@@ -683,7 +683,7 @@ local ENOENT = 2
 --- @return string
 local function thinking_refused_path()
 	return _thinking_refused_path
-		or require("infra.config_paths").state(THINKING_REFUSED_FILE)
+		or require("settings.engine.paths").state(THINKING_REFUSED_FILE)
 end
 
 -- Defined below; declared here for thinking_refused, which reads its expiry

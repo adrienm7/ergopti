@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. This is the coverage that has to exist BEFORE the resolution half moves to
----    infra/config_paths.lua, not after. The failure mode of a wrong-depth path
+---    settings/engine/paths.lua, not after. The failure mode of a wrong-depth path
 ---    is not a crash: it is a path that resolves to a directory that EXISTS and
 ---    holds nothing, so the driver writes the user's personal files somewhere
 ---    they will never look and reports success. Five separate bugs of that exact
@@ -110,11 +110,11 @@ local function load_paths(opts)
 		os.remove(opts.base_dir .. "paths.toml")
 	end
 
-	package.loaded["ui.menu.menu_paths"] = nil
-	package.loaded["infra.config_paths"] = nil
+	package.loaded["settings.ui.menu.paths"] = nil
+	package.loaded["settings.engine.paths"] = nil
 	local previous_file_system = package.loaded["core.fs.adapters.file_system"]
 	package.loaded["core.fs.adapters.file_system"] = make_bootstrap_file_system()
-	local ok, mod = pcall(helpers.load_with_stubs, "ui.menu.menu_paths")
+	local ok, mod = pcall(helpers.load_with_stubs, "settings.ui.menu.paths")
 	package.loaded["core.fs.adapters.file_system"] = previous_file_system
 	os.getenv = real_getenv
 	if not ok then error(mod, 0) end

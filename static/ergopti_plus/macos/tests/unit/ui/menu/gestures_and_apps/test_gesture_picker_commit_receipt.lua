@@ -15,7 +15,7 @@ local OWNED_MODULES = {
 	"ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils",
 	"core.ui.engine.dialog_util", "infra.manifest_menu", "ui.menu.shortcut_utils",
 	"core.timing.engine.deferred_work", "shortcuts.engine.action_parameter_label", "ui.gesture_conflict_notice",
-	"ui.menu.preferences_transaction", "diagnostics.engine.operation_reporter",
+	"settings.ui.menu.preferences_transaction", "diagnostics.engine.operation_reporter",
 	"menu.engine.renderer", "core.logger.engine.shim", "core.lifecycle.engine.compat.utf8", "core.text.engine.number_policy", "core.text.engine.toml_codec.leaf_rows",
 }
 
@@ -61,7 +61,7 @@ local function with_gesture(mode, conflict, scenario)
 					end,
 				}
 				package.loaded["modules.gestures"] = runtime
-				local Transaction = require("ui.menu.preferences_transaction")
+				local Transaction = require("settings.ui.menu.preferences_transaction")
 				local save = Transaction.bind({ save = function(_, candidate)
 					controls.saves = controls.saves + 1
 					if controls.mode == "throw" then error("controlled preference publication error") end

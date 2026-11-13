@@ -35,10 +35,10 @@ local MODULE_NAMES = {
 	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"core.lifecycle.engine.shutdown.teardown_transaction",
 	"core.lifecycle.engine.startup_transaction",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.fs.engine.paths",
 	"modules.hotstrings.hotstrings_config",
-	"infra.factory_reset_journal",
+	"settings.engine.factory_reset_journal",
 	"modules.gestures",
 	"modules.keymap",
 	"infra.manifest_reader",
@@ -302,14 +302,14 @@ local function run_isolated(options, assertions)
 			["core.lifecycle.engine.shutdown.emergency_exit"] = { request = function() return true end },
 			["core.lifecycle.engine.startup_transaction"] = {},
 			-- The boot lets config.toml's [script] rows win once the path resolves.
-			["infra.script_scope"] = { adopt_configured = function() return {} end },
-			["infra.config_paths"] = {
+			["settings.engine.scope.script_scope"] = { adopt_configured = function() return {} end },
+			["settings.engine.paths"] = {
 				init = function() return true end,
 				get_config_dir = function() return "/virtual/config" end,
 				get_logs_dir = function() return "/virtual/logs/" end,
 				get = function(name) return "/virtual/" .. tostring(name) end,
 			},
-			["infra.factory_reset_journal"] = {
+			["settings.engine.factory_reset_journal"] = {
 				path_for = function(config_path)
 					if type(config_path) ~= "string" or config_path == "" then return nil end
 					return config_path .. ".ergopti-reset-journal-v1.json"

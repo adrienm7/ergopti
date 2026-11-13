@@ -158,7 +158,7 @@ local _config_dir = nil
 --- @param supplied table|nil Explicit identity dependency for portable fixtures.
 --- @return function Captured immutable-context redactor.
 local function admit_redaction(supplied)
-	local context = supplied or { home = require("infra.config_paths").account_home(), user = require("core.lifecycle.engine.account_name").resolve() }
+	local context = supplied or { home = require("settings.engine.paths").account_home(), user = require("core.lifecycle.engine.account_name").resolve() }
 	assert(type(context) == "table", "logger_sink: privacy identity unavailable")
 	assert(type(context.home) == "string" and context.home ~= "", "logger_sink: privacy identity unavailable: HOME is not an absolute directory")
 	assert(type(context.user) == "string" and context.user ~= "", "logger_sink: privacy identity unavailable: no account name from USER, LOGNAME or the passwd entry")
@@ -211,7 +211,7 @@ end
 --- @return string Absolute path, no trailing slash.
 function M.log_dir()
 	if _installed and _dir then return _dir end
-	return require("infra.config_paths").get_logs_dir()
+	return require("settings.engine.paths").get_logs_dir()
 end
 
 --- The folder crash dumps are written to, inside the logs folder.
@@ -601,7 +601,7 @@ function M.install(logger, opts)
 	_installed = true
 	-- The folder resolved now; infra.config_paths hands over every later move.
 	-- Read after the sink is live, so a line its storage read writes is redacted.
-	M.follow_config_dir(require("infra.config_paths").get_config_dir())
+	M.follow_config_dir(require("settings.engine.paths").get_config_dir())
 
 	if _stdout_only then
 		pcall(function()
@@ -671,7 +671,7 @@ end
 --- @return string|nil error_message Why the sink stayed where it was.
 function M.repoint()
 	if not _installed then return true end
-	local target = require("infra.config_paths").get_logs_dir()
+	local target = require("settings.engine.paths").get_logs_dir()
 	if target == _dir and not _stdout_only and _main_handle ~= nil then return true end
 	if not ensure_dir(target) then
 		return false, "the logs folder '" .. target .. "' could not be created"

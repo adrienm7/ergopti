@@ -371,7 +371,7 @@ BUDGETS = (
     ),
     (
         "preferences.save",
-        "static/ergopti_plus/macos/infra/preferences.lua",
+        "static/ergopti_plus/macos/settings/engine/preferences/preferences.lua",
         r"(?m)^local SLOW_SAVE_REPORT_MS = (\d+)",
         True,
     ),

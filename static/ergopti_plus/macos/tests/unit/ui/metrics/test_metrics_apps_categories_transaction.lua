@@ -21,7 +21,7 @@ local CATEGORY_OWNERS = {
 	"core.logger.engine.logger",
 	"core.ui.engine.dialog_util",
 	"core.fs.adapters.file_system",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
 	"core.ui.adapters.webview_result",
@@ -126,10 +126,10 @@ local function with_category_store_owned(spec, callback)
 	state.warnings = WarningContract.attach(package.loaded["core.ui.engine.dialog_util"])
 	local previous_modules = {}
 	for _, name in ipairs({ "hs.fs", "core.events.timer_scheduler", "modules.keystats.log_manager",
-			"infra.config_paths" }) do
+			"settings.engine.paths" }) do
 		previous_modules[name] = { value = package.loaded[name] }
 	end
-	package.loaded["infra.config_paths"] = { get_config_dir = function() return state.config_dir end }
+	package.loaded["settings.engine.paths"] = { get_config_dir = function() return state.config_dir end }
 	package.loaded["hs.fs"] = { dir = function() return function() end, {} end }
 	package.loaded["core.events.timer_scheduler"] = {
 		after = function() return { timer = {} }, true end,

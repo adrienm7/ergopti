@@ -362,7 +362,7 @@ local function abort_pre_runtime_boot(stage, detail, alert_key, before_exit)
 	os.exit(1)
 end
 
-local config_paths       = require("infra.config_paths")
+local config_paths       = require("settings.engine.paths")
 Boot.mark("Core module requires")
 Boot.stage("Path: config dir + paths.toml (config_paths.init)")
 
@@ -392,7 +392,7 @@ end
 -- saved values at start, as on Windows. i18n started above from the saved
 -- locale, before the config path existed, so it adopts the configured one now,
 -- before any menu is built.
-require("infra.script_scope").adopt_configured()
+require("settings.engine.scope.script_scope").adopt_configured()
 i18n.adopt_saved_locale()
 -- Configuration consumers may perform reads during require; path ownership comes first.
 local gestures           = require("modules.gestures")
@@ -497,7 +497,7 @@ Boot.stage("Factory-reset recovery reconciled")
 -- controlled reload handoff. Reconcile its durable decision before onboarding,
 -- overrides, preferences, or any default seeding can observe those paths.
 local reset_recovery_ok, reset_recovery_result = xpcall(function()
-	local FactoryResetJournal = require("infra.factory_reset_journal")
+	local FactoryResetJournal = require("settings.engine.factory_reset_journal")
 	local config_path = config_paths.get("ConfigTomlPath")
 	local journal_path = FactoryResetJournal.path_for(config_path)
 	local owner, owner_detail = FactoryResetJournal.create(journal_path)
@@ -1626,7 +1626,7 @@ end
 -- Overrides applied FIRST. config.toml's [script] layer writes into hs.settings,
 -- and the llm.enabled read below sits beside it: the two readers of one
 -- setting must not sit on opposite sides of the layer that populates it.
-local config_overrides = require("infra.config_overrides")
+local config_overrides = require("settings.engine.overrides")
 config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
 -- The boot's one answer to "is the AI on": the native value, else config.toml,
@@ -1634,7 +1634,7 @@ config_overrides.apply(config_paths.get("ConfigTomlPath"))
 -- AI warmup, so it reads this same value. It used to read the native value
 -- alone: a config.toml that turned the AI on, with no native value yet, started
 -- the AI bootstrap and skipped the cleanup.
-local Preferences = require("infra.preferences")
+local Preferences = require("settings.engine.preferences.preferences")
 local ok_core_llm, core_llm = pcall(require, "modules.llm")
 local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
 local boot_llm_enabled = config_overrides.read_native_value(require("settings.engine.keys").KEY.LLM_ENABLED)
@@ -2465,7 +2465,7 @@ end)
 -- its traceback, never lost in the timer's dispatch.
 hs.timer.doAfter(require("core.timing.engine.timings").sec("ui", "unused_keys_warning_delay_ms"), function()
 	local listed, list_err = xpcall(function()
-		require("ui.menu.unused_keys_cleanup").warn_unused(config_paths.get("ConfigTomlPath"))
+		require("settings.ui.menu.unused_keys_cleanup").warn_unused(config_paths.get("ConfigTomlPath"))
 	end, debug.traceback)
 	if not listed then
 		Logger.error(LOG, "Unused configuration entries could not be listed: %s", tostring(list_err))

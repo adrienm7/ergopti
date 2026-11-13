@@ -60,7 +60,7 @@ local i18n      = require("core.i18n.engine.i18n")
 local LOG = "updater.auto_check"
 
 -- The flat preference key mapped to config.toml [updater] check_interval_seconds
--- by infra/preferences.lua.
+-- by settings/engine/preferences/preferences.lua.
 M.STATE_KEY = "update_check_interval_seconds"
 
 local USER_AGENT = "ErgoptiPlus-Updater-macOS/1.0"

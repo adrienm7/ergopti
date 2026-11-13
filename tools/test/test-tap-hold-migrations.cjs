@@ -17,7 +17,7 @@
  *    delete, with bare dotted names, and drop_retired_values names a table
  *    that exists in the shared defaults.
  * 2. Separate from config.toml. The config.toml registry must not know the op
- *    this one adds: windows/infra/config_migrate.ahk refuses an op it does not
+ *    this one adds: windows/settings/engine/migration/migrate.ahk refuses an op it does not
  *    know, so sharing the registry would break every Windows boot.
  * 3. Replay. The reference interpreter below is a second implementation of the
  *    op semantics (after _shared/tap_hold/engine/migrate.lua). It decides each

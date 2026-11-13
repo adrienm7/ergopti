@@ -6,7 +6,7 @@
 # windows/platform/remap/tap_hold_migration.ahk; macOS has no tap_hold.toml.
 # This is NOT the config.toml registry
 # (_shared/settings/data/config_schema/migrations.toml): that one is validated at every
-# Windows boot by windows/infra/config_migrate.ahk, which refuses an op it does
+# Windows boot by windows/settings/engine/migration/migrate.ahk, which refuses an op it does
 # not know, and no op of its closed set can drop a value only when it equals
 # the delay an earlier build shipped for that key. A separate registry keeps
 # the config.toml one untouched.

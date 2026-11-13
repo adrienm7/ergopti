@@ -48,7 +48,7 @@ local HOSTILE_KEYS = { "%", "$", "&" }
 helpers.describe("registry survives a regex-metacharacter magic key", function()
 	helpers.it("registers a ★ trigger without raising when the magic key is '%'", function()
 		local State    = helpers.load_with_stubs("modules.keymap.state")
-		local Registry = helpers.load_with_stubs("modules.keymap.registry")
+		local Registry = helpers.load_with_stubs("settings.engine.registry")
 
 		local state = State.new({ trigger_char = "%", expansion_delay = 0.4 }, {})
 		state.magic_key = "%"
@@ -65,7 +65,7 @@ helpers.describe("registry survives a regex-metacharacter magic key", function()
 
 	helpers.it("produces the literal key in the stored trigger, not an escape artefact", function()
 		local State    = helpers.load_with_stubs("modules.keymap.state")
-		local Registry = helpers.load_with_stubs("modules.keymap.registry")
+		local Registry = helpers.load_with_stubs("settings.engine.registry")
 
 		local state = State.new({ trigger_char = "%", expansion_delay = 0.4 }, {})
 		state.magic_key = "%"
@@ -108,7 +108,7 @@ helpers.describe("registry survives a regex-metacharacter magic key", function()
 	helpers.it("handles every hostile magic key without raising", function()
 		for _, key in ipairs(HOSTILE_KEYS) do
 			local State    = helpers.load_with_stubs("modules.keymap.state")
-			local Registry = helpers.load_with_stubs("modules.keymap.registry")
+			local Registry = helpers.load_with_stubs("settings.engine.registry")
 
 			local state = State.new({ trigger_char = key, expansion_delay = 0.4 }, {})
 			state.magic_key = key

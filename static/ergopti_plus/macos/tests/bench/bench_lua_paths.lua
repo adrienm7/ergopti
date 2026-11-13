@@ -189,11 +189,11 @@ assert(os.execute("mkdir -p '" .. scratch .. "/toml_cache'"), "cannot create the
 --- Builds a fresh registry whose every section is enabled.
 --- @return table registry
 local function fresh_registry()
-	for _, name in ipairs({ "core.fs.adapters.storage", "modules.keymap.registry", "modules.keymap.registry_groups",
+	for _, name in ipairs({ "core.fs.adapters.storage", "settings.engine.registry", "modules.keymap.registry_groups",
 		"modules.keymap.registry_index", "modules.keymap.terminators" }) do
 		package.loaded[name] = nil
 	end
-	local registry = require("modules.keymap.registry")
+	local registry = require("settings.engine.registry")
 	registry.is_section_enabled = function() return true end
 	local State = require("modules.keymap.state")
 	assert(registry.init(State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })))
@@ -249,7 +249,7 @@ workload("hotstring_load_warm", function()
 end)
 
 workload("preferences_save", function()
-	local Preferences = helpers.load_with_stubs("infra.preferences")
+	local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 	local path = scratch .. "/config.toml"
 	write_file(path, read_file(CONFIG_TEMPLATE))
 	local state, status = Preferences.load(path)

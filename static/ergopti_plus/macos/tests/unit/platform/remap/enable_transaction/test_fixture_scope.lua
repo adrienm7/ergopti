@@ -19,7 +19,7 @@ local OWNED_MODULES = {
 	"platform.input.hotkey_registrar",
 	"core.timing.engine.timings",
 	"core.events.timer_scheduler",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
 	"modules.shortcuts",

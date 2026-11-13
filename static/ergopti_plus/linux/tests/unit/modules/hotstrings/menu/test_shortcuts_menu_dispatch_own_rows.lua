@@ -545,8 +545,8 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 		local source = '# independently owned future configuration\n[shortcuts.script_control]\nchords_enabled = '
 			.. tostring(initial) .. '\nscript_altgr_enter = "script_reload"\nfuture_mode = "kept" # independent comment\n[future]\nvalues = ["a", "b"]\n'
 		local file = assert(io.open(path, "wb"));assert(file:write(source));assert(file:close())
-		local paths, loaded = require("infra.config_paths"), {}
-		for _, name in ipairs({ "infra.config_paths", "modules.shortcuts.script_chords" }) do
+		local paths, loaded = require("settings.engine.paths"), {}
+		for _, name in ipairs({ "settings.engine.paths", "modules.shortcuts.script_chords" }) do
 			loaded[#loaded + 1] = { name = name, value = package.loaded[name] }
 		end
 		local port = {}
@@ -554,7 +554,7 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 		port.config = function(name) if name == "config.toml" then return path end return paths.config(name) end
 		local rename = os.rename
 		local called, failure = pcall(function()
-			package.loaded["infra.config_paths"] = port
+			package.loaded["settings.engine.paths"] = port
 			package.loaded["modules.shortcuts.script_chords"] = nil
 			local chords = require("modules.shortcuts.script_chords")
 			chords.init({ is_paused = function() return false end, defer = function() return true end })

@@ -76,7 +76,7 @@ local function with_case(spec, body)
 			-- previous missing-default fixture may have cached it against a stubbed
 			-- manifest; load this dependency against the restored production owner.
 			for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-				"modules.shortcuts.script_chords", "modules.hotstrings.magic_key", "infra.program_binding_transaction" }) do package.loaded[name] = nil end
+				"modules.shortcuts.script_chords", "modules.hotstrings.magic_key", "settings.engine.preferences.program_binding_transaction" }) do package.loaded[name] = nil end
 			local controls = { changed = 0, backups = {}, logs = {}, publications = 0 }
 			local logger = {}
 			for _, level in ipairs({ "error", "warn", "info", "debug", "trace", "start", "success", "done" }) do
@@ -85,7 +85,7 @@ local function with_case(spec, body)
 				end
 			end
 			package.loaded["core.logger.engine.shim"] = logger
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
 			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() error("picker must not close input") end }
@@ -170,7 +170,7 @@ local function with_configuration_picker(body)
 			Sandbox.write_bytes(f.dirs[id] .. "/config.toml", f.bytes(id) .. suffix)
 		end
 		for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-			"modules.shortcuts.script_chords", "modules.hotstrings.magic_key", "infra.program_binding_transaction",
+			"modules.shortcuts.script_chords", "modules.hotstrings.magic_key", "settings.engine.preferences.program_binding_transaction",
 			"ui.action_picker.bridge" }) do package.loaded[name] = nil end
 		local seen = { logs = {}, changed = 0 }
 		local logger = {}
@@ -206,7 +206,7 @@ local function with_configuration_picker(body)
 		end
 		function f.change_folder(id)
 			assert(f.host.show("paths_editor"))
-			local result = require("ui.paths_editor.bridge").on_message({ action = "save", configDir = f.dirs[id] }, {
+			local result = require("settings.ui.paths_editor.bridge").on_message({ action = "save", configDir = f.dirs[id] }, {
 				config_paths = f.paths, webview_manager = f.host, on_reload = function() return true end,
 			})
 			helpers.assert_eq({ result.saved, result.reloaded, result.hidden }, { true, true, true })
@@ -426,7 +426,7 @@ helpers.describe("Linux program picker transaction", function()
 			local nested, acquisitions = nil, 0
 			gestures.acquire_parameter_configuration = function(token)
 				acquisitions = acquisitions + 1
-				nested = require("infra.program_binding_transaction").apply("tap_3", PRIOR, function() return false end)
+				nested = require("settings.engine.preferences.program_binding_transaction").apply("tap_3", PRIOR, function() return false end)
 				return acquire(token)
 			end
 			helpers.assert_eq(pick({ is_paused = function() return false end }, gestures, "tap_3", "run_program",
@@ -476,12 +476,12 @@ helpers.describe("Linux program picker transaction", function()
 					helpers.assert_eq(edit(), false, "committed publication retains refused native compensation")
 					helpers.assert_eq(gestures.get_action_parameter(spec.binding, "run_program"), NEXT)
 					helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).gesture_parameters[spec.binding .. "__run_program"], NEXT)
-					helpers.assert_eq(require("infra.program_binding_transaction").pending(), true)
+					helpers.assert_eq(require("settings.engine.preferences.program_binding_transaction").pending(), true)
 					controls.refuse_release, controls.refuse_restore, controls.refuse_candidate = nil, false, true
 					helpers.assert_eq(edit(), false, "recover the prior inverse before the next candidate's independent refusal")
 					helpers.assert_eq(Sandbox.read_bytes(path), source, "recovered compensation restores exact original bytes")
 					helpers.assert_eq(gestures.get_action_parameter(spec.binding, "run_program"), PRIOR)
-					helpers.assert_eq(require("infra.program_binding_transaction").pending(), false,
+					helpers.assert_eq(require("settings.engine.preferences.program_binding_transaction").pending(), false,
 						"successful retained compensation must retire the candidate source guard and release its leases")
 					helpers.assert_eq(gestures.set_action_parameter(spec.binding, "run_program", PRIOR), true,
 						"terminal compensation admits subsequent ordinary preference mutation")
@@ -501,7 +501,7 @@ helpers.describe("Linux program picker transaction", function()
 				inverses = inverses + 1
 				if inverses == 1 then
 					nested_retry = controls.token.retry_restore()
-					nested = require("infra.program_binding_transaction").apply("tap_3", NEXT, function() return false end)
+					nested = require("settings.engine.preferences.program_binding_transaction").apply("tap_3", NEXT, function() return false end)
 				end
 			end
 			controls.refuse_publish = true
@@ -522,7 +522,7 @@ helpers.describe("Linux program picker transaction", function()
 				retirement_calls = retirement_calls + 1
 				if retirement_calls == 1 then
 					nested_retry = controls.token.retry_restore()
-					nested = require("infra.program_binding_transaction").apply("tap_3", NEXT, function() return false end)
+					nested = require("settings.engine.preferences.program_binding_transaction").apply("tap_3", NEXT, function() return false end)
 				end
 				return stop()
 			end
@@ -545,7 +545,7 @@ helpers.describe("Linux program picker transaction", function()
 					reads = reads + 1
 					if reads == 1 then
 						nested_retry = controls.token.retry_restore()
-						nested = require("infra.program_binding_transaction").apply("tap_3", NEXT, function() return false end)
+						nested = require("settings.engine.preferences.program_binding_transaction").apply("tap_3", NEXT, function() return false end)
 					end
 				end
 				return false
@@ -610,15 +610,15 @@ helpers.describe("Linux program picker transaction", function()
 				function() return provider.set_action("primary_j", "run_program") end, NEXT), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), source, "an exact matching checkpoint admits the retained inverse")
 			helpers.assert_eq(gestures.get_action_parameter("keyboard__primary_j", "run_program"), PRIOR)
-			helpers.assert_eq(require("infra.program_binding_transaction").pending(), false, "terminal recovery releases logical debt")
+			helpers.assert_eq(require("settings.engine.preferences.program_binding_transaction").pending(), false, "terminal recovery releases logical debt")
 		end)
 	end)
 	helpers.it("(program-picker) refuses nested publication during configuration path resolution", function()
 		with_case(CASES[1], function(pick, gestures, provider, controls, path)
 			local nested, reads = nil, 0
-			package.loaded["infra.config_paths"] = { config = function()
+			package.loaded["settings.engine.paths"] = { config = function()
 				reads = reads + 1
-				if reads == 1 then nested = require("infra.program_binding_transaction").apply("tap_3", NEXT,
+				if reads == 1 then nested = require("settings.engine.preferences.program_binding_transaction").apply("tap_3", NEXT,
 					function() return false end) end
 				return path
 			end }
@@ -744,7 +744,7 @@ helpers.describe("parameter transaction physical boundary", function()
 				local stopped, original_stop = 0, gestures.stop_programs
 				gestures.stop_programs = function() stopped = stopped + 1; return original_stop() end
 				helpers.assert_eq(controls.token, nil)
-				helpers.assert_eq(require("infra.program_binding_transaction").apply(spec.binding, selected.scalar,
+				helpers.assert_eq(require("settings.engine.preferences.program_binding_transaction").apply(spec.binding, selected.scalar,
 					function() return false end, selected.action), false)
 				helpers.assert_eq(Sandbox.read_bytes(path), source)
 				helpers.assert_eq(gestures.get_all_action_parameters(), prior_parameters)

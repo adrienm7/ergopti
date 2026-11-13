@@ -184,7 +184,7 @@ local function make_vkb(trigger, replacement, opts, others)
 	package.loaded["core.i18n.engine.i18n"]                   = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	package.loaded["modules.keymap.utils"]       = nil
-	package.loaded["modules.keymap.registry"]    = nil
+	package.loaded["settings.engine.registry"]    = nil
 	package.loaded["modules.keymap.expander"]    = nil
 	-- Expander delegates deletion to TextSender. It captures `hs` at module load
 	-- time too, so it must be reloaded alongside the keymap modules.
@@ -223,7 +223,7 @@ local function make_vkb(trigger, replacement, opts, others)
 	local Expander, SyntheticInput = SyntheticStack.load("modules.keymap.expander", {
 		eventtap = event_hs.eventtap,
 	})
-	local Registry = require("modules.keymap.registry")
+	local Registry = require("settings.engine.registry")
 	local text_utils = require("core.text.engine.utils")
 	-- Required from the SAME load wave as Expander so the harness drives the very
 	-- instance the expander armed — a second instance would hold an empty slot.

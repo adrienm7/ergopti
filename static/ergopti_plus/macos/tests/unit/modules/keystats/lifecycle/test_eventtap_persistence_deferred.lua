@@ -38,7 +38,7 @@ local RESET_MODULES = {
 	"adapters.input_source_broker", "platform.input.keyboard_hook",
 	"core.process.adapters.lifecycle", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
-	"hs.timer", "infra.config_paths", "core.ui.engine.dialog_util", "core.i18n.engine.i18n",
+	"hs.timer", "settings.engine.paths", "core.ui.engine.dialog_util", "core.i18n.engine.i18n",
 	"core.logger.engine.logger", "infra.manifest_reader", "core.timing.engine.timings",
 	"metrics.engine.metrics", "modules.keystats", "modules.keystats.aggregator",
 	"modules.keystats.context_tracker", "modules.keystats.export",
@@ -240,7 +240,7 @@ local function load_fixture(options)
 	}
 	package.loaded["modules.keymap"] = { get_shift_side = function() return options.shift_side or "none" end }
 	package.loaded["infra.manifest_reader"] = { default_for = function() return true end }
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_eventtap_deferred" end,
 		metrics_dir = function() return "/tmp/ergopti_eventtap_deferred/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti_eventtap_deferred/cache" end,

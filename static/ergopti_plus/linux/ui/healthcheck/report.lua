@@ -95,9 +95,9 @@ local DEFAULT_EFFECTS = {
 	end,
 	identity = function()
 		return {
-			home = require("infra.config_paths").home(),
+			home = require("settings.engine.paths").home(),
 			user = os.getenv("USER") or os.getenv("LOGNAME"),
-			config_dir = require("infra.config_paths").get_config_dir(),
+			config_dir = require("settings.engine.paths").get_config_dir(),
 		}
 	end,
 }

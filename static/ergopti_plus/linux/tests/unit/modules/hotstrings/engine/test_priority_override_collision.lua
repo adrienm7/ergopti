@@ -11,7 +11,7 @@ helpers.describe("hotstring priority overrides", function()
 		local Loader = helpers.load_module("modules.hotstrings.loader")
 		local Engine = helpers.load_module("modules.hotstrings.engine")
 		local previous_config = package.loaded["modules.hotstrings.hotstrings_config"]
-		local previous_paths = package.loaded["infra.config_paths"]
+		local previous_paths = package.loaded["settings.engine.paths"]
 		local previous_shell = package.loaded["core.process.adapters.shell_runner"]
 		local previous_storage = package.loaded["core.fs.adapters.storage"]
 		local previous_load_catalogue = Loader.load_catalogue
@@ -97,7 +97,7 @@ helpers.describe("hotstring priority overrides", function()
 		local release_source = helpers.route_source_through_stdio(override_path, true)
 		local ok, failure = xpcall(function()
 			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage()
-			package.loaded["infra.config_paths"] = {
+			package.loaded["settings.engine.paths"] = {
 				config = function() return "/virtual-home/.config/ergopti" end,
 			}
 			package.loaded["core.process.adapters.shell_runner"] = {
@@ -284,7 +284,7 @@ helpers.describe("hotstring priority overrides", function()
 		Loader.load_catalogue = previous_load_catalogue
 		package.loaded["core.fs.adapters.storage"] = previous_storage
 		package.loaded["core.process.adapters.shell_runner"] = previous_shell
-		package.loaded["infra.config_paths"] = previous_paths
+		package.loaded["settings.engine.paths"] = previous_paths
 		package.loaded["modules.hotstrings.hotstrings_config"] = previous_config
 		if not ok then error(failure, 0) end
 	end)

@@ -52,7 +52,7 @@ helpers.describe("Metrics widget commands", function()
 		local rename, execute, notices, attempts = os.rename, os.execute, 0, 0
 		local ok, err = xpcall(function()
 			require("tests.lua.settings.unused_keys_contract").sandbox.with_config("[metrics]\nenabled = false\n", function(path)
-				package.loaded["infra.config_paths"] = { config = function() return path end }
+				package.loaded["settings.engine.paths"] = { config = function() return path end }
 				package.loaded["infra.metrics_preferences"], package.loaded["modules.keystats.keystats"] = nil, nil
 				local stats = require("modules.keystats.keystats")
 				local changes = 0

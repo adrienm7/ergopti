@@ -28,7 +28,7 @@
 local M = {}
 
 local Logger         = require("core.logger.engine.logger")
-local ConfigPaths    = require("infra.config_paths")
+local ConfigPaths    = require("settings.engine.paths")
 local FileSystem     = require("core.fs.adapters.file_system")
 local JsonCodec      = require("core.fs.adapters.json_codec")
 local TimerScheduler = require("core.events.timer_scheduler")

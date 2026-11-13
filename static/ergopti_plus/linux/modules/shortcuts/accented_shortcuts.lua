@@ -111,7 +111,7 @@ end
 --- @return table|nil settings Nil when the file cannot be read or decoded.
 --- @return table|nil source { status, content } for a conditional write.
 local function read_settings()
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	local content, status = Writer.read_classified(path)
 	if status ~= "ok" and status ~= "absent" then return nil end
 	local decoded = Codec.decode(content or "")
@@ -136,7 +136,7 @@ function M.set(id, letter)
 		Logger.warn(LOG, "Invalid letter '%s' for %s refused.", tostring(letter), id)
 		return false
 	end
-	if require("infra.scope_registry").pending() then
+	if require("settings.engine.scope.registry").pending() then
 		Logger.error(LOG, "Accented shortcut change refused: a configuration scope is still pending.")
 		return false
 	end
@@ -145,7 +145,7 @@ function M.set(id, letter)
 		assert(source, "config.toml is unreadable or malformed")
 		local operations = { Manifest.sparse_operation(path_of(id, "enabled"), letter ~= nil) }
 		if letter ~= nil then operations[2] = Manifest.sparse_operation(path_of(id, "letter"), letter) end
-		return Writer.batch_write(require("infra.config_paths").config("config.toml"), operations, nil, source)
+		return Writer.batch_write(require("settings.engine.paths").config("config.toml"), operations, nil, source)
 	end)
 	if not called or committed ~= true then
 		Logger.error(LOG, "Accented shortcut %s was not persisted: %s.", id, tostring(called and detail or committed))

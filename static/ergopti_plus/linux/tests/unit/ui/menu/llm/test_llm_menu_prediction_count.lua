@@ -122,7 +122,7 @@ local function with_numeric_menu(options, exercise)
 		end
 		package.loaded["core.text.engine.toml_codec.writer"] = nil
 		local writer = require("core.text.engine.toml_codec.writer")
-		package.loaded["infra.config_paths"] = { config = function() return path end }
+		package.loaded["settings.engine.paths"] = { config = function() return path end }
 		local locale = options.locale or "en"
 		local strings = NumericJson.decode(numeric_read(NumericRoot .. "core/i18n/data/locales/" .. locale .. ".json"))
 		local translate = { get = function(key) return strings[key] or key end,

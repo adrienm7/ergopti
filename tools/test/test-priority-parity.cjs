@@ -50,7 +50,7 @@ const AHK = fs.readFileSync(
 	path.join(ROOT, 'windows/infra/hotstrings/hotstring_engine_main.ahk'),
 	'utf8'
 );
-const LUA = fs.readFileSync(path.join(ROOT, 'macos/modules/keymap/registry.lua'), 'utf8');
+const LUA = fs.readFileSync(path.join(ROOT, 'macos/settings/engine/registry.lua'), 'utf8');
 
 // AHK: `global HSE_PRIORITY_COMMON := 10`. Lua: `local PRIORITY_COMMON = 10`.
 function ahkConst(key) {
@@ -237,7 +237,7 @@ function cascadePositions(text) {
 
 const luaResolver = LUA.match(/local function resolve_priority[\s\S]*?\nend/);
 if (!luaResolver) {
-	console.log(`  ${FAIL}  macos/modules/keymap/registry.lua: resolve_priority() not found`);
+	console.log(`  ${FAIL}  macos/settings/engine/registry.lua: resolve_priority() not found`);
 	fail++;
 } else {
 	const pos = cascadePositions(luaResolver[0]);

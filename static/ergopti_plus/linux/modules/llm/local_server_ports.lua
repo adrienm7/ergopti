@@ -36,7 +36,7 @@ local Timings = require("core.timing.engine.timings")
 local Monotonic = require("core.logger.engine.monotonic")
 local ProcessRunner = require("core.process.adapters.runner")
 local TimerScheduler = require("core.events.timer_scheduler")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local Policy = require("ai.engine.local_servers.ports_core")
 
 local LOG = "ai.engine.local_servers.ports_core"

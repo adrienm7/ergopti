@@ -24,7 +24,7 @@ local RESET_MODULES = {
 	"modules.llm", "modules.llm.prediction_engine", "modules.keystats",
 	"core.ui.ui.tooltip", "modules.hotstrings.hotstrings_config", "core.ui.adapters.tooltip_renderer",
 	"core.fs.adapters.file_system",
-	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
+	"modules.keymap", "modules.keymap.init", "settings.engine.registry",
 	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
 }

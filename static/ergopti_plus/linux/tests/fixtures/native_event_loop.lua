@@ -108,7 +108,7 @@ local consumer_ok, consumer_error = xpcall(function()
 	local file = assert(io.open(tap_path, "w"))
 	assert(file:write('[shortcuts.tap_keys]\nnumber_row_left="screen_capture"\n'))
 	assert(file:close())
-	package.loaded["infra.config_paths"] = { config = function() return tap_path end }
+	package.loaded["settings.engine.paths"] = { config = function() return tap_path end }
 	package.loaded["modules.gestures.manager"] = {
 		is_assignable = function(id) return id == "screen_capture" end,
 		execute_action = function(action) consumer_calls[#consumer_calls + 1] = action end,

@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local function fresh_registry(magic)
 	local State = helpers.load_with_stubs("modules.keymap.state")
-	local Registry = helpers.load_with_stubs("modules.keymap.registry")
+	local Registry = helpers.load_with_stubs("settings.engine.registry")
 	local state = State.new({ trigger_char = magic, expansion_delay = 0.4 }, {})
 	state.magic_key = magic
 	Registry.init(state)

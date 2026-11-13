@@ -43,7 +43,7 @@ local hs          = hs
 local Logger      = require("core.logger.engine.logger")
 local i18n        = require("core.i18n.engine.i18n")
 local Paths       = require("core.fs.engine.paths")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local FileSystem  = require("core.fs.adapters.file_system")
 local ui_builder  = require("core.ui.ui.builder")
 local Json        = require("core.text.engine.json")
@@ -255,7 +255,7 @@ end
 local function opening_current(session, opening)
 	local function identities_current()
 		return _session == session and not session.retired and session.opening == opening
-			and rawequal(package.loaded["infra.config_paths"], ConfigPaths)
+			and rawequal(package.loaded["settings.engine.paths"], ConfigPaths)
 			and rawequal(package.loaded["core.fs.adapters.file_system"], FileSystem)
 			and FileSystem.read_with_status == opening.read_with_status
 			and FileSystem.write_if_unchanged_admitted == opening.publish

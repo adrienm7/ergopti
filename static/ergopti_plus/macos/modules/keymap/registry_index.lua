@@ -41,7 +41,7 @@ local function require_state(func_name)
 end
 
 --- Injects the shared CoreState so state-dependent functions become live.
---- Called once from registry.lua's M.init() after the main state is wired up.
+--- Called once from ../../settings/engine/registry.lua's M.init() after the main state is wired up.
 --- @param core_state table The shared CoreState from keymap/init.lua.
 --- @return boolean committed True only when the requested binding is active.
 function M.setup(core_state)
@@ -72,7 +72,7 @@ end
 -- ===========================================
 
 -- All group-loading and group-lifecycle logic lives in registry_groups.lua.
--- The public surface below is a thin forward layer so callers of registry.lua
+-- The public surface below is a thin forward layer so callers of ../../settings/engine/registry.lua
 -- keep an identical API without modification.
 
 --- Loads mappings from a Lua file via dofile and records the group.
@@ -354,7 +354,7 @@ local function publish_section_cells(keys, expected, updates)
 	if planned and next(updates) == nil then return true end
 	if planned then
 		local ok, path, files = pcall(function()
-			local config = require("infra.config_paths").get("ConfigTomlPath")
+			local config = require("settings.engine.paths").get("ConfigTomlPath")
 			assert(type(config) == "string" and config ~= "", "config path unavailable")
 			_section_serial = _section_serial + 1
 			local backup = config .. ".section-settings-" .. tostring(hs.timer.absoluteTime())
@@ -565,7 +565,7 @@ function M.set_category_scope_enabled(targets, enabled, publish, excluded)
 	end
 	local personal = false
 	for _, id in ipairs(targets) do if PersonalFiles.components(id) then personal = true; break end end
-	if personal and require("infra.preferences").personal_choices_available(plan) ~= true then return false end
+	if personal and require("settings.engine.preferences.preferences").personal_choices_available(plan) ~= true then return false end
 	local changes, by_id = {}, {}
 	for _, choice in ipairs(plan) do
 		if choice.section == nil then
@@ -586,7 +586,7 @@ end
 function M.apply_hotstring_preferences(saved)
 	if not require_state("apply_hotstring_preferences") then return false end
 	if not settle_sections() then return false end
-	local projected, desired = pcall(require("infra.preferences").project_hotstring_preferences,
+	local projected, desired = pcall(require("settings.engine.preferences.preferences").project_hotstring_preferences,
 		saved, Groups.list_groups(), M.get_sections)
 	if not projected then
 		Logger.error(LOG, "Canonical hotstring projection was refused: %s.", tostring(desired))

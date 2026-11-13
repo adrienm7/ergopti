@@ -66,7 +66,7 @@ local LOG = "karabiner"
 --- @param previous table Exact classified bytes the publication replaced.
 --- @param content string Published bytes.
 local function adopt_config_publication(path, previous, content)
-	local Preferences = require("infra.preferences")
+	local Preferences = require("settings.engine.preferences.preferences")
 	if Preferences.source_snapshot(path) == nil then return end
 	if Preferences.replace_source(path, previous, { status = "ok", content = content }) ~= true then
 		Logger.warn(LOG, "The preferences did not adopt the tap-hold rows written to '%s'.", path)

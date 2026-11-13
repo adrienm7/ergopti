@@ -53,7 +53,7 @@ local function fresh_engine(entries, depth)
 	package.loaded["core.text.engine.utils"] = nil
 	package.loaded["core.text.engine.utils_core"]       = nil
 
-	local R = require("modules.keymap.registry")
+	local R = require("settings.engine.registry")
 	local E = require("modules.keymap.expander")
 	local state = State.new({ trigger_char = STAR, expansion_delay = 0.4 }, {})
 	R.init(state)
@@ -386,9 +386,9 @@ helpers.describe("keymap: the cascade and end characters", function()
 		}, 2)
 		state.buffer = "ab"
 		helpers.assert_true(state ~= nil)
-		require("modules.keymap.registry").set_terminators_consume({ space = true })
+		require("settings.engine.registry").set_terminators_consume({ space = true })
 		local ok, fired = pcall(type_terminator, state, expander, " ")
-		require("modules.keymap.registry").set_terminators_consume({ space = false })
+		require("settings.engine.registry").set_terminators_consume({ space = false })
 		assert(ok, fired)
 		helpers.assert_true(fired, "ab+space must fire")
 		helpers.assert_eq("ef", state.buffer, "the chain ran and the space was swallowed")
@@ -459,7 +459,7 @@ helpers.describe("keymap: the shared cascade_vectors.json corpus", function()
 			end
 			local state, expander, log = fresh_engine(entries, vector.max_arrows)
 			state.buffer = ""
-			local registry = require("modules.keymap.registry")
+			local registry = require("settings.engine.registry")
 			local key = DELIMITER_KEY[vector.end_char]
 			local ok, err = pcall(function()
 				if key then registry.set_terminators_consume({ [key] = vector.end_char_consumed == true }) end

@@ -87,7 +87,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["modules.keymap.state"] = {
 			new = function() return state end,
 		}
-		package.loaded["modules.keymap.registry"] = api({
+		package.loaded["settings.engine.registry"] = api({
 			init = function() return true end,
 			is_repeat_feature_enabled = function() return false end,
 			set_repeat_feature_enabled = noop,
@@ -153,7 +153,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["modules.keymap.state"] = {
 			new = function() return state end,
 		}
-		package.loaded["modules.keymap.registry"] = api({
+		package.loaded["settings.engine.registry"] = api({
 			init = function() return true end,
 			is_repeat_feature_enabled = function() return false end,
 			set_repeat_feature_enabled = noop,

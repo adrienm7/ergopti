@@ -128,11 +128,11 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 			'llm = false\n',
 		}) do
 			Sandbox.with_config(source, function(path)
-				local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings" }
+				local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.profile_settings" }
 				local saved = {}
 				for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 				local ok, err = pcall(function()
-					package.loaded["infra.config_paths"] = { config = function() return path end }
+					package.loaded["settings.engine.paths"] = { config = function() return path end }
 					local settings = require("modules.llm.profile_settings")
 					helpers.assert_nil(settings.resolve_for_app("firefox"))
 					helpers.assert_eq(settings.set_app_override("firefox", "advanced"), false)
@@ -151,11 +151,11 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 		local source = '[llm]\napp_profile_overrides = "' .. first .. '"\n'
 		local successor = '[llm]\napp_profile_overrides = "' .. external .. '"\n'
 		Sandbox.with_config(source, function(path)
-			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings" }
+			local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.profile_settings" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local ok, err = pcall(function()
-				package.loaded["infra.config_paths"] = { config = function() return path end }
+				package.loaded["settings.engine.paths"] = { config = function() return path end }
 				local settings = require("modules.llm.profile_settings")
 				helpers.assert_eq(settings.app_overrides().firefox, "basic")
 				local snapshot = settings.configuration_snapshot()
@@ -191,11 +191,11 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 			local source = document({ USER }, initial_overrides)
 			local successor = document({ USER, external_profile }, { firefox = USER.id, kate = "advanced", terminal = "basic" })
 			Sandbox.with_config(source, function(path)
-				local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings" }
+				local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.profile_settings" }
 				local saved = {}
 				for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 				local ok, err = pcall(function()
-					package.loaded["infra.config_paths"] = { config = function() return path end }
+					package.loaded["settings.engine.paths"] = { config = function() return path end }
 					local settings = require("modules.llm.profile_settings")
 					if first_cache ~= "registry" then
 						helpers.assert_eq(settings.app_overrides().kate, "basic")
@@ -232,11 +232,11 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 		local source = '[llm]\nuser_profiles = "' .. Registry.encode({ USER })
 			.. '"\napp_profile_overrides = "' .. damaged .. '"\n\n[external]\nmarker = "keep external setting"\n'
 		Sandbox.with_config(source, function(path)
-			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings" }
+			local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.profile_settings" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local ok, err = pcall(function()
-				package.loaded["infra.config_paths"] = { config = function() return path end }
+				package.loaded["settings.engine.paths"] = { config = function() return path end }
 				local settings = require("modules.llm.profile_settings")
 				helpers.assert_true(settings.delete_user_profile(USER.id))
 				local actual = assert(require("core.text.engine.toml_codec").decode(Sandbox.read_bytes(path)))

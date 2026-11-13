@@ -18,7 +18,7 @@ helpers.describe("script action whole-state rollback", function()
 			get_shortcut_actions = function() return { slot = runtime } end,
 			set_shortcut_action = function(_, value) runtime = value; return true end,
 		}
-		local save = require("ui.menu.preferences_transaction").bind({}, {
+		local save = require("settings.ui.menu.preferences_transaction").bind({}, {
 			state = state, initial_state = { script_control_shortcuts = { slot = "none" } },
 			initial_preferences = {},
 			read_only_reason = function() runtime = "foreign"; return "read-only" end,

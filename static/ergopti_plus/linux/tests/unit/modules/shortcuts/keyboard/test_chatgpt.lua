@@ -24,7 +24,7 @@ local function with_subject(source, body)
 	local ok, err = pcall(function()
 		Sandbox.with_config(source, function(path)
 			local controls = { commands = {}, legacy_writes = 0, legacy_url = "https://legacy.example" }
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return controls.legacy_url or default end,
 				set = function() controls.legacy_writes = controls.legacy_writes + 1; return true end,
@@ -156,8 +156,8 @@ helpers.describe("Canonical ChatGPT shortcut preference", function()
 
 	helpers.it("retains the consumed URL during actual unused-key detection", function()
 		with_subject(SOURCE, function(_, _, path)
-			package.loaded["ui.menu.unused_keys_cleanup"] = nil
-			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			package.loaded["settings.ui.menu.unused_keys_cleanup"] = nil
+			local scan = require("settings.ui.menu.unused_keys_cleanup").find(path)
 			helpers.assert_eq(scan.status, "ok")
 			local found = {}
 			for _, entry in ipairs(scan.keys) do found[table.concat(entry.path, ".")] = true end

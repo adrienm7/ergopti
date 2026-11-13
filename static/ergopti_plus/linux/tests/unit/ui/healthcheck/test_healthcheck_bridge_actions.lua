@@ -31,7 +31,7 @@ local HOME = "/home/jdoe"
 local function load_bridge(controls)
 	controls = controls or {}
 	local replaced = { "ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes",
-		"core.ui.ui.webview_manager", "adapters.clipboard", "infra.config_paths",
+		"core.ui.ui.webview_manager", "adapters.clipboard", "settings.engine.paths",
 		"platform.input.keyboard_hook" }
 	local loaded = {}
 	for _, name in ipairs(replaced) do loaded[name] = package.loaded[name] end
@@ -64,8 +64,8 @@ local function load_bridge(controls)
 			return controls.clipboard ~= false
 		end,
 	}
-	package.loaded["infra.config_paths"] = setmetatable({ home = function() return HOME end },
-		{ __index = require("infra.config_paths") })
+	package.loaded["settings.engine.paths"] = setmetatable({ home = function() return HOME end },
+		{ __index = require("settings.engine.paths") })
 	local sink = require("core.logger.engine.sink")
 	local previous_log_dir = sink.log_dir
 	if controls.logs_dir ~= nil then
@@ -552,9 +552,9 @@ end)
 
 helpers.describe("diagnostics bridge fixture ownership", function()
 	helpers.it("restores exact collaborators and warm preference paths after a body failure", function()
-		local paths = require("infra.config_paths")
+		local paths = require("settings.engine.paths")
 		local preferences = require("infra.metrics_preferences")
-		local names = { "infra.config_paths", "infra.metrics_preferences", "core.ui.ui.webview_manager", "adapters.clipboard",
+		local names = { "settings.engine.paths", "infra.metrics_preferences", "core.ui.ui.webview_manager", "adapters.clipboard",
 			"ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes" }
 		local before = {}
 		for _, name in ipairs(names) do before[name] = package.loaded[name] end
@@ -573,7 +573,7 @@ helpers.describe("diagnostics bridge fixture ownership", function()
 		for _, name in ipairs(names) do
 			helpers.assert_true(rawequal(package.loaded[name], before[name]), "restore original cache identity: " .. name)
 		end
-		helpers.assert_true(rawequal(require("infra.config_paths"), paths))
+		helpers.assert_true(rawequal(require("settings.engine.paths"), paths))
 		helpers.assert_true(rawequal(require("infra.metrics_preferences"), preferences))
 		helpers.assert_true(logger.warn == warn and sink.log_dir == log_dir and os.getenv == getenv)
 	end)

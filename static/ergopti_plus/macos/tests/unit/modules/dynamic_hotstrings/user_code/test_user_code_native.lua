@@ -15,8 +15,8 @@ local OWNED = {
 	"modules.dynamic_hotstrings.user_code", "modules.dynamic_hotstrings.rules_engine",
 	"modules.dynamic_hotstrings", "modules.dynamic_hotstrings.personal_info",
 	"ui.menu.programmatic_hotstrings", "core.ui.engine.dialog_util", "core.process.adapters.shell_runner",
-	"infra.preferences",
-	"platform.focus.application_notifier", "core.fs.adapters.file_system", "infra.config_paths", "core.i18n.engine.i18n",
+	"settings.engine.preferences.preferences",
+	"platform.focus.application_notifier", "core.fs.adapters.file_system", "settings.engine.paths", "core.i18n.engine.i18n",
 	"platform.focus.secure_field_detector",
 	"modules.diagnostics.hid_diagnostic_mailbox",
 }
@@ -155,7 +155,7 @@ local function with_native(body)
 			if fixture.absent then return nil, "absent" end
 			return fixture.content, "ok"
 		end
-		package.loaded["infra.config_paths"] = { get_config_dir = function() return "/owned" end }
+		package.loaded["settings.engine.paths"] = { get_config_dir = function() return "/owned" end }
 		package.loaded["platform.focus.application_notifier"] = { send = function() fixture.notified = true; return true end }
 		fixture.content = [[return function()
 			__USER_HOTSTRING_FIXTURE.factory_calls = __USER_HOTSTRING_FIXTURE.factory_calls + 1
@@ -907,15 +907,15 @@ helpers.describe("programmable native macOS hotstrings", function()
 				local output = assert(io.open(path, "w")); output:write(content); output:close(); return true
 			end
 			local ok, problem = xpcall(function()
-				local Preferences = require("infra.preferences")
+				local Preferences = require("settings.engine.preferences.preferences")
 				helpers.assert_eq(select(2, Preferences.load(path)), "ok")
 				helpers.assert_true(Preferences.save(path, { dynamichotstrings_user_code_enabled = true,
 					dynamichotstrings_user_code_time_activation_seconds = 0.125 }, {}, {}))
 				local decoded = require("core.text.engine.toml_codec").decode(read_disk())
 				helpers.assert_eq(decoded.other.untouched, "foreign")
 				helpers.assert_eq(decoded.hotstrings.dynamic.user_code.neighbor, "kept")
-				package.loaded["infra.preferences"] = nil
-				local restarted = require("infra.preferences")
+				package.loaded["settings.engine.preferences.preferences"] = nil
+				local restarted = require("settings.engine.preferences.preferences")
 				local saved, status = restarted.load(path)
 				helpers.assert_eq(status, "ok")
 				helpers.assert_true(f.User.set_enabled(false))

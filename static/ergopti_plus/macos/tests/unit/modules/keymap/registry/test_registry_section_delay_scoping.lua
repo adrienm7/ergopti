@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"modules.keymap.registry",
+	"settings.engine.registry",
 	"modules.keymap.registry_groups",
 	"modules.keymap.registry_index",
 	"modules.keymap.terminators",
@@ -41,7 +41,7 @@ local function with_registry(data_by_path, callback)
 		package.loaded["core.timing.engine.timings"] = {
 			sec = function() return 0.01 end,
 		}
-		local Registry = require("modules.keymap.registry")
+		local Registry = require("settings.engine.registry")
 		local state = State.new(
 			{ trigger_char = "★", expansion_delay = 0.4 },
 			{ group_a = 0.4, group_b = 0.4 })
@@ -152,7 +152,7 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 					return true
 				end,
 			}
-			local Registry = require("modules.keymap.registry")
+			local Registry = require("settings.engine.registry")
 			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { group_a = 0.4, group_b = 0.4 })
 			helpers.assert_true(Registry.init(state))
 			local Config = require("modules.hotstrings.hotstrings_config")

@@ -87,14 +87,14 @@ end
 --- @return string config_dir
 local function folders(state)
 	local paths = dependency(state, "paths", "core.fs.engine.paths")
-	local config_paths = dependency(state, "config_paths", "infra.config_paths")
+	local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 	if not paths or not config_paths then error("the shared tree or the configuration folder is unknown", 0) end
 	return paths.shared_root(), config_paths.get_config_dir()
 end
 
 --- Retains the page and exact file which supplied the editor's current draft.
 local function capture_opening(state, context, shared_root, config_dir, ctx)
-	local config_paths = dependency(state, "config_paths", "infra.config_paths")
+	local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	local path = Layers.user_file_path(config_dir, ctx)
 	local content, status, detail = Writer.read_classified(path)
@@ -129,7 +129,7 @@ end
 --- Folder admission remains separate from the writer's exact-byte precondition.
 local function opening_current(owner, state, context)
 	if not opening_page_current(owner, state, context)
-		or dependency(state, "config_paths", "infra.config_paths") ~= owner.config_paths
+		or dependency(state, "config_paths", "settings.engine.paths") ~= owner.config_paths
 		or owner.config_paths.get_config_dir ~= owner.get_config_dir then return false end
 	local called, dir = pcall(owner.get_config_dir)
 	return called and dir == owner.config_dir and opening_page_current(owner, state, context)
@@ -138,11 +138,11 @@ end
 
 --- A committed file may still need application after its page was replaced.
 local function committed_folder_current(owner, state)
-	if not owner or dependency(state, "config_paths", "infra.config_paths") ~= owner.config_paths
+	if not owner or dependency(state, "config_paths", "settings.engine.paths") ~= owner.config_paths
 		or owner.config_paths.get_config_dir ~= owner.get_config_dir then return false end
 	local called, dir = pcall(owner.get_config_dir)
 	return called and dir == owner.config_dir
-		and dependency(state, "config_paths", "infra.config_paths") == owner.config_paths
+		and dependency(state, "config_paths", "settings.engine.paths") == owner.config_paths
 		and owner.config_paths.get_config_dir == owner.get_config_dir
 end
 

@@ -173,7 +173,7 @@ end
 --- Reads every assignment from config.toml, or the manifest default.
 local function load_assignments()
 	if _assignments then return end
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	local content, status, detail = TomlWriter.read_classified(path)
 	if status ~= "ok" and status ~= "absent" then
 		error("tap_keys: cannot read configuration: " .. tostring(detail))
@@ -232,7 +232,7 @@ function M.set_action(id, action_id)
 			tostring(action_id), id)
 		return false
 	end
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	local assignments, generation = _assignments, _dispatch_generation
 	local bytes, status = TomlWriter.read_classified(path)
 	if status ~= "ok" and status ~= "absent" then return false end
@@ -463,7 +463,7 @@ BindingPublication.register(ShortcutCatalogue.TAP_OWNER, ShortcutCatalogue.TAP_M
 function M.capture_collision_inventory()
 	load_assignments()
 	if _configuration_owner ~= nil then return nil end
-	local Routes = require("infra.config_paths")
+	local Routes = require("settings.engine.paths")
 	local route, read, factory = Routes.config, TomlWriter.read_classified, M.capture_collision_inventory
 	local path = route("config.toml")
 	local bytes, status = read(path)
@@ -474,7 +474,7 @@ function M.capture_collision_inventory()
 	local function runtime()
 		if not rawequal(package.loaded["modules.shortcuts.tap_keys"], M) or _configuration_owner ~= nil
 			or _dispatch_generation ~= epoch or not rawequal(_assignments, actual) or not rawequal(TapKeys.loaded_keys(), keys)
-			or _is_active ~= active or not rawequal(package.loaded["infra.config_paths"], Routes)
+			or _is_active ~= active or not rawequal(package.loaded["settings.engine.paths"], Routes)
 			or Routes.config ~= route or TomlWriter.read_classified ~= read or M.capture_collision_inventory ~= factory then return false end
 		if #keys ~= #key_source then return false end
 		for index, key in ipairs(keys) do

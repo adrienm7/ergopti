@@ -45,7 +45,7 @@ local _ = helpers.load_with_stubs("core.logger.engine.logger")
 local State = helpers.load_with_stubs("modules.keymap.state")
 
 -- Warm the registry once so its module path is known; we will reload it per call.
-helpers.load_with_stubs("modules.keymap.registry")
+helpers.load_with_stubs("settings.engine.registry")
 
 
 --- Reloads and initialises a fresh registry with a clean state.
@@ -56,11 +56,11 @@ local function fresh_registry()
 	-- Clear the dependency chain that calls hs.settings.get at load-time
 	package.loaded["core.i18n.engine.i18n"]                   = nil
 	package.loaded["core.i18n.engine.locale"]                 = nil
-	package.loaded["modules.keymap.registry"]    = nil
+	package.loaded["settings.engine.registry"]    = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	-- Refresh the hs stub so hs.settings is available for the new require chain
 	helpers.load_with_stubs("core.logger.engine.logger")
-	local R     = require("modules.keymap.registry")
+	local R     = require("settings.engine.registry")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })
 	R.init(state)
 	return state, R

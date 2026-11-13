@@ -34,7 +34,7 @@ local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- kc_bridge resolves KC_LOG_PATH via ui.menu.menu_paths at module load time.
 -- Stub the module so the require does not fail.
-package.loaded["infra.config_paths"] = {
+package.loaded["settings.engine.paths"] = {
 	get_config_dir = function() return "/tmp/test_ergopti" end,
 }
 

@@ -597,7 +597,7 @@ local OCR_COMMAND = '( d=$(mktemp -d "${TMPDIR:-/tmp}/ergopti-ocr.XXXXXXXX") || 
 local function screenshot_path(kind)
 	local dir = os.getenv("XDG_PICTURES_DIR")
 	if not dir or dir == "" then
-		local ok, Paths = pcall(require, "infra.config_paths")
+		local ok, Paths = pcall(require, "settings.engine.paths")
 		dir = (ok and Paths.home() or ".") .. "/Pictures"
 	end
 	return string.format("%s/ergopti_%s_%s", dir, kind, os.date("%Y-%m-%d_%H-%M-%S"))
@@ -806,7 +806,7 @@ local function _execute_action(action_name, go_next, binding)
 
 		local resolver = OPEN_PATH[name]
 		if not resolver then return false end
-		local ok_paths, Paths = pcall(require, "infra.config_paths")
+		local ok_paths, Paths = pcall(require, "settings.engine.paths")
 		if not ok_paths then
 			Logger.error(LOG, "Cannot resolve paths — '%s' has nothing to open.", name)
 			return true
@@ -1204,7 +1204,7 @@ local _decoder       = nil   -- the multitouch frame decoder for that device
 local _touchpad      = nil   -- what touchpad_finder chose, and what it can express
 local _parameter_delivery_epoch = 0
 local _scope_owner   = nil   -- retains refused runtime compensation
-require("infra.scope_registry").register("gesture_scope", function()
+require("settings.engine.scope.registry").register("gesture_scope", function()
 	return _scope_owner ~= nil and _scope_owner.pending() == true
 end)
 local _scope_native = false -- admits only the scope's synchronous native inverse
@@ -1226,7 +1226,7 @@ end
 --- @return boolean admitted
 local function admit_mutation(owner)
 	if _gesture_click_fence ~= nil and _gesture_click_fence ~= owner then return false end
-	local bindings = package.loaded["infra.program_binding_transaction"]
+	local bindings = package.loaded["settings.engine.preferences.program_binding_transaction"]
 	if type(bindings) == "table" and bindings.pending() and not bindings.owns(owner) then return false end
 	if _parameter_configuration_owner ~= nil then return false end
 	if _scope_owner and _scope_owner ~= owner and _scope_owner.pending() then
@@ -2826,7 +2826,7 @@ function M.init(opts)
 	if type(opts.now_sec) == "function" then
 		_now_sec = opts.now_sec
 	end
-	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
+	_config_path = opts.config_path or require("settings.engine.paths").config("config.toml")
 	_persist = opts.persist == true
 	local configured_enabled = nil
 	if _persist then configured_enabled = load_user_config(_config_path) end

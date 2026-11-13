@@ -22,11 +22,11 @@ local helpers = require("tests.helpers")
 -- minimal dependency by reading the source and verifying the contract
 -- both structurally and logically with a direct require shim.
 --
--- Selected by a declaration unique to modules/keymap/registry.lua rather than
+-- Selected by a declaration unique to settings/engine/registry.lua rather than
 -- by path, so moving or splitting the module cannot turn this invariant into a
 -- path error.
 local src = helpers.read_driver_source("local function trigger_has_shift_symbol")
-helpers.assert_true(src ~= nil, "modules/keymap/registry.lua source must be locatable")
+helpers.assert_true(src ~= nil, "settings/engine/registry.lua source must be locatable")
 
 -- Test 1: classify_trigger must be defined in the source.
 local has_fn = src:find("function M.classify_trigger", 1, true) ~= nil

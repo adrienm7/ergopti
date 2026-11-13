@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 --- @param body function fn(Backup, store, failures)
 local function with_store(store, body)
 	local failures = {}
-	helpers.with_fresh_modules({ "modules.updater.config_backup", "core.fs.adapters.storage", "infra.config_paths" }, function()
+	helpers.with_fresh_modules({ "modules.updater.config_backup", "core.fs.adapters.storage", "settings.engine.paths" }, function()
 		package.loaded["core.fs.adapters.storage"] = {
 			read_exact = function(key)
 				if failures.read then return false, nil end
@@ -29,7 +29,7 @@ local function with_store(store, body)
 				return true
 			end,
 		}
-		package.loaded["infra.config_paths"] = { get_config_dir = function() return "/Users/me/cfg" end }
+		package.loaded["settings.engine.paths"] = { get_config_dir = function() return "/Users/me/cfg" end }
 		body(helpers.load_with_stubs("modules.updater.config_backup"), store, failures)
 	end)
 end

@@ -49,7 +49,7 @@ local US_INTL = keymap("dead_grave, dead_tilde", "minus, underscore", "NoSymbol,
 local function fresh(stored)
 	local log = { deferred = {}, executed = {} }
 	local previous = {}
-	for _, name in ipairs({ "core.fs.adapters.storage", "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
+	for _, name in ipairs({ "core.fs.adapters.storage", "settings.engine.paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
 		previous[name] = package.loaded[name]
 	end
 	local prefs = {}
@@ -61,7 +61,7 @@ local function fresh(stored)
 	end
 	Sandbox.write_bytes(path, table.concat(lines, "\n") .. "\n")
 	log.path = path
-	package.loaded["infra.config_paths"] = { config = function() return path end }
+	package.loaded["settings.engine.paths"] = { config = function() return path end }
 	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key, default) if prefs[key] == nil then return default end return prefs[key] end,
 		set = function(key, value) prefs[key] = value return true end,
@@ -78,7 +78,7 @@ local function fresh(stored)
 		defer = function(fn) log.deferred[#log.deferred + 1] = fn return true end,
 	})
 	log.restore = function()
-		for _, name in ipairs({ "core.fs.adapters.storage", "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
+		for _, name in ipairs({ "core.fs.adapters.storage", "settings.engine.paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
 			package.loaded[name] = previous[name]
 		end
 		os.remove(path)
@@ -168,7 +168,7 @@ helpers.describe("Linux number-row tap keys (tap-keys)", function()
 			local marked = {}
 			TapKeys.mark_config_reads(decoded, function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
 			helpers.assert_eq(table.concat(marked), "shortcuts.tap_keys.number_row_left")
-			local cleanup = require("ui.menu.unused_keys_cleanup")
+			local cleanup = require("settings.ui.menu.unused_keys_cleanup")
 			local live_marked = {}
 			-- Other owners remain real; the action catalogue stub supplies its unused collector.
 			package.loaded["modules.gestures.manager"].mark_config_reads = function() end

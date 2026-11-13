@@ -44,10 +44,10 @@ helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 
 	helpers.it("binds and labels shifted slots through the real declared prefix consumer", function()
 		return helpers.with_stub_scope({
-			"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "core.fs.engine.paths", "infra.config_paths",
-			"infra.preferences", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts",
+			"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "core.fs.engine.paths", "settings.engine.paths",
+			"settings.engine.preferences.preferences", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts",
 		}, function()
-			helpers.load_with_stubs("infra.preferences")
+			helpers.load_with_stubs("settings.engine.preferences.preferences")
 			local observed = {}
 			package.loaded["core.fs.engine.paths"] = {shared = helpers.shared}
 			package.loaded["core.fs.adapters.file_system"] = {read = function(path)

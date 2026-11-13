@@ -116,7 +116,7 @@ local OWNED = {
 	"core.process.adapters.task_environment",
 	"core.events.timer_scheduler",
 	"platform.focus.window_info",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.timing.engine.deferred_work",
 	"core.lifecycle.engine.shutdown.emergency_exit",
 	"infra.field_run_selftest",

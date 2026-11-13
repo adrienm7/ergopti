@@ -46,7 +46,7 @@ local function fresh_engine(rules, max_arrows)
 	package.loaded["core.text.engine.utils"] = nil
 	package.loaded["core.text.engine.utils_core"]       = nil
 
-	local Registry = require("modules.keymap.registry")
+	local Registry = require("settings.engine.registry")
 	local Expander = require("modules.keymap.expander")
 	local state = State.new({ trigger_char = "\xe2\x98\x85", expansion_delay = 0.4 }, {})
 	Registry.init(state)
