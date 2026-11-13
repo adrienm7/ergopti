@@ -268,12 +268,12 @@ const BASELINE_SHARED = 51;
 //   and XKB files themselves and build no keyboard DLL, so counterpart
 //   folders there would hold nothing.
 //   65 -> 68 on 2026-11-11 (coordinator, overnight; to review by the maintainer) -
-//   linux/desktop_focus with its gnome and kwin children: the GNOME Shell
+//   linux/platform/desktop_focus with its gnome and kwin children: the GNOME Shell
 //   extension and the KWin script the installer places so the daemon can read
 //   the focused window under Wayland, where no client may ask the compositor.
 //   Windows and macOS read focus through their own native APIs and install no
 //   desktop-shell code, so counterpart folders there would hold nothing.
-const BASELINE_UNION = 73;
+const BASELINE_UNION = 71;
 
 // ── The test trees, measured apart from the architecture ────────────────────
 //

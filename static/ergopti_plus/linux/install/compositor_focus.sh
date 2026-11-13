@@ -5,7 +5,7 @@
 # MODULE: Desktop Focus Integration Installer
 # DESCRIPTION:
 # Installs, enables and removes the two desktop-side halves of the Wayland
-# focused-application identity (linux/desktop_focus/): the Ergopti GNOME Shell
+# focused-application identity (linux/platform/desktop_focus/): the Ergopti GNOME Shell
 # extension and the Ergopti KWin script. GNOME admits its Introspect interface
 # to allow-listed senders only and KWin answers only a loaded script, so code
 # inside the desktop is the only way to learn which window has focus there.
@@ -32,7 +32,7 @@ set -uo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
 
 # Pinned by tests/unit/adapters/compositor_focus/test_compositor_focus_assets.lua
-# against desktop_focus/gnome/metadata.json and desktop_focus/kwin/metadata.json.
+# against platform/desktop_focus/gnome/metadata.json and platform/desktop_focus/kwin/metadata.json.
 GNOME_FOCUS_UUID="focus@ergopti.fr"
 KWIN_FOCUS_ID="ergopti-focus"
 

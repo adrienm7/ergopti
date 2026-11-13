@@ -1,4 +1,4 @@
-// linux/desktop_focus/kwin/contents/code/main.js
+// linux/platform/desktop_focus/kwin/contents/code/main.js
 
 /**
  * ==============================================================================

@@ -26,7 +26,7 @@ end
 helpers.describe("compositor_focus: shipped desktop files", function()
 	helpers.it("(wayland-desktop-focus) the extension and the KWin script call the daemon's name", function()
 		local Focus = helpers.load_module("adapters.compositor_focus")
-		for _, path in ipairs({ "desktop_focus/gnome/extension.js", "desktop_focus/kwin/contents/code/main.js" }) do
+		for _, path in ipairs({ "platform/desktop_focus/gnome/extension.js", "platform/desktop_focus/kwin/contents/code/main.js" }) do
 			local text = read(path)
 			helpers.assert_eq(constant(text, "BUS_NAME"), Focus.BUS_NAME, path)
 			helpers.assert_eq(constant(text, "OBJECT_PATH"), Focus.OBJECT_PATH, path)
@@ -40,8 +40,8 @@ helpers.describe("compositor_focus: shipped desktop files", function()
 
 	helpers.it("(wayland-desktop-focus) the installer and the worker name the shipped packages", function()
 		local json = require("core.text.engine.json")
-		local gnome = json.decode(read("desktop_focus/gnome/metadata.json"))
-		local kwin = json.decode(read("desktop_focus/kwin/metadata.json"))
+		local gnome = json.decode(read("platform/desktop_focus/gnome/metadata.json"))
+		local kwin = json.decode(read("platform/desktop_focus/kwin/metadata.json"))
 		local installer = read("install/compositor_focus.sh")
 		helpers.assert_eq(installer:match('\nGNOME_FOCUS_UUID="([^"]+)"'), gnome.uuid)
 		helpers.assert_eq(installer:match('\nKWIN_FOCUS_ID="([^"]+)"'), kwin.KPlugin.Id)

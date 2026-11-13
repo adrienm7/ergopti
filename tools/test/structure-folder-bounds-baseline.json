@@ -16,5 +16,5 @@
 	"_shared.code_singleton": 20,
 	"_shared.tests_oversized": 1,
 	"_shared.tests_singleton": 1,
-	"drivers.mismatched_top_level": 4
+	"drivers.mismatched_top_level": 3
 }

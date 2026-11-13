@@ -19,7 +19,7 @@
 ---     listing marks the activated toplevel.
 ---   - GNOME removed Shell.Eval in 41 and admits its Introspect interface to
 ---     allow-listed senders only, and KDE answers only a loaded KWin script:
----     the Ergopti Shell extension and KWin script (linux/desktop_focus/) push
+---     the Ergopti Shell extension and KWin script (linux/platform/desktop_focus/) push
 ---     every focus change to a session-bus name the daemon owns
 ---     (adapters/compositor_focus), read here from memory, without a fork.
 ---   - COSMIC's own toplevel protocol needs a native Wayland client, and

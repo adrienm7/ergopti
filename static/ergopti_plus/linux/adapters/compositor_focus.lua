@@ -6,7 +6,7 @@
 --- Keeps the focused window GNOME Shell, KWin and cosmic-comp push to the
 --- daemon, so adapters/window_info answers the four-times-a-second focus poll
 --- from memory. The Ergopti GNOME Shell extension and KWin script
---- (linux/desktop_focus/) call the session-bus name below, which
+--- (linux/platform/desktop_focus/) call the session-bus name below, which
 --- adapters/compositor_focus_worker owns in a resident child; under COSMIC,
 --- adapters/cosmic_toplevel_worker reads the compositor's toplevel-info
 --- protocol instead. Both print one JSON line per change, in the same records.
