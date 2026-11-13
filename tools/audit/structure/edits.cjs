@@ -151,6 +151,18 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 			'\t\t) || path.join(AHK_ADAPTERS_DIRS[0], `${adapterName}.ahk`);'
 	},
 	{
+		// The ledger's family contracts leave one folder for two, and lose the
+		// name prefixes that told them from their neighbours there.
+		file: 'tools/test/test-contract-vector-ledger.cjs',
+		moves: '_shared/lua/test/menu_numbered_caption_contract.lua',
+		from: "const FAMILY = [[['lua', 'test'], /^(config_scope|toml_|menu_)/]];",
+		to:
+			'const FAMILY = [\n' +
+			"\t[['tests', 'lua', 'menu'], /^(?!feature_notice_contract)/],\n" +
+			"\t[['tests', 'lua', 'settings'], /^(scope_(?!owner_|sparse_)|toml_)/]\n" +
+			'];'
+	},
+	{
 		// The package setup fixture makes the folder it copies the identifiers
 		// into; _shared/data scatters, and its nearest home (_shared) is not
 		// where the identifiers land.
