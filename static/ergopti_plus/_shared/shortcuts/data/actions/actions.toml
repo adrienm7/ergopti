@@ -1771,6 +1771,18 @@ platform = "ahk,hs,linux"
 [sg_actions.sticky_hyper]
 platform = "ahk,hs,linux"
 
+# The layout's AltGr level held for one key (maintainer decision of
+# 2026-11-13): Right Alt on Linux, Option on macOS (Ergopti's AltGr level),
+# and on Windows the layout's own AltGr key, Kana on a Kana-style layout
+# (KS_AltGrSendKey). One action covers AltGr and Kana: every layout compiles
+# its Kana layers to that level (decided by the agent on 2026-11-13, to review
+# by the maintainer).
+[sg_actions.sticky_altgr]
+platform = "ahk,hs,linux"
+
+[sg_actions.sticky_altgr_shift]
+platform = "ahk,hs,linux"
+
 # --- Debug ---
 
 [sg_actions.open_console]
@@ -2102,6 +2114,8 @@ items = [
     "sticky_cmd_option_ctrl",
     "sticky_cmd_shift_ctrl",
     "sticky_option_shift_ctrl",
+    "sticky_altgr",
+    "sticky_altgr_shift",
     "sticky_hyper",
     "--",
     "#grp_app",

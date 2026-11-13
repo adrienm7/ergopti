@@ -815,6 +815,8 @@ function M.action_handlers()
 		["sticky_cmd_shift_ctrl"] = function() return M.arm_sticky("sticky_cmd_shift_ctrl") end,
 		["sticky_option_shift_ctrl"] = function() return M.arm_sticky("sticky_option_shift_ctrl") end,
 		["sticky_hyper"] = function() return M.arm_sticky("sticky_hyper") end,
+		["sticky_altgr"] = function() return M.arm_sticky("sticky_altgr") end,
+		["sticky_altgr_shift"] = function() return M.arm_sticky("sticky_altgr_shift") end,
 		["select_line"] = function() return M.select_line() end,
 		["select_word"] = function() return M.select_word() end,
 		["paste_plain"] = function() return M.paste_plain() end,

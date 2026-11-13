@@ -79,7 +79,7 @@ function rawSpellings() {
 function stickyModifiers(action) {
 	const match = /^sticky_(.+)$/.exec(action);
 	if (match === null || match[1] === 'hyper') return null;
-	const ids = { cmd: 'cmd', ctrl: 'ctrl', option: 'alt', shift: 'shift' };
+	const ids = { cmd: 'cmd', ctrl: 'ctrl', option: 'alt', shift: 'shift', altgr: 'alt_gr' };
 	return match[1].split('_').map((token) => {
 		if (!Object.hasOwn(ids, token)) throw new Error(`sticky action ${action} names ${token}`);
 		return ids[token];

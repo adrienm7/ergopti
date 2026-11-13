@@ -3107,6 +3107,8 @@
 	"sg_actions.page_up": "⇞ Page Up",
 	"sg_actions.save": "⌘S Сохранить",
 	"sg_actions.spotlight": "🔍 Spotlight",
+	"sg_actions.sticky_altgr": "📌 Залипающий {1}",
+	"sg_actions.sticky_altgr_shift": "📌 Залипающий {1}",
 	"sg_actions.sticky_cmd": "📌 Залипающий {1}",
 	"sg_actions.sticky_cmd_ctrl": "📌 Залипающий {1}",
 	"sg_actions.sticky_cmd_option": "📌 Залипающий {1}",

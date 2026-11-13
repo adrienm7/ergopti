@@ -3107,6 +3107,8 @@
 	"sg_actions.page_up": "⇞ Page Up",
 	"sg_actions.save": "⌘S Uložit",
 	"sg_actions.spotlight": "🔍 Spotlight",
+	"sg_actions.sticky_altgr": "📌 Pevný {1}",
+	"sg_actions.sticky_altgr_shift": "📌 Pevný {1}",
 	"sg_actions.sticky_cmd": "📌 Pevný {1}",
 	"sg_actions.sticky_cmd_ctrl": "📌 Pevný {1}",
 	"sg_actions.sticky_cmd_option": "📌 Pevný {1}",

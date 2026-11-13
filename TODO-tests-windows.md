@@ -136,3 +136,7 @@ Account and tester actions (maintainer, from the PC):
 
 - [ ] Navigation-owner DLL after the folder migration (2026-11-13): its manifest fingerprint was derived by the
       migration without a rebuild; run `-UpdateTracked` with the pinned MSVC and check the DLL is byte-identical.
+- [ ] One-shot modifiers (worker A, 2026-11-13): the sticky delay row accepts 0 and shows « no time limit », and the
+      one-shot Shift and `sticky_*` captures then wait with no InputHook timeout; `sticky_altgr` types the AltGr level
+      on the Ergopti layout, through Kana on a Kana-style layout; a tap-hold key set to tap `sticky_altgr` and hold
+      AltGr types one AltGr character after a tap.

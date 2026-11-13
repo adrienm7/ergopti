@@ -3107,6 +3107,8 @@
 	"sg_actions.page_up": "⇞ Page Up",
 	"sg_actions.save": "⌘S सहेजें",
 	"sg_actions.spotlight": "🔍 Spotlight",
+	"sg_actions.sticky_altgr": "📌 स्टिकी {1}",
+	"sg_actions.sticky_altgr_shift": "📌 स्टिकी {1}",
 	"sg_actions.sticky_cmd": "📌 स्टिकी {1}",
 	"sg_actions.sticky_cmd_ctrl": "📌 स्टिकी {1}",
 	"sg_actions.sticky_cmd_option": "📌 स्टिकी {1}",

@@ -3107,6 +3107,8 @@
 	"sg_actions.page_up": "⇞ Page Up",
 	"sg_actions.save": "⌘S Save",
 	"sg_actions.spotlight": "🔍 Spotlight",
+	"sg_actions.sticky_altgr": "📌 Sticky {1}",
+	"sg_actions.sticky_altgr_shift": "📌 Sticky {1}",
 	"sg_actions.sticky_cmd": "📌 Sticky {1}",
 	"sg_actions.sticky_cmd_ctrl": "📌 Sticky {1}",
 	"sg_actions.sticky_cmd_option": "📌 Sticky {1}",

@@ -458,7 +458,8 @@ _GestureActionLabel(Name) {
 
 for _StickyId in ["sticky_ctrl", "sticky_cmd", "sticky_option", "sticky_cmd_shift", "sticky_cmd_option",
 		"sticky_cmd_ctrl", "sticky_option_shift", "sticky_option_ctrl", "sticky_ctrl_shift", "sticky_cmd_option_shift",
-		"sticky_cmd_option_ctrl", "sticky_cmd_shift_ctrl", "sticky_option_shift_ctrl", "sticky_hyper"]
+		"sticky_cmd_option_ctrl", "sticky_cmd_shift_ctrl", "sticky_option_shift_ctrl", "sticky_hyper", "sticky_altgr",
+		"sticky_altgr_shift"]
 	GESTURE_ACTIONS[_StickyId] := { Fn: _GestureMakeStickyRunner(_StickyId) }
 
 ; The remap layer that owns the capture loads after this module.

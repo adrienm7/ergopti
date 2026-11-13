@@ -57,7 +57,7 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
 
 ### Maintainer decisions of 2026-11-13, to implement
 
-- [ ] **One-shot modifiers (OSM-002 and beyond).** Timeout (decided 2026-11-13, replaces the 2026-11-06 refusal of
+- [x] **One-shot modifiers (OSM-002 and beyond).** Timeout (decided 2026-11-13, replaces the 2026-11-06 refusal of
       0 and unlimited): `0` means « no time limit » on every OS. Today each OS asks the delay in a numeric box that
       accepts only a positive whole number (`TapHoldValidOneShotTimeoutMs`, Linux `valid_one_shot_timeout_ms`, the
       macOS `sticky_dialog` prompt): accept 0 there and in `config.toml`, say « 0 = no time limit » in the prompt
@@ -73,8 +73,14 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
         `TapHoldValidOneShotTimeoutMs` and `TapHoldOneShotHookTimeoutOption` on Windows); prompt says
         « 0 = no time limit », menu label `menu.tapholds.sticky_no_limit` in 21 locales; negative and
         fractional values refused.
-  - [ ] Every one-shot on every OS (Linux has no `sticky_*` yet; AltGr and Kana one-shots exist nowhere).
-  - [ ] Tap = one-shot of a modifier, hold = that modifier.
+  - [x] Every one-shot on every OS: Linux runs the fifteen `sticky_*` actions in its tap-hold engine
+        (`arm_sticky`), and `sticky_altgr` / `sticky_altgr_shift` exist on the three OS. One action covers AltGr
+        and Kana: the layouts compile their Kana layers to the AltGr level, and Windows sends the layout's own
+        AltGr key, Kana on a Kana-style layout (decided by the agent on 2026-11-13, to review by the maintainer).
+  - [x] Tap = one-shot of a modifier, hold = that modifier: every OS takes a `sticky_*` action as a tap-hold tap
+        (Right Ctrl already ships one-shot Shift + Shift); the AltGr pair is pinned by tests per OS. The shipped
+        AltGr key keeps its Tab tap (decided by the agent on 2026-11-13, to review by the maintainer).
+  - Hardware checks are in TODO-tests-windows.md, TODO-tests-macos.md and TODO-tests-linux.md.
 - [ ] **One validation contract for every user-entered value (maintainer request 2026-11-13).** Every input box,
       editor field and `config.toml`/TOML key on Windows, macOS and Linux declares its type (integer, decimal,
       boolean, enum, string, path), minimum, maximum, whether decimals are allowed and any special value (such as

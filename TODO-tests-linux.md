@@ -74,3 +74,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       the one-shot wait; a CapsWord menu change applies to the running session. Native one-shot Shift real-device
       output receiving; CapsWord absolute reader and desktop keyboard grouping (moved from the one-shot and
       CapsWord parity follow-ups).
+- [ ] One-shot modifiers (worker A, 2026-11-13): Tap-holds > sticky delay row accepts 0 and shows « no time limit »,
+      and a one-shot Shift then waits indefinitely; a gesture or key bound to `sticky_ctrl_shift`, `sticky_cmd_ctrl`
+      (Super+Ctrl) and `sticky_altgr` wraps the next key in those modifiers once, in a GTK and a Qt application; a
+      tap-hold key set to tap `sticky_altgr` and hold AltGr types one AltGr character after a tap.
