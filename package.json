@@ -154,6 +154,7 @@
 		"test:pinned-reads-shared-helpers": "node ./tools/test/test-pinned-reads-shared-helpers.cjs",
 		"test:structure-repin": "node ./tools/test/test-structure-repin.cjs",
 		"test:structure-lua-prefix-sweeps": "node ./tools/test/test-structure-lua-prefix-sweeps.cjs",
+		"test:structure-scope-ancestor": "node ./tools/test/test-structure-scope-ancestor.cjs",
 		"test:shared-literal-inventory": "node ./tools/test/test-shared-literal-inventory.cjs",
 		"test:stub-interception": "node ./tools/test/test-stubs-intercept-something.cjs",
 		"test:action-emit-per-os": "node ./tools/test/test-action-emit-is-per-os.cjs",
