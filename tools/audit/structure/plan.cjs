@@ -1460,6 +1460,9 @@ function folderGains(map) {
 		let i = 0;
 		while (i < a.length - 1 && i < b.length - 1 && a[i] === b[i]) i++;
 		if (i === 0 || i >= a.length - 1 || i >= b.length - 1 || a[i] === b[i]) continue;
+		// A driver's own folders and its test suites': the shared tree's lists
+		// name languages and data kinds as often as folders.
+		if (!Census.DRIVERS.includes(a[0])) continue;
 		const parent = a.slice(0, i).join('/');
 		const key = `${parent}|${a[i]}|${b[i]}`;
 		if (!gains.has(key)) gains.set(key, { parent, from: a[i], to: b[i], siblings: new Set() });
@@ -1553,7 +1556,8 @@ function scanFile(file, text, ctx) {
 				oldRepo: `${PREFIX}${treeGains[0].parent}`
 			});
 		}
-		for (const m of text.matchAll(/\(((?:[a-z_]+\|)+[a-z_]+)\)/g)) {
+		// \.(ahk|lua) is a list of extensions, whatever folders share the names.
+		for (const m of text.matchAll(/(?<!\\\.)\(((?:[a-z_]+\|)+[a-z_]+)\)/g)) {
 			const names = m[1].split('|');
 			const to = [...new Set(gainsFor(names).map((g) => g.to))];
 			if (to.length === 0) continue;
