@@ -88,6 +88,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '\t\t\tlocal source = "@" .. case.prefix .. separator .. "linux" .. separator .. "core" .. separator .. "fs"\n\t\t\t\t.. separator .. "engine" .. separator .. "paths.lua"'
 	},
 	{
+		// A line of the Linux menu root the parts check expects once, quoted as
+		// JavaScript: its module key follows S05's move of linux/infra/i18n.lua.
+		file: 'tools/test/test-linux-menu-parts.cjs',
+		moves: 'linux/infra/i18n.lua',
+		from: '\t\'local uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")\'',
+		to: '\t\'local uninstall_caption_i18n = rawget(separator_modules, "core.i18n.engine.i18n")\''
+	},
+	{
 		// The port wiring check joins each Lua driver's file-system adapter with
 		// the driver as a variable piece; S04 moves both to core/fs/adapters.
 		file: 'tools/test/test-file-system-port-wired.cjs',
