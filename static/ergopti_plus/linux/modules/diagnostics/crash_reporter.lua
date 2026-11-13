@@ -261,7 +261,8 @@ function M.dump(module_name, error_msg, context)
 			if type(context.stack_trace) == "string" then fields.stack_trace = context.stack_trace end
 			if type(context.locale) == "string" then fields.locale = context.locale end
 		end
-		return redact(CrashReport.encode(CrashReport.build(fields)))
+		local redacted = CrashReport.redact(CrashReport.build(fields), redact)
+		return redacted and CrashReport.encode(redacted) or nil
 	end)
 	if not prepared or type(document) ~= "string" or not live() then return refused() end
 	local made, status = pcall(_ensure_dir, directory)
