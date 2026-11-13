@@ -2260,17 +2260,21 @@ function scanFile(file, text, ctx) {
 				presentNames.has(`${d}|${n}`) &&
 				!['macos', 'linux'].some((o) => o !== d && presentNames.has(`${o}|${n}`))
 		);
+	// The Lua drivers a file outside the trees names: in its path, as a path
+	// segment, as one piece of a joined path (path.join(root, 'macos')), or by
+	// requiring a module only that driver has.
+	const namedDrivers = ['macos', 'linux'].filter(
+		(d) =>
+			file.includes(d) ||
+			text.includes(`/${d}`) ||
+			new RegExp(`\\bpath\\.(?:join|resolve)\\([^)]*(["'])${d}\\1`).test(text) ||
+			ownsAlone(d)
+	);
 	const luaRoots = Census.DRIVERS.includes(inTree)
 		? [inTree, '_shared']
 		: inTree === '_shared'
 			? ['_shared', 'macos', 'linux']
-			: [
-					'_shared',
-					...['macos', 'linux'].filter(
-						(d) =>
-							file.includes(d) || text.includes(`/${d}`) || (file.endsWith('.lua') && ownsAlone(d))
-					)
-				];
+			: ['_shared', ...namedDrivers];
 	if (file.endsWith('.lua') && /\bpackage\.loaded\b/.test(text)) {
 		// A module-name prefix as a Lua pattern, name:match("^modules%.llm%."):
 		// a sweep of package.loaded over every module it covers. A step that
@@ -2498,7 +2502,7 @@ function scanFile(file, text, ctx) {
 		// written to disk): its require sites, and only those, move. The driver
 		// is the one the file names; a name both Lua drivers answer differently
 		// is left alone rather than guessed.
-		const drivers = ['macos', 'linux'].filter((d) => file.includes(d) || text.includes(`/${d}`));
+		const drivers = namedDrivers;
 		for (const m of text.matchAll(luaToken)) {
 			// A dotted name a tool checks a source for (src.includes('keystats.x'))
 			// is a module name too, unless it is a config or locale key.
