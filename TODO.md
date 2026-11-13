@@ -434,7 +434,10 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       The Windows Unit tests meta red (`desktop-ci-evidence`, « a delay between attempts » 0/2, run 43275487956) was
       already fixed by 6082c02f46 (the SwiftPM resolve fakes run ahead of Git Bash's own `sleep`): meta is green on
       `dev` runs 43306862276 and 43457158223, so it left the baseline list.
-- [ ] **Linux hardware test still passes the removed pause argument (found 2026-11-12).**
+- [x] **Linux hardware test still passes the removed pause argument (found 2026-11-12).** Done 2026-11-13 (worker D):
+      the three calls pass the edit source only, and the paused step now expects the copy to run (EDD-1: a pause stops
+      typing, not configuration) and an unchanged copy to keep both files byte for byte; the paused session still
+      forwards the pair. Needs `/dev/uinput`, so only the Linux E2E desktop-webview job runs it.
       `linux/tests/hardware/run_simultaneous_configuration_real.lua` still passes `script.is_paused` to `Scope.edit`
       and `Scope.copy_taps_to_chords`, which take `expected_source` there since the EDD-1 pause-argument removal,
       so the pause function lands in `expected_source` and Linux E2E

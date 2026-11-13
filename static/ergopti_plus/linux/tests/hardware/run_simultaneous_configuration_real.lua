@@ -247,10 +247,10 @@ local function run()
 	burst(15,58); expect(COPY,8,"saved symmetric reverse pair dispatches the original copy action once")
 	completed[#completed + 1] = "symmetric-copy"
 
-	assert(Scope.edit({{section="mod_combos.config.tab_then_caps_lock",key="combo",value="none"}}, script.is_paused, edit_source()),
+	assert(Scope.edit({{section="mod_combos.config.tab_then_caps_lock",key="combo",value="none"}}, edit_source()),
 		"original publisher clears only the known third slot")
 	local before = assert(Writer.output_view(output))
-	assert(Scope.copy_taps_to_chords(script.is_paused, edit_source()), "original owner copies real saved taps")
+	assert(Scope.copy_taps_to_chords(edit_source()), "original owner copies real saved taps")
 	local saved = assert(Files.read_with_status(config_path))
 	local document = assert(Codec.decode(saved))
 	check(document.category_enabled.key_combinations == true and document.mod_combos.enabled == true
@@ -264,14 +264,15 @@ local function run()
 	burst(58,15); expect(COPY,8,"reloaded copied slot dispatches through the original catalogue")
 	completed[#completed + 1] = "published-reload-copy"
 
-	-- The copy now spans both files: a refused one leaves each byte for byte.
+	-- A pause stops typing, not configuration (EDD-1, maintainer 2026-11-12):
+	-- the copy still runs, and an unchanged one leaves each file byte for byte.
 	local saved_config = assert(Files.read_with_status(config_path))
 	local saved_chords = assert(Files.read_with_status(tap_path))
 	script.toggle_pause()
 	assert(script.is_paused() and not Manager.is_active(), "real script controller withdraws remapping")
-	check(Scope.copy_taps_to_chords(script.is_paused) == false and Files.read_with_status(config_path) == saved_config
+	check(Scope.copy_taps_to_chords(edit_source()) == true and Files.read_with_status(config_path) == saved_config
 		and Files.read_with_status(tap_path) == saved_chords,
-		"paused original policy refuses copy and preserves exact saved bytes")
+		"a paused session still copies its configuration and an unchanged copy keeps the exact saved bytes")
 	burst(58,15); expect(PASSTHROUGH,8,"paused session forwards the original edges without business copy")
 	script.toggle_pause(); assert(not script.is_paused() and Manager.is_active())
 	burst(58,15); expect(COPY,8,"real resume restores the saved simultaneous route")
