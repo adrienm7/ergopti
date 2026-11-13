@@ -896,6 +896,30 @@ function run() {
 			'an AutoHotkey climb keeps its climb and follows the file'
 		);
 	}
+	// A list of a driver's folders naming one a step's file leaves names the
+	// folder it moves into: S02 took crypto out of adapters into core, and
+	// every scanner list, fixture copy and test group missed core.
+	const gainMap = new Map([
+		['windows/adapters/crypto.ahk', 'windows/core/crypto/crypto.ahk'],
+		['windows/infra/a.ahk', 'windows/infra/a.ahk'],
+		['windows/modules/b.ahk', 'windows/modules/b.ahk']
+	]);
+	const gainText =
+		"const T = ['adapters', 'infra', 'modules'];\n" +
+		'const G = /^unit\\/(adapters|infra)\\//;\n' +
+		"const D = ['adapters', 'docs'];\n";
+	assert.equal(
+		Apply.rewriteText(
+			gainText,
+			Plan.scanFile('tools/test/z.cjs', gainText, Plan.referenceContext(gainMap)),
+			new Map(),
+			'tools/test/z.cjs'
+		),
+		"const T = ['adapters', 'infra', 'modules', 'core'];\n" +
+			'const G = /^unit\\/(adapters|infra|core)\\//;\n' +
+			"const D = ['adapters', 'docs'];\n",
+		'a sibling folder list gains the folder the step creates'
+	);
 	// Third-party code keeps its own paths; our scripts in a vendor folder move.
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/_shared/ui/vendor/fengari-web.js'));
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/windows/vendor/WebView2.ahk'));

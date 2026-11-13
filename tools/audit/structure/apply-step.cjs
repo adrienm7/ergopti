@@ -181,6 +181,7 @@ function rewriteText(text, rows, movedRepo, file) {
 				'scope-split',
 				'shared-prefix',
 				'source-check',
+				'tree-list',
 				'lua-concat'
 			].includes(row.kind)
 		) {
