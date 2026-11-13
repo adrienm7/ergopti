@@ -100,8 +100,9 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
       instead of rewriting the `sources` list; keep a clear refusal when the extension is absent.
 - [ ] **GTK 3 Compose:** enable IBus for Compose when no input method is active; never replace an active fcitx5;
       keep the inlined single-character rules as the safety net, and state the remaining limit in the menu.
-- [ ] **UPD-2 on AHK confirmed:** manual checks, changelog/Versions windows, channel and interval settings and the
+- [x] **UPD-2 on AHK confirmed:** manual checks, changelog/Versions windows, channel and interval settings and the
       update prompt run while paused, as on macOS and Linux; background checks keep their pause drop.
+      Done 2026-11-13 by worker E (see the « UPD-2 on AHK » line of « Remaining code work »).
 - Validated as they are: structured import keeps action/state names and modifier tokens; the editor page compiles
   and the host never recompiles; macOS ANSI swaps are declared per layout; Unicode names inlined in the app and
   lazy on the site; KMD-3 Linux `awake_ms`; MRT-004 `core.json` fence; resting-thumb bounds (tighten from the next
@@ -386,7 +387,16 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
 
-- [ ] **UPD-2 on AHK (decided by the coordinator on 2026-11-12, after the maintainer's real pause).** A manual check,
+- [x] **UPD-2 on AHK (decided by the coordinator on 2026-11-12, after the maintainer's real pause).**
+      Done 2026-11-13 by worker E: `_Updater_RequestPolicy` allows a manual request whatever the pause and the
+      suspend boundary keeps in-flight manual checks; installs keep the AHK-14 pause contract through
+      `_Updater_InstallRequestPolicy` (download reservation, managed-failure retry, signature fetch,
+      `ForInstall` publication) and refuse visibly while paused; an install asked after a check that crossed a
+      pause owns a fresh request. The update-check window keeps its `BornSuspended` capture (F-25) and refuses
+      only `update` while paused. AHK-31's suspend cancellation now drives a background request, with a new case
+      for a manual check kept through a pause in preparation. Decided by the agent on 2026-11-13, to review by the
+      maintainer: the one-click « Update now » is an install and refuses while paused. Installs while paused stay
+      the follow-up below. A manual check,
       the changelog and Versions windows, the release links, the channel and interval settings and the update prompt
       should run while paused, as macOS `check_now` and Linux `check_for_updates`; background checks keep their pause
       drop. Tried on 2026-11-12 (ea031503, reverted in 79d1914b): `_Updater_RequestPolicy` allowed a manual request

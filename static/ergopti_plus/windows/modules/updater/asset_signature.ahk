@@ -201,7 +201,8 @@ _AssetSignature_Fetch(Url, Request) {
 	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
 	Started := A_TickCount
 	Req := CurlAsyncRequest()
-	Req.SetManagedRouting(0, () => _Updater_RequestPolicy(Request) == UPDATER_REQUEST_POLICY_ALLOW)
+	; The signature is fetched for an install, which stops at a pause (UPD-2).
+	Req.SetManagedRouting(0, () => _Updater_InstallRequestPolicy(Request) == UPDATER_REQUEST_POLICY_ALLOW)
 	Req.SetDeadline(Started, UPDATER_HTTP_RESOLVE_TIMEOUT_MS + UPDATER_HTTP_CONNECT_TIMEOUT_MS
 		+ UPDATER_HTTP_SEND_TIMEOUT_MS + UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 	Req.Open("GET", Url, true)
