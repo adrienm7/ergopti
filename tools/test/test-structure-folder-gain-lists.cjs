@@ -58,6 +58,12 @@ function run() {
 		out.includes('\tDRIVER_ROOT .. "adapters",\n\tDRIVER_ROOT .. "core",\n\thelpers.shared(""),'),
 		out
 	);
+	// A non-capturing alternation is the same list: the Linux pinned-read
+	// ratchet's (?:modules|infra|lib|ui|adapters) lost every pin under core/.
+	const rx = "const LIT = '(?:modules|infra|ui|adapters)[\\\\\\\\/]';\n";
+	const rxRows = Plan.scanFile('tools/lint/zz_probe.cjs', rx, Plan.referenceContext(stepMap));
+	const rxOut = Apply.rewriteText(rx, rxRows, new Map(), 'tools/lint/zz_probe.cjs');
+	assert.ok(rxOut.includes('(?:modules|infra|ui|adapters|core)'), rxOut);
 	// A single element is no list of siblings: it gains nothing.
 	const lone = 'local ROOTS = {\n\tDRIVER_ROOT .. "adapters",\n}\n';
 	const loneRows = Plan.scanFile(FILE, lone, Plan.referenceContext(stepMap));
