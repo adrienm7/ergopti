@@ -87,7 +87,14 @@ end
 --- @return string|nil kind, table|nil window
 function M.parse_record(record)
 	if type(record) ~= "table" then return nil end
-	if record.kind == "ready" or record.kind == "clear" then return record.kind end
+	if record.kind == "ready" then
+		-- COSMIC's worker names the toplevel-info version it bound.
+		local protocol = record.protocol
+		if protocol ~= nil and (type(protocol) ~= "number" or protocol < 1 or protocol % 1 ~= 0
+			or protocol > 1000) then return nil end
+		return "ready", { protocol = protocol }
+	end
+	if record.kind == "clear" then return record.kind end
 	if record.kind ~= "focus" then return nil end
 	if type(record.class) ~= "string" or type(record.title) ~= "string"
 		or type(record.id) ~= "string" or record.id == "" then return nil end
@@ -152,7 +159,8 @@ function M.new(options)
 			if status ~= "starting" then fail("duplicate worker readiness"); return end
 			status = "ready"
 			Logger.info(LOG, "Listening for %s focus reports on %s.", reporter,
-				family == "cosmic" and "zcosmic_toplevel_info_v1" or M.BUS_NAME)
+				family == "cosmic" and ("zcosmic_toplevel_info_v1 version " .. tostring(window.protocol))
+					or M.BUS_NAME)
 			return
 		end
 		if status ~= "ready" then fail("focus report before readiness"); return end
