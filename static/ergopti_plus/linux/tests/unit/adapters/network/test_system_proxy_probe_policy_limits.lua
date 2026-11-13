@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
-local helper = helpers.driver_root() .. "/platform/network/system_proxy_probe.lua"
+local helper = assert(package.searchpath("platform.network.system_proxy_probe", package.path))
 
 --- Runs the helper against a shared root and returns its one receipt.
 --- @param root string Shared root handed as the helper's argument.

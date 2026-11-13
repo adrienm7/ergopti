@@ -74,7 +74,7 @@ Helpers.describe("platform/network/digest_probe exact raw descriptor", function(
 			package.loaded["ffi"] = { cdef = function() end,
 				load = function() loads = loads + 1; return {} end }
 			local ok, err = xpcall(function()
-				local chunk = assert(loadfile(root .. "/platform/network/digest_probe.lua"))
+				local chunk = assert(loadfile(assert(package.searchpath("platform.network.digest_probe", package.path))))
 				local called, refusal = pcall(chunk)
 				Helpers.assert_eq(called, false, "Invalid probe descriptor cannot admit crypto")
 				Helpers.assert_eq(type(refusal), "string", "Native probe refusal has a concrete reason")

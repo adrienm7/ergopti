@@ -23,7 +23,7 @@ local Paths = require("infra.paths")
 local Shell = require("adapters.shell_runner")
 local uv = require("luv")
 
-local helper = helpers.driver_root() .. "/platform/network/system_proxy_probe.lua"
+local helper = assert(package.searchpath("platform.network.system_proxy_probe", package.path))
 
 --- Runs the real helper as a child of this interpreter and returns its stdout.
 --- @param request table The packet written to the helper's stdin.
