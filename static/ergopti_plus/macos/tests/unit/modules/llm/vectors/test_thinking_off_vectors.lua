@@ -4,7 +4,7 @@
 --- MODULE: Thinking-Off Corpus (shared Lua oracle)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/thinking_off_vectors.json through the
---- shared resolver (_shared/lua/llm/thinking_off.lua), which macOS and Linux
+--- shared resolver (_shared/ai/engine/policy/thinking_off.lua), which macOS and Linux
 --- use and the AutoHotkey port replays too: id normalization, globs, the deep
 --- merge, every family through every provider dialect, the HTTP 400 refusal
 --- of an added field, and the refusal of a malformed table.
@@ -18,12 +18,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local ThinkingOff = require("llm.thinking_off")
+local ThinkingOff = require("ai.engine.policy.thinking_off")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -76,8 +76,8 @@ end
 
 helpers.describe("thinking_off replays the shared corpus (thinking-off-everywhere)", function()
 	local corpus = read_json("tests/corpus/llm/thinking_off_vectors.json")
-	local providers = read_json("modules/llm/api_providers.json").providers
-	local families = assert(ThinkingOff.parse_families(read_json("modules/llm/thinking_off.json")))
+	local providers = read_json("ai/data/api_providers.json").providers
+	local families = assert(ThinkingOff.parse_families(read_json("ai/data/thinking_off.json")))
 
 	--- The shipped dialect of a provider.
 	local function dialect(provider)

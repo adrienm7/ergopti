@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. The message rules and the page state are shared with Linux
----    (_shared/lua/layouts/manager_bridge.lua): an allowlist of actions, each
+---    (_shared/layouts/engine/manager_bridge.lua): an allowlist of actions, each
 ---    checked against the catalogue or the installed layouts before it runs.
 --- 2. Singleton: a second open focuses the existing window. Only the exact
 ---    window this module created may receive pushes or close, so a late
@@ -26,8 +26,8 @@ local DeferredWork  = require("infra.deferred_work")
 local i18n          = require("infra.i18n")
 local Paths         = require("infra.paths")
 local FileSystem    = require("adapters.file_system")
-local Json          = require("json")
-local ManagerBridge = require("layouts.manager_bridge")
+local Json          = require("core.text.engine.json")
+local ManagerBridge = require("layouts.engine.manager_bridge")
 local ControllerPool = require("ui.webview_controller_pool").new(function(name)
 	return hs.webview.usercontent.new(name)
 end, Logger)
@@ -159,9 +159,9 @@ end
 --- within the store's bounds; WKWebView shows no panel for <input type="file">.
 --- @param on_done function on_done({filename, text} | {} | {code, detail})
 local function pick_source(on_done)
-	local SourceStore = require("layouts.source_store")
+	local SourceStore = require("layouts.engine.composer.source_store")
 	local DialogUtil = require("infra.dialog_util")
-	local ok_defaults, defaults = pcall(Json.decode, FileSystem.read(Paths.shared("modules/layouts/defaults.json")) or "")
+	local ok_defaults, defaults = pcall(Json.decode, FileSystem.read(Paths.shared("layouts/data/defaults.json")) or "")
 	local settings, settings_err = SourceStore.settings(ok_defaults and defaults or nil)
 	if not settings then
 		Logger.error(LOG, "The layout editor cannot open files: %s.", tostring(settings_err))

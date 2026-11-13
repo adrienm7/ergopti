@@ -7,14 +7,14 @@
 --- Failed file inverses retain the configuration lease until exact cleanup.
 --- ==============================================================================
 local M = {}
-local Files = require("hotstrings.personal_files")
+local Files = require("hotstrings.engine.catalogue.personal_files")
 local Loader = require("infra.personal_hotstrings")
 local Config = require("modules.hotstrings.hotstrings_config")
 local FileSystem = require("adapters.file_system")
 local Paths = require("infra.config_paths")
 local pending
 
-local Recovery = require("hotstrings.publication_recovery")
+local Recovery = require("hotstrings.engine.publication_recovery")
 local Logger = require("infra.logger")
 
 local function same(a, b)

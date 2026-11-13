@@ -10,16 +10,16 @@
 
 local helpers = require("tests.helpers")
 local uv, Shell = require("luv"), require("adapters.shell_runner")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Runs an isolated real catalogue without replacing any native file owner.
 --- @param body function Receives config, engine, source path and write helper.
 --- @param name string|nil Exact literal section identity.
 local function with_catalogue(body, name)
 	-- Complete genuine constructor dependencies before any private owner exists.
-	require("toml_codec.writer")
-	require("config_file_inverse")
-	local names = { "modules.hotstrings.hotstrings_config", "modules.hotstrings.loader", "toml_codec.reader" }
+	require("core.text.engine.toml_codec.writer")
+	require("settings.engine.migration.file_inverse")
+	local names = { "modules.hotstrings.hotstrings_config", "modules.hotstrings.loader", "core.text.engine.toml_codec.reader" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-header-reload-XXXXXX"))
@@ -32,7 +32,7 @@ local function with_catalogue(body, name)
 		write(choices, '[hotstrings.groups]\nmagickey = true\n[hotstrings.modules.magickey]\n' .. Json.quote(name or "probe") .. ' = true\n')
 		Config = require("modules.hotstrings.hotstrings_config")
 		assert(Config._set_config_file_for_test(choices)); assert(Config._set_override_config_dir_for_test(root))
-		local engine = require("hotstring_engine").new()
+		local engine = require("hotstrings.engine.matcher").new()
 		local path = root .. "/magickey.toml"
 		assert(Config.init(engine, path))
 		body(Config, engine, path, write)
@@ -125,7 +125,7 @@ helpers.describe("real hotstring reload logical-value integrity", function()
 				helpers.assert_eq(accepted, true); helpers.assert_eq(retained, 1, "unfinished metadata must retain the healthy mapping")
 				helpers.assert_eq(Config.parse_error_count(), 1)
 				helpers.assert_eq(expand(engine).replacement, "kept")
-				local _, reader_committed = require("toml_codec.reader").parse(path)
+				local _, reader_committed = require("core.text.engine.toml_codec.reader").parse(path)
 				helpers.assert_eq(reader_committed, false)
 				local file = assert(io.open(path, "rb"))
 				helpers.assert_eq(assert(file:read("*a")), partial); assert(file:close())
@@ -183,7 +183,7 @@ helpers.describe("raw hotstring header trailing comments", function()
 
 	helpers.it("(catalogue-raw-comment) caches only committed documents and keeps warm literal identities", function()
 		with_catalogue(function(_, _, path, write)
-			local Reader = require("toml_codec.reader")
+			local Reader = require("core.text.engine.toml_codec.reader")
 			local cache, stored, hits = {}, 0, 0
 			local function bytes()
 				local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text

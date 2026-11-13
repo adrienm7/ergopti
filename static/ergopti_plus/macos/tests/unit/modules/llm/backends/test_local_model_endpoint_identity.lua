@@ -28,7 +28,7 @@ local function with_world(body)
 		"adapters.storage", "infra.logger", "adapters.timer_scheduler", "adapters.json_codec" }, function()
 		local Api = helpers.load_with_stubs("modules.llm.api_ollama")
 		local Storage = require("adapters.storage")
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local Logger = require("infra.logger")
 		helpers.admit_logger_privacy(Logger)
 		local world = { api = Api, gets = {}, posts = {}, failures = {}, successes = {} }

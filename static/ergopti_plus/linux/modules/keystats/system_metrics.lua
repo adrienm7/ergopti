@@ -47,11 +47,11 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Shell = require("adapters.shell_runner")
 local Calendar = require("modules.keystats.calendar")
-local TableUtil = require("table_util")
-local StorageOwned = require("storage_owned")
+local TableUtil = require("core.text.engine.table_util")
+local StorageOwned = require("core.fs.engine.storage_owned")
 
 local LOG = "modules.keystats.system_metrics"
 
@@ -483,7 +483,7 @@ function M.sample()
 		transition("wake", { asleep_ms = sleep_total })
 		local local_ts = os.date("%Y-%m-%d %H:%M:%S", math.floor(clock.wall_ms / 1000))
 		-- A wake earlier than [keystats] night_wake_end_ms after local midnight is a night wake.
-		if require("keystats.aggregator_helpers").is_night_wake(local_ts, require("infra.timings").ms("keystats", "night_wake_end_ms")) then
+		if require("metrics.engine.aggregator.helpers").is_night_wake(local_ts, require("infra.timings").ms("keystats", "night_wake_end_ms")) then
 			_day.night_wake_count = _day.night_wake_count + 1
 		end
 	end

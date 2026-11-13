@@ -10,12 +10,12 @@
 --- This does not claim evdev/uinput or physical keyboard input.
 --- ==============================================================================
 
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 -- A refused AI action reports its reason only in the log. The receipts go to
 -- stdout, so the log goes to stderr (worker.log), which the harness prints
 -- when an assertion fails.
-require("logger").set_sink(function(line) io.stderr:write(line, "\n") end)
-local Json = require("json")
+require("core.logger.engine").set_sink(function(line) io.stderr:write(line, "\n") end)
+local Json = require("core.text.engine.json")
 local Shell = require("adapters.shell_runner")
 local source_path = os.getenv("ERGOPTI_AI_DAEMON_SOURCE") or "ergopti_hotstrings.lua"
 local file = assert(io.open(source_path, "r"))
@@ -73,7 +73,7 @@ package.loaded["modules.llm.api_remote"] = {
 	cancel = function() return true end,
 }
 local Engine = require("modules.llm.prediction_engine")
-local Tone = require("llm.tone")
+local Tone = require("ai.engine.prediction.tone")
 local Keystats = require("modules.keystats.keystats")
 local Guard = require("modules.keystats.focus_guard").new({
 	watch = Watch, detector = Detector, keystats = Keystats, prediction = Engine,

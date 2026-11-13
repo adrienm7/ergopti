@@ -20,7 +20,7 @@
 package.loaded["tests.support.ui.menu.llm.llm_backend_rows_fixture"] = nil
 local Fixture = require("tests.support.ui.menu.llm.llm_backend_rows_fixture")
 local helpers, setup, find = Fixture.helpers, Fixture.setup, Fixture.find
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local AZURE = { id = "azure", label = "Azure OpenAI", base_url = "https://{resource}.openai.azure.com/openai/v1",
 	default_model = "", format = "openai" }

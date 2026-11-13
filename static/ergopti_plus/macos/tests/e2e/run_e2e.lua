@@ -41,9 +41,9 @@ local driver_root = assert(entry_path:match("^(.*)/tests/e2e/run_e2e%.lua$"),
 
 -- This standalone replay needs only standard Lua, including on its CI host.
 -- Load the existing pure-Lua quoting owner before canonicalizing the directory.
-local bootstrap_lua = driver_root .. "/../_shared/lua"
+local bootstrap_lua = driver_root .. "/../_shared"
 package.path = bootstrap_lua .. "/?.lua;" .. bootstrap_lua .. "/?/init.lua;" .. package.path
-local shell_quote = require("text_utils").shell_quote
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 local pipe = assert(io.popen("CDPATH= cd -P -- " .. shell_quote(driver_root) .. " && pwd -P", "r"))
 local read = table.pack(pcall(pipe.read, pipe, "*a"))
 local closed = table.pack(pcall(pipe.close, pipe))
@@ -61,7 +61,7 @@ local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
 -- Single shared-tree root for this bootstrap harness; everything below derives
 -- from it so a future rename of the _shared/ tree only touches this one literal.
 local shared_root  = drivers_root .. "/_shared"
-local shared_lua   = shared_root .. "/lua"
+local shared_lua   = shared_root .. ""
 local corpus_path  = shared_root .. "/tests/corpus/hotstrings/vectors.json"
 
 package.path = table.concat({
@@ -123,14 +123,14 @@ end
 
 
 --- Reads and JSON-decodes the shared corpus file.
---- Requires the _shared/lua json module (tiny pure-Lua JSON parser).
+--- Requires the _shared json module (tiny pure-Lua JSON parser).
 --- @return table Array of vector tables.
 local function load_corpus()
 	local raw = require("tests.support.source_file").read(corpus_path)
 	-- Use the tiny JSON decoder available in the shared Lua library.
-	local ok, json = pcall(require, "json")
+	local ok, json = pcall(require, "core.text.engine.json")
 	if not ok then
-		error("Cannot load shared json module — check _shared/lua/json.lua exists.")
+		error("Cannot load shared json module — check _shared/core/text/engine/json.lua exists.")
 	end
 	local decoded = json.decode(raw)
 	assert(type(decoded) == "table", "Corpus must decode to an object: " .. corpus_path)
@@ -758,7 +758,7 @@ end
 -- this driver ships and replayed exactly as a corpus vector.
 print("\n--- Shipped hotstring family samples ---")
 local static_root = drivers_root:match("^(.*)/[^/]+$")
-local ok_samples, samples = pcall(require("test.hotstring_family_samples").load, static_root)
+local ok_samples, samples = pcall(require("tests.lua.hotstrings.family_samples").load, static_root)
 if not ok_samples then
 	fail_count = fail_count + 1
 	print("  FAIL  mandatory family samples: " .. tostring(samples))
@@ -774,7 +774,7 @@ end
 print("\n--- Shared sequence vectors ---")
 local ok_sequences, sequences = pcall(function()
 	local raw = require("tests.support.source_file").read(shared_root .. "/tests/corpus/hotstrings/sequence_vectors.json")
-	local decoded = require("json").decode(raw)
+	local decoded = require("core.text.engine.json").decode(raw)
 	assert(type(decoded.vectors) == "table" and #decoded.vectors > 0, "sequence_vectors.json has no vectors")
 	return decoded.vectors
 end)

@@ -212,7 +212,7 @@ receiver failure code in its closed list.
 
 ### project-managed-ollama-catalogue-is-a-release-output
 
-`_shared/modules/llm/managed_ollama_release.json` is never committed: the build
+`_shared/ai/data/managed_ollama_release.json` is never committed: the build
 generates it from the native producer and seals it in the bundle, and each
 release attaches it as an asset. The developer app runs the clone's Python and
 shared data, so without it the owned Ollama install refused at
@@ -363,7 +363,7 @@ reader of the mirror for a prompt, goes through `ai_context_of`; extend
 ### project-macos-local-openai-servers-are-keyless-api-entries
 
 Servers the user runs (oMLX, LM Studio, llama-server/LocalAI, Jan) come from
-`_shared/modules/llm/local_servers.json`; `api_remote` registers them as
+`_shared/ai/data/local_servers.json`; `api_remote` registers them as
 `openai`-format providers with `local_server = true`, outside `PROVIDER_ORDER`,
 so a menu lists one only while `local_servers.lua`'s last sweep saw it answer.
 A chosen model is the server's one API entry (`local-<id>`), the only entry
@@ -454,7 +454,7 @@ false. Use an explicit nil check for booleans.
 
 ### project-lua-runners-redirect-a-real-home
 
-Both Lua runners call `test.runner_home` (`_shared/lua/test/runner_home.lua`)
+Both Lua runners call `test.runner_home` (`_shared/tests/lua/core/runner_home.lua`)
 before any module loads: a HOME outside the temporary directories is replaced,
 for that process, by a fresh scratch directory through an `os.getenv` wrapper
 that also hides the XDG base directories, and the directory is removed on exit.
@@ -1791,7 +1791,7 @@ The stream credits the macOS virtual keycode Quartz would have reported for the
 same physical key, so history and the heatmap keep one identity:
 `modules/keystats/physical_key_identity.lua` resolves through
 `_generated/hid_key_identity.lua`, generated from the registry's `hs` and
-`macos_iso.hs` and from `_shared/data/keycodes/hid_usages.json`
+`macos_iso.hs` and from `_shared/layouts/data/keycodes/hid_usages.json`
 (`npm run codegen:hid-key-identity:hs`). Keep HID data out of
 `physical_keys.json`: Windows parses the registry at boot whenever a
 layers.toml exists, and only macOS needs it. A usage names a position by the
@@ -2084,7 +2084,7 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   (the 2026-10-30 `native_child_status=64`), a refusal stage or `not_reached`
   names where it broke.
 - `field_network_hosts`: the hosts are the keys of
-  `_shared/data/identifiers.json` (`github`, `github_api` for the update feed,
+  `_shared/core/text/data/identifiers.json` (`github`, `github_api` for the update feed,
   `huggingface`, `ollama`, `ollama_registry`), one HEAD after the other; the
   registry is probed at `/v2/` because its root answers 503; any answer below
   500 passes, a failure names the native reason by host key. Nothing is

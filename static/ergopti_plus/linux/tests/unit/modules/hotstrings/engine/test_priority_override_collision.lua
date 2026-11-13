@@ -178,7 +178,7 @@ helpers.describe("hotstring priority overrides", function()
 				"clearing priority must restore the registration-order tiebreak")
 
 			helpers.assert_eq(restarted.set_override("first", nil, "priority", 100), true)
-			local extension_category = require("hotstrings.extensions").category_key("sample-pack", "second")
+			local extension_category = require("hotstrings.engine.extensions").category_key("sample-pack", "second")
 			local category_values = { delay = 1.25, color = "#123456", show_tooltip = true, priority = 90 }
 			local section_values = { delay = 2.5, color = "#abcdef", show_tooltip = false, priority = 120 }
 			for _, category in ipairs({ "second", extension_category }) do
@@ -541,7 +541,7 @@ helpers.describe("hotstring override leaf ownership", function()
 
 	helpers.it("keeps source authority across held scope publication and exact restoration", function()
 		with_owner(source, function(config, path, read)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local original = config.configuration_snapshot()
 			local owner = {}
 			local candidate = source:gsub("delay_offset = 0.5", "delay_offset = 7.75")
@@ -572,7 +572,7 @@ helpers.describe("hotstring override leaf ownership", function()
 			end, debug.traceback)
 			Loader.load_catalogue = load_catalogue
 			if not okay then error(failure, 0) end
-		end, nil, require("hotstring_engine").new())
+		end, nil, require("hotstrings.engine.matcher").new())
 	end)
 
 	helpers.it("retains the actual absent or present-empty scope target before ordinary setters", function()
@@ -581,7 +581,7 @@ helpers.describe("hotstring override leaf ownership", function()
 			if content == false then initial = nil end
 			with_owner(initial, function(config, path, read)
 				local owner = {}
-				local participant = require("config_scope_file").new({ path = path,
+				local participant = require("settings.engine.scope.file").new({ path = path,
 					backup_path = path .. ".backup", remove = os.remove })
 				config.load_all = function() return {}, true end
 				helpers.assert_true(participant.prepare({}))

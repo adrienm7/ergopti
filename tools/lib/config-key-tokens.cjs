@@ -17,9 +17,9 @@
  * 2. Refused When Wrong: a name the tables do not hold is left as the plain
  *    identifier tokens, which no literal pin matches; a name that resolves to a
  *    different key yields that key's string, which differs from the pinned one.
- * 3. Only The Spelling The Swap Introduces: `ConfigKeys.KEY.X`, `require("config_keys").KEY.X`
- *    and `CK.KEY.X` for a `local CK = require("config_keys")` collapse. A bare table
- *    alias (`COMMAND.X` after `local COMMAND = require("config_keys").COMMAND`) stays
+ * 3. Only The Spelling The Swap Introduces: `ConfigKeys.KEY.X`, `require("settings.engine.keys").KEY.X`
+ *    and `CK.KEY.X` for a `local CK = require("settings.engine.keys")` collapse. A bare table
+ *    alias (`COMMAND.X` after `local COMMAND = require("settings.engine.keys").COMMAND`) stays
  *    identifier tokens, because gates already pin that spelling as it is.
  * ==============================================================================
  */
@@ -70,7 +70,7 @@ function declaredAliases(code) {
 			at(next + 1, '(') &&
 			code[next + 2] &&
 			code[next + 2].kind === 'string' &&
-			code[next + 2].value === 'config_keys' &&
+			code[next + 2].value === 'settings.engine.keys' &&
 			at(next + 3, ')')
 		)
 			next += 4;
@@ -117,7 +117,7 @@ function collapseConfigKeys(code) {
 		const previous = out[out.length - 1];
 		const afterAccess =
 			previous && previous.kind === 'symbol' && (previous.value === '.' || previous.value === ':');
-		// require("config_keys").TABLE.NAME, for a file with no local left to spend on an alias
+		// require("settings.engine.keys").TABLE.NAME, for a file with no local left to spend on an alias
 		if (
 			token.kind === 'identifier' &&
 			token.value === 'require' &&
@@ -125,7 +125,7 @@ function collapseConfigKeys(code) {
 			at(i + 1, '(') &&
 			code[i + 2] &&
 			code[i + 2].kind === 'string' &&
-			code[i + 2].value === 'config_keys' &&
+			code[i + 2].value === 'settings.engine.keys' &&
 			at(i + 3, ')') &&
 			at(i + 4, '.') &&
 			code[i + 5] &&

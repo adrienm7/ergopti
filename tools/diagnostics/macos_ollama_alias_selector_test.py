@@ -52,11 +52,11 @@ class AliasSelectionControls(unittest.TestCase):
             "binary_sha256": self.case.session_data["binary_sha256"],
             "sha256": self.case.session_data["asset_sha256"],
         }
-        policy = ROOT / "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json"
+        policy = ROOT / "static/ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json"
         self.catalogue = json.dumps(
             {
                 "repository_source_sha256": {
-                    "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json": hashlib.sha256(
+                    "static/ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json": hashlib.sha256(
                         policy.read_bytes()
                     ).hexdigest()
                 }

@@ -31,13 +31,13 @@
 ---    once, so a hung launchctl never leaves a window waiting.
 --- ==============================================================================
 
-local Identifiers = require("identifiers")
+local Identifiers = require("core.text.engine.identifiers")
 local Logger = require("infra.logger")
 local MainThreadHold = require("infra.main_thread_hold")
 local KePaths = require("platform.remap.ke_paths")
 local LeaseMemorySnapshot = require("platform.remap.lease_memory_snapshot")
 local RuntimeVhid = require("platform.remap.runtime_vhid")
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 local M = {}
 
@@ -356,7 +356,7 @@ end
 --- The grammar is shared with the Linux and Windows checks.
 --- @param output any Helper stdout.
 --- @return table steps id → { state, value }
-M.parse_network_helper = require("network.field_check_network").parse_chain_lines
+M.parse_network_helper = require("core.network.engine.field_check_network").parse_chain_lines
 
 --- The managed download chain end to end: system proxy settings, the PAC
 --- download and verdict, then one HEAD request through the native transport.
@@ -364,8 +364,8 @@ M.parse_network_helper = require("network.field_check_network").parse_chain_line
 --- The steps are the shared ones (network.field_check_network); this function
 --- binds them to scutil, the PAC fetch and the native helper.
 function M.network(ports, report, finish)
-	local PacCheck = require("network.pac_check")
-	require("network.field_check_network").run({
+	local PacCheck = require("core.network.engine.pac_check")
+	require("core.network.engine.field_check_network").run({
 		proxy_settings = function(callback)
 			ports.exec(SCUTIL, { "--proxy" }, COMMAND_TIMEOUT, function(code, output)
 				if code ~= 0 then
@@ -898,7 +898,7 @@ end
 --- The composed layout: installs the shipped check composition through the
 --- composer's real path, verifies it, asks the system whether it is enabled and
 --- removes it again (a user's own composition is only read). The steps are the
---- shared ones (_shared/lua/layouts/composer_check.lua).
+--- shared ones (_shared/layouts/engine/composer/check_core.lua).
 function M.composer(ports, report, finish)
 	local env = ports.composer_env()
 	if not env then
@@ -906,7 +906,7 @@ function M.composer(ports, report, finish)
 		finish()
 		return
 	end
-	require("layouts.composer_check").run(env, report, finish)
+	require("layouts.engine.composer.check_core").run(env, report, finish)
 end
 
 -- The checks only the developer field run asks for (data/field_run.json)

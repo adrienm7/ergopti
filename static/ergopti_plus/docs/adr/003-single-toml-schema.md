@@ -56,7 +56,7 @@ linter can act on.
 ### Negative / Trade-offs
 
 - Existing TOML files that used PascalCase required a migration pass.
-- The migration is documented in `static/ergopti_plus/_shared/modules/features/_migration_v1_to_v2.md`.
+- The migration is documented in `static/ergopti_plus/_shared/settings/data/features/_migration_v1_to_v2.md`.
 
 ### Neutral
 
@@ -74,5 +74,5 @@ linter can act on.
 ## Evidence in the codebase
 
 - Enforcement gate: `tools/lint/lint-conventions.js` (check 3, "No PascalCase TOML keys")
-- Source manifest (all snake_case): `static/ergopti_plus/_shared/modules/features/manifest.toml`
-- Migration guide: `static/ergopti_plus/_shared/modules/features/_migration_v1_to_v2.md`
+- Source manifest (all snake_case): `static/ergopti_plus/_shared/settings/data/features/manifest.toml`
+- Migration guide: `static/ergopti_plus/_shared/settings/data/features/_migration_v1_to_v2.md`

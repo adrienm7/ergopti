@@ -29,7 +29,7 @@ end
 
 helpers.describe("Linux developer source mode", function()
 	helpers.it("shares the developer variable with the macOS app", function()
-		helpers.assert_eq(DevSource.ENVIRONMENT, require("identifiers").dev_source.environment)
+		helpers.assert_eq(DevSource.ENVIRONMENT, require("core.text.engine.identifiers").dev_source.environment)
 	end)
 
 	helpers.it("is inactive without the launcher's root", function()
@@ -47,7 +47,7 @@ helpers.describe("Linux developer source mode", function()
 	end)
 
 	helpers.it("watches the driver and the shared Lua of the clone", function()
-		helpers.assert_eq(DevSource.source_dirs(ROOT), { DRIVER, ROOT .. "/static/ergopti_plus/_shared/lua" })
+		helpers.assert_eq(DevSource.source_dirs(ROOT), { DRIVER, ROOT .. "/static/ergopti_plus/_shared" })
 	end)
 
 	helpers.it("(linux-dev-mode-reload) relays the developer launcher on a Reload", function()

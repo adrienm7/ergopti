@@ -39,7 +39,7 @@ helpers.describe("compositor_focus: shipped desktop files", function()
 	end)
 
 	helpers.it("(wayland-desktop-focus) the installer and the worker name the shipped packages", function()
-		local json = require("json")
+		local json = require("core.text.engine.json")
 		local gnome = json.decode(read("desktop_focus/gnome/metadata.json"))
 		local kwin = json.decode(read("desktop_focus/kwin/metadata.json"))
 		local installer = read("install/compositor_focus.sh")

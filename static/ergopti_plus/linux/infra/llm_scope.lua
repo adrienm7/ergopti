@@ -4,9 +4,9 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.llm_preferences")
-local Transaction = require("config_scope_transaction")
-local FencedTransaction = require("config_scope_fenced_transaction")
-local Logger = require("logger.shim")
+local Transaction = require("settings.engine.scope.transaction")
+local FencedTransaction = require("settings.engine.scope.fenced_transaction")
+local Logger = require("core.logger.engine.shim")
 local LOG = "infra.llm_scope"
 local _owner, _sequence = nil, 0
 require("infra.scope_registry").register("llm_scope", function() return _owner ~= nil and _owner.pending() == true end)
@@ -106,7 +106,7 @@ end
 --- The AI participant of a composed scope, bound to the retained owner.
 --- @return table participant See config_scope_composition.
 function M.participant()
-	return require("config_scope_participant").synchronous({
+	return require("settings.engine.scope.participant").synchronous({
 		apply = function(mode) return M.apply(mode) end,
 		owner = function() return _owner end,
 	})

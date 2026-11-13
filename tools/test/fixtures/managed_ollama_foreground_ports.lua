@@ -8,8 +8,8 @@ M.LAUNCH = "exec /native/python -I /source/serve.py"
 
 function M.new(root, production, options)
 	package.path = production .. "/static/ergopti_plus/macos/?.lua;"
-		.. production .. "/static/ergopti_plus/_shared/lua/?.lua;"
-		.. production .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
+		.. production .. "/static/ergopti_plus/_shared/?.lua;"
+		.. production .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
 	local path = root .. "/static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_ollama.lua"
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	local body = assert(source:match("\t\tstart_restart = function%(%)\n(.-)\n\t\tend\n\n\t\tstart_probe"),
@@ -27,7 +27,7 @@ function M.new(root, production, options)
 	modules["infra.notifications"] = { notify = function() return true end }
 	modules["infra.i18n"] = { get = function(key) return key end }
 	modules["modules.llm.parser"], modules["modules.llm.profiles"] = {}, {}
-	modules["modules.llm.progressive_reveal"], modules["llm.local_model_policy"] = {}, {}
+	modules["modules.llm.progressive_reveal"], modules["ai.engine.ollama.local_model_policy"] = {}, {}
 	modules["modules.llm.api_common"] = { DEFAULT_DEDUPLICATION_ENABLED = true,
 		get_retry_policy = function() return 1, 0, 0 end }
 	modules["adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
@@ -56,7 +56,7 @@ function M.new(root, production, options)
 	modules["adapters.managed_ollama_pull"] = { handles = function()
 		state.pull_calls = state.pull_calls + 1; return options.pull_supported
 	end }
-	modules["platform.remap.lease_helper"], modules.json = {}, {}
+	modules["platform.remap.lease_helper"], modules["core.text.engine.json"] = {}, {}
 	modules["adapters.shell_runner"] = { spawn = function(executable, arguments, done, streaming, environment, private, owned)
 		local task = { executable = executable, arguments = arguments, streaming = streaming,
 			environment = environment, private = private, owned = owned, attempted = false,
@@ -91,14 +91,14 @@ function M.new(root, production, options)
 	}, { __index = _G })
 	local owned_paths = {
 		["modules.llm.api_ollama"] = "macos/modules/llm/api_ollama.lua",
-		["llm.request_plan.token_budget"] = "_shared/lua/llm/request_plan/token_budget.lua",
-		["llm.request_plan.ports"] = "_shared/lua/llm/request_plan/ports.lua",
-		["adapter_errors"] = "_shared/lua/adapter_errors.lua",
+		["ai.engine.request_plan.token_budget"] = "_shared/ai/engine/request_plan/token_budget.lua",
+		["ai.engine.request_plan.ports"] = "_shared/ai/engine/request_plan/ports.lua",
+		["diagnostics.engine.adapter_errors"] = "_shared/diagnostics/engine/adapter_errors.lua",
 		["adapters.managed_ollama_daemon"] = "macos/adapters/managed_ollama_daemon.lua",
 		["adapters.owned_program_runner"] = "macos/adapters/owned_program_runner.lua",
-		["core.llm.ollama_runtime_choice"] = "_shared/lua/core/llm/ollama_runtime_choice.lua",
-		["core.llm.managed_ollama_daemon_receipt"] = "_shared/lua/core/llm/managed_ollama_daemon_receipt.lua",
-		["core.llm.managed_ollama_daemon_lifecycle"] = "_shared/lua/core/llm/managed_ollama_daemon_lifecycle.lua",
+		["core.lifecycle.engine.core.ollama_runtime_choice"] = "_shared/core/lifecycle/engine/core/ollama_runtime_choice.lua",
+		["core.lifecycle.engine.core.managed_ollama_daemon_receipt"] = "_shared/core/lifecycle/engine/core/managed_ollama_daemon_receipt.lua",
+		["core.lifecycle.engine.core.managed_ollama_daemon_lifecycle"] = "_shared/core/lifecycle/engine/core/managed_ollama_daemon_lifecycle.lua",
 	}
 	function environment.require(name)
 		if modules[name] then return modules[name] end
@@ -113,7 +113,7 @@ function M.new(root, production, options)
 	-- closed adapter error ids); provide the same real module it requires.
 	local manager_environment = setmetatable({
 		require = environment.require, operation = state.operation,
-		Errors = environment.require("adapter_errors"),
+		Errors = environment.require("diagnostics.engine.adapter_errors"),
 		owns_operation = function() return state.live end,
 		retain_current_waiters = function() return true end,
 		observe_command_settlement = function(handle) state.observed = handle; return true end,

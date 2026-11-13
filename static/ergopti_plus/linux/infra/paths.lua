@@ -12,13 +12,13 @@
 --- at four different depths, and two of them were wrong:
 ---
 ---   * infra/i18n.lua walked `../../` from the driver root to reach
----     `_shared/data/locales`. One level too high. `ls` on the missing directory
+---     `_shared/core/i18n/data/locales`. One level too high. `ls` on the missing directory
 ---     printed nothing, the scan collected zero codes, and the fallback list
 ---     `{"en", "fr"}` took over — so the language menu offered 2 locales out of
 ---     the 21 that ship. Nothing failed; the menu just quietly had two rows.
 ---
 ---   * modules/keystats/sqlite_writer.lua walked `../../../` for
----     `_shared/data/db/schema.sql`. Two levels too high, with a bare relative
+---     `_shared/metrics/data/db/schema.sql`. Two levels too high, with a bare relative
 ---     path as the fallback — which made schema loading depend on the process's
 ---     CURRENT DIRECTORY rather than on where the driver is installed.
 ---
@@ -38,13 +38,13 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "paths"
 
 -- The file a candidate directory must carry to BE the shared tree. Probing a
 -- file rather than the directory keeps a stale empty `_shared/` left by a
 -- partial install from resolving and then failing at every subsequent read.
-local SHARED_PROBE_FILE = "data/locales/en.json"
+local SHARED_PROBE_FILE = "core/i18n/data/locales/en.json"
 
 -- Refusals of the installed-layouts record already logged: the roots are read
 -- at every hotstring reload, and one ERROR per reason is enough to name it.
@@ -101,7 +101,7 @@ end
 --- A relative root is not a local inconvenience: every path built from it is
 --- handed to OTHER processes — the tray icon to the panel, pages to WebKit —
 --- and each of those resolves it against its own working directory. Launched from a checkout (`luajit ergopti_hotstrings.lua`, a
---- relative package.path), the tray announced "./../_shared/assets/…" and the
+--- relative package.path), the tray announced "./../_shared/tray/data/…" and the
 --- panel, running elsewhere, drew nothing.
 --- @param path string
 --- @return string
@@ -167,7 +167,7 @@ end
 ---     would put it at /usr/lib/_shared — a directory no package may own.
 ---
 --- Resolving the sibling ONLY is the defect this ordering replaced. On an
---- installed .deb the probe addressed /usr/lib/_shared/data/locales/en.json and
+--- installed .deb the probe addressed /usr/lib/_shared/core/i18n/data/locales/en.json and
 --- shared_root() returned nil — taking with it every locale, keycode table,
 --- hotstring pack, tooltip config and defaults file the driver reads. The
 --- wrapper's LUA_PATH hides how broad that is: it rescues `require`, so the
@@ -190,7 +190,7 @@ function M.shared_root()
 end
 
 --- Absolute path to a file or directory inside the shared tree.
---- @param rel string Path relative to _shared, e.g. "data/db/schema.sql".
+--- @param rel string Path relative to _shared, e.g. "metrics/data/db/schema.sql".
 --- @return string|nil Absolute path, or nil when the shared tree is missing.
 function M.shared(rel)
 	local root = M.shared_root()

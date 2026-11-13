@@ -20,7 +20,7 @@ local COMBOS = { { id = "esc_tab" } }
 --- @param source string|nil Initial bytes, nil for absent.
 --- @param body function Receives the config module and the disk table.
 local function with_disk(source, body)
-	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.toml.codec", "toml_codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.toml.codec", "core.text.engine.toml_codec" }, function()
 		local config = helpers.load_with_stubs("platform.remap.config")
 		local files = require("adapters.file_system")
 		local old_read, old_write = files.read_with_status, files.write_if_unchanged
@@ -52,7 +52,7 @@ helpers.describe("remap configuration under a scope transaction", function()
 			helpers.assert_true(config.save_user_config(state, "remap.toml", false,
 				{ status = "ok", content = "[other]\nvalue = 17\n" }))
 			helpers.assert_eq(disk.writes, 1)
-			helpers.assert_eq(require("toml_codec").decode(disk.content).other.value, 17)
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(disk.content).other.value, 17)
 		end)
 	end)
 

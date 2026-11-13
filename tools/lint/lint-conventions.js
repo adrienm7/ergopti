@@ -581,7 +581,7 @@ function checkWebUiAntiPatterns() {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function checkMacOsGestureDefaults() {
-	const manifestPath = shared('modules/features/manifest.toml');
+	const manifestPath = shared('settings/data/features/manifest.toml');
 	try {
 		const content = readFileSync(manifestPath, 'utf8');
 		// Only look at the hs.gestures section
@@ -673,8 +673,8 @@ function checkMacOsPathIntegrity() {
 // theme token (var(--theme-*)) or the generated native palette.
 const THEME_OWNER_FILES = new Set([
 	'static/ergopti_plus/_shared/ui/theme.css',
-	'static/ergopti_plus/_shared/data/native_theme.toml',
-	'static/ergopti_plus/_shared/lua/native_theme_data.lua',
+	'static/ergopti_plus/_shared/core/ui/data/native_theme.toml',
+	'static/ergopti_plus/_shared/core/ui/engine/native_theme_data.lua',
 	'static/ergopti_plus/windows/_generated/native_theme.ahk'
 ]);
 const HEX_BASELINE_PATH = join(REPO_ROOT, 'tools/lint/hex-literal-baseline.json');
@@ -698,7 +698,7 @@ function checkHexLiteralsOutsideTheme() {
 	}
 	const baseline = JSON.parse(readFileSync(HEX_BASELINE_PATH, 'utf8'));
 	const hint =
-		'Use a var(--theme-*) token or the generated native palette (_shared/data/native_theme.toml).';
+		'Use a var(--theme-*) token or the generated native palette (_shared/core/ui/data/native_theme.toml).';
 	for (const [file, literals] of found) {
 		const allowed = baseline[file] ?? 0;
 		const abs = join(REPO_ROOT, file);
@@ -741,7 +741,7 @@ const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/ui'),
 	// Portable AHK policy is audited with its native consumers.
-	join(REPO_ROOT, 'static/ergopti_plus/_shared/modules')
+	join(REPO_ROOT, 'static/ergopti_plus/_shared')
 ];
 const ahkTestDirs = [join(REPO_ROOT, 'static/ergopti_plus/windows/tests')];
 const ahkAll = [
@@ -751,7 +751,7 @@ const ahkAll = [
 
 // Lua files — every Lua tree the repo owns (walkFiles skips vendor/).
 //
-// This used to be the macOS driver alone, so the Linux driver and _shared/lua
+// This used to be the macOS driver alone, so the Linux driver and _shared
 // were never checked for file-path headers, banner alignment or section
 // spacing — the two trees that grew most recently, held to no convention at
 // all. The conventions are language-wide, not driver-wide.
@@ -777,7 +777,7 @@ const luaDirs = [
 	// binding — and it held Lua that no convention check had ever read.
 	join(REPO_ROOT, 'static/ergopti_plus/linux/platform'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/platform'),
-	join(REPO_ROOT, 'static/ergopti_plus/_shared/lua')
+	join(REPO_ROOT, 'static/ergopti_plus/_shared')
 ];
 const luaAll = luaDirs.flatMap((d) => walkFiles(d, ['.lua']));
 

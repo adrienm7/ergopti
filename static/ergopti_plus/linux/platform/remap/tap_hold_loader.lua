@@ -4,7 +4,7 @@
 --- MODULE: Tap-Hold Configuration (Linux)
 --- DESCRIPTION:
 --- Reads the tap-hold keys from the shared defaults
---- (_shared/tap_hold/defaults.toml) and the user's tap_hold.toml, with the
+--- (_shared/tap_hold/data/defaults.toml) and the user's tap_hold.toml, with the
 --- rules the Windows loader applies to the same files:
 ---   - the user file is laid over the defaults key by key and field by field;
 ---   - choosing a hold modifier drops the default layer and the reverse, so a
@@ -18,7 +18,7 @@
 ---     tap, as the Windows loader refuses an unknown hold where it reads it;
 ---   - a user key no driver has, or a field no key has, is warned once,
 ---     naming tap_hold.toml, and left out; a catalogue key only another driver
----     has (the file is shared, _shared/tap_hold/SCHEMA.md) is left out
+---     has (the file is shared, _shared/tap_hold/data/SCHEMA.md) is left out
 ---     silently; the rest applies;
 ---   - only [tap_hold] inherit_defaults = true lays the user file over the
 ---     shipped keys; otherwise it starts from no keys at all (an empty file is
@@ -34,7 +34,7 @@
 ---     set it, else the timing registry's default. No shipped key carries a
 ---     delay. The per-key delays this build used to ship, copied into a file by
 ---     a rewrite, are removed once by the versioned migration of
----     _shared/tap_hold/migrations.toml (platform/remap/tap_hold_migration.lua);
+---     _shared/tap_hold/data/migrations.toml (platform/remap/tap_hold_migration.lua);
 ---     a file not yet migrated on disk is read as the migration leaves it;
 ---   - a threshold outside 0..10 s falls back to the global delay, a field of
 ---     the wrong type disables its key, and a malformed user file is reported and
@@ -43,20 +43,20 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local TomlCodec = require("toml_codec")
-local Writer = require("toml_codec.writer")
-local HoldOptions = require("tap_hold.hold_options")
-local KeyCatalog = require("tap_hold.key_catalog")
+local Logger = require("core.logger.engine.shim")
+local TomlCodec = require("core.text.engine.toml_codec")
+local Writer = require("core.text.engine.toml_codec.writer")
+local HoldOptions = require("tap_hold.engine.hold_options")
+local KeyCatalog = require("tap_hold.engine.key_catalog")
 local Manifest = require("infra.manifest_reader")
-local Outdated = require("config_outdated")
+local Outdated = require("settings.engine.migration.outdated")
 local Shapes = require("platform.remap.tap_hold_shapes")
 local Migration = require("platform.remap.tap_hold_migration")
-local ConfigKeys = require("config_keys")
-local LoneTap = require("tap_hold.lone_tap")
+local ConfigKeys = require("settings.engine.keys")
+local LoneTap = require("tap_hold.engine.lone_tap")
 
 local LOG = "platform.remap.tap_hold_loader"
-local TIME_FIELD = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS
+local TIME_FIELD = require("settings.engine.keys").LEAF.TIME_ACTIVATION_SECONDS
 
 -- The bound of time_activation_seconds and the global default: the timing
 -- registry's, the one declaration every driver reads or is pinned to.
@@ -81,7 +81,7 @@ M.ONE_SHOT_TIMEOUT_DEFAULT_MS = require("infra.timings").ms("tap_hold", "one_sho
 --- @param ms any
 --- @return boolean
 function M.valid_one_shot_timeout_ms(ms)
-	return type(ms) == "number" and require("number_policy").within_timer_ceiling(ms) and ms > 0 and ms % 1 == 0
+	return type(ms) == "number" and require("core.text.engine.number_policy").within_timer_ceiling(ms) and ms > 0 and ms % 1 == 0
 end
 
 local STRING_FIELDS = { "tap_action", "hold_modifier", "hold_layer" }
@@ -96,7 +96,7 @@ local KEY_FIELDS = {
 }
 
 -- What a warning names when a candidate document has no file path yet.
-local USER_FILE_NAME = require("tap_hold.shared_file").FILE_NAME
+local USER_FILE_NAME = require("tap_hold.engine.shared_file").FILE_NAME
 
 -- The [tap_hold] leaves config.toml [tap_holds] owns since config schema v22.
 local CONFIG_OWNED_FIELDS = { "enabled", LONE_TAP_FIELD, ONE_SHOT_TIMEOUT_FIELD }
@@ -105,16 +105,16 @@ local CONFIG_OWNED_FIELDS = { "enabled", LONE_TAP_FIELD, ONE_SHOT_TIMEOUT_FIELD 
 -- key on the PC key at its position (maintainer decision TCL-004).
 local shared_spec = nil
 
---- The shared file's spec (_shared/tap_hold/shared_file.toml).
+--- The shared file's spec (_shared/tap_hold/data/shared_file.toml).
 --- @return table See tap_hold.shared_file.parse_spec.
 local function shared_file_spec()
 	if shared_spec == nil then
-		local path = require("infra.paths").shared("tap_hold/shared_file.toml")
+		local path = require("infra.paths").shared("tap_hold/data/shared_file.toml")
 		local text, status = Writer.read_classified(path)
 		if status ~= "ok" or type(text) ~= "string" then
 			error("the shared tap-hold file spec is unreadable: " .. tostring(path), 0)
 		end
-		shared_spec = require("tap_hold.shared_file").parse_spec(TomlCodec.decode(text))
+		shared_spec = require("tap_hold.engine.shared_file").parse_spec(TomlCodec.decode(text))
 	end
 	return shared_spec
 end
@@ -245,7 +245,7 @@ end
 --- @param path string The tap_hold.toml path.
 --- @return string
 function M.config_path_for(path)
-	local folder = assert(require("native_path").dirname(path), "tap_hold.toml needs a configuration folder")
+	local folder = assert(require("core.fs.engine.native_path").dirname(path), "tap_hold.toml needs a configuration folder")
 	return folder .. "/config.toml"
 end
 
@@ -406,7 +406,7 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes, confi
 		end
 	end
 	local user_fields = {}
-	-- The shared file also holds the keys of the other drivers (_shared/tap_hold/SCHEMA.md):
+	-- The shared file also holds the keys of the other drivers (_shared/tap_hold/data/SCHEMA.md):
 	-- a catalogue key Linux lacks (Fn, the Mac Option and Command keys) is theirs.
 	local catalogued = {}
 	for _, entry in ipairs(defaults.tap_hold.catalog.keys) do catalogued[entry.id] = true end
@@ -414,7 +414,7 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes, confi
 	-- unless the file names that key too (shared_file.toml [thumb_positions]).
 	local placed = {}
 	for key_id, override in pairs(overrides) do
-		local positional = type(key_id) == "string" and require("tap_hold.shared_file").positional_key(shared_file_spec(), key_id)
+		local positional = type(key_id) == "string" and require("tap_hold.engine.shared_file").positional_key(shared_file_spec(), key_id)
 		if positional and positional ~= key_id and remappable[positional] and overrides[positional] == nil then
 			placed[positional] = override
 		end
@@ -441,7 +441,7 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes, confi
 					merged[field] = value
 					user_fields[key_id][field] = true
 				elseif field == "hold_action" then
-					-- The shared file's macOS-only hold (_shared/tap_hold/SCHEMA.md).
+					-- The shared file's macOS-only hold (_shared/tap_hold/data/SCHEMA.md).
 					Outdated.report_in_file(user_file, { "tap_hold", "keys", key_id, field },
 						"a macOS hold action; the key keeps its tap and holds nothing here")
 				else

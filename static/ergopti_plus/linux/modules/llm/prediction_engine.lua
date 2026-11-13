@@ -7,14 +7,14 @@
 --- privacy gates, and presents parsed Ollama completions for an explicit user
 --- commit. Model output never reaches the focused application before acceptance,
 --- except for the tone actions, which the user fires on a selection precisely
---- to have it replaced (llm/tone.lua). The screen actions (llm/vision.lua) offer
+--- to have it replaced (ai/engine/prediction/tone.lua). The screen actions (ai/engine/prediction/vision.lua) offer
 --- answers to what is on the screen through the same tooltip and acceptance.
---- The translation action (llm/translate.lua) offers the selection translated;
+--- The translation action (ai/engine/prediction/translate.lua) offers the selection translated;
 --- accepting it replaces the selection the way a tone step does.
 --- Live mode (llm_live_prompt_toggle) redirects the automatic typing trigger to
 --- a chosen prompt, so a rewrite prompt shows the sentence translated or
 --- rewritten as it is typed; Tab accepts it. It owns no second pipeline.
---- The AI agent (llm/agent.lua) offers actions as candidates of the same
+--- The AI agent (ai/engine/agent/agent.lua) offers actions as candidates of the same
 --- tooltip: System 2 reads the selection, a typed command or, in the automatic
 --- mode, the sentence System 1 flagged after a typing pause. Accepting one runs
 --- its connector (modules/llm/agent_connectors.lua); nothing is typed.
@@ -22,26 +22,26 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local HttpBridge = require("infra.llm_bridge")
-local PromptBuilder = require("llm.prompt_builder")
-local ProfileSelector = require("llm.profile_selector")
-local Parser = require("llm.parser")
-local Rewrite = require("llm.rewrite")
-local PromptAction = require("llm.prompt_action")
-local Tone = require("llm.tone")
-local Vision = require("llm.vision")
-local Translate = require("llm.translate")
-local Agent = require("llm.agent")
-local AgentPlan = require("llm.request_plan.agent")
+local PromptBuilder = require("ai.engine.prediction.prompt_builder_core")
+local ProfileSelector = require("ai.engine.settings.profile_selector")
+local Parser = require("ai.engine.api.parser_core")
+local Rewrite = require("ai.engine.prediction.rewrite")
+local PromptAction = require("ai.engine.prediction.prompt_action")
+local Tone = require("ai.engine.prediction.tone")
+local Vision = require("ai.engine.prediction.vision")
+local Translate = require("ai.engine.prediction.translate")
+local Agent = require("ai.engine.agent.agent")
+local AgentPlan = require("ai.engine.request_plan.agent")
 local Settings = require("modules.llm.settings")
 local TriggerSettings = require("modules.llm.trigger_settings")
 local DisplaySettings = require("modules.llm.display_settings")
 local ProfileSettings = require("modules.llm.profile_settings")
 local VisionRequest = require("modules.llm.vision_request")
 local LocalModelOffer = require("modules.llm.local_model_offer")
-local LocalModelPolicy = require("llm.local_model_policy")
+local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
 local Translation = require("modules.llm.translation")
 local AgentSettings = require("modules.llm.agent_settings")
 local AgentConnectors = require("modules.llm.agent_connectors")
@@ -51,8 +51,8 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local Inference = require("modules.llm.inference")
 local Monotonic = require("infra.monotonic")
 local i18n = require("infra.i18n")
-local Base64 = require("compat.base64")
-local Json = require("json")
+local Base64 = require("core.lifecycle.engine.compat.base64")
+local Json = require("core.text.engine.json")
 local EvdevCodes = require("infra.evdev_codes")
 
 local LOG = "modules.llm.prediction_engine"
@@ -108,7 +108,7 @@ local current_focus
 
 -- The tone actions' state. The generation drops a stale answer: a newer tone
 -- step, typing, a cancel or a pause make the one in flight obsolete. The memory
--- ties the rewrite left selected to its original text (llm/tone.lua).
+-- ties the rewrite left selected to its original text (ai/engine/prediction/tone.lua).
 local _tone_generation = 0
 local _tone_memory = nil
 
@@ -224,7 +224,7 @@ local UNKNOWN_TIMEZONE = "unknown"
 local LIVE_ACTION = "llm_live_prompt_toggle"
 local LIVE_ON_KEY = "llm.live.on"
 local LIVE_OFF_KEY = "llm.live.off"
-local LIVE_CONFIG_FILE = "modules/llm/live.json"
+local LIVE_CONFIG_FILE = "ai/data/live.json"
 
 -- The ready-made prompt actions: one per built-in profile, named after it
 -- (tools/test/test-llm-prompt-actions-single-source.cjs pins the catalogue side).
@@ -257,7 +257,7 @@ end
 
 -- Which backend answers: "ollama" (local) or "api" (a remote provider). The
 -- manifest declares the key and its default for every driver.
-local BACKEND_KEY = require("config_keys").KEY.LLM_MODELS_SELECTED
+local BACKEND_KEY = require("settings.engine.keys").KEY.LLM_MODELS_SELECTED
 local BACKENDS = { ollama = true, api = true }
 
 -- The backend module serving the request in flight, so dismiss cancels it.
@@ -266,13 +266,13 @@ local _inflight_backend = nil
 -- passed. When each backend was last sent a request is the plan's state.
 local _rate_timer = nil
 local _clock_ms = Monotonic.now_ms
--- The debounce and rate-floor decisions (_shared/lua/llm/request_plan): this
+-- The debounce and rate-floor decisions (_shared/ai/engine/request_plan): this
 -- engine feeds it events and the clock, and owns the timers and the requests.
 -- (one table, not locals: this chunk is at Lua's limit of 200 local variables).
 local _debounce = {
 	-- How long an automatic request that found its backend busy waits to ask again.
 	busy_recheck_ms = require("infra.timings").ms("llm", "backend_busy_recheck_ms"),
-	plan = require("llm.request_plan.debounce").new(function() return TriggerSettings.get(require("config_keys").LEAF.MIN_REQUEST_INTERVAL_MS) end),
+	plan = require("ai.engine.request_plan.debounce").new(function() return TriggerSettings.get(require("settings.engine.keys").LEAF.MIN_REQUEST_INTERVAL_MS) end),
 	retired = {}, timer_cancel = {}, retiring = {},
 }
 
@@ -335,7 +335,7 @@ end
 -- The stored setting is the only source: an in-memory override set at boot
 -- once shadowed the menu's choice for the whole session.
 local function max_context_chars()
-	return Settings.get(require("config_keys").LEAF.CONTEXT_LENGTH) or HttpBridge.DEFAULT_CONTEXT_LENGTH
+	return Settings.get(require("settings.engine.keys").LEAF.CONTEXT_LENGTH) or HttpBridge.DEFAULT_CONTEXT_LENGTH
 end
 
 --- Validates native application identities without accepting labels as a fallback.
@@ -391,8 +391,8 @@ end
 local function _is_secure_context()
 	local blocked, app_id = global_privacy_blocks()
 	if blocked then return true end
-	local secure_enabled = TriggerSettings.get(require("config_keys").LEAF.SECURE_FILTER_ENABLED)
-	local url_enabled = TriggerSettings.get(require("config_keys").LEAF.URL_BAR_FILTER_ENABLED)
+	local secure_enabled = TriggerSettings.get(require("settings.engine.keys").LEAF.SECURE_FILTER_ENABLED)
+	local url_enabled = TriggerSettings.get(require("settings.engine.keys").LEAF.URL_BAR_FILTER_ENABLED)
 	if secure_enabled == nil then secure_enabled = HttpBridge.DEFAULT_DISABLE_PASSWORD_FIELDS end
 	if url_enabled == nil then url_enabled = HttpBridge.DEFAULT_DISABLE_URL_BARS end
 	if not secure_enabled and not url_enabled then return false end
@@ -454,7 +454,7 @@ local function show_candidates(candidates, meta)
 end
 
 local function context_without_trigger(context, input_chars)
-	local TextUtils = require("text_utils")
+	local TextUtils = require("core.text.engine.utils_core")
 	local count = math.max(0, math.floor(tonumber(input_chars) or 0))
 	if count == 0 or count > #context then return context, 0 end
 	-- Prompt slicing uses bytes; deletion and metrics use the suffix characters.
@@ -490,7 +490,7 @@ end
 --- @return table|nil config { debounce_ms, min_words }, string|nil reason
 function M.parse_live_config(text)
 	local ok, root = pcall(function() return type(text) == "string" and Json.decode(text) or nil end)
-	return require("llm.request_plan.live").config(ok and root or nil)
+	return require("ai.engine.request_plan.live").config(ok and root or nil)
 end
 
 --- The shipped live.json. A missing or malformed file is an installation
@@ -500,7 +500,7 @@ local function live_config()
 	if _live_config then return _live_config end
 	local path = require("infra.paths").shared(LIVE_CONFIG_FILE)
 	local text, status
-	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if path then text, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then text = nil end
 	local config, reason = M.parse_live_config(text)
 	if not config then
@@ -529,8 +529,8 @@ local function live_override()
 	if not _live then return nil end
 	-- Loaded when live mode started, which refuses without it: never nil here.
 	local config = live_config()
-	local decision = require("llm.request_plan.live").decide(
-		config, _live, ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS) or 1, binding_profile(_live))
+	local decision = require("ai.engine.request_plan.live").decide(
+		config, _live, ProfileSettings.get(require("settings.engine.keys").LEAF.NUM_PREDICTIONS) or 1, binding_profile(_live))
 	if decision.action == "stop" then
 		Logger.warn(LOG, "Live mode stopped: the prompt '%s' no longer exists.", _live.profile_id)
 		M.stop_live(decision.cause, false)
@@ -551,8 +551,8 @@ function _debounce.input(event)
 	local live_config_now = _live and live_config() or nil
 	_debounce.plan:configure({
 		enabled = _enabled,
-		debounce_ms = TriggerSettings.get(require("config_keys").LEAF.DEBOUNCE_MS),
-		instant_on_word_end = TriggerSettings.get(require("config_keys").LEAF.INSTANT_ON_WORD_END) == true,
+		debounce_ms = TriggerSettings.get(require("settings.engine.keys").LEAF.DEBOUNCE_MS),
+		instant_on_word_end = TriggerSettings.get(require("settings.engine.keys").LEAF.INSTANT_ON_WORD_END) == true,
 		live_debounce_ms = live_config_now and live_config_now.debounce_ms or false,
 	})
 	return _debounce.plan:on_input(event)
@@ -562,7 +562,7 @@ end
 --- llm.trigger.while_hotstring_tooltip value "both" (the manifest owns the list).
 --- @return boolean
 function M.shows_with_hotstring_rows()
-	return TriggerSettings.get(require("config_keys").LEAF.WHILE_HOTSTRING_TOOLTIP) == "both"
+	return TriggerSettings.get(require("settings.engine.keys").LEAF.WHILE_HOTSTRING_TOOLTIP) == "both"
 end
 
 --- Whether an automatic or live suggestion must leave the window to the
@@ -732,7 +732,7 @@ function M.init(opts)
 	_agent_last_app = nil
 	-- The three ports are checked once, here, so a missing method fails at wiring and
 	-- not inside a timer or a network callback (llm.request_plan.ports).
-	local Ports = require("llm.request_plan.ports")
+	local Ports = require("ai.engine.request_plan.ports")
 	_scheduler = Ports.check("TimerScheduler", options.scheduler or TimerScheduler)
 	-- Without one, the remote client keeps the adapter (and an injected client stays: init runs
 	-- once per process; tests reload the module).
@@ -828,7 +828,7 @@ function M.on_hotstring_expired(context, output_context)
 	arm_agent(context, output_context)
 	if not _enabled then return false end
 	-- Live mode held its request back while the preview was shown (on_char).
-	if not _live and TriggerSettings.get(require("config_keys").LEAF.AFTER_HOTSTRING) ~= true then return false end
+	if not _live and TriggerSettings.get(require("settings.engine.keys").LEAF.AFTER_HOTSTRING) ~= true then return false end
 	-- Shown together, the keystroke's own request already ran beside the preview.
 	if not _live and M.shows_with_hotstring_rows() then return false end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
@@ -848,7 +848,7 @@ local function prompt_language()
 	local ok, I18n = pcall(require, "infra.i18n")
 	local locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
 	if type(locale) == "string" and locale ~= "" then return locale end
-	return require("infra.manifest_reader").default_for(require("config_keys").KEY.SCRIPT_LOCALE)
+	return require("infra.manifest_reader").default_for(require("settings.engine.keys").KEY.SCRIPT_LOCALE)
 end
 
 --- The profile's name as the menu shows it, for the suggestions' info bar:
@@ -868,7 +868,7 @@ local function profile_display_name(profile)
 	if type(label) ~= "string" or label == "" or label == key then return tostring(profile.id) end
 	-- The menu's long form is "●○○ Basic — Simple prediction"; the bar keeps
 	-- the name.
-	return require("llm.request_plan.info_bar").short_profile_label(label) or tostring(profile.id)
+	return require("ai.engine.request_plan.info_bar").short_profile_label(label) or tostring(profile.id)
 end
 
 local function resolve_system_prompt(profile, params, count)
@@ -887,7 +887,7 @@ end
 
 --- Starts a prediction from the given context buffer.
 ---
---- A rewrite profile (llm/rewrite.lua) asks for the current sentence rewritten,
+--- A rewrite profile (ai/engine/prediction/rewrite.lua) asks for the current sentence rewritten,
 --- whatever triggered the request: its tail is that sentence, the context is
 --- widened to hold all of it when the menu's cap would cut it, and its token
 --- budget grows with it. The parser then erases exactly that span.
@@ -910,7 +910,7 @@ function M.predict(context, output_context, override, automatic)
 		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
 		return false
 	end
-	local RequestSettings = require("llm.request_settings")
+	local RequestSettings = require("ai.engine.settings.request_settings")
 	--- What a prediction is sent with: the backend and, under the API backend,
 	--- the active entry's id, provider, model, endpoint and key; under Ollama
 	--- its server address (a model change already retires through set_model).
@@ -967,11 +967,11 @@ function M.predict(context, output_context, override, automatic)
 
 	local clean_context, trigger_chars = context_without_trigger(context,
 		type(output_context) == "table" and output_context.input_chars or 0)
-	local requested = override and override.num_predictions or ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS) or 1
+	local requested = override and override.num_predictions or ProfileSettings.get(require("settings.engine.keys").LEAF.NUM_PREDICTIONS) or 1
 	-- Inline mode types the finished prediction instead of offering it, as
 	-- Windows does: one variant, since typing several would be chaos. Live
 	-- mode keeps its offer (it rewrites what is typed).
-	local inline = TriggerSettings.get(require("config_keys").LEAF.INLINE_AUTOTYPE) == true
+	local inline = TriggerSettings.get(require("settings.engine.keys").LEAF.INLINE_AUTOTYPE) == true
 		and not (override ~= nil and override.live == true)
 	if inline then requested = 1 end
 	-- A request naming its own prompt keeps it; otherwise the profile the user mapped
@@ -981,11 +981,11 @@ function M.predict(context, output_context, override, automatic)
 		or ProfileSettings.resolve(model)
 	if not profile then Logger.error(LOG, "Prediction profile catalogue is unavailable."); return end
 	local params = PromptBuilder.build_params(clean_context, {
-		max_words = Settings.get(require("config_keys").LEAF.MAX_WORDS),
-		min_words = override and override.min_words or Settings.get(require("config_keys").LEAF.MIN_WORDS),
+		max_words = Settings.get(require("settings.engine.keys").LEAF.MAX_WORDS),
+		min_words = override and override.min_words or Settings.get(require("settings.engine.keys").LEAF.MIN_WORDS),
 		num_predictions = requested,
 		temperature = Settings.get("temperature"),
-		auto_raise_temp = Settings.get(require("config_keys").LEAF.AUTO_RAISE_TEMP),
+		auto_raise_temp = Settings.get(require("settings.engine.keys").LEAF.AUTO_RAISE_TEMP),
 		language = prompt_language(),
 		context_window_chars = max_context_chars(),
 	})
@@ -1001,10 +1001,10 @@ function M.predict(context, output_context, override, automatic)
 		params.context_tail = Rewrite.sentence_span(params.context)
 		params.max_tokens = Rewrite.max_tokens(params.context_tail)
 	end
-	local batching = require("llm.request_plan.batching").plan(profile.batch == true, requested)
+	local batching = require("ai.engine.request_plan.batching").plan(profile.batch == true, requested)
 	local is_batch = batching.mode == "batch"
 	local base_temperature = Settings.get("temperature")
-	local auto_raise = Settings.get(require("config_keys").LEAF.AUTO_RAISE_TEMP) == true
+	local auto_raise = Settings.get(require("settings.engine.keys").LEAF.AUTO_RAISE_TEMP) == true
 	local system_prompt = resolve_system_prompt(profile, params, batching.per_call)
 	-- Empty is valid: the raw profile is its context alone, sent as the user turn.
 	if type(system_prompt) ~= "string" then
@@ -1169,7 +1169,7 @@ function M.predict(context, output_context, override, automatic)
 			or base_temperature
 		-- A rewrite's budget follows its sentence; the continuation override
 		-- would truncate it and erase text it could not retype.
-		local sent_tokens = require("llm.request_plan.token_budget").for_call(
+		local sent_tokens = require("ai.engine.request_plan.token_budget").for_call(
 			rewrite and params.max_tokens or _max_tokens or params.max_tokens, batching.per_call)
 		-- A retry is not streamed, as on Windows (DispatchVariant) and macOS.
 		local retrying = retry_call ~= nil
@@ -1199,7 +1199,7 @@ function M.predict(context, output_context, override, automatic)
 			if not request_current(false) then return end
 			streamed = streamed .. think_filter:feed(delta)
 			if DisplaySettings.get("streaming") ~= true then return end
-			if requested > 1 and DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI) ~= true then return end
+			if requested > 1 and DisplaySettings.get(require("settings.engine.keys").LEAF.STREAMING_MULTI) ~= true then return end
 			local partials = parse_response(streamed, is_batch, trigger_chars)
 			publish(partials[#partials])
 		end, function(full_text, err, usage)
@@ -1216,7 +1216,7 @@ function M.predict(context, output_context, override, automatic)
 						require("modules.llm.error_log").describe(err))
 				end
 				-- A refused key is refused again: no retry, no further variant.
-				local refused_key = require("llm.failure_class").is_authentication_failure(err)
+				local refused_key = require("ai.engine.policy.failure_class").is_authentication_failure(err)
 				if refused_key then
 					Logger.warn(LOG, "Prediction stopped: the credential was refused (no retry).")
 				end
@@ -1247,7 +1247,7 @@ function M.predict(context, output_context, override, automatic)
 			Logger.info(LOG, "Prediction request complete: %d chars, %d candidates.", #clean, #candidates)
 			if attempts_remain() or (is_batch and request_index < batching.calls) then
 				-- Shown now: the next variant may wait for the backend's interval.
-				if #candidates > 0 and DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI) == true then publish() end
+				if #candidates > 0 and DisplaySettings.get(require("settings.engine.keys").LEAF.STREAMING_MULTI) == true then publish() end
 				dispatch()
 				return
 			end
@@ -1460,7 +1460,7 @@ local function start_live(prompt, source)
 		translation_target = prompt.translation_target }
 	Logger.info(LOG, "Live mode on from %s (prompt %s, count %s).", source, profile.id,
 		prompt.num_predictions and tostring(prompt.num_predictions) or "from the menu")
-	local count = prompt.num_predictions or ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS) or 1
+	local count = prompt.num_predictions or ProfileSettings.get(require("settings.engine.keys").LEAF.NUM_PREDICTIONS) or 1
 	local template = i18n.get(LIVE_ON_KEY)
 	local at = template:find("{1}", 1, true)
 	local label = ProfileSettings.menu_label(profile, count)
@@ -1710,8 +1710,8 @@ function M.shift_tone(direction, cycle)
 		local backend, target, model, runtime_response = M.resolve_backend()
 		if not backend then return false end
 		local system_prompt = resolve_system_prompt(profile, {
-			min_words = Settings.get(require("config_keys").LEAF.MIN_WORDS),
-			max_words = Settings.get(require("config_keys").LEAF.MAX_WORDS),
+			min_words = Settings.get(require("settings.engine.keys").LEAF.MIN_WORDS),
+			max_words = Settings.get(require("settings.engine.keys").LEAF.MAX_WORDS),
 			language = prompt_language(),
 		}, 1)
 		if type(system_prompt) ~= "string" or system_prompt == "" then
@@ -2073,7 +2073,7 @@ local function finish_capture(flow, spec, outcome)
 		_vision_unscaled_logged = true
 		Logger.info(LOG, "Screenshots are sent at their full size: install ImageMagick to downscale them.")
 	end
-	local read_ok, image, read_status = pcall(require("toml_codec.writer").read_classified, capture.path)
+	local read_ok, image, read_status = pcall(require("core.text.engine.toml_codec.writer").read_classified, capture.path)
 	if not read_ok or read_status ~= "ok" then image = nil end
 	discard_capture(capture)
 	if type(image) ~= "string" or image == "" then
@@ -2426,8 +2426,8 @@ function M._send_test_prediction(sample, on_text, on_fail)
 	local profile = ProfileSettings.resolve(model)
 	if not profile then error("the prediction profile catalogue is unavailable", 0) end
 	local params = PromptBuilder.build_params(sample, {
-		max_words = Settings.get(require("config_keys").LEAF.MAX_WORDS),
-		min_words = Settings.get(require("config_keys").LEAF.MIN_WORDS),
+		max_words = Settings.get(require("settings.engine.keys").LEAF.MAX_WORDS),
+		min_words = Settings.get(require("settings.engine.keys").LEAF.MIN_WORDS),
 		num_predictions = 1,
 		temperature = HttpBridge.TEST_PREDICTION_TEMPERATURE,
 		auto_raise_temp = false,
@@ -2447,12 +2447,12 @@ function M._send_test_prediction(sample, on_text, on_fail)
 end
 
 --- The AI menu's « Test a prediction »: one prediction on a sample context, showing
---- the answer or why it could not run (llm/test_prediction.lua).
+--- the answer or why it could not run (ai/engine/prediction/test_prediction.lua).
 --- @return boolean sent True when the request left.
 function M.test_prediction()
 	-- A field, not a local: this chunk is at Lua's limit of 200 locals.
 	if not M._test_prediction then
-		M._test_prediction = require("llm.test_prediction").new({
+		M._test_prediction = require("ai.engine.prediction.test_prediction").new({
 			text = function(key) return i18n.get(key) end,
 			refusal = function()
 				-- A sample is sent, so an empty typing buffer refuses nothing.
@@ -2973,7 +2973,7 @@ end
 --- @param send function Called when the request may go.
 local function send_when_free(generation, chat, what, send)
 	if _runtime_closed or _scope_owner or generation ~= _agent_generation then return end
-	local interval = TriggerSettings.get(require("config_keys").LEAF.MIN_REQUEST_INTERVAL_MS)
+	local interval = TriggerSettings.get(require("settings.engine.keys").LEAF.MIN_REQUEST_INTERVAL_MS)
 	local verdict = _debounce.plan:on_dispatch({ explicit = false }, _clock_ms())[1]
 	local wait_ms = verdict.action == "defer" and verdict.delay_ms or 0
 	local busy = type(chat.module.is_active) == "function" and chat.module.is_active() == true
@@ -3078,7 +3078,7 @@ local function agent_pause_elapsed(generation, buffer, app)
 	local config = AgentSettings.config()
 	if not config then return end
 	-- Trimmed: a space typed after the sentence does not make it a new one.
-	local sentence = require("text_utils").trim(Rewrite.sentence_span(buffer))
+	local sentence = require("core.text.engine.utils_core").trim(Rewrite.sentence_span(buffer))
 	if AgentPlan.triage_skip({ chars = code_points(sentence), min_chars = config.system1.min_chars,
 		already_triaged = already_triaged(sentence) }) ~= nil then return end
 	if _is_secure_context() then
@@ -3760,15 +3760,15 @@ function M.enable(on_changed)
 	local Preferences = require("infra.llm_preferences")
 	local modal_generation_offset = 0
 	local function snapshot()
-		local values, source = Preferences.get_many({ BACKEND_KEY, require("config_keys").KEY.LLM_MODELS_OLLAMA, require("config_keys").KEY.LLM_ENABLED })
+		local values, source = Preferences.get_many({ BACKEND_KEY, require("settings.engine.keys").KEY.LLM_MODELS_OLLAMA, require("settings.engine.keys").KEY.LLM_ENABLED })
 		local backend = M.get_backend()
 		return {
-			backend = backend, model = values[require("config_keys").KEY.LLM_MODELS_OLLAMA], origin = M.get_base_url(),
+			backend = backend, model = values[require("settings.engine.keys").KEY.LLM_MODELS_OLLAMA], origin = M.get_base_url(),
 			generation = Preferences.generation() + _enable_generation
 				- modal_generation_offset, source = source,
-			enabled = values[require("config_keys").KEY.LLM_ENABLED], paused = _is_paused(),
-			blocked = _scope_owner ~= nil or not Preferences.admit() or _enabled ~= values[require("config_keys").KEY.LLM_ENABLED]
-				or (backend == "ollama" and M.get_current_model() ~= values[require("config_keys").KEY.LLM_MODELS_OLLAMA])
+			enabled = values[require("settings.engine.keys").KEY.LLM_ENABLED], paused = _is_paused(),
+			blocked = _scope_owner ~= nil or not Preferences.admit() or _enabled ~= values[require("settings.engine.keys").KEY.LLM_ENABLED]
+				or (backend == "ollama" and M.get_current_model() ~= values[require("settings.engine.keys").KEY.LLM_MODELS_OLLAMA])
 				or _runtime_closed,
 		}
 	end
@@ -3794,7 +3794,7 @@ function M.enable(on_changed)
 		reject = function(origin, _, _, captured, current, cleanup_only)
 			local Servers = require("modules.llm.local_servers")
 			local Entries = require("modules.llm.api_entries")
-			local Discovery = require("llm.local_server_discovery")
+			local Discovery = require("ai.engine.local_servers.discovery")
 			local I18n = require("infra.i18n")
 			local replacements = {}
 			local function current_cached()
@@ -3812,7 +3812,7 @@ function M.enable(on_changed)
 					if server and verdict and verdict.status == Discovery.STATUS_UP and model
 						and receipt and Servers.is_current(receipt, model) then
 						local values = { server.label, model,
-							require("llm.local_server_menu").host_of(verdict.base_url) }
+							require("ai.engine.local_servers.menu").host_of(verdict.base_url) }
 						replacements[#replacements + 1] = {
 							label = (I18n.get("llm.unreachable.use_server"):gsub("{(%d+)}",
 								function(index) return tostring(values[tonumber(index)] or "") end)),
@@ -3822,7 +3822,7 @@ function M.enable(on_changed)
 				end
 			end
 			local runtime_choices, runtime_note = {}, nil
-			if not cleanup_only and current() and require('llm.runtime_repair').loopback_origin(origin) then
+			if not cleanup_only and current() and require('ai.engine.local_servers.runtime_repair').loopback_origin(origin) then
 				local runtime = runtime_owner()
 				if not runtime then runtime_note = I18n.get("ollama.runtime_repair_failed") end
 				local ok, resolved = pcall(function() return runtime and runtime.resolve() end)
@@ -3916,7 +3916,7 @@ function M.enable(on_changed)
 				if not result or not result.saved or not result.entry then return nil end
 				local source = Entries.capture_source()
 				local function selection_current(phase)
-					local values, live_source = Preferences.get_many({ BACKEND_KEY, require("config_keys").KEY.LLM_MODELS_OLLAMA, require("config_keys").KEY.LLM_ENABLED })
+					local values, live_source = Preferences.get_many({ BACKEND_KEY, require("settings.engine.keys").KEY.LLM_MODELS_OLLAMA, require("settings.engine.keys").KEY.LLM_ENABLED })
 					local active = Entries.active()
 					-- Only the backend owner's second admission observes its one revision
 					-- advance. A reset or preference rewrite during dismissal cannot borrow
@@ -3924,8 +3924,8 @@ function M.enable(on_changed)
 					local expected_revision = selection_revision + (phase == "after" and 1 or 0)
 					return not _is_paused() and M.can_configure_local_servers() and not _enabled
 						and _enable_generation == expected_revision and Preferences.generation() == preference_revision
-						and values[require("config_keys").KEY.LLM_ENABLED] == false and values[BACKEND_KEY] == captured.backend
-						and values[require("config_keys").KEY.LLM_MODELS_OLLAMA] == captured.model
+						and values[require("settings.engine.keys").KEY.LLM_ENABLED] == false and values[BACKEND_KEY] == captured.backend
+						and values[require("settings.engine.keys").KEY.LLM_MODELS_OLLAMA] == captured.model
 						and live_source.status == captured.source.status and live_source.content == captured.source.content
 						and source ~= nil and Entries.source_is_current(source)
 						and active ~= nil and active.id == result.entry.id and active.model == replacement.model
@@ -4260,7 +4260,7 @@ function M.set_model(model_name)
 		return not _runtime_closed and _scope_owner == nil
 			and revision == _enable_generation and app_epoch == _runtime_app_epoch
 	end
-	local _, source = require("infra.llm_preferences").get_many({ require("config_keys").KEY.LLM_MODELS_OLLAMA })
+	local _, source = require("infra.llm_preferences").get_many({ require("settings.engine.keys").KEY.LLM_MODELS_OLLAMA })
 	local profiles = get_profiles()
 	local selected = current() and profiles and type(profiles.set_model) == "function"
 		and profiles.set_model(model_name, source, current) == true and current() or false
@@ -4369,7 +4369,7 @@ function M.set_temperature(value) return Settings.set("temperature", tonumber(va
 function M.get_max_context() return max_context_chars() end
 
 function M.set_max_context(value)
-	return Settings.set(require("config_keys").LEAF.CONTEXT_LENGTH, value)
+	return Settings.set(require("settings.engine.keys").LEAF.CONTEXT_LENGTH, value)
 end
 
 function M.get_stop_sequences() return {} end

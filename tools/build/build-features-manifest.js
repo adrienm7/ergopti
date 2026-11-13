@@ -6,14 +6,14 @@
 //      projection of it (tools/lib/config-template-projection.cjs).
 //
 // Inputs:
-//   static/ergopti_plus/_shared/modules/features/manifest.toml
-//   static/ergopti_plus/_shared/tap_hold/defaults.toml
+//   static/ergopti_plus/_shared/settings/data/features/manifest.toml
+//   static/ergopti_plus/_shared/tap_hold/data/defaults.toml
 //
 // Outputs:
 //   static/ergopti_plus/_shared/_generated/config_template.toml  (three drivers, once)
 //   static/ergopti_plus/windows/_generated/features_manifest.ahk
 //   static/ergopti_plus/windows/_generated/config_template.toml  (projection)
-//   static/ergopti_plus/_shared/lua/features/manifest_data.lua  (macOS + Linux, once)
+//   static/ergopti_plus/_shared/settings/engine/features/manifest_data.lua  (macOS + Linux, once)
 //   static/ergopti_plus/macos/_generated/features_manifest.lua  (projection call)
 //   static/ergopti_plus/macos/_generated/config_template.toml    (projection)
 //   static/ergopti_plus/linux/_generated/features_manifest.lua  (projection call)
@@ -40,7 +40,7 @@ const { shared } = sharedPaths;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
 
-const MANIFEST_PATH = shared('modules/features/manifest.toml');
+const MANIFEST_PATH = shared('settings/data/features/manifest.toml');
 
 const OUT_AHK_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/windows/_generated');
 const OUT_HS_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/macos/_generated');
@@ -48,17 +48,17 @@ const OUT_LINUX_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/linux/_generated')
 const OUT_SHARED_CONFIG_TEMPLATE = shared('_generated/config_template.toml');
 const OUT_SHARED_LUA_DATA = resolve(
 	REPO_ROOT,
-	'static/ergopti_plus/_shared/lua/features/manifest_data.lua'
+	'static/ergopti_plus/_shared/settings/engine/features/manifest_data.lua'
 );
 
 // The two Lua drivers share one generated manifest table
-// (_shared/lua/features/manifest_data.lua); each driver's own file only asks
-// _shared/lua/features/manifest.lua for its projection.
+// (_shared/settings/engine/features/manifest_data.lua); each driver's own file only asks
+// _shared/settings/engine/features/manifest.lua for its projection.
 const LUA_PLATFORMS = ['hs', 'linux'];
 
 // Ultimate fallback default: a feature that declares no 'platforms' at any
 // ancestor level inherits this list. When adding a new driver, this list must
-// match the platforms enum in _shared/modules/features/manifest.schema.json.
+// match the platforms enum in _shared/settings/data/features/manifest.schema.json.
 const PLATFORMS = ['ahk', 'hs', 'linux'];
 
 // =================================================
@@ -429,7 +429,7 @@ function ahkLiteral(value) {
 function renderAhkManifest(manifest, sections, features) {
 	const lines = [];
 	lines.push('; _generated/features_manifest.ahk');
-	lines.push('; AUTO-GENERATED from _shared/modules/features/manifest.toml.');
+	lines.push('; AUTO-GENERATED from _shared/settings/data/features/manifest.toml.');
 	lines.push('; DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.');
 	lines.push('');
 	lines.push('global FEATURES_MANIFEST := Map(');
@@ -551,7 +551,7 @@ function luaFeatureEntry(f, platform) {
 
 /**
  * The table one Lua driver loads from its features_manifest.lua. The shared
- * generated data and its projection (_shared/lua/features/manifest.lua) must
+ * generated data and its projection (_shared/settings/engine/features/manifest.lua) must
  * produce exactly this; test-lua-features-manifest-projection.cjs loads the
  * real Lua files and compares.
  * @returns {object} { version, section_order, scopes, sections, features, unavailable }
@@ -584,7 +584,7 @@ function renderLuaManifest(manifest, sections, features, platform) {
 	const model = luaManifestModel(manifest, sections, features, platform);
 	const lines = [];
 	lines.push('--- _generated/features_manifest.lua');
-	lines.push('--- AUTO-GENERATED from _shared/modules/features/manifest.toml.');
+	lines.push('--- AUTO-GENERATED from _shared/settings/data/features/manifest.toml.');
 	lines.push('--- DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.');
 	lines.push('---');
 	lines.push('--- NOTE (F-LOW-15): description_key is emitted here for structural');
@@ -677,8 +677,8 @@ function sharedLuaRow(f) {
 
 function renderSharedLuaData(manifest, sections, features) {
 	const lines = [];
-	lines.push('--- _shared/lua/features/manifest_data.lua');
-	lines.push('--- AUTO-GENERATED from _shared/modules/features/manifest.toml.');
+	lines.push('--- _shared/settings/engine/features/manifest_data.lua');
+	lines.push('--- AUTO-GENERATED from _shared/settings/data/features/manifest.toml.');
 	lines.push('--- DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.');
 	lines.push('---');
 	lines.push('--- The features manifest both Lua drivers load, written once. A driver does');
@@ -724,14 +724,14 @@ function renderSharedLuaData(manifest, sections, features) {
 function renderLuaDriverManifest(platform) {
 	return [
 		'--- _generated/features_manifest.lua',
-		'--- AUTO-GENERATED from _shared/modules/features/manifest.toml.',
+		'--- AUTO-GENERATED from _shared/settings/data/features/manifest.toml.',
 		'--- DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.',
 		'---',
 		"--- This driver's features manifest: the table the macOS and Linux drivers share",
-		'--- (_shared/lua/features/manifest_data.lua), projected for this driver when it',
+		'--- (_shared/settings/engine/features/manifest_data.lua), projected for this driver when it',
 		'--- loads. Nothing else is declared here.',
 		'',
-		`return require("features.manifest").for_platform("${platform}")`,
+		`return require("settings.engine.features.manifest").for_platform("${platform}")`,
 		''
 	].join('\n');
 }

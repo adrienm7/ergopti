@@ -21,7 +21,7 @@ helpers.describe("expander: the erase count is sane and the suppression window i
 	helpers.it("never asks for a negative number of deletes", function()
 		-- The clamp now lives in the shared injection plan; the expander must
 		-- take its erase count from it rather than subtract on its own.
-		local Plan = require("hotstring_engine.injection_plan")
+		local Plan = require("hotstrings.engine.matcher.injection_plan")
 		helpers.assert_eq(Plan.erase_count({
 			path = "auto", trigger_len = 1, event_len = 2, event_on_screen = false,
 		}), 0, "a trigger shorter than the typed event must be clamped to zero deletes")

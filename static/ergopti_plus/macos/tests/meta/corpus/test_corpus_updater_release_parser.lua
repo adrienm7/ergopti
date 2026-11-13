@@ -51,8 +51,8 @@ local corpus_root, corpus_err = read_corpus()
 -- ===============================================
 
 local function load_parser()
-	package.loaded["updater.release_parser"] = nil
-	return require("updater.release_parser")
+	package.loaded["updater.engine.release_parser"] = nil
+	return require("updater.engine.release_parser")
 end
 
 local function dispatch(P, vec)

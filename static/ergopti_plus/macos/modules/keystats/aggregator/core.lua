@@ -19,9 +19,9 @@ local JsonCodec = require("adapters.json_codec")
 local Logger  = require("infra.logger")
 local Paths   = require("infra.paths")
 local Timings = require("infra.timings")
-local KUtils    = require("keystats.utils")
-local AggHelper = require("keystats.aggregator_helpers")
-local Walker    = require("keystats.walker")
+local KUtils    = require("metrics.engine.utils")
+local AggHelper = require("metrics.engine.aggregator.helpers")
+local Walker    = require("metrics.engine.walker.walker")
 local LOG       = "keystats.aggregator"
 local media_policy = nil
 local media_policy_loading, media_policy_handle = false, nil
@@ -32,7 +32,7 @@ function M.media_policy()
 	if media_policy then return media_policy end
 	assert(not media_policy_loading and media_policy_handle == nil, "Media catalogue preparation or cleanup remains pending")
 	media_policy_loading = true
-	local opened, file = pcall(io.open, Paths.shared("data/keycodes/metrics_media_keys.json"), "r")
+	local opened, file = pcall(io.open, Paths.shared("layouts/data/keycodes/metrics_media_keys.json"), "r")
 	if not opened then error("Media catalogue acquisition failed", 0) end
 	if not file then media_policy_loading = false; error("Media catalogue is unavailable", 0) end
 	media_policy_handle = file -- Retain the exact acquired handle before read or close.
@@ -43,7 +43,7 @@ function M.media_policy()
 	assert(read and type(content) == "string", "Media catalogue read failed")
 	local catalogue, decode_error = JsonCodec.decode(content)
 	assert(not decode_error and type(catalogue) == "table", "Media catalogue is invalid")
-	media_policy = require("keystats.media_store").policy(catalogue)
+	media_policy = require("metrics.engine.media.store").policy(catalogue)
 	return media_policy
 end
 
@@ -128,7 +128,7 @@ local FALLBACK_KC_TO_FINGER = {
 --- {kc=finger} lookup restricted to CONTENT_KCS, or nil on failure.
 --- @return table<number,string>|nil
 local function load_shared_kc_to_finger()
-	local path = Paths.shared("data/keycodes/azerty.json")
+	local path = Paths.shared("layouts/data/keycodes/azerty.json")
 	if type(path) ~= "string" or path == "" then return nil end
 	local fh = io.open(path, "r")
 	if not fh then return nil end
@@ -173,7 +173,7 @@ M.HOLD_THRESHOLD_MS        = HOLD_THRESHOLD_MS
 M.TITLE_CAP_PER_APP_DAY    = TITLE_CAP_PER_APP_DAY
 M.KC_TO_FINGER             = KC_TO_FINGER
 
---- The shared walker (_shared/lua/keystats/walker.lua), keyed on the macOS
+--- The shared walker (_shared/metrics/engine/walker/walker.lua), keyed on the macOS
 --- virtual keycode a typed keystroke carries in meta.kc.
 M.walker = Walker.new({
 	timings = {

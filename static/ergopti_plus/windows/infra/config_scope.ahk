@@ -8,7 +8,7 @@
 ; until reload completion or verified rollback of the complete cohort.
 ; ==============================================================================
 
-#Include %A_LineFile%\..\..\..\_shared\ahk\config_obsolete_parents.ahk
+#Include %A_LineFile%\..\..\..\_shared\settings\engine\migration\obsolete_parents.ahk
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 /**

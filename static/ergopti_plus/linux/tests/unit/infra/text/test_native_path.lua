@@ -1,14 +1,14 @@
 --- tests/unit/infra/text/test_native_path.lua
 
 --- Replays the shared native path contract on the Linux suite.
-require("test.native_path_contract").register(require("tests.helpers"))
+require("tests.lua.core.native_path_contract").register(require("tests.helpers"))
 
-require("test.module_source_identity_contract").register(require("tests.helpers"))
+require("tests.lua.core_fs.module_source_identity_contract").register(require("tests.helpers"))
 
 local helpers = require("tests.helpers")
 helpers.describe("native constructor source", function()
 	helpers.it("source-identity-native: actual constructor accepts literal POSIX component bytes", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local executable = assert(require("luv").exepath())
 		-- A normal runner need not export TMPDIR; retain the actual ABI/provider
@@ -20,7 +20,7 @@ end)
 
 helpers.describe("shared TEST native path bytes", function()
 	helpers.it("shared-test-posix-paths: real corpus and sandbox owners retain physical prefix bytes", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local executable = assert(require("luv").exepath())
 		local provider = assert(package.searchpath("luv", package.cpath))

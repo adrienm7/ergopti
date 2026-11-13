@@ -32,14 +32,14 @@
 
 local M = {}
 
-local Json = require("json")
-local SharedWalker = require("keystats.walker")
+local Json = require("core.text.engine.json")
+local SharedWalker = require("metrics.engine.walker.walker")
 local AggregateWalker = require("modules.keystats.aggregate_walker")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 
-local Helpers = require("keystats.aggregator_helpers")
-local LocalTime = require("keystats.local_time")
-local Logger = require("logger.shim")
+local Helpers = require("metrics.engine.aggregator.helpers")
+local LocalTime = require("metrics.engine.local_time")
+local Logger = require("core.logger.engine.shim")
 
 local SEPARATOR = "\1"
 
@@ -165,7 +165,7 @@ end
 --- @return table batch
 function M.walk_device(opts)
 	local store, device_id, decrypt = opts.store, opts.device_id, opts.decrypt
-	local batch = require("keystats.aggregator_helpers").new_batch()
+	local batch = require("metrics.engine.aggregator.helpers").new_batch()
 	local contexts = {}
 	local os_rows = store.query_rows(string.format("SELECT hex(os) FROM devices WHERE device_id='%s';",
 		SqliteCommand.escape_literal(device_id)))
@@ -220,7 +220,7 @@ function M.walk_device(opts)
 	end
 	-- Windows records its Wi-Fi changes as network_change rows (its own rebuild
 	-- counts them with the legacy wifi_change rows above).
-	local NetworkTransitions = require("keystats.network_transitions")
+	local NetworkTransitions = require("metrics.engine.system.network_transitions")
 	for _, row in ipairs(read_rows(store, "events_network", { "ts", "date", "kind", "meta_json", "utc_offset_min" }, device_id)) do
 		if row.kind == "network_change" then
 			local ok, meta = pcall(Json.decode, row.meta_json ~= "" and row.meta_json or "{}")
@@ -250,7 +250,7 @@ end
 -- ================================
 
 --- The derived tables of the shared schema: every agg_* and ngram_* table.
---- @param schema string Text of _shared/data/db/schema.sql.
+--- @param schema string Text of _shared/metrics/data/db/schema.sql.
 --- @return table names
 function M.derived_tables(schema)
 	local names = {}

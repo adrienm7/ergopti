@@ -10,7 +10,7 @@
 ;    static/ergopti_plus/macos/adapters/. A missing adapter means a port
 ;    contract exists on paper but is not honoured by a driver.
 ;
-; 2. DOMAIN TEST COVERAGE  --  Every domain spec in _shared/core/domain/*.spec.js
+; 2. DOMAIN TEST COVERAGE  --  Every domain spec in _shared/core/text/data/domain/*.spec.js
 ;    has at least one corresponding test file in at least one driver's test
 ;    suite. An untested domain spec is a dead letter.
 ;
@@ -158,7 +158,7 @@ _MetaRunDomainCoverageTests() {
 	; #Include'd file is executing — strip everything from /static/... onward.
 	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
-	DomainDir  := RepoRoot . "/static/ergopti_plus/_shared/core/domain"
+	DomainDir  := RepoRoot . "/static/ergopti_plus/_shared/core/text/data/domain"
 	AhkTests   := RepoRoot . "/static/ergopti_plus/windows/tests"
 	HsTests    := RepoRoot . "/static/ergopti_plus/macos/tests"
 
@@ -204,7 +204,7 @@ _MetaRunDomainCoverageTests() {
 	}
 
 	_ResultDomainCoverage() {
-		Assert(SpecCount > 0, "no *.spec.js found in _shared/core/domain  --  check RepoRoot")
+		Assert(SpecCount > 0, "no *.spec.js found in _shared/core/text/data/domain  --  check RepoRoot")
 		Assert(Uncovered = 0, "meta: " . Uncovered . " domain spec(s) lack a driver test")
 	}
 	Test("meta domain coverage: every domain spec has a driver test (" . SpecCount . " specs)", _ResultDomainCoverage)

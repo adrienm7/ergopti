@@ -181,9 +181,12 @@ check(
 	plistInteger('ThrottleInterval') === 10,
 	'the guardian restart throttle must remain exactly 10 seconds'
 );
-// The label has one source, _shared/data/identifiers.json, generated into Swift.
+// The label has one source, _shared/core/text/data/identifiers.json, generated into Swift.
 const IDENTIFIERS = JSON.parse(
-	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.json'), 'utf8')
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/core/text/data/identifiers.json'),
+		'utf8'
+	)
 );
 const GUARDIAN_LABEL =
 	IDENTIFIERS.service_labels && IDENTIFIERS.service_labels.macos_remap_guardian;

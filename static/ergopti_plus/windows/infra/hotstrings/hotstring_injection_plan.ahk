@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Hotstring Injection Plan
 ; DESCRIPTION:
-; The Windows reader of _shared/lua/hotstring_engine/injection_plan.lua: how many
+; The Windows reader of _shared/hotstrings/engine/matcher/injection_plan.lua: how many
 ; codepoints an expansion erases, what it types, which terminator it replays and
 ; what the rolling buffer holds afterwards. Same inputs, same outputs, pinned by
 ; _shared/tests/corpus/hotstrings/injection_plan_vectors.json. Delivery stays in

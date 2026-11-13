@@ -52,7 +52,7 @@ helpers.describe("extension manifest native read", function()
 local loader = require("modules.hotstrings.loader")
 local paths = require("infra.paths")
 local original = paths.shared
-paths.shared = function(name) if name == "modules/hotstrings/priority.json" then return %q end; return original(name) end
+paths.shared = function(name) if name == "hotstrings/data/catalogue/priority.json" then return %q end; return original(name) end
 local result = loader.load_catalogue({ %q })
 assert(result.committed and #result.mappings == 1)
 ]], package.path, path, pack)
@@ -268,7 +268,7 @@ helpers.describe("hotstring discovery forks nothing", function()
 				Loader.find_toml_files(root, 2)
 				Loader.list_subdirs(root)
 				Loader.unavailable_directories(root, 2)
-				Loader.find_toml_files(require("infra.paths").shared("modules/hotstrings"))
+				Loader.find_toml_files(require("infra.paths").shared("hotstrings/data/catalogue"))
 			end)
 			helpers.assert_eq(forks, 0, "discovery must not fork find or any other process")
 			helpers.assert_true(#found > 150, "the counted walk discovered the fixture")
@@ -353,7 +353,7 @@ helpers.describe("hotstring discovery refuses what a directory cannot hold", fun
 			["/isolated"] = { { name = "locked", type = "directory" }, { name = "kept.toml", type = "file" } },
 			["/isolated/locked"] = { error = "EACCES" },
 		}, { ["/isolated"] = "directory" }, function(Loader)
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local warned = {}
 			local warn = Logger.warn
 			Logger.warn = function(_, message, path, detail) warned[#warned + 1] = string.format(message, path, detail) end

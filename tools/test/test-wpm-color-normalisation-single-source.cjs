@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * The pill's unit strip is its background with each RGB channel multiplied by
  * the canon's unit_strip_darken_factor, rounded half up. The darkening exists
- * twice: once in the shared Lua model (_shared/lua/wpm_widget/model.lua,
+ * twice: once in the shared Lua model (_shared/metrics/engine/wpm_widget_model.lua,
  * which macOS and Linux draw with) and once in AHK (Windows
  * ui/wpm/wpm_widget.ahk). Linux used to keep (1 - factor) of each channel — a
  * lighter strip than the other two — and each driver used to carry its own
@@ -35,7 +35,7 @@ function read(rel) {
 	return fs.readFileSync(path.join(ROOT, rel), 'utf8');
 }
 
-const canon = read('static/ergopti_plus/_shared/modules/wpm_widget/constants.toml');
+const canon = read('static/ergopti_plus/_shared/metrics/data/wpm_widget/constants.toml');
 const factorMatch = canon.match(/^unit_strip_darken_factor\s*=\s*([\d.]+)/m);
 const errors = [];
 if (!factorMatch) {
@@ -89,7 +89,7 @@ if (darkenHex('#fff', FACTOR) !== null)
 	errors.push('a shorthand colour must be refused, not darkened');
 
 // ── The two real implementations ─────────────────────────────────────────────
-const model = read('static/ergopti_plus/_shared/lua/wpm_widget/model.lua');
+const model = read('static/ergopti_plus/_shared/metrics/engine/wpm_widget_model.lua');
 const luaStart = model.indexOf('function M.darken_hex(');
 const luaBody = luaStart === -1 ? '' : model.slice(luaStart, model.indexOf('\nend\n', luaStart));
 if (!luaBody) errors.push('model.lua has no darken_hex');

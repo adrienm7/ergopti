@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Sends a screenshot to the vision model an llm_screen_region, llm_screen_full
 --- or llm_screen_error binding names and returns the model's answer text. The
---- request bodies come from the shared _shared/lua/llm/vision.lua; this module
+--- request bodies come from the shared _shared/ai/engine/prediction/vision.lua; this module
 --- adds the address and the credentials.
 ---
 --- FEATURES & RATIONALE:
@@ -22,10 +22,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Json = require("json")
-local Vision = require("llm.vision")
-local LocalModelPolicy = require("llm.local_model_policy")
+local Logger = require("core.logger.engine.shim")
+local Json = require("core.text.engine.json")
+local Vision = require("ai.engine.prediction.vision")
+local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
 
 local LOG = "modules.llm.vision_request"
 
@@ -84,9 +84,9 @@ end
 --- @return table|nil config
 function M.config()
 	if _config then return _config end
-	local path = require("infra.paths").shared("modules/llm/vision.json")
+	local path = require("infra.paths").shared("ai/data/vision.json")
 	local text, status
-	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if path then text, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then text = nil end
 	local config, reason = M.parse_config(text)
 	if not config then

@@ -38,7 +38,7 @@ local function reset_driver_modules()
 			package.loaded[name] = nil
 		end
 	end
-	package.loaded["dynamic_hotstrings"] = nil
+	package.loaded["hotstrings.engine.dynamic.core"] = nil
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
@@ -107,7 +107,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["adapters.synthetic_input"] = api({
 			current_action_epoch = function() return epoch end,
 		})
-		package.loaded["infra.text_utils"] = require("text_utils")
+		package.loaded["infra.text_utils"] = require("core.text.engine.utils_core")
 		package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
 		package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
 		package.loaded["infra.manifest_reader"] = {
@@ -178,7 +178,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["adapters.synthetic_input"] = api({
 			current_action_epoch = function() return {} end,
 		})
-		package.loaded["infra.text_utils"] = require("text_utils")
+		package.loaded["infra.text_utils"] = require("core.text.engine.utils_core")
 		package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
 		package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
 		package.loaded["infra.manifest_reader"] = {

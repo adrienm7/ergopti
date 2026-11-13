@@ -1,5 +1,5 @@
 # linux/_generated/shell_messages/it.msg
-# AUTO-GENERATED from _shared/data/locales/it.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/it.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=Modulo di rete LuaJIT compilato dai sorgenti.
 build_luv.recipe_required=La compilazione nativa di luv richiede la sua ricetta sorgente.

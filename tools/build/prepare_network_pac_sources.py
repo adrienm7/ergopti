@@ -18,10 +18,10 @@ def integer(value, name):
 
 
 def generate(repo, archive, output, msvc_function):
-    catalog_path = "static/ergopti_plus/_shared/data/linux_native_runtime.json"
-    policy_path = "static/ergopti_plus/_shared/modules/network/proxy_policy.json"
-    defaults_path = "static/ergopti_plus/_shared/modules/updater/defaults.json"
-    helper_path = "static/ergopti_plus/_shared/modules/network/pac_helpers.js"
+    catalog_path = "static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json"
+    policy_path = "static/ergopti_plus/_shared/core/network/data/proxy_policy.json"
+    defaults_path = "static/ergopti_plus/_shared/updater/data/defaults.json"
+    helper_path = "static/ergopti_plus/_shared/core/network/data/pac_helpers.js"
     catalog = json.loads((repo / catalog_path).read_text(encoding="utf-8"))
     # The canonical Linux source authority already pins the shared JS VM.
     authorities = catalog["network_runtime"]["portable"]["flatpak_sources"]
@@ -82,8 +82,8 @@ def generate(repo, archive, output, msvc_function):
         policy_path,
         defaults_path,
         helper_path,
-        "static/ergopti_plus/_shared/native/network/pac_runtime.c",
-        "static/ergopti_plus/_shared/native/network/pac_runtime.h",
+        "static/ergopti_plus/_shared/core/network/native/pac_runtime.c",
+        "static/ergopti_plus/_shared/core/network/native/pac_runtime.h",
         "static/ergopti_plus/windows/native/ergopti_network_pac_platform.c",
         "static/ergopti_plus/windows/native/ergopti_network_pac_platform.h",
         "static/ergopti_plus/windows/native/ergopti_network_pac.c",

@@ -9,7 +9,7 @@
 --- Hammerspoon callback latency. No benchmark runs in the ordinary unit suite.
 --- ==============================================================================
 
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 local helpers = require("tests.helpers")
 local pbt = require("tests.helpers.pbt")
 local isolation = require("tests.support.module_isolation")
@@ -43,7 +43,7 @@ local function payload_bytes()
 end
 
 for _, phase in ipairs({ "baseline", "validated_cache" }) do
-	isolation.purge(root, root .. "/../_shared/lua")
+	isolation.purge(root, root .. "/../_shared")
 	helpers.reset_results()
 	helpers.set_only_filter(nil)
 	local properties, samples = 0, 0

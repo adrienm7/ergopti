@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Gesture Direction (AutoHotkey port)
 ; DESCRIPTION:
-; Port of _shared/lua/gestures/direction.lua, the classifier the macOS
+; Port of _shared/gestures/engine/direction.lua, the classifier the macOS
 ; geometry and the Linux decoder share: a swipe displacement becomes the axis
 ; it travelled on, the direction name a slot carries, and its signed travel
 ; along that direction. The Windows incremental tracker

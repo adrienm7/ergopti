@@ -16,7 +16,7 @@ import time
 
 
 WORKER = r"""
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 local Atspi = require("adapters.atspi_focus")
 local Destination = require("adapters.user_hotstring_destination")
 local direct, ok = Atspi._get_native_snapshot()
@@ -41,7 +41,7 @@ else
     assert(require("adapters.window_info").focused_identity() == identity,
         "the same actual focused control must retain its identity")
 end
-io.write("RECEIPT:" .. require("json").encode({bus=direct.native_bus_name,path=direct.native_object_path,role=direct.role,ai_identity=identity}))
+io.write("RECEIPT:" .. require("core.text.engine.json").encode({bus=direct.native_bus_name,path=direct.native_object_path,role=direct.role,ai_identity=identity}))
 """
 
 

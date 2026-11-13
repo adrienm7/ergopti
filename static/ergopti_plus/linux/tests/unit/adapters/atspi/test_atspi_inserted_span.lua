@@ -7,7 +7,7 @@
 --- deadline contract. Payload bytes stay in private bounded stdout.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 require("adapters.atspi_focus")
 
 local function with_capture(options, body)

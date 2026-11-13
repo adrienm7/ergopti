@@ -167,8 +167,8 @@ test('untagged Windows and Linux calls retain their replacement behavior', () =>
 });
 
 test('actual Lua fresh then cache JavaScript executes without rolling back state', () => {
-	const luaInput = `package.path='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;'..package.path
-local json=require('json')
+	const luaInput = `package.path='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;'..package.path
+local json=require('core.text.engine.json')
 require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,evaluations,errors,successes,pending)
  evaluations[1].done('function')
  local cached=evaluations[2].code
@@ -233,8 +233,8 @@ test('actual Lua category edit survives an older bootstrap and fresh responses s
 	const lua = spawnSync('lua', ['-'], {
 		cwd: path.resolve(__dirname, '../../static/ergopti_plus/macos'),
 		encoding: 'utf8',
-		input: `package.path='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;'..package.path
-local json=require('json')
+		input: `package.path='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;'..package.path
+local json=require('core.text.engine.json')
 require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,evaluations,errors,successes,pending)
  package.loaded['hs.json'].encode=json.encode
  dashboard._app_icon_cache={Editor=false}
@@ -296,8 +296,8 @@ test('actual Lua application dictionaries retain prototype-named keys in the loa
 	const lua = spawnSync('lua', ['-'], {
 		cwd: path.resolve(__dirname, '../../static/ergopti_plus/macos'),
 		encoding: 'utf8',
-		input: `package.path='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;'..package.path
-local json=require('json')
+		input: `package.path='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;'..package.path
+local json=require('core.text.engine.json')
 require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,evaluations,errors,successes,pending)
  local names={'Editor','constructor','toString','__proto__'}
  package.loaded['hs.json'].encode=json.encode

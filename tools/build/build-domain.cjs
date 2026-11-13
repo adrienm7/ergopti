@@ -161,7 +161,7 @@ const PIPELINE = [
 		},
 		generated: [
 			'static/ergopti_plus/windows/_generated/terminators.ahk',
-			'static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua'
+			'static/ergopti_plus/_shared/layouts/engine/layers/terminators_catalogue.lua'
 		]
 	},
 	{
@@ -203,8 +203,8 @@ const PIPELINE = [
 			return { ok, detail: ok ? undefined : stderr };
 		},
 		generated: [
-			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json',
-			'static/ergopti_plus/_shared/modules/menu/startup_tray_projection.ahk'
+			'static/ergopti_plus/_shared/menu/data/menu_manifest.json',
+			'static/ergopti_plus/_shared/menu/data/startup_tray_projection.ahk'
 		]
 	},
 

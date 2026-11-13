@@ -28,7 +28,7 @@ const { frenchPunctuationDefect } = require('./lib/menu-row-text.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const ERGOPTI = path.join(ROOT, 'static', 'ergopti_plus');
-const LOCALES = path.join(ERGOPTI, '_shared', 'data', 'locales');
+const LOCALES = path.join(ERGOPTI, '_shared', 'core', 'i18n', 'data', 'locales');
 const KEY = 'common.label_value';
 const LOCALE_COUNT = 21;
 const DRIVERS = ['_shared', 'windows', 'macos', 'linux'];

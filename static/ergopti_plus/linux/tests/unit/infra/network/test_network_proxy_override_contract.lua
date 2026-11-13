@@ -11,7 +11,7 @@
 --- Register the exact shared proxy override controls.
 local helpers = require("tests.helpers")
 local Paths = require("infra.paths")
-local Contract = require("test.network_proxy_override_contract")
+local Contract = require("tests.lua.core.network_proxy_override_contract")
 local function read(relative)
     local file = assert(io.open(assert(Paths.shared(relative)), "rb"))
     local bytes = file:read("*a")
@@ -102,7 +102,7 @@ helpers.it("proxy edit receipt refuses a same-value intervening write and public
         helpers.assert_eq(value, "direct"); helpers.assert_not_nil(receipt)
         helpers.assert_true(storage.set(key, "direct"))
         helpers.assert_eq(storage.commit_string_edit(receipt, "http://dialog.invalid:8080"), false)
-        helpers.assert_eq(require("json").decode(read_file(path))[key], "direct")
+        helpers.assert_eq(require("core.text.engine.json").decode(read_file(path))[key], "direct")
         value, receipt = storage.capture_string_edit(key)
         helpers.assert_eq(value, "direct"); helpers.assert_not_nil(receipt)
         local original = os.rename
@@ -110,7 +110,7 @@ helpers.it("proxy edit receipt refuses a same-value intervening write and public
         local ok, result = pcall(storage.commit_string_edit, receipt, "http://dialog.invalid:8080")
         os.rename = original
         helpers.assert_true(ok); helpers.assert_eq(result, false)
-        helpers.assert_eq(require("json").decode(read_file(path))[key], "direct")
+        helpers.assert_eq(require("core.text.engine.json").decode(read_file(path))[key], "direct")
         helpers.assert_eq(storage.commit_string_edit(receipt, "direct"), false, "a refused receipt is one-shot")
     end)
 end)
@@ -147,7 +147,7 @@ helpers.it("proxy dialog preserves unrelated external changes and refuses unread
                     helpers.assert_eq(shown[1], "proxy_override.not_saved")
                 else
                     helpers.assert_eq(saved, true); helpers.assert_true(prompted)
-                    local parsed = require("json").decode(read_file(path))
+                    local parsed = require("core.text.engine.json").decode(read_file(path))
                     helpers.assert_eq(parsed["network.proxy_override"], "http://dialog.invalid:8080")
                     helpers.assert_eq(parsed.other, 2)
                 end
@@ -183,7 +183,7 @@ helpers.it("external process writes during the open proxy dialog", function()
                     show_info = function(_, text) shown[#shown + 1] = text end,
                 }
                 local committed = require("ui.proxy_override").run()
-                local parsed = require("json").decode(read_file(path))
+                local parsed = require("core.text.engine.json").decode(read_file(path))
                 helpers.assert_eq(committed, mode == "other")
                 helpers.assert_eq(parsed.other, 2)
                 helpers.assert_eq(parsed["network.proxy_override"], mode == "other" and "http://dialog.invalid:8080" or "http://external.invalid:8080")

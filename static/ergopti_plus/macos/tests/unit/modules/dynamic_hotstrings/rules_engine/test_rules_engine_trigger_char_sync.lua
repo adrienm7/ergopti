@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Regression — dynamic_hotstrings sources the trigger from keymap (F-HIGH-8)
 --- DESCRIPTION:
---- dynamic_hotstrings/init.lua used to source the RulesEngine's "global" trigger
+--- hotstrings/engine/dynamic/core.lua used to source the RulesEngine's "global" trigger
 --- character from PersonalInfo.get_trigger_char() — itself just personal_info.toml's
 --- own independent default — instead of keymap_module.get_trigger_char(), the real
 --- user-configurable magic key backed by CoreState.magic_key. Changing the magic
@@ -30,13 +30,13 @@ local active_fixture = nil
 local function with_dynamic_fixture(body)
 	helpers.with_stub_scope({ "modules.dynamic_hotstrings", "modules.dynamic_hotstrings.rules_engine",
 		"modules.dynamic_hotstrings.personal_info", "modules.dynamic_hotstrings.user_code",
-		"dynamic_hotstrings", "dynamic_hotstrings.user_source", "adapters.synthetic_input",
+		"hotstrings.engine.dynamic.core", "hotstrings.engine.dynamic.user_source", "adapters.synthetic_input",
 		"adapters.timer_scheduler", "adapters.event_provenance", "modules.keymap.utils",
 		"adapters.file_system", "infra.config_paths", "adapters.application_notifier" }, function()
 		local previous = active_fixture
 		local fixture = { captures = 0, factory_loads = 0 }
 		active_fixture = fixture
-		local Source = require("dynamic_hotstrings.user_source")
+		local Source = require("hotstrings.engine.dynamic.user_source")
 		local load = Source.load
 		Source.load = function(...)
 			fixture.factory_loads = fixture.factory_loads + 1
@@ -207,7 +207,7 @@ end)
 helpers.describe("dynamic date calendar observation", function()
 	helpers.it("keeps the shared long-date expansion and previews on one calendar instant", function()
 		helpers.with_stub_scope({ "dynamic_hotstrings" }, function()
-			local engine = require("dynamic_hotstrings")
+			local engine = require("hotstrings.engine.dynamic.core")
 			engine.reset_rules(); engine.register_date_rules("\\")
 			local old_date, old_time = os.date, os.time
 			local boundary = old_time({ year = 2024, month = 12, day = 31, hour = 23, min = 59, sec = 59 })

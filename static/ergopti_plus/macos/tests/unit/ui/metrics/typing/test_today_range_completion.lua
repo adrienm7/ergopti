@@ -12,7 +12,7 @@ local Fixture = require("tests.support.modules.keystats.today_completion_fixture
 local function range(state, reader, projection, first, last)
 	local raw, complete = projection.session(reader, "/fixture/db.sqlite", Fixture.TODAY, state.pacer)
 		.range(first, last, { "Editor" })
-	return require("json").decode(raw), complete
+	return require("core.text.engine.json").decode(raw), complete
 end
 
 helpers.describe("today-range-completion", function()

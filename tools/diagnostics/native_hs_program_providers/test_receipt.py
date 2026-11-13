@@ -19,11 +19,11 @@ NONCE = "b" * 32
 EXPECTED_FILES = (
     "static/ergopti_plus/macos/adapters/program_providers.lua",
     "static/ergopti_plus/macos/infra/fs_dir.lua",
-    "static/ergopti_plus/_shared/lua/program_providers.lua",
-    "static/ergopti_plus/_shared/modules/actions/program_providers.json",
-    "static/ergopti_plus/_shared/lua/program_parameter.lua",
-    "static/ergopti_plus/_shared/lua/json.lua",
-    "static/ergopti_plus/_shared/lua/compat/utf8.lua",
+    "static/ergopti_plus/_shared/apps/engine/program_providers.lua",
+    "static/ergopti_plus/_shared/shortcuts/data/actions/program_providers.json",
+    "static/ergopti_plus/_shared/settings/engine/program_parameter.lua",
+    "static/ergopti_plus/_shared/core/text/engine/json.lua",
+    "static/ergopti_plus/_shared/core/lifecycle/engine/compat/utf8.lua",
     "tools/diagnostics/macos_owned_process.py",
 )
 EXPECTED_FULL = (

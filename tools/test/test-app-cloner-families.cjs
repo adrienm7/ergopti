@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: App Cloner Shared Families
  * DESCRIPTION:
- * Holds the App Cloner family catalogue (_shared/data/app_cloner/families.json)
+ * Holds the App Cloner family catalogue (_shared/apps/data/app_cloner/families.json)
  * that the Windows and Linux App Cloners read to the detection the macOS
  * clone_app.sh writes out by hand: the Electron and VS Code executable names it
  * matches must be catalogue names, so a program cloned with its own profile on
@@ -21,7 +21,7 @@ const path = require('node:path');
 
 const plus = path.resolve(__dirname, '../../static/ergopti_plus');
 const catalogue = JSON.parse(
-	fs.readFileSync(path.join(plus, '_shared/data/app_cloner/families.json'), 'utf8')
+	fs.readFileSync(path.join(plus, '_shared/apps/data/app_cloner/families.json'), 'utf8')
 );
 const cloneApp = fs.readFileSync(
 	path.join(plus, 'macos/apps/App Cloner.app/Contents/Resources/clone_app.sh'),

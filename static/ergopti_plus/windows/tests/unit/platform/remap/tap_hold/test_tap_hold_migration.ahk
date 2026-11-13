@@ -25,7 +25,7 @@
 
 _THM_Defaults() {
 	global _SharedDir
-	return _SharedDir . "\tap_hold\defaults.toml"
+	return _SharedDir . "\tap_hold\data\defaults.toml"
 }
 
 ; Runs Body(Path) on a tap_hold.toml in a throwaway folder, then removes the folder.

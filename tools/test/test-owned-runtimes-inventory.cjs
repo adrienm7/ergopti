@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Owned Runtimes Inventory Tests
  * DESCRIPTION:
- * Keeps the owned runtimes registry (_shared/data/owned_runtimes.json, which
+ * Keeps the owned runtimes registry (_shared/core/network/data/owned_runtimes.json, which
  * docs/design/owned-runtimes.md renders) complete for the three drivers: every
  * external program the driver code starts, as derived from the code by
  * tools/test/lib/spawned-tools.cjs, is in the `programs` of one of that

@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 local Destination = require("tests.support.text_destination_receipt")
 local with_sender = require("tests.support.text_sender_fixture")
-require("logger")
+require("core.logger.engine")
 
 local function emitted(f)
 	local total = f.key_posts
@@ -45,7 +45,7 @@ local function with_text(kind, callback)
 	helpers.with_stub_scope({
 		"modules.shortcuts.actions.text", "modules.shortcuts.actions.text_continuation",
 		"modules.shortcuts.actions.text_dispatch", "modules.shortcuts.actions.text_transform_grace",
-		"unicode_case", "unicode_case.data", "modules.keymap.utils",
+		"core.text.engine.unicode_case", "core.text.engine.unicode_case.data", "modules.keymap.utils",
 	}, function()
 		with_sender(function(f)
 			Destination.install()

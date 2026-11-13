@@ -111,8 +111,8 @@ end)
 
 
 helpers.describe("tray (linux): shared prediction modifier rows", function()
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
-	local Json = require("json")
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+	local Json = require("core.text.engine.json")
 	local SOURCE = '# private independent neighbor\n[llm.navigation]\nfuture = "retain" # unknown\n[other]\nvalue = 42\n'
 	local function with_native_navigation(variant, body)
 		Sandbox.with_config(type(variant) == "table" and variant.source or SOURCE, function(path)
@@ -124,7 +124,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 				package.loaded["infra.config_paths"] = { config = function() return path end,
 					config_home = function() return assert(path:match("^(.*)/[^/]+$")) end,
 					-- The storage adapter keeps storage.json in the default configuration folder.
-					default_config_dir = function() return assert(path:match("^(.*)/[^/]+$")) .. "/" .. require("app_dirs").linux.folder_name end }
+					default_config_dir = function() return assert(path:match("^(.*)/[^/]+$")) .. "/" .. require("core.fs.engine.app_dirs").linux.folder_name end }
 				package.loaded["ui.menu.start_at_login"] = {
 					enabled = function() return false end,
 					command_available = function() return true end,
@@ -135,8 +135,8 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 					localized.get = variant.translate
 					package.loaded["infra.i18n"], i18n = localized, localized
 				end
-				local native_menu = assert(require("menu.renderer").new({
-					platform = "linux", manifest_path = function() return helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json" end,
+				local native_menu = assert(require("menu.engine.renderer").new({
+					platform = "linux", manifest_path = function() return helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json" end,
 					json_decode = function(raw)
 						local root = assert(Json.decode(raw))
 						if variant == "reverse" then root.llm_navigation_rows[1], root.llm_navigation_rows[2] = root.llm_navigation_rows[2], root.llm_navigation_rows[1]; root.llm_navigation_rows[1].i18n = "button.cancel" end
@@ -157,7 +157,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 						end
 						return root
 					end,
-					i18n = i18n, logger = require("logger.shim"),
+					i18n = i18n, logger = require("core.logger.engine.shim"),
 				}))
 				package.loaded["infra.manifest_menu"] = native_menu
 				os.execute = function(command)
@@ -221,11 +221,11 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 		with_native_navigation("invalid", function(fixture) helpers.assert_eq(#fixture.build(), 1) end)
 	end)
 	helpers.it("(llm-nav-shared) renders all twenty-one real locale captions through the actual tray", function()
-		local root = helpers.driver_root() .. "/../_shared/data/"
-		local input = assert(io.open(root .. "locale_order.json", "r"))
+		local root = helpers.driver_root() .. "/../_shared/"
+		local input = assert(io.open(root .. "core/i18n/data/locale_order.json", "r"))
 		local locales = assert(Json.decode(input:read("*a"))).order; input:close()
 		helpers.assert_eq(#locales, 21)
-		local manifest_file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json", "r"))
+		local manifest_file = assert(io.open(helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json", "r"))
 		local definitions = assert(Json.decode(manifest_file:read("*a"))).llm_navigation_rows; manifest_file:close()
 		local corpus_file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/llm_navigation_rows.json", "r"))
 		local expected = assert(Json.decode(corpus_file:read("*a"))).rows; corpus_file:close()
@@ -236,7 +236,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 				{ expected[index].id, expected[index].type, expected[index].i18n })
 		end
 		for _, locale in ipairs(locales) do
-			local file = assert(io.open(root .. "locales/" .. locale .. ".json", "r"))
+			local file = assert(io.open(root .. "core/i18n/data/locales/" .. locale .. ".json", "r"))
 			local catalogue = assert(Json.decode(file:read("*a"))); file:close()
 			local matched_paths = {}
 			local function translated(key)
@@ -289,7 +289,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 					helpers.assert_eq(fixture.notices(), 1)
 					helpers.assert_eq(callback(), true, "the same captured callback retries through the real native writer")
 					helpers.assert_eq(fixture.changed(), 1)
-					local document = require("toml_codec").decode(Sandbox.read_bytes(fixture.path))
+					local document = require("core.text.engine.toml_codec").decode(Sandbox.read_bytes(fixture.path))
 					helpers.assert_eq(document.llm.navigation[direction == "navigation" and "nav_modifiers" or "val_modifiers"], { "alt" })
 					helpers.assert_eq(document.llm.navigation.future, "retain")
 					helpers.assert_eq(document.other.value, 42)
@@ -370,7 +370,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 			local before = Sandbox.read_bytes(fixture.path)
 			local rows, selected = fixture.full(), {}
 			for _, parent in ipairs(parents) do selected[#selected + 1] = assert(parent_named(rows, fixture.i18n.get(parent.key))) end
-			helpers.assert_eq(require("test.menu_native_child_rows").hierarchy(selected), expected.linux)
+			helpers.assert_eq(require("tests.lua.menu.native_child_rows").hierarchy(selected), expected.linux)
 			helpers.assert_eq(Sandbox.read_bytes(fixture.path), before)
 			helpers.assert_eq(fixture.changed(), 0)
 		end)

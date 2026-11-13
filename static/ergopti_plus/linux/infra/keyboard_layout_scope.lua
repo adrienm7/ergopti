@@ -26,8 +26,8 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Transaction = require("config_scope_transaction")
-local Logger = require("logger.shim")
+local Transaction = require("settings.engine.scope.transaction")
+local Logger = require("core.logger.engine.shim")
 local LOG = "infra.keyboard_layout_scope"
 local SCOPE = "keyboard_layout"
 local _owner, _sequence = nil, 0

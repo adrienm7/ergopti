@@ -5,8 +5,8 @@ do
 --- Independent observed-point controls; clocks and native writers are modeled.
 --- Actual shared actors, conjunction and lifetime capabilities execute unchanged.
 local h = require("tests.helpers")
-local Lifecycle = require("keystats.physical_lifecycle_observation")
-local Conjunction = require("keystats.physical_lifecycle_conjunction")
+local Lifecycle = require("metrics.engine.capture.physical_lifecycle_observation")
+local Conjunction = require("metrics.engine.capture.physical_lifecycle_conjunction")
 local function fields(domain)
 	if domain == "pause" then
 		return { paused = false, transition_generation = 3, admission_released = true, settled = true }
@@ -28,7 +28,7 @@ local function actor(domain, custom_clock)
 	return a, owner, records, counters, receive, snapshot
 end
 local function observe_lifetime(body)
-	local name = "keystats.physical_subscription_lifetime"
+	local name = "metrics.engine.capture.physical_subscription_lifetime"
 	local actual = require(name)
 	local captured
 	package.loaded[name] = { new = function(owner, token)
@@ -226,7 +226,7 @@ local NAMES = {
 	"adapters.event_provenance", "adapters.input_source_broker", "adapters.keyboard_hook",
 	"adapters.physical_observation_clock", "adapters.process_lifecycle", "adapters.synthetic_input",
 	"infra.config_paths", "infra.dialog_util", "infra.logger", "infra.manifest_reader",
-	"keystats.physical_lifecycle_observation", "modules.keystats.context_tracker", "modules.keystats.init",
+	"metrics.engine.capture.physical_lifecycle_observation", "modules.keystats.context_tracker", "modules.keystats.init",
 	"modules.keystats.kc_bridge", "modules.keystats.log_manager", "modules.keystats.watchers", "modules.keymap",
 }
 local function actual(body)
@@ -330,10 +330,10 @@ end
 do
 --- Actual shared subscription debt around a modeled foreign clock getter.
 local h = require("tests.helpers")
-local Lifecycle = require("keystats.physical_lifecycle_observation")
+local Lifecycle = require("metrics.engine.capture.physical_lifecycle_observation")
 h.describe("independent initial clock getter frame debt", function()
 	h.it("retains the exact actual lifetime before entering the initial observation clock", function()
-		local name = "keystats.physical_subscription_lifetime"
+		local name = "metrics.engine.capture.physical_subscription_lifetime"
 		local actual = require(name)
 		local capability
 		package.loaded[name] = { new = function(owner, token)
@@ -374,7 +374,7 @@ local h = require("tests.helpers")
 local Pause = require("tests.support.pause_transaction_fixture")
 h.describe("initial native ledger observations", function()
  h.it("observes initial unpaused pause ledger without committing a resume", function()
-  h.with_stub_scope({"keystats.physical_lifecycle_observation", "adapters.physical_observation_clock"}, function()
+  h.with_stub_scope({"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock"}, function()
    Pause.with_context(nil, function(control, ctx)
     local clocks, records, owner = 0, {}, {}
     hs.timer.absoluteTime = function() clocks = clocks + 1; return clocks * 10 end
@@ -391,7 +391,7 @@ h.describe("initial native ledger observations", function()
   end)
  end)
  h.it("validates native options before the first clock and keeps explicit false legacy", function()
-  h.with_stub_scope({"keystats.physical_lifecycle_observation", "adapters.physical_observation_clock"}, function()
+  h.with_stub_scope({"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock"}, function()
    Pause.with_context(nil, function(control)
     local clocks, records, owner = 0, {}, {}
     hs.timer.absoluteTime = function() clocks = clocks + 1; return clocks * 10 end
@@ -405,7 +405,7 @@ h.describe("initial native ledger observations", function()
   end)
  end)
  h.it("reads actual initialized system scalars without acquiring a hardware watcher", function()
-  h.with_stub_scope({"modules.keystats.watchers", "modules.keystats.log_manager", "infra.logger", "keystats.physical_lifecycle_observation", "adapters.physical_observation_clock"}, function()
+  h.with_stub_scope({"modules.keystats.watchers", "modules.keystats.log_manager", "infra.logger", "metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock"}, function()
    package.loaded["infra.logger"] = h.make_logger_stub()
    package.loaded["modules.keystats.log_manager"] = {}
    local clocks, queries, records = 0, 0, {}
@@ -436,7 +436,7 @@ local h = require("tests.helpers")
 h.describe("initial system actual hardware retirement debt", function()
 	h.it("cannot qualify refused retained hardware cleanup as locally settled", function()
 		h.with_stub_scope({ "modules.keystats.watchers", "modules.keystats.log_manager", "infra.logger",
-			"keystats.physical_lifecycle_observation", "adapters.physical_observation_clock" }, function()
+			"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock" }, function()
 			package.loaded["infra.logger"] = h.make_logger_stub()
 			package.loaded["modules.keystats.log_manager"] = {}
 			local clock, stops, permit, running = 0, 0, false, false

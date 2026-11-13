@@ -392,7 +392,7 @@ function auditSource(source, lua, locales, relative = '') {
 }
 
 function main(root = ROOT) {
-	const localeDir = path.join(root, 'static/ergopti_plus/_shared/data/locales');
+	const localeDir = path.join(root, 'static/ergopti_plus/_shared/core/i18n/data/locales');
 	const locales = Object.fromEntries(
 		fs
 			.readdirSync(localeDir)

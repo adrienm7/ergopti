@@ -391,7 +391,7 @@ helpers.describe("owned runtime owner: the pinned artifact is fetched first", fu
 		local fetched = 0
 		world.ports.artifact.fetch = function(callback)
 			fetched = fetched + 1
-			callback(true, "/home/user/" .. require("app_dirs").macos.support_relative .. "/RemapRuntime/1/payload")
+			callback(true, "/home/user/" .. require("core.fs.engine.app_dirs").macos.support_relative .. "/RemapRuntime/1/payload")
 		end
 		owner.init(world.ports)
 		helpers.assert_eq((admit(owner)), true)

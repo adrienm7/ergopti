@@ -27,8 +27,8 @@
 
 local helpers = require("tests.helpers")
 
-local Plan       = require("keystats.text_migration")
-local TextCrypto = require("keystats.text_crypto")
+local Plan       = require("metrics.engine.privacy.text_migration_core")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
 --- Resolves the shell adapter at CALL time, never once at file scope: another
 --- test file reloads adapters.shell_runner, which replaces the cached instance.
@@ -153,7 +153,7 @@ local function load_runner(store)
 		return input:reverse()
 	end
 	package.loaded["infra.openssl_cipher"] = { available = true, encrypt = transform, decrypt = transform,
-		encode_base64 = require("compat.base64").encode, decode_base64 = require("compat.base64").decode,
+		encode_base64 = require("core.lifecycle.engine.compat.base64").encode, decode_base64 = require("core.lifecycle.engine.compat.base64").decode,
 	}
 	local ok, cipher = pcall(helpers.load_module, "modules.keystats.text_cipher")
 	package.loaded["infra.openssl_cipher"] = previous
@@ -248,7 +248,7 @@ end)
 helpers.describe("Linux migration backend identity admission", function()
 	helpers.it("refuses the complete batch when one native row identity is not exact", function()
 		local names = { "modules.keystats.sqlite_writer", "modules.keystats.text_cipher",
-			"modules.keystats.text_migration", "logger.shim" }
+			"modules.keystats.text_migration", "core.logger.engine.shim" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local meta, writes, encryptions, finishes, lines = nil, 0, 0, 0, nil
 		package.loaded["modules.keystats.sqlite_writer"] = {
@@ -266,7 +266,7 @@ helpers.describe("Linux migration backend identity admission", function()
 			decrypt = function() error("unexpected decrypt") end,
 		}
 		local noop = function() end
-		package.loaded["logger.shim"] = { error = noop, warn = noop, info = noop, start = noop,
+		package.loaded["core.logger.engine.shim"] = { error = noop, warn = noop, info = noop, start = noop,
 			success = function() finishes = finishes + 1 end }
 		package.loaded["modules.keystats.text_migration"] = nil
 		local okay, failure = pcall(function()
@@ -665,10 +665,10 @@ helpers.describe("text_migration — failure never leaves data behind", function
 	end)
 end)
 
-require("test.text_migration_durability").register(helpers, {
+require("tests.lua.core.text_migration_durability").register(helpers, {
 	make_store = make_store, load = load_runner, install = install_shell,
 	restore = function() Shell()._reset_runner() end, drain = drain,
-	logger = function() return require("logger.shim") end,
+	logger = function() return require("core.logger.engine.shim") end,
 	log_tag = "modules.keystats.text_migration", device = DEVICE,
 	resume = function(migration, mode) return migration.resume(mode, DEVICE) end,
 })

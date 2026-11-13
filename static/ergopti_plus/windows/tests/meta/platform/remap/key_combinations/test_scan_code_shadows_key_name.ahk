@@ -13,7 +13,7 @@
 ; declared SC00F; the neutral defaults (tap-holds off) exposed it and Tab went
 ; to the application (llm-tab-accepts-visible-prediction). This test bans the
 ; whole class for every layout-independent key the physical-key registry
-; names (_shared/data/keycodes/physical_keys.json: ahk_send -> ahk), static
+; names (_shared/layouts/data/keycodes/physical_keys.json: ahk_send -> ahk), static
 ; labels and literal Hotkey() registrations alike, and proves its scanner on a
 ; fixture (hardening-c-scan-code-precedence). Character keys are named through
 ; the active layout, but the AltGr layer declares every one of them by scan code
@@ -49,7 +49,7 @@ _HCSC_NameTable() {
 	static Table := 0
 	if IsObject(Table)
 		return Table
-	Registry := JsonParse(FileRead(A_ScriptDir . "\..\..\_shared\data\keycodes\physical_keys.json", "UTF-8"))
+	Registry := JsonParse(FileRead(A_ScriptDir . "\..\..\_shared\layouts\data\keycodes\physical_keys.json", "UTF-8"))
 	Names := Map()
 	for Code, Rec in Registry["keys"] {
 		if (Rec["kind"] != "key") || !(Rec["ahk_send"] is String) || (Rec["ahk_send"] = "")
@@ -174,7 +174,7 @@ global _HCSC_CHARACTER_VK_RANGES := [[0x30, 0x39], [0x41, 0x5A], [0xBA, 0xC0], [
 
 ; "SCnnn" -> registry code of every character key: a key with no fixed name.
 _HCSC_CharacterScanCodes() {
-	Registry := JsonParse(FileRead(A_ScriptDir . "\..\..\_shared\data\keycodes\physical_keys.json", "UTF-8"))
+	Registry := JsonParse(FileRead(A_ScriptDir . "\..\..\_shared\layouts\data\keycodes\physical_keys.json", "UTF-8"))
 	Keys := Map()
 	for Code, Rec in Registry["keys"] {
 		if (Rec["kind"] != "key") || ((Rec["ahk_send"] is String) && (Rec["ahk_send"] != ""))

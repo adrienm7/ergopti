@@ -24,7 +24,7 @@ local Logger = require("infra.logger")
 local ShellRunner = require("adapters.shell_runner")
 local Timer = require("adapters.timer_scheduler")
 local FileSystem = require("adapters.file_system")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "adapters.field_check_ports"
 
@@ -313,7 +313,7 @@ end
 local function relay_executable()
 	local launcher = require("platform.remap.lease_helper").resolve()
 	if not launcher then return nil end
-	local path = NativePath.dirname(launcher) .. "/" .. require("network.proxy_auth_relay").EXECUTABLE_NAME
+	local path = NativePath.dirname(launcher) .. "/" .. require("core.network.engine.proxy_auth_relay_core").EXECUTABLE_NAME
 	return FileSystem.exists(path) and path or nil
 end
 
@@ -328,7 +328,7 @@ local function relay_probe(upstream, callback)
 	local origins = NetworkEnv.route_origins("ollama")
 	if not policy or not origins then return callback(nil, "relay_unavailable") end
 	local executable = relay_executable()
-	if not executable then return callback({ status = require("network.proxy_auth_relay").NOT_INSTALLED }) end
+	if not executable then return callback({ status = require("core.network.engine.proxy_auth_relay_core").NOT_INSTALLED }) end
 	local Timings = require("infra.timings")
 	local args = policy.probe_args(upstream, policy.authority(origins[1]), {
 		dial_ms = Timings.ms("adapters", "proxy_relay_dial_timeout_ms"),
@@ -486,7 +486,7 @@ function M.smallest_model(backend, installed)
 	-- Resolved per call: the field run's ports and these share the caller's adapters.
 	local text = path and require("adapters.file_system").read(path) or nil
 	if type(text) ~= "string" then return nil end
-	return require("infra.field_run").smallest_model(require("json").decode(text), backend, installed)
+	return require("infra.field_run").smallest_model(require("core.text.engine.json").decode(text), backend, installed)
 end
 
 function M.new()

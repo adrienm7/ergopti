@@ -10,18 +10,18 @@ local helpers = require("tests.helpers")
 
 -- The real shared updater defaults: release sources are part of the contract.
 local FIXTURE_DIR = (debug.getinfo(1, "S").source:gsub("^@", ""):match("^(.*)[/\\]") or ".")
-local SHARED_DEFAULTS = FIXTURE_DIR .. "/../../../_shared/modules/updater/defaults.json"
+local SHARED_DEFAULTS = FIXTURE_DIR .. "/../../../_shared/updater/data/defaults.json"
 -- The real update-channel registry: the channel ids the window accepts.
-local SHARED_CHANNELS = FIXTURE_DIR .. "/../../../_shared/modules/updater/channels.json"
-local SHARED_NETWORK_POLICY = FIXTURE_DIR .. "/../../../_shared/modules/network/managed_network.json"
-local SHARED_HEADER_POLICY = FIXTURE_DIR .. "/../../../_shared/data/http/header_policy.json"
+local SHARED_CHANNELS = FIXTURE_DIR .. "/../../../_shared/updater/data/channels.json"
+local SHARED_NETWORK_POLICY = FIXTURE_DIR .. "/../../../_shared/core/network/data/managed_network.json"
+local SHARED_HEADER_POLICY = FIXTURE_DIR .. "/../../../_shared/core/network/data/http/header_policy.json"
 
 --- The repository identity of the shared defaults, the updater's own source.
 local function read_shared_github()
 	local handle = assert(io.open(SHARED_DEFAULTS, "r"))
 	local raw = handle:read("*a")
 	handle:close()
-	return assert(require("json").decode(raw)).github
+	return assert(require("core.text.engine.json").decode(raw)).github
 end
 
 local function with_changelog(callback)
@@ -151,10 +151,10 @@ local function with_changelog(callback)
 			}
 			package.loaded["infra.paths"] = {
 				shared = function(relative)
-					if relative == "modules/updater/defaults.json" then return SHARED_DEFAULTS end
-					if relative == "modules/updater/channels.json" then return SHARED_CHANNELS end
-					if relative == "modules/network/managed_network.json" then return SHARED_NETWORK_POLICY end
-					if relative == "data/http/header_policy.json" then return SHARED_HEADER_POLICY end
+					if relative == "updater/data/defaults.json" then return SHARED_DEFAULTS end
+					if relative == "updater/data/channels.json" then return SHARED_CHANNELS end
+					if relative == "core/network/data/managed_network.json" then return SHARED_NETWORK_POLICY end
+					if relative == "core/network/data/http/header_policy.json" then return SHARED_HEADER_POLICY end
 					return "/shared/" .. tostring(relative)
 				end,
 			}

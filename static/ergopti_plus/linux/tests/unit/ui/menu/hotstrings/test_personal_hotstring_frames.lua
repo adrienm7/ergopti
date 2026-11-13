@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local function upvalue(callback, wanted)
 	for index = 1, 100 do
 		local name, value = debug.getupvalue(callback, index)
@@ -26,7 +26,7 @@ end
 --- @param options table|nil Native source and pause posture.
 local function with_personal_frame(scenario, options)
 	options = options or {}
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
+	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "adapters.storage", "ui.hotstring_editor.bridge" }
 	local previous, saved_getenv = {}, os.getenv
 	for name, value in pairs(package.loaded) do previous[name] = value end
@@ -55,7 +55,7 @@ local function with_personal_frame(scenario, options)
 		local build_hotstrings = upvalue(builder.build, "_build_hotstrings")
 		local files = require("infra.paths")
 		local corpus_file = assert(io.open(files.shared("tests/corpus/menus/hotstring_personal_frames.json"), "rb"))
-		local corpus = assert(require("json").decode(assert(corpus_file:read("*a")))); assert(corpus_file:close())
+		local corpus = assert(require("core.text.engine.json").decode(assert(corpus_file:read("*a")))); assert(corpus_file:close())
 		local sections = options.empty and {} or { "alpha", "-", "module", "beta" }
 		local category = { id = "personal", count = 5, sections_order = sections,
 			sections = { alpha = { count = 2 }, module = { count = 0 }, beta = { count = 3 } } }
@@ -120,9 +120,9 @@ helpers.describe("complete personal hotstring shared frames (Linux)", function()
 		with_personal_frame(function(f)
 			local rows = f.build()
 			local parent = assert(find(rows, f.corpus.default_parent_labels.linux.en))
-			local prior = package.loaded["toml_codec.writer"]
-			package.loaded["toml_codec.writer"] = nil
-			local writer = require("toml_codec.writer")
+			local prior = package.loaded["core.text.engine.toml_codec.writer"]
+			package.loaded["core.text.engine.toml_codec.writer"] = nil
+			local writer = require("core.text.engine.toml_codec.writer")
 			local path = os.tmpname()
 			local file = assert(io.open(path, "w")); file:write("[section]\nkey = 1\nKEY = 2\n"); file:close()
 			local reports = 0
@@ -134,7 +134,7 @@ helpers.describe("complete personal hotstring shared frames (Linux)", function()
 			local called, result = pcall(parent.menu[1].fn)
 			os.rename, os.execute = rename, execute
 			os.remove(path)
-			package.loaded["toml_codec.writer"] = prior
+			package.loaded["core.text.engine.toml_codec.writer"] = prior
 			helpers.assert_true(called)
 			helpers.assert_eq(result, false)
 			helpers.assert_eq(reports, 1)
@@ -212,7 +212,7 @@ helpers.describe("complete personal hotstring shared frames (Linux)", function()
 			helpers.assert_eq(f.bridge.get_pref("auto_close"), true)
 			helpers.assert_eq(f.changes(), 2)
 			local bytes = f.read_source()
-			local model = assert(require("json").decode(bytes))
+			local model = assert(require("core.text.engine.json").decode(bytes))
 			helpers.assert_eq(model.future.keep, "bytes")
 			local old_storage = package.loaded["adapters.storage"]
 			local old_bridge = package.loaded["ui.hotstring_editor.bridge"]
@@ -356,7 +356,7 @@ helpers.describe("shared personal default-category leaf policy", function()
 				choice.fn()
 				helpers.assert_eq(f.bridge.get_pref("default_section"), "alpha")
 				helpers.assert_eq(f.changes(), 1)
-				local stored = assert(require("json").decode(f.read_source()))
+				local stored = assert(require("core.text.engine.json").decode(f.read_source()))
 				helpers.assert_eq(stored["hotstring_editor.default_section"], "alpha")
 				helpers.assert_eq(stored.future.keep, "bytes")
 			end)

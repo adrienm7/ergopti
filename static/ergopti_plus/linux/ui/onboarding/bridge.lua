@@ -28,11 +28,11 @@ M.ACTIONS = {
 	registerGesturesManual = true,
 }
 
-local Json = require("json")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
 local Paths = require("infra.paths")
-local TomlCodec = require("toml_codec")
-local Answers = require("onboarding_answers")
+local TomlCodec = require("core.text.engine.toml_codec")
+local Answers = require("onboarding.engine.answers")
 local ConfigDirPicker = require("ui.config_dir_picker")
 local LOG = "bridge.onboarding"
 local APP_NAME = "onboarding"
@@ -49,7 +49,7 @@ local _catalogue = nil
 
 -- This exact request owner outlives view disposal and daemon-state replacement.
 local _publication = nil
-local _finish_gate = require("onboarding_publication").callback_gate()
+local _finish_gate = require("onboarding.engine.publication").callback_gate()
 
 local function dependency(state, field, module_name)
 	if type(state[field]) == "table" then return state[field] end
@@ -112,7 +112,7 @@ local function read_shared(relative)
 end
 
 local function locale_strings(code)
-	local raw = read_shared("data/locales/" .. tostring(code) .. ".json")
+	local raw = read_shared("core/i18n/data/locales/" .. tostring(code) .. ".json")
 	if not raw then
 		Logger.error(LOG, "Onboarding locale '%s' is unreadable.", tostring(code))
 		return nil
@@ -159,7 +159,7 @@ local function tap_hold_values_of(state, path)
 		return nil
 	end
 	local folder = assert(path:match("^(.*)/[^/]*$"), "a config.toml path names its folder")
-	local ok, report, err = pcall(loader.key_report, Paths.shared("tap_hold/defaults.toml"),
+	local ok, report, err = pcall(loader.key_report, Paths.shared("tap_hold/data/defaults.toml"),
 		folder .. "/" .. writer.FILE_NAME, path)
 	if not ok or not report then
 		Logger.error(LOG, "The tap-hold keys in force could not be read: %s.", tostring(ok and err or report))
@@ -330,8 +330,8 @@ end
 --- @return boolean writable
 --- @return string|nil detail
 local function prepare_destination(path)
-	local ConfigMigrate = require("config_migrate")
-	local SharedFile = require("tap_hold.shared_file")
+	local ConfigMigrate = require("settings.engine.migration.migrate")
+	local SharedFile = require("tap_hold.engine.shared_file")
 	local folder = assert(path:match("^(.*)/[^/]*$"), "a config.toml path names its folder")
 	local result = ConfigMigrate.boot({
 		path          = path,
@@ -360,7 +360,7 @@ local function import_tap_holds(state, target_dir, keys)
 		return false
 	end
 	local ok, imported, detail = pcall(function()
-		local preset = loader.preset_keys(Paths.shared("tap_hold/defaults.toml"))
+		local preset = loader.preset_keys(Paths.shared("tap_hold/data/defaults.toml"))
 		return writer.import_recommended(target_dir .. "/" .. writer.FILE_NAME, keys, preset)
 	end)
 	if ok and imported == true then return true end
@@ -379,11 +379,11 @@ end
 --- @return boolean ok False when the layer was due and could not be written.
 local function import_nav_layer(state, target_dir, keys)
 	local loader = dependency(state, "tap_hold_loader", "platform.remap.tap_hold_loader")
-	local LayerPreset = dependency(state, "layer_preset", "keymap.layer_preset")
+	local LayerPreset = dependency(state, "layer_preset", "layouts.engine.layers.preset")
 	local ok, import, err = pcall(function()
 		local shared_root = Paths.shared_root()
 		local layer_id = LayerPreset.read(shared_root, TomlCodec.decode).layer_id
-		local preset = loader.preset_keys(Paths.shared("tap_hold/defaults.toml"))
+		local preset = loader.preset_keys(Paths.shared("tap_hold/data/defaults.toml"))
 		local enters = false
 		for _, key_id in ipairs(keys) do
 			enters = enters or (type(preset[key_id]) == "table" and preset[key_id].hold_layer == layer_id)
@@ -415,7 +415,7 @@ local function finish_owned(state, answers)
 		i18n = dependency(state, "i18n", "infra.i18n"),
 		config_paths = dependency(state, "config_paths", "infra.config_paths"),
 		manifest = dependency(state, "manifest", "infra.manifest_reader"),
-		writer = dependency(state, "writer", "toml_codec.writer"),
+		writer = dependency(state, "writer", "core.text.engine.toml_codec.writer"),
 		prepare = type(state.prepare_destination) == "function" and state.prepare_destination
 			or prepare_destination,
 	}
@@ -456,13 +456,13 @@ local function finish_owned(state, answers)
 	local path_set, path_get = authorities.config_paths.set_config_dir, authorities.config_paths.get_config_dir
 	local locale_set, locale_get = authorities.i18n.set_locale, authorities.i18n.get_locale
 	local locale_persist = authorities.i18n.persist_locale
-	_publication = require("onboarding_publication").new({
+	_publication = require("onboarding.engine.publication").new({
 		files = files,
 		write = function(path, batch, source)
 			return native_write(path, batch, files, source)
 		end,
 		current = function()
-			return dependency(state, "writer", "toml_codec.writer") == authorities.writer
+			return dependency(state, "writer", "core.text.engine.toml_codec.writer") == authorities.writer
 				and dependency(state, "file_system", "adapters.file_system") == files
 				and dependency(state, "config_paths", "infra.config_paths") == authorities.config_paths
 				and dependency(state, "i18n", "infra.i18n") == authorities.i18n

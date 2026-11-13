@@ -51,7 +51,7 @@ local function drain_immediate_timers()
 	error("immediate timer queue did not settle", 0)
 end
 
-helpers.describe("keymap.utils: the field run's scratch window (selftest-scratch-window-typing)", function()
+helpers.describe("layouts.engine.utils: the field run's scratch window (selftest-scratch-window-typing)", function()
 	helpers.it("types hotstrings in the published scratch window only, while it is published", function()
 		package.loaded["infra.field_run_selftest"] = nil
 		package.loaded["modules.keymap.utils"] = nil

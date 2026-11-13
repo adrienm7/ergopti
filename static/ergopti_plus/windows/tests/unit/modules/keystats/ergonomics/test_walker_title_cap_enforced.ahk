@@ -285,7 +285,7 @@ Test("reader: the cold aggregate rebuild bounds agg_app_day_titles (walker-title
 ; many titles an app-day keeps would make the same data look different per host.
 _WTC_CapMatchesSharedContract() {
 	; Two levels up from tests/ (windows/tests/ → windows/ → ergopti_plus/).
-	Path := A_ScriptDir . "\..\..\_shared\lua\keystats\aggregator_helpers.lua"
+	Path := A_ScriptDir . "\..\..\_shared\metrics\engine\aggregator\helpers.lua"
 	Src := ""
 	try Src := FileRead(Path, "UTF-8")
 	Assert(Src != "", "the shared aggregator contract must be readable at " . Path)

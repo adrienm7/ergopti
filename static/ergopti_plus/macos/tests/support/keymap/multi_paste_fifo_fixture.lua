@@ -13,7 +13,7 @@ local OWNED = {
 	"adapters.clipboard", "adapters.event_provenance", "adapters.python_interpreter",
 	"adapters.secure_field_detector", "adapters.storage", "adapters.synthetic_input",
 	"adapters.text_sender", "adapters.timer_scheduler", "adapters.tooltip_renderer",
-	"compat.utf8", "hotstring_engine", "hotstrings.personal_files",
+	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
 	"hs", "hs.application", "hs.canvas",
 	"hs.dialog", "hs.distributednotifications", "hs.eventtap",
 	"hs.fnutils", "hs.fs", "hs.host",
@@ -26,13 +26,13 @@ local OWNED = {
 	"hs.urlevent", "hs.webview", "hs.window",
 	"infra.capsword_output", "infra.hotstring_engine", "infra.i18n",
 	"infra.logger", "infra.paths", "infra.text_utils",
-	"infra.timings", "infra.toml.reader", "json",
-	"keymap.terminators", "keymap.terminators_catalogue", "keymap.utils",
-	"logger.shim", "modules.keystats", "modules.keymap.expander",
+	"infra.timings", "infra.toml.reader", "core.text.engine.json",
+	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",
+	"core.logger.engine.shim", "modules.keystats", "modules.keymap.expander",
 	"modules.keymap.state", "modules.keymap.terminator_replay", "modules.keymap.terminators",
-	"modules.keymap.utils", "tests.stubs.hs", "text_utils",
-	"toml_codec.basic_string", "toml_codec.bom", "toml_codec.key_path",
-	"toml_codec.reader", "toml_codec.record_scanner",
+	"modules.keymap.utils", "tests.stubs.hs", "core.text.engine.utils_core",
+	"core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path",
+	"core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 }
 
 --- Runs one exact expansion world and restores all owned modules and native globals.

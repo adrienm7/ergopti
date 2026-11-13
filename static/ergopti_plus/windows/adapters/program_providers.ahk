@@ -8,7 +8,7 @@
 ; Exact native handles survive refused close and block successor acquisition.
 ; ==============================================================================
 
-#Include ../../_shared/modules/actions/program_providers.ahk
+#Include ../../_shared/shortcuts/data/actions/program_providers.ahk
 
 /** Native inventory lifetime, separate from the owned program execution Job. */
 class ProgramProvidersNative {
@@ -209,7 +209,7 @@ ProgramProviders_Create() {
 	global _SharedDir
 	if !IsSet(_SharedDir)
 		return false
-	Raw := FSReadUtf8ExactBounded(_SharedDir . "\modules\actions\program_providers.json", ProgramProviderSession.MAX_CATALOGUE_BYTES)
+	Raw := FSReadUtf8ExactBounded(_SharedDir . "\shortcuts\data\actions\program_providers.json", ProgramProviderSession.MAX_CATALOGUE_BYTES)
 	if !(Raw is String)
 		return false
 	return ProgramProviderSession(Raw, ProgramProvidersNative().Ports())

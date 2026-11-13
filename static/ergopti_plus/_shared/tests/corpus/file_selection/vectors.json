@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for the file-manager selection parsers of _shared/lua/file_selection: the Finder selection as `osascript -ss` prints an AppleScript list of POSIX paths, and a Linux file manager's copied selection as text/uri-list (RFC 2483). Replayed by the macOS and Linux suites.",
+	"description": "Golden vectors for the file-manager selection parsers of _shared/core/fs/engine: the Finder selection as `osascript -ss` prints an AppleScript list of POSIX paths, and a Linux file manager's copied selection as text/uri-list (RFC 2483). Replayed by the macOS and Linux suites.",
 	"rule": "A Finder report is an AppleScript list literal of double-quoted strings separated by commas; \\\" \\\\ \\n \\r \\t are the only escapes. A text/uri-list report holds one URI per CRLF or LF line; blank lines and lines starting with # are ignored; every other line must be a file: URI with an empty or localhost authority, no query or fragment, and well-formed %XX escapes. Every path must be absolute. Any violation refuses the whole report (the vector is marked refused), never a subset.",
 	"applescript": [
 		{ "id": "empty_list", "text": "{}", "paths": [] },

@@ -6,7 +6,7 @@ _UMF_WithContract(Callback) {
 	Saved := _UpdaterManagedFailureContract
 	try {
 		_UpdaterManagedFailureContract := ManagedNetworkFailureContract(
-			JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8")))
+			JsonParse(FileRead(_SharedDir . "\core\network\data\managed_network.json", "UTF-8")))
 		Callback.Call(_UpdaterManagedFailureContract)
 	} finally {
 		_UpdaterManagedFailureContract := Saved

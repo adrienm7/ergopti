@@ -117,7 +117,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 		package.loaded["infra.paths"] = {
 			shared = function(relative) return helpers.shared(relative) end,
 			shared_llm_path = function(relative)
-				return helpers.shared("modules/llm/" .. tostring(relative or ""))
+				return helpers.shared("ai/data/" .. tostring(relative or ""))
 			end,
 		}
 		local function noop() end

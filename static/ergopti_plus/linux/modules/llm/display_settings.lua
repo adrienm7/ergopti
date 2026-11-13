@@ -10,11 +10,11 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Manifest = require("infra.manifest_reader")
-local DisplayPolicy = require("llm.display_policy")
-local ConfigKeys = require("config_keys")
+local DisplayPolicy = require("ai.engine.settings.display_policy")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.llm.display_settings"
 local PREF_PREFIX = "llm.display."

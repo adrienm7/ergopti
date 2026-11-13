@@ -53,7 +53,7 @@ _UDTO_FindPollBlock() {
 
 _UDTO_600SecCeiling() {
 	global _SharedDir, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
-	Transfer := JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["archive_transfer"]
+	Transfer := JsonParse(FileRead(_SharedDir . "\updater\data\defaults.json", "UTF-8"))["archive_transfer"]
 	AssertEqual(600000, Transfer["archive_idle_timeout_ms"],
 		"the shared archive idle budget stays 600000 ms")
 	AssertEqual(Transfer["archive_idle_timeout_ms"], UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS,

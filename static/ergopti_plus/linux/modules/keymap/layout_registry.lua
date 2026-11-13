@@ -11,13 +11,13 @@
 --- libxkbcommon reads first (user_layout_installer.py), without sudo.
 ---
 --- FEATURES & RATIONALE:
---- 1. The catalogue decisions are shared with macOS (_shared/lua/layouts/
+--- 1. The catalogue decisions are shared with macOS (_shared/layouts/engine/
 ---    catalogue.lua): conditional refresh with the cached ETag, cache and
 ---    shipped-index fallbacks with the exact error, the installed record, and
 ---    the offline installation of a layout shipped with the package.
 --- 2. The conversion is Lua: the .keylayout is read by the parser shared with
----    macOS (_shared/lua/layouts/keylayout.lua) and written as XKB and XCompose
----    by _shared/lua/layouts/xkb_converter.lua, byte for byte what the Python
+---    macOS (_shared/layouts/engine/composer/keylayout.lua) and written as XKB and XCompose
+---    by _shared/layouts/engine/composer/xkb_converter.lua, byte for byte what the Python
 ---    converter writes (tools/test/test-keylayout-canonical-parity.cjs). Python
 ---    3.8 or newer is still required by the user XKB installer that follows,
 ---    which edits the user tree and the desktop configuration; a missing or
@@ -29,7 +29,7 @@
 ---    injectable, so tests replay operations without network, luv or python3.
 --- ==============================================================================
 
-local Logger        = require("logger.shim")
+local Logger        = require("core.logger.engine.shim")
 local Paths         = require("infra.paths")
 local ConfigPaths   = require("infra.config_paths")
 local I18n          = require("infra.i18n")
@@ -38,22 +38,22 @@ local HttpClient    = require("adapters.http_client")
 local FileDigest    = require("adapters.file_digest")
 local ShellRunner   = require("adapters.shell_runner")
 local ProcessRunner = require("adapters.process_runner")
-local Json          = require("json")
-local TomlCodec     = require("toml_codec")
-local Keylayout     = require("layouts.keylayout")
-local XkbConverter  = require("layouts.xkb_converter")
+local Json          = require("core.text.engine.json")
+local TomlCodec     = require("core.text.engine.toml_codec")
+local Keylayout     = require("layouts.engine.composer.keylayout")
+local XkbConverter  = require("layouts.engine.composer.xkb_converter")
 local ShutdownHelpers, HelpersSettled = ProcessRunner.shutdown, ProcessRunner.is_settled
 local CancelHttp, CancelDigest = HttpClient.cancel, FileDigest.cancel
-local Registry      = require("layouts.registry")
-local Catalogue     = require("layouts.catalogue")
-local Extension     = require("layouts.extension")
-local Composer      = require("layouts.composer")
-local SourceStore   = require("layouts.source_store")
-local RegistryStore = require("layouts.registry_store")
+local Registry      = require("layouts.engine.registry.registry_core")
+local Catalogue     = require("layouts.engine.composer.catalogue")
+local Extension     = require("layouts.engine.composer.extension")
+local Composer      = require("layouts.engine.composer.composer")
+local SourceStore   = require("layouts.engine.composer.source_store")
+local RegistryStore = require("layouts.engine.registry.store")
 
 local M = {}
-local TextUtils = require("text_utils")
-local NativePath = require("native_path")
+local TextUtils = require("core.text.engine.utils_core")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "layout_registry"
 local REQUEST_OWNER = "layout_registry"
@@ -239,7 +239,7 @@ local function read_shared_json(rel)
 	if type(raw) ~= "string" then return nil, "_shared/" .. rel .. " is unreadable" end
 	local known = _shared_json[path]
 	if known ~= nil and known.raw == raw then return known.decoded, nil end
-	-- The shared json.lua answers nil to invalid JSON rather than raising.
+	-- The shared core/text/engine/json.lua answers nil to invalid JSON rather than raising.
 	local ok, decoded = pcall(Json.decode, raw)
 	if not ok or type(decoded) ~= "table" then return nil, "_shared/" .. rel .. " is not valid JSON" end
 	_shared_json[path] = { raw = raw, decoded = decoded }
@@ -250,9 +250,9 @@ end
 --- @return table|nil settings
 --- @return string|nil error
 function M.settings()
-	local layouts, layouts_err = read_shared_json("modules/layouts/defaults.json")
+	local layouts, layouts_err = read_shared_json("layouts/data/defaults.json")
 	if not layouts then return nil, layouts_err end
-	local updater, updater_err = read_shared_json("modules/updater/defaults.json")
+	local updater, updater_err = read_shared_json("updater/data/defaults.json")
 	if not updater then return nil, updater_err end
 	-- The daemon runs without the updater (Main loads it optionally), so its
 	-- absence is this function's refusal, not a raise that ends the daemon.
@@ -502,7 +502,7 @@ local function default_deps(settings)
 		bundled_dir = M.bundled_dir(driver_root, settings, FileSystem.exists),
 		converter_data = M.converter_data_path(driver_root, FileSystem.exists),
 		installer = M.installer_path(driver_root, FileSystem.exists),
-		keycodes = Paths.shared("modules/layouts/mac_keycodes.json"),
+		keycodes = Paths.shared("layouts/data/mac_keycodes.json"),
 		translate = I18n.get,
 	}
 end
@@ -1297,12 +1297,12 @@ function M.install_local(entry, text, on_done, deps)
 	return true
 end
 
---- The composer's ports over this module (see layouts/composer.lua).
+--- The composer's ports over this module (see layouts/engine/composer/composer.lua).
 --- @param deps table Resolved collaborators.
 --- @return table|nil operations
 --- @return string|nil error
 local function composer_operations(deps)
-	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
 	if not layout_defaults then return nil, defaults_err end
 	local settings, settings_err = Composer.settings(layout_defaults)
 	if not settings then return nil, settings_err end
@@ -1370,7 +1370,7 @@ end
 --- @return table|nil settings
 --- @return string|nil error
 function M.composer_settings()
-	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
 	if not layout_defaults then return nil, defaults_err end
 	return Composer.settings(layout_defaults)
 end
@@ -1466,7 +1466,7 @@ function M.composer_save(payload, on_done, deps)
 end
 
 --- Stores a layout source for the layout emulation alone: nothing is installed
---- in the system (layouts/composer.lua store).
+--- in the system (layouts/engine/composer/composer.lua store).
 --- @param payload table { source, keylayout [, emulation] }
 --- @param on_done function on_done(ok, code, detail, id)
 --- @param deps table|nil
@@ -1485,12 +1485,12 @@ function M.composer_remove(on_done, deps)
 		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
 end
 
---- The layout editor's file store over this module (see layouts/source_store.lua).
+--- The layout editor's file store over this module (see layouts/engine/composer/source_store.lua).
 --- @param deps table Resolved collaborators.
 --- @return table|nil operations
 --- @return string|nil error
 local function source_operations(deps)
-	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
 	if not layout_defaults then return nil, defaults_err end
 	local settings, settings_err = SourceStore.settings(layout_defaults)
 	if not settings then return nil, settings_err end
@@ -1592,9 +1592,9 @@ function M.shipped_extension_root(deps)
 	if resolved == nil then
 		-- Offline shipped data belongs to the local registry. Its source path
 		-- never needs the updater's initialized transport or installed channel.
-		local layouts, layouts_error = read_shared_json("modules/layouts/defaults.json")
+		local layouts, layouts_error = read_shared_json("layouts/data/defaults.json")
 		if not layouts then error(layouts_error, 0) end
-		local updater, updater_error = read_shared_json("modules/updater/defaults.json")
+		local updater, updater_error = read_shared_json("updater/data/defaults.json")
 		if not updater then error(updater_error, 0) end
 		local settings, settings_error = Registry.resolve(layouts, updater)
 		if not settings then error(settings_error, 0) end

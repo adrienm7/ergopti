@@ -20,7 +20,7 @@ _G.hs.settings.set("ergopti.llm_min_words", 1)
 package.loaded["modules.llm"] = { DEFAULT_STATE = { llm_min_words = 1, llm_max_words = 5 } }
 
 local parser = helpers.load_with_stubs("modules.llm.parser")
-local text_utils = require("text_utils")
+local text_utils = require("core.text.engine.utils_core")
 
 -- Re-stub hs after load_with_stubs reset it
 _G.hs.settings.set("ergopti.llm_min_words", 1)
@@ -44,14 +44,14 @@ end
 --- @param callback function Test body receiving the captured messages.
 --- @return table messages
 local function capture_parser_errors(callback)
-	local candidates = { require("infra.logger"), require("logger.shim") }
+	local candidates = { require("infra.logger"), require("core.logger.engine.shim") }
 	local patched = {}
 	local messages = {}
 	for _, logger in ipairs(candidates) do
 		if not patched[logger] then
 			patched[logger] = logger.error
 			logger.error = function(log, format_string, ...)
-				if log == "llm.parser" then
+				if log == "ai.engine.api.parser_core" then
 					messages[#messages + 1] = string.format(format_string, ...)
 				end
 			end
@@ -64,7 +64,7 @@ local function capture_parser_errors(callback)
 	return messages
 end
 
-helpers.describe("llm.parser edge cases", function()
+helpers.describe("ai.engine.api.parser_core edge cases", function()
 	helpers.it("returns nil for empty body", function()
 		local res = parser.process_prediction("hello", "hello", "")
 		helpers.assert_nil(res)
@@ -94,7 +94,7 @@ helpers.describe("llm.parser edge cases", function()
 		-- lone 0x80 byte comes back as a prediction whose to_type is that byte,
 		-- while "<random gibberish>" two cases below comes back nil — the untagged
 		-- body is rejected in one shape and accepted in the other. That asymmetry
-		-- is real and lives in _shared/lua/llm, so pinning either answer here
+		-- is real and lives in _shared/ai/engine, so pinning either answer here
 		-- would freeze a decision this file is not the place to make.
 		for i = 1, 80 do
 			local ok, res = pcall(parser.process_prediction, "x", "x", string.char(0x80 + (i % 0x40)))

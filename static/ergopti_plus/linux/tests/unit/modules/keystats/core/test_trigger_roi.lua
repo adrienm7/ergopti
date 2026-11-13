@@ -7,7 +7,7 @@ corpus(helpers)
 
 local Home = require("tests.support.keystats_home_fixture")
 local Native = require("tests.support.keystats_native_fixture")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function context(window)
 	return { app_id = "Editor", title = "Document", native_identity = window or "x11:owner:1" }
@@ -251,8 +251,8 @@ Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and
 		last = assert(source:find("\n\t-- A pointer event", first, true))
 		local click = compile(source:sub(first, last - 1) .. "\nreturn on_click")
 		local function type_text(text)
-			for _, cp in require("compat.utf8").codes(text) do
-				local ok, failure = pcall(character, require("compat.utf8").char(cp), 30)
+			for _, cp in require("core.lifecycle.engine.compat.utf8").codes(text) do
+				local ok, failure = pcall(character, require("core.lifecycle.engine.compat.utf8").char(cp), 30)
 				if admitted and not paused then helpers.assert_eq(ok, false); helpers.assert_eq(failure, stop)
 				else helpers.assert_true(ok) end
 			end

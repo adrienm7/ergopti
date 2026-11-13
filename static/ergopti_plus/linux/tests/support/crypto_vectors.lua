@@ -1,8 +1,8 @@
 --- tests/support/crypto_vectors.lua
 --- Loads independent SHA-256 byte vectors shared by native and portable tests.
 --- Expected hashes are standard vectors or independently computed with hashlib.
-local json = require("json")
-local file = assert(io.open("../_shared/data/crypto/sha256_vectors.json", "rb"))
+local json = require("core.text.engine.json")
+local file = assert(io.open("../_shared/core/crypto/data/crypto/sha256_vectors.json", "rb"))
 local rows = assert(json.decode(file:read("*a")))
 assert(file:close())
 assert(#rows == 18, "shared SHA-256 corpus must be complete")

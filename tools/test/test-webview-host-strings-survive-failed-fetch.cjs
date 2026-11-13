@@ -33,7 +33,9 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const I18N_JS = path.join(SHARED, 'ui', 'i18n.js');
-const en = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+const en = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+);
 
 const failures = [];
 const fail = (message) => failures.push(message);
@@ -239,7 +241,8 @@ function loadPage(app, bridge, seed) {
 	sandbox.webkit = { messageHandlers: { [bridge]: { postMessage() {} } } };
 	sandbox.atob = (text) => Buffer.from(text, 'base64').toString('binary');
 	sandbox.TextDecoder = TextDecoder;
-	sandbox.__i18n_base = 'file:///Applications/Ergopti.app/Contents/Resources/_shared/data/locales/';
+	sandbox.__i18n_base =
+		'file:///Applications/Ergopti.app/Contents/Resources/_shared/core/i18n/data/locales/';
 	sandbox._i18n_locale = 'en';
 	if (seed) sandbox._i18n_strings = seed;
 	sandbox.fetch = (url) => {
@@ -258,14 +261,14 @@ function loadPage(app, bridge, seed) {
 }
 
 const schema = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'schema.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'schema.json'), 'utf8')
 );
 // The host supplies export labels independently of the active page locale.
 schema.export_strings = Object.fromEntries(
 	Object.entries(en).filter(([key]) => key.startsWith('healthcheck.'))
 );
 const redaction = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'redaction.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'redaction.json'), 'utf8')
 );
 
 /** The diagnostics init message, with an ERROR in the snapshot. */

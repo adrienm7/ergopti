@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Locale (Linux)
 --- DESCRIPTION:
---- Thin wrapper around _shared/lua/locale/core.lua. Injects Linux-specific
+--- Thin wrapper around _shared/core/i18n/engine/core.lua. Injects Linux-specific
 --- dependencies (vendored JSON decoder, debug.getinfo-based path walker,
 --- logger shim) and re-exports the shared surface. All locale logic lives in
 --- the shared module — this file only wires the platform layer.
@@ -17,19 +17,19 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 -- Always start from a clean locale.core — tests may have left mock state
 -- in the module cache (Core.init is idempotent and won't overwrite it).
-package.loaded["locale.core"] = nil
-local Core   = require("locale.core")
+package.loaded["core.i18n.engine.core"] = nil
+local Core   = require("core.i18n.engine.core")
 
 -- Locale files are JSON data, never executable Lua. A missing decoder is a
 -- broken installation and must be reported before any locale file is read.
-local ok_json, json = pcall(require, "json")
+local ok_json, json = pcall(require, "core.text.engine.json")
 assert(ok_json and type(json) == "table" and type(json.decode) == "function", "locale: JSON decoder unavailable")
 
--- Resolves _shared/data/locales/<code>.json through infra/paths.lua, the one
+-- Resolves _shared/core/i18n/data/locales/<code>.json through infra/paths.lua, the one
 -- resolver that knows both shipped layouts. This used to cut three levels off
 -- this file's own chunk name, which is right only in the checkout and the
 -- tarball: on the .deb and .rpm (/usr/lib/ergopti/infra/locale.lua) it named
@@ -39,7 +39,7 @@ assert(ok_json and type(json) == "table" and type(json.decode) == "function", "l
 local function resolve_locale_path(code)
 	local ok, Paths = pcall(require, "infra.paths")
 	if not ok or type(Paths.shared) ~= "function" then return "" end
-	return Paths.shared("data/locales/" .. code .. ".json") or ""
+	return Paths.shared("core/i18n/data/locales/" .. code .. ".json") or ""
 end
 
 -- Wire the shared module at require-time.

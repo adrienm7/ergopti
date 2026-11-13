@@ -7,7 +7,7 @@
 --- editor's eventual conditional write, including configuration-folder changes.
 --- ==============================================================================
 
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local M = {}
 
 --- Captures a profile menu's source and returns its save and currentness ports.

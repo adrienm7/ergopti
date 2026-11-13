@@ -24,8 +24,8 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Composition = require("config_scope_composition")
-local Logger = require("logger.shim")
+local Composition = require("settings.engine.scope.composition")
+local Logger = require("core.logger.engine.shim")
 local LOG = "infra.global_scope"
 local _composition, _registry, _in_flight = nil, {}, false
 require("infra.scope_registry").register("global_scope", function() return _composition ~= nil and _composition.pending() == true end)

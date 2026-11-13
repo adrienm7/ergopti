@@ -24,10 +24,14 @@ def load(name, path):
     return module
 
 
-AUTH = load("ergopti_pending_authority", SHARED / "python/managed_ollama_operation_authority.py")
+AUTH = load(
+    "ergopti_pending_authority", SHARED / "ai/adapters/python/managed_ollama_operation_authority.py"
+)
 RUNTIME = load("ergopti_pending_runtime", Path(__file__).with_name("managed_ollama_runtime.py"))
 PORTS = load("ergopti_pending_ports", DRIVER / "platform/network/native_ollama_api.py")
-RECEIPT = load("ergopti_pending_receipt", SHARED / "python/managed_operation_receipt.py")
+RECEIPT = load(
+    "ergopti_pending_receipt", SHARED / "ai/adapters/python/managed_operation_receipt.py"
+)
 POLICY = RUNTIME.POLICY
 ADMISSION_PATH = "/api/ergopti-native-http-admission"
 

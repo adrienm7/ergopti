@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/timer/delay_ceiling_vectors.json against the
 ; Windows policy and native timer boundaries, as
-; _shared/lua/test/timer_delay_ceiling_contract.lua does on macOS and Linux.
+; _shared/tests/lua/timer_delay_ceiling_contract.lua does on macOS and Linux.
 ;
 ; ROOT CAUSE ENCODED:
 ; SetTimer never refuses a period: it keeps 32 bits of it, so 2^53, 1e300,
@@ -52,7 +52,7 @@ _TDC_Mark(Fired, *) {
 _TDC_OneCeiling() {
 	global TIMER_MAX_DELAY_MS, _SharedDir
 	AssertEqual(9007199254740992, TIMER_MAX_DELAY_MS, "the ceiling is 2^53 ms")
-	Assert(InStr(FileRead(_SharedDir . "\lua\number_policy.lua", "UTF-8"), "M.MAX_TIMER_DELAY_MS = 2 ^ 53") > 0,
+	Assert(InStr(FileRead(_SharedDir . "\core\text\engine\number_policy.lua", "UTF-8"), "M.MAX_TIMER_DELAY_MS = 2 ^ 53") > 0,
 		"the Lua policy declares the same ceiling")
 }
 Test("timer-delay-ceiling: one named ceiling of 2^53 ms", _TDC_OneCeiling)

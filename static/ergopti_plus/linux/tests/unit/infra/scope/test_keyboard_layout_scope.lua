@@ -13,9 +13,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 
 local SOURCE = '[layout]\ndirect_access_digits = "digits"\nnumber_row_reorder_edges = true\nunknown = "keep"\n[other]\nopaque = [1, 2]\n'
 

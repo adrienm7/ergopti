@@ -13,7 +13,7 @@ Core engine for Ergopti+. Runs the OS-level `eventtap` loop that intercepts ever
 | `TooltipRenderer` | Displays LLM prediction suggestions                    |
 | `TimerScheduler`  | Debounce timers for LLM calls and inactivity detection |
 
-## Domain module (`_shared/core/domain/`)
+## Domain module (`_shared/core/text/data/domain/`)
 
 - `HotstringMatcher.spec.js` — the Registry implements this contract for trigger lookup
 - `Expander.spec.js` — the Expander sub-module implements this contract

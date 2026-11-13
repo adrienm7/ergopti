@@ -41,11 +41,14 @@ try {
 	// The manifest and AppStream file take the host and repository from their single
 	// sources (identifiers.sh, the updater defaults); both must expand to real URLs.
 	const github = JSON.parse(
-		fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.json'), 'utf8')
+		fs.readFileSync(
+			path.join(ROOT, 'static/ergopti_plus/_shared/core/text/data/identifiers.json'),
+			'utf8'
+		)
 	).hosts.github;
 	const updater = JSON.parse(
 		fs.readFileSync(
-			path.join(ROOT, 'static/ergopti_plus/_shared/modules/updater/defaults.json'),
+			path.join(ROOT, 'static/ergopti_plus/_shared/updater/data/defaults.json'),
 			'utf8'
 		)
 	).github;
@@ -53,7 +56,7 @@ try {
 	// PIN), never from a moving branch.
 	const pinned = JSON.parse(
 		fs.readFileSync(
-			path.join(ROOT, 'static/ergopti_plus/_shared/data/linux_native_runtime.json'),
+			path.join(ROOT, 'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json'),
 			'utf8'
 		)
 	).network_runtime.portable.flatpak_sources.luajit;
@@ -69,7 +72,7 @@ try {
 	);
 	const desktop = fs.readFileSync(path.join(payload, `share/applications/${id}.desktop`), 'utf8');
 	assert.equal(desktop.match(/^Icon=(.+)$/m)?.[1], id);
-	const canonical = fs.readFileSync(path.join(BUILD, '_shared/assets/ergopti_tray.png'));
+	const canonical = fs.readFileSync(path.join(BUILD, '_shared/tray/data/ergopti_tray.png'));
 	const width = canonical.readUInt32BE(16),
 		height = canonical.readUInt32BE(20);
 	const relative = `share/icons/hicolor/${width}x${height}/apps/${id}.png`;
@@ -117,7 +120,7 @@ try {
 		0,
 		'a missing exported icon must fail its genuine install command'
 	);
-	const asset = path.join(BUILD, '_shared/assets/ergopti_tray.png');
+	const asset = path.join(BUILD, '_shared/tray/data/ergopti_tray.png');
 	// Rename must stay on the asset's filesystem even when the install replay's
 	// private TMPDIR belongs to another device. Retain the original inode and
 	// metadata instead of copying a replacement over the package fixture.

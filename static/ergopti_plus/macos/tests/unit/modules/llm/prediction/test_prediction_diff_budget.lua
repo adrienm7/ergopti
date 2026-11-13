@@ -1,6 +1,6 @@
 --- tests/unit/modules/llm/prediction/test_prediction_diff_budget.lua
 local helpers = require("tests.helpers")
-local Parser = helpers.load_with_stubs("llm.parser")
+local Parser = helpers.load_with_stubs("ai.engine.api.parser_core")
 
 local function bounded(full, corrected)
 	local instructions = 0
@@ -16,7 +16,7 @@ local function bounded(full, corrected)
 end
 
 -- The longest word the shared parser resource policy admits on every driver
--- (_shared/modules/llm/parser_limits.json: (n + 1)^2 grid cells).
+-- (_shared/ai/data/parser_limits.json: (n + 1)^2 grid cells).
 local LONG_WORD = 500
 
 helpers.describe("prediction diff is bounded", function()

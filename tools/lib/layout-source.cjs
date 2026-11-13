@@ -36,12 +36,14 @@ function vendoredCodec() {
 function keyTables() {
 	return {
 		macKeycodes: JSON.parse(
-			fs.readFileSync(shared('modules', 'layouts', 'mac_keycodes.json'), 'utf8')
+			fs.readFileSync(shared('layouts', 'data', 'mac_keycodes.json'), 'utf8')
 		),
 		physicalKeys: JSON.parse(
-			fs.readFileSync(shared('data', 'keycodes', 'physical_keys.json'), 'utf8')
+			fs.readFileSync(shared('layouts', 'data', 'keycodes', 'physical_keys.json'), 'utf8')
 		),
-		hidUsages: JSON.parse(fs.readFileSync(shared('data', 'keycodes', 'hid_usages.json'), 'utf8'))
+		hidUsages: JSON.parse(
+			fs.readFileSync(shared('layouts', 'data', 'keycodes', 'hid_usages.json'), 'utf8')
+		)
 	};
 }
 

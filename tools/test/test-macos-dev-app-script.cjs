@@ -26,12 +26,12 @@ const appDirs = require('./lib/app-dirs.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/run-macos-dev-app.sh';
-const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.sh';
+const IDENTIFIERS = 'static/ergopti_plus/_shared/core/text/data/identifiers.sh';
 // The runner names the launcher log through the field report's folder reader.
 const FIELD_PATHS = [
 	'tools/dev/field-report-paths.py',
-	'static/ergopti_plus/_shared/modules/paths/app_dirs.toml',
-	'static/ergopti_plus/_shared/modules/logger/sub_files.toml'
+	'static/ergopti_plus/_shared/core/fs/data/paths/app_dirs.toml',
+	'static/ergopti_plus/_shared/core/logger/data/sub_files.toml'
 ];
 
 if (process.platform === 'win32') {

@@ -10,9 +10,9 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Transaction = require("config_scope_transaction")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Transaction = require("settings.engine.scope.transaction")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 local Preferences = require("infra.preferences")
 local PARAMETER_PREFIX = "gestures.action_parameters."
 

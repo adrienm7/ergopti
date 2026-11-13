@@ -7,7 +7,7 @@
 --- definitions, queries the running Ollama instance for available models,
 --- and exposes the currently selected model to the prediction engine.
 --- Ported from the macOS profiles.lua module — single source of truth for
---- profile data is _shared/lua/llm/profile_selector.lua.
+--- profile data is _shared/ai/engine/settings/profile_selector.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Single source: delegates profile resolution to shared profile_selector
@@ -21,7 +21,7 @@
 --- ==============================================================================
 
 local M = {}
-local KEY = require("config_keys").KEY
+local KEY = require("settings.engine.keys").KEY
 
 -- The cooperative constructor captures one engine owner, not a later compatible export.
 local ResponseEngine = require("modules.llm.prediction_engine")
@@ -29,12 +29,12 @@ local ResponseCapture, ResponseCurrent = ResponseEngine.capture_runtime_response
 assert(type(ResponseCapture) == "function" and type(ResponseCurrent) == "function",
 	"original runtime response owner unavailable")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "modules.llm.profiles"
 
 -- Optional dependencies (may fail if modules not available).
 local Selector = nil
-local ok_sel, sel_mod = pcall(require, "llm.profile_selector")
+local ok_sel, sel_mod = pcall(require, "ai.engine.settings.profile_selector")
 if ok_sel then Selector = sel_mod end
 
 local HttpBridge = nil

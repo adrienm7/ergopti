@@ -605,7 +605,7 @@
 		{
 			"id": "js-owned-runtimes-doc",
 			"ordinal": 549,
-			"name": "Owned runtimes document tables are generated from _shared/data/owned_runtimes.json and in sync",
+			"name": "Owned runtimes document tables are generated from _shared/core/network/data/owned_runtimes.json and in sync",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-owned-runtimes-doc.cjs"],
 			"repro": "npm run test:owned-runtimes-doc"
@@ -685,7 +685,7 @@
 		{
 			"id": "js-0512",
 			"ordinal": 631,
-			"name": "structure plan switches every spelling of the shared Lua root in the step that empties _shared/lua",
+			"name": "structure plan switches every spelling of the shared Lua root in the step that empties _shared",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-shared-root-switch.cjs"],
 			"repro": "npm run test:structure-shared-root-switch"

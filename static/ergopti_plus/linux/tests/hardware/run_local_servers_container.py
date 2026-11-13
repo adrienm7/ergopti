@@ -30,7 +30,7 @@ import unittest
 HERE = Path(__file__).resolve().parent
 DRIVER = HERE.parent.parent
 SHARED = DRIVER.parent / "_shared"
-CATALOGUE = json.loads((SHARED / "modules/llm/local_servers.json").read_text())
+CATALOGUE = json.loads((SHARED / "ai/data/local_servers.json").read_text())
 STAND_IN = HERE / "fake_local_server.py"
 
 
@@ -119,9 +119,7 @@ class LocalServersContainer(unittest.TestCase):
             "XDG_DATA_HOME": str(self.home / ".local/share"),
             "XDG_STATE_HOME": str(self.home / ".local/state"),
             "XDG_CACHE_HOME": str(self.home / ".cache"),
-            "LUA_PATH": ";".join(
-                f"{root}/?.lua;{root}/?/init.lua" for root in (DRIVER, SHARED / "lua")
-            )
+            "LUA_PATH": ";".join(f"{root}/?.lua;{root}/?/init.lua" for root in (DRIVER, SHARED))
             + ";;",
         }
         completed = subprocess.run(

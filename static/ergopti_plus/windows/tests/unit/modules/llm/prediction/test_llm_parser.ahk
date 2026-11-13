@@ -200,7 +200,7 @@ Test("LLM parser: unfinished thinking stays private (llm-truncated-thinking)", T
 
 TestLLMParser_ResourcePolicy() {
 	global _SharedDir
-	Limits := JsonParse(FSReadStrict(_SharedDir . "\modules\llm\parser_limits.json"))
+	Limits := JsonParse(FSReadStrict(_SharedDir . "\ai\data\parser_limits.json"))
 	Small := "hello"
 	AtBytes := Limits["max_operand_bytes"]
 	Long := ""

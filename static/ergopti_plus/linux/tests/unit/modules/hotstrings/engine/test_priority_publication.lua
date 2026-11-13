@@ -42,7 +42,7 @@ local function with_priority(body, no_engine)
 		.. '[hotstrings.modules.first]\nmain=true\nclosed=false\n'
 		.. '[hotstrings.modules.second]\nmain=true\nclosed=false\n')
 	local Loader = require("modules.hotstrings.loader")
-	local Writer = require("toml_codec.writer")
+	local Writer = require("core.text.engine.toml_codec.writer")
 	local original_load, original_find, original_publish = Loader.load_catalogue, Loader.find_toml_files, Writer.publish_if_unchanged
 	local state = { loads = 0, writes = 0, images = {}, pushes = {}, read = read, directory = directory,
 		override_path = overrides, choice_path = choices }

@@ -4,7 +4,7 @@
 --- MODULE: API Model Listing Corpus (shared Lua oracle)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/api_model_listing_vectors.json through the
---- shared listing plan (_shared/lua/llm/api_model_listing.lua) the model
+--- shared listing plan (_shared/ai/engine/api/model_listing.lua) the model
 --- selector page draws its API rows with; Linux and the AutoHotkey port replay
 --- it too.
 ---
@@ -15,12 +15,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local Listing = require("llm.api_model_listing")
+local Listing = require("ai.engine.api.model_listing")
 
 local CORPUS = helpers.shared("tests/corpus/llm/api_model_listing_vectors.json")
 

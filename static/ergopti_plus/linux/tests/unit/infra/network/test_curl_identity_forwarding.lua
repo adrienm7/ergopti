@@ -10,7 +10,7 @@
 --- Actual wrapper/GIO/coordinator code; independent native child/close ports.
 --- The Curl port records admission metadata, not actual native execution.
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Ports = require("tests.support.managed_http_native_ports")
 
 local function identity()

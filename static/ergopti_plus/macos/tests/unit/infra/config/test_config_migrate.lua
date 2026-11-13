@@ -4,7 +4,7 @@
 --- MODULE: Config Migration (macOS)
 --- DESCRIPTION:
 --- Runs the shared config migration contract with the macOS driver id: the
---- cross-driver corpus replayed through _shared/lua/config_migrate.lua, byte
+--- cross-driver corpus replayed through _shared/settings/engine/migration/migrate.lua, byte
 --- preservation of every record no step touches, and the boot run's backup,
 --- publication and read-only refusal of a newer file. It also pins where the
 --- root boot runs the migration: before the first-run wizard can create the
@@ -13,9 +13,9 @@
 
 local helpers = require("tests.helpers")
 
-require("test.config_migrate_contract").register(helpers, { driver = "hs" })
-require("test.config_migrate_records_contract").register(helpers, { driver = "hs" })
-require("test.common_autocorrection_migration_contract").register(helpers, helpers.shared)
+require("tests.lua.settings.migrate_contract").register(helpers, { driver = "hs" })
+require("tests.lua.settings.migrate_records_contract").register(helpers, { driver = "hs" })
+require("tests.lua.common_autocorrection_migration_contract").register(helpers, helpers.shared)
 
 --- Returns root init.lua with line comments removed.
 local function init_code()

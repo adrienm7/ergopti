@@ -15,8 +15,8 @@ local helpers = require("tests.helpers")
 --- This is fixture input, never an expectation regenerated from the native producer.
 local function install_legacy_layout_formats(translator)
 	translator = translator or require("infra.i18n")
-	local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
-	local catalogue = assert(require("json").decode(file:read("*a")))
+	local file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "rb"))
+	local catalogue = assert(require("core.text.engine.json").decode(file:read("*a")))
 	assert(file:close())
 	local original_get = translator.get
 	translator.get = function(key)

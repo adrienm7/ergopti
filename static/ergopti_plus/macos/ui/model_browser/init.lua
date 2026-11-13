@@ -29,7 +29,7 @@ local DeferredWork = require("infra.deferred_work")
 local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
-local ModelCatalogue = require("llm.model_catalogue")
+local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
 
 local LOG = "model_browser"
 

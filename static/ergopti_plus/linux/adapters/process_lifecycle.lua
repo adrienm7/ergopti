@@ -27,7 +27,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 -- The focused-window question belongs to one adapter. This file used to answer
 -- it a second time, with its own xdotool calls, and it was the copy that fed the
 -- keystroke path — so teaching WindowInfo about Wayland would have changed

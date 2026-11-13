@@ -5,7 +5,7 @@
  * MODULE: Ollama Port Single-Source Guard
  * DESCRIPTION:
  * The default Ollama port lives in exactly ONE place —
- * _shared/modules/llm/defaults.json. Ergopti's own Ollama reads
+ * _shared/ai/data/defaults.json. Ergopti's own Ollama reads
  * llm_ollama_owned_port on Windows, macOS and Linux, and the stock llm_ollama_port
  * names only the port a user's own Ollama keeps. Linux mirrors both in
  * infra/llm_bridge.lua, pinned by test-linux-llm-defaults-single-source.cjs. The AHK driver loads it
@@ -36,7 +36,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SSOT_FILE = path.join(ROOT, 'static/ergopti_plus/_shared/modules/llm/defaults.json');
+const SSOT_FILE = path.join(ROOT, 'static/ergopti_plus/_shared/ai/data/defaults.json');
 
 // AHK files that must source the Ollama port default from LLM_Defaults, never
 // from a local literal. api_ollama.ahk is a redirect shim; constants live in

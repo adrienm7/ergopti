@@ -9,7 +9,7 @@ local run_contract = function(helpers,load_manager,load_host)
   local controls={windows={},closed={},register=true,release=true,constructor_calls=0,destroy_calls=0,release_calls=0,release_all_calls=0,logs={},views={},view_destroy_calls=0,unregister_calls=0,disconnect_calls=0,signal_serial=0,ucms={},replies={}}
   local manager
   local noop=function()end
-  package.loaded['logger.shim']={success=noop,info=noop,debug=noop,warn=noop,trace=noop,done=noop,start=noop,error=function(_,fmt,...)controls.logs[#controls.logs+1]=string.format(fmt,...)end}
+  package.loaded['core.logger.engine.shim']={success=noop,info=noop,debug=noop,warn=noop,trace=noop,done=noop,start=noop,error=function(_,fmt,...)controls.logs[#controls.logs+1]=string.format(fmt,...)end}
   local window_type=setmetatable({},{__call=function(_,properties)
    controls.constructor_calls=controls.constructor_calls+1
    local window={properties=properties,visible=false,alive=true}
@@ -88,7 +88,7 @@ local run_contract = function(helpers,load_manager,load_host)
   package.loaded['ui.metrics_typing.bridge']={bridge_name='metrics_typing_bridge',on_message=function(...)if controls.message then return controls.message(...)end;return true end,
    on_window_closed=function(epoch)controls.closed[#controls.closed+1]=epoch end}
   local called,detail=pcall(function()
-   local titles=require('window_titles');package.loaded['window_titles']={compose=titles.compose,key_for_app=function(app)if app=='physical_shortcuts'then return 'physical_shortcuts.window_title'end;return titles.key_for_app(app)end}
+   local titles=require('core.ui.engine.window_titles');package.loaded['core.ui.engine.window_titles']={compose=titles.compose,key_for_app=function(app)if app=='physical_shortcuts'then return 'physical_shortcuts.window_title'end;return titles.key_for_app(app)end}
    package.loaded['ui.webkit_host']=nil;manager=load_manager();package.loaded['ui.webview_manager']=manager;manager.build_page_html=function()return'<html>inert owned page</html>'end
    manager.set_daemon_state({input_capture_gate={release=function(_,epoch)
     controls.release_calls=controls.release_calls+1
@@ -588,10 +588,10 @@ local run_contract = function(helpers,load_manager,load_host)
     helpers.it('(native-window-owner) actual physical host retains failed acquisition debt: '..mode,function()
      fixture(function(m,c)
       local received,retired=0,0
-      package.loaded['shortcuts.physical_slots']={new=function()return{candidates=function()return{}end}end}
-      package.loaded['infra.paths']={shared=function()return helpers.driver_root() .. '/../_shared/data/keycodes/physical_keys.json'end}
+      package.loaded['shortcuts.engine.physical_slots']={new=function()return{candidates=function()return{}end}end}
+      package.loaded['infra.paths']={shared=function()return helpers.driver_root() .. '/../_shared/layouts/data/keycodes/physical_keys.json'end}
       package.loaded['modules.gestures.manager']={}
-      package.loaded['shortcuts.physical_editor_window']={new=function(options)
+      package.loaded['shortcuts.engine.physical_editor_window']={new=function(options)
        local closed=false
        return{retire=function()closed=true;retired=retired+1;return true end,receive=function()if closed or options.page_current()~=true then return false end;received=received+1;return true end}
       end}
@@ -614,10 +614,10 @@ local run_contract = function(helpers,load_manager,load_host)
    helpers.it('(native-window-owner) actual host adopts epoch before synchronous ready and close',function()
     fixture(function(m,c)
      local received=0
-     package.loaded['shortcuts.physical_slots']={new=function()return{candidates=function()return{}end}end}
-     package.loaded['infra.paths']={shared=function()return helpers.driver_root() .. '/../_shared/data/keycodes/physical_keys.json'end}
+     package.loaded['shortcuts.engine.physical_slots']={new=function()return{candidates=function()return{}end}end}
+     package.loaded['infra.paths']={shared=function()return helpers.driver_root() .. '/../_shared/layouts/data/keycodes/physical_keys.json'end}
      package.loaded['modules.gestures.manager']={}
-     package.loaded['shortcuts.physical_editor_window']={new=function(options)return{retire=function()return true end,receive=function()helpers.assert_eq(options.page_current(),true);received=received+1;return true end}end}
+     package.loaded['shortcuts.engine.physical_editor_window']={new=function(options)return{retire=function()return true end,receive=function()helpers.assert_eq(options.page_current(),true);received=received+1;return true end}end}
      local host=load_host();package.loaded['ui.physical_shortcuts.bridge']=host
      local options={scope={capture_editor_inventory=function()end,editor_source_current=function()end,edit=function()end,physical_delivery_available=function()return true end},is_paused=function()return false end}
      c.present=function()

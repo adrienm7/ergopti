@@ -10,7 +10,7 @@
 local table_unpack = table.unpack or unpack
 --- TEST: Logger Contract — shared cross-driver vectors (Linux)
 --- DESCRIPTION:
---- Replays _shared/modules/logger/test_vectors.json through the shared logger
+--- Replays _shared/core/logger/data/test_vectors.json through the shared logger
 --- core and asserts every rendered line matches the vector's expected output.
 ---
 --- WHY THIS EXISTS:
@@ -21,7 +21,7 @@ local table_unpack = table.unpack or unpack
 --- cross-driver corpus test lists nine corpora with the logger not among them.
 --- The corpus header said as much — "shared by AHK and Hammerspoon test suites".
 ---
---- Linux and macOS run the SAME shared logger (_shared/lua/logger/init.lua), so
+--- Linux and macOS run the SAME shared logger (_shared/core/logger/engine/init.lua), so
 --- a divergence here would not come from the logger itself. It would come from
 --- the sink, the level, or the timestamp function the driver installs around it
 --- — which is exactly the layer this driver owns and nothing was checking.
@@ -43,7 +43,7 @@ local it          = helpers.it
 local assert_eq   = helpers.assert_eq
 local assert_true = helpers.assert_true
 
-local json   = require("json")
+local json   = require("core.text.engine.json")
 
 local Paths = require("infra.paths")
 
@@ -51,7 +51,7 @@ local Paths = require("infra.paths")
 -- singleton can carry a pending dedup summary from earlier native-owner tests;
 -- capturing that summary would mix their lifecycle with this formatting corpus.
 -- Loading the source directly leaves the registered logger and its debt intact.
-local Logger = assert(loadfile(assert(Paths.shared("lua/logger/init.lua"))))()
+local Logger = assert(loadfile(assert(Paths.shared("core/logger/engine/init.lua"))))()
 
 -- Every variant the corpus can name, mapped to the function that emits it.
 -- A vector naming a variant absent from this table fails loudly rather than
@@ -83,7 +83,7 @@ local MIN_VECTORS = 12
 --- Reads and decodes the shared logger vectors.
 --- @return table|nil vectors, string|nil error
 local function read_vectors()
-	local path = Paths.shared("modules/logger/test_vectors.json")
+	local path = Paths.shared("core/logger/data/test_vectors.json")
 	if not path then return nil, "Paths.shared() returned nil — the shared tree is unreachable" end
 	local f = io.open(path, "r")
 	if not f then return nil, "cannot open " .. path end
@@ -159,4 +159,4 @@ describe("Logger contract: shared cross-driver vectors", function()
 	end
 end)
 
-require("test.adapter_errors_contract").register(helpers)
+require("tests.lua.diagnostics.adapter_errors_contract").register(helpers)

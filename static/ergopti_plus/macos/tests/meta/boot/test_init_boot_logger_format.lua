@@ -47,7 +47,7 @@ helpers.describe("boot privacy admission", function()
 					end }
 				end,
 				io = { open = function(path, access)
-					helpers.assert_eq(path, "/owned-shared/modules/diagnostics/redaction.json")
+					helpers.assert_eq(path, "/owned-shared/diagnostics/data/redaction.json")
 					helpers.assert_eq(access, "rb")
 					if mode == "open" then error("PrivateUser /Users/PrivateUser/private") end
 					return { read = function()

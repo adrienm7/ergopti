@@ -1,7 +1,7 @@
 --- tests/unit/modules/gestures/programs/test_native_worker_owner.lua
 
 local helpers = require("tests.helpers")
-local Worker = require("native_worker_owner")
+local Worker = require("core.lifecycle.engine.native_worker_owner")
 
 helpers.describe("Shared native worker completion ownership", function()
 	helpers.it("publishes completion only after process and physical timer retirement", function()

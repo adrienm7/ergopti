@@ -25,11 +25,15 @@ def load(name, path):
 
 
 RUNTIME = load("ergopti_pull_native_runtime", Path(__file__).with_name("managed_ollama_runtime.py"))
-PULL = load("ergopti_pull_owner", SHARED / "python/managed_ollama_pull.py")
-SESSIONS = load("ergopti_pull_sessions", SHARED / "python/managed_ollama_sessions.py")
-RECEIPT = load("ergopti_pull_private_receipt", SHARED / "python/managed_operation_receipt.py")
+PULL = load("ergopti_pull_owner", SHARED / "ai/adapters/python/managed_ollama_pull.py")
+SESSIONS = load("ergopti_pull_sessions", SHARED / "ai/adapters/python/managed_ollama_sessions.py")
+RECEIPT = load(
+    "ergopti_pull_private_receipt", SHARED / "ai/adapters/python/managed_operation_receipt.py"
+)
 PORTS = load("ergopti_pull_native_ports", DRIVER / "platform/network/native_ollama_api.py")
-AUTH = load("ergopti_pull_authority", SHARED / "python/managed_ollama_operation_authority.py")
+AUTH = load(
+    "ergopti_pull_authority", SHARED / "ai/adapters/python/managed_ollama_operation_authority.py"
+)
 CLEANUP = load("ergopti_pull_cleanup", Path(__file__).with_name("managed_ollama_cleanup.py"))
 POLICY = PULL.POLICY
 
@@ -155,15 +159,18 @@ def select_alias_owner(
 
     source = load("ergopti_pull_daemon_authority", DRIVER / "platform/ollama_daemon_authority.py")
     bootstrap = load("ergopti_pull_bootstrap_policy", DRIVER / "platform/ollama_bootstrap_owner.py")
-    proxy = load("ergopti_pull_bootstrap_proxy", SHARED / "python/network_proxy_policy.py")
+    proxy = load(
+        "ergopti_pull_bootstrap_proxy",
+        SHARED / "core/network/adapters/python_network_proxy_policy.py",
+    )
     catalogue = RUNTIME.POLICY.metadata_bytes(catalogue_bytes)
     expected_policy = catalogue["repository_source_sha256"].get(
-        "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json"
+        "static/ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json"
     )
     if expected_policy is None:
         raise POLICY.RuntimeRefusal("session")
     policy = bootstrap.BootstrapPolicy(
-        SHARED / "modules/llm/managed_ollama_bootstrap.json",
+        SHARED / "ai/data/managed_ollama_bootstrap.json",
         proxy.ProxyPolicy(),
         expected_contract_sha256=expected_policy,
     )

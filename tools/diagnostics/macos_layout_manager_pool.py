@@ -27,7 +27,7 @@ DEPENDENCIES = (
     "static/ergopti_plus/macos/ui/webview_close_owner.lua",
     "static/ergopti_plus/macos/adapters/timer_scheduler.lua",
     "static/ergopti_plus/macos/infra/deferred_work.lua",
-    "static/ergopti_plus/_shared/lua/layouts/manager_bridge.lua",
+    "static/ergopti_plus/_shared/layouts/engine/manager_bridge.lua",
     "static/ergopti_plus/macos/modules/keymap/layout_registry.lua",
     "static/ergopti_plus/_shared/ui/layout_manager/strings.json",
     "static/ergopti_plus/_shared/ui/layout_manager/index.html",

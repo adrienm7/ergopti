@@ -4,7 +4,7 @@
 --- MODULE: Layout Composer Check (macOS)
 --- DESCRIPTION:
 --- The macOS side of the Debug menu's « Test the composed layout »: wires the
---- shared steps (_shared/lua/layouts/composer_check.lua) to this driver's layout
+--- shared steps (_shared/layouts/engine/composer/check_core.lua) to this driver's layout
 --- registry, the shipped check composition and the system's enabled input
 --- sources. The composed layout is installed as a real input source and removed
 --- again; a user's own composition is only read.
@@ -24,12 +24,12 @@
 
 local Paths       = require("infra.paths")
 local FileSystem  = require("adapters.file_system")
-local Report      = require("field_check_report")
+local Report      = require("diagnostics.engine.field_check.report")
 
 local M = {}
 
 -- Where the shipped check composition lives, under the shared tree.
-local FIXTURE_DIR = "modules/layouts/composer_check/"
+local FIXTURE_DIR = "layouts/data/composer_check/"
 
 --- Whether the system lists a keyboard layout as enabled.
 --- @param sources table Records from list_active_keyboard_layouts.

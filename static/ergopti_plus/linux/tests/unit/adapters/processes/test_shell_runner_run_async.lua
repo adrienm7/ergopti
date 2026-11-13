@@ -13,7 +13,7 @@
 --- 4. a cancelled run stops the group and answers nothing.
 --- ==============================================================================
 
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 local helpers = require("tests.helpers")
 
 --- A libuv double that records the child it starts.

@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers    = require("tests.helpers")
-local TomlCodec  = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
+local TomlCodec  = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
 
 local PATH = "/virtual/preferences_unowned/config.toml"
 

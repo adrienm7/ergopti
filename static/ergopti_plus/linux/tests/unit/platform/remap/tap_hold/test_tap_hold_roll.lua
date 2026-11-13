@@ -14,7 +14,7 @@
 
 local helpers = require("tests.helpers")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
 local EV_KEY = 1
 local DOWN, UP, REPEAT = 1, 0, 2
 local SPACE, LSHIFT, LCTRL, CAPS, ENTER = 57, 42, 29, 58, 28

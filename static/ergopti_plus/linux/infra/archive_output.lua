@@ -3,7 +3,7 @@
 --- Parent-only archive output. Children never receive the retained descriptor.
 --- A producer must provide actual stdout EOF and its physical settlement owner.
 --- This module does not authorize pathname reopening, publication or relay policy.
-local Identifiers = require("identifiers")
+local Identifiers = require("core.text.engine.identifiers")
 local Feeder = require("infra.archive_tar_feeder")
 local M = {}
 local retained_leases = {} -- Physical debt outlives dropped factories/callers.
@@ -1094,7 +1094,7 @@ local function native_artifact(basename, pinned)
   record.install, installs[work.token] = work, work -- Reserve before any native/source capability probe.
   local prepared, ready = pcall(function()
    if not capture_install then
-    local policy = require("updater.install_budget")
+    local policy = require("updater.engine.install_budget")
     capture_install, admit_install_budget = rawget(policy, "capture"), rawget(policy, "admit")
     install_deadline, retire_install = rawget(policy, "deadline"), rawget(policy, "retire")
     capture_listing = rawget(policy, "capture_listing")

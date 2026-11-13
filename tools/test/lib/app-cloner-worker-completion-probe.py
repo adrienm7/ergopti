@@ -294,7 +294,7 @@ def main():
     sources = [
         CONTENTS / "MacOS/AppCloner",
         CONTENTS / "Resources/ShortcutBuilder.applescript",
-        Path("static/ergopti_plus/_shared/data/locales/en.json"),
+        Path("static/ergopti_plus/_shared/core/i18n/data/locales/en.json"),
     ]
     hashes = {}
     for relative in sources:

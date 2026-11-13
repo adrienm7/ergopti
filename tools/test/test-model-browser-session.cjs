@@ -134,7 +134,7 @@ const lua = spawnSync('lua', ['-'], {
 	cwd: path.resolve(__dirname, '../../static/ergopti_plus/macos'),
 	encoding: 'utf8',
 	input: `
-package.path = './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;' .. package.path
+package.path = './?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;' .. package.path
 local helpers = require('tests.helpers')
 local bridge, created, calls, opened = nil, 0, 0, 0
 local payloads = {}

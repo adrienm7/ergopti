@@ -44,11 +44,11 @@
 ;                 "hand" => "left"|"right").
 ;
 ; Built from the shared key catalogue, the ``ahk`` column of [tap_hold.catalog]
-; in _shared/tap_hold/defaults.toml, in catalogue order. It was a hardcoded
+; in _shared/tap_hold/data/defaults.toml, in catalogue order. It was a hardcoded
 ; array here whose comment said it mirrored a menu-manifest
 ; ``tap_hold_keys_catalog`` that never existed, while the macOS and Linux trays
 ; kept lists of their own. Those read the same table through
-; _shared/lua/tap_hold/key_catalog.lua, and
+; _shared/tap_hold/engine/key_catalog.lua, and
 ; tools/test/test-tap-hold-key-catalog-single-source.cjs holds each column to
 ; the keys its engine arms.
 global _TH_KeyDefs := _TH_BuildKeyDefs()
@@ -61,7 +61,7 @@ global _TH_KeyDefs := _TH_BuildKeyDefs()
 _TH_BuildKeyDefs() {
 	global _SharedDir
 	Out := []
-	Path := _SharedDir . "\tap_hold\defaults.toml"
+	Path := _SharedDir . "\tap_hold\data\defaults.toml"
 	Sections := ParseTomlFile(Path)
 	Catalog := Sections.Has("tap_hold.catalog") ? Sections["tap_hold.catalog"] : Map()
 	Keys := Catalog.Has("keys") ? Catalog["keys"] : ""
@@ -90,12 +90,12 @@ _TH_BuildKeyDefs() {
 ; Each entry: Map("id" => storage_value, "kind" => "modifier"|"layer"|"none",
 ;                 "i18n" => label_i18n_key).
 ;
-; The ids come from _shared/tap_hold/defaults.toml's [tap_hold.hold_picker].
+; The ids come from _shared/tap_hold/data/defaults.toml's [tap_hold.hold_picker].
 ; They were a hardcoded array here until 2026-08-08, under a comment claiming it
-; "mirrors _shared/modules/menu/menu_manifest.json hold_options" — a key that has
+; "mirrors _shared/menu/data/menu_manifest.json hold_options" — a key that has
 ; never existed in that file. So the canonical list was a copy pointing at
 ; nothing, and the two Lua drivers offered no hold picker at all. They read the
-; same table now through _shared/lua/tap_hold/hold_options.lua, and
+; same table now through _shared/tap_hold/engine/hold_options.lua, and
 ; tools/test/test-tap-hold-hold-options-parity.cjs holds the two enumerations
 ; together.
 global _TH_HoldOptions := _TH_BuildHoldOptions()
@@ -107,7 +107,7 @@ global _TH_HoldOptions := _TH_BuildHoldOptions()
 _TH_ReadHoldPickerArray(FieldName) {
 	global _SharedDir
 	Out := []
-	Path := _SharedDir . "\tap_hold\defaults.toml"
+	Path := _SharedDir . "\tap_hold\data\defaults.toml"
 	Content := ""
 	try Content := ReadTomlFile(Path)
 	if (Content == "") {
@@ -300,7 +300,7 @@ IsTapHoldHoldActive(KeyId, HoldOpt) {
 ; combination's: every hold option in its order, except the "none" sentinel,
 ; which the picker draws as its own row. A hold is never a gesture action, so
 ; the slot lists these options rather than the action catalogue: they are what
-; a hold can be. _shared/lua/tap_hold/hold_options.lua's picker_items builds
+; a hold can be. _shared/tap_hold/engine/hold_options.lua's picker_items builds
 ; the same list for Linux from the same [tap_hold.hold_picker].
 ; @returns {Array} Objects { Type: "action", Id, Label }.
 TapHoldHoldPickerItems() {
@@ -582,7 +582,7 @@ _TH_BuildTapCandidate(KeyId, ActionId, Candidate) {
 
 ; A key another driver switched off (enabled = false in the shared file) is
 ; switched back on when the user chooses what it does here, as on macOS and
-; Linux (_shared/tap_hold/SCHEMA.md).
+; Linux (_shared/tap_hold/data/SCHEMA.md).
 _TH_RebindEnables(Entry) {
 	if Entry.Has("enabled")
 		Entry.Delete("enabled")
@@ -754,7 +754,7 @@ _TH_DurationLeafImage(Source, KeyId, Seconds) {
 	global _SharedDir
 	Section := "tap_hold.keys." . TOML_RenderKey(KeyId)
 	Rows := [{ Section: Section, Key: ConfigLeaf.TIME_ACTIVATION_SECONDS, Value: Seconds }]
-	Migrated := TapHoldMigrateSource(Source, _SharedDir . "\tap_hold\defaults.toml")
+	Migrated := TapHoldMigrateSource(Source, _SharedDir . "\tap_hold\data\defaults.toml")
 	Admitted := TOML_BuildConfigDocumentCandidate(Migrated, Rows, [])
 	if !(Admitted is Map) || !Admitted.Has("content") || !(Admitted["content"] is String)
 		throw ValueError("The semantic TOML owner refused the duration image")
@@ -990,7 +990,7 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 				Source := _TH_CaptureDurationSource(BoundPath)
 				if !(Source is Map)
 					throw Error("The tap-hold source cannot be captured.")
-				Defaults := _SharedDir . "\tap_hold\defaults.toml"
+				Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 				if Source["source_present"]
 					Candidate := LoadTapHoldToml(BoundPath, "", Source)
 				BeforeMutation := _TH_CloneData(Candidate)
@@ -1487,7 +1487,7 @@ TapHoldScopeApply(Mode, Options := unset) {
 		throw Error("Tap-hold scope requires initialized runtime state.")
 	CandidateOptions := IsSet(Options) ? Options.Clone() : Map()
 	Path := CandidateOptions.Get("tap_hold_path", _TH_TapHoldConfigPath())
-	Defaults := CandidateOptions.Get("tap_hold_defaults", _SharedDir . "\tap_hold\defaults.toml")
+	Defaults := CandidateOptions.Get("tap_hold_defaults", _SharedDir . "\tap_hold\data\defaults.toml")
 	CandidateOptions["preset_owner"] := TapHoldScopeOwner(Path, Defaults, Mode,
 		CandidateOptions.Get("layers_config_dir", ""))
 	return ConfigScopeApply(ConfigLeaf.TAP_HOLDS, Mode,
@@ -1802,14 +1802,14 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 ; ===============================================
 ; ===============================================
 
-; Reads Ergopti's recommended layer file (_shared/keymap/layers.recommended.toml):
+; Reads Ergopti's recommended layer file (_shared/layouts/data/layers.recommended.toml):
 ; its exact bytes and the one layer it binds, the layer a recommended key's
 ; hold_layer names.
 ; @param SharedDir string The _shared folder.
 ; @returns {Map} Map("text", String, "layer_id", String).
 ; Throws when the shipped file is missing, empty or does not bind one layer.
 TapHoldRecommendedLayer(SharedDir) {
-	Path := RTrim(SharedDir, "\/") . "\keymap\layers.recommended.toml"
+	Path := RTrim(SharedDir, "\/") . "\layouts\data\layers.recommended.toml"
 	Text := FSReadUtf8Exact(Path)
 	if !(Text is String) || Text == ""
 		throw Error("The recommended navigation layer '" . Path . "' cannot be read.")

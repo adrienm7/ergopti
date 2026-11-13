@@ -35,10 +35,12 @@ OWNER = load("ergopti_serve_image_owner", DRIVER / "platform/suspended_image_own
 ALIASES = load("ergopti_serve_alias_owner", DRIVER / "platform/source_alias_owner.py")
 BOOT = load("ergopti_serve_bootstrap_owner", DRIVER / "platform/ollama_bootstrap_owner.py")
 AUTHORITY = load("ergopti_serve_daemon_authority", DRIVER / "platform/ollama_daemon_authority.py")
-PROXY = load("ergopti_serve_proxy_policy", SHARED / "python/network_proxy_policy.py")
+PROXY = load(
+    "ergopti_serve_proxy_policy", SHARED / "core/network/adapters/python_network_proxy_policy.py"
+)
 NATIVE = load("ergopti_serve_native_helper", DRIVER / "platform/network/native_http.py")
 API = load("ergopti_serve_native_api", DRIVER / "platform/network/native_ollama_api.py")
-PULL = load("ergopti_serve_admission_owner", SHARED / "python/managed_ollama_pull.py")
+PULL = load("ergopti_serve_admission_owner", SHARED / "ai/adapters/python/managed_ollama_pull.py")
 
 
 class ServeRefusal(RuntimeError):
@@ -281,14 +283,14 @@ class ServeOwner:
         contract_bytes, catalogue_bytes, host, self.contract, self.asset = RUNTIME.inputs()
         catalogue = RUNTIME.POLICY.metadata_bytes(catalogue_bytes)
         expected_policy = catalogue["repository_source_sha256"].get(
-            "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json"
+            "static/ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json"
         )
         if expected_policy is None:
             raise ServeRefusal("source")
         # Capture exact inherited settings before any static system-proxy helper
         # can rewrite them. Custom stores remain raw, including relative paths.
         self.policy = BOOT.BootstrapPolicy(
-            SHARED / "modules/llm/managed_ollama_bootstrap.json",
+            SHARED / "ai/data/managed_ollama_bootstrap.json",
             PROXY.ProxyPolicy(),
             expected_contract_sha256=expected_policy,
         )
@@ -373,7 +375,7 @@ class ServeOwner:
                 "session_path": str(self.session.path),
                 "remaining_ms": max(1, math.floor((self.deadline - time.monotonic()) * 1000)),
                 "home": str(Path(os.environ["HOME"]).resolve(strict=True)),
-                "network_policy": str(SHARED / "modules/network/proxy_policy.json"),
+                "network_policy": str(SHARED / "core/network/data/proxy_policy.json"),
                 "host": "127.0.0.1:" + str(self.port),
                 **self.bootstrap.fields(),
             }

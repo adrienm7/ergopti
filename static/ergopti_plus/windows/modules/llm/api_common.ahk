@@ -8,7 +8,7 @@
 ; ``modules/llm/api_common.lua`` — same surface (get_diversity_temperature,
 ; get_retry_policy, insert_prediction,
 ; new_dedup_stats), same algorithm, and the same numeric tunables (loaded
-; from ``static/ergopti_plus/_shared/modules/llm/inference.json``).
+; from ``static/ergopti_plus/_shared/ai/data/inference.json``).
 ;
 ; FEATURES & RATIONALE:
 ; 1. Single source of truth for inference tunables: change a knob in
@@ -53,21 +53,21 @@ _LLM_Common_GetInference() {
 	if IsSet(_LLM_COMMON_INFERENCE)
 		return _LLM_COMMON_INFERENCE
 	; Canonical path next to defaults.json / models.json.
-	path := _SharedDir . "\modules\llm\inference.json"
+	path := _SharedDir . "\ai\data\inference.json"
 	if !FileExist(path) {
-		LoggerError("LLMCommon", "_shared/modules/llm/inference.json not found at '{1}' — LLM inference tunables cannot be loaded.", path)
-		throw Error("ergopti_plus: _shared/modules/llm/inference.json is required but was not found")
+		LoggerError("LLMCommon", "_shared/ai/data/inference.json not found at '{1}' — LLM inference tunables cannot be loaded.", path)
+		throw Error("ergopti_plus: _shared/ai/data/inference.json is required but was not found")
 	}
 	raw := FSRead(path)
 	if (raw == false) {
-		LoggerError("LLMCommon", "_shared/modules/llm/inference.json could not be read at '{1}'.", path)
-		throw Error("ergopti_plus: _shared/modules/llm/inference.json could not be read")
+		LoggerError("LLMCommon", "_shared/ai/data/inference.json could not be read at '{1}'.", path)
+		throw Error("ergopti_plus: _shared/ai/data/inference.json could not be read")
 	}
 	_LLM_COMMON_INFERENCE_RAW := raw
 	parsed := _LLM_Common_ParseInferenceJson(raw)
 	if (parsed.Count == 0) {
-		LoggerError("LLMCommon", "_shared/modules/llm/inference.json parsed to an empty table — malformed JSON.")
-		throw Error("ergopti_plus: _shared/modules/llm/inference.json is present but parsed empty")
+		LoggerError("LLMCommon", "_shared/ai/data/inference.json parsed to an empty table — malformed JSON.")
+		throw Error("ergopti_plus: _shared/ai/data/inference.json is present but parsed empty")
 	}
 	_LLM_COMMON_INFERENCE := parsed
 	return _LLM_COMMON_INFERENCE
@@ -154,7 +154,7 @@ _LLM_Common_Cfg(section, key) {
 	cfg := _LLM_Common_GetInference()
 	if (cfg.Has(section) and cfg[section].Has(key))
 		return cfg[section][key]
-	LoggerError("LLMCommon", "_shared/modules/llm/inference.json is missing tunable '{1}.{2}' — malformed or outdated JSON.", section, key)
+	LoggerError("LLMCommon", "_shared/ai/data/inference.json is missing tunable '{1}.{2}' — malformed or outdated JSON.", section, key)
 	throw Error("ergopti_plus: inference.json missing tunable " . section . "." . key)
 }
 
@@ -179,7 +179,7 @@ _LLM_Common_GetStringArray(section, key) {
 	global _LLM_COMMON_INFERENCE_RAW, _SharedDir
 	if !IsSet(_LLM_COMMON_INFERENCE_RAW) {
 		; Fallback path: raw not yet cached — read the file directly.
-		path := _SharedDir . "\modules\llm\inference.json"
+		path := _SharedDir . "\ai\data\inference.json"
 		raw := FSRead(path)
 		if (raw == false)
 			throw Error("ergopti_plus: inference.json unavailable for array extraction")
@@ -254,7 +254,7 @@ LLM_ApiCommon_GetRetryPolicy() {
 
 
 ; Statuses, local reasons and provider phrases of a refused credential. The
-; Lua twin is _shared/lua/llm/failure_class.lua; both replay
+; Lua twin is _shared/ai/engine/policy/failure_class.lua; both replay
 ; _shared/tests/corpus/llm/auth_failure_vectors.json.
 global LLM_AUTH_STATUSES := [401, 403]
 global LLM_AUTH_REASONS := ["no_credential", "missing_credential", "invalid_credential"]

@@ -4,7 +4,7 @@
 --- MODULE: macOS manifest SQL comes from the shared query catalogue
 --- DESCRIPTION:
 --- The manifest projection runs the named queries of
---- `_shared/data/db/queries.sql` in the in-process dialect, the statements the
+--- `_shared/metrics/data/db/queries.sql` in the in-process dialect, the statements the
 --- Windows and Linux readers run too. The reader must issue exactly those
 --- renderings, each once, so a statement retyped here cannot drift again
 --- (keystats SQL census, PAR-67). Their results are proven against a SQLite
@@ -38,7 +38,7 @@ local function manifest_statements(start_date, end_date)
 end
 
 helpers.describe("macOS manifest: SQL from the shared catalogue", function()
-	local Queries = require("keystats.queries")
+	local Queries = require("metrics.engine.queries")
 	for _, case in ipairs({
 		{ label = "unfiltered", where = "" },
 		{ label = "date-filtered", first = "2026-10-01", last = "2026-10-02",

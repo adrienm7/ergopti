@@ -5,14 +5,14 @@ local control = arg[3]
 assert(control == nil or control == 'legacy-global-column' or control == 'legacy-app-column',
 	'unknown raw projection contract control')
 package.path = root .. '/static/ergopti_plus/linux/?.lua;'
-	.. root .. '/static/ergopti_plus/_shared/lua/?.lua;'
-	.. root .. '/static/ergopti_plus/_shared/lua/?/init.lua;' .. package.path
-package.loaded['logger.shim'] = {
+	.. root .. '/static/ergopti_plus/_shared/?.lua;'
+	.. root .. '/static/ergopti_plus/_shared/?/init.lua;' .. package.path
+package.loaded['core.logger.engine.shim'] = {
 	debug = function() end, info = function() end,
 	warn = function(_, message) error(message) end,
 	error = function(_, message) error(message) end,
 }
-local json = require('json')
+local json = require('core.text.engine.json')
 local command = require('modules.keystats.sqlite_command')
 local reader = require('modules.keystats.sqlite_reader')
 local original_build, original_popen = command.build, io.popen

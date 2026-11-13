@@ -33,7 +33,7 @@ local hs = hs
 local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
 local OllamaBinary  = require("modules.llm.ollama_binary")
-local RuntimeChoice = require("core.llm.ollama_runtime_choice")
+local RuntimeChoice = require("core.lifecycle.engine.core.ollama_runtime_choice")
 
 local LOG = "menu_llm.runtime_offer"
 

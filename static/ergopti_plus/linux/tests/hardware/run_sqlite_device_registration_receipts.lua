@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 if arg[1] == "--owned-startup" then
 	local Keystats = require("modules.keystats.keystats")
 	Keystats.init({ sqlite_path = assert(arg[2]), log_dir = assert(arg[3]) })

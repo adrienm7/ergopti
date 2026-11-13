@@ -355,7 +355,7 @@ helpers.describe("window_info: Wayland", function()
 	for _, backend in ipairs({ "sway", "hyprland", "niri" }) do
 		helpers.it("(linux-focus-command-exit) rejects failed " .. backend .. " client output", function()
 			local executable = assert(arg and arg[-1], "the current interpreter must be identifiable")
-			local quote = require("text_utils").shell_quote
+			local quote = require("core.text.engine.utils_core").shell_quote
 			local fixture = helpers.driver_root() .. "/tests/hardware/run_wayland_query_exit.lua"
 			local status = os.execute(quote(executable) .. " " .. quote(fixture) .. " " .. quote(helpers.driver_root()) .. " " .. quote(backend))
 			helpers.assert_true(status == true or status == 0,
@@ -774,7 +774,7 @@ helpers.describe("window_info: X11 window list (linux-x11-window-list-app-ids)",
 	helpers.it("(linux-x11-window-list-app-ids) states once that wmctrl is missing", function()
 		local wi, log = under("x11", "xfce", {})
 		local warnings = {}
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local original = Logger.warn
 		Logger.warn = function(_, message) warnings[#warnings + 1] = message end
 		local first, second = wi.getAll(), wi.getAll()
@@ -795,7 +795,7 @@ helpers.describe("window_info: X11 window list (linux-x11-window-list-app-ids)",
 			{ "wmctrl -lp", { ok = false, output = "", error = "Cannot get client list properties." } },
 		})
 		local errors = {}
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local original = Logger.error
 		Logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 		local infos = wi.getAll()

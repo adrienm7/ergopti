@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 
 local Gate = helpers.load_module("modules.updater.signature_gate")
 local Signature = helpers.load_module("infra.asset_signature")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function read_json(relative)
 	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/" .. relative, "rb"))
@@ -26,7 +26,7 @@ local function read_json(relative)
 end
 
 local V = read_json("tests/corpus/updater/asset_signature_vectors.json")
-local SHIPPED = read_json("modules/updater/asset_signing.json")
+local SHIPPED = read_json("updater/data/asset_signing.json")
 
 local function policy(enforcement, key)
 	local copy = {}

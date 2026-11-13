@@ -110,7 +110,7 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 					} }
 				end,
 			}
-			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstring_engine").new()
+			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstrings.engine.matcher").new()
 			local changed = 0
 			assert(config._set_config_file_for_test(path))
 			assert(config.init(engine, directory, function() changed = changed + 1 end))
@@ -272,7 +272,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		local builder = helpers.load_module("ui.menu.builder")
 		local ctx = { config = config, _version = "9.9.9", paused = false, on_menu_changed = changed }
 		local key = kind == "global" and "menu.hotstrings.tooltip_default" or "menu.hotstrings.delay_magic_key"
-		local title = require("locale.label_value").compose(require("infra.i18n").get, require("infra.i18n").get(key), "")
+		local title = require("core.i18n.engine.label_value").compose(require("infra.i18n").get, require("infra.i18n").get(key), "")
 		local found
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do
@@ -402,7 +402,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 			local config = require("modules.hotstrings.hotstrings_config")
 			assert(config._set_config_file_for_test(config_path))
 			assert(config._set_override_config_dir_for_test(directory))
-			assert(config.init(require("hotstring_engine").new(), directory))
+			assert(config.init(require("hotstrings.engine.matcher").new(), directory))
 			config._set_categories_for_test({ magickey = { delay = 0.3 } })
 			body({ config = config, path = path, config_path = config_path, original = original, foreign = foreign,
 				config_original = config_original })
@@ -461,7 +461,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 					local retry, committed, _, retry_notices = observe(action, "900")
 					helpers.assert_true(retry);helpers.assert_eq(committed, true);helpers.assert_eq(changed, 1);helpers.assert_eq(#retry_notices, 0)
 					local disk = read(target)
-					local decoded = require("toml_codec").decode(disk)
+					local decoded = require("core.text.engine.toml_codec").decode(disk)
 					if kind == "global" then
 						helpers.assert_eq(decoded.hotstrings.expansion_delay, 0.9, "the base delay is the canonical leaf")
 						helpers.assert_eq(decoded.future.user, "kept", "unrelated canonical data is retained")
@@ -472,7 +472,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 						helpers.assert_eq(decoded.magickey.delay_offset, 0.5, "the delay is stored as an offset of the 0.4 s base")
 						helpers.assert_nil(decoded.magickey.delay, "the absolute spelling is never written")
 					end
-					assert(c.config.init(require("hotstring_engine").new(), c.path:match("^(.*)/")))
+					assert(c.config.init(require("hotstrings.engine.matcher").new(), c.path:match("^(.*)/")))
 					helpers.assert_eq(kind == "global" and c.config.get_base_delay() or c.config.resolve("magickey", nil).delay, 0.9,
 						"a real disk reload agrees with the acknowledged value")
 				end)
@@ -493,7 +493,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 					local disk = read(target)
 					helpers.assert_true(disk:find("# another owner changed the physical source", 1, true) ~= nil,
 						"the foreign edit is kept")
-					helpers.assert_eq(require("toml_codec").decode(disk).hotstrings.expansion_delay, 0.9)
+					helpers.assert_eq(require("core.text.engine.toml_codec").decode(disk).hotstrings.expansion_delay, 0.9)
 					return
 				end
 				helpers.assert_true(called);helpers.assert_eq(result, false);helpers.assert_eq(changed, 0)

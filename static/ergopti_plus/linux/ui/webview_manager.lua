@@ -26,8 +26,8 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local NativePath = require("native_path")
+local Logger = require("core.logger.engine.shim")
+local NativePath = require("core.fs.engine.native_path")
 local Monotonic = require("infra.monotonic")
 local DisplayServer = require("infra.display_server")
 local LOG = "ui.webview_manager"
@@ -37,13 +37,13 @@ local LOG = "ui.webview_manager"
 local UNFOCUSED_APPS = { error_dialog = true }
 
 -- The generated shared policy owns branding for every native host.
-local WindowTitles = require("window_titles")
+local WindowTitles = require("core.ui.engine.window_titles")
 
 -- These receipts prepare page content only; GTK keeps the app's generic caption.
 local ContextLookupOwner = rawget(WindowTitles, "presentation_for_app")
 local ContextComposeOwner = rawget(WindowTitles, "compose")
 local ContextKeyOwner = rawget(WindowTitles, "key_for_app")
-local ContextPresentation = require("webview.presentation")
+local ContextPresentation = require("core.ui.engine.webview.presentation")
 local ContextPrepareOwner = rawget(ContextPresentation, "prepare_contextual_title")
 local _contextual_title_receipts = setmetatable({}, { __mode = "k" })
 local ContextPrepareApi, ContextFieldsApi, ContextCurrentApi, ContextShowOwner, ContextCreateOwner, ContextWindowTitleOwner
@@ -60,7 +60,7 @@ function M.prepare_app_contextual_title(presentation_id, suffix, source_opts)
 		or rawget(source_opts, "title") ~= nil or rawget(source_opts, "label") ~= nil then return nil end
 	local Presentation = ContextPresentation
 	local I18n, Locale = require("infra.i18n"), require("infra.locale")
-	local Core = require("locale.core")
+	local Core = require("core.i18n.engine.core")
 	if type(I18n) ~= "table" or type(Locale) ~= "table" or type(Core) ~= "table" then return nil end
 	local prepare, translate = ContextPrepareOwner, rawget(I18n, "get")
 	local locale_get, locale_current = rawget(Locale, "get"), rawget(Locale, "current_locale")
@@ -71,11 +71,11 @@ function M.prepare_app_contextual_title(presentation_id, suffix, source_opts)
 			and rawget(source_opts, "presentation_suffix") == suffix
 			and rawget(source_opts, "title") == nil and rawget(source_opts, "label") == nil
 			and getmetatable(M) == nil and rawget(package.loaded, "ui.webview_manager") == M
-			and getmetatable(WindowTitles) == nil and rawget(package.loaded, "window_titles") == WindowTitles
-			and getmetatable(Presentation) == nil and rawget(package.loaded, "webview.presentation") == Presentation
+			and getmetatable(WindowTitles) == nil and rawget(package.loaded, "core.ui.engine.window_titles") == WindowTitles
+			and getmetatable(Presentation) == nil and rawget(package.loaded, "core.ui.engine.webview.presentation") == Presentation
 			and getmetatable(I18n) == nil and rawget(package.loaded, "infra.i18n") == I18n
 			and getmetatable(Locale) == nil and rawget(package.loaded, "infra.locale") == Locale
-			and getmetatable(Core) == nil and rawget(package.loaded, "locale.core") == Core
+			and getmetatable(Core) == nil and rawget(package.loaded, "core.i18n.engine.core") == Core
 			and rawget(WindowTitles, "presentation_for_app") == ContextLookupOwner
 			and rawget(WindowTitles, "compose") == ContextComposeOwner
 			and rawget(WindowTitles, "key_for_app") == ContextKeyOwner
@@ -131,8 +131,8 @@ local webkit_host = require("ui.webkit_host")
 -- This used dkjson, loaded optionally, which is neither shipped nor installed:
 -- every object a page posted became nil and no reply reached a page, so the
 -- metrics windows stayed empty and the editors' buttons did nothing.
-local Json = require("json")
-local ConfigKeys = require("config_keys")
+local Json = require("core.text.engine.json")
+local ConfigKeys = require("settings.engine.keys")
 
 
 -- =========================================
@@ -674,7 +674,7 @@ function M._gtk_window_active(app_name)
 end
 
 --- Toggles one page window for the shared `open_*` window actions
---- (_shared/modules/actions/actions.toml, group "UI"): closed opens and
+--- (_shared/shortcuts/data/actions/actions.toml, group "UI"): closed opens and
 --- focuses it, open but hidden or behind another window brings it to the
 --- front, open and frontmost closes it. The window pool is the only state read.
 --- @param app_name string The app name.
@@ -936,7 +936,7 @@ local function _send_response_to_js(webview, bridge_name, value, app_name, docum
 	-- Encode the value as JSON, then base64 to avoid any escaping hazards.
 	local json_str = Json.encode(value)
 	if not json_str then return end
-	local b64 = require("compat.base64")
+	local b64 = require("core.lifecycle.engine.compat.base64")
 	local encoded = b64 and b64.encode(json_str) or json_str:gsub("[^%w]", function(c)
 		return string.format("%%%02X", c:byte())
 	end)
@@ -1150,7 +1150,7 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 			attempt.document_entry = document_entry
 			_document_windows[app_name] = document_entry
 			local loaded, err = pcall(function()
-				local Lease = require("webview.document_lease")
+				local Lease = require("core.ui.engine.webview.document_lease")
 				local Deadline = require("infra.managed_http_deadline")
 				local Timings = require("infra.timings")
 				assert(Monotonic.has_hires(), "document admission requires an actual monotonic clock")

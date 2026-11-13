@@ -1,5 +1,5 @@
 # linux/_generated/shell_messages/hi.msg
-# AUTO-GENERATED from _shared/data/locales/hi.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/hi.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT नेटवर्किंग मॉड्यूल स्रोत से बनाया गया।
 build_luv.recipe_required=नेटिव luv बिल्ड को उसकी स्रोत रेसिपी चाहिए।

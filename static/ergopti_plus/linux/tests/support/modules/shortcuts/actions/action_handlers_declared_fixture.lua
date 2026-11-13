@@ -70,7 +70,7 @@ end
 --- @param configure function|nil Installs daemon handlers after native doubles.
 --- @return table unknown, table pressed Chords sent, by action id.
 local function run_every_action(Gestures, ids, configure)
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local saved = {
 		debug = Logger.debug, warn = Logger.warn,
 		emitter = package.loaded["modules.gestures.combo_emitter"],

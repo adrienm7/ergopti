@@ -182,7 +182,7 @@ helpers.describe("LLM semantic HTTP ownership", function()
 		configure_remote(api)
 		local state, restore = instrument_client(get_upvalue(api.list_active_models, "_listing_client"))
 		local ok, err = xpcall(function()
-			local plan = require("llm.api_model_listing").plan
+			local plan = require("ai.engine.api.model_listing").plan
 			local view = { model = "new-model", default_model = "fallback", extras = {}, format = "openai" }
 			local calls, reason = 0, nil
 			api.list_active_models(function(_, why)

@@ -8,9 +8,9 @@ _NativeIpv6RelayUpstream_Controls() {
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
 				_DriverDir . "\tests\fixtures\native_relay_hop_branches.ps1", "-Ipv6Upstream",
 				"-RoutesPath", _VendorDir . "\ergopti_network_routes.ps1",
-				"-PolicyPath", _SharedDir . "\modules\network\proxy_policy.json",
+				"-PolicyPath", _SharedDir . "\core\network\data\proxy_policy.json",
 				"-TransportPath", _VendorDir . "\ergopti_winhttp_transport.ps1",
-				"-UpdaterDefaultsPath", _SharedDir . "\modules\updater\defaults.json"],
+				"-UpdaterDefaultsPath", _SharedDir . "\updater\data\defaults.json"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 16384)
 		AssertTrue(Handle.start(), "The private IPv6 upstream fixture must start")
 		Started := A_TickCount

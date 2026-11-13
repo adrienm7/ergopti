@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 local MetricsState = require("infra.metrics_state_keys")
 local Fixture = require("tests.support.shortcuts_scope_fixture")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 helpers.describe("terminal macOS shortcut scopes", function()
 	helpers.it("keeps raw physical claims through an unrelated script scope without synthesizing defaults", function()
@@ -441,7 +441,7 @@ helpers.describe("macOS ordinary obsolete shortcut parent policy", function()
 	end)
 end)
 
-require("test.config_obsolete_parents_contract").register(helpers)
+require("tests.lua.settings.obsolete_parents_contract").register(helpers)
 
 helpers.describe("shortcut fixture final script publication admission", function()
 	helpers.it("refuses a withdrawn genuine accessor and retries with the original native owner", function()

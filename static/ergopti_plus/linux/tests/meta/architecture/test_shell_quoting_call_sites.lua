@@ -77,7 +77,7 @@ end
 
 helpers.describe("shell quoting at the call sites", function()
 
-	helpers.describe("crypto.sha256()", function()
+	helpers.describe("core.crypto.engine.sha256()", function()
 		helpers.it("quotes the data it pipes into openssl", function()
 			-- Exercise the retained CLI branch explicitly; native hashing has no argv.
 			local previous_provider = package.loaded["infra.openssl_digest"]
@@ -88,7 +88,7 @@ helpers.describe("shell quoting at the call sites", function()
 			package.loaded["infra.openssl_digest"] = previous_provider
 			package.loaded["adapters.crypto"] = previous_crypto
 			if not ok then error(cmds, 0) end
-			assert_posix_quoted(find_command(cmds, "openssl"), "crypto.sha256")
+			assert_posix_quoted(find_command(cmds, "openssl"), "core.crypto.engine.sha256")
 		end)
 	end)
 

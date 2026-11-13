@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Layout Registry Store Tests (macOS)
 --- DESCRIPTION:
---- Pins the shared store (_shared/lua/layouts/registry_store.lua) both layout
+--- Pins the shared store (_shared/layouts/engine/registry/store.lua) both layout
 --- registry clients build: the installed record round trip, the shipped index
 --- read once, the parent-folder step failing loudly, and a refresh whose
 --- result arrives after the owner's lifetime ended being dropped without
@@ -11,8 +11,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local RegistryStore = require("layouts.registry_store")
+local Json = require("core.text.engine.json")
+local RegistryStore = require("layouts.engine.registry.store")
 
 local function silent_logger()
 	local seen = { warn = {}, error = {} }
@@ -157,5 +157,5 @@ helpers.describe("layout registry store (macos)", function()
 	end)
 end)
 
-require("test.layout_catalogue_source_contract")(helpers, RegistryStore, require("layouts.catalogue"), Json,
+require("tests.lua.layouts.catalogue_source_contract")(helpers, RegistryStore, require("layouts.engine.composer.catalogue"), Json,
 	assert(require("modules.keymap.layout_registry").settings()))

@@ -20,7 +20,7 @@ helpers.describe("personal editor literal brace payload", function()
 			helpers.assert_true(f.ready())
 			local output = "x {a&b} {x<😀} {foo}"
 			helpers.assert_true(f.save(output).saved)
-			local decoded = assert(require("toml_codec").decode(f.read()))
+			local decoded = assert(require("core.text.engine.toml_codec").decode(f.read()))
 			helpers.assert_eq(decoded.english.old.output, output)
 		end)
 	end)
@@ -33,7 +33,7 @@ helpers.describe("personal hotstrings editor while paused", function()
 			f.state.is_paused = function() return true end
 			helpers.assert_true(f.ready())
 			helpers.assert_true(f.save("written while paused").saved)
-			local decoded = assert(require("toml_codec").decode(f.read()))
+			local decoded = assert(require("core.text.engine.toml_codec").decode(f.read()))
 			helpers.assert_eq(decoded.english.old.output, "written while paused")
 		end)
 	end)
@@ -45,7 +45,7 @@ helpers.describe("personal editor row origins", function()
 			f.put('[_meta]\nsections_order = ["english", "second"]\n[english]\n"café" = { output = "résumé", future = "keep", priority = 73, is_case_sensitive = true, is_case_sensitive_strict = true } # retained\n[second]\n')
 			helpers.assert_true(f.ready())
 			local script = f.seen.deliveries[1]
-			local opening = require("json").decode(assert(script:match("window.initData%((.*)%)")))
+			local opening = require("core.text.engine.json").decode(assert(script:match("window.initData%((.*)%)")))
 			local row = opening.sections[1].entries[1]
 			row.trigger, row.output = "été", "changed"
 			local data = { sections_order = { "english", "second" }, sections = {
@@ -53,7 +53,7 @@ helpers.describe("personal editor row origins", function()
 				second = { description = "second", entries = { row } },
 			} }
 			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
-			local parsed = assert(require("toml_codec").decode(f.read()))
+			local parsed = assert(require("core.text.engine.toml_codec").decode(f.read()))
 			helpers.assert_eq(parsed.second["été"].future, "keep")
 			helpers.assert_eq(parsed.second["été"].output, "changed")
 			helpers.assert_eq(parsed.second["été"].priority, 73)
@@ -61,14 +61,14 @@ helpers.describe("personal editor row origins", function()
 			helpers.assert_eq(select(2, f.read():gsub("# retained", "")), 1)
 			row.trigger, row.output = "été2", "again"
 			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
-			parsed = assert(require("toml_codec").decode(f.read()))
+			parsed = assert(require("core.text.engine.toml_codec").decode(f.read()))
 			helpers.assert_eq(parsed.second["été2"].future, "keep")
 			helpers.assert_eq(parsed.second["été2"].output, "again")
 			data.sections_order = { "english", "second", "third" }
 			data.sections.second.entries = {}
 			data.sections.third = { description = "third", entries = { row } }
 			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
-			parsed = assert(require("toml_codec").decode(f.read()))
+			parsed = assert(require("core.text.engine.toml_codec").decode(f.read()))
 			local third = parsed.third[1] or parsed.third
 			helpers.assert_eq(third["été2"].future, "keep")
 			helpers.assert_eq(select(2, f.read():gsub("# retained", "")), 1)
@@ -82,7 +82,7 @@ helpers.describe("personal editor row origins", function()
 				is_case_sensitive = false, final_result = false, is_case_sensitive_strict = false }
 			local data = { sections_order = { "english" }, sections = { english = { description = "english", entries = { row } } } }
 			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
-			local parsed = assert(require("toml_codec").decode(f.read()))
+			local parsed = assert(require("core.text.engine.toml_codec").decode(f.read()))
 			helpers.assert_nil(parsed.english.old.future)
 			helpers.assert_eq(parsed.english.old.output, "new")
 		end)
@@ -90,7 +90,7 @@ helpers.describe("personal editor row origins", function()
 	helpers.it("refuses duplicated or unrecognized snapshot identities", function()
 		with_opening_file(function(f)
 			helpers.assert_true(f.ready())
-			local opening = require("json").decode(assert(f.seen.deliveries[1]:match("window.initData%((.*)%)")))
+			local opening = require("core.text.engine.json").decode(assert(f.seen.deliveries[1]:match("window.initData%((.*)%)")))
 			local row = opening.sections[1].entries[1]
 			local second = {}; for key, value in pairs(row) do second[key] = value end
 			second.trigger = "different"
@@ -107,14 +107,14 @@ helpers.describe("personal editor row origins", function()
 		with_opening_file(function(f)
 			f.put('[_meta]\nsections_order = ["english"]\n[english]\n"old" = { output = "a", future = "retained" }\n')
 			helpers.assert_true(f.ready())
-			local opening = require("json").decode(assert(f.seen.deliveries[1]:match("window.initData%((.*)%)")))
+			local opening = require("core.text.engine.json").decode(assert(f.seen.deliveries[1]:match("window.initData%((.*)%)")))
 			local row = opening.sections[1].entries[1]; row.trigger = "renamed"
 			local data = { sections_order = { "english" }, sections = { english = { description = "english", entries = { row } } } }
 			local write = f.publisher.write; f.publisher.write = function() return false, "refused" end
 			helpers.assert_eq(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved, false)
 			f.publisher.write = write
 			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
-			local parsed = assert(require("toml_codec").decode(f.read()))
+			local parsed = assert(require("core.text.engine.toml_codec").decode(f.read()))
 			helpers.assert_eq(parsed.english.renamed.future, "retained")
 		end)
 	end)
@@ -123,14 +123,14 @@ helpers.describe("personal editor row origins", function()
 		with_opening_file(function(f)
 			f.put('[_meta]\nsections_order = ["english", "second"]\n[english]\n"same" = { output = "one", future = "first" }\n[second]\n"same" = { output = "two", future = "second" }\n')
 			helpers.assert_true(f.ready())
-			local opening = require("json").decode(assert(f.seen.deliveries[1]:match("window.initData%((.*)%)")))
+			local opening = require("core.text.engine.json").decode(assert(f.seen.deliveries[1]:match("window.initData%((.*)%)")))
 			local first, second = opening.sections[1].entries[1], opening.sections[2].entries[1]
 			local data = { sections_order = { "english", "second" }, sections = {
 				english = { description = "english", entries = { second } },
 				second = { description = "second", entries = { first } },
 			} }
 			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
-			local parsed = assert(require("toml_codec").decode(f.read()))
+			local parsed = assert(require("core.text.engine.toml_codec").decode(f.read()))
 			helpers.assert_eq(parsed.english.same.future, "second")
 			helpers.assert_eq(parsed.second.same.future, "first")
 		end)

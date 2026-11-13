@@ -34,7 +34,7 @@ local NBSP = "\194\160"
 local NNBSP = "\226\128\175"
 
 local function utils()
-	return helpers.load_with_stubs("keymap.utils", {})
+	return helpers.load_with_stubs("layouts.engine.utils", {})
 end
 
 

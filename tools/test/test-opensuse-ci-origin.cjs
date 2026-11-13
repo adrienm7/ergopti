@@ -311,7 +311,7 @@ try {
 		'static/ergopti_plus/linux/install.sh',
 		'static/ergopti_plus/linux/native/archive_output/archive_publication.c',
 		'static/ergopti_plus/linux/native/archive_output/archive_publication.h',
-		'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+		'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
 		'static/layouts/registry/index.json',
 		'package.json',
 		helperRelative

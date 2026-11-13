@@ -4,7 +4,7 @@
 ; MODULE: App Category Store Codec
 ; DESCRIPTION:
 ; Reads and writes the document macOS and Linux share through
-; _shared/lua/keystats/app_category_store.lua: { schema, version, apps } holding
+; _shared/metrics/engine/apps/category_store.lua: { schema, version, apps } holding
 ; one { type, score } record per application, or the flat map of records it upgrades.
 ; A flat string entry is refused (see KLAppCatFlatFormError), and a member the
 ; codec does not know is dropped at the next save, as the shared codec does.

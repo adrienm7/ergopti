@@ -17,7 +17,7 @@ helpers.describe("typing metrics cache reset", function()
 			local ok, err = xpcall(function()
 				local removals = 0
 				os.remove = function() removals = removals + 1; return true end
-				local json = require("json")
+				local json = require("core.text.engine.json")
 				package.loaded["hs.json"].encode = json.encode
 				package.loaded["hs.json"].decode = json.decode
 				local source_reads = 0

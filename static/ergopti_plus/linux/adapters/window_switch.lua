@@ -2,9 +2,9 @@
 
 --- Scoped X11 window operations retain exact native retirement ownership.
 local M = {}
-local Worker = require("native_worker_owner")
+local Worker = require("core.lifecycle.engine.native_worker_owner")
 local Runner = require("adapters.program_runner")
-local Policy = require("cursor_window_policy")
+local Policy = require("core.ui.engine.cursor_window_policy")
 local Display = require("infra.display_server")
 local Shell = require("adapters.shell_runner")
 local Paths = require("infra.paths")

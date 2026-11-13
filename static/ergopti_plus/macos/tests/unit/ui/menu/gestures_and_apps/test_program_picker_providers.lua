@@ -2,7 +2,7 @@
 
 --- Drives actual menu providers and helpers with independent persistence receipts.
 local helpers = require("tests.helpers")
-local ProgramParameter = require("program_parameter")
+local ProgramParameter = require("settings.engine.program_parameter")
 local SCALAR = '{"version":1,"executable":"/private/tool","arguments":["two words",""]}'
 
 local function with_provider(kind, options, body)

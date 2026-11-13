@@ -19,7 +19,7 @@ local SOURCE = '[owner]\ncount = 1_000\nnames = ["a", "b"]\nnested = { list = []
 --- @param callback function Work to observe.
 --- @return number parses Key-path parses performed by the callback.
 local function count_key_parses(callback)
-	local KeyPath = require("toml_codec.key_path")
+	local KeyPath = require("core.text.engine.toml_codec.key_path")
 	local original = KeyPath.parse
 	local parses = 0
 	KeyPath.parse = function(...)
@@ -34,7 +34,7 @@ end
 
 helpers.describe("TOML codec decode memo", function()
 	helpers.it("does not parse a text it decoded a moment ago", function()
-		local Codec = require("toml_codec.codec")
+		local Codec = require("core.text.engine.toml_codec.codec")
 		local text = SOURCE .. "# memo probe " .. tostring(os.clock()) .. "\n"
 		helpers.assert_true(count_key_parses(function() Codec.decode_with_shapes(text) end) > 0,
 			"the first decode of a text must parse it")
@@ -43,7 +43,7 @@ helpers.describe("TOML codec decode memo", function()
 	end)
 
 	helpers.it("hands every caller an independent document bound to its own receipts", function()
-		local Codec = require("toml_codec.codec")
+		local Codec = require("core.text.engine.toml_codec.codec")
 		local first, first_shapes = Codec.decode_with_shapes(SOURCE)
 		first.owner.names[1] = "mutated"
 		first.owner.count = 7
@@ -61,7 +61,7 @@ helpers.describe("TOML codec decode memo", function()
 	end)
 
 	helpers.it("keeps refusing a malformed text and still decodes texts evicted from the memo", function()
-		local Codec = require("toml_codec.codec")
+		local Codec = require("core.text.engine.toml_codec.codec")
 		for _ = 1, 2 do
 			local document, shapes = Codec.decode_with_shapes("[owner]\nvalue = 1\nvalue = 2\n")
 			helpers.assert_nil(document)

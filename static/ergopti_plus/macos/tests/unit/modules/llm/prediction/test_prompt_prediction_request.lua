@@ -18,8 +18,8 @@
 
 local helpers = require("tests.helpers")
 local Pipeline = require("tests.support.prediction_pipeline")
-local Selector = require("llm.profile_selector")
-local Rewrite = require("llm.rewrite")
+local Selector = require("ai.engine.settings.profile_selector")
+local Rewrite = require("ai.engine.prediction.rewrite")
 
 --- Returns the shipped built-in profile with an id, labelled for the info bar.
 --- @param id string
@@ -221,9 +221,9 @@ end)
 
 helpers.it("runs a per-binding free language through the current sentence pipeline", function()
 	local fixture = load_fixture({ buffer = "Bonjour Marc. On se voit demain ?" })
-	local Json = require("json")
-	local config_file = assert(io.open(helpers.shared("modules/llm/translate.json"), "r"))
-	local names_file = assert(io.open(helpers.shared("data/locale_names.json"), "r"))
+	local Json = require("core.text.engine.json")
+	local config_file = assert(io.open(helpers.shared("ai/data/translate.json"), "r"))
+	local names_file = assert(io.open(helpers.shared("core/i18n/data/locale_names.json"), "r"))
 	local config = assert(Json.decode(config_file:read("*a"))); config_file:close()
 	local names = assert(Json.decode(names_file:read("*a"))); names_file:close()
 	local previous = package.loaded["modules.llm.selection_translation"]

@@ -7,7 +7,7 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 helpers.describe("i18n persistence", function()
 
@@ -45,7 +45,7 @@ helpers.describe("i18n persistence", function()
         return { read = function() return '{"order":["fr","en"]}' end, close = function() return nil, "close failed" end }
       end
       directory.entries = function() return { { name = "fr.json", kind = "file" }, { name = "en.json", kind = "file" } } end
-      paths.shared = function(name) if name == "data" or name == "data/locales" then return "/synthetic" end; return original_shared(name) end
+      paths.shared = function(name) if name == "data" or name == "core/i18n/data/locales" then return "/synthetic" end; return original_shared(name) end
       local ok, err = pcall(function()
         local i18n = helpers.load_module("infra.i18n")
         helpers.assert_eq(i18n.list_locales(), { "en", "fr" })
@@ -57,7 +57,7 @@ helpers.describe("i18n persistence", function()
       local shell = require("adapters.shell_runner")
       helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
         "native locale catalog receipts require Python and LuaJIT")
-      local quote = require("text_utils").shell_quote
+      local quote = require("core.text.engine.utils_core").shell_quote
       local runtime = assert(shell.exec_line("command -v luajit"))
       local root = helpers.driver_root()
       local fixture = root .. "/tests/hardware/test_i18n_catalog.py"
@@ -322,7 +322,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local fh = assert(io.open(path, "wb"))
 		assert(fh:write(seed)); assert(fh:close())
 		local original_rename = os.rename
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local original_level = logger.get_level()
 		local attempts = 0
 		local observations = nil
@@ -378,7 +378,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 			local before = dialog.is_enabled()
 			local accepted = dialog.set_enabled(false)
 			return { accepted = accepted, before = before, active = dialog.is_enabled(),
-				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path))["script.show_error_dialog"] }
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.show_error_dialog"] }
 		end)
 		helpers.assert_eq(observed, { accepted = false, before = true, active = true, config = initial })
 	end)
@@ -427,7 +427,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 			local dialog = require("ui.error_dialog.bridge")
 			local accepted = dialog.set_enabled(false)
 			return { accepted = accepted, active = dialog.is_enabled(),
-				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path))["script.show_error_dialog"] }
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.show_error_dialog"] }
 		end)
 		helpers.assert_eq(observed, { accepted = true, active = false, config = '[script]\nshow_error_dialog = false\n', stored = false })
 	end)
@@ -439,7 +439,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 			local before = settings.current()
 			local accepted = settings.set("ERROR")
 			return { accepted = accepted, before = before, active = settings.current(),
-				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path))["script.log_level"] }
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.log_level"] }
 		end)
 		helpers.assert_eq(observed, { accepted = false, before = "INFO", active = "INFO", config = initial })
 	end)
@@ -473,7 +473,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 			local settings = require("infra.script_settings")
 			local accepted = settings.set("ERROR")
 			return { accepted = accepted, active = settings.current(),
-				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path))["script.log_level"] }
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.log_level"] }
 		end)
 		helpers.assert_eq(observed, { accepted = true, active = "ERROR", config = '[script]\nlog_level = "ERROR"\n', stored = "ERROR" })
 	end)
@@ -492,7 +492,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local observed = with_owned_store({ config = initial }, function(i18n, path)
 			local accepted = i18n.persist_locale("en")
 			return { accepted = accepted, active = i18n.get_locale(),
-				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path)).locale }
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path)).locale }
 		end)
 		helpers.assert_eq(observed, { accepted = true, active = "en", config = '[script]\nlocale = "en"\n', stored = "en" })
 	end)
@@ -567,7 +567,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 			local observed, attempts = with_owned_store({}, function(i18n, path)
 				local accepted = i18n.persist_locale(code)
 				return { accepted = accepted, locale = i18n.get_locale(),
-					stored = require("json").decode(read(path)) }
+					stored = require("core.text.engine.json").decode(read(path)) }
 			end)
 			helpers.assert_true(observed.accepted)
 			helpers.assert_eq(observed.locale, code)

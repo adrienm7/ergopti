@@ -4,7 +4,7 @@
 ; MODULE: Quit Admission (Windows)
 ; DESCRIPTION:
 ; The decision of what the tray's Quit does, port of
-; _shared/lua/quit_admission.lua. The user asked to quit, so Quit wins: it is
+; _shared/core/lifecycle/engine/shutdown/quit_admission.lua. The user asked to quit, so Quit wins: it is
 ; refused only when it cannot mean anything, and otherwise it waits for a
 ; configuration write that is already running and then proceeds.
 ;

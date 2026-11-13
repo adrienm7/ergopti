@@ -42,7 +42,7 @@ local LOG = "menu_llm.mlx"
 -- api_mlx is the MLX backend's core module — if it cannot load, MLX predictions
 -- are dead anyway, so failing fast is correct.
 local ApiMlx = require("modules.llm.api_mlx")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 
 

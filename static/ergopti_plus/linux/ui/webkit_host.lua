@@ -20,7 +20,7 @@ local M = {}
 -- it before the driver's own package.path is set, and a missing logger must cost
 -- a diagnostic rather than the whole webview layer.
 local Logger
-local ok_logger, logger_mod = pcall(require, "logger.shim")
+local ok_logger, logger_mod = pcall(require, "core.logger.engine.shim")
 if ok_logger and type(logger_mod) == "table" then
 	Logger = logger_mod
 else
@@ -128,12 +128,12 @@ end
 
 --- Resolves the locale data directory for i18n.
 --- @param driver_root string Absolute path to the linux driver root.
---- @return string Absolute path to _shared/data/locales/, or empty string.
+--- @return string Absolute path to _shared/core/i18n/data/locales/, or empty string.
 function M.resolve_locales_dir(driver_root)
 	driver_root = driver_root or "."
 	local candidates = {
-		driver_root .. "/../_shared/data/locales",
-		driver_root .. "/../../_shared/data/locales",
+		driver_root .. "/../_shared/core/i18n/data/locales",
+		driver_root .. "/../../_shared/core/i18n/data/locales",
 	}
 	for _, p in ipairs(candidates) do
 		if regular_file_exists(p .. "/fr.json") then
@@ -226,7 +226,7 @@ function M.build_injected_html(assets_dir, html_name)
 		end
 		local href = attrs:match('href%s*=%s*"([^"]+)"')
 			or attrs:match("href%s*=%s*'([^']+)'")
-		if not href then return reject_asset("Stylesheet", require("text_utils").trim(attrs)) end
+		if not href then return reject_asset("Stylesheet", require("core.text.engine.utils_core").trim(attrs)) end
 		if is_remote(href) then return reject_asset("Stylesheet", href) end
 		local css = read_file(assets_dir .. "/" .. strip_asset_query(href))
 		if css == "" then return reject_asset("Stylesheet", href) end
@@ -259,7 +259,7 @@ end
 ---
 --- Inline script/style remain temporarily necessary because the host builds one
 --- self-contained document. Remote execution and connections are denied. The
---- policy itself is shared with macOS (_shared/lua/webview/document_csp.lua);
+--- policy itself is shared with macOS (_shared/core/ui/engine/webview/document_csp.lua);
 --- the separate CSP hardening finding owns migration away from unsafe-inline.
 --- @param html string
 --- @param app_name string|nil Shared UI application name.
@@ -272,7 +272,7 @@ function M.native_nonce()
 	local read, random = pcall(handle.read, handle, 18)
 	local closed, close_ack = pcall(handle.close, handle)
 	if not read or type(random) ~= "string" or #random ~= 18 or not closed or close_ack ~= true then return nil end
-	local ok, Base64 = pcall(require, "compat.base64")
+	local ok, Base64 = pcall(require, "core.lifecycle.engine.compat.base64")
 	if not ok or type(Base64.encode) ~= "function" then return nil end
 	local encoded, nonce = pcall(Base64.encode, random)
 	return encoded and type(nonce) == "string" and #nonce == 24 and nonce or nil
@@ -291,8 +291,8 @@ function M.inject_no_remote_csp(html, app_name)
 			return "<html><body><h1>Build error: CSP nonce unavailable</h1></body></html>"
 		end
 	end
-	-- Required here: tooling loads this module before _shared/lua is on the path.
-	local DocumentCsp = require("webview.document_csp")
+	-- Required here: tooling loads this module before _shared is on the path.
+	local DocumentCsp = require("core.ui.engine.webview.document_csp")
 	local secured, csp_err = DocumentCsp.apply(html, nonce)
 	if not secured then
 		Logger.error(LOG, "Cannot secure the generated document: %s.", tostring(csp_err))
@@ -323,8 +323,8 @@ function M.build_i18n_boot_script(locales_dir, active_locale, strings)
 	local seed = ""
 	if strings ~= nil then
 		-- Required here, like the CSP module: tooling loads this module before
-		-- _shared/lua is on the path, and never seeds strings
-		local statement, seed_err = require("webview.i18n_seed").statement(strings)
+		-- _shared is on the path, and never seeds strings
+		local statement, seed_err = require("core.ui.engine.webview.i18n_seed").statement(strings)
 		if statement then
 			seed = statement
 		else
@@ -338,10 +338,10 @@ function M.build_i18n_boot_script(locales_dir, active_locale, strings)
 	if base ~= "" then
 		if not base:match("^/") then base = "/" .. base end
 		if not base:match("/$") then base = base .. "/" end
-		base = "file://" .. require("text_utils").percent_encode(base):gsub("%%2F", "/")
+		base = "file://" .. require("core.text.engine.utils_core").percent_encode(base):gsub("%%2F", "/")
 	end
 
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	return string.format(
 		'<script>window.__i18n_base=%s;window._i18n_locale=%s;%s</script>',
 		Json.encode(base):gsub("<", "\\u003c"), Json.encode(active_locale):gsub("<", "\\u003c"), seed

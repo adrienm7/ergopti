@@ -26,15 +26,15 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 		package.cpath = ""
 		package.loaded.luv = setmetatable({}, { __index = function() return blocked end })
 		package.loaded.ffi, package.preload.ffi = nil, blocked
-		for _, name in ipairs({ "logger", "logger.shim", "infra.monotonic", "infra.display_server", "adapters.shell_runner", "adapters.clipboard" }) do
+		for _, name in ipairs({ "core.logger.engine", "core.logger.engine.shim", "infra.monotonic", "infra.display_server", "adapters.shell_runner", "adapters.clipboard" }) do
 			package.loaded[name] = nil
 		end
-		logger = require("logger")
+		logger = require("core.logger.engine")
 		logger.timestamp_fn = function() return "2000-01-01 00:00:00:000" end
 		local tick = 0
 		logger.clock_fn = function() tick = tick + 10; return tick end
 		logger.set_level("debug")
-		assert(require("logger.shim") == logger)
+		assert(require("core.logger.engine.shim") == logger)
 		local logs = {}
 		logger.set_sink(function(line) logs[#logs + 1] = line end)
 		local display = require("infra.display_server")

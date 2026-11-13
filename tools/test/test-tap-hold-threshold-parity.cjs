@@ -7,7 +7,7 @@
  * The tap-vs-hold delay decides how long a key must be held before the hold
  * action fires instead of the tap. All three drivers share ONE model (PAR-15):
  *   - NO key ships a delay of its own: `[tap_hold.keys.*]` in
- *     _shared/tap_hold/defaults.toml declares none;
+ *     _shared/tap_hold/data/defaults.toml declares none;
  *   - every key follows the GLOBAL delay, whose default is one declaration, the
  *     timing registry's tap_hold.default_activation_ms;
  *   - the user can change the global delay, or give one key its own delay; a
@@ -39,8 +39,8 @@ const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const APP = path.join(ROOT, 'static', 'ergopti_plus');
-const DEFAULTS = path.join(APP, '_shared', 'tap_hold', 'defaults.toml');
-const REGISTRY = path.join(APP, '_shared', 'modules', 'timings', 'constants.toml');
+const DEFAULTS = path.join(APP, '_shared', 'tap_hold', 'data', 'defaults.toml');
+const REGISTRY = path.join(APP, '_shared', 'core', 'timing', 'data', 'constants.toml');
 const read = (...parts) => readSourceFile(path.join(APP, ...parts));
 
 const errors = [];
@@ -194,7 +194,7 @@ if (!retiredBlock) {
 // move an overridden key, moves a key without one, a reset follows the global
 // again); this only pins that each driver offers the three rows.
 
-const MENU = read('_shared', 'modules', 'menu', 'menu_manifest.json');
+const MENU = read('_shared', 'menu', 'data', 'menu_manifest.json');
 for (const id of ['tap_hold_global_delay', 'tap_hold_key_delay', 'tap_hold_key_delay_use_global']) {
 	if (!MENU.includes(`"${id}"`)) errors.push(`the tap-hold menu manifest declares no '${id}' row.`);
 }

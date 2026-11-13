@@ -265,7 +265,9 @@ class PublicationAdmission(unittest.TestCase):
     def _assert_independent_publication_fixture_fingerprint_admission(self):
         # The reviewed handwritten fixture is the oracle; the live producer
         # contract is the input checked against it, never a generated inventory.
-        added = "static/ergopti_plus/_shared/go/native_http/failure_stage_test.go"
+        added = (
+            "static/ergopti_plus/_shared/core/network/native/go/native_http/failure_stage_test.go"
+        )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repository, assets = root / "repository", root / "assets"

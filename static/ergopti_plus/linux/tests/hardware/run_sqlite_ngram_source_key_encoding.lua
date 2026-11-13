@@ -7,8 +7,8 @@
 
 --- Native public supplied-software source label encoding regression.
 local uv = require("luv")
-require("compat.utf8").install()
-local Json = require("json")
+require("core.lifecycle.engine.compat.utf8").install()
+local Json = require("core.text.engine.json")
 local root = assert(os.getenv("OWN_SOURCE_ESCAPE_ROOT"))
 assert(uv.fs_mkdir(root, 448))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do

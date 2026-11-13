@@ -14,7 +14,7 @@ local it = helpers.it
 
 local Network = require("modules.keystats.network_metrics")
 
-require("test.network_transitions_contract").register(helpers)
+require("tests.lua.core.network_transitions_contract").register(helpers)
 
 --- A sampler over scripted probes; returns it, the recorded rows and the controls.
 local function scripted()
