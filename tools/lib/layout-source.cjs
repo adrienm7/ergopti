@@ -55,6 +55,7 @@ function loadLayoutSource() {
 		'source_model.js',
 		'source_compiler.js',
 		'source_emulation.js',
+		'target_compiler.js',
 		'target_export.js'
 	]) {
 		const filename = path.join(shared('ui', 'layout_composer'), file);
@@ -65,12 +66,14 @@ function loadLayoutSource() {
 	const composer = vm.runInContext('LayoutComposer', context);
 	const emulation = vm.runInContext('LayoutSourceEmulation', context);
 	const targetExport = vm.runInContext('LayoutTargetExport', context);
+	const targetCompiler = vm.runInContext('LayoutTargetCompiler', context);
 	const tables = keyTables();
 	return {
 		...model,
 		composer,
 		emulation,
 		targetExport,
+		targetCompiler,
 		tables,
 		read: (text) => model.read(text, codec),
 		write: (source) => model.write(source, codec),
@@ -79,7 +82,8 @@ function loadLayoutSource() {
 		compileKeylayout: (source, options) => compiler.compileKeylayout(source, tables, options),
 		exportMacos: (source, format, icons) => compiler.exportMacos(source, tables, format, icons),
 		compileEmulation: (source, options) => compiler.compileEmulation(source, tables, options),
-		targetKeylayout: (source, platform) => compiler.targetKeylayout(source, tables, platform)
+		targetKeylayout: (source, platform) => compiler.targetKeylayout(source, tables, platform),
+		target: (source, platform) => targetCompiler.target(source, tables, platform)
 	};
 }
 

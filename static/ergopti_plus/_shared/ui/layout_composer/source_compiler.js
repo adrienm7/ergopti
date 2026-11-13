@@ -248,6 +248,12 @@ var LayoutSourceCompiler = (function () {
 	// ======= 4/ Compilation ======
 	// =============================
 
+	/** Dead key id -> its .keylayout state: an explicit state, else the id. */
+	function stateResolver(source) {
+		const deadById = new Map((source.dead_keys || []).map((dead) => [dead.id, dead]));
+		return (id) => deadById.get(id).state || id;
+	}
+
 	/** Whether a source has a layer selected by an Alt modifier of its own. */
 	function usesAlt(source) {
 		return (source.layers || []).some((layer) =>
@@ -312,35 +318,40 @@ var LayoutSourceCompiler = (function () {
 	 * The compiled .keylayout is the intermediate form of every native target, so
 	 * this list is common to macOS, Linux and Windows.
 	 */
-	function omissions(source, table, platform) {
+	function omissions(source, table, platform, tokens, layerReason, format) {
 		const omitted = [];
 		const note = (path, reason) => omitted.push({ path, reason });
 		const custom = new Set((source.modifiers || []).map((modifier) => modifier.id));
+		const kept = new Set(
+			Object.entries(tokens)
+				.filter(([, token]) => token !== null)
+				.map(([id]) => id)
+		);
 		for (const modifier of source.modifiers || [])
-			note(`modifiers.${modifier.id}`, 'custom_modifier_not_in_keylayout');
+			if (!kept.has(modifier.id))
+				note(`modifiers.${modifier.id}`, `custom_modifier_not_in_${format}`);
+		const defaultReason = (layer) => {
+			const ids = [layer, ...(layer.alternatives || [])].flatMap((selector) => [
+				...selector.required,
+				...selector.optional
+			]);
+			return ids.includes('kana') && usesAlt(source)
+				? 'kana_level_taken_by_alt'
+				: ids.some((id) => custom.has(id) || (id !== 'kana' && !own(TOKENS, id)))
+					? `modifier_not_in_${format}`
+					: `sided_modifier_not_in_${platform}`;
+		};
 		(source.layers || []).forEach((layer) => {
 			const selectors = [layer, ...(layer.alternatives || [])];
-			if (
-				selectors.every(
-					(selector) => selectorKeys(selector, platformTokens(platform, source)) !== null
-				)
-			)
-				return;
-			const ids = selectors.flatMap((selector) => [...selector.required, ...selector.optional]);
-			const reason =
-				ids.includes('kana') && usesAlt(source)
-					? 'kana_level_taken_by_alt'
-					: ids.some((id) => custom.has(id) || (id !== 'kana' && !own(TOKENS, id)))
-						? 'modifier_not_in_keylayout'
-						: `sided_modifier_not_in_${platform}`;
-			note(`layers.${layer.id}`, reason);
+			if (selectors.every((selector) => selectorKeys(selector, tokens) !== null)) return;
+			note(`layers.${layer.id}`, (layerReason || defaultReason)(layer));
 		});
 		for (const [from, to] of Object.entries(source.remap || {}))
 			if (!nativeRemap(table, from, to)) note(`remap.${from}`, 'system_or_modifier_key_remap');
 		for (const [field, reason] of [
-			['shortcuts', 'shortcut_output_not_in_keylayout'],
+			['shortcuts', `shortcut_output_not_in_${format}`],
 			// config-key-literal-ok: field of the versioned layout format, not application config.
-			['tap_holds', 'tap_hold_not_in_keylayout']
+			['tap_holds', `tap_hold_not_in_${format}`]
 		])
 			(source[field] || []).forEach((entry) => note(`${field}.${entry.key}`, reason));
 		if (source.windows) note('windows', 'windows_only_flags');
@@ -351,24 +362,31 @@ var LayoutSourceCompiler = (function () {
 	}
 
 	/**
-	 * Compile a structured source into one .keylayout.
+	 * The keyMaps, actions and transitions of a structured source: the one model
+	 * the .keylayout text (compileKeylayout) and the converters' canonical form
+	 * (compileCanonical) are both written from.
 	 * @param {object} source - A validated structured source (no imported_keylayout).
 	 * @param {object} tables - {macKeycodes, physicalKeys, hidUsages}.
-	 * @param {{variant?: 'iso'|'ansi', platform?: 'macos'|'linux'|'windows'}} [options]
-	 * @returns {{text: string, convention: 'iso', names: object, omitted: object[]}}
+	 * @param {{variant?: 'iso'|'ansi', platform?: 'macos'|'linux'|'windows', tokens?: object, layerReason?: function, format?: string}} [options]
+	 *   tokens: modifier id -> selector token (null: the target has none), the
+	 *   platform's .keylayout tokens by default; layerReason(layer): the reason a
+	 *   layer those tokens leave out is omitted, the .keylayout reasons by default;
+	 *   format: the artifact the omission reasons name (`keylayout`, `xkb`, `klc`).
+	 * @returns {object} { layers, keyMaps, actions, whens, maxout, names, omitted }.
 	 */
-	function compileKeylayout(source, tables, options = {}) {
+	function compileModel(source, tables, options = {}) {
 		LayoutSource.validate(source);
 		const variant = options.variant || 'iso';
 		const platform = options.platform || 'macos';
 		if (!VARIANTS.includes(variant)) fail('source_variant', String(variant));
 		if (!Object.hasOwn(TARGETS, platform)) fail('source_platform', String(platform));
 		if (source.imported_keylayout) fail('source_imported_preserved', 'imported_keylayout');
+		const tokens = options.tokens || platformTokens(platform, source);
 		const table = keyTable(tables, 'iso');
 		const defaults = systemDefaults();
-		const omitted = omissions(source, table, platform);
-		const deadById = new Map((source.dead_keys || []).map((dead) => [dead.id, dead]));
-		const stateOf = (id) => deadById.get(id).state || id;
+		const format = options.format || 'keylayout';
+		const omitted = omissions(source, table, platform, tokens, options.layerReason, format);
+		const stateOf = stateResolver(source);
 
 		// Every text a dead-key rule answers to, and every key text that composes.
 		const ruleInputs = new Set();
@@ -377,7 +395,7 @@ var LayoutSourceCompiler = (function () {
 		const layers = [];
 		for (const layer of source.layers || []) {
 			const selectors = [layer, ...(layer.alternatives || [])].map((selector) =>
-				selectorKeys(selector, platformTokens(platform, source))
+				selectorKeys(selector, tokens)
 			);
 			if (selectors.includes(null)) continue;
 			layers.push({ layer, selectors, keys: layerKeys(source, layer, platform, variant, table) });
@@ -410,7 +428,7 @@ var LayoutSourceCompiler = (function () {
 				const path = `layers.${layer.id}.keys.${name}`;
 				const mac = table.code(name);
 				if (mac === undefined || MODIFIER_KEYS.has(name)) {
-					omitted.push({ path, reason: 'physical_key_not_in_keylayout' });
+					omitted.push({ path, reason: `physical_key_not_in_${format}` });
 					continue;
 				}
 				if (!TARGETS[platform].unnamedMacCodes && !table.byName.has(name)) {
@@ -437,8 +455,8 @@ var LayoutSourceCompiler = (function () {
 					omitted.push({
 						path,
 						reason: own(mapping, 'action')
-							? 'action_not_in_keylayout'
-							: 'key_chord_not_in_keylayout'
+							? `action_not_in_${format}`
+							: `key_chord_not_in_${format}`
 					});
 			}
 			for (const [mac, output] of defaults) if (!rows.has(mac)) rows.set(mac, ['output', output]);
@@ -465,7 +483,31 @@ var LayoutSourceCompiler = (function () {
 				});
 			}
 
-		const names = variantNames(source, variant);
+		return {
+			layers,
+			keyMaps,
+			actions,
+			whens,
+			maxout,
+			names: variantNames(source, variant),
+			omitted
+		};
+	}
+
+	/**
+	 * Compile a structured source into one .keylayout.
+	 * @param {object} source - A validated structured source (no imported_keylayout).
+	 * @param {object} tables - {macKeycodes, physicalKeys, hidUsages}.
+	 * @param {{variant?: 'iso'|'ansi', platform?: 'macos'|'linux'|'windows'}} [options]
+	 * @returns {{text: string, convention: 'iso', names: object, omitted: object[]}}
+	 */
+	function compileKeylayout(source, tables, options = {}) {
+		const { layers, keyMaps, actions, whens, maxout, names, omitted } = compileModel(
+			source,
+			tables,
+			{ variant: options.variant, platform: options.platform }
+		);
+		const stateOf = stateResolver(source);
 		const esc = LayoutComposer.escapeAttribute;
 		const lines = [
 			'<?xml version="1.1" encoding="UTF-8"?>',
@@ -507,6 +549,98 @@ var LayoutSourceCompiler = (function () {
 			lines.push(`\t\t<when state="${esc(stateOf(dead.id))}" output="${esc(dead.terminator)}"/>`);
 		lines.push('\t</terminators>', '</keyboard>');
 		return { text: lines.join('\n') + '\n', convention: 'iso', names, omitted };
+	}
+
+	/** One selector string of compileModel as the canonical { required, optional } tokens. */
+	function canonicalSelector(keys) {
+		const required = new Set();
+		const optional = new Set();
+		for (const token of keys.split(' ').filter(Boolean))
+			if (token.endsWith('?')) optional.add(token.slice(0, -1));
+			else required.add(token);
+		const sorted = (set) => [...set].sort();
+		return {
+			required: sorted(required),
+			optional: sorted(new Set([...optional].filter((token) => !required.has(token))))
+		};
+	}
+
+	/**
+	 * Compile a structured source straight into the canonical form the XKB and
+	 * KLC writers read (schema 1 of _shared/layouts/engine/composer/keylayout.lua),
+	 * with no .keylayout text in between. The target chooses the selector tokens,
+	 * so a modifier no .keylayout holds (a sided modifier, Kana, a custom one)
+	 * keeps its layer when the target has a level for it. With the converter
+	 * tokens it is exactly what reading compileKeylayout's text gives.
+	 * @param {object} source - A validated structured source (no imported_keylayout).
+	 * @param {object} tables - {macKeycodes, physicalKeys, hidUsages}.
+	 * @param {{platform: 'linux'|'windows', tokens: object, layerReason?: function, format?: string, variant?: 'iso'|'ansi'}} options
+	 *   tokens: modifier id -> canonical token (shift, caps, option, control, command
+	 *   or the target's own), null when the target has none.
+	 * @returns {{canonical: object, convention: 'iso', omitted: object[]}}
+	 */
+	function compileCanonical(source, tables, options) {
+		if (options.platform === 'macos') fail('source_platform', 'macos');
+		const model = compileModel(source, tables, options);
+		const stateOf = stateResolver(source);
+		// What the .keylayout reader refuses in a transition, refused alike.
+		const transition = (when, path) => {
+			if (when.output === '' && when.next === '') fail('source_empty_transition', path);
+			if (when.output !== '' && when.next !== '') fail('source_output_and_next', path);
+			return Object.assign(
+				{ state: when.state },
+				when.output !== '' ? { output: when.output } : {},
+				when.next !== '' ? { next: when.next } : {}
+			);
+		};
+		const actions = [...model.actions].map(([id, neutral]) => {
+			const seen = new Set();
+			const whens = [];
+			for (const when of [{ state: NEUTRAL, ...neutral }, ...model.whens.get(id)]) {
+				if (seen.has(when.state)) continue;
+				seen.add(when.state);
+				whens.push(transition(when, `actions.${id}.${when.state}`));
+			}
+			return { id, whens };
+		});
+		const terminators = [];
+		const states = new Set();
+		for (const dead of source.dead_keys || []) {
+			const state = stateOf(dead.id);
+			if (states.has(state)) continue;
+			states.add(state);
+			terminators.push({ state, output: dead.terminator });
+		}
+		return {
+			canonical: {
+				schema: 1,
+				name: model.names.internal,
+				map_set: 'layout',
+				default_index: 0,
+				selects: model.layers.map(({ selectors }, index) => ({
+					index,
+					modifiers: selectors.map(canonicalSelector)
+				})),
+				key_map_sets: [
+					{
+						id: 'layout',
+						key_maps: model.keyMaps.map((rows, index) => ({
+							index,
+							keys: [...rows.keys()]
+								.sort((a, b) => a - b)
+								.map((code) => {
+									const [kind, value] = rows.get(code);
+									return { code, [kind]: value };
+								})
+						}))
+					}
+				],
+				actions,
+				terminators
+			},
+			convention: 'iso',
+			omitted: model.omitted
+		};
 	}
 
 	// ===========================
@@ -1100,8 +1234,11 @@ var LayoutSourceCompiler = (function () {
 		MACOS_FORMATS,
 		keyTable,
 		ansiPairs,
+		CONVERTER_TOKENS,
 		compileKeylayout,
+		compileCanonical,
 		compileEmulation,
+		usesAlt,
 		importStructured,
 		exportMacos,
 		targetKeylayout

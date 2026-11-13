@@ -4,9 +4,10 @@
  * ==============================================================================
  * MODULE: Ergopti Layout Source XKB Export
  * DESCRIPTION:
- * Compiles a source through the shared Lua export adapter
- * (_shared/layouts/engine/composer/source_export.lua) and the shared target export
- * (_shared/ui/layout_composer/target_export.js), the same two steps the layout
+ * Compiles a source straight to the XKB writer's canonical form (the shared
+ * target compiler, _shared/ui/layout_composer/target_compiler.js), then through
+ * the shared Lua export adapter (_shared/layouts/engine/composer/source_export.lua)
+ * and the shared target export (target_export.js), the same steps the layout
  * editor page runs. Assets and source travel as explicit input; the API returns
  * artifacts without writing files or installing anything.
  * ==============================================================================
@@ -76,14 +77,12 @@ function admitted(step) {
 /** Compile all artifacts before a caller publishes any output. */
 function exportXkb(document) {
 	const source = loadLayoutSource();
-	// The preserved import, or the compiled .keylayout of a structured source.
-	const imported = source.targetKeylayout(document, 'linux');
+	// The preserved import's XML, or the canonical form of a structured source.
+	const target = source.target(document, 'linux');
 	const assets = xkbAssets();
-	const request = admitted(() => source.targetExport.xkbRequest(document, imported, assets));
+	const request = admitted(() => source.targetExport.xkbRequest(document, target, assets));
 	const output = runLua('xkb', request.input, 'xkb_runtime');
-	const { report, files } = admitted(() =>
-		source.targetExport.xkbFiles(imported, request, output, assets.types)
-	);
+	const { report, files } = admitted(() => source.targetExport.xkbFiles(target, request, output));
 	return {
 		report: plain(report),
 		files: new Map(files.map((file) => [file.path, file.text]))

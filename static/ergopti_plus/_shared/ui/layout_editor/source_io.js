@@ -260,9 +260,9 @@ var LayoutSourceIO = (function () {
 	 * @returns {{filename: string, bytes: Uint8Array, files: {path: string, text: string}[], report: object}}
 	 */
 	function xkbArchive(doc, assets) {
-		const imported = LayoutSourceCompiler.targetKeylayout(doc, tables(), 'linux');
+		const target = targetStep(() => LayoutTargetCompiler.target(doc, tables(), 'linux'));
 		const request = targetStep(() =>
-			LayoutTargetExport.xkbRequest(doc, imported, {
+			LayoutTargetExport.xkbRequest(doc, target, {
 				keycodes: tables().macKeycodes,
 				keysyms: assets.keysyms,
 				template: assets.template,
@@ -271,7 +271,7 @@ var LayoutSourceIO = (function () {
 		);
 		const output = assets.lua.call('xkb', request.input);
 		const { report, files } = targetStep(() =>
-			LayoutTargetExport.xkbFiles(imported, request, output, assets.types)
+			LayoutTargetExport.xkbFiles(target, request, output)
 		);
 		const root = `${request.id}_xkb`;
 		return {
@@ -294,15 +294,21 @@ var LayoutSourceIO = (function () {
 	 * @returns {{filename: string, bytes: Uint8Array, report: object}}
 	 */
 	function klcFile(doc, assets) {
-		const imported = LayoutSourceCompiler.targetKeylayout(doc, tables(), 'windows');
+		const target = targetStep(() => LayoutTargetCompiler.target(doc, tables(), 'windows'));
 		const metadata = targetStep(() => LayoutTargetExport.klcMetadata(doc));
-		const read = assets.lua.call('read', { xml: imported.text });
-		if (!read.ok) throw new SourceIOError('target_export_refused', read.reason);
+		// A structured source compiles straight to the canonical form; a preserved
+		// import's XML is read by the shared Lua reader.
+		let canonical = target.canonical;
+		if (!canonical) {
+			const read = assets.lua.call('read', { xml: target.text });
+			if (!read.ok) throw new SourceIOError('target_export_refused', read.reason);
+			canonical = read.canonical;
+		}
 		const exported = targetStep(() =>
 			LayoutTargetExport.klcExport(
 				doc,
-				imported,
-				read.canonical,
+				target,
+				canonical,
 				{ keycodes: tables().macKeycodes, physicalKeys: tables().physicalKeys },
 				assets.generator
 			)

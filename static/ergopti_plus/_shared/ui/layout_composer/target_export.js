@@ -11,11 +11,13 @@
  * editor page load this same script; only the Lua step differs in how it
  * runs (the `lua` process for the tool, fengari in the page) and both run the
  * shared Lua adapter _shared/layouts/engine/composer/source_export.lua.
+ * A structured source reaches both writers as the canonical form
+ * target_compiler.js compiles it to; a preserved import as its own XML.
  *
  * FEATURES & RATIONALE:
  * 1. Pure classic script: no file, process or DOM access; the caller passes
- *    the compiled .keylayout, the Lua results, the tables and the KLC
- *    generator (tools/codegen/lib/windows-keyboard-layout.cjs).
+ *    the target (LayoutTargetCompiler.target), the Lua results, the tables
+ *    and the KLC generator (tools/codegen/lib/windows-keyboard-layout.cjs).
  * 2. Fail fast: a construct an export cannot carry throws a TargetExportError
  *    with a stable reason and its details before any file exists.
  * 3. Same bytes everywhere: the files are returned as text (KLC also as the
@@ -54,12 +56,13 @@ var LayoutTargetExport = (function () {
 	/**
 	 * The XKB converter request of a source, its metadata checked.
 	 * @param {object} document - A validated source.
-	 * @param {{text: string, convention: string}} imported - targetKeylayout(document, 'linux').
+	 * @param {{text?: string, canonical?: object, convention: string, plan?: object}} target
+	 *   LayoutTargetCompiler.target(document, tables, 'linux').
 	 * @param {{keycodes: object, keysyms: object, template: string, types: string}} assets
 	 *   mac_keycodes.json, key_sym.json, xkb_symbols.txt and xkb_types.txt.
 	 * @returns {{id: string, description: string, input: object}}
 	 */
-	function xkbRequest(document, imported, assets) {
+	function xkbRequest(document, target, assets) {
 		const metadata = (document.exports && document.exports.linux) || {};
 		const id = metadata.name !== undefined ? metadata.name : document.layout.id;
 		const description =
@@ -68,50 +71,63 @@ var LayoutTargetExport = (function () {
 		// The converter interpolates this into an XKB quoted string.
 		if (/["\\\u0000-\u001f\u007f-\u009f]/u.test(description))
 			refuse('exports.linux.description contains an unsupported XKB string character');
+		const level5 = target.plan && target.plan.level5;
 		return {
 			id,
 			description,
-			input: {
-				xml: imported.text,
-				convention: imported.convention,
-				layout_id: id,
-				display_name: description,
-				keycodes: assets.keycodes,
-				keysyms: assets.keysyms.keysyms,
-				locale_extended_prefixes: assets.keysyms.locale_extended_prefixes,
-				template: assets.template,
-				types: assets.types
-			}
+			input: Object.assign(
+				target.canonical ? { canonical: target.canonical } : { xml: target.text },
+				level5
+					? { level5: { keys: level5.keys.map((key) => ({ xkb: key.xkb, keysym: key.keysym })) } }
+					: {},
+				{
+					convention: target.convention,
+					layout_id: id,
+					display_name: description,
+					keycodes: assets.keycodes,
+					keysyms: assets.keysyms.keysyms,
+					locale_extended_prefixes: assets.keysyms.locale_extended_prefixes,
+					template: assets.template,
+					types: assets.types
+				}
+			)
 		};
 	}
 
 	/**
 	 * The XKB files and report from the Lua conversion result.
-	 * @param {{omitted: object[]}} imported - The compiled .keylayout's omissions.
+	 * @param {{omitted: object[], plan?: object}} target - xkbRequest's target.
 	 * @param {{id: string, description: string}} request - xkbRequest's result.
-	 * @param {object} output - source_export.lua `xkb` result.
-	 * @param {string} types - xkb_types.txt, written beside the symbols.
+	 * @param {object} output - source_export.lua `xkb` result; its `types` is the
+	 *   types file the symbols need, written beside them.
 	 * @returns {{report: object, files: {path: string, text: string}[]}}
 	 */
-	function xkbFiles(imported, request, output, types) {
+	function xkbFiles(target, request, output) {
 		if (!output.ok) refuse(output.reason, output);
+		const level5 = (target.plan && target.plan.level5) || null;
 		const report = Object.assign(
 			{
 				target: 'linux',
 				status: 'partial',
 				artifact: 'xkb',
-				reason: 'seven_level_character_projection',
+				reason: level5 ? 'eleven_level_character_projection' : 'seven_level_character_projection',
 				blockers: [],
-				omitted: imported.omitted,
+				omitted: target.omitted,
 				name: request.id,
-				description: request.description
+				description: request.description,
+				level5
 			},
 			output.projection,
 			{
 				system_key_codes: output.system_key_codes,
 				limitations: [
 					'Only the character-key table is generated; listed system/keypad codes keep their installed behavior.',
-					'Option maps to AltGr; Linux Alt, Control and Super use the Command shortcut level.',
+					'Option, right Alt and Kana map to AltGr; Linux Alt, Control and Super use the Command shortcut level.',
+					...(level5
+						? [
+								`${level5.modifier} holds the fifth level: ${level5.keys.map((key) => key.key).join(', ')} type ${level5.keys[0].keysym} and no longer act as their own modifier.`
+							]
+						: []),
 					'Listed empty cells emit NoSymbol and may inherit XKB symbols; source key disabling is not compiled.',
 					'Listed unbound character actions use the converter Unicode keysym fallback, without a physical source action binding.',
 					'XCompose requires client support and the exported Compose file; native macOS dead-key fallback and cancellation are not certified.',
@@ -124,7 +140,7 @@ var LayoutTargetExport = (function () {
 			files: [
 				{ path: `${request.id}.xkb`, text: output.symbols },
 				{ path: `${request.id}.XCompose`, text: output.compose },
-				{ path: 'xkb_types.txt', text: types },
+				{ path: 'xkb_types.txt', text: output.types },
 				{ path: 'export.json', text: `${JSON.stringify(report, null, 2)}\n` }
 			]
 		};
@@ -183,8 +199,10 @@ var LayoutTargetExport = (function () {
 	/**
 	 * Create native character files without installing or reserving a Windows KLID.
 	 * @param {object} document - A validated source.
-	 * @param {{convention: string, omitted: object[]}} imported - targetKeylayout(document, 'windows').
-	 * @param {object} canonical - source_export.lua `read` result's canonical reading.
+	 * @param {{convention: string, omitted: object[], plan?: object}} imported
+	 *   LayoutTargetCompiler.target(document, tables, 'windows').
+	 * @param {object} canonical - The target's canonical form, or for a preserved
+	 *   import source_export.lua `read` result's canonical reading.
 	 * @param {{keycodes: object, physicalKeys: object}} tables - mac_keycodes.json, physical_keys.json.
 	 * @param {object} Windows - The KLC generator module.
 	 * @returns {{report: object, klc: string, files: {path: string, text: string}[]}}
@@ -192,6 +210,7 @@ var LayoutTargetExport = (function () {
 	function klcExport(document, imported, canonical, tables, Windows) {
 		const metadata = klcMetadata(document);
 		const { locale, name, author, description } = metadata;
+		const modifierBits = (imported.plan && imported.plan.modifier_bits) || [];
 		const keycodes = tables.keycodes;
 		const physicalKeys = tables.physicalKeys;
 		const physical = keycodes.keys.map((key) => ({
@@ -261,7 +280,8 @@ var LayoutTargetExport = (function () {
 			},
 			keycodes,
 			physicalKeys,
-			sourceRel: `layout-source:${document.layout.id}`
+			sourceRel: `layout-source:${document.layout.id}`,
+			modifierBits
 		};
 		let generated;
 		try {
@@ -333,10 +353,11 @@ var LayoutTargetExport = (function () {
 			locale,
 			language_lcid: metadata.layout_id.toLowerCase(),
 			artifact_version: KLC_ARTIFACT_VERSION,
-			columns: Windows.COLUMNS.map((column) => ({
+			columns: generated.model.columns.map((column) => ({
 				shift_state: column.klc,
 				source_modifiers: column.mac
 			})),
+			modifier_bits: modifierBits,
 			uncompiled_modifiers: unsupported,
 			system_keys: [...untouched]
 				.sort(([a], [b]) => a - b)
@@ -352,6 +373,10 @@ var LayoutTargetExport = (function () {
 			limitations: [
 				'Ctrl and Shift+Ctrl cells are left empty for Windows control-key behavior; source Command mappings are not compiled. Listed combinations retain their source cells for review.',
 				'Virtual keys follow the existing generator allocation; source shortcuts are not inferred from the displayed character.',
+				...modifierBits.map(
+					(bit) =>
+						`${bit.modifier} holds the ${bit.bit} bit: ${bit.key} types VK_${bit.vk} and no longer acts as its own key.`
+				),
 				'Listed system/keypad mappings are not compiled; the KLC generator emits the standard decimal point.',
 				'KLC uses a language LCID, not a reserved keyboard-layout ID; locale/LCID association and native Windows loading are not certified.',
 				'No DLL or installer is produced. The new KLC artifact starts at version 1.0; the source schema has no release-version field.'

@@ -159,6 +159,15 @@ sameXkb(fixture, 'fixture');
 	sameKlc(structured, 'ergopti structured');
 }
 
+// The direct compilers' extra levels: XKB's fifth level, KLC's Kana and Roya bits.
+{
+	const direct = Source.read(
+		fs.readFileSync(shared('tests', 'corpus', 'layouts', 'source', 'direct_levels.toml'), 'utf8')
+	);
+	sameXkb(direct, 'direct levels');
+	sameKlc(direct, 'direct levels');
+}
+
 // A Lua refusal reaches the page as the tool's reason.
 {
 	const read = assets.lua.call('read', { xml: '<keyboard/>' });

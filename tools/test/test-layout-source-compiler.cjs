@@ -507,6 +507,152 @@ const golden = read(path.join(corpus, 'source.keylayout'));
 		/CAPLOKALTGR/,
 		'KLC refuses the Caps+AltGr columns it cannot write'
 	);
+	// Compiled straight to XKB, the left Alt layer is no longer dropped: Left Alt
+	// holds the fifth level.
+	const direct = exportXkb(left);
+	assert.equal(direct.report.level5.modifier, 'alt_left');
+	assert(!direct.report.omitted.some((entry) => entry.path === 'layers.option'));
+	checks++;
+}
+
+// Direct compilers: with the folded tokens the canonical form is exactly the
+// reading of the compiled .keylayout, so the existing layouts keep their bytes.
+{
+	const norm = (value) =>
+		value && typeof value === 'object' && !Array.isArray(value) && !Object.keys(value).length
+			? []
+			: Array.isArray(value)
+				? value.map(norm)
+				: value && typeof value === 'object'
+					? Object.fromEntries(
+							Object.keys(value)
+								.sort()
+								.map((key) => [key, norm(value[key])])
+						)
+					: value;
+	const { runLua } = require('../lib/layout-source-xkb.cjs');
+	for (const [id, document] of [...structured, ['fixture', fixture]])
+		for (const platform of ['linux', 'windows']) {
+			const plain = Source.read(Source.write(document));
+			if (id === 'bepo') {
+				assert.throws(() => Source.target(plain, platform), /source_empty_transition/);
+				continue;
+			}
+			const read = runLua('read', { xml: Source.targetKeylayout(plain, platform).text }, id);
+			assert(read.ok, `${id}: ${read.reason}`);
+			assert.deepEqual(
+				norm(clone(Source.target(plain, platform).canonical)),
+				norm(read.canonical),
+				`${id} ${platform}: the direct canonical form is the .keylayout's`
+			);
+		}
+	checks++;
+}
+
+// Direct compilers: the levels each format has beyond the .keylayout's.
+{
+	const sided = Source.read(read(path.join(corpus, 'direct_levels.toml')));
+
+	// XKB: the first held modifier in layer order takes the fifth level (Right
+	// Ctrl, a sided modifier the .keylayout route dropped); the next one is told.
+	const xkb = exportXkb(sided);
+	assert.deepEqual(clone(xkb.report.level5), {
+		modifier: 'control_right',
+		mode: 'held',
+		keys: [{ key: 'ControlRight', xkb: 'RCTL', keysym: 'ISO_Level5_Shift' }]
+	});
+	assert.equal(xkb.report.reason, 'eleven_level_character_projection');
+	const layerReasons = Object.fromEntries(
+		xkb.report.omitted
+			.filter((entry) => entry.path.startsWith('layers.'))
+			.map((entry) => [entry.path, entry.reason])
+	);
+	assert.deepEqual(layerReasons, {
+		'layers.nav': 'xkb_level5_taken',
+		'layers.sym': 'xkb_level5_taken',
+		'layers.kana': 'modifier_key_cannot_hold_xkb_level5'
+	});
+	const symbols = xkb.files.get('sided.xkb');
+	assert.match(
+		symbols,
+		/key <AC01> \{ type\[group1\] = "ERGOPTI_ELEVEN_LEVEL", \[a, a, A, A, a, ae, a, U03B1, a, a, a\] \};/
+	);
+	assert.match(
+		symbols,
+		/include "level3\(ralt_switch\)"\n\n\tkey <RCTL> \{ \[ ISO_Level5_Shift \] \};\n\};/
+	);
+	const types = xkb.files.get('xkb_types.txt');
+	assert.match(types, /type "ERGOPTI_SEVEN_LEVEL"/, 'the shipped type stays');
+	assert.match(
+		types,
+		/type "ERGOPTI_ELEVEN_LEVEL" \{\n\s+modifiers = Shift \+ Lock \+ LevelThree \+ LevelFive \+ Control \+ Alt \+ Mod4;/
+	);
+	assert.match(types, /map\[Shift \+ LevelThree \+ LevelFive\] = 11;/);
+	// The Linux installer refuses symbols naming a type the shipped types file
+	// does not define (layout_package.validate_layout_files).
+	const defined = new Set([...types.matchAll(/type\s+"([^"]+)"/g)].map((match) => match[1]));
+	for (const [, name] of symbols.matchAll(/type\[[^\]]*\]\s*=\s*"([^"]+)"/gi))
+		assert(defined.has(name), `the exported types define ${name}`);
+	assert.equal(xkb.report.source_levels.length, 11);
+
+	// A locked custom modifier alone on the fifth level types ISO_Level5_Lock.
+	const locked = clone(sided);
+	locked.layers = locked.layers.filter((layer) => !['rctrl', 'nav'].includes(layer.id));
+	const lock = exportXkb(Source.validate(locked));
+	assert.deepEqual(clone(lock.report.level5.keys), [
+		{ key: 'ContextMenu', xkb: 'MENU', keysym: 'ISO_Level5_Lock' }
+	]);
+	assert.match(
+		lock.files.get('sided.xkb'),
+		/key <AB05> \{ type\[group1\] = "ERGOPTI_ELEVEN_LEVEL", \[b, b, B, B, b, NoSymbol, b, rightarrow,/
+	);
+
+	// KLC: Kana on a plain scan code gets the real Kana bit, a held custom
+	// modifier the Roya bit; Right Ctrl (an E0 key) and a locked one are told.
+	const klc = exportKlc(sided);
+	assert.deepEqual(
+		clone(klc.report.modifier_bits).map((bit) => [bit.modifier, bit.bit, bit.key, bit.vk]),
+		[
+			['kana', 'kana', 'F12', 'KANA'],
+			['nav', 'roya', 'CapsLock', 'OEM_FJ_ROYA']
+		]
+	);
+	assert.deepEqual(clone(klc.report.omitted.filter((entry) => entry.path.startsWith('layers.'))), [
+		{ path: 'layers.rctrl', reason: 'modifier_key_not_in_klc' },
+		{ path: 'layers.sym', reason: 'locked_modifier_not_in_klc' }
+	]);
+	const bytes = klc.files.get('kbdsided.klc');
+	const text = Buffer.from(bytes).subarray(2).toString('utf16le').replace(/\r\n/g, '\n');
+	assert.match(text, /\nSHIFTSTATE\n0\n1\n2\n3\n6\n7\n8\n9\n16\n17\n/);
+	assert.match(text, /\n1e\tA\t0\t0061\t0041\t-1\t-1\t00e6\t0061\t-1\t0061\t2190\t0061\n/);
+	assert.match(
+		text,
+		/\n58\tKANA\t0(\t-1){10}\n3a\tOEM_FJ_ROYA\t0(\t-1){10}\n53\tDECIMAL\t0\t002e\t002e(\t-1){8}\n/
+	);
+	assert.match(text, /\nLIGATURE\n\nB\t6\t006b\t0061\n/, 'Kana ligature in its own column');
+	// The KLC reads back into the Windows tables with both bits on their keys.
+	const { fromKlc } = require('../lib/kbd-dll/klc.cjs');
+	const model = fromKlc(Buffer.from(bytes));
+	assert.deepEqual(model.columns, [0, 1, 2, 3, 6, 7, 8, 9, 16, 17]);
+	assert.deepEqual(clone(model.scancodes), [
+		{ sc: 0x58, vk: 0x15 },
+		{ sc: 0x3a, vk: 0x96 }
+	]);
+
+	// Kana on Right Alt (the default, an E0 key) keeps the AltGr columns, as before.
+	const rightAlt = clone(sided);
+	delete rightAlt.windows;
+	rightAlt.layers = rightAlt.layers.filter((layer) => layer.id !== 'altgr');
+	const altgr = exportKlc(Source.validate(rightAlt));
+	assert.deepEqual(
+		clone(altgr.report.modifier_bits).map((bit) => bit.modifier),
+		['nav'],
+		'Kana stays on AltGr'
+	);
+	assert.match(
+		Buffer.from(altgr.files.get('kbdsided.klc')).subarray(2).toString('utf16le'),
+		/\r\n30\tB\t0\t0062\t0042\t-1\t-1\t%%/
+	);
 	checks++;
 }
 
