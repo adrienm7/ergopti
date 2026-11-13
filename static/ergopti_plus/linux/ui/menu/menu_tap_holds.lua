@@ -19,13 +19,8 @@ if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 local prompt_text = require("ui.menu.menu_dialogs").prompt_text
 local show_error = require("ui.menu.menu_dialogs").show_error
 local plain_markup = require("ui.menu.menu_dialogs").plain_markup
-local ValueCheck = require("settings.engine.value_check")
 
 local LOG = "ui.menu.menu_tap_holds"
-
--- The shared value schema declarations of the two delays this menu asks for.
-local GLOBAL_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS
-local KEY_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS
 
 --- Reads typed text through the shared value check. A refusal is logged and
 --- shown with the localized text naming the accepted range, and nothing is
@@ -34,6 +29,7 @@ local KEY_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS
 --- @param text string What the person typed.
 --- @return any|nil value The value in the stored unit, nil when refused.
 local function read_typed(key, text)
+	local ValueCheck = require("settings.engine.value_check")
 	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text)
 	if result.ok then return result.value end
 	Logger.warn(LOG, "Typed value '%s' for %s refused (%s).", tostring(text), key, result.reason)
@@ -217,7 +213,7 @@ local function _build_tap_holds(ctx)
 			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt_current"), current_ms),
 			tostring(current_ms))
 		if value == nil then return false end
-		local seconds = read_typed(KEY_DELAY_KEY, value)
+		local seconds = read_typed(require("settings.engine.value_check").KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS, value)
 		if seconds == nil then return false end
 		if guard() ~= true then changed(false); return false end
 		local call_ok, persisted = pcall(setter, key_id, seconds, guard)
@@ -239,7 +235,7 @@ local function _build_tap_holds(ctx)
 			string.format(i18n_safe("menu.tapholds.tap_hold_dialog_prompt"), default_ms),
 			tostring(current_ms))
 		if value == nil then return false end
-		local seconds = read_typed(GLOBAL_DELAY_KEY, value)
+		local seconds = read_typed(require("settings.engine.value_check").KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS, value)
 		if seconds == nil then return false end
 		if guard() ~= true then changed(false); return false end
 		local call_ok, persisted = pcall(setter, seconds, guard)
