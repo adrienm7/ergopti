@@ -293,6 +293,14 @@ function repairCoupled(before, after) {
 		const coupled = was[index++];
 		return coupled && Number(n) !== lit.length ? `${head}${lit.length}${mid}${q}${lit}${q}` : whole;
 	});
+	// A file path the step respelled under a base (base .. "/core/fs/engine/x.lua"):
+	// a fixture written there needs its new folders from that base's ladder.
+	const respelled = [];
+	for (const m of after.matchAll(
+		/\b([A-Za-z_][\w.]*)\s*\.\.\s*(["'])(\/[^"'\n]+)\/[^"'\n\/]+\.[A-Za-z0-9]+\2/g
+	))
+		if (!before.includes(m[0]) && !/(^|\/)\.\.(\/|$)/.test(m[3]))
+			respelled.push({ base: m[1], rel: m[3], q: m[2] });
 	out = out.replace(MKDIR_LADDER, (whole, head, _v, body, tail) => {
 		// Split at the top-level commas only: an entry may call a function.
 		const entries = [];
@@ -332,6 +340,8 @@ function repairCoupled(before, after) {
 			if (p.raw !== undefined) ordered.push(p.raw);
 			else emit(p.base, p.rel, p.q);
 		}
+		for (const r of respelled)
+			if (parsed.some((p) => p.base === r.base) && hasRoot(r.base)) emit(r.base, r.rel, r.q);
 		if (ordered.join(', ') === entries.join(', ')) return whole;
 		const lead = body.match(/^\s*/)[0];
 		const trail = body.match(/\s*$/)[0];
