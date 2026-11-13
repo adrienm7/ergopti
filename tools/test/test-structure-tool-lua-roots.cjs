@@ -45,6 +45,20 @@ function run() {
 	// A module both drivers have proves no driver: the tool keeps its names.
 	const both = 'local FS = require("adapters.file_system")\n';
 	assert.equal(rewrite(both), both);
+	// A JavaScript test that runs Lua with its working directory joined as
+	// path.join(root, 'macos'): that piece names the driver its chunk loads.
+	const JS = 'tools/test/zz_probe_runner.cjs';
+	const js =
+		"const cwd = path.join(root, 'macos');\n" +
+		'const chunk = "package.loaded[\'adapters.file_system\'].read = nil";\n';
+	const jsMap = new Map([
+		['macos/adapters/file_system.lua', 'macos/core/fs/adapters/file_system.lua'],
+		['linux/adapters/file_system.lua', 'linux/system/adapters/file_system.lua']
+	]);
+	const jsRows = Plan.scanFile(JS, js, Plan.referenceContext(jsMap));
+	const jsOut = Apply.rewriteText(js, jsRows, new Map(), JS);
+	assert.ok(jsOut.includes("package.loaded['core.fs.adapters.file_system']"), jsOut);
+
 	console.log('[OK] a Lua tool that requires a module only one driver has loads that driver.');
 }
 
