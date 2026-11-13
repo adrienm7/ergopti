@@ -283,6 +283,15 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: 'H.load_module("metrics.ui." .. app .. ".bridge")'
 	},
 	{
+		// The native HTTP worker's historical whole-source pin names the bundled
+		// proxy policy at its first place; S01 moves the policy, so the reader
+		// spells it back there before every pinned projection.
+		file: 'tools/test/macos_native_http_receiving_facts_test.py',
+		moves: '_shared/modules/network/proxy_policy.json',
+		from: 'def worker_source():\n    """Read the worker with the newest reviewed layer peeled, as every historical pin expects."""\n    return managed_lookup_stage_projection(\n        route_kind_observation_projection(WORKER.read_text(encoding="utf-8"))\n    )\n',
+		to: '# The structure migration moved the bundled proxy policy into the network\n# feature; every historical pin names its first place.\nSTRUCTURE_MOVE_INVERSE = (\n    (\n        "Contents/Resources/static/ergopti_plus/_shared/core/network/data/proxy_policy.json",\n        "Contents/Resources/static/ergopti_plus/_shared/modules/network/proxy_policy.json",\n    ),\n)\n\n\ndef structure_move_projection(source):\n    """Spell each moved resource at its historical place, exactly once."""\n    for new, old in STRUCTURE_MOVE_INVERSE:\n        if source.count(new) != 1 or old in source:\n            raise ValueError("Structure move projection refused")\n        source = source.replace(new, old, 1)\n    return source\n\n\ndef worker_source():\n    """Read the worker with the newest reviewed layer peeled, as every historical pin expects."""\n    return managed_lookup_stage_projection(\n        route_kind_observation_projection(\n            structure_move_projection(WORKER.read_text(encoding="utf-8"))\n        )\n    )\n'
+	},
+	{
 		// The XI2 receiver derives the shared Lua root from the logger shim's
 		// path; S01 moves the shim to core/logger/engine under _shared itself.
 		file: 'static/ergopti_plus/linux/tests/hardware/xi2_luajit_receiver.lua',
