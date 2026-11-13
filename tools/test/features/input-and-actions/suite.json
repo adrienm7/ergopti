@@ -810,6 +810,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-capsword-fixed-exits-single-source.cjs"],
 			"repro": "npm run test:capsword-fixed-exits-single-source"
+		},
+		{
+			"id": "personal-info-tags-single-source",
+			"ordinal": 637,
+			"name": "personal-info named tags are one table: the shared Lua tags and the Windows map and order",
+			"cmd": "node",
+			"args": ["tools/test/test-personal-info-tags-single-source.cjs"],
+			"repro": "npm run test:personal-info-tags-single-source"
 		}
 	]
 }

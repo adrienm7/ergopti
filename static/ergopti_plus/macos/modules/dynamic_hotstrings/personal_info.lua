@@ -29,6 +29,7 @@ local FileSystem = require("adapters.file_system")
 local BasicString = require("core.text.engine.toml_codec.basic_string")
 local TomlCodec = require("core.text.engine.toml_codec.codec")
 local UnicodeCase = require("core.text.engine.unicode_case")
+local NamedTags   = require("hotstrings.engine.personal_info.tags")
 
 -- The shared personal-info field classification, used ONLY by the preview
 -- provider below. Optional-require rather than a hard dependency so a driver
@@ -514,6 +515,13 @@ local function resolve_combo(combo)
 
 	local okay, length = pcall(utf8.len, combo)
 	if not okay or not length then return parts, fields end
+	-- A named tag types its one field, never its letters' aliases (HCD-3).
+	local named = NamedTags.field(combo)
+	if named then
+		local value = _info[named]
+		if type(value) ~= "string" or value == "" then return parts, fields end
+		return { value }, { named }
+	end
 	for _, codepoint in utf8.codes(combo) do
 		local letter = utf8.char(codepoint)
 		if not is_alias(letter) then return {}, {} end

@@ -172,6 +172,34 @@ helpers.describe("personal-info @-combo resolver", function()
 	-- 4. The preview rows, which are the same answer
 	-- ==========================================================================
 
+	helpers.it("a named tag types its one field, never its letters' aliases (hcd-3-named-tags)", function()
+		local field_calls = {}
+		local observing_injector = {
+			inject = function() return { ok = true } end,
+			inject_fields = function(_count, values, is_private)
+				field_calls[#field_calls + 1] = { values = values, is_private = is_private }
+				return { ok = true }
+			end,
+		}
+		with_fixture(function()
+			helpers.assert_eq(joined("iban"), "FR7630006000011234567890189", "@iban types the IBAN alone")
+			helpers.assert_eq(joined("IBAN"), "FR7630006000011234567890189", "case-insensitive, as on Windows")
+			helpers.assert_eq(joined("rib"), "FR7630006000011234567890189")
+			helpers.assert_eq(joined("tel"), "0606060606", "@tel once typed nothing")
+			helpers.assert_eq(joined("tél"), "0606060606")
+			helpers.assert_eq(joined("bic"), "", "a field the file does not fill types nothing")
+			helpers.assert_eq(joined("np"), "Dupont|Marie", "an ordinary combo still reads its letters")
+			local rows = dh.preview_candidates("@iban")
+			helpers.assert_eq(#rows, 1, "the bubble offers the named tag")
+			helpers.assert_eq(rows[1].fields, { "iban" }, "masked as the IBAN")
+			local fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@iban\\", "\\")
+			helpers.assert_true(fired, "@iban fires")
+		end, observing_injector)
+		helpers.assert_eq(#field_calls, 1)
+		helpers.assert_eq(field_calls[1].values, { "FR7630006000011234567890189" }, "one field, nothing more")
+		helpers.assert_true(field_calls[1].is_private == true)
+	end)
+
 	helpers.it("offers a preview row for a resolvable multi-letter combo", function()
 		with_fixture(function()
 			local rows = dh.preview_candidates("@np")

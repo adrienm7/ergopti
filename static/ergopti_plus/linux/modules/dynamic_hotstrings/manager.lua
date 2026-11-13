@@ -23,6 +23,7 @@
 local M = {}
 local TableUtil = require("core.text.engine.table_util")
 local UnicodeCase = require("core.text.engine.unicode_case")
+local NamedTags = require("hotstrings.engine.personal_info.tags")
 
 local Logger = require("core.logger.engine.shim")
 local ManifestReader = require("infra.manifest_reader")
@@ -332,6 +333,14 @@ function M.resolve_combo(tag)
 	local letters = strict_codepoints(tag)
 	if not letters then return fields end
 
+	-- A named tag types its one field, never its letters' aliases (HCD-3).
+	local named = NamedTags.field(tag)
+	if named then
+		local value = _info[named]
+		if type(value) ~= "string" or value == "" then return fields end
+		return { named }
+	end
+
 	-- Lower-cased because the single-letter rules are registered lower-cased and
 	-- typing "@NP" must mean what "@np" means.
 	for _, raw_letter in ipairs(letters) do
@@ -487,7 +496,8 @@ local function _fire_combo(prefix, trigger, publication, within_delay)
 	-- A single-letter tag that resolves here is one the registered rule already
 	-- declined — its section is off, or the engine holds no rule for it — so
 	-- expanding it now would route around a decision that was already taken.
-	if #values < 2 then return false end
+	-- A named tag (@iban) is no registered rule: its one field fires here.
+	if #values < 2 and (#values == 0 or NamedTags.field(tag) == nil) then return false end
 	local tag_length = strict_codepoint_length(tag)
 	if tag_length == nil then
 		Logger.error(LOG,
@@ -715,8 +725,9 @@ function M.preview_candidates(buffer, start_is_boundary)
 	if #fields == 0 then return rows end
 
 	-- A single-letter tag that resolves here is one no registered rule offered
-	-- above (its rule is absent or declined), and the fire path refuses it too.
-	if #fields < 2 then return rows end
+	-- above (its rule is absent or declined), and the fire path refuses it too;
+	-- a named tag (@iban) is no registered rule and fires its one field.
+	if #fields < 2 and NamedTags.field(tag) == nil then return rows end
 	-- Builtin personal combinations have the same precedence at preview and fire.
 	rows = {}
 
