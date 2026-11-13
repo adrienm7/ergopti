@@ -269,7 +269,7 @@ try:
             original["window_title"] = policy
             manifest.write_text(json.dumps(original))
             # The generator checks every presented caption against the locales.
-            data = policy_root / "static/ergopti_plus/_shared"
+            data = policy_root / "static/ergopti_plus/_shared/core/i18n/data"
             data.mkdir(parents=True)
             shutil.copy(root / "static/ergopti_plus/_shared/core/i18n/data/locale_order.json", data)
             shutil.copytree(
