@@ -1108,3 +1108,16 @@ _KLT_RealCtrlHeldCase() {
 }
 Test("keylayout emulation: Ctrl+AltGr sends Ctrl and the logical key only with a real Ctrl (ILD-2)",
 	_KLT_RealCtrlHeldCase)
+
+; SCD-3: a Ctrl slot of the logical key fires for Ctrl+AltGr+key; with none
+; assigned, or set to none, the chord goes on as Ctrl and the key (ILD-2).
+_KLT_AltGrCtrlSlotCase() {
+	Slots := Map("primary_b", "select_line", "primary_shift_v", "paste_plain", "primary_x", "none")
+	AssertEqual("primary_b", _KLE_AltGrSlotFor("b", "^", Slots), "Ctrl+AltGr+b runs the ctrl_b slot")
+	AssertEqual("primary_b", _KLE_AltGrSlotFor("B", "^", Slots), "the slot follows the letter, whatever its case")
+	AssertEqual("primary_shift_v", _KLE_AltGrSlotFor("v", "^+", Slots), "with Shift, the Ctrl+Shift slot")
+	AssertEqual("", _KLE_AltGrSlotFor("x", "^", Slots), "a slot set to none sends the chord")
+	AssertEqual("", _KLE_AltGrSlotFor("c", "^", Slots), "no slot, the chord")
+	AssertEqual("", _KLE_AltGrSlotFor("", "^", Slots), "no logical key, no slot")
+}
+Test("keylayout emulation: a Ctrl slot fires for Ctrl+AltGr+key (SCD-3)", _KLT_AltGrCtrlSlotCase)

@@ -139,6 +139,9 @@ Account and tester actions (maintainer, from the PC):
 - [ ] Restored API entry under another account (2026-11-13): restore a configuration backup holding a DPAPI API key
       under a second Windows account; the entry is greyed with « Edit » only, and a new key makes it work.
 
+- [ ] SCD-3 (2026-11-13): with a non-Ergopti layout emulated and « Ctrl+B » set to an action, Ctrl+AltGr+B runs it;
+      with the slot set to nothing, Ctrl+AltGr+B sends Ctrl+B.
+
 - [ ] Metrics export and purge on Windows (`KL_RunMetricsMaintenance`): only source contracts check that path.
 
 - [ ] Navigation-owner DLL after the folder migration (2026-11-13): its manifest fingerprint was derived by the
