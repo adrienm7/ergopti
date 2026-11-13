@@ -936,6 +936,18 @@ function run() {
 			'a PowerShell joined path follows its file'
 		);
 	}
+	// "im)^#Include\s+\.\./_shared/modules/x\.ahk\s*$" in an AutoHotkey meta
+	// test checks the entry's #Include: it follows the file, dots escaped. Left
+	// as it was, the boot-order check found no policy include after S01.
+	const policy = '_shared/modules/features/layout_rows_policy.ahk';
+	if (fs.existsSync(path.join(repo, P, policy)) && full.get(policy) !== policy) {
+		const ahk = 'static/ergopti_plus/windows/tests/meta/z.ahk';
+		const line =
+			'P := RegExMatch(E, "im)^#Include\\s+\\.\\./_shared/modules/features/layout_rows_policy\\.ahk\\s*$")\n';
+		const out = Apply.rewriteText(line, Plan.scanFile(ahk, line, fullCtx), moved, ahk);
+		const spelled = `\\.\\./${full.get(policy).replace(/\./g, '\\.')}`;
+		assert.ok(out.includes(spelled), `an AutoHotkey include regex follows its file: ${out}`);
+	}
 	// Third-party code keeps its own paths; our scripts in a vendor folder move.
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/_shared/ui/vendor/fengari-web.js'));
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/windows/vendor/WebView2.ahk'));
