@@ -300,6 +300,9 @@ helpers.describe("AI agent automatic mode: the toggle", function()
 			helpers.assert_eq(world.handlers.llm_agent_auto_toggle("tap_3"), true)
 			helpers.assert_eq(world.preferences.get("llm.agent_mode"), "action")
 			helpers.assert_eq(world.notices[2], Scenario.text("llm.agent.auto_off"))
+			-- A binding switches the mode outside the menu: the tray is redrawn,
+			-- as Windows rebuilds after the commit (agent-mode-tray-redraw).
+			helpers.assert_eq(world.mode_redraws, { "auto", "action" })
 		end)
 	end)
 
@@ -308,6 +311,7 @@ helpers.describe("AI agent automatic mode: the toggle", function()
 			helpers.assert_eq(world.handlers.llm_agent_auto_toggle("tap_3"), false)
 			helpers.assert_eq(world.notices[1], Scenario.text("llm.agent.no_system1"))
 			helpers.assert_eq(world.preferences.get("llm.agent_mode"), "action", "unchanged")
+			helpers.assert_nil(world.mode_redraws, "a refused switch redraws nothing")
 		end)
 	end)
 end)

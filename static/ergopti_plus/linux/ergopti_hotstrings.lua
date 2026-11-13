@@ -2063,6 +2063,10 @@ local function main()
 			on_live_change = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
+			-- The tray's agent rows check the mode: redrawn when a binding switches it.
+			on_agent_mode_change = function()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
 			on_models_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 				require("ui.model_browser.bridge").reproject_current()
