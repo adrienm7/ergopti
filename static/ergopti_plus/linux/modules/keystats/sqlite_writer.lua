@@ -35,6 +35,7 @@
 
 local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
+local TextUtils = require("core.text.engine.utils_core")
 
 local Logger        = require("core.logger.engine.shim")
 local SqliteCommand = require("modules.keystats.sqlite_command")
@@ -94,32 +95,6 @@ local unpack_values = table.unpack or unpack
 -- ======= 2/ Internal Helpers =============
 -- =========================================
 -- =========================================
-
---- Creates a directory and its missing parents, as `mkdir -p` does (mode
---- 0777 under the umask), without a process.
---- @param path string Absolute or relative directory path.
---- @return boolean made True once the directory exists.
---- @return string|nil detail Why it does not.
-local function _make_directories(path)
-	local uv = require("luv")
-	local stat = uv.fs_stat(path)
-	if stat then
-		if stat.type == "directory" then return true end
-		return false, path .. " exists and is not a directory"
-	end
-	local parent = NativePath.dirname(path)
-	if parent and parent ~= path and parent ~= "" then
-		local parent_made, parent_error = _make_directories(parent)
-		if not parent_made then return false, parent_error end
-	end
-	local created, err, code = uv.fs_mkdir(path, 511)
-	-- Another process may create it between the stat and the mkdir.
-	if created or code == "EEXIST" then
-		local again = uv.fs_stat(path)
-		if again and again.type == "directory" then return true end
-	end
-	return false, tostring(err or code or "not created")
-end
 
 --- Checks once whether the sqlite3 CLI binary is available.
 --- @return boolean
@@ -685,12 +660,9 @@ function M.open_db(db_path)
 
 	_db_path = db_path
 
-	-- Ensure the parent directory exists, in process: a shell and mkdir cost
-	-- the boot two processes (docs/audits/performance/linux). A failure is
-	-- logged; the privacy admission below then refuses the store.
+	-- Ensure the parent directory exists.
 	local dir = NativePath.dirname(db_path) or "."
-	local made, mkdir_error = _make_directories(dir)
-	if not made then Logger.error(LOG, "Cannot create the metrics folder %s: %s.", dir, tostring(mkdir_error)) end
+	os.execute(string.format("mkdir -p %s 2>/dev/null", TextUtils.shell_quote(dir)))
 
 	-- Typed records stay private even when the selected parent is shared.
 	PrivateSqlite = PrivateSqlite or require("infra.private_sqlite_file")

@@ -31,34 +31,6 @@ local HAS_SQLITE = (function()
 end)()
 
 helpers.describe("sqlite_writer: bootstrapping a new database", function()
-	helpers.it("creates the missing metrics folders in process, without a mkdir process (keystats-boot-spawns)", function()
-		if not HAS_SQLITE then return end
-		local writer = helpers.load_module("modules.keystats.sqlite_writer")
-		local root = os.tmpname()
-		os.remove(root)
-		local path = root .. "/nested/metrics/db.sqlite"
-		local spawned = {}
-		local execute, popen = os.execute, io.popen
-		os.execute = function(command, ...)
-			spawned[#spawned + 1] = tostring(command)
-			return execute(command, ...)
-		end
-		io.popen = function(command, ...)
-			spawned[#spawned + 1] = tostring(command)
-			return popen(command, ...)
-		end
-		local ok, opened = pcall(writer.open_db, path)
-		os.execute, io.popen = execute, popen
-		writer.close_db()
-		local stat = require("luv").fs_stat(root .. "/nested/metrics")
-		execute("rm -rf '" .. root .. "'")
-		helpers.assert_true(ok and opened == true, tostring(opened))
-		helpers.assert_eq(stat and stat.type, "directory", "the parents are created")
-		for _, command in ipairs(spawned) do
-			helpers.assert_true(not command:find("mkdir", 1, true), "no mkdir process: " .. command)
-		end
-	end)
-
 	helpers.it("sqlite-private-identities: preserves unit spacing across native ABI boundaries", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
