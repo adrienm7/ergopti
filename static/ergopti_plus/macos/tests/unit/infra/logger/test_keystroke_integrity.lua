@@ -18,7 +18,7 @@ helpers.describe("infra.keystroke_integrity", function()
 	local saved = {
 		logger = package.loaded["infra.logger"],
 		deferred = package.loaded["infra.deferred_work"],
-		timer = package.loaded["adapters.timer_scheduler"],
+		timer = package.loaded["core.events.timer_scheduler"],
 		subject = package.loaded["infra.keystroke_integrity"],
 	}
 	local now_ms = 0
@@ -34,7 +34,7 @@ helpers.describe("infra.keystroke_integrity", function()
 			return true
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = { now_ns = function() return now_ms * 1e6 end }
+	package.loaded["core.events.timer_scheduler"] = { now_ns = function() return now_ms * 1e6 end }
 	package.loaded["infra.keystroke_integrity"] = nil
 	local Integrity = require("infra.keystroke_integrity")
 
@@ -104,6 +104,6 @@ helpers.describe("infra.keystroke_integrity", function()
 
 	package.loaded["infra.logger"] = saved.logger
 	package.loaded["infra.deferred_work"] = saved.deferred
-	package.loaded["adapters.timer_scheduler"] = saved.timer
+	package.loaded["core.events.timer_scheduler"] = saved.timer
 	package.loaded["infra.keystroke_integrity"] = saved.subject
 end)

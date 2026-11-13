@@ -203,7 +203,7 @@ local function deps()
 		installer = require("modules.updater.release_installer"),
 		coordinator = require("infra.termination_coordinator"),
 		handoff = require("modules.updater.feed_handoff"),
-		timer = require("adapters.timer_scheduler"),
+		timer = require("core.events.timer_scheduler"),
 	}
 end
 

@@ -77,7 +77,7 @@ local DEFAULT_DEPS = {
 			return require("modules.gestures.combo_emitter").press(combo)
 		end
 		return require("adapters.clipboard").read_selection_uri_list(
-			guarded_press, require("adapters.event_loop").sleep_ms)
+			guarded_press, require("core.events.loop").sleep_ms)
 	end,
 	write_clipboard = function(text) return require("adapters.clipboard").write(text) end,
 	notify_success = function(message)

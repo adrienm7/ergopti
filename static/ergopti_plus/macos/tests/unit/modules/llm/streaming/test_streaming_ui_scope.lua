@@ -8,7 +8,7 @@
 
 local helpers = require("tests.helpers")
 local SUBJECT = "tests.unit.modules.llm.streaming.test_streaming_handler_ui_commit_gate"
-local OWNERS = { "modules.llm.parser", "modules.llm.streaming_handler", "adapters.timer_scheduler" }
+local OWNERS = { "modules.llm.parser", "modules.llm.streaming_handler", "core.events.timer_scheduler" }
 
 local function capture_scenario()
 	local register = helpers.it

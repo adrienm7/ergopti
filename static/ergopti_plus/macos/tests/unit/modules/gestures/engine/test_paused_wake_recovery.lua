@@ -40,7 +40,7 @@ local function with_runtime(scenario)
 			for _, handle in ipairs(runtime.wake_handles) do
 				helpers.assert_eq(handle.running, false, "every retired wake watcher must stop")
 			end
-			for _, handle in ipairs(require("adapters.timer_scheduler").handles) do
+			for _, handle in ipairs(require("core.events.timer_scheduler").handles) do
 				helpers.assert_eq(handle.active, false, "every owned timer must cancel")
 			end
 		end, debug.traceback)
@@ -76,7 +76,7 @@ local function prepare_live_runtime(gestures, runtime, watcher)
 	deliver_touch(runtime, watcher)
 	helpers.assert_eq(runtime.engine_process_calls, 1)
 	helpers.assert_eq(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME, true)
-	local scheduler = require("adapters.timer_scheduler")
+	local scheduler = require("core.events.timer_scheduler")
 	scheduler.handles[1].callback()
 	helpers.assert_eq(#scheduler.handles, 2,
 		"the first-frame observation must enter the normal slow health timer")

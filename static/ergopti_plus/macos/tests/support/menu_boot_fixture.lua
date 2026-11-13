@@ -35,7 +35,7 @@ local REAL_MODULES = {
 	"ui.menu.recoverable_file_moves",
 	"ui.menu.click_gate",
 	-- Captures hs at require time; each boot gets a fresh stub table.
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 }
 
 --- Deep-copies plain Lua data so fixture snapshots cannot alias live state.

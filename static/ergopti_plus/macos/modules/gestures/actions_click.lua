@@ -27,7 +27,7 @@ local Logger          = require("infra.logger")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput  = require("adapters.synthetic_input")
 local Timings         = require("infra.timings")
-local TimerScheduler  = require("adapters.timer_scheduler")
+local TimerScheduler  = require("core.events.timer_scheduler")
 local LOG             = "gestures.click"
 
 -- Delay to ignore the spurious mouseUp from the gesture’s own finger-lift

@@ -26,7 +26,7 @@ local KeyboardGeometry = require("adapters.keyboard_geometry")
 local ControlSentinels = require("modules.keymap.control_sentinels")
 local SelftestGate = require("modules.keymap.selftest_gate")
 local SyntheticInput = require("adapters.synthetic_input")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
 local Keycodes   = require("infra.keycodes")
@@ -48,7 +48,7 @@ local HotPath    = require("infra.hotpath_profiler")
 local KeystrokeIntegrity = require("infra.keystroke_integrity")
 local KeyEventHealth = require("infra.key_event_health")
 local UnicodeCarrier = require("adapters.unicode_carrier")
-local EventClock = require("adapters.event_clock")
+local EventClock = require("core.events.clock")
 local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 local ConfigKeys = require("settings.engine.keys")
@@ -2229,8 +2229,8 @@ local AUTOREPEAT_PROPERTY = eventtap.event.properties.keyboardEventAutorepeat
 --- is protected and both only write tables.
 --- @param e table Physical keyDown or keyUp event.
 --- @param phase string "down" or "up".
---- @param lateness_ms number|nil Callback lateness from adapters/event_clock.lua.
---- @param stamp integer|nil Raw event stamp from adapters/event_clock.lua.
+--- @param lateness_ms number|nil Callback lateness from core/events/clock.lua.
+--- @param stamp integer|nil Raw event stamp from core/events/clock.lua.
 --- @return any keycode The key code read, or nil when it could not be read.
 local function observe_key_health(e, phase, lateness_ms, stamp)
 	local ok_code, keycode = pcall(e.getKeyCode, e)

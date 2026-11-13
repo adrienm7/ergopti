@@ -48,7 +48,7 @@ helpers.describe("clipboard: a write that throws must not keep the user's clipbo
 	helpers.it("the sibling that was already fixed still restores", function()
 		helpers.with_stub_scope({
 			"adapters.text_sender", "adapters.clipboard", "adapters.synthetic_input",
-			"adapters.timer_scheduler", "adapters.event_provenance", "adapters.storage",
+			"core.events.timer_scheduler", "adapters.event_provenance", "adapters.storage",
 			"adapters.json_codec", "infra.logger", "infra.paths", "infra.timings",
 		}, function()
 			local f = require("tests.support.synthetic_input_fixture").make({ deliver_trigger = false })

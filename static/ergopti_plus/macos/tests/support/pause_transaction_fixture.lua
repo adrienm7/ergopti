@@ -27,7 +27,7 @@ local OWNERS = {
 	"ui.tooltip",
 	"modules.keystats",
 	"adapters.event_provenance",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 }
 
 --- Loads a fresh script-control module over observable subsystem doubles.

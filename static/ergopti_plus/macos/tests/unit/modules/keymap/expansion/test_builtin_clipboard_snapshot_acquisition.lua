@@ -22,7 +22,7 @@ local function with_world(scenario)
 			if w.multi then return { { "public.utf8-plain-text" }, { "public.file-url" } } end
 			return native_types()
 		end
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		local original, foreign = {}, {
 			["public.utf8-plain-text"] = "FOREIGN INITIAL COPY",
 			["public.html"] = "<i>FOREIGN INITIAL COPY</i>",

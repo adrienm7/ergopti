@@ -815,13 +815,13 @@ function M.start_session(opts)
 		is_paused = opts.is_paused,
 		on_available = opts.on_available,
 		config = config,
-		timer = require("adapters.timer_scheduler"),
+		timer = require("core.events.timer_scheduler"),
 		storage = require("adapters.storage"),
 		http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
 		manual_http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
 		now = os.time,
 	})
-	local watcher = require("adapters.wake_watcher").new(owner.on_wake)
+	local watcher = require("core.events.wake_watcher").new(owner.on_wake)
 	local watcher_ok, watcher_started = pcall(watcher.start)
 	if not watcher_ok or watcher_started ~= true then
 		Logger.error(LOG, "The wake watcher did not start; a wake is caught at the next bounded re-evaluation.")

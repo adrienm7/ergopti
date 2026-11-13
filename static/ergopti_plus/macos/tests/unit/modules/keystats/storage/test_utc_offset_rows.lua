@@ -48,7 +48,7 @@ helpers.describe("keystats: rows in UTC with their recorded offset (utc-offset-r
 			helpers.with_stub_scope({
 				"infra.logger", "adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
 				"modules.keystats.aggregator", "modules.keystats.rotation", "modules.keystats.export",
-				"metrics.engine.metrics", "adapters.file_system", "adapters.timer_scheduler",
+				"metrics.engine.metrics", "adapters.file_system", "core.events.timer_scheduler",
 			}, function()
 				package.loaded["infra.logger"] = helpers.make_logger_stub()
 				local seen = {}

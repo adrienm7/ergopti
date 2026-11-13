@@ -33,7 +33,7 @@ local STUBBED_MODULES = {
 	"adapters.file_system",
 	"adapters.ledger_append",
 	"tests.support.keystats.absent_ledger_file_system",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 }
 
 local function make_state()
@@ -123,7 +123,7 @@ local function run_unowned_case(failure)
 	end
 	local timer_handle = make_timer_handle(nil)
 
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	local module = helpers.load_with_stubs("modules.keystats.log_manager", {
 		execute = function(command)
 			if command:find("ioreg", 1, true) then return HOST_SIGNATURE end
@@ -310,7 +310,7 @@ local function run_publication_case(failure)
 	end
 	local timer_handle = make_publication_timer_handle(nil)
 
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	local module = require("tests.support.keystats.absent_ledger_file_system").load({
 		execute = function(command)
 			if command:find("ioreg", 1, true) then return HOST_SIGNATURE end

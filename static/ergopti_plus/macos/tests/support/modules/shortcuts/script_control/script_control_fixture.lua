@@ -88,7 +88,7 @@ end
 
 -- ScriptControl's watchdog scheduler must capture the same fresh hs stub as
 -- ScriptControl itself; load_with_stubs deliberately reloads only its target.
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 local SC = helpers.load_with_stubs("modules.shortcuts.script_control")
 
 return {

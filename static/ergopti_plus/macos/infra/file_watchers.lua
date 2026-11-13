@@ -35,7 +35,7 @@ local fs_dir        = require("infra.fs_dir")
 local git_status    = require("infra.git_status")
 local reload_gate   = require("core.lifecycle.engine.reload.gate")
 local RuntimeLog    = require("diagnostics.engine.runtime_log")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG = "file_watchers"
 

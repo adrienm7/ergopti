@@ -30,7 +30,7 @@ local function with_baseline(callback)
 	return Native.with_runtime(function(runtime)
 		local hs, field = runtime.hs, runtime.ax_native.field
 		local clock, timer_new, attribute = hs.timer.absoluteTime, hs.timer.new, field.attributeValue
-		local scheduler = assert(package.loaded["adapters.timer_scheduler"])
+		local scheduler = assert(package.loaded["core.events.timer_scheduler"])
 		local now, reads, timers = clock() / 1000000, { count = 0 }, {}
 		hs.timer.absoluteTime = function() return now * 1000000 end
 		hs.timer.new = function(delay, work)

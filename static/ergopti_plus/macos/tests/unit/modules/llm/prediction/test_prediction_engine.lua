@@ -229,7 +229,7 @@ local function load_real_setting_bridge()
 		["modules.keymap.registry"] = {},
 		["modules.hotstrings.hotstrings_config"] = {},
 		["modules.keymap.expander"] = {},
-		["adapters.timer_scheduler"] = {after = noop},
+		["core.events.timer_scheduler"] = {after = noop},
 		["infra.manifest_reader"] = {},
 		["modules.diagnostics.hid_diagnostic_mailbox"] = {},
 		["modules.llm.prediction_engine"] = PE,
@@ -374,7 +374,7 @@ end)
 helpers.describe("prediction_engine - Ollama daemon recovery", function()
 	helpers.it("restarts only the active runtime and parks recovery while paused", function()
 		local core = package.loaded["modules.llm"]
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		local original_backend = core.get_backend
 		local original_runtime = core.get_runtime_llm_enabled
 		local original_after = scheduler.after
@@ -470,7 +470,7 @@ helpers.describe("prediction_engine - Ollama daemon recovery", function()
 	}) do
 		helpers.it("retains recovery cleanup debt when timer cancel returns " .. case.name, function()
 			local core = package.loaded["modules.llm"]
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local original_backend = core.get_backend
 			local original_after = scheduler.after
 			local original_cancel = scheduler.cancel
@@ -1011,7 +1011,7 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 		local core = package.loaded["modules.llm"]
 		local streaming = package.loaded["modules.llm.streaming_handler"]
 		local keystats = package.loaded["modules.keystats"]
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		local previous_fetch = core.fetch_llm_prediction
 		local previous_build = streaming.build_callbacks
 		local previous_log = keystats.log_llm_dismissed

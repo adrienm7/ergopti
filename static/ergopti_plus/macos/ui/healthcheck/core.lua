@@ -32,7 +32,7 @@ local Paths    = require("infra.paths")
 local Snapshot = require("diagnostics.engine.healthcheck.snapshot")
 local Cleanup = require("diagnostics.engine.healthcheck.cleanup")
 local Actions  = require("diagnostics.engine.healthcheck.actions")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local DeferredWork = require("infra.deferred_work")
 local TableUtil = require("core.text.engine.table_util")
 local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
@@ -506,7 +506,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.event_clock",
+		id       = "core.events.clock",
 		contract = { "lateness_ms", "duration_ms" },
 		-- The keymap taps and the physical fence read every key event's lateness.
 		wired    = true,
@@ -701,7 +701,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.timer_scheduler",
+		id       = "core.events.timer_scheduler",
 		contract = { "after", "every" },
 		wired    = true,
 	},
@@ -732,7 +732,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.wake_watcher",
+		id       = "core.events.wake_watcher",
 		contract = { "new" },
 		wired    = true,
 	},

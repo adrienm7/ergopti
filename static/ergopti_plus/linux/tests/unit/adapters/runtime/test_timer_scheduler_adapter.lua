@@ -9,7 +9,7 @@
 ---   sudo apt install lua-luv  (or luarocks install luv)
 
 local helpers = require("tests.helpers")
-local ts      = helpers.load_module("adapters.timer_scheduler")
+local ts      = helpers.load_module("core.events.timer_scheduler")
 
 -- Native API double: the backend retains callbacks, not returned Lua tokens.
 local function timer_fixture()
@@ -31,10 +31,10 @@ local function timer_fixture()
 		local timer = state.timers[index]
 		if not timer.closed and not timer.stopped then timer.callback() end
 	end
-	local previous_backend, previous_scheduler = package.loaded.luv, package.loaded["adapters.timer_scheduler"]
-	package.loaded.luv, package.loaded["adapters.timer_scheduler"] = backend, nil
-	local scheduler = require("adapters.timer_scheduler")
-	package.loaded.luv, package.loaded["adapters.timer_scheduler"] = previous_backend, previous_scheduler
+	local previous_backend, previous_scheduler = package.loaded.luv, package.loaded["core.events.timer_scheduler"]
+	package.loaded.luv, package.loaded["core.events.timer_scheduler"] = backend, nil
+	local scheduler = require("core.events.timer_scheduler")
+	package.loaded.luv, package.loaded["core.events.timer_scheduler"] = previous_backend, previous_scheduler
 	return scheduler, state
 end
 
@@ -343,12 +343,12 @@ end)
 
 local function with_luv(fake_luv, body)
   local previous_luv = package.loaded["luv"]
-  local previous_scheduler = package.loaded["adapters.timer_scheduler"]
+  local previous_scheduler = package.loaded["core.events.timer_scheduler"]
   package.loaded["luv"] = fake_luv
-  package.loaded["adapters.timer_scheduler"] = nil
-  local ok, err = pcall(function() body(require("adapters.timer_scheduler")) end)
+  package.loaded["core.events.timer_scheduler"] = nil
+  local ok, err = pcall(function() body(require("core.events.timer_scheduler")) end)
   package.loaded["luv"] = previous_luv
-  package.loaded["adapters.timer_scheduler"] = previous_scheduler
+  package.loaded["core.events.timer_scheduler"] = previous_scheduler
   helpers.assert_true(ok, "luv timer probe must not throw: " .. tostring(err))
 end
 
@@ -594,7 +594,7 @@ helpers.describe("native timer constructor rollback ownership", function()
 		for _, start in ipairs({ "false", "throw" }) do
 			for _, rollback in ipairs({ "accepted", "refused" }) do
 				helpers.it("(timer-start-retirement) " .. method .. " start " .. start .. " rollback " .. rollback, function()
-					local previous = package.loaded["adapters.timer_scheduler"]
+					local previous = package.loaded["core.events.timer_scheduler"]
 					local state = { allocations = 0, starts = 0, closes = 0, physical = 0,
 						callbacks = 0, allow_close = rollback == "accepted" }
 					local backend = setmetatable({
@@ -623,8 +623,8 @@ helpers.describe("native timer constructor rollback ownership", function()
 							end)
 						end,
 					}, { __index = uv })
-					local scheduler = helpers.load_module_with_dependency("adapters.timer_scheduler", "luv", backend)
-					package.loaded["adapters.timer_scheduler"] = previous
+					local scheduler = helpers.load_module_with_dependency("core.events.timer_scheduler", "luv", backend)
+					package.loaded["core.events.timer_scheduler"] = previous
 					local ok, detail = pcall(function()
 						local token = scheduler[method](60, function() state.callbacks = state.callbacks + 1 end)
 						helpers.assert_true(token.fired and not token.armed)

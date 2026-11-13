@@ -18,7 +18,7 @@ local function load_real_sticky_pause_owner()
 			or name == "modules.gestures.sticky_modifiers"
 			or name == "modules.gestures"
 			or name == "adapters.modifier_injector"
-			or name == "adapters.timer_scheduler") then
+			or name == "core.events.timer_scheduler") then
 			package.loaded[name] = nil
 		end
 	end
@@ -72,7 +72,7 @@ local function load_real_sticky_pause_owner()
 		end,
 	}, { __index = function() return function() return true end end })
 
-	local TimerScheduler = require("adapters.timer_scheduler")
+	local TimerScheduler = require("core.events.timer_scheduler")
 	local Injector = require("adapters.modifier_injector")
 	local Sticky = require("modules.gestures.sticky_modifiers")
 
@@ -131,7 +131,7 @@ local function load_real_sticky_pause_owner()
 		default_for = function() return false end,
 		recommended_for = function() return "none" end,
 	}
-	package.loaded["adapters.timer_scheduler"] = TimerScheduler
+	package.loaded["core.events.timer_scheduler"] = TimerScheduler
 	reset_module("modules.gestures")
 	local gestures = require("modules.gestures")
 

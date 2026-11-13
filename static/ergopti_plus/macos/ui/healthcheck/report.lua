@@ -81,7 +81,7 @@ local function open_with(args, done, current)
 		if retired() then cleanup[#cleanup + 1] = request end
 	end
 	for _, request in ipairs(cleanup) do request.cancel() end
-	local Scheduler = require("adapters.timer_scheduler")
+	local Scheduler = require("core.events.timer_scheduler")
 	local request, task, timer = {}, nil, nil
 	local active, terminal, retiring, forced_error = true, false, false, nil
 	local function stop_timer()

@@ -33,7 +33,7 @@ helpers.describe("HttpClient timeout ownership transaction", function()
 		local timer_stub = make_single_timer("success")
 		local http_stub = make_http_stub()
 		package.loaded["adapters.http_client"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		local HttpClient = helpers.load_with_stubs("adapters.http_client", {
 			timer = timer_stub,
 			http = http_stub,

@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
 	"infra.logger",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.http_client",
 }
 

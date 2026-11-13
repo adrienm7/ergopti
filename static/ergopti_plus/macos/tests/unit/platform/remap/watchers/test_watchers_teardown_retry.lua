@@ -171,7 +171,7 @@ local function fresh_harness()
 			return schedule_after
 		end,
 	})
-	package.loaded["adapters.timer_scheduler"] = timer_scheduler
+	package.loaded["core.events.timer_scheduler"] = timer_scheduler
 
 	package.loaded["adapters.shell_runner"] = {
 		spawn = function(_command, _args, callback)
@@ -880,7 +880,7 @@ helpers.describe("watchers app-switch teardown is exact and retryable", function
 		helpers.with_stub_scope({
 			"tests.stubs.hs", "platform.remap.watchers", "modules.keymap.control_sentinels",
 			"adapters.synthetic_input", "adapters.input_source_broker", "infra.logger",
-			"adapters.timer_scheduler", "adapters.shell_runner", "adapters.hotkey_registrar",
+			"core.events.timer_scheduler", "adapters.shell_runner", "adapters.hotkey_registrar",
 			"adapters.key_state", "adapters.mouse_control", "adapters.task_lifecycle",
 			"platform.remap.ke_paths", "platform.remap.lease_contract", "platform.remap.ke_variables",
 		}, function()

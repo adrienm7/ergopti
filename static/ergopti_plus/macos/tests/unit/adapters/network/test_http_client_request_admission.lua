@@ -73,7 +73,7 @@ local function load_client(redirects)
 		}
 	end
 	package.loaded["adapters.http_client"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["infra.logger"] = nil
 	local HttpClient = helpers.load_with_stubs("adapters.http_client", { http = http, timer = timer })
 	local logs = {}

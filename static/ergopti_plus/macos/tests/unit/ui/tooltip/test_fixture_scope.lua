@@ -13,7 +13,7 @@ local OWNERS = {
 	"hs", "tests.stubs.hs", "ui.tooltip.config", "ui.tooltip.renderer",
 	"ui.tooltip.tooltip_llm", "ui.tooltip.tooltip_hotstring", "ui.tooltip", "ui.tooltip.init",
 	"adapters.event_provenance", "adapters.key_state", "adapters.synthetic_input",
-	"adapters.timer_scheduler", "adapters.storage", "infra.hotpath_profiler", "infra.logger",
+	"core.events.timer_scheduler", "adapters.storage", "infra.hotpath_profiler", "infra.logger",
 }
 
 local function with_observer(callback)

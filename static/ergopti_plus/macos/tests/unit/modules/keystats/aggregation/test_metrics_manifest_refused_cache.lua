@@ -143,7 +143,7 @@ local APP_OWNERS = {
 	"infra.logger", "hs.sqlite3", "hs.json", "core.text.engine.json", "ui.metrics_apps", "tests.stubs.hs", "hs", "hs.fs",
 	"tests.support.metrics_delivery_fixture", "tests.support.dashboard_window_fixture", "ui.ui_builder",
 	"infra.paths", "infra.i18n", "infra.dialog_util", "infra.deferred_work", "infra.config_paths",
-	"adapters.file_system", "adapters.timer_scheduler", "adapters.webview_result",
+	"adapters.file_system", "core.events.timer_scheduler", "adapters.webview_result",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 }
 

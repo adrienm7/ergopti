@@ -35,7 +35,7 @@ local function load_keymap()
 		reset_for_action_epoch = function() return true end,
 	}, { __index = function() return function() end end })
 
-	local scheduler = require("adapters.timer_scheduler")
+	local scheduler = require("core.events.timer_scheduler")
 	local scheduler_hs = hs
 	local original_awake = scheduler.hotstring_time
 	scheduler.hotstring_time = function() return original_awake() + 10000 end
@@ -184,7 +184,7 @@ helpers.describe("hotstrings.idle_reset_seconds: a pause starts a new word", fun
 
 	helpers.it("expires suppression after wall-clock rollback on the real key tap (hotstring-clock-regression)", function()
 		with_keymap(function(f)
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local old_awake, old_wall = scheduler.hotstring_time, hs.timer.secondsSinceEpoch
 			local awake, wall = 1000, 1000
 			scheduler.hotstring_time = function() return awake end
@@ -202,7 +202,7 @@ helpers.describe("hotstrings.idle_reset_seconds: a pause starts a new word", fun
 
 	helpers.it("expires suppression after sleep on the real key tap (hotstring-clock-wake)", function()
 		with_keymap(function(f)
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local old_awake, old_wall = scheduler.awake_time, f.clock_hs.timer.secondsSinceEpoch
 			local awake, wall = 20000, 50000
 			scheduler.awake_time = function() return awake end

@@ -45,7 +45,7 @@ local function with_caps_word(source, body)
 				now_sec = function() return context.now / 1000 end,
 				resolution_ms = function() return context.resolution end,
 			}
-			local EventLoop = require("adapters.event_loop")
+			local EventLoop = require("core.events.loop")
 			local original_defer = EventLoop.defer
 			EventLoop.defer = function(fn, delay_ms)
 				context.deferred[#context.deferred + 1] = { fn = fn, due = context.now + delay_ms }

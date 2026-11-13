@@ -40,9 +40,9 @@ end
 --- Runs a scenario over a fresh scanner with fake commands, files and timers.
 --- @param scenario function Receives (Scanner, world).
 local function with_scanner(scenario)
-	helpers.with_fresh_modules({ "modules.llm.local_server_ports", "adapters.timer_scheduler" }, function()
+	helpers.with_fresh_modules({ "modules.llm.local_server_ports", "core.events.timer_scheduler" }, function()
 		local world = { runs = {}, timers = {}, files = {}, terminated = 0, cancellations = {} }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(seconds, fn)
 				if world.raise_timer then error("controlled scheduler failure") end
 				local timer = { seconds = seconds, fn = fn }

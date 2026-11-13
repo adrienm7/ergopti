@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local OWNED = { "ui.physical_shortcuts", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
-	"adapters.timer_scheduler", "infra.logger", "infra.paths", "infra.i18n", "core.ui.engine.webview.i18n_seed", "core.ui.engine.window_titles",
+	"core.events.timer_scheduler", "infra.logger", "infra.paths", "infra.i18n", "core.ui.engine.webview.i18n_seed", "core.ui.engine.window_titles",
 	"adapters.file_system", "adapters.json_codec", "shortcuts.engine.physical_slots", "shortcuts.engine.physical_editor_window",
 	"shortcuts.engine.physical_availability", "infra.locale", "core.i18n.engine.core", "core.ui.engine.webview.presentation", "hs.webview", "core.text.engine.json" }
 

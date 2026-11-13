@@ -23,7 +23,7 @@ FILTER_SCOPE = (
 DEPENDENCIES = (
     "static/ergopti_plus/macos/ui/ui_builder.lua",
     "static/ergopti_plus/macos/ui/webview_close_owner.lua",
-    "static/ergopti_plus/macos/adapters/timer_scheduler.lua",
+    "static/ergopti_plus/macos/core/events/timer_scheduler.lua",
     "static/ergopti_plus/macos/infra/deferred_work.lua",
     "static/ergopti_plus/macos/adapters/webview_result.lua",
     "static/ergopti_plus/macos/ui/metrics_apps/init.lua",

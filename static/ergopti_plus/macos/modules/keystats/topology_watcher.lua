@@ -36,7 +36,7 @@ local _session = nil
 --- @return table ports
 local function default_ports()
 	local WindowInfo = require("adapters.window_info")
-	local TimerScheduler = require("adapters.timer_scheduler")
+	local TimerScheduler = require("core.events.timer_scheduler")
 	return {
 		focused = WindowInfo.focused_topology,
 		running_bundle_ids = WindowInfo.running_bundle_ids,

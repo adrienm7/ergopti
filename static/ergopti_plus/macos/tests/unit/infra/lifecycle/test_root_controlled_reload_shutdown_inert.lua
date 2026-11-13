@@ -20,7 +20,7 @@ local MODULE_NAMES = {
 	"hs",
 	"tests.stubs.hs",
 	"infra.logger",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.keyboard_geometry",
 	"adapters.synthetic_input",
 	"platform.remap.ke_lifecycle",
@@ -235,7 +235,7 @@ local function run_isolated(options, assertions)
 
 		local fakes = {
 			["infra.logger"] = Logger,
-			["adapters.timer_scheduler"] = {
+			["core.events.timer_scheduler"] = {
 				cancelAll = function()
 					state.cancel_all_calls = state.cancel_all_calls + 1
 					return true

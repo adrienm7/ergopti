@@ -35,7 +35,7 @@ helpers.describe("tooltip watcher reuse preserves dequeue ownership", function()
 	helpers.it("(hotstring-clock-regression) expires a row despite a wall clock rollback", function()
 		with_fixture(function(fixture)
 			local context = fixture.load_tooltip(CASES[2])
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local old_awake, old_wall = scheduler.hotstring_time, hs.timer.secondsSinceEpoch
 			local awake, wall, expiries = 100, 100, 0
 			scheduler.hotstring_time = function() return awake end

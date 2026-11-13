@@ -28,11 +28,11 @@ local DIRECTIONS = { "up", "down", "left", "right", "left_up", "left_down", "rig
 local function run(path, bindings)
 	local hs = _G.hs
 	local saved_clock, saved_absolute = hs.timer.secondsSinceEpoch, hs.timer.absoluteTime
-	local saved_scheduler, saved_timings = package.loaded["adapters.timer_scheduler"], package.loaded["infra.timings"]
+	local saved_scheduler, saved_timings = package.loaded["core.events.timer_scheduler"], package.loaded["infra.timings"]
 	local clock = 2000.0
 	hs.timer.secondsSinceEpoch = function() return clock end
 	hs.timer.absoluteTime = function() return clock * 1e9 end
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["infra.timings"] = nil
 	package.loaded["modules.gestures.engine"] = nil
 	hs.eventtap.__reset()
@@ -66,7 +66,7 @@ local function run(path, bindings)
 	end, debug.traceback)
 	pcall(function() require("modules.gestures.engine").stop() end)
 	hs.timer.secondsSinceEpoch, hs.timer.absoluteTime = saved_clock, saved_absolute
-	package.loaded["adapters.timer_scheduler"], package.loaded["infra.timings"] = saved_scheduler, saved_timings
+	package.loaded["core.events.timer_scheduler"], package.loaded["infra.timings"] = saved_scheduler, saved_timings
 	package.loaded["modules.gestures.engine"] = nil
 	if not ok then error(err, 0) end
 	return fired

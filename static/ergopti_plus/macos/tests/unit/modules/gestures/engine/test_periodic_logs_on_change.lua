@@ -38,7 +38,7 @@ local Replay  = require("tests.support.repeat_collapsing_replay")
 -- ===========================================
 
 local MODULE_NAMES = {
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"hs",
 	"hs._asm.undocumented.touchdevice",
 	"hs.caffeinate.watcher",
@@ -143,7 +143,7 @@ local function with_fixture(scenario)
 		if handle then handle.active = false end
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 
 	-- One running watcher per device, as a healthy touchdevice delivers.
 	local function new_watcher()

@@ -217,7 +217,7 @@ function M.hold_tray(deps, texts)
 	end)
 	show_details()
 	Logger.start(LOG, "Holding the degraded tray until Quit.")
-	local sleep_ms = deps.sleep_ms or require("adapters.event_loop").sleep_ms
+	local sleep_ms = deps.sleep_ms or require("core.events.loop").sleep_ms
 	while not quit do
 		tray.pump()
 		actions.run_once()

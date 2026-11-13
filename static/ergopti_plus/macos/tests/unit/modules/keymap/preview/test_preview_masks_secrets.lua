@@ -247,7 +247,7 @@ local PREVIEW_OWNERSHIP = {
 	"modules.llm.prediction_engine",
 	"modules.llm.warmup_controller",
 	"modules.llm.streaming_handler",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 }
 
 local function capture_rows(register, buf)

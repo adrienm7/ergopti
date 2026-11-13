@@ -252,7 +252,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 
 	helpers.it("retains a deferred personal-shortcuts launch until delivery", function()
 		helpers.with_fresh_modules({
-			"adapters.timer_scheduler",
+			"core.events.timer_scheduler",
 			"infra.deferred_work",
 			"infra.personal_shortcuts",
 		}, function()
@@ -352,7 +352,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 
 	helpers.it("retains a clickable notification and releases it after activation", function()
 		helpers.with_fresh_modules({
-			"adapters.timer_scheduler",
+			"core.events.timer_scheduler",
 			"infra.notifications",
 		}, function()
 			local weak_timers, restore_timers = install_weak_timers()

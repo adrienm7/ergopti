@@ -224,7 +224,7 @@ Offer._reset_for_test({ confirm = function()
 	model_consents = model_consents + 1
 	return true
 end })
-local EventLoop = require("adapters.event_loop")
+local EventLoop = require("core.events.loop")
 local expired = false
 local fixture_timer = assert(uv.new_timer())
 assert(fixture_timer:start(900000, 0, function()
