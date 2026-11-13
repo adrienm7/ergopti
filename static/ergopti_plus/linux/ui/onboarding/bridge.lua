@@ -49,6 +49,9 @@ local _catalogue = nil
 
 -- This exact request owner outlives view disposal and daemon-state replacement.
 local _publication = nil
+-- The language chosen on the first step, until Finish persists it: the host's
+-- dialogs during the wizard speak it, as on Windows and macOS (OBM-001).
+local _chosen_strings = nil
 local _finish_gate = require("onboarding.engine.publication").callback_gate()
 
 local function dependency(state, field, module_name)
@@ -255,8 +258,22 @@ end
 
 local normalize_config_dir = ConfigDirPicker.normalize
 
+--- Translates a host string in the language chosen in the wizard, else in the
+--- running one.
+--- @param state table Daemon state.
+--- @return table translator { get(key) }.
+local function wizard_translator(state)
+	local i18n = dependency(state, "i18n", "infra.i18n")
+	local strings = _chosen_strings
+	return { get = function(key)
+		if strings and type(strings[key]) == "string" then return strings[key] end
+		return i18n.get(key)
+	end }
+end
+
 --- Tells the user what the wizard could not save, as the other hosts' dialogs
---- do; a refused commit leaves the window open for a retry.
+--- do, in the language chosen in the wizard; a refused commit leaves the window
+--- open for a retry.
 --- @param state table Daemon state.
 --- @param key string Locale key of the message.
 local function report_failure(state, key)
@@ -264,7 +281,7 @@ local function report_failure(state, key)
 		Logger.error(LOG, "Onboarding failure '%s' has no notifier to reach the user.", key)
 		return
 	end
-	local ok, err = pcall(state.notify_error, key)
+	local ok, err = pcall(state.notify_error, key, wizard_translator(state).get)
 	if not ok then
 		Logger.error(LOG, "Onboarding failure '%s' could not be shown: %s.", key, tostring(err))
 	end
@@ -557,9 +574,8 @@ end
 local function pick_config_dir(state, current, page_current)
 	local shell = dependency(state, "shell", "adapters.shell_runner")
 	local config_paths = dependency(state, "config_paths", "infra.config_paths")
-	local i18n = dependency(state, "i18n", "infra.i18n")
 	if not shell or not config_paths then return { picked = false } end
-	local normalized = ConfigDirPicker.pick(shell, config_paths, i18n, current)
+	local normalized = ConfigDirPicker.pick(shell, config_paths, wizard_translator(state), current)
 	if not normalized or not page_current() then return { picked = false } end
 	push(state, "setConfigDir", normalized, page_current)
 	return { picked = true, path = normalized }
@@ -605,6 +621,8 @@ function M.on_message(payload, state, context)
 		return { pushed = false }
 	end
 	if action == "ready" then
+		-- A fresh page starts in the running language.
+		_chosen_strings = nil
 		local data = build_init_data(state)
 		if not data then return { pushed = false } end
 		return { pushed = push(state, "initData", data, page_current), data = data,
@@ -619,7 +637,11 @@ function M.on_message(payload, state, context)
 		}, page_current), titled = retitle(state, strings, page_current) }
 	elseif action == "localeSelected" then
 		local i18n = dependency(state, "i18n", "infra.i18n")
-		return { accepted = locale_available(i18n, payload.locale) }
+		if not locale_available(i18n, payload.locale) then return { accepted = false } end
+		local strings = locale_strings(payload.locale)
+		if not strings then return { accepted = false } end
+		_chosen_strings = strings
+		return { accepted = true }
 	elseif action == "pickConfigDir" then
 		return pick_config_dir(state, payload.current, page_current)
 	elseif action == "resolveMetricsPath" then
