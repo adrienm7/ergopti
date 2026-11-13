@@ -50,6 +50,23 @@ function run() {
 	const fixture = 'static/ergopti_plus/windows/tests/fixtures/zz_probe_fixture.ahk';
 	const fixtureRows = Plan.scanFile(fixture, text, Plan.referenceContext(stepMap));
 	assert.equal(Apply.rewriteText(text, fixtureRows, new Map(), fixture), text);
+	// A scattered folder: kept while it holds files, refused once emptied.
+	const folder = '\tRoot := A_ScriptDir . "\\..\\zz_probe_dir\\"\n';
+	const keeps = new Map([
+		['windows/zz_probe_dir/a.ahk', 'windows/core/zz_a/a.ahk'],
+		['windows/zz_probe_dir/b.ahk', 'windows/zz_probe_dir/b.ahk']
+	]);
+	const kept = Plan.scanFile(included, folder, Plan.referenceContext(keeps));
+	assert.ok(!kept.some((r) => Plan.REFUSED_KINDS.has(r.kind)), JSON.stringify(kept));
+	const empties = new Map([
+		['windows/zz_probe_dir/a.ahk', 'windows/core/zz_a/a.ahk'],
+		['windows/zz_probe_dir/b.ahk', 'windows/core/zz_b/b.ahk']
+	]);
+	const emptied = Plan.scanFile(included, folder, Plan.referenceContext(empties));
+	assert.ok(
+		emptied.some((r) => r.kind === 'dir-split'),
+		JSON.stringify(emptied)
+	);
 	console.log(`[OK] an included test's A_ScriptDir climb follows the file ${step.id} moves.`);
 }
 
