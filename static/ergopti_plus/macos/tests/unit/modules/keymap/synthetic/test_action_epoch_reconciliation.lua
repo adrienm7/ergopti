@@ -450,15 +450,19 @@ helpers.describe("keymap action epochs", function()
 	helpers.it("drops the emulation's pending dead key when processing pauses (pause-drops-dead-key)", function()
 		local fixture = load_fixture()
 		local emulation = package.loaded["modules.keymap.layout_emulation"]
-		local original, drops = emulation.drop_pending_dead_key, 0
+		local original, original_reset, drops, resets = emulation.drop_pending_dead_key, emulation.reset, 0, 0
 		emulation.drop_pending_dead_key = function() drops = drops + 1; return true end
+		emulation.reset = function() resets = resets + 1 end
 		local ok, err = pcall(function()
 			helpers.assert_eq(fixture.keymap.pause_processing(), true)
 			helpers.assert_eq(drops, 1, "the pause reaches the emulation's dead key")
+			helpers.assert_eq(resets, 0,
+				"a full reset at pause would drop a held modifier's release (pause-keeps-held-modifier)")
 			helpers.assert_eq(fixture.keymap.resume_processing(), true)
 			helpers.assert_eq(drops, 1, "a resume drops nothing")
 		end)
 		emulation.drop_pending_dead_key = original
+		emulation.reset = original_reset
 		fixture.keymap.stop()
 		if not ok then error(err, 0) end
 	end)

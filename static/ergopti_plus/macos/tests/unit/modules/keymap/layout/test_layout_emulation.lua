@@ -293,6 +293,22 @@ helpers.describe("layout emulation (macOS): a layout source's records", function
 		helpers.assert_eq(after.unicode, "a", "the keylayout types again")
 	end)
 
+	helpers.it("keeps a custom modifier held through a pause until its key-up (pause-keeps-held-modifier)", function()
+		local M, record = source_fixture()
+		helpers.assert_true(M.reload())
+		helpers.assert_true(M.key_down(event(), KC_INTL), "the modifier is held")
+		record.paused = true
+		M.drop_pending_dead_key()
+		record.paused = false
+		local e = event({}, "a")
+		helpers.assert_true(not M.key_down(e, KC_A))
+		helpers.assert_eq(e.unicode, "α", "a full reset at pause would have dropped the hold")
+		helpers.assert_true(M.key_up(event(), KC_INTL), "its key-up is still owned")
+		local after = event({}, "a")
+		M.key_down(after, KC_A)
+		helpers.assert_eq(after.unicode, "a", "and ends the layer")
+	end)
+
 	helpers.it("toggles a locked modifier on its presses (source-emulation)", function()
 		local M = source_fixture()
 		helpers.assert_true(M.reload())

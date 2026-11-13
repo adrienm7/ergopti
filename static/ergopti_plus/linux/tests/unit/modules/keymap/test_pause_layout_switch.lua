@@ -147,6 +147,8 @@ helpers.describe("pause layout switch", function()
 		-- compose with the first key typed after the resume.
 		helpers.assert_true(listener:find('if paused then require("modules.keymap.layout_emulation").drop_pending_dead_key() end',
 			1, true) ~= nil, "a pause drops the emulation's pending dead key")
+		helpers.assert_nil(listener:find('layout_emulation").reset(', 1, true),
+			"a full emulation reset at pause would drop a held modifier's release (pause-keeps-held-modifier)")
 		local _, quits = source:gsub('require%("modules%.keymap%.pause_layout_switch"%)%.quit_safely%(%)', "")
 		-- The tray row, the shortcut and the gesture Quit share one owner (LCY-003).
 		helpers.assert_eq(quits, 1, "the user Quit owner switches first")
