@@ -601,7 +601,8 @@ package.preload["adapters.event_loop"] = function()
 					"the real word-reset owner must acknowledge the arrow policy")
 			elseif token == "SELECT" then
 				i = i + #token + 2
-				callbacks.onClick()
+				-- The hook calls onClick with the pressed button's code (BTN_LEFT, 0x110).
+				callbacks.onClick(0x110)
 				selection.primary = selection.primary == "" and "selected" or "fresh"
 				screen = chars(selection.primary)
 				selection.focused = true
