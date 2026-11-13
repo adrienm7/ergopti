@@ -54,6 +54,9 @@ const { execFileSync } = require('node:child_process');
 const Plan = require('./plan.cjs');
 const Edits = require('./edits.cjs');
 
+// The plan's committed move map: old path, new path and step, by line.
+const MOVE_MAP = 'docs/design/structure-plan/move-map.tsv';
+
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const PIN = /\b[0-9a-f]{64}\b/g;
 const MAX_ROUNDS = 10;
@@ -128,13 +131,21 @@ function deriveAll({
 	const at = (f) => path.join(root, moves.get(f) || f);
 	// An entry names its files as the tree had them before the migration; an
 	// earlier step may have moved them already. The plan moves each file once,
-	// so the file is at its first place or at its last.
+	// so the file is at its first place or at the last one the committed move
+	// map gives (the plan run on a stepped tree no longer knows the first).
 	let finals = null;
 	const located = (f) => {
 		if (fs.existsSync(at(f))) return f;
-		if (!finals) finals = Plan.moveMap().map;
-		const target = f.startsWith(Plan.PREFIX) ? finals.get(f.slice(Plan.PREFIX.length)) : null;
-		const moved = target ? Plan.PREFIX + target : null;
+		if (!finals)
+			finals = new Map(
+				fs
+					.readFileSync(path.join(root, MOVE_MAP), 'utf8')
+					.split('\n')
+					.slice(1)
+					.filter(Boolean)
+					.map((line) => line.split('\t'))
+			);
+		const moved = finals.get(f);
 		if (moved && fs.existsSync(at(moved))) return moved;
 		throw new Error(`repin: derived pin names a missing file ${f}`);
 	};
