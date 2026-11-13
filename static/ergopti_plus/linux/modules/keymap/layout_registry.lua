@@ -617,7 +617,10 @@ end
 --- The whole conversion runs in Lua (layouts.keylayout parses the file,
 --- layouts.xkb_converter writes the XKB symbols and XCompose text): no child
 --- process, so a machine without python3 still converts, and only the user XKB
---- installer that follows needs it.
+--- installer that follows needs it. The composed layout of a layout source is
+--- written from the converter target the page compiled straight from the
+--- source (composer.lua check_target), which keeps the levels its .keylayout
+--- cannot hold (XKB's fifth level); its .keylayout stays the record's file.
 --- @param deps table
 --- @param entry table
 --- @param layout_path string
@@ -629,15 +632,29 @@ local function convert(deps, entry, layout_path, on_done, rows)
 		on_done(false, M.FAILURE_CONVERSION, "the XKB conversion data is not shipped with this driver")
 		return
 	end
-	local text = deps.read(layout_path)
-	if type(text) ~= "string" then
-		on_done(false, M.FAILURE_CONVERSION, "the downloaded .keylayout cannot be read: " .. layout_path)
-		return
+	local canonical, level5
+	local composer_settings = entry.id ~= nil and M.composer_settings() or nil
+	if composer_settings ~= nil and entry.id == composer_settings.id then
+		local target, target_err = Composer.read_target(composer_settings,
+			deps.config_dir or (ConfigPaths.config("") .. "/"), deps)
+		if target_err ~= nil then
+			on_done(false, M.FAILURE_CONVERSION, target_err)
+			return
+		end
+		if target ~= nil then canonical, level5 = target.canonical, target.level5 end
 	end
-	local canonical, parse_err = Keylayout.parse(text)
-	if not canonical then
-		on_done(false, M.FAILURE_CONVERSION, parse_err)
-		return
+	if canonical == nil then
+		local text = deps.read(layout_path)
+		if type(text) ~= "string" then
+			on_done(false, M.FAILURE_CONVERSION, "the downloaded .keylayout cannot be read: " .. layout_path)
+			return
+		end
+		local parse_err
+		canonical, parse_err = Keylayout.parse(text)
+		if not canonical then
+			on_done(false, M.FAILURE_CONVERSION, parse_err)
+			return
+		end
 	end
 	local function decode_file(path)
 		local raw = deps.read(path)
@@ -666,8 +683,15 @@ local function convert(deps, entry, layout_path, on_done, rows)
 		display_name = entry.name,
 		hints = entry.xkb,
 		rows = rows,
+		level5 = level5,
 	})
 	if not result then on_done(false, M.FAILURE_CONVERSION, convert_err) return end
+	local types_ok, shipped_types = pcall(XkbConverter.types_text, types, level5)
+	if not types_ok then
+		on_done(false, M.FAILURE_CONVERSION, tostring(type(shipped_types) == "table" and shipped_types.keylayout_error
+			or shipped_types))
+		return
+	end
 	-- What the conversion could not carry is named, never silently lost.
 	if #result.unplaced > 0 then
 		Logger.warn(LOG, "Layout '%s': %d key(s) have no Linux key name and are left out (macOS codes %s).",
@@ -681,7 +705,7 @@ local function convert(deps, entry, layout_path, on_done, rows)
 	for _, file in ipairs({
 		{ entry.id .. ".xkb", result.symbols_text },
 		{ entry.id .. ".XCompose", result.compose_text },
-		{ "xkb_types.txt", types },
+		{ "xkb_types.txt", shipped_types },
 	}) do
 		local written, write_err = write_file(deps, out_dir .. file[1], file[2])
 		if not written then on_done(false, M.FAILURE_WRITE, write_err) return end

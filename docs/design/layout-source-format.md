@@ -319,10 +319,9 @@ Lock there), `action`/`key` mappings, and keys with no macOS code. Two keys
 sharing a compose identity with different texts are refused
 (`source_compose_conflict`).
 
-The ErgoptiPlus composer host still receives this `.keylayout` for Linux (the
-driver installs it through the converter) and the emulation table lists what it
-leaves out; the Linux XKB and Windows KLC exports compile the source directly
-(next section).
+The ErgoptiPlus composer host still records this `.keylayout`; the Linux XKB and
+Windows KLC exports, and the Linux install, compile the source directly (next
+section).
 
 ### Direct XKB and KLC compilation
 
@@ -364,6 +363,17 @@ compiled `.keylayout`, so the shipped layouts keep their bytes
 same files, `tools/test/test-layout-editor-target-exports.cjs`). Each writer's
 own report (projection levels, KLC column limits, `level5`, `modifier_bits`)
 follows.
+
+The Linux install takes the same compilation: the page's install payload carries
+`target` (`LayoutTargetCompiler.hostTarget`: `format = "ergopti-layout-target"`,
+`version = 1`, the layout id, `platform = "linux"`, the canonical form and the
+fifth level's keys), which `composer.lua` `check_target` admits (this source's,
+this driver's, references resolved, named as the `.keylayout`, a writable fifth
+level, at most `max_target_bytes`) and stores as `target_file`. The Linux
+registry then writes the installed XKB from it, at install and for every later
+number-row conversion; a save without one drops it, so a `.keylayout` is never
+converted beside an older target. It is the plain reader's reading (an empty
+transition passes, as the host read it before), not the exports' strict one.
 
 ### The Kana level
 

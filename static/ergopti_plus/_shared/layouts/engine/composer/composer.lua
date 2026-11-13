@@ -37,6 +37,7 @@ local Registry = require("layouts.engine.registry.registry_core")
 local Keylayout = require("layouts.engine.composer.keylayout")
 local TableUtil = require("core.text.engine.table_util")
 local SourceEmulation = require("layouts.engine.composer.source_emulation")
+local XkbConverter = require("layouts.engine.composer.xkb_converter")
 
 local M = {}
 
@@ -66,7 +67,8 @@ local CONVENTIONS = { iso = true, ansi = true }
 --- Validates the [composer] table of the shared layout defaults.
 --- @param layout_defaults table Decoded _shared/layouts/data/defaults.json.
 --- @return table|nil settings { id, folder, declaration_file, max_declaration_bytes, source_file,
----   max_source_bytes, emulation_file, max_emulation_bytes, keylayout_file, family }
+---   max_source_bytes, emulation_file, max_emulation_bytes, keylayout_file, target_file,
+---   max_target_bytes, family }
 --- @return string|nil error
 function M.settings(layout_defaults)
 	local composer = type(layout_defaults) == "table" and layout_defaults.composer or nil
@@ -93,7 +95,12 @@ function M.settings(layout_defaults)
 		or named[composer.keylayout_file] then
 		return nil, "the composer keylayout file is not a plain .keylayout file name distinct from the other three"
 	end
-	for _, field in ipairs({ "max_declaration_bytes", "max_source_bytes", "max_emulation_bytes" }) do
+	named[composer.keylayout_file] = true
+	if type(composer.target_file) ~= "string" or not composer.target_file:match("^[A-Za-z0-9._-]+%.json$")
+		or named[composer.target_file] then
+		return nil, "the composer target file is not a plain .json file name distinct from the other four"
+	end
+	for _, field in ipairs({ "max_declaration_bytes", "max_source_bytes", "max_emulation_bytes", "max_target_bytes" }) do
 		local bound = composer[field]
 		if type(bound) ~= "number" or bound <= 0 or bound % 1 ~= 0 then
 			return nil, "the composer " .. field .. " bound is not a positive integer"
@@ -109,6 +116,8 @@ function M.settings(layout_defaults)
 		emulation_file = composer.emulation_file,
 		max_emulation_bytes = composer.max_emulation_bytes,
 		keylayout_file = composer.keylayout_file,
+		target_file = composer.target_file,
+		max_target_bytes = composer.max_target_bytes,
 		family = composer.family,
 	}, nil
 end
@@ -264,6 +273,75 @@ function M.check_emulation(settings, emulation_text, source_text, platform, deco
 	if table_.layout ~= source.layout.id then return refuse("the emulation table is not the source's") end
 	if table_.platform ~= platform then return refuse("the emulation table is not compiled for " .. platform) end
 	return true, nil, nil
+end
+
+--- The format of the XKB target the page sends beside a source on Linux: the
+--- source compiled straight to the XKB writer's canonical form
+--- (layout_composer/target_compiler.js) with its fifth-level plan.
+M.TARGET_FORMAT = "ergopti-layout-target"
+M.TARGET_VERSION = 1
+M.TARGET_PLATFORMS = { linux = true }
+
+--- Checks the converter target the page sends beside a source: this source's,
+--- for this driver, a canonical form whose references resolve and that names
+--- the layout as its compiled .keylayout does, and a fifth level the XKB
+--- writer can hold.
+--- @param settings table From M.settings.
+--- @param target_text any The target's JSON as the page wrote it.
+--- @param checked table M.check_source's result for the same save.
+--- @param source_text string The source it was compiled from (already checked).
+--- @param platform string This driver's platform.
+--- @param decode_json function
+--- @param decode_toml function
+--- @return table|nil target { canonical, level5 }
+--- @return string|nil failure_code
+--- @return string|nil detail
+function M.check_target(settings, target_text, checked, source_text, platform, decode_json, decode_toml)
+	local function refuse(detail) return nil, M.FAILURE_INVALID, detail end
+	if not M.TARGET_PLATFORMS[platform] then return refuse("this driver installs no converter target") end
+	if type(target_text) ~= "string" then return refuse("the converter target must be sent as text") end
+	if #target_text > settings.max_target_bytes then
+		return refuse("the converter target is larger than " .. settings.max_target_bytes .. " bytes")
+	end
+	local ok, target = pcall(decode_json, target_text)
+	if not ok or type(target) ~= "table" then return refuse("the converter target is not valid JSON") end
+	if target.format ~= M.TARGET_FORMAT or target.version ~= M.TARGET_VERSION then
+		return refuse("the converter target has an unknown format or version")
+	end
+	if target.platform ~= platform then return refuse("the converter target is not compiled for " .. platform) end
+	if target.layout ~= decode_toml(source_text).layout.id then return refuse("the converter target is not the source's") end
+	local canonical, reason = Keylayout.admit_canonical(target.canonical)
+	if not canonical then return refuse("the converter target is not a readable canonical form: " .. tostring(reason)) end
+	if canonical.name ~= checked.keyboard_name then
+		return refuse("the converter target is not named after the source")
+	end
+	local planned, plan_error = pcall(XkbConverter.level_plan, target.level5)
+	if not planned then
+		return refuse("the converter target's fifth level cannot be written: "
+			.. tostring(type(plan_error) == "table" and plan_error.keylayout_error or plan_error))
+	end
+	return { canonical = canonical, level5 = target.level5 }
+end
+
+--- The converter target stored beside the composed layout's source, decoded and
+--- checked again; nil when the composed layout has none.
+--- @param settings table From M.settings.
+--- @param config_dir string The configuration folder, with a trailing slash.
+--- @param ports table { exists(path), read(path), decode_json }
+--- @return table|nil target { canonical, level5 }
+--- @return string|nil error
+function M.read_target(settings, config_dir, ports)
+	local path = config_dir .. settings.folder .. "/" .. settings.target_file
+	if not ports.exists(path) then return nil, nil end
+	local text = ports.read(path)
+	if type(text) ~= "string" or #text > settings.max_target_bytes then
+		return nil, "the stored converter target " .. path .. " is unreadable or larger than its bound"
+	end
+	local ok, target = pcall(ports.decode_json, text)
+	if not ok or type(target) ~= "table" then return nil, "the stored converter target " .. path .. " is not JSON" end
+	local canonical, reason = Keylayout.admit_canonical(target.canonical)
+	if not canonical then return nil, "the stored converter target " .. path .. " is refused: " .. tostring(reason) end
+	return { canonical = canonical, level5 = target.level5 }, nil
 end
 
 --- The emulation table stored beside the composed layout's source, decoded.
@@ -459,6 +537,10 @@ function M.new(env)
 		return env.config_dir .. settings.folder .. "/" .. settings.keylayout_file
 	end
 
+	local function target_path()
+		return env.config_dir .. settings.folder .. "/" .. settings.target_file
+	end
+
 	--- A stored file within its bound, "unreadable" when it is not, nil when absent.
 	local function stored(path, bound, what)
 		if not env.exists(path) then return nil end
@@ -489,7 +571,10 @@ function M.new(env)
 
 	--- Stores a composition or a layout source (with its emulation table, when
 	--- the source has records no .keylayout holds) and installs its layout.
-	--- @param payload table { declaration | source [, emulation], keylayout, use }
+	--- The installed layout is written from the converter target when the page
+	--- sends one (Linux: the source compiled straight to XKB), else from the
+	--- .keylayout; the target is stored for the driver's later conversions.
+	--- @param payload table { declaration | source [, emulation] [, target], keylayout, use }
 	--- @param on_done function on_done(ok, code, detail, used, installed): installed is what the
 	---   driver's install reported (the macOS and Linux install results), for the Debug check.
 	function operations.save(payload, on_done)
@@ -505,9 +590,14 @@ function M.new(env)
 					payload.source, env.platform, env.decode_json, env.decode_toml)
 				if not emulation_ok then checked, code, detail = nil, emulation_code, emulation_detail end
 			end
+			if checked and payload.target ~= nil then
+				local target_ok, target_code, target_detail = M.check_target(settings, payload.target, checked,
+					payload.source, env.platform, env.decode_json, env.decode_toml)
+				if not target_ok then checked, code, detail = nil, target_code, target_detail end
+			end
 			stored_path, stored_text, other_path = source_path(), payload.source, declaration_path()
-		elseif payload.emulation ~= nil then
-			checked, code, detail = nil, M.FAILURE_INVALID, "an emulation table comes only with a source"
+		elseif payload.emulation ~= nil or payload.target ~= nil then
+			checked, code, detail = nil, M.FAILURE_INVALID, "an emulation table or a converter target comes only with a source"
 		else
 			checked, code, detail = M.check(settings, env.max_file_bytes, payload.declaration, payload.keylayout,
 				env.decode_json)
@@ -539,8 +629,18 @@ function M.new(env)
 					return
 				end
 			end
+			if payload.target ~= nil then
+				local target_written, target_err = env.write(target_path(), payload.target)
+				if not target_written then
+					env.log("error", "The converter target could not be stored: %s.", tostring(target_err))
+					on_done(false, M.FAILURE_WRITE, tostring(target_err), false)
+					return
+				end
+			end
 			local stale = { other_path }
 			if payload.emulation == nil then stale[#stale + 1] = emulation_path() end
+			-- A layout installed from its .keylayout must not be converted from an older target.
+			if payload.target == nil then stale[#stale + 1] = target_path() end
 			for _, path in ipairs(stale) do
 				if env.exists(path) and not env.delete(path) then
 					env.log("error", "The replaced composition %s could not be deleted.", path)
@@ -630,7 +730,7 @@ function M.new(env)
 	--- @param on_done function on_done(ok, code, detail)
 	function operations.remove(on_done)
 		local function delete_declaration()
-			for _, path in ipairs({ declaration_path(), source_path(), emulation_path(), keylayout_copy_path() }) do
+			for _, path in ipairs({ declaration_path(), source_path(), emulation_path(), keylayout_copy_path(), target_path() }) do
 				if env.exists(path) and not env.delete(path) then
 					on_done(false, M.FAILURE_WRITE, "cannot delete " .. path)
 					return

@@ -427,13 +427,19 @@ var LayoutSourceIO = (function () {
 	 * On Windows it also carries the four DLL images (base64 per architecture,
 	 * `dll_name`), which the host registers through its elevated helper.
 	 * @param {'macos'|'linux'|'windows'} platform
-	 * @returns {{source: string, keylayout: string, emulation?: string, dll_name?: string,
-	 *   dlls?: Object<string, string>}}
+	 * On Linux it carries the converter target (LayoutTargetCompiler.hostTarget)
+	 * the host writes the installed XKB from.
+	 * @returns {{source: string, keylayout: string, emulation?: string, target?: string,
+	 *   dll_name?: string, dlls?: Object<string, string>}}
 	 */
 	function installPayload(doc, platform) {
 		const compiled = LayoutSourceCompiler.targetKeylayout(doc, tables(), platform);
 		const payload = { source: serialize(doc), keylayout: compiled.text };
 		if (!isPreserved(doc)) payload.emulation = JSON.stringify(emulationTable(doc, platform));
+		// Linux writes the installed XKB from the source compiled straight to the
+		// writer's canonical form, which keeps the levels the .keylayout cannot hold.
+		if (platform === 'linux' && !isPreserved(doc))
+			payload.target = JSON.stringify(LayoutTargetCompiler.hostTarget(doc, tables()));
 		const images = NATIVE_IMAGES[platform];
 		if (images) Object.assign(payload, images(doc));
 		return payload;
