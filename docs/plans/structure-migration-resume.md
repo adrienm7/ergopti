@@ -4,10 +4,10 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 12:55)
+## Where things stand (2026-11-13, 13:55)
 
 - Branch: `claude/ergopti-todo-structure-phase2`, fast-forward only. Base:
-  dev `520bb24c`, merged in `ee1aa96f`. Tip: `7d880ab7`.
+  dev `520bb24c`, merged in `ee1aa96f`. Tip: `677fc455`.
 - Steps landed on dev: none. The coordinator lands each green block of steps
   on dev; the first block is S01+S02.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
@@ -42,9 +42,15 @@ same commit as each step or checkpoint. Times are Paris time.
   - macOS Launcher XCTest and Archive update controls: a Ruby `require
 "json"` respelled as a Lua module (`a8ebd6dc`), the locales climb in
     CatalogUpdateUserDriverTests (`7d880ab7`).
-- Proof 9 (S01+S02 from the tip): built in `/home/user/wt-seq` (log
-  `scratchpad/proof9-run.log`), pushed to `…-proof-9`, then `ci.yml` with
-  `os_lanes=all`. Only baseline reds → send the coordinator the range.
+- Proof 9 (S01+S02 from `7d880ab7`, `…-proof-9` at `475a6374`, run
+  43421949833): one red outside the baseline, Common Ai and network. The
+  serve-command receiving test copies `_shared/python`, which S01 splits into
+  the ai and network features; now a listed edit names both homes
+  (`677fc455`). Every other red matched the baseline.
+- Proof 10 (S01+S02 from the tip `677fc455`): rebuilding in
+  `/home/user/wt-seq` (log `scratchpad/proof10-run.log`), then `…-proof-10`
+  and `ci.yml os_lanes=all`. Only baseline reds → send the coordinator the
+  range.
 - Later steps, found on proof 6 locally (macOS and Linux Lua suites): init
   modules named with their stem (`3ef3fc4a`), the macOS keyboard data readers
   and the Linux tray source reader (`1b0998e0`), a climbing `Paths.shared`
