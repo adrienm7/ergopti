@@ -63,8 +63,7 @@ local function build_world(buffer)
 	-- Every driver module is loaded fresh: the acceptance fixture of a previous
 	-- scenario leaves its own doubles (manifest reader, keymap, tooltip) cached
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
-			or name:find("^infra%.") or name:find("^ui%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end

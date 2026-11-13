@@ -33,8 +33,7 @@ end
 local function reset_driver_modules()
 	for name in pairs(package.loaded) do
 		if type(name) == "string"
-			and (name:find("^modules%.") or name:find("^adapters%.")
-				or name:find("^infra%.") or name:find("^ui%.")) then
+			and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end

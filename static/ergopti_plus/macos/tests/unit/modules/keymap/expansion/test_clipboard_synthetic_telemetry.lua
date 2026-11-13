@@ -17,7 +17,7 @@ local function load_fixture(keystats)
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
 			or name == "modules.keystats"
-			or name:match("^adapters%.")
+			or helpers.is_driver_module(name)
 			or name == "infra.logger"
 			or name == "infra.timings"
 		) then

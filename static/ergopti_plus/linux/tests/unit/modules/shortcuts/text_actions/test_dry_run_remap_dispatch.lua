@@ -32,7 +32,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 	local saved = {}
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	for name in pairs(saved) do
-		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
+		if helpers.is_driver_module(name)
 			or name:match("^platform%.remap%.") or name:match("^config_binding") or name == "core.logger.engine.shim" then package.loaded[name] = nil end
 	end
 	local config_path, tap_path = os.tmpname(), os.tmpname()

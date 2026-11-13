@@ -25,7 +25,7 @@ local function install_collaborators(effects)
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
 			or name:match("^modules%.dynamic_hotstrings")
-			or name:match("^adapters%.")
+			or helpers.is_driver_module(name)
 		) then
 			package.loaded[name] = nil
 		end
