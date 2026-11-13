@@ -33,11 +33,7 @@ const LAYOUT_MANAGER_ACTIONS = Object.freeze([
 	'composer_open',
 	'composer_save',
 	'composer_remove',
-	'composer_emulate',
-	'source_open',
-	'source_save',
-	'source_pick',
-	'nav_save'
+	'open_editor'
 ]);
 
 // Failure codes the hosts report, each with its own explanation. Any other
@@ -441,244 +437,13 @@ window.initData = function (data) {
 		_strings = data.strings;
 		applyDomStrings();
 	}
-	// Only a host that stores the editor's files offers it (all three drivers).
-	// There the editor replaces the composer, which fills layers from the same
-	// sources.
+	// Only a host that stores the editor's files offers it (all three drivers),
+	// in its own window (_shared/ui/layout_editor_window). There the editor
+	// replaces the composer, which fills layers from the same sources.
 	const editor = data.source_editor === true;
 	document.getElementById('btn-editor').hidden = !editor;
 	document.getElementById('btn-compose').hidden = editor;
-	_hostPicks = data.source_pick === true;
-	_hostAppliesNav = data.nav_apply === true;
-	_hostEmulates = data.emulate === true;
 	window.updateState(data.state);
-};
-
-// ========================================
-// ========================================
-// ======= 5/ Layout editor ===============
-// ========================================
-// ========================================
-
-// The unified layout editor (_shared/ui/layout_editor), mounted in this window
-// once the host sent the last saved source; files save through the host.
-let _editor = null;
-let _pendingSave = null;
-let _pendingInstall = null;
-let _pendingSources = null;
-let _pendingPick = null;
-let _pendingNav = null;
-// Whether the host applies the source's navigation layer (nav_save), from initData.
-let _hostAppliesNav = false;
-// Whether the host opens files in a native panel (macOS), from initData.
-let _hostPicks = false;
-// Whether the host emulates a source without installing it (composer_emulate), from initData.
-let _hostEmulates = false;
-
-/** Shows the editor or the layout list. */
-function showEditor(visible) {
-	document.getElementById('layout-view').hidden = visible;
-	document.getElementById('layout-editor').hidden = !visible;
-}
-
-/** Saves one editor file through the host; settles on sourceResult. */
-function hostSave(filename, text) {
-	return new Promise(function (resolve, reject) {
-		if (_pendingSave) {
-			reject({ code: 'save_busy', path: filename });
-			return;
-		}
-		_pendingSave = { resolve: resolve, reject: reject };
-		send('source_save', undefined, { filename: filename, text: text });
-	});
-}
-
-/**
- * Installs the editor's source through the composer host (composer_save with
- * `source`, _shared/layouts/engine/composer/composer.lua) and switches to it; settles on
- * the composerResult that answers it.
- */
-function hostInstall(payload) {
-	return new Promise(function (resolve, reject) {
-		if (_pendingInstall || _pendingSave) {
-			reject({ code: 'save_busy', path: 'composer_save' });
-			return;
-		}
-		_pendingInstall = { resolve: resolve, reject: reject, action: 'composer_save' };
-		const message = { source: payload.source, keylayout: payload.keylayout, use: true };
-		// The drivers perform the source's emulation table for what the .keylayout cannot hold.
-		if (payload.emulation !== undefined) message.emulation = payload.emulation;
-		// The Windows host registers the layout DLL images the page wrote.
-		if (payload.dlls !== undefined) {
-			message.dll_name = payload.dll_name;
-			message.dlls = payload.dlls;
-		}
-		send('composer_save', undefined, message);
-	});
-}
-
-/**
- * « Emulate without installing »: stores the editor's source for the driver's
- * layout emulation alone (composer_emulate) and turns the emulation onto it;
- * settles on the composerResult that answers it.
- */
-function hostEmulate(payload) {
-	return new Promise(function (resolve, reject) {
-		if (_pendingInstall || _pendingSave) {
-			reject({ code: 'save_busy', path: 'composer_emulate' });
-			return;
-		}
-		_pendingInstall = { resolve: resolve, reject: reject, action: 'composer_emulate' };
-		const message = { source: payload.source, keylayout: payload.keylayout };
-		if (payload.emulation !== undefined) message.emulation = payload.emulation;
-		send('composer_emulate', undefined, message);
-	});
-}
-
-/**
- * The registry layouts a layer can be filled from: the composer host's own
- * sources ({id, name, convention, text}), asked with composer_open.
- */
-function hostSources() {
-	return new Promise(function (resolve, reject) {
-		if (_pendingSources) {
-			reject({ code: 'save_busy', path: 'composer_open' });
-			return;
-		}
-		_pendingSources = resolve;
-		send('composer_open');
-	});
-}
-
-/** Routes the composer host's answers to the editor when it asked, else to the composer section. */
-function routeComposerResults() {
-	const composerData = window.composerData;
-	window.composerData = function (data) {
-		const pending = _pendingSources;
-		if (!pending) {
-			if (typeof composerData === 'function') composerData(data);
-			return;
-		}
-		_pendingSources = null;
-		pending(data && Array.isArray(data.sources) ? data.sources : []);
-	};
-	const composerResult = window.composerResult;
-	window.composerResult = function (result) {
-		const pending = _pendingInstall;
-		if (!pending || !result || result.action !== pending.action) {
-			if (typeof composerResult === 'function') composerResult(result);
-			return;
-		}
-		_pendingInstall = null;
-		// macOS may defer turning a new layout on until the next login.
-		if (result.ok === true) pending.resolve({ pending: result.pending === true });
-		else pending.reject({ code: result.code || 'host_save_failed', path: result.detail || '' });
-	};
-}
-
-/**
- * Applies the layers.toml the editor built from the source's navigation layer
- * through the host's navigation layer editor save (nav_save); settles on navResult.
- */
-function hostApplyNav(text) {
-	return new Promise(function (resolve, reject) {
-		if (_pendingNav) {
-			reject({ code: 'save_busy', path: 'nav_save' });
-			return;
-		}
-		_pendingNav = { resolve: resolve, reject: reject };
-		send('nav_save', undefined, { text: text });
-	});
-}
-
-/**
- * Called by the host once the navigation layer is saved: { saved, applied, errors }.
- * A refused save rejects with its first error's code.
- * @param {Object} result
- */
-window.navResult = function (result) {
-	const pending = _pendingNav;
-	_pendingNav = null;
-	if (!pending) return;
-	const errors = result && Array.isArray(result.errors) ? result.errors : [];
-	if (result && result.saved === true) pending.resolve({ applied: result.applied === true });
-	else
-		pending.reject({
-			code: (errors[0] && errors[0].code) || 'host_save_failed',
-			path: (errors[0] && errors[0].detail) || ''
-		});
-};
-
-/** Opens a file in the host's native panel; settles on sourcePicked. */
-function hostPick() {
-	return new Promise(function (resolve, reject) {
-		if (_pendingPick) {
-			reject({ code: 'save_busy', path: 'source_pick' });
-			return;
-		}
-		_pendingPick = { resolve: resolve, reject: reject };
-		send('source_pick');
-	});
-}
-
-/**
- * Called by the host with the picked file: { filename, text }, {} when the
- * user cancelled, or { code, detail } when the host refused the file.
- * @param {Object} data
- */
-window.sourcePicked = function (data) {
-	const pending = _pendingPick;
-	_pendingPick = null;
-	if (!pending) return;
-	if (data && typeof data.code === 'string')
-		pending.reject({ code: data.code, path: data.detail || '' });
-	else pending.resolve(data && typeof data.text === 'string' ? data : null);
-};
-
-/**
- * Called by the host with the last saved source: { text, filename, folder }.
- * @param {Object} data
- */
-window.sourceData = function (data) {
-	const initial = data && typeof data.text === 'string' ? data.text : null;
-	// A host that does not seed window._i18n_strings (Windows) sends the editor's strings here.
-	if (data && data.strings && typeof data.strings === 'object')
-		window._i18n_strings = Object.assign({}, window._i18n_strings || {}, data.strings);
-	showEditor(true);
-	if (_editor) {
-		if (initial !== null) _editor.open(data.filename, initial);
-		return;
-	}
-	routeComposerResults();
-	_editor = LayoutEditorPage.mount(document.getElementById('layout-editor'), {
-		saveFile: hostSave,
-		install: hostInstall,
-		emulate: _hostEmulates ? hostEmulate : null,
-		loadSources: hostSources,
-		pickFile: _hostPicks ? hostPick : null,
-		applyNav: _hostAppliesNav ? hostApplyNav : null,
-		platform: _state && _state.platform,
-		savedStatus: 'status.saved_in_app',
-		initial: initial,
-		onClose: function () {
-			showEditor(false);
-		}
-	});
-};
-
-/**
- * Called by the host once a file is stored: { ok, code, detail, filename }.
- * @param {Object} result
- */
-window.sourceResult = function (result) {
-	const pending = _pendingSave;
-	_pendingSave = null;
-	if (!pending) return;
-	if (result && result.ok === true) pending.resolve();
-	else
-		pending.reject({
-			code: (result && result.code) || 'host_save_failed',
-			path: (result && result.detail) || ''
-		});
 };
 
 /**
@@ -692,7 +457,7 @@ window.updateState = function (state) {
 
 // ========================================
 // ========================================
-// ======= 6/ Events & Ready ==============
+// ======= 5/ Events & Ready ==============
 // ========================================
 // ========================================
 
@@ -700,8 +465,9 @@ document.getElementById('btn-refresh').addEventListener('click', function () {
 	send('refresh');
 });
 
+// The layout editor opens in its own window (_shared/ui/layout_editor_window).
 document.getElementById('btn-editor').addEventListener('click', function () {
-	send('source_open');
+	send('open_editor');
 });
 
 document.getElementById('btn-close').addEventListener('click', function () {

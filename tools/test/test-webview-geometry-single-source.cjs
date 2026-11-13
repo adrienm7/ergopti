@@ -262,6 +262,7 @@ const MACOS_MODULES = {
 	onboarding: 'ui/onboarding/init.lua',
 	paths_editor: 'ui/menu/menu_paths.lua',
 	layout_manager: 'ui/layout_manager/init.lua',
+	layout_editor_window: 'ui/layout_manager/init.lua',
 	healthcheck: 'ui/healthcheck/core.lua',
 	error_dialog: 'ui/error_dialog/init.lua',
 	permission_dialog: 'ui/permission_dialog/init.lua',
@@ -398,6 +399,15 @@ const WINDOWS_APPS = {
 		checks: (m) => [
 			new RegExp(`ACTPICK_WIDTH\\s*:=\\s*${m.width}\\b`),
 			new RegExp(`ACTPICK_HEIGHT\\s*:=\\s*${m.height}\\b`)
+		]
+	},
+	layout_editor_window: {
+		file: 'ui/layout_manager/editor_window.ahk',
+		// The layout editor's own window, opened through WebViewHost.TryOpen under
+		// its manifest id, as the layer editor is.
+		checks: () => [
+			/WebViewHost\.TryOpen\(\s*LAYOUT_EDITOR_WINDOW_APP_ID\b/,
+			/LAYOUT_EDITOR_WINDOW_APP_ID := "layout_editor_window"/
 		]
 	},
 	layer_editor: {

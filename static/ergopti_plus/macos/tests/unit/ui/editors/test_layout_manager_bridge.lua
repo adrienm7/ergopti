@@ -262,3 +262,55 @@ helpers.describe("layout manager bridge: the emulation follows a changed layout"
 	end)
 end)
 
+
+--- A controller over a registry that stores the layout editor's sources.
+--- @param extra table|nil More deps (editor_window, open_editor_window).
+--- @return table controller, table state
+local function editor_controller(extra)
+	local state = { pushes = {}, calls = {}, logs = {}, windows = 0 }
+	local deps = {
+		registry = {
+			snapshot = function() return { platform = "macos", installed = {} } end,
+			refresh = function(on_done) state.calls[#state.calls + 1] = "refresh"; on_done({}) end,
+			source_open = function(on_done) on_done({ text = "format = 1", filename = "mine.toml", folder = "x/" }) end,
+			source_save = function(_, on_done) on_done(true) end,
+		},
+		push = function(name, payload) state.pushes[#state.pushes + 1] = { name = name, payload = payload }; return true end,
+		strings = function() return { ["layout_editor.title"] = "Layout editor" } end,
+		open_url = function() end,
+		close = function() end,
+		log = function(level, message) state.logs[#state.logs + 1] = level .. ": " .. message end,
+	}
+	for key, value in pairs(extra or {}) do deps[key] = value end
+	return ManagerBridge.new(deps), state
+end
+
+helpers.describe("layout manager bridge: the layout editor in its own window", function()
+	helpers.it("the manager's open_editor opens the editor window (layout-editor-own-window)", function()
+		local state
+		local instance
+		instance, state = editor_controller({ open_editor_window = function() state.windows = state.windows + 1 end })
+		helpers.assert_true(instance.on_message({ action = "open_editor" }) == true)
+		helpers.assert_eq(state.windows, 1, "the host opens the editor window")
+		helpers.assert_eq(#state.pushes, 0, "the manager page itself receives no source")
+	end)
+
+	helpers.it("refuses open_editor on a host without an editor window (layout-editor-own-window)", function()
+		local instance, state = editor_controller()
+		helpers.assert_true(instance.on_message({ action = "open_editor" }) == false)
+		helpers.assert_true(#state.logs == 1, "the refusal is logged")
+	end)
+
+	helpers.it("the editor window answers ready with the last saved source and no catalogue (layout-editor-own-window)",
+		function()
+			local instance, state = editor_controller({ editor_window = true })
+			helpers.assert_true(instance.on_message({ action = "ready" }) == true)
+			helpers.assert_eq(state.pushes[1].name, "initData")
+			helpers.assert_eq(state.pushes[1].payload.strings["layout_editor.title"], "Layout editor")
+			helpers.assert_eq(state.pushes[1].payload.state.platform, "macos", "the editor compiles for this platform")
+			helpers.assert_true(state.pushes[1].payload.source_editor == true)
+			helpers.assert_eq(state.pushes[2].name, "sourceData")
+			helpers.assert_eq(state.pushes[2].payload.filename, "mine.toml")
+			helpers.assert_eq(#state.calls, 0, "the editor window fetches no catalogue")
+		end)
+end)

@@ -85,3 +85,6 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       types a multi-character Compose output, Layout shows « every sequence, through IBus », and the layout stays the
       system's; with fcitx5 running the row names the input method and `~/.config/environment.d/90-ergopti-ibus.conf`
       is absent.
+- [ ] Layout editor window (2026-11-13): « Create or edit a layout… » and the layout manager's « Layout editor » open
+      the editor in its own WebKitGTK window; a second request brings it to the front with its unsaved work; « Close »
+      closes it.

@@ -136,4 +136,29 @@ helpers.describe("layout manager bounds native controller ownership", function()
 			end)
 		end)
 	end
+	helpers.it("opens the layout editor in its own window from the manager (layout-editor-own-window)", function()
+		Fixture(function(host, h)
+			local registry = package.loaded["modules.keymap.layout_registry"]
+			registry.source_open = function(on_done) on_done({ text = "x", filename = "mine.toml" }) end
+			registry.source_save = function(_, on_done) on_done(true) end
+			assert(host.open())
+			local manager_view, manager_controller = h.current()
+			h.post(manager_controller, manager_view, { action = "ready" })
+			h.post(manager_controller, manager_view, { action = "open_editor" })
+			assert(#h.views == 2, "the editor has a window of its own")
+			local editor_view, editor_controller = h.views[2], h.controllers[#h.controllers]
+			assert(editor_view.options.assets_dir:match("ui/layout_editor_window/$"), editor_view.options.assets_dir)
+			assert(editor_controller.name == "layout_editor_window_bridge", tostring(editor_controller.name))
+			assert(host.editor_window() == editor_view and host.window() == manager_view)
+			h.post(editor_controller, editor_view, { action = "ready" })
+			local last = editor_view.evaluations[#editor_view.evaluations]
+			assert(last:match("window%.sourceData") and last:match("mine%.toml"), last)
+			for _, script in ipairs(manager_view.evaluations) do
+				assert(not script:match("sourceData"), "the manager page receives no source")
+			end
+			assert(host.open_editor() and #h.views == 2, "a second request focuses the open editor")
+			assert(host.close_editor() and host.editor_window() == nil and host.window() == manager_view)
+			h.close()
+		end)
+	end)
 end)
