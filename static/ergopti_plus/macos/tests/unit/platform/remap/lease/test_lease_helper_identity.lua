@@ -202,3 +202,88 @@ helpers.describe("karabiner lease helper: bundle-owned identity", function()
 		helpers.assert_true(type(resolve_err) == "string" and resolve_err ~= "")
 	end)
 end)
+
+
+
+
+
+-- ================================================
+-- ================================================
+-- ======= 2/ Relocated Launchers (MLC-005) =======
+-- ================================================
+-- ================================================
+
+--- Resolves with the driver tree and the launcher export spelled differently
+--- for one file, as Hammerspoon and Foundation spell a relocated app.
+--- @param driver_root string Bundle-derived driver tree (the init.lua spelling).
+--- @param exported string Path the launcher exported.
+--- @param files table Path → { dev, ino } for every spelling of a regular file.
+--- @param resolved string The real path of the helper.
+--- @return string|nil resolved, string|nil detail
+local function resolve_relocated(driver_root, exported, files, resolved)
+	package.loaded["platform.remap.lease_helper"] = nil
+	local function attributes(path)
+		local file = files[path]
+		if not file then return nil end
+		return { mode = "file", permissions = "rwxr-xr-x", dev = file.dev, ino = file.ino }
+	end
+	local helper = helpers.load_with_stubs("platform.remap.lease_helper", {
+		fs = {
+			symlinkAttributes = attributes,
+			attributes = attributes,
+			pathToAbsolute = function(path) return files[path] and resolved or nil end,
+		},
+	})
+	local original_getenv = os.getenv
+	os.getenv = function(name)
+		if name == HELPER_ENV then return exported end
+		if name == HELPER_DEVICE_ENV then return EXPECTED_DEVICE end
+		if name == HELPER_INODE_ENV then return EXPECTED_INODE end
+		return original_getenv(name)
+	end
+	local ok, path, detail = pcall(helper.resolve, driver_root)
+	os.getenv = original_getenv
+	if not ok then error(path) end
+	return path, detail
+end
+
+local SAME = { dev = tonumber(EXPECTED_DEVICE), ino = tonumber(EXPECTED_INODE) }
+local SUFFIX = "/Contents/Resources/static/ergopti_plus/macos"
+
+helpers.describe("karabiner lease helper: relocated launcher (mlc-005-relocated-launcher)", function()
+	helpers.it("accepts a translocated app whose two spellings name one file", function()
+		local private = "/private/var/folders/xy/T/AppTranslocation/4F2C/d/ErgoptiPlus.app"
+		local public = "/var/folders/xy/T/AppTranslocation/4F2C/d/ErgoptiPlus.app"
+		local helper = "/Contents/MacOS/ErgoptiPlus"
+		local path, detail = resolve_relocated(private .. SUFFIX, public .. helper,
+			{ [private .. helper] = SAME, [public .. helper] = SAME }, private .. helper)
+		helpers.assert_eq(path, public .. helper, tostring(detail))
+	end)
+
+	helpers.it("accepts a spaced, accented folder spelled NFC on one side and NFD on the other", function()
+		local nfc = "/Users/lea/Applications de L\u{e9}a/Ergopti Plus.app"
+		local nfd = "/Users/lea/Applications de Le\u{301}a/Ergopti Plus.app"
+		local helper = "/Contents/MacOS/ErgoptiPlus"
+		local path, detail = resolve_relocated(nfd .. SUFFIX, nfc .. helper,
+			{ [nfc .. helper] = SAME, [nfd .. helper] = SAME }, nfd .. helper)
+		helpers.assert_eq(path, nfc .. helper, tostring(detail))
+	end)
+
+	helpers.it("accepts an app reached through a symlinked Applications folder", function()
+		local link = "/Users/lea/Applications/ErgoptiPlus.app"
+		local real = "/Volumes/Apps/ErgoptiPlus.app"
+		local helper = "/Contents/MacOS/ErgoptiPlus"
+		local path, detail = resolve_relocated(real .. SUFFIX, link .. helper,
+			{ [link .. helper] = SAME, [real .. helper] = SAME }, real .. helper)
+		helpers.assert_eq(path, link .. helper, tostring(detail))
+	end)
+
+	helpers.it("still refuses another file under a relocated spelling", function()
+		local private = "/private/var/folders/xy/T/AppTranslocation/4F2C/d/ErgoptiPlus.app"
+		local helper = "/Contents/MacOS/ErgoptiPlus"
+		local other = "/tmp/elsewhere/ErgoptiPlus.app" .. helper
+		local path = resolve_relocated(private .. SUFFIX, other,
+			{ [private .. helper] = SAME, [other] = { dev = SAME.dev, ino = SAME.ino + 1 } }, private .. helper)
+		helpers.assert_nil(path, "a second ErgoptiPlus file is not the running launcher")
+	end)
+end)
