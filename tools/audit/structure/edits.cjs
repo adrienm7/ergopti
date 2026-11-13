@@ -219,6 +219,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "(MAC + 'tests/support/core/native_http_fixture_main.swift',)"
 	},
 	{
+		// The XI2 receiver derives the shared Lua root from the logger shim's
+		// path; S01 moves the shim to core/logger/engine under _shared itself.
+		file: 'static/ergopti_plus/linux/tests/hardware/xi2_luajit_receiver.lua',
+		moves: '_shared/lua/logger/shim.lua',
+		from: 'logger_source:match("^(.*)/logger/shim%.lua$")',
+		to: 'logger_source:match("^(.*)/core/logger/engine/shim%.lua$")'
+	},
+	{
 		// The ledger's family contracts leave one folder for two, and lose the
 		// name prefixes that told them from their neighbours there.
 		file: 'tools/test/test-contract-vector-ledger.cjs',
