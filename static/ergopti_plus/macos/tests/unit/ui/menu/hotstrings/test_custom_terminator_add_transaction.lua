@@ -383,14 +383,15 @@ helpers.describe("declared delay configuration command: actual macOS provider", 
 		end)
 	end
 
-	helpers.it("preserves the existing paused disabled row without acquiring its window", function()
+	-- A pause stops typing, not configuration (EDD-1): the settings window opens.
+	helpers.it("opens the settings window from the paused row (edd1-paused-writes)", function()
 		with_fixture("config_paused", function(fixture)
 			local observations = { opens = 0 }
 			package.loaded["ui.hotstrings_config_window"] = { open = function() observations.opens = observations.opens + 1 end }
-			helpers.assert_eq(fixture.delay_rows[1].disabled, true)
-			if fixture.delay_rows[1].action then fixture.delay_rows[1].action() end
-			helpers.assert_eq(observations.opens, 0)
-			helpers.assert_eq(fixture.calls.saves, 0)
+			helpers.assert_true(fixture.delay_rows[1].disabled ~= true)
+			fixture.delay_rows[1].action()
+			helpers.assert_eq(observations.opens, 1)
+			helpers.assert_eq(fixture.calls.saves, 0, "opening the window writes no preferences")
 		end)
 	end)
 

@@ -1359,8 +1359,7 @@ function hotstringScopePublication(source, platform, manifest) {
 						'local row = ManifestMenu.check_row("hotstring_scope_checkbox", "hotstring_scope_all_sections", { hotstring_scope_all_sections = function() return false end }, { hotstring_scope_all_on = function() return all_on end })'
 					],
 					['if not row then return nil end'],
-					['row.disabled = ctx.paused or nil'],
-					['row.action = not ctx.paused and set_fn(not all_on) or nil'],
+					['row.action = set_fn(not all_on)'],
 					['return row']
 				]
 			);
@@ -2381,12 +2380,7 @@ function personalSectionChoicePublication(source, platform, manifest) {
 			!luaSame(action.value.args[2].object, actualSection) ||
 			action.value.args[3]?.binding !== label ||
 			!luaSame(action.value.args[4], parameters.admission) ||
-			ready.value.type !== 'binary' ||
-			ready.value.op !== 'and' ||
-			!luaSame(ready.value.left, parameters.group_enabled) ||
-			ready.value.right.type !== 'unary' ||
-			ready.value.right.op !== 'not' ||
-			!luaSame(ready.value.right.value, paused) ||
+			!luaSame(ready.value, parameters.group_enabled) ||
 			!luaCall(row.value, 'ManifestMenu', 'check_row') ||
 			row.value.callee.object.binding !== facade
 		)
@@ -2474,7 +2468,7 @@ function personalSectionChoicePublication(source, platform, manifest) {
 					'local lbl = (type(sec.description) == "string" and sec.description ~= "") and sec.description or tostring(sec.name):gsub("_", " ") lbl = ctx.applyTriggerChar(lbl)',
 					2
 				],
-				['local ready = group_enabled and not paused', 2],
+				['local ready = group_enabled', 2],
 				[
 					'local caption = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl',
 					2

@@ -88,7 +88,7 @@ module.exports = function verifyPersonalSectionOwner(base, manifest) {
 			'personal_section_ready = function() return ready end,',
 			'personal_section_ready = function() return true end,'
 		],
-		['local ready = group_enabled and not paused', 'local ready = true'],
+		['local ready = group_enabled', 'local ready = true'],
 		['if type(row) ~= "table" then return false end', 'if false then return false end'],
 		['if not ready then row.action = nil end', 'if false then row.action = nil end'],
 		[
@@ -292,7 +292,7 @@ module.exports = function verifyPersonalSectionOwner(base, manifest) {
 		assert.equal(admits(), true, 'exact repair restores original completed-port custody');
 		controls++;
 	}
-	const start = '\n\t\t\t\tlocal ready = group_enabled and not paused',
+	const start = '\n\t\t\t\tlocal ready = group_enabled',
 		end = '\n\t\t\t\ttarget[#target + 1] = row';
 	assert.equal(source.split(start).length - 1, 1, 'one real section row start');
 	const at = source.indexOf(start),
@@ -301,7 +301,7 @@ module.exports = function verifyPersonalSectionOwner(base, manifest) {
 	const original = source.slice(0, at) + ORIGINAL_SECTION_ROW + source.slice(last + end.length);
 	assert.equal(
 		createHash('sha256').update(original).digest('hex'),
-		'a5d7a3daafecf89687c5069a632a155832576e334b81347cd36e121bfba23bbd',
+		'9cf37b8b6a1b6fdb2146e67dafe9f06fbcb1734ac58b5817936d7fe8c5835f3f',
 		'independent captured current V2 original producer, not a regenerated oracle'
 	);
 	assert.equal(

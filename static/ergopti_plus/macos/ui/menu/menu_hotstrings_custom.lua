@@ -250,8 +250,8 @@ end
 --- « tout désactiver » pair used to be: two rows and two keys for one control,
 --- whose state the user could only guess. Ticked when all of them are on; a click
 --- switches them all to the other side through `set_fn(enable)`, the scope's
---- batched writer. Greyed and inert while the script is paused, like every
---- hotstring row.
+--- batched writer. It runs while paused: a pause stops typing, not
+--- configuration (EDD-1).
 --- @param ctx table Context.
 --- @param group_names table Array of group names.
 --- @param set_fn function Returns the writer for one target state.
@@ -263,8 +263,7 @@ function M.all_sections_row(ctx, group_names, set_fn)
 		{ hotstring_scope_all_on = function() return all_on end })
 	if not row then return nil end
 	-- Acquire the original native callback only after declaration admission.
-	row.disabled = ctx.paused or nil
-	row.action = not ctx.paused and set_fn(not all_on) or nil
+	row.action = set_fn(not all_on)
 	return row
 end
 
@@ -553,7 +552,7 @@ function M.build_custom(ctx, counts)
 				local lbl = (type(sec.description) == "string" and sec.description ~= "")
 					and sec.description or tostring(sec.name):gsub("_", " ")
 				lbl = ctx.applyTriggerChar(lbl)
-				local ready = group_enabled and not paused
+				local ready = group_enabled
 				local caption = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl
 				-- The original factory only allocates this closure; native effects run on delivery.
 				local action = toggleSectionFn(ctx, group_name, sec.name, lbl, admission)
@@ -621,12 +620,12 @@ function M.build_custom(ctx, counts)
 		[require("settings.engine.keys").COMMAND.HOTSTRING_FILE_OPEN] = function() return open_toml_path(toml_path_for_group(ctx, "personal")) end,
 		[require("settings.engine.keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = close_action,
 	}, {
-		["hotstring_file_ready"] = function() return not paused end,
+		["hotstring_file_ready"] = function() return true end,
 		["personal_open_present"] = function() return true end,
 		["personal_controls_head_boundary"] = function() return true end,
 		["personal_controls_tail_boundary"] = function() return false end,
 		["personal_preferences_present"] = function() return true end,
-		["personal_controls_ready"] = function() return not paused end,
+		["personal_controls_ready"] = function() return true end,
 		[require("settings.engine.keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = function() return state.custom_close_on_add == true end,
 	}, {
 		["personal_editor"] = function() return editor_row and { editor_row } or {} end,

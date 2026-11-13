@@ -103,7 +103,7 @@ helpers.describe("actual native Hotstrings language scope frame", function()
 		end)
 	end)
 
-	helpers.it("scope checkbox keeps its exact native callback and pause posture", function()
+	helpers.it("scope checkbox keeps its exact native callback while paused", function()
 		fixture(function(f)
 			local selections, calls = {}, 0
 			local callback = function() calls = calls + 1; return false end
@@ -113,11 +113,12 @@ helpers.describe("actual native Hotstrings language scope frame", function()
 			helpers.assert_eq(row.action(), false)
 			helpers.assert_eq(calls, 1)
 			helpers.assert_eq(selections, { false })
+			-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
 			f.context.paused = true
 			row = assert(f.custom.all_sections_row(f.context, { "french_magickey" }, selected))
-			helpers.assert_eq(row.disabled, true)
-			helpers.assert_eq(row.action, nil)
-			helpers.assert_eq(selections, { false }, "paused menus acquire no native write callback")
+			helpers.assert_true(row.disabled ~= true)
+			helpers.assert_true(rawequal(row.action, callback), "a paused menu keeps the native write callback")
+			helpers.assert_eq(selections, { false, false })
 		end)
 	end)
 

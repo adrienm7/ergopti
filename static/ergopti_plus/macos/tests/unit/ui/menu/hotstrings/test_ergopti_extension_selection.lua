@@ -152,19 +152,9 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				helpers.assert_type(find(extension.menu, suffix_title .. " (24)"), "table",
 					"all suffixes are visible in the extension's actual category subtree")
 				helpers.assert_true(type(initial.action) == "function")
-				for _, read in ipairs({ function() return nil end, function() return true end,
-					function() error("pause unavailable") end }) do
-					ctx.is_paused = read
-					local called, accepted = pcall(initial.action)
-					helpers.assert_true(called, "pause failures must not escape the menu action")
-					helpers.assert_eq(accepted, false, "unknown or paused state must not change the extension")
-					local bulk = Hotstrings.build_extension_bulk_actions(ctx, {}, Hotstrings.bound_sections(ctx).ergopti)
-					local bulk_called, bulk_accepted = pcall(bulk[1].action)
-					helpers.assert_true(bulk_called)
-					helpers.assert_eq(bulk_accepted, false, "bulk changes must also consult the live pause owner")
-					helpers.assert_eq(saves, 0)
-				end
-				ctx.is_paused = function() return false end
+				-- A pause stops typing, not configuration (EDD-1): the extension's
+				-- rows commit without consulting the pause owner (edd1-paused-writes).
+				ctx.is_paused = function() error("the extension rows do not read the pause") end
 				helpers.assert_true(initial.action())
 				helpers.assert_eq(Registry.is_section_enabled("magickey", "replace"), true)
 				local saved = Preferences.load(prefs_file)
@@ -175,10 +165,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				refuse = true
 				helpers.assert_eq(initial.action(), false)
 				helpers.assert_eq(Registry.is_section_enabled("magickey", "replace"), true, "save refusal rolls back native and cache")
-				local before = saves; ctx.paused = true
-				helpers.assert_eq(initial.action(), false)
-				helpers.assert_eq(saves, before, "a retained paused callback cannot write")
-				ctx.paused, refuse = false, false
+				refuse = false
 				helpers.assert_true(Registry.disable_section("magickey", "replace"))
 				helpers.assert_true(Registry.apply_hotstring_preferences(saved))
 				helpers.assert_eq(Registry.is_section_enabled("magickey", "replace"), true, "canonical boot projection restores replacement")
