@@ -15,6 +15,9 @@ gestures in the terminal): coverage table, verdicts and what no run can test in
       `events_window_topo` holds the rows from the libxcb and RandR reads; unplug the network and bring a WireGuard
       tunnel up then down: `events_network` holds the four Internet and VPN kinds.
 - [ ] <!-- field-point: wayland_focus --> Wayland focus on GNOME and KDE: after `install.sh` (and a new login on GNOME), the excluded-applications rules and the metrics' per-app attribution follow the focused window under GNOME Shell 45+ and Plasma 6 (and 5): the log says « Listening for GNOME Shell/KWin focus reports », a title change in a browser updates the title, and turning the GNOME extension off makes the identity unknown.
+      COSMIC (2026-11-13): the log says « Listening for cosmic-comp focus reports on zcosmic_toplevel_info_v1
+      version 2 » on a current cosmic-comp (1 on an older one) and the focused application follows the window; the
+      v1, v2 and v2-without-list paths are proved only against the LuaJIT protocol fake.
 
 No machine is available. First `bash tools/dev/collect-linux-field-report.sh` on a real desktop: the field run
 without a click (53c1766514), the report marks, and `driver_reload` (one daemon restart under a real user manager).
