@@ -36,9 +36,17 @@ is read only by `tools/lib/kbd-dll/reader.cjs`), so the panel says to open its `
 Decided by the coordinator on 2026-11-11, to review by the maintainer.
 
 - **Website.** `src/routes/editeur/+page.svelte` frames `layout_editor/index.html` served from `static/`.
-- **ErgoptiPlus, macOS and Linux.** The layout manager window (`layout_manager/index.html`) loads the same scripts and
-  mounts the editor when `initData` carries `source_editor: true`. The page posts `source_open` and
-  `{action: "source_save", filename, text}` on `layout_manager_bridge`; the shared bridge
+- **ErgoptiPlus, its own window on the three OS.** The editor has a window of its own,
+  `layout_editor_window/index.html` (manifest id `layout_editor_window`, bridge `layout_editor_window_bridge`), which
+  loads the same scripts and mounts the editor on the host's first `sourceData`. The menu's « Create or edit a
+  layout… » opens it, and so does the layout manager's « Layout editor » button (shown when `initData` carries
+  `source_editor: true`), which posts `open_editor`; a second request brings the open editor to the front and keeps its
+  unsaved work, and the editor's « Close » closes the window. The editor window's controller (the shared
+  `manager_bridge.lua` with `editor_window`, Windows `editor_window.ahk`) answers the page's `ready` with `initData`,
+  then the last saved source, and fetches no catalogue. Decided by the agent on 2026-11-13, to review by the
+  maintainer: one page per window rather than the editor inside the manager window.
+- **ErgoptiPlus, macOS and Linux.** The page posts `source_open` and
+  `{action: "source_save", filename, text}` on `layout_editor_window_bridge`; the shared bridge
   (`_shared/layouts/engine/manager_bridge.lua`) routes them to the registry's `source_open` / `source_save`, which use
   `_shared/layouts/engine/composer/source_store.lua`. The host answers `window.sourceData({text, filename, folder})` and
   `window.sourceResult({ok, code, detail, filename})`. Files go to `layout_sources/` of the configuration folder
@@ -56,7 +64,8 @@ Decided by the coordinator on 2026-11-11, to review by the maintainer.
   admin right, no input source; the layout types over the system one while ErgoptiPlus runs. Failures come back as
   `composerResult {action: "composer_emulate", ok: false, code}` with `emulate_not_saved` or `emulate_failed`.
   macOS binds the port from the menu (`ui/layout_manager` `set_emulation_applier`, it holds the preferences
-  state); Linux binds it in `ui/layout_manager/bridge.lua`. Decided by the coordinator on 2026-11-11, to review by
+  state); Linux binds it in `ui/layout_manager/bridge.lua`, whose factory also builds the editor window's handler
+  (`M.editor`, loaded as `ui.layout_manager.editor_bridge`). Decided by the coordinator on 2026-11-11, to review by
   the maintainer.
   « Fill a layer from a layout » takes the host's `composer_open` sources (its `composerData` is routed to the
   editor too), so on these hosts the page hides « Compose »: the editor does the composer's job. macOS also sets
@@ -71,10 +80,12 @@ Decided by the coordinator on 2026-11-11, to review by the maintainer.
   same save and the remap manager reload) and answers `window.navResult({saved, applied, errors})`. The navigation
   layer editor window keeps working: Windows still needs it. Decided by the coordinator on 2026-11-11, to review by
   the maintainer.
-- **ErgoptiPlus, Windows.** Done on 2026-11-12 as planned in [Windows host](#windows-host): `init.ahk` accepts
-  every action of the page (`source_pick` is refused there, WebView2's own file chooser opens files) and sends
-  `source_editor`, `emulate` and `nav_apply`; the layout editor's strings travel with `sourceData`, since this host
-  does not seed `window._i18n_strings`; `source_store.ahk` keeps the files; `composer.ahk` takes the source form of
+- **ErgoptiPlus, Windows.** Done on 2026-11-12 as planned in [Windows host](#windows-host), in its own window since
+  2026-11-13: `editor_window.ahk` hosts the page through `WebViewHost` and accepts its actions, which
+  `LayoutManager_HandleEditorAction` (`init.ahk`) answers (`source_pick` is refused there, WebView2's own file
+  chooser opens files); its `initData` sends `source_editor`, `emulate` and `nav_apply`; the layout editor's strings
+  travel with `sourceData`, since this host does not seed `window._i18n_strings`; an install or an emulation from the
+  editor refreshes an open layout manager; `source_store.ahk` keeps the files; `composer.ahk` takes the source form of
   `composer_save` and `composer_emulate`; `kbd_register.ahk` is the elevated helper (`kbd_register_core.ahk` holds
   its steps behind ports; the compiled driver runs them with `--kbd-register`); `keylayout_emulation.ahk` reads the
   composer copy and performs the emulation table through `source_emulation.ahk`. Left: retire the composer section

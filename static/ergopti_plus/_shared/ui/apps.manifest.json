@@ -140,6 +140,14 @@
 			"min_height": 620,
 			"vhost": "ergopti.layereditor"
 		},
+		"layout_editor_window": {
+			"title_key": "layout_editor.title",
+			"width": 1180,
+			"height": 820,
+			"min_width": 900,
+			"min_height": 620,
+			"vhost": "ergopti.layouteditor"
+		},
 		"layout_manager": {
 			"title_key": "layout_manager.window_title",
 			"width": 720,

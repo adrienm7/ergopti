@@ -136,7 +136,7 @@ test('without the table, the decoder refuses instead of guessing', () => {
 	);
 });
 
-test('the host pages list the decoder, the layout manager also the table', () => {
+test('the host pages list the decoder, the editor window also the table', () => {
 	const scripts = (page) =>
 		[...fs.readFileSync(path.join(UI, page), 'utf8').matchAll(/<script src="([^"]+)"/g)].map(
 			(m) => path.basename(path.dirname(m[1])) + '/' + path.basename(m[1])
@@ -149,9 +149,10 @@ test('the host pages list the decoder, the layout manager also the table', () =>
 		!site.some((s) => s.startsWith('_generated/unicode_names')),
 		'the site loads the table lazily'
 	);
-	const manager = scripts('layout_manager/index.html');
-	const table = manager.indexOf('_generated/unicode_names.js');
-	const decoder = manager.indexOf('layout_editor/unicode_names.js');
+	// The inline hosts open the editor in its own window (layout_editor_window).
+	const window = scripts('layout_editor_window/index.html');
+	const table = window.findIndex((s) => s.endsWith('_generated/unicode_names.js'));
+	const decoder = window.findIndex((s) => s.endsWith('layout_editor/unicode_names.js'));
 	assert.ok(table >= 0 && decoder > table, 'the inline host lists the table before its decoder');
 });
 

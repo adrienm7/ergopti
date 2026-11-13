@@ -11,7 +11,9 @@
  * bundle, removed from the registry), the buttons each status offers, the
  * catalogue line with its error, the result line, the busy state, and that
  * the page only ever posts the allowlisted actions. Every string it shows
- * must exist in every locale.
+ * must exist in every locale. The layout editor's own window
+ * (_shared/ui/layout_editor_window) is driven the same way: its host actions,
+ * its strings and the install payload it forwards.
  * ==============================================================================
  */
 
@@ -27,6 +29,9 @@ const PAGE = path.join(SHARED, 'ui/layout_manager');
 const source = fs.readFileSync(path.join(PAGE, 'script.js'), 'utf8');
 const html = fs.readFileSync(path.join(PAGE, 'index.html'), 'utf8');
 const hostBridge = fs.readFileSync(path.join(SHARED, 'ui/host_bridge.js'), 'utf8');
+const EDITOR_PAGE = path.join(SHARED, 'ui/layout_editor_window');
+const editorSource = fs.readFileSync(path.join(EDITOR_PAGE, 'script.js'), 'utf8');
+const editorHtml = fs.readFileSync(path.join(EDITOR_PAGE, 'index.html'), 'utf8');
 const LOCALE_DIR = path.join(SHARED, 'core/i18n/data/locales');
 const LOCALES = [
 	'ar',
@@ -70,10 +75,12 @@ function locale(code) {
 // ==============================
 
 /**
- * Builds a fresh page with every id declared in index.html.
+ * Builds a fresh page with every id declared in its index.html.
+ * @param {{html: string, source: string, bridge: string}} [page] - The layout
+ *   manager page by default.
  * @returns {{context: object, byId: Map, messages: Array}}
  */
-function loadPage() {
+function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 	const byId = new Map();
 	const i18nElements = [];
 	const messages = [];
@@ -127,10 +134,10 @@ function loadPage() {
 		return el;
 	}
 
-	for (const match of html.matchAll(/<(\w+)[^>]*?\bid="([^"]+)"[^>]*>/g)) {
+	for (const match of page.html.matchAll(/<(\w+)[^>]*?\bid="([^"]+)"[^>]*>/g)) {
 		byId.set(match[2], makeElement(match[1]));
 	}
-	for (const match of html.matchAll(/<(\w+)[^>]*?data-i18n="([^"]+)"[^>]*>/gs)) {
+	for (const match of page.html.matchAll(/<(\w+)[^>]*?data-i18n="([^"]+)"[^>]*>/gs)) {
 		const id = /\bid="([^"]+)"/.exec(match[0]);
 		const el = id ? byId.get(id[1]) : makeElement(match[1]);
 		el.attributes['data-i18n'] = match[2];
@@ -149,7 +156,7 @@ function loadPage() {
 	const window = {
 		webkit: {
 			messageHandlers: {
-				layout_manager_bridge: { postMessage: (payload) => messages.push(payload) }
+				[page.bridge]: { postMessage: (payload) => messages.push(payload) }
 			}
 		}
 	};
@@ -162,8 +169,17 @@ function loadPage() {
 		atob: (text) => Buffer.from(text, 'base64').toString('binary')
 	});
 	vm.runInContext(hostBridge, context, { filename: 'host_bridge.js' });
-	vm.runInContext(source, context, { filename: 'script.js' });
+	vm.runInContext(page.source, context, { filename: 'script.js' });
 	return { context, byId, messages, window };
+}
+
+/** The layout editor's own window, as the hosts open it. */
+function loadEditorPage() {
+	return loadPage({
+		html: editorHtml,
+		source: editorSource,
+		bridge: 'layout_editor_window_bridge'
+	});
 }
 
 /** A copy of a value made in the page realm, comparable with plain objects. */
@@ -722,38 +738,111 @@ check(
 	}
 );
 
-check('the three hosts accept exactly the actions the page sends', () => {
-	const { context } = loadPage();
+check('the three hosts accept exactly the actions each page sends', () => {
+	const manager = [...vm.runInContext('LAYOUT_MANAGER_ACTIONS', loadPage().context)].sort();
 	// A top-level const is not a property of the context: evaluate it there.
-	const page = [...vm.runInContext('LAYOUT_MANAGER_ACTIONS', context)].sort();
-	assert.ok(page.length >= 8, `the page declares only ${page.length} actions`);
+	const editor = [
+		...vm.runInContext('LAYOUT_EDITOR_WINDOW_ACTIONS', loadEditorPage().context)
+	].sort();
+	assert.ok(manager.length >= 8, `the manager page declares only ${manager.length} actions`);
+	assert.ok(editor.length >= 8, `the editor window declares only ${editor.length} actions`);
+	// macOS and Linux serve both windows with the one shared controller.
 	const lua = fs.readFileSync(path.join(SHARED, 'layouts/engine/manager_bridge.lua'), 'utf8');
 	const luaBlock = /M\.ACTIONS = \{([\s\S]*?)\n\}/.exec(lua);
 	assert.ok(luaBlock, 'manager_bridge.lua declares no M.ACTIONS');
 	const luaActions = [...luaBlock[1].matchAll(/^\t([a-z_]+) = true,$/gm)].map((m) => m[1]).sort();
-	assert.deepEqual(luaActions, page, 'the macOS and Linux hosts accept another list');
-	const ahk = fs.readFileSync(
-		path.resolve(SHARED, '../windows/ui/layout_manager/init.ahk'),
-		'utf8'
-	);
-	const ahkBlock = /global LAYMGR_ACTIONS := Map\(([\s\S]*?)\)\n/.exec(ahk);
-	assert.ok(ahkBlock, 'the Windows host declares no LAYMGR_ACTIONS');
-	const ahkActions = [...ahkBlock[1].matchAll(/"([a-z_]+)", true/g)].map((m) => m[1]).sort();
-	// The Windows host offers the layout editor too (docs/design/layout-editor.md
-	// « Windows host »): no action of the page is pending there any more.
-	const windowsPending = [];
 	assert.deepEqual(
-		ahkActions,
-		page.filter((action) => !windowsPending.includes(action)),
-		'the Windows host accepts another list'
+		luaActions,
+		[...new Set([...manager, ...editor])].sort(),
+		'the macOS and Linux hosts accept another list'
+	);
+	const windows = (file, name) => {
+		const ahk = fs.readFileSync(path.resolve(SHARED, '../windows/ui/layout_manager', file), 'utf8');
+		const block = new RegExp(`global ${name} := Map\\(([\\s\\S]*?)\\)\\n`).exec(ahk);
+		assert.ok(block, `the Windows host declares no ${name}`);
+		return [...block[1].matchAll(/"([a-z_]+)", true/g)].map((m) => m[1]).sort();
+	};
+	assert.deepEqual(
+		windows('init.ahk', 'LAYMGR_ACTIONS'),
+		manager,
+		'the Windows layout manager accepts another list'
+	);
+	assert.deepEqual(
+		windows('editor_window.ahk', 'LAYOUT_EDITOR_WINDOW_ACTIONS'),
+		editor,
+		'the Windows layout editor window accepts another list'
 	);
 });
 
-check('« Install and use » forwards the Windows layout DLL images the page wrote', () => {
-	const { context, window, messages } = loadPage();
+check('the manager opens the layout editor in its own window', () => {
+	const { window, byId, messages } = loadPage();
 	window.initData({
 		strings,
-		state: { platform: 'windows', shortcut_menu_path: SHORTCUT_MENU.windows, index, installed: {} },
+		state: { platform: 'linux', shortcut_menu_path: SHORTCUT_MENU.linux, index, installed: {} },
+		source_editor: true
+	});
+	assert.equal(byId.get('btn-editor').hidden, false);
+	assert.equal(byId.get('btn-compose').hidden, true, 'the editor replaces the composer');
+	assert.ok(!byId.has('layout-editor'), 'the manager page no longer carries the editor');
+	byId.get('btn-editor').click();
+	assert.equal(plain(messages[messages.length - 1]).action, 'open_editor');
+	assert.ok(!/layout_editor\/editor_page\.js/.test(html), 'the manager loads no editor script');
+});
+
+check('the editor window declares its strings for the hosts, present in every locale', () => {
+	const keys = [...editorHtml.matchAll(/data-i18n="([^"]+)"/g)].map((m) => m[1]).sort();
+	const declared = JSON.parse(fs.readFileSync(path.join(EDITOR_PAGE, 'strings.json'), 'utf8')).keys;
+	assert.deepEqual(
+		[...declared].sort(),
+		keys,
+		'strings.json must list exactly the keys the page shows'
+	);
+	for (const code of LOCALES) {
+		const table = locale(code);
+		assert.deepEqual(
+			keys.filter((key) => typeof table[key] !== 'string' || table[key] === ''),
+			[],
+			`${code}.json lacks layout editor window strings`
+		);
+	}
+});
+
+check(
+	'the editor window mounts the editor on sourceData and closes its window on « Close »',
+	() => {
+		const { context, window, messages } = loadEditorPage();
+		window.initData({ strings: {}, state: { platform: 'linux' }, nav_apply: true, emulate: true });
+		let host = null;
+		context.LayoutEditorPage = {
+			mount: (root, options) => {
+				host = options;
+				return { open: () => {} };
+			}
+		};
+		window.sourceData({ text: 'a = 1', filename: 'mine.toml' });
+		assert.ok(host, 'the editor is mounted on sourceData');
+		assert.equal(host.platform, 'linux');
+		assert.equal(host.initial, 'a = 1');
+		assert.equal(typeof host.applyNav, 'function');
+		assert.equal(typeof host.emulate, 'function');
+		assert.equal(host.pickFile, null, 'no native picker without source_pick');
+		host.onClose();
+		assert.equal(plain(messages[messages.length - 1]).action, 'close');
+		host.saveFile('mine.toml', 'b = 2');
+		assert.deepEqual(plain(messages[messages.length - 1]), {
+			action: 'source_save',
+			filename: 'mine.toml',
+			text: 'b = 2'
+		});
+		window.sourceResult({ ok: true });
+	}
+);
+
+check('« Install and use » forwards the Windows layout DLL images the page wrote', () => {
+	const { context, window, messages } = loadEditorPage();
+	window.initData({
+		strings: {},
+		state: { platform: 'windows' },
 		source_editor: true
 	});
 	let host = null;
