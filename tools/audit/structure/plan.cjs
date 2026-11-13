@@ -416,7 +416,9 @@ function resolvePathToken(raw, file, inTree, byRepoPath, sharedArgument = false,
 		// shared Lua root, which S00 turns into _shared itself. Only a Lua file
 		// is read that way: "<config>/hotstrings/x" in a redaction corpus is a
 		// user path, not the shared hotstrings folder.
-		if (!lead && !fileRelative && /\.lua$/.test(rest))
+		// A climb (\..\..\_shared\lua\x.lua) starts from a base this reading
+		// does not know; the embedded tree it names says where it lands.
+		if (!lead && !fileRelative && /\.lua$/.test(rest) && !/(^|\/)\.\.(\/|$)/.test(rest))
 			candidates.push({
 				form: 'shared',
 				lead,
@@ -1439,7 +1441,13 @@ function scanFile(file, text, ctx) {
 		// A token with regular-expression escapes (static\/x\.json) is the
 		// regex-path rules' to respell, escapes kept; a plain path or folder
 		// rule would write it back unescaped.
-		if (['path', 'dir', 'dir-successor', 'dir-kept'].includes(kind) && /\\[/.]/.test(oldToken))
+		// A Windows source (AutoHotkey, PowerShell) separates with backslashes:
+		// \..\..\_shared climbs, it escapes nothing.
+		if (
+			['path', 'dir', 'dir-successor', 'dir-kept'].includes(kind) &&
+			!/\.(ahk|ps1|psm1|bat|cmd)$/.test(file) &&
+			/\\\/|\\\.[A-Za-z0-9_]/.test(oldToken)
+		)
 			return;
 		seen.add(key);
 		rows.push({ file, category, kind, old: oldToken, new: newToken, resolution });

@@ -881,6 +881,21 @@ function run() {
 		const coordinates = (t) => t.split('\n').filter((l) => /@[A-Za-z]?:?[/.\\]/.test(l));
 		assert.deepEqual(coordinates(out), coordinates(text), `${e.file}: ${e.why}`);
 	}
+	// \..\..\_shared\lua\x.lua in an AutoHotkey script climbs to the tree it
+	// names: its backslashes separate, they escape nothing. Read as escaped,
+	// the path stayed; read against the shared Lua root, it lost its climb.
+	const climbed = '_shared/lua/keystats/aggregator_helpers.lua';
+	if (fs.existsSync(path.join(repo, P, climbed)) && full.get(climbed) !== climbed) {
+		const ahk = 'static/ergopti_plus/windows/tests/unit/z.ahk';
+		const line =
+			'\tPath := A_ScriptDir . "\\..\\..\\_shared\\lua\\keystats\\aggregator_helpers.lua"\n';
+		const out = Apply.rewriteText(line, Plan.scanFile(ahk, line, fullCtx), moved, ahk);
+		assert.equal(
+			out,
+			`\tPath := A_ScriptDir . "\\..\\..\\${full.get(climbed).replace(/\//g, '\\')}"\n`,
+			'an AutoHotkey climb keeps its climb and follows the file'
+		);
+	}
 	// Third-party code keeps its own paths; our scripts in a vendor folder move.
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/_shared/ui/vendor/fengari-web.js'));
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/windows/vendor/WebView2.ahk'));
