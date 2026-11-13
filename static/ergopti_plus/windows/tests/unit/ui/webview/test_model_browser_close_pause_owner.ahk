@@ -193,24 +193,40 @@ _MBPT_ChildSource(Directory) {
 	return Code . "#Include " . Fixture . "`n"
 }
 
+; Exclusive native creation needs each parent before its children. The folders
+; come from the staged files themselves, so they follow wherever the data lives.
+_MBPT_CreateParents(Base, Relatives) {
+	Made := Map()
+	for Relative in Relatives {
+		Parts := StrSplit(Relative, "\"), Folder := Base
+		Loop Parts.Length - 1 {
+			Folder .= "\" . Parts[A_Index]
+			if !Made.Has(Folder) {
+				FSCreateDirectoryExclusiveStrict(Folder)
+				Made[Folder] := true
+			}
+		}
+	}
+}
+
 ; Keep even error-reporting locale-cache writes inside this exact private root.
 ; These are byte-verified copies of the shipped data, never synthetic defaults.
 _MBPT_StageAssets(Directory) {
 	global _SharedDir
-	for Relative in ["shared", "shared\modules", "shared\modules\llm", "shared\modules\hotstrings", "shared\modules\menu",
-		"shared\modules\diagnostics", "shared\data", "shared\data\locales", "shared\data\keycodes", "shared\core",
-		"shared\core\config_schema", "shared\core\config_schema\examples", "local-app-data"]
-		FSCreateDirectoryExclusiveStrict(Directory . "\" . Relative)
+	FSCreateDirectoryExclusiveStrict(Directory . "\shared")
+	FSCreateDirectoryExclusiveStrict(Directory . "\local-app-data")
 	; Stage the complete shipped schema pack for the genuine boot owner, plus
 	; canonical presentation/privacy policies for diagnostics. The component
 	; does not claim every reserved policy is read on its successful cold path.
-	for Relative in ["modules\llm\defaults.json", "modules\llm\models.json", "modules\hotstrings\_index.toml", "data\locales\fr.json", "data\locales\en.json",
+	Assets := ["modules\llm\defaults.json", "modules\llm\models.json", "modules\hotstrings\_index.toml", "data\locales\fr.json", "data\locales\en.json",
 		"modules\llm\backends.json", "modules\menu\menu_manifest.json", "modules\diagnostics\redaction.json", "data\keycodes\physical_keys.json",
 		"core\config_schema\migrations.toml", "core\config_schema\config.schema.json",
 		"core\config_schema\tap_hold.schema.json", "core\config_schema\SCHEMA.md",
 		"core\config_schema\examples\hs_tap_hold.example.toml", "core\config_schema\examples\personal_info.example.toml",
 		"core\config_schema\examples\hs_config.example.toml", "core\config_schema\examples\ahk_config.example.toml",
-		"core\config_schema\examples\hotstrings_config.example.toml", "core\config_schema\examples\ahk_tap_hold.example.toml"] {
+		"core\config_schema\examples\hotstrings_config.example.toml", "core\config_schema\examples\ahk_tap_hold.example.toml"]
+	_MBPT_CreateParents(Directory . "\shared", Assets)
+	for Relative in Assets {
 		Source := _SharedDir . "\" . Relative, Target := Directory . "\shared\" . Relative
 		Before := FSReadBytesStrict(Source), Expected := CryptoSha256Bytes(Before)
 		AssertTrue(Expected != "" && !FileExist(Target), "Only an exclusive private target may receive authentic data")
