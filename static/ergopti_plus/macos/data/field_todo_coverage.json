@@ -782,6 +782,12 @@
 			"title": "Configuration paths in NFD and NFC",
 			"checks": [],
 			"not_testable": "Needs APFS and a person: the configuration folder is created once composed (NFC) and once decomposed (NFD) by Finder, which no field run step does; the Lua path readers are unit-tested on Linux only."
+		},
+		{
+			"id": "native_ui_receiving",
+			"title": "Runtime, editor and diagnostics receiving boundaries",
+			"checks": [],
+			"not_testable": "Needs a person on the Mac to provoke each boundary in the real windows (a refused write, a stale epoch, a window closed during a save); the private models are unit-tested, the native receivers are not."
 		}
 	]
 }

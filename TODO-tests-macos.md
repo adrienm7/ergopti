@@ -128,4 +128,9 @@ Hands needed:
       2026-11-13 by worker F): put `config.toml` and a personal hotstring file in a folder named `Données` once typed
       composed (NFC) and once created by Finder (decomposed, NFD), point `paths.toml` at it: the driver reads, saves and
       reloads both, the menu names the folder as typed, and no « file not found » or duplicate backup appears.
+- [ ] <!-- field-point: native_ui_receiving --> Runtime, editor and diagnostics receiving ([native UI audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md),
+      moved here 2026-11-13 by worker F): in the layout editor, the navigation layer editor and the diagnostics page,
+      make a save fail (read-only `config.toml`), reload the driver while a window is open, and close a window during a
+      save: each refusal is told once, nothing is half written, no timer or window outlives its owner (log lines name
+      the cleanup).
 - [ ] <!-- field-point: input_policies --> Branch `wave3/input-policies` (2026-11-06): CapsWord closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778) (`test_watchers_capsword_auto_off` « a second CapsWord action ends it at once and unlocks CapsLock », `test_karabiner_actions_reachable`, `test_menu_caps_word` « ★ » after the rename). Native one-shot Shift (modifier-map, dead-key and IME handling of the captured key) and CapsWord key/control payload receiving stay hands (moved from the one-shot and CapsWord parity follow-ups).
